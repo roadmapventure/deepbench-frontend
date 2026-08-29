@@ -5,6 +5,75 @@
 
 ---
 
+## session/cycle-20260829-1840 (v7.0.322, 2026-08-29, runner cycle `cfbfe1be-2462-4187-b548-84d451c98a54`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-243` — the auto-done bar learns Prime Directive §2f
+
+**Selection ran the Prime Directive's §2, not the P1–P10 board.** §2(a)'s mission directive
+`6acd590e` had no work left — `SES-220` reached `done` at 17:21Z and `SES-191` `delivered` at
+17:59Z with its re-drill result recorded honestly (99.996%, two rows missed and **named**). §2(b)'s
+M3 drain returned `blocked`: both named members are waiting on John (`SES-182` on his hold,
+`SES-191` on his Accept). §2(c) then had two buildable M3 members — `SES-242` and `SES-243` — and
+`SES-243` is the newest filed and the higher-leverage one, because it removes a standing John-tap
+tax from **every** remaining non-P10 Selfbuild ship rather than from one runbook.
+
+**THE DEFECT, revalidated live rather than taken from the ticket.** `scripts/verifier.js` decided
+`auto_done_eligible` from `docs/SELFBUILD-CHARTER.md` decision 2 — the Selfbuild family's
+`P10 - Tooling` deliveries — and contained no reference to the Prime Directive at all. §2f of
+directive `a0ef9525` (John, 2026-08-29 ~16:0xZ, verbatim *"run it"*) had widened that to **"ANY
+Selfbuild-epic ship the verifier lane passes GREEN"**, with no class restriction. `SES-241` is the
+row that proved it: `Selfbuild M3`, `P9 - Bug Fixes`, verdict `approve`, all three gates green —
+and it landed `delivered`, costing John a tap he had already said should not be needed.
+
+**THE DESIGN CHOICE THE TICKET LEFT TO THIS CYCLE, and it is the thing to read twice: the widening
+is a LOOKUP, never a constant.** §2f's own closing sentence is *"at Selfbuild completion or
+revocation, §2f lapses and SES-154 resumes in full"* — so a hardcoded boolean would have to be
+un-set by hand and would outlive the word that authorised it, which is the exact class of rule this
+platform has watched go silently unfollowed eight times over. The flag is read live from the
+`runner_directives` row, exactly as epic and priority class are already read off the board rather
+than taken from argv. When John revokes the directive, the row leaves `queued`, the lookup goes
+false, and the class restriction resumes with no edit to any file.
+
+**KEYED ON THE BODY PREFIX RATHER THAN THE UUID, with the trade stated in both directions.** A uuid
+key cannot false-positive, but John has already re-declared this directive once (`071fc16a` →
+`a0ef9525`), and under a uuid key a re-declaration would silently lapse the widening he had just
+restated. The prefix tracks re-declarations; its false-positive risk is paid for by **anchoring the
+match at the start of the body**, because rows that merely *discuss* the directive — `SES-243`'s own
+ticket text among them — quote it mid-body. **HONEST BOUND, measured rather than claimed: on today's
+ledger the anchored and unanchored forms return the same single row, so the anchor guards a future
+false positive and did not catch a live one.** Said plainly instead of presented as a catch.
+
+**THE DEFAULT IS THE SAFETY, and it is why `SES-181`'s guard still passes byte-unchanged.**
+`undefined`, absent, `null`, `false` and a failed lookup are **one answer** — *not proven live* — and
+all keep the narrow rule. Unknown costs John one tap; the other direction costs him a `done` he
+never authorised. `SES-181-verifier.js`'s `ELIGIBLE` fixture carries no such key, so that file now
+doubles as the "directive absent → charter rule" control without a line changing in it.
+
+**THE EDIT THIS SHIP FORBIDS:** `const widened = primeDirectiveActive;`. That truthy form widens the
+bar on the **string** `"false"` — what a mis-parsed REST payload produces — and the guard applies it
+to the same fixture and asserts it **loses** on `"false"`, `"0"`, `{}` and `[]`, so the test proves a
+difference from the rejected design rather than a property both share.
+
+**NOT BUILT, AND NAMED RATHER THAN LEFT TO BE FOUND:** §2f's *other* half — a ship the verifier
+structurally cannot grade auto-doning on recorded evidence plus green CI. That path must not live in
+this file: it would have the verifier bless precisely the edits charter premise 3 bars it from
+grading, laundering `SELF_CERTIFYING_PATHS`. Carried as this ticket's declared remainder.
+
+**QA.** Build green. Full suite **115/115** after step 7a's render. New guard
+`tests/regression/SES-243-prime-directive-autodone.js`, 9 clauses, each with its own control.
+**File-level behavioural negative control:** `origin/dev`'s eligibility logic with only the missing
+export stubbed in fails `thePrimeDirectiveWidensTheClass` on the same fixture; tree restored
+byte-identical (`sha256 ca4bab1f…` both ways). **Seam proof** (labeled): the repo's own module plus
+the real Supabase REST — `SES-241`'s exact live shape flips `false` → `true` against the live
+`a0ef9525` row, one variable. **The one suite red was not this change:**
+`SES-177-claude-state-renderer.js` failed `drift` *before* the render — `SES-213`'s documented
+by-construction failure whenever a predecessor has shipped — and running
+`scripts/render-claude-state.js` first, as step 7a directs, changed 3 lines and cleared it.
+
+**Ships `delivered`, by construction and by the ticket's own prediction:** the diff touches
+`scripts/verifier.js`, which is in that script's own `SELF_CERTIFYING_PATHS`, so the auto-done bar is
+unavailable to it. Doc + script + test; no `src`/`api`/`lib` change, no site change, no schema change.
+
+---
+
 ## session/cycle-20260829-1741 (v7.0.321, 2026-08-29, runner cycle `3fa83582-7950-4bbd-8384-0f4bc60c955c`, `trigger = chained (drain continuation)` of `6a84c2dd`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-241` — a restore's real errors stop hiding behind 114 expected ones
 
 **Chained in-session from this session's own `SES-50` ship** under Prime Directive §2e:

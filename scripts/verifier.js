@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// DeepBench v7.0.322 | scripts/verifier.js | SES-243 -- the auto-done bar learns Prime Directive
+// §2f, and the thing to read twice is WHY THE WIDENING IS A LOOKUP AND NOT A CONSTANT: §2f's own
+// closing sentence is "at Selfbuild completion or revocation, §2f lapses", so a hardcoded boolean
+// would have to be un-set by hand and would outlive the word that authorised it. It is read live
+// from the directive row, anchored at the START of the body so rows that merely DISCUSS the
+// directive (SES-243's own ticket text among them) cannot switch it on. THE DEFAULT IS THE SAFETY:
+// absent, undefined, a failed lookup and a genuinely revoked directive are ONE answer -- not proven
+// live -- and all keep charter decision 2's narrow P10 - Tooling rule, because unknown costs John
+// one tap while the other direction costs him a `done` he never authorised. The EPIC restriction and
+// the self-certification refusal are untouched; §2f's evidence-path half is deliberately NOT here
+// (see the header note). Guarded by tests/regression/SES-243-prime-directive-autodone.js.
+//
 // DeepBench v7.0.299 | scripts/verifier.js | SES-213 -- summarizeGateOutput(): the verdict ledger
 // now records WHAT a gate blocked on. The retired `res.stderr || res.stdout` preferred stderr
 // WHOLESALE, so all 26 block rows stored an unrelated GATE_BYPASS_SECRET warning and never the
@@ -48,6 +60,21 @@
 // self-certifying its scope, so epic and priority class are read live from public.backlog_items via
 // the ticket id. No ticket, or a ticket the board does not carry, is NOT eligible -- fail closed,
 // with the reason named rather than a silent false.
+//
+// AND THE CLASS HALF OF THAT SCOPE IS SUSPENDED WHILE THE PRIME DIRECTIVE STANDS (SES-243). §2f of
+// directive a0ef9525 widened auto-done to "ANY Selfbuild-epic ship the verifier lane passes GREEN",
+// and this script did not know it -- so every non-P10 Selfbuild ship landed `delivered` and cost
+// John a tap he had already said should not be needed. The widening is read LIVE from the directive
+// row (see PRIME_DIRECTIVE_BODY_PREFIX) so it lapses on its own terms; the EPIC restriction and the
+// self-certification refusal below are untouched by it.
+//
+// WHAT §2f's OTHER HALF IS AND WHY IT IS NOT HERE, named rather than left to be found. §2f also says
+// that where the verifier "structurally cannot grade" a ship -- a diff living in
+// deepbench-backups-offsite, or a self-certifying-path edit -- the ship auto-dones on its recorded
+// evidence plus a green CI run. That path deliberately does NOT belong in this file: implementing it
+// here would have the verifier bless precisely the edits charter premise 3 bars it from grading, and
+// SELF_CERTIFYING_PATHS is the invariant that would be laundered. It is a cycle-side judgement about
+// evidence, not a verdict, and it stays outside this script.
 //
 // AND IT REFUSES TO GRADE ITSELF, IN CODE RATHER THAN BY CONVENTION. Charter premise 3: "no change
 // certifies itself; a fresh-context verifier must pass it." A delivery whose diff touches this file
@@ -109,6 +136,28 @@ export const GATES = Object.freeze([
 
 export const AUTO_DONE_EPIC_PREFIX = "Selfbuild";
 export const AUTO_DONE_CLASS_PREFIX = "P10";
+
+// THE PRIME DIRECTIVE'S §2f WIDENING, AND WHY IT IS A LOOKUP RATHER THAN A CONSTANT (SES-243).
+// Charter decision 2 scopes auto-done to the Selfbuild family's `P10 - Tooling` deliveries. Prime
+// Directive a0ef9525 §2f (John, 2026-08-29 ~16:0xZ, verbatim "run it") widens that FOR THAT
+// DIRECTIVE'S DURATION to "ANY Selfbuild-epic ship the verifier lane passes GREEN" -- no class
+// restriction. Its own closing sentence is the reason this may not be hardcoded: "At Selfbuild
+// completion or revocation, §2f lapses and SES-154 resumes in full."
+//
+// So the widening is keyed on the DIRECTIVE ROW BEING LIVE, exactly as epic and priority class are
+// already read off the board rather than taken from argv (see the header). When John revokes the
+// directive -- or Selfbuild completes and it closes -- the row leaves `queued`, this lookup goes
+// false, and the class restriction resumes with no edit to this file and nothing for a cycle to
+// remember. A boolean constant here would have to be un-set by hand, which is the exact class of
+// rule this platform has watched go silently unfollowed eight times over.
+//
+// KEYED ON THE BODY PREFIX, NOT THE UUID, and that choice cuts both ways so it is stated rather than
+// implied. A uuid key cannot false-positive, but John has already re-declared this directive once
+// (071fc16a -> a0ef9525), and a re-declaration under a new uuid would silently lapse the widening he
+// had just restated. The body prefix tracks the re-declaration. The cost is a false-positive risk,
+// which is why the match is ANCHORED AT THE START of the body: rows that merely DISCUSS the Prime
+// Directive -- SES-243's own ticket text among them -- quote it mid-body and never open with it.
+export const PRIME_DIRECTIVE_BODY_PREFIX = "THE SELFBUILD PRIME DIRECTIVE";
 
 // The files that ARE the verification. A delivery whose diff touches one of these is graded by the
 // code it just changed, so it may not take the auto-done bar -- charter premise 3, "no change
@@ -229,9 +278,20 @@ export function selfCertificationBlock(changedFiles) {
   return { blocked: false, reason: "" };
 }
 
-// Charter decision 2's scope test. Returns { eligible, reason } -- the reason is stored either way,
-// because "not eligible" with no reason is indistinguishable from "nobody checked".
-export function autoDoneEligibility({ verdict, epicName, priorityClass, changedFiles }) {
+// Charter decision 2's scope test, as widened for the Prime Directive's duration by §2f. Returns
+// { eligible, reason } -- the reason is stored either way, because "not eligible" with no reason is
+// indistinguishable from "nobody checked".
+//
+//   primeDirectiveActive  TRUE only when the directive row was READ AND FOUND LIVE. Absent,
+//                         undefined and false are all one answer -- "not proven live" -- and they
+//                         all keep charter decision 2's narrow P10 rule. That default is the whole
+//                         safety of this widening: a lookup that failed, a caller that never passed
+//                         the flag, and a genuinely revoked directive must not be distinguishable
+//                         from each other in the permissive direction, because the failure they
+//                         would share is the runner widening its own autonomy on an absence of
+//                         evidence. Unknown costs John one tap; the other direction costs him a
+//                         `done` he never authorised.
+export function autoDoneEligibility({ verdict, epicName, priorityClass, changedFiles, primeDirectiveActive }) {
   if (verdict !== "approve") {
     return { eligible: false, reason: `verdict is ${verdict}; the interim auto-done bar requires approve (all three gates green).` };
   }
@@ -241,8 +301,12 @@ export function autoDoneEligibility({ verdict, epicName, priorityClass, changedF
   if (!String(epicName).startsWith(AUTO_DONE_EPIC_PREFIX)) {
     return { eligible: false, reason: `epic '${epicName}' is outside the ${AUTO_DONE_EPIC_PREFIX} family; charter decision 2 supersedes SES-154's John-only-writer rule for that family and nothing else.` };
   }
-  if (!String(priorityClass ?? "").startsWith(AUTO_DONE_CLASS_PREFIX)) {
-    return { eligible: false, reason: `priority class '${priorityClass ?? "(none)"}' is not ${AUTO_DONE_CLASS_PREFIX} - Tooling; charter decision 2 approves auto-accept for tooling deliveries only.` };
+  // THE CLASS RESTRICTION IS CHARTER DECISION 2'S, AND §2f SUSPENDS IT -- it does not delete it.
+  // The epic test above still stands on both paths (§2f widens the CLASS, never the family), and so
+  // does the self-certification refusal below.
+  const widened = primeDirectiveActive === true;
+  if (!widened && !String(priorityClass ?? "").startsWith(AUTO_DONE_CLASS_PREFIX)) {
+    return { eligible: false, reason: `priority class '${priorityClass ?? "(none)"}' is not ${AUTO_DONE_CLASS_PREFIX} - Tooling; charter decision 2 approves auto-accept for tooling deliveries only, and the Prime Directive's §2f widening is not proven live (a revoked, completed or unreadable directive all fail closed here).` };
   }
   // Checked LAST so that a ticket which otherwise qualifies gets the specific reason -- "you are
   // grading yourself" -- rather than a scope message that would send the next reader looking in the
@@ -250,9 +314,14 @@ export function autoDoneEligibility({ verdict, epicName, priorityClass, changedF
   const self = selfCertificationBlock(changedFiles);
   if (self.blocked) return { eligible: false, reason: self.reason };
 
+  // The reason NAMES WHICH RULE GRANTED THE BAR, because the two are not the same authority and the
+  // ledger is where that distinction has to survive: decision 2 is standing charter, §2f is a
+  // directive John can revoke tonight.
   return {
     eligible: true,
-    reason: `all three gates green on a ${AUTO_DONE_EPIC_PREFIX} ${AUTO_DONE_CLASS_PREFIX} - Tooling delivery, and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- the interim bar of charter decision 2 is met. Reverse stays one tap away.`,
+    reason: widened
+      ? `all three gates green on a ${AUTO_DONE_EPIC_PREFIX}-epic delivery in class '${priorityClass ?? "(none)"}', and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- the Prime Directive's §2f widening is live, so the ${AUTO_DONE_CLASS_PREFIX} - Tooling restriction of charter decision 2 is suspended for its duration. Reverse stays one tap away.`
+      : `all three gates green on a ${AUTO_DONE_EPIC_PREFIX} ${AUTO_DONE_CLASS_PREFIX} - Tooling delivery, and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- the interim bar of charter decision 2 is met. Reverse stays one tap away.`,
   };
 }
 
@@ -263,16 +332,36 @@ export function autoDoneEligibility({ verdict, epicName, priorityClass, changedF
 // The delivery's changed files: committed-vs-base plus anything still in the working tree, because a
 // cycle runs this BEFORE its push and the change may be either. Returns null when git cannot answer
 // -- selfCertificationBlock() reads null as "fails closed", never as "nothing changed".
+// ONE PORCELAIN LINE -> ONE PATH. Pure and exported because the shape of this string is the whole
+// of charter premise 3's reach, and it was WRONG (found live 2026-08-29 by SES-243's own QA, on the
+// cycle that was editing scripts/verifier.js and was told its diff touched nothing).
+//
+// `git status --porcelain` is FIXED-WIDTH: two status columns, then a space, then the path. For a
+// WORKTREE-ONLY modification the first column is a SPACE -- " M scripts/verifier.js". The retired
+// form called line.trim() FIRST, which ate that column and left "M scripts/verifier.js"; the
+// two-column strip `^.{2}\s+` then needed whitespace at offset 2 and found the "s" of "scripts", so
+// it did not match and the status letter stayed welded to the path. The result matched no entry in
+// SELF_CERTIFYING_PATHS ever, so the self-certification refusal was INERT for every unstaged change
+// -- which is the state a cycle is in at step 7a by construction, because the verifier runs BEFORE
+// the commit. Staged lines ("M  path", two real columns) survived the trim, which is why the rule
+// appeared to work whenever anyone checked it against a staged tree.
+//
+// THE FIX IS TO STOP TRIMMING THE LEFT, not to widen the regex: the leading space IS data.
+export function parsePorcelainPath(line) {
+  const path = line.slice(3);                       // fixed-width prefix: XY + one space
+  return path.replace(/^.*\s->\s/, "").trim();      // "R  old -> new" keeps the destination
+}
+
 function changedFilesFor(repoRoot, base) {
   const out = [];
   for (const argv of [["diff", "--name-only", `${base}...HEAD`], ["status", "--porcelain"]]) {
     const r = spawnSync("git", argv, { cwd: repoRoot, encoding: "utf8" });
     if (r.error || r.status !== 0) return null;
     for (const line of String(r.stdout).split("\n")) {
-      const t = line.trim();
-      if (!t) continue;
+      if (!line.trim()) continue;
       // `git status --porcelain` prefixes a two-column status; `git diff --name-only` does not.
-      out.push(argv[0] === "status" ? t.replace(/^.{2}\s+/, "").replace(/^.*\s->\s/, "") : t);
+      const p = argv[0] === "status" ? parsePorcelainPath(line) : line.trim();
+      if (p) out.push(p);
     }
   }
   return out;
@@ -378,9 +467,25 @@ async function main() {
     lookupNote = " (no --ticket passed)";
   }
 
+  // §2f's widening, read live off the ledger for the reason given at PRIME_DIRECTIVE_BODY_PREFIX.
+  // Every failure path leaves this FALSE: no credentials, a REST error, or no matching row. The
+  // note says which, so "not widened" is never indistinguishable from "nobody looked".
+  let primeDirectiveActive = false;
+  let primeNote = "";
+  if (supabaseUrl && supabaseKey) {
+    const pq = `runner_directives?select=id&type=eq.directive&status=eq.queued` +
+      `&body=like.${encodeURIComponent(PRIME_DIRECTIVE_BODY_PREFIX + "*")}&limit=1`;
+    const pr = await rest(supabaseUrl, supabaseKey, pq);
+    if (pr.error) primeNote = ` (Prime Directive lookup failed, §2f widening NOT applied: ${pr.error})`;
+    else if (pr.rows.length) primeDirectiveActive = true;
+    else primeNote = " (no live Prime Directive row; charter decision 2's P10 - Tooling scope applies)";
+  } else {
+    primeNote = " (no credentials to read the Prime Directive; charter decision 2's P10 - Tooling scope applies)";
+  }
+
   const changedFiles = changedFilesFor(repoRoot, arg("base", "origin/dev"));
-  const elig = autoDoneEligibility({ verdict, epicName, priorityClass, changedFiles });
-  const autoDoneReason = elig.reason + lookupNote;
+  const elig = autoDoneEligibility({ verdict, epicName, priorityClass, changedFiles, primeDirectiveActive });
+  const autoDoneReason = elig.reason + lookupNote + primeNote;
 
   const detailLine = GATES.map(g => `${g.label}=${gateResults[g.key]} [${gateDetail[g.key]}]`).join("\n  ");
   const prose =
@@ -395,6 +500,10 @@ async function main() {
     verdict, gates: gateResults, gateDetail, reasoning,
     auto_done_eligible: elig.eligible, auto_done_reason: autoDoneReason,
     ticket: ticket || null, version: version || null, epic_name: epicName, priority_class: priorityClass,
+    // Reported, never stored in its own column: runner_verdicts carries no such field and adding one
+    // would be a schema change this ticket did not ask for. The fact reaches the ledger inside
+    // auto_done_reason, which is the column that already exists to carry exactly this.
+    prime_directive_active: primeDirectiveActive,
   };
 
   if (dryRun) {
