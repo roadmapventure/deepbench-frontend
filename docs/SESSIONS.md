@@ -5,6 +5,75 @@
 
 ---
 
+## session/cycle-20260829-1940 (v7.0.326, 2026-08-29, runner cycle `179edfd6-a480-41d0-9117-18c8ea98a2a0`, `trigger = chained (drain continuation)` of `cb06c7e1`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — delivered: `SES-24` — the hygiene checks stop pointing at a list that no longer exists
+
+**A DEAD POINTER THAT READ AS ALL-CLEAR.** `SES-011` replaced `CLAUDE-STATE.md`'s shared *"In flight
+now"* bullet list with per-session `inflight/` markers on 2026-07-21 and retargeted
+`scripts/check-session-docs.js` at the time — its own comment says so. **The prose a human follows
+was not retargeted.** Measured before editing: `CLAUDE-STATE.md` contains the string *"In flight
+now"* **zero** times (generated since `SES-177`; it carries Version / Prior / Standing brief), while
+check 5c said *"For each 'In flight now' bullet"* and 5d said *"for every worktree name mentioned in
+an 'In flight now' bullet"*. An instruction to grep a file for something that is not in it returns
+nothing and **reads as all clear** — which is the whole defect, and why it survived a month.
+
+**AND CHECK 5e HAD NO SECTION AT ALL.** It has been in the script since 2026-07-23 (`SES-23`, line
+714) and in the script's own mechanized-checks list, and appeared in the runbook only *inside check
+5's sentence*. Its load-bearing half is the **suppression rule**: an on-disk unpushed marker means
+the worktree is LIVE, so check 5's verdict for it is suppressed entirely. Without that written down
+a hand run reaches the exact opposite of the truth — *"likely finished, safe to clean"* about a
+running session. The four worktrees found live on 2026-07-23, two under 45 minutes old, are the
+measurement.
+
+**THE TICKET'S OWN LOCATION HAD MOVED, AND THIS CYCLE'S PREDECESSOR GOT IT WRONG AN HOUR EARLIER.**
+`SES-24` says the fix is in `.claude/skills/session-hygiene/SKILL.md`, a path register B39 bars an
+unattended cycle from editing, and `v7.0.325`'s ledger repeated that. Read live: `SES-121`
+(`v7.0.198`) moved the body **verbatim** into `docs/runbooks/session-hygiene.md` *"because it churned
+too often to live under `.claude/`, which unattended cycles cannot edit"*, and the `.claude/` file is
+now a **nine-line loader with no checks in it**. So `SES-24` was never `needs-desktop`; it was
+buildable all along. Corrected by measurement rather than carried forward.
+
+**TWO OF THE TICKET'S THREE HALVES WERE ALREADY CLOSED, and saying so is the point.** Check 5 was
+already retargeted (cites `inflight/`, B41, `SES-011`); 5b never referenced the bullet list at all;
+the four numbered `CLAUDE.md` citations (*rule 6c* ×2, *rule #7*, *router rule 1*) are **gone** — a
+grep returns nothing, the file says *"`CLAUDE.md`'s router step 1"*. What was genuinely owed: 5c
+(untouched), 5d (half done), and 5e (absent). Those three shipped.
+
+**QA.** Build exit 0; suite **118/118** after step 7a's render (the pre-render `SES-177` failure was
+`SES-213`'s drift — this cycle's own predecessor had just closed `shipped` — and is the rule earning
+its keep rather than a defect); verifier **APPROVE** on all three gates, `auto_done_eligible` **YES**
+(`runner_verdicts ecda277b`), auto-doned under Prime Directive **§2f** with a Reverse-capable ship
+card. Guard `tests/regression/SES-24-hygiene-inflight-retarget.js`, seven parts: four clauses **read
+out of** the shipped runbook each with its own negative control, the `SES-158` vacuity meta-check, a
+file-level control reconstructing the pre-change prose in-process (all four clauses fail there) —
+reconstructed rather than read from `origin/dev` **deliberately**, since `SES-240` is the open finding
+that asserting against that moving ref fails for unrelated reasons — a **cross-file clause** reading
+the real script's emitted check ids (never a hand-kept list) and asserting every `5`-family check has
+a write-up, **whose own negative control removes 5e's section and asserts the clause reports exactly
+`5e`**, and a both-directions check that the retired bullet list is genuinely gone from a
+`CLAUDE-STATE.md` that still looks like the generated state file.
+
+**TWO CARDS BEFORE THE BUILD, both B24 drops.** `SES-82` was the chain gate's pick and is not
+buildable by anyone — its blocker is Anthropic shipping a programmatic usage read. Premise
+revalidated live: Claude Code 2.1.251 has no `usage` subcommand (`--json` → *"unknown option"*;
+`claude usage` is parsed as a prompt). Cycle `4e076c15` predicted yesterday that the picker would
+hand it back forever, and it did. Carded `gated_before_build` (`63e312bb`) asking John the
+representation question that is genuinely his — a fourth `design_status` value, an `external_blocker`
+column, or a re-tier with the picker reading tier — and flagged `needs-john`, which stops the loop
+today. Reported honestly on that card: `rate_limit_info` is now returned by the session-describe MCP
+call, a real signal that did not exist at filing, carrying **no percentage**, so it replaces nothing.
+
+**FILED, NOT FOLDED IN:** `SES-245` — the script emits **23** check ids and the runbook writes up
+**12**; eleven (`3d, 3e, 3f, 6b, 6c, 9, 10, 11, 12, 13, 14`) fire in CI with no write-up anywhere.
+That is this ticket's defect one level out and `5e` is the proof it bites. One atomic
+`feature_id_counter` claim, `M`, `gate_count` 0. Also measured and left to it: **check 1b is now
+vacuous**, flagging bullets in a file that has none — a *vacuous* check rather than a *mis-targeted*
+one, and outside `SES-24`'s named scope.
+
+Doc + test + kickoff; no `src`/`api`/`lib` change, no site change, no schema change.
+Kickoff: `docs/kickoffs/v7.0.326-SES-24-hygiene-inflight-retarget.md`.
+
+---
+
 ## session/cycle-20260829-1940 (v7.0.325, 2026-08-29, runner cycle `cb06c7e1-9a7e-4270-901c-825556a66530`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, the 679-file sweep delegated to a **Sonnet 5** subagent per register B21) — delivered: `SES-32` — `MI-41` is a reused number, and the folds-in sweep is finished
 
 **A YEAR-OLD QUESTION ANSWERED BY READING, NOT BY DECIDING — AND THE ANSWER WAS ALREADY IN THE REPO.**
