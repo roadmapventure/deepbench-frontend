@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.299 | scripts/verifier.js | SES-213 -- summarizeGateOutput(): the verdict ledger
+// now records WHAT a gate blocked on. The retired `res.stderr || res.stdout` preferred stderr
+// WHOLESALE, so all 26 block rows stored an unrelated GATE_BYPASS_SECRET warning and never the
+// failing test. See that function's own header for the measurement. The ORDERING half of SES-213 is
+// deliberately NOT in this file -- it is step 7a of docs/runbooks/runner-cycle.md, because a
+// verifier that spawns render-claude-state.js would be a verifier that writes to the tree, and
+// verdict-only is this file's founding property (see below).
+//
 // DeepBench v7.0.247 | scripts/verifier.js | SES-181 (Selfbuild M3 - Independent Verification)
 //
 // THE REVIEWER LANE, first rung: a VERDICT-ONLY, FAIL-CLOSED verifier. It runs the three mechanical
@@ -136,6 +144,40 @@ export function gateStatus({ ran, exitCode }) {
   return exitCode === 0 ? "green" : "red";
 }
 
+// How much of a gate's output the ledger keeps. Four [FAIL] lines plus a summary line legitimately
+// exceed the 400 this used to be, and a reasoning that stops mid-failure is the defect in miniature.
+export const DETAIL_CAP = 600;
+
+// WHAT A GATE BLOCKED ON -- the second half of SES-213, and it is a fact about WHICH STREAM, not a
+// formatting preference. This used to read `res.stderr || res.stdout`, which prefers stderr
+// WHOLESALE: the first non-empty stream wins and the other is discarded entirely. Measured against
+// the real output shape rather than assumed -- tests/regression/run-all.js:77 prints
+// `[FAIL] <file> -- <message>` through console.log (STDOUT), while the ubiquitous
+// `WARN: GATE_BYPASS_SECRET not found` is a console.warn (STDERR). So stderr was always non-empty,
+// always won, and all 26 block rows in public.runner_verdicts recorded the warning and never the
+// failing test. The verdict ledger could not say what it blocked on, which is why SES-213 needed a
+// live reproduction instead of a query.
+//
+// THE RULE: read BOTH streams, and prefer the lines that name failures over the lines that merely
+// came last. Position is not evidence.
+//
+// Pure and exported so its guard can test it directly instead of spawning a suite -- the tail it
+// replaced was buried inside runGate() and was therefore only ever observable through a real
+// 20-minute gate run, which is how it survived 26 rows.
+export function summarizeGateOutput({ stdout, stderr }) {
+  const lines = `${stdout || ""}\n${stderr || ""}`
+    .split("\n").map(l => l.trim()).filter(Boolean);
+  const fails = lines.filter(l => l.startsWith("[FAIL]"));
+  // The pass count anchors the verdict, so it is preferred over the not-run notice when both are
+  // present -- "96/97 passed" tells a reader how much of the suite the failure represents.
+  const summary = lines.filter(l => /^regression suite:/.test(l))
+    .concat(lines.filter(l => /^NOT A FULL RUN:/.test(l)));
+  // No [FAIL] vocabulary (npm build, the hygiene tripwire) falls back to the last three lines of the
+  // COMBINED output -- stderr is concatenated last, so an npm failure still ends on its own error.
+  const chosen = fails.length ? [...fails.slice(0, 4), ...summary.slice(0, 1)] : lines.slice(-3);
+  return chosen.join(" | ");
+}
+
 // The whole verdict rule, in one pure function.
 //
 //   gates  { build: 'green'|'red'|'skipped', regression: ..., hygiene: ... }
@@ -253,8 +295,8 @@ function runGate(gate, repoRoot) {
   // A signal kill leaves status null -- gateStatus() reads that as skipped, which is why the raw
   // status is passed through rather than defaulted to a number here.
   const status = gateStatus({ ran: true, exitCode: res.status });
-  const tail = String(res.stderr || res.stdout || "").trim().split("\n").slice(-3).join(" | ");
-  return { status, detail: `exit ${res.status === null ? "signal " + res.signal : res.status}${tail ? " -- " + tail.slice(0, 400) : ""}` };
+  const tail = summarizeGateOutput({ stdout: res.stdout, stderr: res.stderr });
+  return { status, detail: `exit ${res.status === null ? "signal " + res.signal : res.status}${tail ? " -- " + tail.slice(0, DETAIL_CAP) : ""}` };
 }
 
 // ---------------------------------------------------------------------------
