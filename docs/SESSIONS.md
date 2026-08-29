@@ -5,6 +5,58 @@
 
 ---
 
+## session/cycle-20260829-2140 (v7.0.331, 2026-08-29, runner cycle `698059bf-a776-4253-ad61-9d68a0636514`, `trigger = chained (drain continuation)` of `5e0ec1a5`, `scheduler_gate` verdict `run` — model Opus 5) — `SES-248` — the origin/dev reader stops reporting a clean pass when it could not read anything
+
+**A SWALLOWED ERROR WAS SPELLED THE SAME AS A REAL ZERO, and that equality is the whole defect.**
+`freshDevDirEntries()` lists the inflight markers with `git -C SHARED_CHECKOUT`, and
+`SHARED_CHECKOUT` is the hard-coded literal `C:/Projects/deepbench-frontend`. On any non-Windows run
+that throws and the `catch` returned `[]` — indistinguishable from *"there are no inflight markers"*.
+So **check 1b's inflight arm and checks 5 / 5b / 5d reported a clean pass on every unattended cloud
+run**: loud on stderr, silent in the findings, invisible on John's machine and total in the cloud.
+It is `SES-245`'s silent-all-clear class one directory deeper, and worse in one respect — there the
+blindness was a dead string a reader could see in the source, here it is environmental.
+
+**Both halves the ticket named shipped, because each alone leaves half the hole open.** The checkout
+is now **resolved** — `SHARED_CHECKOUT` first, so John's machine observes no change at all, with the
+running worktree behind it; both answer the *same* question from a different local mirror of
+`origin/dev`, so this does not re-point the checks at a new source. And when neither resolves, one
+aggregated **WARN** names which checks went blind. `WARN` was checked rather than assumed: it is not
+in `GATING_CHECKS`, so an unreachable checkout cannot redden CI, and `tripwire-to-backlog.js` never
+files a `WARN`, so it cannot spam the board with a ticket per run either.
+
+**MEASURED ON ONE TREE WITH ONE VARIABLE, and the fix immediately found real work that had been
+invisible:** `origin/dev`'s own pre-change script produces **0** check-1b findings here and **5**
+`fatal:` lines; the shipped one produces **1** `fatal:` line and a genuine FLAG —
+`inflight/design-arch-beta-0729.md` at **1,678 characters** against the 800-char cap. That marker
+has been over the cap the whole time and no cloud run could see it.
+
+**`SES-247` WAS GATED, NOT BUILT — and this is the honest half of the cycle.** The Prime Directive's
+§2c tier-3 ordering (oldest first) put `SES-247` ahead of `SES-248`, so it was picked and
+revalidated first. Its premise **holds**, read from `pg_get_functiondef` rather than its own prose:
+`drain_epic_next`'s pick predicate filters queue, `delivered`, the three `design_status` flags,
+`blocked_by` and claims, and has **no** clause for a remainder that is not buildable now for a reason
+that is not another open ticket. But the fix would be the **first way a cycle can remove work from
+John's standing drain on its own judgment**, and its closest precedent — `SES-218`'s `blocked_by` —
+carried his explicit directive and verbatim criterion, while this carries none. Uncertain
+classification ⇒ `gated_before_build`, never an unattended ship. Card `285eafc9` carries the full
+proposal (a `blocked_note` plus a `blocked_until_decided` pointer at a live `runner_questions` row,
+so the exclusion expires by itself), the ticket is flagged `needs-john`, and this was the B24 drop to
+the next ticket rather than a cycle ending build-less.
+
+**Also worth recording:** `drain_chain_gate()` named `SES-248` as its continuation pick while the
+Prime Directive's own §2c ordering yields `SES-247` — the gate's Gate B reads `drain_epic_next`'s
+queue order, not the directive's milestone-critical-path order. The directive's order was followed.
+That divergence is small today (both were buildable Selfbuild work) and is noted here rather than
+filed, since it is adjacent to `SES-247`'s own subject and belongs with whatever John decides there.
+
+**Verifier lane: `approve`, 3/3 gates green (`runner_verdicts 7235e935`), re-run AFTER the last edit
+so the verdict grades the tree that actually ships.** Auto-done refused in code — the diff touches
+`scripts/check-session-docs.js`, a `SELF_CERTIFYING_PATH` — so the ticket ships **`delivered`**.
+Suite **122/122**; `--gate` exit 0 before and after. Stamp count on `session-hygiene.md` held at 5
+per check 7, and `SES-164` step 2 was actually run first: `v7.0.198`'s entire content is restated
+verbatim in `.claude/skills/session-hygiene/SKILL.md`'s loader paragraph, so nothing unique was
+archived.
+
 ## session/cycle-20260829-2140 (v7.0.330, 2026-08-29, runner cycle `5e0ec1a5-ad28-4356-a7c2-5c93ede031d2`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, adversarial root-cause review delegated to a Fable 5 subagent per register B21) — `SES-245` (remainder) — checks 1b and 2 stop looking for a heading that no longer exists
 
 **THE TICKET'S OWN WORD FOR THIS WAS WRONG, AND THAT WORD IS WHAT DECIDES THE FIX.** `v7.0.329`

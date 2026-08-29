@@ -1,4 +1,33 @@
 #!/usr/bin/env node
+// DeepBench v7.0.331 | scripts/check-session-docs.js | SES-248 -- THE origin/dev READER STOPS
+// SPELLING "I COULD NOT LOOK" THE SAME WAY IT SPELLS "THERE WAS NOTHING TO FIND", and that equality
+// is the whole defect. freshDevDirEntries() shelled `git -C SHARED_CHECKOUT`, SHARED_CHECKOUT is a
+// hard-coded Windows path, and on every non-Windows run the catch returned [] -- indistinguishable
+// from an empty directory. So check 1b's inflight arm and checks 5/5b/5d reported a CLEAN PASS on
+// every unattended cloud run: loud on stderr (`fatal: cannot change to 'C:/Projects/...'`) and
+// silent in the findings, invisible on John's machine and total in the cloud. It is SES-245's
+// silent-all-clear class one directory deeper, and worse in one respect -- there the blindness was
+// a dead string a reader could see in the source, here it is environmental.
+// TWO HALVES, because each alone leaves half the hole open and the ticket named both.
+// (1) RESOLVE rather than hard-code: SHARED_CHECKOUT is tried FIRST so John's machine observes no
+// change, with the running worktree behind it -- both answer the SAME question from a different
+// local mirror of origin/dev, so this does NOT re-point the checks at a new source.
+// (2) ANNOUNCE: checkFreshDevReader() emits ONE aggregated WARN naming which checks went blind.
+// WARN was CHECKED, not assumed: it is not in GATING_CHECKS so it cannot redden CI (an unreachable
+// checkout is an environment fact, never a defect in the tree under test), and
+// tripwire-to-backlog.js never files a WARN, so it cannot spam the board with a ticket per run.
+// THE EDITS THIS FORBIDS: reordering the candidates so the worktree is tried first (SHARED_CHECKOUT
+// is what 5-7 concurrent sessions coordinate through -- preferring the local worktree would answer
+// from whichever session happened to run the check), and promoting the WARN to FLAG.
+// MEASURED ON ONE TREE, one variable: origin/dev's own pre-change script produces 0 check-1b
+// findings and 5 `fatal:` lines here; this one produces a real 1,678-char inflight-marker FLAG that
+// was invisible before, and 1. Arm A's stale "In flight now" label -- a CLAUDE-STATE.md section
+// gone since SES-177 -- is corrected in the same edit.
+// NOT DONE, AND NAMED: this does not change WHAT the checks read. Re-pointing them at the running
+// worktree's own HEAD rather than a mirror of origin/dev is a different ticket and a different
+// claim. Guarded by tests/regression/SES-248-freshdev-blindness.js, whose clause 3 is a vacuity
+// guard -- the WARN must NOT fire when a checkout resolves, or the fix trades a false all-clear for
+// a permanent false alarm nobody would notice.
 // DeepBench v7.0.330 | scripts/check-session-docs.js | SES-245 (remainder) -- CHECKS 1b AND 2 STOP
 // LOOKING FOR A HEADING THAT NO LONGER EXISTS, and the thing to read twice is that the ticket's own
 // word for this was WRONG in the way that decides the fix. Its declared remainder called check 1b
@@ -196,6 +225,54 @@ import { execFileSync } from "child_process";
 import { pathToFileURL } from "url";
 
 const SHARED_CHECKOUT = "C:/Projects/deepbench-frontend";
+
+// ---- Which checkout answers "what is on origin/dev?" (SES-248, v7.0.331) ----
+// SHARED_CHECKOUT above is a hard-coded Windows path, and the readers below shell `git -C` at it.
+// On any non-Windows run that throws, and freshDevDirEntries()'s catch returned [] -- a value
+// SPELLED THE SAME as "there are no inflight markers". So check 1b's inflight arm and checks
+// 5/5b/5d reported a clean pass on every cloud run, while stderr filled with
+// `fatal: cannot change to 'C:/Projects/deepbench-frontend'`. Loud in the terminal, silent in the
+// findings, invisible on John's machine and total in the cloud.
+//
+// TWO HALVES, because each alone leaves half the hole open -- the ticket named both and this ships
+// both. (1) RESOLVE rather than hard-code: try SHARED_CHECKOUT FIRST so John's machine observes no
+// change at all, then fall back to the running worktree, which is a real clone of this repo in
+// every cloud run. Both are asked the SAME question and answer it from a different local mirror of
+// origin/dev -- this does not re-point the checks at a different source. (2) When neither can serve
+// the read, SAY SO: checkFreshDevReader() below emits one aggregated WARN instead of letting an
+// empty result read as an all-clear.
+//
+// THE EDIT THIS FORBIDS: reordering the candidates so the worktree is tried first. SHARED_CHECKOUT
+// is the shared checkout 5-7 concurrent sessions coordinate through; preferring the local worktree
+// on John's machine would answer from whichever session happened to run the check.
+//
+// Cached for the process: freshDevText() runs once per marker file, and probing per call would
+// multiply a failing git invocation across every entry.
+// The choice itself is a PURE function -- candidates in, the first usable one out, or null. It is
+// exported so the guard drives the real ordering rather than a copy of it (STANDARDS.md Section 4).
+function resolveFreshDevRoot(candidates, isGitCheckout) {
+  for (const candidate of candidates) {
+    if (isGitCheckout(candidate)) return candidate;
+  }
+  return null;
+}
+
+function isGitCheckout(dir) {
+  try {
+    execFileSync("git", ["-C", dir, "rev-parse", "--git-dir"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;   // not a git checkout on this machine
+  }
+}
+
+let FRESH_DEV_ROOT;              // undefined = not probed yet, null = nothing usable
+function freshDevRoot() {
+  if (FRESH_DEV_ROOT === undefined) {
+    FRESH_DEV_ROOT = resolveFreshDevRoot([SHARED_CHECKOUT, WORKTREE], isGitCheckout);
+  }
+  return FRESH_DEV_ROOT;
+}
 
 // SES-83 (d) cycle 4, v7.0.115. The three FEATURES*.md files were emptied to
 // legend-only stubs in cycle 2 (v7.0.113) -- `public.backlog_items` is the
@@ -571,6 +648,30 @@ function checkStandardsDrift(findings) {
   }
 }
 
+// ---- SES-248: the origin/dev reader announces its own blindness ----
+// ONE aggregated WARN, never one per failed call -- the convention checks 3c/3e/14 already keep,
+// for the reason each states: reported as one line so it cannot bury the actionable flags above it.
+//
+// WARN IS THE CORRECT SEVERITY AND THAT WAS CHECKED RATHER THAN ASSUMED. It is not in
+// GATING_CHECKS, so it cannot redden CI (a checkout this script cannot reach is an environment
+// fact, never a defect in the tree under test), and scripts/tripwire-to-backlog.js never files a
+// WARN, so it cannot spam the board with one ticket per run either. It appears in the report --
+// the one place the blindness has to be visible, because the report is what a reader mistakes for
+// an all-clear.
+//
+// Pure: findings array in, findings array out. The resolver is a parameter with the real cached
+// freshDevRoot() as its default, so the guard can drive BOTH arms -- a root that resolves and one
+// that does not -- without a second copy of this function's logic.
+function checkFreshDevReader(findings, rootResolver = freshDevRoot) {
+  if (rootResolver() !== null) return;   // the normal, quiet case -- say nothing
+  findings.push({
+    check: "1b", severity: "WARN",
+    detail: `no usable git checkout for the origin/dev reader (tried ${SHARED_CHECKOUT}, then the running worktree), `
+      + `so checks 1b (inflight arm), 5, 5b and 5d read NOTHING from origin/dev and cannot report on it. `
+      + `An empty result here is "could not look", never "nothing to find" -- do not read this run as a clean pass on those checks.`,
+  });
+}
+
 // ---- Checks 5, 5b, 5d: worktree <-> "In flight now" cross-reference ----
 function gitWorktreeList() {
   let out;
@@ -605,9 +706,11 @@ function isAncestorOfDev(worktreePath) {
 // pattern CLAUDE.md's rule 3b fallback circuit-breaker already uses for exactly
 // this staleness problem. Falls back to the local copy if git is unavailable.
 function freshDevText(relPath, localFallbackText) {
+  const root = freshDevRoot();
+  if (root === null) return localFallbackText;   // SES-248: announced by checkFreshDevReader()
   try {
-    execFileSync("git", ["-C", SHARED_CHECKOUT, "fetch", "origin", "dev"], { stdio: "ignore" });
-    return execFileSync("git", ["-C", SHARED_CHECKOUT, "show", `origin/dev:${relPath}`], { encoding: "utf8" });
+    execFileSync("git", ["-C", root, "fetch", "origin", "dev"], { stdio: "ignore" });
+    return execFileSync("git", ["-C", root, "show", `origin/dev:${relPath}`], { encoding: "utf8" });
   } catch {
     return localFallbackText;
   }
@@ -619,9 +722,14 @@ function freshDevText(relPath, localFallbackText) {
 // (works even though .claude/inflight/ may not exist locally in every worktree
 // yet), then fetches each file's content the same way freshDevText() already does.
 function freshDevDirEntries(relDirPath) {
+  const root = freshDevRoot();
+  // SES-248: an unreachable checkout used to be spelled the same as an empty directory. It is now
+  // announced once by checkFreshDevReader(); returning [] here is still correct, it is just no
+  // longer SILENT.
+  if (root === null) return [];
   let names;
   try {
-    const out = execFileSync("git", ["-C", SHARED_CHECKOUT, "ls-tree", "--name-only", "-r", "origin/dev", "--", relDirPath], { encoding: "utf8" });
+    const out = execFileSync("git", ["-C", root, "ls-tree", "--name-only", "-r", "origin/dev", "--", relDirPath], { encoding: "utf8" });
     names = out.split("\n").map(l => l.trim()).filter(Boolean).map(p => path.basename(p));
   } catch {
     return []; // directory doesn't exist yet on origin/dev, or git unavailable
@@ -771,7 +879,9 @@ function checkEntryLengths(findings, stateText) {
   for (const entry of extractInFlightBullets(null)) {
     const len = entry.text.length;
     if (len > ENTRY_LENGTH_CAP) {
-      findings.push({ check: "1b", severity: "FLAG", detail: `"In flight now" entry "${entry.name}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
+      // SES-248: the label said "In flight now", a CLAUDE-STATE.md section that has not existed
+      // since SES-177. The entry is an inflight marker FILE and the finding now says so.
+      findings.push({ check: "1b", severity: "FLAG", detail: `inflight marker "inflight/${entry.name}.md" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
     }
   }
 
@@ -1579,6 +1689,9 @@ function checkRecreatedLogicLint(findings) {
 // halves stay the per-check helpers the guards already drive.
 function collectFindings() {
   const findings = [];
+  // SES-248: FIRST, so a reader who gets nothing from the origin/dev-backed checks below sees WHY
+  // at the top of the report rather than inferring a clean pass from their silence.
+  checkFreshDevReader(findings);
   const stateText = checkClaudeState(findings);
   checkEntryLengths(findings, stateText);
   checkTrimmedStubs(findings);
@@ -1687,6 +1800,13 @@ export {
   extractSectionLines,
   checkEntryLengths,
   ENTRY_LENGTH_CAP,
+  // SES-248 -- the origin/dev reader's pure pieces. resolveFreshDevRoot is the ORDERING itself, so
+  // the guard drives the real one rather than asserting a copy of the candidate list.
+  resolveFreshDevRoot,
+  freshDevRoot,
+  freshDevDirEntries,
+  checkFreshDevReader,
+  SHARED_CHECKOUT,
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
