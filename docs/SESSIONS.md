@@ -5,6 +5,69 @@
 
 ---
 
+## session/cycle-20260829-2140 (v7.0.330, 2026-08-29, runner cycle `5e0ec1a5-ad28-4356-a7c2-5c93ede031d2`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, adversarial root-cause review delegated to a Fable 5 subagent per register B21) — `SES-245` (remainder) — checks 1b and 2 stop looking for a heading that no longer exists
+
+**THE TICKET'S OWN WORD FOR THIS WAS WRONG, AND THAT WORD IS WHAT DECIDES THE FIX.** `v7.0.329`
+left one declared remainder and called it *vacuous*: *"check 1b flags 'In flight now' / 'Last 3
+sessions' bullets in `CLAUDE-STATE.md`, which has been generated since `SES-177` and contains zero
+of either"*, with a real choice named between **retargeting** and **retiring**. Measured on an
+unedited tree rather than recalled, that framing is wrong in one direction and right in the other:
+
+- **Arm A was already retargeted and is not the problem.** `extractInFlightBullets()` ignores its
+  `stateText` argument entirely and reads the repo-root `inflight/` directory (`SES-011`,
+  2026-07-21). `"In flight now"` genuinely occurs **0** times in the file, and that is correct.
+- **Arm B is MIS-TARGETED, not vacuous.** It passed the literal `**Last 3 sessions:**`;
+  `scripts/render-claude-state.js` emits the heading as an **H2**. The section is right there with
+  three real entries and the check simply could not find it. **0** entries visible under the
+  retired string, **3** under the emitted one — and the longest sat **within 20 characters** of
+  check 1b's own 800-char cap (783 / 785 / 118 on the tree as found; 762 / 783 / 785 after this
+  cycle's own render, which is why every write-up states the **margin** and not the three numbers).
+
+**Vacuous would have argued for retiring the check. Mis-targeted argues for retargeting it** — and
+retiring would have deleted a check whose population is live and sitting ~2% under its own bar.
+
+**THE COLLATERAL FIND, which the ticket did not name.** A Fable 5 adversarial review of this root
+cause (register B21) verified all three measurements and returned one thing the diagnosis had
+missed: **check 2 was dead for the identical reason**, one hard-coded copy of the same string away
+(`text.indexOf("**Last 3 sessions:**")`, its whole body skipped on `-1`). Fixing 1b alone would
+have shipped half a fix on a fact already measured, so the header now has **one home** —
+`LAST_SESSIONS_HEADERS` plus a resolver — and both checks read it. Widening from `1b` to `1b + 2`
+is a **named deviation** from the remainder's wording: it is one shared fact with two copies, not
+scope creep.
+
+**Two things stated honestly rather than overclaimed.** Check 2 has **no live population and
+cannot get one** — the renderer emits `cycles.slice(0, 3)`, so more than three bullets is
+unreachable by construction — so its retarget is documented as a **regression guard**, never as a
+live check. And check 1b's remediation text now names the **source**: these bullets are
+`renderBullet()` concatenating a ship card's `runner_items.plain_after` + `plain_worth`, so telling
+a reader to trim the bullet pointed them at a file the next render overwrites.
+
+**NOT DONE, and named rather than left to be found.** The ~800 cap is **not recalibrated** — a
+threshold move in the same ship that makes the check able to see would confound the change under
+test (check 3d's own ratchet rule). Expect the next verbose ship card to trip 1b; that is the check
+working. And arm A returns `[]` on **every** non-Windows run because `SHARED_CHECKOUT` is the
+hard-coded path `C:/Projects/deepbench-frontend` — the same silent-all-clear class one directory
+deeper, and invisible on John's machine while total in the cloud. Filed as **`SES-248` — hygiene
+check 1b's inflight arm silently returns nothing on every cloud run** rather than folded in.
+
+**QA was two arms on one tree with one variable, plus a file-level control.** The shipped resolver
+finds 3 entries in the live `CLAUDE-STATE.md` where the retired literal finds 0. Every clause of
+`tests/regression/SES-245-last-sessions-header.js` carries the retired form applied to its **own**
+fixture and asserted to **lose**, so each proves a *difference* rather than a property both share;
+one clause is a vacuity meta-check that fails if the renderer's heading ever moves again. The
+file-level control is `origin/dev`'s own pre-change script run against the **same** fixture worktree
+through the real CLI: this build FLAGs a 963-char entry, the pre-change build finds **nothing**.
+Import-level failure was rejected as the control — it proves the exports are new, not that the
+behaviour differs. `npm run build` green; regression suite **121/121** after step 7a's render (the
+one red before it was `SES-177`'s byte-comparison, the `SES-213` staleness, not this change);
+`check-session-docs.js --gate` exit 0 before and after — `1b` and `2` are not in `GATING_CHECKS`,
+so a future finding here reports rather than reddening CI.
+
+**Verifier lane: `approve`, all three gates green (`runner_verdicts cba2e570`). Auto-done refused
+in code, as it should be** — the diff touches `scripts/check-session-docs.js`, one of the verifier's
+own `SELF_CERTIFYING_PATHS`, so charter premise 3 applies and the ticket ships **`delivered`** with
+a reverse-capable ship card. `v7.0.329` predicted exactly this when it deferred the remainder.
+
 ## session/cycle-20260829-2040 (v7.0.329, 2026-08-29, runner cycle `f477c1f2-7ba3-4ada-b34f-466e7468a5ac`, `trigger = chained (drain continuation)` of `fa1e306d`, `scheduler_gate` verdict `run` — model Opus 5, no subagent) — `SES-245` — every hygiene check the script emits now has a write-up, and the list is derived
 
 **THE PREMISE HELD; ITS NUMBER DID NOT, AND THAT IS THE FINDING.** `SES-245` was filed saying

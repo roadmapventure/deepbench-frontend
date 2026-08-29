@@ -1,4 +1,34 @@
 #!/usr/bin/env node
+// DeepBench v7.0.330 | scripts/check-session-docs.js | SES-245 (remainder) -- CHECKS 1b AND 2 STOP
+// LOOKING FOR A HEADING THAT NO LONGER EXISTS, and the thing to read twice is that the ticket's own
+// word for this was WRONG in the way that decides the fix. Its declared remainder called check 1b
+// "vacuous"; it is MIS-TARGETED. Measured on an unedited tree rather than recalled: the section is
+// right there with three real entries, and the literal `**Last 3 sessions:**` that BOTH checks
+// carried their own hard-coded copy of has been dead since SES-177 made CLAUDE-STATE.md generated
+// and render-claude-state.js started emitting an H2. 0 entries visible under the retired string,
+// 3 under the emitted one, the longest within 20 characters of check 1b's own 800-char cap. Vacuous
+// would have argued for RETIRING the check; mis-targeted argues for retargeting it, and retiring
+// would have deleted a check whose population is live and sitting ~2% under its bar.
+// THE COLLATERAL FIND, which the ticket did not name and a Fable 5 review surfaced: check 2 was
+// dead for the IDENTICAL reason, one hard-coded copy of the same string away. Fixing 1b alone would
+// have left the second copy behind, so the header now has ONE home (LAST_SESSIONS_HEADERS + the
+// resolver) and both checks read it. Said honestly rather than overclaimed: check 2 has NO live
+// population and cannot get one -- the renderer emits cycles.slice(0, 3) -- so its retarget is a
+// REGRESSION GUARD, not a live check, and it is documented as one.
+// THE EDIT THIS SHIP FORBIDS: re-typing either header string at a third call site. That is the
+// defect itself, and a copy inside the guard would be the same defect wearing a test's clothes --
+// which is why tests/regression/SES-245-last-sessions-header.js IMPORTS the resolver and quotes
+// only the DEAD form, as its negative control's input.
+// NOT DONE, AND NAMED RATHER THAN LEFT TO BE FOUND: the 800-char cap is NOT recalibrated here (a
+// threshold move in the same ship that makes the check able to see would confound the change under
+// test -- check 3d's own ratchet rule), and arm A's inflight reader returns [] on every non-Windows
+// run because SHARED_CHECKOUT is a hard-coded C:/ path -- the same silent-all-clear class one
+// directory deeper, filed as SES-248 rather than folded in.
+// QA was two arms on one tree, one variable, plus a file-level control: origin/dev's own pre-change
+// script and this one run against the SAME fixture worktree through the real CLI -- this one FLAGs
+// a 963-char entry, the pre-change one finds nothing. Guarded by
+// tests/regression/SES-245-last-sessions-header.js, every clause of which carries the retired form
+// applied to its own fixture and asserted to LOSE.
 // DeepBench v7.0.301 | scripts/check-session-docs.js | SES-205 -- collectFindings(): main()'s
 // collection block extracted VERBATIM so scripts/tripwire-to-backlog.js can file against the real
 // implementation instead of parsing this script's stdout. No check was added, removed, reordered
@@ -234,16 +264,9 @@ function checkClaudeState(findings) {
     findings.push({ check: "1", severity: "FLAG", detail: `CLAUDE-STATE.md is ${kb(bytes)} KB, over the ~10 KB baseline (post-cleanup baseline ~4.6 KB)` });
   }
 
-  const lastSessionsIdx = text.indexOf("**Last 3 sessions:**");
-  if (lastSessionsIdx !== -1) {
-    const after = text.slice(lastSessionsIdx);
-    // Stop at the next "---" section break or blank-then-heading, whichever's first.
-    const sectionEnd = after.search(/\n---/);
-    const window = sectionEnd === -1 ? after : after.slice(0, sectionEnd);
-    const bulletCount = (window.match(/^\-\s/gm) || []).length;
-    if (bulletCount > 3) {
-      findings.push({ check: "2", severity: "FLAG", detail: `"Last 3 sessions" has ${bulletCount} bullets, over the rolling-window cap of 3` });
-    }
+  const bulletCount = lastSessionsBulletCount(text);
+  if (bulletCount !== null && bulletCount > LAST_SESSIONS_BULLET_CAP) {
+    findings.push({ check: "2", severity: "FLAG", detail: `"Last 3 sessions" has ${bulletCount} bullets, over the rolling-window cap of ${LAST_SESSIONS_BULLET_CAP}` });
   }
   return text;
 }
@@ -609,9 +632,11 @@ function freshDevDirEntries(relDirPath) {
   })).filter(e => e.text !== null);
 }
 
-// Generic section-bullet extractor -- "In flight now" and "Last 3 sessions"
-// are both a bolded header followed by a run of "- " lines up to the next
-// bolded header or "---" break. Shared by extractInFlightBullets() (needs the
+// Generic section-bullet extractor -- a section header followed by a run of "- " lines up to
+// the next section start. The header may be BOLDED (the hand-written era's idiom) or an H2
+// (what scripts/render-claude-state.js emits since SES-177); it used to assume bold only, and
+// that assumption is what SES-245 found broken -- see LAST_SESSIONS_HEADERS below. Callers pass
+// the header they resolved rather than a literal. Shared by extractInFlightBullets() (needs the
 // worktree-name capture) and the entry-length check (needs raw bullet text
 // only, no name parsing).
 function extractSectionLines(stateText, header) {
@@ -619,9 +644,74 @@ function extractSectionLines(stateText, header) {
   const idx = stateText.indexOf(header);
   if (idx === -1) return [];
   const after = stateText.slice(idx);
-  const end = after.search(/\n(\*\*[A-Z]|---)/); // next bolded header or section break
+  // Next bolded header, section break, or H2 heading. The H2 arm is SES-245: once a section
+  // can START at an H2 (see LAST_SESSIONS_HEADERS below), the old two-arm terminator can no
+  // longer see that section's END, so the window ran to EOF. Harmless on today's generated
+  // file -- which ends on this very section -- and a silent over-run the moment the renderer
+  // appends anything below it. The leading \n is what keeps the start marker itself from
+  // terminating its own window.
+  const end = after.search(/\n(\*\*[A-Z]|---|## )/);
   const window = end === -1 ? after : after.slice(0, end);
   return window.split("\n").filter(l => /^\-\s/.test(l));
+}
+
+// ---- The "Last 3 sessions" section header has exactly ONE home (SES-245, v7.0.330) ----
+// CLAUDE-STATE.md has been GENERATED since SES-177, and scripts/render-claude-state.js emits
+// this section as an H2 -- `lines.push("## Last 3 sessions", "")`. Two checks in this file had
+// the retired hand-written form `**Last 3 sessions:**` hard-coded INDEPENDENTLY (check 2's
+// indexOf, check 1b's extractSectionLines call), so both matched nothing on every run while the
+// section sat right there with three real entries in it.
+//
+// MEASURED at this ship, not inferred: 0 lines against the retired string, 3 against the emitted
+// one -- and the longest of the three sat within 20 characters of check 1b's 800-char cap (783 /
+// 785 / 118 on the tree as found; 762 / 783 / 785 after this ship's own render, which is why the
+// durable claim here is the MARGIN and not the three numbers -- they move on every render). The
+// check was MIS-TARGETED, never vacuous, which is why SES-245's remainder RETARGETS it rather than
+// retiring it: retiring would have deleted a check whose population is live and sitting ~2% under
+// its own bar.
+//
+// The retired form is KEPT as a transition fallback -- the same dual-home shape
+// extractInFlightBullets() already uses for inflight/ and .claude/inflight/. It costs nothing and
+// still reads a CLAUDE-STATE.md that predates SES-177.
+//
+// ONE HOME: a new reader of this section resolves it HERE. Re-typing the string at a third call
+// site rebuilds exactly the drift this fixed.
+const LAST_SESSIONS_HEADERS = Object.freeze(["## Last 3 sessions", "**Last 3 sessions:**"]);
+
+// Pure: text in, position out. Returns { header, idx } for whichever form is present, preferring
+// the H2 the renderer actually emits -- or null when neither is, which is a real answer and not
+// an error (a CLAUDE-STATE.md with no such section has nothing for either check to measure).
+function findLastSessionsHeader(stateText) {
+  if (!stateText) return null;
+  for (const header of LAST_SESSIONS_HEADERS) {
+    const idx = stateText.indexOf(header);
+    if (idx !== -1) return { header, idx };
+  }
+  return null;
+}
+
+const LAST_SESSIONS_BULLET_CAP = 3;
+
+// Check 2's pure half (SES-245). Bullet count in the "Last 3 sessions" section, or null when the
+// section is absent -- which is a real answer, not an error.
+//
+// WHY THIS IS RETARGETED RATHER THAN RETIRED, stated honestly rather than implied: unlike check
+// 1b's arm, check 2 has NO live population and cannot get one from the renderer -- render-claude-
+// state.js emits `cycles.slice(0, 3)`, so more than three bullets is unreachable BY CONSTRUCTION.
+// So this is a REGRESSION GUARD, not a live check: it fires if that slice is ever widened, or if
+// someone hand-edits a file whose own header says not to. That is worth one line and no more, and
+// claiming it watches a live population would be the overstatement this file keeps warning about.
+// It shares the header resolver because leaving the retired literal here would keep a second copy
+// of the exact fact that broke -- which is the defect, not the check's reach.
+function lastSessionsBulletCount(stateText) {
+  const found = findLastSessionsHeader(stateText);
+  if (found === null) return null;
+  const after = stateText.slice(found.idx);
+  // Stop at the next "---" section break or the next H2, whichever is first. The H2 arm is
+  // SES-245's: under the emitted heading there is no "---" left in the generated file to stop on.
+  const sectionEnd = after.search(/\n(---|## )/);
+  const window = sectionEnd === -1 ? after : after.slice(0, sectionEnd);
+  return (window.match(/^\-\s/gm) || []).length;
 }
 
 // (Retargeted 2026-07-21, SES-011 -- "In flight now" is no longer a
@@ -648,6 +738,15 @@ function extractInFlightBullets(stateText) {
 // against this file's own real entries at the time this check was written --
 // generous enough for a genuinely detailed 3-4 sentence bullet, tight enough to
 // catch a paragraph masquerading as one.
+//
+// THE CAP IS DELIBERATELY NOT RECALIBRATED BY SES-245, and that is a decision rather than an
+// omission. Retargeting the check is what makes it able to SEE its section at all; moving the
+// threshold in the same ship would confound the change under test with a threshold change, which
+// is the ratchet rule check 3d states three comments below. The longest live entry sits within 20
+// characters of this 800 -- so the first verbose ship card after this lands is expected to trip
+// it, and that is the check working, not a regression. Whoever holds that finding decides whether
+// 800 is still the right number for the runner's register; it was calibrated in the hand-written
+// era, and the honest reading is that it has not been re-examined since.
 const ENTRY_LENGTH_CAP = 800;
 
 // ---- Check 3d: per-ROW character cap (added SES-25a) ----
@@ -676,14 +775,24 @@ function checkEntryLengths(findings, stateText) {
     }
   }
 
-  // "Last 3 sessions" is unmoved (Context's explicit scope decision, SES-011)
-  // -- still a CLAUDE-STATE.md text block, checked the same way as before.
-  for (const line of extractSectionLines(stateText, "**Last 3 sessions:**")) {
+  // "Last 3 sessions" is unmoved (Context's explicit scope decision, SES-011) -- still a
+  // CLAUDE-STATE.md text block. What DID move is the heading it is written under: since
+  // SES-177 the file is generated and the renderer emits an H2, so the literal
+  // `**Last 3 sessions:**` this loop used to pass matched nothing on every run and this arm
+  // reported zero findings against a section holding three real entries (SES-245, v7.0.330).
+  // Resolve the header, never re-type it.
+  const lastSessions = findLastSessionsHeader(stateText);
+  for (const line of lastSessions === null ? [] : extractSectionLines(stateText, lastSessions.header)) {
     const len = line.length;
     if (len > ENTRY_LENGTH_CAP) {
       const nameMatch = line.match(/`([a-z0-9-]+-\d{4})`/i) || line.match(/^-\s*(\S+)/);
       const label2 = nameMatch ? nameMatch[1] : line.slice(0, 40) + "...";
-      findings.push({ check: "1b", severity: "FLAG", detail: `"Last 3 sessions" entry "${label2}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings)` });
+      // THE REMEDIATION NAMES THE SOURCE, NOT THIS FILE (SES-245). CLAUDE-STATE.md is generated
+      // and says so in its own first lines, so telling a reader to trim the bullet points them at
+      // a file the next render overwrites. These bullets are render-claude-state.js's
+      // renderBullet() concatenating the ship card's plain_after + plain_worth verbatim, with no
+      // truncation anywhere -- so the length lives in runner_items, and that is where it is fixed.
+      findings.push({ check: "1b", severity: "FLAG", detail: `"Last 3 sessions" entry "${label2}" is ${len} chars, over the ${ENTRY_LENGTH_CAP}-char cap -- likely paragraph bloat (STANDARDS.md: default to 2-4 sentences, full narrative only for genuinely novel findings). CLAUDE-STATE.md is GENERATED: fix this in the ship card's runner_items.plain_after / plain_worth, or in scripts/render-claude-state.js's renderBullet(), never by editing the rendered line` });
     }
   }
 }
@@ -1568,6 +1677,16 @@ export {
   importsRealImplementation,
   backtickedSubjectNames,
   checkRecreatedLogicInKickoffs,
+  // SES-245 -- checks 1b and 2's "Last 3 sessions" half, pure pieces only (text in, positions and
+  // counts out; no disk, no exit). Exported so the guard drives the REAL resolver rather than a
+  // copy of the header string, which is the very thing that drifted (STANDARDS.md Section 4).
+  LAST_SESSIONS_HEADERS,
+  LAST_SESSIONS_BULLET_CAP,
+  findLastSessionsHeader,
+  lastSessionsBulletCount,
+  extractSectionLines,
+  checkEntryLengths,
+  ENTRY_LENGTH_CAP,
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
