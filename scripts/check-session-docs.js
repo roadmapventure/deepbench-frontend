@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.301 | scripts/check-session-docs.js | SES-205 -- collectFindings(): main()'s
+// collection block extracted VERBATIM so scripts/tripwire-to-backlog.js can file against the real
+// implementation instead of parsing this script's stdout. No check was added, removed, reordered
+// or reconfigured, and THIS SCRIPT STAYS REPORT-ONLY -- the writer lives in its own file, because
+// this one is the CI gate and SES-199 deliberately kept its bare output byte-identical. Proven
+// rather than asserted: the bare CLI's output diffs clean against origin/dev's own copy run on the
+// same tree. GATING_CHECKS/GATING_SEVERITY are now also read by that engine to decide what never
+// files (a gating FLAG already fails CI, so it cannot go unnoticed) -- imported, never copied.
 // DeepBench v7.0.281 | scripts/check-session-docs.js | SES-45 -- CHECK 14, the remaining half of
 // the ticket. STANDARDS.md's SES-45 rule (Section 4, "A test must assert against the REAL
 // implementation. Logic recreated inside the test file is not a test -- it is a second
@@ -1451,7 +1459,16 @@ function checkRecreatedLogicLint(findings) {
   checkRecreatedLogicInKickoffs(findings, kickoffDocs, repoSymbols);
 }
 
-function main() {
+// SES-205. Every check main() runs, in main()'s order, returning the findings array instead of
+// printing it. This is a VERBATIM extraction -- no check was added, removed, reordered or
+// reconfigured -- so `collectFindings()` and the bare CLI produce the same findings by
+// construction, which is what lets scripts/tripwire-to-backlog.js file against the REAL
+// implementation rather than parsing this script's stdout. Parsing the prose was the alternative
+// and it is the one STANDARDS.md Section 4's SES-45 rule exists to refuse: a second reader of a
+// format nobody versioned is a second implementation agreeing with itself until the day it does
+// not. Not pure -- it reads disk and shells out to git, exactly as main() always has; the pure
+// halves stay the per-check helpers the guards already drive.
+function collectFindings() {
   const findings = [];
   const stateText = checkClaudeState(findings);
   checkEntryLengths(findings, stateText);
@@ -1469,6 +1486,12 @@ function main() {
   const freshArchiveText = freshDevText("docs/FEATURES-ARCHIVE.md", readIfExists(path.join(WORKTREE, "docs", "FEATURES-ARCHIVE.md")));
   checkWorktrees(findings, freshStateText);
   checkBulletStaleness(findings, freshStateText, freshArchiveText);
+
+  return findings;
+}
+
+function main() {
+  const findings = collectFindings();
 
   const flags = findings.filter(f => f.severity === "FLAG");
   const warns = findings.filter(f => f.severity === "WARN");
@@ -1518,10 +1541,15 @@ export {
   RETIREMENT_VOCAB,
   RETIREMENT_WINDOW,
   // SES-199 -- the gating policy, exported so the guard drives the real set rather than a copy.
+  // SES-205 reads the SAME two symbols to decide what never files: a gating FLAG already fails CI,
+  // so it cannot go unnoticed, and being unnoticed is the whole of what SES-205 fixes. Importing
+  // rather than copying is what makes the two policies impossible to drift apart.
   GATING_CHECKS,
   GATING_SEVERITY,
   gatingFindings,
   gateModeRequested,
+  // SES-205 -- every check main() runs, findings out, nothing printed. See its comment.
+  collectFindings,
   // SES-200 -- checks 12 and 13, pure halves only (findings in, findings out; no disk, no exit).
   enclosingParagraph,
   statementContentWords,
