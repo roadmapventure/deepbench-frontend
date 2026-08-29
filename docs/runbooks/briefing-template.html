@@ -37,6 +37,26 @@
      comment is matched by scanners that look for the real thing, and it skewed this very cycle's
      first offset measurement before it was caught).
 
+     DeepBench v7.0.314 | runbooks/briefing-template.html | SES-236 — NEW §17, The Prime Directive,
+     APPENDED at the end of the locked order (John, gated card a8eaee1d: extend the list, never
+     renumber it — the §15/§16 precedent), plus §8's header row and board line becoming ANCHORS
+     because §8 now renders two different things. Directive a0ef9525 §7 wants its text VERBATIM on
+     every rebuild and §7b wants §8 to show the Prime-Directive pick order rather than the P1-P10
+     board. THE PANEL ADDS NO CSS AND NO NEW CLASS, and that is the SES-178 rule for the SES-188
+     reason: every rule added to #s sits ABOVE the state block. §17 is built from h2/.secnum, bare
+     <p>, .tnote, .empty, .mono, .tscroll and table/th/td.dim/td.ttl2 — all of which §8/§11/§15/§16
+     already ship. THE PLACEMENT QUESTION THE TICKET OWNED, answered by measurement and not taste:
+     briefing-state sits at byte 2,624 of this file (1.6%) and doc() emits it FIRST in the body
+     before #f/#s, while sections render into #page — AFTER it on both paths — so a ~7.6 KB verbatim
+     body is provably below the block and costs a harvesting cycle nothing. A FOLD WAS REJECTED for
+     a second reason: a folded section is one John can leave closed, and §7's point is that this is
+     standing law he reads. THE EDIT THIS FORBIDS: summarising the body to save bytes — §7 makes the
+     runner_directives row the truth and this page its mirror, so a paraphrase makes the page a
+     SECOND source that can disagree, the exact failure §7 names. §8's two new anchors are must()
+     rather than sample text for the SES-178 reason: a template edit that reflows the header row
+     fails LOUDLY at exit 2 rather than publishing board headers over pick-order rows. Guarded by
+     tests/regression/SES-236-prime-directive-briefing.js.
+
      DeepBench v7.0.297 | runbooks/briefing-template.html | directive db84b784 — §15 GAINS ITS
      BURN-DOWN BLOCK, and the two numbers John has twice been shown as one are finally rendered as
      two. His word, attended architect session 2026-08-28, verbatim: "yes, build the burn-down with
@@ -1433,6 +1453,12 @@
     // a value, "epic: —", rather than as "belongs to no epic".
     +'<h2><span class="secnum">8</span>The queue — top 12 of 562 numbered</h2>'
     +'<div class="tscroll"><table>'
+    // SES-236 — THE HEADER ROW IS AN ANCHOR NOW, because §8 renders TWO different things. While
+    // the Selfbuild Prime Directive stands (runner_directives a0ef9525 §7b) this table is the
+    // PICK ORDER — what the next cycles will actually take — and its columns are #/Lane/ID/…;
+    // when the directive is not standing it is the P1-P10 board exactly as before. The builder
+    // swaps this line, so a template edit that reflows it fails LOUDLY at exit 2 rather than
+    // publishing board headers over pick-order rows.
     +'<tr><th>Queue</th><th>ID</th><th>Epic</th><th>Class</th><th>Status</th>'
     +'<th>Design status</th><th>Title</th></tr>'
     // Titles below are backlog_display_title() trimmed to ~70 at a WORD boundary with an ellipsis
@@ -1452,6 +1478,11 @@
     +queueRow(11,'LOG-134','','P5 - Enhancements','open','—','**`Post-beta`** (dormant rows render nothing &mdash; invisible, not&hellip;')
     +queueRow(12,'LAV-30','','P5 - Enhancements','open','—','**`Post-beta`** (receipt copy quality on the Agent Console + CHI&hellip;')
     +'</table></div>'
+    // SES-236 — the board line §7b names, verbatim: "below them a single line 'P1-P10 board:
+    // suspended by the Prime Directive until Selfbuild completes (N tickets waiting)'". The
+    // builder replaces it; when the directive is NOT standing it says so instead, because a
+    // section that always claimed suspension would be the same staleness class in reverse.
+    +'<p class="tnote">P1-P10 board: sample line &mdash; the builder replaces it.</p>'
     // SES-99 — the question list. Rebuild these rows from public.runner_questions WHERE
     // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows
     // below are sample values. A question that cannot be asked as yes/no does not belong here;
@@ -1808,6 +1839,35 @@
     +'hygiene), not necessarily a defect you would have reworked, so &ldquo;verifier &ge; '
     +'you&rdquo; is necessary for that bar and never sufficient. A block still does not stop a '
     +'push &mdash; the lane is verdict-only, on your split of card 10de5fb5.</p>'
+
+    // ===== §17 · THE PRIME DIRECTIVE (SES-236, v7.0.314) ==================================
+    // APPENDED, NEVER A RENUMBER — John, gated card a8eaee1d ("extend the list, never renumber
+    // it"), the same precedent §15 and §16 shipped under.
+    //
+    // WHY IT SITS HERE AND NOT IN A FOLD, measured rather than argued. §7 of directive a0ef9525
+    // says the text renders VERBATIM every rebuild, and the body is ~7.6 KB and grows with each
+    // amendment — which collides with the SES-188 read budget. It does not, and here is the
+    // measurement: `briefing-state` sits at byte 2,624 of this template (1.6%), and doc() emits
+    // the state block FIRST in the body, before #f/#s — that ordering IS SES-188's fix. Every
+    // section renders into #page, which is AFTER the block on both paths. So §17's growth is
+    // provably below the block and costs a harvesting cycle nothing. The guard asserts exactly
+    // that: briefing-state's byte offset in the BUILT page must be unchanged by this section.
+    //
+    // A FOLD WAS REJECTED FOR A SECOND REASON: a folded section is one John can leave closed,
+    // and §7's whole point is that this is standing law he reads, not an appendix.
+    //
+    // NO NEW CSS AND NO NEW CLASS (SES-178's rule, SES-188's reason): every rule added to #s sits
+    // ABOVE the state block. This section is built from h2/.secnum, bare <p>, table/th/td.dim —
+    // all of which §8/§11/§15/§16 already ship.
+    //
+    // THE EDIT THIS FORBIDS: summarising the body to save bytes. VERBATIM is John's explicit
+    // word; §7 makes this row the truth and the page merely its mirror, so a paraphrase here
+    // would make the page a SECOND source that can disagree — the exact failure §7 names.
+    // The builder splices between the two markers below; both are unique literals.
+    +'<h2><span class="secnum">17</span>The Prime Directive</h2>'
+    // §17-BODY-START
+    +'<p class="tnote">Sample &mdash; the builder splices this section from runner_directives.</p>'
+    // §17-BODY-END
     // SES-124 · REMOVED, on John's explicit instruction: the footer note. It restated the
     // read-only rule that the savebar already states in place, at the moment it matters, and
     // then closed the page on housekeeping instead of on his board. The read-only signal is

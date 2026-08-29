@@ -5,6 +5,92 @@
 
 ---
 
+## session/cycle-20260829-1611 (v7.0.314, 2026-08-29, runner cycle `5b3992dc-cc28-4231-badf-a0f0aca59128`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-236` — the briefing renders the Prime Directive verbatim, and §8 stops showing a queue the picker does not follow
+
+**Selection was `runner_directives` `5fdc72b1`, filed 16:09:49Z — 75 seconds before this cycle
+opened.** Prime Directive §2(a): John's §7/§7b word executed as a build order, and its own text says
+why it outranks the other Selfbuild picks — *"Until it ships the page disagrees with the live picker
+— the staleness class §7b names."* §4 honoured: the invention pass is suspended by the directive.
+
+**Premise revalidated live, not taken from the ticket:** `grep -i "prime.directive"` over
+`scripts/build-briefing.mjs` and `docs/runbooks/briefing-template.html` returned **zero matches in
+both files**, and §8's rows were spliced from `order=queue.asc&limit=12` — the P1–P10 board order.
+Both halves of the gap were real.
+
+**THE DESIGN QUESTION THE TICKET OWNED WAS PLACEMENT, AND IT WAS ANSWERED BY MEASUREMENT RATHER THAN
+TASTE.** §7 demands the directive body **verbatim** on every rebuild; the body is ~7.6 KB and grows
+with each amendment, against the `SES-188` read budget — three cycles have already declined a
+republish over exactly that budget. The ticket left placement open ("below the state block … or a
+fold"). Measured on the template: `briefing-state` sits at byte **2,624 (1.6%)**, and `doc()` emits
+it **first in the body** before `#f`/`#s` — which is `SES-188`'s own fix — while every section
+renders into `#page`, **after** it on both paths. So §17's growth is provably below the block.
+**Proven numerically at the ship rather than argued:** pages built from `origin/dev` and from this
+tree both put `briefing-state` at byte **2,624**, with the page **9,549 bytes larger**. A fold was
+rejected for a second reason — a folded section is one John can leave closed, and §7's point is that
+this is standing law he reads.
+
+**THE PART THAT IS NOT ABOUT THE PAGE AT ALL, and is the reason this is `M` rather than `S`.** §7b's
+bar is *"a queue display that disagrees with the live picker … must not ship"*, and the obvious build
+— reproducing the §2(a)-(c) selection in JavaScript inside the builder — **satisfies that on the day
+and breaks it later**, because it becomes a **third** expression of a predicate that already exists
+in `drain_chain_gate`'s §2e branch (`ses238`, attended). That is `SES-45`'s *"a second implementation
+agreeing with itself"*. So migration `ses236_prime_directive_queue` creates
+`public.prime_directive_queue()` as **one SQL home**, and `ses236_chain_gate_reads_one_home`
+**refactors `drain_chain_gate` to call it** — the page and the live chain gate now read the same rows
+by construction. `SES-238`'s own description had asked for exactly this.
+
+**THE REFACTOR IS AN EXTRACTION AND THAT WAS PROVEN, NEVER ASSERTED.** `drain_chain_gate`'s full
+output on cycle `04ddd470` was captured **before** the migration and is **byte-identical after** —
+`continue` / `gate_failed` NULL / `drain_outcome` `blocked` / `drain_pick` `SES-183` / the same §2e
+reason string. Gates A/C/D/E are unmoved. `pg_proc` count asserted **1** for both functions per
+`.claude/rules/supabase-function-signature.md`; grants asserted **both directions** per `SES-101`
+(`anon` false, `authenticated` false, `service_role` true).
+
+**THE EDIT THIS SHIP FORBIDS**, and it is the tempting tidy-up: excluding the drain lane's members
+from the `selfbuild` lane **inside the SQL** so a ticket cannot appear twice. That changes what the
+gate's §2e branch selects and silently breaks the equivalence above. The de-duplication is therefore
+done at **render** time, on `pdSeen`; the predicate stays whole.
+
+**BOTH SECTIONS ARE CONDITIONAL, which is what makes this additive rather than a rewrite of §8.**
+`prime_standing` is read from the function's **always-present `board` row** — the same predicate the
+gate uses — so when John revokes the directive §8 reverts to the P1–P10 board and §17 says so in
+words. An empty result cannot distinguish *"not standing"* from *"standing with nothing to pick"*,
+which is why that row is always emitted (the `SES-147` "NULL is not zero" boundary). §17 is
+**appended**, never a renumber (John, gated card `a8eaee1d`), and adds **no CSS and no new class**
+(`SES-178`'s rule for `SES-188`'s reason) — asserted structurally, not by eye.
+
+**Live result:** §8 renders 12 of 24 picks (5 directives, 0 drain, 19 Selfbuild) under
+*"P1-P10 board: suspended by the Prime Directive until Selfbuild completes (551 tickets waiting)"*;
+§17 carries the body verbatim plus a **derived** amendment history — §7b, §2e and §2f, each with its
+date and John's own words.
+
+**TWO NAMED DEVIATIONS, disclosed rather than buried (the `SES-196` convention).** (1) §2(c)'s prose
+says *"oldest first"* while the **shipped** picker orders by `queue`; the page must match the picker,
+not the prose, so it orders by `queue` and says so — filed as question `q-pd-oldest-first`.
+(2) `runner_directives` has **no column** separating a build order from a standing authorization, and
+five rows are queued of which one was a mission, so the directive lane renders **every** open queued
+directive — which is what a cycle actually reads at layer 1a — rather than inventing the split in a
+`LIKE` heuristic. Filed as `q-pd-mission-flag`. **Declared remainder:** the drain lane re-expresses
+`drain_epic_next`'s pick side, because that function **writes** (it retires a completed drain) and so
+cannot be called for display; consolidating the two is named, not absorbed.
+
+**QA, and the guard caught its own weakness before the ship rather than after.** 11 clauses, each
+with its own `breaks()` negative control, the `SES-158` vacuity meta-check, a structural no-new-CSS
+arm with its own injected-class control, and a **file-level** control running every clause against
+`origin/dev`'s pre-change tree. That last arm **failed on the first run** and was right to:
+`the-predicate-is-not-re-spelled-in-javascript` was written as an *absence* test, so it passed on the
+old tree too — describing the repo in general rather than pinning this ship. It is now conjunctive.
+Full suite **109/109**, build green, verifier **APPROVE** on all three gates
+(`runner_verdicts` `f69ae202`) with `auto_done_eligible` YES — so `SES-236` closes **`done`** under
+Prime Directive §2f, with a Reverse-capable ship card on the page.
+
+**Reported honestly rather than absorbed:** `SES-177` failed on the pre-render suite run and passed
+after `render-claude-state.js` — the `SES-213` ordering working exactly as designed, not a defect.
+
+Doc + script + test + two migrations; no `src`/`api`/`lib` change, no site change.
+
+---
+
 ## session/cycle-20260829-1540 (v7.0.313, 2026-08-29, runner cycle `04ddd470-199b-4f16-b6de-38b202ce1fe7`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent delegated) — shipped: `SES-66` — the account-wide Anthropic usage cap gets the pre-flight check the Vercel quota has had since `SES-015`
 
 **THE FIRST CYCLE TO RUN UNDER THE SELFBUILD PRIME DIRECTIVE** (`runner_directives` `a0ef9525`,

@@ -1,4 +1,43 @@
 #!/usr/bin/env node
+// DeepBench v7.0.314 | scripts/build-briefing.mjs | SES-236 — THE PAGE STOPS DISAGREEING WITH THE
+// PICKER. Two clauses of directive a0ef9525 land: §7 renders the Prime Directive VERBATIM as a new
+// §17, and §7b re-derives §8 from the Prime Directive's own pick order. THE THING TO READ TWICE is
+// WHERE the predicate lives. §7b's bar is "a queue display that disagrees with the live picker is
+// the SES-167/SES-188 staleness class and must not ship", and the obvious build — reproducing the
+// §2(a)-(c) selection in JavaScript here — SATISFIES IT ON THE DAY AND BREAKS IT LATER, because it
+// makes a THIRD expression of a predicate that already exists in drain_chain_gate's §2e branch
+// (ses238, attended). That is SES-45's "a second implementation agreeing with itself" and is the
+// defect this ticket names. So migration ses236_prime_directive_queue creates
+// public.prime_directive_queue() as ONE SQL home and ses236_chain_gate_reads_one_home REFACTORS
+// drain_chain_gate TO CALL IT — the gate and this page now read the same rows by construction.
+// THE REFACTOR IS AN EXTRACTION AND THAT WAS PROVEN, NOT ASSERTED: drain_chain_gate's full output
+// on cycle 04ddd470 was captured BEFORE the migration and is byte-identical after (continue /
+// gate_failed null / drain_outcome blocked / drain_pick SES-183 / same §2e reason string); Gates
+// A/C/D/E are unmoved; pg_proc count asserted 1 for both functions per
+// .claude/rules/supabase-function-signature.md; grants asserted BOTH directions per SES-101 (anon
+// false, authenticated false, service_role true).
+// THE EDIT THIS SHIP FORBIDS, and it is the tempting tidy-up: excluding the drain lane's members
+// from the selfbuild lane inside the SQL so a ticket cannot appear twice. That would change what
+// the gate's §2e branch selects and silently break the equivalence above — the de-duplication is
+// therefore done HERE, at render time, on `pdSeen`. The predicate stays whole.
+// §17's PLACEMENT was the design question SES-236 owned, and it was answered by measurement rather
+// than taste: `briefing-state` sits at byte 2,624 (1.6%) of the template and doc() emits it FIRST
+// in the body before #f/#s (SES-188's own fix), while every section renders into #page, which is
+// AFTER it on both paths. So the ~7.6 KB verbatim body costs a harvesting cycle nothing, and the
+// guard asserts precisely that: briefing-state's byte offset in the BUILT page is unchanged.
+// BOTH SECTIONS ARE CONDITIONAL, which is what makes this additive rather than a rewrite of §8:
+// `prime_standing` is read from prime_directive_queue()'s always-present `board` row — the same
+// predicate the gate uses — so when John revokes the directive §8 reverts to the P1-P10 board and
+// §17 says so in words. An empty result cannot tell "not standing" from "standing with nothing to
+// pick", which is why that row is always emitted (the SES-147 "NULL is not zero" boundary).
+// TWO NAMED DEVIATIONS, disclosed rather than buried (the SES-196 convention): §2(c)'s prose says
+// "oldest first" while the SHIPPED picker orders by `queue`, and the page must match the picker,
+// not the prose (question q-pd-oldest-first); and runner_directives has no column separating a
+// mission from a standing authorization, so the directive lane renders EVERY open queued directive
+// — which is what a cycle actually reads at layer 1a — rather than inventing the split in a LIKE
+// heuristic (question q-pd-mission-flag).
+// Guarded by tests/regression/SES-236-prime-directive-briefing.js.
+//
 // DeepBench v7.0.308 | scripts/build-briefing.mjs | SES-222 — TWO SPLICES ESCAPED DATABASE TEXT THAT
 // THE TEMPLATE ESCAPES AGAIN, and esc() is not idempotent, so John read the escape sequence. The rule
 // was already written next to esc() itself (SES-208, v7.0.255): ESCAPE WHAT CAME OUT OF THE DATABASE,
@@ -445,14 +484,76 @@ const displayTitle = async (b) => {
 };
 const titles = {};
 for (const b of board) titles[b.backlog_id] = await displayTitle(b);
+
+// SES-236 (v7.0.314) — §8 RENDERS THE PRIME DIRECTIVE'S PICK ORDER WHILE a0ef9525 STANDS.
+// §7b, verbatim: "the briefing's queue section must render the PRIME-DIRECTIVE-ORDERED pick list,
+// not the P1-P10 board order — i.e. what the next cycles will ACTUALLY pick … A queue display that
+// disagrees with the live picker is the SES-167/SES-188 staleness class and must not ship."
+//
+// THE PREDICATE IS NOT WRITTEN HERE AND MUST NEVER BE. public.prime_directive_queue() is the one
+// SQL home (migration ses236_prime_directive_queue) and drain_chain_gate's §2e branch reads the
+// SAME function, so the page and the live chain gate cannot drift. Re-deriving the lanes in JS is
+// SES-45's "a second implementation agreeing with itself" and is the defect this ticket names.
+//
+// IT IS CONDITIONAL, WHICH IS WHAT MAKES IT ADDITIVE: prime_standing comes from the function's
+// always-present `board` row, so when John revokes the directive §8 reverts to the P1-P10 board
+// byte-for-byte. An empty result cannot distinguish "not standing" from "standing with nothing to
+// pick", which is why that row is always emitted (the SES-147 "NULL is not zero" boundary).
+const pdq = await rpc('prime_directive_queue');
+const pdBoard = pdq.find(r => r.lane === 'board') || { prime_standing: false, board_waiting: 0 };
+const pdStanding = pdBoard.prime_standing === true;
+// The DE-DUPLICATION IS HERE, AT RENDER TIME, AND DELIBERATELY NOT IN THE SQL: excluding drain
+// members from the selfbuild lane inside the function would change what drain_chain_gate's §2e
+// branch selects and silently break the extraction's equivalence proof.
+const pdSeen = new Set();
+const pdPicks = pdq
+  .filter(r => r.lane !== 'board' && r.pos != null)
+  .sort((a, b) => a.pos - b.pos)
+  .filter(r => { if (pdSeen.has(r.ref)) return false; pdSeen.add(r.ref); return true; });
+const PD_TOP = 12;
+const pdShown = pdPicks.slice(0, PD_TOP);
+const LANE = { directive: 'Directive', drain: 'Drain', selfbuild: 'Selfbuild' };
+
+if (pdStanding && !pdShown.length) {
+  die('§8: the Prime Directive stands but prime_directive_queue() returned no picks — refusing to '
+    + 'publish the P1-P10 board under a Prime-Directive heading, and refusing to publish the '
+    + 'template\'s sample rows. A genuinely empty pick list is the PARKED state (§2(d)), not a page.');
+}
+
 must(`+'<h2><span class="secnum">8</span>The queue — top 12 of 562 numbered</h2>'`,
-  `+'<h2><span class="secnum">8</span>The queue &mdash; top 12 of ${total} numbered</h2>'`, '§8 heading');
-splice('+queueRow(1,', `+'</table></div>'\n    // SES-99 — the question list.`,
+  pdStanding
+    ? `+'<h2><span class="secnum">8</span>The queue &mdash; what the next cycles will pick '`
+      + `+'(top ${pdShown.length} of ${pdPicks.length})</h2>'`
+    : `+'<h2><span class="secnum">8</span>The queue &mdash; top 12 of ${total} numbered</h2>'`,
+  '§8 heading');
+
+must(`+'<tr><th>Queue</th><th>ID</th><th>Epic</th><th>Class</th><th>Status</th>'\n    +'<th>Design status</th><th>Title</th></tr>'`,
+  pdStanding
+    ? `+'<tr><th>#</th><th>ID</th><th>Where it sits</th><th>Lane</th><th>Status</th>'\n    +'<th>Design status</th><th>What it is</th></tr>'`
+    : `+'<tr><th>Queue</th><th>ID</th><th>Epic</th><th>Class</th><th>Status</th>'\n    +'<th>Design status</th><th>Title</th></tr>'`,
+  '§8 header row');
+
+splice('+queueRow(1,', `+'</table></div>'\n    // SES-236`,
   // SES-222: priority_class goes RAW — queueRow() esc()s it. The retired form was
   // J(H(cls).replace(/'/g,'&rsquo;')), which esc() then double-escaped into &amp;rsquo;. The epic
   // arg beside it has always been raw and has always rendered correctly; it is the control.
   // `title` stays H()'d via cut(), because queueRow() splices THAT one raw (see displayTitleRaw).
-  board.map(b => `+queueRow(${b.queue},${J(b.backlog_id)},${J(epics[b.epic_id] || '')},${J(b.priority_class)},${J(b.status)},${J(b.design_status || '—')},${J(titles[b.backlog_id] || cut(b.title))})\n    `).join(''), '§8 rows');
+  // The Prime-Directive rows below obey the SAME asymmetry: five esc()'d args raw, title H()'d.
+  (pdStanding
+    ? pdShown.map(r => `+queueRow(${J(String(r.pos))},${J(r.ref)},${J(r.lane_note || '')},`
+        + `${J(LANE[r.lane] || r.lane)},${J(r.item_status || '—')},${J(r.design_flag || '—')},`
+        + `${J(cut(r.title))})\n    `)
+    : board.map(b => `+queueRow(${b.queue},${J(b.backlog_id)},${J(epics[b.epic_id] || '')},${J(b.priority_class)},${J(b.status)},${J(b.design_status || '—')},${J(titles[b.backlog_id] || cut(b.title))})\n    `)
+  ).join(''), '§8 rows');
+
+// §7b's "single line" below the list, worded as the directive words it.
+must(`+'<p class="tnote">P1-P10 board: sample line &mdash; the builder replaces it.</p>'`,
+  pdStanding
+    ? `+'<p class="tnote">P1-P10 board: suspended by the Prime Directive until Selfbuild `
+      + `completes (${pdBoard.board_waiting} tickets waiting).</p>'`
+    : `+'<p class="tnote">P1-P10 board: live &mdash; no Prime Directive is standing `
+      + `(${pdBoard.board_waiting} tickets numbered outside Selfbuild).</p>'`,
+  '§8 board line');
 
 // §9 / §12 — asks, supplied by the cycle
 splice(`+question('9.1',`, '// ===== §9.1 · ANSWERED', questionRows, '§9');
@@ -637,6 +738,71 @@ must(`the lane started <b>Aug 25</b> and has '\n    +'graded <b>20</b> tickets, 
   `the lane started <b>${svStart}</b> and has '\n    +'graded <b>${svGraded.size}</b> tickets, of which <b>${svOverlap.length}</b> also carry a tap of yours &mdash; on those '\n    `
   + `+'it blocked at least once on <b>${svOverlapBlocked}</b> and you reworked or reversed <b>${svOverlapNeg}</b>. '\n    +'${svDepthLine}`, '§16 tnote');
 
+// §17 — THE PRIME DIRECTIVE, rendered VERBATIM (SES-236, v7.0.314). Directive a0ef9525 §7:
+// "This directive's full text renders VERBATIM in a standing briefing-page section … with
+// amendment history (date + John's word for each change). If the page and this row disagree, this
+// runner_directives row is the truth and the page is stale."
+//
+// VERBATIM IS THE WHOLE CONSTRAINT AND IS NOT NEGOTIABLE FOR BYTES. The only transformation is
+// paragraph breaking, and it is applied at whitespace that ALREADY separated the text — its own
+// newlines, plus the space before each bracketed amendment marker — so not one character of John's
+// words is added, dropped or reordered. Summarising to fit a budget would make this page a SECOND
+// source that can disagree with the row, which is precisely what §7 forbids.
+//
+// THE AMENDMENT HISTORY IS DERIVED FROM THE BODY, never maintained beside it, for the same reason:
+// a hand-kept list is a second copy that goes stale the first time John amends the row and nobody
+// updates the table.
+const pdRows = await sel("runner_directives?select=id,body,created_at&type=eq.directive"
+  + "&status=eq.queued&body=like.THE%20SELFBUILD%20PRIME%20DIRECTIVE*&order=created_at.desc&limit=1");
+const pdRow = pdRows[0] || null;
+if (pdStanding && !pdRow) {
+  die('§17: prime_directive_queue() reports the Prime Directive standing but no matching '
+    + 'runner_directives row came back — refusing to publish the template\'s sample text over a '
+    + 'section whose whole contract is that the row is the truth.');
+}
+
+let pdBlock;
+if (pdRow) {
+  const pdText = String(pdRow.body || '');
+  const pdParas = pdText.replace(/\s(\[§)/g, '\n$1').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const pdAmend = [...pdText.matchAll(/\[(§[^\s\]]+)\s+AMENDMENT([\s\S]*?)\]/g)].map(m => {
+    const rest = m[2];
+    const when = (rest.match(/(\d{4}-\d{2}-\d{2}(?:\s*~?\s*[0-9:xXzZ]+)?)/) || [])[1] || '—';
+    const word = (rest.match(/"([^"]{1,120})"/) || [])[1] || '—';
+    // WHAT IT CHANGED, in three fallbacks rather than one, because the amendments are not written
+    // to a template and two of the three shapes already differ. (1) an ALL-CAPS headline right
+    // after AMENDMENT ("— CONTINUOUS DRAIN,"); (2) otherwise the clause AFTER the first spaced em
+    // dash, which is where the substance sits once John's question and quote are out of the way;
+    // (3) otherwise the opening text. Without (2) a comma-form amendment renders its own preamble
+    // and repeats the quote already shown in the column beside it.
+    const caps = (rest.match(/—\s*([A-Z][A-Z0-9 '’\-]{5,60}?)\s*,/) || [])[1];
+    const tail = (rest.split(/\s—\s/)[1] || '').replace(/\s+/g, ' ').trim();
+    const what = caps ? caps.trim()
+      : (tail || rest.replace(/\s+/g, ' ').replace(/^[\s,—-]+/, '')).slice(0, 88);
+    return { label: m[1], when, word, what };
+  });
+  const cst = cstStamp(new Date(pdRow.created_at));
+  pdBlock =
+    `+${J(`<p class="tnote">Standing since ${H(cst)} CST &middot; runner_directives `
+      + `<span class="mono">${H(String(pdRow.id).slice(0, 8))}</span> &middot; this row is the truth; `
+      + `if this page disagrees with it, the page is stale (&sect;7).</p>`)}\n    `
+    + pdParas.map(p => `+${J('<p>' + H(p) + '</p>')}\n    `).join('')
+    + `+'<h2><span class="secnum">17.1</span>Amendment history</h2>'\n    `
+    + (pdAmend.length
+        ? `+'<div class="tscroll"><table><tr><th>Clause</th><th>When</th><th>Your word</th>'\n    `
+          + `+'<th>What it changed</th></tr>'\n    `
+          + pdAmend.map(a => `+${J(`<tr><td class="mono">${H(a.label)}</td><td class="dim">${H(a.when)}</td>`
+              + `<td class="ttl2">&ldquo;${H(a.word)}&rdquo;</td><td class="dim">${H(a.what)}</td></tr>`)}\n    `).join('')
+          + `+'</table></div>'\n    `
+        : `+'<p class="empty">No amendments yet &mdash; the directive stands as first written.</p>'\n    `);
+} else {
+  // NOT STANDING IS A REAL STATE AND SAYS SO. Rendering nothing would be indistinguishable from
+  // the builder failing to find the row, which is the failure mode this section must not have.
+  pdBlock = `+'<p class="empty">No Prime Directive is standing &mdash; the P1-P10 board in '\n    `
+    + `+'&sect;8 is live and selection follows the ordinary class order.</p>'\n    `;
+}
+splice('// §17-BODY-START', '// §17-BODY-END', pdBlock, '§17 Prime Directive body');
+
 // §2b — the AUTOMATION object (SES-162, v7.0.204). THIS BUILDER HAD NO ANCHOR FOR IT AT ALL, so
 // every page it built published the template's SAMPLE values: measured on the served artifact
 // 2026-08-23T18:1xZ, John's panel said his last run was "sample value — 12:41 AM CST · SES-143 ·
@@ -673,6 +839,12 @@ console.log(`  §15 Project: ${spRows.length} Selfbuild milestones, ${spDone}/${
 console.log(`  §15 burn-down: drain ${bdDrain ? `${bdOpen} of ${bdNamed} named open (${bdEpicName})` : 'none standing'}, `
   + `epic bucket ${bdDrain ? `${bdBucketOpen} of ${bdBucketTotal} open` : 'n/a'}; `
   + `remaining by size S ${bdS} / M ${bdM} / L ${bdL} / unstamped ${bdUn} (${bdRemaining.length} total)`);
+console.log(`  §8/§17 Prime Directive: ${pdStanding ? 'STANDING' : 'not standing'}`
+  + (pdStanding
+      ? ` — pick order ${pdShown.length} shown of ${pdPicks.length} (`
+        + ['directive', 'drain', 'selfbuild'].map(l => `${l} ${pdPicks.filter(r => r.lane === l).length}`).join(', ')
+        + `), board suspended with ${pdBoard.board_waiting} waiting`
+      : ` — §8 renders the P1-P10 board (${pdBoard.board_waiting} numbered outside Selfbuild)`));
 console.log(`  §16 Reviewer lane: verifier blocked ${svBlocks}/${sv30.length} (${svPct(svBlocks, sv30.length)}%), `
   + `your Rework+Reverse ${svNeg}/${svTaps30.length} (${svPct(svNeg, svTaps30.length)}%), `
   + `auto-done eligible ${svAuto}/${sv30.length}; like-for-like overlap ${svOverlap.length} `
