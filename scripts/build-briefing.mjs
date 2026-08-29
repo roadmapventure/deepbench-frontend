@@ -1,4 +1,30 @@
 #!/usr/bin/env node
+// DeepBench v7.0.308 | scripts/build-briefing.mjs | SES-222 — TWO SPLICES ESCAPED DATABASE TEXT THAT
+// THE TEMPLATE ESCAPES AGAIN, and esc() is not idempotent, so John read the escape sequence. The rule
+// was already written next to esc() itself (SES-208, v7.0.255): ESCAPE WHAT CAME OUT OF THE DATABASE,
+// NEVER WHAT THE BUILDER COMPOSED — and never twice. Both sites are the builder escaping DB text on a
+// path whose template side already calls esc(), so the fix is to drop the builder's copy, not to add
+// a second guard. (1) §15 msRow: the filed defect. public.epics holds exactly one name with an
+// ampersand — "Selfbuild M0 - Backup & Rollback" — so the live chain was & -> &amp; -> &amp;amp; and
+// M0's row rendered the literal "&amp;" every morning. Only M0 is affected, which is why eight ships
+// walked past it. (2) §8 queueRow's priority_class: FOUND BY THE SIBLING SWEEP THE TICKET ASKED FOR,
+// and it is NOT the ampersand. H() does not touch apostrophes; the .replace(/'/g,'&rsquo;') that
+// followed it did, and esc(cls) then turned that entity into &amp;rsquo; — so "P1 - Improves John's
+// Skills" renders as "P1 - Improves John&rsquo;s Skills". LATENT TODAY, said plainly rather than
+// claimed as a visible fix: §8 shows the top 12 and no P1 ticket is in it right now; it goes live the
+// moment one reaches the head of the board. Dropping the &rsquo; substitution is safe and was checked
+// rather than assumed — J() already escapes a backslash and then an apostrophe, so the single-quoted
+// literal stays well-formed without it.
+//
+// THE EDIT THIS SHIP FORBIDS, and it is the tempting consistency pass: dropping H() from classRow
+// (§11) or from cut() on §8's title as well. Those two are the MIRROR IMAGE — their template sides
+// splice RAW, so the builder is the only escaper and removing it renders class names and ticket prose
+// as live markup, which is SES-208's defect facing the other way. The asymmetry is deliberate and is
+// already stated at displayTitleRaw() below. Ask which side a NEW splice's template renderer is on
+// before copying either pattern. The internal control that proves which side is which: §8 passes the
+// SAME epic name raw and renders it correctly, while §15 pre-escaped it and did not.
+// Guarded by tests/regression/SES-222-double-escape.js.
+//
 // DeepBench v7.0.297 | scripts/build-briefing.mjs | directive db84b784 — §15's burn-down block is
 // DERIVED, never pasted forward: the drain's named-scope count, the epic's live bucket count, and
 // remaining Selfbuild work by size_stamp. The two counts are read from two different sources on
@@ -422,7 +448,11 @@ for (const b of board) titles[b.backlog_id] = await displayTitle(b);
 must(`+'<h2><span class="secnum">8</span>The queue — top 12 of 562 numbered</h2>'`,
   `+'<h2><span class="secnum">8</span>The queue &mdash; top 12 of ${total} numbered</h2>'`, '§8 heading');
 splice('+queueRow(1,', `+'</table></div>'\n    // SES-99 — the question list.`,
-  board.map(b => `+queueRow(${b.queue},${J(b.backlog_id)},${J(epics[b.epic_id] || '')},${J(H(b.priority_class).replace(/'/g, '&rsquo;'))},${J(b.status)},${J(b.design_status || '—')},${J(titles[b.backlog_id] || cut(b.title))})\n    `).join(''), '§8 rows');
+  // SES-222: priority_class goes RAW — queueRow() esc()s it. The retired form was
+  // J(H(cls).replace(/'/g,'&rsquo;')), which esc() then double-escaped into &amp;rsquo;. The epic
+  // arg beside it has always been raw and has always rendered correctly; it is the control.
+  // `title` stays H()'d via cut(), because queueRow() splices THAT one raw (see displayTitleRaw).
+  board.map(b => `+queueRow(${b.queue},${J(b.backlog_id)},${J(epics[b.epic_id] || '')},${J(b.priority_class)},${J(b.status)},${J(b.design_status || '—')},${J(titles[b.backlog_id] || cut(b.title))})\n    `).join(''), '§8 rows');
 
 // §9 / §12 — asks, supplied by the cycle
 splice(`+question('9.1',`, '// ===== §9.1 · ANSWERED', questionRows, '§9');
@@ -495,7 +525,9 @@ const spTotal = spRows.reduce((n, r) => n + r.total, 0);
 const spPct = spTotal ? (100 * spDone / spTotal).toFixed(1) : '0.0';
 if (!spRows.length) die('§15: no Selfbuild epics carry tickets — refusing to publish an empty Project panel over the template\'s sample rows');
 splice("+msRow('Selfbuild M0", `+'</table>'\n    +'<div class="bar">`,
-  spRows.map(r => `+msRow(${J(H(r.name))},${r.done},${r.total},'${r.total ? (100 * r.done / r.total).toFixed(1) : '0.0'}')\n    `).join(''), '§15 rows');
+  // SES-222: the epic name goes RAW — msRow() esc()s it. The retired J(H(r.name)) form turned
+  // "Selfbuild M0 - Backup & Rollback" into a rendered literal "&amp;" on John's page every morning.
+  spRows.map(r => `+msRow(${J(r.name)},${r.done},${r.total},'${r.total ? (100 * r.done / r.total).toFixed(1) : '0.0'}')\n    `).join(''), '§15 rows');
 must(`+'<div class="bar"><div class="dev" style="width:20.6%"></div></div>'`,
   `+'<div class="bar"><div class="dev" style="width:${spPct}%"></div></div>'`, '§15 bar');
 must(`+'<p class="barlbl">Overall &mdash; <b>14</b> of <b>68</b> Selfbuild tickets done '\n    +'(<b>20.6%</b>)</p>'`,
