@@ -239,8 +239,14 @@ function theDataRestoreIsReportedNotReplayed() {
   });
   assert.match(withImages.qa_evidence, /2 before-image\(s\)/,
     "the card must COUNT the before-images in the range");
-  assert.match(withImages.qa_evidence, /REPORTED, not replayed/,
-    "the slice-1 deferral must be stated on the card, not left to be discovered");
+  // SLICE 4 (v7.0.335) SUPERSEDED THE WORDING, NOT THE PROPERTY. Slice 1 wrote the literal
+  // "REPORTED, not replayed"; the card now renders summarizeRestorePlan(), which states the same
+  // thing on every branch ("NOTHING IS REPLAYED" with a plan, "nothing is replayed either way"
+  // without one). The clause is therefore pinned to the PROPERTY -- the card must always say the
+  // data was not put back -- because pinning the retired literal made this clause fail on a change
+  // that strengthened exactly what it protects. SES-182d-restore-plan.js asserts it branch by branch.
+  assert.match(withImages.qa_evidence, /not replayed|nothing is replayed/i,
+    "the card must always state that the data was NOT put back, not leave it to be discovered");
 
   const noImages = buildIncidentCard(d, { cycleId: "c", headSha: HEAD, beforeImages: [], trigger: "ci-red" });
   assert.match(noImages.qa_evidence, /No before-images/,

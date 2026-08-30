@@ -5,6 +5,67 @@
 
 ---
 
+## session/cycle-20260830-1940 (v7.0.335, 2026-08-30, runner cycle `dfee1925-8456-4546-8d3d-c106f6d55d88`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, with a **Fable 5 subagent** for the judgment-dense design pass per register B21: unlike slices 1–3 this slice had no standing design, because `v7.0.324` §8 deliberately left the data-restore remainder unwritten as "a design question, not a slice a cycle should assume") — `SES-182` (slice 4) — the data-restore PLAN: classify every touched row, apply nothing
+
+**Picked by the M3 drain** (`drain_epic_next` → `pick`, `open_now = 1`, directive `9feb7018`, epic
+`Selfbuild M3 - Independent Verification`). Premise revalidated live against
+`scripts/rollback-on-red.js:366-375` — the engine reports before-images and replays none.
+
+**What shipped.** `public.plan_data_restore(uuid)` (migration `ses182d_restore_plan`) classifies the
+before-images of a reverted range — `restorable` / `unverifiable` / `refused` — and **applies
+nothing**; `readRestorePlan()` + the pure `summarizeRestorePlan()` render it onto the incident card,
+which stops saying *"N before-image(s) … REPORTED, not replayed"* and starts saying what could and
+could not be put back, with the ground for each. The resolver is in Postgres for three reasons that
+are facts, not taste: SQL `NULL` and the jsonb scalar `'null'` are indistinguishable through a
+PostgREST read; an arbitrary table's primary key is a catalog question and the repo carries no
+schema SQL; and the **oldest** image per `(table, pk)` is the true pre-range state.
+
+**THE TWO REFUSAL GROUNDS THAT MUST NEVER MERGE:** `refused`-for-staleness means *checked and it
+moved*; `unverifiable` means *cannot check* (no `updated_at`). Both are unsafe to apply and they are
+different facts John acts on differently. The guard's negative control is exactly the collapsed
+one-bucket form, run on the same fixture and asserted to LOSE.
+
+**Two things found live, measured over all 3,109 attributed before-images:**
+- **`table_name` is not always a table** — 19 images carry a provenance label where a table name
+  belongs (`pg_proc:scheduler_gate`, `the_library (DDL)`, a whole sentence beginning
+  `drill-project itcimllfniypelrxsuoh: DROP SCHEMA public CASCADE`). An engine that trusted the
+  column would resolve garbage and, on an upsert, write a junk row into production — the failure the
+  ticket feared, arriving from a direction it did not name.
+- **136 images store something that is not the primary key** (135 `backlog_items`, 1 `epics`), so
+  §19v's *"no before-image, no write"* promise is unredeemable for them. Filed as **`SES-251`**. The
+  obvious repair is a trap: `backlog_id` has no unique constraint (`CHI-48` occupies two rows,
+  `SES-97`), so a fallback to it would restore **both** rows.
+
+**A RED THIS CYCLE CAUSED, CAUGHT, AND FILED RATHER THAN QUIETLY FIXED — read this before writing a
+regression test.** The first draft of `SES-182d-restore-plan.js` was a top-level script that called
+`process.exit()`. `run-all.js` **imports** each test and awaits its default export
+(`run-all.js:142-146`), so that draft did not fail — it **terminated the whole suite mid-run**,
+skipping every alphabetically later file and exiting **0 with no summary line**, i.e. reporting
+GREEN on a suite that had just printed `[FAIL] SES-182-rollback-on-red.js`. `verifier.js` consumed
+that exit 0 and recorded an `approve` verdict (`runner_verdicts 8fc3748b`). It was caught only
+because the verdict's own regression detail carried a `[FAIL]` line beside `exit 0` and that
+contradiction was checked instead of trusted. The test is rewritten in the correct shape; the
+**gate's** fragility is pre-existing and is filed as **`SES-252`**.
+
+**The slice-1 clause was updated, not disabled.** `SES-182-rollback-on-red.js` pinned the literal
+`REPORTED, not replayed`. Slice 4 supersedes the wording and keeps the property, so the clause now
+asserts the property (`/not replayed|nothing is replayed/i`) and `SES-182d` asserts it branch by
+branch — including the branch where the plan cannot be read at all, which is UNKNOWN and never
+"nothing to restore".
+
+**QA.** Build green. Regression **126/126, exit 0, summary line reached** (that last part is the
+evidence the truncation is gone). Verifier **APPROVE**, all three gates green, `auto_done_eligible`
+YES — and **declined**: the remainder is a genuine design question, and the Prime Directive's §2f
+says uncertain → deliver and card, never auto-done. Grants asserted both directions in the
+migration (`anon` false, `service_role` true) and `count(*) = 1` on the overload. File-level negative
+control: the guard cannot even load against `origin/dev`'s engine.
+
+**Ticket state.** `SES-182` stays `partial`, `design_status = 'needs-john'` — the apply lane is his
+call, on the gated card. Consequence stated rather than hidden: M3's drain now has no claimable
+member, so the chain stops and M3's finish line is on his briefing page.
+
+---
+
 ## session/cycle-20260830-1840 (v7.0.334, 2026-08-30, runner cycle `450aa2fa-1455-41cb-996a-62d6eb1f489f`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent: register B21 routes judgment-dense *design* to Fable 5, and the design for this slice was already standing from `v7.0.324` §8, which names it by name) — `SES-182` (slice 3) — deploy-serving-red becomes a real trigger
 
 **Picked by the M3 drain** (`drain_epic_next` → `pick`, `open_now = 1`, directive `9feb7018`, epic

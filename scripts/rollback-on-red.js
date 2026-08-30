@@ -1,9 +1,17 @@
 #!/usr/bin/env node
-// DeepBench v7.0.333 | scripts/rollback-on-red.js | SES-182 slices 1-2
+// DeepBench v7.0.335 | scripts/rollback-on-red.js | SES-182 slices 1-4
 // FEATURE: SES-182 -- auto-rollback on red. Slice 1 of the kickoff v7.0.324 design: record the
 // rolling "last green state", and on an attributable CI red decide between reverting a CODE-ONLY
 // range and carding everything else. John authorised the build 2026-08-30 (card 2c136c5b, Q2
 // "BUILD NOW"); Q1 is settled and enforced here -- see THE VERIFIER IS NOT A TRIGGER below.
+//
+// -- SLICE 4 (v7.0.335): THE DATA-RESTORE PLAN -- CLASSIFY EVERY TOUCHED ROW, APPLY NOTHING ---
+// Slice 1's card said "N before-image(s) ... REPORTED, not replayed", which is true and useless:
+// it names that something was touched and says nothing about whether it could be put back.
+// public.plan_data_restore() answers the second question in the database (see readRestorePlan);
+// summarizeRestorePlan() renders it. THE APPLY LANE IS NOT BUILT AND IS NOT THIS CYCLE'S TO BUILD --
+// it is on the ship card as John's question, and unanswered defaults to list-only. Two grounds that
+// must never merge: `refused`-for-staleness is CHECKED AND IT MOVED, `unverifiable` is CANNOT CHECK.
 //
 // -- SLICE 2 (v7.0.333): A RANGE WITH MIGRATIONS IS NO LONGER AUTOMATICALLY CARD-ONLY ------
 // Slice 1 carded EVERY moved-watermark range, by construction, because no down existed to apply.
@@ -363,16 +371,15 @@ export function revertPlanFor(greenSha, headSha) {
 // backlog_id stays NULL and the human reference goes in display_ref -- SES-116: backlog_id is a
 // JOIN KEY and composing a reference into it silently broke 63 of 80 card->ticket joins.
 export function buildIncidentCard(decision, ctx = {}) {
-  const { cycleId = null, headSha = null, beforeImages = [], trigger = "ci-red" } = ctx;
+  const { cycleId = null, headSha = null, beforeImages = [], trigger = "ci-red", restorePlan = null } = ctx;
   const reverted = decision.action === ACTIONS.REVERT_AND_CARD;
   const shortSha = headSha ? String(headSha).slice(0, 7) : "(unknown sha)";
 
-  const imageTables = [...new Set(beforeImages.map((i) => i.table_name))].sort();
-  const dataRecord =
-    beforeImages.length === 0
-      ? "No before-images were written in the reverted range, so no data was changed by it."
-      : `${beforeImages.length} before-image(s) across ${imageTables.length} table(s) (${imageTables.join(", ")}) ` +
-        `were written in this range. They are REPORTED, not replayed -- data restore is a named deferral.`;
+  // SES-182 slice 4. Slice 1's sentence -- "N before-image(s) across M table(s) ... REPORTED, not
+  // replayed" -- was true and useless: it said something was touched and nothing about whether it
+  // could be put back. The plan answers the second question. It still replays nothing, and
+  // summarizeRestorePlan() says so verbatim on every branch.
+  const dataRecord = summarizeRestorePlan(restorePlan, beforeImages.length);
 
   // The schema record (slice 2). Absent on a code-only range, and that is the honest rendering:
   // there was no schema question to answer. Present otherwise, saying either what will be downed or
@@ -482,6 +489,73 @@ export async function readBeforeImages(base, key, cycleId) {
   const r = await rest(base, key, `runner_before_images?select=table_name,pk_value&cycle_id=eq.${encodeURIComponent(cycleId)}`);
   if (r.error) return { error: `could not read before-images: ${r.error}` };
   return { images: r.rows };
+}
+
+// SES-182 slice 4. The row-level twin of readCapturedDowns: the ENGINE ASKS, THE DATABASE DECIDES.
+// The classification cannot be done out here -- SQL NULL and the jsonb scalar 'null' are
+// indistinguishable through a PostgREST read, and the primary key of an arbitrary table is a
+// catalog question -- so this is one RPC call, exactly like every other read in this file.
+//
+// A plan that could not be fetched is UNKNOWN, never "nothing to restore": the caller renders the
+// slice-1 sentence unchanged rather than a reassuring one, the same fail-closed direction
+// `--migrations` takes when it is omitted on a red.
+export async function readRestorePlan(base, key, cycleId) {
+  if (!cycleId) return { plan: null };
+  const r = await rest(base, key, "rpc/plan_data_restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ p_cycle_id: cycleId }),
+  });
+  if (r.error) return { error: `could not read the data-restore plan: ${r.error}` };
+  return { plan: r.rows };
+}
+
+// Pure, exported, and bounded -- the summarizeGateOutput() shape, and kept pure for the same
+// reason: a summarizer buried inside the fetch is observable only through a real incident, which
+// is how a defect survives 26 rows.
+//
+// THE TWO REFUSAL GROUNDS IT MUST NEVER MERGE: 'refused' with a stale reason means CHECKED AND IT
+// MOVED; 'unverifiable' means CANNOT CHECK. Collapsing them into "not restorable" throws away the
+// distinction John decides on, and is the edit this function forbids.
+export const RESTORE_CLASSES = ["restorable", "unverifiable", "refused"];
+export const RESTORE_REASON_CAP = 3;
+
+export function summarizeRestorePlan(plan, imageCount = 0) {
+  if (!Array.isArray(plan)) {
+    return imageCount === 0
+      ? "No before-images were written in the reverted range, so no data was changed by it."
+      : `${imageCount} before-image(s) were written in this range. The restore plan could not be read, ` +
+        `so what could be put back is UNKNOWN -- nothing is replayed either way.`;
+  }
+  if (plan.length === 0) {
+    return "No before-images were written in the reverted range, so no data was changed by it.";
+  }
+  const by = (c) => plan.filter((p) => p.classification === c);
+  const restorable = by("restorable");
+  const unverifiable = by("unverifiable");
+  const refused = by("refused");
+
+  // Named grounds, commonest first, capped -- a 476-row plan must not put 476 sentences on a card.
+  const grounds = [...refused, ...unverifiable].reduce((m, p) => {
+    const g = String(p.reason ?? "unstated").split(" -- ")[0];
+    m.set(g, (m.get(g) ?? 0) + 1);
+    return m;
+  }, new Map());
+  const named = [...grounds.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, RESTORE_REASON_CAP)
+    .map(([g, n]) => `${n}x ${g}`)
+    .join("; ");
+  const more = grounds.size > RESTORE_REASON_CAP ? ` (+${grounds.size - RESTORE_REASON_CAP} further ground(s))` : "";
+
+  return (
+    `Data: ${plan.length} distinct row(s) were touched in this range. ` +
+    `${restorable.length} could be put back (${restorable.filter((p) => p.action === "delete").length} by delete, ` +
+    `${restorable.filter((p) => p.action === "upsert").length} by restore); ` +
+    `${unverifiable.length} cannot be verified as untouched since; ${refused.length} are refused. ` +
+    (named ? `Grounds: ${named}${more}. ` : "") +
+    `NOTHING IS REPLAYED -- this is the plan only, and applying it is not a power this runner holds.`
+  );
 }
 
 // §19v: no before-image logged -> the write does not happen. row_data = NULL encodes "this row did
@@ -612,13 +686,21 @@ async function main() {
     finish(0, { decision, applied: false }, `${decision.action}: ${decision.reason}`);
   }
 
-  const imgRes = await readBeforeImages(base, key, decision.attribution?.cycleId ?? null);
+  const attributedCycle = decision.attribution?.cycleId ?? null;
+  const imgRes = await readBeforeImages(base, key, attributedCycle);
   if (imgRes.error) fail(2, imgRes.error);
+
+  // A plan that cannot be read is NOT a wall: the card falls back to the count-only sentence and
+  // says the restore picture is unknown. Refusing to card at all because the plan failed would
+  // trade a complete card for no card, on the one path where John most needs one.
+  const planRes = await readRestorePlan(base, key, attributedCycle);
+  if (planRes.error) console.error(planRes.error);
 
   const card = buildIncidentCard(decision, {
     cycleId,
     headSha,
     beforeImages: imgRes.images,
+    restorePlan: planRes.plan ?? null,
     trigger,
   });
   const filed = await fileIncidentCard(base, key, card);
