@@ -5,6 +5,74 @@
 
 ---
 
+## session/cycle-20260830-2141 (v7.0.336, 2026-08-30, runner cycle `e9ee10fd-ade6-42f2-8109-de0a69ae5d64`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 throughout: register B21 delegates kickoff design to a Fable 5 subagent for **P1–P5** work, and this is `P10 - Tooling`, so the design pass stayed with the orchestrator) — `SES-182` (slice 5) — the safe-row apply, behind John's Reverse only. **SES-182 is complete.**
+
+**Picked by the M3 drain** (`drain_epic_next` → `pick`, `open_now = 1`, directive `9feb7018`, epic
+`Selfbuild M3 - Independent Verification` — its last open member). Premise revalidated live, not
+recalled: `plan_data_restore()` read from `pg_get_functiondef` classifies and returns, and nothing
+in `scripts/` acts on it — `summarizeRestorePlan()`'s closing sentence is still *"NOTHING IS
+REPLAYED … applying it is not a power this runner holds."* The gap was real.
+
+**The authorisation, and it scopes the whole slice.** Gated card `b75f5603`, accepted 21:02:07Z,
+John's word *"Whatever is your suggestion"* on the suggestion put to him — **wire the safe-row apply
+behind John's Reverse click only; doubtful rows always list-only; nothing automatic.** Three
+constraints, all three structural rather than prose a cycle must remember.
+
+**What shipped.** `public.apply_data_restore(p_actor_cycle, p_item_id)` (migration
+`ses182e_apply_data_restore`) — the only thing that ever acts on slice 4's plan. It applies
+`restorable` rows alone (`delete` by pk, or `upsert` restoring the stored prior row), writes a
+`runner_before_images` row **first** for every write so the restore is itself reversible, and is
+idempotent on the new `runner_items.restore_applied_at`.
+
+**THE GATE IS A PREDICATE IN SQL, NOT A SENTENCE IN THE RUNBOOK** — `kind = 'ship'` **and**
+`decision = 'reverse'`. At rollback time the incident card is `gated_before_build` and undecided, so
+*"apply it automatically during a rollback"* is unreachable **by construction** rather than by a rule
+that gets silently forgotten (`record_skip`'s precedent, eight times over). John's *"nothing
+automatic"* was too expensive to leave to memory.
+
+**Why `kind = 'ship'` is half the gate and not decoration.** A Reverse means **opposite** things on
+the two card kinds: on a ship card *"I reject this delivery"*, where the card's own `cycle_id` **is**
+the range that made the writes; on slice 1's incident card *"the rollback was wrong, put the code
+BACK"*, whose `cycle_id` is the **observing** cycle. The widened *"any reversed card"* form therefore
+replays the **wrong range's rows** into production — not a near-miss, the opposite operation. The
+guard's negative control is exactly that retired form on the same fixture, asserted to apply rows
+where the shipped one applies none.
+
+**The plan is re-derived inside the apply, never passed in**, so `plan_data_restore()`'s freshness
+test runs against the state at the moment of writing rather than against a plan computed minutes
+earlier on a card John has been reading since — a stale plan handed in as an argument is the
+*"authored from memory"* the slice-2 down design forbids. Ledger tables are excluded by
+**inheritance** from that function's own denylist (one fact, one home); generated columns are dropped
+from the restore column list (`attgenerated = ''`), which is `SES-220`'s lesson.
+
+**QA was six live arms** against real Supabase inside a deliberately failing `DO` block, one variable
+each, all rolled back. The negative control ran **first**, so it could not benefit from arm (a)'s
+idempotence stamp, and asserts its own non-vacuity: the gated card applied **nothing** where the
+retired form would have applied **2** rows. Then an accepted ship card refused; the real path applied
+1 delete + 1 upsert with the prior payload actually restored (`CHANGED` → `ORIGINAL`) and the
+range-inserted row gone; an `unverifiable` row on a table with **no** `updated_at` left byte-identical
+and counted; a second call `already_applied`; grants asserted **both** directions per `SES-101`
+(`anon`/`authenticated` false, `service_role` true). Tree re-read after: 0 fixture tables, 0 fixture
+cycles, 0 fixture cards, 0 fixture images, 0 stamps, 1 overload. Build green; suite **127/127**;
+verifier **APPROVE**, auto-done eligible.
+
+**Stated rather than left to be found: this ship's own down is `refused`, and that is a result.** It
+adds a column to an existing table — an in-place `ALTER` that `capture_migration_down()` refuses by
+design — so a red range containing it is **card-only**, not auto-rollbackable.
+
+**Step 4a's green anchor was NOT recorded this cycle.** The GitHub Actions listing exceeded the tool
+result cap on all three narrowings, and its overflow lands in the permission-gated
+`~/.claude/…/tool-results/` path an unattended cycle may not shell-process (`SES-96`, register B39).
+That is *exit 2 — could not run*, **not a pass**: no green was recorded that was not observed. The
+fail direction is safe by construction — a stale anchor makes a later red **card** rather than
+revert.
+
+**Stamp count held at 5** per session-hygiene check 7: `v7.0.310` moved verbatim to this file's
+appendix, checked first by grep. Four of its six warnings survive in step 0b's body; the two that do
+not describe a one-time migration already applied, so they guard an act that cannot recur.
+
+---
+
 ## session/cycle-20260830-1940 (v7.0.335, 2026-08-30, runner cycle `dfee1925-8456-4546-8d3d-c106f6d55d88`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 orchestrating, with a **Fable 5 subagent** for the judgment-dense design pass per register B21: unlike slices 1–3 this slice had no standing design, because `v7.0.324` §8 deliberately left the data-restore remainder unwritten as "a design question, not a slice a cycle should assume") — `SES-182` (slice 4) — the data-restore PLAN: classify every touched row, apply nothing
 
 **Picked by the M3 drain** (`drain_epic_next` → `pick`, `open_now = 1`, directive `9feb7018`, epic
@@ -11245,6 +11313,21 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+<!-- DeepBench v7.0.310 | runbooks/runner-cycle.md | SES-104 — THE STALL TRIPWIRE'S "MINUTES FROZEN" STOPS BEING A NUMBER NOBODY MEASURED, and the thing to read twice is that the ticket's own fix sentence is WRONG on one word. It offers "backfill heartbeat_at to NULL for rows that never wrote one (OR exclude heartbeat_at IS NULL from (d))" — and the two are NOT alternatives; each repairs a defect the other cannot touch. MEASURED LIVE 2026-08-29T11:4xZ on an unedited tree rather than recalled from the ticket: runner_cycles held 269 rows, 43 still carrying the ses103 backfill constant 2026-08-21 18:19:19.001555+00, ZERO carrying NULL, 45 with no last_step. The ticket's 43 has not moved in eight days. ALL 43 ARE CLOSED and ALL 43 carry a heartbeat LATER than their own started_at — which is precisely what makes the value dangerous rather than obviously wrong: it is indistinguishable from a real one, so no reader can repair it. That is half one, and it is why the DATA had to move: coalesce() is powerless against a non-NULL wrong value. Half two is the DETECTOR, and it is the live one: bare `heartbeat_at < now() - INTERVAL '20 minutes'` evaluates to NULL — not true — for a NULL heartbeat, so such a row silently LEAVES the tripwire and John gets no push, while stall_watchdog() has coalesced since SES-194 (read from pg_get_functiondef, not assumed) and remains free to close that same row 'failed' at the 24h bar. A cycle could therefore be closed for going silent having never produced the 20-minute alert the tripwire exists to send. TWO DETECTORS OVER ONE COLUMN DISAGREEING ABOUT WHAT A MISSING VALUE MEANS is the drift this repo keeps paying for; probe (d) now uses stall_watchdog()'s own expression, so they cannot drift apart. THE EDIT THIS SHIP FORBIDS: moving never_reported out of the projection and into the WHERE. A never-reporting open peer is MORE worth pushing, not less — it has not reached its first step boundary — and the flag changes only the push's WORDING ("has not reported since it started" vs "frozen since its last step"); filtering on it rebuilds the exact invisibility this fixed. NOT DONE, AND NAMED RATHER THAN LEFT TO BE FOUND: the column's DEFAULT now() is deliberately KEPT — it is what makes a fresh row's basis equal its own started_at, which is the correct basis, and dropping it changes every future INSERT for no observable gain under the coalesce. The honest consequence is stated in the body: on today's schema a LIVE row cannot carry NULL, so the NULL arm guards the 43 historical rows and any future explicit NULL — this ship removes a divergence, it does not patch a hot path, and saying otherwise would be claiming an operational fix the measurement does not support. THE MIGRATION'S PREDICATE IS TWO-PART ON PURPOSE (ses104_null_never_reported_heartbeats): the heartbeat statement writes heartbeat_at AND last_step in ONE update, so `last_step IS NULL` proves no cycle ever ran it — and the pair correctly SPARES the 2 further rows that carry last_step NULL beside their own DEFAULT-now() start-time heartbeat, whose basis is already honest. It raises rather than guessing if the count is not 43. Before-images written for all 43 (§19v), verified after: 0 constant, 43 NULL, 43 images, 2 spared. QA WAS DISCRIMINATING RATHER THAN A GREP: isStale() reproduces three-valued logic on BOTH bases over the SAME fixture and the negative control IS the retired basis — the never-reported row is caught by the coalesced form and MISSED by the bare one — plus the fix is asserted NOT to manufacture an alert on a peer that heartbeat 5 minutes ago. FILE-LEVEL NEGATIVE CONTROL run against origin/dev's own pre-change runbook: 4 of 4 clauses FAIL there, 4 of 4 pass here. The vacuity meta-check EARNED ITS PLACE DURING THE BUILD rather than passing decoratively: it caught clause 3's alternation matching this ship's own rationale prose, and the clause was tightened instead of shipped. Tripwire totals unchanged by this edit, measured both ways: 53 flagged / 4 warning before and after. Stamp count held at 5 per session-hygiene check 7: v7.0.252 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — all four of its editor warnings survive in the body (the retirement-predicate/open_now/authorisation-defect warning at the `delivered` drain property, "not a skip" x5, "Gate C" x5, "removal proposed" x12). Guarded by tests/regression/SES-104-heartbeat-basis.js. Doc + test + migration; no src/api/lib change, no site change. -->
+
+**Retired by `SES-182` slice 5 (v7.0.336, 2026-08-30) to hold the stamp count at 5 — every editor
+warning checked by grep against the live body FIRST, not by recollection.** Four of its six are
+already restated in `runner-cycle.md`'s step 0b: `never_reported` is projected and never filtered
+on; the column's `DEFAULT now()` is deliberately NOT dropped; the ticket's own "backfill **or**
+exclude" is wrong on that "or", because neither half substitutes for the other; and two detectors
+over one column disagreeing about what a missing value means is the drift being removed. The two
+that appear nowhere else — that the migration RAISES rather than guessing if the affected count is
+not 43, and that it deliberately SPARES the 2 rows whose basis was already honest — are properties
+of `ses104_null_never_reported_heartbeats`, a **one-time migration that has already been applied**.
+They guard an act that cannot happen again, so they are archived here rather than relocated beside
+live code: there is none left for them to protect. That is the `SES-164` step-2 test being run and
+answered, not skipped.
 
 <!-- DeepBench v7.0.301 | runbooks/runner-cycle.md | SES-205 — THE TRUTH TRIPWIRE'S FINDINGS BECOME BACKLOG ROWS, and the thing to read twice is WHAT THE SIGNATURE IS KEYED ON: the CHECK ID, deliberately not the finding's `detail`. New step 8b-bis, next to the heal sweep whose shape it borrows wholesale (detect / dedup / `--apply --cycle-id --backlog-ids`, ids passed IN because the script never mints its own). Third and last piece of the `SES-176` remainder; pieces 1 and 2 shipped as `SES-200` (`v7.0.243`). THE DEFECT, measured live at 01:46Z on an unedited tree rather than recalled: `check-session-docs.js` prints its findings to stdout and exits 0 in a job whose own closing line reads *"Report only -- nothing auto-fixed"*, and NOTHING persists them — so nothing could tell a NEW finding from one printed on every run for a week. THE TICKET'S OWN FIGURES ARE STALE AND THIS SHIP REPORTS ITS OWN: filed 2026-08-25 against *"33 FLAG and 6 WARN"* with *"18 of today's 33 FLAGs"* in check 3d; measured at build, **48 FLAG / 4 WARN with 45 in check 3d alone**. The ratio got WORSE, which strengthens the aggregation argument rather than weakening it. THE TWO DESIGN QUESTIONS THE TICKET REFUSED TO ANSWER, both owned here. (1) SIGNATURE. Hashing `detail` is the obvious move and is the defect one level down: check 6's detail carries a KB figure that moves on every ship, and check 3d's findings differ only by ticket id and char count — so a detail hash files a NEW ticket every run. Digit-collapsing (heal-engine's `normalizeErrorClass`) fixes the numbers and not the subject: 3d would still shatter into 45 signatures keyed on 45 ticket ids. The key is `tripwire|check|<id>`, hashed sha256/12 in heal-engine's format so ONE substring dedup serves both engines — and the header says out loud that THE HASH ADDS NO ENTROPY OVER THE CHECK ID rather than implying a derivation. (2) AGGREGATION: one row per CHECK CLASS, which is the same decision wearing a second hat. Within a check every finding shares a rule and a fix shape — clearing 3d is ONE job (trim descriptions into `docs/harvests/`), not forty-five — and the member list lives in the description, so the row stays accurate as members churn while the key does not move. There is deliberately NO threshold to tune: heal-engine needs one because a single failed hop is noise, whereas a tripwire FLAG is already a rule this platform wrote down and then broke. Live result: 48 findings collapse to FOUR tickets (3d/45 stamped `M`; 3, 6, 13 stamped `S`). TWO EXCLUSIONS, STATED AS DECISIONS RATHER THAN OMISSIONS: `WARN` never files (the tripwire itself calls its WARNs *"compliant, nothing to do"* / *"not new drift"* / *"a migration backlog"* — a ticket each is board noise for decided work), and a GATING check never files, because a gating FLAG already fails CI at `--gate` and therefore CANNOT go unnoticed — and unnoticed is the whole of what this ticket fixes. `GATING_CHECKS`/`GATING_SEVERITY` are IMPORTED from `check-session-docs.js`, never copied, so widening `SES-199`'s policy widens this exclusion with it and the two cannot drift. THE EDIT THIS SHIP FORBIDS: folding the detail back into the key to "strengthen" it. That is the duplicate-per-run failure in a hash's clothes, and `signatureIsNotTheDetail()` pins it with the retired form applied to the SAME fixture and asserted to LOSE. WHY A NEW FILE RATHER THAN A MODE ON THE TRIPWIRE: `check-session-docs.js` is the CI gate, and `SES-199` deliberately kept its bare output byte-identical because CI reads it; a network writer inside it is a crash path in the one script that must not have one. It gains ONE thing — `collectFindings()`, a VERBATIM extraction of `main()`'s collection block — so the engine reads the REAL implementation instead of parsing `[check N, SEV]` prose, which would be a second reader of an unversioned format, i.e. `SES-45`'s *"a second implementation agreeing with itself"*. PROVEN, not asserted: the bare CLI's output is byte-identical (`diff`, no differences) against `origin/dev`'s own copy run on the same tree. QA WAS FOUR MUTATIONS ON THE SHIPPED ENGINE, one variable each, each failing a DIFFERENT named clause and the tree restored byte-identical afterwards: signature folds in the detail -> `signatureIsNotTheDetail` fails; gating exclusion removed -> `aGatingCheckNeverFiles` fails; WARN allowed through -> `warnNeverFiles` fails; before-image moved AFTER the insert -> `theBeforeImageComesFirst` fails. Every clause additionally carries its own inline negative control, and two of those controls ARE the retired designs (detail-keyed hash; one-row-per-finding producing 18 rows from the ticket's own worked example where the shipped one produces 1) — so the guard proves a DIFFERENCE from what was rejected rather than a property both share. KNOWN LIMITATION, INHERITED DELIBERATELY AND NAMED RATHER THAN FOUND: the dedup matches CLOSED tickets too, so a check that files once never files again even if its member set turns over completely — heal-engine's own v1 shape, the right default for an unattended loop, and the live list is one command away. NAMED DEVIATION (the `SES-196` convention): this is FOUR files against `CLAUDE.md`'s cap of three. The fourth is step 8b-bis itself, and it is not padding — without it no cycle ever invokes the engine, and shipping a filer nothing calls is *"no ticket anywhere owns that remainder"* wearing this very ticket's clothes. Stamp count held at 5 per session-hygiene check 7: `v7.0.248` moved VERBATIM to `docs/SESSIONS.md`'s appendix, checked FIRST by grep rather than recollection — three of its warnings are restated at `SESSIONS.md`:1815 and :1821-1824 and in step 7's own QA bar, and its fifth item is not a warning but check 13's open FINDING (the `B40` claim SQL's two live homes), which THIS SHIP gives a durable home: the tripwire reports it every run and 8b-bis now files it as a row. Guarded by `tests/regression/SES-205-tripwire-backlog.js`. Doc + script + test; no `src`/`api`/`lib` change, no site change, no schema change. -->
 
