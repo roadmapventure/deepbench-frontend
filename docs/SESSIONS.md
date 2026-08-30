@@ -5,6 +5,86 @@
 
 ---
 
+## session/cycle-20260830-1840 (v7.0.334, 2026-08-30, runner cycle `450aa2fa-1455-41cb-996a-62d6eb1f489f`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent: register B21 routes judgment-dense *design* to Fable 5, and the design for this slice was already standing from `v7.0.324` §8, which names it by name) — `SES-182` (slice 3) — deploy-serving-red becomes a real trigger
+
+**Picked by the M3 drain** (`drain_epic_next` → `pick`, `open_now = 1`, directive `9feb7018`, epic
+`Selfbuild M3 - Independent Verification`), under the Prime Directive (`a0ef9525`) §2(b). Layer 1a's
+queued rows are all standing policy directives, not one-off missions, so nothing there was consumed.
+Walls clear at step 3: month $0.00 / $100, today $0 / $5, meter 29% against an 85% rest wall, day cap
+200M (`daily-max-box`) against 11.15M spent. Invention pass **suspended by Prime Directive §4**.
+
+**Premise revalidated live, not recalled.** `TRIGGER_SOURCES = ["ci-red", "deploy-red"]` at
+`scripts/rollback-on-red.js:109` and `decide()` handles the value end to end — slice 1 admitted it
+deliberately so the vocabulary could not drift — while nothing anywhere had ever produced it.
+
+**What shipped.** `scripts/check-deploy-serving.js`: probe the dev alias, classify what it serves,
+and on a red hand the existing engine the facts it already knows how to act on. Runbook step 4a-bis
+plus a line in 8a. No `src`/`api`/`lib` change, no site change, no schema change.
+
+**The three decisions, and the fail direction of each.**
+
+1. **The probe is RED-ONLY and can never write a green anchor.** The tempting edit — hand every
+   sample to the engine as `jobs`, exactly as step 4a does — takes `decide()`'s `RECORD_GREEN` branch
+   and stores the probed commit as the anchor every later red is measured against, on the evidence
+   that *a web server answered*. That is not what the anchor means. `engineArgsFor()` returns `null`
+   on anything but `serving-red`, and a red's jobs always carry a `failure` conclusion, so the green
+   branch is unreachable by construction rather than by a rule someone must remember.
+2. **The commit judged is the SERVING one, never `dev`'s head.** `SES-015` measured this project's
+   push→serve lag at a median 37s, p90 852s, max 2,973s, 28% over five minutes — so the two are
+   routinely different commits, and reverting one the public was never served is the one direction
+   this ticket must never fail in. `pickServing()` is imported, never re-derived (`SES-45`).
+3. **Unknown is a third verdict, not a synonym for red.** A DNS blip, a proxy 407, a rotated bypass
+   secret or a 429 must not revert a healthy `dev`. Three consecutive reds are required, and any one
+   green sample makes the whole probe green.
+
+**The named blind spot, and the half of it that was closed.** An HTTP probe cannot see a client-side
+render failure — published in `PROBE_LIMITS` and asserted by the guard rather than left to be found.
+What *was* closed is the common half: the probe follows the shell's own entry-module reference (read
+from the shell, never guessed — Vite rehashes it every build), and a shell served beside a 404ing
+bundle is red. That is the shape of a real blank deploy, and it is server-side observable.
+
+**QA: six live arms over real HTTP, one variable each, nothing written.** (1) the real deployment
+green through its actual hashed bundle `/assets/index-C5wASfTj.js`; (2) **the same healthy
+deployment with the bypass secret withheld → HTTP 403 → `unknown`, exit 2, no trigger** — the arm
+that proves a rotated credential cannot revert a working site; (3) 503, (4) shell-with-404ing-bundle,
+(5) 200-with-empty-body, all `serving-red` exit 1 with their reasons named; (6) a **seam proof**, so
+labeled because its two facts come from different sources by construction — a red local origin plus
+the real resolved serving sha, fed into the real engine in **dry run** (`--apply` withheld, no card
+filed), reaching `revert-and-card` attributed to the cycle that actually pushed `211aa1c`.
+
+**A non-arm, reported rather than quietly re-rolled.** The first live-red attempt pointed the probe
+at `/assets` on the real deployment and came back **green** — Vercel's SPA rewrite serves the shell
+for unknown paths, which is correct behaviour and simply not a red. The arm was replaced with
+controlled origins rather than written up as a finding.
+
+**File-level negative control:** the guard cannot even *load* against `origin/dev` — the module it
+pins does not exist there — and passes on the shipped tree. Three of its inline controls are the
+retired designs applied to the same fixture and asserted to lose, plus the vacuity meta-check.
+
+**The `SES-213` staleness caught this cycle exactly as step 7a predicts, and is reported rather than
+absorbed:** the first full suite ran 124/125 with `SES-177-claude-state-renderer.js` red — the
+committed `CLAUDE-STATE.md` was missing the predecessor's ship, which reaches `shipped` only in its
+own tail. Step 7a's opening `render-claude-state.js` fixed it; the suite is **125/125** after, on a
+tree whose only other change was those three rendered lines. Build green.
+
+**Verifier: APPROVE, `auto_done_eligible` YES — and the ticket is still `partial`, deliberately.**
+Prime Directive §2f would auto-`done` a green Selfbuild ship, and its own sentence is why this one
+does not: *uncertain → deliver and card, never auto-done*. `SES-182`'s remainder is real — **data
+restore**, where before-images in a reverted range are reported and never replayed, because replaying
+rows needs per-table pk resolution and an insert/update/delete discrimination a wrong guess writes
+into production. Whether that is built at all is a design question, not a slice to assume. Written on
+the ship card rather than settled here. Named so no later cycle mistakes it for a gap: grant/ACL
+migrations coming back `refused` at capture is a **result**, not a remainder, and verifier-as-trigger
+stays refused on John's Q1 ruling.
+
+**Stamp count held at 5** per session-hygiene check 7: `v7.0.301` (`SES-205`) moved verbatim to this
+file's appendix, checked first by grep rather than recollection — five of its six warnings are
+restated in step 8b-bis's body, and the sixth (*why a new file rather than a mode on the tripwire*)
+appears zero times in the runbook but lives verbatim in `scripts/check-session-docs.js:61-65`, beside
+the code it protects. Archived rather than re-prosed — the same judgment slice 1 made for `SES-218`.
+
+---
+
 ## session/cycle-20260830-1740 (v7.0.333, 2026-08-30, runner cycle `0e9dc18d-d3c6-4e21-8e3d-5ca13be01fb4`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent: the design was already standing from `v7.0.324`, and register B21 delegates judgment-dense *design*, which this cycle implemented rather than authored) — `SES-182` (slice 2) — down capture at apply time, and the migration-range rollback it feeds
 
 **Picked by the M3 drain** (`drain_epic_next` → `pick`, directive `9feb7018`, epic
@@ -11104,6 +11184,25 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+<!-- DeepBench v7.0.301 | runbooks/runner-cycle.md | SES-205 — THE TRUTH TRIPWIRE'S FINDINGS BECOME BACKLOG ROWS, and the thing to read twice is WHAT THE SIGNATURE IS KEYED ON: the CHECK ID, deliberately not the finding's `detail`. New step 8b-bis, next to the heal sweep whose shape it borrows wholesale (detect / dedup / `--apply --cycle-id --backlog-ids`, ids passed IN because the script never mints its own). Third and last piece of the `SES-176` remainder; pieces 1 and 2 shipped as `SES-200` (`v7.0.243`). THE DEFECT, measured live at 01:46Z on an unedited tree rather than recalled: `check-session-docs.js` prints its findings to stdout and exits 0 in a job whose own closing line reads *"Report only -- nothing auto-fixed"*, and NOTHING persists them — so nothing could tell a NEW finding from one printed on every run for a week. THE TICKET'S OWN FIGURES ARE STALE AND THIS SHIP REPORTS ITS OWN: filed 2026-08-25 against *"33 FLAG and 6 WARN"* with *"18 of today's 33 FLAGs"* in check 3d; measured at build, **48 FLAG / 4 WARN with 45 in check 3d alone**. The ratio got WORSE, which strengthens the aggregation argument rather than weakening it. THE TWO DESIGN QUESTIONS THE TICKET REFUSED TO ANSWER, both owned here. (1) SIGNATURE. Hashing `detail` is the obvious move and is the defect one level down: check 6's detail carries a KB figure that moves on every ship, and check 3d's findings differ only by ticket id and char count — so a detail hash files a NEW ticket every run. Digit-collapsing (heal-engine's `normalizeErrorClass`) fixes the numbers and not the subject: 3d would still shatter into 45 signatures keyed on 45 ticket ids. The key is `tripwire|check|<id>`, hashed sha256/12 in heal-engine's format so ONE substring dedup serves both engines — and the header says out loud that THE HASH ADDS NO ENTROPY OVER THE CHECK ID rather than implying a derivation. (2) AGGREGATION: one row per CHECK CLASS, which is the same decision wearing a second hat. Within a check every finding shares a rule and a fix shape — clearing 3d is ONE job (trim descriptions into `docs/harvests/`), not forty-five — and the member list lives in the description, so the row stays accurate as members churn while the key does not move. There is deliberately NO threshold to tune: heal-engine needs one because a single failed hop is noise, whereas a tripwire FLAG is already a rule this platform wrote down and then broke. Live result: 48 findings collapse to FOUR tickets (3d/45 stamped `M`; 3, 6, 13 stamped `S`). TWO EXCLUSIONS, STATED AS DECISIONS RATHER THAN OMISSIONS: `WARN` never files (the tripwire itself calls its WARNs *"compliant, nothing to do"* / *"not new drift"* / *"a migration backlog"* — a ticket each is board noise for decided work), and a GATING check never files, because a gating FLAG already fails CI at `--gate` and therefore CANNOT go unnoticed — and unnoticed is the whole of what this ticket fixes. `GATING_CHECKS`/`GATING_SEVERITY` are IMPORTED from `check-session-docs.js`, never copied, so widening `SES-199`'s policy widens this exclusion with it and the two cannot drift. THE EDIT THIS SHIP FORBIDS: folding the detail back into the key to "strengthen" it. That is the duplicate-per-run failure in a hash's clothes, and `signatureIsNotTheDetail()` pins it with the retired form applied to the SAME fixture and asserted to LOSE. WHY A NEW FILE RATHER THAN A MODE ON THE TRIPWIRE: `check-session-docs.js` is the CI gate, and `SES-199` deliberately kept its bare output byte-identical because CI reads it; a network writer inside it is a crash path in the one script that must not have one. It gains ONE thing — `collectFindings()`, a VERBATIM extraction of `main()`'s collection block — so the engine reads the REAL implementation instead of parsing `[check N, SEV]` prose, which would be a second reader of an unversioned format, i.e. `SES-45`'s *"a second implementation agreeing with itself"*. PROVEN, not asserted: the bare CLI's output is byte-identical (`diff`, no differences) against `origin/dev`'s own copy run on the same tree. QA WAS FOUR MUTATIONS ON THE SHIPPED ENGINE, one variable each, each failing a DIFFERENT named clause and the tree restored byte-identical afterwards: signature folds in the detail -> `signatureIsNotTheDetail` fails; gating exclusion removed -> `aGatingCheckNeverFiles` fails; WARN allowed through -> `warnNeverFiles` fails; before-image moved AFTER the insert -> `theBeforeImageComesFirst` fails. Every clause additionally carries its own inline negative control, and two of those controls ARE the retired designs (detail-keyed hash; one-row-per-finding producing 18 rows from the ticket's own worked example where the shipped one produces 1) — so the guard proves a DIFFERENCE from what was rejected rather than a property both share. KNOWN LIMITATION, INHERITED DELIBERATELY AND NAMED RATHER THAN FOUND: the dedup matches CLOSED tickets too, so a check that files once never files again even if its member set turns over completely — heal-engine's own v1 shape, the right default for an unattended loop, and the live list is one command away. NAMED DEVIATION (the `SES-196` convention): this is FOUR files against `CLAUDE.md`'s cap of three. The fourth is step 8b-bis itself, and it is not padding — without it no cycle ever invokes the engine, and shipping a filer nothing calls is *"no ticket anywhere owns that remainder"* wearing this very ticket's clothes. Stamp count held at 5 per session-hygiene check 7: `v7.0.248` moved VERBATIM to `docs/SESSIONS.md`'s appendix, checked FIRST by grep rather than recollection — three of its warnings are restated at `SESSIONS.md`:1815 and :1821-1824 and in step 7's own QA bar, and its fifth item is not a warning but check 13's open FINDING (the `B40` claim SQL's two live homes), which THIS SHIP gives a durable home: the tripwire reports it every run and 8b-bis now files it as a row. Guarded by `tests/regression/SES-205-tripwire-backlog.js`. Doc + script + test; no `src`/`api`/`lib` change, no site change, no schema change. -->
+
+**Retired by `SES-182` slice 3 (v7.0.334, 2026-08-30) to hold the stamp count at 5 — every editor
+warning checked by grep against the live body first, not by recollection.** Five are already
+restated in `runner-cycle.md`'s step 8b-bis: one row per CHECK CLASS never one per finding; the
+signature is the check id and not the detail, with the "do not strengthen the key by folding the
+detail back in" prohibition intact; `WARN` never files and a GATING check never files, with the
+gating set imported rather than copied; the three `8b` boundaries (never mints its own id,
+before-image first, filing is not fixing); and the known limitation that the dedup matches closed
+tickets too. The sixth — *why a new file rather than a mode on the tripwire* (`check-session-docs.js`
+is the CI gate, a network writer inside it is a crash path in the one script that must not have one,
+and `collectFindings()` is a verbatim extraction so the engine reads the real implementation) —
+appears nowhere in this runbook's body, and was **archived rather than re-prosed** because it already
+has a stronger, executable home: `scripts/check-session-docs.js` lines 61-65 and 1682-1690 carry it
+verbatim, beside the code it protects. Same judgment `SES-182` slice 1 made for `SES-218`'s two
+warnings living in `drain_epic_next()`'s own comments. The remaining stamp text is a disclosure about
+that ship (its four-files deviation, its measured 48→4 collapse), not a warning to a future editor.
+
 
 <!-- DeepBench v7.0.299 | runbooks/runner-cycle.md | SES-213 — THE VERDICT IS TAKEN AGAINST THE TREE THAT ACTUALLY SHIPS: step 7a now OPENS with `node scripts/render-claude-state.js`, and the thing to read twice is WHERE the fix went — the runbook, deliberately NOT scripts/verifier.js. THE DEFECT, measured not inferred: all 26 `block` rows in public.runner_verdicts carried the identical triple build=green / regression=red / hygiene=green, against 30 all-green `approve` rows, and the discriminator was never the change under test — it was WHETHER THE PREDECESSOR SHIPPED. render-claude-state.js renders the cycles whose outcome is already 'shipped' (:162, .slice(0,3) at :121); a cycle's own row does not reach 'shipped' until its step-9 tail, i.e. AFTER it rendered and pushed; verifier.js's runGate spawns the suite with NO `env` of its own (:242-248) so it inherits 7a's credentials, which runs the CREDENTIALED half of tests/regression/SES-177-claude-state-renderer.js (:140-153), which spawns `render-claude-state.js --check` (:180-190) and compares the committed file BYTE-FOR-BYTE against the ledger. Predecessor ships → drift → [FAIL] → red → block, on work that is perfectly sound. A predecessor that closed gated_before_build or did_not_run never joins the shipped set, the file still matches, and the gate is green — which is exactly the 26/30 split. CAUGHT IN THE ACT ON AN UNEDITED TREE, which is why this is a measurement rather than a reconstruction: `--check` exit 0 at 23:44Z with SES-177 [PASS] and a re-render writing byte-identical bytes (git diff empty), peer cycle dc047a05 (v7.0.298, SES-220) closed 'shipped' at 23:46:57Z, `--check` exit 1 — DRIFT — minutes later with ZERO file changes in between. THE TWO ORDERINGS THE TICKET NAMED CONVERGE, and saying so is half the design: option A as literally worded ("7a after the close-out render") is impossible, because the close-out render sits AFTER the ticket status write and 7a's auto-done bar DECIDES whether that write is `done` or `delivered` — so the verdict must precede it, and repaired A IS B. The only live question was WHERE the render invocation lives. THE EDIT THIS SHIP FORBIDS, and it is the one a later cycle will reach for: moving the render INSIDE scripts/verifier.js so no cycle has to remember it. That script's founding property is verdict-only — "this script CANNOT EDIT… touches no file in the tree", its own header and charter Multi-agent verification item 1 — and spawning a file-writer is that invariant laundered, not kept; it would also have the verifier grade a file it had just authored. This file's most-cited lesson (a rule each cycle must remember is a rule that gets silently forgotten — record_skip's precedent, eight times over) argues the OTHER way and LOSES here on asymmetric fail directions, stated rather than asserted: forgetting the runbook line reproduces EXACTLY the old behaviour — a spurious block, ship delivered, card John — which is loud, fail-closed and visible on the scoreboard, NEVER a false approve; the in-verifier variant's failure is an invariant nobody sees erode. NOT CLAIMED, AND NAMED IN THE BODY RATHER THAN LEFT TO BE FOUND: this shrinks the staleness window from "one whole ship, by construction" to "a peer closing shipped in the seconds between your render and your verdict" — under parallel cycles (B42) that race is real; and BACKLOG-SNAPSHOT.md plus the hand-written docs/SESSIONS.md entry land after the verdict in EVERY legal ordering, because the snapshot must follow the status write it captures. Neither is gate-checked, so neither costs a verdict today. SECOND DEFECT, same ticket, fixed in the script where it belongs: runner_verdicts.reasoning stored only the tail of `res.stderr || res.stdout`, which prefers stderr WHOLESALE — and run-all.js:77 prints `[FAIL] <file> -- <message>` on STDOUT while the ubiquitous GATE_BYPASS_SECRET warning is a console.warn on STDERR, so all 26 rows recorded the warning and never the failing test; the ledger could not say what it blocked on, which is why this needed a live reproduction instead of a query. summarizeGateOutput() is PURE and EXPORTED (the retired tail was buried inside runGate() and observable only through a real 20-minute gate run, which is how it survived 26 rows), reads BOTH streams, prefers [FAIL] lines over lines that merely came last, keeps the pass count, falls back to the last three COMBINED lines for gates with no [FAIL] vocabulary, and stays bounded at 4 failures + 1 summary under the named DETAIL_CAP=600 (the retired literal 400 truncated mid-failure). QA WAS TWO ARMS ON ONE TREE, ONE VARIABLE, the ticket's own measurement shape: SES-177 FAILS ("1 !== 0") before the render and PASSES after it, the only change on disk being CLAUDE-STATE.md's 3 lines. The code half carries its own negative control — the retired `stderr || stdout` expression is applied to the SAME fixture inside the guard and asserted to LOSE the failing test, so the guard proves a DIFFERENCE from the old behaviour rather than a property both share. Full suite 97/98, build green. THE ONE RED IS REPORTED HONESTLY RATHER THAN ABSORBED: LOG-41 fails HTTP 401 inside the suite, it failed identically on the unmodified tree BEFORE any edit, and it is ALREADY ROOT-CAUSED as the SES-221 cross-test env leak (run-all.js imports every test into one process; seven set VITE_SUPABASE_ANON_KEY="regression-placeholder" without restoring it) — re-verified here rather than taken on trust: LOG-41 run ALONE passes and declares its anon arm not-run, in-suite it fails. It is independent of this ticket and means this cycle's own verdict blocks regardless of this fix. An earlier reading in this cycle blamed a missing GATE_BYPASS_SECRET; that was inference from the adjacent warning and is corrected here rather than left standing. Guarded by tests/regression/SES-213-verdict-ordering.js: 5 runbook clauses each with its own negative control plus the SES-158 vacuity meta-check, and a file-level control run against the pre-change runbook where 5 of 5 clauses fail and 5 of 5 pass on the shipped one. SELF-CERTIFICATION REFUSED BY CODE, not by memory: this delivery touches scripts/verifier.js, which is in that script's own SELF_CERTIFYING_PATHS (:113-117), so the auto-done bar is unavailable and the ticket ships `delivered` with a visible ship card — which is also exactly what John's directive a7be7fd6 says in words. Stamp count held at 5 per session-hygiene check 7: v7.0.247 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — four of its five editor warnings are already restated in this file's body (the fail-closed `skipped` is not `green` rule at step 7a, scope read off the board not argv, "a block IS NOT A WALL", and the self-certification refusal), and its fifth — that the fail-closed rule has TWO homes on purpose, verdictFor() AND ck_runner_verdicts_fail_closed, because this script will not stay the only thing that inserts a verdict row — appeared ZERO times outside its stamp and was RELOCATED into step 7a next to the gate it protects rather than archived, the SES-164 step that makes a trim safe. Doc + script + test; no src/api/lib change, no site change. -->
 
