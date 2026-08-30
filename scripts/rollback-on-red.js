@@ -1,9 +1,37 @@
 #!/usr/bin/env node
-// DeepBench v7.0.332 | scripts/rollback-on-red.js | SES-182 slice 1
+// DeepBench v7.0.333 | scripts/rollback-on-red.js | SES-182 slices 1-2
 // FEATURE: SES-182 -- auto-rollback on red. Slice 1 of the kickoff v7.0.324 design: record the
 // rolling "last green state", and on an attributable CI red decide between reverting a CODE-ONLY
 // range and carding everything else. John authorised the build 2026-08-30 (card 2c136c5b, Q2
 // "BUILD NOW"); Q1 is settled and enforced here -- see THE VERIFIER IS NOT A TRIGGER below.
+//
+// -- SLICE 2 (v7.0.333): A RANGE WITH MIGRATIONS IS NO LONGER AUTOMATICALLY CARD-ONLY ------
+// Slice 1 carded EVERY moved-watermark range, by construction, because no down existed to apply.
+// `public.capture_migration_down()` now derives one at apply time from the objects' live prior
+// state, so this engine can ask a real question: does EVERY migration in the red range carry a
+// stored `auto-downable` down? `schemaPlanFor()` answers it and emits the ordered plan.
+//
+// THREE PROPERTIES OF THAT ANSWER, each of which is how it gets rebuilt wrong:
+//   * ONE MISSING MEMBER CARDS THE WHOLE RANGE. There is no partial schema rollback -- a schema
+//     half-undone is a state no green anchor describes, and the design's own fail-direction reads
+//     "a red range containing ANY migration the actuator cannot match to a stored, classified down
+//     -> no automatic schema action at all". `steps` is returned EMPTY on a miss so a caller
+//     cannot apply a subset even by accident, and the card names every blocking member.
+//   * THE PLAN IS NEWEST-FIRST. Downs applied oldest-first re-create what a later down expected
+//     gone. The order is reversed here rather than left to the caller.
+//   * AN ABSENT OR EMPTY `--migrations` LIST IS NOT AN EMPTY RANGE. It resolves to "not
+//     reversible, the list was not supplied" -- unknown is not innocent, the same reading
+//     `rangeIsCodeOnly` gives an unknown watermark. That is also what keeps every slice-1 caller's
+//     behaviour byte-identical: no list, same card-only outcome as before.
+//
+// THE MIGRATION LIST IS PASSED IN, never fetched -- `supabase_migrations` is not exposed through
+// PostgREST and `runner_secrets` holds no credential for it. The cycle calls
+// `public.migrations_in_range(green_watermark, current_watermark)` through the connector and hands
+// the rows here, exactly as it hands in the CI conclusion.
+//
+// AND THE ENGINE STILL APPLIES NO DDL. It emits `schema_plan`; the cycle runs it through
+// `apply_migration` behind the gates named below. Extending "it never pushes" to "it never applies
+// DDL either" is the same boundary, not an exception carved into it.
 //
 // -- WHAT THIS SCRIPT IS, AND THE TWO THINGS IT DELIBERATELY IS NOT ------------------------
 // It is a DECISION ENGINE plus a ledger writer. It is not a daemon (the runner's own blocker
@@ -57,9 +85,11 @@
 //                                   is not.
 //   red, code-only, attributable -> revert plan + card. The one automatic path.
 //
-// -- NAMED DEFERRALS (slice 2/3, and they are deferrals rather than omissions) --------------
-//   * DOWN CAPTURE at apply time (`runner_migration_downs` ships as SCHEMA ONLY here) and
-//     migration-range rollback.
+// -- NAMED DEFERRALS (slice 3, and they are deferrals rather than omissions) ----------------
+//   * GRANT/ACL migrations. `capture_migration_down()` classifies them `refused` deliberately, so
+//     a range containing one cards rather than rolling back. Re-applying an exploded ACL correctly
+//     is `.claude/rules/supabase-column-grants.md`'s entire subject matter and a wrong one is a
+//     live exposure -- refused-and-loud is recoverable, guessed-and-applied is not.
 //   * DEPLOY-SERVING-RED as a second trigger. John's Q1 answer names it a valid trigger; the
 //     deploy probe is a different read (the Vercel bypass header, runbook step 4) and it earns
 //     its own slice. TRIGGER_SOURCES admits it as a value NOW so the vocabulary cannot drift,
@@ -83,6 +113,10 @@ export const TRIGGER_SOURCES = ["ci-red", "deploy-red"];
 export const GREEN_CONCLUSION = "success";
 
 export const GREEN_STATE_RETENTION = 50;
+
+// The two values `ck_runner_migration_downs_classification` admits (read from pg_get_constraintdef
+// at this ship). Kept as data so the guard asserts the vocabulary rather than restating it.
+export const DOWN_CLASSIFICATIONS = { AUTO: "auto-downable", REFUSED: "refused" };
 
 export const ACTIONS = {
   RECORD_GREEN: "record-green",
@@ -128,6 +162,78 @@ export function attributionOf(headSha, cycles) {
   return hit ? { cycleId: hit.id ?? null, version: hit.version ?? null, sha: hit.push_sha } : null;
 }
 
+// Is the SCHEMA half of a red range reversible, and if not, which member stopped it?
+//
+// The answer is all-or-nothing on purpose. `steps` comes back EMPTY whenever anything is missing,
+// so no caller can apply a subset even by accident -- a schema half-undone is a state no green
+// anchor describes. `missing` names every blocking member so the card can say which, rather than
+// telling John a range "could not be rolled back" and leaving him to find out why.
+//
+// Newest-first, because downs applied oldest-first re-create what a later down expected gone.
+export function schemaPlanFor(migrations, downs) {
+  if (!Array.isArray(migrations) || migrations.length === 0) {
+    return {
+      reversible: false,
+      reason:
+        "the migration list for this range was not supplied, so what landed in it is unknown -- " +
+        "unknown is not innocent, exactly as it is not for the watermark itself.",
+      steps: [],
+      missing: [],
+    };
+  }
+
+  const byName = new Map();
+  for (const d of Array.isArray(downs) ? downs : []) {
+    if (d?.up_name) byName.set(String(d.up_name), d);
+  }
+
+  const missing = [];
+  const steps = [];
+  const newestFirst = [...migrations].sort((a, b) =>
+    String(b?.version ?? "").localeCompare(String(a?.version ?? ""))
+  );
+
+  for (const m of newestFirst) {
+    const name = String(m?.name ?? "");
+    const version = m?.version ?? null;
+    const row = name ? byName.get(name) : null;
+    if (!row) {
+      missing.push({ version, name: name || "(unnamed migration)", why: "no down was captured for it" });
+      continue;
+    }
+    if (row.classification !== DOWN_CLASSIFICATIONS.AUTO) {
+      missing.push({ version, name, why: `it was classified '${row.classification}' at capture time` });
+      continue;
+    }
+    const sql = typeof row.down_sql === "string" ? row.down_sql.trim() : "";
+    if (!sql) {
+      missing.push({ version, name, why: "its captured down is blank" });
+      continue;
+    }
+    steps.push({ version, name, down_sql: sql });
+  }
+
+  if (missing.length > 0) {
+    return {
+      reversible: false,
+      reason:
+        `${missing.length} of ${migrations.length} migration(s) in the range have no usable down ` +
+        `(${missing.map((m) => `${m.name}: ${m.why}`).join("; ")}). No partial schema rollback is ever attempted.`,
+      steps: [],
+      missing,
+    };
+  }
+
+  return {
+    reversible: true,
+    reason:
+      `all ${steps.length} migration(s) in the range carry a captured auto-downable down; ` +
+      `they are applied newest-first.`,
+    steps,
+    missing: [],
+  };
+}
+
 // The whole rule, in one place, returning a named reason for every branch. A branch that returned
 // a bare action would put the "why" on the card's author instead of in the engine, which is how
 // two homes for one rule start.
@@ -139,6 +245,8 @@ export function decide(facts = {}) {
     greenAnchor = null,
     currentWatermark = null,
     cycles = [],
+    migrations = [],
+    downs = [],
   } = facts;
 
   if (!TRIGGER_SOURCES.includes(trigger)) {
@@ -183,16 +291,37 @@ export function decide(facts = {}) {
   }
 
   if (!rangeIsCodeOnly(greenAnchor.migration_watermark, currentWatermark)) {
+    // Slice 2: the watermark moving no longer ENDS the question, it asks a second one -- does every
+    // migration in the range carry a captured, auto-downable down? A miss still cards, and it now
+    // names which member missed instead of pointing at an unbuilt slice.
+    const schemaPlan = schemaPlanFor(migrations, downs);
+    const watermarkMove =
+      `The migration watermark ${describeWatermark(greenAnchor.migration_watermark)} -> ` +
+      `${describeWatermark(currentWatermark)}, so the range is not code-only`;
+
+    if (!schemaPlan.reversible) {
+      return {
+        action: ACTIONS.CARD_ONLY,
+        reason:
+          `${trigger} (${redDetail}) on unattended push ${headSha}. ${watermarkMove}: ` +
+          `NO automatic schema action is taken and no revert is planned. ${schemaPlan.reason}`,
+        attribution,
+        greenAnchor,
+        redDetail,
+        schemaPlan,
+      };
+    }
+
     return {
-      action: ACTIONS.CARD_ONLY,
+      action: ACTIONS.REVERT_AND_CARD,
       reason:
-        `${trigger} (${redDetail}) on unattended push ${headSha}. The migration watermark ` +
-        `${describeWatermark(greenAnchor.migration_watermark)} -> ${describeWatermark(currentWatermark)}, ` +
-        `so the range is not code-only: NO automatic schema action is taken and no revert is planned. ` +
-        `Down capture is slice 2.`,
+        `${trigger} (${redDetail}) on unattended push ${headSha}. ${watermarkMove} -- but ` +
+        `${schemaPlan.reason} The code reverts forward and the schema downs apply after it.`,
       attribution,
       greenAnchor,
       redDetail,
+      revertPlan: revertPlanFor(greenAnchor.commit_sha, headSha),
+      schemaPlan,
     };
   }
 
@@ -243,7 +372,18 @@ export function buildIncidentCard(decision, ctx = {}) {
     beforeImages.length === 0
       ? "No before-images were written in the reverted range, so no data was changed by it."
       : `${beforeImages.length} before-image(s) across ${imageTables.length} table(s) (${imageTables.join(", ")}) ` +
-        `were written in this range. They are REPORTED, not replayed -- data restore is a named slice-2 deferral.`;
+        `were written in this range. They are REPORTED, not replayed -- data restore is a named deferral.`;
+
+  // The schema record (slice 2). Absent on a code-only range, and that is the honest rendering:
+  // there was no schema question to answer. Present otherwise, saying either what will be downed or
+  // exactly which member blocked the range -- never "could not be rolled back" with no reason.
+  const plan = decision.schemaPlan ?? null;
+  const schemaRecord = !plan
+    ? "Schema: the migration watermark did not move in this range, so no schema action was in question."
+    : plan.reversible
+      ? `Schema: ${plan.steps.length} captured down(s) apply newest-first -- ` +
+        `${plan.steps.map((s) => `${s.name} (${s.version ?? "no version"})`).join(", ")}.`
+      : `Schema: NO automatic schema action. ${plan.reason}`;
 
   return {
     kind: "gated_before_build",
@@ -262,6 +402,7 @@ export function buildIncidentCard(decision, ctx = {}) {
       `Attribution: cycle ${decision.attribution?.cycleId ?? "(none)"}${decision.attribution?.version ? ` (${decision.attribution.version})` : ""}.`,
       `Green anchor: ${decision.greenAnchor?.commit_sha ?? "(none recorded)"}${decision.greenAnchor?.migration_watermark ? ` @ watermark ${decision.greenAnchor.migration_watermark}` : ""}.`,
       dataRecord,
+      schemaRecord,
       reverted ? `Revert plan: ${decision.revertPlan?.command}` : "Revert plan: none -- see the reason.",
     ].join("\n"),
     plain_cant: reverted
@@ -318,6 +459,22 @@ export async function readPushingCycles(base, key) {
   const r = await rest(base, key, "runner_cycles?select=id,push_sha,version&push_sha=not.is.null&order=started_at.desc&limit=200");
   if (r.error) return { error: `could not read pushing cycles: ${r.error}` };
   return { cycles: r.rows };
+}
+
+// The captured downs for the migrations the CYCLE named. Keyed on up_name, which is
+// runner_migration_downs' own unique key -- a name with no row simply comes back absent, which
+// schemaPlanFor() reads as "no down was captured for it" rather than as an error.
+export async function readMigrationDowns(base, key, names) {
+  const wanted = [...new Set((Array.isArray(names) ? names : []).map(String).filter(Boolean))];
+  if (wanted.length === 0) return { downs: [] };
+  const list = wanted.map((n) => `"${n.replace(/"/g, '\\"')}"`).join(",");
+  const r = await rest(
+    base,
+    key,
+    `runner_migration_downs?select=up_name,down_sql,classification&up_name=in.(${encodeURIComponent(list)})`
+  );
+  if (r.error) return { error: `could not read the captured migration downs: ${r.error}` };
+  return { downs: r.rows };
 }
 
 export async function readBeforeImages(base, key, cycleId) {
@@ -398,6 +555,7 @@ async function main() {
   const version = argValue("version", null);
   const currentWatermark = argValue("watermark", null);
   const jobsRaw = argValue("jobs", null);
+  const migrationsRaw = argValue("migrations", null);
 
   if (!headSha) fail(2, "--sha=<head sha> is required.");
   let jobs;
@@ -406,11 +564,21 @@ async function main() {
   } catch (e) {
     fail(2, `--jobs must be a JSON array of {name, conclusion}: ${e.message}`);
   }
+  // Slice 2. Omitted is NOT "no migrations landed" -- it is "the list was not supplied", which
+  // schemaPlanFor() fails closed on. Read it with public.migrations_in_range(green, current).
+  let migrations;
+  try {
+    migrations = migrationsRaw ? JSON.parse(migrationsRaw) : [];
+  } catch (e) {
+    fail(2, `--migrations must be a JSON array of {version, name}: ${e.message}`);
+  }
 
   const anchorRes = await readGreenAnchor(base, key);
   if (anchorRes.error) fail(2, anchorRes.error);
   const cyclesRes = await readPushingCycles(base, key);
   if (cyclesRes.error) fail(2, cyclesRes.error);
+  const downsRes = await readMigrationDowns(base, key, migrations.map((m) => m?.name));
+  if (downsRes.error) fail(2, downsRes.error);
 
   const decision = decide({
     trigger,
@@ -419,6 +587,8 @@ async function main() {
     greenAnchor: anchorRes.anchor,
     currentWatermark,
     cycles: cyclesRes.cycles,
+    migrations,
+    downs: downsRes.downs,
   });
 
   if (!APPLY) {
@@ -456,9 +626,19 @@ async function main() {
 
   finish(
     0,
-    { decision, applied: true, cardId: filed.id, revertPlan: decision.revertPlan ?? null },
+    {
+      decision,
+      applied: true,
+      cardId: filed.id,
+      revertPlan: decision.revertPlan ?? null,
+      schemaPlan: decision.schemaPlan ?? null,
+    },
     `${decision.action}: ${decision.reason}\ncard ${filed.id}` +
-      (decision.revertPlan ? `\nrun this behind the cycle's push gates:\n  ${decision.revertPlan.command}` : "")
+      (decision.revertPlan ? `\nrun this behind the cycle's push gates:\n  ${decision.revertPlan.command}` : "") +
+      (decision.schemaPlan?.reversible
+        ? `\nthen apply these downs newest-first, through apply_migration, behind the same gates:\n` +
+          decision.schemaPlan.steps.map((s) => `  -- ${s.name} (${s.version ?? "no version"})`).join("\n")
+        : "")
   );
 }
 

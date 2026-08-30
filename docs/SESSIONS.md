@@ -5,6 +5,85 @@
 
 ---
 
+## session/cycle-20260830-1740 (v7.0.333, 2026-08-30, runner cycle `0e9dc18d-d3c6-4e21-8e3d-5ca13be01fb4`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent: the design was already standing from `v7.0.324`, and register B21 delegates judgment-dense *design*, which this cycle implemented rather than authored) — `SES-182` (slice 2) — down capture at apply time, and the migration-range rollback it feeds
+
+**Picked by the M3 drain** (`drain_epic_next` → `pick`, directive `9feb7018`, epic
+`Selfbuild M3 - Independent Verification`), under the Prime Directive (`a0ef9525`) §2(b). Layer 1a
+produced nothing buildable: John's mission directive `6acd590e` names `SES-220` and `SES-191`, and
+both read `done` on the live board.
+
+**The defect, measured on an unedited tree at 17:4xZ rather than recalled.**
+`public.runner_migration_downs` held **0 rows**; `capture_migration_down` and `migrations_in_range`
+did not exist (`pg_proc` count 0); and the only mention of the table anywhere in `scripts/ api/
+lib/ src/ tests/ docs/runbooks/` was `rollback-on-red.js`'s own header naming it a slice-2
+deferral. So slice 1's moved-watermark branch carded **every** migration range by construction,
+with no path to ever do otherwise.
+
+**What shipped.** `public.capture_migration_down(cycle, up_name, objects)` derives a down from the
+named objects' **live prior state** — absent object → drop by identity; existing function →
+re-apply the captured definitions **plus** the stale-overload drop and the `count(*)` assertion
+`.claude/rules/supabase-function-signature.md` requires; existing view → `CREATE OR REPLACE` with
+the captured definition; anything else already existing, and every unsupported kind including
+grants/ACL → `classification = 'refused'`, no down offered. `public.migrations_in_range()` gives
+the range predicate one executable home. `schemaPlanFor()` in the engine turns those rows into an
+ordered plan, and `decide()`'s moved-watermark branch now reverts when every member of the range
+carries an `auto-downable` down.
+
+**Three rules that are load-bearing rather than stylistic.** The capture must run **before** the
+up — run afterwards it captures what the up just wrote, which is a down that restores the bug, and
+nothing backfills it. The plan is **newest-first**, because downs applied oldest-first re-create
+what a later down expected gone. And it is **all-or-nothing**: `steps` comes back empty on any
+miss, so no caller can apply a subset even by accident — a schema half-undone is a state no green
+anchor describes.
+
+**A defect found by this ship's own QA and fixed rather than worked around.** The first arm to
+exercise the write path raised `42702` — the OUT parameters `up_name` / `classification` /
+`down_sql` shadow `runner_migration_downs`' own columns, `SES-134`'s `work_class` collision
+exactly. An INSERT column list cannot be qualified and OUT names are not identity args, so
+`CREATE OR REPLACE` refuses the change; migration
+`ses182_capture_migration_down_fix_out_param_shadowing` drops and re-creates by full identity list
+with the `count(*) = 1` assertion inside the migration itself.
+
+**QA.** Nine live arms against real Supabase inside a deliberately failing `DO` block, one variable
+each, all rolled back — existing function (re-applies both definitions, carries the overload drop,
+asserts count 2) with the retired definitions-only form as its negative control and asserted to
+lose; absent function; existing view; existing table refused; grant refused; a mixed list refused
+as a whole; ordering; idempotent re-capture (1 row, 2 before-images); and the range function's
+exclusive-from / inclusive-to boundary. Tree re-read after: 0 rows, 0 fixture images, 0 stray
+objects, 1 overload. Grants asserted **both** directions per `SES-101`. Build green, regression
+suite **124/124**, verifier **APPROVE** (`runner_verdicts 094b84b5`). File-level negative control:
+`tests/regression/SES-182b-migration-downs.js` cannot even load against `origin/dev`'s engine — the
+exports it pins do not exist — and passes on the shipped one.
+
+**Why the ticket stays `partial` and did NOT take its auto-done.** The verifier reported
+`auto_done_eligible: YES` under the Prime Directive's §2f widening, and the bar was deliberately
+not applied: `SES-182` has a live named remainder — deploy-serving-red as a second trigger,
+grant/ACL downs, and data replay — so `done` would be a claim the work does not support.
+§2f's own fail-closed sentence governs (*uncertain → deliver and card, never auto-done*), and
+`partial` is the runbook's value for work that genuinely continues. The remainder is written onto
+the ticket so the next picker reads it instead of re-deriving it. **Consequence, stated rather than
+hidden: the M3 drain does not retire on this ship**, and the M3 gate review therefore still waits
+on `SES-182`.
+
+**One honest bootstrap gap.** This ship's own two migrations carry **no** captured down —
+`capture_migration_down` did not exist when they were applied, and the capture reads prior state,
+which is gone afterwards. So a red on this very push cards rather than rolling back. That is the
+fail-closed direction working, and it is on the ship card rather than left to be discovered.
+
+**Also folded in, exactly where it asked to land:** directive `a75e22e6`'s continuation-spawn line
+(create a new session carrying the runner stamp; never `fire_trigger` on an `http_api`-created
+routine — `SES-140`), added to the tail's step (8) on the next ship touching this file, per that
+directive's own instruction never to spend a dedicated cycle on the doc edit.
+
+**Stamp count held at 5** per `session-hygiene` check 7: `v7.0.299` moved verbatim to this file's
+appendix, checked first by grep — four of its five editor warnings are restated in the runbook
+body, and the fifth (`summarizeGateOutput()` reads both streams and stays pure) appeared zero times
+outside its stamp and was **relocated** into step 7a rather than archived.
+
+Doc + script + test + migration; no `src`/`api`/`lib` change, no site change.
+
+---
+
 ## session/cycle-20260830-1640 (v7.0.332, 2026-08-30, runner cycle `06bc56be-34a7-4c4f-a740-44633af533e0`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5, no subagent: the judgment-dense half was the design, delegated to Fable 5 by the `v7.0.324` cycle and already standing) — `SES-182` (slice 1 of 3) — auto-rollback on red: the green anchor, the decision engine, and the two sweeps that use them
 
 **JOHN AUTHORISED THE BUILD, AND BOTH DESIGN QUESTIONS ARE ANSWERED.** Card `2c136c5b`, decided
@@ -11025,6 +11104,18 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+<!-- DeepBench v7.0.299 | runbooks/runner-cycle.md | SES-213 — THE VERDICT IS TAKEN AGAINST THE TREE THAT ACTUALLY SHIPS: step 7a now OPENS with `node scripts/render-claude-state.js`, and the thing to read twice is WHERE the fix went — the runbook, deliberately NOT scripts/verifier.js. THE DEFECT, measured not inferred: all 26 `block` rows in public.runner_verdicts carried the identical triple build=green / regression=red / hygiene=green, against 30 all-green `approve` rows, and the discriminator was never the change under test — it was WHETHER THE PREDECESSOR SHIPPED. render-claude-state.js renders the cycles whose outcome is already 'shipped' (:162, .slice(0,3) at :121); a cycle's own row does not reach 'shipped' until its step-9 tail, i.e. AFTER it rendered and pushed; verifier.js's runGate spawns the suite with NO `env` of its own (:242-248) so it inherits 7a's credentials, which runs the CREDENTIALED half of tests/regression/SES-177-claude-state-renderer.js (:140-153), which spawns `render-claude-state.js --check` (:180-190) and compares the committed file BYTE-FOR-BYTE against the ledger. Predecessor ships → drift → [FAIL] → red → block, on work that is perfectly sound. A predecessor that closed gated_before_build or did_not_run never joins the shipped set, the file still matches, and the gate is green — which is exactly the 26/30 split. CAUGHT IN THE ACT ON AN UNEDITED TREE, which is why this is a measurement rather than a reconstruction: `--check` exit 0 at 23:44Z with SES-177 [PASS] and a re-render writing byte-identical bytes (git diff empty), peer cycle dc047a05 (v7.0.298, SES-220) closed 'shipped' at 23:46:57Z, `--check` exit 1 — DRIFT — minutes later with ZERO file changes in between. THE TWO ORDERINGS THE TICKET NAMED CONVERGE, and saying so is half the design: option A as literally worded ("7a after the close-out render") is impossible, because the close-out render sits AFTER the ticket status write and 7a's auto-done bar DECIDES whether that write is `done` or `delivered` — so the verdict must precede it, and repaired A IS B. The only live question was WHERE the render invocation lives. THE EDIT THIS SHIP FORBIDS, and it is the one a later cycle will reach for: moving the render INSIDE scripts/verifier.js so no cycle has to remember it. That script's founding property is verdict-only — "this script CANNOT EDIT… touches no file in the tree", its own header and charter Multi-agent verification item 1 — and spawning a file-writer is that invariant laundered, not kept; it would also have the verifier grade a file it had just authored. This file's most-cited lesson (a rule each cycle must remember is a rule that gets silently forgotten — record_skip's precedent, eight times over) argues the OTHER way and LOSES here on asymmetric fail directions, stated rather than asserted: forgetting the runbook line reproduces EXACTLY the old behaviour — a spurious block, ship delivered, card John — which is loud, fail-closed and visible on the scoreboard, NEVER a false approve; the in-verifier variant's failure is an invariant nobody sees erode. NOT CLAIMED, AND NAMED IN THE BODY RATHER THAN LEFT TO BE FOUND: this shrinks the staleness window from "one whole ship, by construction" to "a peer closing shipped in the seconds between your render and your verdict" — under parallel cycles (B42) that race is real; and BACKLOG-SNAPSHOT.md plus the hand-written docs/SESSIONS.md entry land after the verdict in EVERY legal ordering, because the snapshot must follow the status write it captures. Neither is gate-checked, so neither costs a verdict today. SECOND DEFECT, same ticket, fixed in the script where it belongs: runner_verdicts.reasoning stored only the tail of `res.stderr || res.stdout`, which prefers stderr WHOLESALE — and run-all.js:77 prints `[FAIL] <file> -- <message>` on STDOUT while the ubiquitous GATE_BYPASS_SECRET warning is a console.warn on STDERR, so all 26 rows recorded the warning and never the failing test; the ledger could not say what it blocked on, which is why this needed a live reproduction instead of a query. summarizeGateOutput() is PURE and EXPORTED (the retired tail was buried inside runGate() and observable only through a real 20-minute gate run, which is how it survived 26 rows), reads BOTH streams, prefers [FAIL] lines over lines that merely came last, keeps the pass count, falls back to the last three COMBINED lines for gates with no [FAIL] vocabulary, and stays bounded at 4 failures + 1 summary under the named DETAIL_CAP=600 (the retired literal 400 truncated mid-failure). QA WAS TWO ARMS ON ONE TREE, ONE VARIABLE, the ticket's own measurement shape: SES-177 FAILS ("1 !== 0") before the render and PASSES after it, the only change on disk being CLAUDE-STATE.md's 3 lines. The code half carries its own negative control — the retired `stderr || stdout` expression is applied to the SAME fixture inside the guard and asserted to LOSE the failing test, so the guard proves a DIFFERENCE from the old behaviour rather than a property both share. Full suite 97/98, build green. THE ONE RED IS REPORTED HONESTLY RATHER THAN ABSORBED: LOG-41 fails HTTP 401 inside the suite, it failed identically on the unmodified tree BEFORE any edit, and it is ALREADY ROOT-CAUSED as the SES-221 cross-test env leak (run-all.js imports every test into one process; seven set VITE_SUPABASE_ANON_KEY="regression-placeholder" without restoring it) — re-verified here rather than taken on trust: LOG-41 run ALONE passes and declares its anon arm not-run, in-suite it fails. It is independent of this ticket and means this cycle's own verdict blocks regardless of this fix. An earlier reading in this cycle blamed a missing GATE_BYPASS_SECRET; that was inference from the adjacent warning and is corrected here rather than left standing. Guarded by tests/regression/SES-213-verdict-ordering.js: 5 runbook clauses each with its own negative control plus the SES-158 vacuity meta-check, and a file-level control run against the pre-change runbook where 5 of 5 clauses fail and 5 of 5 pass on the shipped one. SELF-CERTIFICATION REFUSED BY CODE, not by memory: this delivery touches scripts/verifier.js, which is in that script's own SELF_CERTIFYING_PATHS (:113-117), so the auto-done bar is unavailable and the ticket ships `delivered` with a visible ship card — which is also exactly what John's directive a7be7fd6 says in words. Stamp count held at 5 per session-hygiene check 7: v7.0.247 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — four of its five editor warnings are already restated in this file's body (the fail-closed `skipped` is not `green` rule at step 7a, scope read off the board not argv, "a block IS NOT A WALL", and the self-certification refusal), and its fifth — that the fail-closed rule has TWO homes on purpose, verdictFor() AND ck_runner_verdicts_fail_closed, because this script will not stay the only thing that inserts a verdict row — appeared ZERO times outside its stamp and was RELOCATED into step 7a next to the gate it protects rather than archived, the SES-164 step that makes a trim safe. Doc + script + test; no src/api/lib change, no site change. -->
+
+**Retired by `SES-182` slice 2 (v7.0.333, 2026-08-30) to hold the stamp count at 5 — every
+editor warning checked by grep against the live body first, not by recollection. Four were
+already restated there: the render-first rule (step 7a's opening line), the forbidden edit
+(moving the render inside `scripts/verifier.js`), "a `block` IS NOT A WALL", and the
+self-certification refusal read off `SELF_CERTIFYING_PATHS`. The fifth — that
+`runner_verdicts.reasoning` must read BOTH streams and prefer `[FAIL]` lines, and that
+`summarizeGateOutput()` is pure and exported precisely because the retired tail was buried in
+`runGate()` and observable only through a real 20-minute gate run — appeared ZERO times outside
+this stamp and was RELOCATED into step 7a next to the gate it protects, rather than archived.**
 
 <!-- DeepBench v7.0.252 | runbooks/runner-cycle.md | SES-196 — JOHN OVERRULED THIS FILE'S OWN PROHIBITION, AND THE PROHIBITION'S REASON IS KEPT RATHER THAN RETRACTED. Tail (8) has forbidden a design_status clause in drain_epic_next()'s PICK predicate since v7.0.238, on a real ground: that predicate also feeds step 5, where a flagged member was RETURNED so the cycle could record_skip() it onto John's section 10. The previous cycle correctly stopped and asked instead of editing it. John answered 2026-08-25T05:09Z from an attended architect session, directive 5dc62981, verbatim: "i don't want the system to stop". THE COST THE PROHIBITION NEVER WEIGHED, measured live at 05:17Z on the M3 drain before a line changed: drain_epic_next() returned SES-191 (needs-desktop) as the pick, queue 5, open_now 18 — on EVERY cycle — while THIRTEEN buildable named members sat reachable behind it (SES-77 at queue 234 first). A standing drain John declared could not advance at all. THE SIGNAL WAS CHECKED, NOT ARGUED AWAY, which is the half that made the reversal safe: all four flagged M3 members ALREADY carried unresolved runner_skips rows (SES-191 needs-desktop 04:45Z, SES-180 needs-desktop x8, SES-181 needs-john 04:46Z, SES-182 needs-john x2), and a skip row is cleared by the ticket going done, never by a cycle waiting long enough — so section 10 keeps the ask and what stops is only the RE-skipping of a ticket already on his page (SES-154's one-ask-one-home boundary). THE THREE EDITS THIS SHIP FORBIDS, each a way the next cycle widens it: (1) putting the flags in the RETIREMENT predicate too — open_now goes 0 and John's standing directive closes on the runner's own say-so, the SES-142 authorisation defect; open_now reads 18 pre- and post-fix, which is the proof it did not move. (2) Reading the directive's literal "design_status is non-null" — that also skips 'designed', which step 5's table calls EXPLICITLY NOT A SKIP and step 6 calls the fast path, so the literal form makes a drain step past its BEST picks; his own parenthetical enumerates needs-john / needs-desktop / john-paced and those three are what shipped, mirroring drain_chain_gate's c_flagged byte-for-byte so the two homes cannot drift. (3) Deleting Gate C as redundant — its population should now be zero, and it is the thing that fires if a later edit takes the clause back out of the picker. NOT INCLUDED AND SAID SO: status = 'removal proposed', which SES-196's own description lists among the five blocked-prefix flags, stays pickable here and remains step 5's procedural skip — John scoped the directive to design_status, and widening it to a status he did not name is the runner granting itself scope. Carried as the declared remainder. QA IS JOHN'S OWN THREE ARMS: (a) live, same board, one variable — pick SES-191 pre-fix, SES-77 post-fix; (b) all-flagged fixture inside a deliberately failing DO block (the SES-147 rolled-back pattern) returns blocked, pick null, open_now 18, blocked_detail naming all 17 flagged members with their flags plus the 1 delivered — never a silent empty — and the board was re-counted afterwards byte-identical (4 flagged / 13 unflagged / 1 delivered); (c) the negative control IS arm (a)'s pre-fix call, taken on the real board rather than reconstructed. The widened RETURNS TABLE needed a DROP+CREATE (a return type cannot be replaced); the ARGUMENT list is untouched so no overload can survive, asserted anyway at count(*)=1 per .claude/rules/supabase-function-signature.md, with grants asserted in BOTH directions (SES-101's REVOKE FROM PUBLIC lesson). drain_chain_gate reads the call into a record and was proven end-to-end through Gate B on a rolled-back fixture: verdict continue, pick SES-77, pick_design_status null. Guarded by tests/regression/SES-196-drain-pick-flags.js (6 clauses, 6 of 6 failing on the pre-change file); SES-197's own guard clause forbids-pick-predicate-edit is RETARGETED rather than deleted — it now pins the overrule AND the reason, because deleting a guard when its rule moves loses the reason with it. Stamp count held at 5 per session-hygiene check 7: v7.0.230 moved VERBATIM to docs/SESSIONS.md's appendix, checked first — all four of its editor warnings (the 24h bar is not to be tuned toward the 20-minute tripwire, the AND ended_at IS NULL resume guard, one row closed per cycle, and WENT SILENT never "died") are already restated in step 0b's own body, confirmed by grep rather than recollection. Doc + test + migration; no src/api/lib change, no site change. -->
 
