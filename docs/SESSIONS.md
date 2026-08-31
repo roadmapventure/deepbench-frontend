@@ -5,6 +5,85 @@
 
 ---
 
+## session/cycle-20260831-0140 (v7.0.337, 2026-08-31, runner cycle `b0a3dde5-e945-4b38-acf3-acca92c8cf84`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 as orchestrator; register B21 delegates kickoff design to Fable 5 for **P1–P5** work and this is `P10 - Tooling`, so the design pass stayed here, while the **mechanical** repo verification went to a Sonnet 5 subagent as B21 directs) — **M4 SUCCESSION**: the M3 gate review's named members filed, the `Selfbuild M4 - Infrastructure Floor` drain declared, the runner un-parked.
+
+**UN-PARKED FIRST, and the check that licensed it is the whole reason this cycle ran at all.**
+`runner_directives b25b2b56` (`PARKED`, 2026-08-30T23:00Z) was open, and Prime Directive
+`a0ef9525` §3 says a fire that finds one checks **only** whether the named blockers changed —
+unchanged means close `did_not_run` immediately, minimal ceremony. One had changed: the park's own
+text named *"this Accept and SES-183 are the two that matter most"*, and card `6c4d3453`
+(*Selfbuild M3 - Independent Verification — milestone gate review*) carried
+`decision = 'accept'` at **01:27:44Z**, John's word verbatim *"Acceept"* — **41 minutes after the
+previous parked fire (`9cda4296`) had already closed at 00:46Z.** This was the first fire able to
+see it. The park was closed `superseded`, not deleted.
+
+**THE AUTHORITY CHAIN WAS VERIFIED BEFORE A ROW WAS WRITTEN, because the obvious reading forbids
+this ship.** `runner-cycle.md`'s Standing prohibitions read *"never create a drain row (only John
+does that)"*. Directive `0970abad` (2026-08-29, John's word verbatim *"run both"*) and Prime
+Directive `a0ef9525` §6 say the opposite for exactly one case: **STANDING DRAIN SUCCESSION** — a
+completed gate review that names the next milestone's fixed scope declares that milestone's drain
+immediately, by the attended session **or by the first cycle after it that finds the named scope
+recorded and no drain declared**, with no separate word from John. `a0ef9525` §5 (*"every
+never-rule in runner-cycle.md stands exactly as written"*) is the general clause and §6 the
+specific carve-out **in the same directive**, so specific governs. **Checked live rather than
+assumed: `ARCHITECTURE.md` §19v is SILENT on who may create a drain** (grep returns two hits, both
+about chain continuation) — so this was a runbook-versus-directive gap, **not** a §19v conflict,
+which is what licensed reconciling the text here instead of carrying it as a standing disagreement.
+
+**THE EDIT THE CARVE-OUT FORBIDS, and it is the tempting one because it reads like permission:**
+treating *"a review named successors"* as enough. It is not — the review must be **accepted**,
+because `gate-review.md`'s prohibition 1 puts the filing power in John's Accept (*"a review
+PROPOSES successor members and John's Accept FILES them"*), and a drain declared off an undecided
+card turns a check **on** the runner into a widening **of** it, which is that file's whole subject.
+
+**COMPOSITION WAS SETTLED BY PRECEDENT, NOT BY JUDGMENT** — the one genuinely ambiguous question,
+and the place this cycle could have invented scope. Measured from `runner_drain_scope` joined to
+`backlog_items.created_at` rather than reasoned: M3's drain `6810599f` named **19 then-open epic
+members PLUS the 4 tickets filed straight after the preceding (M2) gate review**. M4 is the same
+shape, **4 + 4**. Already-`done` members (`SES-192`, `SES-193`) are deliberately **not** named:
+naming a closed ticket only moves the retirement predicate's finish line.
+
+**WHAT LANDED.** Directive `4583bdc1` (`type='drain-epic'`), **8 named members**, fixed at
+declaration per `SES-142`: `SES-183` (q5, `needs-john`), `SES-47` (q247, `needs-john`), **`SES-254`
+(q254)**, **`SES-255` (q255)**, **`SES-256` (q256)**, `SES-244` (q262, `needs-john`, **adopted from
+M3**, epic moved with a before-image), `DAT-21` (q575, `needs-desktop`), `HAR-34` (q576,
+`needs-john`). **Proposed member 5 is deliberately NOT a ticket** — *"re-measure DAT-21's scope at
+the SES-183 gate"* is an instruction about an existing member, so it lives in the directive body,
+with the two lenses' unresolved split (Chief Architect: promote to gate-critical; PM: the premise
+may be stale) carried for John rather than smoothed over.
+
+**THE THREE NEW TICKETS' EVIDENCE WAS RE-VERIFIED THIS CYCLE, NEVER COPIED OFF THE CARD** (the
+card's findings were up to three hours old at pick time). Full write-up:
+`docs/harvests/M4-succession-2026-08-31.md`.
+- **`SES-254`** — 8 `runner_items` rows carry `epic_id`; **4 violate** the contract (`SES-45`,
+  `SES-210` gated; `SES-211`, `SES-182` ship), all on M3. That is what hid M3's own review. No
+  CHECK, no script, and **no regression test across all 129 files** under `tests/regression/`.
+- **`SES-255`** — this cycle's **own** measurement: `list_workflow_runs` for `ci.yml` on `dev` at
+  `per_page=1` returned **71,371 characters** and its overflow landed in the permission-gated
+  `~/.claude/.../tool-results/` path register B39 forbids. **Exit 2 — could not run, not a pass; no
+  green anchor recorded.** Second consecutive cycle to hit it, and a repo sweep confirms **no
+  ticket had ever been filed** — this is that ticket. The nuance the card understated and a fix
+  must respect: the proximate blocker is the **tool-result size cap**, B39 merely compounds it.
+- **`SES-256`** — all five SES-182 guards run on fixtures or rolled-back transactions, so the
+  charter's auto-rollback drill is genuinely unexecuted; no drill runbook and no harvest exists.
+
+**TWO ROUTES ARE CARDED-NOT-ASSUMED INSIDE THE TICKETS THEMSELVES, which is where the fail-closed
+direction lives:** `SES-255`'s narrowly-scoped GitHub credential provisions a secret and is John's
+call; `SES-256`'s seed-a-real-red drill is an outward-facing act covered by **no** standing
+authorisation (directive `1c9609de` pre-authorises drill **dumps** only, explicitly not this). Each
+ticket says so in its own text, so a later cycle cannot reach for the dangerous route by omission.
+
+**Blocker sweep:** dev `serving-green` (1 of 1 sample, app root 200 + entry module
+`/assets/index-C5wASfTj.js` 200). **Walls:** API $0 today / $0 month against $5/$100; token cap
+`200,000,000` (`cap_source = daily-max-box`, John's standing 200M), day spend ~15.4M at open, rest
+wall not hit (meter 29% vs 85%). Reading age **34.9h** — inside the 48h stale floor, but past the
+24h warn bar. **Invention pass: suspended by Prime Directive §4.**
+
+**Carried, not fixed:** the `SES-141` claim held by attended session `design-briefing-redesign`
+since 2026-08-23 is still open (silence probe (b)) — an attended session's claim, not a silent
+cloud cycle, so it is reported rather than adjudicated (B37). Doc-only ship: no `src/`/`api/`/`lib/`
+change, no site change, no schema change, no migration.
+
 ## session/cycle-20260830-2141 (v7.0.336, 2026-08-30, runner cycle `e9ee10fd-ade6-42f2-8109-de0a69ae5d64`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 throughout: register B21 delegates kickoff design to a Fable 5 subagent for **P1–P5** work, and this is `P10 - Tooling`, so the design pass stayed with the orchestrator) — `SES-182` (slice 5) — the safe-row apply, behind John's Reverse only. **SES-182 is complete.**
 
 **Picked by the M3 drain** (`drain_epic_next` → `pick`, `open_now = 1`, directive `9feb7018`, epic
@@ -11313,6 +11392,18 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+**Retired by the M4 succession cycle (`v7.0.337`, 2026-08-31) to hold the stamp count at 5 — every
+editor warning checked by grep against the live body FIRST, not by recollection.** All three of
+`SES-134`'s load-bearing warnings survive in `runner-cycle.md`'s own body, so this stamp is archived
+rather than re-prosed: the promotion test is a **modulo, never `streak >= 5`** (body: *"promotion ⇔
+streak %% 5 = 0 — 5, 10, 15, …; NEVER \"streak >= 5\""*), `apply_ladder_decision()` is the **one
+home** for the arithmetic (body: the single `SELECT * FROM public.apply_ladder_decision(...)` call),
+and idempotence is **structural** via `runner_items.ladder_applied_at` (body: *"makes a second call
+a no-op, so a re-run — or two peers…"*). Register B34 — a gated card touches neither rung nor
+streak — appears six times in the body independently of this stamp.
+
+<!-- DeepBench v7.0.315 | runbooks/runner-cycle.md | SES-134 — THE TRUST LADDER STOPS BEING ARITHMETIC EVERY CYCLE DOES BY HAND, and the thing to read twice is WHY THE TEST IS A MODULO AND NOT A THRESHOLD. John answered yes to q-ladder-executable 2026-08-23T00:35Z, so this is authorised work rather than a proposal; step 2's ladder bullet used to say in its own words that no code implemented the rule and that making it executable was "John's call, filed as a question, not done here". Migration ses134_ladder_executable ships public.apply_ladder_decision(cycle_id, item_id) as the ONE home, and the runbook now points at the call instead of restating the arithmetic — otherwise the prose and the function become two homes for one rule, which is the defect being fixed. THE EDIT THIS SHIP FORBIDS: rewriting the promotion test as `streak >= 5`. SES-107 records why — a streak parked at 5 then promotes on EVERY later Accept, a rung per tap forever, which is the opposite failure and equally not what John asked for. The QA's negative control IS that retired form applied to the same fixture and asserted to LOSE: at a streak of 5 the shipped modulo form returns promoted=false and the retired threshold returns promoted=true, so the guard proves a DIFFERENCE rather than a property both share. IDEMPOTENCE IS STRUCTURAL RATHER THAN A RULE A CYCLE MUST REMEMBER — runner_items.ladder_applied_at makes a second call a no-op, because a double-counted streak does not merely look wrong, it silently MANUFACTURES a promotion; that matters under parallel cycles (B42) where two peers can harvest one tap. B34 IS ENFORCED IN CODE NOW, not by memory: a gated_before_build card touches neither rung nor streak, because paying the runner for asking permission is the one behaviour that must always be free. THE GUARD EARNED ITS KEEP BEFORE THE SHIP RATHER THAN AFTER: arm (a) raised 42702 "column reference work_class is ambiguous" the first time a real arm exercised the write path — work_class is both an OUT parameter and a column, and only the UPDATE was unqualified — fixed and recorded rather than quietly patched. Seven fixture arms inside a deliberately failing DO block, one variable each, ALL rolled back: accept 1/2->1/3 no promotion; 5th accept 1/4->2/5 promoted with the streak NOT reset; the retired-form control differing; reverse 3/7->2/0; a gated card leaving the ladder at 1/2; rework unchanged; a second call "already counted". Ladder re-read afterwards and byte-identical (tooling 13/42 both ways), 0 fixture tickets, 0 fixture cards, 0 stray before-images. pg_proc count asserted 1 per .claude/rules/supabase-function-signature.md; grants asserted BOTH directions per SES-101 (anon false, authenticated false, service_role true). A STALE CLAIM CORRECTED RATHER THAN REPEATED: the ticket says `grep -rl runner_ladder --include=*.js` returns nothing; it returns two files today, and both only READ the ladder for display — nothing but this function writes it. OUT OF SCOPE and named: SES-122 is where rungs start unlocking autonomy; this is bookkeeping that cannot drift. Guarded by tests/regression/SES-134-ladder-executable.js. Doc + test + migration; no src/api/lib change, no site change. -->
 
 <!-- DeepBench v7.0.310 | runbooks/runner-cycle.md | SES-104 — THE STALL TRIPWIRE'S "MINUTES FROZEN" STOPS BEING A NUMBER NOBODY MEASURED, and the thing to read twice is that the ticket's own fix sentence is WRONG on one word. It offers "backfill heartbeat_at to NULL for rows that never wrote one (OR exclude heartbeat_at IS NULL from (d))" — and the two are NOT alternatives; each repairs a defect the other cannot touch. MEASURED LIVE 2026-08-29T11:4xZ on an unedited tree rather than recalled from the ticket: runner_cycles held 269 rows, 43 still carrying the ses103 backfill constant 2026-08-21 18:19:19.001555+00, ZERO carrying NULL, 45 with no last_step. The ticket's 43 has not moved in eight days. ALL 43 ARE CLOSED and ALL 43 carry a heartbeat LATER than their own started_at — which is precisely what makes the value dangerous rather than obviously wrong: it is indistinguishable from a real one, so no reader can repair it. That is half one, and it is why the DATA had to move: coalesce() is powerless against a non-NULL wrong value. Half two is the DETECTOR, and it is the live one: bare `heartbeat_at < now() - INTERVAL '20 minutes'` evaluates to NULL — not true — for a NULL heartbeat, so such a row silently LEAVES the tripwire and John gets no push, while stall_watchdog() has coalesced since SES-194 (read from pg_get_functiondef, not assumed) and remains free to close that same row 'failed' at the 24h bar. A cycle could therefore be closed for going silent having never produced the 20-minute alert the tripwire exists to send. TWO DETECTORS OVER ONE COLUMN DISAGREEING ABOUT WHAT A MISSING VALUE MEANS is the drift this repo keeps paying for; probe (d) now uses stall_watchdog()'s own expression, so they cannot drift apart. THE EDIT THIS SHIP FORBIDS: moving never_reported out of the projection and into the WHERE. A never-reporting open peer is MORE worth pushing, not less — it has not reached its first step boundary — and the flag changes only the push's WORDING ("has not reported since it started" vs "frozen since its last step"); filtering on it rebuilds the exact invisibility this fixed. NOT DONE, AND NAMED RATHER THAN LEFT TO BE FOUND: the column's DEFAULT now() is deliberately KEPT — it is what makes a fresh row's basis equal its own started_at, which is the correct basis, and dropping it changes every future INSERT for no observable gain under the coalesce. The honest consequence is stated in the body: on today's schema a LIVE row cannot carry NULL, so the NULL arm guards the 43 historical rows and any future explicit NULL — this ship removes a divergence, it does not patch a hot path, and saying otherwise would be claiming an operational fix the measurement does not support. THE MIGRATION'S PREDICATE IS TWO-PART ON PURPOSE (ses104_null_never_reported_heartbeats): the heartbeat statement writes heartbeat_at AND last_step in ONE update, so `last_step IS NULL` proves no cycle ever ran it — and the pair correctly SPARES the 2 further rows that carry last_step NULL beside their own DEFAULT-now() start-time heartbeat, whose basis is already honest. It raises rather than guessing if the count is not 43. Before-images written for all 43 (§19v), verified after: 0 constant, 43 NULL, 43 images, 2 spared. QA WAS DISCRIMINATING RATHER THAN A GREP: isStale() reproduces three-valued logic on BOTH bases over the SAME fixture and the negative control IS the retired basis — the never-reported row is caught by the coalesced form and MISSED by the bare one — plus the fix is asserted NOT to manufacture an alert on a peer that heartbeat 5 minutes ago. FILE-LEVEL NEGATIVE CONTROL run against origin/dev's own pre-change runbook: 4 of 4 clauses FAIL there, 4 of 4 pass here. The vacuity meta-check EARNED ITS PLACE DURING THE BUILD rather than passing decoratively: it caught clause 3's alternation matching this ship's own rationale prose, and the clause was tightened instead of shipped. Tripwire totals unchanged by this edit, measured both ways: 53 flagged / 4 warning before and after. Stamp count held at 5 per session-hygiene check 7: v7.0.252 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — all four of its editor warnings survive in the body (the retirement-predicate/open_now/authorisation-defect warning at the `delivered` drain property, "not a skip" x5, "Gate C" x5, "removal proposed" x12). Guarded by tests/regression/SES-104-heartbeat-basis.js. Doc + test + migration; no src/api/lib change, no site change. -->
 
