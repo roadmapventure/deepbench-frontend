@@ -1,3 +1,8 @@
+// DeepBench v7.0.352 | tests/regression/SES-244-tap-buffer.js | SES-244a — writeTap's OUTCOME must
+// be readable from `state`. The pinned negative-control blob (ad48b08f, v7.0.349) predates writeTap
+// entirely, so v7.0.352's four clauses are asserted FALSE there rather than gated out of arm 2 —
+// a control that skips the newest clauses stops measuring the newest half of the guard.
+//
 // DeepBench v7.0.351 | tests/regression/SES-244-tap-buffer.js | SES-244a fix — arm 3 stopped
 // consuming the response body it was about to read, and stopped calling .catch() on a Response.
 // Both were live-run-only defects: arms 1 and 2 are offline, so an uncredentialed run was green
@@ -37,6 +42,21 @@ function contentChecks(src) {
   r.escapesUserText = src.includes("replace(/'/g, \"''\")");
   r.insertsBufferRow = wt.includes('INSERT INTO public.briefing_taps') && wt.includes('tap_kind') && wt.includes('::jsonb');
   r.neverRetries = !/retry|setTimeout\s*\(\s*writeTap/i.test(wt); // a write rejection is outcome-unknown
+  // v7.0.352 — the outcome must be readable from `state`, not only from the savebar. Both of these
+  // are FALSE on the pinned pre-change blob for the strongest possible reason: it predates writeTap
+  // entirely, so the slice is empty. Arm 2 asserts them false rather than gating them out, which
+  // keeps the control honest instead of merely quiet.
+  r.recordsFailureInState = wt.includes('state.last_tap_error');
+  r.recordsSuccessInState = wt.includes('state.last_tap_ok');
+  // Every way out of the mcp path must leave a stamp. A rejected use('mcp') — a denied or
+  // unanswered consent prompt — used to be an UNHANDLED rejection: async, so the outer catch never
+  // saw it, and the tap failed in total silence. Two handlers on use() is what this pins.
+  // Identified by the handler's OWN parameter name and code, never by a structural
+  // `}, function` regex: that pattern also matches the INNER callTool handlers, so it stayed true
+  // with the use() handler deleted. Caught by this change's own mutation run before it shipped —
+  // the check was vacuous for one round, which is the SES-158 shape.
+  r.handlesUseRejection = /\}\s*,\s*function\s*\(\s*uerr\s*\)/.test(wt) && wt.includes("'use_rejected'");
+  r.stampsEveryBranch = (wt.match(/state\.last_tap_error\s*=/g) || []).length >= 3;
   const kinds = ['decision', 'answer', 'ask', 'unblock', 'setting', 'directive', 'reading'];
   r.allKindsWired = kinds.every((k) => src.includes("writeTap('" + k + "'"));
   r.callSiteCount = (src.match(/writeTap\(/g) || []).length; // 9 sites + 1 definition = 10
@@ -72,6 +92,12 @@ export default async function run() {
   assert.strictEqual(p.writeTapDefined, false, 'control is vacuous: pre-change template already defines writeTap');
   assert.strictEqual(p.allKindsWired, false, 'control is vacuous: pre-change template already wires tap kinds');
   assert.ok(p.callSiteCount === 0, 'control is vacuous: pre-change template already calls writeTap');
+  // v7.0.352's clauses, asserted false here rather than skipped: the pinned blob predates writeTap,
+  // so a control that merely ignored them would stop measuring the newest half of this guard.
+  assert.strictEqual(p.recordsFailureInState, false, 'control is vacuous: pre-change template already stamps last_tap_error');
+  assert.strictEqual(p.recordsSuccessInState, false, 'control is vacuous: pre-change template already stamps last_tap_ok');
+  assert.strictEqual(p.handlesUseRejection, false, 'control is vacuous: pre-change template already handles a rejected use()');
+  assert.strictEqual(p.stampsEveryBranch, false, 'control is vacuous: pre-change template already stamps every branch');
   assert.ok(preserved(pre), 'preservation checks must hold on BOTH trees or they measure nothing');
 
   // Arm 3 — credentialed live arm: buffer table exists, is writable at service level,

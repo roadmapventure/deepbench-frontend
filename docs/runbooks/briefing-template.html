@@ -1948,21 +1948,53 @@
     var q = 'INSERT INTO public.briefing_taps (tap_kind, target_ref, payload, page_built) VALUES ('
       + sqlLit(kind) + ',' + sqlLit(targetRef) + ','
       + sqlLit(JSON.stringify(payload || {})) + '::jsonb,' + sqlLit(PAGE_BUILT) + ')';
+    // v7.0.352 — EVERY OUTCOME OF THIS WRITE IS RECORDED INTO `state`, not only into the savebar.
+    // Three live taps (Daily max 199 -> 198 -> 197) each self-published correctly and each wrote no
+    // row, and nothing on the page said why: the only report was bar(), which lives in §7 while
+    // John was tapping in §2b. A savebar is not an observation channel — it is off-screen from most
+    // of the page and gone on the next render. Riding `state` means the branch that fired is
+    // readable from the served copy afterwards, by someone who cannot see his screen.
+    // NO save() FROM HERE, deliberately: the handlers already call save() immediately after
+    // writeTap fires, so the stamp rides the NEXT self-publish, which his tapping cadence
+    // guarantees. Publishing from a failure handler is how a failing write becomes a publish loop.
     try {
       window.claude.use('mcp').then(function(m){
-        if (!m) { bar('tap saved on page only — database channel unavailable'); return; }
+        if (!m) {
+          state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind, code: 'mcp_null' };
+          bar('tap saved on page only — database channel unavailable'); return;
+        }
         // ONE ATTEMPT ONLY, deliberately: under the mcp contract a rejected write is
         // outcome-UNKNOWN, not proof it did not run, so a second attempt is how one tap becomes two
         // rows. Every failure branch reaches the savebar — a silent one would let John believe a
         // tap was durable when it wasn't. (The guard greps this slice for the r-word; the words are
         // avoided here on purpose, not by accident — do not "clarify" them back in.)
-        m.callTool('Supabase', 'execute_sql', { query: q }).then(function(){}, function(err){
+        m.callTool('Supabase', 'execute_sql', { query: q }).then(function(){
+          state.last_tap_ok = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind };
+        }, function(err){
           var c = err && err.code;
+          state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind,
+                                   code: (c || 'unknown'),
+                                   msg: String((err && err.message) || '').slice(0, 200) };
           if (c === 'selection_required') { bar('choose your Supabase connector in the prompt, then tap again'); }
           else { bar('tap saved on page only — database copy failed (' + (c || 'unknown') + ')'); }
         });
+      }, function(uerr){
+        // THE BRANCH THAT COULD REPORT NOTHING AT ALL, and the one that best fits what John saw.
+        // use('mcp') was given only a FULFILLED handler, so a REJECTED use() — which is what a
+        // denied or never-answered consent prompt produces — was an unhandled promise rejection:
+        // async, so the outer catch below never sees it, no bar(), no state, total silence, while
+        // the self-publish beside it succeeded. That is exactly the reported symptom. Same copy as
+        // the callTool failure branch on purpose — this is a new branch, not new wording.
+        var uc = (uerr && uerr.code) || 'use_rejected';
+        state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind, code: uc,
+                                 msg: String((uerr && uerr.message) || '').slice(0, 200) };
+        bar('tap saved on page only — database copy failed (' + uc + ')');
       });
-    } catch (e) { /* page-only: the existing self-publish still records this tap in phase A */ }
+    } catch (e) {
+      state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind, code: 'exception',
+                               msg: String((e && e.message) || '').slice(0, 200) };
+      /* page-only: the existing self-publish still records this tap in phase A */
+    }
   }
 
   var saving = false;
