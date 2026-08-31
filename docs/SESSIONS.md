@@ -5,6 +5,89 @@
 
 ---
 
+## session/cycle-20260831-1541 (v7.0.343, 2026-08-31, runner cycle `ab2948c6-bff4-4154-888d-8fad856a7cbb`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10 AM America/Chicago) — model Opus 5 orchestrator throughout; **no subagent was delegated to**, stated rather than implied: register B21 routes kickoff design to Fable 5 for **P1–P5** work and this is `P10 - Tooling`, and the work itself was transcribing rulings John had already made and applying their two board consequences — a delegation would have re-derived a decision that was already verbatim in three `runner_directives` rows) — `SES-183` — the M4 design gate's outcome lands on the board, and **the runner un-parks**.
+
+**THE STATE THIS CYCLE WOKE INTO, and it is the reason the cycle exists.** The platform was
+**parked**. Park row `4d5d9e71` (Prime Directive `a0ef9525` §2(d), written 06:11:02Z by cycle
+`69725495`) had found §2(a)–(c) empty and named every remaining Selfbuild ticket's blocker, calling
+`SES-183` *"THE ONE THAT UNBLOCKS THE MOST"*. **Eight consecutive fires closed `did not run —
+parked`** under §3: `b09b2223` 07:42Z, `086b6646` 08:41Z, `80dfc62e` 09:42Z, `d5e183ba` 10:42Z,
+`cd68cab3` 11:41Z, `3612f220` 12:43Z, `c78f7826` 13:42Z, `07c9ffaa` 14:41Z. The last cycle to do real
+work closed at 07:05Z — **an 8.98-hour gap on an hourly cron**, which `scheduler_gate` reported in
+its own `reason` string.
+
+**John closed the park at 15:30Z, twelve minutes before this fire**, by running the `SES-183`
+sitting attended and ruling all three parts. This cycle is the first to run work since. Read the
+park's own closing line rather than inferring it: *"named blocker addressed — the SES-183 design gate
+sitting ran in full and John ruled all three parts."*
+
+**THE PREMISE REVALIDATION IS THE JUDGMENT OF THIS CYCLE, and the careless read is the wrong one.**
+`SES-183` asks for a design sitting; the sitting had happened; so the obvious conclusion is *premise
+dead → `removal proposed`*. That would have been wrong and would have thrown away the ticket's
+actual deliverable. Its description owes **two** things — *"budget reviewed with John AT THIS GATE"*
+**and** *"Members filed at the gate, not before"* — and only the first was done. Measured live at
+15:4xZ before a line was written, not quoted off a card: the three rulings exist as
+`runner_directives` rows `cff4fd5f` / `d7670e18` / `0f292cfa` and card `838f7a4d` carries
+`decision = accept`; **zero** `backlog_items` rows were created after 14:00Z; a survey over open
+tickets for `.env.local` / `service key` / `master key` returned **no ticket** covering ruling 2's
+owed cleanup; and `HAR-34` still carried `design_status = 'needs-john'` against a ruling that names
+it as addressed. That gap was the build.
+
+**WHAT SHIPPED.** The decision record `docs/design/SES-183-m4-infrastructure-floor-gate.md` (the
+three rulings verbatim against their directive ids, with the precedence rule that **the rows are the
+truth and the file is the copy**, the same relation Prime Directive §7 sets for the briefing page);
+this kickoff; `SES-258` filed as the one genuinely-new member; and `HAR-34`'s stale flag cleared.
+
+**THE DISCRIMINATION THAT IS THE SUBSTANCE, and a blanket sweep gets two of four wrong.** Four
+tickets are touched by these rulings and they are **not** treated alike. `HAR-34` is unflagged
+because ruling 3 re-scopes it onto the push channel and says so **by name** (*"its needs-john flag is
+addressed by this ruling"*). **`SES-47` keeps its `needs-john`** — its ask is a *spend* decision and
+ruling 1's standing clause routes paid-tier proposals back to John *"full stop"*, so ruling 1
+answers this proposal without retiring the flag's subject. `DAT-21` keeps `needs-desktop` — ruling 1
+**names it as the coverage path** and its blocker is the repo it lives in. `SES-123` is left open and
+unrewritten: ruling 3 settles the **channel** (push, not email) and does **not** fix push failing to
+arrive, which is what `SES-123` actually reports — its email half retires, its delivery half stands.
+
+**THE NAMED DEVIATION, disclosed rather than buried (the `SES-196` convention).** `runner-cycle.md`
+step 5 says *"**never clear the flag yourself** — it is cleared by … John's tap, or the attended
+session that makes the edit"*, and this cycle is neither. It cleared `HAR-34`'s anyway, and the
+argument is in the record: the rule's own next clause names the mischief it guards — the flag is
+cleared by the unblocking event *"rather than by a cycle deciding it has waited long enough"* — so
+the prohibition is on a cycle **self-authorising**, and here John authorised in writing, attended,
+**naming the ticket**, which `CLAUDE.md` puts first (*"John's word outranks everything"*). The cost
+of the other choice is not neutral and is what settles it: since `SES-196` the flag test lives in
+`drain_epic_next()`'s **pick** predicate, so a stale flag makes the picker step past a ticket John
+has explicitly unblocked — and would have **re-parked the runner against a blocker that no longer
+exists**. `SES-47` is the control that proves this was not a sweep.
+
+**QA WAS A DISCRIMINATING PAIR, not a completeness check.** Board bookkeeping has no executable
+surface, so the test is the read-back both directions (`SES-101`): `HAR-34.design_status IS NULL`
+**and** `SES-47.design_status = 'needs-john'`. A blanket sweep passes the first and fails the second;
+doing nothing fails the first and passes the second; only the intended change passes both. Both
+observed. Three `runner_before_images` rows written first, the `SES-258` insert carrying
+`row_data = NULL` per the step-8b INSERT convention, and the id claimed atomically from
+`feature_id_counter` (`SES` block of 1 → 258) — never hand-counted (`SES-18`).
+
+**A REAL FAILURE, REPORTED RATHER THAN QUIETLY FIXED.** The regression suite came back **129/130**,
+failing `SES-177-claude-state-renderer.js`. That is `SES-213` exactly — `CLAUDE-STATE.md` is a pure
+function of cycles already `shipped`, and predecessor `e89251a2` closed `shipped` after the committed
+file was last rendered — so the fix was step 7a's own first line, `render-claude-state.js`, which is
+sequenced before the verifier for precisely this reason. Re-ran green. Worth recording because the
+failure looked like a defect in this cycle's change and was not: the diff touches no source at all.
+
+**Verifier `APPROVE`** (`runner_verdicts 9f034b78`), all three gates green, and
+**`auto_done_eligible: YES`** — so `SES-183` closed **`done`** rather than `delivered`, under Prime
+Directive **§2f**'s Selfbuild widening, with the Reverse-capable ship card still filed (`SES-210`'s
+guarantee). Doc-only: two new docs plus the generated `CLAUDE-STATE.md` and `BACKLOG-SNAPSHOT.md`.
+**No `src`/`api`/`lib` change, no migration, no schema change, no site change.**
+
+**WHAT THIS DID NOT SETTLE, so a later cycle does not assume it did.** The **briefing republish gate
+still blocks** — `SES-244`, `SES-257` and `SES-237` all describe it, all remain open, and John's page
+has been stale since 2026-08-29T17:19Z, so this cycle **built its ship card into the database but
+could not publish the page**. M4 is **not** retired: `drain_epic_next()` reported `open_now = 5`
+before this cycle and a drain retires on John's acceptance of its named members, never on a cycle's
+say-so (`SES-142`).
+
 ## session/cycle-20260831-0641 (v7.0.342, 2026-08-31, runner cycle `e89251a2-b60a-42ca-a6f1-91f047e70273`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 AM America/Chicago) — model Opus 5 orchestrator throughout; **no subagent was delegated to**, stated rather than implied: register B21 routes root-cause diagnosis to Fable 5, and the diagnosis here was a single failing assertion whose own message named the defect, read straight out of CI's log — a delegation would have re-derived a measured answer rather than adding judgment) — **step-4 blocker: `SES-256`'s file-level negative control turned a blocking CI job red.**
 
 **No ticket was claimed, picked or skipped.** Selection never ran: step 4a found `dev` red and
