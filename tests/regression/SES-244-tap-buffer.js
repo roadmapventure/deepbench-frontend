@@ -1,3 +1,10 @@
+// DeepBench v7.0.351 | tests/regression/SES-244-tap-buffer.js | SES-244a fix — arm 3 stopped
+// consuming the response body it was about to read, and stopped calling .catch() on a Response.
+// Both were live-run-only defects: arms 1 and 2 are offline, so an uncredentialed run was green
+// while every credentialed run (CI included) failed AND leaked a fixture row into briefing_taps.
+// The lesson for the next author: a credential-gated arm that has never been RUN with credentials
+// is unproven code, not covered code — the [NOT RUN] line is the warning, not a formality.
+//
 // DeepBench v7.0.350 | tests/regression/SES-244-tap-buffer.js | SES-244 phase A — every briefing
 // tap writes a briefing_taps row via the mcp capability, additively (self-publish preserved).
 // File-level negative control pins the PRE-CHANGE template at immutable blob
@@ -80,7 +87,12 @@ export default async function run() {
     method: 'POST', headers: hdrs,
     body: JSON.stringify({ tap_kind: 'ask', target_ref: 'SES-244-guard-fixture', payload: { q: "it's a fixture", at: '2026-08-31T00:00Z' }, page_built: 'guard' }),
   });
-  assert.strictEqual(ins.status, 201, `service-level INSERT refused: ${ins.status} ${await ins.text()}`);
+  // NEVER put `await ins.text()` in an assert MESSAGE. Arguments are evaluated eagerly, so the
+  // message is built — and the body consumed — even on the 201 path, and the ins.json() below then
+  // throws "Body is unusable". That fired AFTER the fixture INSERT landed and BEFORE the DELETE, so
+  // every credentialed run failed AND leaked its fixture row into briefing_taps (CI red, 2 orphans,
+  // v7.0.351). Read the body only on the branch that actually needs it.
+  if (ins.status !== 201) assert.fail(`service-level INSERT refused: ${ins.status} ${await ins.text()}`);
   const [row] = await ins.json();
   assert.strictEqual(row.payload.q, "it's a fixture", 'payload with a quote did not round-trip');
   const del = await fetch(`${URL_}/rest/v1/briefing_taps?id=eq.${row.id}`, { method: 'DELETE', headers: hdrs });
@@ -89,7 +101,10 @@ export default async function run() {
   assert.strictEqual(left.length, 0, 'fixture rows left behind');
   // Grants, both directions: zero public rows; service_role present.
   const gq = `select grantee, count(*) n from information_schema.role_table_grants where table_schema='public' and table_name='briefing_taps' group by grantee`;
-  const g = await (await fetch(`${URL_}/rest/v1/rpc/exec_readonly_sql`, { method: 'POST', headers: hdrs, body: JSON.stringify({ q: gq }) })).catch(() => null);
+  // .catch() goes on the PROMISE, not on the awaited Response — a Response has no .catch, so the
+  // original `await (await fetch(...)).catch(...)` threw "r.catch is not a function" on every
+  // credentialed run. It was invisible only because the body-consumption bug above failed first.
+  const g = await fetch(`${URL_}/rest/v1/rpc/exec_readonly_sql`, { method: 'POST', headers: hdrs, body: JSON.stringify({ q: gq }) }).catch(() => null);
   // exec_readonly_sql may not exist as an RPC on this project; if the call 404s, assert the
   // public-role denial the direct way instead: an anon-key read must be refused.
   if (!g || g.status === 404) {
