@@ -5,6 +5,46 @@
 
 ---
 
+## session/cycle-20260831-1740 (v7.0.347, 2026-08-31, runner cycle `c6780beb-4d6f-44aa-9c25-ccc37a272df3`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (12 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5 subagent delegated to for the design decision**) — `SES-261` — **the CLAUDE-STATE check stops racing the cycle's own close, and the red it was causing is measured rather than inferred.**
+
+**THE HARNESS/B21 CONFLICT THE PREVIOUS ENTRY REPORTED IS RESOLVED, and it is worth one line because that entry left it open.** `v7.0.345` recorded that this harness carries a standing instruction not to invoke the Agent tool unless the user requests it, and that this conflicts with register B21's routing of judgment-dense work to Fable 5. It does not: the runner's own stored routine prompt is the request, and its item 7 names the Agent tool and the model ids explicitly. So the design decision here **was** delegated to a Fable 5 subagent, with the clone's absolute path stated in the prompt per the sub-agent rule. Its shape was adopted with one correction, below.
+
+### The defect, and the scope correction the ticket did not have
+
+`SES-261` was filed by the previous cycle (`a906b726`) at 16:58Z and was in M4's drain scope, so the drain returned it as this cycle's `pick`. Its premise was revalidated live before any build, and it held.
+
+`render-claude-state.js --check` re-rendered `CLAUDE-STATE.md` from the **live** ledger and byte-compared it against the **committed** file; `SES-177`'s credentialed half runs that in CI on every `dev` push. A cycle renders and pushes at step 7a, but its own row reaches `outcome='shipped'` only in its step-9 tail — after the push — so the committed file could never contain the pushing cycle's own ship, and went stale the instant that tail closed.
+
+**Measured this cycle, not quoted from the ticket:** cycle `a906b726` closed `shipped` at `17:08:22Z`; its own pushes `4170428` (17:05Z) and `52a3d7f` (17:08Z) were **green** — CI won that race. Every dev commit pushed *after* that close was **red**: `05506b0` (17:24Z) and `b7f97081` (17:43Z), both with `Build (blocking)`=success and `Tripwire + regression (blocking)`=failure. Reproduced locally at **130/131**, `SES-177` the sole failure; the drift was exactly one ship (file said `v7.0.343`/`SES-183`, ledger rendered `v7.0.345`/`SES-47`).
+
+**The correction to the ticket's own framing, recorded because a later reader would otherwise re-derive the narrower version:** the ticket frames this as the pushing cycle's commit racing its own close. The red **outlasts that commit** — every later commit by anyone, including the two attended `SES-263` pushes, stayed red until something happened to re-render. The check asserted "the file equals what the ledger renders *right now*", a moving target no commit can satisfy for long.
+
+### The decision, and the one correction made to the subagent's design
+
+Shape **(d)** of the ticket's four — pin the comparison to the ledger state the commit was rendered from — carried in the generated file as a `ledger-pin:` clause inside its existing trailing HTML comment.
+
+**The correction, and it is load-bearing:** the pin is an explicit **list of cycle ids**, never a timestamp cutoff. A `started_at <= basis` window is unsound on this platform because a cloud cycle can be suspended and resumed across wall-clock gaps invisible from inside it — `633fe486` started 05:07Z and was still executing at 13:10Z — so a cycle can close `shipped` long after a later-*started* one already did, and a time window would silently admit rows the render never saw.
+
+(a) was rejected on this cycle's own evidence: "ignore the newest just-closed cycle" does not cover two further red commits, and a past render is not a contiguous window of today's ledger anyway — the committed file's own `v7.0.343` current / `v7.0.344` prior inversion proves cycles interleave. (b) deletes the gate from the only venue that enforces it. (c) the ticket rejects on its face.
+
+### What it trades away, named rather than left to be found
+
+This is now an **authenticity** gate, not a **freshness** one. A valid old render stays green indefinitely, so if step 7a's render silently stopped running, nothing here would go red. That is deliberate — freshness is unsatisfiable under the one-push rule — and it ships with a **non-gating WARN** when the pinned newest id differs from the live newest shipped id. A hard freshness bound is a separate ticket, and the script's header forbids bolting one on by re-reading the live top-10, which is exactly the race this removed.
+
+### QA — both directions, and one measurement error caught and redone
+
+Seven live arms on the real file and the real ledger: unmodified → **0**; a hand-edited body line → **1**; the pin stripped entirely → **1** (never a pass — a "skip when absent" branch would let deleting one comment turn the gate green); a fabricated pin id → **1**; the pin repointed at a *real but different* cycle → **1**; restored → **0**; and with credentials withheld → **2**, "could not run", never a pass.
+
+**A measurement error in that arm is recorded rather than buried:** the first run piped node through `tail` and read `$?`, so it captured `tail`'s status and printed `exit=0` for all seven arms while the DRIFT *messages* were correct. The exit code **is** the gate, so that run proved nothing and was redone capturing node's own status. Ten minutes earlier, in the same cycle, the same class of error would have shipped a vacuous QA.
+
+The regression guard's load-bearing assertion is a **difference**: `theRetiredComparatorLoses()` runs the retired live-top-10 form and the shipped pin-anchored form on the *same* fixture and asserts old=red, new=green — a test asserting only "the new form is green" is satisfied by an always-green comparator. File-level negative control: the guard run against `origin/dev`'s renderer and `CLAUDE-STATE.md` **exits 1**, and against the shipped pair **exits 0**, with the renderer restored byte-identical by sha256 afterwards.
+
+Suite went **130/131 → 132/132**; `npm run build` green; verifier **APPROVE**, all three gates green, `auto_done_eligible` YES, so `SES-261` closed `done` under step 7a's interim bar rather than `delivered`. Reverse stays one tap.
+
+Doc + script + test; no `src/`/`api/`/`lib/` change, no site change, no schema change, no migration.
+
+---
+
 ## session/cycle-20260831-1640 (v7.0.345, 2026-08-31, runner cycle `a906b726-3467-43cd-8c53-466e0e142413`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (11 AM America/Chicago) — model Opus 5 orchestrator throughout; **no subagent was delegated to**, and unlike the two entries below this one it is NOT because the task shape did not call for it: register B21 routes root-cause diagnosis to Fable 5, and this cycle root-caused a live CI red itself. The harness this session runs under carries a standing instruction not to invoke the Agent tool unless the user requests it, which conflicts with B21; the conflict is reported here rather than resolved by a cycle, and the diagnosis was mechanical in the end — one failing assertion out of 130, whose own message named the file) — `SES-47` — **the Vercel deploy ceiling becomes a measured number, and an engine-proposed revert of six commits was declined on evidence.**
 
 **THE CYCLE'S FIRST FINDING WAS NOT ITS TICKET.** Step 4a read `ci_run_conclusions` and found `dev`'s head `95cf5fee` **red** (`Build (blocking)`=success, `Tripwire + regression (blocking)`=**failure**), so `rollback-on-red.js --apply` was run exactly as the runbook directs. It returned **`revert-and-card`** with a plan to revert `de6e08e8..95cf5fee` — **six commits from four different cycles** — and filed incident card `b7aef844`. **The revert was NOT executed, and the card was rewritten because it asserted in past tense that it had been.** The engine files its card at decision time while, by its own header, it "NEVER RUNS git AND NEVER PUSHES", so a cycle that declines the plan leaves a false statement of fact on John's page; the card now says what actually happened (before-image `fe6c2e7e` first). Three independent reasons to decline, each measured: **(1) the green anchor is stale** — the newest `runner_green_states` row is `de6e08e8` @07:04Z, but `8766a99d` concluded **green on both blocking jobs** @16:01:36Z, nine hours later, and was never recorded as an anchor, so the proposed range swallows a commit CI itself certified; **(2) the range is four cycles' work** — `ab2948c6` (v7.0.343, `SES-183`), `6be8379a` (v7.0.344, `DAT-21`), `b0d37c31` (`SES-258`) — while the engine attributes it wholly to `b0d37c31`, the last pusher, so reverting is a successor adjudicating three predecessors' shipped deliveries, which step 0b / register B37 forbids outright; **(3) the procedural gate cannot be met** — the runbook requires the revert to run behind the ticket-claim re-assertion, and at step 4a this cycle held no claim. `migrations_in_range` returned 0 rows, so the range was genuinely code-only and no schema action was ever in question.

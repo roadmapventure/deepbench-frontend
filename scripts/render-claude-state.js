@@ -1,4 +1,17 @@
 #!/usr/bin/env node
+// DeepBench v7.0.347 | scripts/render-claude-state.js | SES-261 — `--check` IS PIN-ANCHORED and no
+// longer races the pushing cycle's own close. It grades the committed file against the cycles the file
+// SAYS it was rendered from (the `ledger-pin:` id list in its own trailing comment), never against the
+// live top-10. THE EDIT THIS FORBIDS, and it is tempting because it reads like a freshness check:
+// re-reading the live top-10 here to assert the file is CURRENT. That is precisely the race this
+// removed — a cycle's row reaches `shipped` only in its step-9 tail, after it rendered and pushed, so
+// "current" is unsatisfiable under the one-push rule and every ship went red by construction. This is
+// an AUTHENTICITY gate now; the freshness signal is the non-gating WARN and a hard bound is a separate
+// ticket. The pin is a LIST OF IDS and must not become a timestamp cutoff — a cloud cycle can be
+// suspended across wall-clock gaps invisible from inside it, so `started_at <= basis` silently admits
+// rows the render never saw. Guarded by tests/regression/SES-261-ledger-pin.js, whose control runs the
+// retired live-top-10 form on the SAME fixture and asserts it LOSES.
+//
 // DeepBench v7.0.228 | scripts/render-claude-state.js | SES-177 — CLAUDE-STATE.md's derivable half is
 // GENERATED; its standing judgment prose lives in docs/runbooks/standing-brief.md and is linked, never
 // regenerated.
@@ -87,6 +100,54 @@ export function stripId(title, id) {
   return title.replace(re, "");
 }
 
+// THE LEDGER PIN (SES-261, v7.0.347) — the ids this file was rendered FROM, carried in the file.
+//
+// WHY A LIST OF IDS AND NOT A TIMESTAMP CUTOFF, which is the obvious cheaper form and is UNSOUND
+// here: a cloud cycle can be suspended and resumed across wall-clock gaps invisible from inside it
+// (`633fe486` started 05:07Z and was still executing at 13:10Z), so a cycle can close `shipped` long
+// after a later-STARTED cycle already did. A `started_at <= basis` window would then silently admit
+// rows the render never saw, and the check would go red on a file nobody touched. An id list
+// describes exactly what was read and is immune to that by construction.
+export function renderPin(cycles) {
+  return cycles.map(c => String(c.id)).join(",");
+}
+
+// Parse the pin back out. Returns [] for a file with no parseable pin -- the CALLER decides what that
+// means, and it must mean DRIFT (exit 1), never a pass: a stripped pin is a hand-edit, and a
+// "gracefully skip when absent" branch here would let deleting one comment turn the gate green.
+export function parsePin(fileText) {
+  if (typeof fileText !== "string") return [];
+  const m = fileText.match(/ledger-pin:\s*([0-9a-fA-F,-]*?)\s*-->/);
+  if (!m) return [];
+  return m[1].split(",").map(s => s.trim()).filter(Boolean);
+}
+
+// The comparator, pure and exported so the guard asserts the REAL predicate rather than a copy of it
+// (the DIR-603f44ea / SES-176 precedent). `rows` is whatever the ledger returned for the pinned ids.
+// Returns { code, reason }: 0 = no drift, 1 = drift. It never returns 2 -- "could not run" belongs to
+// the caller's network/env layer, and conflating a deleted row (real drift) with a REST failure
+// (could not run) is how a check softens.
+export function checkAgainstPin(fileText, rows, cardsByTicket) {
+  const pin = parsePin(fileText);
+  if (pin.length === 0) {
+    return { code: 1, reason: "no ledger-pin in the committed file — it was hand-edited or predates SES-261" };
+  }
+  const byId = new Map((rows || []).map(r => [String(r.id), r]));
+  const missing = pin.filter(id => !byId.has(id));
+  if (missing.length) {
+    return { code: 1, reason: `the ledger no longer carries ${missing.length} pinned cycle(s): ${missing.join(", ")}` };
+  }
+  const notShipped = pin.filter(id => byId.get(id).outcome !== "shipped");
+  if (notShipped.length) {
+    return { code: 1, reason: `pinned cycle(s) are no longer outcome=shipped: ${notShipped.join(", ")}` };
+  }
+  const ordered = pin.map(id => byId.get(id));
+  const body = renderBody(ordered, cardsByTicket);
+  return body === fileText
+    ? { code: 0, reason: "the committed file is a byte-exact render of the cycles it pins" }
+    : { code: 1, reason: "the committed file differs from a re-render of the cycles it pins" };
+}
+
 export function renderBody(cycles, cardsByTicket) {
   // THE VERSION LINES AND THE SESSION BULLETS READ DIFFERENT SETS, deliberately. "Version in dev" and
   // "Prior" answer *which version is on dev*, so they skip cycles that claimed no version at all -- a
@@ -120,7 +181,7 @@ export function renderBody(cycles, cardsByTicket) {
   lines.push("## Last 3 sessions", "");
   for (const c of cycles.slice(0, 3)) lines.push(renderBullet(c, cardsByTicket.get(c.item_id) || null));
   lines.push("");
-  lines.push(`${GENERATED_MARK} — do not hand-edit the sections above. -->`);
+  lines.push(`${GENERATED_MARK} — do not hand-edit the sections above. ledger-pin: ${renderPin(cycles)} -->`);
   return lines.join("\n") + "\n";
 }
 
@@ -172,21 +233,57 @@ async function main() {
     for (const c of cards) if (!cardsByTicket.has(c.backlog_id)) cardsByTicket.set(c.backlog_id, c);
   }
 
+  // --check is PIN-ANCHORED (SES-261, v7.0.347): it grades the committed file against the cycles that
+  // file says it was rendered from, NOT against the live top-10. The live-top-10 form made every
+  // runner ship red by construction -- a cycle's own row reaches `shipped` only in its step-9 tail,
+  // AFTER it rendered and pushed, so the committed file was stale the instant its own cycle closed,
+  // and every LATER commit by anyone stayed red until something happened to re-render. Measured
+  // 2026-08-31: `a906b726` closed shipped 17:08:22Z; `05506b0` (17:24Z) and `b7f97081` (17:43Z) were
+  // both red on this one test with Build green.
+  //
+  // WHAT THIS DELIBERATELY TRADES AWAY, named rather than discovered later: this is now an
+  // AUTHENTICITY gate, not a FRESHNESS one. A valid old render stays green indefinitely, so if step
+  // 7a's render silently stopped running nothing here would go red. That is why the WARN below
+  // ships with it. A hard freshness bound is a separate ticket -- do not bolt one on by re-reading
+  // the live top-10 here, which is exactly the race this removed.
+  if (check) {
+    const current = fs.existsSync(OUT) ? fs.readFileSync(OUT, "utf8") : "";
+    const pin = parsePin(current);
+    let pinnedRows = [];
+    let pinnedCards = new Map();
+    if (pin.length) {
+      // Fetch EXACTLY the pinned rows. A REST failure dies at exit 2 inside rest() -- "could not run"
+      // is never a pass, and is a different verdict from "a pinned row is gone" (drift, exit 1).
+      pinnedRows = await rest(url, key,
+        "runner_cycles?select=id,started_at,trigger,model,version,item_id,push_sha,outcome" +
+        `&id=in.(${pin.join(",")})`);
+      const pinnedTickets = [...new Set(pinnedRows.map(c => c.item_id).filter(Boolean))];
+      if (pinnedTickets.length) {
+        const pinnedCardRows = await rest(url, key,
+          `runner_items?select=backlog_id,title,plain_after,plain_worth,kind,created_at` +
+          `&kind=eq.ship&backlog_id=in.(${pinnedTickets.map(t => `"${t}"`).join(",")})&order=created_at.desc`);
+        for (const c of pinnedCardRows) if (!pinnedCards.has(c.backlog_id)) pinnedCards.set(c.backlog_id, c);
+      }
+    }
+    const verdict = checkAgainstPin(current, pinnedRows, pinnedCards);
+    if (verdict.code === 0) {
+      // Non-gating freshness signal: visibility without re-importing the race the pin just removed.
+      const liveNewest = cycles[0] ? String(cycles[0].id) : null;
+      if (liveNewest && pin[0] !== liveNewest) {
+        console.log(`render-claude-state --check: WARN -- the file is authentic but not current; the ledger's newest shipped cycle is ${liveNewest.slice(0, 8)} and the file pins ${String(pin[0]).slice(0, 8)}. The next render folds it in. Not a failure.`);
+      }
+      console.log(`render-claude-state --check: no drift -- ${verdict.reason}.`);
+      process.exit(0);
+    }
+    console.log(`render-claude-state --check: DRIFT -- ${verdict.reason}.`);
+    process.exit(1);
+  }
+
   const body = renderBody(cycles, cardsByTicket);
 
   // The same predicate the test asserts. A body that lost the link never reaches disk.
   if (!bodyKeepsStandingLink(body)) {
     die("the rendered body does not link the standing brief — refusing to write it (John's fail-closed condition)");
-  }
-
-  if (check) {
-    const current = fs.existsSync(OUT) ? fs.readFileSync(OUT, "utf8") : "";
-    if (current === body) {
-      console.log("render-claude-state --check: no drift -- CLAUDE-STATE.md matches the ledger.");
-      process.exit(0);
-    }
-    console.log("render-claude-state --check: DRIFT -- CLAUDE-STATE.md differs from what the ledger renders.");
-    process.exit(1);
   }
 
   fs.writeFileSync(OUT, body);
