@@ -1,3 +1,10 @@
+// DeepBench v7.0.349 | tests/regression/SES-244-briefing-bridge-contract.js | HAR-34's cycle --
+// the file-level negative control is PINNED to a commit instead of the moving origin/dev ref.
+// It self-invalidated the instant its own ship landed on dev (v7.0.348 pushed 18:44:03Z; the
+// suite red at 18:56Z on an UNEDITED tree, reproduced on a pristine origin/dev worktree), which
+// is the SES-213 defect in a new costume -- a gate red BY CONSTRUCTION after every ship. The
+// repair is the one this file's own assertion message already prescribed. See PRE_CHANGE_REF.
+//
 // DeepBench v7.0.348 | tests/regression/SES-244-briefing-bridge-contract.js | SES-244
 //
 // Guards John's briefing-republish BRIDGE (directive 27b5d8cb, attended architect session
@@ -23,8 +30,9 @@
 //      thing a clause checks and assert the clause then FAILS. Plus the SES-158 meta-assertion,
 //      because that ticket shipped a control that changed nothing and only a checked control
 //      caught it.
-//   2. A FILE-LEVEL NEGATIVE CONTROL (theSameAssertionsFailOnOriginDev) -- run the identical clause
-//      set against origin/dev's copies of both files. They MUST fail there. This is the clause that
+//   2. A FILE-LEVEL NEGATIVE CONTROL (theSameAssertionsFailOnThePreChangeCommit) -- run the identical clause
+//      set against the PRE-CHANGE copies of both files -- a PINNED commit, never the moving
+//      origin/dev ref (see PRE_CHANGE_REF). They MUST fail there. This is the clause that
 //      answers "would this test still pass if the change did nothing?" with a measurement instead
 //      of a promise: a presence-only test passes vacuously on any file containing the word
 //      "republish". It is declared not-run rather than passing vacuously when git or the ref is
@@ -215,21 +223,37 @@ function aVacuousMutationFailsItsOwnControl() {
   );
 }
 
-// THE FILE-LEVEL NEGATIVE CONTROL. The same clause set, run against origin/dev's copies of both
+// THE PRE-CHANGE COMMIT, PINNED — repaired by HAR-34's cycle (v7.0.349, 2026-08-31) the first time
+// this guard fired, applying the instruction the assertion below already carried.
+//
+// The control was written against the MOVING ref `origin/dev`, so it self-invalidated the instant
+// its own ship landed there: v7.0.348 pushed at 18:44:03Z and the suite went red at 18:56Z on an
+// UNEDITED tree, reproduced here on a pristine `origin/dev` worktree with no local change at all.
+// That is not a stale test — it is the SES-213 defect in a new costume (a gate red BY CONSTRUCTION
+// after every ship, which produced 26 consecutive FALSE `block` verdicts before it was found), and
+// it would have marked every later cycle's delivery blocked.
+//
+// A pinned commit is what a "before" ref has to be: `origin/dev` names whatever shipped last, which
+// after this ship is this ship. The value is v7.0.348's own parent, i.e. the tree these clauses were
+// authored against. A shallow clone that cannot resolve it still lands in the notRun arm below,
+// exactly as an absent `origin/dev` did.
+const PRE_CHANGE_REF = "1188ddccec84082d05facb1b80b83e02293bcd58";   // v7.0.347, parent of 798b3b9b
+
+// THE FILE-LEVEL NEGATIVE CONTROL. The same clause set, run against the PRE-CHANGE copies of both
 // files: they MUST fail there, or this whole file proves nothing about the change that shipped.
-function theSameAssertionsFailOnOriginDev() {
+function theSameAssertionsFailOnThePreChangeCommit() {
   let before;
   try {
     before = Object.fromEntries(Object.keys(CLAUSES).map(rel => [
       rel,
-      execFileSync("git", ["show", `origin/dev:${rel}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }),
+      execFileSync("git", ["show", `${PRE_CHANGE_REF}:${rel}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }),
     ]));
   } catch {
     notRun(
-      "the file-level negative control against origin/dev",
-      "git or the origin/dev ref is not available here (a shallow clone, or a checkout with no "
-      + "remote). The per-clause controls above still ran and still have teeth; this arm is declared "
-      + "not-run rather than passed, because a control that silently no-ops is the SES-158 failure.",
+      "the file-level negative control against the pre-change commit",
+      "git or the pinned pre-change commit is not available here (a shallow clone, or a checkout "
+      + "with no history). The per-clause controls above still ran and still have teeth; this arm is "
+      + "declared not-run rather than passed, because a control that silently no-ops is the SES-158 failure.",
     );
     return;
   }
@@ -242,15 +266,15 @@ function theSameAssertionsFailOnOriginDev() {
       // ASSERTED as the control's result, never skipped -- a `continue` here would make the whole
       // arm pass while checking nothing, which is the SES-158 vacuous-control failure this file's
       // own header names.
-      proof.push(`${rel}: no bridge block on origin/dev at all`);
+      proof.push(`${rel}: no bridge block at ${PRE_CHANGE_REF.slice(0, 7)} at all`);
       continue;
     }
     const failures = spec.clauses.filter(c => !c.test(block));
     assert.ok(failures.length > 0,
-      `origin/dev's ${rel} already satisfies EVERY bridge clause, so this test cannot distinguish `
-      + `the shipped change from its predecessor. If this ship has since merged to dev, re-point the `
-      + `control at the pre-change commit rather than deleting it.`);
-    proof.push(`${rel}: ${failures.length}/${spec.clauses.length} clauses fail on origin/dev `
+      `${rel} at ${PRE_CHANGE_REF.slice(0, 7)} already satisfies EVERY bridge clause, so this test `
+      + `cannot distinguish the shipped change from its predecessor. Re-point PRE_CHANGE_REF at the `
+      + `commit these clauses were actually authored against rather than deleting the control.`);
+    proof.push(`${rel}: ${failures.length}/${spec.clauses.length} clauses fail at ${PRE_CHANGE_REF.slice(0, 7)} `
       + `(${failures.map(f => f.id).join(", ")})`);
   }
 
@@ -280,7 +304,7 @@ function run() {
   aVacuousMutationFailsItsOwnControl();
   theRulingIsNamedSoItCanBeRetired();
 
-  const proof = theSameAssertionsFailOnOriginDev();
+  const proof = theSameAssertionsFailOnThePreChangeCommit();
   if (proof) console.log("         [CONTROL] " + proof.join(" | "));
 
   notRun(
