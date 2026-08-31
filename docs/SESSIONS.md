@@ -5,6 +5,79 @@
 
 ---
 
+## session/cycle-20260831-0540 (v7.0.341, 2026-08-31, runner cycle `69725495-024c-473d-9731-441f12ba5dc3`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (12 AM America/Chicago) — model Opus 5 orchestrator throughout; no subagent was delegated to, and that is stated rather than implied: register B21 routes kickoff design to Fable 5 for **P1–P5** work and this is `P10 - Tooling`, while the work itself was executing a procedure and observing what happened, which is not a judgment a delegate can take on the orchestrator's behalf) — `SES-256` — the auto-rollback drill runs for the first time.
+
+**Selected by the Prime Directive, not the board.** `a0ef9525` §2(b): the declared M4 drain
+`4583bdc1` returned `SES-256` (queue 255, 6 named members open). §4 **suspends the daily invention
+pass** for the Prime Directive's duration, and this cycle recorded it suspended — with one honest
+qualification, since the egress probe had already been run before §4 was read: the probe **succeeded**
+(one live WebSearch returned results), which is evidence precondition C3 is open. No proposals were
+generated and none would have been: the `invention` ladder rung is **0**, and the rung is the cap.
+
+### The gap, re-measured rather than quoted
+
+`SELFBUILD-CHARTER.md` criterion 5 wants two drills. The restore half is done and linked; the
+auto-rollback half had never run. Checked in-repo this cycle: **no** rollback-drill runbook in
+`docs/runbooks/`, **no** harvest recording one, and **5 of 5** `SES-182` guards fixture- or
+rolled-back-transaction-based. `SES-182` shipped complete in five slices and **nothing had ever
+executed the `revert_plan` the engine emits** — every guard asserts what `decide()` *decides*.
+
+### The boundary decided the shape of the session
+
+`SES-256`'s own decision boundary splits the drill in two, and this cycle took only the half it is
+allowed: a **controlled** drill (scratch project + controlled git origin) is ordinary cycle work; a
+red seeded on **real `dev`** is outward-facing, has a live blast radius, and is covered by **no**
+standing authorisation — `1c9609de` pre-authorises drill *dumps* and explicitly not this. That route,
+and the question of **whether a controlled drill satisfies criterion 5 at all**, are on the ship card
+as John's. `docs/SELFBUILD-CHARTER.md` is therefore deliberately **unedited**: writing the score would
+answer his question on the runner's own say-so.
+
+### The drill, and the two setup defects it found by failing
+
+Controlled origin (bare repo + clone), a real `app.js`/`check.js`, and the **unmodified** engine
+pointed at scratch project `itcimllfniypelrxsuoh` (confirmed live via `list_projects`, not quoted).
+Two failures are recorded rather than smoothed over, because a second runner would rediscover both:
+`42P10` — `recordGreenState()` upserts `ON CONFLICT (commit_sha)` and a mirror built from a column
+list alone lacks `uq_runner_green_states_sha`; and `23503` — the engine writes a before-image for the
+green record, so the **observing cycle must exist as a row** before the first call.
+
+Green `dc51779` (`[PASS]`, exit 0) → anchor recorded → red `ec7d77b`, a **real** red
+(`AssertionError: 'hello, dev!' !== 'hello dev'`, exit 1) → **negative control first**, unattributable
+red → `none`, **0 cards** → one variable changed (a cycle now claims the sha) → **`revert-and-card`**
+→ the plan **executed verbatim** → `21f47cb`. Four proofs, each answering a different question: the
+check exits **0**; `git diff --stat dc51779 HEAD` is **empty** (tree restored, not merely building);
+the red commit is **still reachable** (revert-forward, not rewrite); and the controlled **origin's**
+ref is the new head. Second control: anchor deleted, same red → **`card-only`**, no revert plan —
+which is what proves the revert depended on the anchor rather than being what the engine does with
+any red. A documented fail direction was also observed for the first time: `plan_data_restore()` 404s
+on the scratch project and the engine **files the card anyway**, exactly as its header promises.
+
+**Cleanup asserted in both directions.** Scratch back to 0 rows on all four tables; **production**
+carries no drill anchor, no drill cycle, no drill card, and its newest anchor is still
+`506efeee…` — the one this same cycle recorded at its own step 4a. Zero blast radius, measured.
+
+### QA — including a vacuity the guard found in itself
+
+`tests/regression/SES-256-rollback-drill.js` compares the runbook's documented command against
+`revertPlanFor()`'s **actual** output, so doc-vs-code drift fails CI rather than waiting for a reader.
+Five mutations, tree restored byte-identical (`sha256`) and re-passing after each: revert command →
+`reset --hard`, green `--jobs` → `cancelled`, the "never do it" boundary dropped, the verifier claimed
+as a trigger — all **FAIL**. The fifth — dropping "produces evidence, not a score" — **PASSED**, and
+that is reported rather than quietly re-rolled: the assertion searched the whole file and the
+provenance stamp restates the sentence, so deleting it from the **body** left the guard green. It now
+runs against the body with HTML comments stripped, and the same mutation fails. A second process
+defect is recorded for the same reason: the first battery restored with `git checkout --` on files
+that are **new and untracked**, which silently does nothing, so three mutations accumulated before the
+byte-identity check caught it. Both batteries were re-run from a real backup.
+
+Build green. Suite **129/130** before step 7a's render — the one red was `SES-177` `CLAUDE-STATE.md`
+drift, the `SES-213` staleness and not this change — green after. Verifier **APPROVE**, all three
+gates green, **auto-done eligible**, so the ticket closed `done` under Prime Directive §2f with a
+Reverse-capable ship card on the page. Doc + doc + test; **no `src`/`api`/`lib` change, no site
+change, no production schema change** — the two migrations are on the scratch project only.
+
+---
+
 ## session/cycle-20260831-0440 (v7.0.340, 2026-08-31, runner cycle `ebdec9c2-d3a3-493e-93b8-ee719f55fcd6`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (11 PM America/Chicago) — model Opus 5 orchestrator throughout; no subagent was delegated to, and that is stated rather than implied: the root cause was a single failing assertion whose own message named it, and the remedy was a precedent already written into a sibling file, so a delegation would have re-derived a measured answer) — **step-4 blocker** — the negative control that turned dev's blocking CI job permanently red.
 
 **No ticket was picked, and none was claimed or skipped.** Runbook step 4 preempts selection on a
