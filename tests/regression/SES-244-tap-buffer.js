@@ -1,3 +1,31 @@
+// DeepBench v7.0.353 | tests/regression/SES-244-tap-buffer.js | SES-273 — AN UNREACHABLE PINNED
+// BLOB IS A CONTROL THAT DID NOT RUN, NOT A GUARD THAT FAILED, and the thing to read twice is that
+// THIS FILE'S OWN ARM 2 HAD BEEN HOLDING dev RED FOR FOUR CONSECUTIVE COMMITS. Measured live at
+// this ship rather than quoted: CI's "Tripwire + regression (blocking)" job was failure on
+// 92436fa (21:18Z), 451d0821 (22:45Z), 7177e857 (22:57Z) and head 3f1a313c (23:15Z), last green
+// 5acdba64 (21:07:58Z) — 134/135, ONE failing test, this one, on the line
+// `assert.fail('negative control could not run: git cat-file failed: …')`. actions/checkout@v4
+// clones at depth 1, so blob ad48b08f is simply absent from CI's checkout.
+// WHY TWO ATTENDED FOLLOW-UP SHIPS WALKED PAST IT (v7.0.351, v7.0.352): the suite is 135/135 in a
+// full clone, so the failure is INVISIBLE from any full-clone run. It was reproduced here in a
+// deliberate `git clone --depth 1` where the blob is likewise unreachable — origin/dev's copy
+// FAILS there at exit 1, this copy declares and exits 0, on the identical tree.
+// THE EDIT THIS SHIP FORBIDS, and it is the tempting one because it is one line shorter: widening
+// the notRun branch to any failing control. A control that RESOLVES and turns out to be vacuous is
+// a real finding and must still fail hard — proven here rather than promised, by repointing
+// PRE_BLOB at the CURRENT template blob (744e26cd, which does define writeTap): it fails with
+// "control is vacuous: pre-change template already defines writeTap", exit 1. Only an
+// UNRESOLVABLE object is declared. SES-158's rule is untouched; what changed is that a shallow
+// clone stopped being reported as a broken guard.
+// ARM 3 IS NOW ITS OWN FUNCTION AND THAT IS LOAD-BEARING, not tidying: arms 1-3 shared one run()
+// body, so the `return` that accompanies notRun() would have skipped the credentialed live arm on
+// exactly the shallow-clone path where CI DOES hold the credentials — trading a red suite for a
+// silently narrower one. Verified by the full-clone run reaching arm 3's own trailing declaration.
+// Precedent adopted verbatim, never re-spelled: SES-255-ci-conclusion-reporting.js,
+// SES-256-rollback-drill.js and SES-50-resolved-id-citations.js all declare this same condition,
+// and all three are visible as [NOT RUN] in the very log where this file failed.
+// Test-only change; no src/api/lib change, no site change, no schema change, no migration.
+//
 // DeepBench v7.0.352 | tests/regression/SES-244-tap-buffer.js | SES-244a — writeTap's OUTCOME must
 // be readable from `state`. The pinned negative-control blob (ad48b08f, v7.0.349) predates writeTap
 // entirely, so v7.0.352's four clauses are asserted FALSE there rather than gated out of arm 2 —
@@ -18,7 +46,7 @@
 import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
-import { execFileSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { selfRun, notRun } from './_lib/self-run.js';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', '..');
@@ -79,15 +107,48 @@ export default async function run() {
   }
   assert.ok(preserved(live), 'phase A must PRESERVE self-publish and the state block');
 
-  // Arm 2 — file-level negative control against the pinned pre-change blob:
-  // the content checks must FAIL there, and preservation must HOLD there
-  // (a control that cannot run is a failure, never a skip — SES-158).
-  let pre;
-  try {
-    pre = norm(execFileSync('git', ['cat-file', '-p', PRE_BLOB], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 25 }));
-  } catch (e) {
-    assert.fail('negative control could not run: git cat-file failed: ' + e.message);
+  preChangeControl();
+  await liveArm();
+}
+
+// Arm 2 — file-level negative control against the pinned pre-change blob: the content checks must
+// FAIL there, and preservation must HOLD there.
+//
+// IT LIVES IN ITS OWN FUNCTION SO THE DECLARATION BELOW RETURNS FROM *THIS* ARM ONLY (SES-273).
+// Arms 1-3 shared one run() body, so a bare `return` beside the notRun() would have skipped arm 3
+// — the credentialed live arm — on exactly the shallow-clone path where CI *does* hold the
+// credentials. That would have traded a red suite for a silently narrower one, which is the worse
+// of the two. Same one-function-per-arm shape the sibling guards already use.
+function preChangeControl() {
+  // TWO DIFFERENT THINGS, AND CONFLATING THEM IS WHAT MADE CI RED (SES-273). A control that RUNS
+  // and turns out to be vacuous is a real failure and every assertion below still says so —
+  // that is SES-158's rule and it is untouched. A control whose pinned object is simply NOT IN
+  // THIS CHECKOUT has not run at all: actions/checkout@v4 clones at depth 1, so `git cat-file`
+  // cannot resolve ad48b08f in CI, and assert.fail() there reported a shallow clone as a broken
+  // guard. Measured live 2026-08-31: dev was red on four consecutive commits (first 92436fa
+  // 21:18Z, head 3f1a313c 23:15Z) on this one line, 134/135, while a full clone ran 135/135 —
+  // which is exactly why two attended follow-up ships walked straight past it.
+  // notRun() is what this case is for (SES-180 (b), v7.0.224: run-all.js exits 1 iff something
+  // FAILED, never because a part was declared), and three siblings in this same suite already
+  // draw the line here on the identical condition — SES-255-ci-conclusion-reporting.js,
+  // SES-256-rollback-drill.js and SES-50-resolved-id-citations.js, all three visible as
+  // [NOT RUN] in the same red log. This adopts their shape verbatim rather than inventing a
+  // fourth spelling of it.
+  //
+  // THE EDIT THIS FORBIDS: reaching for this branch when the blob DOES resolve and an assertion
+  // below fails. That is a real finding about the guard, and declaring it not-run would be the
+  // silently-no-opping control SES-158 names. Only an unresolvable object may be declared.
+  const show = spawnSync('git', ['cat-file', '-p', PRE_BLOB], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 25 });
+  if (show.status !== 0 || !show.stdout) {
+    notRun(
+      `the file-level negative control (briefing-template.html at blob ${PRE_BLOB.slice(0, 12)} must FAIL the content checks)`,
+      `git cat-file -p ${PRE_BLOB} did not resolve here -- the blob is reachable from any full ` +
+        'clone of this repo; a shallow or partial clone (actions/checkout@v4 at its default ' +
+        'depth) may not carry it. An unrunnable control is declared, never counted as a pass.',
+    );
+    return;
   }
+  const pre = norm(show.stdout);
   const p = contentChecks(pre);
   assert.strictEqual(p.writeTapDefined, false, 'control is vacuous: pre-change template already defines writeTap');
   assert.strictEqual(p.allKindsWired, false, 'control is vacuous: pre-change template already wires tap kinds');
@@ -99,9 +160,11 @@ export default async function run() {
   assert.strictEqual(p.handlesUseRejection, false, 'control is vacuous: pre-change template already handles a rejected use()');
   assert.strictEqual(p.stampsEveryBranch, false, 'control is vacuous: pre-change template already stamps every branch');
   assert.ok(preserved(pre), 'preservation checks must hold on BOTH trees or they measure nothing');
+}
 
-  // Arm 3 — credentialed live arm: buffer table exists, is writable at service level,
-  // and holds zero public grants (both directions, SES-101).
+// Arm 3 — credentialed live arm: buffer table exists, is writable at service level,
+// and holds zero public grants (both directions, SES-101).
+async function liveArm() {
   const KEY = process.env.SUPABASE_SERVICE_KEY;
   const URL_ = process.env.SUPABASE_URL || 'https://rallojeqnkgtxgsdsnqm.supabase.co';
   if (!KEY) {
