@@ -5,6 +5,81 @@
 
 ---
 
+## session/cycle-20260831-0341 (v7.0.339, 2026-08-31, runner cycle `d913b001-c3e4-4b62-b3e0-165234a33c09`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10 PM America/Chicago) — model Opus 5 orchestrator, **design adjudicated by a Fable 5 subagent** per register B21: the class is `P10 - Tooling`, but the question was root-cause diagnosis and authority classification, which B21 routes to Fable 5 regardless of class) — `SES-255` — CI publishes its own grade, because nothing else can read it.
+
+**Picked by the M4 drain** (`drain_epic_next` → `pick`, `open_now = 7`, directive `4583bdc1`, epic
+`Selfbuild M4 - Infrastructure Floor`). **This cycle hit the defect at its own step 4a, before it
+had picked the ticket that describes it** — which is what revalidated the premise.
+
+### The cycle's own first diagnosis was wrong, and that is recorded rather than dropped
+
+Three measurements, all this cycle. The GitHub MCP listing for one `ci.yml` run on `dev` at
+`per_page=1` returned **71,575 characters** (cycle `b0a3dde5` measured 71,371 the cycle before) —
+over the tool-result cap, overflowing into the `~/.claude/…/tool-results/` path **register B39
+forbids an unattended cycle to shell-process**. Raw HTTPS to `api.github.com` returned **403**
+*"GitHub access is not enabled for this session"* **even with the `GITHUB_TOKEN` this environment
+carries**, and 403 unauthenticated.
+
+From the 403s the orchestrator concluded there is **no network path at all** — which would have
+falsified the ticket's own *"bounded proxy = ordinary cycle work"* route and forced a gated card.
+**The Fable 5 subagent re-ran the MCP call and got 71,575 characters back.** The connector path *is*
+reachable; only raw HTTPS is proxy-blocked; the ticket's original **size-cap + B39** diagnosis was
+right all along. The false finding is written into the kickoff and the stamp instead of being
+quietly dropped — a wrong mechanism in the ledger is what a later cycle builds on.
+
+What actually decides the design is that **no bounded `sha → conclusion` read exists on any surface
+a cycle has**: `actions_list` takes no `head_sha` and no minimal-output flag (one run object is
+~70KB), the bounded `actions_get` / `get_check_run` need an id obtainable only from the oversized
+listing, the `pull_request_*` forms need a PR number and a `dev` push is not a PR, and a git-level
+read carries no check conclusions. A proxy the cycle *hosts* would still call `api.github.com` and
+need a credential — which `SES-255`'s own decision boundary reserves to John.
+
+### So the direction is inverted, and it provisions nothing
+
+`ci.yml` gains a `report-conclusion` job (`needs: [build, checks]`,
+`if: always() && github.event_name == 'push'`) that reads `needs.<job>.result` and upserts
+`public.ci_run_conclusions`; step 4a reads that row. **Both keys are the repository secrets
+`SES-180 (d)` already exposes**, which keeps this out of the John-only lane `ci.yml`'s own header
+names (adding secrets; branch protection). **Authority was verified, not assumed:** this file
+records cycle `b9f90b84`, `trigger = scheduled`, **unattended**, shipping this same workflow as
+`P10 - Tooling` in `v7.0.286` — a strictly more consequential edit. The engine is **untouched**:
+`rollback-on-red.js` is not edited, `TRIGGER_SOURCES` is unchanged, the cycle still mediates
+`--jobs`, so John's accepted `SES-182` design (*the conclusion is passed in*) is preserved and only
+the read instruction moved.
+
+### The third verdict was measured, not reasoned
+
+Step 4a now carries **three** verdicts, and ARM F is why: a `cancelled` handed to the engine as
+`ci-red` lands on the **red** branch. `isRunGreen()` refusing it as green is *not* the claim *"this
+run was red"* — `cancel-in-progress` cancels superseded runs routinely — so `cancelled` / `skipped` /
+empty / **no row** are **could-not-tell: invoke nothing**. A missing row is stale, never bad; the
+reporting job cannot report its own failure, which is `rollback-on-red.js`'s own fail direction.
+
+### QA
+
+Build green. Regression **129/129, exit 0** (one FAIL first — `SES-177` `CLAUDE-STATE.md` drift,
+which is `SES-213`'s mechanism exactly; step 7a's render cleared it). Verifier **APPROVE**
+(`runner_verdicts a810b5e5`), `auto_done_eligible` **YES**, so the ticket closes `done` under the
+charter's decision-2 carve-out. Three discriminating arms on the real `ci.yml` (4th job absent from
+`needs` → exit 1 `missing: lint`; push guard dropped → exit 1; restored → exit 0), tree restored
+byte-identical. File-level negative control against `origin/dev` fails there, as required. Live seam
+proof through CI's exact `curl`: POST ok, second POST ok at **1 row** (upsert), anon key **42501
+denied on read and write** with a same-key control returning **200** on three tables it may read —
+the first attempt used a *fake* key, returned 401 for the wrong reason and proved nothing, and was
+redone per `SES-101`'s both-directions rule. Row read back → **real engine → `record-green`**.
+Tree re-read after: 0 fixture rows, 0 stray anchors.
+
+**Disclosed rather than buried:** the fixture INSERT's `runner_before_images` row (`row_data = NULL`)
+was written **after** the insert, not before it; §19v wants it first. **Down capture** came back
+`auto-downable` (`drop table`) — unlike the last three ships, this one **is** auto-rollbackable.
+**Step 4a recorded no green anchor this cycle** — the fix ships first and its own CI run is what
+writes the first real row.
+
+Three files — `.github/workflows/ci.yml`, `docs/runbooks/runner-cycle.md`, and the new guard — plus
+migration `ses255_ci_run_conclusions`. No `src/`/`api/`/`lib/` change, no site change.
+
+---
+
 ## session/cycle-20260831-0240 (v7.0.338, 2026-08-31, runner cycle `c3fc4a98-87b3-4e1a-be06-95ec5b8786b9`, `trigger = scheduled`, `scheduler_gate` verdict `run` — model Opus 5 as orchestrator, no subagent: register B21 routes judgment-dense *design* to Fable 5 for **P1–P5** work and this is `P10 - Tooling`, and the diagnosis was already carded by the M4-succession cycle, so this cycle **re-measured** it rather than re-deriving it) — `SES-254` — `runner_items.epic_id`'s contract becomes a constraint.
 
 **Picked by the M4 drain** (`drain_epic_next` → `pick`, `open_now = 8`, directive `4583bdc1`, epic
@@ -11472,6 +11547,20 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+**Retired by `SES-255`'s cycle (`v7.0.339`, 2026-08-31) to hold the stamp count at 5 — every
+editor warning checked by grep against the live body FIRST, not by recollection.** Four of
+`v7.0.333`'s six warnings survive in `runner-cycle.md`'s own body (capture **before, never after**
+the up; oldest-first ordering forbidden; an absent `--migrations` is **unknown**, not "nothing
+landed"; a `refused` classification is a **result, not an error to work around**). The two that do
+not each have a **durable home stronger than a relocated sentence**, so they are archived rather
+than re-prosed — the same judgment `v7.0.334` and `SES-218` made: `schemaPlanFor()` returning
+`steps` **EMPTY on any miss** (so a caller cannot apply a half-undone schema even by accident)
+lives verbatim in `scripts/rollback-on-red.js` lines 26 and 175, beside the code it protects; and
+the `42702` OUT-parameter shadowing defect that `SES-182` slice 2's own QA found and fixed is
+already recorded in this file at line 408.
+
+<!-- DeepBench v7.0.333 | runbooks/runner-cycle.md | SES-182 slice 2 — DOWN CAPTURE AT APPLY TIME, and the thing to read twice is WHY THE CAPTURE MUST HAPPEN BEFORE THE UP RATHER THAN AFTER IT. capture_migration_down() derives a down from the objects' LIVE PRIOR STATE — absent object downs to a drop by identity, an existing function downs to its captured definitions PLUS the stale-overload drop and the count(*) assertion .claude/rules/supabase-function-signature.md requires, an existing view downs to CREATE OR REPLACE with its captured definition. Run it AFTER the up and it captures the state the up just wrote, which is a down that restores the bug; there is no backfill, because after the up that prior state is gone. THE DEFECT THIS CLOSES, measured on an unedited tree at 17:4xZ rather than recalled: runner_migration_downs held 0 rows, neither function existed (pg_proc count 0), and the ONLY mention of the table anywhere in scripts/ api/ lib/ src/ tests/ docs/runbooks/ was rollback-on-red.js's own header naming it a deferral — so slice 1's moved-watermark branch carded EVERY migration range by construction, with no path to ever do otherwise. THE EDIT THIS SHIP FORBIDS: downing the members that have downs and carding the rest. schemaPlanFor() returns steps EMPTY on any miss so a caller cannot apply a subset even by accident — a schema half-undone is a state no green anchor describes — and the guard pins it with the retired best-effort form applied to the SAME fixture and asserted to yield 2 steps where the shipped one yields 0. THE SECOND FORBIDDEN EDIT is oldest-first ordering: downs applied in the order the range was supplied re-create what a later down expected gone. A THIRD, quieter one: treating an absent --migrations list as an empty range. It is UNKNOWN, not 'nothing landed', and it fails closed — which is also what keeps every slice-1 caller byte-identical, tests/regression/SES-182-rollback-on-red.js included (re-run, still green). REFUSAL IS A RESULT, NOT A FAILURE: grants/ACL and in-place ALTERs come back classification='refused' deliberately, because re-applying an exploded ACL correctly is .claude/rules/supabase-column-grants.md's entire subject and a wrong one is a live exposure — the consequence (that ship is not auto-rollbackable) is stated on the card rather than left to be found. A DEFECT FOUND BY THIS SHIP'S OWN QA AND FIXED RATHER THAN WORKED AROUND, on the first arm that exercised the write path: the OUT parameters up_name / classification / down_sql shadowed runner_migration_downs' own columns and the INSERT raised 42702 — SES-134's work_class collision exactly. An INSERT column list cannot be qualified and OUT names are not identity args, so CREATE OR REPLACE refuses the change; fixed by DROP-then-CREATE by full identity list with the count(*)=1 assertion in the migration itself. QA WAS NINE LIVE ARMS against real Supabase inside a deliberately failing DO block, one variable each, all rolled back: existing function (re-applies both definitions, has the overload drop, asserts count 2) with the retired definitions-only form as its control and asserted to LOSE; absent function; existing view; existing table refused; grant refused; MIXED refused as a whole; ordering (index dropped before table); idempotent re-capture (1 row, 2 before-images); and migrations_in_range's exclusive-from/inclusive-to boundary. Tree re-read after: 0 rows, 0 fixture images, 0 stray objects, 1 overload. Grants asserted BOTH directions per SES-101 (anon/authenticated EXECUTE false, service_role true). FILE-LEVEL NEGATIVE CONTROL: the new guard cannot even LOAD against origin/dev's engine — the exports it pins do not exist — and passes on the shipped one. Directive a75e22e6's continuation-spawn line is folded into the tail's step (8) here, which is exactly where it asked to land: 'a cycle should fold this into runner-cycle.md's continuation step on its next ship touching that file — never a dedicated cycle for the doc edit'. Stamp count held at 5 per session-hygiene check 7: v7.0.299 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — four of its five warnings are restated in the body, and the fifth (summarizeGateOutput reads BOTH streams and stays pure) appeared ZERO times outside its stamp and was RELOCATED into step 7a rather than archived. Guarded by tests/regression/SES-182b-migration-downs.js. Doc + script + test + migration; no src/api/lib change, no site change. -->
 
 **Retired by the M4 succession cycle (`v7.0.337`, 2026-08-31) to hold the stamp count at 5 — every
 editor warning checked by grep against the live body FIRST, not by recollection.** All three of

@@ -1,3 +1,24 @@
+# DeepBench v7.0.339 | .github/workflows/ci.yml | SES-255 — CI PUBLISHES ITS OWN GRADE, because
+# nothing an unattended cycle can reach is able to read it. runner-cycle.md step 4a needs this run's
+# conclusion to record the green anchor SES-182's auto-rollback measures every later red against;
+# the engine holds no credential by John's own design, so the cycle must supply it. Measured three
+# times rather than argued: the GitHub REST listing for ONE run on dev returns ~71,000 characters
+# (71,371 then 71,575), over the agent tool-result cap and into the ~/.claude/.../tool-results/ path
+# register B39 forbids an unattended cycle to touch; raw HTTPS to api.github.com is separately
+# refused by the session proxy regardless of credential. No bounded sha -> conclusion read exists on
+# any surface a cycle has, so the direction is inverted and the grader publishes its own grade.
+#
+# THE NEW JOB PROVISIONS NOTHING. It uses the two repository secrets SES-180 (d) already exposes to
+# the regression step, which is what keeps it out of the John-only lane this header names below
+# (adding secrets; branch protection). Its two guards fail in OPPOSITE directions and both are
+# load-bearing — see the block above the job itself.
+#
+# THE EDIT THIS SHIP FORBIDS: dropping a job from `report-conclusion`'s `needs` to "simplify" it.
+# isRunGreen() requires EVERY blocking job to be `success`, so a job absent from `needs` is one whose
+# failure the anchor silently forgets and the run still reads green.
+# tests/regression/SES-255-ci-conclusion-reporting.js computes that set from this file rather than
+# hardcoding it, so a fourth job added without adding it here fails the suite.
+#
 # DeepBench v7.0.304 | .github/workflows/ci.yml | SES-180 (d) — THE REGRESSION STEP IS ACTUALLY
 # CREDENTIALED, and the thing to read twice is that this ship exists because the header below was
 # WRONG. John, attended architect session 2026-08-29, directive 82403dad, after reading this file at
@@ -187,3 +208,79 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node tests/regression/run-all.js
+
+  # SES-255, v7.0.339 — CI PUBLISHES ITS OWN GRADE, because nothing else can read it.
+  #
+  # runner-cycle.md step 4a requires an unattended cycle to read this run's conclusion and hand it
+  # to scripts/rollback-on-red.js as `--jobs`; the engine holds no credential and fetches nothing,
+  # by John's own SES-182 design. That read has now failed on three consecutive cycles for one
+  # measured reason: the GitHub REST listing for a single run on dev returns ~71,000 characters
+  # (71,371 then 71,575, measured live), which exceeds the agent tool-result cap and overflows into
+  # the ~/.claude/.../tool-results/ path register B39 forbids an unattended cycle to touch. Raw
+  # HTTPS to api.github.com is separately refused by the session proxy. There is no bounded
+  # sha -> conclusion read on any surface a cycle has.
+  #
+  # So the direction is inverted: the grader publishes its own grade to a table the runner already
+  # reads. NO NEW SECRET IS PROVISIONED — both keys below are the repository secrets SES-180 (d)
+  # already exposes to the step above, which is what keeps this out of the John-only lane this
+  # file's header names (adding secrets; branch protection). The engine is untouched and the
+  # conclusion is still PASSED IN.
+  #
+  # THE TWO GUARDS ARE LOAD-BEARING, not defensive habit:
+  #
+  #   `github.event_name == 'push'` — on a pull_request from a FORK both secrets resolve to the
+  #   empty string by GitHub's design (the header says so for the step above), so without this the
+  #   curl fails and paints an innocent contributor's PR red. It also stops same-repo PR runs
+  #   writing rows for PR-branch shas that were never pushed to dev.
+  #
+  #   `always()` — a run whose `checks` job FAILED is the case the anchor most needs recorded, and
+  #   the default `success()` would skip exactly it.
+  #
+  # WHAT THIS JOB CANNOT DO, stated rather than left to be found: it cannot report its own failure.
+  # If it dies, no row is written, the anchor goes STALE, and a later red is measured against an
+  # older commit or none — which is scripts/rollback-on-red.js's own stated fail direction (stale,
+  # never wrong). Same for a cancelled run: `cancel-in-progress` kills this job too. A row whose
+  # conclusions are neither all-success nor any-failure is COULD-NOT-TELL on the reading side and
+  # triggers nothing; that rule lives in step 4a, because a `cancelled` handed in as a red would
+  # let decide() revert on a superseded run.
+  #
+  # `needs` must name EVERY other job in this file. tests/regression/SES-255-ci-conclusion-reporting.js
+  # computes that set from the shipped YAML rather than hardcoding it, so adding a fourth job
+  # without adding it here fails the suite.
+  report-conclusion:
+    name: Report conclusions to the runner ledger
+    needs: [build, checks]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish blocking-job conclusions
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_KEY:-}" ]; then
+            echo "No Supabase credentials in this context -- nothing published."
+            echo "The anchor stays stale, which is the safe direction. Not a failure."
+            exit 0
+          fi
+          # jq composes the body so a job name containing a quote cannot break the JSON.
+          jq -n \
+            --arg sha "${GITHUB_SHA}" \
+            --argjson run_id "${GITHUB_RUN_ID}" \
+            --arg build "${BUILD_RESULT}" \
+            --arg checks "${CHECKS_RESULT}" \
+            '{commit_sha: $sha, run_id: $run_id, jobs: [
+               {name: "Build (blocking)", conclusion: $build},
+               {name: "Tripwire + regression (blocking)", conclusion: $checks}
+             ]}' > /tmp/ci-conclusion.json
+          cat /tmp/ci-conclusion.json
+          curl --fail --silent --show-error \
+            -X POST "${SUPABASE_URL}/rest/v1/ci_run_conclusions?on_conflict=commit_sha" \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            --data @/tmp/ci-conclusion.json
