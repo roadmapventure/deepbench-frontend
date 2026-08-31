@@ -5,6 +5,75 @@
 
 ---
 
+## session/cycle-20260831-0440 (v7.0.340, 2026-08-31, runner cycle `ebdec9c2-d3a3-493e-93b8-ee719f55fcd6`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (11 PM America/Chicago) — model Opus 5 orchestrator throughout; no subagent was delegated to, and that is stated rather than implied: the root cause was a single failing assertion whose own message named it, and the remedy was a precedent already written into a sibling file, so a delegation would have re-derived a measured answer) — **step-4 blocker** — the negative control that turned dev's blocking CI job permanently red.
+
+**No ticket was picked, and none was claimed or skipped.** Runbook step 4 preempts selection on a
+broken run, and this one was found by step 4a's own read: `ci_run_conclusions` reported
+`Tripwire + regression (blocking) = failure` on **both** rows it held — dev's head `ea08ff0` and
+`SES-255`'s own ship `8ec18ea`. The M4 drain and the class-sorted board were never reached. Same
+move `SES-208` made, under the same clause.
+
+### The blocker, root-caused rather than bisected
+
+`check-session-docs.js --gate` exits **0**, so the tripwire half was not it. `run-all.js` exited
+**1** at **127/129**, and one of the two failures is permanent:
+
+`SES-255-ci-conclusion-reporting.js`'s file-level negative control ran
+`git show origin/dev:.github/workflows/ci.yml` and asserted the shipped reporter assertions **fail**
+there. That premise holds only while the change is unmerged. `SES-255` merged as `8ec18ea`, so
+`origin/dev`'s `ci.yml` **became** the post-change file, every assertion passed where it is asserted
+to fail, and the control threw — on every run, forever. The failing assertion's own message named
+both branches and the live one first: *"Either the change already landed (**re-baseline this
+control**) or the assertions above have been weakened."* Nothing re-baselined it.
+
+**Why it is a blocker and not a nit.** The job is `blocking`; it is one of `verifier.js`'s three
+gates, so **every later cycle's verdict would be `block` by construction** — the `SES-213` defect one
+storey up — and step 4a could never record a green anchor again, disabling the auto-rollback lane
+`SES-182` and `SES-255` were built across six ships to provide.
+
+### The remedy is `SES-242`'s, taken verbatim — this is the same defect, twice
+
+`tests/regression/SES-242-restore-rerun.js` (v7.0.324) hit this identical class on 2026-08-29,
+minutes after `v7.0.323` shipped, and its header already states both the rule and the fix: *"A
+file-level control keyed to a branch tip is self-defeating by construction: it is only correct in
+the window before its own ship, which is the one window nobody re-runs it in"*, remedied by pinning
+to an immutable blob. `SES-242` also settled the bookkeeping: *"Fixed in the cycle that caught it
+(feature-owns-its-bugs, §19v), **never filed as a ticket**."* So the card carries a `display_ref`
+and the board did not move — the snapshot export printed `unchanged` (736 tickets).
+
+`PRE_CHANGE_BLOB` is `ci.yml` at `8ec18ea^` = `91c17db1…` (HEAD's is `50ae1562…`, so they genuinely
+differ), read with **`git cat-file -p <sha>`, never `git show <ref>:<path>`** — both resolve the
+object today, but `git show` is the form a later editor re-parameterises with a branch name, which
+is exactly how the bug arrived; `cat-file` takes an object id and no path, so the moving-ref form
+cannot be reintroduced by editing one string.
+
+**The edit this forbids, and it is tempting because it turns the suite green in one line:** deleting
+the control, or softening it to *"if the baseline passes, declare not-run"*. Both make the guard
+vacuous — `SES-255`'s own header calls an unrunnable control *"not a control"*, and a control that
+excuses itself whenever it would fail is weaker still. Pinning removes the control's **expiry date**,
+never its teeth.
+
+### QA — and the first attempt was a non-arm, reported rather than quietly re-rolled
+
+Arm A alone (127/129 → **129/129**) is not QA: deleting the control entirely would also produce it.
+Arms B and C slice `assertReporterIsCorrect` out of the **shipped** file (never a reimplementation —
+`SES-45`) and prove the predicate *discriminates*: the pinned blob **throws** for the right reason
+(*"ci.yml must define a `report-conclusion` job"*) while the working tree **passes**.
+
+The first run of B/C sliced from the wrong offset and dropped the module constants, so **both** arms
+threw `REPORTER is not defined` — passing the "must throw" arm for a reason that proves nothing, the
+`SES-101` both-directions failure. It was redone from the constants, not reported as a result.
+
+The second failure, `SES-177-claude-state-renderer.js`, is the known `SES-213` lag — dev's committed
+`CLAUDE-STATE.md` was missing its predecessor's ship because `d913b001` reached `shipped` after it
+rendered. Step 7a's render regenerated it; no code change, and the file stays generated.
+
+Build green, suite **129/129**, verifier **APPROVE** on all three gates (`runner_verdicts`
+`55b0e822`), version claim verified against the issued-versions ledger. Test-file + docs only; no
+`src`/`api`/`lib` change, no site change, no schema change, no migration.
+
+---
+
 ## session/cycle-20260831-0341 (v7.0.339, 2026-08-31, runner cycle `d913b001-c3e4-4b62-b3e0-165234a33c09`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10 PM America/Chicago) — model Opus 5 orchestrator, **design adjudicated by a Fable 5 subagent** per register B21: the class is `P10 - Tooling`, but the question was root-cause diagnosis and authority classification, which B21 routes to Fable 5 regardless of class) — `SES-255` — CI publishes its own grade, because nothing else can read it.
 
 **Picked by the M4 drain** (`drain_epic_next` → `pick`, `open_now = 7`, directive `4583bdc1`, epic

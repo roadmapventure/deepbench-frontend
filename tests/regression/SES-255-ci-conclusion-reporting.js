@@ -1,3 +1,8 @@
+// DeepBench v7.0.340 | tests/regression/SES-255-ci-conclusion-reporting.js | step-4 blocker fix --
+// the file-level negative control is PINNED TO A BLOB SHA, not to origin/dev. Keyed to a moving ref
+// it passed only in the window before its own ship and turned the BLOCKING CI job red the moment
+// SES-255 landed on dev. Same defect and same remedy as SES-242 (v7.0.324). See the block below.
+//
 // DeepBench v7.0.339 | tests/regression/SES-255-ci-conclusion-reporting.js | SES-255 (Selfbuild M4)
 //
 // Guards the ship that made the green anchor recordable at all. runner-cycle.md step 4a requires an
@@ -23,10 +28,37 @@
 // for PR-branch shas that were never pushed to dev.
 //
 // FILE-LEVEL NEGATIVE CONTROL (the SES-182c pattern): the same static assertions are run against
-// `git show origin/dev:.github/workflows/ci.yml` and MUST fail there. Without it every assertion
-// below could be vacuously true of some other file, and a reader could not tell this guard from one
-// that merely describes a workflow. If the control cannot run (no git, no origin/dev) it is
-// DECLARED not-run rather than passed -- an unrunnable control is not a control.
+// the PRE-CHANGE ci.yml and MUST fail there. Without it every assertion below could be vacuously
+// true of some other file, and a reader could not tell this guard from one that merely describes a
+// workflow. If the control cannot run (no git, no object) it is DECLARED not-run rather than passed
+// -- an unrunnable control is not a control.
+//
+// THE CONTROL IS PINNED TO A BLOB SHA, AND THAT IS THIS GUARD'S OWN BUG FIXED (v7.0.340, found live
+// 2026-08-31T04:5xZ by cycle ebdec9c2 running step 4's blocker sweep). The first version read
+// `origin/dev:.github/workflows/ci.yml` -- a MOVING ref. It passed while this change sat unpushed
+// and began FAILING THE WHOLE SUITE the instant SES-255 landed on dev as 8ec18ea, because "the
+// pre-change copy" had become the post-change copy and every assertion then PASSED where it is
+// asserted to fail. That red is not cosmetic: `Tripwire + regression` is a BLOCKING job, it is one
+// of verifier.js's three gates (so every later cycle's verdict becomes `block` by construction --
+// the SES-213 defect one storey up), and step 4a can never record a green anchor while it stands,
+// which disables the very auto-rollback lane SES-182 and SES-255 were built to provide.
+//
+// THIS IS SES-242's DEFECT, VERBATIM, AND ITS REMEDY IS TAKEN VERBATIM (tests/regression/
+// SES-242-restore-rerun.js, v7.0.324, which hit it minutes after v7.0.323 shipped): "A file-level
+// control keyed to a branch tip is self-defeating by construction: it is only correct in the window
+// before its own ship, which is the one window nobody re-runs it in." PRE_CHANGE_BLOB is ci.yml at
+// 8ec18ea^ -- the commit before SES-255 -- and a blob sha is immutable, so this control means the
+// same thing forever.
+//
+// THE EDIT THIS FORBIDS, and it is tempting because it turns the suite green in one line: deleting
+// this control, or softening it to "if the baseline passes, declare not-run". Both make the guard
+// vacuous -- an unrunnable control is not a control, and a control that excuses itself whenever it
+// would fail is weaker still. Pinning removes the control's EXPIRY DATE, never its teeth.
+//
+// READ WITH `git cat-file -p <sha>`, NEVER `git show <ref>:<path>`. Both resolve this object today.
+// `git show` is the form a later editor re-parameterises with a branch name, which is exactly how
+// this bug arrived; `cat-file` takes an object id and no path, so the moving-ref form cannot be
+// reintroduced by editing one string.
 
 import assert from "assert";
 import fs from "fs";
@@ -39,6 +71,11 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const CI_YML = path.join(REPO, ".github", "workflows", "ci.yml");
 const REPORTER = "report-conclusion";
 const TABLE = "ci_run_conclusions";
+
+// .github/workflows/ci.yml as of 8ec18ea^ -- immutable, unlike a branch tip. It carries no
+// `report-conclusion` job and no `ci_run_conclusions` reference at all, so it cannot satisfy the
+// assertions below under any reading.
+const PRE_CHANGE_BLOB = "91c17db16746b875c11948ed39329e8d0e08fabe";
 
 // GitHub's own conclusion vocabulary. `cancelled` and `skipped` are the COULD-NOT-TELL half that
 // step 4a's third verdict exists for -- admitted as values, never as a red.
@@ -141,19 +178,20 @@ function workingTreeReporterIsCorrect() {
 }
 
 // ---------------------------------------------------------------------------
-// (B) File-level negative control: the same assertions MUST fail on origin/dev.
+// (B) File-level negative control: the same assertions MUST fail on the PRE-CHANGE ci.yml.
+//     Pinned to an immutable blob, never to a branch tip -- see PRE_CHANGE_BLOB and the header.
 // ---------------------------------------------------------------------------
-function originDevFailsTheSameAssertions() {
-  const show = spawnSync("git", ["-C", REPO, "show", "origin/dev:.github/workflows/ci.yml"], {
+function preChangeCiFailsTheSameAssertions() {
+  const show = spawnSync("git", ["-C", REPO, "cat-file", "-p", PRE_CHANGE_BLOB], {
     encoding: "utf8",
     maxBuffer: 8 * 1024 * 1024,
   });
   if (show.status !== 0 || !show.stdout) {
     notRun(
-      "the file-level negative control (origin/dev's ci.yml must FAIL these assertions)",
-      "git show origin/dev:.github/workflows/ci.yml did not resolve here -- run `git fetch origin dev` " +
-        "in a checkout with the remote configured and re-run. An unrunnable control is declared, " +
-        "never counted as a pass.",
+      `the file-level negative control (ci.yml at blob ${PRE_CHANGE_BLOB.slice(0, 12)} must FAIL these assertions)`,
+      `git cat-file -p ${PRE_CHANGE_BLOB} did not resolve here -- the blob is reachable from any ` +
+        "full clone of this repo; a shallow or partial clone may not carry it. An unrunnable " +
+        "control is declared, never counted as a pass.",
     );
     return;
   }
@@ -165,9 +203,10 @@ function originDevFailsTheSameAssertions() {
   }
   assert.ok(
     threw,
-    "origin/dev's ci.yml PASSED the reporter assertions -- so they assert nothing this ship added. " +
-      "Either the change already landed (re-baseline this control) or the assertions above have been " +
-      "weakened into something true of any workflow.",
+    `the pre-change ci.yml (blob ${PRE_CHANGE_BLOB.slice(0, 12)}) PASSED the reporter assertions -- ` +
+      "so they assert nothing this ship added, and the assertions above have been weakened into " +
+      "something true of any workflow. Note this baseline is IMMUTABLE, so 'the change already " +
+      "landed' can no longer be the explanation -- that was the v7.0.340 bug and it is fixed.",
   );
 }
 
@@ -213,7 +252,7 @@ async function tableExistsAndRowsAreWellShaped() {
 
 export default async function run() {
   workingTreeReporterIsCorrect();
-  originDevFailsTheSameAssertions();
+  preChangeCiFailsTheSameAssertions();
   await tableExistsAndRowsAreWellShaped();
 }
 
