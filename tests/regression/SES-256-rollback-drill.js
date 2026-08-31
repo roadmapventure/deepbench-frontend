@@ -1,3 +1,28 @@
+// DeepBench v7.0.342 | tests/regression/SES-256-rollback-drill.js | STEP-4 BLOCKER — THE FILE-LEVEL
+// NEGATIVE CONTROL'S OWN not-run DECLARATION TURNED A BLOCKING CI JOB RED, and the thing to read
+// twice is WHERE the defect can and cannot be seen. `notRun(part, reason)` takes TWO arguments and
+// raises on a missing `reason` (_lib/self-run.js: "an unexplained gap is worse than none"). Both
+// declarations below passed ONE concatenated string, so `reason` was undefined and the call THREW.
+// It is unreachable on a full clone — the pinned commit resolves, the control runs, and the branch
+// is never entered — so it passed every check the authoring cycle could make and failed on the
+// FIRST push, in CI, where actions/checkout@v4 gives a shallow checkout at its default depth.
+// MEASURED, NOT INFERRED: run 33362760570 on 071503ae, job "Tripwire + regression (blocking)",
+// 129/130 with the single line `[FAIL] SES-256-rollback-drill.js -- notRun(part, reason): reason
+// must say why`. Reproduced here in a real `git clone --depth 1` of dev, byte-identical, and the
+// same clone with the shipped file restored is the negative control that still fails.
+//
+// WHY THIS WAS NOT A REVERT, recorded because the machinery proposed one: scripts/rollback-on-red.js
+// returned `revert-and-card` over 506efee..071503a, correctly attributed. The range is a
+// charter-required drill ship carrying an undecided ship card, and the whole red is one missing
+// argument in this file — so the runbook's step-4 rule (a blocker is fixed root-cause-first, no
+// blind fixes) and the v7.0.340 precedent govern: fixed forward in the cycle that caught it, no
+// ticket. Reverting was NOT run.
+//
+// THE EDIT THIS FORBIDS, and it is the tempting one because it makes the arity mistake impossible:
+// giving `reason` a default in notRun(). The raise IS the contract — SES-180 (b)'s rule is that an
+// undeclared gap is indistinguishable from coverage, and a defaulted reason reinstates exactly the
+// silent gap it exists to forbid. The fix belongs at the call site, which is where it is.
+//
 // DeepBench v7.0.341 | tests/regression/SES-256-rollback-drill.js | SES-256 (Selfbuild M4)
 //
 // Guards docs/runbooks/rollback-drill.md — the procedure written by executing the first end-to-end
@@ -185,8 +210,9 @@ function theRunbookDidNotExistBeforeThisShip() {
   });
   if (probe.error || probe.status === null) {
     notRun(
-      "file-level negative control: git is unavailable in this environment, so 'the runbook was " +
-        "absent before this ship' could not be established. DECLARED not-run, never passed.",
+      "file-level negative control",
+      "git is unavailable in this environment, so 'the runbook was absent before this ship' could " +
+        "not be established. DECLARED not-run, never passed.",
     );
     return;
   }
@@ -196,8 +222,11 @@ function theRunbookDidNotExistBeforeThisShip() {
   });
   if (commitExists.status !== 0) {
     notRun(
-      `file-level negative control: pinned commit ${PRE_CHANGE_COMMIT.slice(0, 7)} is not in this ` +
-        "clone (a shallow checkout). DECLARED not-run, never passed.",
+      "file-level negative control",
+      `pinned commit ${PRE_CHANGE_COMMIT.slice(0, 7)} is not in this clone (a shallow checkout -- ` +
+        "which is what actions/checkout@v4 gives CI at its default depth), so the pre-change tree " +
+        "could not be read. Deepen the clone and re-run to exercise it. DECLARED not-run, never " +
+        "passed.",
     );
     return;
   }

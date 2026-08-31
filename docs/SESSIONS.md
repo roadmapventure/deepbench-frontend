@@ -5,6 +5,70 @@
 
 ---
 
+## session/cycle-20260831-0641 (v7.0.342, 2026-08-31, runner cycle `e89251a2-b60a-42ca-a6f1-91f047e70273`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 AM America/Chicago) — model Opus 5 orchestrator throughout; **no subagent was delegated to**, stated rather than implied: register B21 routes root-cause diagnosis to Fable 5, and the diagnosis here was a single failing assertion whose own message named the defect, read straight out of CI's log — a delegation would have re-derived a measured answer rather than adding judgment) — **step-4 blocker: `SES-256`'s file-level negative control turned a blocking CI job red.**
+
+**No ticket was claimed, picked or skipped.** Selection never ran: step 4a found `dev` red and
+runbook step 4's rule ("a user-blocking failure preempts everything — fix it first,
+root-cause-first, no blind fixes") governs. Same shape as the immediately preceding blocker ship,
+`v7.0.340`.
+
+### The red, and the engine that proposed reverting a good ship
+
+`ci_run_conclusions` reported `Tripwire + regression (blocking) = failure` on dev's head
+`071503ae` (run `33362760570`). `scripts/rollback-on-red.js` — run **dry, no `--apply`** — returned
+**`revert-and-card`** over `506efee..071503a`, correctly attributed to cycle `69725495` / `v7.0.341`.
+That range is `SES-256`, a charter-required drill ship carrying an **undecided ship card**. The
+revert was **not run**: the whole red is one missing argument in one test file, and reverting a
+delivery to fix a one-line defect inside it is not root-cause-first. Recorded here because the
+machinery proposed it and a later reader deserves to know it was declined deliberately, not missed.
+
+### The diagnosis was measured, and the first hypothesis was WRONG — recorded as wrong
+
+The local suite failed **one** test, `SES-177-claude-state-renderer.js` (the `CLAUDE-STATE.md` drift
+check), and the obvious reading was that this was `SES-213`'s predecessor lag one storey up. A
+negative control killed that: the **green anchor** `506efee`'s own committed `CLAUDE-STATE.md` fails
+the identical check right now, so the failure is time-dependent, not commit-dependent — it could not
+attribute anything. Rather than ship on that inference, CI's real log was read
+(`get_job_logs` with `run_id` + `tail_lines` — **bounded**, and reachable only because `SES-255`
+put the `run_id` in the database; `SES-255`'s finding that no bounded *sha → conclusion* read exists
+is unaffected and stands). It says something different from the local run: `SES-177` **PASSED** in
+CI, and the single failure is
+`[FAIL] SES-256-rollback-drill.js -- notRun(part, reason): reason must say why`.
+
+### Root cause, and why it was invisible to the cycle that shipped it
+
+`notRun(part, reason)` takes **two** arguments and raises on a missing `reason`
+(`_lib/self-run.js`: *"an unexplained gap is worse than none"*). Both declarations in
+`theRunbookDidNotExistBeforeThisShip()` passed **one** concatenated string, so `reason` was
+`undefined` and the call **threw**. Both branches are entered only when the pinned pre-change commit
+is unreachable — which never happens on a full clone, so the authoring cycle could not have seen it
+by any check available to it, and it failed on the **first** push, in CI, where
+`actions/checkout@v4` gives a shallow checkout at its default depth. It is the third consecutive
+`file-level negative control` defect to redden CI (`SES-242`, then `SES-255`/`v7.0.340`, now this)
+and the first whose mechanism is **arity**, not a moving ref.
+
+### QA — three arms, one variable each, plus a survey
+
+Reproduced in a real `git clone --depth 1` of `dev`: byte-identical failure message. **Arm A**
+(shallow + fixed) → PASS with the gap properly declared. **Arm B**, the negative control (the *same*
+shallow clone with the shipped file restored) → FAIL, identical message — so the change is doing real
+work and would not pass if it did nothing. **Arm C** (full clone + fixed) → PASS with the control
+genuinely *running*, proving the fix did not neuter it. Suite `129/130 → 130/130` exit 0, build exit
+0, hygiene gate exit 0, verifier **APPROVE** on all three gates (`runner_verdicts`
+`6d629817-637f-4400-8031-30b7d8a83b3c`). A survey of all 72 `notRun()` call sites found no second
+offender — and **CI is itself that survey's control**, since it runs on a shallow clone (the
+condition that reaches these branches) and reddened on this file alone.
+
+### Named deviation, disclosed rather than buried
+
+Prime Directive `a0ef9525` §3 says a fire that finds an open `PARKED` row checks **only** whether the
+named blockers changed, *before* harvest/walls/anything, and closes in seconds. This cycle ran the
+full ceremony and only then found the park — and that is how the red was caught at all, because §3's
+near-free path skips step 4's blocker sweep entirely. **While the runner is parked, nothing watches
+`dev`.** Filed as a question for John rather than resolved here: a cycle does not amend its own
+governing directive. The park itself **stands** — none of its named blockers is one this cycle could
+address, all of them are John's — so the `PARKED` row was left open and untouched.
+
 ## session/cycle-20260831-0540 (v7.0.341, 2026-08-31, runner cycle `69725495-024c-473d-9731-441f12ba5dc3`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (12 AM America/Chicago) — model Opus 5 orchestrator throughout; no subagent was delegated to, and that is stated rather than implied: register B21 routes kickoff design to Fable 5 for **P1–P5** work and this is `P10 - Tooling`, while the work itself was executing a procedure and observing what happened, which is not a judgment a delegate can take on the orchestrator's behalf) — `SES-256` — the auto-rollback drill runs for the first time.
 
 **Selected by the Prime Directive, not the board.** `a0ef9525` §2(b): the declared M4 drain
