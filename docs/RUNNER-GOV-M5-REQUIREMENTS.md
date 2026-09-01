@@ -82,11 +82,19 @@ existing fail-LOUD behaviour rather than getting a second, quieter one.
 
 ### <a id="M5-04"></a>M5-04 — answer from the matrix, never by re-deriving (`prose`)
 
-> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question.
+> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `priority_class`, `filed_at` as the created date, `status`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags.
 
 Re-deriving per question is how two answers to the same question disagree. It is also what the
 accounting review had to do — and the re-derivation is where the missing `item_id` rows silently
 dropped out of the totals.
+
+**Amended 2026-09-01 (`SES-294`, v7.0.360), John verbatim: _"Include in the matrix, and make this
+permanent - epic, date created, priority order."_** The column list above is now part of the rule
+rather than a convention each answer re-chooses, which is what let `epic` and the filing date drop
+out of earlier answers. **`filed_at` is the created date, never `created_at`** — `created_at` records
+when a row was bulk-loaded into Supabase during the board migration, so ordering or reporting by it
+misdates most of the board; `filed_at` is mined from git history (`B10`) and is also what `M5-02`'s
+priority lane selects on.
 
 ### <a id="M5-05"></a>M5-05 — a new rule declares its own metadata (`reviewer`)
 
