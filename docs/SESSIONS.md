@@ -5,6 +5,102 @@
 
 ---
 
+## session/cycle-20260901-0012 (v7.0.354, 2026-09-01, runner cycle `d3d7c6f6-15da-4871-9d82-a22b57a33039`, `trigger = scheduled`)
+
+### The park lifted, and the first thing behind it was a broken instrument
+
+This fire opened onto an open `PARKED` row (`9b5f9e22`, 19:20Z) whose §3 contract is cheap: check
+only whether the named blockers changed. Two had. John, in an attended session at 23:11Z, closed
+`SES-244 — the briefing republish contract stops contradicting the bridge ruling` (`done`) and
+removed `SES-257`; at 00:08:50Z — four minutes before this fire — he recorded standing decision
+`35329da4`, *"why is the viewer holding up this project? Can we complete it later, after all
+milestones are done?"*, deferring the viewer channel past every milestone. Prime Directive §3 is
+unambiguous on that: a blocker addressed closes the park and the cycle proceeds to §2 normally. The
+park was closed `superseded` and selection ran.
+
+### Selection found the drain returning an answer that cannot be true
+
+`drain_epic_next()` first returned `pick = SES-47`, whose `blocked_by` still named `SES-244` — a
+ticket that had just gone `done`, so the blocker cleared and the drain began handing back a partial
+whose remainder John had meanwhile reassigned. Under his standing decision `b2252555` the
+briefing-headroom render lands on the `ADM-5` Super Admin page, not the artifact, so `blocked_by`
+was re-pointed to `ADM-5` (before-image first) — the column the runbook names for exactly this, and
+never `design_status`, which would put an ask on his §10 he cannot act on.
+
+Re-running the same call then returned something worse: **`pick = SES-244`, a ticket whose status is
+`done`.**
+
+### Root cause, read from `pg_get_functiondef` rather than inferred
+
+The pick predicate carried **no status clause**. It excluded finished members only through
+`b.queue IS NOT NULL`, on the strength of its own comment — *"'done'/'removed' need no clause (the
+recompute strips their queue)"*. That is an invariant maintained by **other writers**: whoever sets
+a ticket `done` must also run `recompute_backlog_queue()`. The attended session had not, so the row
+kept **queue 265** and became pickable. The retirement predicate in the same function has always
+carried the clause explicitly — the two halves already disagreed about whether it may be assumed.
+
+**The damage is the outcome word, not a wrong build, and reading it the other way is how this gets
+under-fixed.** Step 5's atomic claim carries `AND status <> 'done'`, so no duplicate build is
+reachable. What is reachable is the chain: Gate B fails only on a non-`pick` verdict and Gate C
+reads a `design_status` that is `NULL` on a finished row, so **both gates pass** and a continuation
+opens on a drain with nothing claimable — the `SES-197` / `SES-218` inversion one level down.
+
+### What shipped
+
+`SES-275` was filed (id claimed atomically, `S`, `gate_count` 0, no epic so it can never hold a
+drain open) and built the same cycle as a **step-5 blocker preemption** — the same shape as
+`e89251a2` (`v7.0.342`) and `fefa6728` (`SES-273`, `v7.0.353`) earlier the same day. The deviation
+is named rather than buried: a new ticket is not a Selfbuild-epic member, so Prime Directive §2(c)
+does not literally authorise it; it is claimed as a preemption of the instrument §2(b) requires.
+
+Migration `ses275_drain_pick_status_clause` puts `b.status <> ALL (c_finished)` into the pick
+predicate **and** the `blocked_detail` census base, from one constant rather than two hand-copied
+literals (`SES-196` requires that census to read "exactly the base the pick predicate reads"). Down
+captured **before** the apply: `auto-downable`, 1 object, 0 refusals — unlike the three ships before
+it, this one is auto-rollbackable.
+
+The data repair ran too and is not a substitute for the clause: `recompute_backlog_queue()` moved
+**336 rows**, stripping `SES-244`'s and `SES-257`'s queue, after which the same call returned
+`blocked` correctly. That repairs the board it found; it does nothing about the next writer of
+`done` who skips the recompute. `SES-260` and `DAT-25`, which wait on John by their own descriptions
+and already carried unresolved skip rows, were flagged `needs-john` from that same text (`SES-114`
+precedent, before-image first) so no later cycle re-derives it.
+
+### QA was a difference, not a property both forms share
+
+Four live arms on real Supabase inside a deliberately failing `DO` block, one variable each, all
+rolled back. With `SES-244` put back to `done`-carrying-queue-265: the shipped form returns
+`blocked` naming `SES-47 (blocked by ADM-5)`; the **retired** form — the same query with only this
+clause removed — returns **`pick = SES-244`**. An unblocked live member is still picked (both
+directions, `SES-101`); exactly 1 overload remains. Tree re-read after: `SES-244` queue `NULL`,
+`SES-47` `blocked_by` `ADM-5`, zero fixture residue. Build green, regression **136/136** (33 parts
+declared not-run across 26 tests, this ticket's function body among them — it lives in the
+database). Verifier **APPROVE**, all three gates green; `auto_done_eligible` **no** (no epic, and an
+unknown epic fails closed), so the ticket ships `delivered` and the recompute moved 0 rows — a
+delivered ticket keeps its slot, exactly as `SES-154` intends. The guard's file-level negative
+control: 7/7 clauses fail against `origin/dev`'s runbook, 0/7 against the shipped one.
+
+### Stamp discipline
+
+Held at 5 per session-hygiene check 7: `v7.0.338` moved **verbatim** to this file's retired-stamps
+appendix, `SES-164` step 2 run **first by grep** rather than recollection and delegated to a Sonnet 5
+subagent (register B21 — the first cycle to exercise that delegation on a doc sweep). Two of its
+seven editor warnings survive in the runbook body; **four appeared zero times and were relocated
+into step 8d's bullet** rather than archived (repair-before-constraint ordering; `VALID` not
+`NOT VALID` and why an un-updatable row lands on a card John has just tapped; the 22-hit grep
+showing the null is not data loss; the `refused` down that makes that range card-only); the seventh
+has an executable home in `tests/regression/SES-254-epic-id-contract.js`. Body below the header
+proven byte-identical either side of the trim, `sha256 74597d38…b02b7b`.
+
+### Declared remainder
+
+`docs/SESSIONS.md` stands at ~1.62 MB, past check 8's ~1.5 MB rotation threshold. Pre-existing and
+not caused by this ship; rotation is the `SES-172` shape and its own ticket. Named here rather than
+left for the next cycle to rediscover.
+
+---
+
+
 ## session/cycle-20260831-1841 (v7.0.349, 2026-08-31, runner cycle `270f26c8-e9b3-44c2-b533-722423f0889d`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 PM America/Chicago) — model Opus 5 orchestrator throughout; **no subagent was delegated to**, and the reason is reported rather than resolved, exactly as `v7.0.345`'s entry reports it: register B21 routes kickoff design to Fable 5 for **P1–P5** work and this is `P10 - Tooling`, so none was owed there — but B21 also routes **root-cause diagnosis** to Fable 5, and this cycle root-caused a live red suite itself, because the harness this session runs under carries a standing instruction not to invoke the Agent tool unless the user requests it. That conflict with B21 is now on its second consecutive cycle and is stated here, not decided here) — `HAR-34` — **a spend-gate IP block finally reaches John, and a guard that had gone red on an unedited tree is repaired.**
 
 ### The ticket's own blocker had already been retired — by John, nine days after he wrote it
@@ -11984,6 +12080,24 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+<!-- DeepBench v7.0.338 | runbooks/runner-cycle.md | SES-254 — runner_items.epic_id's CONTRACT BECOMES A CONSTRAINT, and the thing to read twice is WHY THE SECOND CLAUSE IS THE ONE THAT DOES THE WORK. ses179_runner_items_epic_id added the column as a plain nullable uuid with NO CHECK; its contract — set on gate-review cards AND NOTHING ELSE — lived only in a migration comment and in step 8d's prose here. Step 8d finds an owed milestone review with NOT EXISTS (... ri.epic_id = e.id), so ONE non-review card carrying epic_id makes that epic read as ALREADY REVIEWED, permanently, with no recovery path. MEASURED LIVE at 02:4xZ 2026-08-31 before a line changed, not quoted from the ticket: 8 rows carried epic_id, 4 legitimate review cards and 4 VIOLATORS — SES-45 and SES-210 (gated) and SES-211 and SES-182 (ship), all four on M3, which is what hid M3's own gate review until a human found it by hand. THE DISCRIMINATOR WAS TESTED AGAINST THAT LIVE DATA RATHER THAN CHOSEN: kind='gated_before_build' AND backlog_id IS NULL separates the two populations with zero exceptions. THE HALF A REBUILD DROPS is the backlog_id clause: a kind-only constraint looks equivalent and ACCEPTS the SES-45 / SES-210 shape — a gated card for an ordinary ticket — which is half the live violator population; the guard runs that retired form on the SAME fixtures and asserts it LOSES, a DIFFERENCE rather than a property both share. THE EDIT THIS SHIP FORBIDS, and the ticket itself offers it as the alternative: ALSO narrowing step 8d's sweep predicate to the same discriminator. With the CHECK in force ri.epic_id = e.id can only match a review card BY CONSTRUCTION, so a second copy in prose is one fact with two homes that can drift — the SES-116 / SES-113 / SES-86-phase-3 defect one level up, and the prose copy is the one no test can execute; theSweepPredicateKeepsNoSecondCopy() pins it. ORDER IS LOAD-BEARING: the four violators are repaired (epic_id NULL, one before-image each, §19v) BEFORE the constraint, because added first it rejects them and the migration fails. VALID, NOT 'NOT VALID' — the SES-116 lesson: a NOT VALID CHECK is still enforced on UPDATE, so leaving the violators behind one makes them UN-UPDATABLE, and the decision harvest UPDATEs runner_items to record John's taps — SES-182's row is an UNDECIDED ship card on his page right now, so that failure would land on a card he had just tapped. NULLING THE FOUR IS NOT DATA LOSS, surveyed rather than assumed: grep over scripts/ src/ api/ lib/ tests/ returns 22 epic_id hits and NOT ONE reads runner_items.epic_id — the briefing's §15 burn-down and §8 matrix both read backlog_items.epic_id, a different column on a different table — and each row's full prior state is in runner_before_images, so a Reverse restores it byte-for-byte. THE INVERSE FAILURE IS DELIBERATELY UNTOUCHED: gate-review.md's prohibition (a review card filed WITHOUT epic_id repeats that review forever) is about a MISSING value, and this CHECK admits epic_id IS NULL on every row precisely so that filing rule stays that file's to enforce — it answers who MAY carry one, never who MUST. QA WAS SIX LIVE ARMS against real Supabase inside a deliberately failing DO block, one variable each, all rolled back: the 4 review cards still valid; a ship card refused; a gated card WITH a ticket refused (the arm the kind-only form would pass); a real review card still ACCEPTED (both directions, SES-101); an ordinary card unaffected; and the retired form asserted to accept what the shipped one refuses. Tree re-read after: 0 fixture rows, 4 rows with epic_id, 0 violators, 4 before-images. Grants asserted BOTH directions (anon INSERT false, service_role true). DOWN CAPTURE CAME BACK 'refused' AND THAT IS A RESULT, NOT A GAP: this is an in-place ALTER of an existing table, which capture_migration_down() refuses by design, so a red range containing it is CARD-ONLY and the ship is not auto-rollbackable — stated here rather than left for a later cycle to discover. Stamp count held at 5 per session-hygiene check 7: v7.0.332 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — five of its six warnings survive in this body, and the sixth (a new 'incident' kind would render on no surface John reads) appears ZERO times here but lives verbatim in scripts/rollback-on-red.js lines 363-368 beside the code it protects, an executable home stronger than a relocated sentence, so it is archived rather than re-prosed — the same judgment SES-218 made. Guarded by tests/regression/SES-254-epic-id-contract.js. Doc + test + migration; no src/api/lib change, no site change. -->
+
+**Retired by `SES-275`'s cycle (`v7.0.354`, 2026-09-01) to hold the stamp count at 5 — every
+editor warning checked by grep against the live body FIRST, not by recollection (the check ran as
+a Sonnet 5 subagent under register B21; its findings are reproduced here rather than summarised).**
+Two of `v7.0.338`'s seven warnings already survive in `runner-cycle.md`'s own body and are archived
+unchanged: the `kind = 'gated_before_build'` + NULL `backlog_id` discriminator, and the prohibition
+on copying that discriminator into step 8d's sweep predicate — both in the step-8d bullet, which
+also names the pinning test. **Four appeared ZERO times in that body and were RELOCATED into it
+rather than archived** (step 8d's bullet, next to the migration they protect): repair-before-
+constraint ordering; `VALID` rather than `NOT VALID`, and why an un-updatable row lands on a card
+John has just tapped; the 22-hit grep showing that nulling the four rows is not data loss; and the
+`refused` down capture that makes `ses254_epic_id_review_only`'s range card-only. The seventh — the
+inverse failure, that the CHECK answers who **may** carry `epic_id` and never who **must** — is
+archived rather than re-prosed because it has a durable home beside the code, verbatim in
+`tests/regression/SES-254-epic-id-contract.js` lines 32–35; this file's own precedent (`v7.0.332`,
+`v7.0.333`) treats an executable home as stronger than a relocated sentence.
 
 <!-- DeepBench v7.0.337 | runbooks/runner-cycle.md | M4 SUCCESSION (cycle b0a3dde5, directive 4583bdc1) — THE STANDING PROHIBITION STOPPED FORBIDDING THE ONE DRAIN JOHN PRE-AUTHORISED, AND THE THING TO READ TWICE IS WHY THIS IS A RECONCILIATION RATHER THAN A WIDENING. §19v's prohibition list read "never create a drain row (only John does that)" from before directive 0970abad existed (2026-08-29, John's word verbatim "run both") and was never reconciled with it, so a cycle reading only that line would refuse the STANDING DRAIN SUCCESSION John wrote precisely to remove the dead time between a gate review ending and him separately typing "declare the drain". Prime Directive a0ef9525 §6 restates it; a0ef9525 §5 ("every never-rule in runner-cycle.md stands exactly as written") is the general clause and §6 the specific carve-out in the SAME directive, so specific governs. VERIFIED BEFORE ACTING, not recalled: ARCHITECTURE.md §19v is SILENT on who may create a drain (grep returns two hits, both about chain continuation), so this was a runbook-versus-directive gap and NOT a §19v conflict — which is what licenses fixing the text here instead of carrying it as a standing disagreement briefing item. THE EDIT THIS FORBIDS, and it is the tempting one because the carve-out reads like permission: treating "a review named successors" as enough. It is not — the review must be ACCEPTED, because gate-review.md's prohibition 1 puts the filing power in John's Accept ("a review PROPOSES successor members and John's Accept FILES them"), and a drain declared off an undecided review card would turn a check ON the runner into a widening OF it, which is that file's whole subject. Card 6c4d3453 carried decision='accept' at 2026-08-31T01:27:44Z, John's word verbatim "Acceept", before a single row was written. THE SECOND FORBIDDEN EDIT is re-deriving the drain's COMPOSITION by judgment: settled by PRECEDENT rather than reasoned about — M3's drain 6810599f named the epic's then-open members PLUS the tickets filed straight after the preceding gate review (19+4, measured live from runner_drain_scope joined to backlog_items.created_at, not quoted), so M4 is the same shape (4+4). Already-done members (SES-192, SES-193) are deliberately NOT named: naming a closed ticket only moves the retirement predicate's finish line. WHAT THIS CYCLE DID UNDER THAT CARVE-OUT: un-parked (Prime Directive §3 — the park's named blocker was addressed), filed the review's three new members SES-254/255/256, adopted SES-244 into M4 (epic moved, before-image first), declared drain 4583bdc1 over 8 named members, and recorded proposed member 5 (re-measure DAT-21 at the SES-183 gate, where the two lenses split) in the directive body rather than as a ticket, because it is an instruction about an existing member and not work of its own. ALL THREE NEW TICKETS' EVIDENCE WAS RE-VERIFIED THIS CYCLE RATHER THAN COPIED OFF THE CARD (docs/harvests/M4-succession-2026-08-31.md): 8 runner_items rows carry epic_id and 4 violate the contract, measured live; no CHECK, no script and NO regression test enforces it across all 129 test files; the GitHub Actions listing returned 71,371 chars at per_page=1 and landed in the permission-gated tool-results path, which is this cycle's OWN measurement of SES-255 and the second consecutive cycle to hit it with no ticket ever filed; all five SES-182 guards run on fixtures or rolled-back transactions, so the charter's auto-rollback drill is genuinely unexecuted. TWO ROUTES ARE CARDED-NOT-ASSUMED IN THE TICKETS THEMSELVES, which is where the fail-closed direction lives: SES-255's narrowly-scoped GitHub credential provisions a secret and is John's call, and SES-256's seed-a-real-red drill is an outward-facing act covered by NO standing authorisation (directive 1c9609de pre-authorises drill DUMPS only, explicitly not this). Doc-only; no src/api/lib change, no site change, no schema change, no migration. Stamp count held at 5: v7.0.315 (SES-134) moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — all three of its load-bearing warnings survive in the body (the modulo-not-threshold promotion test, apply_ladder_decision as the one home, ladder_applied_at's structural idempotence), so it is archived rather than re-prosed. -->
 
