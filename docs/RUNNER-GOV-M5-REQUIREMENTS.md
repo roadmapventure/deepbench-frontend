@@ -236,6 +236,73 @@ full scheduler cadence rather than one quiet afternoon.
 
 ---
 
+## Amendment note — `SES-281`, 2026-09-01 (`v7.0.363`)
+
+<!-- FEATURE: SES-281 — Phase 2. The `script` rules stop being recorded and start executing. No
+     rule STATEMENT changes here, so the byte-for-byte registry↔doc equality that
+     tests/regression/ses-280-m5-governance-rules.test.mjs pins is untouched; only this note is
+     added. -->
+
+**Four rules moved from recorded to executing.** The Phase-split section above says plainly that *"a
+rule marked `script` below is not yet enforced by any script."* For `M5-01`, `M5-02`, `M5-07` and
+`M5-09` that sentence is now **out of date**: migration `ses281_m5_pick_enforcement` wired all four
+into `public.drain_epic_next(uuid)` **and** `public.prime_directive_queue()`, which are the two
+functions the chain gate and the briefing page read. `M5-06` and `M5-15` remain recorded-only; they
+answer *should a session run at all*, which is a pre-boot question and belongs to `SES-297`.
+
+What each one is, in the pick path:
+
+- **`M5-01` — the scope fence is structural.** The pick joins `public.epics` and requires
+  `name ILIKE 'Selfbuild%'`. Before this, drain eligibility was a name in `runner_drain_scope`, and
+  a mis-scoped directive could hand non-Selfbuild work to an unattended cycle. Eligibility is now a
+  property of the ticket's own `epic_id`, which naming cannot widen.
+- **`M5-02` — the filing lane replaces bare queue order.** `drain_epic_next` ordered by
+  `b.queue` and nothing else. It now orders by **filing lane first** (`filed_at < 2026-08-21` is the
+  priority lane; on or after it is the review bucket), then `queue`, then `M5-07`. **`filed_at`,
+  never `created_at`** — `created_at` is the board-migration bulk-load stamp and misdates most of the
+  board by up to 68 days (`SES-295`). A NULL `filed_at` falls to the review bucket; zero rows carry
+  one today. This is the clause that retires **B3**, whose ordering ended *"newest-to-oldest within
+  class"* — the exact inverse of the lane John set.
+- **`M5-07` — cheapest-first tiebreak.** `predicted_cycles` ascending, **nulls last**, as the last
+  ordering term. It changes only ties: never a lane, never a class.
+- **`M5-09` — the rolling wave, enforced.** A member is unpickable while its milestone's own design
+  gate is unresolved (`status <> 'done'`). **A gate ticket never blocks itself** (`g.id <> b.id`) —
+  without that exclusion the milestone deadlocks permanently behind the one ticket that could open
+  it.
+
+**Named deviation from the `SES-281` kickoff doc, measured rather than assumed.** The kickoff
+identified a gate as the epic member with `scope_origin = 'original'` **and** a title matching
+`'M% design gate%'`. Live, only `SES-183` (M4) and `SES-184` (M5) carry `scope_origin = 'original'`;
+`SES-185` (M6) and `SES-186` (M7) carry `'pre-existing'`. Requiring `'original'` would have silently
+disabled `M5-09` for M6 and M7 — every milestone that has not started, which is the only place the
+rolling wave still has work to do. The shipped predicate is the **title pattern alone**, written
+`'M_ design gate%'` (`_` is LIKE's single-character wildcard), which matches exactly the four real
+gates and no ordinary member.
+
+**What `c_flagged` now holds: `ARRAY['needs-desktop']`, and nothing else.** It is declared identically
+in `drain_epic_next` and `drain_chain_gate`, and spelled inline in `prime_directive_queue`'s
+`buildable` CTE. Two entries left:
+
+- `'needs-john'` was retired outright by `M6-01` (`SES-285`, `v7.0.359`); no ticket can be in it.
+- `'john-paced'` was **the human gate that migration missed** — it matched on the string
+  `'needs-john'` rather than on the concept. Seven open tickets still carried it, four of them in
+  Selfbuild epics. "Paced by John" is exactly the blocking-on-a-human-decision `M6-01` forbids, so
+  this migration recorded a `runner_before_images` row per ticket
+  (`session_name = 'design-drain-enforcement-0901'`) and converted all seven to `'needs-decision'`.
+
+`'needs-desktop'` **stays blocking, and that is deliberate**: it records a physical constraint (work
+needing a machine John has), never a judgment call. Three open tickets carry it and were not touched.
+
+**Measured on the live board immediately after the migration** — the evidence, not the intent:
+`drain_epic_next` returns `SES-184`, M5's own gate, and `prime_directive_queue`'s drain lane returns
+the same ticket, so the two agree. Every other M5 member, and every M6 and M7 member, is now held
+behind its unresolved gate; `M1`/`M2`/`M3` have no gate ticket and are unaffected. In the selfbuild
+lane, `SES-43` (queue 251, filed pre-cut) now sorts **ahead of** `SES-288` (queue 4, filed post-cut)
+— a live lane inversion that bare queue order could not produce, and the one
+`tests/regression/ses-281-m5-pick-enforcement.test.mjs` grades over PostgREST.
+
+---
+
 ## Related registers and files
 
 | Where | What it holds |
