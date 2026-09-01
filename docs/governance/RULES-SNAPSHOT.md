@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 108 · **By status:** 91 live · 7 retired · 10 superseded · **Payload sha256:** `3210f3efe71ae776a83c9e3c5a75e8faad0f044cdff6664dbe56de9593e0579f`
+**Rules:** 108 · **By status:** 91 live · 7 retired · 10 superseded · **Payload sha256:** `18505d522195d26a1e5036637d64559ce72d665b6e110a9d9f319a0e297241ba`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -71,7 +71,7 @@ exactly one space per side, and a reader removes one character per side rather t
 | M5-01 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-01 |  | A ticket is eligible for unattended development only if its `epic_id` resolves to a `Selfbuild M0`–`M7` epic; unlinked or non-Selfbuild tickets are never picked by a cycle. |
 | M5-02 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-02 |  | Order the pickable board by filing lane first: tickets with `filed_at` before 2026-08-21 take the priority lane, tickets filed on or after it enter a review bucket that requires explicit promotion before pick; within a lane, order by tier then priority class P1→P10. Supersedes B3. |
 | M5-03 | live | prose | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-03 |  | The per-ticket governance matrix mandated by FILE-MATRIX additionally carries `epic_id` and `filed_at`, because M5-01 and M5-02 select on them; FILE-MATRIX's fail-LOUD tripwire covers the added fields. |
-| M5-04 | live | prose | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-04 |  | Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `priority_class`, `filed_at` as the created date, `status`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags. |
+| M5-04 | live | prose | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-04 |  | Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `priority_class`, `filed_at` as the created date, `status`, `scope_rationale`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags. |
 | M5-05 | live | reviewer | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-05 |  | Every new governance rule declares `canonical_doc`, `enforcement` and `status`, sets `superseded_by` on any rule it replaces, and is checked against the live rule set for duplication before it ships. |
 | M5-06 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-06 |  | Never start a ticket whose predicted cost exceeds the remaining weekly usage headroom; B32's daily ceiling does not bound the weekly wall. |
 | M5-07 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-07 |  | Within the same lane and priority class, break queue ties by lowest `predicted_cycles` first. |

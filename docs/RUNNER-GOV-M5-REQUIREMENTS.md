@@ -82,7 +82,7 @@ existing fail-LOUD behaviour rather than getting a second, quieter one.
 
 ### <a id="M5-04"></a>M5-04 — answer from the matrix, never by re-deriving (`prose`)
 
-> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `priority_class`, `filed_at` as the created date, `status`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags.
+> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `priority_class`, `filed_at` as the created date, `status`, `scope_rationale`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags.
 
 Re-deriving per question is how two answers to the same question disagree. It is also what the
 accounting review had to do — and the re-derivation is where the missing `item_id` rows silently
@@ -95,6 +95,10 @@ out of earlier answers. **`filed_at` is the created date, never `created_at`** �
 when a row was bulk-loaded into Supabase during the board migration, so ordering or reporting by it
 misdates most of the board; `filed_at` is mined from git history (`B10`) and is also what `M5-02`'s
 priority lane selects on.
+
+**Extended 2026-09-01 (`SES-295`, v7.0.361), John verbatim: _"add that column from here on out to the matrix as well"_** — `scope_rationale` joins the mandated list. It records *why* a ticket belongs in its epic's chartered scope (which charter goal it advances), as distinct from `scope_origin`, which records only *where the ticket came from*. Measured when the column was added: 11 of the 13 open post-2026-08-21 `Selfbuild M5` tickets carried no scope reasoning at all, so `M5-02`'s review bucket had no criterion to review against.
+
+**Bug found and fixed in the same change — `ticket_matrix` was serving the wrong date.** The view read `b.created_at AS filed_at`, so every answer that sourced the filing date from the matrix was actually reporting the board-migration bulk-load timestamp under the name `filed_at`. Worst live case: `AA-01` reported 2026-08-20 for a ticket genuinely filed 2026-06-13, a 68-day error. Impact was contained — across the 32 open Selfbuild tickets 5 dates differed and **zero** changed lane under `M5-02` — but `SES-281` was about to wire the pick path to that column, which would have made the mislabel decision-bearing. The view now selects `b.filed_at`.
 
 ### <a id="M5-05"></a>M5-05 — a new rule declares its own metadata (`reviewer`)
 
