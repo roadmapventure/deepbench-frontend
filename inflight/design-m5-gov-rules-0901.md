@@ -1,1 +1,0 @@
-design-m5-gov-rules-0901 — design session encoding the M5 prioritization + auto-close governance rule set (Selfbuild scope fence, pre-8/21 filing lanes, stuck-ticket cap, outcome-confirmed closing, enhancement lane) into public.governance_rules, superseding B3's newest-first ordering. John-approved conversationally 2026-09-01; model Claude Opus 5.
