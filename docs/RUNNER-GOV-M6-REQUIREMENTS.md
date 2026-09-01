@@ -147,6 +147,69 @@ It is the one gate John's instruction did not reach, and the test for this ticke
 
 ---
 
+## Execution economics — added 2026-09-01 (`SES-296`, v7.0.362)
+
+John, after reading the cost measurement: *"i think the drain and routines cost a lot of extra tokens
+that was unecessary... stay close as possible to its predicted 32M tokens without interuption"*, then
+*"make this a permenant governance we use from here on out, removing past conflicting governance."*
+
+**The measurement these five rules answer to**, taken over the weekly window beginning 2026-08-28:
+
+| Cycle type | Ships a ticket for |
+|---|---|
+| Chained (stays in session) | **809,364 tokens** |
+| Scheduled (cold boot) | **2,277,193 tokens** — 2.8× |
+
+The gap is startup tax — roughly **1.47M tokens per boot** re-reading `CLAUDE.md`, `CLAUDE-STATE.md`,
+the standing brief and the runbook before any work begins. Separately, **53 scheduled cycles booted
+cold, found nothing to do, and closed: 32.4M tokens shipping nothing** — more than the entire 31.9M
+predicted cost of finishing M5. Days with chaining shipped 15–30 tickets; the two days without it
+shipped 4 and 5 while burning 7–10M on parked boots.
+
+### <a id="M6-09"></a>M6-09 — a fire with nothing to do costs no session (`script`)
+
+> Never boot a session to discover there is nothing to do: every scheduled fire is gated by a pre-boot pickability query, and a fire with nothing pickable closes without spawning a session.
+
+The single largest recoverable waste in the system. Implementation is `SES-297`.
+
+### <a id="M6-10"></a>M6-10 — the chain is the unit of work (`script`)
+
+> The chain is the unit of work: one boot drains tickets in-session until the epic empties, the budget wall hits, or the re-anchor bound is reached. A cold boot per ticket is never the default.
+
+### <a id="M6-11"></a>M6-11 — a filtered skip is not a failure (`script`)
+
+> A ticket skipped because a rule filtered it — blocked, out-of-lane, or gate-held — is not a no-ship, and never counts toward a chain's no-ship streak or a ticket's stuck count.
+
+Without this, `M5-08` and `M5-09` doing their job would kill chains and force the expensive cold boot
+they exist to avoid. `runner_settings.chain_max_noship_streak` raised 2 → 4 in the same change.
+
+### <a id="M6-12"></a>M6-12 — a chain re-anchors, it does not drift (`script`)
+
+> A chain re-anchors from the durable record — the board and the charter — every sixth ticket, paying one boot deliberately rather than trusting carried context for correctness.
+
+The charter's own warning: a session "never relies on context compression for correctness." Chaining
+is cheap *because* it reuses context, so the bound is the price of the saving, not an afterthought.
+
+### <a id="M6-13"></a>M6-13 — scope caps bind the cycle, not the chain (`prose`)
+
+> The one-feature, three-file, four-task scope caps bind an individual cycle, never the chained session that contains several.
+
+### Conflicting governance withdrawn in the same change
+
+| Rule | Was | Now |
+|---|---|---|
+| `CAP-SESSION-SPLIT-SIGNS` | split once a session "runs past 20 minutes" | wall-clock is no longer a split trigger — a chained drain runs long by design; file/task caps and compaction still are |
+| `B22` | one session named for its one ticket | a chained session is named for its drain and renamed at each pick |
+
+`B24`'s "exactly one build per cycle" would have conflicted too; it was already superseded by `M6-06`
+in `SES-285`. `B42` (parallel cycles, no mutex) and `B32` (daily ceiling) are unaffected — chains and
+parallelism coexist, and the ceiling still binds.
+
+**Projected effect on M5** (24 remaining cycles): all-scheduled **54.7M** (71% over prediction);
+all-chained **19.4M**; realistic three-boot mix **~23.8M**, about 25% under the 31.9M prediction.
+
+---
+
 ## Related registers and files
 
 | Where | What it holds |

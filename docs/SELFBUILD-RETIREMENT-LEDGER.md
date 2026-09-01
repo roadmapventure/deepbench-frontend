@@ -596,3 +596,19 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
 | "masthead … carries a one-tap '▶ Run a cycle now' link" | briefing-page.md, regeneration step 1 | Superseded by SES-143 (v7.0.182): the link lives on §2b; John's explicit do-not-reinstate for the masthead copy | Rewritten in place as a §2b pointer (SES-102 provenance kept) + git |
 | "Always three rows … **No** deletes it and records it in vision/rejected-paths.md" | briefing-page.md, §12 SHAPE (SES-125 paragraph) | Superseded by SES-157 (v7.0.206): rejection = kept `status='rejected'` row; rejected-paths.md is a retired stub; drip contract's 1–3 rows is current | Rewritten in place to the SES-157 tap table + git |
 | "fires exactly one successor run" / "A wall-stopped cycle fires nothing" | briefing-page.md, regeneration step 6 | Superseded by SES-140 FINAL (v7.0.195): in-session continuation cycles; session-spawning platform-refused | Rewritten in place ("continues nothing"; runner-cycle.md tail step (8) deferral kept) + git |
+
+### 34. `CAP-SESSION-SPLIT-SIGNS` — the 20-minute split trigger (amended)
+<!-- FEATURE: SES-296 — the wall-clock half of this rule is withdrawn in the same commit that lands
+     M6-10, per the SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old
+     split trigger nor the chain rule is in force. -->
+- **Said:** split a session once its kickoff doc exceeds 4 tasks or 3 files, **it runs past 20 minutes**, or compacting starts.
+- **Withdrawn:** the 20-minute clause only. A chained drain (`M6-10`) runs long by design — measured, a chain ships a ticket for 809K tokens against 2.28M for a cold boot, so a wall-clock split forces the exact cost it should avoid.
+- **Survives:** the 4-task / 3-file caps and the compaction trigger, unchanged. `M6-13` states that those caps bind the individual cycle, not the chained session.
+- **Restore:** re-add the clause to the registry row and this file's entry; `git` history of `docs/governance/RULES-SNAPSHOT.md`.
+
+### 35. `B22` — one session, one ticket name (amended)
+<!-- FEATURE: SES-296 — amended alongside M6-10 in the same commit. -->
+- **Said:** rename each cycle's own session to `<TICKET-ID> — <short name>` the moment it picks its work.
+- **Withdrawn:** the implicit one-session-one-ticket assumption. A chained session covers several tickets and cannot carry one ticket's name.
+- **Survives:** the rename discipline itself — a chained session is named for its drain and renamed at each pick, so a reader can still tell what a session is doing at any moment.
+- **Restore:** registry row plus this entry; `git` history.

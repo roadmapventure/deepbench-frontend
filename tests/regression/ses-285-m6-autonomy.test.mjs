@@ -67,7 +67,8 @@ const SNAPSHOT = path.join(ROOT, "docs/governance/RULES-SNAPSHOT.md");
 const CANONICAL_REL = "docs/RUNNER-GOV-M6-REQUIREMENTS.md";
 const CANONICAL = path.join(ROOT, CANONICAL_REL);
 
-export const M6_IDS = Array.from({ length: 8 }, (_, i) => `M6-0${i + 1}`);
+// SES-296 (v7.0.362) added M6-09..M6-13 — the execution-economics rules. Two-digit safe.
+export const M6_IDS = Array.from({ length: 13 }, (_, i) => `M6-${String(i + 1).padStart(2, '0')}`);
 export const RETIRED_IDS = ["B13", "B16", "B23", "B28", "B29"];
 export const SUPERSEDED_BY = {
   B7: "M6-03", B12: "M6-04", B14: "M6-02", B17: "M6-05",
