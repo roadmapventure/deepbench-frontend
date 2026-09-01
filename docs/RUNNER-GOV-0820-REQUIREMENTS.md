@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.358 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-280 — FEATURE: SES-280. **B3 SUPERSEDED by `M5-02`**, dated note in place at its entry (original wording kept below it, per this file's convention) and its two downstream mentions (B4's shipped-function note, B10's `filed_at` rationale) marked so neither reads as live. The registry row now carries `status = 'superseded'`, `superseded_by = 'M5-02'`; the replacement's canonical home is the new `docs/RUNNER-GOV-M5-REQUIREMENTS.md`, and the ledger entry is `docs/SELFBUILD-RETIREMENT-LEDGER.md` #20. Why B3 could not stay live: its "newest filed → oldest" tie-break is the direct inverse of the pre-2026-08-21 priority lane John set on 2026-09-01, and B3 is script-enforced — two contradictory sort keys in one pick path. Beta, its other tie-break, was already retired 2026-08-19. The tier-then-priority-class half survives verbatim in M5-02. NOT yet true, stated so it is not assumed: M5-02 ships with `enforcement = 'script'` RECORDED, not executed — Phase 2 wires the filing lane into `drain_epic_next()` / `recompute_backlog_queue()` and is a follow-up ticket, so the pick path still sorts the way B3 described until it lands. -->
 <!-- DeepBench v7.0.173 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-115 — register B1 formally REVISED in place under a dated note (its original wording kept above the note, per this file's convention that the superseded sentence stays visible). "History leaves the table" becomes "history lives in the table, filtered": rows are never deleted, public.backlog_active (migration ses115_backlog_active) is the one owning definition of active and carries a computed `mode` via public.backlog_mode(). The revision is not a softening of John's no-archive rule — his objection was to MAINTAINING archived tickets, and nothing about a kept row is maintained; what a closed ticket must shed is only its live-board state (queue number, pin, claim), which recompute_backlog_queue() and the step-7 release already clear. MEASURED, and it is why this could not stay prose: read literally, the old wording made check-session-docs check 3 flag every done row — 37 of that report's 49 findings, 76% noise, every one of them instructing the reader to "close it out of the table", which under the revised rule is the wrong action. Check 3 is retargeted to the residue only, so it now fires on a missed recompute and is silent on history. -->
 <!-- DeepBench v7.0.133 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-86 phase 3, directive f47e5a95 — B30 amended in place: John's automation queue stops being a selection layer a cycle EXECUTES BY HAND and becomes the board's leading sort key (backlog_items.automation_rank, migration ses86c_automation_lane). B30 predicted this ("post-SES-83 d/e the queue engine's pins express the same thing in data"); this is that, arriving early because the prose layer had already failed silently — measured 16:29Z, C4's tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told John the next cycle would be "building product, not tooling". He overruled it and force-ran the cycle. The self-retiring property B30 described is preserved mechanically (a done ticket leaves the ranked set). Two things named as NOT done so they are not assumed: B23 pins (when built, a pin sorts ABOVE automation_rank — John's live tap outranks a standing build order) and the parallel-cycles half of his line, which collides with the B31 lease and went to him as a gated card. -->
 <!-- DeepBench v7.0.122 | RUNNER-GOV-0820-REQUIREMENTS.md | directive 34865f07 — register B39 appended and B38 corrected in place under a dated banner (its wrong sentences kept; the mistake is the lesson). John's testimony — "Those sessions came back alive because I opened them and allowed permissions. That should not be happening." — names the mechanism four probes could not: the .claude/ gate is a harness permission prompt rendered ONLY in the human session UI, invisible and unanswerable to the agent, cleared by a person. B38's location was right, its clearing model wrong: the stall does not self-clear, so "a cost, not a prohibition — budget ~35 minutes" was a sample of the ATTENDED cases only. The partition is exact and was re-derived from live rows: John's taps stop 03:48Z, resume 12:50Z; every probe that cleared ran inside his waking window, all three that parked 8h+/never ran inside the nine-hour hole, and the two parked cycles resumed TOGETHER eighteen minutes after his first morning tap. New rule: an unattended cycle never enters the gate (no bounded recovery); the edit stays legitimate work needing a session he attends. SES-95 superseded as "the decisive probe" — unattended it parks rather than confirms. His onset attribution is contradicted by 21 hours and said so; his mechanism is right, and a real mediated link survives. Three residues kept labelled as inference, the steelman shipped alongside, and two questions left to John: relocate the inflight marker out of .claude/, and whether a pre-approval can be granted these cloud sessions at all. -->
@@ -70,10 +71,17 @@
   > history, which is not.
 - **B2. Both governance modes (Manual + Automated) switch to the DB** for backlog reads/writes.
   [SES-83 d/e — John's sign-off at switchover]
-- **B3. Ordering:** finish ALL of tier `now` before `next`, all `next` before `later`; within a
-  tier, class P1 - Improves John's Skills → P10 - Tooling; within a class, tie order
-  **beta-marked first → newest filed → oldest**. Beta tickets belong in `now` unless
-  deliberately parked (supersedes old beta-sorted-first-within-class line).
+- **B3. Ordering — SUPERSEDED 2026-09-01 by `M5-02` (`SES-280`, `v7.0.358`); the registry row is
+  `status = 'superseded'`, `superseded_by = 'M5-02'`, and the ledger entry is
+  `docs/SELFBUILD-RETIREMENT-LEDGER.md` #20.** The original wording is kept below, per this file's
+  convention that the superseded sentence stays visible. *Why:* B3's **newest-to-oldest within
+  class** is the direct inverse of the pre-2026-08-21 priority lane John set in `M5-02`, and both
+  could not be live; beta, its other tie-break, was itself retired 2026-08-19. The tier-then-class
+  half survives verbatim inside `M5-02`. **As originally shipped:** finish ALL of tier `now` before
+  `next`, all `next` before `later`; within a tier, class P1 - Improves John's Skills →
+  P10 - Tooling; within a class, tie order **beta-marked first → newest filed → oldest**. Beta
+  tickets belong in `now` unless deliberately parked (supersedes old
+  beta-sorted-first-within-class line).
 - **B4. Materialized `queue` field** — position visible, not recalculated per read. Recompute
   events: new ticket (classed), ticket picked, completed/removed, any sort-field edit. One
   idempotent full renumber. No queue number = not pickable (unclassed / P-GATED).
@@ -86,7 +94,9 @@
   new ticket produced `435 → 2 → 0`, because `backlog_id` has no unique constraint, `CHI-48`
   occupies two rows identical on all five sort keys, and `row_number()` is non-deterministic
   across ties. Fixed by appending the primary key as a sixth tie-break
-  (`ses86b_queue_deterministic_tiebreak`); the duplicate is filed as `SES-97`. B3's ordering is
+  (`ses86b_queue_deterministic_tiebreak`); the duplicate is filed as `SES-97`. B3's ordering — which
+  `M5-02` **superseded** 2026-09-01 (`SES-280`), so this describes the function as shipped in
+  `v7.0.130`, not the ordering the pick path is being moved to — is
   copied clause-for-clause with all five live
   traps preserved — verified by a negative control on the same rows, where a lexical
   implementation yields 17,616 class and 81,281 tier inversions against the shipped function's 0.
@@ -130,7 +140,8 @@
 - **B9. Filing rule:** every NEW backlog ticket is classed (named form) at filing; never
   enters the board undecided.
 - **B10. `filed_at` mined from git history** (no file records ticket birth; needed for B3's
-  newest/oldest).
+  newest/oldest — and still needed after `M5-02` **superseded** B3 on 2026-09-01, because the
+  filing lane selects on `filed_at` too).
 - **B11. Classification/meta work rides the directive queue** (bootstrap exception so
   P9 - Bug Fixes volume can't starve the passes that order the board).
 - **B12. Invention engine wiring:** one designated invention cycle per day — research

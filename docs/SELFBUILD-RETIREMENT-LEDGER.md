@@ -374,6 +374,46 @@ Restore path for any entry, unless stated otherwise: `git log --follow -- <path>
 - **Restore:** `git log --follow -- docs/runbooks/runner-cycle.md` (likewise
   `docs/runbooks/briefing-page.md`), then `git show <commit>:<path>` at or before `v7.0.347`.
 
+### 20. `public.governance_rules` B3 — backlog queue ordering (superseded)
+<!-- FEATURE: SES-280 — B3's retirement entry. Written in the same commit that inserts M5-02 and
+     flips B3 to `superseded`, per the SELFBUILD-CHARTER transition rule: no commit may exist in
+     which neither ordering is in force. -->
+- **Said:** *"Order the backlog queue by tier (now/next/later), then priority class P1→P10, then
+  beta-first, then newest-to-oldest within class."* (registry `statement`; the register entry it
+  renders is `docs/RUNNER-GOV-0820-REQUIREMENTS.md` **B3**, which words the same rule as *"within a
+  class, tie order beta-marked first → newest filed → oldest"*.)
+- **Lived:** `public.governance_rules` row `B3` (`source_group = 'runner-gov-register'`,
+  `enforcement = 'script'`), canonical home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B3`.
+- **Retired:** 2026-09-01, by `SES-280` (`v7.0.358`), kickoff
+  `docs/kickoffs/v7.0.358-SES-280-m5-governance-rules.md`.
+- **Superseded by:** `M5-02` — *"Order the pickable board by filing lane first: tickets with
+  `filed_at` before 2026-08-21 take the priority lane, tickets filed on or after it enter a review
+  bucket that requires explicit promotion before pick; within a lane, order by tier then priority
+  class P1→P10. Supersedes B3."*
+- **Why retired:** **newest-to-oldest ordering within class is the direct inverse of the
+  pre-2026-08-21 priority lane John set; both cannot be live.** B3 sorts the *newest* filing to the
+  front of a class; M5-02's filing lane sends everything filed before 2026-08-21 to the front of the
+  board and everything filed on or after it into a review bucket that needs explicit promotion. There
+  is no ordering that satisfies both, and B3 is script-enforced, so leaving it live would have left
+  two contradictory sort keys in the same pick path. Beta, B3's other tie-break, was itself retired
+  2026-08-19 — so that clause had already stopped meaning anything.
+- **Survives:** the tier-then-priority-class half of B3 is carried forward verbatim in M5-02's second
+  clause ("within a lane, order by tier then priority class P1→P10"); only the beta and
+  newest-to-oldest tie-breaks are gone. B3's row is **not deleted** — it stays in the registry with
+  `status = 'superseded'` and `superseded_by = 'M5-02'` (register B1's never-delete discipline applies
+  to rules as it does to tickets), and its register entry stays in place in
+  `docs/RUNNER-GOV-0820-REQUIREMENTS.md` under a dated supersession note in that file's usual style.
+- **Not yet true, said plainly:** M5-02 ships with `enforcement = 'script'` **recorded, not
+  executed**. Phase 2 (a follow-up ticket) wires the filing lane into `drain_epic_next()` and
+  `recompute_backlog_queue()`; until it lands, the pick path still sorts the way B3 described. The
+  rule is retired in the registry and in the docs, which is what the transition rule governs; the
+  code change is the second half and is tracked as its own ticket.
+- **Restore:** `git log --follow -- docs/governance/RULES-SNAPSHOT.md`, then
+  `git show <commit>:docs/governance/RULES-SNAPSHOT.md` at or before `v7.0.357` for the row as it
+  stood; the register prose is in the git history of `docs/RUNNER-GOV-0820-REQUIREMENTS.md`. To make
+  it live again: flip the row back to `status = 'live'`, clear `superseded_by`, retire `M5-02` in the
+  same commit, and re-export the snapshot.
+
 ## SES-171 — briefing-page.md header trim (2026-08-23, same session)
 
 Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery record. Summary entries:
