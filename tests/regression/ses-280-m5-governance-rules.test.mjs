@@ -100,10 +100,16 @@ export function parseSnapshot(text) {
 
 // The canonical doc states each rule once, as the blockquote directly under its anchored heading.
 // Returns { id -> statement } so the byte-for-byte comparison has something to compare against.
+// LINE ENDINGS ARE NORMALISED FIRST, and that is not tidying. This repo's working tree is CRLF
+// (git converts on checkout) while the file this session authored was LF on disk, so a pattern
+// written as `\n+` matched during authoring and matched NOTHING once the file had been committed
+// and checked back out -- `\n\r\n>` is not `\n\n>`. Measured live: 15 sections before the commit,
+// 0 after it, on byte-identical content. Normalise, then match.
 export function parseCanonicalDoc(text) {
   const out = new Map();
+  const lf = String(text).replace(/\r\n/g, "\n");
   const re = /^###\s+<a id="(M5-\d\d)"><\/a>[^\n]*\n+>\s(.+)$/gm;
-  for (const m of text.matchAll(re)) out.set(m[1], m[2].trim());
+  for (const m of lf.matchAll(re)) out.set(m[1], m[2].trim());
   return out;
 }
 
