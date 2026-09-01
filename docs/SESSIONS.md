@@ -5,6 +5,108 @@
 
 ---
 
+## session/cycle-20260901-0340 (v7.0.356, 2026-09-01, runner cycle `404ef8d1-fbab-4156-ae38-6e66cbebf468`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5 subagent delegated to for the root-cause verification**, per register B21 as amended by directive `87018d83`) — `SES-265` — **the standing brief's "rendered at every ship" claim becomes true, and the thing to read twice is that nothing was ever failing.**
+
+### The sentence did not go stale; it described a step that did not exist
+
+`docs/runbooks/standing-brief.md` has asserted since `v7.0.236` that its block is *"rendered from
+the tables by `scripts/render-standing-brief.js` at every ship."* A grep for `render-standing-brief`
+over the whole of `docs/runbooks/runner-cycle.md` returned **zero hits** — the close-out invoked
+`render-claude-state.js` and `export-backlog-snapshot.js` and never this renderer, on any step. So
+the file was not describing a lapsed habit. It was describing a step no cycle had ever run, which is
+`SES-263` review finding **F4**, in its CLOSE bucket.
+
+### What the seven days actually cost — measured at the fix, not argued
+
+The block every session reads at start was stamped `2026-08-24 23:32Z`, ~120 versions back, and
+three of its numbers were operationally wrong rather than merely old:
+
+| Fact | Advertised | Live |
+|---|---|---|
+| `needs-john` tickets (what John owes decisions on) | **9** | **32** |
+| Standing daily max | **40M** | **196M** |
+| Standing epic drain | **M2 — 3 of 10 open** | **M5 — 11 of 11 open** |
+| Open tickets / board rows | 581 / 670 | 596 / 759 |
+| Open-but-unnumbered | 0 | **3** |
+
+### Why it survived seven days — and why the usual remedy loses here
+
+This platform's standing answer to *a rule each cycle must remember is a rule that gets silently
+forgotten* (`record_skip`'s precedent, recorded eight times over) is to move the rule into code. It
+could not go into the gate, because **nothing grades this file.**
+`tests/regression/SES-177b-standing-brief-block.js` runs entirely on fixtures without credentials —
+its own header says *"Both run WITHOUT credentials on purpose"* — so unlike `CLAUDE-STATE.md`, whose
+committed copy `SES-177`'s credentialed half `--check`s **inside** the verifier (the whole of
+`SES-213`), a stale standing brief turns **no gate red**. There was no failing signal for any cycle
+to notice. The drift was silent by construction, so the invocation itself is the only fix.
+
+**The edit this ship forbids**, and it is the tempting one because it looks structural: adding a
+credentialed `--check` of the **committed** block to the regression suite. That rebuilds exactly the
+by-construction red `SES-213` spent a ship removing — the board moves under every cycle, so the
+committed block is stale the instant a peer files a ticket.
+
+### Placement is load-bearing, not tidy
+
+The invocation went into step 7's close-out **after** the ticket status write and its recompute,
+beside `export-backlog-snapshot.js` — **not** at step 7a beside `render-claude-state.js`. The two
+renderers look interchangeable and are not: `render-claude-state.js` sits at 7a *because* the
+verifier reads its output and it must precede the verdict; this one is read by no gate and its
+inputs are `backlog_items`, the table the close-out has just written. Rendered at 7a it would
+capture the board **before** this cycle's own `delivered` write and ship a census one cycle stale by
+construction — `SES-109`'s staleness defect, which is why the snapshot export already sits there.
+
+### The second home of the same false claim
+
+`scripts/render-claude-state.js` was **emitting** *"It is maintained by hand and is never
+regenerated"* into `CLAUDE-STATE.md` on every render, plus a second copy in its `CHARTER` string —
+telling every session the opposite of the truth for ~120 versions. Both now name the generated block
+and the hand prose separately, and the stale `WHAT IS STILL HAND-MAINTAINED` header note (which
+still called the extraction `SES-177`'s unattempted remainder, shipped at `v7.0.236`) is corrected
+with it.
+
+### The regression suite caught this cycle's own change, which is the guard earning its keep
+
+The first full run came back **134/136 with one `[FAIL]`: `SES-261-ledger-pin.js` — "the committed
+CLAUDE-STATE.md must be a byte-exact render of the cycles it pins."** That was **not** a
+pre-existing red and not a flake: editing the two emitted strings is precisely what makes the
+committed file no longer a byte-exact render under the new renderer. Step 7a's render resolved it —
+`SES-261` and `SES-177` both exit **0** afterwards — and the failure is recorded here rather than
+quietly re-run, because a guard that fires on the one change that should trip it is evidence the
+authenticity gate works.
+
+### QA — a difference, not a property both states share
+
+Against **real Supabase**, on the **real file**: `--check` on the committed brief exited **1
+(DRIFT)**; the render exited **0** (*"facts MOVED, stamp refreshed; judgment prose untouched"*);
+`--check` re-run exited **0**. Would it still pass if the change did nothing? No — the before arm
+fails and the after arm passes on the same command. The write's own guarantee was asserted rather
+than trusted: every changed hunk fell inside the markers at lines 46/85 with head and tail
+byte-identical. The runbook diff was asserted to exactly three hunks — stamp in, stamp out, one new
+bullet — body otherwise byte-identical.
+
+### Declared non-goal, named rather than left to be found
+
+The hand-maintained judgment prose beneath the block still says the scheduler runs *"3 hours —
+12/3/6/9"* against a live `interval_hours` of **1**. The renderer is structurally incapable of
+writing outside its markers, and the block's own line 49 already rules that where the two disagree
+**the block is right and the prose is stale — "say so rather than reconciling them by hand."**
+Repairing that sentence is a hand edit and a separate ticket, not a gap in this one.
+
+### Stamp rotation
+
+`runner-cycle.md` was at the 5-stamp cap, so `v7.0.339` (`SES-255`) moved **verbatim** to this
+file's appendix. `SES-164` step 2 was run **first, by grep rather than recollection**: three of its
+six warnings survive in the body (the third-verdict collapse, *a missing row is likewise not a red*,
+*`TRIGGER_SOURCES` is unchanged*); the other three had **zero** body hits but durable homes beside
+the code, verified in-file — the computed-`needs` coverage assertion is **executable** in
+`tests/regression/SES-255-ci-conclusion-reporting.js` (`needsOf()` and the assertion differencing
+`needs` against every other job in the shipped YAML), `NO SECRET IS PROVISIONED` lives in
+`.github/workflows/ci.yml`'s own `report-conclusion` `env:` block, and `schemaPlanFor()`'s
+empty-on-miss is documented at its definition in `scripts/rollback-on-red.js`. None was owed a
+relocation.
+
+Doc + script + runbook. No `src`/`api`/`lib` change, no site change, no schema change, no migration.
+
 ## session/cycle-20260901-0240 (v7.0.355, 2026-09-01, runner cycle `00b02a29-3e4e-4951-bcd3-fcadd7dded84`, `trigger = scheduled`) — the M5 succession
 
 ### The park lifted on its top blocker, and the thing behind it was a milestone waiting to be declared
@@ -12170,6 +12272,22 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+<!-- DeepBench v7.0.339 | runbooks/runner-cycle.md | SES-255 — THE GREEN ANCHOR'S READ STOPS BEING A GITHUB CALL, and the thing to read twice is THAT THIS CYCLE'S OWN FIRST DIAGNOSIS WAS WRONG AND IS RECORDED AS WRONG. Step 4a told every cycle to read CI's conclusion "through your own GitHub tooling"; MEASURED THREE TIMES, never quoted: the REST listing for one ci.yml run on dev at per_page=1 returned 71,371 chars (cycle b0a3dde5), then 71,575 (this cycle), each over the tool-result cap and overflowing into the ~/.claude/.../tool-results/ path REGISTER B39 FORBIDS AN UNATTENDED CYCLE TO SHELL-PROCESS. The orchestrator then measured raw HTTPS to api.github.com returning 403 "GitHub access is not enabled for this session" EVEN WITH the GITHUB_TOKEN this environment carries, and concluded there is NO network path at all — which would have made the ticket's own "bounded proxy = ordinary cycle work" route impossible and forced a gated card. THE FABLE 5 SUBAGENT RE-RAN THE MCP CALL AND GOT 71,575 CHARACTERS BACK: the connector path IS reachable, only raw HTTPS is proxy-blocked, and the ticket's original size-cap + B39 diagnosis was right all along. The false finding is written into the kickoff rather than quietly dropped — a wrong mechanism in the ledger is what a later cycle would have built on. WHAT ACTUALLY DECIDES THE DESIGN is that NO BOUNDED sha->conclusion READ EXISTS ON ANY SURFACE A CYCLE HAS: actions_list takes no head_sha and no minimal-output flag (one run object is ~70KB), the bounded actions_get/get_check_run need an id obtainable only from the oversized listing, the pull_request_* forms need a PR number and a dev push is not a PR, and a git-level read carries no check conclusions. A proxy the cycle HOSTS would still call api.github.com and need a credential — which SES-255's own decision boundary reserves to John. SO THE DIRECTION IS INVERTED: ci.yml's report-conclusion job reads needs.<job>.result and upserts public.ci_run_conclusions, and step 4a reads THAT. NO SECRET IS PROVISIONED — both keys are the repository secrets SES-180 (d) already exposes, which is what keeps this out of the John-only lane ci.yml's header names (adding secrets; branch protection). AUTHORITY WAS VERIFIED, NOT ASSUMED: docs/SESSIONS.md records cycle b9f90b84, trigger=scheduled, UNATTENDED, shipping this same file as P10 - Tooling in v7.0.286 — a strictly more consequential edit. THE ENGINE IS UNTOUCHED: rollback-on-red.js is not edited, TRIGGER_SOURCES is unchanged, the cycle still mediates --jobs, so John's accepted SES-182 design (the conclusion is PASSED IN) is preserved and only the read instruction moved. THE EDIT THIS SHIP FORBIDS, and it is tempting because isRunGreen() already refuses a cancelled as green: collapsing step 4a's THIRD verdict into the second. isRunGreen returning false is not the claim "this run was red" — cancel-in-progress cancels superseded runs routinely — and ARM F PROVED IT rather than arguing it: a cancelled handed in as ci-red lands on the RED branch. A missing row is likewise stale, never bad. THE GUARD'S LOAD-BEARING ASSERTION IS COMPUTED, NEVER LISTED: `needs` must cover every other job in the shipped YAML, differenced from it — a hardcoded [build,checks] passes forever on a file that grew a fourth job, whose failure the anchor would then silently forget. THREE DISCRIMINATING ARMS on the real file, tree restored byte-identical: a 4th job absent from needs -> exit 1 (missing: lint); the push guard dropped -> exit 1; restored -> exit 0. FILE-LEVEL NEGATIVE CONTROL: the same assertions run against origin/dev's ci.yml and MUST fail there; they do. LIVE SEAM PROOF through CI's exact curl: POST ok, second POST ok with 1 row (upsert not duplicate), anon key DENIED 42501 on both read and write WITH a same-key control returning 200 on three tables it may read (the first attempt used a FAKE key, returned 401 for the wrong reason, proved nothing, and was redone — SES-101's both-directions rule), the row read back driving the REAL engine to record-green, and failure/cancelled both refused. Tree re-read after: 0 fixture rows, 0 stray anchors. DISCLOSED RATHER THAN BURIED: the fixture INSERT's before-image (row_data NULL) was written AFTER the insert, not before it; §19v wants it first. DOWN CAPTURE CAME BACK auto-downable (drop table) — unlike the last three ships this one IS auto-rollbackable. Stamp count held at 5 per session-hygiene check 7: v7.0.333 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep — four of its six warnings survive in this body, and the two that do not have durable homes beside the code (schemaPlanFor's empty-on-miss at rollback-on-red.js:26,175; the 42702 shadowing defect at SESSIONS.md:408), so they are archived rather than re-prosed. Guarded by tests/regression/SES-255-ci-conclusion-reporting.js. Doc + workflow + test + migration; no src/api/lib change, no site change. -->
+
+**Retired by `SES-265`’s cycle (`v7.0.356`, 2026-09-01) to hold the stamp count at 5 — `SES-164`
+step 2 was run FIRST by grep rather than recollection, and ALL SIX of this stamp’s editor warnings have
+a surviving home, so none is owed a relocation. Three survive in `runner-cycle.md`’s own body: the
+third-verdict collapse (step 4a, `collapsing the third row into the second`), `a missing row is likewise
+not a red`, and `TRIGGER_SOURCES is unchanged`. The other three appeared ZERO times in the body and were
+archived rather than re-prosed because each has a DURABLE home beside the code, verified in-file at this
+ship: the computed-`needs` coverage assertion is EXECUTABLE in
+`tests/regression/SES-255-ci-conclusion-reporting.js` (`needsOf()`, and the computed coverage assertion
+that differences `needs` against every other job in the shipped YAML) — an executable home is stronger
+than a relocated sentence; `NO SECRET IS PROVISIONED` lives in `.github/workflows/ci.yml` itself, whose
+`report-conclusion` job carries the two repository secrets `SES-180 (d)` already exposes in its own
+`env:` block; and `schemaPlanFor()`’s empty-on-miss is documented at its definition in
+`scripts/rollback-on-red.js`.**
 
 <!-- DeepBench v7.0.338 | runbooks/runner-cycle.md | SES-254 — runner_items.epic_id's CONTRACT BECOMES A CONSTRAINT, and the thing to read twice is WHY THE SECOND CLAUSE IS THE ONE THAT DOES THE WORK. ses179_runner_items_epic_id added the column as a plain nullable uuid with NO CHECK; its contract — set on gate-review cards AND NOTHING ELSE — lived only in a migration comment and in step 8d's prose here. Step 8d finds an owed milestone review with NOT EXISTS (... ri.epic_id = e.id), so ONE non-review card carrying epic_id makes that epic read as ALREADY REVIEWED, permanently, with no recovery path. MEASURED LIVE at 02:4xZ 2026-08-31 before a line changed, not quoted from the ticket: 8 rows carried epic_id, 4 legitimate review cards and 4 VIOLATORS — SES-45 and SES-210 (gated) and SES-211 and SES-182 (ship), all four on M3, which is what hid M3's own gate review until a human found it by hand. THE DISCRIMINATOR WAS TESTED AGAINST THAT LIVE DATA RATHER THAN CHOSEN: kind='gated_before_build' AND backlog_id IS NULL separates the two populations with zero exceptions. THE HALF A REBUILD DROPS is the backlog_id clause: a kind-only constraint looks equivalent and ACCEPTS the SES-45 / SES-210 shape — a gated card for an ordinary ticket — which is half the live violator population; the guard runs that retired form on the SAME fixtures and asserts it LOSES, a DIFFERENCE rather than a property both share. THE EDIT THIS SHIP FORBIDS, and the ticket itself offers it as the alternative: ALSO narrowing step 8d's sweep predicate to the same discriminator. With the CHECK in force ri.epic_id = e.id can only match a review card BY CONSTRUCTION, so a second copy in prose is one fact with two homes that can drift — the SES-116 / SES-113 / SES-86-phase-3 defect one level up, and the prose copy is the one no test can execute; theSweepPredicateKeepsNoSecondCopy() pins it. ORDER IS LOAD-BEARING: the four violators are repaired (epic_id NULL, one before-image each, §19v) BEFORE the constraint, because added first it rejects them and the migration fails. VALID, NOT 'NOT VALID' — the SES-116 lesson: a NOT VALID CHECK is still enforced on UPDATE, so leaving the violators behind one makes them UN-UPDATABLE, and the decision harvest UPDATEs runner_items to record John's taps — SES-182's row is an UNDECIDED ship card on his page right now, so that failure would land on a card he had just tapped. NULLING THE FOUR IS NOT DATA LOSS, surveyed rather than assumed: grep over scripts/ src/ api/ lib/ tests/ returns 22 epic_id hits and NOT ONE reads runner_items.epic_id — the briefing's §15 burn-down and §8 matrix both read backlog_items.epic_id, a different column on a different table — and each row's full prior state is in runner_before_images, so a Reverse restores it byte-for-byte. THE INVERSE FAILURE IS DELIBERATELY UNTOUCHED: gate-review.md's prohibition (a review card filed WITHOUT epic_id repeats that review forever) is about a MISSING value, and this CHECK admits epic_id IS NULL on every row precisely so that filing rule stays that file's to enforce — it answers who MAY carry one, never who MUST. QA WAS SIX LIVE ARMS against real Supabase inside a deliberately failing DO block, one variable each, all rolled back: the 4 review cards still valid; a ship card refused; a gated card WITH a ticket refused (the arm the kind-only form would pass); a real review card still ACCEPTED (both directions, SES-101); an ordinary card unaffected; and the retired form asserted to accept what the shipped one refuses. Tree re-read after: 0 fixture rows, 4 rows with epic_id, 0 violators, 4 before-images. Grants asserted BOTH directions (anon INSERT false, service_role true). DOWN CAPTURE CAME BACK 'refused' AND THAT IS A RESULT, NOT A GAP: this is an in-place ALTER of an existing table, which capture_migration_down() refuses by design, so a red range containing it is CARD-ONLY and the ship is not auto-rollbackable — stated here rather than left for a later cycle to discover. Stamp count held at 5 per session-hygiene check 7: v7.0.332 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — five of its six warnings survive in this body, and the sixth (a new 'incident' kind would render on no surface John reads) appears ZERO times here but lives verbatim in scripts/rollback-on-red.js lines 363-368 beside the code it protects, an executable home stronger than a relocated sentence, so it is archived rather than re-prosed — the same judgment SES-218 made. Guarded by tests/regression/SES-254-epic-id-contract.js. Doc + test + migration; no src/api/lib change, no site change. -->
 

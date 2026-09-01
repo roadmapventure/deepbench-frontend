@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.356 | scripts/render-claude-state.js | SES-265 — the two standing-brief sentences this
+// script EMITS ("maintained by hand", "never regenerated") were false from v7.0.236 and shipped into
+// CLAUDE-STATE.md on every render; both now name the generated block and the hand prose separately. See
+// the WHAT IS STILL HAND-MAINTAINED note below. No behaviour change — string content only.
+//
 // DeepBench v7.0.347 | scripts/render-claude-state.js | SES-261 — `--check` IS PIN-ANCHORED and no
 // longer races the pushing cycle's own close. It grades the committed file against the cycles the file
 // SAYS it was rendered from (the `ledger-pin:` id list in its own trailing comment), never against the
@@ -34,11 +39,17 @@
 // (missing env, REST failure, missing standing brief). Exit 2 is never a pass — same convention as
 // export-backlog-snapshot.js and heal-engine.js.
 //
-// WHAT IS STILL HAND-MAINTAINED, named rather than left to be discovered: the standing brief itself.
-// Splitting the board census / drain state / scheduler settings back OUT of that prose and generating
-// them from tables is the remainder of SES-177 and is deliberately not attempted here — the paragraph
-// interleaves those facts with judgment, and a surgical extraction is the same destroy-what-you-cannot-
-// see risk this script exists to refuse.
+// WHAT IS STILL HAND-MAINTAINED, corrected at v7.0.356 (SES-265) because the sentence that stood here
+// had gone false and this script was EMITTING it into CLAUDE-STATE.md on every ship. It used to read
+// that the standing brief "is maintained by hand", with the census/drain/scheduler extraction named as
+// SES-177's unattempted remainder. That remainder SHIPPED at v7.0.236 (SES-177 (b)): those facts now
+// live in a marked, generated block that scripts/render-standing-brief.js renders from the tables, and
+// runner-cycle.md step 7 invokes that renderer at every ship. So the brief has TWO halves and the two
+// user-visible strings below say so — a generated block, and hand-maintained judgment prose beneath it.
+// Do not re-collapse them into one claim in either direction: "hand-maintained" understates the block
+// (and is what CLAUDE-STATE.md told every session for ~120 versions), and "generated" overstates the
+// prose, which this repo deliberately keeps hand-written and which render-standing-brief.js is
+// structurally incapable of touching.
 
 import fs from "fs";
 import path from "path";
@@ -56,7 +67,9 @@ const CHARTER =
   "**generated** from `runner_cycles` by `scripts/render-claude-state.js` — do not hand-edit them; " +
   "edit the row or the renderer. Standing judgment context (board census, drain state, automation-lane " +
   "rules, scheduler settings, standing filing rules) lives in [`docs/runbooks/standing-brief.md`](" +
-  STANDING_REL + ") and is maintained by hand. Read `docs/SESSIONS.md` only when you need version " +
+  STANDING_REL + "), whose derivable facts are **generated from the tables at every ship** by " +
+  "`scripts/render-standing-brief.js` and whose judgment prose beneath that block is hand-maintained. " +
+  "Read `docs/SESSIONS.md` only when you need version " +
   "history or root-cause context from a past session, never by default.";
 
 function die(msg, code = 2) {
@@ -174,7 +187,10 @@ export function renderBody(cycles, cardsByTicket) {
   lines.push(
     "**Standing brief:** the standing context every session reads at start — board census, drain " +
       "state, automation-lane rules, scheduler settings and the standing filing rules — lives in " +
-      `[\`${STANDING_REL}\`](${STANDING_REL}). It is maintained by hand and is never regenerated.`,
+      `[\`${STANDING_REL}\`](${STANDING_REL}). Its derivable facts are **generated**, rendered from ` +
+      "the tables by `scripts/render-standing-brief.js` at every ship (`runner-cycle.md` step 7); " +
+      "the judgment prose beneath that block is hand-maintained, and where the two disagree about a " +
+      "number the generated block is the one that is right.",
     ""
   );
 
