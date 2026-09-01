@@ -347,6 +347,33 @@ Restore path for any entry, unless stated otherwise: `git log --follow -- <path>
 - **Restore:** the exact strings are quoted above (these files are NOT git-tracked — this
   ledger entry is the only record).
 
+### 19. docs/runbooks/runner-cycle.md step 9 + briefing-page.md regeneration step 2 — the mandatory republish (rewrite)
+- **Said:** the briefing republish is mandatory and **"a cycle must never end without it"** — step 9
+  of `runner-cycle.md`, restated in `briefing-page.md`'s regeneration step 2.
+- **Lived:** both files, in the two homes named above.
+- **Why retired:** John's bridge ruling `27b5d8cb` (attended architect session 2026-08-31, his word
+  verbatim *"b with the bridge"*) **forbids an unattended cycle making the republish**, so the
+  runbook and a standing directive were both law and directly opposed for twenty-six hours, and
+  every cycle after 16:16Z that day reconciled the pair by hand — the one-fact-two-homes defect
+  this platform has already paid for at `SES-116`, `SES-113` and `SES-86` phase 3. `SES-244`
+  (`v7.0.348`) rewrote both homes **in one commit**, because fixing one is exactly how the two
+  files drift.
+- **Survives:** rewritten in place in both files as THE BRIDGE — (b), a briefing that is a pure
+  render of the database, is the durable fix and is what gets built; (a), a standing permission for
+  unattended sessions on the `.claude/` path, is **rejected** and must not be re-proposed as a
+  shortcut; until (b) ships the attended session republishes whenever John is present, and an
+  unattended cycle **builds the page, records the build in its own `runner_cycles.notes`, and stops
+  there**. The tail's `SES-127` `briefed_at` stamp is bound to the same condition: a cycle that did
+  not publish must not stamp it at all.
+- **Filed by:** runner cycle `00b02a29-3e4e-4951-bcd3-fcadd7dded84` (`v7.0.355`), on the *Present*
+  finding of the **Selfbuild M4 gate review** (`runner_items` card `7d3b1fb3`, accepted by John
+  2026-09-01T02:19:39Z, verbatim *"accept m4"*). Both lenses raised it independently: the rewrite
+  landed in both homes and got no entry here, which this ledger's own contract requires for a
+  rewrite. This is that entry — written when the review that found it was accepted, not at the
+  rewrite, and said plainly rather than backdated.
+- **Restore:** `git log --follow -- docs/runbooks/runner-cycle.md` (likewise
+  `docs/runbooks/briefing-page.md`), then `git show <commit>:<path>` at or before `v7.0.347`.
+
 ## SES-171 — briefing-page.md header trim (2026-08-23, same session)
 
 Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery record. Summary entries:

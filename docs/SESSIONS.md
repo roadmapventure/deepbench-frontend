@@ -5,6 +5,96 @@
 
 ---
 
+## session/cycle-20260901-0240 (v7.0.355, 2026-09-01, runner cycle `00b02a29-3e4e-4951-bcd3-fcadd7dded84`, `trigger = scheduled`) — the M5 succession
+
+### The park lifted on its top blocker, and the thing behind it was a milestone waiting to be declared
+
+This fire opened onto the `PARKED` row `fb5dfa18` written 01:00Z, whose own list named the M4 gate
+review as *"the top of that list"*. Prime Directive §3's contract is cheap — check only whether the
+named blockers changed — and one had: card `7d3b1fb3`, *Selfbuild M4 - Infrastructure Floor —
+milestone gate review*, was decided **`accept`** at **02:19:39Z** by the attended architect session,
+John verbatim **"accept m4"**. The predecessor cycle read that same card `undecided` at 01:41Z and
+was right at the time; this cycle read it live rather than quoting either.
+
+Directive `0970abad` and Prime Directive §6 then bind together and leave no discretion: an accepted
+gate review that names the next milestone's scope declares that milestone's drain **immediately** —
+*"by the attended session running the review, or by the first cycle after it that finds the named
+scope recorded and no drain declared"* — **with no separate word from John**. `gate-review.md`
+supplies the other half: a review **proposes** successor members and John's Accept **files** them.
+The review filed nothing, correctly; the Accept is the authorisation; filing was this cycle's work.
+
+### What shipped
+
+Eleven members named, seven of them the review's: `SES-276` (heal-engine v2 over widened sources)
+and `SES-277` (seeded-failure closed-loop drill) filed new from **one** `feature_id_counter` block of
+two — never one id and a hand-count (`SES-18`); `SES-123`, `SES-260`, `DAT-25`, `SES-269` and
+`SES-265` re-homed into the M5 epic, before-image each; and the four pre-existing open M5 members the
+review's own text says *"stand either way"* (`SES-184`, `SES-247`, `SES-161`, `SES-82`). Composition
+follows the M3 and M4 precedent rather than being re-derived — the epic's then-open members plus the
+tickets the preceding review named — which the runbook's own carve-out says is settled by precedent.
+
+### The one design decision: `blocked_by`, not `needs-john`
+
+`SES-276` and `SES-277` **are** the M5 design gate's subject matter — `SES-184` reads *"outcome
+telemetry, heal-engine recurrence"* — so building either before that sitting would pre-empt a design
+John has not given. But that is a fact about **another ticket**, not a decision he owes on these two
+rows, and the runbook forbids the shortcut in as many words: *never write `design_status =
+'needs-john'` on a blocked ticket to get it out of the picker* — it puts an ask on his §10 he cannot
+act on. `blocked_by` also needs nothing to clear it: the clause is a `NOT EXISTS` over `SES-184`'s
+live status, so both members re-admit themselves the instant that gate closes, with no write anyone
+must remember.
+
+### A review prediction recorded as superseded rather than quietly dropped
+
+The PM lens wrote: *"ALL FOUR open M5 members are flagged needs-john, so declaring the M5 drain
+before John sits that gate will park the platform immediately."* True of the four pre-existing
+members; **not** true of the eleven, because three of the seven **the review itself named** —
+`SES-265`, `SES-269`, `SES-123` — carry no flag and no blocker. `drain_epic_next()` therefore
+returned **`pick = SES-265`**, not `blocked`. John's accept reason honours the same warning from the
+other side (*"the platform parking until it happens is expected shape, not a defect"*) and that stays
+true — the park is now three tickets away rather than zero.
+
+### QA — four live arms, one variable each, all rolled back
+
+Arm 1 is the one that matters, because it is a **difference** and not a property both forms share:
+with this cycle's declaration removed, `drain_epic_next()` returns **`none`**, against `pick /
+SES-265` on the shipped board. Arm 2 held the three claimable members under a peer claim and the call
+returned `blocked` with a `blocked_detail` naming all eleven — six `needs-john` by name, two blocked
+by `SES-184` by name, three peer-held — never a silent empty (`SES-196`). Arm 3 closed `SES-184` and
+the pick became `SES-276` with **no write from anyone**, proving the re-admission in both directions
+(`SES-101`). Arm 4 set every named member `done` and the drain **retired**, `open_now = 0` — the
+pick-side clauses did not leak into the retirement predicate, the boundary this repo has now had to
+state four times (`SES-154`, `SES-196`, `SES-218`, `SES-275`). Tree re-read after: zero fixture
+residue.
+
+### Two things disclosed rather than buried
+
+**The verifier was run twice, and the first row is a mis-attribution by this cycle.** Verdict
+`7b495d18` was produced with `--ticket=SES-276` and came back `auto_done_eligible: true` — which
+reads as *"SES-276 shipped"*. It did not: it was **filed** minutes earlier and is `blocked_by`
+`SES-184`. The M4 succession's own precedent (`b0a3dde5`, `v7.0.337`) passed **no** `--ticket` and
+recorded `backlog_id: null` / `auto_done_eligible: false`, which is the honest shape for a ticketless
+succession cycle; verdict `4e5adbf5` is this cycle's re-run in that shape. **No ticket status was
+written on the strength of either row** — `SES-276` and `SES-277` are `open`, as filed. The first row
+is left standing because it is a true record of what the script was asked and answered; deleting a
+ledger row to tidy a mistake is the worse habit.
+
+**This cycle held no ticket claim, so step 0's re-assertion gate is inapplicable** — the succession is
+a directive-authorised act, not a ticket build, and there was nothing to re-assert. The heartbeat's
+`AND ended_at IS NULL` resume-guard (`SES-194`) was checked before the push in its place. Named here
+rather than left as a gate that looks silently skipped.
+
+### Also written: the retirement-ledger line the review found owed
+
+Both lenses independently flagged, in the review's *Present* direction, that the one binding contract
+rewritten during M4 — the runbook's *"a cycle must never end without republishing the briefing"*,
+replaced by John's bridge ruling `27b5d8cb` — landed in both its homes and got no
+`docs/SELFBUILD-RETIREMENT-LEDGER.md` entry, which that ledger's contract requires for a rewrite.
+Entry 19 is that line, dated to when the review that found it was accepted rather than backdated to
+the rewrite.
+
+Doc + ledger rows; no `src`/`api`/`lib` change, no site change, no schema change, no migration.
+
 ## session/cycle-20260901-0012 (v7.0.354, 2026-09-01, runner cycle `d3d7c6f6-15da-4871-9d82-a22b57a33039`, `trigger = scheduled`)
 
 ### The park lifted, and the first thing behind it was a broken instrument
