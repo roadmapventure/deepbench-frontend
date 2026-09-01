@@ -414,6 +414,178 @@ Restore path for any entry, unless stated otherwise: `git log --follow -- <path>
   it live again: flip the row back to `status = 'live'`, clear `superseded_by`, retire `M5-02` in the
   same commit, and re-export the snapshot.
 
+<!-- FEATURE: SES-285 — entries 21–33, one per rule the card/tap retirement withdrew: five retired
+     (B13, B16, B23, B28, B29) and eight superseded by M6-01..M6-08 (B7, B12, B14, B17, B24, B27,
+     B34, B35). All thirteen ship in ONE commit with docs/RUNNER-GOV-M6-REQUIREMENTS.md and the
+     registry rows, per the SELFBUILD-CHARTER transition rule. Facts common to all thirteen, stated
+     once here rather than thirteen times below:
+       * Retired 2026-09-01 by SES-285 (v7.0.359), kickoff
+         docs/kickoffs/v7.0.359-SES-285-retire-card-tap-surface.md.
+       * Trigger — John, 2026-09-01, verbatim: "I no longer want to work via cards or taps. And you
+         are supposed to be more self sufficient to update tickets accordingly without me."
+       * Measured at decision time: 45 gated_before_build cards undecided, 42 of them older than 48
+         hours, against 79 ever decided; 33 open tickets at design_status='needs-john'.
+       * NO ROW IS DELETED. Every rule below keeps its governance_rules row at status='retired' or
+         'superseded' (register B1's never-delete discipline), and keeps its register entry in
+         docs/RUNNER-GOV-0820-REQUIREMENTS.md.
+       * Restore path, identical for all thirteen: `git log --follow -- docs/governance/RULES-SNAPSHOT.md`
+         then `git show <commit>:docs/governance/RULES-SNAPSHOT.md` at or before `v7.0.358` for the
+         row as it stood. To make one live again: flip its row back to status='live', clear
+         superseded_by, withdraw its M6 replacement in the SAME commit, and re-export the snapshot. -->
+
+### 21. `public.governance_rules` B7 — unattended removal ban (superseded)
+- **Said:** *"Revalidate ticket premises at every pick and in background for the stale tail; never remove a ticket unattended — route removal proposals to a John Accept/Reverse/Rework card."*
+- **Lived:** row `B7` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B7`.
+- **Superseded by:** `M6-03` — *"A ticket whose premise fails revalidation twice consecutively is removed automatically, reversible inside its window; no removal waits on a human Accept. Supersedes B7."*
+- **Why:** the removal card was a gate with no timer, so a ticket whose premise had demonstrably
+  evaporated stayed on the board competing for picks until John tapped — and the measured tap rate
+  says he mostly did not. The revalidation half of B7 is not the problem and is not withdrawn.
+- **Survives:** the *"revalidate at every pick and in background for the stale tail"* clause is
+  unchanged practice; only the routing of the result changes. `M6-03` additionally hardens it —
+  **twice consecutively**, never on a single failed read — and the 72-hour reversal window (`M6-02`)
+  is what makes an automatic removal safe rather than final.
+
+### 22. `public.governance_rules` B12 — daily invention card (superseded)
+- **Said:** *"Run one invention cycle per day (research, score against vision corpus, R&D gate) and file results as a gated-before-build card for John's Accept."*
+- **Lived:** row `B12` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B12`.
+- **Superseded by:** `M6-04` — *"Invention proposals are admitted or rejected by the enhancement-lane admission test (`SES-283`), never by a card. Supersedes B12."*
+- **Why:** B12 was the single highest-volume producer of the 45-card backlog — one card per day,
+  every day, into a surface with a two-thirds non-response rate. The bar is not lowered by
+  superseding it; it moves into `SES-283`'s admission test, where it is written down, applied
+  identically every time, and can be argued with. A card is not a bar, it is a queue.
+- **Survives:** the daily invention cycle itself, and the scoring against the vision corpus. Only
+  the disposal route changes.
+
+### 23. `public.governance_rules` B13 — DRIP claim cards (retired)
+- **Said:** *"Draft the nine vision-corpus documents as best-inference claims, verified by John via small daily DRIP claim cards rather than a long interview."*
+- **Lived:** row `B13` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B13`.
+- **Why retired, with no replacement:** B13 is a *verification-by-tap* rule end to end — the card is
+  not an implementation detail of it, it is the whole mechanism. With the tap surface withdrawn
+  there is nothing left of B13 to restate, so it is retired rather than superseded. Retiring it does
+  not delete the vision corpus or the best-inference drafting; it removes the claim that John
+  ratifies those drafts one card at a time.
+- **Survives:** nothing of B13 is carried into an `M6` rule. The vision-corpus documents and the
+  drip mechanism live on in `docs/runbooks/briefing-page.md` §12; how a claim is confirmed without a
+  tap is genuinely open and belongs to whoever next works that surface — **stated plainly as a gap,
+  not papered over.**
+
+### 24. `public.governance_rules` B14 — only John's tap ratifies a rule (superseded)
+- **Said:** *"Generate business rules from declared, mined, and learned sources as proposed-rule briefing cards; only John's tap ratifies a rule."*
+- **Lived:** row `B14` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B14`.
+- **Superseded by:** `M6-02` — *"A decision executes immediately and is reversible for 72 hours; silence is assent, never a park. Supersedes B14 and B23's silence-parks-forever."*
+- **Why:** *"only John's tap ratifies"* makes non-response the strongest possible veto, and the
+  measurement says non-response was the normal case. `M6-02` inverts the default without removing
+  his authority: a proposed rule takes effect now and he has 72 hours to reverse it.
+- **Survives:** rule generation from declared, mined and learned sources is untouched — that half of
+  B14 describes where rules come from, not who ratifies them. **What is gone is the veto-by-silence.**
+
+### 25. `public.governance_rules` B16 — Unclassifiable escalation card (retired)
+- **Said:** *"Reserve \"Unclassifiable\" for tickets whose text is too degraded to judge, with a reason note, and surface every one as a briefing card for John's Rework or removal."*
+- **Lived:** row `B16` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B16`.
+- **Why retired, with no replacement:** the surviving half of B16 — reserve the label for genuinely
+  degraded text, and write the reason down — is already carried by register `B9` (nothing enters the
+  board unclassed) and by the `Unclassifiable` class definition itself. What is withdrawn is the
+  escalation: an unreadable ticket is now decided by the cycle under `M6-01`, with its reasoning
+  recorded, exactly like any other decision.
+- **Survives:** the reserve-it-narrowly discipline and the mandatory reason note, in the class
+  definition. Only the card is gone.
+
+### 26. `public.governance_rules` B23 — silence parks a card forever (retired)
+- **Said:** *"Re-enter a gated/proposal card's ticket at queue #1 as a system pin on Accept, timestamped; a later \"move to 1\" outranks it, and silence parks a card forever."*
+- **Lived:** row `B23` (`runner-gov-register`, `enforcement = 'script'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B23`.
+- **Why retired — this is the load-bearing one:** *"silence parks a card forever"* is not a
+  description of the 45-card backlog, **it is the mechanism that manufactured it.** An unanswered
+  card was never a deferral; it was a permanent stall with no timer on it, and 42 of the 45 had been
+  in that state for more than 48 hours. It is retired rather than superseded because `M6-02` is its
+  exact inverse — silence is assent — and the two cannot both be live for a single second.
+- **Survives:** the pin half is unaffected and stays live in register `B5` (John's *"move to N"*
+  directives hold absolute slots). What is gone is the park-on-silence default and the
+  Accept-triggered system pin, which had nothing left to trigger on.
+
+### 27. `public.governance_rules` B24 — never let a card waste a cycle (superseded)
+- **Said:** *"Never let a gated-before-build or removal-proposed card waste a cycle; drop to the next queued ticket and still deliver exactly one build per cycle."*
+- **Lived:** row `B24` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B24`.
+- **Superseded by:** `M6-06` — *"A cycle never ends by asking; wherever it would have escalated to a card, it decides, records the reasoning, and records the reversal handle. Supersedes B24 and B27."*
+- **Why:** B24 was the *mitigation* for a surface that has now been removed — it protected the
+  cycle's throughput from the card, rather than preventing the card. `M6-06` reaches the same
+  outcome one step earlier: there is no card to drop past, because the cycle decides.
+- **Survives:** **"exactly one build per cycle" is not withdrawn** — it is a throughput rule
+  independent of cards and continues to bind through the runbook's own cycle contract.
+
+### 28. `public.governance_rules` B27 — the build-vs-ask matrix (superseded)
+- **Said:** *"Decide build-vs-ask at pick time on two axes (authority/gated, and specification completeness), escalating through build/design-then-build/gated-card/requirements-session outcomes without ever ending the cycle build-less on the middle two."*
+- **Lived:** row `B27` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B27`.
+- **Superseded by:** `M6-06` (statement as quoted in entry 27).
+- **Why:** B27 named *"gated-card"* as a defined outcome for the ambiguous middle of its own matrix
+  — so the cases where a decision was most needed were precisely the ones routed away from being
+  decided. `M6-06` removes that branch and keeps the rest.
+- **Survives:** **the two axes survive as a reasoning tool, not as a routing table.** Authority and
+  specification completeness are still the right questions at pick time; what changes is that every
+  answer now ends in a decision plus its recorded reasoning, never in an escalation.
+
+### 29. `public.governance_rules` B28 — weekly count of John's judgments (retired)
+- **Said:** *"Track on the briefing how many cards needed John's judgment this week vs last, feeding decided cards into rule-mining so repeated question-shapes stop reaching him."*
+- **Lived:** row `B28` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B28`.
+- **Why retired, with no replacement:** B28 measures a quantity that is now structurally zero. Its
+  *goal* — that repeated question-shapes stop reaching John — is achieved outright rather than
+  trended toward, so a week-over-week counter of it would report `0 vs 0` forever, which is a metric
+  that cannot move and therefore cannot inform.
+- **Survives:** **rule-mining from decided items survives and matters more, not less** — the corpus
+  it mines is now the cycle's own recorded reasoning under `M6-01` and `M6-06`, which is a larger
+  and better-attributed corpus than the decided cards ever were.
+
+### 30. `public.governance_rules` B29 — the daily "help me" ticket (retired)
+- **Said:** *"Nominate one \"help me\" ticket per day on the briefing, selected by the automation ordering, carrying John's specific open questions; resolving it re-enters the ticket at queue #1."*
+- **Lived:** row `B29` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B29`.
+- **Why retired, with no replacement:** it is a daily ask, which is the shape John's instruction
+  removed — and it had the same failure mode as the cards, one nomination per day into a surface
+  with a two-thirds non-response rate. Under `M6-01` a cycle that has an open question decides it
+  and records the reasoning instead of nominating it.
+- **Survives:** nothing of the daily nomination. **A genuinely stuck ticket is still visible** —
+  through `M5-10`, amended in this same commit to surface a three-cycle stall with its defer reason
+  in the standing brief. That is the honest successor: visibility without a question attached.
+
+### 31. `public.governance_rules` B17 — an Accept must never evaporate (superseded)
+- **Said:** *"Auto-convert an Accept on a gated-before-build card into a classed, queued backlog ticket — an Accept must never evaporate."*
+- **Lived:** row `B17` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B17`.
+- **Superseded by:** `M6-05` — *"Every decision a cycle makes files its resulting ticket in the same transaction — a decision must never evaporate. Supersedes B17."*
+- **Why:** B17's promise is exactly right and its scope was too narrow — it covered *Accepts*, which
+  is one kind of decision made by one person on one surface. `M6-05` keeps the promise verbatim
+  (*"must never evaporate"*) and widens it to every decision a cycle makes, in the same transaction
+  as the decision, so no window exists where the decision is recorded and its ticket is not.
+- **Survives:** the promise, its wording, and its enforcement — **strengthened, not weakened.** The
+  measured proof that the window is real: card `04d34757` (the September budget outage that stopped
+  the runner) sat undecided with no ticket behind it at all, so its content lived nowhere but the card.
+
+### 32. `public.governance_rules` B34 — an Accept is permission, not a rating (superseded)
+- **Said:** *"Never count a gated-before-build Accept toward the runner's trust ladder — it authorizes one build, not a rating of unattended judgment."*
+- **Lived:** row `B34` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B34`.
+- **Superseded by:** `M6-07` — *"The trust ladder's inputs are verifier verdicts and post-window reversals, not Accepts; an unreversed decision past its window promotes, a reversal demotes. Supersedes B34 and B35."*
+- **Why:** B34 was *correct* and is superseded only because its subject no longer arrives — with the
+  card surface withdrawn there are no gated Accepts to exclude, so leaving it live would point a
+  live rule at nothing. **Its reasoning is the reasoning `M6-07` is built on**, which is why the
+  supersession is not a reversal of it.
+- **Survives:** the principle in full — permission is not a rating — carried into `M6-07`'s choice of
+  inputs. It also survives *executably*: `public.apply_ladder_decision()` still short-circuits every
+  `kind = 'gated_before_build'` row with the reason *"gated card — permission is not a rating (B34),
+  ladder untouched"*, which is why closing 44 cards in this migration moved the ladder by zero rungs.
+
+### 33. `public.governance_rules` B35 — John's three rulings (superseded)
+- **Said:** *"Apply John's three rulings: a Reverse on a gated card still demotes the ladder; the budget day boundary is midnight America/Chicago; a dead-cycle report must state why it died and what to do next."*
+- **Lived:** row `B35` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B35`.
+- **Superseded by:** `M6-07` (statement as quoted in entry 32).
+- **Why:** only the **first** of B35's three rulings concerns the card surface, and B35 bundles three
+  unrelated rulings into one row — so superseding the row is the only way the registry can express
+  that one of them has lost its subject. `M6-07` carries the demotion forward in the form that still
+  has a subject: **a reversal demotes.**
+- **Survives — and this is the clause a later reader must not lose:** the other two rulings are
+  **unaffected and still binding**, and neither is an `M6` matter. *The budget day boundary is
+  midnight America/Chicago* — still true, still what `runner_budget` is read against. *A dead-cycle
+  report must state why it died and what to do next* — still true, still the `did_not_run` contract
+  in `docs/runbooks/runner-cycle.md`. Both are restated in that runbook independently of this row.
+  If either is ever in doubt, they are John's rulings and they were never withdrawn; only the routing
+  of the first one through a card was.
+
 ## SES-171 — briefing-page.md header trim (2026-08-23, same session)
 
 Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery record. Summary entries:

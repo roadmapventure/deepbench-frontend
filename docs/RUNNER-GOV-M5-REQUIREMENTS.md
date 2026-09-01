@@ -123,19 +123,32 @@ and keeps it running.
 
 ### <a id="M5-09"></a>M5-09 — the rolling wave, enforced (`script`)
 
-> No milestone member ticket is pickable while that milestone's design-gate ticket is unresolved (`design_status = 'needs-john'` or `status <> 'done'`).
+> No milestone member ticket is pickable while that milestone's design-gate ticket is unresolved (`status <> 'done'`).
 
 The charter already says members are filed at the gate and never speculatively — as prose, with
-nothing enforcing it. Measured: M5's own gate `SES-184` sat at `needs-john` while M5 held 10 open
+nothing enforcing it. Measured: M5's own gate `SES-184` sat unresolved while M5 held 10 open
 members, two of them filed that same day by a cycle.
+
+**Amended by `SES-285` (`v7.0.359`) — see the amendment note at the foot of this file.** The
+original wording made the gate unresolved when its ticket carried `design_status = 'needs-john'`
+*or* was not `done`. `M6-01` retires `needs-john` as a blocking state outright, so that half of the
+clause now names a state no ticket can be in. **What the rule tests is unchanged in substance:** a
+milestone gate blocks its members while the gate ticket is not `done`, which is the condition that
+was always doing the work.
 
 ### <a id="M5-10"></a>M5-10 — three cycles, then it stops (`script`)
 
-> A ticket that has consumed three cycles without shipping is auto-deferred with `defer_status = 'stuck'` and carded for John, never silently re-picked.
+> A ticket that has consumed three cycles without shipping is auto-deferred with `defer_status = 'stuck'`, recorded with its defer reason and surfaced in the standing brief, never silently re-picked.
 
 This is the single largest measured leak: 69 non-shipping cycles across **12** tickets, ~5.75 cycles
-each. Three is the point past which the evidence says another attempt is not the answer, and the card
-is what makes the stall visible instead of silently expensive.
+each. Three is the point past which the evidence says another attempt is not the answer, and the
+record is what makes the stall visible instead of silently expensive.
+
+**Amended by `SES-285` (`v7.0.359`).** The original wording deferred the ticket *"and carded for
+John"*. The card surface is retired (`M6-01`, `M6-06`), and a card was in any case the wrong
+instrument here: the stall needs to be **visible**, not **decided**, and 42 of the 45 stalled cards
+prove a card is not a visibility mechanism. The defer reason plus the standing brief
+(`docs/runbooks/standing-brief.md`, regenerated at every ship) is the surface that is actually read.
 
 ### <a id="M5-11"></a>M5-11 — auto-close needs a complete cost row (`script`)
 
@@ -163,11 +176,18 @@ there is no window in which the status is set and the attribution is not.
 
 ### <a id="M5-14"></a>M5-14 — auto-close does not reach John's own work (`reviewer`)
 
-> Auto-close never applies to a ticket whose `scope_origin` is not `original` or `gate-review`; `discovered` and `john-named` work closes only on John's Accept.
+> Auto-close never applies to a ticket whose `scope_origin` is not `original` or `gate-review`; `discovered` and `john-named` work closes on verifier pass once its reversal window elapses.
 
 Auto-close is a delegation of *John's* judgment, and he delegated it for the work the platform scoped
-itself. Work he named, or that a cycle discovered mid-build, is closed by him on the briefing —
-Accept/Reverse/Rework — not by the mechanism that scoped it.
+itself. Work he named, or that a cycle discovered mid-build, does not take the same fast path.
+
+**Amended by `SES-285` (`v7.0.359`).** The original wording ended *"closes only on John's Accept"*,
+which is the tap this project retired. **The distinction the rule draws survives intact, and it is a
+distinction in timing, not in whether the rule still bites:** `original` and `gate-review` work
+auto-closes at ship, while `discovered` and `john-named` work closes only after its verifier verdict
+*and* the elapse of its 72-hour reversal window (`M6-02`). So John's own work still cannot be closed
+by the mechanism that scoped it, and it still cannot be closed on the day it ships — it is closed by
+a verdict plus his opportunity to reverse, rather than by his tap.
 
 ### <a id="M5-15"></a>M5-15 — no pick on a stale usage reading (`script`)
 
@@ -179,6 +199,31 @@ the week — so the refusal belongs on the reading's age, not on the arithmetic.
 
 ---
 
+## Amendment note — `SES-285`, 2026-09-01 (`v7.0.359`)
+
+<!-- FEATURE: SES-285 — this note exists because the registry row is authoritative and this file is
+     its byte-for-byte home. Three statements moved in the row; they move here in the same commit,
+     or the truth tripwire (check 9 / check 12) reads a live rule against stale doc text. -->
+
+Three rules in this register — `M5-09`, `M5-10`, `M5-14` — were written hours before `SES-285` and
+encoded the very dependency it removed: they named `design_status = 'needs-john'`, *"carded for
+John"*, and *"John's Accept"* as live mechanisms. `SES-285` retired that surface, so those clauses
+named things that no longer exist.
+
+**They are amended, not retired.** Each keeps its id, its `status = 'live'`, and its place in this
+register; only the clause naming the withdrawn surface was rewritten, and each section above carries
+its own amendment paragraph saying exactly what changed and what did not. Registry rows and the
+statements above were rewritten in the same commit, and `docs/governance/RULES-SNAPSHOT.md` was
+re-exported from the rows — never hand-edited.
+
+Because the amendment changed no rule's *effect*, there is **no retirement-ledger entry** for these
+three; the ledger's contract covers removals and rewrites of withdrawn content, and entries 21–33
+there cover the thirteen rules `SES-285` actually withdrew. `M5-12`'s 72-hour observation window and
+`M6-02`'s 72-hour reversal window are deliberately the same span, for the same reason: it covers a
+full scheduler cadence rather than one quiet afternoon.
+
+---
+
 ## Related registers and files
 
 | Where | What it holds |
@@ -186,5 +231,6 @@ the week — so the refusal belongs on the reading's age, not on the arithmetic.
 | `public.governance_rules` | **Authoritative.** The fifteen rows this file renders, plus every other live rule. |
 | `docs/governance/RULES-SNAPSHOT.md` | Generated repo-side copy of the whole registry. Never hand-edited. |
 | `docs/RUNNER-GOV-0820-REQUIREMENTS.md` | The 2026-08-20 governance register (A1–A6, B1–B42). B3 lives there, superseded. |
+| `docs/RUNNER-GOV-M6-REQUIREMENTS.md` | The M6 autonomy register (`M6-01`–`M6-08`), which withdrew thirteen 0820 rules and amended the three rules noted above. |
 | `docs/SELFBUILD-RETIREMENT-LEDGER.md` | B3's retirement entry, with the reason and the restore path. |
 | `docs/SELFBUILD-CHARTER.md` | The rolling-wave rule, the transition rule and the storage rule these fifteen answer to. |

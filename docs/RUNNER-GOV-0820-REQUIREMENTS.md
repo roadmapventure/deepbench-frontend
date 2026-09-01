@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.359 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-285 — FEATURE: SES-285. **THIRTEEN RULES WITHDRAWN IN ONE COMMIT**, each with a dated note at its own entry and its original wording kept below it, per this file's convention. RETIRED with no replacement (5): B13, B16, B23, B28, B29. SUPERSEDED by the new M6 register (8): B7→M6-03, B12→M6-04, B14→M6-02, B17→M6-05, B24→M6-06, B27→M6-06, B34→M6-07, B35→M6-07. Canonical home of the replacements: `docs/RUNNER-GOV-M6-REQUIREMENTS.md`; ledger entries `docs/SELFBUILD-RETIREMENT-LEDGER.md` #21–#33. Trigger — John, 2026-09-01, verbatim: "I no longer want to work via cards or taps. And you are supposed to be more self sufficient to update tickets accordingly without me." Measured at decision time: 45 gated_before_build cards undecided, 42 of them older than 48 hours, against 79 ever decided; 33 open tickets at design_status='needs-john'. B23's "silence parks a card forever" is the mechanism that manufactured that backlog, which is why it is retired outright rather than reworded. **DELIBERATELY RETAINED, and stated here so no later reader mistakes the sweep for total: B20 (dev→main stays John's) and HR-MERGE are still `live`, as are B5 (pin directives) and B39 (the .claude/ write gate).** NOT yet true, stated so it is not assumed: the 72-hour reversal window M6-02 declares is a RULE here, not a mechanism — the timer and expiry sweep are SES-286. Three mention sites are known to remain in live voice in the runbooks (runner-cycle.md, briefing-page.md, gate-review.md) and are tracked as their own ticket rather than swept here; see that ticket before assuming a runbook card procedure is current. -->
 <!-- DeepBench v7.0.358 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-280 — FEATURE: SES-280. **B3 SUPERSEDED by `M5-02`**, dated note in place at its entry (original wording kept below it, per this file's convention) and its two downstream mentions (B4's shipped-function note, B10's `filed_at` rationale) marked so neither reads as live. The registry row now carries `status = 'superseded'`, `superseded_by = 'M5-02'`; the replacement's canonical home is the new `docs/RUNNER-GOV-M5-REQUIREMENTS.md`, and the ledger entry is `docs/SELFBUILD-RETIREMENT-LEDGER.md` #20. Why B3 could not stay live: its "newest filed → oldest" tie-break is the direct inverse of the pre-2026-08-21 priority lane John set on 2026-09-01, and B3 is script-enforced — two contradictory sort keys in one pick path. Beta, its other tie-break, was already retired 2026-08-19. The tier-then-priority-class half survives verbatim in M5-02. NOT yet true, stated so it is not assumed: M5-02 ships with `enforcement = 'script'` RECORDED, not executed — Phase 2 wires the filing lane into `drain_epic_next()` / `recompute_backlog_queue()` and is a follow-up ticket, so the pick path still sorts the way B3 described until it lands. -->
 <!-- DeepBench v7.0.173 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-115 — register B1 formally REVISED in place under a dated note (its original wording kept above the note, per this file's convention that the superseded sentence stays visible). "History leaves the table" becomes "history lives in the table, filtered": rows are never deleted, public.backlog_active (migration ses115_backlog_active) is the one owning definition of active and carries a computed `mode` via public.backlog_mode(). The revision is not a softening of John's no-archive rule — his objection was to MAINTAINING archived tickets, and nothing about a kept row is maintained; what a closed ticket must shed is only its live-board state (queue number, pin, claim), which recompute_backlog_queue() and the step-7 release already clear. MEASURED, and it is why this could not stay prose: read literally, the old wording made check-session-docs check 3 flag every done row — 37 of that report's 49 findings, 76% noise, every one of them instructing the reader to "close it out of the table", which under the revised rule is the wrong action. Check 3 is retargeted to the residue only, so it now fires on a missed recompute and is silent on history. -->
 <!-- DeepBench v7.0.133 | RUNNER-GOV-0820-REQUIREMENTS.md | SES-86 phase 3, directive f47e5a95 — B30 amended in place: John's automation queue stops being a selection layer a cycle EXECUTES BY HAND and becomes the board's leading sort key (backlog_items.automation_rank, migration ses86c_automation_lane). B30 predicted this ("post-SES-83 d/e the queue engine's pins express the same thing in data"); this is that, arriving early because the prose layer had already failed silently — measured 16:29Z, C4's tickets sat at queue 2/241/242/243/244/280/281 of 551 while the v7.0.130 briefing told John the next cycle would be "building product, not tooling". He overruled it and force-ran the cycle. The self-retiring property B30 described is preserved mechanically (a done ticket leaves the ranked set). Two things named as NOT done so they are not assumed: B23 pins (when built, a pin sorts ABOVE automation_rank — John's live tap outranks a standing build order) and the parallel-cycles half of his line, which collides with the B31 lease and went to him as a gated card. -->
@@ -12,7 +13,9 @@
 > (4) prioritization — iterating in this file, (5) full automation — pending.
 > **Status: REQUIREMENTS COMPLETE — John called it done 2026-08-20.** Everything in A is live
 > on dev/Supabase; B1–B29 are the locked build requirements the automation-queue tickets
-> execute against; C1/C2/C4 closed (C3 — the invention-cycle egress check — rides `SES-88`).
+> execute against — **as locked in 2026-08-20; thirteen of them were since retired or superseded
+> by `SES-285` on 2026-09-01 (see this file's header), so read each entry's own dated note before
+> treating it as current**; C1/C2/C4 closed (C3 — the invention-cycle egress check — rides `SES-88`).
 > This file is the design record the kickoffs cite.
 
 ## A. Shipped this session (live)
@@ -128,7 +131,15 @@
 - **B6. Lifecycle status:** `filed` → `queued` → `designed` → `in development` → `completed` |
   `removal proposed` → `removed`. Completed/removed/picked are dequeue events. Orphan healing:
   a dead cycle's `in development` ticket re-queues. Reverse reopens completed → queued.
-- **B7. Staleness / revalidation:** age is the trigger (30 days untouched), premise is the
+- **B7. Staleness / revalidation — SUPERSEDED 2026-09-01 by `M6-03` (`SES-285`, `v7.0.359`);
+  registry row is `status = 'superseded'`, `superseded_by = 'M6-03'`, ledger entry
+  `docs/SELFBUILD-RETIREMENT-LEDGER.md` #21.** Original wording kept below, per this file's
+  convention. *What changed:* only the **"No unattended removal"** clause. A premise that fails
+  revalidation **twice consecutively** now removes its ticket automatically, reversible inside its
+  72-hour window (`M6-02`); no removal waits on a tap. *What did not:* the revalidation half —
+  age as trigger, premise as verdict, pick-time always, background sweep of the sinking tail — is
+  unchanged and still binds. **As originally shipped:** age is the trigger (30 days untouched),
+  premise is the
   verdict. Pick-time premise revalidation ALWAYS (step one of any build); background
   revalidation of the sinking tail (30d+, bottom-dwellers, retired-vocabulary hits) on spare
   cycle capacity. **No unattended removal:** `removal proposed` state → briefing card with
@@ -144,15 +155,33 @@
   filing lane selects on `filed_at` too).
 - **B11. Classification/meta work rides the directive queue** (bootstrap exception so
   P9 - Bug Fixes volume can't starve the passes that order the board).
-- **B12. Invention engine wiring:** one designated invention cycle per day — research
+- **B12. Invention engine wiring — SUPERSEDED 2026-09-01 by `M6-04` (`SES-285`, `v7.0.359`);
+  `superseded_by = 'M6-04'`, ledger #22.** Original wording kept below. *What changed:* the
+  disposal route only — invention proposals are admitted or rejected by `SES-283`'s
+  enhancement-lane admission test, never by a card. B12 was the highest-volume producer of the
+  45-card backlog: one card a day into a surface with a two-thirds non-response rate. *What did
+  not:* the daily invention cycle itself, its research inputs, and the vision-corpus scoring.
+  **As originally shipped:** one designated invention cycle per day — research
   (market/competitor/whitespace/usage + the P1 lens), score against the vision corpus, R&D
   gate, file as gated-before-build card; John's Accept turns it into a queued ticket. Check
   cloud egress permits web research. Volume widens only by trust ladder.
-- **B13. Vision corpus (SES-84, restructured by John):** Claude drafts all nine docs as
+- **B13. Vision corpus (SES-84, restructured by John) — RETIRED 2026-09-01 by `SES-285`
+  (`v7.0.359`), no replacement rule; registry row is `status = 'retired'`, ledger #23.** Original
+  wording kept below. *Why no successor:* B13 is verification-by-tap end to end — the DRIP card is
+  not a detail of it, it is the whole mechanism — so with the tap surface withdrawn there is
+  nothing left to restate. The nine documents and the best-inference drafting are untouched; how a
+  claim is confirmed without a tap is **an open gap, named rather than papered over**.
+  **As originally shipped:** Claude drafts all nine docs as
   best-inference claims (self-education: repo + memory + Supabase + local session archive +
   outside research); John verifies by DRIP — 1–3 claim cards per briefing (~15 min/day max),
   plus on-demand "I have X minutes" bursts. No hours-long interview.
-- **B14. Business-rule generation loop:** declared (John states) + mined (SES-79 over his
+- **B14. Business-rule generation loop — SUPERSEDED 2026-09-01 by `M6-02` (`SES-285`,
+  `v7.0.359`); `superseded_by = 'M6-02'`, ledger #24.** Original wording kept below. *What
+  changed:* the ratification default. *"Only John's tap ratifies"* made non-response the strongest
+  possible veto, and non-response was the measured norm; a proposed rule now takes effect
+  immediately and he has 72 hours to reverse it. *What did not:* rule generation from declared,
+  mined and learned sources, which describes where rules come from, not who ratifies them.
+  **As originally shipped:** declared (John states) + mined (SES-79 over his
   structured taps) + learned (incidents) → proposed-rule briefing cards → only John's tap
   ratifies. Rule-making stays gated forever.
 - **B15. Lane ≠ class (John's catch, 2026-08-20): the `P-GATED` class marker is RETIRED**
@@ -162,7 +191,12 @@
   gated ticket reaching the top of the queue produces a **gated-before-build briefing card**
   instead of an unattended build — John's tap decides its path. The briefing (later Super
   Admin) shows the gated-flagged tickets with their queue positions ("Your lane" view).
-- **B16. "Unclassifiable" (John's term) replaces "unreadable":** reserved for tickets whose
+- **B16. "Unclassifiable" (John's term) replaces "unreadable" — RETIRED 2026-09-01 by `SES-285`
+  (`v7.0.359`), no replacement rule; `status = 'retired'`, ledger #25.** Original wording kept
+  below. *Why no successor:* the surviving half — reserve the label narrowly, write the reason
+  down — is already carried by `B9` and by the class definition itself. What is withdrawn is the
+  escalation: an unreadable ticket is now decided by the cycle under `M6-01`, with its reasoning
+  recorded, like any other decision. **As originally shipped:** reserved for tickets whose
   text is genuinely too degraded to judge; carries a **reason/note field** saying why; every
   one surfaces as a briefing card for John's Rework or removal. Expected population: a
   handful of ~420.
@@ -171,7 +205,9 @@
 
 - C1. John's remaining follow-up questions (his item 6) — not yet stated.
 - C2. Full-automation requirements review (his original topic 5) — in discussion.
-- C3. Egress check for invention-cycle web research (B12) — unverified; precondition on SES-88.
+- C3. Egress check for invention-cycle web research (B12 — **superseded** 2026-09-01 by `M6-04`;
+  the daily invention cycle survives, only its card-based disposal route does not, so the egress
+  question is unchanged) — unverified; precondition on SES-88.
 - ~~C4. Build sequencing~~ — **SUPERSEDED same day by JOHN'S AUTOMATION QUEUE (his words,
   2026-08-20), which is now THE order:**
   **(1)** Briefing page easily accessible — DeepBench Admin screen via the Vercel link
@@ -179,14 +215,22 @@
   **(2)** The backlog-ticket DB completed and USED — updating, exposure, usability, manual
   and automated (`SES-83` b/c/d/e + `SES-86` queue engine).
   **(3)** The C2 automation-gap tickets (`SES-89` Heal engine, `HAR-41` flags design session,
-  B17/B18 rules, agent lanes when they surface).
+  B17/B18 rules — B17 **superseded** 2026-09-01 by `M6-05`, which widens its never-evaporate
+  promise from Accepts to every decision — agent lanes when they surface).
   **(4)** Claude reads ALL sessions and becomes the behavior expert on John's decisions —
   "think like me" (`SES-79` expanded over the full local session archive + structured taps).
   **(5)** THEN the priority-classification sweep (`SES-85`) — deliberately after (4) so
   classification is grounded in John's thinking, not inference. `SES-87` revalidation follows.
   **(6)** The inventor tickets (`SES-84` corpus drip + `SES-88` wiring) run IN PARALLEL at
   any time.
-- **B17. Accept follow-through (found live 2026-08-20):** an Accept on a gated-before-build
+- **B17. Accept follow-through (found live 2026-08-20) — SUPERSEDED 2026-09-01 by `M6-05`
+  (`SES-285`, `v7.0.359`); `superseded_by = 'M6-05'`, ledger #31.** Original wording kept below.
+  *What changed — a widening, not a weakening:* B17's promise was right and its scope too narrow.
+  `M6-05` keeps the wording *"must never evaporate"* verbatim and extends it from Accepts to
+  **every** decision a cycle makes, filed **in the same transaction** so no window exists in which
+  a decision is recorded and its ticket is not. Measured proof the window was real: card
+  `04d34757` — the September budget outage that stopped the runner — sat undecided with no ticket
+  behind it at all. **As originally shipped:** an Accept on a gated-before-build
   card automatically becomes a queued backlog ticket (classed at filing) — an Accept must
   never evaporate. Backfill: the accepted stale-prompt step-0 guards proposal
   (`runner_items.d1c1ca1b`) → directive queued.
@@ -198,13 +242,27 @@
   owner-authenticated Artifact until Clerk (unchanged).
 - **B20. dev→main stays John's forever** — full automation ends at dev, stated as a boundary,
   not a gap.
-- **B23. Gated re-entry is through the queue (John, 2026-08-20):** a gated/proposal card's
-  **Accept re-enters the ticket at queue #1** — a system pin, timestamped by the tap, same
+- **B23. Gated re-entry is through the queue (John, 2026-08-20) — RETIRED 2026-09-01 by `SES-285`
+  (`v7.0.359`); `status = 'retired'`, ledger #26. THIS IS THE LOAD-BEARING ONE.** Original wording
+  kept below. *Why:* its clause *"silence parks the card forever — no timer, no retry"* is not a
+  description of the 45-card backlog, **it is the mechanism that manufactured it** — 42 of the 45
+  had been silent for more than 48 hours with nothing able to move them. It is retired rather than
+  superseded because `M6-02` is its exact inverse (silence is assent, reversible for 72 hours) and
+  the two cannot both be live for a single second. *What survives:* the pin half, live in `B5` —
+  John's *"move to N"* still holds an absolute slot. **As originally shipped:** a gated/proposal
+  card's **Accept re-enters the ticket at queue #1** — a system pin, timestamped by the tap, same
   machinery as "move to 1"; the recompute renumbers everything beneath sequentially. Multiple
   Accepts in one sitting stack at the top in tap order; an explicit "move to 1" still outranks
   (latest word wins). Silence parks the card forever — no timer, no retry. Accept authorizes
   that one item once; the gate never learns itself open.
-- **B24. A gated card never wastes the cycle (John, 2026-08-20):** filing a gated-before-build
+- **B24. A gated card never wastes the cycle (John, 2026-08-20) — SUPERSEDED 2026-09-01 by
+  `M6-06` (`SES-285`, `v7.0.359`); `superseded_by = 'M6-06'`, ledger #27.** Original wording kept
+  below. *What changed:* B24 was the **mitigation** for a surface now withdrawn — it protected the
+  cycle's throughput from the card rather than preventing the card. `M6-06` reaches the same
+  outcome one step earlier: there is no card to drop past, because the cycle decides. *What did
+  not:* **"exactly ONE build per cycle" is not withdrawn** — it is a throughput rule independent of
+  cards and still binds through the runbook's cycle contract. **As originally shipped:** filing a
+  gated-before-build
   or removal-proposed card is bookkeeping, not a build — the cycle then drops to the next
   available queued ticket and runs it on the same schedule. Still exactly ONE build per cycle;
   carded tickets go pending immediately so no cycle re-trips on them. Only walls and blockers
@@ -217,7 +275,8 @@
   **top five** (queue #, ticket ID, named class, short title, gated flag) so John can see what
   upcoming cycles will do and choose to run the schedule early. Run-now (mobile app /
   claude.ai/code/routines) consumes queue #1 **without shifting the fixed clock schedule**;
-  the next scheduled fire takes whatever is then next. Overlap guard (B17 backfill) protects
+  the next scheduled fire takes whatever is then next. Overlap guard (B17 backfill; B17's own row
+  was superseded by `M6-05` on 2026-09-01, and the guard it describes is unaffected) protects
   the race. Until `SES-86`, the preview is computed at rebuild; after, it is rows 1–5.
 - **B26. Briefing shows the `now`-tier ticket census (John, 2026-08-20):** a count of all open
   backlog tickets remaining in tier `now`, broken down by named priority class (one line per
@@ -225,7 +284,14 @@
   data every cycle. **Amendment (John, same day): the page top also carries a compact
   "Next 3" — `ID — title` for the queue's next three — glanceable without scrolling; B25's
   fuller top-five section sits below.**
-- **B27. Build-vs-ask decision (John's question, 2026-08-20) — two axes at pick time, four
+- **B27. Build-vs-ask decision (John's question, 2026-08-20) — SUPERSEDED 2026-09-01 by `M6-06`
+  (`SES-285`, `v7.0.359`); `superseded_by = 'M6-06'`, ledger #28.** Original wording kept below.
+  *What changed:* outcomes (3) and (4) named a **gated card** as the defined result for the
+  ambiguous middle of the matrix — so the cases where a decision was most needed were precisely the
+  ones routed away from being decided. Those two branches are withdrawn. *What did not:* **the two
+  axes survive as a reasoning tool, not as a routing table** — authority and specification
+  completeness are still the right questions at pick time; every answer now ends in a decision plus
+  its recorded reasoning. **As originally shipped — two axes at pick time, four
   outcomes:** Axis 1 authority (the gated list — fails to John regardless of clarity); axis 2
   specification (every open question answerable from: the ticket text, governing architecture,
   vision corpus + decision patterns, or an existing code pattern — else it's John's judgment
@@ -238,13 +304,28 @@
   session is the fallback, never the default. **Continuation clause (John, same exchange):
   outcomes 3/4 never end the cycle — the ticket goes pending, the cycle drops to the next
   queued ticket per B24 and still delivers its one build.**
-- **B28. Exposure rate on the briefing (John, 2026-08-20):** a line tracking cards that needed
+- **B28. Exposure rate on the briefing (John, 2026-08-20) — RETIRED 2026-09-01 by `SES-285`
+  (`v7.0.359`), no replacement rule; `status = 'retired'`, ledger #29.** Original wording kept
+  below. *Why no successor:* it measures a quantity that is now structurally zero, so a
+  week-over-week trend of it reports `0 vs 0` forever — a metric that cannot move cannot inform.
+  Its *goal* is achieved outright rather than trended toward. *What survives:* **rule-mining from
+  decided items matters more, not less** — the corpus it mines is now the cycle's own recorded
+  reasoning (`M6-01`, `M6-06`), which is larger and better attributed than the decided cards ever
+  were. **As originally shipped:** a line tracking cards that needed
   John's judgment this week vs. last — the learning loop's visible metric. Every decided card
   (decision + reason, structured) feeds `SES-79` mining → criteria in the decision-patterns
   file / vision corpus → B27 axis 2 consults them, so repeated question-shapes stop reaching
   John. Generalizations are never silent: three similar taps → a proposed-rule card (B14),
   John's tap ratifies. The floor is novel judgment only — nothing should need him twice.
-- **B29. The daily "help me" ticket (John, 2026-08-20):** the briefing nominates **one ticket
+- **B29. The daily "help me" ticket (John, 2026-08-20) — RETIRED 2026-09-01 by `SES-285`
+  (`v7.0.359`), no replacement rule; `status = 'retired'`, ledger #30.** Original wording kept
+  below. *Why no successor:* it is a daily ask, which is the shape John's instruction removed, and
+  it had the cards' own failure mode — one nomination a day into a surface with a two-thirds
+  non-response rate. Under `M6-01` a cycle with an open question decides it and records the
+  reasoning instead of nominating it. *What survives:* **a genuinely stuck ticket is still
+  visible** — `M5-10`, amended in the same commit, surfaces a three-cycle stall with its defer
+  reason in the standing brief. Visibility without a question attached. **As originally shipped:**
+  the briefing nominates **one ticket
   per day where the runner needs John** — selected from the pending-on-John set by the SAME
   ordering as automation (tier → class → beta → newest), so it changes daily with what's
   pending. The card carries the specific questions (B27's card content) and invites a manual
@@ -289,8 +370,11 @@
   read this file to honour it. **It still retires itself, exactly as this register said it would:**
   a `done` ticket leaves the ranked set, so the lane evaporates when the last one closes — that is
   the mechanical form of his "until automation is complete", and no cycle ever declares it over.
-  **Not yet built, and named so it is not assumed:** B23's pins. When they land, a pin sorts
-  **above** `automation_rank` — John's live tap outranks a standing build order.
+  **Not yet built, and named so it is not assumed — now moot on its stated source:** the pins this
+  paragraph attributed to B23. **B23 was retired 2026-09-01 by `SES-285`**, so the pin requirement
+  no longer descends from it; the surviving authority for a pin is `B5`, which is still live. When
+  pins land, a pin sorts **above** `automation_rank` — John's direction outranks a standing build
+  order.
   **Second half of his line NOT actioned, carded instead:** "run as many in parallel as possible"
   collides with the `runner_lease` (B31 — since SUPERSEDED by B42, recorded 2026-08-24, attended
   decision-drain, on John's SES-176 Accept: the one-runner mutex is retired, parallel cycles are
@@ -310,8 +394,16 @@
   `SES-83` phases (d)/(e) flip the database to authoritative. **Consequence for any future
   markdown↔DB reconciliation:** `source_file='heal-engine'` must be added to that script's
   ignore-list, or a naive orphan sweep will delete every heal-filed ticket as unmatched.
-- **B34. A gated Accept is permission, not a rating (John, 2026-08-21, directive `fb643367`):**
-  asked outright whether an Accept on a `gated_before_build` card should count toward the trust
+- **B34. A gated Accept is permission, not a rating (John, 2026-08-21, directive `fb643367`) —
+  SUPERSEDED 2026-09-01 by `M6-07` (`SES-285`, `v7.0.359`); `superseded_by = 'M6-07'`, ledger #32.**
+  Original wording kept below. *Why a correct rule was superseded:* **B34 was right and remains
+  right — its subject simply no longer arrives.** With the card surface withdrawn there are no
+  gated Accepts to exclude, so leaving it live would point a live rule at nothing. **Its reasoning
+  is the reasoning `M6-07` is built on**, which is why this is not a reversal of it. *What
+  survives, executably:* `public.apply_ladder_decision()` still short-circuits every
+  `kind = 'gated_before_build'` row with the reason *"gated card — permission is not a rating
+  (B34), ladder untouched"* — which is why closing 44 cards in `SES-285`'s migration moved the
+  ladder by exactly zero rungs. **As originally shipped:** asked outright whether an Accept on a `gated_before_build` card should count toward the trust
   ladder, John answered **"no"**. An Accept there authorises that one build and re-enters the
   ticket at queue #1 (B23); it writes `decision`/`decision_reason`/`decided_at` like any tap and
   **does not touch `runner_ladder`**. The ladder measures the runner's *unattended* judgment, fed
@@ -330,14 +422,29 @@
   the gated lane, so `v7.0.118` **carded** the exact replacement text for John's Accept instead of
   editing it.
 
-- **B35. John's three answers, 2026-08-21 (directive `1d01ea85`, shipped `v7.0.121`):** one line
+- **B35. John's three answers, 2026-08-21 (directive `1d01ea85`, shipped `v7.0.121`) — SUPERSEDED
+  2026-09-01 by `M6-07` (`SES-285`, `v7.0.359`); `superseded_by = 'M6-07'`, ledger #33. READ THE
+  SCOPE OF THIS ONE BEFORE ACTING ON IT.** Original wording kept below. **Only answer (1) —
+  Reverse-on-gated — lost its subject.** B35 bundles three unrelated rulings into one registry row,
+  so superseding the row is the only way the registry can say that one of them no longer has
+  anything to apply to; `M6-07` carries that ruling forward in the form that still does have a
+  subject: **a reversal demotes.** **Answers (2) and (3) are UNAFFECTED and still binding, and
+  neither is an M6 matter:** *the budget day boundary is midnight America/Chicago* (still what
+  `runner_budget` is read against), and *a dead-cycle report must state why it died and what to do
+  next* (still the `did_not_run` contract in `docs/runbooks/runner-cycle.md`). Both are restated in
+  that runbook independently of this row. They are John's rulings and were never withdrawn.
+  **As originally shipped:** one line
   into the briefing directive box — `1.leave it 2. Midnight cst 3.need to know why it died and
   what to do next` — answering the three "Help me" questions the `v7.0.118` page asked, in its
   order. All three are now in the procedure rather than in a directive row.
-  - **(1) Reverse-on-gated → "leave it".** `B34` deliberately left this half open rather than
-    close it by inference. John has now ruled: a Reverse on a `gated_before_build` card **still**
-    sets the streak to 0 and demotes a rung. The behaviour does not change; its **status** does —
-    it is settled, and the briefing and the runbooks stop carrying it as an open question. `B34`'s
+  - **(1) Reverse-on-gated → "leave it" — the one answer of the three that `M6-07` superseded on
+    2026-09-01, because gated cards no longer exist to be reversed.** `B34` (also **superseded**,
+    by the same rule) deliberately left this half open rather than
+    close it by inference. John ruled: a Reverse on a `gated_before_build` card **still**
+    sets the streak to 0 and demotes a rung — a ruling `M6-07` carries forward in the form that
+    still has a subject, *a reversal demotes*. The behaviour did not change; its **status** did —
+    it was settled, and the briefing and the runbooks stopped carrying it as an open question.
+    `B34`'s
     second "deliberately not done" is therefore **closed**; its first (no retroactive re-derivation
     of the ladder's history) stands untouched and still awaits the word "rewind the ladder".
   - **(2) The budget day → "Midnight cst".** "Today", on both budget tracks, is an
@@ -373,7 +480,8 @@
 
 - **B37. A silent cycle is not a dead cycle — measured, and it corrected this same cycle's own
   rule before it shipped (`v7.0.121`, 2026-08-21).** While `v7.0.121` was writing B35(3)'s
-  dead-cycle rule, the two cycles that rule was *about* — `ba8f2ce3` (started 03:52Z) and
+  dead-cycle rule — **B35's row was later superseded by `M6-07` (2026-09-01) for its
+  Reverse-on-gated clause only; answer (3), the dead-cycle report, is unaffected and still binds** — the two cycles that rule was *about* — `ba8f2ce3` (started 03:52Z) and
   `633fe486` (05:07Z), both pronounced `outcome='failed'` by a successor at 08:24Z on the
   strength of the 45-minute lease TTL — **woke up and finished**. At 13:11Z and 13:12Z they
   wrote their own token accounting, detected the live lease, **correctly declined to push and
@@ -582,6 +690,8 @@
 read when upstream ships) · SES-83 (backlog→DB; a ✅ v7.0.100, b/c queued, d/e gated) ·
 SES-84 (vision corpus, drip model) · **SES-85 (classification sweep) · SES-86 (queue engine) ·
 SES-87 (revalidation flow) · SES-88 (invention wiring)** — the four cut on C4's approval,
-dependencies in each row. B14 extends existing SES-79; B9/B11 are rulebook edits, not tickets.
+dependencies in each row. B14 extends existing SES-79 (B14 was **superseded** by `M6-02` on
+2026-09-01 — only its tap-ratifies clause; the mining half it extends SES-79 with is unaffected);
+B9/B11 are rulebook edits, not tickets.
 
 **Directives queued:** SES-83 phases b+c (id `5e4bc577`, with John's amendments).
