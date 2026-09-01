@@ -5,6 +5,79 @@
 
 ---
 
+## session/cycle-20260901-0440 (v7.0.357, 2026-09-01, runner cycle `8af80ad7-b009-486d-979f-7879b1af116b`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (11 PM America/Chicago) — Opus 5 orchestrator, **with a Sonnet 5 subagent delegated to for the mechanical surface survey**, per register B21 as amended by directive `87018d83`) — `SES-269` — **the runner's own silence becomes a measured number, and the thing to read twice is that the ticket's own fix line, implemented literally, is silent on the incident it was filed from.**
+
+### The fix the ticket names cannot see the incident the ticket is written from
+
+`SES-269` asks for *"a 'no fire in N hours' line on the briefing."* The literal implementation of
+that sentence is `now() - max(started_at)` — the age of the newest `runner_cycles` row — and **that
+form can never report a silence that has already ended.** The only cycle in a position to report one
+is, by construction, alive.
+
+Measured rather than argued. The real silence was **38.97 hours**, `2026-08-26T12:43:36.977Z` to
+`2026-08-28T03:42:00.597Z`, found by scanning every gap between consecutive fires over the trailing
+14 days — and corroborated independently, found rather than recalled, at
+`docs/harvests/DIR-60d35b49.md:126`, where a governance review had already written the same window
+down as an unaddressed finding. At the recovering fire the newest row was **zero minutes old**. This
+ship's own live run prints both answers side by side: `currentGapHours: 0.16` beside
+`worst.hours: 38.97`.
+
+### The second trap is in the ticket's premise, and it is a clock
+
+`SES-269` says *"2026-08-27 produced ZERO rows."* True of the **UTC** day. On **John's** clock —
+America/Chicago, the boundary step 3 mandates for every "today" (directive `1d01ea85`, register
+B35) — **2026-08-27 held two rows**: `03:42Z` and `04:42Z` UTC are 22:42 and 23:42 CST. So the
+obvious build, the one the ticket's own title suggests, *does not fire on the incident it was filed
+from*. A second control closes the escape hatch: a 20-hour hole sitting inside one day is invisible
+to a day-bucket form on **either** clock, so the first control is not an artefact of which day is
+used.
+
+### Nothing was watching, and the two things that look like they were are watching something else
+
+`stall_watchdog()` closes a cycle row that is **open** and has gone quiet — a silence has no open
+row. `deepbench-staleness-watchdog` reads `runner_usage_readings` and `PARKED` directives, not
+absent fires, and **did not exist until `2026-08-28T16:31Z`**, after the hole had closed. A
+repo-wide survey for any "hours since the last cycle" computation returned nothing at all.
+
+### What shipped, and the one number that is not a number
+
+`scripts/check-cycle-cadence.js`, a new step **4a-quinquies**, and
+`tests/regression/SES-269-cycle-cadence.js`. The threshold is
+`max(6, runner_settings.interval_hours × 4)` — a column times a named multiple, never a literal (the
+`SES-146` "a column, not a literal" correction, third time). The `6` is not chosen either: it is the
+cron period of `deepbench-staleness-watchdog`, the only independent watcher on this platform, below
+which this alarm adds nothing. One push per hole, keyed on **that gap's own end** — a per-day marker
+would re-push a 39-hour hole on every calendar day it touched.
+
+### QA was three live arms and four mutations, and mutation 1 *is* "the change did nothing"
+
+The real script against real Supabase found the real 38.97h hole and read John's real
+`interval_hours=1` (exit 1); the credential withheld returned exit 2 *cannot-run*, **not** clear.
+Then each of the four decisions was mutated in turn — the between-fires scan disabled, the threshold
+hardcoded, an unmeasurable board called clear, the suppression key made a calendar date — and the
+guard was asserted **red on every one** and green on the restored tree.
+
+### Shipped `partial`, not auto-done — and `blocked_by` is NULL on purpose
+
+The verifier returned `approve` with `auto_done_eligible: YES` under the Prime Directive's §2f
+widening. It was not taken, on `SES-47`'s own precedent (`v7.0.345`) and §2f's own clause —
+*uncertain → deliver and card, never auto-done*: the briefing line the ticket's Fix names is not
+built, so `done` would be a false statement about a ticket whose named fix is unbuilt. But the
+remainder is **buildable**, not blocked: directive `27b5d8cb` bars an unattended cycle from
+**publishing** the page, never from building it, and §2b's `deriveAutomation()` already reads
+`runner_cycles`. So `blocked_by` stays NULL, which is John's criterion verbatim (`07dea95e`):
+*"keeps partial re-pickable when the remainder IS buildable."* The M5 drain handing `SES-269` back
+next cycle is the design, not the `SES-218` defect. The half that genuinely needs a session John
+attends is the live-during-a-hole alarm — it belongs in his own 6-hourly watchdog routine, and an
+unattended cycle may not edit his routines.
+
+**Stamp discipline.** Held at 5 per session-hygiene check 7: `v7.0.345` moved verbatim to this
+file's appendix, `SES-164` step 2 run **first by grep** rather than recollection. Nine of its
+warnings survive in step 4a-ter's body; the pagination control has an executable home in `SES-47`'s
+own guard; the one with **no** home anywhere — `Number(null)` is `0`, so an undeterminable count
+rendered as *"zero deployments today, all clear"* — was **relocated** into step 4a-quinquies rather
+than archived, because it now governs three probes rather than the one that paid for it.
+
 ## session/cycle-20260901-0340 (v7.0.356, 2026-09-01, runner cycle `404ef8d1-fbab-4156-ae38-6e66cbebf468`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5 subagent delegated to for the root-cause verification**, per register B21 as amended by directive `87018d83`) — `SES-265` — **the standing brief's "rendered at every ship" claim becomes true, and the thing to read twice is that nothing was ever failing.**
 
 ### The sentence did not go stale; it described a step that did not exist
@@ -12272,6 +12345,23 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > docs/SESSIONS-ARCHIVE-2026-0607.md. Live file holds current + previous month; a monthly
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
+
+<!-- DeepBench v7.0.345 | runbooks/runner-cycle.md | SES-47 — THE VERCEL CEILING BECOMES A MEASURED NUMBER, and the thing to read twice is WHY THE WINDOW IS A TRAILING 24 HOURS RATHER THAN A DAY. John ruled the fork the ticket left open (directive e2c05416, attended architect session 2026-08-31, verbatim "option 1"): stay on the free tier, the 100-deploys/day cap is deliberately ACCEPTED and NOT raised, build the tracking instead. TWO CALENDAR DAYS ARE IN PLAY AND NEITHER IS KNOWABLE FROM A CYCLE: John's spending day is America/Chicago (1d01ea85, register B35) but that governs HIS budget and Vercel does not read it, and Vercel's own quota reset boundary is not in the API response, not in runner_secrets, and not verifiable from this session — so asserting one would be the "report a number that doesn't trace to a row or log" the standing prohibitions forbid. A trailing 24h count is >= any fixed-window count over the same traffic BY CONSTRUCTION, so it can only alert EARLY, never late; the script names its own window in its output so the number traces to a stated window rather than an assumed reset. THE EDIT THIS FORBIDS: "correcting" the window to a calendar day — that is not a tightening, it is a guess about somebody else's billing clock, and it makes the alarm fire LATE on exactly the burst days it exists to catch. THE COUNT IS ACCOUNT-WIDE AND THAT WAS MEASURED, NOT ASSUMED: the cap SES-33 hit is an ACCOUNT limit, and check-deploy-current.js's ?app=deepbench-frontend filter would under-count the moment a second project exists — probed live at this ship, the unfiltered and filtered queries BOTH returned 18 over the trailing 24h, {"deepbench-frontend":18}, i.e. they agree today ONLY because this account deploys one project, which is precisely why the agreement must not be baked in. THE HALF A REBUILD DROPS IS PAGINATION: /v6/deployments caps a page at 100 and THE CEILING UNDER TEST IS 100, so a single-page read reports at most 100 and can NEVER observe an overrun — it prints "100/100, 0 remaining" on a day that actually burned 137. The guard runs that retired single-page form on the SAME 137-deployment fixture and asserts it reports 100 where the shipped walk reports 137: a DIFFERENCE, not a property both share. THE THRESHOLD IS INCLUSIVE — "cross 80" starts AT 80; written `used > ALERT_AT` the 80th passes silently and John loses one of the twenty deploys he left himself, and the guard runs that retired form on used=80 and asserts it stays clear. A DEFECT THIS SHIP FOUND IN ITSELF, disclosed rather than buried: verdictFor() first read `Number(used)`, and Number(null) is 0 — finite, non-negative — so an undeterminable count rendered as "zero deployments today, all clear", an unknown wearing the safest possible number. The guard caught it BEFORE the ship, which is the test earning its keep early; the typeof test is now first and carries that reason. WHAT A RED NUMBER DOES NOT AUTHORISE, and it is tempting because the fix costs $20: upgrading. John's own prohibition rides in the script header verbatim — "no cycle may upgrade on its own" — and the guard asserts that sentence is still there. QA WAS THREE LIVE ARMS plus fixtures: the real API with the real token (18/100, 82 left, agreeing exactly with an independent probe), the token withheld (exit 2 cannot-run, NOT clear), and the human-readable form. DECLARED REMAINDER, named rather than left to be found: John's ruling has TWO halves and only the alarm shipped — the briefing headroom render is barred by directive 27b5d8cb ("b with the bridge"), which forbids an unattended cycle republishing the page, so SES-47 is partial and that half is on its ship card. Stamp count held at 5 per session-hygiene check 7: v7.0.334 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep rather than recollection — all five of its prose warnings survive in step 4a-bis's body, and the sixth (pickServing is IMPORTED from check-deploy-current.js, never a second implementation) lives in scripts/check-deploy-serving.js and its guard, an executable home stronger than a relocated sentence, so it is archived rather than re-prosed. Guarded by tests/regression/SES-47-deploy-quota-headroom.js. Doc + script + test; no src/api/lib change, no site change, no schema change, no migration. -->
+
+**Retired by `SES-269`'s cycle (`v7.0.357`, 2026-09-01) to hold the stamp count at 5 — `SES-164`
+step 2 was run FIRST by grep rather than recollection.** Nine of this stamp's warnings survive in
+step 4a-ter's own body (the trailing-24h window and the refusal to "correct" it to a calendar day,
+the account-wide count and the `?app=` filter that would under-count, pagination, the inclusive
+threshold, John's `no cycle may upgrade on its own`, the `partial` remainder and directive
+`e2c05416`). The pagination negative control — a single-page read reports 100 on a day that burned
+137 — has an EXECUTABLE home in `tests/regression/SES-47-deploy-quota-headroom.js`
+(`theSinglePageFormCannotSeeAnOverrun`), which is stronger than a relocated sentence, so it is
+archived rather than re-prosed. **One warning appeared ZERO times anywhere in the body and was
+RELOCATED rather than archived:** `Number(used)` first read an undeterminable count as `0` —
+finite and non-negative — and rendered it as *"zero deployments today, all clear"*, an unknown
+wearing the safest possible number; the `typeof` test comes first. It now governs three probes
+(`check-deploy-quota.js`, `check-deploy-serving.js`, `check-cycle-cadence.js`) rather than the one
+that paid for it, so it sits in step 4a-quinquies' body where all three can see it.
 
 <!-- DeepBench v7.0.339 | runbooks/runner-cycle.md | SES-255 — THE GREEN ANCHOR'S READ STOPS BEING A GITHUB CALL, and the thing to read twice is THAT THIS CYCLE'S OWN FIRST DIAGNOSIS WAS WRONG AND IS RECORDED AS WRONG. Step 4a told every cycle to read CI's conclusion "through your own GitHub tooling"; MEASURED THREE TIMES, never quoted: the REST listing for one ci.yml run on dev at per_page=1 returned 71,371 chars (cycle b0a3dde5), then 71,575 (this cycle), each over the tool-result cap and overflowing into the ~/.claude/.../tool-results/ path REGISTER B39 FORBIDS AN UNATTENDED CYCLE TO SHELL-PROCESS. The orchestrator then measured raw HTTPS to api.github.com returning 403 "GitHub access is not enabled for this session" EVEN WITH the GITHUB_TOKEN this environment carries, and concluded there is NO network path at all — which would have made the ticket's own "bounded proxy = ordinary cycle work" route impossible and forced a gated card. THE FABLE 5 SUBAGENT RE-RAN THE MCP CALL AND GOT 71,575 CHARACTERS BACK: the connector path IS reachable, only raw HTTPS is proxy-blocked, and the ticket's original size-cap + B39 diagnosis was right all along. The false finding is written into the kickoff rather than quietly dropped — a wrong mechanism in the ledger is what a later cycle would have built on. WHAT ACTUALLY DECIDES THE DESIGN is that NO BOUNDED sha->conclusion READ EXISTS ON ANY SURFACE A CYCLE HAS: actions_list takes no head_sha and no minimal-output flag (one run object is ~70KB), the bounded actions_get/get_check_run need an id obtainable only from the oversized listing, the pull_request_* forms need a PR number and a dev push is not a PR, and a git-level read carries no check conclusions. A proxy the cycle HOSTS would still call api.github.com and need a credential — which SES-255's own decision boundary reserves to John. SO THE DIRECTION IS INVERTED: ci.yml's report-conclusion job reads needs.<job>.result and upserts public.ci_run_conclusions, and step 4a reads THAT. NO SECRET IS PROVISIONED — both keys are the repository secrets SES-180 (d) already exposes, which is what keeps this out of the John-only lane ci.yml's header names (adding secrets; branch protection). AUTHORITY WAS VERIFIED, NOT ASSUMED: docs/SESSIONS.md records cycle b9f90b84, trigger=scheduled, UNATTENDED, shipping this same file as P10 - Tooling in v7.0.286 — a strictly more consequential edit. THE ENGINE IS UNTOUCHED: rollback-on-red.js is not edited, TRIGGER_SOURCES is unchanged, the cycle still mediates --jobs, so John's accepted SES-182 design (the conclusion is PASSED IN) is preserved and only the read instruction moved. THE EDIT THIS SHIP FORBIDS, and it is tempting because isRunGreen() already refuses a cancelled as green: collapsing step 4a's THIRD verdict into the second. isRunGreen returning false is not the claim "this run was red" — cancel-in-progress cancels superseded runs routinely — and ARM F PROVED IT rather than arguing it: a cancelled handed in as ci-red lands on the RED branch. A missing row is likewise stale, never bad. THE GUARD'S LOAD-BEARING ASSERTION IS COMPUTED, NEVER LISTED: `needs` must cover every other job in the shipped YAML, differenced from it — a hardcoded [build,checks] passes forever on a file that grew a fourth job, whose failure the anchor would then silently forget. THREE DISCRIMINATING ARMS on the real file, tree restored byte-identical: a 4th job absent from needs -> exit 1 (missing: lint); the push guard dropped -> exit 1; restored -> exit 0. FILE-LEVEL NEGATIVE CONTROL: the same assertions run against origin/dev's ci.yml and MUST fail there; they do. LIVE SEAM PROOF through CI's exact curl: POST ok, second POST ok with 1 row (upsert not duplicate), anon key DENIED 42501 on both read and write WITH a same-key control returning 200 on three tables it may read (the first attempt used a FAKE key, returned 401 for the wrong reason, proved nothing, and was redone — SES-101's both-directions rule), the row read back driving the REAL engine to record-green, and failure/cancelled both refused. Tree re-read after: 0 fixture rows, 0 stray anchors. DISCLOSED RATHER THAN BURIED: the fixture INSERT's before-image (row_data NULL) was written AFTER the insert, not before it; §19v wants it first. DOWN CAPTURE CAME BACK auto-downable (drop table) — unlike the last three ships this one IS auto-rollbackable. Stamp count held at 5 per session-hygiene check 7: v7.0.333 moved VERBATIM to docs/SESSIONS.md's appendix, checked FIRST by grep — four of its six warnings survive in this body, and the two that do not have durable homes beside the code (schemaPlanFor's empty-on-miss at rollback-on-red.js:26,175; the 42702 shadowing defect at SESSIONS.md:408), so they are archived rather than re-prosed. Guarded by tests/regression/SES-255-ci-conclusion-reporting.js. Doc + workflow + test + migration; no src/api/lib change, no site change. -->
 
