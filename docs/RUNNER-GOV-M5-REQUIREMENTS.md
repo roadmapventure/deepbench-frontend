@@ -337,3 +337,69 @@ lane, `SES-43` (queue 251, filed pre-cut) now sorts **ahead of** `SES-288` (queu
 | `docs/RUNNER-GOV-M6-REQUIREMENTS.md` | The M6 autonomy register (`M6-01`–`M6-08`), which withdrew thirteen 0820 rules and amended the three rules noted above. |
 | `docs/SELFBUILD-RETIREMENT-LEDGER.md` | B3's retirement entry, with the reason and the restore path. |
 | `docs/SELFBUILD-CHARTER.md` | The rolling-wave rule, the transition rule and the storage rule these fifteen answer to. |
+
+---
+
+## The M5 gate decision — `SES-184`, decided 2026-09-02 (`v7.0.370`)
+
+<!-- FEATURE: SES-184 — the M5 design gate, decided rather than asked. M6-01: no cycle blocks on a
+     human decision; it decides with recorded reasoning. This section IS that record. Reversible
+     under M6-02's 72h window. -->
+
+**Decided by attended session `design-m5-gate-0902`, not by a card.** The card surface was retired
+by `SES-285`; `M6-01` requires the decision be made and its reasoning recorded, which is this
+section. It is reversible for 72 hours under `M6-02`.
+
+### What M5 promises, and which ticket carries each promise
+
+`SES-184`'s own scope names three pillars. Measured against the board, one had no member at all:
+
+| Pillar | Carried by | State at the gate |
+|---|---|---|
+| **1. Outcome telemetry** — did shipped work change the metric it claimed? | `SES-303` | **Had no ticket until 2026-09-02.** A board-wide search found nothing covering it, so M5 could not have completed as chartered no matter how the existing list was worked. Filed at this gate, `scope_origin = original`. |
+| **2. Heal-engine v2** — fix-confirmation and recurrence re-filing | `SES-276`, proven by `SES-277` | Both filed at the M4 gate review, both blocked on this gate |
+| **3. Usage/budget instrumentation** | `SES-82`, `SES-161` (`SES-104` done) | Named in `SES-184`'s own text as absorbed |
+
+**Plus one enabler, ruled into the required set:** `SES-282` — `runner_cycles.item_id` has no
+foreign key, so a shipped change cannot be attributed to the ticket that claimed it. Pillar 1 cannot
+measure what it cannot attribute, so `SES-282` is required *for* M5 rather than merely adjacent.
+
+**And one detection member, ruled in:** `SES-269` (silent cron days). The charter's goal 4 is that
+"production failures are **detected**, ticketed, fixed, and confirmed-fixed by the loop itself" —
+runner silence is such a failure. Ruled in on evidence, not theory: on 2026-09-01 the cron went
+silent for **13.4 hours** and nothing noticed, the second such hole after 2026-08-27, which is the
+incident `SES-269` was filed from.
+
+### M5's required set — 8 tickets, 16 cycles
+
+`SES-184` (this gate) · `SES-82` · `SES-161` · `SES-282` · `SES-303` · `SES-276` · `SES-277` · `SES-269`
+
+**M5 is complete when those close.** Completion is a property of that set, not of the epic label.
+
+### Seven tickets carry the M5 epic and do not serve M5
+
+Ruled here so the milestone's definition of done is not silently inflated by 11 cycles of unrelated
+work. **They are not cancelled and not deprioritised — they serve a different milestone**, and the
+re-homing is deliberately left to John rather than executed here, because moving seven tickets
+across four milestones on the same night he asked for caution about ticket churn would be the
+churn he objected to.
+
+| Ticket | Serves | Why not M5 |
+|---|---|---|
+| `SES-295` scope rationale + backfill | M2 — Truth Infrastructure | A field every ticket must carry and that must be auditable. Not outcome telemetry. |
+| `SES-284` B30 status ruling | M2 — Truth Infrastructure | Registry hygiene: a rule that may have expired without a ledger entry. |
+| `SES-283` the enhancement lane | M7 — The Inventor | Governs how *new* features are admitted; M7 is where the platform originates them. |
+| `SES-247` chain gate hands back the partial | M6 — Autonomy Graduation | Drain execution mechanics. |
+| `SES-260` `.env.local` privileged keys | M4 — Infrastructure Floor | M4's own text: "secrets off one machine." |
+| `DAT-25` offsite backup mirror behind | M4 — Infrastructure Floor | M4's own text: "backups/PITR." |
+| `SES-123` routines notifications | M4 — Infrastructure Floor | M4's own text: "notification reliability." |
+
+**The M4 three reopen M4 if moved**, which is the honest consequence and the reason this is John's
+call rather than a bookkeeping edit: a milestone whose gate was accepted does not silently reacquire
+members. If he prefers, they stay where they are and M5 simply carries them without owing them.
+
+### What this gate deliberately does not decide
+
+The **M6 budget review** (`SES-185`) and anything about retiring the runner routine. Tonight's
+13.4-hour cron silence is real and is `SES-269`'s subject, but whether the routine survives is an
+M6 question and belongs to that gate.
