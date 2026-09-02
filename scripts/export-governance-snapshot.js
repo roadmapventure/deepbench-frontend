@@ -53,7 +53,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { pathToFileURL } from "url";
+import { pathToFileURL, fileURLToPath } from "url";
 
 function arg(name, fallback) {
   const prefix = `--${name}=`;
@@ -61,7 +61,14 @@ function arg(name, fallback) {
   return hit ? hit.slice(prefix.length) : fallback;
 }
 
-const WORKTREE = arg("worktree", process.cwd());
+// FEATURE: SES-282 — default the repo root to THIS SCRIPT'S OWN repo, not the caller's cwd.
+// Found live 2026-09-01: invoked by absolute path from outside the worktree, the old
+// `process.cwd()` default wrote docs/governance/RULES-SNAPSHOT.md into C:\Projects\ — OUTSIDE the
+// repo entirely — and reported success. A generator that reports success while writing where
+// nobody reads is the same class of defect as the item_id gap this ticket exists for: tooling that
+// looks green and is measuring, or writing, the wrong thing. `--worktree=` still wins when given.
+const SCRIPT_REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const WORKTREE = arg("worktree", SCRIPT_REPO_ROOT);
 const JSON_OUT = process.argv.includes("--json");
 
 const PAGE_SIZE = 500;
