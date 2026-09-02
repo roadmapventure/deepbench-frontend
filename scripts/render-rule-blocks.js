@@ -21,6 +21,37 @@
 // pre-commit tripwire, a checker that silently no-ops without credentials is a FALSE ALL-CLEAR, and
 // governance_rules is service_role-only since SES-174, so a live read could not work here even in
 // principle. A missing snapshot is a loud failure naming the regeneration command, never a skip.
+//
+// DeepBench v7.0.402 | scripts/render-rule-blocks.js | SES-313 -- three changes:
+//
+// (1) A CRLF byte reaching the compare, found live rather than guessed at: this repo's runbooks are
+// CRLF on disk (git stores LF; checkout re-introduces \r) and the block-extraction loop below used
+// to split on a bare "\n", leaving each `found` line carrying a trailing "\r" that the LF-only
+// `expected` lines never have. `found.join(" / ")` in the finding's own detail then printed the two
+// as if identical, because a bare \r moves a terminal's cursor to column 0 and the rest of that same
+// console.error call overwrites what it had already printed -- a false DRIFTED report on text that
+// had not moved, on B40 and B18's rendered blocks (measured on origin/dev: 2 markers, both CRLF).
+// Fixed by comparing (and reporting) the trailing-\r-stripped form while still consuming the ORIGINAL
+// (possibly \r-terminated) line lengths when repairing, so --write's byte offsets stay correct on a
+// CRLF file. A checker that cries wolf on unmoved text is a checker nobody runs.
+//
+// (2) A second marker kind, {{lanes}}, rendered from docs/governance/MODEL-LANES-SNAPSHOT.md
+// (public.runner_model_lanes' offline copy, same contract as RULES-SNAPSHOT.md) rather than
+// governance_rules -- B21's model-per-lane routing table, ported to data at M6. Same fenced-block
+// exclusion, same "marker is the first token inside the comment" guard, same expand-in-place shape;
+// {{rule:ID}} and {{lanes}} are collected in one pass so --write's back-to-front offset walk stays
+// correct across both kinds in the same file.
+//
+// (3) docs/kickoffs/ is now excluded from the scan (EXCLUDE_PREFIXES), for the SES-180 self-flagging
+// trap in a new costume: this very ticket's own kickoff (docs/kickoffs/v7.0.402-SES-313-model-lanes.md)
+// illustrates the {{lanes}} block format as an inline, UNFENCED backtick span -- unlike SES-175's
+// kickoff, which fenced its {{rule:ID}} illustration and so was already inert here. Once {{lanes}}
+// exists, that unfenced example is a real match with no rendered block after it: a marker this
+// script would legitimately have to report as `missing-block`, on a file no runner cycle ever reads
+// mid-run. A kickoff is a point-in-time instruction set, not a live runbook, and its ten prior
+// members already quote marker syntax as prose/illustration data with zero live markers among
+// them (measured: 0 of 10 kickoff files under docs/kickoffs/ currently match {{rule:...}} outside a
+// fence) -- so the exclusion changes nothing about today's coverage and forecloses the whole class.
 
 import fs from "fs";
 import path from "path";
@@ -28,15 +59,19 @@ import { fileURLToPath } from "url";
 
 const WORKTREE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULES_SNAPSHOT_REL = "docs/governance/RULES-SNAPSHOT.md";
+const LANES_SNAPSHOT_REL = "docs/governance/MODEL-LANES-SNAPSHOT.md"; // SES-313
 
 // Generated files are excluded from the scan for the reason check-session-docs.js states: they carry
 // ticket PROSE that quotes rule ids and marker syntax as DATA, and RULES-SNAPSHOT.md is the input
 // itself. SESSIONS-ARCHIVE-* is history — a retired stamp must never be rewritten to today's text.
+// docs/kickoffs/ joined SES-313 -- see the v7.0.402 header note above for why a kickoff's own
+// unfenced illustration of a marker is exactly this same class of false positive, one file later.
 const EXCLUDE_RELS = new Set([
   RULES_SNAPSHOT_REL,
+  LANES_SNAPSHOT_REL,
   "docs/backlog/BACKLOG-SNAPSHOT.md",
 ]);
-const EXCLUDE_PREFIXES = ["docs/SESSIONS-ARCHIVE-"];
+const EXCLUDE_PREFIXES = ["docs/SESSIONS-ARCHIVE-", "docs/kickoffs/"];
 
 // Carried from check 11 rather than re-invented: `{{rule:ID}}` is how this family of docs WRITES
 // ABOUT the syntax, and `ID` is not a name any rule may have.
@@ -47,6 +82,12 @@ const MARKER_PLACEHOLDERS = new Set(["ID", "<ID>", "RULE-ID", "<RULE-ID>", "rule
 // 11's first run flagged its OWN documentation, because prose explaining the syntax looks exactly
 // like a use of it. Prose never opens an HTML comment with the marker, so prose is inert here.
 const MARKER_RE = /<!--\s*\{\{rule:([^}]*)\}\}([\s\S]*?)-->/g;
+
+// SES-313 -- the second marker kind, same first-token-in-comment shape, no id capture (there is
+// exactly one lanes table, never a family of them).
+const LANES_MARKER_RE = /<!--\s*\{\{lanes\}\}([\s\S]*?)-->/g;
+const LANE_ORDER = ["orchestrator", "judgment", "mechanical"];
+const LANE_FIELDS = ["lane", "model_id", "purpose"];
 
 // ---- snapshot reader -------------------------------------------------------------------------
 // Deliberately a SECOND copy of check-session-docs.js's parseRulesSnapshot/decodeCell rather than a
@@ -92,6 +133,24 @@ function parseRulesSnapshot(text) {
   return rules;
 }
 
+// SES-313 -- second copy of the same decoder for MODEL-LANES-SNAPSHOT.md, same scope reasoning as
+// the RULES-SNAPSHOT.md duplication comment above (a shared scripts/lib/ reader is a 4th file).
+function parseLanesSnapshot(text) {
+  const lanes = new Map();
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith("|")) continue;
+    const cells = line.split(/(?<!\\)\|/).slice(1, -1);
+    if (cells.length !== LANE_FIELDS.length) continue;
+    const decoded = cells.map(decodeCell);
+    if (decoded[0] === "Lane" || /^-+$/.test(decoded[0] ?? "")) continue;
+    const row = {};
+    LANE_FIELDS.forEach((f, i) => { row[f] = decoded[i]; });
+    if (!row.lane) continue;
+    lanes.set(row.lane, row);
+  }
+  return lanes;
+}
+
 // ---- the rendered form -----------------------------------------------------------------------
 // One function, so the writer and the checker can never disagree about what "rendered" means. A
 // stored newline becomes a further `> ` line, so a statement that later grows a second sentence
@@ -99,6 +158,19 @@ function parseRulesSnapshot(text) {
 function renderBlock(id, statement) {
   const lines = String(statement ?? "").split("\n");
   return lines.map((l, i) => (i === 0 ? `> **Rule ${id}** — ${l}` : `> ${l}`));
+}
+
+// SES-313 -- one line per lane, fixed order (LANE_ORDER), never alphabetical: the order a cycle
+// actually escalates through. `lanes` is the Map parseLanesSnapshot() returns; a lane the snapshot
+// does not carry renders a line that says so rather than being silently skipped, so a truncated or
+// stale MODEL-LANES-SNAPSHOT.md produces a visible three-line block instead of a shorter one nobody
+// would notice was short.
+function renderLanesBlock(lanes) {
+  return LANE_ORDER.map(lane => {
+    const row = lanes.get(lane);
+    if (!row) return `> **${lane}** — MISSING from ${LANES_SNAPSHOT_REL} — re-export it`;
+    return `> **${lane}** — \`${row.model_id}\` — ${row.purpose}`;
+  });
 }
 
 function listMarkdown(dir, out = []) {
@@ -154,61 +226,100 @@ function inRanges(ranges, index) {
   return ranges.some(([a, b]) => index >= a && index < b);
 }
 
+// SES-313 -- both marker kinds collected into ONE list, sorted by position, so a single
+// back-to-front walk keeps every remaining match's offset valid regardless of which kind is being
+// rewritten first (same reasoning as the original single-kind collection, extended to two regexes).
+function collectMarkers(text) {
+  const fences = fencedRanges(text);
+  const out = [];
+  MARKER_RE.lastIndex = 0;
+  for (const m of text.matchAll(MARKER_RE)) {
+    if (MARKER_PLACEHOLDERS.has(m[1].trim())) continue;
+    if (inRanges(fences, m.index)) continue;
+    out.push({ kind: "rule", id: m[1].trim(), index: m.index, length: m[0].length });
+  }
+  LANES_MARKER_RE.lastIndex = 0;
+  for (const m of text.matchAll(LANES_MARKER_RE)) {
+    if (inRanges(fences, m.index)) continue;
+    out.push({ kind: "lanes", id: null, index: m.index, length: m[0].length });
+  }
+  out.sort((a, b) => a.index - b.index);
+  return out;
+}
+
+// SES-313, root cause of the two-{{rule:B40}}-and-{{rule:B18}}-findings-that-print-identically
+// defect: this repo's runbooks are CRLF on disk, so `result.slice(blockStart).split("\n")` used to
+// leave a trailing "\r" on every `found` line that the LF-only `expected` line never carries. The
+// strings then compared unequal while PRINTING identical, because a bare "\r" in a console.error
+// argument rewinds the terminal's cursor to column 0 and the rest of that same call overwrites what
+// it had already written -- the drift was real (as bytes) and invisible (as terminal output) at
+// once. Fixed by stripping one trailing "\r" for BOTH the comparison and the reported text, while
+// still measuring the ORIGINAL (possibly "\r"-terminated) line length when repairing -- `foundRaw`
+// carries the real bytes consumed so --write's blockEnd offset stays correct on a CRLF file.
+function stripCR(line) {
+  return line.endsWith("\r") ? line.slice(0, -1) : line;
+}
+
 // Process one file. Returns { findings, text } — `text` is the repaired document when repair is on.
 //
 // Markers are collected FIRST and then walked back-to-front. That ordering is the whole reason this
 // needs no re-scanning: rewriting a block changes every offset after it and none before it, so a
 // reverse walk keeps all remaining match positions valid against the string being edited.
-function processFile(rel, text, rules, repair) {
+function processFile(rel, text, rules, lanes, repair) {
   const findings = [];
-  MARKER_RE.lastIndex = 0;
-  const fences = fencedRanges(text);
-  const markers = [...text.matchAll(MARKER_RE)]
-    .filter(m => !MARKER_PLACEHOLDERS.has(m[1].trim()))
-    .filter(m => !inRanges(fences, m.index));
+  const markers = collectMarkers(text);
   let result = text;
 
   for (let i = markers.length - 1; i >= 0; i--) {
     const m = markers[i];
-    const id = m[1].trim();
     const line = lineOf(text, m.index);
-    const rule = rules.get(id);
-    if (!rule) {
-      findings.push({ rel, line, id, kind: "unknown-rule",
-        detail: `marker {{rule:${id}}} is not a rule id in ${RULES_SNAPSHOT_REL}. Fix the id, or add the rule to public.governance_rules and re-export.` });
-      continue;
+    const label = m.kind === "lanes" ? "{{lanes}}" : `{{rule:${m.id}}}`;
+
+    let expected;
+    if (m.kind === "rule") {
+      const rule = rules.get(m.id);
+      if (!rule) {
+        findings.push({ rel, line, id: m.id, kind: "unknown-rule",
+          detail: `marker ${label} is not a rule id in ${RULES_SNAPSHOT_REL}. Fix the id, or add the rule to public.governance_rules and re-export.` });
+        continue;
+      }
+      expected = renderBlock(m.id, rule.statement);
+    } else {
+      expected = renderLanesBlock(lanes);
     }
 
     // The block is the maximal run of `>` lines starting on the line immediately after the comment
     // closes. No closing marker, so a later edit cannot leave one dangling.
-    const after = m.index + m[0].length;
+    const after = m.index + m.length;
     const nl = result.indexOf("\n", after);
     if (nl === -1) {
-      findings.push({ rel, line, id, kind: "missing-block",
-        detail: `marker {{rule:${id}}} is the last thing in the file — the rendered rule text is missing.` });
+      findings.push({ rel, line, id: m.id, kind: "missing-block",
+        detail: `marker ${label} is the last thing in the file — the rendered ${m.kind === "lanes" ? "lanes" : "rule"} text is missing.` });
       continue;
     }
     const blockStart = nl + 1;
-    const found = [];
+    const foundRaw = [];
     for (const l of result.slice(blockStart).split("\n")) {
-      if (!l.startsWith(">")) break;
-      found.push(l);
+      if (!stripCR(l).startsWith(">")) break;
+      foundRaw.push(l);
     }
+    const found = foundRaw.map(stripCR);
 
-    const expected = renderBlock(id, rule.statement);
     if (found.length === expected.length && found.every((l, j) => l === expected[j])) continue;
 
     if (repair) {
-      // +1 per line for the newline each `>` line consumed.
-      const blockEnd = blockStart + found.reduce((n, l) => n + l.length + 1, 0);
+      // +1 per line for the newline each `>` line consumed. foundRaw (not found) carries the real
+      // on-disk byte length -- see the stripCR() note above for why this must not use the
+      // CR-stripped copy on a CRLF file.
+      const blockEnd = blockStart + foundRaw.reduce((n, l) => n + l.length + 1, 0);
       result = result.slice(0, blockStart) + expected.join("\n") + "\n" + result.slice(blockEnd);
       continue;
     }
 
-    findings.push({ rel, line, id, kind: found.length === 0 ? "missing-block" : "drifted",
+    findings.push({ rel, line, id: m.id, kind: found.length === 0 ? "missing-block" : "drifted",
       detail: found.length === 0
-        ? `marker {{rule:${id}}} is not followed by a rendered rule block (expected a line starting "> **Rule ${id}** — ").`
-        : `the text under {{rule:${id}}} has DRIFTED from the registry.\n      committed: ${found.join(" / ")}\n      registry:  ${expected.join(" / ")}`,
+        ? `marker ${label} is not followed by a rendered ${m.kind === "lanes" ? "lanes" : "rule"} block (expected a line starting "> **${m.kind === "lanes" ? LANE_ORDER[0] : `Rule ${m.id}`}** — ").`
+        : `the text under ${label} has DRIFTED from the ${m.kind === "lanes" ? LANES_SNAPSHOT_REL : "registry"}.\n      committed: ${found.join(" / ")}\n      ${m.kind === "lanes" ? "snapshot:  " : "registry: "} ${expected.join(" / ")}`,
     });
   }
   // Findings were collected back-to-front; report them in reading order.
@@ -234,6 +345,23 @@ function main() {
     process.exit(2);
   }
 
+  // SES-313 -- same hard-fail-if-missing contract as RULES-SNAPSHOT.md above: "a missing snapshot
+  // is a loud failure naming the regeneration command, never a skip," applied to the second table.
+  const lanesSnapPath = path.join(WORKTREE, LANES_SNAPSHOT_REL);
+  let lanesSnapText;
+  try {
+    lanesSnapText = fs.readFileSync(lanesSnapPath, "utf8");
+  } catch {
+    console.error(`render-rule-blocks: ${LANES_SNAPSHOT_REL} is missing. Regenerate it with:\n` +
+      `  SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/export-governance-snapshot.js`);
+    process.exit(2);
+  }
+  const lanes = parseLanesSnapshot(lanesSnapText);
+  if (lanes.size === 0) {
+    console.error(`render-rule-blocks: parsed 0 lanes from ${LANES_SNAPSHOT_REL} — refusing to run.`);
+    process.exit(2);
+  }
+
   const rels = args.filter(a => !a.startsWith("--"));
   const files = rels.length ? rels : listMarkdown(path.join(WORKTREE, "docs"));
 
@@ -244,14 +372,10 @@ function main() {
     const full = path.isAbsolute(rel) ? rel : path.join(WORKTREE, rel);
     let text;
     try { text = fs.readFileSync(full, "utf8"); } catch { continue; }
-    MARKER_RE.lastIndex = 0;
-    const fences = fencedRanges(text);
-    const markers = [...text.matchAll(MARKER_RE)]
-      .filter(m => !MARKER_PLACEHOLDERS.has(m[1].trim()))
-      .filter(m => !inRanges(fences, m.index));
+    const markers = collectMarkers(text);
     if (markers.length === 0) continue;
     blocks += markers.length;
-    const { findings, text: out } = processFile(rel, text, rules, repair);
+    const { findings, text: out } = processFile(rel, text, rules, lanes, repair);
     allFindings.push(...findings);
     if (repair && out !== text) {
       fs.writeFileSync(full, out);
@@ -260,13 +384,13 @@ function main() {
     }
   }
 
-  console.log(`render-rule-blocks: ${rules.size} rules · ${blocks} marker${blocks === 1 ? "" : "s"} in ${files.length} scanned file${files.length === 1 ? "" : "s"}`);
+  console.log(`render-rule-blocks: ${rules.size} rules · ${lanes.size} lanes · ${blocks} marker${blocks === 1 ? "" : "s"} in ${files.length} scanned file${files.length === 1 ? "" : "s"}`);
   if (repair) {
-    console.log(rewritten === 0 ? "unchanged — every rendered block already matches the registry" : `${rewritten} file(s) rewritten`);
+    console.log(rewritten === 0 ? "unchanged — every rendered block already matches the registry and runner_model_lanes" : `${rewritten} file(s) rewritten`);
     process.exit(0);
   }
   if (allFindings.length === 0) {
-    console.log("clean — every rendered rule block matches public.governance_rules");
+    console.log("clean — every rendered rule block matches public.governance_rules and public.runner_model_lanes");
     process.exit(0);
   }
   for (const f of allFindings) {

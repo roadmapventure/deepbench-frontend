@@ -24,6 +24,15 @@
 // deliberately NOT exported for the same reason -- it changes on writes that alter nothing a reader
 // cares about, and exporting it would break the guarantee.
 //
+// DeepBench v7.0.402 | scripts/export-governance-snapshot.js | SES-313 -- a second output,
+// docs/governance/MODEL-LANES-SNAPSHOT.md, exported from public.runner_model_lanes in the SAME
+// run. Same reasoning as the header above, restated for a second table rather than re-argued: the
+// runbook's {{lanes}} block (scripts/render-rule-blocks.js) needs an offline, credential-free read,
+// and runner_model_lanes is service_role-only like every runner_ table (SES-78a), so a live read at
+// session-start could not work here either. Fixed lane order (orchestrator, judgment, mechanical --
+// the order John's own routing prose has always used, LANE_ORDER below), not alphabetical, so the
+// rendered runbook block reads in the order a cycle actually escalates through rather than a-to-z.
+//
 // Usage:
 //   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/export-governance-snapshot.js
 //
@@ -79,6 +88,11 @@ const MAX_PAGES = 40; // hard ceiling; the registry is 84 rows, this is a runawa
 export const COLUMNS = ["id", "status", "enforcement", "source_group", "canonical_doc", "superseded_by", "statement"];
 
 const HEADERS = ["Rule", "Status", "Enforcement", "Source group", "Canonical doc", "Superseded by", "Statement"];
+
+// SES-313 -- runner_model_lanes columns and the fixed rendering order (see header note above).
+export const LANE_COLUMNS = ["lane", "model_id", "purpose"];
+const LANE_HEADERS = ["Lane", "Model id", "Purpose"];
+export const LANE_ORDER = ["orchestrator", "judgment", "mechanical"];
 
 // ---------------------------------------------------------------------------
 // Cell escaping -- byte-for-byte the convention BACKLOG-SNAPSHOT.md uses, so
@@ -163,6 +177,46 @@ export function buildDocument(rules) {
   return { text: lines.join("\n"), hash };
 }
 
+// SES-313 -- same escaping, same determinism contract, one table instead of 116 rows.
+export function canonicalLanesPayload(lanes) {
+  return LANE_ORDER
+    .map(lane => lanes.find(r => String(r.lane) === lane))
+    .filter(Boolean)
+    .map(r => LANE_COLUMNS.map(c => esc(r[c])).join("\t"))
+    .join("\n");
+}
+
+export function buildLanesDocument(lanes) {
+  const hash = sha256Hex(canonicalLanesPayload(lanes));
+  const ordered = LANE_ORDER.map(lane => lanes.find(r => String(r.lane) === lane)).filter(Boolean);
+  const missing = LANE_ORDER.filter(lane => !lanes.some(r => String(r.lane) === lane));
+
+  const lines = [];
+  lines.push("# Runner model lanes — repo-side snapshot of `public.runner_model_lanes`");
+  lines.push("");
+  lines.push("<!-- GENERATED FILE — do not hand-edit. Regenerate with:");
+  lines.push("     SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/export-governance-snapshot.js");
+  lines.push("     The table in Supabase is the authority; this file is its only in-repo copy and the");
+  lines.push("     input scripts/render-rule-blocks.js's {{lanes}} marker reads. -->");
+  lines.push("");
+  lines.push(`**Lanes:** ${ordered.length} · **Payload sha256:** \`${hash}\``);
+  if (missing.length) lines.push(`**Missing lanes (registry incomplete):** ${missing.join(", ")}`);
+  lines.push("");
+  lines.push("Cell escaping matches `docs/governance/RULES-SNAPSHOT.md`: `\\` → `\\\\`, `|` → `\\|`, newline → `\\n`.");
+  lines.push("An empty cell is SQL NULL; the marker `\\e` is a stored empty string. Every cell is padded with");
+  lines.push("exactly one space per side, and a reader removes one character per side rather than trimming.");
+  lines.push("Row order is fixed (orchestrator, judgment, mechanical), not alphabetical — the order a cycle");
+  lines.push("actually escalates through.");
+  lines.push("");
+  lines.push(`| ${LANE_HEADERS.join(" | ")} |`);
+  lines.push(`|${LANE_HEADERS.map(() => "---").join("|")}|`);
+  for (const r of ordered) {
+    lines.push(`| ${LANE_COLUMNS.map(c => esc(r[c])).join(" | ")} |`);
+  }
+  lines.push("");
+  return { text: lines.join("\n"), hash };
+}
+
 async function fetchAllRules(supabaseUrl, supabaseKey) {
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
   const base = supabaseUrl.replace(/\/+$/, "");
@@ -202,85 +256,142 @@ async function fetchAllRules(supabaseUrl, supabaseKey) {
   return { error: `governance_rules paging exceeded MAX_PAGES (${MAX_PAGES}) -- refusing to write a possibly truncated snapshot` };
 }
 
-function fail(code, message) {
-  if (JSON_OUT) {
-    console.log(JSON.stringify({ ok: false, exitCode: code, error: message }));
-  } else {
-    console.error(message);
+// SES-313 -- three rows, no paging needed; still reads through the identical REST/headers path so
+// a credentials or connectivity failure fails the same way for both snapshots.
+async function fetchAllLanes(supabaseUrl, supabaseKey) {
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+  const base = supabaseUrl.replace(/\/+$/, "");
+  const cols = LANE_COLUMNS.join(",");
+  const url = `${base}/rest/v1/runner_model_lanes?select=${cols}&order=lane.asc`;
+  let res;
+  try {
+    res = await fetch(url, { headers });
+  } catch (e) {
+    return { error: `could not reach the Supabase REST endpoint for runner_model_lanes: ${e.message}` };
   }
-  process.exit(code);
+  if (!res.ok) {
+    let body = "";
+    try {
+      body = await res.text();
+    } catch {
+      // best effort -- an unreadable body is still a failure, just a less descriptive one
+    }
+    return { error: `Supabase REST returned HTTP ${res.status} ${res.statusText} for runner_model_lanes: ${body}` };
+  }
+  let body;
+  try {
+    body = await res.json();
+  } catch (e) {
+    return { error: `Supabase REST returned unparseable JSON for runner_model_lanes: ${e.message}` };
+  }
+  if (!Array.isArray(body)) {
+    return { error: `Supabase REST returned a non-array payload for runner_model_lanes` };
+  }
+  return { lanes: body };
 }
 
-function done(code, summary, prose) {
-  if (JSON_OUT) {
-    console.log(JSON.stringify({ ok: true, exitCode: code, ...summary }));
-  } else {
-    console.log(prose);
-  }
-  process.exit(code);
+// SES-313 -- exit/print helpers no longer call process.exit() directly: two snapshots are now
+// produced in one run, so main() collects a {code, summary, prose} result from each and combines
+// them at the very end. Combined exit code is the WORST of the two (2 beats 1 beats 0) -- the same
+// severity ordering documented in the header (2 = could not run, 1 = drift, 0 = clean), so one
+// snapshot's failure can never be silently outvoted by the other's success.
+function result(code, summary, prose) {
+  return { code, summary, prose };
 }
 
-async function main() {
-  const outArg = arg("out", "docs/governance/RULES-SNAPSHOT.md");
-  const outPath = path.isAbsolute(outArg) ? outArg : path.join(WORKTREE, outArg);
-  const CHECK = process.argv.includes("--check");
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    const missing = [!supabaseUrl && "SUPABASE_URL", !supabaseKey && "SUPABASE_SERVICE_KEY"].filter(Boolean).join(", ");
-    return fail(
-      2,
-      `export-governance-snapshot: missing required env var(s): ${missing}. Exiting 2 (cannot run) -- this is NOT a pass, the registry was never fetched.`
+// One table's worth of the write-or-check logic, shared by both snapshots so they cannot drift
+// from each other in behaviour. `label` names the row unit in prose ("rules" / "lanes").
+function processSnapshot({ label, noun, rows, buildFn, outPath, CHECK, emptyIsFatal }) {
+  if (emptyIsFatal && !rows.length) {
+    return result(2,
+      { mode: CHECK ? "check" : "write", [noun]: 0, error: `${label} returned ZERO rows` },
+      `export-governance-snapshot: ${label} returned ZERO rows. Exiting 2 (cannot run) rather than writing an empty snapshot -- an empty registry would silently disarm every truth check that reads it.`
     );
   }
 
-  const { rules, error } = await fetchAllRules(supabaseUrl, supabaseKey);
-  if (error) {
-    return fail(2, `export-governance-snapshot: ${error}\nExiting 2 (cannot run) -- this is NOT a pass, the registry was never fully fetched.`);
-  }
-  if (!rules.length) {
-    return fail(
-      2,
-      `export-governance-snapshot: governance_rules returned ZERO rows. Exiting 2 (cannot run) rather than writing an empty snapshot -- an empty registry would silently disarm every truth check that reads it.`
-    );
-  }
-
-  const { text, hash } = buildDocument(rules);
+  const { text, hash } = buildFn(rows);
   const existing = fs.existsSync(outPath) ? fs.readFileSync(outPath, "utf8") : null;
   const existed = existing !== null;
   const changed = existing !== text;
 
   if (CHECK) {
     if (!changed) {
-      return done(
-        0,
-        { mode: "check", rules: rules.length, sha256: hash, changed: false, outPath },
-        `export-governance-snapshot --check: no drift -- ${outPath} matches the registry (${rules.length} rules, sha256 ${hash}).`
+      return result(0,
+        { mode: "check", [noun]: rows.length, sha256: hash, changed: false, outPath },
+        `export-governance-snapshot --check: no drift -- ${outPath} matches ${label} (${rows.length} ${noun}, sha256 ${hash}).`
       );
     }
-    return done(
-      1,
-      { mode: "check", rules: rules.length, sha256: hash, changed: true, outPath },
-      `export-governance-snapshot --check: DRIFT -- ${outPath} ${existed ? "does not match" : "is missing; the registry currently has"} ${rules.length} rules (sha256 ${hash}). Regenerate with: node scripts/export-governance-snapshot.js`
+    return result(1,
+      { mode: "check", [noun]: rows.length, sha256: hash, changed: true, outPath },
+      `export-governance-snapshot --check: DRIFT -- ${outPath} ${existed ? "does not match" : "is missing; "} ${label} currently has ${rows.length} ${noun} (sha256 ${hash}). Regenerate with: node scripts/export-governance-snapshot.js`
     );
   }
 
   if (!changed) {
-    return done(
-      0,
-      { mode: "write", rules: rules.length, sha256: hash, changed: false, outPath },
-      `export-governance-snapshot: unchanged -- ${outPath} already matches the registry (${rules.length} rules, sha256 ${hash}). Not touching the file.`
+    return result(0,
+      { mode: "write", [noun]: rows.length, sha256: hash, changed: false, outPath },
+      `export-governance-snapshot: unchanged -- ${outPath} already matches ${label} (${rows.length} ${noun}, sha256 ${hash}). Not touching the file.`
     );
   }
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, text, "utf8");
-  return done(
-    0,
-    { mode: "write", rules: rules.length, sha256: hash, changed: true, created: !existed, outPath },
-    `export-governance-snapshot: ${existed ? "updated" : "created"} ${outPath} (${rules.length} rules, sha256 ${hash}).`
+  return result(0,
+    { mode: "write", [noun]: rows.length, sha256: hash, changed: true, created: !existed, outPath },
+    `export-governance-snapshot: ${existed ? "updated" : "created"} ${outPath} (${rows.length} ${noun}, sha256 ${hash}).`
   );
+}
+
+async function main() {
+  const outArg = arg("out", "docs/governance/RULES-SNAPSHOT.md");
+  const outPath = path.isAbsolute(outArg) ? outArg : path.join(WORKTREE, outArg);
+  const lanesOutArg = arg("lanes-out", "docs/governance/MODEL-LANES-SNAPSHOT.md");
+  const lanesOutPath = path.isAbsolute(lanesOutArg) ? lanesOutArg : path.join(WORKTREE, lanesOutArg);
+  const CHECK = process.argv.includes("--check");
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    const missing = [!supabaseUrl && "SUPABASE_URL", !supabaseKey && "SUPABASE_SERVICE_KEY"].filter(Boolean).join(", ");
+    if (JSON_OUT) console.log(JSON.stringify({ ok: false, exitCode: 2, error: `missing required env var(s): ${missing}` }));
+    else console.error(`export-governance-snapshot: missing required env var(s): ${missing}. Exiting 2 (cannot run) -- this is NOT a pass, nothing was fetched.`);
+    process.exit(2);
+  }
+
+  const [rulesFetch, lanesFetch] = await Promise.all([
+    fetchAllRules(supabaseUrl, supabaseKey),
+    fetchAllLanes(supabaseUrl, supabaseKey),
+  ]);
+
+  const results = [];
+
+  if (rulesFetch.error) {
+    results.push(result(2, { table: "governance_rules", error: rulesFetch.error },
+      `export-governance-snapshot: ${rulesFetch.error}\nExiting 2 (cannot run) -- this is NOT a pass, the registry was never fully fetched.`));
+  } else {
+    results.push(processSnapshot({
+      label: "the registry", noun: "rules", rows: rulesFetch.rules, buildFn: buildDocument,
+      outPath, CHECK, emptyIsFatal: true,
+    }));
+  }
+
+  if (lanesFetch.error) {
+    results.push(result(2, { table: "runner_model_lanes", error: lanesFetch.error },
+      `export-governance-snapshot: ${lanesFetch.error}\nExiting 2 (cannot run) -- this is NOT a pass, runner_model_lanes was never fully fetched.`));
+  } else {
+    results.push(processSnapshot({
+      label: "runner_model_lanes", noun: "lanes", rows: lanesFetch.lanes, buildFn: buildLanesDocument,
+      outPath: lanesOutPath, CHECK, emptyIsFatal: true,
+    }));
+  }
+
+  const code = Math.max(...results.map(r => r.code));
+  if (JSON_OUT) {
+    console.log(JSON.stringify({ ok: code === 0, exitCode: code, results: results.map(r => ({ ...r.summary })) }));
+  } else {
+    for (const r of results) console.log(r.prose);
+  }
+  process.exit(code);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
