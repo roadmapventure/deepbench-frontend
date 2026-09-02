@@ -201,13 +201,24 @@ auto-closes at ship, while `discovered` and `john-named` work closes only after 
 by the mechanism that scoped it, and it still cannot be closed on the day it ships — it is closed by
 a verdict plus his opportunity to reverse, rather than by his tap.
 
-### <a id="M5-15"></a>M5-15 — no pick on a stale usage reading (`script`)
+### <a id="M5-15"></a>M5-15 — a stale usage reading degrades the cycle (`script`)
 
-> A drain refuses to start a pick when the freshest `runner_usage_readings` row is older than 24 hours.
+> A drain whose freshest `runner_usage_readings` row is older than 24 hours does not refuse to run — it degrades, capping the cycle at `runner_budget.stale_fallback_tokens` and recording `usage_reading_stale` on the cycle row. Refusing would make a number only John can type into a precondition for autonomy, which M6-01 forbids.
 
 M5-06 bounds a start against remaining weekly headroom, and that bound is only as good as the reading
 it is computed from. A stale reading makes the headroom check pass on numbers that no longer describe
-the week — so the refusal belongs on the reading's age, not on the arithmetic.
+the week — so the *consequence* belongs on the reading's age, not on the arithmetic.
+
+**Amended 2026-09-01 (`SES-298`, `v7.0.365`), and the amendment is the whole point of the rule.**
+This shipped worded as a refusal, and within the hour it was live-blocking the drain on a 32.66h-old
+reading. The only way to refresh that reading is John typing it — `SES-82`, the programmatic read,
+is unbuilt — so the refusal made **a number only John can produce into a precondition for autonomous
+work**, which is exactly what `M6-01` forbids, written by the same session that retired the card
+surface. It also ignored a mechanism the platform already had: `runner_budget.stale_fallback_tokens`
+(3,000,000) exists so a cycle can run under a smaller ceiling when the meter is old. Staleness is
+still graded and still reported (`detail.reading_stale`, `detail.reading_age_hours`) — only the
+consequence changed, from `should_boot = false` to `reason = 'pickable_degraded'` with
+`detail.token_cap` carrying the fallback.
 
 ---
 
