@@ -540,15 +540,23 @@ async function theLiveGateObeysItsOwnLadder() {
     if (!res.ok) throw new Error(`${q} returned HTTP ${res.status}`);
     return Number((res.headers.get("content-range") || "/0").split("/")[1]);
   };
-  const before = {
+  // Design-session follow-up (2026-09-02, design-m6-build-0902): the board is SHARED. Attended
+  // sessions and cycles write runner_before_images rows at any moment, so a single before/after
+  // sample around the call can move for reasons that have nothing to do with the function -- CI
+  // read exactly that on d1853cca while a close-out was writing images. The arm therefore samples
+  // up to three times and fails only if the board moved across EVERY sample: a STABLE function
+  // that writes would move it every time, a concurrent writer will not.
+  const sample = async () => ({
     images: await countOf("runner_before_images?select=id"),
     queuedDirectives: await countOf("runner_directives?select=id&status=eq.queued"),
-  };
-  const again = [await call(), await call()];
-  const after = {
-    images: await countOf("runner_before_images?select=id"),
-    queuedDirectives: await countOf("runner_directives?select=id&status=eq.queued"),
-  };
+  });
+  let before, after, again;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    before = await sample();
+    again = [await call(), await call()];
+    after = await sample();
+    if (JSON.stringify(after) === JSON.stringify(before)) break;
+  }
   assert.deepStrictEqual(
     after, before,
     "calling runner_should_boot() moved the board. It is supposed to be STABLE and read-only; the " +
