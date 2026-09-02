@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.403 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | M6 milestone gate review (attended session design-m6-build-0902, two Fable 5 lenses, decided under SES-312 as decision c3e86310, reversible until 2026-09-05 18:33 CST): PASS WITH NAMED GAPS — SES-315 and SES-316 filed required into M6, SES-317 non-required behind SES-314, cap_relax_rung 5→13, M7 pick order corrected, the Selfbuild M7 drain declared under 0970abad. Both lenses recorded in their own words. No rule STATEMENT changed. -->
 <!-- DeepBench v7.0.396 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-286 (c) — THE PHASE SPLIT IS OVER, said in an amendment note rather than by editing the paragraph that recorded it. SES-286 (a) (v7.0.394), (b) (v7.0.395) and (c) (v7.0.396) built the reversal-window machinery this file deferred: public.runner_decisions plus record_decision() / sweep_decision_windows() / reverse_decision() / ladder_apply_signal(); runner-cycle.md 7b and its serial-tail sweep; session-setup.md 3d and its Reversing-a-decision section; and the standing brief's Open decisions block, which lists every open decision beside the one line that undoes it. NO RULE STATEMENT CHANGED — not one `>` quoted line was touched, so the ses-285 registry↔doc equality guard is untouched, and no governance_rules row moved. THE SUPERSEDED SENTENCE IS LEFT STANDING DELIBERATELY: "a rule marked `script` below is not yet enforced by any script" was true on 2026-09-01 and false from v7.0.396, and this file is a GATE RECORD — the phase it records really happened, so the note supersedes the sentence rather than deleting the history. An editor tempted to tidy the paragraph instead should read the amendment first. Doc only; the renderer and the new guard tests/regression/ses-286c-open-decisions-brief.test.mjs ship in the same commit. -->
 <!-- DeepBench v7.0.391 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-185 — the M6 design gate, decided rather than asked (attended session design-m6-build-0902, Fable 5.1, M6-01). This file gains the gate record: what M6 promises and which ticket carries each promise, the required set (6 tickets, 11 cycles — stored as milestone_required), four members filed at the gate (SES-310..313), the rulings the gate owed (exit-exam defaults kept, dev→main promotion withdrawn from SES-185 scope under M6-08, design/coding split satisfied by measurement for the runner), and the M5 milestone-review runner_items row written so step 8d and directive 0970abad can see that review. No rule STATEMENT changed: the ses-285 registry↔doc equality guard is untouched. Doc-only plus Supabase rows, all before-imaged under session_name design-m6-build-0902. -->
 <!-- DeepBench v7.0.359 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-285 — the M6 autonomy rule set (M6-01..M6-08) gets its canonical home. FEATURE: SES-285 — this file and the eight public.governance_rules rows it renders land in ONE commit with the five retirements (B13, B16, B23, B28, B29) and eight supersessions (B7, B12, B14, B17, B24, B27, B34, B35) they replace, per the SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old rule nor its replacement is in force. Retirement entries: docs/SELFBUILD-RETIREMENT-LEDGER.md 21–33. -->
@@ -337,3 +338,100 @@ precondition with a decided-and-unreversed one, so the M7 handoff needs no hand-
 Per `public.ticket_matrix` at the gate: 11 required cycles ≈ 14.6 M tokens (4.9 % of a weekly
 allowance); all 13 open-member cycles ≈ 17.3 M. Chained, per the `M6-09`…`M6-13` measurement,
 roughly a third of that.
+
+## <a id="the-m6-milestone-gate-review"></a>The M6 milestone gate review — decided 2026-09-02, decision `c3e86310`
+
+<!-- FEATURE: SES-312 first live run — the review decided, filed and declared inside one recorded
+     decision (gate-review.md § The decision and the successors). Attended session
+     design-m6-build-0902; two fresh-context lenses on Fable 5; no card, no tap. -->
+
+**Record:** `runner_items` `4f443b75` (`Selfbuild M6 - Autonomy Graduation — milestone gate review`,
+`decision = 'accept'`). **Decision:** `runner_decisions` `c3e86310`, kind `gate`, **reversible until
+2026-09-05 18:33 CST** — `select public.reverse_decision('c3e86310-340e-42ea-9309-6283d1929681', 'John', '<why>');`
+**Drain:** `Selfbuild M7 - The Inventor` declared as `runner_directives` `34600430` under `0970abad`
+as amended by `SES-312`, five named members (`SES-186`, `SES-159`, `SES-160`, `SES-004`, `SES-84`),
+every one held behind the M7 design gate `SES-186` by `M5-09` until that gate is done. Every row
+this review wrote carries a before-image with `decision_id = c3e86310`; one reversal undoes all of
+it except the record itself.
+
+### Verdict — PASS WITH NAMED GAPS, both lenses
+
+Both lenses independently reached the same line. In plain words: **the autonomy machinery M6
+promised is built and proven in rolled-back fixtures, and it has not yet run without a person in
+the room.** Every one of the six required members is `done`; every retired or amended rule has its
+replacement live and green; and three things M6 promised are not yet true in the way John would
+experience them. The lenses split on one placement, recorded below and ruled the narrower way.
+
+### What the review filed and changed, in one transaction
+
+| Item | What | Why (evidence) |
+|---|---|---|
+| `SES-315` — *A shipped change has a live Reverse: the auto-done status write records a decision row, reverse_decision() is the one Reverse for ships, and the tap-only ladder and restore paths retire* (Tooling, **P10 - Tooling**, M6, **required**, 2 cycles) | Both lenses. A ship's close-out records no decision (7b says its Reverse "lives on the ship card"), and the card's tap is the surface `SES-285` retired — so a shipped change has no live Reverse, and since only `reverse_decision()` demotes, **a bad ship can never demote the ladder**. `apply_ladder_decision()` still promotes on a ship-card Accept. Absorbs the latent `apply_data_restore()` delete-and-reinsert FK hole and the four `runner-cycle.md` passages still stating withdrawn rules in live voice. |
+| `SES-316` — *Claim and release stop making decisions un-undoable* (Bug, **P9 - Bug Fixes**, M6, **required**, 1 cycle) | Architect lens. Claim and release write `updated_at = now()`; `reverse_decision()` refuses any row written after its image **and still returns `applied`** — so every decision on a ticket the drain has since claimed is silently un-undoable. |
+| `SES-317` — *done requires a passing verdict on the shipped version, or a recorded attended override* (Tooling, **P10 - Tooling**, M6, non-required, `blocked_by SES-314`) | Both lenses named it; the Architect ruled it required, the PM ruled it M7-gate material behind `SES-314` (the CRLF false block makes every attended verdict a `block` today). **Ruled the narrower: filed, non-required, blocked.** `SES-301` and `SES-311` are `done` on a single `block` each. |
+| `runner_settings.cap_relax_rung` 5 → 13 | PM lens G1. `class_autonomy('P10 - Tooling')` was paying out +8 files / +8 tasks on a rung earned entirely under the tap regime (`tooling` 13/42 from 08-24 until the first verdict moved it). The extras now accrue only from verifier-fed promotions. A settings row on the reversal allowlist. |
+| `SES-159`, `SES-84` → `blocked_by SES-186`; `SES-186` tier `now`, 2 cycles, description re-scoped | Both lenses F1–F3. M7's members are written in the retired card idiom (`SES-160` "John's Accept files the ticket"; `SES-159` checkpoints on the retired `B13` drip; `SES-186` "gated cards"); pick order let `SES-159` run before its gate. `SES-186` now owns four deliverables and one **Tier-3 item**: exit-exam criterion 7's "ratified by John" is John's wording — the gate records its reading as a decision whose 72-hour window is his ratification, and names it to him. |
+| Two false-block verdicts (`253aca14`, `fa079428`) **not** fed to the ladder | Exemption recorded here rather than silently skipped: a streak reset on an environment defect (Windows spawn, since fixed; CRLF, `SES-314`) is noise, not judgment. |
+| Exit-exam targets | Kept at defaults (both lenses). No target is read before the rolling-30 floor the charter names — one decision, zero reversals is not a 0 % reversal rate. |
+
+### Burndown — two figures, never netted
+
+Named at the gate: **15** (7 open + 8 already done). Closed since: **14** (`SES-313`, non-required,
+in flight at review time). Filed **into M6** since the gate: **0** (plus the three this review filed).
+Filed **elsewhere** from M6 work: **1** — `SES-314` (general board). No M6 drain was ever declared
+(M6 was built attended, and `0970abad` had nothing accepted to stand on), so the burndown is computed
+from epic membership; `SES-312`'s transaction gives M7 the row home M6 never had.
+
+### The PM lens, in its own words
+
+PASS WITH NAMED GAPS. M6 delivered every required member and every mechanism it promised is live.
+Two things keep it from a clean pass: the cap relaxation is paying out on a trust-ladder balance the
+verifier never earned, and the entire milestone — the one called *Autonomy Graduation* — was built
+by attended sessions; no unattended cycle has exercised a single M6 mechanism yet. Backward: promise
+1 (verifier decides, silence is assent) — mechanism yes, production no: one real decision row exists,
+0 finalised, 0 reversed, and the M5/M6 gate decisions themselves predate the mechanism so their
+"reversible under M6-02" sentences point at nothing. Promise 2 — yes with G1. Promise 3 — coverage
+yes, pass-bar no: 4 of the 6 required M6 ships closed before the trigger and carry no verdict; 58
+Selfbuild `done` tickets carry none (historical by design). Promise 4 — built, never run: this
+review is the first execution of the `SES-312` path. Promise 5 — yes, nothing moved. Slippage: 10
+real build sessions against 11 predicted cycles; the 14.6 M-token estimate is neither confirmed nor
+refuted because attended cost is unmeasured (`SES-82`, deferred). All ten M6 ships were
+`trigger = 'supervised'`; the first M7 chain is M6's real acceptance test. Forward: `SES-186` grows
+1 → 2, `SES-160` likely shrinks 4 → 3; the order changed, not the total. The verifier's attended
+block rate today was 2 false of 3, on top of M3's zero true catches in 100 verdicts — any M7 design
+that leans on "the verifier decides" is leaning on a rate that reads noise.
+
+### The Chief Architect lens, in its own words
+
+PASS WITH NAMED GAPS. (a) Reversal works on the designed path — in-place restore from the oldest
+image, allowlist, written-since refusal, demote, a reversal is itself recorded and cannot be
+reversed — and has never yet been run against a live row. The commonest real path defeats it: claim
+and release bump `updated_at`, so a decision on a picked ticket refuses every row and still says
+`applied`; a reversed gate review would delete its drain and scope and leave claimed successors
+orphaned. M6's own decisions (the gate ruling, the M5 review row, the `milestone_required` flags,
+the 36 `needs-decision` conversions) have no handle — the window binds from v7.0.395 forward.
+(b) The ladder is fed by verdicts, sweeps and reversals; reversal rows cannot self-promote; but
+`apply_ladder_decision()` still promotes on a ship-card Accept (dormant since 08-30, live), and
+**a bad ship can never demote a class** — the charter's "a Reverse spike auto-narrows the ladder"
+has no live input for shipped work; `tooling` at 13/43 is effectively permanent. (c) Caps widen only
+with the rung going forward; the starting width was inherited. (d) `done` requires *any* verdict —
+`SES-301` and `SES-311` are `done` on a block each; the unattended path writes `delivered` on a
+block, so the hole is attended-only. Drains retire on the gate's ruling; `SES-312`'s mechanism
+fires live for the first time at this review. (e) dev→main is John's alone everywhere. Present:
+registry = snapshot = STANDARDS byte-for-byte, ledger 21–38 complete; four `runner-cycle.md`
+passages still state withdrawn rules in live voice (step 8c "No unattended removal, ever"; step 6's
+`needs-john` SET; the step-5 flag table and the chain-gate flag-set mentions; the Accept→streak
+lines). Forward: M7's four assumptions are disproved — cards, Accept-files, verdict mining from a
+corpus frozen since 08-30, a John-model accuracy number that would be noise — and `delivered` is a
+state with no exit for non-Selfbuild classes (16 tickets sit there today; `SES-154` resumes at
+Selfbuild completion with no Accept surface). What should change before M7 is drained: the
+invention control after cards (EL-01 + window), `SES-160`/`SES-159` rewritten off the retired drip,
+the John-model's signal redefined as reversals plus attended rulings with no numeric criterion until
+≥ 30 signals exist, and the `delivered` exit resolved before the first general-board ship.
+
+### What this review deliberately did not do
+
+It did not re-feed the two false-block verdicts, re-grade the four required ships that closed
+before the trigger, re-home the four tickets whose `milestone` disagrees with their epic (John's
+call, M5 record), or decide anything the M7 gate owns. `SES-315` and `SES-316` are M6's own promise
+and are drained attended in this session, per the M5 precedent; M6 retires when they close.
