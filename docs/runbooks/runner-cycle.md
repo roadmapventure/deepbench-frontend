@@ -1997,6 +1997,21 @@ only on a row some future cycle explicitly marks — where making the column ine
 backfilled at this ship** — `SES-216` was already `delivered`, so setting it on `SES-191` would have
 stranded a ticket whose dependency had landed.
 
+**Fourth costume, closed by `SES-247` (2026-09-02, v7.0.380) — a partial whose remainder is not
+buildable now, for a reason that is not a ticket.** Found live 2026-08-29: `drain_chain_gate()`
+handed back `SES-246` twice and `SES-245` once, each a `partial` the closing cycle had just declared
+"not buildable in this cycle" with no `blocked_by` to say why. `SES-247` proposed a new column
+(`blocked_note` + a pointer at a `runner_questions` row); read against `M6-01` and `SES-305`, none
+is needed — every case is one of three, and each already has its column. **When you close a ticket
+`partial` with a declared remainder, decide which:**
+- **(a) the remainder awaits another ticket** → write `blocked_by` (the `SES-218` clause above); it clears itself the moment the blocker lands.
+- **(b) the remainder awaits a decision** → there is no such state: under `M6-01` you decide it now, record the reasoning on the ticket, and either build the remainder or leave the partial **re-pickable** — John's criterion, *"keeps partial re-pickable when the remainder IS buildable"*. Two of the three 2026-08-29 hand-backs were questions for John; they are decisions a cycle makes now, reversible under `M6-02`.
+- **(c) genuinely not buildable now for a non-ticket reason** (a machine John has → `needs-desktop`; an external party, a real-world wait) → write `defer_status = 'yes'` with `defer_reason` naming the condition. `SES-305` keeps it out of the pick and the pre-boot gate — **pick predicate only, never the retirement one**, exactly as `blocked_by` — and the drain census reports it every fire (*"N deferred (…)"*), so it is visible without a question attached (`M5-10`'s standard). Whoever resolves the condition clears the flag; the census is what stops that write being forgotten.
+
+The forbidden one-liner stays forbidden — `partial` is NOT uniformly do-not-re-pick, and a
+buildable remainder coming back is the design. `drain_chain_gate()` inherits all three branches
+through `drain_epic_next()`; nothing was added to the chain gate itself.
+
 **A FINISHED MEMBER IS NOT WORK EITHER, AND THE PICK PREDICATE NOW SAYS SO IN ITS OWN WORDS —
 `status NOT IN ('done','removed')` (`SES-275`, `v7.0.354`, migration
 `ses275_drain_pick_status_clause`).** The three clauses above each added a reason a *live* member is
