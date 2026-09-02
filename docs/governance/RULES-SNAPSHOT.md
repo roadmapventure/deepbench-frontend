@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 113 · **By status:** 96 live · 7 retired · 10 superseded · **Payload sha256:** `26107c36d20c4f8e4c2583989e576cd31384d40a1db66858636c9c433a2a1ecd`
+**Rules:** 116 · **By status:** 99 live · 7 retired · 10 superseded · **Payload sha256:** `f7c47df0f7f2b3094e357208466a4175d20893eb664b2977f3ab8599d0f9c1ce`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -25,6 +25,9 @@ exactly one space per side, and a reader removes one character per side rather t
 | HR-SUBAGENT-WORKTREE | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Run every sub-agent inside the parent session's own worktree (never `isolation: worktree`), stating its absolute path verbatim in the prompt. |
 | HR-VERIFY | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Never assert a checkable fact about code, schema, config, or Supabase data from memory; verify it fresh this session or say it's unverified. |
 | HR-WORKTREE-ISO | live | hook | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Isolate every session in its own git worktree branched from origin/dev; never read, edit, or run against the shared checkout directly. |
+| EL-01 | live | script | enhancement-lane-register | docs/RUNNER-GOV-ENHANCEMENT-LANE.md#EL-01 |  | A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04). |
+| EL-02 | live | script | enhancement-lane-register | docs/RUNNER-GOV-ENHANCEMENT-LANE.md#EL-02 |  | Enhancement work may consume at most 20% of the weekly usage allowance (John, 2026-09-02; `runner_settings.enhancement_cap_pct`): the pick path refuses an admitted enhancement whose `predicted_pct_of_week`, added to the `predicted_pct_of_week` of every enhancement a cycle has started in the current weekly window, would exceed the cap. The cap binds enhancements only — chartered work is never held by it. |
+| EL-03 | live | reviewer | enhancement-lane-register | docs/RUNNER-GOV-ENHANCEMENT-LANE.md#EL-03 |  | An enhancement whose `enhancement_claim` has held twice under the outcome verdicts of SES-303 earns a chartered milestone: the next gate review (SES-179) names it a member of the milestone it serves. Until then it remains an enhancement and stays under the cap. |
 | B1 | live | script | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B1 |  | Keep every backlog ticket row in backlog_items forever (never delete); public.backlog_active/backlog_mode() define active status, clearing only live-board state on close. |
 | B2 | live | prose | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B2 |  | Switch both governance modes (Manual and Automated) to read and write backlog data from the DB. |
 | B3 | superseded | script | runner-gov-register | docs/RUNNER-GOV-0820-REQUIREMENTS.md#B3 | M5-02 | Order the backlog queue by tier (now/next/later), then priority class P1→P10, then beta-first, then newest-to-oldest within class. |

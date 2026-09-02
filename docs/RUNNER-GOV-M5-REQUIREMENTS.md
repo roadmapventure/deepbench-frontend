@@ -48,7 +48,10 @@ intent for a live gate: **a rule marked `script` below is not yet enforced by an
 **Deliberately not in this register:** the enhancement-lane rules (admission test, weekly enhancement
 cap, promotion path). They wait on John's decision about the cap percentage, raised 2026-09-01 and
 unanswered; filing them half-decided would cost a second amendment cycle under the charter's
-transition rule.
+transition rule. **Resolved 2026-09-02 (`SES-283`, v7.0.379):** John set the cap — verbatim *"20% is
+fine"* — and the three rules now live in their own register, `docs/RUNNER-GOV-ENHANCEMENT-LANE.md`
+(`EL-01`..`EL-03`, `source_group = 'enhancement-lane-register'`), enforced in the same two pick homes
+as `M5-01`/`M5-02`/`M5-09`.
 
 ---
 
