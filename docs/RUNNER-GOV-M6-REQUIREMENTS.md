@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.391 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-185 — the M6 design gate, decided rather than asked (attended session design-m6-build-0902, Fable 5.1, M6-01). This file gains the gate record: what M6 promises and which ticket carries each promise, the required set (6 tickets, 11 cycles — stored as milestone_required), four members filed at the gate (SES-310..313), the rulings the gate owed (exit-exam defaults kept, dev→main promotion withdrawn from SES-185 scope under M6-08, design/coding split satisfied by measurement for the runner), and the M5 milestone-review runner_items row written so step 8d and directive 0970abad can see that review. No rule STATEMENT changed: the ses-285 registry↔doc equality guard is untouched. Doc-only plus Supabase rows, all before-imaged under session_name design-m6-build-0902. -->
 <!-- DeepBench v7.0.359 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-285 — the M6 autonomy rule set (M6-01..M6-08) gets its canonical home. FEATURE: SES-285 — this file and the eight public.governance_rules rows it renders land in ONE commit with the five retirements (B13, B16, B23, B28, B29) and eight supersessions (B7, B12, B14, B17, B24, B27, B34, B35) they replace, per the SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old rule nor its replacement is in force. Retirement entries: docs/SELFBUILD-RETIREMENT-LEDGER.md 21–33. -->
 # Selfbuild M6 — Autonomy Graduation Requirements Register
 
@@ -221,3 +222,76 @@ all-chained **19.4M**; realistic three-boot mix **~23.8M**, about 25% under the 
 | `docs/SELFBUILD-RETIREMENT-LEDGER.md` | Entries 21–33: one per retired or superseded rule, with the reason and the restore path. |
 | `docs/SELFBUILD-CHARTER.md` | The sequencing invariant and the transition rule these eight answer to. |
 | `tests/regression/ses-285-m6-autonomy.test.mjs` | Guards all of the above, including that `B20` and `HR-MERGE` did not move. |
+
+## <a id="the-m6-gate-decision"></a>The M6 gate decision — `SES-185`, decided 2026-09-02 (`v7.0.391`)
+
+<!-- FEATURE: SES-185 — the M6 design gate, decided rather than asked. M6-01: a cycle decides with
+     recorded reasoning instead of asking. This section IS that record. Reversible under M6-02. -->
+
+**Decided by attended session `design-m6-build-0902`, not by a card.** John's word that opened the
+sitting, verbatim: *"anything m6 can be built without my input right now? if so, run through all
+those tickets."* The card surface is retired (`SES-285`); `M6-01` requires the decision be made and
+its reasoning recorded, which is this section. It is reversible for 72 hours under `M6-02`. Every
+row it wrote carries a before-image under `session_name = 'design-m6-build-0902'`.
+
+### What M6 promises, and which ticket carries each promise
+
+`SES-185`'s own text and the charter's M6 row name the theme — *ladder-driven auto-accept, caps
+retirement* — and the M5 milestone review of 2026-09-02 handed this gate four findings. Measured
+against the board, two promises had no member at all:
+
+| Promise | Carried by | State at the gate |
+|---|---|---|
+| **1. The verifier decides; silence past 72 hours is assent** | `SES-285` (rules, done) · `SES-286` (mechanism) | The eight `M6-*` rules are live, but the window has no timer, no expiry sweep and no reversal handle — a rule marked `script` that no script runs. `SES-286` ruled **required**. |
+| **2. The ladder measures verdicts and reversals, and a rung buys real autonomy** | `SES-134` (done) · `SES-122` | The arithmetic is executable; the rung still unlocks nothing (`SES-122`'s own finding). Decided at this gate on `SES-122`'s row: a rung buys auto-done eligibility for its class and a one-step cap relaxation, both read from `runner_settings` columns, both fed only by `M6-07`'s inputs. **Caps retirement lives here** — the charter's sequencing invariant is met because the rung that relaxes a cap is fed only by verifier verdicts and unreversed decisions, and a reversal demotes it. |
+| **3. Every ship is graded** | `SES-311` — **had no ticket until this gate** | Four of the seven M5 required ships carry no `runner_verdicts` row: attended close-outs never run the verifier and nothing refuses `done` without one. A ladder that sees half the work is not a measurement. |
+| **4. Milestones succeed each other without a tap** | `SES-310`, `SES-312` — **had no ticket until this gate** | The M5 drain cannot retire (its deferred and non-required named members count as remaining), so step 8d's sweep never fires; and directive `0970abad` needs an *accepted card*, a thing that no longer exists. Two mechanisms, two tickets; `SES-312` is `blocked_by` `SES-286`. |
+| **5. Autonomy stops at `dev`** | `M6-08` (live) | Nothing to build. `SES-185`'s description lists *"ship-point promotion for dev→main"*; that item is **withdrawn from scope** — `M6-08` is the later rule, John's, and outranks the ticket text it contradicts. |
+
+### M6's required set — 6 tickets, 11 cycles
+
+`SES-185` (this gate, 1) · `SES-286` (3) · `SES-122` (2) · `SES-310` (1) · `SES-311` (2) · `SES-312` (2)
+
+**M6 is complete when those close.** Stored form: the six rows carry `milestone_required = true`
+and `milestone = 'M6'`, so *"what is left for M6"* is `select … from public.ticket_matrix where
+milestone = 'M6' and milestone_required and status <> 'done'` (`M5-04`). **Non-required members**
+(in the epic, pickable, not owed): `SES-301` (B34's rendered block, 1) and `SES-313` (model-per-lane
+to data, 1, charter decision 5's *"ported to data at M6"*). Eight tickets carried the M6 epic as
+`done` before this gate sat: `SES-134`, `SES-247`, `SES-285`, `SES-296`, `SES-297`, `SES-298`,
+`SES-300`, `SES-302`.
+
+### Rulings this gate owed, and how each was decided
+
+- **The exit exam's starred targets** (charter §Definition of success: 14 days, 90 % zero-touch,
+  30 John-minutes/day, ≤ 5 % reversal, 4 drift-free weeks) — **kept at their defaults.** There is
+  no measurement yet to tighten from: reversal rate and verdict coverage begin accruing only when
+  `SES-286` and `SES-311` land. Re-reviewed at the M7 gate (`SES-186`) with data.
+- **Collapse the design/coding session boundary** — **satisfied by measurement for the runner, not
+  filed.** An unattended cycle already designs and builds in one session (kickoff record, then
+  build, `M6-10`'s chain). The attended split is John's standing working rule
+  (`CLAUDE-DESIGN.md`), outside this project's authority to modify (charter §Transition rule).
+- **Model-per-lane ported to data** — `SES-313`, non-required.
+- **CI reds are unclassifiable to the heal engine** (M5 review finding) — **observation, not
+  filed.** Heal-engine classification is M5's theme and M5 is complete; under charter §Closure
+  discipline item 2 a new ticket needs a genuine discovery with evidence, and the next unexplained
+  CI red is that evidence. It queues to the general board when it happens.
+- **Deliberately not decided here:** the M7 gate (`SES-186`), and whether the hourly routine
+  survives — that is John's own switch (`runner_settings.scheduler_on`, §2b), never this project's.
+
+### The M5 milestone review now has a record the runner can see
+
+The review ran attended on 2026-09-02 and its findings live in `docs/RUNNER-GOV-M5-REQUIREMENTS.md`
+— but step 8d's sweep keys on a `runner_items` row per epic and directive `0970abad` reads that row
+as succession provenance, so with none the same review would be re-run unattended and M6 could never
+be declared. This gate wrote that row (`runner_items` `18500000-…-a5`, `kind = gated_before_build`,
+`epic_id` = M5, `decision = 'accept'` with John's *"yes, file the two tickets"* as the reason) and put
+the M6 successor list on it in the `SES-142` fixed-list form: the epic's open members at naming —
+`SES-286`, `SES-122`, `SES-301`, `SES-310`, `SES-311`, `SES-312`, `SES-313`. The M6 drain declares
+under `0970abad` once the M5 drain retires (`SES-310`); `SES-312` then replaces the accepted-card
+precondition with a decided-and-unreversed one, so the M7 handoff needs no hand-written row.
+
+### Cost
+
+Per `public.ticket_matrix` at the gate: 11 required cycles ≈ 14.6 M tokens (4.9 % of a weekly
+allowance); all 13 open-member cycles ≈ 17.3 M. Chained, per the `M6-09`…`M6-13` measurement,
+roughly a third of that.
