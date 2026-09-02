@@ -51,6 +51,31 @@ Copy-Item "C:/Projects/deepbench-frontend/.env.local" "C:/Projects/deepbench-fro
 
 (or the Bash `cp` equivalent). Skip only for a pure-bookkeeping edit (see the exception below).
 
+**`.env.local` carries publishable values only — John's ruling `d7670e18`, enforced `SES-260`
+(2026-09-02, v7.0.381).** `SUPABASE_URL`, `VITE_*`, `ALLOWED_ORIGIN` and nothing else. The
+privileged keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SUPABASE_SERVICE_KEY`, `VERCEL_TOKEN`,
+`VERCEL_AUTOMATION_BYPASS_SECRET`) were removed from all 25 copies on this machine; a copy that
+grows one back fails `tests/regression/ses-260-env-local-publishable-only.test.mjs`. Each has one
+sanctioned home, and a session that needs one borrows it for the session, **never inside the repo**:
+
+- **Live tests / anything needing the Anthropic, OpenAI or service key** → pull the Vercel project
+  env to a scratch file *outside* the repo and point Node at it:
+  ```
+  vercel env pull "<scratch>/session.env" --environment=production --yes --cwd "<scratch>/vlink"
+  node --env-file-if-exists="<scratch>/session.env" tests/regression/run-all.js
+  ```
+  `<scratch>` is this session's scratchpad directory (the harness names it; never a repo path).
+  `<scratch>/vlink` is a one-time linked scratch directory — create it once per machine with
+  `vercel link --yes --project deepbench-frontend --cwd "<scratch>/vlink"` — so no worktree ever
+  gets a `.vercel/` folder or a regenerated `.env.local`. Delete `session.env` in step 5.
+- **`VERCEL_TOKEN`** → not needed on this desktop at all: the Vercel CLI is logged in
+  (`vercel whoami` → `roadmapventure`), and its credential lives in your user profile.
+- **`VERCEL_AUTOMATION_BYPASS_SECRET`** → not a Vercel env var; read it by name from
+  `public.runner_secrets` over the Supabase MCP the moment a live-QA call needs the header, and
+  put it in the process environment for that one command, never in a file.
+- **The runner** reads all of these by name from `runner_secrets` (routine prompt step 3) and is
+  unaffected.
+
 ### 1c. Work against the worktree path for the rest of the session
 
 Do all Read/Edit/Write/Bash work against the worktree's absolute path
