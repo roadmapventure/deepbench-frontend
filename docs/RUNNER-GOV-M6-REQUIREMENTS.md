@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.396 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-286 (c) — THE PHASE SPLIT IS OVER, said in an amendment note rather than by editing the paragraph that recorded it. SES-286 (a) (v7.0.394), (b) (v7.0.395) and (c) (v7.0.396) built the reversal-window machinery this file deferred: public.runner_decisions plus record_decision() / sweep_decision_windows() / reverse_decision() / ladder_apply_signal(); runner-cycle.md 7b and its serial-tail sweep; session-setup.md 3d and its Reversing-a-decision section; and the standing brief's Open decisions block, which lists every open decision beside the one line that undoes it. NO RULE STATEMENT CHANGED — not one `>` quoted line was touched, so the ses-285 registry↔doc equality guard is untouched, and no governance_rules row moved. THE SUPERSEDED SENTENCE IS LEFT STANDING DELIBERATELY: "a rule marked `script` below is not yet enforced by any script" was true on 2026-09-01 and false from v7.0.396, and this file is a GATE RECORD — the phase it records really happened, so the note supersedes the sentence rather than deleting the history. An editor tempted to tidy the paragraph instead should read the amendment first. Doc only; the renderer and the new guard tests/regression/ses-286c-open-decisions-brief.test.mjs ship in the same commit. -->
 <!-- DeepBench v7.0.391 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-185 — the M6 design gate, decided rather than asked (attended session design-m6-build-0902, Fable 5.1, M6-01). This file gains the gate record: what M6 promises and which ticket carries each promise, the required set (6 tickets, 11 cycles — stored as milestone_required), four members filed at the gate (SES-310..313), the rulings the gate owed (exit-exam defaults kept, dev→main promotion withdrawn from SES-185 scope under M6-08, design/coding split satisfied by measurement for the runner), and the M5 milestone-review runner_items row written so step 8d and directive 0970abad can see that review. No rule STATEMENT changed: the ses-285 registry↔doc equality guard is untouched. Doc-only plus Supabase rows, all before-imaged under session_name design-m6-build-0902. -->
 <!-- DeepBench v7.0.359 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-285 — the M6 autonomy rule set (M6-01..M6-08) gets its canonical home. FEATURE: SES-285 — this file and the eight public.governance_rules rows it renders land in ONE commit with the five retirements (B13, B16, B23, B28, B29) and eight supersessions (B7, B12, B14, B17, B24, B27, B34, B35) they replace, per the SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old rule nor its replacement is in force. Retirement entries: docs/SELFBUILD-RETIREMENT-LEDGER.md 21–33. -->
 # Selfbuild M6 — Autonomy Graduation Requirements Register
@@ -52,6 +53,47 @@ replace are retired or superseded in the same commit. **The reversal-window mach
 the expiry sweep, the reversal handle — is `SES-286`, a separate ticket.** Said plainly so no reader
 mistakes a recorded intent for a live gate: **a rule marked `script` below is not yet enforced by
 any script.** The `reviewer` rules bind a reader from the moment they are live.
+
+<!-- FEATURE: SES-286 (c) — the amendment that ends the phase split. Appended, never a rewrite of
+     the paragraph above it: that paragraph is part of the gate record and was true when written. -->
+
+**Amendment — 2026-09-02, `SES-286` (a) `v7.0.394`, (b) `v7.0.395`, (c) `v7.0.396`.** The
+reversal-window machinery this section deferred is built, and the paragraph above is now history
+rather than the current state. What shipped, in order:
+
+- **(a) `v7.0.394`** — `public.runner_decisions`: a decision is a row with an `expires_at` and a
+  handle, its handle being its own `id`, and the before-images written under it carry
+  `decision_id`. With it, four functions: `record_decision()`, `sweep_decision_windows()`,
+  `reverse_decision()` and `ladder_apply_signal()` (plus the `ladder_work_class()` helper).
+- **(b) `v7.0.395`** — the runbooks call them: `docs/runbooks/runner-cycle.md` **7b** (what a
+  decision is, and the one transaction that records it with its rows), its serial-tail
+  **`(7b) SWEEP THE DECISION WINDOWS`** step ahead of the chain gate, and step 8c's automatic
+  removal; `docs/runbooks/session-setup.md` **3d**, its close-out sweep, and its
+  § *Reversing a decision*.
+- **(c) `v7.0.396`** — `scripts/render-standing-brief.js` renders an **Open decisions** block into
+  `docs/runbooks/standing-brief.md` at every ship: every open decision, when it finalises in CST,
+  and beside it the single `reverse_decision()` line that undoes it.
+
+**`M6-02`, `M6-05`, `M6-06` and `M6-07` therefore have an executing mechanism.** The window is the
+column `runner_settings.reversal_window_hours` and each `expires_at` is computed at record time, so
+a later change to the setting never moves an existing window (`M6-02`). A decision and the ticket it
+files are one transaction, and the before-images naming that `decision_id` are written in it
+(`M6-05`). The recorded reversal handle is the decision's `id`, and it is now on the page John reads
+(`M6-06`). The ladder promotes on a decision nobody reversed — at the sweep, once its window closes
+— and demotes on a reversal, inside the window or after it (`M6-07`).
+
+**`M6-01` and `M6-03` execute through the same record.** A cycle's recorded reasoning is the
+`reasoning` column of its decision row rather than prose on a ticket, which is what makes "decides,
+never asks" auditable afterwards (`M6-01`); and an automatic removal after a second consecutive
+failed revalidation is a `kind = 'removal'` decision whose window is precisely what makes acting on
+that second failure safe (`M6-03`).
+
+**The sentence this note supersedes** is the one above: *"a rule marked `script` below is not yet
+enforced by any script."* It was true on 2026-09-01 and false from `v7.0.396`. It is left standing
+rather than edited because this file is a gate record and the phase it records really happened —
+read it as history and read this note as the current state. What remains un-scripted is narrower and
+named: `M6-04` is a `reviewer` rule and always was, and `M6-08` is a boundary statement, not a
+script. No rule **statement** changed in this amendment and no `governance_rules` row moved.
 
 ## Deliberately retained — autonomy stops at `dev`
 

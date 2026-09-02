@@ -1,4 +1,34 @@
 #!/usr/bin/env node
+// DeepBench v7.0.396 | scripts/render-standing-brief.js | SES-286 (c) — OPEN DECISIONS ARE ON THE
+// PAGE JOHN READS, WITH THE LINE THAT UNDOES EACH. Parts (a) (v7.0.394) and (b) (v7.0.395) gave a
+// decision a row, an expiry and a handle, and told the cycle and the attended close-out where to
+// record it and when to sweep it. The handle then lived in a cycle's notes and a ticket description
+// — two places John does not read. This block is the one surface every attended session and John
+// both read, and it is regenerated at every ship (SES-265), so this is where "reverse is always one
+// tap away" (charter goal 5) becomes, for a decision, one line he can copy.
+//
+// WHAT IS NEW AND WHERE IT IS NOT: one fact group, `Open decisions`, between the drain census and
+// the provenance footer; runner_decisions in fetchFacts(); and the open ids, their expiries and both
+// weekly counts in the factsSha() payload, so a decision opening, finalising or being reversed MOVES
+// THE SHA and --check reports it. Nothing outside the markers moves — the head/tail assertion below
+// is untouched, and if a change here made it fire, the change would be wrong, not the assertion.
+//
+// THE HANDLE IS THE FULL UUID, never the 8-char prefix the bullet displays. The prefix is for
+// reading; reverse_decision() takes the whole id, and a bullet that printed only the prefix would
+// hand John a line that cannot run — which is worse than no line at all, because it looks like one.
+//
+// "THIS WEEK" IS A ROLLING 7 DAYS AND SAYS SO. The kickoff offered the Friday-07:00Z weekly reset
+// "the file already uses for its census" — measured this session, no such helper exists anywhere in
+// scripts/ or docs/runbooks/, and this file's census is a point-in-time count with no week boundary
+// at all. Inventing one here would be a number nobody else in the platform computes, so the counts
+// are a rolling 7 days back from render time and the block labels them as that rather than leaving
+// "this week" to be read as a calendar week.
+//
+// A MISSING decisions KEY IS NOT "NONE OPEN". renderBlock() tolerates a facts object built without
+// one (the SES-177b fixtures predate this ship) and SAYS the ledger was not read. Reporting a zero
+// it never measured would be the stale-number defect this whole script exists against, in the one
+// place John would trust it most.
+//
 // DeepBench v7.0.393 | scripts/render-standing-brief.js | SES-310 — the drain census says which
 // members are the FINISH LINE (milestone_required), not just how many are named; SES-177 (b) — the
 // standing brief's DERIVABLE facts become a generated block; its judgment prose is never touched.
@@ -135,6 +165,18 @@ export function factsSha(facts) {
     items: facts.items.map(r => [r.id, r.status, r.design_status, r.queue]).sort(),
     settings: facts.settings || null,
     drain: facts.drain || null,
+    // FEATURE: SES-286 (c) — the open ids, their EXPIRIES and both counts, so a decision opening, a
+    // sweep finalising one, or a reversal each move the sha and --check reports the drift. The
+    // 7-day cutoff itself is deliberately ABSENT from this payload: it advances with the clock, so
+    // including it would report drift on every single run and the check would be ignored inside a
+    // day — the same reason the "as of" stamp is not in here either.
+    decisions: facts.decisions
+      ? {
+          open: facts.decisions.open.map(d => [d.id, d.expires_at]).sort(),
+          finalWeek: facts.decisions.finalWeek,
+          reversedWeek: facts.decisions.reversedWeek,
+        }
+      : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
 }
@@ -145,16 +187,44 @@ export function shaFromBlock(block) {
   return m ? m[1] : null;
 }
 
+/**
+ * FEATURE: SES-286 (c) — ONE CST formatter, two callers. The stamp's CST half and a decision's
+ * "finalises …" time are the same display rule (John, 2026-08-20, and register B35's second ruling:
+ * a time he reads is CST and is labelled), so they must not be two format strings that can drift
+ * apart. EXTRACTED from asOf() rather than copied out of it — asOf() now calls this, so there is
+ * exactly one place the format lives.
+ */
+export function cst(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) throw new Error(`cst: not a date: ${iso}`);
+  return d.toLocaleString("en-US", {
+    timeZone: "America/Chicago", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  }) + " CST";
+}
+
+/**
+ * FEATURE: SES-286 (c) — a decision summary, safe to put in a markdown bullet.
+ *
+ * THE BACKTICK IS THE ONE THAT MATTERS, and it is not tidiness: the bullet ENDS with an inline code
+ * span carrying the reverse_decision() line, so a single backtick anywhere in a free-text summary
+ * opens a span early and swallows the handle John came to copy. Summaries are written by cycles into
+ * runner_decisions.summary, which carries no format constraint at all (SES-286a: NOT NULL and
+ * non-blank, nothing more), so this is untrusted text landing on John's page. Newlines collapse for
+ * the same reason — one bullet has to stay one line.
+ */
+export function summarise(s, max = 120) {
+  const flat = String(s == null ? "" : s).replace(/`/g, "'").replace(/\s+/g, " ").trim();
+  if (!flat) return "—";
+  return flat.length > max ? flat.slice(0, max - 1).trimEnd() + "…" : flat;
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
   if (Number.isNaN(d.getTime())) throw new Error(`asOf: not a date: ${nowIso}`);
   const utc = d.toISOString().slice(0, 16).replace("T", " ") + "Z";
-  const cst = d.toLocaleString("en-US", {
-    timeZone: "America/Chicago", month: "short", day: "numeric",
-    hour: "numeric", minute: "2-digit", hour12: true,
-  });
-  return `as of ${utc} (${cst} CST)`;
+  return `as of ${utc} (${cst(nowIso)})`;
 }
 
 /**
@@ -163,7 +233,8 @@ export function asOf(nowIso) {
  * returns, so the test can drive it from a fixture.
  */
 export function renderBlock(facts, nowIso) {
-  const { items, settings, drain } = facts;
+  // FEATURE: SES-286 (c) — decisions joins the destructure; it may be absent (see the header note).
+  const { items, settings, drain, decisions } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -269,6 +340,46 @@ export function renderBlock(facts, nowIso) {
   }
   L.push("");
 
+  // ---- Open decisions (FEATURE: SES-286 (c) — M6-02, M6-06) ---------------------------------
+  // The window is READ OFF runner_settings, never written as "72". M6-02's prose says 72 hours, but
+  // the column is what record_decision() actually computed every live expires_at from (SES-146's
+  // rule: every cadence number is a column), so if John changes the column this sentence changes
+  // with it instead of becoming the next stale number in a file that exists to have none.
+  const windowHours = settings && settings.reversal_window_hours != null
+    ? `${settings.reversal_window_hours}h` : "not set";
+  L.push(`**Open decisions** — *${stamp}.* Decisions made under \`M6-02\` that are still inside ` +
+    `their reversal window (\`runner_settings.reversal_window_hours\` = ${windowHours}). Silence ` +
+    "finalises them; to reverse one, run the line beside it (`docs/runbooks/session-setup.md` § " +
+    "Reversing a decision).");
+  L.push("");
+  if (!decisions) {
+    // NOT the same statement as "none open", and the difference is the whole point: a render whose
+    // facts carried no decision ledger says so rather than publishing a zero it never measured.
+    L.push("- *The decision ledger was not read for this render* — which is **not** the same as " +
+      "*none open*. Re-run `scripts/render-standing-brief.js` with a service key.");
+  } else if (decisions.open.length === 0) {
+    L.push("- **None open.**");
+  } else {
+    for (const d of decisions.open) {
+      // The DISPLAYED id is the 8-char prefix John reads by; the id inside the call is the FULL
+      // uuid, because that is what reverse_decision() takes.
+      L.push(`- \`${String(d.id).slice(0, 8)}\` · ${d.kind || "—"} · ` +
+        `${d.backlog_id ? `\`${d.backlog_id}\`` : "—"} · ${summarise(d.summary)} · ` +
+        `finalises ${d.expires_at ? cst(d.expires_at) : "—"} · ` +
+        `\`select public.reverse_decision('${d.id}','John','<why>');\``);
+    }
+  }
+  if (decisions) {
+    L.push("");
+    L.push(`**${decisions.finalWeek} final this week, ${decisions.reversedWeek} reversed this ` +
+      "week** — *this week* is a **rolling 7 days** back from the stamp, not a calendar week and not " +
+      "a Friday-07:00Z reset: no such weekly-reset helper exists in this file or anywhere in " +
+      "`scripts/`, so a rolling window is what is used and is labelled as one. A reversal is the " +
+      "strongest negative signal the ladder takes (`M6-07`), so the second number is the one to read " +
+      "first.");
+  }
+  L.push("");
+
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
     "The stamp says when this was last read; the sha says whether it still matches the tables. " +
@@ -358,7 +469,29 @@ export async function fetchFacts(url, key) {
       deferredIds: ids(deferredRows),
     };
   }
-  return { items, settings, drain };
+  // FEATURE: SES-286 (c) — the decision ledger. runner_decisions is service_role only (SES-286a's
+  // explicit REVOKE), which is the same key everything else in this script already needs; there is
+  // no anon path to fall back to and none is wanted. rest() dies with exit 2 on any non-2xx, so a
+  // checkout run against a database predating the SES-286a migration REFUSES rather than rendering a
+  // brief with this group silently missing.
+  //
+  // THREE READS, NOT ONE WITH A COUNT HEADER: rest() sends no Prefer header and returns parsed JSON,
+  // so the counts are array lengths. At this ledger's size (0 rows live at this ship) that is free,
+  // and the limit keeps a runaway ledger from being read wholesale.
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const openDecisions = await rest(url, key,
+    "runner_decisions?select=id,kind,backlog_id,summary,expires_at&status=eq.open&order=expires_at&limit=1000");
+  const finalWeek = await rest(url, key,
+    `runner_decisions?select=id&status=eq.final&finalized_at=gte.${since}&limit=1000`);
+  const reversedWeek = await rest(url, key,
+    `runner_decisions?select=id&status=eq.reversed&reversed_at=gte.${since}&limit=1000`);
+  const decisions = {
+    open: Array.isArray(openDecisions) ? openDecisions : [],
+    finalWeek: Array.isArray(finalWeek) ? finalWeek.length : 0,
+    reversedWeek: Array.isArray(reversedWeek) ? reversedWeek.length : 0,
+  };
+
+  return { items, settings, drain, decisions };
 }
 
 async function main() {
