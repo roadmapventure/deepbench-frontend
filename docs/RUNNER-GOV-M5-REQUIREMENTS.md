@@ -82,7 +82,7 @@ existing fail-LOUD behaviour rather than getting a second, quieter one.
 
 ### <a id="M5-04"></a>M5-04 — answer from the matrix, never by re-deriving (`prose`)
 
-> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `priority_class`, `filed_at` as the created date, `status`, `scope_rationale`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags.
+> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `milestone`, `milestone_required`, `priority_class`, `filed_at` as the created date, `status`, `scope_rationale`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags. A milestone's required set is the stored `milestone_required` flag, set at its gate decision and never re-judged per question.
 
 Re-deriving per question is how two answers to the same question disagree. It is also what the
 accounting review had to do — and the re-derivation is where the missing `item_id` rows silently
@@ -99,6 +99,10 @@ priority lane selects on.
 **Extended 2026-09-01 (`SES-295`, v7.0.361), John verbatim: _"add that column from here on out to the matrix as well"_** — `scope_rationale` joins the mandated list. It records *why* a ticket belongs in its epic's chartered scope (which charter goal it advances), as distinct from `scope_origin`, which records only *where the ticket came from*. Measured when the column was added: 11 of the 13 open post-2026-08-21 `Selfbuild M5` tickets carried no scope reasoning at all, so `M5-02`'s review bucket had no criterion to review against.
 
 **Bug found and fixed in the same change — `ticket_matrix` was serving the wrong date.** The view read `b.created_at AS filed_at`, so every answer that sourced the filing date from the matrix was actually reporting the board-migration bulk-load timestamp under the name `filed_at`. Worst live case: `AA-01` reported 2026-08-20 for a ticket genuinely filed 2026-06-13, a 68-day error. Impact was contained — across the 32 open Selfbuild tickets 5 dates differed and **zero** changed lane under `M5-02` — but `SES-281` was about to wire the pick path to that column, which would have made the mislabel decision-bearing. The view now selects `b.filed_at`.
+
+**Extended 2026-09-02 (`SES-304`, v7.0.374), John verbatim: _"create a new Milestone field, and appropriately label each ticket to their correct milestone"_ and _"add to the list of columns in the matrix … the new milestone field"_** — `milestone` and `milestone_required` join the mandated list, and the last sentence of the rule is new. The defect it answers is in `docs/M5-HANDOFF-2026-09-02.md` goal 2: *"what is needed for M5"* was asked six times on 2026-09-01/02 and answered six ways, because the required set was never stored and so was re-judged on every asking — this rule's own prohibition, violated for an evening. Two columns on `backlog_items` now hold what was being re-derived: **`milestone`** (`M0`…`M7`) is the milestone a ticket *serves*, and **`milestone_required`** is whether the ticket is in that milestone's required set as ruled at its gate. **`epic_id` keeps its job as the pick lane** (`M5-01`, `M5-02`, `M5-09` all select on it) and is deliberately *not* what `milestone` reports on: the seven M5-epic tickets the `SES-184` gate record names as serving other milestones carry `milestone` = `M2`/`M4`/`M6`/`M7` while their epic stays M5, so nothing reopens the accepted M4 and nothing loses pickability — moving their epics is John's call and is one `UPDATE` if he makes it. Backfilled for every Selfbuild ticket from its epic; the M5 required set is exactly the eight tickets the gate record names. Five tickets that carried **no epic at all** (`SES-290`, `SES-291`, `SES-292`, `SES-293`, `SES-279` — three of them John's own instructions) were invisible in every milestone view and unpickable under `M5-01`; they now sit in M2 (`SES-292` in M5, `milestone_required = false`). Every changed row has a before-image (`session_name = 'design-m5-milestone-0902'`).
+
+**Bug found and fixed in the same change — the matrix never carried `priority_class`.** This rule has mandated `priority_class` in every answer since `SES-280` (v7.0.358), and `public.ticket_matrix` had no such column, so no answer that obeyed *"from the matrix"* could also obey the column list. The view now carries it, appended with the two new columns so every existing positional reader is unaffected.
 
 ### <a id="M5-05"></a>M5-05 — a new rule declares its own metadata (`reviewer`)
 
@@ -375,6 +379,8 @@ incident `SES-269` was filed from.
 `SES-184` (this gate) · `SES-82` · `SES-161` · `SES-282` · `SES-303` · `SES-276` · `SES-277` · `SES-269`
 
 **M5 is complete when those close.** Completion is a property of that set, not of the epic label.
+
+**Stored 2026-09-02 (`SES-304`, v7.0.374).** The set above is no longer only prose: those eight rows carry `backlog_items.milestone_required = true` and `milestone = 'M5'`, so *"what is left for M5"* is `select … from public.ticket_matrix where milestone = 'M5' and milestone_required and status <> 'done'` — the same answer on every asking (`M5-04`). Amending the set means amending the flag, with a before-image, in the same change as the amendment note here.
 
 ### Seven tickets carry the M5 epic and do not serve M5
 
