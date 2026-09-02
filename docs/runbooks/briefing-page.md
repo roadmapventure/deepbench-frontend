@@ -950,7 +950,11 @@ SELECT claim_ref, source_doc, claim_text, judgment_class, confidence, is_root
 `is_root DESC` leads because the four roots are the `ARCHITECTURE.md` §19v judgment-class purposes and
 **every later claim is scored against them** — a corpus whose roots are still the doc's paraphrase is
 one John never actually ratified. `LOW` confidence before `MED` before `HIGH` is register B13's
-existing rule, unchanged; each doc's *"Open questions for John"* imported as `low`-confidence rows and
+existing rule (B13 **retired** 2026-09-01 with no successor — `SES-285`, annotated `SES-289`; the
+drip-card surface it describes is gone, so **this whole ordering rule is annotated-as-withdrawn and
+unrunnable**: nothing renders these cards and no tap ratifies them. Left in place rather than
+rewritten because the replacement route is undecided — that is `SES-289`'s follow-up); each doc's
+*"Open questions for John"* imported as `low`-confidence rows and
 needs no separate pass. Never more than 3, never zero while `proposed` rows remain.
 
 Card face: the claim sentence phrased as *"X because Y — true?"*, its `claim_ref` (`VC-THESIS-004`) and
@@ -1312,11 +1316,20 @@ streak left running — **never reset on promotion** (John, `q-ladder-streak-res
 2026-08-21T22:04Z; full rule and the runaway it avoids: `runner-cycle.md` step 2 — cited, not
 restated); Reverse → streak 0, demote; Rework neutral. On a
 `gated_before_build` card, **an Accept is permission to build, not a rating, and does not touch
-the ladder at all** (John, 2026-08-21, directive `fb643367`, register B34) — it authorises that
-one build and re-enters the ticket at queue #1 (B23). **A Reverse on a gated card still demotes,
+the ladder at all** (John, 2026-08-21, directive `fb643367`, register B34 — B34 **superseded**
+2026-09-01 by `M6-07`, `SES-285`, annotated `SES-289`; its substance is still enforced in
+`apply_ladder_decision()`, its subject simply no longer arrives) — it authorises that
+one build and re-enters the ticket at queue #1 (B23 — **retired** 2026-09-01, `SES-285`, annotated
+`SES-289`, along with its silence-parks-a-card-forever clause). **A Reverse on a gated card still demotes,
 and that is now settled** — asked directly, John answered "leave it" (2026-08-21, directive
-`1d01ea85`, register B35). It is his ruling, not an unclosed asymmetry: **the page stops
-carrying it as an open question.** **The full statement, including why the history is not re-derived, lives in
+`1d01ea85`, register B35 — B35 **superseded** 2026-09-01 by `M6-07`, `SES-285`, annotated `SES-289`;
+scope matters, and only the Reverse-on-gated answer of superseded B35 lost its subject — its
+America/Chicago budget-day boundary and dead-cycle-report rulings were never about cards and
+still bind).
+It is his ruling, not an unclosed asymmetry: **the page stops
+carrying it as an open question.** **This whole paragraph is annotated-as-withdrawn and unrunnable**
+— there are no `gated_before_build` cards left to Accept or Reverse, so nothing re-enters a ticket
+at queue #1 by that route; the rewrite is `SES-289`'s follow-up, not this annotation. **The full statement, including why the history is not re-derived, lives in
 `runner-cycle.md` step 2 — do not restate it here, cite it**, so the two runbooks cannot drift
 the way this line did. Un-decided cards carry forward to the rebuilt page —
 **silence is never an Accept.**
