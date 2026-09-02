@@ -224,7 +224,8 @@ every column below is load-bearing:
 ```sql
 INSERT INTO backlog_items
   (backlog_id, tier, type, priority_class, title, description, status, epic_id,
-   source_file, session_ref, row_ordinal)
+   source_file, session_ref, row_ordinal,
+   filed_at, scope_origin, size_stamp, predicted_cycles, defer_status, scope_rationale, milestone)
 SELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>',
        '<named P-class — REQUIRED at filing, register B9>',
        '<one-line human title — never the class string>',
@@ -232,7 +233,12 @@ SELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>'
        'open',
        (SELECT id FROM epics WHERE name = '<epic name>')::uuid,  -- or NULL for no epic
        'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',
-       coalesce(max(row_ordinal),0)+1
+       coalesce(max(row_ordinal),0)+1,
+       now(),                                   -- filed_at: the created date (never created_at, M5-04)
+       '<original|gate-review|john-named|discovered|pre-existing>',   -- scope_origin (FILE-MATRIX)
+       '<S|M|L>', <predicted cycles, >= 1>, '<no|maybe|yes>',           -- size_stamp, predicted_cycles, defer_status
+       '<scope_rationale: WHY it belongs — "Goal N, <name>: …" — REQUIRED on a Selfbuild ticket, M5-03>',
+       '<M0..M7 the ticket serves, or NULL>'                            -- milestone (SES-304)
   FROM backlog_items
 RETURNING backlog_id, priority_class;
 ```
@@ -240,6 +246,12 @@ RETURNING backlog_id, priority_class;
 - **`priority_class` is mandatory at filing** (register B9 — nothing enters the board
   undecided), always the full named form (`P10 - Tooling`), `· FLAGGED` suffix only on
   `P9 - Bug Fixes` pixel-moving fixes.
+- **`scope_rationale` is the review bucket's promotion criterion (`M5-03`, `SES-295`, 2026-09-02):**
+  a Selfbuild ticket filed on or after 2026-08-21 with no rationale is **never picked** — not by the
+  drain, not by the pre-boot gate — until one is written. Name the charter goal it advances
+  (`docs/SELFBUILD-CHARTER.md` "Goals"), one or two sentences. The other matrix fields
+  (`scope_origin`, `size_stamp`, `predicted_cycles`, `defer_status`) are fail-LOUD (`FILE-MATRIX`):
+  a missing one is flagged, not refused.
 - **`row_ordinal` is NOT NULL** — omit it and the INSERT fails (found live filing `SES-96`,
   2026-08-21); the `SELECT … max+1` form above handles it.
 - **`title` is the human sentence.** Phases (a)/(b) imported the class string into `title` for

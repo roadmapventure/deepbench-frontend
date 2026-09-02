@@ -74,11 +74,13 @@ neither is in force). Retirement entry: `docs/SELFBUILD-RETIREMENT-LEDGER.md`.
 
 ### <a id="M5-03"></a>M5-03 — the matrix carries what the picker selects on (`prose`)
 
-> The per-ticket governance matrix mandated by FILE-MATRIX additionally carries `epic_id` and `filed_at`, because M5-01 and M5-02 select on them; FILE-MATRIX's fail-LOUD tripwire covers the added fields.
+> The per-ticket governance matrix mandated by FILE-MATRIX additionally carries `epic_id`, `filed_at` and `scope_rationale`: M5-01 and M5-02 select on the first two, and `scope_rationale` (why the ticket belongs in its epic's chartered scope, naming the charter goal it advances) is the review bucket's promotion criterion — a ticket filed on or after 2026-08-21 with no scope rationale is not promoted out of the bucket and is never picked. FILE-MATRIX's fail-LOUD tripwire covers the added fields.
 
 A selector the picker reads but the matrix does not carry is a field nobody can audit after the fact.
 The two new columns are exactly the two M5-01 and M5-02 select on, and they inherit FILE-MATRIX's
 existing fail-LOUD behaviour rather than getting a second, quieter one.
+
+**Extended 2026-09-02 (`SES-295`, v7.0.377), John 2026-09-01 verbatim: _"on tickets created after 8/21, are you stating why they have been added to original scope?"_** Measured answer then: no — 11 of the 13 open post-cut M5 tickets carried provenance ("named by the M4 gate review", "found live by cycle X") but no *justification*. `scope_rationale` joined the matrix in `SES-295`'s first half (`v7.0.361`); this half makes it bite. **Three things shipped together:** (1) every open Selfbuild ticket filed on or after 2026-08-21 — 24 rows — now carries a rationale naming the charter goal it advances (before-images `session_name = 'design-ses-295-0902'`), so nothing is stranded by (2); (2) the rationale is **the promotion criterion `M5-02` always said the review bucket needed and never had**: `drain_epic_next()` and `prime_directive_queue()` exclude a post-cut Selfbuild ticket with no rationale (migration `ses295_scope_rationale_promotion`, the same anchored-replace pattern as `SES-305`), and the drain census reports "N awaiting scope rationale (…)" so the rejection is never a silent empty; (3) `FILE-MATRIX`'s statement names the field, and the canonical filing `INSERT` in `docs/runbooks/session-setup.md` carries it. **Deliberately not fail-closed at the database:** FILE-MATRIX chose fail-LOUD so the runner's own filing path can never park mid-drain on a NOT NULL; the pick-time exclusion is the enforcement, and `SES-279`'s tripwire is the alarm. Pre-cut tickets (filed before 2026-08-21) are untouched — the priority lane never needed a promotion.
 
 ### <a id="M5-04"></a>M5-04 — answer from the matrix, never by re-deriving (`prose`)
 
