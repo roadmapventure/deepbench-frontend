@@ -65,13 +65,20 @@ const BLOCK_END = "**0. Bootstrap.**";
 // what each one MEANS is read out of the runbook by the clauses below, never restated.
 export const REASONS = [
   "scheduler_off",
-  "usage_reading_stale",
+  // SES-298: 'usage_reading_stale' is NOT here. A stale reading degrades to 'pickable_degraded'
+  // rather than refusing -- M5-15 as shipped made a number only John can type into a precondition
+  // for autonomy, which M6-01 forbids, and it live-blocked the runner within the hour.
+  "pickable_degraded",
   "weekly_wall",
   "no_budget_row",
   "nothing_pickable",
   "unaffordable",
 ];
 export const PASS_REASON = "pickable";
+// SES-298: two reasons boot. 'pickable' runs on the full day allowance; 'pickable_degraded' runs
+// on stale_fallback_tokens because the meter is old. Both are passes, so should_boot is true for
+// both -- a set, not a single string, or the consistency check below calls a degraded boot a drift.
+export const BOOTING_REASONS = new Set([PASS_REASON, "pickable_degraded"]);
 
 // ---------------------------------------------------------------------------
 // Pure readers
@@ -386,12 +393,16 @@ export function chicagoMonth(now = new Date()) {
 // is reimplemented is only the six-branch LADDER, which is the thing under test.
 export function expectedReason(f) {
   if (f.schedulerOn === false) return "scheduler_off";
-  if (f.readingAgeHours === null || f.readingAgeHours > 24) return "usage_reading_stale";
+  // SES-298: staleness is graded LAST and degrades rather than refusing. Held here in the ladder's
+  // real position so this oracle keeps grading the shipped precedence, not a remembered one.
   if (f.weeklyRestPct !== null && f.allModelsPct !== null && f.allModelsPct >= f.weeklyRestPct)
     return "weekly_wall";
   if (!f.budgetRowExists) return "no_budget_row";
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
+  // SES-298: the degraded pass. Everything above cleared, but the meter is old -- the cycle runs
+  // under stale_fallback_tokens instead of the full day allowance.
+  if (f.readingAgeHours === null || f.readingAgeHours > 24) return "pickable_degraded";
   return PASS_REASON;
 }
 
@@ -421,9 +432,9 @@ async function theLiveGateObeysItsOwnLadder() {
     `runner_should_boot() returned an unknown reason ${JSON.stringify(v.reason)}; the closed set is ` +
     `${[...REASONS, PASS_REASON].join(", ")}`);
   assert.strictEqual(
-    v.should_boot, v.reason === PASS_REASON,
+    v.should_boot, BOOTING_REASONS.has(v.reason),
     `should_boot=${v.should_boot} disagrees with reason=${v.reason}. The two must never be able to ` +
-      "drift: a true with a refusal reason boots a cycle into a wall, a false with 'pickable' " +
+      "drift: a true with a refusal reason boots a cycle into a wall, a false with a booting reason " +
       "silences the runner with nothing to point at",
   );
   assert.ok(v.detail && typeof v.detail === "object",
@@ -495,10 +506,19 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
     "drain/selfbuild rows -- the gate and the picker are reading different boards");
 
-  if (v.reason === "usage_reading_stale") {
+  if (v.reason === "pickable_degraded") {
+    // SES-298: the degraded pass must BOOT, must actually be stale, and must carry the smaller
+    // ceiling. Asserting only should_boot would pass if the cap were never applied -- the cap is
+    // the whole of the amendment, so it is the thing graded.
+    assert.strictEqual(v.should_boot, true,
+      "pickable_degraded must boot -- M5-15 degrades under a smaller ceiling, it does not refuse");
     assert.ok(d.reading_age_hours === null || Number(d.reading_age_hours) > 24,
-      `M5-15 refused on a reading detail reports as ${d.reading_age_hours}h old -- the age must be ` +
-      "in the payload and must actually be stale, or the refusal cannot be checked by whoever reads it");
+      `M5-15 degraded on a reading detail reports as ${d.reading_age_hours}h old -- the age must be ` +
+      "in the payload and must actually be stale, or the degradation cannot be checked by its reader");
+    assert.strictEqual(d.reading_stale, true, "detail.reading_stale must say so on a degraded pass");
+    assert.ok(d.token_cap !== null && d.token_cap !== undefined,
+      "a degraded pass must carry detail.token_cap -- without it the cycle has no smaller ceiling " +
+      "to run under and the degradation is cosmetic");
   }
   if (v.reason === PASS_REASON) {
     assert.ok(d.pick && d.pick.backlog_id,

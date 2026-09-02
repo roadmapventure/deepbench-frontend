@@ -100,24 +100,40 @@ RETURNING id;
 
   Then **end**. No push notification, no session rename, no serial tail, no successor fire.
 
-**The six refusal reasons, in the precedence the function applies them.** Each names itself, always:
-**a bare `false` is the "NULL is not zero" defect this codebase has paid for repeatedly.**
+**AMENDED SAME DAY BY `SES-298` (v7.0.365) — A STALE READING NO LONGER REFUSES.** `M5-15` shipped
+worded as a refusal, and within the hour it was live-blocking the runner on a 32.66h-old reading.
+The only way to refresh that reading is John typing it (`SES-82`, the programmatic read, is
+unbuilt), so the refusal made **a number only John can produce into a precondition for autonomy —
+exactly what `M6-01` forbids**, and it did so in a rule written by the same session that retired the
+card surface. It also ignored a mechanism the platform already had: `runner_budget.stale_fallback_tokens`
+(3,000,000) exists precisely so a cycle can run under a smaller ceiling when the meter is old.
+**A stale reading now DEGRADES**: `reason = 'pickable_degraded'`, `should_boot = true`, and
+`detail.token_cap` carries `stale_fallback_tokens` instead of `runner_day_token_allowance`. The
+staleness is still graded and still reported (`detail.reading_stale`, `detail.reading_age_hours`) —
+what changed is the consequence. A stale reading still grades the wall in (2): a stale 63% is better
+evidence than none, it simply can no longer stop the boot by itself.
+
+**The five refusal reasons, in the precedence the function applies them**, plus one degraded pass.
+Each names itself, always: **a bare `false` is the "NULL is not zero" defect this codebase has paid
+for repeatedly.**
 
 1. `scheduler_off` — `runner_settings.scheduler_on` is false. John's own switch, the same one step
    1b's `scheduler_gate()` honours.
-2. `usage_reading_stale` — **`M5-15`**: the freshest `runner_usage_readings.taken_at` is older than
-   24h, **or there is no reading at all**. `detail.reading_age_hours` carries the age.
-3. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` is at or above
+2. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` is at or above
    `runner_budget.weekly_rest_pct` for the current **`America/Chicago`** month (register `B35` — the
    month boundary is John's clock, never UTC).
-4. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
+3. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
    that stopped the runner and then sat unread in a card, and it now has a name instead of a silent
-   pass.** (3) preceding (4) is deliberate and NULL-safe: with the row absent, (3)'s comparison is
-   NULL rather than true, so it falls through to (4) instead of blaming the wall for a missing row.
-5. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
+   pass.** (2) preceding (3) is deliberate and NULL-safe: with the row absent, (2)'s comparison is
+   NULL rather than true, so it falls through to (3) instead of blaming the wall for a missing row.
+4. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row.
-6. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
+5. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`).
+
+Then, not a refusal: `pickable_degraded` — everything above passed but the reading is stale, so the
+cycle **runs** under `detail.token_cap` = `stale_fallback_tokens`. `pickable` is the same pass with
+a fresh reading and the full `runner_day_token_allowance`.
 
 **This gate and `scheduler_gate()` answer different questions and both hold.** `scheduler_gate()`
 asks *is this fire admissible on John's clock grid*; this one asks *is there anything to do at all*.
