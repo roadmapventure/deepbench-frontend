@@ -335,6 +335,56 @@ RETURNING backlog_id, priority_class;
   `Automation` is pre-authorized, so a session that wants a NEW epic asks first rather than
   inserting one.
 
+### 3d. Record a decision — the attended session's own (`SES-286`, `v7.0.395`)
+
+<!-- FEATURE: SES-286 (b) — the attended path calls the decision ledger part (a) built. -->
+An attended session makes judgment writes too, and they are the same kind of thing an unattended
+cycle's are: **what counts as a decision and what does not is defined once, in
+`docs/runbooks/runner-cycle.md` step 7b** — read the list there rather than reasoning from this
+page. When this session resolves, defers, re-tiers, re-homes, removes or re-scopes a ticket, rules
+a gate or amends a directive, record it in the same transaction as the write:
+
+```sql
+DO $$
+DECLARE
+  v_dec uuid;
+  v_img jsonb;
+BEGIN
+  v_dec := public.record_decision(
+    NULL, '<short-session-name>',
+    '<kind>',
+    '<TICKET-ID or NULL>',
+    '<one-sentence summary of what you decided>',
+    '<the reasoning — what you read, what you ruled, why>',
+    public.ladder_work_class('<the ticket''s priority_class, or NULL>')
+  );
+
+  SELECT to_jsonb(b) INTO v_img
+    FROM public.backlog_items b WHERE b.backlog_id = '<TICKET-ID>';
+  INSERT INTO public.runner_before_images
+    (cycle_id, session_name, table_name, pk_value, row_data, decision_id)
+  VALUES (NULL, '<short-session-name>', 'backlog_items', '<TICKET-ID>', v_img, v_dec);
+
+  UPDATE public.backlog_items
+     SET <the judgment>, updated_at = now()
+   WHERE backlog_id = '<TICKET-ID>';
+END $$;
+```
+
+- **`cycle_id` NULL, `session_name` set — that is the whole difference from the unattended shape.**
+  `record_decision()` raises unless exactly one of the two is present
+  (`ck_decision_attribution`), and an attended session is the `session_name` half. Pass the same
+  `<short-session-name>` your worktree and inflight file already carry.
+- **One transaction, and it is not a style choice.** Step 7b carries the reason in full: `now()` is
+  frozen for the length of a transaction, and `reverse_decision()` refuses any row whose live
+  `updated_at` postdates the image it would restore from. Split this into two statements and the
+  reversal restores nothing while still reporting `outcome = 'applied'`.
+- **Put the handle on the ticket and in your close-out note:**
+  `Decision <id> — reversible until <expires_at, CST>: select public.reverse_decision('<id>', 'John', '<why>');`
+- Before-images you already wrote without a decision id are adopted rather than re-taken:
+  `public.attach_before_images('<decision id>', ARRAY['<image id>']::uuid[])` fills `decision_id`
+  only where it is still NULL.
+
 ### 4. Fetch, rebase, then push `HEAD:dev`
 
 Before any push to `dev` (kickoff commit, close-out commit — anything), from inside the worktree:
@@ -368,6 +418,19 @@ The verdict vocabulary `public.ticket_outcome` grades that series with is
 omission, not a measurement — while `none: <why>` is how a ticket declares it has none and reads
 `unmeasurable` honestly. Stamp on every ship, claim or not.
 
+**Then sweep the decision windows (`SES-286`, `v7.0.395` — `M6-02`, `M6-07`)** — one call, every
+close-out, right after the scoreboard stamp:
+
+```sql
+SELECT * FROM public.sweep_decision_windows(NULL, '<short-session-name>');
+```
+
+It finalises every decision whose window has closed and promotes the work class each one named,
+returning `finalized, promoted` — note both numbers in your close-out. It is idempotent (a second
+call returns `0, 0`), and **run it even if this session recorded no decision of its own**: the
+windows it closes are whoever's expired while it worked. That is the point of putting it here —
+**every attended close-out sweeps, so a window never waits for a cron that may be off.**
+
 ### 5. Delete your inflight file in the close-out commit
 
 When you push your close-out commit, delete your own `inflight/<short-session-name>.md` in
@@ -381,6 +444,43 @@ Once the worktree is merged into `dev` and pushed:
 git -C "C:/Projects/deepbench-frontend" worktree remove ".claude/worktrees/<short-session-name>"
 git -C "C:/Projects/deepbench-frontend" branch -D "session/<short-session-name>"
 ```
+
+---
+
+## Reversing a decision — John's handle (`SES-286`, `v7.0.395` — `M6-02`, `M6-06`)
+
+<!-- FEATURE: SES-286 (b) — the undo is one line, and this is where it is written down. -->
+One line, from any session or straight over the Supabase MCP:
+
+```sql
+select public.reverse_decision('<decision id>', 'John', '<why>');
+```
+
+**What it does.** It restores the rows the decision touched — each from the *oldest* image recorded
+under that decision, i.e. the state before the decision touched it, restored in place rather than
+re-created; it writes before-images of everything the reversal itself writes; it marks the decision
+`reversed` with the actor and the reason; it demotes the work class the decision named (rung −1
+floored at 0, streak 0); and it records the reversal as its own `kind = 'reversal'` decision row.
+
+**Read the counts, not just the outcome.** It returns `outcome`, `restored`,
+`restored_unverified`, `refused`, `demoted`, `reversal_id` and a `reason` sentence. A row outside
+the allowlist of tables a decision may legitimately have changed, a row without a single-column
+primary key, and a row written since its image are each counted `refused` and left alone — and
+`outcome` still reads `applied`. `restored_unverified` is a table with no `updated_at` column: the
+row was written, and the doubt is reported rather than hidden.
+
+**Where the ids are.** The standing brief's *Open decisions* block is the page to read — it lands
+in `SES-286` part (c), and until it does the list is one query:
+
+```sql
+SELECT id, decided_at, kind, backlog_id, summary, expires_at
+  FROM public.runner_decisions WHERE status = 'open' ORDER BY expires_at;
+```
+
+**It works inside the window and after it.** A decision already `final` still reverses, and a late
+reversal still demotes — silence buys the promotion, it does not buy immunity. The one thing it
+refuses is reversing a reversal: undoing one would re-apply the decision it undid, which is a new
+decision and gets recorded as one, with its own window.
 
 ---
 
