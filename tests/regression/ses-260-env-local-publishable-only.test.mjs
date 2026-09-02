@@ -56,16 +56,16 @@ const read = rel => fs.readFileSync(path.join(REPO, rel), "utf8").replace(/\r\n/
 
 const DOC_CLAUSES = [
   {
-    id: "session-setup-names-the-pull-pattern", file: "docs/runbooks/session-setup.md",
-    test: s => /vercel env pull/.test(s) && /session\.env/.test(s) && /never inside the repo/.test(s),
-    breaks: s => s.replace(/vercel env pull/g, "vercel env list"),
-    detail: "step 1b must tell a session how to get credentials for a live test without putting them in the repo",
+    id: "session-setup-names-runner-secrets-as-the-session-source", file: "docs/runbooks/session-setup.md",
+    test: s => /by\s+name from `public\.runner_secrets`/.test(s) && /never written to\s+a file/.test(s) && /never inside the repo/.test(s),
+    breaks: s => s.replace(/by\s+name from `public\.runner_secrets`/, "by name from `.env.local`"),
+    detail: "step 1b must name runner_secrets (read by name over the MCP, exported inline) as the only session-time source -- a pulled Vercel file returns sensitive values empty, measured 2026-09-02",
   },
   {
-    id: "standards-rule-5-names-the-session-env", file: "docs/STANDARDS.md",
-    test: s => /--env-file-if-exists=<scratch>\/session\.env/.test(s),
-    breaks: s => s.split("--env-file-if-exists=<scratch>/session.env").join("--env-file-if-exists=.env.local"),
-    detail: "the specced suite command must point credentialed arms at the pulled session env, not at .env.local, which now carries only publishable values",
+    id: "standards-rule-5-names-the-inline-export-form", file: "docs/STANDARDS.md",
+    test: s => /SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests\/regression\/run-all\.js/.test(s) && !/session\.env/.test(s),
+    breaks: s => s.replace("SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js", "node --env-file-if-exists=<scratch>/session.env tests/regression/run-all.js"),
+    detail: "the credentialed form must be the inline export from runner_secrets, and the retracted pulled-file form must not survive anywhere in STANDARDS.md",
   },
 ];
 

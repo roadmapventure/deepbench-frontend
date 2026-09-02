@@ -58,16 +58,20 @@ privileged keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SUPABASE_SERVICE_KEY`, 
 grows one back fails `tests/regression/ses-260-env-local-publishable-only.test.mjs`. Each has one
 sanctioned home, and a session that needs one borrows it for the session, **never inside the repo**:
 
-- **Live tests / anything needing the Anthropic, OpenAI or service key** → pull the Vercel project
-  env to a scratch file *outside* the repo and point Node at it:
+- **Live tests / anything needing the Anthropic, OpenAI or service key** → read the value **by
+  name from `public.runner_secrets` over the Supabase MCP** and export it inline for the one
+  command that needs it — the runner's own convention (routine prompt step 3: *"secrets by NAME
+  from runner_secrets … never print a secret value anywhere"*), exported as env, **never written to
+  a file**:
   ```
-  vercel env pull "<scratch>/session.env" --environment=production --yes --cwd "<scratch>/vlink"
-  node --env-file-if-exists="<scratch>/session.env" tests/regression/run-all.js
+  SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js
   ```
-  `<scratch>` is this session's scratchpad directory (the harness names it; never a repo path).
-  `<scratch>/vlink` is a one-time linked scratch directory — create it once per machine with
-  `vercel link --yes --project deepbench-frontend --cwd "<scratch>/vlink"` — so no worktree ever
-  gets a `.vercel/` folder or a regenerated `.env.local`. Delete `session.env` in step 5.
+  **Corrected the same day it shipped (measured, not assumed):** the first form of this step said
+  to `vercel env pull` a session file. Vercel marks these variables *sensitive* and a pull returns
+  every one of them **empty** (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY` all came back as `""` on 2026-09-02) — the names travel, the values do not. The
+  Vercel project env is where the *deployment* reads them; a session cannot borrow from it.
+  `runner_secrets` holds every one of the five and is the sanctioned session-time source.
 - **`VERCEL_TOKEN`** → not needed on this desktop at all: the Vercel CLI is logged in
   (`vercel whoami` → `roadmapventure`), and its credential lives in your user profile.
 - **`VERCEL_AUTOMATION_BYPASS_SECRET`** → not a Vercel env var; read it by name from
