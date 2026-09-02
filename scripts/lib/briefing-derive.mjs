@@ -1,3 +1,7 @@
+// DeepBench v7.0.368 | scripts/lib/briefing-derive.mjs | SES-300 — unregisteredAskTargets() takes a
+// fourth argument, `withdrawnDomIds`: a card carrying decision='retired' can never be re-keyed by a
+// rebuild, so its ask target needs no briefing_dom_ids row. Named as the fourth consumer this
+// ticket touched rather than absorbed silently (kickoff Section 7).
 // DeepBench v7.0.207 | scripts/lib/briefing-derive.mjs | SES-163
 // FEATURE: the briefing rebuild stops needing a cycle to hand-author the page.
 //
@@ -260,11 +264,20 @@ export function droRowsHtml(rows) {
  *
  * A target whose card is simply not being rendered (decided, or self-retired) is NOT an error —
  * that is the orphan renderer doing its job, and failing on it would wedge every future rebuild.
+ *
+ * FEATURE: SES-300 — `withdrawnDomIds` is the fourth argument and the one that says WHY a target
+ * needs no briefing_dom_ids row. The guard's real question is "could a future rebuild re-key this
+ * card and orphan John's thread?", and for a card carrying `decision = 'retired'` the answer is
+ * structurally no: the surface it asked about was withdrawn, so no rebuild will ever render it
+ * again under any id. Registering a row for it would state the opposite — that the id is one the
+ * builder must keep honouring — and would paper over the semantics the `retired` value exists to
+ * carry. Defaults to [] so every existing three-argument call keeps its exact meaning.
  */
-export function unregisteredAskTargets(askTargetIds, renderedDomIds, tableDomIds) {
+export function unregisteredAskTargets(askTargetIds, renderedDomIds, tableDomIds, withdrawnDomIds = []) {
   const rendered = new Set(renderedDomIds);
   const known = new Set(tableDomIds);
+  const withdrawn = new Set(withdrawnDomIds);
   return askTargetIds
     .filter(t => /^item-/.test(t))
-    .filter(t => !rendered.has(t) && !known.has(t));
+    .filter(t => !rendered.has(t) && !known.has(t) && !withdrawn.has(t));
 }

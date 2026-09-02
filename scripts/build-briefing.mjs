@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// DeepBench v7.0.368 | scripts/build-briefing.mjs | SES-300 — A WITHDRAWN CARD STOPS READING AS AN
+// OPEN ASK. The orphan guard below (SES-163) fails a build when an item- ask target is neither
+// rendered nor claimed by a briefing_dom_ids row. SES-285 closed 44 gated_before_build cards with
+// decision='rework' because the CHECK constraint permitted only accept/reverse/rework and `accept`
+// would have manufactured an approval John never gave — right reasoning, wrong value. One of those
+// 44 (item-a9c4d1e2, AGT-015) carries an ask thread, so every rebuild since has died on it and
+// SES-135 has been red in CI. Migration ses300_retired_decision_value adds a fourth value,
+// `retired`, and moves exactly those 44 (matched on decision_reason LIKE 'Closed by SES-285%', so
+// John's 7 genuine Reworks do not move); this file then teaches the guard that a retired card's id
+// needs no registration, because no rebuild will ever render it again. briefing_open_cards() reads
+// `decision is null` and so already excluded them; the value change is what makes them nameable.
 // DeepBench v7.0.314 | scripts/build-briefing.mjs | SES-236 — THE PAGE STOPS DISAGREEING WITH THE
 // PICKER. Two clauses of directive a0ef9525 land: §7 renders the Prime Directive VERBATIM as a new
 // §17, and §7b re-derives §8 from the Prime Directive's own pick order. THE THING TO READ TWICE is
@@ -314,7 +325,16 @@ const monthStart = `${NOW.toISOString().slice(0, 7)}-01T00:00:00Z`;
 // THE GUARD. Exit 2, never a warning: SES-132's §9.1 orphan renderer means a re-keyed card still
 // shows its text, so this failure is silent by construction and here is the only place to catch it.
 const askTargets = [...new Set((await sel('runner_card_asks?select=target_id')).map(r => r.target_id))];
-const unregistered = unregisteredAskTargets(askTargets, rendered.map(domIdFor), Object.values(FIXED_IDS));
+// FEATURE: SES-300 — a WITHDRAWN card is not an open ask. `decision = 'retired'` is the value
+// SES-285's 44 closures should have carried: the card/tap surface they asked about was withdrawn,
+// so briefing_open_cards() will never return them again and no rebuild can re-key them. Before
+// this, they wore `rework` — indistinguishable from John's 7 real "do another pass" cards — and
+// this guard read one of them (item-a9c4d1e2, AGT-015) as a thread about to be orphaned and
+// failed the build. The fix is the semantics, not a briefing_dom_ids row: registering rows here
+// would assert the builder must keep honouring those ids forever.
+const withdrawnDomIds = (await sel('runner_items?select=id&decision=eq.retired')).map(domIdFor);
+const unregistered = unregisteredAskTargets(
+  askTargets, rendered.map(domIdFor), Object.values(FIXED_IDS), withdrawnDomIds);
 if (unregistered.length) {
   die(`UNREGISTERED ASK TARGET(S): ${unregistered.join(', ')} — each names a card DOM id that no `
     + `public.briefing_dom_ids row claims, so this rebuild would re-key the card and orphan John's `

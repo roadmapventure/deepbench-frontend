@@ -1,4 +1,5 @@
-// DeepBench v7.0.248 | tests/regression/SES-201-rule-block-batch1.js | SES-201 (batch 1)
+// DeepBench v7.0.368 | tests/regression/SES-201-rule-block-batch1.js | SES-201 (batch 1),
+// negative control narrowed to LIVE rules by SES-300 (v7.0.368)
 //
 // Guards the FOUR sites batch 1 migrated in docs/runbooks/runner-cycle.md -- B12 (step 4b),
 // B18 (twice, in step 9) and B34 (step 2) -- from a hand-copied rule statement to a rendered
@@ -19,6 +20,18 @@
 // John's decision, gated card 064604e5, 2026-08-25, verbatim: "migrate the four sites BY
 // JUDGMENT: the rule sentence becomes the rendered {{rule:ID}} block; John's adjacent
 // WHY-reasoning (e.g. the B34 ladder ruling) is preserved byte-for-byte."
+//
+// SES-300 (v7.0.368) — B12's SITE IS GONE, AND THE NEGATIVE CONTROL IS NOW READ OUT OF THE
+// REGISTRY. M6-04 superseded B12 (SES-285), and check 12 only considers rules whose status is
+// `live` (checkRuleTextOutsideHome's own first line), so removing B12's marker flagged nothing and
+// the exemption it guarded was guarding nothing. That is not a test to relax: it is the rendered
+// block that was wrong, restating a withdrawn rule in live voice — the same two-homes defect one
+// layer down — so SES-300 removed B12's marker and block from the runbook, and the control below
+// DERIVES its membership from RULES-SNAPSHOT.md's status column instead of a hand-kept list.
+// theLoadBearingControlIsLiveOnlyAndNotEmpty() is what stops that derivation becoming the "skip
+// the failing one" move: a live rule may never be excluded, and an empty control is a failure, not
+// a pass. B12's half-2 pair below is UNCHANGED and still load-bearing — the hand-copied sentence
+// stayed retired and John's reasoning at that site stayed byte-for-byte.
 
 import assert from "assert";
 import fs from "fs";
@@ -31,11 +44,23 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
 const SNAPSHOT_REL = "docs/governance/RULES-SNAPSHOT.md";
 
-const BATCH_1 = ["B12", "B18", "B34"];
+// The batch-1 rules whose marker and rendered block STILL STAND in the runbook. B12 was migrated
+// here too and is deliberately absent: SES-300 removed its site when M6-04 superseded the rule.
+const BATCH_1 = ["B18", "B34"];
 
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const rules = () => [...parseRulesSnapshot(read(SNAPSHOT_REL)).values()];
+const rulesById = () => new Map(rules().map(r => [r.id, r]));
 const twelve = findings => findings.filter(f => f.check === "12");
+
+// The subset check 12 can actually see. It reads `rules.filter(r => r.status === "live")`, so a
+// superseded rule's marker exempts nothing and its removal flags nothing — the negative control
+// below would report a false failure on a runbook that is entirely correct. Membership is the
+// registry's own status column, never a hand-kept exclusion list.
+const loadBearing = () => {
+  const byId = rulesById();
+  return BATCH_1.filter(id => byId.get(id)?.status === "live");
+};
 
 function findingsFor(text) {
   const out = [];
@@ -69,10 +94,33 @@ function theMarkerIsWhatMakesItQuiet() {
   // The detail opens `rule B12's statement is restated ...` -- capture up to the possessive, not
   // through it, or every id comes back as `B12's` and the assertion below fails on a working control.
   const ids = new Set(findingsFor(stripped).map(f => f.detail.match(/^rule (\S+?)'s\b/)[1]));
-  for (const id of BATCH_1) {
+  for (const id of loadBearing()) {
     assert.ok(ids.has(id),
       `${id} must flag once its marker is removed -- if it does not, the block under that marker ` +
       `is not a real render of the registry row and the exemption is hiding nothing`);
+  }
+}
+
+// SES-300. The control above walks a DERIVED list, and a derived list can quietly shrink to
+// nothing -- one more supersession and "every member flagged" would be true of the empty set,
+// which is the vacuous pass this file's own header warns about. So: the batch may never be empty,
+// and membership must be exactly the registry's `live` set. That second half is the discriminating
+// one -- it is what fails if a later editor drops a still-live rule out of BATCH_1 to quiet a red
+// test, which is how a meta-test becomes decorative.
+function theLoadBearingControlIsLiveOnlyAndNotEmpty() {
+  const byId = rulesById();
+  const batch = loadBearing();
+  assert.ok(batch.length > 0,
+    `the marker-is-load-bearing control is EMPTY: no batch-1 rule (${BATCH_1.join(", ")}) is ` +
+    `\`live\` in ${SNAPSHOT_REL} any more, so nothing here proves a marker still does work. ` +
+    `Point BATCH_1 at a live rule's migrated site rather than leaving a control with nothing to check.`);
+  for (const id of BATCH_1) {
+    const status = byId.get(id)?.status;
+    assert.ok(status, `${id} is not in ${SNAPSHOT_REL} -- re-export the snapshot`);
+    assert.strictEqual(batch.includes(id), status === "live",
+      `${id} is \`${status}\` in the registry but is ${batch.includes(id) ? "in" : "not in"} the ` +
+      `load-bearing control. Membership is the registry status and nothing else: a withdrawn rule ` +
+      `is excluded because check 12 cannot see it, never because excluding it makes the test green.`);
   }
 }
 
@@ -84,6 +132,17 @@ function everyBatch1RuleHasAMarkerInTheRunbook() {
   // B40 predates this ticket (SES-175). It is asserted here so a later trim of this file's
   // markers cannot quietly take the original two with it.
   assert.ok(text.includes("{{rule:B40}}"), "SES-175's B40 marker must survive batch 1");
+
+  // SES-300, the other direction: B12's site is GONE and must stay gone. A withdrawn rule with a
+  // rendered block is a doc stating a superseded rule in live voice, which is the defect SES-289
+  // annotated one layer up. Asserted on both halves -- the marker and the rendered line -- because
+  // a re-render would restore the pair together.
+  const byId = rulesById();
+  assert.ok(!text.includes("{{rule:B12}}"),
+    `B12's marker is back in ${RUNBOOK_REL}. B12 is \`${byId.get("B12")?.status}\` ` +
+    `(superseded by ${byId.get("B12")?.superseded_by}) -- a withdrawn rule keeps no rendered block.`);
+  assert.ok(!text.includes(renderedLine(byId.get("B12"))),
+    `B12's rendered block is back in ${RUNBOOK_REL}, restating a withdrawn rule in live voice.`);
 }
 
 function everyRenderedBlockEqualsItsRegistryRow() {
@@ -154,6 +213,7 @@ function johnsReasoningSurvivedByteForByte() {
 function run() {
   theRunbookIsQuietOnCheck12();
   theMarkerIsWhatMakesItQuiet();
+  theLoadBearingControlIsLiveOnlyAndNotEmpty();
   everyBatch1RuleHasAMarkerInTheRunbook();
   everyRenderedBlockEqualsItsRegistryRow();
   theHandCopiedStatementsAreGone();
