@@ -107,13 +107,22 @@ unbuilt), so the refusal made **a number only John can produce into a preconditi
 exactly what `M6-01` forbids**, and it did so in a rule written by the same session that retired the
 card surface. It also ignored a mechanism the platform already had: `runner_budget.stale_fallback_tokens`
 (3,000,000) exists precisely so a cycle can run under a smaller ceiling when the meter is old.
-**A stale reading now DEGRADES**: `reason = 'pickable_degraded'`, `should_boot = true`, and
-`detail.token_cap` carries `stale_fallback_tokens` instead of `runner_day_token_allowance`. The
-staleness is still graded and still reported (`detail.reading_stale`, `detail.reading_age_hours`) —
-what changed is the consequence. A stale reading still grades the wall in (2): a stale 63% is better
-evidence than none, it simply can no longer stop the boot by itself.
+**CORRECTED SAME NIGHT BY `SES-302` (v7.0.369) — THIS GATE OWNS NO CAP AND NO STALENESS THRESHOLD.**
+`SES-298`'s wording above was still wrong, one layer down: it gave this gate a `detail.token_cap` of
+`stale_fallback_tokens` at a **24h** threshold. But `resolve_day_token_cap()` **RUNG 2 has owned the
+staleness brake all along** — at **48h**, returning `cap_source = 'stale-floor'`, carrying the
+spec-verbatim comment *"The box does NOT defeat it"*. With the reading at 35.4h the two homes
+returned **opposite answers on the same fact**: the resolver said 196M (RUNG 3, the standing box),
+this gate said 3M. Nothing consumed the gate's field, but this runbook told a cycle to use it — so
+an unattended run would have capped itself at 3M and stalled M5 around its first ticket.
 
-**The five refusal reasons, in the precedence the function applies them**, plus one degraded pass.
+**So: the gate reports `reading_age_hours` and a `cap_authority` pointer, and stops there.** It
+carries no `token_cap`, grades no staleness, and emits no `pickable_degraded` reason. **The day cap
+has exactly one home — `public.resolve_day_token_cap()`, read at step 3** — and staleness lowers the
+ceiling there, never here. A stale reading still grades the weekly wall in (2): a stale 63% is
+better evidence than none.
+
+**The five refusal reasons, in the precedence the function applies them.**
 Each names itself, always: **a bare `false` is the "NULL is not zero" defect this codebase has paid
 for repeatedly.**
 
@@ -133,9 +142,10 @@ for repeatedly.**
 5. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`).
 
-Then, not a refusal: `pickable_degraded` — everything above passed but the reading is stale, so the
-cycle **runs** under `detail.token_cap` = `stale_fallback_tokens`. `pickable` is the same pass with
-a fresh reading and the full `runner_day_token_allowance`.
+Everything else is `pickable` — one pass reason, no degraded variant (`SES-302`). A stale reading
+does not change this verdict; it changes the **ceiling**, and that is `resolve_day_token_cap()`'s
+RUNG 2 to apply at step 3, never this gate's. Read `detail.reading_age_hours` if you want to know
+how old the meter is; read the resolver if you want to know what you may spend.
 
 **This gate and `scheduler_gate()` answer different questions and both hold.** `scheduler_gate()`
 asks *is this fire admissible on John's clock grid*; this one asks *is there anything to do at all*.

@@ -201,9 +201,22 @@ auto-closes at ship, while `discovered` and `john-named` work closes only after 
 by the mechanism that scoped it, and it still cannot be closed on the day it ships — it is closed by
 a verdict plus his opportunity to reverse, rather than by his tap.
 
-### <a id="M5-15"></a>M5-15 — a stale usage reading degrades the cycle (`script`)
+### <a id="M5-15"></a>M5-15 — staleness lowers the ceiling, and one place applies it (`script`)
 
-> A drain whose freshest `runner_usage_readings` row is older than 24 hours does not refuse to run — it degrades, capping the cycle at `runner_budget.stale_fallback_tokens` and recording `usage_reading_stale` on the cycle row. Refusing would make a number only John can type into a precondition for autonomy, which M6-01 forbids.
+> Staleness of the freshest `runner_usage_readings` row never refuses a run — it lowers the ceiling, and `public.resolve_day_token_cap()` RUNG 2 is the single authority that applies it (48h, `stale-floor`, which a standing daily max may not override). No other gate carries its own staleness threshold or its own cap.
+
+**Rewritten twice on 2026-09-01/02, and the second rewrite is the instructive one.** `SES-280`
+shipped this as a *refusal* at 24h; within the hour it live-blocked the drain, because the only way
+to refresh that reading is John typing it (`SES-82` is unbuilt) — a number only he can produce
+turned into a precondition for autonomy, which `M6-01` forbids. `SES-298` changed the consequence
+from refusal to degradation. **`SES-302` found that even that was still wrong**: the platform had
+owned this mechanism the whole time in `resolve_day_token_cap()` RUNG 2 — same fallback value, but
+at **48h**, with the spec-verbatim comment *"The box does NOT defeat it"*. So the rule had become a
+second home at a different threshold, and with the reading at 35.4h the two returned **opposite
+answers on the same fact** (resolver 196M via the standing box; the gate 3M). The rule now
+*describes* RUNG 2 rather than competing with it, and `runner_should_boot()` carries neither a cap
+nor a staleness verdict. **The lesson worth more than the rule: a rule about a mechanism was written
+twice without reading the function that implements it.**
 
 M5-06 bounds a start against remaining weekly headroom, and that bound is only as good as the reading
 it is computed from. A stale reading makes the headroom check pass on numbers that no longer describe

@@ -65,20 +65,19 @@ const BLOCK_END = "**0. Bootstrap.**";
 // what each one MEANS is read out of the runbook by the clauses below, never restated.
 export const REASONS = [
   "scheduler_off",
-  // SES-298: 'usage_reading_stale' is NOT here. A stale reading degrades to 'pickable_degraded'
-  // rather than refusing -- M5-15 as shipped made a number only John can type into a precondition
-  // for autonomy, which M6-01 forbids, and it live-blocked the runner within the hour.
-  "pickable_degraded",
+  // SES-302: neither 'usage_reading_stale' nor 'pickable_degraded' is here. Staleness does not
+  // refuse a run AND does not change this gate's verdict -- resolve_day_token_cap() RUNG 2 owns the
+  // staleness brake (48h, stale-floor, box may not override). This gate carries no cap and no
+  // threshold of its own; SES-298 gave it both at 24h and the two homes disagreed on live data.
   "weekly_wall",
   "no_budget_row",
   "nothing_pickable",
   "unaffordable",
 ];
 export const PASS_REASON = "pickable";
-// SES-298: two reasons boot. 'pickable' runs on the full day allowance; 'pickable_degraded' runs
-// on stale_fallback_tokens because the meter is old. Both are passes, so should_boot is true for
-// both -- a set, not a single string, or the consistency check below calls a degraded boot a drift.
-export const BOOTING_REASONS = new Set([PASS_REASON, "pickable_degraded"]);
+// SES-302: exactly ONE reason boots. The set is kept rather than collapsed back to a string so a
+// future pass reason is a one-line change here instead of a rewrite of the consistency check.
+export const BOOTING_REASONS = new Set([PASS_REASON]);
 
 // ---------------------------------------------------------------------------
 // Pure readers
@@ -400,9 +399,7 @@ export function expectedReason(f) {
   if (!f.budgetRowExists) return "no_budget_row";
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
-  // SES-298: the degraded pass. Everything above cleared, but the meter is old -- the cycle runs
-  // under stale_fallback_tokens instead of the full day allowance.
-  if (f.readingAgeHours === null || f.readingAgeHours > 24) return "pickable_degraded";
+  // SES-302: no staleness branch. The reading's age is reported, never graded, by this gate.
   return PASS_REASON;
 }
 
@@ -506,20 +503,19 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
     "drain/selfbuild rows -- the gate and the picker are reading different boards");
 
-  if (v.reason === "pickable_degraded") {
-    // SES-298: the degraded pass must BOOT, must actually be stale, and must carry the smaller
-    // ceiling. Asserting only should_boot would pass if the cap were never applied -- the cap is
-    // the whole of the amendment, so it is the thing graded.
-    assert.strictEqual(v.should_boot, true,
-      "pickable_degraded must boot -- M5-15 degrades under a smaller ceiling, it does not refuse");
-    assert.ok(d.reading_age_hours === null || Number(d.reading_age_hours) > 24,
-      `M5-15 degraded on a reading detail reports as ${d.reading_age_hours}h old -- the age must be ` +
-      "in the payload and must actually be stale, or the degradation cannot be checked by its reader");
-    assert.strictEqual(d.reading_stale, true, "detail.reading_stale must say so on a degraded pass");
-    assert.ok(d.token_cap !== null && d.token_cap !== undefined,
-      "a degraded pass must carry detail.token_cap -- without it the cycle has no smaller ceiling " +
-      "to run under and the degradation is cosmetic");
-  }
+  // SES-302: the gate must NOT carry a cap or a staleness verdict of its own. These two assertions
+  // are the guard against the defect reappearing -- resolve_day_token_cap() RUNG 2 owns staleness
+  // at 48h, and a second home here at 24h returned the opposite answer on live data (35.4h reading:
+  // resolver 196M, gate 3M). Asserting the absence is the only way to catch a re-add.
+  assert.ok(!("token_cap" in d),
+    "runner_should_boot must not carry detail.token_cap -- the day cap has exactly one home, " +
+    "public.resolve_day_token_cap(), and a second copy here is free to disagree with it");
+  assert.strictEqual(d.cap_authority, "public.resolve_day_token_cap()",
+    "detail.cap_authority must name the resolver, so a reader of this payload is pointed at the " +
+    "one place the ceiling is decided rather than inferring it from a field that is not here");
+  assert.ok(d.reading_age_hours === null || typeof Number(d.reading_age_hours) === "number",
+    "the reading's age is still REPORTED even though it is no longer graded here -- dropping it " +
+    "would leave a reader unable to see a stale meter at all");
   if (v.reason === PASS_REASON) {
     assert.ok(d.pick && d.pick.backlog_id,
       "a 'pickable' verdict must name the ticket it would pick -- 'there is work' with no ticket is " +
