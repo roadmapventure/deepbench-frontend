@@ -5,6 +5,98 @@
 
 ---
 
+## session/cycle-20260902-1505 (v7.0.376, 2026-09-02, runner cycle `de1e78a8-2578-46be-b5fc-2ae3c3dee3ba`, `trigger = scheduled`, `scheduler_gate` verdict `run` (started off the cron grid, so exempt from pacing) — Opus 5 orchestrator, **with a Fable 5 subagent delegated to for the invention pass**, per register B21) — `SES-161` — **the token wall's number finally gets checked against the platform's own figure, and the thing to read twice is that the ticket's own candidate first step was already dead.**
+
+### The ticket proposed a measurement the platform no longer permits
+
+`SES-161`'s stated candidate first step is *"have one cycle read `get_session` at open and at close,
+log both alongside its own estimate."* Read live at `15:10Z` by this cycle, rather than recalled:
+`mcp__Claude_Code_Remote__get_session` returns **no usage block at all** — its `external_metadata`
+carries `container_cc_version`, `current_branches`, `last_served_model` and
+`rate_limit_info {status, rateLimitType, resetsAt}`, and not one token count. The 2026-08-23 reading
+the ticket quotes (`cache_read_tokens 11,614,849`, `cost_usd 11.84`) cannot be reproduced. So the
+ticket's part **(b)** — *can `get_session`'s usage block be made to report live?* — is answered **no**
+on today's platform, and the calibration had to come from somewhere the platform still exposes.
+
+### The platform figure that does exist is John's own meter
+
+`runner_usage_readings.all_models_pct` is a number the platform produced and John typed in. While he
+is asleep the runner is the only spender, so a night→morning bracket is a window in which the meter's
+movement and the runner's own `est_tokens` describe **the same work** — and their ratio is therefore
+a property of his *plan*, not of that night's work. If `est_tokens` tracked the meter it would be
+near-constant. Reproduced this cycle from raw readings and cycle rows, never re-quoted from the
+stored column:
+
+| Bracket | Meter | est tokens | tokens/pct |
+|---|---|---|---|
+| 2026-08-23 03:36Z → 13:51Z | 32% → 37% | 13,255,000 | 2,651,000 |
+| 2026-08-24 03:19Z → 14:40Z | 60% → 65% | 12,927,000 | 2,585,400 |
+| 2026-08-25 04:57Z → 13:56Z | 84% → 92% | 7,363,000 | 920,375 |
+| 2026-08-29 03:14Z → 14:47Z | 17% → 29% | 27,710,000 | 2,309,166.67 |
+
+**A 2.88× spread across four windows that should each report one constant.** That is the check
+`SES-161` says has never been made. Part **(a)** — *are the two even measuring the same quantity?* —
+is answered **no**.
+
+### The spread is reported, never graded — and the verdict is a different question
+
+There is no principled line at which a spread becomes "too wide", and this codebase has paid twice
+already for constants a cycle chose (`SES-146`'s *"a column, not a literal"*). So the spread is
+**output**. The **verdict** is a question every input to which is a stored row: *can the day token
+cap brake anything before the weekly rest wall does?* Convert the cap into percent-of-weekly-meter
+through each bracket's rate and compare against the remaining headroom. Live, with John's standing
+196M box against 37% headroom: **73.93%** of a whole weekly meter on the most generous bracket,
+**212.96%** on the least. **The day cap cannot be reached before the 85% rest wall fires — it is not
+a brake.** The 10M standing default *would* bind, at 3.77%, and that is the positive arm of the QA
+rather than a rhetorical aside.
+
+The alert uses the **most generous** bracket, so a non-binding verdict means non-binding even on the
+reading most favourable to the wall — the fail-away-from-acting direction `check-deploy-serving.js`
+and `check-cycle-cadence.js` already take. And the cap is **passed in** with `--day-cap`, never
+looked up: `public.resolve_day_token_cap()` is the one home of the five-rung ladder, and the guard
+grades that on the REST paths the script actually reaches for rather than on whether the words
+appear — the payload deliberately *names* the resolver so John's reader is told where the number
+came from.
+
+### QA was two retired designs losing on the same fixture, plus three mutations
+
+The single-bracket form — the instruction step 3 itself used to carry, *"calibrate from the two most
+recent readings"* — has no spread to report at all, and defined as a one-bracket ratio it is
+**1.0×, perfect agreement**, on a board that disagrees by 2.88×. The unit-blind form (today's est
+spend against the cap, both in est-token units: 25M against 196M) reports the wall **healthy**. Three
+mutations were each asserted red and the restored tree green: alerting off the *least* generous
+bracket (`212.96 !== 73.93`), `MIN_BRACKETS = 1`, and `Number(c.est_tokens_dev)` with no finite check
+(`0 !== 1` — the `Number(null) is 0` defect, which the live board found first: a `{all_models_pct:
+null}` reading rendered as *"0% spent, a whole week of headroom"* until the presence test was moved
+ahead of the coercion). The live run reproduced all four stored `tokens_per_pct` values exactly
+without reading that column — end-to-end, not a seam proof. Build green; suite **145/145**.
+
+### Closed `done` on the auto-done bar, and the decision it produced is a ticket, not a card
+
+The verifier returned `APPROVE` with `auto_done_eligible: YES` (Selfbuild epic, `P10 - Tooling`,
+diff touching none of the self-certifying paths), so the close-out wrote `done` rather than
+`delivered`. **`partial` would have been the wrong word**: the investigation finished and produced
+its answer. What it did *not* build is a correction — and that is deliberate, because the correction
+is a decision about John's own typed number. Per `M6-05` (*a decision must never evaporate*) it is
+filed as `SES-306 — John's standing 196M/day token box cannot brake anything: measured at 73.9–213%
+of a whole weekly meter`, `design_status = 'needs-decision'`, with both honest options stated and
+neither chosen: lower the box to something reachable, or document the day-cap rung as decoration and
+name the rest wall as the only brake. **A cycle must not lower his number on its own initiative.**
+
+### Two runbook↔schema disagreements found in passing, and neither was routed around
+
+Step 1 instructs a cycle to insert its `runner_cycles` row with *"your prompt's `trigger:` line,
+verbatim"*. `runner_cycles_trigger_check` admits only the bare words `scheduled` / `on_demand` /
+`supervised` / `chained (drain continuation)`, so the verbatim form is **rejected at INSERT** — the
+first attempt this cycle made failed on exactly that. `scheduler_gate()` normalises either form
+(`SES-146`), so the two calls disagree about what to pass. The row was opened with the bare word;
+the runbook line is the half that is wrong, and it is named here rather than quietly worked around.
+Separately, the invention pass was **suspended by the Prime Directive `a0ef9525` §4** (invention
+waits until Selfbuild is complete) with the `invention` ladder rung at **0** — so zero proposals, on
+the standing order rather than on a cycle's judgment.
+
+---
+
 ## session/cycle-20260901-0440 (v7.0.357, 2026-09-01, runner cycle `8af80ad7-b009-486d-979f-7879b1af116b`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (11 PM America/Chicago) — Opus 5 orchestrator, **with a Sonnet 5 subagent delegated to for the mechanical surface survey**, per register B21 as amended by directive `87018d83`) — `SES-269` — **the runner's own silence becomes a measured number, and the thing to read twice is that the ticket's own fix line, implemented literally, is silent on the incident it was filed from.**
 
 ### The fix the ticket names cannot see the incident the ticket is written from
