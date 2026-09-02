@@ -1,4 +1,4 @@
-// DeepBench v7.0.328 | tests/regression/SES-246-decision-pattern-corpus.js | SES-246
+// DeepBench v7.0.400 | tests/regression/SES-246-decision-pattern-corpus.js | SES-246, SES-311
 //
 // FEATURE: the decision-pattern ship gate reads docs/SESSIONS.md's OWN ARCHIVED HALF.
 //
@@ -32,7 +32,8 @@
 //      (rather than its count) means this test fails loudly if the set changes in either
 //      direction: someone grounding them, or a new ungrounded quote arriving.
 //
-// No network, no credentials. Corpora are symlinked into the fixture trees, never copied.
+// No network, no credentials. Corpora are symlinked into the fixture trees, never copied -- with
+// a copy fallback on Windows accounts that lack the symlink privilege (see linkOrCopy below).
 
 import assert from "assert";
 import fs from "node:fs";
@@ -60,6 +61,25 @@ function missed(res) {
   return [...`${res.stdout}\n${res.stderr}`.matchAll(/^\s*#(\d+):/gm)].map((m) => Number(m[1]));
 }
 
+// FEATURE: SES-311 -- symlink, or copy when the OS refuses to let us.
+// `fs.symlinkSync` raises EPERM on a Windows account without SeCreateSymbolicLinkPrivilege
+// (and EISDIR/EEXIST in a few edge cases), which used to abort every clause here and turn a
+// whole verifier run red on John's machine -- a false `block`, which since SES-122a resets the
+// class's autonomy streak. The fallback is safe for THESE fixtures specifically: every corpus
+// exposed below is a read-only control (the gate only ever reads them; the fixture's own
+// JOHN-DECISION-PATTERNS.md is written, never linked, and the trees are rmSync'd at the end of
+// each clause), so a copy is behaviourally identical to a link -- the link was only ever an
+// optimisation to avoid duplicating a multi-MB corpus per fixture. No assertion changes; on a
+// privileged account the symlink path still runs.
+function linkOrCopy(src, dest) {
+  try {
+    fs.symlinkSync(src, dest);
+  } catch (e) {
+    if (!["EPERM", "EISDIR", "EEXIST", "EACCES", "ENOSYS", "UNKNOWN"].includes(e.code)) throw e;
+    fs.cpSync(src, dest, { recursive: true, force: true });
+  }
+}
+
 // Build a minimal tree the gate accepts: a doc plus whichever corpora we choose to expose.
 function fixture({ doc, withArchive = true, extraDocs = [] }) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ses246-"));
@@ -67,11 +87,11 @@ function fixture({ doc, withArchive = true, extraDocs = [] }) {
   fs.mkdirSync(path.join(d, "harvests"), { recursive: true });
   fs.writeFileSync(path.join(d, "JOHN-DECISION-PATTERNS.md"), doc);
   for (const f of ["SESSIONS.md", "FEATURES-ARCHIVE.md"]) {
-    fs.symlinkSync(path.join(DOCS, f), path.join(d, f));
+    linkOrCopy(path.join(DOCS, f), path.join(d, f));   // FEATURE: SES-311
   }
-  if (withArchive) fs.symlinkSync(path.join(DOCS, ARCHIVE), path.join(d, ARCHIVE));
+  if (withArchive) linkOrCopy(path.join(DOCS, ARCHIVE), path.join(d, ARCHIVE));   // FEATURE: SES-311
   for (const f of fs.readdirSync(path.join(DOCS, "harvests"))) {
-    if (f.endsWith(".md")) fs.symlinkSync(path.join(DOCS, "harvests", f), path.join(d, "harvests", f));
+    if (f.endsWith(".md")) linkOrCopy(path.join(DOCS, "harvests", f), path.join(d, "harvests", f));   // FEATURE: SES-311
   }
   for (const [name, body] of extraDocs) fs.writeFileSync(path.join(d, name), body);
   return tmp;

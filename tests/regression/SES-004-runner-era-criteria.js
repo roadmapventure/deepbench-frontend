@@ -1,4 +1,4 @@
-// DeepBench v7.0.327 | tests/regression/SES-004-runner-era-criteria.js | SES-004
+// DeepBench v7.0.400 | tests/regression/SES-004-runner-era-criteria.js | SES-004, SES-311
 //
 // FEATURE: SES-004's runner-era half -- the criteria mined from the 2026-08-15 -> 2026-08-29
 // corpus (John's taps, directives, answered questions, card asks and comments), which live in
@@ -33,7 +33,8 @@
 //      is precisely "would it still pass if the change did nothing?"
 //
 // No network, no credentials. Everything is read off the tree; the control tree is symlinked
-// rather than copied so a 3.3 MB corpus is not duplicated per run.
+// rather than copied so a 3.3 MB corpus is not duplicated per run -- with a copy fallback on
+// Windows accounts that lack the symlink privilege (see linkOrCopy below).
 
 import assert from "assert";
 import fs from "node:fs";
@@ -60,6 +61,24 @@ const ENTRY_RE = /^\*\*(\d+)\.\s/gm;
 
 function readDoc() {
   return fs.readFileSync(DOC, "utf8");
+}
+
+// FEATURE: SES-311 -- symlink, or copy when the OS refuses to let us.
+// `fs.symlinkSync` raises EPERM on a Windows account without SeCreateSymbolicLinkPrivilege
+// (and EISDIR/EEXIST in a few edge cases), which used to abort clause 5 outright and turn a
+// whole verifier run red on John's machine -- a false `block`, which since SES-122a resets the
+// class's autonomy streak. The fallback is safe for THIS fixture specifically: every entry in
+// the control tree is a read-only control (the gate only ever reads these corpora, and the tree
+// is rmSync'd in the same `finally`), so a copy is behaviourally identical to a link -- the link
+// was only ever an optimisation to avoid duplicating a 3.3 MB corpus per run. No assertion
+// changes; on a privileged account the symlink path still runs.
+function linkOrCopy(src, dest) {
+  try {
+    fs.symlinkSync(src, dest);
+  } catch (e) {
+    if (!["EPERM", "EISDIR", "EEXIST", "EACCES", "ENOSYS", "UNKNOWN"].includes(e.code)) throw e;
+    fs.cpSync(src, dest, { recursive: true, force: true });
+  }
 }
 
 // Split the doc into one text block per criterion, keyed by number.
@@ -210,11 +229,11 @@ function withoutTheHarvestTheGateFails() {
     // The doc under test, and every corpus the gate reads -- EXCEPT SES-004.md.
     fs.copyFileSync(DOC, path.join(docsDir, "JOHN-DECISION-PATTERNS.md"));
     for (const f of ["SESSIONS.md", "FEATURES-ARCHIVE.md"]) {
-      fs.symlinkSync(path.join(REPO, "docs", f), path.join(docsDir, f));
+      linkOrCopy(path.join(REPO, "docs", f), path.join(docsDir, f));   // FEATURE: SES-311
     }
     for (const f of fs.readdirSync(path.join(REPO, "docs", "harvests"))) {
       if (!f.endsWith(".md") || f === "SES-004.md") continue;
-      fs.symlinkSync(path.join(REPO, "docs", "harvests", f), path.join(harvestsDir, f));
+      linkOrCopy(path.join(REPO, "docs", "harvests", f), path.join(harvestsDir, f));   // FEATURE: SES-311
     }
 
     // The DIFFERENCE is the assertion, not the exit code: the gate exits 1 on both trees

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.400 | docs/runbooks/session-setup.md | SES-311 — the attended close-out gains the verifier step it never had. New step 3e (run `scripts/verifier.js` before writing `done`, feed `verdict_ladder_signal`) plus a one-line pointer in step 4. It is not advice: migration `ses311_done_requires_verdict` puts a BEFORE UPDATE trigger on `backlog_items` that refuses `status='done'` on a Selfbuild-epic ticket with no `runner_verdicts` row. Measured 2026-09-02: 58 of 112 Selfbuild `done` tickets carried no verdict, four of them M5 required ships. Every exemption lives in that migration's header, never on this page. -->
 <!-- DeepBench v7.0.222 | docs/runbooks/session-setup.md | SES-175 — §2c's claim SQL gains a rendered rule block: a `{{rule:B40}}` marker comment above the committed text of rule B40, generated from `public.governance_rules` and checked by `scripts/render-rule-blocks.js`. John's call on gated card `a4e0254a` 2026-08-24: "Accept with C" — expand-in-place, so this file still carries the real sentence a session reads mid-run and the script is what stops that copy drifting from the registry. The text under the marker is NOT hand-maintained: edit the registry row, re-export `docs/governance/RULES-SNAPSHOT.md`, then `node scripts/render-rule-blocks.js --write`. Full rationale, the three options John chose between, and the QA: `docs/runbooks/runner-cycle.md`'s v7.0.222 stamp and `docs/kickoffs/v7.0.222-SES-175-rendered-rule-blocks.md` — cited here, not restated. -->
 <!-- DeepBench v7.0.198 | docs/runbooks/session-setup.md | SES-121 — body moved verbatim from .claude/skills/session-setup/SKILL.md (which remains as a thin loader); .claude/ is not writable by unattended cycles (register B39), this runbook is. This file is the canonical copy. -->
 
@@ -385,6 +386,77 @@ END $$;
   `public.attach_before_images('<decision id>', ARRAY['<image id>']::uuid[])` fills `decision_id`
   only where it is still NULL.
 
+### 3e. Run the verifier before you write `done` — the attended session's own verdict (`SES-311`, `v7.0.400`)
+
+<!-- FEATURE: SES-311 — the attended close-out gains the verifier step it never had. -->
+**Why this is load-bearing and not ceremony:** the trigger `backlog_done_requires_verdict`
+(migration `ses311_done_requires_verdict`) **refuses** `status = 'done'` on a Selfbuild-epic ticket
+that has no `runner_verdicts` row for its `backlog_id`. Without this step the write in step 4 /
+`CLAUDE-DESIGN.md` 5c raises `check_violation` and the ship does not close.
+
+**Why it exists at all — measured, not argued.** Of the 112 Selfbuild tickets `done` on
+2026-09-02, **58 carried no verdict row**, four of them M5 *required* ships (`SES-184`, `SES-269`,
+`SES-282`, `SES-303`). The unattended path (`docs/runbooks/runner-cycle.md` step 7a) has run the
+verifier on every ship since `SES-181`; the attended path never did. `M6-07` makes the verdict the
+autonomy ladder's input (`SES-122` routes it), so a ladder that never sees attended ships grades
+half the work.
+
+**First, open a supervised cycle row if this session has none** — the verdict has to belong to a
+cycle. Same stamp shape the M5/M6 attended sessions used, `trigger = 'supervised'`:
+
+```sql
+INSERT INTO public.runner_cycles (id, stamp, trigger, model, item_id, backlog_item_id, last_step)
+SELECT gen_random_uuid(),
+       'QA-<TICKET-ID>-supervised-<short-session-name>',
+       'supervised',
+       '<the model named in the kickoff, e.g. claude-opus-5>',
+       '<TICKET-ID>',
+       b.id,
+       'step 3e — attended verifier run'
+  FROM public.backlog_items b WHERE b.backlog_id = '<TICKET-ID>'
+RETURNING id;
+```
+
+**Then run the verifier**, from inside the worktree, with the two credentials borrowed **by name
+from `runner_secrets` over the Supabase MCP for that one command** — exported inline, never
+written to a file, never printed (`SES-260`; `vercel env pull` returns these EMPTY):
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js \
+  --cycle-id=<the id returned above> --ticket=<TICKET-ID> --version=<vX.Y.Z> --base=origin/dev
+```
+
+Exit codes — the same convention step 7a uses:
+
+- **0 = `approve`.** All three gates green, the verdict row is written, and the `done` write in
+  step 4 is now permitted.
+- **1 = `block`.** A gate was red. Write **`delivered`, not `done`**, and say so in the report:
+  **a block is a verdict, not a wall** — the row exists, the gate is satisfied, and the honest
+  status is `delivered`. Never re-run hunting for a green.
+- **2 = the verifier could not run** (missing env, missing `--cycle-id`, the insert failed). That
+  is the *absence* of a judgement, never a pass and never a block. **Fix it first; never write
+  `done` around it.**
+
+**Then feed the ladder**, exactly as step 7a does — the moment the verifier prints
+`recorded as runner_verdicts <id>`:
+
+```sql
+SELECT * FROM public.verdict_ladder_signal('<verdict id>');
+```
+
+Two notes worth reading once:
+
+- **This step needs `SES-122b`'s Windows fix on `origin/dev` to be runnable at all.** Before
+  `v7.0.398`, `runGate()` handed an unquoted `C:\Program Files\nodejs\node.exe` to `cmd`, so every
+  attended run on John's machine was a **false `block`** (verdict `253aca14`, `SES-301`). Confirm
+  `spawnCommandFor` is present in `scripts/verifier.js` if a run blocks on
+  `'C:\Program' is not recognized`.
+- **A verdict that predates the claim is still a verdict.** The trigger tests *existence* of a row
+  for the `backlog_id`, never its recency or polarity — recency is the ladder's concern
+  (`SES-122`), not the gate's. The complete exemption list (non-Selfbuild epics, non-`done`
+  statuses, and which of the two Reverse paths can fire this) lives in the migration's own header,
+  never in this page.
+
 ### 4. Fetch, rebase, then push `HEAD:dev`
 
 Before any push to `dev` (kickoff commit, close-out commit — anything), from inside the worktree:
@@ -398,6 +470,9 @@ git -C "<worktree-path>" push origin HEAD:dev
 Use `HEAD:dev`, never bare `git push origin dev` (CLAUDE.md hard rule — worktrees share local refs).
 If the push is rejected as non-fast-forward, another concurrent session merged first: re-fetch,
 re-rebase, retry once.
+
+<!-- FEATURE: SES-311 -->
+**`done` requires 3e's verdict (`SES-311`).**
 
 **Then stamp the scoreboard (`SES-303`, 2026-09-02, v7.0.382)** — every ship, attended or not,
 records the platform's five standing numbers at that moment, so the ticket's effect can be read
