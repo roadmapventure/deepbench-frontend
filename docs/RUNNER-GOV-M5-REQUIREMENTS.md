@@ -402,11 +402,21 @@ incident `SES-269` was filed from.
 
 **M5 is complete when those close.** Completion is a property of that set, not of the epic label.
 
-**Status 2026-09-02, after v7.0.384 — 6 of the 7 required tickets are `done`:** `SES-184`, `SES-161`,
-`SES-282`, `SES-303`, `SES-276`, `SES-277`. **`SES-269` is `partial`** and is the last one: its shipped
-half measures runner silence; its declared remainder edits John's own routine (an unattended cycle
-may not) and the briefing line barred by `27b5d8cb`. M5 closes when that remainder lands or is
-re-ruled — a decision recorded here, never a card.
+**M5 COMPLETE — 2026-09-02, v7.0.385. All 7 required tickets are `done`:** `SES-184` (gate, v7.0.370)
+· `SES-161` (v7.0.376, the runner cycle John fired by hand) · `SES-282` (v7.0.371) · `SES-303`
+(v7.0.382, Shape B) · `SES-276` (v7.0.372) · `SES-277` (v7.0.384, the drill — which caught and fixed
+v2's unpersisted verdicts) · `SES-269` (ruled done by John, verbatim *"yes"*, session
+`design-m5-close-0902`). **The `SES-269` ruling, recorded here rather than carded:** the number the
+ticket exists for — hours of runner silence — is stamped at every ship
+(`platform_scoreboard.cron_silence_hours`) and measured by `scripts/check-cycle-cadence.js`; its
+undischarged remainder (a standing alarm routine in John's account, and the briefing line barred for
+unattended cycles by `27b5d8cb`) is re-ruled out of M5, because whether an alarm routine runs is the
+same question as whether the hourly runner runs — the M6 gate, `SES-185` — and notifications do not
+reach John today (`SES-123`). Reversible under `M6-02`. Stored form: the seven rows read
+`milestone_required = true` and `status = 'done'`; `select … from public.ticket_matrix where milestone
+= 'M5' and milestone_required and status <> 'done'` returns **zero rows**. The M5 drain directive
+(`238aa9ca`) keeps its open non-required members (`SES-292`, and the deferred `DAT-25`, `SES-123`,
+`SES-82`); completion is a property of the required set, as this record said it would be.
 
 **Stored 2026-09-02 (`SES-304`, v7.0.374).** The set above is no longer only prose: those eight rows carry `backlog_items.milestone_required = true` and `milestone = 'M5'`, so *"what is left for M5"* is `select … from public.ticket_matrix where milestone = 'M5' and milestone_required and status <> 'done'` — the same answer on every asking (`M5-04`). Amending the set means amending the flag, with a before-image, in the same change as the amendment note here.
 
