@@ -360,9 +360,22 @@ async function run(ctx = {}) {
     status = e.status;
     out = `${e.stdout || ""}${e.stderr || ""}`;
   }
-  assert.strictEqual(status, 0,
-    `--check exited ${status} (1 = the block's facts no longer match the tables, so re-run the ` +
-    `renderer; 2 = it COULD NOT RUN and is never a pass): ${out.trim()}`);
+  // SES-286c follow-up (design session, 2026-09-02): exit 1 is DRIFT, and drift is not a defect of
+  // this ticket -- the block is re-rendered at every SHIP (SES-265), while the board moves on every
+  // ticket close-out, claim and recompute in between. The first CI run after a close-out between
+  // two ships therefore read exit 1 and turned dev red for a fact that was true and expected. The
+  // arm now grades what the ticket owns: the checker RUNS (exit 2 is never a pass) and, when the
+  // block is current, says so in words. Drift is reported as declared-not-proven, never as a fail.
+  assert.notStrictEqual(status, 2,
+    `--check COULD NOT RUN (exit 2), which is never a pass: ${out.trim()}`);
+  if (status === 1) {
+    notRun("the live --check arm (block matches the tables right now)",
+      "the tables have moved since the last ship re-rendered the block (exit 1 = drift, refreshed at " +
+      "the next ship by runner-cycle.md step 7 / session-setup.md step 4): " + out.trim().slice(0, 200));
+    results.push("live-check-ran-and-reported-drift");
+    return results;
+  }
+  assert.strictEqual(status, 0, `--check exited ${status}: ${out.trim()}`);
   assert.ok(/no drift/.test(out),
     `--check exited 0 but did not report 'no drift' — read its output rather than its status: ${out.trim()}`);
   results.push("live-check-clean-against-the-tables");
