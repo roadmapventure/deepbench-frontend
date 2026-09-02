@@ -451,16 +451,22 @@ async function theLivePickPathObeysTheFourRules() {
   );
 
   // --- The conversion is reversible from the ledger, not from memory.
-  const images = await pg(
+  // Filter on the CAPTURED design_status, not on the session name alone. The session that ran
+  // this migration also writes before-images for its own ticket close-outs, so a bare session
+  // count grades unrelated activity and goes red on a correct board -- found live 2026-09-01,
+  // when SES-281's own close-out image made this a 8-vs-7 failure with nothing actually wrong.
+  const allImages = await pg(
     url, key,
-    "runner_before_images?select=pk_value,table_name&session_name=eq.design-drain-enforcement-0901&limit=100",
+    "runner_before_images?select=pk_value,table_name,row_data&session_name=eq.design-drain-enforcement-0901&limit=100",
   );
+  const images = allImages.filter(i => i?.row_data?.design_status === "john-paced");
   assert.strictEqual(
     images.length,
     7,
-    `runner_before_images holds ${images.length} rows for session design-drain-enforcement-0901, ` +
-      "expected 7 -- one per converted john-paced ticket. Fewer means the conversion is not " +
-      "reversible for every row it touched",
+    `runner_before_images holds ${images.length} before-images capturing design_status='john-paced' ` +
+      `for session design-drain-enforcement-0901 (out of ${allImages.length} total for that session), ` +
+      "expected 7 -- one per converted ticket. Fewer means the conversion is not reversible for " +
+      "every row it touched",
   );
   assert.ok(
     images.every(i => i.table_name === "backlog_items"),
