@@ -450,6 +450,43 @@ async function theLivePickPathObeysTheFourRules() {
       "ONLY; needs-desktop records a physical constraint and stays blocking",
   );
 
+  // --- SES-299: the STORED queue obeys M5-02 too, not just the pick predicate.
+  // SES-280 retired B3 in the registry and SES-281 changed drain_epic_next, but
+  // recompute_backlog_queue() kept running B3's `coalesce(filed_at, created_at) DESC` tail --
+  // so the queue every reader sees was ordered by the retired rule while the drain picked by the
+  // live one. Found by John asking why SES-82, the oldest M5 ticket and the only one in his
+  // priority lane, sat at queue 290: BECAUSE it was oldest. Two homes, one rule, and the visible
+  // home was wrong. This asserts the invariant on the LIVE board rather than reading the function
+  // body, which PostgREST cannot do.
+  const ordered = await pg(
+    url, key,
+    "backlog_items?select=backlog_id,queue,filed_at,created_at,tier,priority_class," +
+      "automation_rank,pinned_position,predicted_cycles&queue=not.is.null" +
+      "&pinned_position=is.null&automation_rank=is.null&limit=2000",
+  );
+  const LANE_CUT = Date.parse("2026-08-21T00:00:00Z");
+  const bucket = r => `${r.tier}|${r.priority_class}`;
+  const isPre = r => Date.parse(r.filed_at ?? r.created_at) < LANE_CUT;
+  const inversions = [];
+  for (const a of ordered) {
+    for (const b of ordered) {
+      if (a.backlog_id === b.backlog_id) continue;
+      if (bucket(a) !== bucket(b)) continue;
+      // a is pre-cut, b is post-cut, same bucket, neither pinned nor automation-ranked:
+      // a MUST hold the earlier slot. This is exactly what B3's DESC tail got backwards.
+      if (isPre(a) && !isPre(b) && a.queue > b.queue) {
+        inversions.push(`${a.backlog_id}(q${a.queue}, pre) after ${b.backlog_id}(q${b.queue}, post)`);
+      }
+    }
+  }
+  assert.deepStrictEqual(
+    inversions.slice(0, 5), [],
+    `M5-02 is not in recompute_backlog_queue(): ${inversions.length} unpinned, un-ranked ticket ` +
+      `pairs in the same tier+class bucket put a pre-2026-08-21 ticket AFTER a post-cut one. ` +
+      `First few: ${inversions.slice(0, 5).join("; ")}. That is B3's retired newest-first ordering ` +
+      "still running in the stored queue",
+  );
+
   // --- The conversion is reversible from the ledger, not from memory.
   // Filter on the CAPTURED design_status, not on the session name alone. The session that ran
   // this migration also writes before-images for its own ticket close-outs, so a bare session
