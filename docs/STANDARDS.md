@@ -39,9 +39,11 @@ predates the 2026-07-07 worktree discipline.)*
 
 ## Section 2: Session Scope Rules
 
-1. One feature per session
-2. Max 3 files modified per session
-3. Max 4 tasks per kickoff doc
+**The caps below are a BASELINE PLUS WHAT THE RUNG EARNED (`SES-122` (c), `v7.0.399` — charter decision 5, the M6 gate's ruling).** Rules 2 and 3 used to be flat literals; they are now the floor under a per-class grant that the trust ladder pays out and a reversal takes back. **Rules 1–3 and the `HR-SCOPE` blockquote below them are the canonical text of `public.governance_rules` rows `CAP-SCOPE-FEATURE`, `CAP-SCOPE-FILES`, `CAP-SCOPE-TASKS` and `HR-SCOPE` — byte-for-byte, each on ONE line, guarded by `tests/regression/ses-122c-class-caps.test.mjs`.** The registry is authoritative and this section is its home: edit the row, re-export `docs/governance/RULES-SNAPSHOT.md`, then reconcile the line here — never the line alone.
+
+1. Scope every session to exactly one feature.
+2. Modify at most 3 files per session, plus the extra files the ticket's class has earned on the trust ladder (`public.class_autonomy(priority_class).extra_files` — one per rung above `runner_settings.cap_relax_rung`; M6, SES-122). The baseline is CLAUDE.md's hard rule; the extra is the class's, read at pick time, never assumed.
+3. Include at most 4 tasks per kickoff doc, plus the extra tasks the ticket's class has earned (`class_autonomy(priority_class).extra_tasks`; M6, SES-122).
 4. If Claude Code shows "compacting" — **STOP immediately**, exit, start fresh
 5. Node.js test must pass before any commit — for any Category K or M session, the suite must also pass (SES-009a). **The specced command is `node --env-file-if-exists=.env.local tests/regression/run-all.js`** (`SES-61`, `v7.0.253`). **For a credentialed run** (`SES-260`, `v7.0.381`, corrected `v7.0.383`): `.env.local` carries publishable values only, so the credentialed arms take their values from `public.runner_secrets` by name, exported inline for the one command per `docs/runbooks/session-setup.md` step 1b — `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js` — never from a pulled file (Vercel returns sensitive values empty); without them they declare NOT RUN exactly as before. Three rules on invoking it, the first two from real false results found 2026-07-28 (`SES-28`), the third from one found 2026-07-29 and re-measured 2026-08-25:
    - **`run-all.js` is the gate — never spec `node tests/regression/<file>.js` as the suite check** in a kickoff doc, runbook, or checklist. Each test file now self-runs when invoked directly (`SES-28`), so a bare invocation is real rather than vacuous, but only `run-all.js` runs all of them. (history: `docs/SESSIONS.md`)
@@ -53,7 +55,23 @@ predates the 2026-07-07 worktree discipline.)*
 6. `npm run build` must pass before any commit
 7. Browser console check required after every deploy
 
-**Signs a session is too big:** kickoff doc has >4 tasks, >3 files modified, session runs >20 min, or compacting starts. Split into S[X]a and S[X]b.
+**Two more rows are homed in this section as BLOCKQUOTES rather than as list items, and that placement is deliberate: the rule NUMBERS above are load-bearing** — `tests/regression/SES-61-suite-invocation.js` slices "rule 5" by its literal opening, and Section 5 plus eight test files cite "Section 2 rule 5" / "rule 7" — **so a new item 4 would renumber every one of those citations.**
+
+**`HR-SCOPE` — the hard-rule form of rules 1–3, and this section is its canonical home as of `SES-122` (c) (`v7.0.399`), re-homed from `CLAUDE.md#hard-rules`.** `CLAUDE.md` is John's file, so the row now points at the doc a ticket is allowed to reconcile; his hard-rule `Scope` line stays exactly as he wrote it and is the **baseline** the amended row cites — cited, never contradicted, and never edited by a cycle.
+
+> Keep each session to one feature, at most 3 modified files, and at most 4 tasks — the baseline; a class's trust-ladder rung above `runner_settings.cap_relax_rung` adds one file and one task per rung (`class_autonomy()`, M6, SES-122), and a reversal takes them back.
+
+**`CAP-SESSION-SPLIT-SIGNS` — when to split, reconciled to its row here by `SES-122` (c).** The paraphrase that stood here ("kickoff doc has >4 tasks, >3 files modified, session runs >20 min, or compacting starts") was stale twice over: it still carried the 20-minute wall-clock trigger `SES-296` withdrew (retirement-ledger entry 34 — a chained drain runs long by design) and it still stated the caps as flat literals, four lines under the rules that had just stopped being flat.
+
+> Split a session into S[X]a/S[X]b once its kickoff doc exceeds 4 tasks or 3 files, or compacting starts. Wall-clock duration is not a split trigger — a chained drain (M6-10) runs long by design.
+
+**How a cycle reads its caps (`SES-122` (c); scoped by `M6-13`).** At pick — step 5 of `docs/runbooks/runner-cycle.md`, once, before any design — run `SELECT * FROM public.class_autonomy('<priority_class>')` (the statement is fenced in that runbook step, and deliberately not a second fenced copy here) and write the answer into the cycle's `notes` as `files N (+k) / tasks M (+k)`, where `N`/`M` are the baseline 3 and 4 and each `k` is that class's `extra_files` / `extra_tasks`. **The reviewer then grades the ship against THOSE numbers, not against the bare 3/4** (step 7's QA bar cites them). Three boundaries, each of which is how this gets got wrong:
+
+- **A rung is a fact about the ticket's `priority_class`, not about its epic or its ticket.** The same class earns the same widening on any epic.
+- **It is read at pick and never re-derived by the caller.** `class_autonomy()` is the one home for what a rung buys, and its thresholds are stored columns (`runner_settings.cap_relax_rung`), never literals — the defect this ticket exists to remove, so re-introducing the arithmetic anywhere else re-introduces it.
+- **It fails closed.** An unclassed ticket, a class the ladder does not track, or a missing `runner_settings` singleton all earn **zero** extras, so a lookup that goes wrong narrows the cap and can never widen it. A blank rung is NULL, not 0 — rung 0 is a real rung.
+
+`M6-13` scopes all of this to the individual **cycle** — never to the chained session a drain runs inside.
 
 ---
 

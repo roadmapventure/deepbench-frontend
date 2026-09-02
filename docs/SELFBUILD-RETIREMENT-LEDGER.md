@@ -612,3 +612,33 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
 - **Withdrawn:** the implicit one-session-one-ticket assumption. A chained session covers several tickets and cannot carry one ticket's name.
 - **Survives:** the rename discipline itself — a chained session is named for its drain and renamed at each pick, so a reader can still tell what a session is doing at any moment.
 - **Restore:** registry row plus this entry; `git` history.
+
+### 36. `CAP-SCOPE-FILES` — the three-file cap as a flat literal (amended)
+<!-- FEATURE: SES-122 (c) — the replacement lands in the SAME commit as the amendment, per the
+     SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old flat cap nor
+     the class-scoped one is in force. The row stays `live`; only its wording left. -->
+- **Said, verbatim:** *"Modify at most 3 files per session."*
+- **Lived:** row `CAP-SCOPE-FILES` (`standards-caps`, `enforcement = 'prose'`, `status = 'live'`), home `docs/STANDARDS.md#section-2-session-scope-rules` (unchanged).
+- **Replaced by, verbatim:** *"Modify at most 3 files per session, plus the extra files the ticket's class has earned on the trust ladder (`public.class_autonomy(priority_class).extra_files` — one per rung above `runner_settings.cap_relax_rung`; M6, SES-122). The baseline is CLAUDE.md's hard rule; the extra is the class's, read at pick time, never assumed."*
+- **Why:** charter decision 5 — *numeric file/task caps retire **only when** the verifier replaces them* — and the M6 gate's ruling on how. The verifier exists (`SES-181`, and `SES-122` (b) made it read the rung), a verdict now moves the ladder (`M6-07`, `SES-122` (a)), and `class_autonomy()` is the one home for what a rung buys. So the cap comes down exactly as fast as verification proves itself and goes back up when it does not: that is the charter's sequencing invariant satisfied **by construction rather than by a date**.
+- **Survives — and this is the half a later reader must not lose:** the **3 is not gone**. It is the floor, it is still John's `CLAUDE.md` hard rule, and it is what an unclassed ticket, an untracked class or a failed lookup all fall back to (`class_autonomy()` fails closed at zero extras). Nothing was widened for anybody the ladder has not promoted.
+- **Restore:** the row's prior text is in `runner_before_images` — image `1fa15afc-9ac5-419a-b825-a99970c3c66f`, `session_name = 'ses-122c-coding'`, full row as `row_data`. Restore the `statement` from that image, re-export `docs/governance/RULES-SNAPSHOT.md`, and reconcile Section 2 rule 2 in the same commit. Also in `git` history of the snapshot.
+
+### 37. `CAP-SCOPE-TASKS` — the four-task cap as a flat literal (amended)
+<!-- FEATURE: SES-122 (c) — amended in the same commit as entries 36 and 38, same transition rule. -->
+- **Said, verbatim:** *"Include at most 4 tasks per kickoff doc."*
+- **Lived:** row `CAP-SCOPE-TASKS` (`standards-caps`, `enforcement = 'prose'`, `status = 'live'`), home `docs/STANDARDS.md#section-2-session-scope-rules` (unchanged).
+- **Replaced by, verbatim:** *"Include at most 4 tasks per kickoff doc, plus the extra tasks the ticket's class has earned (`class_autonomy(priority_class).extra_tasks`; M6, SES-122)."*
+- **Why:** entry 36's reason, applied to the task half — the two extras are the *same* number (`greatest(0, rung − runner_settings.cap_relax_rung)`), read from the same function, so splitting them across two rules with two different mechanisms would be the second-home defect this project keeps closing.
+- **Survives:** the **4** as the floor, on the same fail-closed terms as entry 36.
+- **Restore:** image `adb56e29-5b89-4c7c-8f9e-46e59bdacb4c` (`session_name = 'ses-122c-coding'`), then re-export the snapshot and reconcile Section 2 rule 3 in the same commit.
+
+### 38. `HR-SCOPE` — the hard-rule scope line, and its canonical home (amended + re-homed)
+<!-- FEATURE: SES-122 (c) — the re-homing is recorded here because it is the one change in this
+     ticket that a reader would otherwise look for in CLAUDE.md's history and never find. -->
+- **Said, verbatim:** *"Keep each session to one feature, at most 3 modified files, and at most 4 tasks."*
+- **Lived:** row `HR-SCOPE` (`claude-md-hard-rules`, `enforcement = 'prose'`, `status = 'live'`), home **`CLAUDE.md#hard-rules`**.
+- **Replaced by, verbatim:** *"Keep each session to one feature, at most 3 modified files, and at most 4 tasks — the baseline; a class's trust-ladder rung above `runner_settings.cap_relax_rung` adds one file and one task per rung (`class_autonomy()`, M6, SES-122), and a reversal takes them back."*
+- **RE-HOMED in the same UPDATE:** `canonical_doc` moved from `CLAUDE.md#hard-rules` to **`docs/STANDARDS.md#section-2-session-scope-rules`**, where the statement now sits as a blockquote under rules 1–3. **Why, and it is the whole reason this entry exists:** a rule's `canonical_doc` must carry its text byte-for-byte, and `CLAUDE.md` is **John's file** — this ticket may cite it and may not edit it. The choice was therefore between a live rule whose home contradicts it and a rule homed where a cycle is allowed to reconcile it; the second is the only one that leaves the registry and its home in agreement. **John's `Scope` hard-rule line in `CLAUDE.md` is untouched, still says "One feature per session. Max 3 files. Max 4 tasks.", and is now cited BY the amended row as the baseline** — the row widens what a promoted class may do on top of his floor, it does not overwrite his sentence.
+- **Survives:** the one-feature cap in full (`CAP-SCOPE-FEATURE`, *"Scope every session to exactly one feature."*, deliberately **not** amended — a rung buys breadth of edit, never a second feature), the 3/4 floor, and John's own line.
+- **Restore:** image `333ff789-be41-4d59-a2ba-35d6b1219d48` (`session_name = 'ses-122c-coding'`) carries both the prior `statement` **and** the prior `canonical_doc`; restoring the row restores the home. Then re-export the snapshot and remove the blockquote from Section 2.

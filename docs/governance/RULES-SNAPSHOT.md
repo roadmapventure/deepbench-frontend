@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 116 · **By status:** 99 live · 7 retired · 10 superseded · **Payload sha256:** `f7c47df0f7f2b3094e357208466a4175d20893eb664b2977f3ab8599d0f9c1ce`
+**Rules:** 116 · **By status:** 99 live · 7 retired · 10 superseded · **Payload sha256:** `1ce1446f9bbe48f98bf4088520fe0191bbfb219a776dc98aa56587b9946b2957`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -20,7 +20,7 @@ exactly one space per side, and a reader removes one character per side rather t
 | HR-NO-CD-COMPOUND | live | hook | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Never write a `cd "path" && …` compound in a Bash call; pass the path as a direct argument instead (e.g. `git -C`). |
 | HR-NO-HOOK-ROUTE | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Never retry an action a PreToolUse hook denied through a different tool the hook doesn't match; stop and report the deny reason instead. |
 | HR-PUSH-HEAD-DEV | live | hook | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Push with `git push origin HEAD:dev`, never a bare `git push origin dev`. |
-| HR-SCOPE | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Keep each session to one feature, at most 3 modified files, and at most 4 tasks. |
+| HR-SCOPE | live | prose | claude-md-hard-rules | docs/STANDARDS.md#section-2-session-scope-rules |  | Keep each session to one feature, at most 3 modified files, and at most 4 tasks — the baseline; a class's trust-ladder rung above `runner_settings.cap_relax_rung` adds one file and one task per rung (`class_autonomy()`, M6, SES-122), and a reversal takes them back. |
 | HR-SELFTEST | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Have coding sessions push to dev and design sessions verify their own Manual QA Checklist themselves, never handing manual testing to John. |
 | HR-SUBAGENT-WORKTREE | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Run every sub-agent inside the parent session's own worktree (never `isolation: worktree`), stating its absolute path verbatim in the prompt. |
 | HR-VERIFY | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Never assert a checkable fact about code, schema, config, or Supabase data from memory; verify it fresh this session or say it's unverified. |
@@ -108,8 +108,8 @@ exactly one space per side, and a reader removes one character per side rather t
 | CAP-QA-SINGLE-CHANGE | live | reviewer | standards-caps | docs/STANDARDS.md#section-5-claude-code-verification-checklist |  | Write every Manual QA item to test only the change under test — never bundle another ticket's acceptance behavior into it. |
 | CAP-SCOPE-COMPACTING | live | prose | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Stop immediately, exit, and start fresh the moment Claude Code shows "compacting". |
 | CAP-SCOPE-FEATURE | live | prose | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Scope every session to exactly one feature. |
-| CAP-SCOPE-FILES | live | prose | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Modify at most 3 files per session. |
-| CAP-SCOPE-TASKS | live | prose | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Include at most 4 tasks per kickoff doc. |
+| CAP-SCOPE-FILES | live | prose | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Modify at most 3 files per session, plus the extra files the ticket's class has earned on the trust ladder (`public.class_autonomy(priority_class).extra_files` — one per rung above `runner_settings.cap_relax_rung`; M6, SES-122). The baseline is CLAUDE.md's hard rule; the extra is the class's, read at pick time, never assumed. |
+| CAP-SCOPE-TASKS | live | prose | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Include at most 4 tasks per kickoff doc, plus the extra tasks the ticket's class has earned (`class_autonomy(priority_class).extra_tasks`; M6, SES-122). |
 | CAP-SESSION-SPLIT-SIGNS | live | prose | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Split a session into S[X]a/S[X]b once its kickoff doc exceeds 4 tasks or 3 files, or compacting starts. Wall-clock duration is not a split trigger — a chained drain (M6-10) runs long by design. |
 | CAP-SKILL-SCHEMA-COCHANGE | live | reviewer | standards-caps | docs/STANDARDS.md#section-5-claude-code-verification-checklist |  | Any session changing an agent output field must edit both the skill's method/objective text and its traits.schema (properties + required) in the same session, and prove the field arrives via one real live call. |
 | CAP-TEST-NODEJS-GATE | live | script | standards-caps | docs/STANDARDS.md#section-4-nodejs-test-requirements |  | Write a pure-Node test file (no app imports, run as `node test-[session-id].mjs`) that shows ALL TESTS PASS before any commit, then delete it before committing. |
