@@ -470,7 +470,7 @@ primary key, and a row written since its image are each counted `refused` and le
 row was written, and the doubt is reported rather than hidden.
 
 **Where the ids are.** The standing brief's *Open decisions* block is the page to read — it lands
-in `SES-286` part (c), and until it does the list is one query:
+in `SES-286` part (c) (`v7.0.396`, the *Open decisions* block of `docs/runbooks/standing-brief.md`); the same list is one query:
 
 ```sql
 SELECT id, decided_at, kind, backlog_id, summary, expires_at
