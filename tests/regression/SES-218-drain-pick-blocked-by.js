@@ -112,7 +112,7 @@ export const CLAUSES = [
       /NOT uniformly do-not-re-pick/i.test(s) &&
       /SES-51/.test(s) &&
       /SES-180/.test(s),
-    breaks: s => s.replace(/NOT uniformly do-not-re-pick/i, "always do-not-re-pick"),
+    breaks: s => s.replace(/NOT uniformly do-not-re-pick/gi, "always do-not-re-pick"),
   },
   {
     id: "delivered-unblocks-a-dependent",
@@ -125,7 +125,7 @@ export const CLAUSES = [
       /remainder becomes buildable/i.test(s) &&
       /not \*?\*?is accepted/i.test(s) &&
       /collapsing them to one breaks one of the two/i.test(s),
-    breaks: s => s.replace(/UNBLOCKS a dependent/i, "still blocks a dependent"),
+    breaks: s => s.replace(/UNBLOCKS a dependent/gi, "still blocks a dependent"),
   },
   {
     id: "nothing-clears-it",
@@ -138,7 +138,7 @@ export const CLAUSES = [
       /`?NOT EXISTS`?/.test(s) &&
       /blocker's\*?\*? live status/i.test(s) &&
       /record_skip/.test(s),
-    breaks: s => s.replace(/NOTHING CLEARS IT, and nothing should have to/i, "Clear it by hand once the blocker lands"),
+    breaks: s => s.replace(/NOTHING CLEARS IT, and nothing should have to/gi, "Clear it by hand once the blocker lands"),
   },
   {
     id: "keyed-on-id-never-backlog-id",
@@ -147,7 +147,7 @@ export const CLAUSES = [
       "reason (backlog_id is not unique; CHI-48 occupies two rows) -- a text key silently means " +
       "both rows, the SES-142 / SES-86 lesson",
     test: s => /never `?backlog_id`?/i.test(s) && /CHI-48/.test(s) && /two rows/i.test(s),
-    breaks: s => s.replace(/never `backlog_id`/i, "or `backlog_id`, either is fine"),
+    breaks: s => s.replace(/never `backlog_id`/gi, "or `backlog_id`, either is fine"),
   },
   {
     id: "never-use-design-status-instead",
@@ -161,7 +161,7 @@ export const CLAUSES = [
       /john-paced/.test(s) &&
       /SES-166/.test(s) &&
       /cannot act on/i.test(s),
-    breaks: s => s.replace(/NEVER write/i, "You may write"),
+    breaks: s => s.replace(/NEVER write/gi, "You may write"),
   },
 ];
 
