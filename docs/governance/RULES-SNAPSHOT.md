@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 113 · **By status:** 96 live · 7 retired · 10 superseded · **Payload sha256:** `cc6b592c061d46230931b3f5f9c771658a62924fa389b44bad02a523decef82f`
+**Rules:** 113 · **By status:** 96 live · 7 retired · 10 superseded · **Payload sha256:** `8fdda4928f5ae56d202b592c05fff804f93dc89670429b7e729b1ec94e0a780c`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -82,7 +82,7 @@ exactly one space per side, and a reader removes one character per side rather t
 | M5-12 | live | reviewer | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-12 |  | A Selfbuild M5 healing ticket holds at `partial` until the failure it claims to fix is observed non-recurring for 72 hours; only then may it write `done`. |
 | M5-13 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-13 |  | A ship writes `session_ref` and `item_id` in the same transaction as the status change; a ship with either field null is rejected, not warned. |
 | M5-14 | live | reviewer | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-14 |  | Auto-close never applies to a ticket whose `scope_origin` is not `original` or `gate-review`; `discovered` and `john-named` work closes on verifier pass once its reversal window elapses. |
-| M5-15 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-15 |  | A drain refuses to start a pick when the freshest `runner_usage_readings` row is older than 24 hours. |
+| M5-15 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-15 |  | A drain whose freshest `runner_usage_readings` row is older than 24 hours does not refuse to run — it degrades, capping the cycle at `runner_budget.stale_fallback_tokens` and recording `usage_reading_stale` on the cycle row. Refusing would make a number only John can type into a precondition for autonomy, which M6-01 forbids. |
 | M6-01 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-01 |  | No cycle may block on a human decision; `needs-john` is retired as a blocking state and a cycle decides with recorded reasoning instead of asking. |
 | M6-02 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-02 |  | A decision executes immediately and is reversible for 72 hours; silence is assent, never a park. Supersedes B14 and B23's silence-parks-forever. |
 | M6-03 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-03 |  | A ticket whose premise fails revalidation twice consecutively is removed automatically, reversible inside its window; no removal waits on a human Accept. Supersedes B7. |
