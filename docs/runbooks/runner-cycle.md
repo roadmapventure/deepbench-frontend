@@ -2546,6 +2546,20 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js \
   tail re-exports it once the harvest has landed; see the tail's snapshot sub-step below. Do NOT
   try to close the gap by moving the harvest earlier: B42 put those writes in the serial tail on
   purpose, because they race under parallel cycles.**
+- **Scoreboard stamp (`SES-303`, `v7.0.382`, John's Shape B) — every ship, immediately after the
+  snapshot and before the standing brief, one call, no file:**
+  ```sql
+  SELECT * FROM public.snapshot_platform_scoreboard('ship', '<ticket>', '<push sha>', <hygiene flag count or NULL>);
+  ```
+  It writes one `platform_scoreboard` row — no-ship cycles and their tokens this weekly window,
+  shipped cycles, tokens per shipped cycle, cycles per shipped ticket, the worst silence between fires
+  over 7 days — computed from `runner_cycles` by the function itself; you supply only the hygiene
+  flag count from your own tripwire run (`NULL` = unmeasurable, never `0`). This row is the
+  ticket's **before**; `public.ticket_outcome` reads the newest row at least 72 hours later as its
+  **after** (`M5-12`'s window) and grades the ticket's `enhancement_claim` ("metric: down|up") as
+  `held` / `did_not_hold` / `unmeasurable` / `pending`, with all five deltas beside it so a
+  regression nobody claimed still shows. **Stamp on every ship, claim or not** — a ticket with no
+  claim still moves the series, and the series is what the next reviewer reads.
 - **Standing brief (`SES-265`, `v7.0.356`) — in the same commit set, every ship, immediately after
   the snapshot:**
   `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-standing-brief.js` (both values from

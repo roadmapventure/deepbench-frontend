@@ -331,6 +331,19 @@ Use `HEAD:dev`, never bare `git push origin dev` (CLAUDE.md hard rule — worktr
 If the push is rejected as non-fast-forward, another concurrent session merged first: re-fetch,
 re-rebase, retry once.
 
+**Then stamp the scoreboard (`SES-303`, 2026-09-02, v7.0.382)** — every ship, attended or not,
+records the platform's five standing numbers at that moment, so the ticket's effect can be read
+off the series later (`public.ticket_outcome`, M5-12's 72-hour window). One call over the Supabase
+MCP, right after the push lands:
+
+```sql
+SELECT * FROM public.snapshot_platform_scoreboard('ship', '<TICKET-ID>', '<push sha>', <hygiene flag count or NULL>);
+```
+
+The flag count is `session-hygiene`'s "N flagged" line if you ran it this session; `NULL` means
+unmeasurable, never zero. Nothing else to fill in — the other four numbers are computed from
+`runner_cycles` by the function itself.
+
 ### 5. Delete your inflight file in the close-out commit
 
 When you push your close-out commit, delete your own `inflight/<short-session-name>.md` in

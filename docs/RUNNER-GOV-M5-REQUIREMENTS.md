@@ -189,6 +189,21 @@ M5 is the closed-loop *healing* epic: its tickets claim a recurring failure has 
 an observation over time, not a green build, and 72 hours is the window that spans a full scheduler
 cadence rather than a single quiet afternoon.
 
+**Instrumented 2026-09-02 (`SES-303`, v7.0.382).** "Observed non-recurring for 72 hours" was a
+judgment with no instrument. It now has one: every ship stamps `public.platform_scoreboard` (five
+standing numbers — no-ship cycles and their tokens this weekly window, shipped cycles, tokens per
+shipped cycle, cycles per shipped ticket, worst silence between fires; migration
+`ses303_platform_scoreboard`), and `public.ticket_outcome` reads, for each shipped ticket, the row
+stamped at its ship as *before* and the newest row at least 72 hours later as *after* — exactly this
+rule's window — grading the ticket's claim (`enhancement_claim`, "metric: down|up") as `held`,
+`did_not_hold`, `unmeasurable` or `pending`, with all five deltas beside it so a regression nobody
+claimed still shows. John chose this shape (verbatim *"b"*) over per-ticket claims: one stored
+series, zero ceremony per ticket, the same answer on every asking. **Stated so it is not assumed:**
+attended ships write no `runner_cycles` row (`M5-11`/`M5-13`'s gap), so the cycle-derived numbers
+move only with unattended fires; an attended ship still stamps the row (session-setup step 4) so its
+before/after distance is real. The series starts 2026-09-02; nothing before it is measurable and no
+row is backdated.
+
 ### <a id="M5-13"></a>M5-13 — attribution is written, not warned about (`script`)
 
 > A ship writes `session_ref` and `item_id` in the same transaction as the status change; a ship with either field null is rejected, not warned.
@@ -367,7 +382,7 @@ section. It is reversible for 72 hours under `M6-02`.
 
 | Pillar | Carried by | State at the gate |
 |---|---|---|
-| **1. Outcome telemetry** — did shipped work change the metric it claimed? | `SES-303` | **Had no ticket until 2026-09-02.** A board-wide search found nothing covering it, so M5 could not have completed as chartered no matter how the existing list was worked. Filed at this gate, `scope_origin = original`. |
+| **1. Outcome telemetry** — did shipped work change the metric it claimed? | `SES-303` | **Had no ticket until 2026-09-02.** A board-wide search found nothing covering it, so M5 could not have completed as chartered no matter how the existing list was worked. Filed at this gate, `scope_origin = original`. **Shipped 2026-09-02 (v7.0.382), Shape B by John's call** — the platform scoreboard and `public.ticket_outcome`; see the note under `M5-12`. |
 | **2. Heal-engine v2** — fix-confirmation and recurrence re-filing | `SES-276`, proven by `SES-277` | Both filed at the M4 gate review, both blocked on this gate |
 | **3. Usage/budget instrumentation** | `SES-82`, `SES-161` (`SES-104` done) | Named in `SES-184`'s own text as absorbed |
 
