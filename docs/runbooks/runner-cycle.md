@@ -2753,7 +2753,7 @@ BEGIN
     FROM public.backlog_items b WHERE b.backlog_id = '<TICKET-ID>';
   INSERT INTO public.runner_before_images
     (cycle_id, session_name, table_name, pk_value, row_data, decision_id)
-  VALUES ('<your cycle id>', NULL, 'backlog_items', '<TICKET-ID>', v_img, v_dec);
+  VALUES ('<your cycle id>', NULL, 'backlog_items', (v_img->>'id'), v_img, v_dec);  -- pk_value is the row's PRIMARY KEY (the uuid in v_img->>'id'), never the ticket id: reverse_decision() addresses a row by its pk and refuses one it cannot cast (SES-286b follow-up, measured: a ticket-id pk_value reversed nothing and reported refused=1)
 
   UPDATE public.backlog_items
      SET <the judgment: status / tier / defer_status / scope>, updated_at = now()
