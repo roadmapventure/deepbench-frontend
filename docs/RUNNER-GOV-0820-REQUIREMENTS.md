@@ -381,6 +381,23 @@
   the design, and the lease survives only as the serial tail's publish lock), the single-runner
   control added *after* two cycles built `ADM-1` v1 simultaneously. That call was John's and he
   made it (2026-08-21, register B42): run in parallel — the question this card carried is settled.
+  **STATUS RULED 2026-09-02 (`SES-284`, v7.0.378): **live, executing, retirement condition not met**.**
+  `SES-284` asked whether the self-retirement clause above had quietly triggered with no ledger entry,
+  because `automation_rank` was null on 18 of 23 open Selfbuild tickets. Measured on the live board
+  (session `design-ses-284-0902`): the lane is *code*, not prose — `recompute_backlog_queue()` still
+  takes `automation_rank NULLS LAST` as its leading `ORDER BY` — and the Automation epic still holds
+  **11 open tickets**, so "until automation is complete" has not arrived. The real defect is the
+  inverse of the one feared: **8 of the 11 open Automation-epic tickets carry no `automation_rank`**
+  (`SES-105`, `SES-108`, `ADM-2`, `SES-80`, `SES-131`, `SES-152`, `SES-155`, `SES-156`) because
+  `claim_automation_lane_top()` was never called for them at filing — the lane John ordered is
+  half-empty, and those eight sit in the class-sorted backlog he said they should outrank. The ten
+  ranked open rows are, conversely, mostly *not* Automation-epic tickets (`SES-288`, `SES-287`,
+  `SES-231`, `SES-203`, `SES-185`, `SES-186`, `SES-84` plus three Automation rows already
+  `delivered`/`removal proposed`): the lane has been used as a general "top of John's queue"
+  device. Both facts are recorded rather than undone — re-ranking eight tickets reorders the top of
+  John's board, which is his call, and `M5-01`'s epic fence keeps the Automation epic out of every
+  unattended pick regardless of rank, so nothing is mis-built meanwhile. No retirement-ledger entry:
+  nothing retired. Registry row unchanged: the statement is still true as written.
 - **B33. Heal engine v1 shipped, as built (SES-89, v7.0.108, 2026-08-20):** groups failed
   `public.durable_hops` rows into `(capability_slug, error_class)` signatures, fires at ≥3
   occurrences in a 14-day window, dedups forever on a 12-hex `sig_hash` written into the filed
