@@ -1,4 +1,34 @@
 #!/usr/bin/env node
+// DeepBench v7.0.389 | scripts/heal-engine.js | SES-308 -- A PENDING FIX-CONFIRMATION IS AN EXIT 1,
+// so the unattended cycle actually applies it. SES-277 made the --apply path persist a verdict on a
+// run with nothing new to file; this ship makes the DRY RUN say that there is one. Before it, the
+// last third of the loop never ran unattended: runbook step 8b re-runs with --apply only on exit 1,
+// exit 1 meant "signatures to file", and a confirmed fix is BY DEFINITION a run with nothing to
+// file -- so the verdict was computed, printed in `confirmLine`, and thrown away, every cycle. Every
+// row in public.runner_heal_signatures at this ship carried updated_at = 2026-09-02T16:14:42Z, the
+// one supervised drill cycle; no unattended cycle had ever written signature state.
+//
+// FEATURE: SES-308
+//
+// THREE CHANGES, and the second is a latent defect the drill could not have seen:
+//   1. `pendingVerdictCount()` is exported and pure, and the dry run's nothing-to-file path exits 1
+//      when it is > 0. `pendingVerdicts` is in the JSON summary on EVERY exit path, and it counts
+//      verdicts COMPUTED BUT NOT YET PERSISTED -- so under --apply it is 0, because they just
+//      landed. That makes "exit 1 iff there is unfinished work" a contract a cycle can grade.
+//   2. `assessConfirmations()` records a recurrence ONCE. A row already in state `recurred` with
+//      `last_recurrence_at` set was reported as a NEW recurrence on every run while the signature
+//      stayed in the 14-day window, and `verdictPatches()` would re-increment `recurrence_count`
+//      each time. Harmless while nothing acted on the count -- and actively harmful the moment
+//      change 1 makes every computed recurrence trigger an --apply. A sighting no later than the
+//      stored `last_recurrence_at` is now `stillWatching` with a reason. The hash stays in
+//      `suppressed`, so the detector still cannot file a duplicate for it.
+//   3. `--apply` no longer demands `--backlog-ids` up front. FOUND LIVE THIS SESSION, and it makes
+//      change 1's own instruction unrunnable without it: main()'s first gate failed 2 on
+//      `APPLY && !--backlog-ids` BEFORE reaching the nothing-to-file branch, so the "re-run with
+//      --apply --cycle-id=<uuid>, no ids needed" remedy this ship prints would have exited 2 every
+//      time. The requirement now lives where it is actually needed -- `parseBacklogIds()`, after the
+//      nothing-to-file branch returns -- so filing WITHOUT ids still exits 2, unchanged.
+//
 // DeepBench v7.0.372 | scripts/heal-engine.js | SES-276 -- HEAL v2. Three things change and one
 // thing deliberately does not.
 //
@@ -135,9 +165,12 @@
 //                     writes nothing at all, to either table.
 //   --cycle-id=<uuid> Required with --apply. The open runner_cycles row every before-image row
 //                     is bound to (runner_before_images.cycle_id is a real FK).
-//   --backlog-ids=<>  Required with --apply. Comma-separated ids the CYCLE claimed atomically
-//                     (e.g. LOO-38,LOO-39). This script never mints an id itself -- see the
-//                     "Why this script does NOT claim its own ids" note below.
+//   --backlog-ids=<>  Required with --apply ONLY WHEN the dry run listed signatures to file
+//                     (SES-308). Comma-separated ids the CYCLE claimed atomically (e.g.
+//                     LOO-38,LOO-39). This script never mints an id itself -- see the "Why this
+//                     script does NOT claim its own ids" note below. An --apply run whose only
+//                     work is persisting fix-confirmation verdicts needs no ids and must not
+//                     claim any: there is nothing to file, so a claimed block would be burnt.
 //   --window-days=<n> Detection lookback window. Default 14.
 //   --threshold=<n>   Occurrences within the window before a signature files. Default 3.
 //   --max-filings=<n> Hard cap on tickets filed in one run. Default 3.
@@ -149,12 +182,16 @@
 //
 // Exit codes:
 //   0  ran cleanly -- nothing new to file, or --apply filed everything it detected
-//   1  dry run detected signatures that are over threshold, classified `product`, and not yet
-//      filed. This is the signal a runner cycle acts on, the same "there is drift" role --check
-//      plays in scripts/export-backlog-snapshot.js.
-//   2  cannot run -- missing env, a Supabase REST failure, or --apply without a valid
-//      --cycle-id. Deliberately distinct from 1: an unrunnable check must never read as a pass,
-//      and must not be confused with a real detection either.
+//   1  the dry run has unfinished work for a cycle to apply. EITHER it detected signatures that
+//      are over threshold, classified `product`, and not yet filed; OR [SES-308] it computed
+//      fix-confirmation verdicts that are not yet persisted (`pendingVerdicts > 0`). Both are the
+//      same "there is drift" signal --check plays in scripts/export-backlog-snapshot.js, and both
+//      are answered by the same re-run with --apply. --backlog-ids is needed for the FIRST case
+//      only; the JSON's `detections` array says which case fired.
+//   2  cannot run -- missing env, a Supabase REST failure, --apply without a valid --cycle-id, or
+//      --apply with signatures to file but no --backlog-ids. Deliberately distinct from 1: an
+//      unrunnable check must never read as a pass, and must not be confused with a real detection
+//      either.
 //
 // Env (read from process.env only -- never hardcoded, never printed):
 //   SUPABASE_URL           Project REST base, e.g. https://xxxx.supabase.co
@@ -765,6 +802,10 @@ export function assessConfirmations(stateRows, seenSignatures, opts = {}) {
   const confirmed = [];
   const recurred = [];
   const stillWatching = [];
+  // FEATURE: SES-308 -- hashes whose recurrence is ALREADY on the row. They produce no new verdict,
+  // but they stay in `suppressed`: the detector's duplicate-filing guard must not weaken just
+  // because the verdict stopped being re-written.
+  const recurrenceAlreadyRecorded = [];
 
   for (const row of stateRows ?? []) {
     const hash = row?.sig_hash;
@@ -776,12 +817,31 @@ export function assessConfirmations(stateRows, seenSignatures, opts = {}) {
 
     if (row.state === "confirmed_fixed" || row.state === "recurred") {
       if (hit) {
+        const lastSeen = hit.lastSeen instanceof Date ? hit.lastSeen : now;
+        // FEATURE: SES-308 -- a recurrence is a NEW recurrence only when the newest sighting is
+        // later than the one already on the row. A signature stays in the 14-day detection window
+        // for days after it recurs, so without this the same reappearance was re-reported (and
+        // recurrence_count re-incremented by verdictPatches) on every run until it aged out. That
+        // was invisible while nothing acted on the verdict; now that a computed verdict triggers an
+        // --apply, it would make the cycle re-apply and re-increment on every fire.
+        const recordedAt = row.state === "recurred" && row.last_recurrence_at
+          ? new Date(row.last_recurrence_at)
+          : null;
+        if (recordedAt && !Number.isNaN(recordedAt.getTime()) && lastSeen.getTime() <= recordedAt.getTime()) {
+          recurrenceAlreadyRecorded.push(hash);
+          stillWatching.push({
+            sigHash: hash,
+            backlogId: row.backlog_id ?? null,
+            reason: `recurrence already recorded at ${recordedAt.toISOString()}`,
+          });
+          continue;
+        }
         recurred.push({
           sigHash: hash,
           backlogId: row.backlog_id ?? null,
           previousState: row.state,
           recurrenceCount: (Number.isFinite(row.recurrence_count) ? row.recurrence_count : 0) + 1,
-          lastRecurrenceAt: (hit.lastSeen instanceof Date ? hit.lastSeen : now).toISOString(),
+          lastRecurrenceAt: lastSeen.toISOString(),
           occurrences: hit.count ?? 0,
           confirmationWindowDays: windowDays,
         });
@@ -827,7 +887,22 @@ export function assessConfirmations(stateRows, seenSignatures, opts = {}) {
     }
   }
 
-  return { confirmed, recurred, stillWatching, suppressed: new Set(recurred.map((r) => r.sigHash)) };
+  return {
+    confirmed,
+    recurred,
+    stillWatching,
+    // FEATURE: SES-308 -- the union, not just this run's new verdicts. See recurrenceAlreadyRecorded.
+    suppressed: new Set([...recurred.map((r) => r.sigHash), ...recurrenceAlreadyRecorded]),
+  };
+}
+
+// FEATURE: SES-308. How many verdicts THIS RUN computed that are not yet on the table. Pure, so the
+// regression test grades the contract with no network. It is the whole of the exit-1 decision in
+// main()'s nothing-new-to-file branch: a confirmed fix is, by definition, a run with nothing new to
+// file, so before this the dry run exited 0 and the runbook's "only re-run with --apply on exit 1"
+// meant the verdict was computed and discarded on every unattended cycle.
+export function pendingVerdictCount(confirmation) {
+  return (confirmation?.confirmed?.length ?? 0) + (confirmation?.recurred?.length ?? 0);
 }
 
 // The rows this run would write to runner_heal_signatures. Pure, so the test can assert the shape
@@ -1181,13 +1256,11 @@ async function main() {
   if (APPLY && !cycleId) {
     fail(2, "--apply requires --cycle-id=<uuid>: every write needs a before-image bound to a real open cycle.");
   }
-  if (APPLY && !argValue("backlog-ids", null)) {
-    fail(
-      2,
-      "--apply requires --backlog-ids=<comma-separated ids>: the cycle claims the id block atomically " +
-        "through the Supabase connector (session-setup SKILL.md §3b) and passes it in.",
-    );
-  }
+  // FEATURE: SES-308 -- this used to be a hard gate here, and it made this ship's own remedy
+  // unrunnable: an --apply run whose only work is persisting fix-confirmation verdicts has nothing
+  // to file and therefore no ids to pass, yet it failed 2 before ever reaching the nothing-to-file
+  // branch. The requirement is unchanged where it actually applies -- parseBacklogIds() below,
+  // reached only once there ARE detections to file -- so filing without ids still exits 2.
 
   const windowDays = Number.parseInt(argValue("window-days", String(DEFAULT_WINDOW_DAYS)), 10);
   const threshold = Number.parseInt(argValue("threshold", String(DEFAULT_THRESHOLD)), 10);
@@ -1311,6 +1384,11 @@ async function main() {
     `${confirmation.confirmed.length} confirmed-fixed, ${confirmation.recurred.length} recurrence(s), ` +
     `${confirmation.stillWatching.length} still watching (window ${confirmationWindowDays}d).`;
 
+  // FEATURE: SES-308. Verdicts this run computed that are NOT YET on the table. Under --apply they
+  // are persisted below, so the number a completed apply reports is 0 by construction -- which is
+  // what makes `exitCode === 1 iff there is unfinished work` a contract a cycle can grade.
+  const computedVerdicts = pendingVerdictCount(confirmation);
+
   if (detections.length === 0) {
     // SES-277: nothing new to FILE is not nothing to WRITE. Under --apply the occurrence state and
     // this run's verdicts still land -- a confirmed fix is exactly a run with nothing new to file.
@@ -1320,15 +1398,37 @@ async function main() {
         groups, stateResult, confirmation, windowEnd, confirmationWindowDays, filedByHash: new Map(),
       });
     }
+    const quietProse =
+      `Heal engine v2 (${APPLY ? "apply" : "dry run"}): rows→records ${streamLine}; ` +
+      `${firstPass.recordsInWindow.length} record(s) in the last ${windowDays}d — ${classLine}; ` +
+      `${signaturesSeen} signature(s), ${withheld.length} withheld (not product / recurrence), ` +
+      `${alreadyFiled.length} already filed. Nothing new to file.` +
+      (APPLY ? ` ${written.stateRows} state row(s) and ${written.verdictRows} verdict(s) written.` : "") +
+      `\n${confirmLine}`;
+
+    // FEATURE: SES-308 -- the whole ticket. A dry run holding an unpersisted verdict is unfinished
+    // work, so it signals exit 1 exactly as a detection does, and step 8b's "re-run with --apply on
+    // exit 1" finally reaches the loop's last third. It still writes NOTHING: exit 1 is a signal,
+    // never a side effect.
+    if (!APPLY && pendingVerdictCount(confirmation) > 0) {
+      finish(
+        1,
+        { ...summary, filed: [], stateRowsWritten: 0, pendingVerdicts: computedVerdicts },
+        `${quietProse}\n${computedVerdicts} fix-confirmation verdict(s) computed and NOT YET ` +
+          `PERSISTED. Re-run with --apply --cycle-id=<uuid> — no --backlog-ids needed, nothing new ` +
+          `to file. NOTHING WAS WRITTEN by this run — not backlog_items, not runner_before_images, ` +
+          `not ${HEAL_STATE_TABLE}.`,
+      );
+    }
     finish(
       0,
-      { ...summary, filed: [], stateRowsWritten: written.stateRows + written.verdictRows },
-      `Heal engine v2 (${APPLY ? "apply" : "dry run"}): rows→records ${streamLine}; ` +
-        `${firstPass.recordsInWindow.length} record(s) in the last ${windowDays}d — ${classLine}; ` +
-        `${signaturesSeen} signature(s), ${withheld.length} withheld (not product / recurrence), ` +
-        `${alreadyFiled.length} already filed. Nothing new to file.` +
-        (APPLY ? ` ${written.stateRows} state row(s) and ${written.verdictRows} verdict(s) written.` : "") +
-        `\n${confirmLine}`,
+      {
+        ...summary,
+        filed: [],
+        stateRowsWritten: written.stateRows + written.verdictRows,
+        pendingVerdicts: APPLY ? 0 : computedVerdicts,
+      },
+      quietProse,
     );
   }
 
@@ -1338,13 +1438,17 @@ async function main() {
     );
     finish(
       1,
-      { ...summary, filed: [], stateRowsWritten: 0 },
+      // FEATURE: SES-308 -- `pendingVerdicts` rides EVERY exit path, not only the quiet branch, so a
+      // cycle never has to read its absence as a zero.
+      { ...summary, filed: [], stateRowsWritten: 0, pendingVerdicts: computedVerdicts },
       `Heal engine v2 (dry run): rows→records ${streamLine}; ` +
         `${firstPass.recordsInWindow.length} record(s) in the last ${windowDays}d — ${classLine}; ` +
         `${withheld.length} signature(s) withheld as not-product or recurrence.\n` +
         `${detections.length} product signature(s) over threshold and not yet filed:\n` +
         `${lines.join("\n")}\n${confirmLine}\n` +
-        `Re-run with --apply --cycle-id=<uuid> to file them (max ${maxFilings} per run). ` +
+        `${computedVerdicts} fix-confirmation verdict(s) also pending (SES-308).\n` +
+        `Re-run with --apply --cycle-id=<uuid> --backlog-ids=… to file them (max ${maxFilings} per ` +
+        `run) — ids are required here BECAUSE there are signatures to file. ` +
         `NOTHING WAS WRITTEN by this run — not backlog_items, not runner_before_images, not ${HEAL_STATE_TABLE}.`,
     );
   }
@@ -1391,7 +1495,8 @@ async function main() {
   const skipped = detections.length - toFile.length;
   finish(
     0,
-    { ...summary, filed, stateRowsWritten: written.stateRows + written.verdictRows },
+    // FEATURE: SES-308 -- 0 because persistSignatureState() above just landed them.
+    { ...summary, filed, stateRowsWritten: written.stateRows + written.verdictRows, pendingVerdicts: 0 },
     `Heal engine v2: filed ${filed.length} ticket(s) — ${filed.map((f) => f.backlogId).join(", ")}.` +
       (skipped > 0 ? ` ${skipped} more over threshold, deferred to the next run by --max-filings.` : "") +
       `\n${confirmLine}`,
