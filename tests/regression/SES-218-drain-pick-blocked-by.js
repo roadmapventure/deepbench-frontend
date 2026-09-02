@@ -99,7 +99,7 @@ export const CLAUSES = [
       /on the runner's own say-so/i.test(s) &&
       /SES-142/.test(s) &&
       /never `?retired`?/i.test(s),
-    breaks: s => s.replace(/PICK predicate ONLY/i, "PICK and RETIREMENT predicates"),
+    breaks: s => s.replace(/PICK predicate ONLY/gi, "PICK and RETIREMENT predicates"), // SES-247 added a second occurrence; a first-occurrence mutation left the clause standing and turned CI red (v7.0.380-385)
   },
   {
     id: "partial-is-not-uniformly-do-not-repick",
