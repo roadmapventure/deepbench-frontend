@@ -255,7 +255,7 @@ against the board, two promises had no member at all:
 **M6 is complete when those close.** Stored form: the six rows carry `milestone_required = true`
 and `milestone = 'M6'`, so *"what is left for M6"* is `select … from public.ticket_matrix where
 milestone = 'M6' and milestone_required and status <> 'done'` (`M5-04`). **Non-required members**
-(in the epic, pickable, not owed): `SES-301` (B34's rendered block, 1) and `SES-313` (model-per-lane
+(in the epic, pickable, not owed): `SES-301` (B34 — superseded 2026-09-01 by `M6-07`, `SES-285` — still carries a rendered block in the runbook, 1) and `SES-313` (model-per-lane
 to data, 1, charter decision 5's *"ported to data at M6"*). Eight tickets carried the M6 epic as
 `done` before this gate sat: `SES-134`, `SES-247`, `SES-285`, `SES-296`, `SES-297`, `SES-298`,
 `SES-300`, `SES-302`.
