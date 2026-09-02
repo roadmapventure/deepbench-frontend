@@ -1,5 +1,6 @@
-// DeepBench v7.0.368 | tests/regression/SES-201-rule-block-batch1.js | SES-201 (batch 1),
-// negative control narrowed to LIVE rules by SES-300 (v7.0.368)
+// DeepBench v7.0.392 | tests/regression/SES-201-rule-block-batch1.js | SES-201 (batch 1),
+// negative control narrowed to LIVE rules by SES-300 (v7.0.368); the PRESENCE assertion narrowed
+// the same way, and both directions generalised over the batch, by SES-301 (v7.0.392)
 //
 // Guards the FOUR sites batch 1 migrated in docs/runbooks/runner-cycle.md -- B12 (step 4b),
 // B18 (twice, in step 9) and B34 (step 2) -- from a hand-copied rule statement to a rendered
@@ -32,6 +33,18 @@
 // the failing one" move: a live rule may never be excluded, and an empty control is a failure, not
 // a pass. B12's half-2 pair below is UNCHANGED and still load-bearing — the hand-copied sentence
 // stayed retired and John's reasoning at that site stayed byte-for-byte.
+//
+// SES-301 (v7.0.392) — B34'S SITE IS GONE TOO, AND THE PRESENCE ASSERTION IS NOW READ OUT OF THE
+// REGISTRY AS WELL. M6-07 superseded B34 (SES-285, v7.0.359) and SES-300's finding applies to it
+// unchanged: a rendered block restates its rule in LIVE VOICE, so a withdrawn rule that keeps one
+// is the two-homes defect one layer down. SES-300 derived the NEGATIVE control from the status
+// column but left everyBatch1RuleHasAMarkerInTheRunbook() and everyRenderedBlockEqualsItsRegistryRow()
+// asserting B34's marker and block were PRESENT -- so a correct runbook would have turned CI red.
+// Both now walk loadBearing() rather than BATCH_1, and the withdrawn members are asserted in the
+// OTHER direction (neither marker nor rendered line, generalised over
+// BATCH_1.filter(status !== "live")) so the next supersession needs no edit here and a re-render
+// cannot quietly restore a withdrawn pair. B12's explicit both-directions pair stays: B12 is not in
+// BATCH_1, so the generalised loop does not reach it, and dropping it would retire a live guard.
 
 import assert from "assert";
 import fs from "fs";
@@ -126,18 +139,38 @@ function theLoadBearingControlIsLiveOnlyAndNotEmpty() {
 
 function everyBatch1RuleHasAMarkerInTheRunbook() {
   const text = read(RUNBOOK_REL);
-  for (const id of BATCH_1) {
+  const byId = rulesById();
+
+  // SES-301: membership is the registry's status column, exactly as loadBearing() already read it
+  // for the negative control. A LIVE batch-1 rule must still carry its marker -- that is the
+  // migration this ticket's parent landed and the thing a later trim would take.
+  for (const id of loadBearing()) {
     assert.ok(text.includes(`{{rule:${id}}}`), `${id}'s marker was deleted from ${RUNBOOK_REL}`);
   }
   // B40 predates this ticket (SES-175). It is asserted here so a later trim of this file's
   // markers cannot quietly take the original two with it.
   assert.ok(text.includes("{{rule:B40}}"), "SES-175's B40 marker must survive batch 1");
 
-  // SES-300, the other direction: B12's site is GONE and must stay gone. A withdrawn rule with a
-  // rendered block is a doc stating a superseded rule in live voice, which is the defect SES-289
-  // annotated one layer up. Asserted on both halves -- the marker and the rendered line -- because
-  // a re-render would restore the pair together.
-  const byId = rulesById();
+  // SES-301, the other direction, generalised: a batch-1 rule the registry no longer calls `live`
+  // must carry NEITHER its marker NOR a rendered block. Both halves, because a re-render restores
+  // the pair together; and the bare `> **Rule <id>** —` prefix as well as the exact registry line,
+  // so a hand-edited block that has drifted from the statement cannot slip back through the
+  // equality test's blind spot. Derived rather than listed: the next supersession needs no edit.
+  for (const id of BATCH_1.filter(x => byId.get(x)?.status !== "live")) {
+    const rule = byId.get(id);
+    assert.ok(rule, `${id} is not in ${SNAPSHOT_REL} -- re-export the snapshot`);
+    assert.ok(!text.includes(`{{rule:${id}}}`),
+      `${id}'s marker is back in ${RUNBOOK_REL}. ${id} is \`${rule.status}\` ` +
+      `(superseded by ${rule.superseded_by}) -- a withdrawn rule keeps no rendered block.`);
+    assert.ok(!text.includes(renderedLine(rule)),
+      `${id}'s rendered block is back in ${RUNBOOK_REL}, restating a withdrawn rule in live voice.`);
+    assert.ok(!new RegExp(`^> \\*\\*Rule ${id}\\*\\* —`, "m").test(text),
+      `a \`> **Rule ${id}** —\` line is back in ${RUNBOOK_REL}. ${id} is \`${rule.status}\`; a ` +
+      `hand-edited block that no longer matches the registry row is still a withdrawn rule in live voice.`);
+  }
+
+  // SES-300, kept explicitly: B12's site is GONE and must stay gone. B12 is not in BATCH_1 -- the
+  // loop above cannot reach it -- so removing these two would retire a live guard, not deduplicate it.
   assert.ok(!text.includes("{{rule:B12}}"),
     `B12's marker is back in ${RUNBOOK_REL}. B12 is \`${byId.get("B12")?.status}\` ` +
     `(superseded by ${byId.get("B12")?.superseded_by}) -- a withdrawn rule keeps no rendered block.`);
@@ -151,7 +184,11 @@ function everyRenderedBlockEqualsItsRegistryRow() {
   // same-named reader returns a Map -- the two are deliberate copies, SES-175). Index it here
   // rather than assuming either shape.
   const byId = new Map(rules().map(r => [r.id, r]));
-  for (const id of [...BATCH_1, "B40"]) {
+  // SES-301: live batch-1 rules only. A withdrawn rule has no rendered block to compare against --
+  // asserting equality for one is asserting the defect this ticket removed. The withdrawn members
+  // are covered in the other direction by everyBatch1RuleHasAMarkerInTheRunbook() above, and
+  // theLoadBearingControlIsLiveOnlyAndNotEmpty() is what stops this list going quietly empty.
+  for (const id of [...loadBearing(), "B40"]) {
     const rule = byId.get(id);
     assert.ok(rule, `${id} is not in ${SNAPSHOT_REL} -- re-export the snapshot`);
     assert.ok(text.includes(renderedLine(rule)),
