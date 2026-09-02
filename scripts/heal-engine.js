@@ -30,6 +30,16 @@
 // WHAT DOES NOT CHANGE: detection never auto-fixes, the before-image precedes every insert, ids are
 // never minted here, and a run without `--apply` writes NOTHING -- including to the new table.
 //
+// 4. [SES-277, 2026-09-02 -- FOUND BY THE SEEDED-FAILURE DRILL, the first time the loop was walked
+//    end to end.] A run WITH `--apply` that has NOTHING NEW TO FILE still persists occurrence state
+//    and the confirmation verdicts. Before this, `main()` finished early on "nothing new to file"
+//    BEFORE the state upsert and the verdict PATCHes -- and a signature whose failure has STOPPED
+//    is, by definition, a run with nothing new to file. So `confirmed_fixed` was reported in the
+//    JSON and never written to the table: the drill's step 5 read `state = watching` after an
+//    apply that had just printed "1 confirmed-fixed". `persistSignatureState()` is now the single
+//    write path both branches use, and `verdictPatches()` is pure so the regression test can grade
+//    the verdict shape without the network.
+//
 // -- THE ONE PLACE THIS SHIP DEPARTS FROM ITS OWN KICKOFF, said out loud rather than buried -------
 // The kickoff's Task 2 offers the rule "a CI failure that reproduces on a commit the runner did not
 // push is `product`". Implemented literally it would have filed noise: 29 of the 32 live CI
@@ -868,6 +878,48 @@ export function buildSignatureStateRows(groups, opts = {}) {
   });
 }
 
+// SES-277. The verdict PATCH payloads for one run, pure: [sigHash, fields] per confirmed-fixed and
+// per recurrence. A patch, never an upsert -- see buildSignatureStateRows()'s header for why.
+export function verdictPatches(confirmation, windowEnd) {
+  const at = (windowEnd instanceof Date ? windowEnd : new Date()).toISOString();
+  return [
+    ...(confirmation?.confirmed ?? []).map((c) => [c.sigHash, {
+      state: "confirmed_fixed",
+      confirmed_fixed_at: c.confirmedAt,
+      confirmation_window_days: c.confirmationWindowDays,
+      updated_at: at,
+    }]),
+    ...(confirmation?.recurred ?? []).map((r) => [r.sigHash, {
+      state: "recurred",
+      recurrence_count: r.recurrenceCount,
+      last_recurrence_at: r.lastRecurrenceAt,
+      confirmation_window_days: r.confirmationWindowDays,
+      updated_at: at,
+    }]),
+  ];
+}
+
+// SES-277. THE ONE WRITE PATH for signature state under --apply, used by BOTH the filing branch and
+// the nothing-new-to-file branch. Occurrence rows first (carrying prior state forward), verdicts
+// LAST so the upsert cannot overwrite a verdict decided in this same run. Returns the counts the
+// report prints; fails loudly on any write error.
+async function persistSignatureState(base, key, { groups, stateResult, confirmation, windowEnd, confirmationWindowDays, filedByHash }) {
+  const stateRows = buildSignatureStateRows(groups, {
+    now: windowEnd,
+    confirmationWindowDays,
+    filedByHash: filedByHash ?? new Map(),
+    existingByHash: new Map(stateResult.states.map((s) => [s.sig_hash, s])),
+  });
+  const stateWrite = await upsertSignatureStates(base, key, stateRows);
+  if (stateWrite.error) fail(2, stateWrite.error);
+  const verdicts = verdictPatches(confirmation, windowEnd);
+  for (const [sigHash, fields] of verdicts) {
+    const patched = await patchSignatureState(base, key, sigHash, fields);
+    if (patched.error) fail(2, patched.error);
+  }
+  return { stateRows: stateRows.length, verdictRows: verdicts.length };
+}
+
 // ---------------------------------------------------------------------------
 // Supabase REST
 // ---------------------------------------------------------------------------
@@ -1260,13 +1312,23 @@ async function main() {
     `${confirmation.stillWatching.length} still watching (window ${confirmationWindowDays}d).`;
 
   if (detections.length === 0) {
+    // SES-277: nothing new to FILE is not nothing to WRITE. Under --apply the occurrence state and
+    // this run's verdicts still land -- a confirmed fix is exactly a run with nothing new to file.
+    let written = { stateRows: 0, verdictRows: 0 };
+    if (APPLY) {
+      written = await persistSignatureState(base, supabaseKey, {
+        groups, stateResult, confirmation, windowEnd, confirmationWindowDays, filedByHash: new Map(),
+      });
+    }
     finish(
       0,
-      { ...summary, filed: [], stateRowsWritten: 0 },
+      { ...summary, filed: [], stateRowsWritten: written.stateRows + written.verdictRows },
       `Heal engine v2 (${APPLY ? "apply" : "dry run"}): rows→records ${streamLine}; ` +
         `${firstPass.recordsInWindow.length} record(s) in the last ${windowDays}d — ${classLine}; ` +
         `${signaturesSeen} signature(s), ${withheld.length} withheld (not product / recurrence), ` +
-        `${alreadyFiled.length} already filed. Nothing new to file.\n${confirmLine}`,
+        `${alreadyFiled.length} already filed. Nothing new to file.` +
+        (APPLY ? ` ${written.stateRows} state row(s) and ${written.verdictRows} verdict(s) written.` : "") +
+        `\n${confirmLine}`,
     );
   }
 
@@ -1321,43 +1383,15 @@ async function main() {
   // Signature state is persisted for EVERY signature seen, not only the filed ones: a process or
   // unclassified signature still needs its occurrence history for SES-303 to read, and a signature
   // that never filed is exactly the one whose "no ticket, nothing to confirm" verdict must be
-  // visible rather than inferred from absence.
-  const stateRows = buildSignatureStateRows(groups, {
-    now: windowEnd,
-    confirmationWindowDays,
-    filedByHash,
-    existingByHash: new Map(stateResult.states.map((s) => [s.sig_hash, s])),
+  // visible rather than inferred from absence. Same write path as the nothing-to-file branch (SES-277).
+  const written = await persistSignatureState(base, supabaseKey, {
+    groups, stateResult, confirmation, windowEnd, confirmationWindowDays, filedByHash,
   });
-  const stateWrite = await upsertSignatureStates(base, supabaseKey, stateRows);
-  if (stateWrite.error) fail(2, stateWrite.error);
-
-  // Verdicts from the confirmation pass are written LAST, so the occurrence upsert above (which
-  // carries the prior state forward) cannot overwrite a verdict decided in this same run.
-  const verdicts = [
-    ...confirmation.confirmed.map((c) => [c.sigHash, {
-      state: "confirmed_fixed",
-      confirmed_fixed_at: c.confirmedAt,
-      confirmation_window_days: c.confirmationWindowDays,
-      updated_at: windowEnd.toISOString(),
-    }]),
-    ...confirmation.recurred.map((r) => [r.sigHash, {
-      state: "recurred",
-      recurrence_count: r.recurrenceCount,
-      last_recurrence_at: r.lastRecurrenceAt,
-      confirmation_window_days: r.confirmationWindowDays,
-      updated_at: windowEnd.toISOString(),
-    }]),
-  ];
-  for (const [sigHash, fields] of verdicts) {
-    const patched = await patchSignatureState(base, supabaseKey, sigHash, fields);
-    if (patched.error) fail(2, patched.error);
-  }
-  const verdictRows = verdicts;
 
   const skipped = detections.length - toFile.length;
   finish(
     0,
-    { ...summary, filed, stateRowsWritten: stateRows.length + verdictRows.length },
+    { ...summary, filed, stateRowsWritten: written.stateRows + written.verdictRows },
     `Heal engine v2: filed ${filed.length} ticket(s) — ${filed.map((f) => f.backlogId).join(", ")}.` +
       (skipped > 0 ? ` ${skipped} more over threshold, deferred to the next run by --max-filings.` : "") +
       `\n${confirmLine}`,

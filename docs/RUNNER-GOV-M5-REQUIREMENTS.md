@@ -383,7 +383,7 @@ section. It is reversible for 72 hours under `M6-02`.
 | Pillar | Carried by | State at the gate |
 |---|---|---|
 | **1. Outcome telemetry** — did shipped work change the metric it claimed? | `SES-303` | **Had no ticket until 2026-09-02.** A board-wide search found nothing covering it, so M5 could not have completed as chartered no matter how the existing list was worked. Filed at this gate, `scope_origin = original`. **Shipped 2026-09-02 (v7.0.382), Shape B by John's call** — the platform scoreboard and `public.ticket_outcome`; see the note under `M5-12`. |
-| **2. Heal-engine v2** — fix-confirmation and recurrence re-filing | `SES-276`, proven by `SES-277` | Both filed at the M4 gate review, both blocked on this gate |
+| **2. Heal-engine v2** — fix-confirmation and recurrence re-filing | `SES-276`, proven by `SES-277` | Both filed at the M4 gate review, both blocked on this gate. **Proven 2026-09-02 (`SES-277`, v7.0.384):** the seeded-failure drill walked detect → file → dedup → confirm → recur on live Supabase, **and it failed once** — v2 printed `confirmed_fixed` and never wrote it, because its nothing-new-to-file exit skipped the verdict write; fixed in the same commit. Record: `docs/harvests/SES-277-drill-2026-09-02.md`. |
 | **3. Usage/budget instrumentation** | `SES-82`, `SES-161` (`SES-104` done) | Named in `SES-184`'s own text as absorbed |
 
 **Plus one enabler, ruled into the required set:** `SES-282` — `runner_cycles.item_id` has no
@@ -401,6 +401,12 @@ incident `SES-269` was filed from.
 `SES-184` (this gate) · `SES-82` · `SES-161` · `SES-282` · `SES-303` · `SES-276` · `SES-277` · `SES-269`
 
 **M5 is complete when those close.** Completion is a property of that set, not of the epic label.
+
+**Status 2026-09-02, after v7.0.384 — 6 of the 7 required tickets are `done`:** `SES-184`, `SES-161`,
+`SES-282`, `SES-303`, `SES-276`, `SES-277`. **`SES-269` is `partial`** and is the last one: its shipped
+half measures runner silence; its declared remainder edits John's own routine (an unattended cycle
+may not) and the briefing line barred by `27b5d8cb`. M5 closes when that remainder lands or is
+re-ruled — a decision recorded here, never a card.
 
 **Stored 2026-09-02 (`SES-304`, v7.0.374).** The set above is no longer only prose: those eight rows carry `backlog_items.milestone_required = true` and `milestone = 'M5'`, so *"what is left for M5"* is `select … from public.ticket_matrix where milestone = 'M5' and milestone_required and status <> 'done'` — the same answer on every asking (`M5-04`). Amending the set means amending the flag, with a before-image, in the same change as the amendment note here.
 
