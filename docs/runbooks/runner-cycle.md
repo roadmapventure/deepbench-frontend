@@ -2698,7 +2698,8 @@ platform's own failure ledger and let anything recurring become a normal queued 
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/heal-engine.js --json
 ```
 
-Exit **1** means it found recurring failure signatures that are over threshold and not yet filed.
+Exit **1** means it found recurring failure signatures that are over threshold, **classified
+`product`** (`SES-276`), and not yet filed.
 Only then, claim an id block of that size in **one** `feature_id_counter` call (SQL:
 `docs/runbooks/session-setup.md` §3b) and re-run with
 `--apply --cycle-id=<your cycle id> --backlog-ids=LOO-<n>,…`. Exit **0** is "nothing new" — the
@@ -2706,13 +2707,51 @@ normal, quiet case. Exit **2** is "could not run" (missing env, REST failure, `-
 cycle id or ids): note it in the cycle row and never treat it as a pass. List any filed `LOO-` ids
 in the cycle row's notes and on the briefing.
 
+**Since `SES-276` (`v7.0.372`) this is heal v2, and three things about the step changed.**
+
+- **It reads THREE streams, not one.** `durable_hops`, `ci_run_conclusions` and `runner_cycles`,
+  all normalised behind one failure record. The M4 gate review found v1's single input had gone
+  dead; re-measured 2026-09-02, `durable_hops`'s newest row of any status was **2026-08-23** while
+  `ci_run_conclusions` was live through that morning with 32 of 57 rows carrying a failed job.
+  **`durable_hops` is kept** — dead today, not retired — and the run reports its zero rows as a
+  measured zero (`durable_hops 0→0`), never as absence.
+- **Every record is classified `product` / `process` / `unclassified`, and only `product` may
+  file.** `process` is the runner's own noise (a known race, listed with its evidence in
+  `KNOWN_RUNNER_RACES`); `unclassified` is a record the row cannot decide. **Neither ever files.**
+  A signature whose members disagree collapses to `unclassified` — mixed evidence is not evidence.
+- **Fix-confirmation exists.** `public.runner_heal_signatures` (migration
+  `ses276_runner_heal_signatures`, down registered `auto-downable`) holds one row per signature. A
+  filed signature that goes quiet for `confirmation_window_days` (default 7, the named constant
+  `DEFAULT_CONFIRMATION_WINDOW_DAYS`, **persisted per row so a verdict carries the window that
+  produced it**) is recorded `confirmed_fixed`; a reappearance is recorded as a **recurrence against
+  the original**, never filed as a duplicate. That table is `SES-303`'s read seam for outcome
+  telemetry — join `backlog_id` to `state` / `confirmed_fixed_at` / `recurrence_count`, no parsing.
+
+**Read-only means read-only.** A run without `--apply` writes nothing to any of the three tables it
+can write (`backlog_items`, `runner_before_images`, `runner_heal_signatures`). Proven at the
+`SES-276` ship: two full dry runs against live data left `runner_before_images` at 3,790,
+`backlog_items` at 785 and `runner_heal_signatures` at 0.
+
+**What that first live run reported, recorded because a zero is a result:** 38 records in the
+14-day window — `durable_hops 0→0`, `ci_run_conclusions 58→32`, `runner_cycles 6→6` — classified
+**0 product / 9 process / 29 unclassified**, 6 signatures, **0 tickets it would file**. The 9
+`process` are the three CI runs where the runner was grading its own in-flight close (`SES-261`)
+and all six failed cycles (stall-watchdog closes, closed-by-successor, one lease race). The 29
+`unclassified` are reds on the blocking `Tripwire + regression` job: that one job runs BOTH the
+governance-doc tripwire (process) and the regression suite (product), and `ci_run_conclusions.jobs`
+records **job-level conclusions only**, so the row cannot say which half failed. **Do not "fix"
+that by promoting not-runner-pushed reds to `product`** — 29 of the 32 live CI failures are exactly
+those, and they are the doc-drift and race noise the PM lens warned about. What promotes a CI red
+to `product` is a failing job that cannot be produced by runner state, i.e. `Build (blocking)`.
+
 Four things this step deliberately does:
 
 - **It reads `durable_hops`, not `ai_activity_log`.** The `SES-89` ticket said the latter; verified
   live 2026-08-20, `ai_activity_log` has 34,449 rows and **no status or error column at all**, so
   there is no error rate in it to read. `durable_hops` is the real ledger: 260 `failed` rows, all
   260 carrying classifiable error text. Regression trends and Vercel logs were dropped for the same
-  reason — nothing persists them to query.
+  reason — nothing persists them to query. (`SES-276` widened the inputs beside it; it did not
+  reopen this.)
 - **It never mints its own ticket id.** The atomic block claim is an `UPDATE … RETURNING` with
   arithmetic, which PostgREST cannot express and this project has no RPC for. The cycle claims the
   block through the connector and passes it in — that is what keeps CLAUDE.md's atomic-counter rule
