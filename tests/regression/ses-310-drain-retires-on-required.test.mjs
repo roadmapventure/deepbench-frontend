@@ -188,9 +188,23 @@ async function run(ctx = {}) {
     "runner_directives?select=id,epic_id,created_at&type=eq.drain-epic&status=eq.queued&order=created_at&limit=1");
   const brief = read(BRIEF_REL);
 
+  // Design-session follow-up (2026-09-02, design-m6-build-0902): the block is re-rendered at every
+  // SHIP, while a drain can be declared or retired between two ships -- the M7 drain 34600430 was
+  // declared by the M6 gate review minutes after SES-313's push, and the verifier's snapshot read a
+  // brief that still said "No drain standing". A brief that predates the live drain state proves
+  // nothing about SES-310's wording either way, so that case is DECLARED not-run rather than failed;
+  // the arm grades only a brief that describes the drain state the tables hold right now.
+  const stale = reason => {
+    notRun("the live generated-block arm",
+      `docs/runbooks/standing-brief.md predates the live drain state (${reason}): the block is ` +
+      "refreshed at the next ship (runner-cycle.md step 7 / session-setup.md step 4)");
+    return results;
+  };
+
   if (!Array.isArray(dirs) || !dirs[0]) {
     // No standing drain is a legitimate board state -- and then the block must SAY so rather than
-    // carry a stale census. Asserted, not skipped.
+    // carry a stale census. A brief still carrying a census here is stale, not wrong.
+    if (!/No drain standing/.test(brief)) return stale("a drain retired since the last render");
     assert.ok(/No drain standing/.test(brief),
       "no queued drain-epic directive exists, but the generated block still reports a drain census " +
       "-- docs/runbooks/standing-brief.md is stale; re-run scripts/render-standing-brief.js");
@@ -199,6 +213,11 @@ async function run(ctx = {}) {
   }
 
   const d = dirs[0];
+  const epicRows = await pg(url, key, `epics?select=name&id=eq.${d.epic_id}`);
+  const epicName = Array.isArray(epicRows) && epicRows[0] ? epicRows[0].name : null;
+  if (epicName && !brief.includes(`**${epicName}**`)) {
+    return stale(`drain ${d.id.slice(0, 8)} on ${epicName} was declared since the last render`);
+  }
   const scope = await pg(url, key, `runner_drain_scope?select=item_id&directive_id=eq.${d.id}&limit=1000`);
   const items = await pg(url, key,
     "backlog_items?select=id,backlog_id,status,milestone_required&limit=5000");
