@@ -1,6 +1,16 @@
 #!/usr/bin/env node
-// DeepBench v7.0.236 | scripts/render-standing-brief.js | SES-177 (b) — the standing brief's
-// DERIVABLE facts become a generated block; its judgment prose is never touched.
+// DeepBench v7.0.393 | scripts/render-standing-brief.js | SES-310 — the drain census says which
+// members are the FINISH LINE (milestone_required), not just how many are named; SES-177 (b) — the
+// standing brief's DERIVABLE facts become a generated block; its judgment prose is never touched.
+//
+// SES-310 (v7.0.393). The drain bullet used to report "N of M named members still open", which is the
+// number drain_epic_next() stopped retiring on: since this ship the finish line is the members the
+// GATE ruled required (backlog_items.milestone_required, SES-304 / M5-04) whenever the list carries
+// such a ruling. Measured live 2026-09-02: the M5 drain 238aa9ca had 9 required members, 0 of them
+// open, and 3 open non-required ones — so "3 of 18 named still open" read as unfinished work when the
+// milestone was in fact complete. The bullet now leads with requiredOpen-of-required and reports the
+// rest as explicitly NOT the finish line; with no gate ruling (required === 0) the old wording is
+// unchanged, the same fail-closed direction the function takes.
 //
 // WHY THIS IS ADDITIVE AND NOT AN EXTRACTION, which is the whole design and the thing an editor will
 // undo by habit. SES-177 part (a) (v7.0.228) split CLAUDE-STATE.md and moved the standing judgment
@@ -219,13 +229,36 @@ export function renderBlock(facts, nowIso) {
   L.push("");
 
   L.push("**Standing epic drain** — *" + stamp + ".* Created only by John; the runner may read one," +
-    " never write one (`drain_epic_next()` property 5). The finish line is the members he **named**" +
-    " (`runner_drain_scope`), never the live `now` tier (`SES-142`).");
+    " never write one (`drain_epic_next()` property 5). The finish line is drawn from the members he" +
+    " **named** (`runner_drain_scope`), never the live `now` tier (`SES-142`) — and within that list" +
+    " it is the members a milestone **gate ruled required** (`milestone_required`, `SES-310`)" +
+    " whenever the list carries such a ruling, every named member otherwise.");
   L.push("");
   if (!drain || !drain.directive_id) {
     L.push("- **No drain standing.** Selection is the class-sorted board exactly as it is with no " +
       "drain declared.");
+  } else if (drain.required > 0) {
+    // SES-310: this list HAS a gate ruling, so the finish line is the required set and the bullet
+    // says so. The non-required and deferred members are named too, and named as NOT the finish
+    // line — they stay on the board and stay pickable under Prime Directive §2(c) once the drain
+    // retires; omitting them would read as if they had disappeared.
+    const fmt = t => `\`${t}\``;
+    L.push(`- **${drain.epic_name || "(unnamed epic)"}** — **${drain.requiredOpen} of ` +
+      `${drain.required} required members still open** (${drain.named} named). It retires when every ` +
+      "required member is `done`/`removed` (`SES-310`); `delivered` is deliberately absent from that " +
+      "side, because a drain retires on the gate's ruling and never on the runner's own say-so.");
+    if (drain.requiredOpenIds.length) {
+      L.push(`- Still open (required): ${drain.requiredOpenIds.map(fmt).join(", ")}.`);
+    }
+    if (drain.nonRequiredOpenIds.length) {
+      L.push(`- Open but not on the finish line: ${drain.nonRequiredOpenIds.map(fmt).join(", ")}.`);
+    }
+    if (drain.deferredIds.length) {
+      L.push(`- Deferred: ${drain.deferredIds.map(fmt).join(", ")}.`);
+    }
   } else {
+    // SES-310 fail-closed branch: no member of this list carries a gate ruling, so every named
+    // member IS the finish line and the wording is unchanged from before this ship.
     L.push(`- **${drain.epic_name || "(unnamed epic)"}** — **${drain.open} of ${drain.named} named ` +
       "members still open**. It retires when every named member is `done`/`removed`; `delivered` is " +
       "deliberately absent from that side, because a drain retires on John's acceptance and never on " +
@@ -274,7 +307,13 @@ async function rest(base, key, pathAndQuery) {
 }
 
 export async function fetchFacts(url, key) {
-  const items = await rest(url, key, "backlog_items?select=id,backlog_id,status,design_status,queue&limit=5000");
+  // SES-310: milestone_required and defer_status join the projection — the drain census below needs
+  // the gate's finish-line ruling and the SES-305 deferral state. `select=*` is deliberately still
+  // not used: the anon key's column-list grants make a star select a 403 waiting to happen
+  // (.claude/rules/supabase-column-grants.md), and naming columns keeps this readable under a
+  // service key too.
+  const items = await rest(url, key,
+    "backlog_items?select=id,backlog_id,status,design_status,queue,milestone_required,defer_status&limit=5000");
   if (!Array.isArray(items) || items.length === 0) die("backlog_items came back empty — refusing to render a board census from nothing");
 
   const settingsRows = await rest(url, key, "runner_settings?select=*&id=eq.1");
@@ -293,12 +332,30 @@ export async function fetchFacts(url, key) {
     // (CHI-48 occupies two rows, SES-97), so joining on it silently pulls in both.
     const openRows = scope.filter(s => { const r = byId.get(s.item_id); return r && !CLOSED.has(r.status); });
     const epics = await rest(url, key, `epics?select=id,name&id=eq.${d.epic_id}`);
+    // SES-310: the finish line. `required` counts the named members the GATE ruled required, over the
+    // whole named list (not just the open ones) — it is what decides whether this drain HAS a ruled
+    // finish line at all, which is the same test drain_epic_next()'s v_req_n makes. `=== true` and not
+    // a truthiness check: NULL and false both mean "not ruled required", and the fail-closed branch
+    // below depends on telling those apart from true.
+    const reqRows = scope.filter(s => { const r = byId.get(s.item_id); return r && r.milestone_required === true; });
+    const requiredOpenRows = reqRows.filter(s => !CLOSED.has(byId.get(s.item_id).status));
+    // Open but NOT on the finish line, and open-and-deferred. These are two INDEPENDENT censuses, not
+    // a partition: a non-required deferred member is reported in both, exactly as the function's
+    // blocked_detail buckets do it.
+    const nonReqOpenRows = openRows.filter(s => byId.get(s.item_id).milestone_required !== true);
+    const deferredRows = openRows.filter(s => ["yes", "stuck"].includes(byId.get(s.item_id).defer_status));
+    const ids = rows => rows.map(s => byId.get(s.item_id).backlog_id).filter(Boolean).sort();
     drain = {
       directive_id: d.id,
       epic_name: Array.isArray(epics) && epics[0] ? epics[0].name : null,
       named: scope.length,
       open: openRows.length,
-      openIds: openRows.map(s => byId.get(s.item_id).backlog_id).filter(Boolean).sort(),
+      openIds: ids(openRows),
+      required: reqRows.length,
+      requiredOpen: requiredOpenRows.length,
+      requiredOpenIds: ids(requiredOpenRows),
+      nonRequiredOpenIds: ids(nonReqOpenRows),
+      deferredIds: ids(deferredRows),
     };
   }
   return { items, settings, drain };
