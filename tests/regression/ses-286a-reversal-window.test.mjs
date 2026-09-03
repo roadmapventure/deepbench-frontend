@@ -192,9 +192,17 @@ function readM6() {
 // claim or a release, and the slice is bounded by the fence around it: a check that grepped the
 // whole file for `updated_at` would fail on correct content, which is a checker that has to be
 // disabled the first time it fires.
+// THREE FILES, NOT TWO, and the third is the one this ticket nearly shipped without. The claim
+// statement has three homes -- the cycle runbook, the session runbook, and GOVERNANCE-MODES.md's
+// shared-board rule, which CLAUDE.md's own hard-rule block points a session at for "the full rule
+// with what it does and does not protect". Found by grep AFTER the first two were fixed, still
+// carrying `updated_at = now()`: a cycle copying from that page would have reopened the defect on
+// its next claim. That is why this arm is keyed off a list rather than two hand-written checks --
+// the failure mode is an editor syncing the copies they remembered.
 const RUNBOOKS = {
   "runner-cycle": "docs/runbooks/runner-cycle.md",
   "session-setup": "docs/runbooks/session-setup.md",
+  "governance-modes": "docs/GOVERNANCE-MODES.md",
 };
 
 export const CLAIM_SITES = [
@@ -235,6 +243,17 @@ export const CLAIM_SITES = [
     detail:
       "session-setup.md 2c's release UPDATE must not write updated_at, same reason as the " +
       "cycle's",
+  },
+  {
+    id: "governance-modes-shared-board-claim",
+    file: "governance-modes",
+    anchor: "claimed_by = '<your cycle id or session name>'",
+    detail:
+      "GOVERNANCE-MODES.md's shared-board rule carries a THIRD copy of the claim statement, and " +
+      "CLAUDE.md's hard-rule block sends a session there for the full rule -- it was still " +
+      "bumping updated_at after both runbooks were fixed (found by grep at the SES-316 ship, not " +
+      "by the kickoff), so a cycle copying from that page would have reopened the defect on its " +
+      "next claim",
   },
 ];
 

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.403 | GOVERNANCE-MODES.md | SES-316 — THE SHARED-BOARD CLAIM STOPS BUMPING `updated_at`, and the thing to read twice is THAT THIS PAGE WAS THE THIRD COPY AND THE KICKOFF NAMED ONLY TWO. `SES-316` fixed the claim and release in `runbooks/runner-cycle.md` step 5 / step 7's tail and `runbooks/session-setup.md` 2c; a grep AFTER those two landed found this page's own copy still writing it, and `CLAUDE.md`'s hard-rule block sends a session HERE for the full rule — so a cycle copying from this page would have reopened the defect on its next claim. THE DEFECT, measured at the M6 milestone gate review (decision `c3e86310`, 2026-09-02): `reverse_decision()` refuses a row whose live `updated_at` postdates the decision, and a claim landing minutes later is indistinguishable from somebody else's later write, so every decision that touched a ticket became un-restorable the moment the continuous drain picked it up — while the function still answered `outcome = \'applied\'`. A claim is coordination, not a judgment write; that boundary is this page's own *"name what it protects"* list, and it is now honoured in the SQL rather than contradicted by it. All three copies are pinned together by `tests/regression/ses-286a-reversal-window.test.mjs` (five sites, each with a negative control that puts the bump back), so the next editor who syncs two of them is told about the one they forgot. Authority boundaries, the release-after-push order and the three "does NOT serialize" clauses are untouched. -->
 <!-- DeepBench v7.0.198 | GOVERNANCE-MODES.md | SES-121 — one reference repointed: manual-session claim SQL now cited at docs/runbooks/session-setup.md step 2c (the session-setup skill body moved there verbatim; SKILL.md is a thin loader). Authority boundaries untouched. -->
 <!-- DeepBench v7.0.195 | GOVERNANCE-MODES.md | SES-140 FINAL (John's 6-requirement order, 2026-08-23, attended session successional-review) — chained sessions become chained CYCLES: the platform refuses every session-spawning actuator (3x create_session, 1x fire_trigger, 1 silent dead create_trigger spawn, all ledger-proven), so a draining cycle continues IN-SESSION via a new runner_cycles row carrying the chained (drain continuation) trigger. The Automated-mode row's cadence cell rewritten to the SES-151 clock-grid model: hourly cron + scheduler_gate() admitting only America/Chicago hours divisible by interval_hours (3 = 12/3/6/9 on John's clock, DST-proof). Authority boundaries unchanged: drain creation John-only, stamp required, one continuation cycle at a time. -->
 <!-- DeepBench v7.0.144 | GOVERNANCE-MODES.md | SES-100, directive 48ae1939 line 2 ("update governance rules that the new backlog status enables sessions from overwriting on top of each other") — the shared-invariants section gains the TICKET CLAIM as a named invariant covering manual and scheduled sessions alike, with what it does and does not protect spelled out (it serializes ticket selection; it does NOT serialize the dev branch or the briefing republish) and the 24h expiry stated as the reason a dead session cannot strand a ticket. Claim-on-pick shipped in SES-86 phase 1 (v7.0.127) and was documented only in runner-cycle.md step 5 and the session-setup skill; the governance docs still described worktree isolation as the whole coordination story, which is exactly the gap that let e36d4379 and 4da5a7bd both build ADM-1. Second drift corrected in passing, inside the same sentence: "FEATURES row" is retired — the close-out is a Supabase write on backlog_items (SES-83 (d) cycle 3, v7.0.114). -->
@@ -46,12 +47,22 @@ check-then-claim in two statements, because the write *is* the reservation:
 
 ```sql
 UPDATE public.backlog_items
-   SET claimed_by = '<your cycle id or session name>', claimed_at = now(), updated_at = now()
+   SET claimed_by = '<your cycle id or session name>', claimed_at = now()
  WHERE backlog_id = '<TICKET-ID>'
    AND status <> 'done'
    AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
 RETURNING backlog_id;
 ```
+
+<!-- FEATURE: SES-316 — the third copy of the claim SQL, found by grep at that ship. -->
+**No `updated_at`, and the omission is load-bearing (`SES-316`, `v7.0.403`).** A claim is
+coordination, not a judgment write — the boundary this file's own *"name what it protects"* list
+draws. Bumping `updated_at` made every decision on a picked ticket un-restorable, because
+`reverse_decision()` refuses a row written after the decision and could not tell a claim from
+somebody else's later write. **This is the THIRD copy of this statement** (`runner-cycle.md` step 5
+and `session-setup.md` 2c are the others) and it was the one `SES-316` nearly missed: all three are
+pinned together by `tests/regression/ses-286a-reversal-window.test.mjs`, so the next editor who
+syncs two of them is told about the one they forgot.
 
 **1 row → the ticket is yours. 0 rows → another session holds it; take the next queued ticket
 and keep going** (John's rule, verbatim: *"self administered and fixes itself if it happens to
