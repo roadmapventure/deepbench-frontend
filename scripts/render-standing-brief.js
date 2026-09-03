@@ -1,4 +1,25 @@
 #!/usr/bin/env node
+// DeepBench v7.0.418 | scripts/render-standing-brief.js | LOG-143 (c) — CRITERION 7 GETS ITS
+// INSTRUMENT: real-visitor use of the first platform-originated feature is a view the standing
+// brief renders, so the exit exam reads a number instead of an assertion. A new fact group,
+// `Invention in use`, lands AFTER John-model and BEFORE the provenance footer.
+//
+// THE PREDICATE FOR "REAL VISITOR" LIVES IN THE VIEW, NOT HERE — public.report_card_usage (the
+// LOG-143 (c) migration) decides it once: visitor_id present, request_host = the production host
+// (the standing dev-URL-is-John rule), call_source outside the platform's own closed
+// automated-traffic set (src/lib/callerBuckets.js AUTOMATED_NOVID_SOURCES), and the visitor not
+// labelled John's own in visitor_labels. This file only prints the three window rows (7d/30d/all)
+// the view returns — the same division of labour as the class census and John-model above it.
+//
+// NO RATE, EVER (the kickoff's own design rule, and correct at this ship's population of one
+// logged judge run): judge_runs and judge_runs_real_visitors are printed as counts side by side,
+// never divided. A percentage over a population this small is a confident wrong number.
+//
+// Measured live 2026-09-03: `report_card_usage` returns 1 judge run in every window, 0 of them by
+// a real visitor — the two logged rows are both the attended QA run from John's own machine
+// (visitor_id NULL, call_source 'script', the Vercel preview host), which the predicate excludes
+// on three independent grounds.
+//
 // DeepBench v7.0.410 | scripts/render-standing-brief.js | SES-004 — THE JOHN-MODEL REPORTS ITS SIGNAL,
 // AND REPORTS A COUNT UNTIL 30 DECISIONS EARN A RATE. A second fact group, `John-model`, lands AFTER
 // `Judgment classes` and BEFORE the provenance footer: how often a decision that leaned on a standing
@@ -233,6 +254,16 @@ export function factsSha(facts) {
           r.agreement_rate == null ? null : String(Number(r.agreement_rate)),
         ]).sort()
       : null,
+    // FEATURE: LOG-143 (c) — the report-card usage rows, so a judge run, a real-visitor use, or a
+    // first/last-real-visitor timestamp moving each move the sha and --check reports the drift.
+    // Sorted by window rather than relying on `ord`'s presence, same defensive posture as the
+    // johnModel mapping above it.
+    inventionUse: Array.isArray(facts.inventionUse)
+      ? facts.inventionUse.map(r => [
+          r.window, Number(r.judge_runs), Number(r.judge_runs_real_visitors),
+          Number(r.distinct_real_visitors), r.first_real_visitor_at || null, r.last_real_visitor_at || null,
+        ]).sort()
+      : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
 }
@@ -448,6 +479,55 @@ export function renderJohnModel(signal, stamp) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: LOG-143 (c) — the `Invention in use` fact group, criterion 7's instrument
+ * (`docs/SELFBUILD-CHARTER.md`: "at least one platform-originated feature ... is measurably used
+ * by real visitors"). PURE: (usage rows, stamp) in, markdown out, the same contract as
+ * renderJudgmentClasses()/renderJohnModel() above it, so the guard can drive it from a fixture.
+ * NOTHING HERE COUNTS OR DECIDES ANYTHING — `public.report_card_usage` is the one home for the
+ * real-visitor predicate; `rows` is exactly what fetchFacts() reads from it, one row per window
+ * (`7d`, `30d`, `all`) in that order.
+ *
+ * NO RATE, EVER (the kickoff's design rule) — judge_runs and judge_runs_real_visitors print as
+ * counts side by side, never divided into a percentage.
+ *
+ * TWO BRANCHES:
+ *   - no usage rows at all (absent or not an array) — SAID, never rendered as zeros, the same
+ *     rule the class census and John-model groups above it already follow;
+ *   - the window rows — one line each, then a single first-use line read off the `all` window's
+ *     `first_real_visitor_at` (the earliest real-visitor run ever, not per-window — there is only
+ *     one "first" to report).
+ */
+export function renderInventionUse(rows, stamp) {
+  const L = [];
+  L.push(`**Invention in use** — *${stamp}.* Criterion 7 (\`docs/SELFBUILD-CHARTER.md\`): at ` +
+    "least one platform-originated feature — the Bench Report Card judge (`LOG-143`) — is " +
+    "measurably used by real visitors, live from `public.report_card_usage`. Counts only, never a rate.");
+  L.push("");
+  if (!Array.isArray(rows) || rows.length === 0) {
+    L.push("- *Report Card usage was not read for this render* — which is **not** the same as " +
+      "*no usage*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+  for (const r of rows) {
+    const n = Number(r.judge_runs);
+    const m = Number(r.judge_runs_real_visitors);
+    const k = Number(r.distinct_real_visitors);
+    L.push(`- **${r.window}:** ${n} judge run${n === 1 ? "" : "s"}, ${m} by real visitor` +
+      `${m === 1 ? "" : "s"} (${k} distinct).`);
+  }
+  L.push("");
+  const all = rows.find(r => r.window === "all");
+  if (all && all.first_real_visitor_at) {
+    L.push(`- First real-visitor use: ${cst(all.first_real_visitor_at)}.`);
+  } else {
+    L.push("- *no real-visitor use yet.*");
+  }
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -467,7 +547,7 @@ export function renderBlock(facts, nowIso) {
   // "zero". Renamed on the way in: `census` in this scope is the column-census helper above.
   // FEATURE: SES-004 — johnModel joins the destructure on the same terms as census: absent means
   // "not read", never "no pattern-citing decisions".
-  const { items, settings, drain, decisions, census: classCensus, johnModel } = facts;
+  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -624,6 +704,12 @@ export function renderBlock(facts, nowIso) {
   // nothing itself.
   L.push(renderJohnModel(johnModel, stamp));
 
+  // ---- Invention in use (FEATURE: LOG-143 (c) — criterion 7's instrument) -------------------
+  // After John-model, before the provenance line. Same contract as the two groups above it: a
+  // pure helper the guard can assert from a fixture, rendering what the view returned and
+  // counting nothing itself.
+  L.push(renderInventionUse(inventionUse, stamp));
+
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
     "The stamp says when this was last read; the sha says whether it still matches the tables. " +
@@ -757,7 +843,18 @@ export async function fetchFacts(url, key) {
     "john_model_signal?select=ord,scope,pattern_no,imperative,citing_decisions,finalised_unreversed,reversed,open,agreement_rate&order=ord,citing_decisions.desc,pattern_no");
   if (!Array.isArray(johnModel) || johnModel.length === 0) die("john_model_signal came back empty — refusing to render the John-model from nothing (the view always returns its overall row)");
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel };
+  // FEATURE: LOG-143 (c) — the report-card usage rows, read from the VIEW and never re-derived
+  // here; the view is also where the real-visitor predicate lives, so this script never decides
+  // who counts as a real visitor. report_card_usage is service_role only (mirrors
+  // platform_scoreboard's own grants), the same key everything above needs. Columns are named
+  // rather than `*` — this file's own rule — and `order=ord` pins the 7d/30d/all order the view
+  // defines. The view ALWAYS returns its three window rows (no GROUP BY that could vanish), so an
+  // empty array means the read itself is wrong and this refuses rather than publishing a silent gap.
+  const inventionUse = await rest(url, key,
+    "report_card_usage?select=window,ord,judge_runs,judge_runs_real_visitors,distinct_real_visitors,first_real_visitor_at,last_real_visitor_at&order=ord");
+  if (!Array.isArray(inventionUse) || inventionUse.length === 0) die("report_card_usage came back empty — refusing to render invention-in-use from nothing (the view always returns its three window rows)");
+
+  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse };
 }
 
 async function main() {
