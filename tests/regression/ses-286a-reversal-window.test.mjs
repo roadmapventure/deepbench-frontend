@@ -1,3 +1,33 @@
+// DeepBench v7.0.403 | tests/regression/ses-286a-reversal-window.test.mjs | SES-316 -- EXTENDED,
+// never duplicated: two new arms hold down the half of the reversal mechanism this file could not
+// see, namely that the thing a reversal has to survive is the BOARD MOVING UNDER IT.
+//
+// FEATURE: SES-316 -- (a) the two runbooks' claim and release SQL must not write updated_at, and
+// (b) reverse_decision() must expose refused_written_since. Both arms below, with their controls.
+//
+// WHAT THE DEFECT WAS, measured by the M6 milestone gate review (decision c3e86310, 2026-09-02):
+// reverse_decision() refused any row whose live updated_at postdated the BEFORE-IMAGE it would
+// restore from -- and still returned outcome = 'applied' with the row counted `refused`. The claim
+// (runner-cycle.md step 5, session-setup.md 2c) and the release both wrote `updated_at = now()`, so
+// every decision that touched a ticket became un-restorable the moment the continuous drain picked
+// it up. Minutes, not days, and silently. Two halves fixed it and NEITHER WORKS ALONE, which is why
+// there are two arms: migration ses316_reversal_survives_claims re-points the guard at the
+// decision's own decided_at and adds refused_written_since (+ outcome 'partial'), and the runbooks
+// stop writing updated_at in a claim or a release.
+//
+// A NAMED DEVIATION FROM THE KICKOFF, because its premise did not survive a check. The kickoff
+// specifies arm (b) as reading the RPC's signature out of PostgREST's OpenAPI root (GET /rest/v1/).
+// MEASURED before a line was written: that document describes an RPC's INPUT parameters only --
+// /rpc/reverse_decision carries p_decision/p_actor/p_reason/p_actor_cycle and a bare
+// `responses: {200: {description: "OK"}}`, and `definitions` has no reverse_decision entry at all.
+// There is no return-column list there to read. So the arm reads the columns the only way PostgREST
+// exposes them -- off a real response -- and it does that WITHOUT WRITING ANYTHING by calling the
+// function's FIRST guard: a blank p_actor returns at the second statement of the body, before the
+// decision row is even SELECTed. The assertion is on the `reason` text, so it proves WHICH path ran
+// rather than merely that a row came back (a test that could pass on any path would pass if the fix
+// did nothing), and the write-free-ness is asserted by side effect the same way arm 2 asserts
+// ladder_work_class()'s purity, because pg_proc is unreachable from here.
+//
 // DeepBench v7.0.394 | tests/regression/ses-286a-reversal-window.test.mjs | SES-286 (a)
 //
 // FEATURE: SES-286 (a) -- guards the reversal window's MECHANISM: public.runner_decisions, the
@@ -149,6 +179,164 @@ export const CLAUSES = [
 
 function readM6() {
   return fs.readFileSync(M6, "utf8");
+}
+
+// ---------------------------------------------------------------------------
+// SES-316 arm (a): A CLAIM IS NOT A JUDGMENT WRITE, asserted in the SQL a session copies.
+// ---------------------------------------------------------------------------
+//
+// THE ANCHOR IS THE CLAIM'S OWN COLUMN, never a line number or a step heading. Both runbooks carry
+// several `UPDATE public.backlog_items` blocks (the design_status flag write and 7b's decision
+// template among them) and those blocks SHOULD keep writing updated_at -- a judgment write is
+// exactly what updated_at is for. So each site is found by the `claimed_by` term that makes it a
+// claim or a release, and the slice is bounded by the fence around it: a check that grepped the
+// whole file for `updated_at` would fail on correct content, which is a checker that has to be
+// disabled the first time it fires.
+const RUNBOOKS = {
+  "runner-cycle": "docs/runbooks/runner-cycle.md",
+  "session-setup": "docs/runbooks/session-setup.md",
+};
+
+export const CLAIM_SITES = [
+  {
+    id: "runner-cycle-step-5-claim",
+    file: "runner-cycle",
+    anchor: "claimed_by = '<your cycle id or session name>'",
+    detail:
+      "runner-cycle.md step 5's claim UPDATE must not write updated_at. A claim is coordination, " +
+      "and 7b's own list of what is NOT a decision names it -- bumping updated_at contradicted " +
+      "that in SQL and made every decision on a picked ticket un-restorable minutes after the " +
+      "drain picked it up, because reverse_decision() cannot tell a claim from somebody else's " +
+      "later write",
+  },
+  {
+    id: "runner-cycle-release",
+    file: "runner-cycle",
+    anchor: "claimed_by = NULL, claimed_at = NULL",
+    detail:
+      "runner-cycle.md's post-push release UPDATE must not write updated_at either -- a release " +
+      "is the claim's mirror image, and one that stamped updated_at would make the decision the " +
+      "cycle recorded at 7b un-restorable one statement after its own push",
+  },
+  {
+    id: "session-setup-2c-claim",
+    file: "session-setup",
+    anchor: "claimed_by = '<short-session-name>'",
+    detail:
+      "session-setup.md 2c's claim UPDATE must not write updated_at. Manual sessions and " +
+      "scheduled cycles share one board and one claim contract (register B40); a fix that " +
+      "landed on only one of the two runbooks leaves the defect live on whichever half John " +
+      "happens to be running",
+  },
+  {
+    id: "session-setup-2c-release",
+    file: "session-setup",
+    anchor: "claimed_by = NULL, claimed_at = NULL",
+    detail:
+      "session-setup.md 2c's release UPDATE must not write updated_at, same reason as the " +
+      "cycle's",
+  },
+];
+
+// Slice the fenced ```sql block that CONTAINS `anchor`. Returns "" when the anchor or its fence is
+// absent -- a finding for the caller to report, never a throw, same contract as extractBlock().
+//
+// IT SCANS EVERY OCCURRENCE, and that is not defensive coding -- it is the fix for a real first-run
+// failure. `claimed_by = NULL, claimed_at = NULL` appears in runner-cycle.md's PROSE (the paragraph
+// recording that the old wording said the opposite) ~200 lines before the statement itself, so a
+// first-match slicer resolved to an unfenced mention and reported "site missing" on correct
+// content. Same shape as the ID-decoy trap in .claude/rules: a string that merely LOOKS like the
+// thing gets picked up ahead of the thing. So the loop takes the first occurrence that actually
+// resolves inside a ```sql fence, and an anchor with no fenced occurrence at all still returns "".
+export function sqlBlockAround(md, anchor) {
+  for (let at = md.indexOf(anchor); at >= 0; at = md.indexOf(anchor, at + 1)) {
+    const open = md.lastIndexOf("```sql", at);
+    if (open < 0) continue;
+    const bodyStart = md.indexOf("\n", open);
+    if (bodyStart < 0 || bodyStart > at) continue;
+    const close = md.indexOf("```", bodyStart);
+    if (close < 0 || close < at) continue;   // the anchor sits after this fence closed: prose
+    return md.slice(bodyStart + 1, close);
+  }
+  return "";
+}
+
+// The claim's shape, as one predicate so the teeth check below can break it. TWO HALVES, and the
+// positive half is not decoration: without it a mis-sliced empty block would "pass" the
+// no-updated_at half trivially, which is the vacuous-green shape SES-158 named.
+export const isCoordinationOnly = sql =>
+  /UPDATE\s+public\.backlog_items/.test(sql) &&
+  /claimed_by/.test(sql) &&
+  !/updated_at/.test(sql);
+
+// The break every site shares: put the bump back exactly where SES-316 took it out.
+export const restoreTheBump = sql =>
+  sql.replace(/(claimed_at = (?:now\(\)|NULL))/, "$1, updated_at = now()");
+
+function readRunbook(key) {
+  return fs.readFileSync(path.join(ROOT, RUNBOOKS[key]), "utf8");
+}
+
+function aClaimNeverWritesUpdatedAt() {
+  for (const s of CLAIM_SITES) {
+    const sql = sqlBlockAround(readRunbook(s.file), s.anchor);
+    assert.ok(
+      sql.length > 0,
+      `${RUNBOOKS[s.file]}: no fenced sql block found around ${JSON.stringify(s.anchor)} -- the ` +
+        "site this clause grades has moved or been renamed, so the clause is grading nothing. " +
+        `Re-anchor it rather than deleting it: ${s.detail}`,
+    );
+    assert.ok(
+      /UPDATE\s+public\.backlog_items/.test(sql) && /claimed_by/.test(sql),
+      `${RUNBOOKS[s.file]}: the block sliced for "${s.id}" is not a backlog_items claim/release ` +
+        `statement -- the anchor matched somewhere else in the file. Block was:\n${sql}`,
+    );
+    assert.ok(
+      !/updated_at/.test(sql),
+      `${RUNBOOKS[s.file]} site "${s.id}" writes updated_at again: ${s.detail} (SES-316). The ` +
+        `statement is:\n${sql}`,
+    );
+  }
+}
+
+// EVERY SITE HAS TEETH: put the bump back and the predicate must fail.
+function everyClaimSiteHasTeeth() {
+  for (const s of CLAIM_SITES) {
+    const sql = sqlBlockAround(readRunbook(s.file), s.anchor);
+    const broken = restoreTheBump(sql);
+    assert.notStrictEqual(
+      broken, sql,
+      `site "${s.id}"'s break returned its input unchanged -- restoreTheBump() no longer matches ` +
+        "this statement's shape, so the teeth check below would pass vacuously (the SES-158 " +
+        `meta-control). Block was:\n${sql}`,
+    );
+    assert.ok(
+      !isCoordinationOnly(broken),
+      `site "${s.id}" still reads as coordination-only with updated_at = now() put back -- the ` +
+        "clause is not testing what its detail claims and would go green through the exact edit " +
+        "it exists to catch",
+    );
+    assert.ok(
+      isCoordinationOnly(sql),
+      `site "${s.id}" fails isCoordinationOnly() on the SHIPPED text while the broken form is ` +
+        "graded -- the two halves of the predicate disagree, so one of them is wrong",
+    );
+  }
+}
+
+// FILE-LEVEL NEGATIVE CONTROL for the slicer: an absent anchor and an unfenced one are both
+// reported as "" rather than crashing or returning the rest of the file.
+function aMissingClaimBlockIsFlagged() {
+  assert.strictEqual(sqlBlockAround("nothing here", "claimed_by = NULL"), "",
+    "sqlBlockAround() must return \"\" for an absent anchor");
+  assert.strictEqual(sqlBlockAround("claimed_by = NULL with no fence at all", "claimed_by = NULL"), "",
+    "sqlBlockAround() must return \"\" when the anchor sits outside any ```sql fence -- otherwise " +
+    "prose that merely MENTIONS the claim would be graded as the statement");
+  assert.strictEqual(
+    sqlBlockAround("```sql\nUPDATE public.backlog_items SET claimed_by = NULL;\n```", "claimed_by = NULL"),
+    "UPDATE public.backlog_items SET claimed_by = NULL;\n",
+    "sqlBlockAround() must return the fenced body, and only the body",
+  );
 }
 
 function theShippedRegisterIsClean() {
@@ -384,17 +572,132 @@ async function theClassMappingHasOneHome() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// SES-316 arm (b): the shipped RPC reports written-since refusals in their own column.
+// ---------------------------------------------------------------------------
+//
+// READ-ONLY BY THE PATH IT TAKES, and that is the whole argument for a permanent test being
+// allowed to call a writer at all. p_actor = '' returns at the SECOND statement of the function
+// body -- before `select ... from runner_decisions ... for update`, before the reversal row is
+// inserted, before the image loop. Nothing is read and nothing is written. Two things make that
+// claim checkable rather than asserted: the `reason` text pins WHICH guard answered (so this
+// cannot silently start grading some other path), and the ledger counts are compared either side.
+const SES316_OUT_COLUMNS = [
+  "outcome", "restored", "restored_unverified", "refused",
+  "refused_written_since",   // SES-316. The reason this arm exists.
+  "demoted", "reversal_id", "reason",
+];
+
+const BLANK_ACTOR_GUARD = "p_actor is required";
+
+async function theRpcReportsWrittenSinceRefusals() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) {
+    notRun(
+      "the live reverse_decision() signature arm: refused_written_since present in the RPC's own " +
+        "response columns, its made-up-column control, and the write-free-ness of the guard path " +
+        "asserted by side effect",
+      "SUPABASE_URL and/or SUPABASE_SERVICE_KEY are absent. The doc arm above still graded both " +
+        "runbooks' claim and release statements against the committed text. Canonical " +
+        "invocation: STANDARDS.md Section 2 rule 5.",
+    );
+    return;
+  }
+
+  const before = {
+    decisions: await countOf(url, key, "runner_decisions?select=id"),
+    images: await countOf(url, key, "runner_before_images?select=id"),
+  };
+
+  const args = JSON.stringify({
+    p_decision: "00000000-0000-0000-0000-000000000000",
+    p_actor: "",                                   // the guard this arm rides on
+    p_reason: "ses-316 read-only signature probe",
+  });
+
+  // 3a. THE COLUMN SET, off a real response -- the only place PostgREST exposes it (see the
+  // deviation note in this file's header: the OpenAPI root describes inputs only).
+  const res = await raw(url, key, "rpc/reverse_decision", { method: "POST", body: args });
+  assert.ok(
+    res.ok,
+    `rpc/reverse_decision returned HTTP ${res.status} -- this is the arm that fails against a ` +
+      "database still carrying the pre-SES-316 function, and it also fails if service_role lost " +
+      "EXECUTE (the grants a DROP + CREATE silently discards)",
+  );
+  const rows = await res.json();
+  assert.ok(Array.isArray(rows) && rows.length === 1,
+    `rpc/reverse_decision returned ${JSON.stringify(rows).slice(0, 200)}; a TABLE-returning ` +
+    "function's guard path yields exactly one row");
+
+  // THE PATH, PINNED. Without this the column check could go green off any other return -- and
+  // one of those other returns writes a reversal row.
+  assert.ok(
+    String(rows[0].reason || "").includes(BLANK_ACTOR_GUARD),
+    `the probe did not take the blank-actor guard path (reason was ` +
+      `${JSON.stringify(rows[0].reason)}). This arm is only read-only BECAUSE that is the path it ` +
+      "takes -- if the guard order changed, stop and re-derive the write-free path before " +
+      "re-pointing this assertion",
+  );
+  assert.deepStrictEqual(
+    Object.keys(rows[0]).sort(), [...SES316_OUT_COLUMNS].sort(),
+    "reverse_decision()'s response columns are not the SES-316 set. refused_written_since is the " +
+      "new one: it counts ONLY rows left alone because they were written after the decision, " +
+      "which is a different fact from `refused` (a row that was never this decision's to undo). " +
+      "A missing column here means the migration did not land; an extra one means a later " +
+      "session changed the contract and every reader of these counts needs re-reading",
+  );
+  assert.strictEqual(rows[0].refused_written_since, 0,
+    "the guard path must report refused_written_since = 0, not null -- every early return " +
+    "initialises the counter, so a caller never has to distinguish 'none' from 'unset'");
+
+  // 3b. THE PAIRED CONTROL, in this file's own idiom: the projection of the new column must 200
+  // AND a made-up name on the same endpoint must 400. Without the second half, a permissive
+  // gateway or a stripped-nulls response would look identical to the column existing.
+  const good = await raw(url, key, "rpc/reverse_decision?select=refused_written_since",
+                         { method: "POST", body: args });
+  assert.strictEqual(good.status, 200,
+    `?select=refused_written_since returned HTTP ${good.status} -- the column is not projectable, ` +
+    "so it is not in the function's return type whatever the row above appeared to show");
+  const bad = await raw(url, key, "rpc/reverse_decision?select=ses316_no_such_column",
+                        { method: "POST", body: args });
+  assert.strictEqual(bad.status, 400,
+    `the control projection of a made-up column returned HTTP ${bad.status}, not 400 -- so the ` +
+    "assertion above proves nothing about whether refused_written_since exists, only that the " +
+    "request was answered");
+
+  // 3c. WRITE-FREE, asserted by side effect (pg_proc is unreachable from here). Three calls above;
+  // the ledger must not have moved by one row.
+  const after = {
+    decisions: await countOf(url, key, "runner_decisions?select=id"),
+    images: await countOf(url, key, "runner_before_images?select=id"),
+  };
+  assert.deepStrictEqual(
+    after, before,
+    "the guard-path probe MOVED THE LEDGER. reverse_decision() is a writer, and this arm is only " +
+      "permitted because p_actor = '' returns before the first write -- if that is no longer " +
+      "true, delete this arm rather than accepting the drift. " +
+      `before=${JSON.stringify(before)} after=${JSON.stringify(after)}`,
+  );
+}
+
 async function run() {
   theShippedRegisterIsClean();
   aMissingBlockIsFlagged();
   everyClauseHasTeeth();
   aVacuousMutationFailsItsOwnControl();
+  aClaimNeverWritesUpdatedAt();          // SES-316 arm (a)
+  everyClaimSiteHasTeeth();              // SES-316 arm (a), controls
+  aMissingClaimBlockIsFlagged();         // SES-316 arm (a), slicer control
   await theShippedSchemaCarriesTheWindow();
   await theClassMappingHasOneHome();
+  await theRpcReportsWrittenSinceRefusals();   // SES-316 arm (b)
 
   notRun(
     "the write paths -- record_decision(), attach_before_images(), sweep_decision_windows() and " +
-      "reverse_decision() -- and every pg_proc fact (provolatile, overload count, EXECUTE grants)",
+      "reverse_decision()'s RESTORE path (arm 3 above calls only its blank-actor guard, which " +
+      "returns before the first read or write) -- and every pg_proc fact (provolatile, overload " +
+      "count, EXECUTE grants)",
     "all four are WRITERS: they insert the decision ledger, move runner_ladder, and delete and " +
       "rewrite rows. A permanent regression test must never do that on the live board (the " +
       "SES-196 / SES-218 / SES-275 refusal), and this suite reaches Supabase only over PostgREST, " +
@@ -417,6 +720,31 @@ async function run() {
       "for an absent id, and for a blank actor. Zero fixture residue on re-read: 0 " +
       "runner_decisions rows, 0 images attributed to the fixture session, 0 images carrying a " +
       "decision_id, SES-286 tier back at 'now', tooling back at 13/42, reversal_window_hours 72. " +
+      "SES-316 ADDED FOUR MORE FIXTURES AT ITS OWN SHIP (v7.0.403), same rolled-back DO-block " +
+      "shape, and they are the claimed-after-decision case this file cannot hold permanently -- " +
+      "asserted on the OUTCOME AND THE COUNTS, never on \"it returned\": (1) a before-image dated " +
+      "5 minutes BEFORE decided_at (the attach_before_images() shape) plus a claim in the new " +
+      "coordination-only form -> outcome='applied', restored 1, refused_written_since 0, the " +
+      "ticket's tier restored, and the claim itself intact -- the OLD guard would have refused " +
+      "this row, because updated_at postdated that image; (2) THE CONTROL, the same fixture with " +
+      "the OLD claim shape (updated_at bumped to decided_at + 5 min) -> outcome='refused', " +
+      "refused_written_since 1, restored 0, the tier LEFT ALONE, runner_decisions.status still " +
+      "'open', runner_ladder unmoved, and ZERO rows with reverses = that decision (the reversal " +
+      "row is withdrawn, so the ledger never carries a kind='reversal' row pointing at a " +
+      "decision that still stands) -- assert this pair together or neither proves anything, " +
+      "since (1) alone would also pass if the guard had simply been deleted; (3) two backlog rows " +
+      "under one decision with one of them legitimately written later -> outcome='partial', " +
+      "restored 1 / refused_written_since 1, decision marked 'reversed', bug_fix demoted once, " +
+      "and the reversal row's own summary carrying the counts verbatim; (4) a runner_items " +
+      "(ledger, outside the allowlist) image beside a restorable backlog row -> outcome='applied' " +
+      "with refused 1 and the reason sentence appending 'READ THE COUNTS, NOT THE OUTCOME' -- " +
+      "that hint fires ONLY where the outcome and the counts disagree, so 'partial' and 'refused' " +
+      "deliberately do not get it. Zero residue on re-read: 0 fixture decisions, 0 fixture " +
+      "images, both live open decisions untouched, SES-316/SES-315 unchanged, bug_fix back at " +
+      "1/1. Also measured at that ship, before a line changed: backlog_items carries NO " +
+      "updated_at trigger (pg_trigger: only backlog_done_requires_verdict, BEFORE UPDATE OF " +
+      "status), which is what makes the arm-(a) omission real rather than cosmetic, and " +
+      "recompute_backlog_queue() writes queue and pinned_position ONLY. " +
       "pg_proc at the same ship: exactly 1 overload of each of the six functions, " +
       "ladder_work_class provolatile='i', and EXECUTE true for service_role and false for anon and " +
       "authenticated on all six (has_function_privilege, both directions). runner_decisions itself: " +

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.403 | docs/runbooks/session-setup.md | SES-316 — A CLAIM IS NOT A JUDGMENT WRITE, and the thing to read twice is THAT THE WRITTEN-SINCE GUARD DID NOT GO AWAY — IT CHANGED REFERENCE POINT. 2c's claim and release both dropped `updated_at = now()`; 7b's own list of what is not a decision already said a claim isn't one, so this is that definition honoured in the SQL rather than a new rule. MEASURED AT THE M6 GATE (decision `c3e86310`, 2026-09-02), not reasoned about: `reverse_decision()` refused any row whose live `updated_at` postdated the BEFORE-IMAGE's `created_at` and still returned `outcome = 'applied'` with the row counted `refused` — so every decision that touched a ticket became un-restorable the moment the continuous drain claimed it (minutes, not days), silently. Migration `ses316_reversal_survives_claims` re-points that guard at the decision's own `decided_at` (`now()` is frozen per transaction, so every write the decision made carries exactly that stamp — the decision's own writes can therefore never trip the guard, and anything strictly later is genuinely somebody else's) and adds `refused_written_since` beside `refused`, because the two mean different things: `refused` is "that row was never this decision's to undo", `refused_written_since` is "your undo did not happen". THE ONE FACT AN EDITOR WILL GET WRONG: there is NO `updated_at` trigger on `backlog_items` (read out of `pg_trigger` before a line changed — the only trigger is `backlog_done_requires_verdict`, BEFORE UPDATE OF status), which is what makes dropping the column from these two statements actually work rather than cosmetic; and `recompute_backlog_queue()` writes `queue` and `pinned_position` ONLY, never `updated_at`, so a recompute between a decision and its reversal is harmless. The one-`DO`-block rule is UNCHANGED and still load-bearing — split the decision from its write and `decided_at` lands in the first transaction while the row lands in the second, which the new guard refuses just as the old one did (now honestly, as `refused`, instead of a silent `applied`). Guarded by `tests/regression/ses-286a-reversal-window.test.mjs`. -->
 <!-- DeepBench v7.0.400 | docs/runbooks/session-setup.md | SES-311 — the attended close-out gains the verifier step it never had. New step 3e (run `scripts/verifier.js` before writing `done`, feed `verdict_ladder_signal`) plus a one-line pointer in step 4. It is not advice: migration `ses311_done_requires_verdict` puts a BEFORE UPDATE trigger on `backlog_items` that refuses `status='done'` on a Selfbuild-epic ticket with no `runner_verdicts` row. Measured 2026-09-02: 58 of 112 Selfbuild `done` tickets carried no verdict, four of them M5 required ships. Every exemption lives in that migration's header, never on this page. -->
 <!-- DeepBench v7.0.222 | docs/runbooks/session-setup.md | SES-175 — §2c's claim SQL gains a rendered rule block: a `{{rule:B40}}` marker comment above the committed text of rule B40, generated from `public.governance_rules` and checked by `scripts/render-rule-blocks.js`. John's call on gated card `a4e0254a` 2026-08-24: "Accept with C" — expand-in-place, so this file still carries the real sentence a session reads mid-run and the script is what stops that copy drifting from the registry. The text under the marker is NOT hand-maintained: edit the registry row, re-export `docs/governance/RULES-SNAPSHOT.md`, then `node scripts/render-rule-blocks.js --write`. Full rationale, the three options John chose between, and the QA: `docs/runbooks/runner-cycle.md`'s v7.0.222 stamp and `docs/kickoffs/v7.0.222-SES-175-rendered-rule-blocks.md` — cited here, not restated. -->
 <!-- DeepBench v7.0.198 | docs/runbooks/session-setup.md | SES-121 — body moved verbatim from .claude/skills/session-setup/SKILL.md (which remains as a thin loader); .claude/ is not writable by unattended cycles (register B39), this runbook is. This file is the canonical copy. -->
@@ -148,12 +149,20 @@ principle as the counters below:
 
 ```sql
 UPDATE public.backlog_items
-   SET claimed_by = '<short-session-name>', claimed_at = now(), updated_at = now()
+   SET claimed_by = '<short-session-name>', claimed_at = now()
  WHERE backlog_id = '<TICKET-ID>'
    AND status <> 'done'
    AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
 RETURNING backlog_id;
 ```
+
+<!-- FEATURE: SES-316 — the claim stops bumping updated_at. -->
+**A claim is coordination, not a judgment write — and it deliberately does NOT touch `updated_at`
+(`SES-316`).** Bumping it made every decision on a picked ticket un-restorable: `reverse_decision()`
+refuses a row written after the decision, and a claim minutes later looked exactly like somebody
+else's later write. `claimed_by` / `claimed_at` are the claim's own columns; nothing reads
+`updated_at` to learn about a claim. (7b's own list of what is *not* a decision already named the
+claim — this is that definition honoured in the SQL.)
 
 **1 row → yours. 0 rows → another session (possibly a scheduled cycle) holds it** — tell John
 who holds it (`SELECT claimed_by, claimed_at FROM backlog_items WHERE backlog_id = '<ID>'`)
@@ -166,9 +175,14 @@ push → one guarded release:
 
 ```sql
 UPDATE public.backlog_items
-   SET claimed_by = NULL, claimed_at = NULL, updated_at = now()
+   SET claimed_by = NULL, claimed_at = NULL
  WHERE backlog_id = '<TICKET-ID>' AND claimed_by = '<your session name>';
 ```
+
+<!-- FEATURE: SES-316 — the release stops bumping updated_at, same reason as the claim. -->
+**No `updated_at` here either, and for the same reason (`SES-316`):** a release is the claim's
+mirror image, so it is coordination too. A release that stamped `updated_at` would make the
+decision this very session just recorded un-restorable one statement after the push.
 
 The holder guard is the point — a session can never clear a claim that has since moved to
 another session. On an abort, release at the point you stop. An unreleased claim expires after
@@ -377,9 +391,12 @@ END $$;
   (`ck_decision_attribution`), and an attended session is the `session_name` half. Pass the same
   `<short-session-name>` your worktree and inflight file already carry.
 - **One transaction, and it is not a style choice.** Step 7b carries the reason in full: `now()` is
-  frozen for the length of a transaction, and `reverse_decision()` refuses any row whose live
-  `updated_at` postdates the image it would restore from. Split this into two statements and the
-  reversal restores nothing while still reporting `outcome = 'applied'`.
+  frozen for the length of a transaction, so the decision's `decided_at` and every write it makes
+  carry the same stamp — and `reverse_decision()` refuses any row whose live `updated_at` postdates
+  that stamp (`SES-316`; it used to compare against the *image's* `created_at`). Split this into two
+  statements and `decided_at` lands in the first while the write lands in the second, so the row
+  postdates its own decision and the reversal restores nothing — now reported honestly as
+  `outcome = 'refused'`, but still an undo that did not happen.
 - **Put the handle on the ticket and in your close-out note:**
   `Decision <id> — reversible until <expires_at, CST>: select public.reverse_decision('<id>', 'John', '<why>');`
 - Before-images you already wrote without a decision id are adopted rather than re-taken:
@@ -538,11 +555,23 @@ re-created; it writes before-images of everything the reversal itself writes; it
 floored at 0, streak 0); and it records the reversal as its own `kind = 'reversal'` decision row.
 
 **Read the counts, not just the outcome.** It returns `outcome`, `restored`,
-`restored_unverified`, `refused`, `demoted`, `reversal_id` and a `reason` sentence. A row outside
-the allowlist of tables a decision may legitimately have changed, a row without a single-column
-primary key, and a row written since its image are each counted `refused` and left alone — and
-`outcome` still reads `applied`. `restored_unverified` is a table with no `updated_at` column: the
-row was written, and the doubt is reported rather than hidden.
+`restored_unverified`, `refused`, `refused_written_since`, `demoted`, `reversal_id` and a `reason`
+sentence. A row outside the allowlist of tables a decision may legitimately have changed, and a row
+without a single-column primary key, are counted `refused` and left alone — and `outcome` can still
+read `applied`, in which case the `reason` sentence says *"read the counts, not the outcome"* itself.
+`restored_unverified` is a table with no `updated_at` column: the row was written, and the doubt is
+reported rather than hidden.
+
+<!-- FEATURE: SES-316 — the third outcome, and the counter that explains it. -->
+**`outcome = 'partial'` means some rows were written after the decision and were left alone — read
+`refused_written_since`** (`SES-316`). That counter is kept apart from `refused` because it means
+something different: `refused` says *"that row was never this decision's to undo"*, while
+`refused_written_since` says *"your undo did not happen to this row"*. The three outcomes are
+exact — **`applied`** (nothing was written since), **`partial`** (something was, and something was
+still restored: the decision IS marked reversed and the rung DOES demote), and **`refused`** (something
+was, and *nothing* was restored: the decision is **not** marked reversed, no rung moves, and no
+reversal row is left behind, so you can decide whether the later write or the undo should win and
+call it again).
 
 **Where the ids are.** The standing brief's *Open decisions* block is the page to read — it lands
 in `SES-286` part (c) (`v7.0.396`, the *Open decisions* block of `docs/runbooks/standing-brief.md`); the same list is one query:
