@@ -63,6 +63,15 @@ until it ships, no enhancement can be promoted, which is the honest state.
 
 ## Dispositions this lane governs today
 
+**The invention pass is this lane's producer (`SES-160`, `v7.0.414`).** `docs/runbooks/runner-cycle.md`
+step 4b's daily pass is the row's only writer: `public.file_invention_proposal()` files a proposal
+and its own `record_decision()` in one transaction, admitted or rejected on the row exactly as
+`EL-01` states — pace and the epic link are `runner_settings` columns (`invention_floor_days`,
+`invention_per_rung_per_day`, `invention_requires_epic`), never literals. `LOG-143` (the Bench
+Report Card) was the first row through, ratified under the M7 gate's first-feature exception
+(decision `05cc2722`) rather than by this lane's ordinary window — every later proposal is ratified
+by its own 72-hour window like any other decision, with no exception and no card.
+
 | Ticket | Disposition under EL-01 |
 |---|---|
 | `SES-234` "Every operational default becomes a rules-registry row" (no epic) | Not admitted: no `enhancement_claim`, no `scope_rationale`. Writes them → admissible. |
