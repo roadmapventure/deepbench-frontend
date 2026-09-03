@@ -1,4 +1,25 @@
 #!/usr/bin/env node
+// DeepBench v7.0.409 | scripts/render-standing-brief.js | SES-84 — THE PER-CLASS CENSUS OF THE VISION
+// CORPUS IS ON THE PAGE, AND RATIFICATION IS A STANDING METRIC, NOT A FINISH LINE. The M7 design gate
+// (decision 05cc2722, ruling ii) re-scoped SES-84: every live vision_claims row carries a judgment
+// class (P1–P4) or an explicit class-neutral mark, and the standing brief renders, per class, the
+// ratified / proposed / rejected counts and the newest proposed root claim. John ruled 2026-08-23 that
+// there is no terminal "understood" state for a class, so the counts are reported, never gated on.
+//
+// THE NUMBERS COME FROM A VIEW, NOT FROM THIS FILE. `public.judgment_class_census` is the one home for
+// the census (SES-159's class-understanding loop reads the same view); this script names its columns
+// and renders what comes back. Nothing here re-derives a count from vision_claims rows, because two
+// implementations of one census is how "two surfaces, two numbers" starts.
+//
+// ONE FACT GROUP, `Judgment classes`, AFTER Open decisions and BEFORE the provenance footer. The view
+// joins fetchFacts() and its rows join the factsSha() payload, so a claim being classed, ratified,
+// rejected or a new root claim MOVES THE SHA and --check reports it. `unclassed` is printed ONLY when
+// it is non-zero, as a FLAG line: after SES-84's recorded classification decision it is zero by
+// construction, and a non-zero is drift (a claim inserted without a classing decision), not a state
+// to report calmly. A MISSING census KEY IS NOT "ZERO CLAIMS" — same rule as the decisions group:
+// the SES-177b / SES-286c fixtures predate this ship, and a render whose facts carried no census says
+// so rather than publishing zeros it never measured.
+//
 // DeepBench v7.0.396 | scripts/render-standing-brief.js | SES-286 (c) — OPEN DECISIONS ARE ON THE
 // PAGE JOHN READS, WITH THE LINE THAT UNDOES EACH. Parts (a) (v7.0.394) and (b) (v7.0.395) gave a
 // decision a row, an expiry and a handle, and told the cycle and the attended close-out where to
@@ -177,6 +198,13 @@ export function factsSha(facts) {
           reversedWeek: facts.decisions.reversedWeek,
         }
       : null,
+    // FEATURE: SES-84 — the per-class census rows, so a claim being classed, ratified, rejected, a
+    // new root claim, or an `unclassed` row appearing each move the sha. The claim TEXT is
+    // deliberately absent: the ref identifies the newest root claim, and a text edit that keeps the
+    // same ref is not a census change.
+    census: Array.isArray(facts.census)
+      ? facts.census.map(r => [r.judgment_class, r.ratified, r.proposed, r.rejected, r.total, r.newest_root_claim_ref || null])
+      : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
 }
@@ -219,6 +247,78 @@ export function summarise(s, max = 120) {
   return flat.length > max ? flat.slice(0, max - 1).trimEnd() + "…" : flat;
 }
 
+/**
+ * FEATURE: SES-84 — the four judgment classes in the fixed order the census view emits them
+ * (`ord` 1–4). Named form always (John, 2026-08-20: `P10 - Tooling`, never a bare `P9`).
+ */
+export const CLASS_ORDER = [
+  "P1 - Improves John's Skills",
+  "P2 - Inventive",
+  "P3 - Investor Value",
+  "P4 - New Customers",
+];
+
+/**
+ * FEATURE: SES-84 — the `Judgment classes` fact group. PURE: (census rows, stamp) in, markdown out,
+ * so tests/regression/ses-84-claims-classed.test.mjs drives it from a fixture the same way the
+ * SES-177b / SES-286c guards drive renderBlock(). `census` is exactly what fetchFacts() reads from
+ * `public.judgment_class_census` — one row per class in P1→P4 order, then `neutral`, then
+ * `unclassed` — and nothing here counts anything: the view is the census, this is its rendering.
+ *
+ * THREE BRANCHES, AND THE DIFFERENCE BETWEEN THEM IS THE POINT:
+ *   - no census at all (the key is absent or not an array) — SAID, never rendered as zeros;
+ *   - a class row missing from the six — an em-dash row, an honest gap rather than an invented 0;
+ *   - `unclassed` > 0 — a FLAG line, because after SES-84's recorded decision it is zero by
+ *     construction and a non-zero is drift; at zero the row is not printed at all, so the table is
+ *     five rows and a sixth row appearing is itself the signal.
+ *
+ * The claim text goes through summarise(): it is corpus text drafted by agents, some of it quoting
+ * file names in backticks, and this bullet ends inside a markdown line — same untrusted-text rule as
+ * the decision bullets above.
+ */
+export function renderJudgmentClasses(census, stamp) {
+  const L = [];
+  L.push(`**Judgment classes** — *${stamp}.* What the corpus currently holds per pull test, live from ` +
+    "`public.judgment_class_census` (`SES-84`; the same view `SES-159` reads). Ratification is a " +
+    "standing metric (John, 2026-08-23: a class is never finished being learned), never a finish line.");
+  L.push("");
+  if (!Array.isArray(census)) {
+    L.push("- *The class census was not read for this render* — which is **not** the same as *zero " +
+      "claims*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+  const byClass = new Map(census.map(r => [r.judgment_class, r]));
+  L.push("| class | ratified | proposed | rejected | total |");
+  L.push("|---|---:|---:|---:|---:|");
+  for (const k of [...CLASS_ORDER, "neutral"]) {
+    const r = byClass.get(k);
+    if (!r) { L.push(`| \`${k}\` | — | — | — | — |`); continue; }
+    L.push(`| \`${k}\` | ${r.ratified} | ${r.proposed} | ${r.rejected} | ${r.total} |`);
+  }
+  L.push("");
+  for (const k of CLASS_ORDER) {
+    const r = byClass.get(k);
+    const short = k.split(" - ")[0];
+    if (r && r.newest_root_claim_ref) {
+      L.push(`- Newest proposed root claim for ${short}: \`${r.newest_root_claim_ref}\` — ` +
+        summarise(r.newest_root_claim, 160));
+    } else {
+      L.push(`- Newest proposed root claim for ${short}: *no proposed root claim*.`);
+    }
+  }
+  const un = byClass.get("unclassed");
+  const unTotal = un ? Number(un.total) : 0;
+  if (unTotal > 0) {
+    L.push("");
+    L.push(`- **FLAG: ${unTotal} live claim${unTotal === 1 ? "" : "s"} still \`unclassed\`** — after ` +
+      "`SES-84` this is zero by construction; a non-zero here is drift (a claim inserted without a " +
+      "classing decision) and needs one recorded decision, never a default.");
+  }
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -234,7 +334,9 @@ export function asOf(nowIso) {
  */
 export function renderBlock(facts, nowIso) {
   // FEATURE: SES-286 (c) — decisions joins the destructure; it may be absent (see the header note).
-  const { items, settings, drain, decisions } = facts;
+  // FEATURE: SES-84 — the class census joins it on the same terms: absent means "not read", never
+  // "zero". Renamed on the way in: `census` in this scope is the column-census helper above.
+  const { items, settings, drain, decisions, census: classCensus } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -380,6 +482,11 @@ export function renderBlock(facts, nowIso) {
   }
   L.push("");
 
+  // ---- Judgment classes (FEATURE: SES-84 — M7 gate ruling ii) ------------------------------
+  // After Open decisions, before the provenance line. The group is a pure helper so the guard can
+  // assert it from a fixture; it renders what the view returned and counts nothing itself.
+  L.push(renderJudgmentClasses(classCensus, stamp));
+
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
     "The stamp says when this was last read; the sha says whether it still matches the tables. " +
@@ -491,7 +598,18 @@ export async function fetchFacts(url, key) {
     reversedWeek: Array.isArray(reversedWeek) ? reversedWeek.length : 0,
   };
 
-  return { items, settings, drain, decisions };
+  // FEATURE: SES-84 — the per-class census, read from the VIEW and never re-derived here.
+  // judgment_class_census is service_role only (its migration revokes anon/authenticated by name,
+  // the SES-78a rule), the same key everything above needs. Columns are named rather than `*` —
+  // this file's own rule — and `order=ord` pins the P1→P4, neutral, unclassed order the view
+  // defines so the block never churns between renders. rest() dies with exit 2 on any non-2xx, so
+  // a checkout run against a database predating the ses84_claim_classing migration REFUSES rather
+  // than rendering a brief with this group silently missing.
+  const classCensus = await rest(url, key,
+    "judgment_class_census?select=judgment_class,ord,ratified,proposed,rejected,total,newest_root_claim_ref,newest_root_claim&order=ord");
+  if (!Array.isArray(classCensus) || classCensus.length === 0) die("judgment_class_census came back empty — refusing to render a class census from nothing");
+
+  return { items, settings, drain, decisions, census: classCensus };
 }
 
 async function main() {
