@@ -1,3 +1,10 @@
+// DeepBench v7.0.419 | api/prompt/ai-enrichment.js | LOG-143 (d1) -- a 'trace_facts' value in
+// fetchSection()'s generic fetch_instruction.source switch (the AA-107 / AA-162 route): given a
+// trace_id in task_context it reads that trace's own ai_activity_log rows server-side and renders
+// one section carrying the hops, the distinct retrieved_chunk_ids, the self_reported_claims and the
+// the_library text behind those ids via LOG-143 (d2)'s readContentByIds(). The Bench Report Card's
+// judge therefore scores delegation fit, groundedness and Skill use from the LOG rather than from
+// the subset the browser could see. No new capability, no second model turn, no executor change.
 // DeepBench v7.0.212 | api/prompt/ai-enrichment.js | LAV-17 -- fetchSection() stops dropping the
 // retrieved record TITLES on the floor. `_rag_titles` is a sibling of LOG-37's `_rag_chunk_ids`,
 // under the same `ragMethod === 'similarity-search'` gate and for the same reason (a direct
@@ -46,7 +53,13 @@
 // FEATURE: AA-43 — Takes Prompt Request, fetches runtime data, renders assembled system prompt
 
 import { queryRAG } from "../../lib/rag.js";
-import { queryContent } from "../../lib/search-harness.js";
+// FEATURE: LOG-143 (d1) -- readContentByIds() joins queryContent() from the same broker. The
+// enrichment layer is already the one place that reads Library content on any capability's behalf
+// (the `the_library` source below has always done exactly this), so the trace_facts source reads
+// chunk text here rather than through a delegation hop, and Rule #1 still holds: the read runs
+// inside lib/librarian.js and logs its own `eleanor` librarian row, and no capability's data names
+// another agent.
+import { queryContent, readContentByIds } from "../../lib/search-harness.js";
 import { getRosterCandidates } from "../../lib/project-manager.js";
 import { logActivity } from '../../lib/activity-log.js';
 import { withRequestContext } from '../../lib/request-context.js';
@@ -60,7 +73,18 @@ const RAG_TIMEOUT_MS = 10000;
 // describeLibraryCatalog() (a catalog listing). Neither embeds anything, so neither can produce a
 // retrieved chunk. Every other source -- the_library / the_reasoning via queryContent(), and the
 // null/unknown fallthrough via queryRAG() -- runs a real embedding similarity search.
-const DIRECT_LOOKUP_SOURCES = new Set(['roster', 'the_library_catalog']);
+// FEATURE: LOG-143 (d1) -- 'trace_facts' is a direct lookup too: a PostgREST select on
+// ai_activity_log by trace_id plus a by-id Library read. No embedding runs, so classifying it as a
+// similarity search would make retrieved_chunk_ids meaningful where they are not (the exact defect
+// LOG-37a-patch fixed) and would bill a retrieval_method this source never performs.
+const DIRECT_LOOKUP_SOURCES = new Set(['roster', 'the_library_catalog', 'trace_facts']);
+
+// FEATURE: LOG-143 (d1) -- the trace_facts caps, named rather than inline so the section can state
+// its own bounds to the judge. A truncated input that does not SAY it was truncated is how a judge
+// scores "the answer cited nothing" over a section that simply ran out of room.
+const TRACE_FACTS_MAX_HOPS = 32;
+const TRACE_FACTS_MAX_CHUNK_IDS = 64;   // the same cap lookupRecordsWithContent() enforces (LOG-143 d2)
+const TRACE_FACTS_CHUNK_CHARS = 1200;   // per chunk, not per section
 
 // FEATURE: AA-179c -- who owns each brokered assembly source (§19e's LOCKED registry: Eleanor
 // owns the_library, Michelle the roster directory; §19 rule 16 precedent for naming a service
@@ -83,6 +107,132 @@ function retrievalMethodFor(source) {
   return DIRECT_LOOKUP_SOURCES.has(source) ? 'direct-lookup' : 'similarity-search';
 }
 
+// FEATURE: LOG-143 (d1) -- the trace_facts section builder. WHAT PROBLEM THIS SOLVES: the Bench
+// Report Card judges a finished run on delegation fit, groundedness and Skill use, and all three
+// need facts the BROWSER CANNOT SEE. assembled_skill_slugs, retrieved_chunk_ids and
+// self_reported_claims are written server-side onto ai_activity_log and returned to no client, so
+// part (b)'s trigger could only pass the hop triples it happened to send, and the judge scored two
+// of three dimensions `unknown` on every card. This reads the run's own recorded facts back out,
+// server-side, and renders them as one prompt section on the judge's OWN model turn -- no second
+// capability call, no second model turn, no executor change.
+//
+// WHY A PROMPT SECTION AND NOT A DETERMINISTIC CAPABILITY: measured this session, the harness has
+// no deterministic dispatch path. runLoop() calls callModel() unconditionally before it can reach
+// sendRequest(), sendRequest() itself either consumes a precomputed_turn or calls callModel(), and
+// capabilities.execution_type is read in exactly one place (db-assembly.js, to stamp the signature)
+// and never branches execution. `fetch_instruction.source` IS the platform's existing data-driven
+// way to put server-side facts in front of a model before it reasons, and two prior tickets added a
+// source by this same route (AA-107 the_reasoning, AA-162 the_library_catalog).
+//
+// A HOP IS AN `agent-turn` ROW, and that is a measured choice rather than a convenient one: the
+// guardrails-check and agent-directory rows in a trace are sub-calls of a hop, not hops, and
+// counting them would inflate every delegation-fit denominator. intent_slug is not a column -- it
+// is the middle segment of `feature`, written as `<capability>:<intent>:depth<N>` -- so it is parsed
+// from there rather than invented.
+//
+// GROUNDEDNESS AND THE STORE BOUNDARY, which is the subtle part. A trace's retrieved_chunk_ids can
+// come from ANY retrieval path, and `call_facts.retrieval_method` records similarity-vs-direct but
+// NOT which store. the_library, the_reasoning and knowledge_entries are physically separate stores
+// that never share a code path (.claude/rules/library-access.md), and only the_library's text is
+// readable here. So ids that do not resolve are reported as "not the_library records" and the
+// section says in words that this means the run grounded elsewhere -- NOT that its claims are
+// unsupported. Collapsing those two into one silent empty is how an honest `unknown` becomes a
+// fabricated low score (C-rejected-17/18).
+export function parseIntentFromFeature(feature) {
+  // `<capability>:<intent>:depth<N>` -- return the middle segment only when the shape really matches,
+  // never a best guess off a two-part or malformed feature string.
+  const parts = String(feature || '').split(':');
+  return parts.length === 3 && /^depth\d+$/.test(parts[2]) ? parts[1] : null;
+}
+
+export async function buildTraceFacts({ traceId, tenantId, requestingAgentId }) {
+  const empty = (note) => ({ context: `TRACE FACTS — unavailable.\n${note}`, chunks: [], matchCount: 0 });
+
+  if (!traceId) return empty('No trace_id was supplied in task_context, so no run could be looked up. Score every dimension that depends on the run\'s logged facts as unknown.');
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) return empty('The platform log could not be reached from this execution. Score every dimension that depends on the run\'s logged facts as unknown.');
+
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+  const url = `${supabaseUrl}/rest/v1/ai_activity_log`
+    + `?trace_id=eq.${encodeURIComponent(traceId)}`
+    + `&tenant_id=eq.${encodeURIComponent(tenantId || 'global')}`
+    + `&select=id,agent_id,ai_type,feature,call_facts&order=id.asc`;
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) return empty('The platform log returned an error for this trace. Score every dimension that depends on the run\'s logged facts as unknown.');
+  const rows = await res.json();
+  if (!Array.isArray(rows) || rows.length === 0) return empty(`No log rows exist for trace ${traceId}. Score every dimension that depends on the run's logged facts as unknown.`);
+
+  const turns = rows.filter(r => r.ai_type === 'agent-turn');
+  const hops = turns.slice(0, TRACE_FACTS_MAX_HOPS).map(r => ({
+    agent_id: r.agent_id ?? null,
+    capability_slug: r.call_facts?.capability_slug ?? null,
+    intent_slug: parseIntentFromFeature(r.feature),
+    assembled_skill_slugs: Array.isArray(r.call_facts?.assembled_skill_slugs) ? r.call_facts.assembled_skill_slugs : [],
+  }));
+
+  // Distinct, order-preserving, across every row in the trace -- retrieval happens on the row of
+  // whichever agent performed it, which is not necessarily an agent-turn row.
+  const chunkIds = [];
+  for (const r of rows) {
+    for (const id of (Array.isArray(r.call_facts?.retrieved_chunk_ids) ? r.call_facts.retrieved_chunk_ids : [])) {
+      if (typeof id === 'string' && !chunkIds.includes(id)) chunkIds.push(id);
+    }
+  }
+  const cappedIds = chunkIds.slice(0, TRACE_FACTS_MAX_CHUNK_IDS);
+
+  const claims = rows.map(r => r.call_facts?.self_reported_claims).filter(c => c !== null && c !== undefined);
+
+  // The Library half, through the d2 primitive. Never a direct table read from this file.
+  let records = [];
+  if (cappedIds.length > 0) {
+    const out = await readContentByIds({
+      requestingAgentId, store: 'the_library', ids: cappedIds, tenantId: tenantId || 'global',
+    });
+    records = Array.isArray(out?.records) ? out.records : [];
+  }
+  const withText = records.filter(r => r.exists && typeof r.content === 'string' && r.content.length > 0);
+
+  const lines = [];
+  lines.push(`TRACE FACTS for trace ${traceId} — read from this platform's own ai_activity_log, server-side. These are the run's recorded facts, not a summary of them. Judge from these, never from what the answer says about itself.`);
+  lines.push('');
+  lines.push(`HOPS (${hops.length}${turns.length > hops.length ? ` shown of ${turns.length}; capped at ${TRACE_FACTS_MAX_HOPS}` : ''}, in execution order). A hop is one agent turn; guardrail and directory sub-calls are not hops:`);
+  if (hops.length === 0) lines.push('  (none recorded)');
+  hops.forEach((h, i) => {
+    lines.push(`  ${i + 1}. agent_id: ${h.agent_id ?? 'unknown'} | capability: ${h.capability_slug ?? 'unknown'} | intent: ${h.intent_slug ?? 'unknown'} | assembled_skill_slugs: ${h.assembled_skill_slugs.length ? h.assembled_skill_slugs.join(', ') : '(none recorded)'}`);
+  });
+  lines.push('');
+  lines.push(`RETRIEVED CHUNK IDS (${cappedIds.length}${chunkIds.length > cappedIds.length ? ` shown of ${chunkIds.length}; capped at ${TRACE_FACTS_MAX_CHUNK_IDS}` : ''}, distinct, across all rows of the trace):`);
+  lines.push(cappedIds.length ? `  ${cappedIds.join(', ')}` : '  (none — this run retrieved nothing)');
+  lines.push('');
+  lines.push('SELF-REPORTED CLAIMS (what the run said about its own sourcing — evidence of a claim, never proof of one):');
+  lines.push(claims.length ? claims.map(c => `  ${JSON.stringify(c)}`).join('\n') : '  (none recorded)');
+  lines.push('');
+
+  if (cappedIds.length === 0) {
+    lines.push('RETRIEVED LIBRARY CHUNK TEXT: not applicable — the run retrieved no chunks at all. Score groundedness unknown and say so.');
+  } else if (withText.length === 0) {
+    lines.push(`RETRIEVED LIBRARY CHUNK TEXT: none of the ${cappedIds.length} chunk id(s) above is a the_library record, so no Library text backs them. THIS DOES NOT MEAN THE RUN WAS UNGROUNDED: the platform keeps several physically separate stores and only the_library's text is readable here, so this run grounded on a different store. Score groundedness unknown for that reason — never low.`);
+  } else {
+    lines.push(`RETRIEVED LIBRARY CHUNK TEXT (${withText.length} of ${cappedIds.length} chunk id(s) resolved to a the_library record; each trimmed to ${TRACE_FACTS_CHUNK_CHARS} characters — a claim resting on trimmed text is still traceable, cite the id):`);
+    for (const r of withText) {
+      const body = r.content.length > TRACE_FACTS_CHUNK_CHARS
+        ? `${r.content.slice(0, TRACE_FACTS_CHUNK_CHARS)}… [trimmed]`
+        : r.content;
+      lines.push(`--- CHUNK [id: ${r.id}] [TITLE: ${r.title ?? 'untitled'}] [citeable: ${r.citeable}] ---`);
+      lines.push(body);
+    }
+    const unresolved = cappedIds.filter(id => !withText.some(r => r.id === id));
+    if (unresolved.length) {
+      lines.push(`(${unresolved.length} further chunk id(s) are not the_library records — a different store, not a missing source: ${unresolved.join(', ')})`);
+    }
+  }
+
+  return { context: lines.join('\n'), chunks: [], matchCount: withText.length };
+}
+
 async function fetchWithTimeout(promise, timeoutMs) {
   let timer;
   const timeout = new Promise((_, reject) => {
@@ -98,7 +248,13 @@ async function fetchWithTimeout(promise, timeoutMs) {
 // FEATURE: AA-179c -- `spanId` joins the existing `traceId` positional so the two brokered fetches
 // below can stamp the run's §19p identity on the rows they write. No emit lives in here: the
 // completion frame is attached at the STEP 1 call site instead (see there for why).
-async function fetchSection(section, taskContext, tenantId, requestingAgentId, traceId = null, spanId = null) {
+// FEATURE: LOG-143 (d1) -- taskContextObj is the RAW task_context, added because `taskContext` above
+// is the flattened string (task_context.goal, or a JSON dump) and the trace_facts source needs one
+// structured field out of it. Deliberately NOT reusing the `traceId` param one line over: that is
+// the CURRENT execution's own trace (the judge's), while task_context.trace_id is the trace being
+// JUDGED. Conflating them would have the judge grade itself. Defaults to null, so every existing
+// call site is byte-identical.
+async function fetchSection(section, taskContext, tenantId, requestingAgentId, traceId = null, spanId = null, taskContextObj = null) {
   if (section.type === "stored") return { ...section };
 
   if (section.type === "rag") {
@@ -110,7 +266,19 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
       // branch is a thin pass-through to lib/librarian.js's existing queryLibrary(), proven
       // byte-identical by S-ARCH-REASONING-LAYER-01a's M1/M2 regression test. There is no fallback
       // branch for either value -- same "exactly one path" posture AG-30 established for the_library.
-      const result = fi.source === "roster"
+      // FEATURE: LOG-143 (d1) -- one more value in the same generic `fi.source` switch every other
+      // branch below already uses. Names no capability, no agent and no intent: any Skill Profile
+      // that declares traits.source = 'trace_facts' gets this section (.claude/rules/capabilities-are-data.md).
+      const result = fi.source === "trace_facts"
+        ? await fetchWithTimeout(
+            buildTraceFacts({
+              traceId: taskContextObj && typeof taskContextObj === 'object' ? taskContextObj.trace_id : null,
+              tenantId,
+              requestingAgentId,
+            }),
+            RAG_TIMEOUT_MS
+          )
+        : fi.source === "roster"
         // FEATURE: AA-179c -- Michelle Manning's roster read already writes an `agent-directory`
         // row per fetch; it just had no way to say which run it belonged to. Both values are the
         // requesting execution's own (§19p: identity travels with the work it credits).
@@ -291,7 +459,9 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
     // A failed fetch emits nothing -- it already surfaces to the caller as an omitted section plus
     // a fetch_errors entry, and inventing a failure frame here would be a second, softer claim
     // about the same event. `stored` sections emit nothing either: no work happened.
-    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id, span_id).then(fetched => {
+    // FEATURE: LOG-143 (d1) -- the raw task_context rides alongside the flattened string; only the
+    // trace_facts source reads it, every other branch ignores the extra argument.
+    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id, span_id, task_context).then(fetched => {
       if (s.type === "rag" && !fetched._fetch_error) {
         const source = s.fetch_instruction?.source ?? 'knowledge';
         emit({ type: 'assembly_work_complete', work: 'fetch',

@@ -255,22 +255,41 @@ export default async function run() {
     assert.match(intent.method, /retrieved_chunk_ids/,
       "the Skill's method must tell the judge which task_context field carries the chunk ids its " +
       "groundedness score rests on");
-    assert.match(intent.method, /include_content/,
-      "the method must tell the judge to obtain the chunk TEXT (include_content) rather than " +
-      "scoring groundedness from ids alone -- LOG-143 (d2) is what made that possible");
-    assert.match(intent.method, /ONLY when no retrieved_chunk_ids were passed/,
-      "unknown must be RESERVED for the genuinely input-less case. An unconditional unknown and a " +
-      "fabricated score are the same failure from opposite ends (C-rejected-17/18).");
+    // AMENDED AGAIN BY LOG-143 (d1) (decision 67ce31ca-3a14-4711-9a50-abfd187b542b). d2 had the judge
+    // REQUEST chunk text through the Library lookup's include_content flag; d1 supersedes that by
+    // delivering the text to it, already resolved, in the TRACE FACTS section -- so the rubric names
+    // the section rather than a lookup it no longer has to make (traits.can_request_help is still
+    // false, and now correctly so: no delegation is needed).
+    assert.match(intent.method, /TRACE FACTS/,
+      "the method must point the judge at the TRACE FACTS section -- that section IS the record, and " +
+      "a rubric that does not name it leaves the judge scoring from the answer's own prose");
+    // The two-case unknown rule, and the second case is the one that matters: chunk ids that are not
+    // Library records mean the run grounded on a DIFFERENT STORE, not on nothing. Reading that as a
+    // low score is C-rejected-17/18's fabrication from the opposite direction, so the instruction
+    // forbidding it is pinned verbatim.
+    assert.match(intent.method, /THE SECOND CASE IS NOT A LOW SCORE/,
+      "the method must forbid scoring groundedness LOW when a run's chunk ids are not Library " +
+      "records -- the platform keeps physically separate stores and only Library text is readable");
+    assert.match(intent.method, /exactly two cases/,
+      "unknown must be RESERVED for two named cases. An unconditional unknown and a fabricated " +
+      "score are the same failure from opposite ends (C-rejected-17/18).");
     assert.match(intent.method, /Never infer groundedness from the answer/,
       "the method must forbid inferring groundedness from the answer's own prose");
     assert.match(intent.method, /unknown is the honest value/,
       "the method must state that an unsupportable dimension is unknown, never a fabricated score");
 
     const csp = await svc(`capability_skill_profiles?capability_slug=eq.${CAPABILITY_SLUG}&select=skill_profile_slug,level,is_required,display_order&order=display_order`);
-    assert.equal(csp.length, 3, "all three Skills must be wired to the capability");
+    // FOUR since LOG-143 (d1), decision 67ce31ca-3a14-4711-9a50-abfd187b542b: rc-trace-knowledge is
+    // the knowledge Skill whose traits.source = 'trace_facts' is what puts the graded run's own
+    // logged facts in front of the judge. Asserted by NAME as well as by count -- a bare count of 4
+    // would pass against any fourth Skill, and this one is the ticket.
+    assert.equal(csp.length, 4, "all four Skills must be wired to the capability");
+    assert.ok(csp.some(r => r.skill_profile_slug === "rc-trace-knowledge"),
+      "rc-trace-knowledge must be wired to bench-report-card -- without it the judge's prompt " +
+      "carries no TRACE FACTS section and every dimension that reads the log scores unknown again");
     assert.ok(csp.every(r => r.level === 2 && r.is_required === true),
-      "all three are level 2 and required, mirroring the qg-* rows");
-    assert.deepEqual(csp.map(r => r.display_order), [1, 2, 3], "display_order must be 1..3");
+      "all four are level 2 and required, mirroring the qg-* rows");
+    assert.deepEqual(csp.map(r => r.display_order), [1, 2, 3, 4], "display_order must be 1..4 with no gap");
 
     // The table and the view are readable by the service role (existence, without asserting rows:
     // a fresh table is legitimately empty and an emptiness assertion would break on the first
