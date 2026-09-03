@@ -177,6 +177,17 @@ export const SERVICE_CATALOG = [
   // the display Name ('Tool Use'), matching every other entry in this catalog -- corresponds to
   // PATTERN_CATALOG's 'tool-use' slug.
   { slug: 'pattern-vocabulary-review', name: 'Pattern Vocabulary Review (Susan Smith)', serviceType: 'ai', patterns: ['Tool Use'], roadmap: 'now' },
+  // FEATURE: LOG-143 -- bench-report-card capability (Owen Marsh -- The Proofreader, grading a
+  // finished run on delegation fit, groundedness and Skill use). No AI_TYPE_TO_SERVICE entry is
+  // needed: ai_type will equal capability_slug ('bench-report-card') exactly, resolved by the
+  // existing `|| e.type` fallback -- the same pattern as hypothesis-evaluation/pipeline-triage/
+  // data-analysis/quality-gate. patterns uses display Names, matching every other entry
+  // ('LLM-as-Judge / Verifier' = PATTERN_CATALOG's 'llm-as-judge', 'RAG' = 'rag').
+  // 'RAG' is declared because the judge's groundedness dimension reads retrieved Library content;
+  // note that the retrieval itself lands with LOG-143 part (d) -- nothing on the platform can read
+  // the_library chunk TEXT by id yet, so groundedness returns `unknown` until then. Declared here
+  // rather than added later so the service's pattern set does not churn mid-feature.
+  { slug: 'bench-report-card',       name: 'Bench Report Card',         serviceType: 'ai',     patterns: ['LLM-as-Judge / Verifier', 'Structured Output', 'RAG'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge

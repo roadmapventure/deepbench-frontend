@@ -57,6 +57,12 @@ import { handle as reasoningWriteHandle } from '../_lib/handlers/reasoning-write
 import { handle as patternVocabularyWriteHandle } from '../_lib/handlers/pattern-vocabulary-write.js';
 // FEATURE: LOO-22 -- Eleanor's record-level library verification read handler registration.
 import { handle as libraryLookupHandle } from '../_lib/handlers/library-lookup.js';
+// FEATURE: LOG-143 -- Owen's bench_report_cards write handler registration. This registry is the
+// generic registration mechanism every write handler has used (AA-44, AI-35, LOO-22): it names no
+// capability, and which handler runs is still pure data (traits.handler on the Skill Profile), so
+// ARCHITECTURE.md §19b holds. Registration is not optional -- KNOWN_HANDLERS below is derived from
+// this map and an unregistered slug 501s, so a data-only capability could never reach its store.
+import { handle as reportCardWriteHandle } from '../_lib/handlers/report-card-write.js';
 import { logActivity } from '../../lib/activity-log.js';
 // FEATURE: LOG-67 -- merges the fact-half (buildCallFacts) with the config-half signature snapshot
 // carried on the enriched prompt_request.
@@ -65,7 +71,8 @@ import { withRequestContext } from '../../lib/request-context.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
-const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle };
+// FEATURE: LOG-143 -- 'report-card-write' joins the map; see the import comment above.
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle, 'report-card-write': reportCardWriteHandle };
 const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
