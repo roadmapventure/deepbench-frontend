@@ -1,4 +1,4 @@
-// DeepBench v7.0.410 | tests/regression/ses-004-decision-patterns.test.mjs | SES-004 — JOHN'S
+// DeepBench v7.0.411 | tests/regression/ses-004-decision-patterns.test.mjs | SES-004 (b) — JOHN'S
 // DECISION PATTERNS ARE ROWS A DECISION CAN CITE, AND THE JOHN-MODEL REPORTS A COUNT UNTIL 30
 // DECISIONS EARN A RATE. The M7 design gate (decision 05cc2722, rulings ii/iii) re-scoped SES-004's
 // declared remainder — "patterns as queryable rows a cycle cites" — away from the card surface
@@ -8,6 +8,15 @@
 // public.runner_decision_patterns; (3) the standing brief reports the share of pattern-citing
 // decisions that stood unreversed — and reports COUNTS ONLY below 30 finalised-or-reversed
 // decisions, never a rate.
+//
+// PART (b) (this ship, `v7.0.411`): part (a) (`v7.0.410`, push `ddef954c`) shipped the rows, the
+// trigger, the exporter, the view, the brief block and 7b's own citation rule, then stopped at its
+// earned file cap owing two sentences — docs/runbooks/session-setup.md 3d's matching instruction for
+// an ATTENDED decision, and docs/JOHN-DECISION-PATTERNS.md's own header paragraph naming the exporter
+// and putting --check in its ship gate. Both are written now, and this file's two DOC-arm `notRun()`
+// declarations for them become real assertions below — `the3dSectionAlsoCitesItsPatterns()` and
+// `theMdHeaderNamesTheExporterAndCheckGate()`, each with its own mutation control (strip the sentence
+// from an in-memory copy of the section and confirm the very same check goes false).
 //
 // THREE ARMS, and what each proves is stated rather than implied:
 //
@@ -24,7 +33,11 @@
 //      branch is live rather than the string merely present.
 //   2. DOC (always runs): docs/runbooks/runner-cycle.md step 7b on disk carries the `pattern:N`
 //      instruction, the reserved-`pattern:0` meaning, the never-fails-to-record property, and one
-//      fenced example — inside 7b, not merely somewhere in a 3,900-line file.
+//      fenced example — inside 7b, not merely somewhere in a 3,900-line file. As of part (b), the
+//      same arm also checks docs/runbooks/session-setup.md 3d (the attended equivalent of 7b's
+//      instruction) and docs/JOHN-DECISION-PATTERNS.md's header (the exporter/--check paragraph) —
+//      each scoped to its own section, not merely somewhere in the file, and each with a mutation
+//      control proving the check can actually fail.
 //   3. LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY; DECLARED not-run otherwise, never silently
 //      skipped): decision_patterns holds the 161 md criteria contiguously plus the reserved row;
 //      compareRows() against the live table reports NO DRIFT (this IS `--check`, run through the
@@ -61,6 +74,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const CYCLE_REL = "docs/runbooks/runner-cycle.md";
 const EXPORTER_REL = "scripts/export-decision-patterns.js";
 const RENDERER_REL = "scripts/render-standing-brief.js";
+const SETUP_REL = "docs/runbooks/session-setup.md";
 
 const read = rel => fs.readFileSync(path.join(REPO, rel), "utf8").replace(/\r\n/g, "\n");
 
@@ -472,6 +486,69 @@ function step7bTellsACycleToCiteItsPatterns() {
     "the record_decision() reasoning placeholder must carry the instruction too — a rule stated only in prose above a copy-paste block is a rule that gets copied past");
 }
 
+// SES-004b — the two doc sentences part (a) left under the file cap: session-setup.md 3d cites
+// pattern:N too, and the patterns file names its own rows and its --check gate.
+function the3dSectionAlsoCitesItsPatterns() {
+  const setup = read(SETUP_REL);
+  const from = setup.indexOf("### 3d. Record a decision");
+  const to = setup.indexOf("### 3e. Run the verifier");
+  assert.ok(from > -1 && to > from, "control: 3d's span was not located in session-setup.md");
+  const section = setup.slice(from, to);
+
+  const hasSentence = s => {
+    const flat = s.replace(/\s+/g, " ");
+    return /names the criteria it relied on,? as `pattern:N` tokens/.test(flat)
+      && /runner-cycle\.md` step 7b/.test(flat)
+      && /pattern:0` = no\s*standing pattern applied/.test(flat)
+      && /`public\.runner_decision_patterns`/.test(flat);
+  };
+
+  assert.ok(hasSentence(section),
+    `${SETUP_REL} 3d must carry the pattern:N sentence for attended decisions — naming ` +
+    "runner-cycle.md step 7b, pattern:0's meaning, and public.runner_decision_patterns");
+
+  // MUTATION CONTROL: strip the sentence from an in-memory copy and confirm the check goes false —
+  // otherwise the regex above could be trivially satisfied by unrelated text and the assert above
+  // would be a vacuous pass.
+  const mutated = section.replace(
+    /\*\*The `reasoning` above also names[\s\S]*?unattended path\.\n/, "",
+  );
+  assert.notStrictEqual(mutated, section, "control: the mutation must actually remove text");
+  assert.ok(!hasSentence(mutated), "control: removing the sentence must make the check fail");
+}
+
+function theMdHeaderNamesTheExporterAndCheckGate() {
+  const md = read(DOC_REL);
+  const from = md.indexOf("> **This is now the full");
+  const to = md.indexOf("**Why this file exists");
+  assert.ok(from > -1 && to > from, `control: ${DOC_REL}'s header blockquote was not located`);
+  const header = md.slice(from, to);
+
+  const hasParagraph = s => {
+    // Strip the leading `> ` blockquote marker per LINE first — collapsing whitespace before
+    // stripping leaves stray `>` characters stranded mid-string with no line start to anchor on.
+    const flat = s.replace(/^>\s?/gm, "").replace(/\s+/g, " ");
+    return /`public\.decision_patterns`/.test(flat)
+      && /scripts\/export-decision-patterns\.js/.test(flat)
+      && /--check/.test(flat)
+      && /ship gate/.test(flat)
+      && /`scripts\/check-decision-pattern-quotes\.js`/.test(flat)
+      && /cites the criteria it relied on as `pattern:N`/.test(flat)
+      && /never renumbered/.test(flat);
+  };
+
+  assert.ok(hasParagraph(header),
+    `${DOC_REL}'s header must name the exporter, put --check in the ship gate alongside ` +
+    "check-decision-pattern-quotes.js, and state that decisions cite pattern:N and numbers are never renumbered");
+
+  // MUTATION CONTROL, same shape as the 3d one above.
+  const mutated = header.replace(
+    />\s*\*\*The criteria are also rows[\s\S]*?never renumbered\.\n/, "",
+  );
+  assert.notStrictEqual(mutated, header, "control: the mutation must actually remove text");
+  assert.ok(!hasParagraph(mutated), "control: removing the paragraph must make the check fail");
+}
+
 // ---------------------------------------------------------------------------
 // Arm 3 — LIVE.
 // ---------------------------------------------------------------------------
@@ -564,18 +641,11 @@ async function run(ctx = {}) {
   step7bTellsACycleToCiteItsPatterns();
   results.push("doc-7b-instructs-the-pattern-citation");
 
-  // DECLARED, NOT SILENTLY OMITTED. The kickoff's fifth and sixth repo files —
-  // docs/runbooks/session-setup.md § 3d's matching sentence for attended decisions, and
-  // docs/JOHN-DECISION-PATTERNS.md's own header paragraph naming the exporter and --check — are
-  // outside this session's earned file budget (class_autonomy('P10 - Tooling') → extra_files 1,
-  // measured 2026-09-02, spent on runner-cycle.md). They are carried to SES-004b with the runbook
-  // stamp rotation, and their assertions belong to that ship, not to a passing test here.
-  notRun(
-    "the 3d and md-header doc arms (session-setup.md § 3d carries the pattern:N sentence for attended " +
-    "decisions; JOHN-DECISION-PATTERNS.md's header names the exporter and puts --check in its ship gate)",
-    "both files are outside SES-004's earned file cap and are carried to SES-004b — see the kickoff's " +
-    "Section 7 split rule. Nothing here is broken; the instruction simply does not exist yet in those two files.",
-  );
+  // SES-004b — the two sentences part (a) left under the file cap: session-setup.md 3d and the
+  // patterns file's own header. What used to be a declared notRun() here is now a real assertion.
+  the3dSectionAlsoCitesItsPatterns();
+  theMdHeaderNamesTheExporterAndCheckGate();
+  results.push("doc-3d-and-md-header-carry-the-pattern-citation");
 
   const url = ctx.url ?? process.env.SUPABASE_URL;
   const key = ctx.key ?? process.env.SUPABASE_SERVICE_KEY;

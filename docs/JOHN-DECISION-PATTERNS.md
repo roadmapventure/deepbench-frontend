@@ -1,3 +1,12 @@
+<!-- DeepBench v7.0.411 | docs/JOHN-DECISION-PATTERNS.md | SES-004 (b) — header blockquote gains one
+     paragraph: the criteria are rows in `public.decision_patterns`, exported by
+     `scripts/export-decision-patterns.js` (`--check` is now part of this file's ship gate alongside
+     `scripts/check-decision-pattern-quotes.js`); every recorded decision cites them as `pattern:N`;
+     numbers are permanent and never renumbered. NO CRITERION TEXT TOUCHED —
+     `check-decision-pattern-quotes.js` exits exactly as before: FAIL, 3 ungrounded phrases on #137.
+     Part (b) of `SES-004`'s remainder — part (a) (`v7.0.410`, push `ddef954c`) shipped the rows, the
+     trigger and 7b's own citation rule and stopped at the file cap owing this paragraph and
+     `docs/runbooks/session-setup.md` 3d's matching sentence. -->
 <!-- DeepBench v7.0.327 | docs/JOHN-DECISION-PATTERNS.md | SES-004 — the RUNNER-ERA half of the mining
      pass: criteria 138–161, mined from the 2026-08-15 → 2026-08-29 corpus (197 decided cards carrying
      John's typed reason, 77 directives, 23 answered questions, 11 card asks, 8 comments). That corpus
@@ -42,6 +51,13 @@
 > or half-remembered instance is worse than a missing criterion — it teaches a wrong prior to every
 > autonomous decision downstream. Pairs with `WORKING-WITH-JOHN.md`'s "Adopt John's Practice
 > Instinct First — Concede Fast."
+>
+> **The criteria are also rows (`SES-004`).** Every criterion above is exported into
+> `public.decision_patterns` by `node scripts/export-decision-patterns.js`; `--check` compares the
+> live table against this file and is part of this file's ship gate alongside
+> `scripts/check-decision-pattern-quotes.js`. Every recorded decision — `docs/runbooks/runner-cycle.md`
+> step 7b for a cycle, `docs/runbooks/session-setup.md` 3d for an attended session — cites the
+> criteria it relied on as `pattern:N`. Numbers are permanent and never renumbered.
 
 **Why this file exists (from the `design-log-38-0724` retrospective):** Claude carries broad "best
 practices," but a best practice is a *prior*, not a decision — the right answer is that prior *conditioned
