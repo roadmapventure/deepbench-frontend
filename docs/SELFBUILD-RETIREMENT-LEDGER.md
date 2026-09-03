@@ -687,3 +687,109 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
   place. Restoring it means re-adding the `accept` arm *and* re-answering reason (2): a restored
   promotion must be paired with removing one of the two `M6-07` inputs, or the double count comes
   back with it.
+
+### 40. `SES-154`'s Accept-writes-`done` clause (superseded)
+<!-- FEATURE: SES-320 — the replacement mechanism is ALREADY LIVE and predates this entry, so there
+     is no commit in which neither the old clause nor its replacement is in force (SELFBUILD-CHARTER
+     transition rule): `public.sweep_decision_windows()` has closed a finalised `delivered` ticket
+     since `v7.0.412`, 2026-09-02. This entry records the ledger line the M7 gate review found
+     missing — the M7 kickoff's own §7 folded the retirement note into
+     `docs/RUNNER-GOV-M5-REQUIREMENTS.md`'s M5-14 amendment rather than here, because a ledger entry
+     would have been that session's fifth repo file, and this entry is the deferred write. -->
+- **Said, verbatim** (`runner-cycle.md`'s own `v7.0.205` header stamp): *"ACCEPTANCE-GATED
+  COMPLETION: a runner ship writes `delivered`, and only John's Accept ever writes `done`."*
+  Restated at step 7's close-out bullet: *"THE STATUS YOU WRITE IS `delivered`, NEVER `done`
+  (`SES-154`, `v7.0.205`; spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1, John
+  "yes" 2026-08-23)."* And at the step-5 status table's `delivered` row, quoted from the pre-change
+  blob (`git show 816187bd~1:docs/runbooks/runner-cycle.md`): *"`status = 'delivered'` | Built and
+  pushed by a cycle; John's Accept is pending (`SES-154`) | John, on the ship card."*
+- **Lived:** `docs/runbooks/runner-cycle.md` step 5's status table and step 7's close-out bullet —
+  runbook prose, not a `public.governance_rules` row. Spec
+  `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1, migration `ses154_delivered_status`.
+- **Superseded by:** `SES-320` (`v7.0.412`, 2026-09-02) — `public.sweep_decision_windows()` gained a
+  third `OUT` column `closed` and now writes `done` on a still-`delivered` ticket whose `kind='ship'`
+  decision it has just finalised, any class, any epic, once the decision's 72-hour reversal window
+  elapses unreversed.
+- **Why:** `SES-285` (2026-09-01) retired the Accept tap the clause depended on, so for eleven days
+  the clause named a mechanism that could not fire — a `delivered` ticket had **no exit at all**,
+  and sixteen rows sat there. A rule nobody can satisfy is not a gate, it is a leak.
+- **Survives — and this is the half a later editor must not lose:** the `delivered` status itself,
+  its exclusion from every pick predicate (migration `ses154_delivered_status`), its silent
+  step-past at step 5, and its **keeping its queue slot** while it waits — all four are `SES-154`'s
+  and all four are untouched. Only the *writer* of `done` changed, from a tap to a decision-window
+  finalisation.
+- **Restore:** re-adding an Accept-driven `done` write to the step-9 harvest is not sufficient and
+  not safe on its own — the `kind = 'ship'` branch must come out of `sweep_decision_windows()` in
+  the same change, because leaving both would close one delivery twice. Also
+  `docs/RUNNER-GOV-M5-REQUIREMENTS.md`'s `M5-14` note (added by `SES-320`) and `git` history of
+  `runner-cycle.md`.
+
+### 41. Step 4b's card route — "file the surviving proposal as a card; John's Accept turns it into a ticket" (superseded)
+<!-- FEATURE: SES-160 — the replacement (`file_invention_proposal()`) is ALREADY LIVE and predates
+     this entry, `v7.0.414`, 2026-09-03, same transition-rule reasoning as entry 40. This is the
+     ledger line for the RUNBOOK PROSE's retirement, distinct from entry 22 (`B12`'s registry-row
+     supersession by `M6-04`, 2026-09-01) — the register rule and the runbook sentence describing
+     its mechanism were retired on two different dates because the register rule's replacement
+     (the enhancement-lane admission test) existed before the runbook sentence's replacement
+     (`file_invention_proposal()`) did. -->
+- **Said, verbatim** (`git show 4736d4de~1:docs/runbooks/runner-cycle.md`, step 4b items 5–6):
+  *"File the surviving proposal as a `gated_before_build` `runner_items` card — ANNOTATED AS
+  WITHDRAWN AND UNRUNNABLE (`SES-289`): the card surface it files into no longer exists.
+  ... No backlog ticket yet: John's Accept turns the card into a queued ticket (B17 — superseded
+  2026-09-01 by `M6-05`; B23 — retired 2026-09-01, no replacement; both `SES-285`). Reverse kills it
+  and records the rejection as a `vision_claims` row with `status='rejected'`."*
+- **Lived:** `docs/runbooks/runner-cycle.md` step 4b items 5–6 (the invention pass's disposal
+  route) — register `B12` names the mechanism generally (entry 22, superseded by `M6-04` on
+  2026-09-01) but the runbook's own procedural sentence survived that supersession, annotated
+  *"withdrawn and unrunnable"* by `SES-289` rather than rewritten, because nothing yet existed to
+  replace it with.
+- **Superseded by:** `SES-160` (`v7.0.414`, 2026-09-03) — `public.file_invention_proposal()` files a
+  `backlog_items` row and its own `record_decision(kind='invention')` in **one transaction**; the
+  proposal's 72-hour reversal window is its ratification. No card, no Accept.
+- **Why:** `SES-289` could only annotate the sentence as withdrawn-and-unrunnable, because `M6-04`
+  (`SES-285`) had removed the card surface the sentence pointed at, but the runbook still needed
+  *some* instruction for what a cycle does with a surviving proposal, and no replacement mechanism
+  existed yet to write instead. `SES-160` is the rewrite `SES-289`'s own note deferred — same
+  two-stage retirement shape as entry 39's `apply_ladder_decision()`, where a rule is superseded on
+  one date and the artifact that embodied it is retired on a later one, once its replacement is
+  actually built.
+- **Survives:** everything upstream of filing — the egress probe, the class-lens research leg, the
+  ladder-and-cap-paced proposal count, the vision-corpus scoring and the R&D gate — is unchanged;
+  only the disposal route (item 5) and its `notes` bookkeeping (item 6) were rewritten.
+- **Restore:** `git show 4736d4de~1:docs/runbooks/runner-cycle.md` for the pre-change step 4b.
+  Restoring the card route also needs the `gated_before_build` card surface itself back, which
+  entry 22 records as retired by `M6-04`/`SES-285` — this file's edit alone cannot revive it.
+
+### 42. `M5-01`'s statement, pre-`SES-321` wording (amended)
+<!-- FEATURE: SES-321 — amended in the SAME commit that lands the pick-path enforcement
+     (migration `ses321_enhancement_passes_fence`), per the SELFBUILD-CHARTER transition rule: no
+     commit may exist in which neither the old fence nor the widened one is in force. Entries
+     34–38 are the precedent that a rule AMENDMENT, not only a retirement or supersession, gets a
+     ledger line. -->
+- **Said, verbatim** (`git show bd8de880~1:docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-01`, the wording
+  standing since `SES-280`, `v7.0.358`): *"A ticket is eligible for unattended development only if
+  its `epic_id` resolves to a `Selfbuild M0`–`M7` epic; unlinked or non-Selfbuild tickets are never
+  picked by a cycle."*
+- **Lived:** row `M5-01` (`selfbuild-m5-register`, `enforcement = 'script'`, `status = 'live'`),
+  home `docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-01`; also `docs/governance/RULES-SNAPSHOT.md`'s
+  generated copy of the row.
+- **Amended by:** `SES-321`, 2026-09-03 (`v7.0.416`), decision
+  `182655e3-f559-4b46-9457-7d3df8bbf998` — the statement now reads: *"A ticket is eligible for
+  unattended development only if its `epic_id` resolves to a `Selfbuild M0`–`M7` epic, **or an
+  enhancement admitted under `EL-01`**; unlinked or non-Selfbuild tickets are never picked by a
+  cycle **unless admitted as such**."*
+- **Why:** measured while filing `LOG-143` — `prime_directive_queue()`'s `buildable` CTE INNER
+  JOINed `epics` on `name ILIKE 'Selfbuild%'` *before* `EL-01`'s admission clause was ever
+  evaluated, so an unlinked ticket admitted under `EL-01` (claim, rationale and cycles present,
+  under the weekly cap) could never reach the pick path — an admitted enhancement passed the
+  register's own promise and still failed the fence in code. Migration
+  `ses321_enhancement_passes_fence` makes the `buildable` CTE a `LEFT JOIN` on `epics`, with the
+  fence evaluated as `(Selfbuild epic OR admitted enhancement)` in one clause, so the register's
+  promise is now the pick path's actual behaviour.
+- **Survives:** the fence's whole point — an unlinked or non-Selfbuild ticket is still never picked
+  — is unchanged; only the second way of clearing it (`EL-01` admission) was added. Nothing
+  Selfbuild-scoped widened.
+- **Restore:** the before-image under decision `182655e3-f559-4b46-9457-7d3df8bbf998`, or
+  `git show bd8de880~1:docs/RUNNER-GOV-M5-REQUIREMENTS.md` for the row as it stood. To make it live
+  again: restore the `statement` column, re-export `docs/governance/RULES-SNAPSHOT.md`, and revert
+  `prime_directive_queue()`'s `buildable` CTE to an `INNER JOIN` in the same commit.
