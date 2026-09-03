@@ -62,11 +62,27 @@ as `M5-01`/`M5-02`/`M5-09`.
 
 ### <a id="M5-01"></a>M5-01 — the scope fence (`script`)
 
-> A ticket is eligible for unattended development only if its `epic_id` resolves to a `Selfbuild M0`–`M7` epic; unlinked or non-Selfbuild tickets are never picked by a cycle.
+> A ticket is eligible for unattended development only if its `epic_id` resolves to a `Selfbuild M0`–`M7` epic, or an enhancement admitted under EL-01; unlinked or non-Selfbuild tickets are never picked by a cycle unless admitted as such.
 
 Drain eligibility is currently a directive-named list (`runner_drain_scope`) — a name, not a
 structural property, so nothing prevents non-Selfbuild work entering the unattended lane. This makes
 eligibility a property of the ticket's own `epic_id`, which cannot be widened by naming.
+
+**Amended `SES-321`, 2026-09-03 (`v7.0.416`), decision `182655e3-f559-4b46-9457-7d3df8bbf998`.**
+Measured while filing `LOG-143`: `prime_directive_queue()`'s `buildable` CTE INNER JOINed `epics` on
+`name ILIKE 'Selfbuild%'` before the `EL-01` admission clause was ever evaluated, so an unlinked
+ticket admitted under `EL-01` — claim, rationale and cycles present, under the weekly cap — could
+never reach the pick path, reproduced live on a rolled-back fixture (served after the fix, not
+served once its claim was blanked). Admission is the scope argument for an enhancement, exactly as
+`docs/RUNNER-GOV-ENHANCEMENT-LANE.md`'s `EL-01` already said, so this rule's fence now reads it: the
+epic link and `EL-01` admission are two ways to clear the same gate, never two separate ones.
+Migration `ses321_enhancement_passes_fence` makes `prime_directive_queue()`'s `buildable` CTE a
+`LEFT JOIN` on `epics` with the fence evaluated as `(Selfbuild epic OR admitted enhancement)` in one
+condition, so the enhancement half is never discarded before it is read. `drain_chain_gate()` and
+`runner_should_boot()` were read and left untouched: both inherit the fence through
+`prime_directive_queue()`/`drain_epic_next()` rather than restating it. `drain_epic_next()`'s own
+named-drain-scope fence is a separate predicate on a different concept (a directive's fixed named
+member list) and is out of this migration's scope.
 
 ### <a id="M5-02"></a>M5-02 — the filing lane, and B3's retirement (`script`)
 

@@ -19,7 +19,10 @@ review bucket, `M5-03`'s promotion criterion). Protection is automatic. **Enhanc
 must argue for itself** — John's goal 4 in `docs/M5-HANDOFF-2026-09-02.md`: *"He is not against new
 work. He is against silent scope growth."* This lane is the narrow door: a proposal that names the
 charter goal it serves, the number it will move, and what it costs may be built; one that cannot
-say those three things waits until it can.
+say those three things waits until it can. **Since `SES-321` (2026-09-03), `M5-01`'s epic fence is
+passed by admission**: an enhancement with no Selfbuild epic link clears the pick path the moment
+its own row passes the `EL-01` test above, the same as a Selfbuild-linked ticket — the epic link and
+`EL-01` admission are two ways to clear one gate, never two separate ones.
 
 **Use case.** A cycle invents an "M8 mission auditor" (`SES-234`/`SES-235`, filed unlinked on
 2026-08-29 and unpickable under `M5-01` ever since). Today its fate is silence. Under this lane the
