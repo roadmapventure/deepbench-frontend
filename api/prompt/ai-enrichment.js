@@ -187,11 +187,13 @@ export async function buildTraceFacts({ traceId, tenantId, requestingAgentId }) 
 
   // The Library half, through the d2 primitive. Never a direct table read from this file.
   let records = [];
+  let libraryAccess = null;
   if (cappedIds.length > 0) {
     const out = await readContentByIds({
       requestingAgentId, store: 'the_library', ids: cappedIds, tenantId: tenantId || 'global',
     });
     records = Array.isArray(out?.records) ? out.records : [];
+    libraryAccess = out?._access ?? null;
   }
   const withText = records.filter(r => r.exists && typeof r.content === 'string' && r.content.length > 0);
 
@@ -211,10 +213,17 @@ export async function buildTraceFacts({ traceId, tenantId, requestingAgentId }) 
   lines.push(claims.length ? claims.map(c => `  ${JSON.stringify(c)}`).join('\n') : '  (none recorded)');
   lines.push('');
 
+  // FEATURE: LOG-143 (d3) -- a denial is never reported as an absence. libraryAccess is checked
+  // BEFORE withText.length, so a denied read (no Library access at all) never falls through to the
+  // "not a the_library record" wording below -- that wording is honest only when the read actually
+  // ran and simply found nothing, which is a different fact from "this agent could not read the
+  // store" (C-rejected-17/18). Denial gets its own sentence and its own `unknown`, never a low score.
   if (cappedIds.length === 0) {
     lines.push('RETRIEVED LIBRARY CHUNK TEXT: not applicable — the run retrieved no chunks at all. Score groundedness unknown and say so.');
+  } else if (libraryAccess && !libraryAccess.granted) {
+    lines.push(`RETRIEVED LIBRARY CHUNK TEXT: not readable — the requesting agent ${requestingAgentId ?? 'unknown'} has no Library access for these ids (${libraryAccess.tier}); this is an access condition, NOT evidence about the run's sourcing; score groundedness unknown.`);
   } else if (withText.length === 0) {
-    lines.push(`RETRIEVED LIBRARY CHUNK TEXT: none of the ${cappedIds.length} chunk id(s) above is a the_library record, so no Library text backs them. THIS DOES NOT MEAN THE RUN WAS UNGROUNDED: the platform keeps several physically separate stores and only the_library's text is readable here, so this run grounded on a different store. Score groundedness unknown for that reason — never low.`);
+    lines.push(`RETRIEVED LIBRARY CHUNK TEXT: none of the ${cappedIds.length} chunk id(s) above is a the_library record (a different store, not a missing source), so no Library text backs them. THIS DOES NOT MEAN THE RUN WAS UNGROUNDED: the platform keeps several physically separate stores and only the_library's text is readable here, so this run grounded on a different store. Score groundedness unknown for that reason — never low.`);
   } else {
     lines.push(`RETRIEVED LIBRARY CHUNK TEXT (${withText.length} of ${cappedIds.length} chunk id(s) resolved to a the_library record; each trimmed to ${TRACE_FACTS_CHUNK_CHARS} characters — a claim resting on trimmed text is still traceable, cite the id):`);
     for (const r of withText) {
