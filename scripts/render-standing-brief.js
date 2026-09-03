@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+// DeepBench v7.0.410 | scripts/render-standing-brief.js | SES-004 — THE JOHN-MODEL REPORTS ITS SIGNAL,
+// AND REPORTS A COUNT UNTIL 30 DECISIONS EARN A RATE. A second fact group, `John-model`, lands AFTER
+// `Judgment classes` and BEFORE the provenance footer: how often a decision that leaned on a standing
+// criterion of John's (`public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md` by
+// `scripts/export-decision-patterns.js`) stood unreversed through its reversal window.
+//
+// THE FLOOR LIVES IN THE VIEW, NOT HERE, and that is the one thing to read twice. The M7 gate
+// (decision 05cc2722, ruling iii) set 30 finalised-or-reversed decisions as the point a rate means
+// anything; `public.john_model_signal` returns `agreement_rate = NULL` below it, and
+// renderJohnModel() branches on that NULL rather than on its own comparison. So the constant printed
+// in the prose is a LABEL, never the decision — move the floor in the view and the brief follows with
+// no edit here. A renderer that applied the floor itself would be a second home for it.
+// THE EDIT THIS FORBIDS: dividing in this file. Live at this ship: 10 open decisions, 0 finalised,
+// 0 reversed, 0 of them citing a pattern — every one of which is a count, and none of which is a rate.
+//
 // DeepBench v7.0.409 | scripts/render-standing-brief.js | SES-84 — THE PER-CLASS CENSUS OF THE VISION
 // CORPUS IS ON THE PAGE, AND RATIFICATION IS A STANDING METRIC, NOT A FINISH LINE. The M7 design gate
 // (decision 05cc2722, ruling ii) re-scoped SES-84: every live vision_claims row carries a judgment
@@ -205,6 +220,19 @@ export function factsSha(facts) {
     census: Array.isArray(facts.census)
       ? facts.census.map(r => [r.judgment_class, r.ratified, r.proposed, r.rejected, r.total, r.newest_root_claim_ref || null])
       : null,
+    // FEATURE: SES-004 — the John-model rows, so a decision citing a pattern, one finalising, one
+    // being reversed, or the rate crossing the floor each move the sha and --check reports the
+    // drift. The IMPERATIVE is deliberately absent for the same reason the claim TEXT is above: the
+    // number identifies the criterion, and re-wording one in the md is not a change in the signal.
+    // agreement_rate is stringified because PostgREST returns a numeric as a string and a
+    // fixture-driven test writes a JS number — the sha must not depend on which one produced it.
+    johnModel: Array.isArray(facts.johnModel)
+      ? facts.johnModel.map(r => [
+          r.scope, r.pattern_no == null ? null : Number(r.pattern_no),
+          Number(r.citing_decisions), Number(r.finalised_unreversed), Number(r.reversed), Number(r.open),
+          r.agreement_rate == null ? null : String(Number(r.agreement_rate)),
+        ]).sort()
+      : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
 }
@@ -319,6 +347,107 @@ export function renderJudgmentClasses(census, stamp) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: SES-004 — the floor a rate binds from (M7 gate, decision 05cc2722, ruling iii). It is
+ * printed in the prose AND enforced in `public.john_model_signal`, which is why the renderer branches
+ * on `agreement_rate === null` rather than on this number: the VIEW decides whether a rate exists,
+ * this constant only says the same thing to John in words. A renderer that applied the floor itself
+ * would be a second home for it, and the two would drift the first time the gate moves it.
+ */
+export const JOHN_MODEL_FLOOR = 30;
+
+/** How many patterns the rate branch lists. The five most-cited, never all 162. */
+export const JOHN_MODEL_TOP_N = 5;
+
+/**
+ * FEATURE: SES-004 — the `John-model` fact group. PURE: (signal rows, stamp) in, markdown out, so
+ * tests/regression/ses-004-decision-patterns.test.mjs drives it from fixtures the same way the
+ * SES-84 guard drives renderJudgmentClasses(). `signal` is exactly what fetchFacts() reads from
+ * `public.john_model_signal`: one `overall` row, then one row per cited criterion.
+ *
+ * NOTHING HERE COUNTS ANYTHING, and nothing here divides. The view is the census and the view applies
+ * the floor; this function reports what came back. **The `overall` row's `agreement_rate` is the ONLY
+ * thing that decides which branch prints** — so if the gate ever moves the floor, the brief follows
+ * the database without an edit here.
+ *
+ * THREE BRANCHES, and the difference between them is the point:
+ *   - no signal at all (absent or not an array) — SAID, never rendered as zeros, exactly as the class
+ *     census does it: a render that could not read the ledger must not publish a number it never
+ *     measured;
+ *   - below the floor — the COUNTS and an explicit "no rate below N" line. A rate over three
+ *     decisions is not a small signal, it is a wrong one;
+ *   - at or above the floor — the rate, then the five most-cited criteria with their own counts.
+ *
+ * Imperatives go through summarise(): they are John's own words copied out of
+ * docs/JOHN-DECISION-PATTERNS.md, and several of them quote identifiers in backticks — an unbalanced
+ * backtick inside a table cell opens a code span that swallows the rest of the row.
+ */
+export function renderJohnModel(signal, stamp) {
+  const L = [];
+  L.push(`**John-model** — *${stamp}.* How often a decision that leaned on a standing pattern of ` +
+    "John's stood unreversed through its window, live from `public.john_model_signal` (`SES-004`; " +
+    "the criteria are `public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md`). " +
+    `A rate binds only from ${JOHN_MODEL_FLOOR} finalised-or-reversed decisions (M7 gate, ruling iii).`);
+  L.push("");
+
+  if (!Array.isArray(signal)) {
+    L.push("- *The John-model signal was not read for this render* — which is **not** the same as " +
+      "*no pattern-citing decisions*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const overall = signal.find(r => r.scope === "overall");
+  if (!overall) {
+    // An honest gap, never invented zeros — the same rule as a missing class row in the census.
+    L.push("- *The signal returned no `overall` row* — the view is present but did not report a " +
+      "total, so there is nothing to state here. Read `public.john_model_signal` directly.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const n = Number(overall.citing_decisions);
+  const f = Number(overall.finalised_unreversed);
+  const r = Number(overall.reversed);
+  const o = Number(overall.open);
+
+  if (overall.agreement_rate == null) {
+    L.push(`- **${n} pattern-citing decision${n === 1 ? "" : "s"} so far** (${f} finalised ` +
+      `unreversed, ${r} reversed, ${o} open) — no rate below ${JOHN_MODEL_FLOOR}.`);
+    L.push("");
+    return L.join("\n");
+  }
+
+  L.push(`- **${pct(f, f + r)} agreement** over ${f + r} finalised-or-reversed decisions (${f} ` +
+    `finalised unreversed, ${r} reversed; ${o} still open, ${n} citing in total). A reversal is the ` +
+    "strongest negative signal the ladder takes, so the second number is the one to read first.");
+  L.push("");
+
+  const top = signal
+    .filter(x => x.scope === "pattern")
+    .sort((a, b) => Number(b.citing_decisions) - Number(a.citing_decisions) ||
+                    Number(a.pattern_no) - Number(b.pattern_no))
+    .slice(0, JOHN_MODEL_TOP_N);
+  if (top.length === 0) {
+    L.push("- *No criterion has been cited yet* — the overall rate is above the floor with no " +
+      "per-pattern rows, which is a shape the view should not produce; read it directly.");
+    L.push("");
+    return L.join("\n");
+  }
+  L.push("| criterion | citing | final unreversed | reversed | open | rate |");
+  L.push("|---|---:|---:|---:|---:|---:|");
+  for (const p of top) {
+    L.push(`| \`pattern:${p.pattern_no}\` ${summarise(p.imperative, 80)} | ${p.citing_decisions} | ` +
+      `${p.finalised_unreversed} | ${p.reversed} | ${p.open} | ` +
+      `${p.agreement_rate == null ? "—" : pct(Number(p.finalised_unreversed), Number(p.finalised_unreversed) + Number(p.reversed))} |`);
+  }
+  L.push("");
+  L.push(`- A per-pattern \`—\` is not a zero: that criterion has not reached ${JOHN_MODEL_FLOOR} ` +
+    "finalised-or-reversed citations of its own, so it carries counts and no rate.");
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -336,7 +465,9 @@ export function renderBlock(facts, nowIso) {
   // FEATURE: SES-286 (c) — decisions joins the destructure; it may be absent (see the header note).
   // FEATURE: SES-84 — the class census joins it on the same terms: absent means "not read", never
   // "zero". Renamed on the way in: `census` in this scope is the column-census helper above.
-  const { items, settings, drain, decisions, census: classCensus } = facts;
+  // FEATURE: SES-004 — johnModel joins the destructure on the same terms as census: absent means
+  // "not read", never "no pattern-citing decisions".
+  const { items, settings, drain, decisions, census: classCensus, johnModel } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -487,6 +618,12 @@ export function renderBlock(facts, nowIso) {
   // assert it from a fixture; it renders what the view returned and counts nothing itself.
   L.push(renderJudgmentClasses(classCensus, stamp));
 
+  // ---- John-model (FEATURE: SES-004 — M7 gate ruling iii) ----------------------------------
+  // After Judgment classes, before the provenance line. Same contract as the group above it: a pure
+  // helper the guard can assert from a fixture, rendering what the view returned and counting
+  // nothing itself.
+  L.push(renderJohnModel(johnModel, stamp));
+
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
     "The stamp says when this was last read; the sha says whether it still matches the tables. " +
@@ -609,7 +746,18 @@ export async function fetchFacts(url, key) {
     "judgment_class_census?select=judgment_class,ord,ratified,proposed,rejected,total,newest_root_claim_ref,newest_root_claim&order=ord");
   if (!Array.isArray(classCensus) || classCensus.length === 0) die("judgment_class_census came back empty — refusing to render a class census from nothing");
 
-  return { items, settings, drain, decisions, census: classCensus };
+  // FEATURE: SES-004 — the John-model signal, read from the VIEW and never re-derived here; the view
+  // is also where the 30-decision floor lives, so this script never divides. john_model_signal is
+  // service_role only (its migration revokes anon/authenticated by name, the SES-78a rule), the same
+  // key everything above needs. Columns are named rather than `*` — this file's own rule — and the
+  // order pins overall-first, then the most-cited criteria, so the block never churns between
+  // renders. The view ALWAYS returns its `overall` row (an aggregate with no GROUP BY), so an empty
+  // array means the read itself is wrong and this refuses rather than publishing a silent gap.
+  const johnModel = await rest(url, key,
+    "john_model_signal?select=ord,scope,pattern_no,imperative,citing_decisions,finalised_unreversed,reversed,open,agreement_rate&order=ord,citing_decisions.desc,pattern_no");
+  if (!Array.isArray(johnModel) || johnModel.length === 0) die("john_model_signal came back empty — refusing to render the John-model from nothing (the view always returns its overall row)");
+
+  return { items, settings, drain, decisions, census: classCensus, johnModel };
 }
 
 async function main() {
