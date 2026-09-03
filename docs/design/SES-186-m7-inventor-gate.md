@@ -162,5 +162,13 @@ feature's own build — unpredictable until it is pitched.
   decides' is leaning on a rate that reads noise"* stands; ruling (iv) leans on the verdict plus the
   window, which is the bar M6 set, not a stronger one.
 - **`ses-281-m5-pick-enforcement.test.mjs`'s live arm** reads a claimed, unresolved gate as *"the
-  self-exclusion is gone"* (memory from the M6 sitting). This gate is claimed only for the length of
-  the sitting and is `done` at its close; the test itself is not touched here.
+  self-exclusion is gone"* — confirmed at this sitting: `prime_directive_queue()` served none of the
+  M7 members while `SES-186` was claimed, so the claim was released for the length of the verifier
+  run (today's runner spend was 2.84 M of the 3 M stale-floor cap, so no unattended cycle could take
+  it) and re-asserted before the `done` write. The test itself is not touched here.
+- **Verdict `9a2edb27` (block) is an environment defect, exempt from the ladder** — the same
+  exemption the M6 review recorded for `253aca14` and `fa079428`. The first LF-snapshot run used a
+  junction to the shared checkout's `node_modules`, which lacks `@vercel/functions`, so three
+  regression files failed at import (`DAT-003`, `DAT-12`, `HAR-20`); build and hygiene were green.
+  A clean `npm ci` in the snapshot and a second run followed; `verdict_ladder_signal()` is never
+  called on `9a2edb27`.
