@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.412 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | SES-320 — M5-14 gains a dated note NAMING THE MECHANISM that performs it, and the rule STATEMENT is untouched: no registry row edit, no re-export of docs/governance/RULES-SNAPSHOT.md, so the byte-for-byte registry↔doc equality tests/regression/ses-280-m5-governance-rules.test.mjs pins is unaffected. What the rule lacked was an executor for “closes on verifier pass once its reversal window elapses”: sweep_decision_windows finalised the decision and never touched backlog_items, so from SES-285 (which retired the Accept tap) to this ship a `delivered` ticket had NO exit and sixteen rows sat there. Migration ses320_delivered_exit makes the sweep write `done` on a still-`delivered` ticket whose kind=ship decision it has just finalised — any class, any epic — returning the count as a third OUT column `closed`. The timing distinction M5-14 draws is preserved exactly (original / gate-review may still auto-done at ship through 7a’s rung; discovered / john-named reach done only on verdict PLUS window), and a block finalises nothing because record_ship_decision refuses a non-approve verdict. THE SES-154 RETIREMENT LIVES HERE RATHER THAN IN docs/SELFBUILD-RETIREMENT-LEDGER.md, deliberately and on the kickoff’s own §7 instruction — the ledger entry would have been this session’s fifth repo file, so it folds into the same note; it names what SURVIVES (the `delivered` status, its pick-predicate exclusion, its silent step-past, its kept queue slot) and a restore path that must remove the sweep’s ship branch in the same change, because leaving both would close one delivery twice. -->
 <!-- DeepBench v7.0.390 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | close-out of session design-m5-fixes-0902 (attended, Fable 5.1 design, Opus 5 coding agents) — the SES-184 gate record gains its completion amendment: SES-308 (v7.0.389) and SES-309 (v7.0.390) are done with live QA, so M5 is complete against the 9-ticket required set. Doc-only plus the backlog snapshot re-export; the status writes, before-images and scoreboard stamps are in Supabase. No rule STATEMENT changed. -->
 <!-- DeepBench v7.0.388 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | M5 gate review (session design-m5-gate-review-0902, attended, Fable 5.1) — the SES-184 gate record gains one amendment: John's "yes, file the two tickets" adds SES-308 and SES-309 to the M5 required set (9 tickets, 16 cycles) and supersedes the "M5 COMPLETE" paragraph. Doc-only plus the backlog snapshot re-export; the rows, drain-scope entries and before-images are in Supabase. No rule STATEMENT changed, so the ses-280 registry↔doc equality guard is untouched. -->
 <!-- DeepBench v7.0.358 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | SES-280 — the M5 prioritization and auto-close rule set (M5-01..M5-15) gets its canonical home. FEATURE: SES-280 — Phase 1 (encode) of the two-phase split: this file and the fifteen public.governance_rules rows it renders land together, and B3 is superseded by M5-02 in the same commit per the SELFBUILD-CHARTER transition rule ("leaves no commit where neither is in force"). Phase 2 — script enforcement in drain_epic_next() / recompute_backlog_queue() — is a follow-up ticket; every rule below records the enforcement it is INTENDED to have, and the `script` ones are not executable yet. -->
@@ -228,6 +229,36 @@ auto-closes at ship, while `discovered` and `john-named` work closes only after 
 *and* the elapse of its 72-hour reversal window (`M6-02`). So John's own work still cannot be closed
 by the mechanism that scoped it, and it still cannot be closed on the day it ships — it is closed by
 a verdict plus his opportunity to reverse, rather than by his tap.
+
+<!-- FEATURE: SES-320 — the register names the mechanism that performs this rule; the rule statement is unchanged. -->
+**Mechanism named 2026-09-02 (`SES-320`, `v7.0.412`, migration `ses320_delivered_exit`). THE RULE
+STATEMENT ABOVE IS UNCHANGED — no registry row edit, and no re-export of
+`docs/governance/RULES-SNAPSHOT.md`.** What this rule lacked was the thing that performs *"closes on
+verifier pass once its reversal window elapses"*: `public.sweep_decision_windows()` finalised the
+decision and never touched `backlog_items`, so between `SES-285` (which retired the Accept tap) and
+this ship a `delivered` ticket had **no exit at all** and sixteen rows sat there. The sweep now
+writes `done` on a ticket still `delivered` whose `kind='ship'` decision it has just finalised — any
+class, any epic — and returns the count as a third column, `closed`. **The timing distinction this
+rule draws is preserved exactly:** `original` / `gate-review` work may still auto-`done` at ship
+through step 7a's rung, while `discovered` / `john-named` work reaches `done` only through its
+verdict *plus* the elapse of the window. A block never finalises, because `record_ship_decision()`
+refuses a non-`approve` verdict and so records nothing for the sweep to close.
+
+**And the `SES-154` clause *"only John's Accept writes `done`"* is RETIRED here rather than in
+`docs/SELFBUILD-RETIREMENT-LEDGER.md`** — deliberately, on the `SES-320` kickoff's own instruction
+(§7: the ledger entry folds into this note if it would be this session's fifth repo file, and it
+would have been). **Retired by:** `SES-320`, 2026-09-02, `v7.0.412`. **Superseded by:** a verifier
+verdict plus a reversal window — the sweep's finalisation, which is the mechanism this same note
+names above. **Why, and it is not merely that the tap went away:** `SES-285` retired the surface the
+clause depended on, so for eleven days the clause named a mechanism that could not fire and the only
+consequence was tickets accumulating in a state with no exit — a rule nobody can satisfy is not a
+gate, it is a leak. **What SURVIVES the retirement, and a later editor must not read this as
+permission to remove it:** the `delivered` status itself, its exclusion from every pick predicate
+(migration `ses154_delivered_status`), its silent step-past at step 5, and its **keeping its queue
+slot** while it waits — all four are `SES-154`'s and all four are untouched. **Restore path:**
+re-adding an Accept-driven `done` write to the step-9 harvest is not sufficient and not safe on its
+own — the `kind = 'ship'` branch must come out of `sweep_decision_windows()` in the same change,
+because leaving both would close one delivery twice.
 
 ### <a id="M5-15"></a>M5-15 — staleness lowers the ceiling, and one place applies it (`script`)
 
