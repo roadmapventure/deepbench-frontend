@@ -69,6 +69,36 @@ export function gateAdmitsRetiredAnyReversed(card) {
 export const APPLIED_CLASSES = ["restorable"];
 export const COUNTED_ONLY_CLASSES = ["unverifiable", "refused"];
 
+// FEATURE: SES-315 (b) -- THE SHAPE OF THE UPSERT, as a pure pair, for the same reason gateAdmits()
+// is one: the clause has to prove a DIFFERENCE from the form it replaced rather than a property
+// both share. The retired form deleted the row and re-inserted it, which raised 23503 the first
+// time a live backlog_items.blocked_by pointed at a restored ticket (ses-286a's fixture; fixed
+// there at ses286a_restore_in_place while THIS restore engine kept the broken form until SES-315).
+// An in-place UPDATE is also the smaller operation -- it is the one actually asked for, and it
+// cannot cascade.
+export function restoreShape(rowExistsNow) {
+  return rowExistsNow ? "update-in-place" : "insert";
+}
+
+// The RETIRED form this ship forbids. Kept ONLY as the negative control.
+export function restoreShapeRetiredDeleteReinsert() {
+  return "delete-then-insert";
+}
+
+function anExistingRowIsRestoredInPlace() {
+  assert.strictEqual(restoreShape(true), "update-in-place",
+    "a row that is still there is UPDATEd in place -- delete-and-reinsert drops every FK referent " +
+    "in the gap and raises 23503 on backlog_items_blocked_by_fkey, measured live at SES-315");
+  assert.strictEqual(restoreShape(false), "insert",
+    "a row that is genuinely GONE has no other shape than an INSERT -- and that branch must not be " +
+    "'simplified' away with the delete, because it is the only way a deleted row comes back");
+  assert.notStrictEqual(
+    restoreShape(true), restoreShapeRetiredDeleteReinsert(),
+    "shipped and retired restore shapes must diverge on an existing row, or the in-place clause is " +
+    "decorative -- that row is precisely the one the retired form destroys referents for"
+  );
+}
+
 function theGateNeedsBothHalves() {
   const shipReversed = { kind: "ship", decision: "reverse" };
   const incidentReversed = { kind: "gated_before_build", decision: "reverse" };
@@ -106,6 +136,10 @@ function doubtfulRowsAreNeverApplied() {
 
 // ---- the source half ---------------------------------------------------------------------------
 
+// The runbook is hard-wrapped, so a load-bearing phrase can straddle a line break; a literal match
+// that fails on a reflow fails for a reason that has nothing to do with the rule (SES-194).
+export const norm = s => s.replace(/\s+/g, " ");
+
 function clausesOver(text) {
   return {
     // The runbook POINTS AT the call -- one home for the rule.
@@ -118,13 +152,79 @@ function clausesOver(text) {
     keepsSkipsSeparate: /skipped_unverifiable/.test(text) && /skipped_refused/.test(text),
     // ...and says the apply is unreachable from the rollback path by construction.
     saysUnreachableFromRollback: /step 8a \*\*cannot\*\* reach the apply/.test(text),
+
+    // FEATURE: SES-315 (b) -- TWO CLAUSES THIS SHIP ADDS, each pinning a fact whose absence would
+    // send a cycle to do the wrong thing rather than merely leave it under-informed.
+    //
+    // (1) THE TRIGGER MOVED AND THE PROCEDURE DID NOT. A ship reversal now arrives as a queued
+    //     REVERT-FORWARD REQUESTED directive, because reverse_decision() restores the rows itself
+    //     and cannot revert the push. Without this, a cycle holding that directive has no written
+    //     procedure at all -- and the tempting guess is the wrong one: calling apply_data_restore()
+    //     for it would replay rows reverse_decision() has already put back, which is the
+    //     double-apply restore_applied_at exists to stop one level down. So the clause requires the
+    //     refusal sentence as well as the trigger.
+    statesTheDirectiveTrigger:
+      /A SHIP REVERSAL NOW ARRIVES AS A QUEUED DIRECTIVE RATHER THAN AS A CARD TAP/.test(text) &&
+      /REVERT-FORWARD REQUESTED: <TICKET>/.test(text) &&
+      /Do NOT also call `apply_data_restore\(\)` for it/.test(text),
+
+    // (2) THE UPSERT RESTORES IN PLACE. Stated at the apply's own site because that is where a
+    //     later editor "simplifying" the two branches back into a delete-and-reinsert would be
+    //     reading -- and the 23503 it reintroduces is invisible until a live blocked_by points at
+    //     a restored ticket, which is how the hole survived from SES-182 slice 5 to SES-315.
+    statesRestoreIsInPlace:
+      /AN EXISTING ROW IS RESTORED IN PLACE, NEVER DELETE-AND-REINSERT/.test(text) &&
+      /jsonb_populate_record/.test(text) &&
+      /23503/.test(text),
   };
 }
 
+// SES-158's vacuity meta-check, added here at SES-315 (b) in the SES-134 shape: one mutation per
+// clause, asserted to turn that clause false. The file-level pre-change control below is the other
+// half and neither replaces the other -- the pre-change control proves the clauses did not hold
+// BEFORE, these mutations prove each one is reading the phrase it claims to read.
+const MUTATIONS = {
+  namesTheCall: s => s.replace("SELECT * FROM public.apply_data_restore(",
+                               "UPDATE public.backlog_items SET ("),
+  statesShipOnly: s => s.split("A REVERSE ON A `ship` CARD").join("A REVERSE ON ANY CARD")
+                        .split("only a `SHIP` card").join("any card"),
+  forbidsWidening: s => s.replace('THE EDIT THIS FORBIDS: widening the gate to "any reversed card"',
+                                  "A LATER TICKET MAY WIDEN THE GATE"),
+  keepsSkipsSeparate: s => s.split("skipped_unverifiable").join("skipped_total"),
+  saysUnreachableFromRollback: s => s.replace("step 8a **cannot** reach the apply",
+                                              "step 8a may reach the apply"),
+  statesTheDirectiveTrigger:
+    s => s.replace("Do NOT also call `apply_data_restore()` for it",
+                   "Then call `apply_data_restore()` for it"),
+  statesRestoreIsInPlace:
+    s => s.replace("AN EXISTING ROW IS RESTORED IN PLACE, NEVER DELETE-AND-REINSERT",
+                   "THE ROW IS DELETED AND RE-INSERTED"),
+};
+
 function theRunbookHasOneHomeForTheRule() {
-  const c = clausesOver(fs.readFileSync(RUNBOOK, "utf8"));
+  const src = fs.readFileSync(RUNBOOK, "utf8");
+  const c = clausesOver(src);
   for (const [name, ok] of Object.entries(c)) {
     assert.ok(ok, `runner-cycle.md clause failed: ${name}`);
+  }
+
+  const names = Object.keys(c);
+  assert.deepStrictEqual(
+    names.filter(n => !MUTATIONS[n]), [],
+    "every runbook clause needs a mutation in MUTATIONS -- a clause with no control is a clause " +
+    "that can rot into a phrase nobody reads"
+  );
+  for (const name of names) {
+    const broken = MUTATIONS[name](src);
+    assert.notStrictEqual(
+      broken, src,
+      `clause "${name}"'s mutation returned its input unchanged -- the check below would pass ` +
+      "vacuously, which is a control that controls nothing"
+    );
+    assert.ok(
+      !clausesOver(broken)[name],
+      `${name} is VACUOUS -- it still passes after its own mutation`
+    );
   }
 }
 
@@ -221,6 +321,7 @@ async function theLiveGateRefuses() {
 async function run() {
   theGateNeedsBothHalves();
   doubtfulRowsAreNeverApplied();
+  anExistingRowIsRestoredInPlace();
   theRunbookHasOneHomeForTheRule();
   theClausesFailOnThePreChangeTree();
   await theLiveGateRefuses();

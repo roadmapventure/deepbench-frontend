@@ -1,5 +1,5 @@
-// DeepBench v7.0.404 | tests/regression/ses-315-ship-reverse.test.mjs | SES-315 (a) -- a ship is a
-// decision with a handle, and an Accept is no longer a ladder input.
+// DeepBench v7.0.405 | tests/regression/ses-315-ship-reverse.test.mjs | SES-315 (a)+(b) -- a ship
+// is a decision with a handle, an Accept is no longer a ladder input, and the runbook says so.
 //
 // WHAT IS BEING PINNED, and why the obvious guard would be the wrong one. It is easy to write a
 // test that asserts "record_ship_decision exists". That passes just as well against the build the
@@ -24,11 +24,18 @@
 // mechanism without ever exercising the live write. The write paths' evidence is the rolled-back
 // fixture at the foot of this file.
 //
-// PART (a) OF A TWO-PART TICKET. `class_autonomy('P10 - Tooling').extra_files` is 0 (tooling rung
-// 13 against cap_relax_rung 13), so SES-315's six files do not fit one session's cap. This commit
-// is the migration + the ledger + this guard; the runbook edits and the SES-134 / SES-182e clause
-// updates are part (b), and the arms that would grade them are DECLARED not-run below rather than
-// written against text that is not in the tree yet.
+// A TWO-PART TICKET, NOW COMPLETE, AND THE SPLIT LEFT A MARK ON THIS FILE THAT IS WORTH READING.
+// `class_autonomy('P10 - Tooling').extra_files` is 0 (tooling rung 13 against cap_relax_rung 13),
+// so SES-315's six files did not fit one session's cap. Part (a) (v7.0.404) shipped the migration,
+// the ledger entry and this guard, and DECLARED the runbook arms not-run rather than writing them
+// against text that was not in the tree. Part (b) (v7.0.405) shipped docs/runbooks/runner-cycle.md
+// and the SES-134 / SES-182e clause updates, and flipped that declaration into the nine asserted
+// RUNBOOK_CLAUSES below.
+//
+// TWO PRE-CHANGE SHAs, ONE PER HALF, and that is not fussiness: the ledger clauses must fail on the
+// tree before part (a), the runbook clauses on the tree before part (b) -- which IS part (a)'s
+// commit, the window in which the four functions were live and the file every cycle follows still
+// described the world they replaced. Pinning both halves to one SHA would pass and prove less.
 
 import assert from "assert";
 import fs from "fs";
@@ -47,6 +54,17 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const PRE_CHANGE_SHA = "9eb38971f3117f928ec41457257916990e05854a"; // origin/dev immediately before SES-315 (a)
 const LEDGER_REL = "docs/SELFBUILD-RETIREMENT-LEDGER.md";
 const LEDGER = path.join(ROOT, LEDGER_REL);
+
+// PART (b)'s OWN PRE-CHANGE SHA, and it is a DIFFERENT commit from the one above. The two halves of
+// this ticket landed in two commits, so one SHA cannot control both: the ledger clauses have to
+// fail on the tree before part (a), and the runbook clauses on the tree before part (b) -- which
+// is part (a)'s own commit, where the migration is live and runner-cycle.md still describes the
+// world it replaced. Pinning both to 9eb38971 would have "worked" and proved less: every runbook
+// clause fails there too, but for the wrong reason, and a later ship touching only the runbook
+// would then be graded against a two-commit-old file.
+const PRE_CHANGE_SHA_B = "107071e96fe7b33f4ba519b5f9aba7e6cb90e822"; // SES-315 part (a), before the runbook edits
+const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
+const RUNBOOK = path.join(ROOT, RUNBOOK_REL);
 
 // The ledger is hard-wrapped, so a load-bearing phrase can straddle a line break, and a literal
 // match that fails on a reflow fails for a reason that has nothing to do with the rule (SES-194).
@@ -270,6 +288,204 @@ function theClausesFailOnThePreChangeTree() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// THE RUNBOOK HALF -- part (b), which was DECLARED not-run in part (a)'s commit and is asserted
+// here. Every clause reads docs/runbooks/runner-cycle.md.
+// ---------------------------------------------------------------------------------------------
+//
+// WHY THIS IS NINE CLAUSES AND NOT ONE "the runbook mentions record_ship_decision" CLAUSE. Between
+// part (a) and part (b) the mechanism was live and unreached: the functions existed, and the file
+// every cycle actually follows still told it to write a status and record nothing, still described
+// an Accept promotion the migration had made inert, and still stated four withdrawn rules in live
+// voice. A guard that only checked the new call would pass against a runbook that names the call
+// AND keeps every one of those -- which is the same build the M6 gate review forbids, one where a
+// cycle can read two contradictory instructions and pick either. So the clauses come in pairs
+// wherever a rule both LOST something and KEPT something, and each pair's KEPT half is there to
+// stop a later editor "finishing" the retirement.
+
+export const RUNBOOK_CLAUSES = [
+  {
+    id: "step-7-close-out-calls-record-ship-decision",
+    detail:
+      "step 7's close-out must name the call. Without it part (a) is unreached: a ship lands, the " +
+      "status is written, and the delivery has no handle -- exactly the state the M6 gate review " +
+      "measured (decision c3e86310) and the whole reason this ticket exists",
+    test: s => /SELECT public\.record_ship_decision\(/.test(s),
+    breaks: s => s.replace("SELECT public.record_ship_decision(", "SELECT public.record_decision("),
+  },
+  {
+    id: "the-call-sits-at-the-foot-of-the-close-out-and-says-why",
+    detail:
+      "the ORDERING is the load-bearing half and it must be written down, because both failure " +
+      "modes are silent. Called before the cycle's other close-out writes, the adoption " +
+      "(`decision_id IS NULL`) picks up none of them and the Reverse restores less than the ship " +
+      "wrote; called before the writes at all, reverse_decision()'s written-since guard (measured " +
+      "against `decided_at` since SES-316) refuses every one of them and the undo does not happen. " +
+      "A cycle that only knows 'record a ship decision' will reach for the status write, which is " +
+      "where every other decision in 7b sits",
+    test: s => /IT GOES HERE, AT THE FOOT OF THE CLOSE-OUT, AND THE ORDERING IS LOAD-BEARING/.test(norm(s)) &&
+               /decision_id IS NULL/.test(s) && /decided_at/.test(s),
+    breaks: s => s.replace("IT GOES HERE, AT THE FOOT OF THE CLOSE-OUT",
+                           "IT GOES BESIDE THE STATUS WRITE"),
+  },
+  {
+    id: "the-close-out-declares-the-verdict-keyed-deviation",
+    detail:
+      "the kickoff says 'after the `done` write on an eligible approve' and the shipped " +
+      "instruction is keyed to the VERDICT, which is the function's own gate -- so an approve that " +
+      "wrote `delivered` records its handle too. That is a DEVIATION and the SES-196 convention is " +
+      "that it is disclosed where it is made, not buried in a commit message. It also has to be " +
+      "argued rather than asserted, because the narrow reading is the plausible one: restricting " +
+      "the call to auto-done ships leaves every ship awaiting John's Accept with no Reverse at " +
+      "all, and the ship card's tap being the surface SES-285 retired IS the absence M6-01 measured",
+    test: s => /keyed to the \*\*verdict\*\*, which is the function's own and only verdict gate/.test(norm(s)),
+    // A REGEX, never a literal carrying a `\n`: this worktree is CRLF and git stores LF, so a
+    // literal newline mutation is a no-op on one of the two trees and the teeth check then passes
+    // vacuously there. The suite is verified on an LF snapshot for the same reason.
+    breaks: s => s.replace(/keyed to the\s+\*\*verdict\*\*/, "keyed to the **auto-`done` bar**"),
+  },
+  {
+    id: "7b-no-longer-calls-a-ship-not-a-decision",
+    detail:
+      "7b is the ONE HOME for what counts as a decision and every other site cites it. While its " +
+      "list still opened with step 7's close-out -- 'its Reverse lives on the ship card', a surface " +
+      "SES-285 retired -- a cycle reading 7b was told, in the canonical place, that the thing it " +
+      "had just recorded was not a decision. BOTH DIRECTIONS ARE ASSERTED: the retired sentence is " +
+      "gone from the live list AND the correction names record_ship_decision(), because deleting " +
+      "the sentence without saying what replaced it leaves a reader looking for the rule they " +
+      "remember and finding nothing",
+    test: s => !/\*\*Not a decision:\*\* step 7's own close-out status write/.test(s) &&
+               /A SHIP \*IS\* A DECISION, AND THE SENTENCE THAT SAID OTHERWISE IS RETIRED/.test(s) &&
+               /public\.record_ship_decision\(\)/.test(s),
+    breaks: s => s.replace("**Not a decision:** a queue recompute",
+                           "**Not a decision:** step 7's own close-out status write on a green verdict, a queue recompute"),
+  },
+  {
+    id: "step-2s-reverse-ceremony-is-triggered-by-the-directive",
+    detail:
+      "a ship reversal's code half is a git operation no SQL function can perform, so " +
+      "reverse_decision() queues a REVERT-FORWARD REQUESTED directive and the next cycle performs " +
+      "it. The ceremony's PROCEDURE is unchanged; its TRIGGER is not, and the runbook has to say " +
+      "which -- a cycle holding that directive with no written procedure guesses, and the " +
+      "attractive guess (call apply_data_restore() too) replays rows the reversal already put back",
+    test: s => /A SHIP REVERSAL NOW ARRIVES AS A QUEUED DIRECTIVE RATHER THAN AS A CARD TAP/.test(s) &&
+               /REVERT-FORWARD REQUESTED: <TICKET>/.test(s) &&
+               /at step 5's selection layer \(1a\)/.test(norm(s)) &&
+               /Do NOT also call `apply_data_restore\(\)` for it/.test(s),
+    breaks: s => s.replace("Do NOT also call `apply_data_restore()` for it",
+                           "Then call `apply_data_restore()` for it"),
+  },
+  {
+    id: "the-accept-input-is-annotated-retired-and-the-function-is-not",
+    detail:
+      "THE PAIR THAT MATTERS MOST, and the one a tidy-minded editor breaks. The runbook must say " +
+      "at the call site that the `accept` branch is retired as a LADDER INPUT and that the " +
+      "FUNCTION is not retired -- naming the demote that survived. Read as 'this function is dead' " +
+      "and cleaned up, the deletion removes the only demote a legacy ship card has, and M6-07's " +
+      "entire safety measure is that a reversal always costs a rung. SES-134 pins the same two " +
+      "phrases from the other side; that overlap is deliberate, not duplication",
+    test: s => /THIS CALL IS RETIRED AS A LADDER INPUT FOR AN ACCEPT, AND IS NOT RETIRED AS A FUNCTION/.test(norm(s)) &&
+               /`reverse` branch keeps its demote in full/.test(norm(s)) &&
+               /still\s+stamps `ladder_applied_at`/.test(norm(s)),
+    breaks: s => s.replace("AND IS NOT RETIRED AS A FUNCTION", "AND THE FUNCTION IS DEAD"),
+  },
+  {
+    id: "step-8c-no-unattended-removal-is-annotated-superseded",
+    detail:
+      "'No unattended removal, ever' is superseded by M6-03 (registry: B7, superseded_by M6-03), " +
+      "and the M6-03 path sits in the very next paragraph -- so the live-voice form had a cycle " +
+      "reading a prohibition and its replacement two inches apart. The annotation must also say " +
+      "what SURVIVED, because the rule was not wholly withdrawn: the FIRST failed revalidation " +
+      "still only proposes, and an editor who reads the retirement as 'removal needs no second " +
+      "failure' gets the one behaviour M6-03 explicitly refuses",
+    test: s => /"No unattended removal, ever" is SUPERSEDED by `M6-03`/.test(norm(s)) &&
+               /second consecutive\*\* failed revalidation/.test(norm(s)),
+    breaks: s => s.replace('"No unattended removal, ever" is SUPERSEDED by `M6-03`',
+                           '"No unattended removal, ever" is the standing rule'),
+  },
+  {
+    id: "step-6-may-write-only-needs-desktop",
+    detail:
+      "step 6's design_status write is an INSTRUCTION, not narrative, so a retired value left in " +
+      "its placeholder is a cycle actually writing it. M6-01 retired `needs-john` as a blocking " +
+      "state and c_flagged has been ARRAY['needs-desktop'] alone since SES-281, so a ticket " +
+      "flagged `needs-john` today is parked with nothing waiting to un-park it. BOTH DIRECTIONS: " +
+      "the placeholder is gone AND the surviving value is named, because a statement with no value " +
+      "at all is worse than one with a retired value",
+    test: s => /SET design_status = 'needs-desktop', updated_at = now\(\)/.test(s) &&
+               !/design_status = '<needs-john\|needs-desktop>'/.test(s),
+    breaks: s => s.replace("SET design_status = 'needs-desktop', updated_at = now()",
+                           "SET design_status = '<needs-john|needs-desktop>', updated_at = now()"),
+  },
+  {
+    id: "the-flag-set-mentions-carry-their-retirement",
+    detail:
+      "step 5's blocked-prefix row for `needs-john` and the chain-gate flag-set mentions both " +
+      "stated a three-value set that has been one value since SES-281 -- read out of " +
+      "pg_get_functiondef at this ship rather than recalled. Gate C's row is the canonical one: a " +
+      "reader who believes the gate still stops on `john-paced` predicts a chain terminating where " +
+      "it now continues, and one who believes `needs-john` still blocks predicts a drain parked " +
+      "where nothing is parked. The retirement vocabulary sits on the SAME LINE as each mention " +
+      "because tripwire check 9 decides within the enclosing block",
+    test: s => /`ARRAY\['needs-desktop'\]` ALONE since `SES-281`/.test(s) &&
+               /RETIRED as a blocking state by `M6-01`; no cycle writes it any more \(`SES-315`\)/.test(s),
+    breaks: s => s.replace("`ARRAY['needs-desktop']` ALONE since `SES-281`",
+                           "`needs-john` / `needs-desktop` / `john-paced`"),
+  },
+];
+
+function readRunbook() {
+  return fs.readFileSync(RUNBOOK, "utf8");
+}
+
+function theRunbookCarriesPartB() {
+  const src = readRunbook();
+  for (const c of RUNBOOK_CLAUSES) {
+    assert.ok(c.test(src), `${c.id} -- ${c.detail}`);
+  }
+}
+
+function everyRunbookClauseHasTeeth() {
+  const src = readRunbook();
+  for (const c of RUNBOOK_CLAUSES) {
+    const broken = c.breaks(src);
+    assert.notStrictEqual(
+      broken, src,
+      `clause "${c.id}"'s breaks() returned its input unchanged -- the teeth check below would ` +
+      "pass vacuously, which is a control that controls nothing",
+    );
+    assert.ok(
+      !c.test(broken),
+      `${c.id} is VACUOUS -- it still passes after its own breaks() mutation`,
+    );
+  }
+}
+
+// FILE-LEVEL NEGATIVE CONTROL against PART (a)'s commit, where the mechanism is already live and
+// the runbook has none of this. Every clause must FAIL there.
+function theRunbookClausesFailOnPartA() {
+  let before;
+  try {
+    before = execFileSync("git", ["show", `${PRE_CHANGE_SHA_B}:${RUNBOOK_REL}`], {
+      cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    notRun(
+      "the runbook file-level negative control",
+      `commit ${PRE_CHANGE_SHA_B} is unreachable in this checkout (a shallow clone), so part (a)'s ` +
+      "runbook could not be read. The nine clauses above still ran against the shipped tree; what " +
+      "is unproven is that they FAIL on the tree where the functions were live and unreached.",
+    );
+    return;
+  }
+  const passing = RUNBOOK_CLAUSES.filter(c => c.test(before)).map(c => c.id);
+  assert.deepStrictEqual(
+    passing, [],
+    `these clauses pass on PART (a)'s runbook and therefore pin nothing about part (b): ${passing.join(", ")}`,
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
 // THE LIVE HALF -- Supabase over PostgREST. It invokes the REAL functions, but only on inputs the
 // guards must REFUSE, so it proves the deployed mechanism while writing nothing. The
 // write-free-ness is ASSERTED by side effect below rather than assumed.
@@ -483,26 +699,10 @@ export default async function run() {
   theLedgerRecordsTheRetirement();
   everyClauseHasTeeth();
   theClausesFailOnThePreChangeTree();
+  theRunbookCarriesPartB();
+  everyRunbookClauseHasTeeth();
+  theRunbookClausesFailOnPartA();
   await theShipDecisionRpcIsReachableAndFailsClosed();
-
-  notRun(
-    "SES-315 part (b) -- the runner-cycle.md arms: step 7's close-out naming " +
-      "record_ship_decision(), 7b no longer calling a ship 'not a decision', the four live-voice " +
-      "passages carrying retirement vocabulary (step 8c's no-unattended-removal, step 6's " +
-      "needs-john, the step-5 flag table row, the chain-gate flag-set mentions), and step 2's " +
-      "Reverse ceremony triggered by the directive instead of a card tap -- together with the " +
-      "SES-134 and SES-182e clause updates those edits require",
-    "this commit is part (a) of a two-part ticket: class_autonomy('P10 - Tooling').extra_files is " +
-      "0 (tooling rung 13, cap_relax_rung 13), so the six files SES-315 names do not fit one " +
-      "session's cap. Writing those arms now would grade text that is not in the tree, so they " +
-      "are declared rather than written -- and the arms above deliberately do NOT read " +
-      "runner-cycle.md at all, so nothing here can pass vacuously off a passage part (b) will " +
-      "add. MEASURED CONSEQUENCE OF THE SPLIT, stated so a later reader does not mistake it for " +
-      "an oversight: between (a) and (b) the mechanism is live and unreached -- step 7 does not " +
-      "yet call record_ship_decision(), so a ship landing in that window still has no handle, " +
-      "exactly as before; and step 2 still describes the Accept promotion the migration has " +
-      "already made inert.",
-  );
 
   notRun(
     "the WRITE paths of all four functions -- record_ship_decision()'s success path and its image " +

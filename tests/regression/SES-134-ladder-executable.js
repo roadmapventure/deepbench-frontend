@@ -45,6 +45,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const PRE_CHANGE_SHA = "a01ad5b2829be3b9c475cb5e5c9478564949df37";   // origin/dev immediately before SES-134 (v7.0.315) landed
 const RUNBOOK = path.join(ROOT, "docs/runbooks/runner-cycle.md");
 
+// The runbook is hard-wrapped, so a load-bearing phrase can straddle a line break and a literal
+// match then fails on a reflow for a reason that has nothing to do with the rule (SES-194). Used
+// only by the clauses added at SES-315 (b); the older clauses keep the whitespace-tolerant regexes
+// they already had, deliberately unchanged.
+export const norm = s => s.replace(/\s+/g, " ");
+
 // ---- the pure half -----------------------------------------------------------------------------
 
 // The SHIPPED rule. Exported so the divergence assertion below drives the real expression.
@@ -87,9 +93,54 @@ export const CLAUSES = [
     id: "runbook-names-the-call",
     detail:
       "step 2 must tell a cycle to call public.apply_ladder_decision(), because a rule each cycle " +
-      "applies by hand is the rule that got applied wrongly",
-    test: s => /SELECT \* FROM public\.apply_ladder_decision\(/.test(s),
+      "applies by hand is the rule that got applied wrongly -- AND, since SES-315 (v7.0.405), the " +
+      "call must not stand there unannotated. TIGHTENED RATHER THAN LEFT ALONE, with its control " +
+      "unchanged so this half still has teeth: the bare form passed just as well against the " +
+      "runbook SES-315 forbids, one where the call is named and the page still reads as though an " +
+      "Accept moved the ladder. A cycle finding the call and no annotation does exactly what the " +
+      "pre-SES-315 file told it to do, which is count a tap the migration has already made inert.",
+    test: s => /SELECT \* FROM public\.apply_ladder_decision\(/.test(s) &&
+               /RETIRED AS A LADDER INPUT FOR AN ACCEPT, AND IS NOT RETIRED AS A FUNCTION/.test(s),
     breaks: s => s.replace("SELECT * FROM public.apply_ladder_decision(", "UPDATE public.runner_ladder SET ("),
+  },
+  {
+    // FEATURE: SES-315 (b) -- the annotation half gets its OWN clause and its own mutation. Folding
+    // it into the clause above would have left one of the two halves without a control, because
+    // that clause's breaks() mutates the call and the vacuity meta-check is satisfied by either.
+    id: "the-accept-branch-is-annotated-inert-not-deleted",
+    detail:
+      "the runbook must say, at the call site, that the `accept` branch is retired as a LADDER " +
+      "INPUT and that the FUNCTION is not retired -- and it must name what survived. This is the " +
+      "clause that stops the tempting cleanup: a later editor who reads 'Accept is not an input' " +
+      "as 'this function is dead' and deletes the rest removes the ONLY demote a legacy ship card " +
+      "has, and M6-07's whole safety measure is that a reversal always costs a rung ('autonomy is " +
+      "elastic, never ratcheted'). The inert-but-still-stamping half matters for the same reason " +
+      "the ladder is idempotent at all: an unstamped card is one a re-run or a second harvesting " +
+      "peer can still count.",
+    test: s => /RETIRED AS A LADDER INPUT FOR AN ACCEPT, AND IS NOT RETIRED AS A FUNCTION/.test(s) &&
+               /still\s+stamps `ladder_applied_at`/.test(norm(s)) &&
+               /`reverse` branch keeps its demote in full/.test(norm(s)),
+    // The mutation is a REGEX, never a literal with a `\n` in it: this worktree is CRLF and git
+    // stores LF, so a literal newline in a mutation is a no-op on exactly one of the two and the
+    // teeth check then passes vacuously on the other. Same reason the tests never trust a local
+    // green (the tripwire's own CRLF false-green, docs/runbooks/session-hygiene.md).
+    breaks: s => s.replace(/still\s+stamps `ladder_applied_at`/, "no longer stamps anything"),
+  },
+  {
+    // FEATURE: SES-315 (b) -- the Accept->streak arithmetic keeps its words and loses its trigger.
+    id: "the-accept-streak-arithmetic-carries-its-supersession",
+    detail:
+      "SES-107's arithmetic (streak % 5, no reset, forward only) is LIVE and this ship did not " +
+      "touch it -- it moved to ladder_apply_signal(), driven by verdict_ladder_signal() at 7a and " +
+      "sweep_decision_windows() at the tail. What M6-07 retired is the ACCEPT as the input. Those " +
+      "two facts sit in the same paragraphs, so the runbook has to hold both at once: an " +
+      "annotation that read 'the streak rule is retired' would be as wrong as no annotation at " +
+      "all, and either way the next cycle re-derives the rule. The clause therefore requires the " +
+      "supersession vocabulary AND the surviving-arithmetic sentence together.",
+    test: s => /the \*\*Accept\*\* that used to trigger it is \*\*retired\*\* as a\s+ladder input/.test(norm(s)) &&
+               /ladder_apply_signal\(\)/.test(s) &&
+               /counts one delivery twice/.test(norm(s)),
+    breaks: s => s.replace("is **retired** as a", "is **still** a"),
   },
   {
     id: "the-hand-applied-claim-survives-only-as-a-quotation",

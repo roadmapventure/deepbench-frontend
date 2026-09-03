@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.405 | runbooks/runner-cycle.md | SES-315 (b) — A SHIPPED CHANGE FINALLY HAS A REVERSE, AND THIS FILE STOPS INSTRUCTING CYCLES IN RULES THAT WERE WITHDRAWN. Part (a) (`v7.0.404`, migration `ses315_ship_decision`) put the mechanism in the database and DECLARED this half not-run; between the two commits the four functions were live and unreached, and step 7 still wrote a status and recorded nothing. THE THING TO READ TWICE IS WHERE THE NEW CALL SITS: `record_ship_decision()` goes at the **foot** of step 7's close-out, after the push and after the claim release, and moving it up beside the status write breaks it two ways that were read out of `pg_get_functiondef` rather than recalled. It ADOPTS the cycle's `runner_before_images` rows `WHERE decision_id IS NULL` — the ship's own writes ARE the decision's undo set, no second copy — so a call made before the snapshot, the scoreboard stamp and the standing brief adopts none of them and hands out a Reverse that restores less than the ship wrote; and `reverse_decision()` refuses any row whose live `updated_at` postdates the decision's own `decided_at` (`SES-316`), so a decision recorded first and written afterwards makes every one of its own writes un-restorable — 7b's one-`DO`-block failure spread across a whole step. The `push_sha` argument is the third tell and the cheapest to notice: before the push there is no sha to pass. NAMED DEVIATION, disclosed rather than buried (`SES-196` convention): the kickoff says *"after the `done` write on an eligible approve"* and the shipped instruction is keyed to the VERDICT, which is the function's own and only verdict gate, so an `approve` that wrote `delivered` records its handle too — restricting the call to auto-`done` ships would leave every ship still awaiting John's Accept with no Reverse whatsoever, and the ship card's tap being the surface `SES-285` retired IS the absence `M6-01` measured. FIVE PASSAGES STOPPED SPEAKING IN LIVE VOICE, each annotated on the SAME LINE as its rule mention because tripwire check 9 decides within the enclosing block: 7b's *"not a decision"* list (a ship IS one now — the status write alone stays mechanical output, which is why it is still absent from the list), step 8c's *"No unattended removal, ever"* (SUPERSEDED by `M6-03`, registry row `B7`; what survives is that the FIRST failed revalidation still only proposes, and an editor who reads the retirement as "removal needs no second failure" gets the one behaviour `M6-03` refuses), step 6's `design_status` write (only `needs-desktop` may be written — `needs-john` RETIRED as a blocking state by `M6-01`, and that placeholder was an INSTRUCTION, so a retired value left in it is a cycle actually writing it), step 5's blocked-prefix row for `needs-john` (legacy rows only; they are still skipped and still recorded), and the six chain-gate flag-set mentions — `drain_chain_gate()` AND `drain_epic_next()` both carry `c_flagged = ARRAY['needs-desktop']` since `SES-281`, `needs-john` retired outright and `john-paced` converted by `ses281_m5_pick_enforcement`. THE LADDER PASSAGE KEEPS ITS ARITHMETIC AND LOSES ITS TRIGGER, and that is the distinction an editor will collapse in either direction: `streak % 5 = 0`, no reset and forward-only are all LIVE, re-homed in `ladder_apply_signal()` and driven by `verdict_ladder_signal()` (7a) and the decision-window sweep at the tail's `(7b)`; what `M6-07` retired is the ACCEPT as an input, because counting a tap as well as the verdict counts one delivery twice and a double count does not merely look wrong — it manufactures a rung, which buys real extra files, real extra tasks and the auto-done bar. So `apply_ladder_decision()` is annotated retired-as-an-input and explicitly NOT retired as a function: its `accept` branch is inert and STILL STAMPS `ladder_applied_at` (an unstamped card is one a re-run or a second harvesting peer can still count), and its `reverse` branch KEEPS its demote, which is a legacy card's only one — a later editor reading "Accept is not an input" as "this function is dead" would delete the last demote `M6-07`'s safety measure depends on. Step 2's Reverse ceremony keeps its procedure and changes its trigger: a ship reversal arrives as a queued `REVERT-FORWARD REQUESTED` directive, met at step 5's selection layer (1a), and the cycle reverts the push and closes the row — and it must NOT also call `apply_data_restore()`, because `reverse_decision()` already restored the rows IN PLACE and a second restore replays a row a later write may legitimately have re-created. GUARDS UPDATED WITH THEIR CONTROLS RATHER THAN BY LOOSENING A REGEX: `SES-134`'s `runbook-names-the-call` was TIGHTENED to require the retired-as-an-input annotation beside the call (the bare form passed against the very runbook this ship forbids) and two clauses added, each with its own `breaks()` because one mutation cannot give two halves teeth; `SES-182e` gained the directive trigger and the in-place upsert as clauses, a pure `restoreShape()` / `restoreShapeRetiredDeleteReinsert()` divergence pair, and a `MUTATIONS` map so all seven of its runbook clauses now have per-clause controls instead of only the file-level one; and the `ses-315` guard's part-(b) arm flipped from DECLARED NOT-RUN to **nine** asserted runbook clauses, each with a `breaks()` mutation and all nine failing against part (a)'s own commit `107071e9` — a SECOND pre-change SHA, because the ledger half and the runbook half landed in different commits and one SHA cannot control both. Every cross-line mutation in all three files is a REGEX, never a literal carrying a `\n`: this worktree is CRLF and git stores LF, so a literal newline is a no-op on exactly one of the two trees and the teeth check then passes vacuously there. Doc + three tests; no src/api/lib change, no site change, NO MIGRATION and no schema change. Stamp count held at 5 per session-hygiene check 7: `v7.0.398` (`SES-122` (b)) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep over this body and over `scripts/` rather than from recollection — every one of its editor warnings already has a home, so nothing was relocated: the ladder grant not returning early so control still reaches `selfCertificationBlock()` on every path, and `spawnCommandFor()`'s win32 quoting defect, both restated in `scripts/verifier.js`'s own header (the latter also at `session-setup.md`'s verifier note); `class_autonomy()` reporting an untracked class's rung as NULL-not-0 and the fail-closed-on-both-lookups argument, both in step 7a's auto-done bar; and the rung-is-a-fact-about-the-class reading with charter decision 2 / §2f retained as its floor, in the same block. -->
 <!-- DeepBench v7.0.403 | runbooks/runner-cycle.md | SES-316 — A CLAIM IS NOT A JUDGMENT WRITE, AND A REVERSAL NOW SAYS WHEN IT COULD NOT RESTORE. The thing to read twice is THAT THE WRITTEN-SINCE GUARD DID NOT GO AWAY — IT CHANGED REFERENCE POINT, and re-pointing it back at the before-image is a regression rather than a simplification. MEASURED BY THE M6 MILESTONE GATE REVIEW (decision `c3e86310`, 2026-09-02) rather than reasoned about: `reverse_decision()` refused any row whose live `updated_at` postdated the image it would restore from — the right guard against clobbering a later legitimate write — **and still returned `outcome = 'applied'`** with the row counted `refused`. Step 5's claim and the release above both wrote `updated_at = now()`, so every decision that touched or filed a ticket became un-restorable the moment the continuous drain picked it up (minutes, not days), and a reversed gate review would have deleted its drain and scope rows (no `updated_at`) while the claimed successor tickets survived: an epic with orphaned members and no drain. TWO HALVES, and neither works alone. (1) Migration `ses316_reversal_survives_claims` — DROP + CREATE on the SAME IN signature, because a new OUT column changes the return type and `CREATE OR REPLACE` cannot (`.claude/rules/supabase-function-signature.md`), one overload asserted and the grants re-issued in the migration's own trailing `DO` block because a dropped function loses them — compares the live `updated_at` against the decision's own `decided_at`: `now()` is frozen per transaction and 7b's one-`DO`-block rule puts the record and the writes in one, so every write the decision made carries exactly `decided_at`, the decision's own writes can never trip the guard, an image attached by `attach_before_images()` (which PREDATES the decision) no longer refuses itself, a decision that imaged one row twice no longer refuses on its own second write, and anything strictly later is genuinely somebody else's. The new `refused_written_since` column counts ONLY that refusal and `outcome` becomes three-valued — `applied`, `partial` (something restored and something not: decision IS reversed, rung DOES demote), `refused` (nothing restored: decision NOT reversed, no rung moves, and the reversal row is withdrawn so the ledger carries no `kind='reversal'` row pointing at a decision that still stands). (2) The claim (step 5) and the release (step 7's ship-point tail) stop writing `updated_at` at all. THE ONE FACT AN EDITOR WILL GET WRONG, read out of `pg_trigger` before a line changed rather than recalled: `backlog_items` carries NO `updated_at` trigger — its only trigger is `backlog_done_requires_verdict`, BEFORE UPDATE OF status — which is what makes dropping the column from those two statements actually work instead of cosmetic. And `recompute_backlog_queue()` writes `queue` and `pinned_position` ONLY, never `updated_at` (read out of `pg_get_functiondef`), so a recompute landing between a decision and its reversal is harmless and needed no edit. QA WAS FOUR DELIBERATELY FAILING `DO` BLOCKS, every fixture rolled back, asserted on the OUTCOME AND THE COUNTS rather than on "it returned": image predating the decision + a claim in the new shape → `applied`, restored 1, `refused_written_since` 0, tier restored; the SAME fixture with the OLD claim shape (`updated_at` bumped 5 minutes after `decided_at`) → `refused`, `refused_written_since` 1, restored 0, tier left alone, decision status still `open`, ladder unmoved, ZERO reversal rows for that decision (the withdrawal, asserted rather than assumed); two rows with one legitimately written later → `partial`, 1 restored / 1 `refused_written_since`, decision `reversed`, `bug_fix` demoted, and the reversal row's own `summary` carrying the counts; a ledger-table image alongside a restorable row → `applied` with `refused` 1 and the `reason` sentence appending READ THE COUNTS, NOT THE OUTCOME (it fires only where the outcome and the counts disagree, which is why `partial` and `refused` do not get it). Zero residue on re-read: 0 fixture decisions, 0 fixture images, both open decisions untouched, `SES-316`/`SES-315` unchanged, `bug_fix` back at 1/1. Guarded by `tests/regression/ses-286a-reversal-window.test.mjs` (extended, not duplicated). Doc + test + migration; no src/api/lib change, no site change. Stamp count held at 5 per session-hygiene check 7: `v7.0.397` (`SES-122` (a)) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep over this body rather than from recollection — every one of its editor warnings already has a body home (a `block` never touching the rung at step 7a's verdict paragraph, "leaves its rung exactly where it was"; `class_autonomy` reporting an untracked class's rung as NULL-not-0 at step 7a's auto-done bar; and its fail-closed null arithmetic at that same paragraph's "UNKNOWN IS NOT INNOCENT ON EITHER LOOKUP"), so nothing was relocated. -->
 <!-- DeepBench v7.0.402 | runbooks/runner-cycle.md | SES-313 — MODEL-PER-LANE BECOMES DATA, AND THE THING TO READ TWICE IS THAT THE CRLF BUG WAS INVISIBLE ONLY IN THE TERMINAL, NEVER ON DISK. B21's routing table (orchestrator → Opus 5, judgment → Fable 5, mechanical → Sonnet 5) moves from hand-typed prose in three places to one row set, `public.runner_model_lanes` (three rows, `lane` primary key CHECK-constrained, service_role only like every `runner_` table), rendered into this file's step 6 by a second marker kind in `scripts/render-rule-blocks.js`, `{{lanes}}`, sourced from a new offline snapshot `docs/governance/MODEL-LANES-SNAPSHOT.md` (exported by the same `export-governance-snapshot.js` run, never a live read — the same contract `{{rule:ID}}` already relies on). MEASURED, NOT INHERITED: the kickoff's own pre-existing finding — `render-rule-blocks.js` default mode reported findings on `origin/dev`, `[drifted]` on `{{rule:B40}}` and `{{rule:B18}}` whose committed and registry lines PRINTED IDENTICALLY — was a CRLF byte reaching the compare, not a text drift: this file is CRLF on disk (3,779 of 3,779 line endings, measured before this edit), and the block-extraction loop split only on a bare `\n`, leaving each committed line carrying a trailing `\r` the LF-only registry line never has. The two then compared UNEQUAL while PRINTING equal, because a bare `\r` inside one `console.error` argument rewinds the terminal cursor to column 0 and the rest of that call overwrites what it had already written — a checker crying wolf on text that had not moved. Fixed by comparing (and reporting) the `\r`-stripped form while still measuring the ORIGINAL line length for `--write`'s byte offsets, so a CRLF file repairs correctly too; a fixture with a real one-character drift still flags (the control `tests/regression/ses-313-model-lanes.test.mjs` pins). A SECOND SES-180 SELF-FLAGGING TRAP, found on THIS ticket's own kickoff rather than a prior one: `docs/kickoffs/v7.0.402-SES-313-model-lanes.md` illustrates the `{{lanes}}` block as an inline, UNFENCED backtick span (unlike the `SES-175` kickoff, which fenced its `{{rule:ID}}` illustration and so stayed inert) — once `{{lanes}}` existed as a real marker, that example was a genuine match with no rendered block after it. `scripts/render-rule-blocks.js` now excludes `docs/kickoffs/` from the scan entirely (measured: 0 of 10 prior kickoffs carried a live marker outside a fence, so this changes nothing about today's coverage). `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B21` is brought to byte-equality with the registry row's statement, amendment sentence included (the 2026-08-31 drift the kickoff named), with one added sentence pointing at `runner_model_lanes` as the ids' one home; `docs/runbooks/gate-review.md`'s `Fable 5` mention becomes a citation of the `judgment` lane. `CLAUDE-DESIGN.md` untouched — John's file, his standing rule for attended sessions. Doc + script + migration + test; no `src/`/`api/` change, no site change. Stamp count held at 5 per session-hygiene check 7: `v7.0.395` (`SES-286` (b)) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep over this body rather than from recollection — every one of its editor warnings already has a body home (the transaction's `updated_at`-postdate hazard and `attach_before_images()` at step 7b's own paragraph, the `M6-06` no-card/no-escalation/no-waiting boundary at step 7b's tail, `reverse_decision()` refusing to reverse a reversal at the same paragraph, and the two true reasons for the tail's placement — not at step 1 because a sweep there would let a cycle spend a widening it had just awarded itself, not after step 8 because a step below it never runs on the cycle that terminates a chain — both at step 9's serial-tail note), so nothing was relocated. -->
 <!-- DeepBench v7.0.401 | runbooks/runner-cycle.md | SES-312 — A MILESTONE REVIEW NOW DECIDES, FILES ITS NAMED SUCCESSORS AND DECLARES THE NEXT DRAIN INSIDE ONE REVERSIBLE TRANSACTION, and the thing to read twice is THAT THE ANTI-WIDENING GUARANTEE DID NOT GO AWAY — IT CHANGED INSTRUMENT. It used to be John's Accept on a card; it is now the decision's own before-images (`row_data NULL` per filed row, every one carrying one `decision_id`), so a review that files a member it never named is one `reverse_decision()` from undone. `M6-08` untouched, `drain_epic_next()` untouched, and a review may still file ONLY members named in its own findings. MEASURED LIVE OVER THE MCP BEFORE A LINE CHANGED, not recalled: `SES-286` is `done` (so this ticket's `blocked_by` is cleared); the M5 drain `238aa9ca` is now `done` — `SES-310` retired it — and NO M6 drain exists, so the succession is genuinely owed and the old property 4 could not produce it; all six epic-scoped `runner_items` rows already carry `decision = 'accept'`, and the M5 one (`18500000-…-a5`) was written BY HAND at the M6 gate, which is the precedent this mechanism replaces rather than a mechanism; and `runner_decisions` carries NO `kind` CHECK at all (read out of `pg_get_constraintdef` and `pg_get_functiondef`), so `gate` and `directive` are admitted by `record_decision()`'s vocabulary comment, not by a constraint — which is why the section names the kind explicitly instead of trusting the schema to. THE MEASUREMENT THAT DECIDED THE PROSE, and it is the reason the tail's precondition is TWO-PART rather than one: `reverse_decision()`'s allowlist admits `backlog_items`, `runner_directives`, `runner_drain_scope`, `runner_settings`, `governance_rules` and `epics` and DELIBERATELY EXCLUDES the runner's own evidence tables — `runner_items` among them. Proven in a rolled-back fixture at this ship (retiring epic → next epic, two successors, next epic holding five open members): `outcome = applied`, **2 restored** (the two `backlog_items`, the only rows with an `updated_at`), **8 restored-but-unverifiable** (the directive plus its seven scope rows — neither table has `updated_at`, so the engine writes and REPORTS the doubt), **1 refused: the review's own record**; tickets left 0, directive left 0, scope left 0, `runner_items` left 1, decision `reversed`. So a reversal undoes everything the review FILED and leaves the fact that the review HAPPENED standing — step 8d's idempotence key survives, and reading only the card would let a reversed review's drain stand. Zero residue on re-read, both fixtures. TWO NAMED DEVIATIONS FROM THE KICKOFF, each because its premise did not survive a check. (1) The kickoff says *"Prohibitions 2–4 unchanged"*; prohibition 2 of `gate-review.md` read *"nothing creates a drain row but John's own declaration… it may never start it"*, which as written forbids EXACTLY what this ticket builds — the identical unreconciled-prohibition defect this file's own tail passage fixed at `v7.0.337`, where the bare "never create a drain row" predated `0970abad` and would have made a cycle refuse the one declaration John pre-authorised. So prohibition 2 now cites the carve-out and says what is still John's alone; its substance is unchanged and 3 and 4 are byte-identical. (2) The successor members and the drain's scope rows come from ONE query, not two lists to reconcile: (3) files the successors into the next epic as `open` in the same transaction, so (4)'s "the next epic's open members" already includes them — which reproduces the M3 (19+4) / M4 (4+4) composition precedent exactly instead of restating it as arithmetic. Two schema facts an editor will otherwise get wrong, read from `information_schema` rather than remembered: `runner_drain_scope` carries a NOT NULL `backlog_id` beside `item_id`, and `runner_items.cycle_id` is NOT NULL with an FK to `runner_cycles` — so an attended review must open its supervised cycle row (`session-setup.md` 3e) BEFORE it can write its record. Stamp count held at 5 per session-hygiene check 7: `v7.0.393` (`SES-310`) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep over this body rather than from recollection — its boundary argument and its FAIL-CLOSED clause both already sat at the `SES-310` boundary paragraph and its deferral-never-exempts warning at that paragraph's tail, but its CENSUS-SUM warning appeared ZERO times in this body and was RELOCATED beside the `blocked_detail` census paragraph it protects: `v_nonreq_open_n` counts DIFFERENT tickets than `v_open_now`, so folding it into the read-the-scope-by-hand sum would explain a required member's unclaimability with a fact about somebody else's ticket. Doc + one new test; one `runner_directives` UPDATE and one `runner_decisions` row over MCP, before-image first under `session_name = 'ses-312-coding'`; no src/api/lib change, no site change, NO SCHEMA CHANGE and no migration. -->
 <!-- DeepBench v7.0.399 | runbooks/runner-cycle.md | SES-122 (c) — THE SCOPE CAPS STOP BEING LITERALS A CYCLE RECITES AND BECOME A NUMBER IT READS, and the thing to read twice is THAT THE 3 AND THE 4 DID NOT GO ANYWHERE. They are the floor; a class earns one extra file and one extra task per rung it holds above `runner_settings.cap_relax_rung`, and a reversal takes them back. Charter decision 5 says the numeric caps retire *only when the verifier replaces them* — the verifier exists (`SES-181`), part (b) made it read the rung, part (a) made a verdict move the ladder and shipped `public.class_autonomy(text)` as the one home for what a rung buys, so the scaffolding comes down exactly as fast as verification proves itself. That is the charter's sequencing invariant satisfied BY CONSTRUCTION rather than by a date, and it is why this is three registry AMENDMENTS and not three retirements: `CAP-SCOPE-FILES`, `CAP-SCOPE-TASKS` and `HR-SCOPE` all stay `live`, all keep their ids, and the retirement ledger (entries 36/37/38) records the wording that LEFT, with the `runner_before_images` id that restores each one. MEASURED LIVE BEFORE A ROW MOVED, not inherited from the kickoff: the three statements were flat literals (*"Modify at most 3 files per session."*, *"Include at most 4 tasks per kickoff doc."*, *"Keep each session to one feature, at most 3 modified files, and at most 4 tasks."*), `class_autonomy('P10 - Tooling')` already returned rung 13 / `extra_files` 8 / `extra_tasks` 8 against `cap_relax_rung` 5, and NOTHING anywhere read those extras — part (a) built the grant and part (c) is its first consumer. THE ONE CHANGE A LATER READER WILL GO LOOKING FOR IN THE WRONG FILE: `HR-SCOPE`'s `canonical_doc` moved from `CLAUDE.md#hard-rules` to `docs/STANDARDS.md#section-2-session-scope-rules`, in the SAME `UPDATE` as its statement. `CLAUDE.md` is JOHN'S FILE — this ticket may cite it and may not edit it — so a rule whose home must carry its text byte-for-byte could not stay homed there once the text grew. His `Scope` line is untouched, still reads "One feature per session. Max 3 files. Max 4 tasks.", and is now CITED BY the amended row as the baseline the class extra sits on top of; the re-homing is recorded in ledger entry 38 precisely because `CLAUDE.md`'s history will show nothing. THE FEATURE CAP IS NOT ON THE LADDER AND MUST NOT BE PUT THERE: `CAP-SCOPE-FEATURE` (*"Scope every session to exactly one feature."*) is byte-for-byte unchanged and pinned by this ship's guard as the assertion about what did NOT move — a rung buys breadth of edit, never a second ticket folded into one cycle. TWO SITES HERE, no procedure rewritten beyond them: new step 5a reads the caps at pick with one fenced statement and writes `files N (+k) / tasks M (+k)` into the cycle `notes`, and step 7's QA bar gained the bullet that grades the ship against THOSE numbers rather than a remembered 3/4 — a reviewer holding the bare literals would block a ship the ladder had already paid for, and holding someone else's `+k` is the same error pointed the other way, which is why the numbers live on the cycle row and not in anyone's head. FAIL CLOSED IS THE NULL ARITHMETIC, NOT A SPECIAL CASE (part (a)'s design, restated at step 5a because this is where a cycle meets it): no class on the board, a class the ladder does not track, a failed RPC or a missing `runner_settings` singleton all yield zero extras, so a lookup that goes wrong NARROWS the cap and can never widen it; and a blank rung reads NULL rather than 0, because rung 0 is a real rung and `invention` sits at it. `M6-13` still scopes every one of these caps to the individual cycle and never to the chained session that holds several. Section 2 of `docs/STANDARDS.md` now carries all four cap statements byte-for-byte, each on ONE line, homed as list items 1–3 plus blockquotes — blockquotes deliberately, because Section 2's rule NUMBERS are load-bearing (`SES-61` slices "rule 5" by its literal opening and eight test files cite "Section 2 rule 5"), so a new item 4 would have renumbered every one of those citations. `CAP-SESSION-SPLIT-SIGNS`'s paraphrase there was reconciled in the same pass: it still carried the 20-minute wall-clock trigger `SES-296` withdrew AND still stated the caps as flat literals four lines under the rules that had stopped being flat. Guarded by `tests/regression/ses-122c-class-caps.test.mjs` — eight clauses, seven of which FAIL on the pre-change tree (measured against `d1d4589a`, not predicted), each with a negative control, plus a read-only live arm that recomputes `greatest(0, rung − cap_relax_rung)` from `runner_ladder` and `runner_settings` in the same test rather than pinning today's 8. Doc + test only; three `governance_rules` `UPDATE`s over MCP, each preceded by its own `runner_before_images` row (`session_name = 'ses-122c-coding'`); no src/api/lib change, no site change, NO SCHEMA CHANGE and no migration. Stamp count held at 5 per session-hygiene check 7: `v7.0.392` (`SES-301`) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep over this body rather than from recollection — its forbidden registry-row flip already had a body home at step 8b-bis (relocated there by `SES-310`) and its `SES-134` pinned-literal trap already sat at the `apply_ladder_decision` bullet, but the OTHER half of its forbidden edit — re-rendering a withdrawn rule's block back into existence with `render-rule-blocks.js --write` — appeared NOWHERE in this body and was RELOCATED beside the B34 withdrawal annotation it protects rather than archived with the stamp. -->
-<!-- DeepBench v7.0.398 | runbooks/runner-cycle.md | SES-122 (b) — THE AUTO-DONE BAR IS A LADDER FACT THE VERIFIER READS, AND THE VERIFIER FINALLY RUNS ON WINDOWS. Step 7a's bar stops being a class name and becomes a MEASUREMENT: eligible when the ticket's work class's rung ≥ `runner_settings.auto_done_rung`, read from `public.class_autonomy(priority_class)` (part (a), `v7.0.397`) and never re-derived by the caller — that comparison has one home and it is the SQL function. The M6 gate's own words on `SES-122`'s row (`docs/RUNNER-GOV-M6-REQUIREMENTS.md`, promise 2, 2026-09-02) are *"a rung buys auto-done eligibility for its class"*, and THE THING TO READ TWICE IS THAT A RUNG IS A FACT ABOUT THE CLASS AND NOT ABOUT THE EPIC — so the grant bypasses charter decision 2's `Selfbuild`-family restriction as well as its `P10` one: `tooling` at rung 13 against `auto_done_rung` 3 auto-dones on ANY epic, while `bug_fix` at rung 1 stays `delivered` on a Selfbuild epic. Decision 2 and §2f are RETAINED AS THE FLOOR beneath it for every class the ladder has not promoted; nothing was deleted. THE GRANT DOES NOT `return` — IT ONLY SKIPS THE TWO SCOPE TESTS, and that shape is the one an editor must not "simplify": an early return would jump over `selfCertificationBlock()`, so control now reaches charter premise 3's refusal on EVERY path, ladder or no ladder. A rung never buys a change the right to grade itself, and this ship is its own witness — `tooling` sat at rung 13 and the diff touched `scripts/verifier.js`, so it was refused the bar it had just built (`SELF_CERTIFYING_PATHS`, as `SES-181`'s own ship was). FAIL CLOSED IS THE DEFAULT ON BOTH LOOKUPS, the same default §2f uses: no class on the board, a class the ladder does not track, a failed RPC, absent credentials — all leave `classAutonomy` NULL, all fall to the floor, none widens anything; and the stored `auto_done_reason` says WHICH, because "the ladder declined" and "nobody asked the ladder" are different facts about a ticket that stayed `delivered`. `class_autonomy` reports an untracked class's rung as **NULL, not 0** (rung 0 is a real rung — `invention` sits at it), so a blank rung is never read here as the bottom one. AND THE ENVIRONMENT DEFECT, MEASURED RATHER THAN INFERRED: `runGate()` spawns with `shell: true` on win32, which hands `cmd /d /s /c "<cmd> <args>"` to the shell, and `process.execPath` on John's machine is `C:\Program Files\nodejs\node.exe` — unquoted, cmd split it at the space, so the regression and hygiene gates both exited 1 with `'C:\Program' is not recognized` and EVERY attended verifier run on Windows was a false `block` about the environment. Verdict `253aca14` (`SES-301`) is the record: build green, both node-spawned gates red on exactly that string. The Linux cloud runner passes the command as argv[0] and never saw it, which is why it survived, and `SES-311`'s attended verifier step could not exist until now. The fix is `spawnCommandFor(cmd, shell)` — quoted only when a shell will parse it, untouched when it is argv[0] (a quote there names a file that does not exist, the same defect pointed backwards), idempotent, pure and exported so its guard is a string assertion instead of a 20-minute gate run. Verified end-to-end on Windows from an LF snapshot: all three gates RAN. NO SCHEMA CHANGE and no `runner_ladder` write from the verifier — part (a) shipped the columns, part (c) does the caps (`extra_files`/`extra_tasks` are deliberately not read here). Guarded by `tests/regression/SES-181-verifier.js` (four new functions, every one of which fails on the pre-change source — asserted, not assumed). Doc + script + test; no src/api/lib change, no site change, no migration. Stamp count held at 5 per session-hygiene check 7: `v7.0.390` (`SES-309`) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep over this body rather than from recollection — it found TWO of that stamp's editor warnings with no body home, both RELOCATED into step 8's snapshot block beside the `unclaimed` paragraph they protect and both re-verified against live SQL rather than copied: `ticket_outcome`'s after-row is the newest scoreboard row ≥72h ACROSS THE WHOLE TABLE (read out of `pg_get_viewdef` — the LATERAL carries no `backlog_id` filter), and `ck_backlog_outcome_claim` → `outcome_claim_is_valid(text)` rejects an invented metric AT FILING (seven names, read out of `pg_get_functiondef`). -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -702,13 +702,57 @@ returned it complete, on the same page four seconds apart. The test, the two bra
 not become *"use WebFetch, it works"* live in `briefing-page.md`'s decision read-back contract —
 **cited here, not restated**, so these two files cannot drift the way step 5 and step 7 did
 before `v7.0.114`. For each decided
-item: write `decision`/`decision_reason`/`decided_at` to `runner_items`; **Accept** → ladder
-streak +1, and **promote a rung on every 5th Accept — the test is `streak % 5 = 0`, never "at
-least 5" — leaving the streak to keep counting (see the no-reset rule below)**, **on a `shipped`
-card only — see the gated-card rule below**;
+item: write `decision`/`decision_reason`/`decided_at` to `runner_items`; **Accept** → **NO LADDER
+EFFECT — the Accept was RETIRED as a ladder input by `M6-07` (`SES-315`, `v7.0.404`)**, and this
+clause used to read *"ladder streak +1, and promote a rung on every 5th Accept — the test is
+`streak % 5 = 0`, never 'at least 5' — leaving the streak to keep counting (see the no-reset rule
+below), on a `shipped` card only"* (that arithmetic is unchanged and still live — it moved to
+`ladder_apply_signal()`, which the **verdict** at 7a and the **decision window** at the tail's
+`(7b)` drive; see the `apply_ladder_decision()` bullet below). An Accept still writes the three
+decision columns and still confers completion (`status = 'done'`, below);
 **Reverse** → revert-forward the item's commits, restore its before-images **through the one call
 below — never by hand**, reopen its backlog row carrying John's line, ladder streak → 0 and
-rung −1; **Rework** → John's line becomes a new `runner_directives` row, queued first.
+rung −1 (**this half is NOT retired** — `M6-07`'s safety measure is that a reversal always costs a
+rung); **Rework** → John's line becomes a new `runner_directives` row, queued first.
+
+<!-- FEATURE: SES-315 (b) — the ship reversal's ceremony keeps its procedure and changes its trigger. -->
+**A SHIP REVERSAL NOW ARRIVES AS A QUEUED DIRECTIVE RATHER THAN AS A CARD TAP — THE PROCEDURE IS
+UNCHANGED, ITS TRIGGER IS NOT (`SES-315`, `M6-01`, `v7.0.404`, migration `ses315_ship_decision`).**
+A `kind = 'ship'` decision reversed through step 7's handle
+(`public.reverse_decision('<decision id>', 'John', '<why>')`) restores that ship's rows itself —
+**in place**, never delete-and-reinsert — demotes the ticket's work class, and then queues exactly
+one `runner_directives` row (`type = 'directive'`, `status = 'queued'`) reading:
+
+```
+REVERT-FORWARD REQUESTED: <TICKET> <version> <sha> — reversal <id>; the next cycle reverts the push (runner-cycle.md step 2 Reverse ceremony) and closes this row
+```
+
+**That row is the trigger, and you meet it at step 5's selection layer (1a) — a queued directive is
+the mission — not on the briefing page.** Two things to do, in this order, and **neither of them is
+a data restore**: **(1)** revert the named push forward on `dev` (`git revert <sha>`, or a fresh
+commit that undoes it, then `git fetch origin dev && git rebase origin/dev &&
+git push origin HEAD:dev` — step 8's own revert-forward mechanics, unchanged); **(2)** close the
+directive row, before-image first. **Do NOT also call `apply_data_restore()` for it** —
+`reverse_decision()` already put the rows back and already reported what it refused, so a second
+restore replays a row a later write may legitimately have re-created, which is the double-apply
+`runner_items.restore_applied_at` exists to stop one level down.
+
+**WHY THE SQL LEAVES AN INSTRUCTION INSTEAD OF CARRYING IT OUT: the code half of a ship's Reverse
+is a git operation no SQL function can perform.** So the reversal writes it where the next cycle
+reads first (`runner_directives`, the Prime Directive's own inbox) rather than pretending to have
+reverted code or hoping somebody prints its return value. `reverse_decision()`'s `reason` says the
+same thing a second time on purpose — *"THE CODE IS STILL LIVE: revert-forward requested as
+runner_directives `<id>`"* — because the rows being back reads like the push being gone, and it is
+not. **THE EDIT THIS FORBIDS:** dropping the directive on the grounds that the reason string
+already mentions it. A string a caller may never print is not an instruction. The directive is
+queued on the `applied` **and** the `partial` branch alike, and on **neither** refusal branch — a
+partial reversal is still a reversal (the decision is marked, the rung has moved, so the code must
+come back too), while a `refused` one left the decision standing and must never send a cycle to
+undo a delivery nobody reversed.
+
+**THE CARD PATH BELOW IS NOT DELETED, ONLY DEMOTED FROM BEING THE TRIGGER.** The ship card's tap is
+the surface `SES-285` **retired** on 2026-09-01, so no new tap arrives — but cards already filed can
+still be tapped, and for one of those the call below is still the right and only apply.
 
 **A REVERSE ON A `ship` CARD PUTS THE PROVABLY-SAFE ROWS BACK, AND THE APPLY IS GATED IN SQL RATHER
 THAN HERE (`SES-182` slice 5, `v7.0.336`, migration `ses182e_apply_data_restore`; John, attended
@@ -764,6 +808,17 @@ this body, checked by grep rather than recollection):**
   `apply_ladder_decision` shape, for the same reason.
 - **Generated columns are dropped from the restore column list (`attgenerated = ''`).** That is
   `SES-220`'s lesson — they cannot be inserted into, so a restore that names them fails outright.
+
+<!-- FEATURE: SES-315 (b) — the apply's upsert shape, stated where a cycle reads the apply. -->
+- **AN EXISTING ROW IS RESTORED IN PLACE, NEVER DELETE-AND-REINSERT (`SES-315`, `v7.0.404`;
+  `reverse_decision()` was fixed the same way at `ses286a_restore_in_place`).** The `upsert` action
+  is an `UPDATE … SET (<cols>) = (SELECT … FROM jsonb_populate_record(…))`; only a row that is
+  genuinely **gone** is INSERTed back, which is the one case with no other shape. **The hole this
+  closed was latent, not theoretical:** the identical delete-then-insert form raised **`23503`** on
+  `backlog_items_blocked_by_fkey` the first time a fixture pointed a real `blocked_by` at a restored
+  ticket, and it was proven at this ship by running the retired shape against the same row in the
+  same transaction. An in-place `UPDATE` is also the smaller operation — it is the one actually
+  asked for, and it cannot cascade.
 
 **AN ACCEPT ON A `shipped` CARD NOW WRITES THE TICKET `done` — IT IS THE ONLY THING THAT EVER DOES
 (`SES-154`, `v7.0.205`; spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1).** Step 7's
@@ -842,9 +897,25 @@ a filing-cycle test would not have cleared the very flag John cleared by hand. `
 relatedness test the scope guard actually needs — *"an Accept on an unrelated card"* is an Accept
 naming a **different ticket**.
 
+<!-- FEATURE: SES-315 (b) — the streak rule keeps its arithmetic and loses its Accept trigger. -->
+**READ THE NEXT THREE PARAGRAPHS WITH THIS IN FRONT OF THEM (`SES-315`, `M6-07`, `v7.0.404`): the
+ARITHMETIC below is live and unchanged; the **Accept** that used to trigger it is **retired** as a
+ladder input.** Everything the streak rule says about *how* a promotion is computed — `streak % 5`,
+no reset, forward only — is exactly as `SES-107` settled it and is now enforced in
+`public.ladder_apply_signal()`, which `verdict_ladder_signal()` (7a, an `approve`) and the
+**decision-window sweep** at the tail's `(7b)` (a decision that outlived its window) drive — named
+that way here rather than by its function name on purpose: `ses-286b` pins that call to **exactly
+one** site in this file, the tail's own, so a second copy of the name cannot become a second home
+for it. What is
+**superseded** is only the *input*: a tap on a ship card no longer feeds it, because counting the
+tap as well as the verdict counts one delivery twice, and a double count does not merely look wrong
+— it manufactures a rung, which buys real extra files, real extra tasks and the auto-done bar.
+John's rulings quoted below are not reopened by that; they are re-homed.
+
 **THE STREAK IS NEVER RESET ON PROMOTION — the count keeps running, and a rung is earned on every
 5th Accept (John, 2026-08-21, question `q-ladder-streak-reset` answered **no** at 22:04Z; `SES-107`,
-`v7.0.148`).** The written rule used to be *"Accept → streak +1 (5 consecutive → rung +1)"*, which
+`v7.0.148`; the *Accept* trigger in this heading is **retired** by `M6-07`/`SES-315` — the
+arithmetic is not, and now runs on a verdict or an expired window instead).** The written rule used to be *"Accept → streak +1 (5 consecutive → rung +1)"*, which
 never said what happens to the streak **after** a promotion. Cycle `7392e345` hit that blank live
 at 20:27Z — John's Accept took `tooling` from streak 4 to 5, promoting rung 6 → 7 — set the streak
 to 0, and filed the question rather than letting an invented rule stand. John's answer was **no**,
@@ -885,9 +956,25 @@ Three boundaries, so no later cycle has to guess:
 SELECT * FROM public.apply_ladder_decision('<your cycle id>', '<the runner_items row id>');
 ```
 
-  It encodes every rule above and the two beside it, so none of them can be re-derived differently:
+<!-- FEATURE: SES-315 (b) — the call stays, its Accept branch is annotated retired-as-input. -->
+  **THIS CALL IS RETIRED AS A LADDER INPUT FOR AN ACCEPT, AND IS NOT RETIRED AS A FUNCTION
+  (`SES-315`, `M6-07`, `v7.0.404`).** Read the two halves separately, because a later editor who
+  reads *"Accept is not an input"* as *"this function is dead"* removes the only demote a legacy
+  card has. **What went:** the `accept` branch no longer moves the ladder. It answers
+  `applied false` with the reason *"Accept is not a ladder input since M6-07 (SES-315); the ladder
+  reads verdicts and decisions"*, and — this part is deliberate, not an oversight — it **still
+  stamps `ladder_applied_at`**, because an unstamped card is one a re-run or a second harvesting
+  peer can still count. **What stayed:** the `reverse` branch keeps its demote in full, a
+  reversal by John's word costing a rung; the gated short-circuit; the `rework` and untracked-class
+  answers; and the idempotence stamp on every path. **Still call it on every flipped card** — it is
+  what stamps the card, and the retirement is about the ladder, not about the bookkeeping.
+
+  It encodes every rule above and the two beside it, so none of them can be re-derived differently
+  — with the first row **superseded** by `M6-07` and kept here as the record of what the function
+  used to do:
   Accept on a `shipped` card → `streak + 1` and promote **iff** `streak % 5 = 0` with the streak
-  **not** reset; `Reverse` → `streak 0`, `rung - 1` floored at 0; a `gated_before_build` card →
+  **not** reset (**RETIRED as a ladder input**, `SES-315`: the branch is inert and only stamps);
+  `Reverse` → `streak 0`, `rung - 1` floored at 0 (live, and a legacy card's only demote); a `gated_before_build` card →
   **nothing** (B34); B34 was superseded 2026-09-01 by `M6-07` (`SES-285`, annotated `SES-289`) and
   this short-circuit is unchanged, still enforced in SQL; a `rework` → nothing; a class with no
   ladder row (`P1`/`P3`/`P4`/`P6`) →
@@ -1784,14 +1871,17 @@ withdrawn and still binds, so the drop itself is unchanged) on any of them:
 |---|---|---|
 | `status = 'removal proposed'` | The runner argued the premise is dead; John's verdict is pending (`SES-113`) | John, on the removal card |
 | `status = 'delivered'` | Built and pushed by a cycle; John's Accept is pending (`SES-154`) | John, on the ship card |
-| `design_status = 'needs-john'` | A decision is owed on a filed `gated_before_build` card | John, on that card |
+| `design_status = 'needs-john'` — **RETIRED as a blocking state by `M6-01`; no cycle writes it any more (`SES-315`), and `drain_chain_gate()` stopped counting it a flag at `SES-281`** | On a LEGACY row: a decision was owed on a filed `gated_before_build` card. On any new one the cycle **decides** and records the handle (7b) instead of flagging | John, on that card — or nobody, because the decision was already made and recorded |
 | `design_status = 'needs-desktop'` | The remaining work is on a surface an unattended cycle may not touch (`.claude/`, register B39) | A session John attends |
 | `design_status = 'john-paced'` | The remaining work is John ratifying cards **already on the page** (`SES-166`, `v7.0.209` — today only `SES-84`, whose ask is §12's vision claim cards) | John, on those cards, at his own pace |
 | `design_status = 'designed'` | **Not a skip** — the design already exists; see step 6's fast path | — |
 
 Three of the five — `removal proposed`, `needs-john`, `needs-desktop` — are a `record_skip()`
 call before you drop (`reason_kind` `removal-proposed` / `needs-john` / `needs-desktop` — or
-`permission-gate` when the block is the `.claude/` gate specifically); `delivered` and
+`permission-gate` when the block is the `.claude/` gate specifically). <!-- FEATURE: SES-315 (b) — the needs-john third of that trio is a legacy-row-only path. -->
+**The `needs-john` third of that trio is a LEGACY-ROW path only, since `M6-01` RETIRED the flag
+(`SES-315`): a row already carrying it is still skipped and still recorded, and no cycle creates a
+new one.** `delivered` and
 `john-paced` are stepped past **silently, with no `record_skip()`**, because their ask already
 lives on a card John's page carries (the two paragraphs below say why). **A contested claim is
 still NOT a skip** — it clears itself in 24h and John can do nothing about it.
@@ -1900,7 +1990,8 @@ waits for John.
   `v7.0.155`.**
 - **`pick`** — build `backlog_id` (claim it with step 5's atomic claim, same as any ticket). It is
   the lowest-`queue` **named** member you can claim. **Since `SES-196` (`v7.0.252`) it is also the
-  lowest-`queue` member that is not flagged `needs-john` / `needs-desktop` / `john-paced`** — the
+  lowest-`queue` member that is not flagged `needs-desktop` (`c_flagged`; the `needs-john` and
+  `john-paced` entries that used to sit beside it were **retired** / **converted** at `SES-281`)** — the
   picker skips those itself, so a flagged member is no longer handed to you to `record_skip()`. Its
   existing skip row already carries the ask (tail (8)'s `SES-196` block has the measurement).
   **And since `SES-218` (`v7.0.295`) it is also a member whose remainder is not blocked on another
@@ -2244,12 +2335,17 @@ only the ask existed, which is why the next cycle had to rediscover the block fr
 the same breath as the `runner_items` insert, **before-image first** (§19v):
 
 ```sql
--- 'needs-john'    = the card asks John to DECIDE something.
 -- 'needs-desktop' = the remaining work is on a surface an unattended cycle may not touch.
+--   SINCE SES-315 (M6-01, v7.0.404) THAT IS THE ONLY VALUE THIS STATEMENT MAY WRITE.
+-- 'needs-john' is RETIRED as a blocking state by M6-01: no cycle blocks on a human decision --
+--   it decides, records the reasoning and carries the reversal handle (step 7b) instead of
+--   flagging the ticket and dropping it. drain_chain_gate()'s c_flagged has been
+--   ARRAY['needs-desktop'] alone since SES-281, so writing 'needs-john' now parks a ticket
+--   that nothing is waiting to un-park. Legacy rows keep theirs; step 5's table reads them.
 -- ('john-paced' also exists — John ratifying on-page cards, SES-166 — but it is NEVER yours
 --  to write here: no gated card carries it, and assigning it is John's call. Step 5's table.)
 UPDATE public.backlog_items
-   SET design_status = '<needs-john|needs-desktop>', updated_at = now()
+   SET design_status = 'needs-desktop', updated_at = now()
  WHERE backlog_id = '<TICKET-ID>'
 RETURNING backlog_id, design_status;
 ```
@@ -2839,6 +2935,63 @@ RETURNING backlog_id;   -- 0 rows = already re-claimed by someone else; leave th
   front of it — release at the point the cycle stops. Nothing here can strand a ticket either
   way: an unreleased claim expires on the 24h boundary.
 
+<!-- FEATURE: SES-315 (b) — the close-out finally calls part (a)'s function, so a shipped change has a Reverse. -->
+- **RECORD THE SHIP AS A DECISION — this is the shipped change's Reverse handle, and it is the
+  whole of `SES-315` (`M6-01`; migration `ses315_ship_decision`, `v7.0.404`).** One call, after the
+  push has landed and the claim is released:
+
+```sql
+SELECT public.record_ship_decision('<your cycle id>', '<TICKET-ID>', 'v<your version>',
+                                   '<your push sha>', '<the verdict id 7a printed>');
+```
+
+  **WHY A SHIP NEEDED ONE AT ALL, measured by the M6 milestone gate review (decision `c3e86310`,
+  2026-09-02) rather than argued.** This close-out wrote a status and recorded nothing, and 7b said
+  a ship's Reverse *"lives on the ship card"* — the card tap `SES-285` retired on 2026-09-01. So a
+  shipped change had **no** live Reverse, and because `reverse_decision()` is the only demote, a bad
+  ship could not cost the ladder a rung: the charter's *"a Reverse spike auto-narrows the ladder —
+  autonomy is elastic, never ratcheted"* had no live input for shipped work at all.
+
+  **IT GOES HERE, AT THE FOOT OF THE CLOSE-OUT, AND THE ORDERING IS LOAD-BEARING RATHER THAN TIDY
+  — do not move it up beside the status write.** Three reasons, the first two read out of the
+  function bodies rather than recalled. (1) It **adopts** every `runner_before_images` row of your
+  cycle that no decision has claimed yet (`decision_id IS NULL`) — the ship's own writes ARE the
+  decision's undo set, and that is the design rule: no second copy. A call made before the snapshot,
+  the scoreboard stamp and the standing brief adopts none of those and hands out a Reverse that
+  restores less than the ship wrote. (2) `reverse_decision()` refuses any row whose live
+  `updated_at` is **later** than the decision's own `decided_at` (7b's reference-point rule,
+  `SES-316`), so a decision recorded *first* and written *afterwards* makes every one of this
+  cycle's own writes un-restorable — the exact failure 7b's one-`DO`-block rule exists to prevent,
+  spread across a whole step. (3) The `push_sha` argument is the cheapest of the three to notice:
+  before the push there is no sha to pass.
+
+  **WHAT IT REFUSES, each refusal a different mistake, and every one of them raises before the
+  first write:** a verdict that is not `approve` — a `block` writes `delivered` and cards John, so
+  there is no accepted delivery to undo and no rung to demote; a verdict naming **another** ticket,
+  or **no** ticket — a handle pointing at somebody else's reasoning is worse than no handle, and
+  a verdict with no ticket is not evidence for this one; a null cycle id — the reversal reads that
+  cycle row for the version and sha it must hand the next cycle. It is **idempotent per (cycle,
+  ticket)**: a second call returns the **same** id and writes nothing twice, which matters more than
+  convenience here, because the adoption above is `decision_id IS NULL` and a second decision would
+  adopt nothing and then report a Reverse that restores nothing.
+
+  **NAMED DEVIATION, disclosed rather than buried (the `SES-196` convention).** `SES-315`'s kickoff
+  says *"after the `done` write on an eligible approve"*; the instruction here is keyed to the
+  **verdict**, which is the function's own and only verdict gate, so an `approve` that wrote
+  `delivered` records its handle too. Restricting the call to auto-`done` ships would leave every
+  ship still waiting on John's Accept with no Reverse whatsoever — the ship card's tap being the
+  surface `SES-285` retired is precisely the absence `M6-01` measured, and it is not narrower for a
+  `delivered` ticket than for a `done` one.
+
+  **THE HANDLE GOES ON THE SHIP CARD'S `plain_worth` AND INTO YOUR CYCLE `notes`, in 7b's words:**
+  `Decision <id> — reversible until <expires_at, CST>: select public.reverse_decision('<id>', 'John', '<why>');`
+  A Reverse on a `kind = 'ship'` decision does three things, and the third is the one to read twice:
+  it restores the rows, it demotes the ticket's work class, and it queues a **`REVERT-FORWARD
+  REQUESTED`** `runner_directives` row — because the code half of a ship's Reverse is a git
+  operation no SQL function can perform, so the reversal leaves the instruction where the next cycle
+  reads first instead of pretending to have reverted code. Step 2's Reverse ceremony is where that
+  instruction is carried out.
+
 **7b. Every decision is a row with a handle (`SES-286`, `v7.0.395` — `M6-02`, `M6-05`, `M6-06`).** <!-- FEATURE: SES-286 (b) — the runbook finally calls the ledger part (a) built. -->
 Part (a) (`v7.0.394`) shipped `public.runner_decisions`, `runner_settings.reversal_window_hours`,
 `runner_before_images.decision_id` and six functions; **this block is where a cycle calls them**,
@@ -2852,10 +3005,23 @@ expiry, and no ladder effect. This block is not a step you reach once per cycle:
 restating the list.** Any write you make **on judgment rather than on a rule's mechanical output**:
 resolving a `needs-decision` ticket, deferring one (`defer_status = 'yes'`/`'stuck'`), removing one
 under `M6-03`, re-tiering or re-homing it, amending a required set, ruling a gate, amending a
-directive. **Not a decision:** step 7's own close-out status write on a green verdict (that is the
-verifier's output, and its Reverse lives on the ship card), a queue recompute, a claim, a
+directive. **Not a decision:** a queue recompute, a claim, a
 before-image, a scoreboard stamp. A decision that files a ticket files it in the same transaction
 (`M6-05`).
+
+<!-- FEATURE: SES-315 (b) — 7b stops calling a ship "not a decision", because since part (a) it is one. -->
+**A SHIP *IS* A DECISION, AND THE SENTENCE THAT SAID OTHERWISE IS RETIRED (`SES-315`, `M6-01`).**
+That list used to open *"step 7's own close-out status write on a green verdict (that is the
+verifier's output, and its Reverse lives on the ship card)"*, and it survives above only as this
+quotation of what the file **used to** say. Both halves stopped being true together: the status
+write is indeed the verifier's mechanical output — that much is unchanged and is why it is still
+absent from the decision list — but the *delivery* it recorded had no handle at all once `SES-285`
+retired the ship card's tap. Step 7's close-out now records the ship with
+`public.record_ship_decision()`: a `kind = 'ship'` row carrying the verdict's own reasoning, adopting
+the cycle's own before-images as its undo set. So a shipped change's Reverse is
+`public.reverse_decision('<that id>', …)` exactly like every other decision's — with one addition
+nothing else here has, the `REVERT-FORWARD REQUESTED` directive step 2's ceremony acts on, because
+SQL can put the rows back and cannot put the code back.
 
 **ONE STATEMENT — copy this.** It records the decision, images every row the decision is about to
 touch, and makes the write, inside one transaction:
@@ -3196,8 +3362,15 @@ Also sweep, regardless of age, tickets whose text hits retired vocabulary (`Beta
 `Post-beta`, "FEATURES.md row", the pre-rename class digits) — a retired-vocabulary premise is
 the cheapest death to detect. For each (≤3 per cycle): premise still real → `revalidated_at =
 now()`, nothing else; premise dead → `status = 'removal proposed'` + briefing card with
-evidence + queue recompute. **No unattended removal, ever** — `removed` is written only by
-harvesting John's Accept on the card. Card harvest rules (in the step-9 tail): **Accept** →
+evidence + queue recompute. <!-- FEATURE: SES-315 (b) — the no-unattended-removal rule stops being asserted in live voice. -->
+**"No unattended removal, ever" is SUPERSEDED by `M6-03` and is quoted here as the record of a
+withdrawn rule, not asserted** (`SES-286`, `v7.0.395`; annotated `SES-315`, `v7.0.404` — the
+registry has `B7` **superseded by `M6-03`**). It used to continue *"— `removed` is written only by
+harvesting John's Accept on the card"*, and the `M6-03` path immediately below is what replaced it:
+a **second consecutive** failed revalidation removes the ticket now, reversibly inside its window,
+with no Accept in front of it. What survives unchanged is this paragraph's own first failure, which
+still only **proposes** — one failed revalidation is as likely a transient read as a dead premise.
+Card harvest rules for a proposal card (in the step-9 tail): **Accept** →
 `status='removed'`, queue recompute (terminal); **Reverse** → prior status restored,
 `revalidated_at = now()` (the 30-day quiet); **Rework** → his line rewrites the description,
 ticket re-queues.
@@ -3486,8 +3659,9 @@ retry, never skip); **(2)** re-fetch the live page and re-parse `briefing-state`
 self-healing step: another cycle may have republished while you built, and publishing from a
 pre-lease harvest is exactly the "about to overwrite another session" moment John's ruling
 requires you to notice and absorb; **(3)** write the harvested decisions idempotently
-(`… AND decision IS NULL`; ladder moves only from rows you actually flipped, `shipped` cards
-only), store any reading/directive rows, and store any `asks` (`v7.0.145` — idempotent on
+(`… AND decision IS NULL`; the `apply_ladder_decision()` call goes on every flipped card and its
+Accept branch is **retired** as a ladder input since `M6-07` (`SES-315`) — a `reverse` on a legacy
+`shipped` card is the only tap that still moves a rung here), store any reading/directive rows, and store any `asks` (`v7.0.145` — idempotent on
 `uniq_card_ask`) **and any `unblocks` (`SES-127`, `v7.0.162`)** **and any `settings` (`SES-143`,
 `v7.0.182` — see the block below)**; **(4)** re-export the backlog snapshot now that the harvest writes have
 landed — the fix for the one-harvest staleness `SES-109` found (`v7.0.149`). Re-run step 7's
@@ -3572,7 +3746,7 @@ gates, in the order the call applies them — the first failure stops and names 
 |---|---|---|
 | A | `ran-a-cycle` | your own `outcome` ∉ `shipped` / `gated_before_build` / `reverted` |
 | B | `drain-has-work` | `drain_epic_next()` returns anything but `pick` |
-| C | `pick-actionable` | the pick's `design_status` ∈ `needs-john` / `needs-desktop` / `john-paced` |
+| C | `pick-actionable` | the pick's `design_status` ∈ `c_flagged` — **`ARRAY['needs-desktop']` ALONE since `SES-281`**; `needs-john` was **retired** outright by `M6-01` and `john-paced` was **converted** by migration `ses281_m5_pick_enforcement`, so both left that set (read out of `pg_get_functiondef` at `SES-315`, not recalled) |
 | D | `noship-streak` | consecutive non-shipping cycles ≥ `runner_settings.chain_max_noship_streak` (2) |
 | E | `undecided-ceiling` | undecided cards ≥ `runner_settings.chain_max_undecided_cards` (**off** unless John sets it) |
 
@@ -3614,8 +3788,10 @@ keeps its home. What stops is the **re-skipping of a ticket already on his page*
   ONLY. Adding them to the **retirement** predicate returns `open_now = 0` and closes John's
   standing directive on the runner's own say-so — the `SES-142` authorisation defect, rebuilt. A
   drain whose every remaining member is waiting on John is `blocked`, **never** `retired`.
-- **`'designed'` is NOT a flag.** The three are `needs-john` / `needs-desktop` / `john-paced`,
-  mirroring `drain_chain_gate`'s own `c_flagged`. The directive's literal words were *"design_status
+- **`'designed'` is NOT a flag.** The three used to be `needs-john` / `needs-desktop` /
+  `john-paced` — **and are one since `SES-281`: `c_flagged` is `ARRAY['needs-desktop']`, `needs-john`
+  RETIRED by `M6-01` and `john-paced` CONVERTED by that migration** (annotated `SES-315`) — still
+  mirroring `drain_chain_gate`'s own `c_flagged`, which is the property that must not drift. The directive's literal words were *"design_status
   is non-null"*, and taken literally that also excludes `designed` — which step 5's blocked-prefix
   table calls **explicitly not a skip** and step 6 calls the **fast path**. The literal reading
   would make a drain step past its *best* picks; his own parenthetical enumerates the three, so the
@@ -3684,7 +3860,8 @@ accumulating one.
 4. **The chain ends where a fresh cycle would end:** Gate A fails (a wall-stop or a `failed`
    close — **not** `gated_before_build`, which Gate A explicitly passes), Gate B fails (the drain
    retired, or every remaining named member is claimed), **Gate C fails (the pick is flagged
-   `needs-john` / `needs-desktop` / `john-paced`)**, **Gate D fails (two cycles running without a
+   `needs-desktop` — the only member of `c_flagged` since `SES-281`, `needs-john` **retired** by
+   `M6-01` and `john-paced` **converted**)**, **Gate D fails (two cycles running without a
    ship)**, Gate E fails if John set a ceiling, or the platform ends the session itself — and
    nothing is lost on that
    last one: an open claim expires in 24h and the next scheduled fire resumes the drain. A
@@ -3743,15 +3920,18 @@ can add to. `SES-110`, named in the previous version of this paragraph, is `stat
 this cycle's live read and is no longer a blocker either. **The second was true until `SES-197`
 (`v7.0.238`) and is now HALF true — read the distinction, because the underlying fact has not
 changed:** `drain_epic_next`'s pick predicate still reads `queue` and claims and **never
-`design_status`**, so a `needs-desktop`, `needs-john` or `john-paced` member still comes back as a
+`design_status`**, so a `needs-desktop` member — or a legacy `needs-john` / `john-paced` one, both
+of which left `c_flagged` at `SES-281` when `M6-01` **retired** the first and that migration
+**converted** the second — still comes back as a
 `pick` and still gets skipped procedurally at step 5 (`SES-114`; `john-paced` records no skip row —
 `SES-166`). **That is deliberate and must stay** — step 5 needs the flagged member returned so it
 can `record_skip()` and put the ask on John's §10. What changed is the **chain**: tail (8)'s
 `drain_chain_gate()` reads `design_status` on the pick and fails **Gate C**, so the chain is no
 longer bounded by *"Gate A plus the token wall"* — it stops at the first continuation whose only
 work is a decision John owes, or after `chain_max_noship_streak` cycles that ship nothing.
-Said plainly for John: when every remaining named member is flagged `needs-john` /
-`needs-desktop` / `john-paced`, the drain's finish line is on his briefing page, not in any
+Said plainly for John: when every remaining named member is flagged `needs-desktop` (or carries one
+of the two flags **retired** / **converted** out of `c_flagged` at `SES-281`, `needs-john` and
+`john-paced`), the drain's finish line is on his briefing page, not in any
 cycle's hands — and **the chain now stops and says so** instead of running until the budget wall
 noticed for it.
 
