@@ -27,12 +27,14 @@
 // Anthropic call on every run. The judge's real end-to-end behaviour is the design session's own
 // Manual QA, and its evidence lives in the kickoff's Section 11.
 //
-// GROUNDEDNESS IS UNKNOWN BY DESIGN IN THIS PART (parent ruling, 2026-09-03, Blocker B / Option 2):
-// nothing on the platform can read `the_library` chunk TEXT by id -- lib/librarian.js's
-// lookupRecordsByIds() selects `id,data_type` only, and queryLibrary() is similarity-only -- so the
-// by-id Library content read is LOG-143 part (d). The Skill's method text is pinned below to say so,
-// because a later editor who deletes that instruction would silently turn an honest `unknown` into
-// a fabricated score, which is the exact failure C-rejected-17/18 named.
+// GROUNDEDNESS WAS UNKNOWN BY DESIGN IN PART (a) (parent ruling, 2026-09-03, Blocker B / Option 2):
+// nothing on the platform could read `the_library` chunk TEXT by id -- lib/librarian.js's
+// lookupRecordsByIds() selects `id,data_type` only, and queryLibrary() is similarity-only. LOG-143
+// (d2) shipped that read, so the method assertions near the bottom of this file were amended at
+// v7.0.419 (decision 32fa2fea-89e3-40f6-97b7-a1ec26eac2f7) to pin the RULE rather than the outcome:
+// unknown is reserved for a run that carried no chunk ids, and is never inferred from the answer's
+// own prose. Both directions are the same failure C-rejected-17/18 named -- a fabricated score, and
+// an unknown asserted over an input the judge can now obtain. See that block's own comment.
 
 import assert from "assert";
 import fs from "fs";
@@ -236,11 +238,31 @@ export default async function run() {
       "traits.handler is what dispatches the structured output to the deterministic store -- " +
       "capabilities are data (§19b), so this is the only thing that routes the write");
     assert.ok(intent.traits?.schema?.properties?.groundedness,
-      "the structured card must declare a groundedness field even while it is always unknown");
-    // The honest-unknown instruction. An editor who deletes this turns a NULL into a guess.
-    assert.match(intent.method, /Library chunk text not readable by id yet - LOG-143 \(d\)/,
-      "the Skill's method must pin the exact evidence string for the unknown groundedness " +
-      "dimension (parent ruling, Blocker B / Option 2)");
+      "the structured card must declare a groundedness field");
+    // AMENDED BY LOG-143 (d2), decision 32fa2fea-89e3-40f6-97b7-a1ec26eac2f7, and the amendment is
+    // the point rather than a maintenance chore. Part (a) pinned the exact string "Library chunk
+    // text not readable by id yet - LOG-143 (d)" because at that ship the platform genuinely could
+    // not read chunk TEXT by id, so a permanent unknown was the honest value. Part (d2) shipped
+    // that read (lib/search-harness.js readContentByIds -> lib/librarian.js
+    // lookupRecordsWithContent, behind api/_lib/handlers/library-lookup.js's include_content flag),
+    // which makes the old string a false statement about the platform -- and a guard that pins a
+    // false statement is worse than no guard, because it blocks the correction.
+    //
+    // WHAT IS PINNED NOW IS THE RULE, NOT THE OUTCOME, and that is a stronger assertion than the
+    // one it replaces: unknown must be reserved for the case where the inputs are genuinely absent
+    // (no chunk ids were passed), never asserted unconditionally and never inferred from prose. An
+    // editor who lets the judge score groundedness off the answer's wording still fails here.
+    assert.match(intent.method, /retrieved_chunk_ids/,
+      "the Skill's method must tell the judge which task_context field carries the chunk ids its " +
+      "groundedness score rests on");
+    assert.match(intent.method, /include_content/,
+      "the method must tell the judge to obtain the chunk TEXT (include_content) rather than " +
+      "scoring groundedness from ids alone -- LOG-143 (d2) is what made that possible");
+    assert.match(intent.method, /ONLY when no retrieved_chunk_ids were passed/,
+      "unknown must be RESERVED for the genuinely input-less case. An unconditional unknown and a " +
+      "fabricated score are the same failure from opposite ends (C-rejected-17/18).");
+    assert.match(intent.method, /Never infer groundedness from the answer/,
+      "the method must forbid inferring groundedness from the answer's own prose");
     assert.match(intent.method, /unknown is the honest value/,
       "the method must state that an unsupportable dimension is unknown, never a fabricated score");
 
