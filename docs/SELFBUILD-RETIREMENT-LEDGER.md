@@ -642,3 +642,48 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
 - **RE-HOMED in the same UPDATE:** `canonical_doc` moved from `CLAUDE.md#hard-rules` to **`docs/STANDARDS.md#section-2-session-scope-rules`**, where the statement now sits as a blockquote under rules 1–3. **Why, and it is the whole reason this entry exists:** a rule's `canonical_doc` must carry its text byte-for-byte, and `CLAUDE.md` is **John's file** — this ticket may cite it and may not edit it. The choice was therefore between a live rule whose home contradicts it and a rule homed where a cycle is allowed to reconcile it; the second is the only one that leaves the registry and its home in agreement. **John's `Scope` hard-rule line in `CLAUDE.md` is untouched, still says "One feature per session. Max 3 files. Max 4 tasks.", and is now cited BY the amended row as the baseline** — the row widens what a promoted class may do on top of his floor, it does not overwrite his sentence.
 - **Survives:** the one-feature cap in full (`CAP-SCOPE-FEATURE`, *"Scope every session to exactly one feature."*, deliberately **not** amended — a rung buys breadth of edit, never a second feature), the 3/4 floor, and John's own line.
 - **Restore:** image `333ff789-be41-4d59-a2ba-35d6b1219d48` (`session_name = 'ses-122c-coding'`) carries both the prior `statement` **and** the prior `canonical_doc`; restoring the row restores the home. Then re-export the snapshot and remove the blockquote from Section 2.
+
+### 39. `apply_ladder_decision()` — the Accept promotion, as a ladder input (retired)
+<!-- FEATURE: SES-315 (a) — the replacement is ALREADY LIVE and predates this entry, so there is no
+     commit in which neither the old input nor the new one is in force (SELFBUILD-CHARTER transition
+     rule): `verdict_ladder_signal()` has moved the ladder off verdicts since `SES-122` (a),
+     `v7.0.397`, and `sweep_decision_windows()` off decision windows since `SES-286a`, `v7.0.394`.
+     This entry records the removal of the SECOND, older input, not the arrival of the first. -->
+- **Did, verbatim from the retired branch:** on a `runner_items` ship card whose `decision = 'accept'`,
+  `apply_ladder_decision()` set `v_streak := v_before.streak + 1`, promoted the work class on
+  `v_streak % 5 = 0` (`v_rung := v_before.rung + 1`), wrote the `runner_ladder` row after its
+  before-image, and returned `applied true` with *"accept on a ship card: streak N -> N+1, rung R ->
+  R' (promoted — every 5th Accept)"*.
+- **Lived:** `public.apply_ladder_decision(uuid, uuid)`, the `IF v_item.decision = 'accept'` arm,
+  shipped by `SES-134` (`v7.0.315`, migration `ses134_ladder_executable`) and last amended by
+  `SES-122` (a). Called from `docs/runbooks/runner-cycle.md` step 2 and the step-9 serial tail.
+- **Why retired:** two reasons, and the second is the one that makes it unsafe rather than merely
+  dead. (1) **Its input no longer exists.** The Accept it counted is a *tap on the ship card*, and
+  that surface was retired by `SES-285`; the branch has been dormant since 2026-08-30 while still
+  live in the database. (2) **`M6-07` gave the ladder two real inputs, and a third would double-count
+  one delivery.** A ship is now graded by its verdict (`verdict_ladder_signal()`: `approve` promotes,
+  `block` resets the streak and never the rung) and by its decision window
+  (`sweep_decision_windows()` promotes on silence, `reverse_decision()` demotes). Leaving the
+  promotion here as well meant one delivery could be counted twice — once by its verdict and once by
+  a tap on the same card — which is a *manufactured* promotion: `SES-107`'s runaway with a second
+  author. Measured before the change: `runner_ladder.tooling` stood at rung 13 with `cap_relax_rung`
+  5 and `auto_done_rung` 3, so a manufactured rung buys real extra files, real extra tasks and the
+  auto-done bar.
+- **Survives — and this is the half a later editor must not lose:** the function is **not** deleted
+  and its `reverse` branch **keeps its demote**. That is not an inconsistency: a Reverse on a legacy
+  card **is** a reversal by John's word, and `M6-07`'s safety measure requires that a reversal always
+  costs a rung. `greatest(v_before.rung - 1, 0)` and `streak := 0` are unchanged, the `B34` gated
+  short-circuit and the `rework` branch are byte-identical, and the retired `accept` arm is **inert
+  rather than absent** — it still stamps `runner_items.ladder_applied_at` (the idempotence guard is
+  structural: an unstamped card is one a re-run or a second harvesting peer can still count) and
+  returns `applied false, 'Accept is not a ladder input since M6-07 (SES-315); the ladder reads
+  verdicts and decisions'`. The promotion arithmetic itself survives with **one** home,
+  `ladder_apply_signal()`, which is what both live inputs drive; the migration asserts that
+  `apply_ladder_decision`'s body no longer contains it at all.
+- **Restore:** `git show 9eb38971:docs/SELFBUILD-RETIREMENT-LEDGER.md` for this file, and for the
+  branch itself the pre-change body is in the recorded SQL of migration
+  `ses122a_verdict_ladder_signals` (`supabase_migrations.schema_migrations`, version
+  `20260902210032`) — the last migration to carry `apply_ladder_decision()` with the promotion in
+  place. Restoring it means re-adding the `accept` arm *and* re-answering reason (2): a restored
+  promotion must be paired with removing one of the two `M6-07` inputs, or the double count comes
+  back with it.
