@@ -172,3 +172,11 @@ feature's own build — unpredictable until it is pitched.
   regression files failed at import (`DAT-003`, `DAT-12`, `HAR-20`); build and hygiene were green.
   A clean `npm ci` in the snapshot and a second run followed; `verdict_ladder_signal()` is never
   called on `9a2edb27`.
+- **Verdict `44ba3968` (block) was a TRUE catch, recorded as one.** With dependencies installed the
+  suite ran 164/165 and `ses-310-drain-retires-on-required.test.mjs` failed: the standing brief on
+  `origin/dev` was rendered before this gate, so it still said *"5 of 5 named members"* while the
+  drain now carried five `milestone_required` members and owed a *required* finish line. That is the
+  verifier catching a stale generated view against the live tables — the keystone metric's first
+  real signal in an attended sitting. Fixed by re-rendering the brief, `CLAUDE-STATE.md` and the
+  backlog snapshot (this record's second commit) and re-running; only the final verdict is fed to
+  the ladder, and this one is named here so the catch is not lost.
