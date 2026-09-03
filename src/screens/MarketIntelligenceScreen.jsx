@@ -1,3 +1,9 @@
+// DeepBench v7.0.417 | MarketIntelligenceScreen.jsx | LOG-143 (b) -- every finished Q&A run is graded in
+// the background by Owen Marsh -- The Proofreader's bench-report-card capability: one fire-and-forget
+// callCapability() at the point the final answer is committed to state, one call per trace ever, and one
+// appended Audit Pipeline Log line when the card lands. Three of report-card-intent's six declared inputs
+// (assembled_skill_slugs, retrieved_chunk_ids, self_reported_claims) are NOT available client-side and are
+// omitted rather than defaulted -- full field trace above gradeFinishedRun().
 // DeepBench v7.0.191 | MarketIntelligenceScreen.jsx | CHI-84 -- the chat handoff bubble's step chip is
 // now TAPPABLE: tapping it jumps Steps & Evidence to that step's drawer (opens it, scrolls its top into
 // view, pulses it once). Wiring of two shipped mechanisms, not new machinery -- CHI-82's StepChip and
@@ -1110,6 +1116,12 @@ function describePipelineEvent(evt, opts = {}) {
     // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
     case "hypothesis_generation":
       return { summary: "Reviewing found data, putting together a theory", color: T.moss };
+    // FEATURE: LOG-143 (b) — the one line the Audit Pipeline Log gains when the background judge
+    // finishes. T.moss is the existing convention for "an agent completed its work cleanly"
+    // (delegation_return/hypothesis_generation above) — no new colour, no new row style, no new
+    // panel on this screen.
+    case "report_card":
+      return { summary: reportCardLogSummary(evt.data), color: T.moss };
     // FEATURE: MI-29 -- surfaces the real caught error (e.message) in the existing Pipeline Log
     // instead of it only ever reaching a devtools-only console.error. Reuses T.flag, the same
     // alert color already used for guardrail "block" results above -- no new color introduced.
@@ -1605,6 +1617,105 @@ export async function callCapability({ capability_slug, intent_slug, agent_id, t
   return finalResult;
 }
 
+// ── FEATURE: LOG-143 (b) — the Bench Report Card's trigger ───────────────────────────────────
+// Every finished Q&A run is graded in the background by Owen Marsh — The Proofreader's
+// `bench-report-card` capability (LOG-143 (a), v7.0.415). Fire-and-forget by construction: the
+// call is never awaited on the answer path, every failure is consoled and swallowed, and one
+// trace is graded at most once, ever.
+//
+// MOCK-FIDELITY FIELD TRACE — every task_context field, and where it is read from. The kickoff
+// stated all six of `report-card-intent`'s inputs are "already held client-side"; three of them
+// are not, and the verification is recorded here rather than papered over with a synthesised
+// value (C-rejected-17/18: an invented input is worse than a declared gap):
+//   • trace_id  — PASSED. `qa.trace_id`, the trace of Marcus's own `ci-answer-intent` execution,
+//     threaded out of runQaWithQualityGate() as `judgeTraceId`. Born in execute.js runCapability()
+//     (`const traceId = _trace_id || crypto.randomUUID()`), returned on runLoop()'s final result
+//     (LOG-79) and unwrapped by callCapability() above. NOT read off the qa_answer pipeline event:
+//     that event only fires when no internal delegation resolved the call (LOO-010's
+//     `display_agent_id == null` guard), so the event is a conditional carrier of the id and the
+//     return value is an unconditional one. Each top-level callCapability() opens its OWN trace,
+//     so this is deliberately the ANSWERING call's trace, not routing's, the gate's or display's.
+//   • question — PASSED. `clean`, onSend()'s own trimmed question text.
+//   • answer   — PASSED. `plainText`, the same plain-text join of the formatted card that
+//     conversationContext()/onReview already use (S-ARCH-DISPLAY-LOOP-01).
+//   • hops     — PASSED, PARTIAL. Each entry is the literal {agent_id, capability_slug,
+//     intent_slug} triple a callCapability() call site actually sent to /api/capabilities/execute
+//     (built in runIntentPipeline/runQaWithQualityGate as the calls happen), plus the display
+//     hop's real resolved `display_agent_id`. It is NOT read off the Audit Pipeline Log as the
+//     kickoff assumed: verified this session, a hop event carries `agentId` and the response
+//     content, and capability/intent slugs appear only on the delegation-family events the
+//     executor streams (`toCapabilitySlug`/`toIntentSlug`) — i.e. only when a delegation
+//     happened. `assembled_skill_slugs` is OMITTED from every hop, not defaulted to []: it is
+//     written server-side onto the ai_activity_log agent-turn row (LOG-49) and no response field
+//     or streamed event carries it, so the client cannot know it. An empty array would assert
+//     "this agent carried no Skills", which is a fabrication; an absent key is the honest
+//     "not given", and the judge's own rubric turns an unsupportable dimension into `unknown`.
+//   • retrieved_chunk_ids — OMITTED. No `src/` file has ever held this value (it is written on
+//     Eleanor Voss's librarian rows server-side). Moot in this version regardless: part (a)
+//     Blocker B means `report-card-intent` scores groundedness NULL unconditionally, because
+//     nothing on the platform can read Library chunk text by id until LOG-143 (d).
+//   • self_reported_claims — OMITTED. Same reason: extractSelfReportedClaims() runs inside
+//     request-receivable.js/execute.js and its output goes to the log row's facts half, never to
+//     the response.
+// A judged card therefore lands today with a real delegation_fit and skill_use where the routing
+// chain supports them, `unknown` where it does not, and groundedness always `unknown` — which is
+// exactly what the Report Card panel renders (never a 0/5 standing in for a gap).
+const gradedTraceIds = new Set();
+
+// One judge call per trace, ever. Not free of side effects — claiming the id IS the guard, and
+// splitting the check from the claim would reopen the double-fire window the module-scope Set
+// exists to close — but pure with respect to everything else, so the regression test can drive it
+// with its own Set and assert the second call for the same id returns false.
+export function shouldGradeTrace(traceId, seen) {
+  if (typeof traceId !== "string" || !traceId) return false;
+  if (!seen || typeof seen.has !== "function") return false;
+  if (seen.has(traceId)) return false;
+  seen.add(traceId);
+  return true;
+}
+
+// FEATURE: LOG-143 (b) — the summary text for the Audit Pipeline Log's one appended line. A NULL
+// dimension prints the word `unknown`, never 0/5 (C-rejected-17/18), and there is no blended
+// overall figure (C-rejected-27) — three dimensions, shown separately.
+export function reportCardLogSummary({ agent_name, delegation_fit, groundedness, skill_use }) {
+  const d = (v) => (v === null || v === undefined ? "unknown" : `${v}/5`);
+  return `Report card: ${agent_name || "the answering agent"} — fit ${d(delegation_fit)} · grounded ${d(groundedness)} · skills ${d(skill_use)}`;
+}
+
+// FEATURE: LOG-143 (b) — fired from onSend()'s qa branch and deliberately NOT awaited there. A
+// judge failure must not delay or alter the answer, so nothing in here can throw into the answer
+// path: shouldGradeTrace() refuses a missing/duplicate trace, and the whole call is wrapped.
+export async function gradeFinishedRun({ traceId, question, answer, hops, fallbackAgentId, resolveAgentName = (id) => id, logLine, isStale = () => false, seen = gradedTraceIds }) {
+  if (!shouldGradeTrace(traceId, seen)) return null;
+  const t0 = Date.now();
+  try {
+    const card = await callCapability({
+      capability_slug: "bench-report-card", intent_slug: "report-card-intent", agent_id: "owen",
+      task_context: { trace_id: traceId, question, answer, hops },
+      isStale,
+    });
+    // The graded agent is the judge's own answer (`card.agent_id`, the agent on the hop that
+    // produced the answer), never Owen — the same read-side twin of Rule #1 the write handler
+    // enforces. Note `card.trace_id` is NOT usable here: callCapability()'s unwrap overwrites the
+    // content's trace_id with the JUDGE's execution trace (LOG-79's generic passthrough), so the
+    // graded run's id is the one this function was handed.
+    const gradedAgentId = card?.agent_id || fallbackAgentId || null;
+    if (isStale() || typeof logLine !== "function") return card ?? null;
+    logLine(buildHopEvent("report_card", gradedAgentId, {
+      ...card,
+      trace_id: traceId, // the GRADED run's trace, restored over the judge's own
+      agent_name: resolveAgentName(gradedAgentId),
+    }, Date.now() - t0));
+    return card ?? null;
+  } catch (e) {
+    // Swallowed on purpose: the answer is already on screen and correct. Nothing is appended to
+    // the Audit Pipeline Log for a failed judge — a report-card row that does not exist must not
+    // be narrated as if it did.
+    console.error("[MarketIntelligenceScreen] FEATURE: LOG-143 — Bench Report Card judge failed (swallowed, never on the answer path)", e);
+    return null;
+  }
+}
+
 // FEATURE: MI-01d — resolve a pending_confirmation (accept/reject/edit). Generic across any
 // capability — the confirmation_id already encodes which capability/agent/intent it belongs to.
 // FEATURE: MI-42 — gains the identical onProgress/stream treatment for consistency (Nadia's
@@ -1661,6 +1772,14 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
   });
   if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
 
+  // FEATURE: LOG-143 (b) — the run's hop list for the Bench Report Card judge, accumulated as the
+  // calls actually happen so a hop that never ran is never listed. Each entry is the literal
+  // triple this function handed /api/capabilities/execute, which is why capability_slug and
+  // intent_slug are real here and null on the Audit Pipeline Log's own hop events (see the field
+  // trace above gradeFinishedRun()). `assembled_skill_slugs` is deliberately absent from every
+  // entry — it exists only on the server-side agent-turn row.
+  const judgeHops = [{ agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent" }];
+
   setStatus("Owen is reviewing…"); // FEATURE: MI-42 (was MI-41) -- macro-hop swap, was invisible before
   // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
   // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
@@ -1683,6 +1802,7 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
     onEvent, hop_type: "proofreader",
   });
   if (isStale()) return gate; // FEATURE: CHI-04 — stop before the display hand-off hop
+  judgeHops.push({ agent_id: "owen", capability_slug: "quality-gate", intent_slug: "qg-review-intent" }); // FEATURE: LOG-143 (b)
   const retried = !!gate.final_answer;
 
   if (gate.guardrail?.result === "block") {
@@ -1748,6 +1868,10 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
     onProgress, isStale, onRecovery,
   });
   if (isStale()) return display; // FEATURE: CHI-04
+  // FEATURE: LOG-143 (b) — the display hop credits the agent Michelle's pick actually resolved to
+  // (`display_agent_id`, the executor's own generic passthrough), null when the hand-off declined
+  // its tool call and answered as plain text — never a guessed formatter.
+  judgeHops.push({ agent_id: (typeof display === "string" ? null : display.display_agent_id) || null, capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent" });
 
   // FEATURE: AA-137 — callCapability() returns a raw string when the display/format hand-off
   // declines its tool call and responds with plain text instead (e.g. it recognizes a real problem
@@ -1771,6 +1895,9 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
       needs_review: true, review_reason: "Display agent output couldn't be rendered in the expected format — see message below.",
       displayAgentCard: typeof display === "string" ? null : display.display_agent_card,
       displayAgentId: typeof display === "string" ? null : display.display_agent_id,
+      // FEATURE: LOG-143 (b) — additive identity for the background judge; every existing caller
+      // reads named fields, so this changes nothing they see.
+      judgeTraceId: qa.trace_id ?? null, judgeHops,
     };
   }
   return {
@@ -1779,6 +1906,9 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
     citations: display.citations, confidence_tier: display.confidence_tier,
     needs_review: display.needs_review, review_reason: display.review_reason,
     displayAgentCard: display.display_agent_card, displayAgentId: display.display_agent_id,
+    // FEATURE: LOG-143 (b) — the ANSWERING call's own trace (Marcus's ci-answer-intent execution),
+    // which is the run the Report Card grades, plus the hop list built above.
+    judgeTraceId: qa.trace_id ?? null, judgeHops,
   };
 }
 
@@ -1799,7 +1929,14 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, backgroundContext, onRecovery); // FEATURE: HAR-17
+  const qaResult = await runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, backgroundContext, onRecovery); // FEATURE: HAR-17
+  // FEATURE: LOG-143 (b) — the routing hop is the first hop of the run and the one that chose the
+  // Intent, so delegation_fit cannot be judged without it; it is prepended here rather than
+  // rebuilt inside runQaWithQualityGate, which never sees this call. Only the qa shapes carry a
+  // hop list (a qa_failed/non_qa run produced no answer to grade).
+  return Array.isArray(qaResult?.judgeHops)
+    ? { ...qaResult, judgeHops: [{ agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent" }, ...qaResult.judgeHops] }
+    : qaResult;
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
@@ -4333,6 +4470,22 @@ export default function MarketIntelligenceScreen() {
           // it alongside the real elapsed time above.
           estimate: expectationAtStart,
         })]);
+        // FEATURE: LOG-143 (b) — the finished run is graded here, at the single point where its
+        // final answer is committed to state, and the call is deliberately NOT awaited: the answer
+        // is already rendered above and a judge failure must not delay or alter it. The judge's own
+        // line is appended to the Audit Pipeline Log (Column 3) by logEvent when it lands, ~10-30s
+        // later; nothing is appended if it fails. One call per trace, ever (gradedTraceIds).
+        // Field-by-field provenance of everything passed: see the trace above gradeFinishedRun().
+        gradeFinishedRun({
+          traceId: result.judgeTraceId,
+          question: clean,
+          answer: plainText,
+          hops: result.judgeHops || [],
+          fallbackAgentId: "marcus",
+          resolveAgentName: (id) => agents.find(a => a.id === id)?.name || id,
+          logLine: logEvent,
+          isStale,
+        });
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
       } else if (result.kind === "hyp_entry") {
