@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.406 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | M6 COMPLETE — close-out of attended session design-m6-build-0902 (2026-09-02): the required set closed at 8 (the gate's six plus SES-315 and SES-316 from the milestone review), every ship verdict-backed, the first live ship decision recorded (b5214a0a), the M7 drain standing behind SES-186. Doc-only plus the generated CLAUDE-STATE.md, standing brief and backlog snapshot. -->
 <!-- DeepBench v7.0.403 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | M6 milestone gate review (attended session design-m6-build-0902, two Fable 5 lenses, decided under SES-312 as decision c3e86310, reversible until 2026-09-05 18:33 CST): PASS WITH NAMED GAPS — SES-315 and SES-316 filed required into M6, SES-317 non-required behind SES-314, cap_relax_rung 5→13, M7 pick order corrected, the Selfbuild M7 drain declared under 0970abad. Both lenses recorded in their own words. No rule STATEMENT changed. -->
 <!-- DeepBench v7.0.396 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-286 (c) — THE PHASE SPLIT IS OVER, said in an amendment note rather than by editing the paragraph that recorded it. SES-286 (a) (v7.0.394), (b) (v7.0.395) and (c) (v7.0.396) built the reversal-window machinery this file deferred: public.runner_decisions plus record_decision() / sweep_decision_windows() / reverse_decision() / ladder_apply_signal(); runner-cycle.md 7b and its serial-tail sweep; session-setup.md 3d and its Reversing-a-decision section; and the standing brief's Open decisions block, which lists every open decision beside the one line that undoes it. NO RULE STATEMENT CHANGED — not one `>` quoted line was touched, so the ses-285 registry↔doc equality guard is untouched, and no governance_rules row moved. THE SUPERSEDED SENTENCE IS LEFT STANDING DELIBERATELY: "a rule marked `script` below is not yet enforced by any script" was true on 2026-09-01 and false from v7.0.396, and this file is a GATE RECORD — the phase it records really happened, so the note supersedes the sentence rather than deleting the history. An editor tempted to tidy the paragraph instead should read the amendment first. Doc only; the renderer and the new guard tests/regression/ses-286c-open-decisions-brief.test.mjs ship in the same commit. -->
 <!-- DeepBench v7.0.391 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-185 — the M6 design gate, decided rather than asked (attended session design-m6-build-0902, Fable 5.1, M6-01). This file gains the gate record: what M6 promises and which ticket carries each promise, the required set (6 tickets, 11 cycles — stored as milestone_required), four members filed at the gate (SES-310..313), the rulings the gate owed (exit-exam defaults kept, dev→main promotion withdrawn from SES-185 scope under M6-08, design/coding split satisfied by measurement for the runner), and the M5 milestone-review runner_items row written so step 8d and directive 0970abad can see that review. No rule STATEMENT changed: the ses-285 registry↔doc equality guard is untouched. Doc-only plus Supabase rows, all before-imaged under session_name design-m6-build-0902. -->
@@ -435,3 +436,33 @@ It did not re-feed the two false-block verdicts, re-grade the four required ship
 before the trigger, re-home the four tickets whose `milestone` disagrees with their epic (John's
 call, M5 record), or decide anything the M7 gate owns. `SES-315` and `SES-316` are M6's own promise
 and are drained attended in this session, per the M5 precedent; M6 retires when they close.
+
+### M6 COMPLETE — 2026-09-02, v7.0.405
+
+**The required set closed at 8 tickets** — the gate's six (`SES-185`, `SES-286`, `SES-122`, `SES-310`,
+`SES-311`, `SES-312`) plus the two the milestone review filed as M6's own promise (`SES-315`,
+`SES-316`) — every one `done` with a before-image, and the last five with an attended verifier
+`approve` recorded on an LF snapshot (`SES-312` `9aace1b8`, `SES-313` `59e9dda3`, `SES-316`
+`c9f4983a`, `SES-315` see its row; `SES-301` and `SES-311` carry environment-only blocks, `SES-314`).
+Stored form: `select … from public.ticket_matrix where milestone = 'M6' and milestone_required and
+status <> 'done'` returns **zero rows**. Non-required members: `SES-301` and `SES-313` done;
+`SES-317` open, `blocked_by SES-314` (general board) — it does not hold M6.
+
+**What is true now that was not this morning, in John's terms:** a cycle decides instead of asking
+and every decision is a row he can undo with one line for 72 hours; a shipped change has that same
+handle (`record_ship_decision()`), so his Reverse of a delivery is one line too, and it demotes the
+class that shipped it; the trust ladder moves only on verifier verdicts and on those windows and
+reversals; the scope caps widen only from rungs earned that way (`cap_relax_rung = 13`, so nothing
+is widened yet); `done` cannot be written on a Selfbuild ticket without a verdict behind it; a
+milestone drain retires on the members its gate ruled required; a milestone review decides, files
+its successors and declares the next drain inside one reversible transaction — and did, for M7,
+tonight; dev→main is still his alone.
+
+**What M6 did not do, said plainly:** no unattended cycle has yet exercised any of it. All twelve
+ships were attended; the first M7 chain is M6's real acceptance test, and the M7 design gate
+`SES-186` — now first in the M7 drain — carries one Tier-3 item (charter criterion 7's "ratified by
+John") that John should hear about before or as the gate is decided.
+
+**Cost, as far as it is measurable:** 12 ships in one attended session against a gate estimate of
+11 required cycles; attended token cost is not attributable (`SES-82`, deferred), so the 14.6 M
+figure is neither confirmed nor refuted.

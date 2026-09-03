@@ -70,3 +70,20 @@ Two facts every later grants session needs:
   still hold `m` on all 32 tables (`DAT-20`, latent, not DML, unreachable via PostgREST). Read
   `pg_class.relacl` / `pg_default_acl` when the question is "the complete grant surface," not just
   the information_schema views.
+
+
+## Addendum (2026-09-02, `SES-315`): functions default OPEN — `REVOKE … FROM PUBLIC` does not close them
+
+`pg_default_acl` for functions in this project grants EXECUTE to `anon`, `authenticated` and
+`service_role` **by name** the instant a function is created, so a new `runner_*` function is
+callable through the browser's anon key until its migration revokes those roles explicitly.
+`REVOKE ALL ON FUNCTION … FROM PUBLIC` removes only the PUBLIC grant and leaves the named role
+grants standing — the migration reports success and the function stays open. This is the opposite
+direction from the table write-grant default above (closed for writes, SELECT open).
+
+Found live by `SES-315`'s migration (`ses315_ship_decision`, 2026-09-02): its own trailing `DO`
+block asserted `has_function_privilege('anon', …, 'EXECUTE')` false, the first attempt was refused
+and rolled back, and the shipped form revokes `PUBLIC, anon, authenticated` by name before
+granting `service_role`. Every `runner_*` function created before it was created the same way and
+closed the same way (`SES-286a` § 1h, `SES-122a` § 7); a migration that creates a function must
+revoke the three by name and assert both directions, never trust the success flag.
