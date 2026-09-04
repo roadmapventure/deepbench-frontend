@@ -1,1 +1,0 @@
-design-m7-item1-0904 — attended: the decision-window finaliser (pg_cron, under SES-320 as its disclosed follow-up), SES-319's platform half (runner_silence(), linked to M7), and SES-326's two missing M7 measures added to its scope.
