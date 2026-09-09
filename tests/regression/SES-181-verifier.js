@@ -1,3 +1,35 @@
+// DeepBench v7.0.433 | tests/regression/SES-181-verifier.js | AGT-67 -- THE AGENT'S OPINION IS NOT A
+// PERMISSION, and both invariants are asserted against a MUTANT that has the guard removed, because
+// that is the only way to answer "would this test still pass if the code guard did nothing?".
+//
+//   theAgentCannotTurnARedGateIntoAnApprove()   invariant (a). The mutant `withoutTheVerdictGuard()`
+//                                               below is reconcileJudgment() with the mechanical
+//                                               short-circuit deleted -- it returns APPROVE on the
+//                                               identical fixture, which is the measurement that
+//                                               makes the real assertion non-vacuous.
+//   theAgentCannotBuyPastSelfCertification()    invariant (b). `withoutTheEligibilityGuard()` is the
+//                                               same file with codeEligibility dropped as the
+//                                               ceiling; it says ELIGIBLE on a diff touching
+//                                               scripts/verifier.js -- this ship's own diff.
+//   theDegradePathIsTodaysBehaviourExactly()    no agent => the mechanical verdict and the code's
+//                                               own eligibility, unchanged. The `--judge=none`
+//                                               default every existing caller reaches.
+//   judgeModeIsValidatedNotDefaulted()          a typo'd `--judge` is an error, never a silent
+//                                               downgrade to the mechanical-only lane.
+//   theIntentSchemaIsTheContract()              validateAgentVerdict() against the Intent's own
+//                                               stored shape, with the mutants a model really emits
+//                                               (a "true" string, a missing lens, an over-long field).
+//   aVerdictMustBeAboutThisDelivery()           THE VERIFIER PUT THIS ONE HERE. Its first real run
+//                                               (verdict 5f414763, finding 1) noticed pass two never
+//                                               compared the agent's own backlog_id/version against
+//                                               the delivery being graded, so a stale or foreign
+//                                               verdict file passed the schema and landed on the
+//                                               wrong ledger row.
+//
+// NO MODEL CALL AND NO WRITE: every AGT-67 clause here is the pure reconciliation, driven with
+// fixtures. Whether the Verifier's Skill text produces a verdict that cites file:line is the
+// kickoff's attended QA, run once against this ship's own commit and recorded on the v7.0.433 row.
+//
 // DeepBench v7.0.425 | tests/regression/SES-181-verifier.js | SES-340 -- THE SCOPE TEST IS A PROJECT
 // STATUS, so the fixtures carry `epicProjectExecuting` where they used to carry a Selfbuild-shaped
 // `epicName`, and the assertions follow. Two things are deliberately NOT the same edit:
@@ -55,6 +87,14 @@ import {
   autoDoneEligibility,
   selfCertificationBlock,
   spawnCommandFor,
+  // FEATURE: AGT-67 -- the judgment half.
+  JUDGE_MODES,
+  EXIT_AWAITING_JUDGMENT,
+  parseJudgeMode,
+  judgeContextPathFor,
+  validateAgentVerdict,
+  verdictIdentityMismatch,
+  reconcileJudgment,
 } from "../../scripts/verifier.js";
 
 const ALL_GREEN = { build: "green", regression: "green", hygiene: "green" };
@@ -464,6 +504,268 @@ function spawnCommandIsQuotedOnlyForTheShell() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// AGT-67: the judgment half. The agent contributes reasons and contributes no permission.
+// ---------------------------------------------------------------------------
+
+// A well-formed verdict from a model that likes the change. Everything about it is valid; the only
+// question every clause below asks is whether the CODE still holds its own line.
+const AGENT_APPROVES = Object.freeze({
+  backlog_id: "AGT-67",
+  version: "v7.0.433",
+  verdict: "approve",
+  reasoning: "The kickoff's four tasks are all present; scripts/verifier.js:400 keeps autoDoneEligibility() unchanged.",
+  pm_lens: "Delivered what the kickoff promised; no slippage.",
+  architect_lens: "Fits the SES-331 one-assembly rule; nothing re-derived at the call site.",
+  auto_done_eligible: true,
+  auto_done_reason: "All three gates green and the class holds the rung.",
+  missing_evidence: [],
+});
+
+// The mechanical half of a delivery whose regression gate went RED, and the same delivery's code
+// eligibility. Two facts the model cannot see past.
+const RED_MECHANICAL = Object.freeze(verdictFor({ ...ALL_GREEN, regression: "red" }));
+const GREEN_MECHANICAL = Object.freeze(verdictFor(ALL_GREEN));
+
+// THE MUTANTS -- and an honest statement of what they do and do not prove, because the first
+// draft's comment overclaimed and the Verifier caught it (verdict 5f414763, finding 4: "the
+// negative controls are tautologies").
+//
+// These are NOT reconcileJudgment() with a line commented out. They are the whole of what that
+// function would COMPUTE for these two fields if its guard were absent: with the mechanical
+// short-circuit gone, the verdict IS the agent's verdict; with codeEligibility gone as the ceiling,
+// eligibility IS the agent's boolean. Asserting a mutant returns its own input proves nothing on its
+// own -- so it is not asserted on its own. What is asserted is that the SHIPPED function and the
+// guard-less computation DISAGREE on the same fixture, which is the only statement that
+// distinguishes "the guard is doing work" from "the fixture happened to agree with both".
+function withoutTheVerdictGuard({ agent }) {
+  // DELETED: `if (mechanical.verdict === "block") -> block` -- the agent's word becomes the answer.
+  return { verdict: agent.verdict };
+}
+function withoutTheEligibilityGuard({ agent }) {
+  // DELETED: `codeEligibility.eligible === true &&` -- the agent's opinion becomes the bar.
+  return { eligible: agent.auto_done_eligible === true };
+}
+
+// INVARIANT (a), kickoff Task 2: agent says approve, a gate is red -> block.
+function theAgentCannotTurnARedGateIntoAnApprove() {
+  const codeEligibility = autoDoneEligibility({ ...ELIGIBLE, verdict: "block" });
+  const r = reconcileJudgment({ mechanical: RED_MECHANICAL, agent: AGENT_APPROVES, codeEligibility });
+  assert.strictEqual(r.verdict, "block",
+    "a red mechanical gate can never become approve, however the agent graded it -- charter " +
+    "decision 2's bar is not a matter of opinion, and ck_runner_verdicts_fail_closed says the same " +
+    "thing in the database");
+  assert.strictEqual(r.eligible, false, "and a block can never be auto-done");
+  assert.ok(r.overrides.some(o => /approve/.test(o) && /gate/.test(o)),
+    "the ledger must record that the code OVERRODE the agent -- 'the agent agreed' and 'the agent " +
+    "was overruled' are different facts about an identical row, and the reason column is where " +
+    `either one survives. got: ${JSON.stringify(r.overrides)}`);
+
+  // THE DISCRIMINATION, stated as a disagreement rather than as a tautology: the shipped function
+  // and the guard-less computation return DIFFERENT answers for this one fixture, and only the
+  // shipped one is correct. If they ever agreed here, the assertion above would be measuring the
+  // fixture and not the guard.
+  assert.notStrictEqual(r.verdict, withoutTheVerdictGuard({ agent: AGENT_APPROVES }).verdict,
+    "reconcileJudgment() must DISAGREE with a guard-less implementation on a red-gate/agent-approve " +
+    "fixture -- that disagreement is the whole of what invariant (a) buys");
+
+  // Judgment TIGHTENS, in the other direction: green gates and an agent that blocks IS a block.
+  // Without this the lane would be decorative -- the agent could only ever agree.
+  const tightened = reconcileJudgment({
+    mechanical: GREEN_MECHANICAL,
+    agent: { ...AGENT_APPROVES, verdict: "block", auto_done_eligible: false },
+    codeEligibility: autoDoneEligibility(ELIGIBLE),
+  });
+  assert.strictEqual(tightened.verdict, "block",
+    "the whole point of the judgment lane is that it can block a delivery all three mechanical " +
+    "gates passed; an implementation that only ever echoes the gates has added nothing");
+  assert.strictEqual(tightened.eligible, false);
+
+  // And an unreadable verdict value fails closed to block rather than to the mechanical answer.
+  for (const bad of ["APPROVE", "approved", "", null, undefined, true]) {
+    const e = reconcileJudgment({ mechanical: GREEN_MECHANICAL, agent: { ...AGENT_APPROVES, verdict: bad }, codeEligibility: autoDoneEligibility(ELIGIBLE) });
+    assert.strictEqual(e.verdict, "block", `verdict ${JSON.stringify(bad)} is not the literal "approve"`);
+  }
+  // NEGATIVE CONTROL for that loop: the literal approve on green gates DOES approve, so it is the
+  // value doing the work rather than the branch being broken outright.
+  assert.strictEqual(
+    reconcileJudgment({ mechanical: GREEN_MECHANICAL, agent: AGENT_APPROVES, codeEligibility: autoDoneEligibility(ELIGIBLE) }).verdict,
+    "approve");
+}
+
+// INVARIANT (b), kickoff Task 2: agent says auto-done eligible, the diff touches
+// scripts/verifier.js -> not eligible. THIS SHIP'S OWN DIFF is the live instance.
+function theAgentCannotBuyPastSelfCertification() {
+  for (const p of SELF_CERTIFYING_PATHS) {
+    const codeEligibility = autoDoneEligibility({ ...ELIGIBLE, changedFiles: ["docs/SESSIONS.md", p] });
+    assert.strictEqual(codeEligibility.eligible, false, "precondition: the code refuses the bar");
+    const r = reconcileJudgment({ mechanical: GREEN_MECHANICAL, agent: AGENT_APPROVES, codeEligibility });
+    assert.strictEqual(r.eligible, false,
+      `a delivery touching ${p} is graded by the code it changed; charter premise 3 outranks the ` +
+      "agent exactly as it outranks the ladder");
+    assert.strictEqual(r.verdict, "approve",
+      "and the VERDICT still stands -- premise 3 refuses the auto-done bar, it does not invent a " +
+      "block. Collapsing the two would make every edit to the verification look like a bad change.");
+    assert.ok(r.reason.includes(p), "the reason must name the file, or the next reader looks in the wrong place");
+    assert.ok(r.overrides.some(o => /auto-done/.test(o)),
+      "the override has to be recorded: the agent said eligible and the code said no");
+
+    // THE DISCRIMINATION: the shipped function and the guard-less computation DISAGREE on this
+    // fixture -- the code refuses the bar, the guard-less version hands it to the agent.
+    assert.notStrictEqual(r.eligible, withoutTheEligibilityGuard({ agent: AGENT_APPROVES }).eligible,
+      `reconcileJudgment() must DISAGREE with a guard-less implementation on a diff touching ${p} -- ` +
+      "that disagreement is the whole of what invariant (b) buys");
+  }
+
+  // The conjunction runs the other way too: the code may allow the bar and the agent still withhold
+  // it. An eligibility that ignored the agent would be a second rubber stamp.
+  const withheld = reconcileJudgment({
+    mechanical: GREEN_MECHANICAL,
+    agent: { ...AGENT_APPROVES, auto_done_eligible: false, auto_done_reason: "the QA would pass if the change did nothing" },
+    codeEligibility: autoDoneEligibility(ELIGIBLE),
+  });
+  assert.strictEqual(withheld.eligible, false);
+  assert.ok(/did nothing/.test(withheld.reason), "and the agent's reason has to reach the ledger");
+
+  // STRICT === true on the agent's side, SES-243's lesson applied to a model's JSON.
+  for (const notTrue of ["true", 1, {}, [], "yes", null, undefined]) {
+    const e = reconcileJudgment({
+      mechanical: GREEN_MECHANICAL,
+      agent: { ...AGENT_APPROVES, auto_done_eligible: notTrue },
+      codeEligibility: autoDoneEligibility(ELIGIBLE),
+    });
+    assert.strictEqual(e.eligible, false, `auto_done_eligible=${JSON.stringify(notTrue)} is not the boolean true`);
+  }
+  // NEGATIVE CONTROL, one variable: both sides true IS eligible.
+  assert.strictEqual(
+    reconcileJudgment({ mechanical: GREEN_MECHANICAL, agent: AGENT_APPROVES, codeEligibility: autoDoneEligibility(ELIGIBLE) }).eligible,
+    true);
+}
+
+// The degrade path: no agent, today's behaviour, unchanged. This is what `--judge=none` -- the
+// default every existing caller passes -- reaches, and it is the clause that would catch a
+// "judgment half" that quietly changed the mechanical lane on its way in.
+function theDegradePathIsTodaysBehaviourExactly() {
+  const codeEligibility = autoDoneEligibility(ELIGIBLE);
+  for (const noAgent of [null, undefined]) {
+    const r = reconcileJudgment({ mechanical: GREEN_MECHANICAL, agent: noAgent, codeEligibility });
+    assert.strictEqual(r.verdict, GREEN_MECHANICAL.verdict);
+    assert.strictEqual(r.eligible, codeEligibility.eligible);
+    assert.strictEqual(r.reason, codeEligibility.reason);
+    assert.deepStrictEqual(r.overrides, [], "nothing was overridden -- nobody spoke");
+  }
+  // ...and a red-gated delivery with no agent is still a block with no eligibility.
+  const red = reconcileJudgment({
+    mechanical: RED_MECHANICAL, agent: null,
+    codeEligibility: autoDoneEligibility({ ...ELIGIBLE, verdict: "block" }),
+  });
+  assert.strictEqual(red.verdict, "block");
+  assert.strictEqual(red.eligible, false);
+}
+
+function judgeModeIsValidatedNotDefaulted() {
+  assert.deepStrictEqual(JUDGE_MODES, ["none", "session", "executor"]);
+  assert.strictEqual(EXIT_AWAITING_JUDGMENT, 3,
+    "3 is a third kind of non-answer: not 1 (nothing was judged) and not 2 (the verifier ran its " +
+    "half fine). A caller that collapses it into either has lost the distinction.");
+  for (const absent of [undefined, null, ""]) assert.strictEqual(parseJudgeMode(absent).mode, "none");
+  for (const m of JUDGE_MODES) assert.strictEqual(parseJudgeMode(m).mode, m);
+  // THE CLAUSE THAT MATTERS: a typo must be an ERROR, never a silent downgrade to the
+  // mechanical-only lane. Running unjudged when judgment was asked for is a skipped gate wearing a
+  // flag's costume -- invisible in the ledger, because the row looks exactly like a --judge=none row.
+  for (const typo of ["sesion", "Session", "agent", "yes", "executor "]) {
+    const r = parseJudgeMode(typo);
+    assert.ok(r.error, `--judge=${typo} must be refused, not defaulted`);
+    assert.strictEqual(r.mode, undefined);
+  }
+
+  // The context path is derived from the ticket, so two invocations find one file and two
+  // concurrent cycles never share one.
+  assert.ok(judgeContextPathFor("/tmp", "AGT-67").endsWith("verify-AGT-67.json"));
+  assert.notStrictEqual(judgeContextPathFor("/tmp", "AGT-67"), judgeContextPathFor("/tmp", "AGT-68"));
+  assert.strictEqual(judgeContextPathFor("/tmp", ""), null,
+    "a ticket-less run gets no shared default path -- two cycles would both write it");
+  // A ticket id can reach this from the board; a path separator in one must not escape the scratch
+  // directory. `..` and `/` are stripped rather than trusted.
+  assert.ok(!judgeContextPathFor("/tmp", "../../etc/passwd").includes(".."),
+    "path separators and dot segments are stripped from the ticket before it becomes a filename");
+}
+
+// The Intent's stored schema IS the contract; validateAgentVerdict() reads whatever the row carries
+// rather than restating it, so the two cannot drift. Driven here with the schema's real shape.
+function theIntentSchemaIsTheContract() {
+  const schema = {
+    type: "object",
+    required: ["backlog_id", "version", "verdict", "reasoning", "pm_lens", "architect_lens", "auto_done_eligible", "auto_done_reason", "missing_evidence"],
+    properties: {
+      backlog_id: { type: "string" }, version: { type: "string" },
+      verdict: { type: "string", enum: ["approve", "block"] },
+      reasoning: { type: "string" },
+      pm_lens: { type: "string", maxLength: 1200 },
+      architect_lens: { type: "string", maxLength: 1200 },
+      auto_done_eligible: { type: "boolean" },
+      auto_done_reason: { type: "string", maxLength: 400 },
+      missing_evidence: { type: "array", items: { type: "string" } },
+    },
+  };
+  assert.strictEqual(validateAgentVerdict(schema, AGENT_APPROVES).ok, true,
+    "the fixture every other AGT-67 clause is driven with must satisfy the real contract, or those " +
+    "clauses are testing a shape the platform would reject");
+
+  // The mutants a model really emits, each rejected BY NAME so the exit-2 message tells a reader
+  // what to fix.
+  const cases = [
+    [{ ...AGENT_APPROVES, verdict: "approved" }, /verdict/, "an enum near-miss"],
+    [{ ...AGENT_APPROVES, auto_done_eligible: "true" }, /auto_done_eligible/, "the JSON string true -- SES-243's lesson"],
+    [{ ...AGENT_APPROVES, missing_evidence: "none" }, /missing_evidence/, "a string where the array goes"],
+    [{ ...AGENT_APPROVES, missing_evidence: [1] }, /missing_evidence/, "a non-string item"],
+    [{ ...AGENT_APPROVES, auto_done_reason: "x".repeat(401) }, /auto_done_reason/, "over maxLength"],
+    [(() => { const v = { ...AGENT_APPROVES }; delete v.architect_lens; return v; })(), /architect_lens/, "a dropped lens"],
+  ];
+  for (const [value, pattern, why] of cases) {
+    const r = validateAgentVerdict(schema, value);
+    assert.strictEqual(r.ok, false, `${why} must be rejected`);
+    assert.ok(r.errors.some(e => pattern.test(e)), `the error must name the offending key (${why}): ${JSON.stringify(r.errors)}`);
+  }
+
+  // Non-objects, and the schema itself missing. Unknown is not innocent: with no schema there is
+  // nothing to validate against, so nothing may be accepted.
+  for (const notAnObject of [null, "approve", 3, [], undefined]) {
+    assert.strictEqual(validateAgentVerdict(schema, notAnObject).ok, false);
+  }
+  for (const noSchema of [null, undefined, "", 0]) {
+    assert.strictEqual(validateAgentVerdict(noSchema, AGENT_APPROVES).ok, false,
+      "a verdict cannot be validated against a schema that could not be read, and an unvalidated " +
+      "verdict must not be recorded");
+  }
+}
+
+// The guard the Verifier's own first run put here (verdict 5f414763, finding 1): a verdict file that
+// satisfies the schema perfectly can still be about a DIFFERENT delivery. The schema requires
+// backlog_id and version; this is what makes requiring them mean something.
+function aVerdictMustBeAboutThisDelivery() {
+  assert.deepStrictEqual(verdictIdentityMismatch(AGENT_APPROVES, { ticket: "AGT-67", version: "v7.0.433" }), [],
+    "the matching case must report nothing, or every run would refuse itself");
+
+  // A stale file from an earlier version of the SAME ticket is the likeliest real instance: the
+  // context path is derived from the ticket, so a re-run finds last time's verdict sitting there.
+  const stale = verdictIdentityMismatch(AGENT_APPROVES, { ticket: "AGT-67", version: "v7.0.434" });
+  assert.ok(stale.length && /version/.test(stale[0]), `a stale version must be caught: ${JSON.stringify(stale)}`);
+  const foreign = verdictIdentityMismatch(AGENT_APPROVES, { ticket: "AGT-68", version: "v7.0.433" });
+  assert.ok(foreign.length && /backlog_id/.test(foreign[0]), `a foreign ticket must be caught: ${JSON.stringify(foreign)}`);
+  // Both wrong reports both, rather than stopping at the first.
+  assert.strictEqual(verdictIdentityMismatch(AGENT_APPROVES, { ticket: "AGT-68", version: "v7.0.434" }).length, 2);
+
+  // An UNSTATED caller-side value is unmatchable, not agreement. Unknown is not innocent here
+  // either -- a `--ticket`-less run that accepted any verdict would be the hole wearing a blank.
+  for (const missing of [{ ticket: "", version: "v7.0.433" }, { ticket: "AGT-67", version: "" }, {}]) {
+    assert.ok(verdictIdentityMismatch(AGENT_APPROVES, missing).length,
+      `a run with ${JSON.stringify(missing)} cannot match the agent's own identity fields and must say so`);
+  }
+  // The agent OMITTING a field is the schema's job, not this function's -- it must not double-report.
+  assert.deepStrictEqual(verdictIdentityMismatch({}, { ticket: "AGT-67", version: "v7.0.433" }), []);
+}
+
 function run() {
   // The table's own constraints — ck_runner_verdicts_fail_closed and
   // ck_runner_verdicts_eligible_implies_approve — ship as migration ses181_runner_verdicts and live
@@ -496,6 +798,13 @@ function run() {
   aRungNeverBuysPastSelfCertification();
   theLadderIsReadStrictlyAndNullIsNotInnocent();
   spawnCommandIsQuotedOnlyForTheShell();
+  // FEATURE: AGT-67 -- the judgment half.
+  theAgentCannotTurnARedGateIntoAnApprove();
+  theAgentCannotBuyPastSelfCertification();
+  theDegradePathIsTodaysBehaviourExactly();
+  judgeModeIsValidatedNotDefaulted();
+  theIntentSchemaIsTheContract();
+  aVerdictMustBeAboutThisDelivery();
 }
 
 selfRun(import.meta.url, run);

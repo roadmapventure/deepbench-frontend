@@ -1,4 +1,81 @@
 #!/usr/bin/env node
+// DeepBench v7.0.433 | scripts/verifier.js | AGT-67 -- THE JUDGMENT HALF BECOMES A CAPABILITY AND
+// THE SCRIPT KEEPS THE MECHANICAL GATES, and the thing to read twice is that THE AGENT CAN ONLY
+// TIGHTEN. Every rule this file already enforced is enforced in code AFTER the agent speaks, on the
+// agent's own output, so a model that says `approve` over a red gate changes nothing but the
+// ledger's record of having said it. That is the whole design: the Verifier (`verifier` /
+// `verify-ship`, seeded by this ticket's section of docs/design/ga-agents-seed.sql) contributes
+// REASONS -- findings with file:line, the PM lens, the Chief Architect lens -- and contributes no
+// permission.
+//
+// (1) `--judge=<none|session|executor>`, DEFAULT `none`, AND `none` IS BYTE-IDENTICAL TO WHAT THIS
+// FILE DID BEFORE. That default is not timidity, it is the degrade path §2 of the kickoff demands:
+// "the script degrades to today's behaviour when [no agent] is available -- never a silent
+// widening." Every existing caller (docs/runbooks/runner-cycle.md step 7a, the cloud runner) passes
+// no `--judge` and reaches exactly the code it reached at v7.0.425.
+//
+// (2) THE SESSION LANE IS TWO INVOCATIONS AND AN EXIT CODE, because a session sub-agent is not a
+// function this script can call. Pass one (`--judge=session`) runs the gates, reads the board, and
+// writes EVERYTHING the judgment needs to `<scratch>/verify-<ticket>.json` -- gate outputs with
+// their exit lines, the diff, the changed-file list, the kickoff, the class and its ladder answer --
+// then prints that path and the assembled `verify-ship` prompt and exits **3, awaiting judgment**.
+// 3 is a THIRD kind of non-answer and is deliberately not 2: 2 means the verifier could not run, 3
+// means it ran its half and is waiting for the other. A caller that reads 3 as a verdict is the
+// defect this numbering exists to make visible. Pass two (`--judge=session --verdict-file=<path>`)
+// reads the agent's JSON, validates it against THE INTENT'S OWN STORED SCHEMA (read live from
+// `skill_profiles`, never restated here), reconciles it against the mechanical facts and inserts the
+// one row.
+//
+// (3) THE PROMPT IS NOT ASSEMBLED HERE. It comes from `assemblePrompt()` + `renderAssembly()` --
+// scripts/agent-prompt.js's own export, which is api/capabilities/execute.js's own assembly
+// (SES-331). A second copy of the assembly is the drift this project exists to end, so this file
+// contributes the task_context and nothing else. AND IT PASSES THE INTENT SLUG, read from
+// `capabilities.default_intent_slug`: MEASURED in db-assembly.js:684 (AA-188), a null `intent_slug`
+// does not fall back to the capability's default -- it filters EVERY intent-type Skill out, which
+// for `verify-ship` deletes the output schema and the verdict contract while still producing a
+// confident, well-formed prompt. `node scripts/agent-prompt.js --agent=verifier
+// --capability=verify-ship` with no `--intent` is that prompt; this script never builds it.
+//
+// (4) reconcileJudgment() IS THE FILE'S NEW LOAD-BEARING FUNCTION AND IT IS A CONJUNCTION, NOT A
+// CHOICE. `verdict` is block if the MECHANICAL verdict is block, whatever the agent said; it is
+// also block if the agent said block on green gates (judgment tightens, never loosens); approve
+// requires both. `auto_done_eligible` is `codeEligibility.eligible === true AND
+// agent.auto_done_eligible === true` -- autoDoneEligibility() above is unchanged and is still the
+// ceiling, so a diff touching scripts/verifier.js is refused the bar no matter how eligible the
+// agent believes it is. Both sides are compared with `=== true` for SES-243's reason (a JSON `"true"`
+// is truthy). Every place the code contradicted the agent is recorded in `overrides` and lands in
+// the stored reasoning, because "the agent agreed" and "the agent was overruled" are different facts
+// about an identical row and the ledger is the only place either survives.
+//
+// THIS SHIP IS ITS OWN WITNESS, AGAIN. The diff touches this file, so SELF_CERTIFYING_PATHS refuses
+// it the auto-done bar -- and the refusal is now proven twice over: once by the code (which the
+// agent cannot reach past) and once by the agent, which is asked to make the same call from the
+// changed-file list. The attended QA for this version is that run.
+//
+// (5) THREE OF THIS FILE'S RULES WERE PUT HERE BY THE VERIFIER ITSELF, on its first real run.
+// Verdict `5f414763-c63c-452d-be63-d1086bbe2677` (attended, this ticket's own commit, all three
+// gates green, auto-done refused on the self-certifying path) returned seven findings; three were
+// defects in this file and are fixed above rather than filed:
+//   * verdictIdentityMismatch() -- pass two validated the agent's JSON against the schema and then
+//     recorded it WITHOUT comparing the `backlog_id`/`version` the agent itself returned. A stale or
+//     foreign verdict file satisfies the schema perfectly and lands on the wrong ledger row.
+//   * the pass-one context now stores the FULL `autoDoneReason` (with the lookup/prime/ladder
+//     notes), not the bare `elig.reason` -- a session-judged row was carrying the same columns with
+//     less content than a `--judge=none` row.
+//   * the exit-3 payload no longer spreads the mechanical `ok`/`exitCode`. Under `--json` it was
+//     reporting `ok: true, exitCode: 0` on a run that exited 3 having recorded nothing -- this
+//     header's own warning, seeded by the script. The prompt now goes to a file and reaches stdout
+//     only when stdout is not carrying the JSON line.
+// That is the lane working: the findings cite file:line, the code was wrong, and the fix is in the
+// same ship. The remaining findings are recorded in the commit body.
+//
+// A NAMED DEVIATION AND A NAMED LIMIT. `--judge=executor` is written to the kickoff's §3 spec (one
+// run, the executor's own POST, the API dollar cost added to `runner_cycles.api_cost_qa_usd`) and is
+// NOT PROVEN LIVE by this ship -- it is off by default and the kickoff asked for no live run of it.
+// It is a flagged path with an unexercised network call, and this comment is the honest label rather
+// than a claim of coverage. `SELF_CERTIFYING_PATHS` deliberately gains nothing: SES-337 adds the
+// Verifier's own Skill rows to it, not this ticket.
+//
 // DeepBench v7.0.425 | scripts/verifier.js | SES-340 -- THE SCOPE TEST IS A PROJECT STATUS, NOT A
 // NAME, and the thing to read twice is that BOTH name-fenced facts in this file were reading a
 // string where a row now exists. Measured live 2026-09-09, not recalled: `public.projects` holds
@@ -180,13 +257,35 @@
 //   --dry-run           Run the gates and print the verdict; write nothing, need no credentials.
 //   --json              Single-line machine-readable output.
 //   --repo=<path>       Repo root the gates run in. Defaults to this file's parent directory.
+//   --judge=<mode>      AGT-67. `none` (default) is the mechanical-only behaviour every existing
+//                       caller gets. `session` splits the run in two (see below). `executor` POSTs
+//                       to the capability executor and finishes in one run -- NOT proven live.
+//   --verdict-file=<p>  AGT-67, `--judge=session` pass two: the sub-agent's JSON verdict.
+//   --context-file=<p>  AGT-67: override the derived `<scratch>/verify-<ticket>.json` path.
+//   --scratch=<dir>     AGT-67: where the judgment context is written. Defaults to os.tmpdir().
+//   --kickoff=<path>    AGT-67: the kickoff doc handed to the agent as part of its evidence.
+//
+// The `--judge=session` two-pass shape (AGT-67):
+//   node scripts/verifier.js --judge=session --ticket=AGT-67 --version=v7.0.433 \
+//     --cycle-id=<uuid> --kickoff=docs/kickoffs/v7.0.433-AGT-67-verifier-agent.md
+//     -> runs the gates, writes the context JSON, prints its path and the assembled prompt, exit 3
+//   ...run the printed prompt as a sub-agent, save its JSON to <path>...
+//   node scripts/verifier.js --judge=session --ticket=AGT-67 --version=v7.0.433 \
+//     --cycle-id=<uuid> --verdict-file=<path>
+//     -> validates, reconciles, records the row, exit 0/1
 //
 // Exit codes (the convention check-version-claim.js and export-backlog-snapshot.js set):
 //   0  verdict APPROVE  -- all three gates green
 //   1  verdict BLOCK    -- a gate was red, or could not run
-//   2  the VERIFIER could not run (missing env, missing --cycle-id, the insert failed). Distinct
-//      from 1 on purpose: 1 is a judgement about the change, 2 is the absence of a judgement, and
-//      an unrunnable verifier must never be reported as either a pass or a block on the work.
+//   2  the VERIFIER could not run (missing env, missing --cycle-id, the insert failed, an agent
+//      verdict that does not satisfy the Intent's schema). Distinct from 1 on purpose: 1 is a
+//      judgement about the change, 2 is the absence of a judgement, and an unrunnable verifier must
+//      never be reported as either a pass or a block on the work.
+//   3  AGT-67 -- AWAITING JUDGMENT. The gates ran, the context was written, the prompt was printed,
+//      and no row exists yet. Reached only under `--judge=session` pass one. It is NOT 2, because
+//      the verifier did run its half; it is NOT 1, because nothing has been judged. A caller that
+//      collapses 3 into either has thrown away the distinction between "blocked" and "not yet
+//      asked".
 //
 // Env (process.env only -- never hardcoded, never printed):
 //   SUPABASE_URL           Project REST base.
@@ -214,6 +313,8 @@
 // tests/regression/SES-181-verifier.js, tests/regression/SES-243-prime-directive-autodone.js and
 // tests/regression/ses-340-projects-govern.test.mjs.
 
+import fs from "fs";
+import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -255,6 +356,21 @@ export const SELF_CERTIFYING_PATHS = Object.freeze([
   "scripts/check-session-docs.js",
   "tests/regression/run-all.js",
 ]);
+
+// FEATURE: AGT-67 -- the judgment half.
+// WHO THE JUDGMENT IS, as data rather than as a prompt. These two name the seeded rows (this
+// ticket's section of docs/design/ga-agents-seed.sql); the INTENT is deliberately NOT a constant
+// here -- it is read from `capabilities.default_intent_slug`, because the capability row is the one
+// home for which Intent it defaults to and a literal here would be a second copy of it.
+export const VERIFIER_AGENT_ID = "verifier";
+export const VERIFY_CAPABILITY = "verify-ship";
+
+// The judge lanes, and `none` FIRST because it is the default and the degrade path.
+export const JUDGE_MODES = Object.freeze(["none", "session", "executor"]);
+
+// AGT-67's third non-answer. See the exit-code table in the header: not 1 (nothing was judged), not
+// 2 (the verifier ran its half fine), and named rather than written as a bare 3 at its two sites.
+export const EXIT_AWAITING_JUDGMENT = 3;
 
 function arg(name, fallback) {
   const prefix = `--${name}=`;
@@ -468,6 +584,189 @@ function describeLadder(classAutonomy) {
 }
 
 // ---------------------------------------------------------------------------
+// FEATURE: AGT-67 -- the judgment half. Pure helpers, all exported, no network.
+// ---------------------------------------------------------------------------
+
+// The mode, validated rather than defaulted-on-typo. `--judge=sesion` must NOT quietly become
+// `none`: silently running the mechanical-only path when a caller asked for judgment is the same
+// class of failure as a skipped gate reported green, and it would be invisible in the ledger.
+export function parseJudgeMode(raw) {
+  if (raw === undefined || raw === null || raw === "") return { mode: "none" };
+  if (JUDGE_MODES.includes(raw)) return { mode: raw };
+  return { error: `--judge must be one of ${JUDGE_MODES.join(", ")}; got "${raw}"` };
+}
+
+// Where pass one leaves the evidence for pass two. DERIVED FROM THE TICKET, not random, so the two
+// invocations find the same file without the caller having to carry a path between them -- and a
+// ticket-less run is refused rather than given a shared default that two concurrent cycles would
+// both write.
+// The dot is deliberately NOT in the allowed set. A backlog id has none (`AGT-67`, `SES-181`), and
+// leaving it in let `../../etc/passwd` through as `verify-..-..-etc-passwd.json` -- harmless once the
+// separators are gone, but "harmless because of a second rule" is how the first rule stops being
+// checked. Found by this function's own guard in tests/regression/SES-181-verifier.js.
+export function judgeContextPathFor(scratchDir, ticket) {
+  const safe = String(ticket || "").replace(/[^A-Za-z0-9_-]/g, "-");
+  if (!safe) return null;
+  return path.join(scratchDir, `verify-${safe}.json`);
+}
+
+// The agent's JSON against THE INTENT'S OWN STORED SCHEMA (`skill_profiles.traits.schema` for the
+// capability's default Intent, read live in main()). This validator is deliberately small and
+// deliberately NOT a restatement of the contract: it reads whatever the row carries, so the schema
+// and the check cannot drift the way a hand-copied required-key list would.
+//
+// WHY A REJECTION IS FATAL RATHER THAN A BLOCK. A verdict that does not satisfy its own contract is
+// not a judgment about the change -- it is the ABSENCE of one, arriving in a shape that looks like a
+// judgment. Recording it as `block` would put a fabricated verdict in the ledger; recording the
+// mechanical verdict instead would silently launder an `approve` the agent never validly gave. So
+// pass two exits 2 with the errors named and writes nothing (see the header's exit-code table).
+export function validateAgentVerdict(schema, value) {
+  const errors = [];
+  const typeOf = v => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
+  const typeOk = (v, t) => {
+    const want = Array.isArray(t) ? t : [t];
+    return want.some(w => (w === "integer" ? Number.isInteger(v)
+      : w === "number" ? typeof v === "number"
+      : w === "object" ? v !== null && typeOf(v) === "object"
+      : typeOf(v) === w));
+  };
+  if (!schema || typeof schema !== "object") {
+    return { ok: false, errors: ["no schema was read from the Intent Skill, so the agent's verdict could not be validated -- unknown is not innocent"] };
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, errors: [`the agent's verdict must be a JSON object; got ${typeOf(value)}`] };
+  }
+  for (const key of schema.required || []) {
+    if (!(key in value)) errors.push(`missing required key "${key}"`);
+  }
+  for (const [key, spec] of Object.entries(schema.properties || {})) {
+    if (!(key in value) || spec === null || typeof spec !== "object") continue;
+    const v = value[key];
+    if (spec.type && !typeOk(v, spec.type)) {
+      errors.push(`"${key}" must be ${JSON.stringify(spec.type)}; got ${typeOf(v)}`);
+      continue;
+    }
+    if (Array.isArray(spec.enum) && !spec.enum.includes(v)) {
+      errors.push(`"${key}" must be one of ${JSON.stringify(spec.enum)}; got ${JSON.stringify(v)}`);
+    }
+    if (spec.maxLength !== undefined && typeof v === "string" && v.length > spec.maxLength) {
+      errors.push(`"${key}" is ${v.length} characters, over the schema's maxLength ${spec.maxLength}`);
+    }
+    if (spec.items && spec.items.type && Array.isArray(v)) {
+      const badAt = v.findIndex(item => !typeOk(item, spec.items.type));
+      if (badAt !== -1) errors.push(`"${key}"[${badAt}] must be ${JSON.stringify(spec.items.type)}`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// THE VERDICT MUST BE ABOUT THIS DELIVERY. Found by this ticket's own attended QA -- the Verifier's
+// first real run, verdict `5f414763`, finding 1: pass two validated the agent's JSON against the
+// Intent's schema and then recorded it, without ever comparing the `backlog_id` and `version` the
+// agent itself returned against the ones being graded. A verdict file from another ticket, or a
+// stale one left in the scratch directory from an earlier version, satisfies the schema perfectly
+// and lands on the wrong row -- and a row in `runner_verdicts` is exactly the artifact nobody
+// re-derives later. The schema REQUIRES both keys; this is the check that makes requiring them mean
+// something.
+//
+// A blank on the caller's side is not a licence: an unstated `--ticket` cannot be matched, so it is
+// reported as unmatchable rather than treated as agreement. Unknown is not innocent, here as
+// everywhere else in this file.
+export function verdictIdentityMismatch(agent, { ticket, version }) {
+  const mismatches = [];
+  const cmp = (label, mine, theirs) => {
+    if (!theirs) return;                                  // the agent omitted it: the schema's job
+    if (!mine) { mismatches.push(`the agent's ${label} is "${theirs}" but this run was given none, so the two cannot be matched`); return; }
+    if (String(mine) !== String(theirs)) mismatches.push(`the agent graded ${label} "${theirs}" but this run is grading "${mine}"`);
+  };
+  cmp("backlog_id", ticket, agent?.backlog_id);
+  cmp("version", version, agent?.version);
+  return mismatches;
+}
+
+// THE FUNCTION THIS TICKET IS ABOUT. The agent contributes reasons; the code keeps every permission
+// it already had.
+//
+//   mechanical      { verdict, reasoning } from verdictFor() over the three real gate results.
+//   agent           the validated agent verdict object, or null when no agent spoke.
+//   codeEligibility autoDoneEligibility()'s own answer, computed from the SAME facts the agent was
+//                   shown. Unchanged by this ticket and still the ceiling.
+//
+// TWO INVARIANTS, BOTH CONJUNCTIONS, BOTH ASSERTED WITH THEIR MUTANTS IN
+// tests/regression/SES-181-verifier.js:
+//
+//   (a) A RED GATE CAN NEVER BECOME APPROVE. `mechanical.verdict === "block"` short-circuits to
+//       block. This is not a re-derivation of verdictFor() -- it is the refusal to let a second
+//       opinion outrank the first, and it is why the agent's `verdict` is read as a TIGHTENING
+//       (approve+approve => approve; anything else => block) rather than as the answer.
+//
+//   (b) A DIFF TOUCHING A SELF-CERTIFYING PATH CAN NEVER BE AUTO-DONE. `codeEligibility.eligible`
+//       must be `true` before the agent's opinion is even consulted, so charter premise 3 sits
+//       upstream of the model exactly as it sits upstream of the ladder in autoDoneEligibility().
+//
+// STRICT `=== true` ON BOTH SIDES, for SES-243's reason applied to a model's JSON: a verdict file
+// carrying the string "true" is truthy, and the distance between truthy and true here is the
+// distance between John tapping Accept and a cycle writing `done`.
+export function reconcileJudgment({ mechanical, agent, codeEligibility }) {
+  const overrides = [];
+  const mechVerdict = mechanical?.verdict === "approve" ? "approve" : "block";
+
+  let verdict = mechVerdict;
+  if (!agent) {
+    // The degrade path, named rather than silent: no agent spoke, so the mechanical verdict stands
+    // exactly as it did before this ticket. This is `--judge=none` and it is not a widening.
+    return {
+      verdict,
+      reasoning: `${mechanical?.reasoning ?? ""}\nNo agent judgment was obtained; the mechanical verdict stands (AGT-67 degrade path -- never a silent widening).`.trim(),
+      eligible: codeEligibility?.eligible === true,
+      reason: codeEligibility?.reason ?? "",
+      overrides,
+    };
+  }
+
+  if (mechVerdict === "block" && agent.verdict === "approve") {
+    overrides.push(`the agent returned approve while a mechanical gate was not green; the code held the block (a red or skipped gate can never become approve -- charter decision 2's bar is not a matter of opinion)`);
+  } else if (mechVerdict === "approve" && agent.verdict === "block") {
+    // Judgment TIGHTENS. Not an override -- this is exactly what the lane is for.
+    verdict = "block";
+  } else if (mechVerdict === "approve" && agent.verdict !== "approve") {
+    verdict = "block";
+    overrides.push(`the agent's verdict was ${JSON.stringify(agent.verdict)}, which is neither approve nor block; an unreadable judgment fails closed to block`);
+  }
+
+  const codeEligible = codeEligibility?.eligible === true;
+  const agentEligible = agent.auto_done_eligible === true;
+  if (!codeEligible && agentEligible) {
+    overrides.push(`the agent held the delivery auto-done eligible; the code refused it -- ${codeEligibility?.reason ?? "no code eligibility was computed"}`);
+  }
+  const eligible = verdict === "approve" && codeEligible && agentEligible;
+
+  const lens = [];
+  if (agent.pm_lens) lens.push(`PM lens: ${agent.pm_lens}`);
+  if (agent.architect_lens) lens.push(`Chief Architect lens: ${agent.architect_lens}`);
+  if (Array.isArray(agent.missing_evidence) && agent.missing_evidence.length) {
+    lens.push(`Missing evidence named by the agent: ${agent.missing_evidence.join("; ")}`);
+  }
+
+  const reasoning = [
+    `${verdict}: ${agent.reasoning ?? "(the agent returned no reasoning)"}`,
+    ...lens,
+    `Mechanical: ${mechanical?.reasoning ?? "(none)"}`,
+    overrides.length
+      ? `CODE OVERRODE THE AGENT: ${overrides.join(" | ")}`
+      : `The code agreed with the agent on both the verdict and the auto-done bar.`,
+  ].join("\n");
+
+  const reason = !codeEligible
+    ? codeEligibility?.reason ?? ""
+    : !agentEligible
+      ? `the code's bar was met (${codeEligibility?.reason ?? ""}) but the agent withheld auto-done eligibility: ${agent.auto_done_reason ?? "(no reason given)"}`
+      : `${codeEligibility?.reason ?? ""} The agent concurred: ${agent.auto_done_reason ?? "(no reason given)"}`;
+
+  return { verdict, reasoning, eligible, reason, overrides };
+}
+
+// ---------------------------------------------------------------------------
 // Gates
 // ---------------------------------------------------------------------------
 
@@ -593,6 +892,186 @@ function emit({ code, payload, prose }) {
   process.exit(code);
 }
 
+// FEATURE: AGT-67 -- the evidence the judgment is handed, and the ONE insert both lanes go through.
+
+// A DECLARED cap, not a silent slice. An agent that receives a truncated diff and cannot tell would
+// certify a change it never saw -- so the marker says so in the payload itself, in a sentence the
+// Verifier's own guardrails ("block on any missing input, naming it") can act on.
+export const DIFF_CAP = 400_000;
+export const KICKOFF_CAP = 60_000;
+
+function cap(text, limit, what) {
+  const s = String(text ?? "");
+  if (s.length <= limit) return s;
+  return `${s.slice(0, limit)}\n\n[TRUNCATED: this ${what} is ${s.length} characters and was cut at ${limit}. You have NOT seen all of it -- treat anything you would need the rest to judge as missing evidence.]`;
+}
+
+function readCapped(absPath, limit) {
+  if (!absPath) return null;
+  try { return cap(fs.readFileSync(absPath, "utf8"), limit, "document"); }
+  catch (e) { return `[UNREADABLE: ${absPath} -- ${e.message}]`; }
+}
+
+// Committed-vs-base plus the working tree, the same two views changedFilesFor() takes its paths
+// from, so the file list and the diff cannot describe two different trees.
+function diffFor(repoRoot, base) {
+  const parts = [];
+  for (const argv of [["diff", base + "...HEAD"], ["diff"]]) {
+    const r = spawnSync("git", argv, { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    if (r.error || r.status !== 0) return `[UNREADABLE: git ${argv.join(" ")} failed -- the diff could not be read, which is missing evidence and fails closed]`;
+    if (String(r.stdout).trim()) parts.push(`--- git ${argv.join(" ")} ---\n${r.stdout}`);
+  }
+  return cap(parts.join("\n"), DIFF_CAP, "diff");
+}
+
+// THE ROW, as one pure function both lanes call. Exported so a guard can assert that the JUDGED
+// lane records a row identical in SHAPE to the mechanical lane's without inserting anything into the
+// live verdict ledger -- `runner_verdicts` gained no column for this ticket, and the agent's lens
+// findings reach it through `reasoning`, which is the column that already exists to carry exactly
+// that. A judged row that grew a key would be a schema change nobody asked for.
+export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, reasoning, eligible, autoDoneReason, epicName, priorityClass }) {
+  const g = gateResults || {};
+  return {
+    cycle_id: cycleId,
+    backlog_id: ticket || null,
+    version: version || null,
+    verdict,
+    gate_build: g.build,
+    gate_regression: g.regression,
+    gate_hygiene: g.hygiene,
+    reasoning,
+    auto_done_eligible: eligible,
+    auto_done_reason: autoDoneReason,
+    epic_name: epicName ?? null,
+    priority_class: priorityClass ?? null,
+  };
+}
+
+// The single write this script makes, in one place, so the judged lane and the mechanical lane
+// cannot drift into two payload shapes for one table.
+async function insertVerdict(args) {
+  const ins = await rest(args.supabaseUrl, args.supabaseKey, "runner_verdicts", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(verdictRowFor(args)),
+  });
+  if (ins.error) return { error: ins.error };
+  return { rowId: Array.isArray(ins.rows) && ins.rows[0] ? ins.rows[0].id : null };
+}
+
+// Both judged lanes end here: reconcile, then record. The reconciliation is reconcileJudgment()'s
+// and nothing about the two invariants is re-decided at this call site.
+async function recordJudgedVerdict({ stored, agentVerdict, intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey }) {
+  const gateResults = stored.gates || {};
+  const mechanical = stored.mechanical || verdictFor(gateResults);
+  const codeEligibility = stored.code_eligibility || { eligible: false, reason: "the pass-one context carried no code eligibility, so the bar fails closed" };
+  const r = reconcileJudgment({ mechanical, agent: agentVerdict, codeEligibility });
+
+  const detailLine = GATES.map(g => `${g.label}=${gateResults[g.key] ?? "skipped"} [${(stored.gate_detail || {})[g.key] ?? "no detail recorded"}]`).join("\n  ");
+  const reasoning = `${r.reasoning}\nJudged by ${VERIFIER_AGENT_ID}/${VERIFY_CAPABILITY} (intent ${intentSlug}).${stored.note ? ` ${stored.note}` : ""}\nGates: ${detailLine.replace(/\n\s+/g, " | ")}`;
+  const prose =
+    `verifier verdict: ${r.verdict.toUpperCase()}${ticket ? ` on ${ticket}` : ""}${version ? ` (${version})` : ""} -- judged\n` +
+    `  ${detailLine}\n` +
+    `  ${r.reasoning.replace(/\n/g, "\n  ")}\n` +
+    `  auto-done eligible: ${r.eligible ? "YES" : "no"} -- ${r.reason}`;
+  const payload = {
+    ok: r.verdict === "approve",
+    exitCode: r.verdict === "approve" ? 0 : 1,
+    verdict: r.verdict, gates: gateResults, gateDetail: stored.gate_detail || {},
+    reasoning, agent_verdict: agentVerdict.verdict, overrides: r.overrides,
+    auto_done_eligible: r.eligible, auto_done_reason: r.reason,
+    ticket: ticket || null, version: version || null,
+    epic_name: stored.epic_name ?? null, priority_class: stored.priority_class ?? null,
+    judged_by: `${VERIFIER_AGENT_ID}/${VERIFY_CAPABILITY}`, intent_slug: intentSlug,
+  };
+
+  if (dryRun) {
+    return emit({ code: payload.exitCode, payload: { ...payload, recorded: false }, prose: prose + "\n  --dry-run: nothing recorded." });
+  }
+  const ins = await insertVerdict({
+    supabaseUrl, supabaseKey, cycleId, ticket, version, verdict: r.verdict, gateResults,
+    reasoning, eligible: r.eligible, autoDoneReason: r.reason,
+    epicName: stored.epic_name ?? null, priorityClass: stored.priority_class ?? null,
+  });
+  if (ins.error) {
+    return emit({ code: 2, payload: { ...payload, recorded: false, error: ins.error },
+      prose: `${prose}\n  RECORDING FAILED: ${ins.error}\n  Exiting 2 -- the verdict above was reached but is not in the ledger, so it is not assertable.` });
+  }
+  return emit({ code: payload.exitCode, payload: { ...payload, recorded: true, verdict_id: ins.rowId },
+    prose: `${prose}\n  recorded as runner_verdicts ${ins.rowId}` });
+}
+
+// `--judge=executor`. NOT PROVEN LIVE by AGT-67 -- see the header's named limit. The endpoint and
+// both bypass headers follow docs/runbooks/CHI-TRUE-REGRESSION.md §3 (HAR-33: a live API call from a
+// non-`unlimited` IP also needs `x-db-gate-bypass` or it 403s at the edge).
+async function callExecutor({ intentSlug, taskContext, tenant }) {
+  const endpoint = process.env.DEEPBENCH_EXECUTOR_URL
+    || "https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app/api/capabilities/execute";
+  const headers = { "Content-Type": "application/json", "x-db-call-source": "script" };
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers["x-vercel-protection-bypass"] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (process.env.GATE_BYPASS_SECRET) headers["x-db-gate-bypass"] = process.env.GATE_BYPASS_SECRET;
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        capability_slug: VERIFY_CAPABILITY, intent_slug: intentSlug,
+        agent_id: VERIFIER_AGENT_ID, tenant_id: tenant, task_context: taskContext,
+      }),
+    });
+  } catch (e) { return { error: `${endpoint}: ${e.message}` }; }
+  if (!res.ok) return { error: `${endpoint} returned HTTP ${res.status} ${res.statusText}: ${await res.text().catch(() => "")}` };
+  let body;
+  try { body = await res.json(); } catch (e) { return { error: `the executor returned unparseable JSON: ${e.message}` }; }
+  let content = body?.content ?? body?.result?.content ?? body;
+  if (typeof content === "string") {
+    try { content = JSON.parse(content); } catch { /* validateAgentVerdict() will reject it, by name */ }
+  }
+  return { verdict: content, traceId: body?.trace_id ?? body?.result?.trace_id ?? null };
+}
+
+// A cost nobody could read is UNKNOWN, never 0. `api_cost_qa_usd` is a measurement of what the
+// executor lane costs; a silent zero would make it look free forever, which is the same
+// blank-is-not-zero boundary the rest of this platform keeps.
+async function executorCostFor(supabaseUrl, supabaseKey, traceId) {
+  if (!traceId) return { usd: null, note: "the executor returned no trace_id, so its rows could not be found" };
+  const r = await rest(supabaseUrl, supabaseKey, `ai_activity_log?select=cost_usd&trace_id=eq.${encodeURIComponent(traceId)}`);
+  if (r.error) return { usd: null, note: `ai_activity_log lookup failed: ${r.error}` };
+  const rows = Array.isArray(r.rows) ? r.rows : [];
+  const priced = rows.filter(x => x.cost_usd !== null && x.cost_usd !== undefined);
+  if (!priced.length) return { usd: null, note: `${rows.length} ai_activity_log row(s) for this trace carry no cost_usd` };
+  return { usd: priced.reduce((s, x) => s + Number(x.cost_usd), 0), note: "" };
+}
+
+async function addQaCost(supabaseUrl, supabaseKey, cycleId, usd) {
+  const cur = await rest(supabaseUrl, supabaseKey, `runner_cycles?select=api_cost_qa_usd&id=eq.${encodeURIComponent(cycleId)}&limit=1`);
+  if (cur.error) return;
+  const now = Number((Array.isArray(cur.rows) && cur.rows[0] ? cur.rows[0].api_cost_qa_usd : 0) || 0);
+  await rest(supabaseUrl, supabaseKey, `runner_cycles?id=eq.${encodeURIComponent(cycleId)}`, {
+    method: "PATCH", body: JSON.stringify({ api_cost_qa_usd: now + usd }),
+  });
+}
+
+// FEATURE: AGT-67 -- the judgment lane's network reads, kept out of main() so main() stays readable.
+// The INTENT comes from `capabilities.default_intent_slug`, never from a literal here: db-assembly.js
+// (AA-188, line ~684) does NOT fall back to it, so a null intent_slug filters every intent-type Skill
+// out of the assembly and the verdict contract disappears from a prompt that still looks complete.
+async function judgmentRows(supabaseUrl, supabaseKey) {
+  const cr = await rest(supabaseUrl, supabaseKey, `capabilities?select=slug,default_intent_slug&slug=eq.${VERIFY_CAPABILITY}&limit=1`);
+  if (cr.error) return { error: `could not read the ${VERIFY_CAPABILITY} capability row: ${cr.error}` };
+  const capRow = Array.isArray(cr.rows) ? cr.rows[0] : null;
+  if (!capRow) return { error: `no capabilities row for "${VERIFY_CAPABILITY}" -- apply the AGT-67 section of docs/design/ga-agents-seed.sql` };
+  const intentSlug = capRow.default_intent_slug || null;
+  if (!intentSlug) return { error: `capability "${VERIFY_CAPABILITY}" declares no default_intent_slug, so the verdict contract cannot be loaded` };
+  const sr = await rest(supabaseUrl, supabaseKey, `skill_profiles?select=slug,traits&slug=eq.${encodeURIComponent(intentSlug)}&limit=1`);
+  if (sr.error) return { error: `could not read the Intent Skill "${intentSlug}": ${sr.error}` };
+  const intentRow = Array.isArray(sr.rows) ? sr.rows[0] : null;
+  if (!intentRow) return { error: `no skill_profiles row for the Intent "${intentSlug}"` };
+  const schema = intentRow.traits && intentRow.traits.schema;
+  if (!schema) return { error: `the Intent "${intentSlug}" carries no traits.schema, so an agent verdict cannot be validated` };
+  return { intentSlug, schema };
+}
+
 async function main() {
   const repoRoot = arg("repo", path.resolve(__dirname, ".."));
   const dryRun = process.argv.includes("--dry-run");
@@ -600,15 +1079,71 @@ async function main() {
   const ticket = arg("ticket", "");
   const version = arg("version", "");
 
+  // FEATURE: AGT-67 -- the judge lane. Validated, never defaulted on a typo (see parseJudgeMode).
+  const judgeParsed = parseJudgeMode(arg("judge", undefined));
+  if (judgeParsed.error) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: judgeParsed.error },
+      prose: `verifier: ${judgeParsed.error}. Exiting 2 -- this is NOT a verdict.` });
+  }
+  const judge = judgeParsed.mode;
+  const verdictFilePath = arg("verdict-file", "");
+  const scratchDir = arg("scratch", os.tmpdir());
+  const contextPath = arg("context-file", "") || judgeContextPathFor(scratchDir, ticket);
+  const kickoffPath = arg("kickoff", "");
+  // Pass two is "session mode AND a verdict file". It re-runs NOTHING: the gates that graded this
+  // delivery ran in pass one and their results are in the context file. Re-running them here would
+  // grade a different instant with the same version number on it -- and would cost 20 minutes.
+  const awaitingJudgment = judge === "session" && !verdictFilePath;
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
   if (!dryRun) {
     const missing = [!supabaseUrl && "SUPABASE_URL", !supabaseKey && "SUPABASE_SERVICE_KEY", !cycleId && "--cycle-id"].filter(Boolean);
-    if (missing.length) {
-      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", missing },
-        prose: `verifier: missing ${missing.join(", ")}. Exiting 2 (the verifier could not run) -- this is NOT a verdict. Use --dry-run to reach a verdict without recording one.` });
+    // Pass one records nothing, so it does not need a cycle id -- but it DOES need credentials,
+    // because the prompt it prints is assembled from the database.
+    const needed = awaitingJudgment ? missing.filter(m => m !== "--cycle-id") : missing;
+    if (needed.length) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", missing: needed },
+        prose: `verifier: missing ${needed.join(", ")}. Exiting 2 (the verifier could not run) -- this is NOT a verdict. Use --dry-run to reach a verdict without recording one.` });
     }
+  }
+  if (judge !== "none" && !ticket) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "--judge needs --ticket" },
+      prose: `verifier: --judge=${judge} requires --ticket -- the judgment context file is derived from it, and a ticket-less run would have two concurrent cycles write the same path. Exiting 2.` });
+  }
+
+  // ---- AGT-67 pass two: the agent has spoken; validate, reconcile, record. -------------------
+  if (judge === "session" && verdictFilePath) {
+    let stored, agentVerdict;
+    try {
+      stored = JSON.parse(fs.readFileSync(contextPath, "utf8"));
+    } catch (e) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: `context: ${e.message}` },
+        prose: `verifier: could not read the judgment context at ${contextPath} (${e.message}). Run pass one first, or pass --context-file. Exiting 2 -- no verdict.` });
+    }
+    try {
+      agentVerdict = JSON.parse(fs.readFileSync(verdictFilePath, "utf8"));
+    } catch (e) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: `verdict-file: ${e.message}` },
+        prose: `verifier: could not read the agent's verdict at ${verdictFilePath} (${e.message}). Exiting 2 -- an unreadable judgment is the ABSENCE of one, never a block on the change.` });
+    }
+    const rows = await judgmentRows(supabaseUrl, supabaseKey);
+    if (rows.error) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: rows.error },
+        prose: `verifier: ${rows.error}. Exiting 2 -- no verdict.` });
+    }
+    const valid = validateAgentVerdict(rows.schema, agentVerdict);
+    if (!valid.ok) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", schema_errors: valid.errors },
+        prose: `verifier: the agent's verdict does not satisfy Intent "${rows.intentSlug}"'s schema:\n  - ${valid.errors.join("\n  - ")}\nExiting 2 and recording NOTHING -- a verdict that fails its own contract is not a judgment about the change, and writing the mechanical verdict in its place would launder an approve the agent never validly gave.` });
+    }
+    const wrongDelivery = verdictIdentityMismatch(agentVerdict, { ticket, version });
+    if (wrongDelivery.length) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", identity_errors: wrongDelivery },
+        prose: `verifier: the agent's verdict is not about this delivery:\n  - ${wrongDelivery.join("\n  - ")}\nExiting 2 and recording NOTHING -- a stale or foreign verdict file passes the schema perfectly, and runner_verdicts is exactly the row nobody re-derives later.` });
+    }
+    return recordJudgedVerdict({ stored, agentVerdict, intentSlug: rows.intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey });
   }
 
   const gateResults = {};
@@ -710,7 +1245,8 @@ async function main() {
     ladderNote = " (no credentials to read class_autonomy; charter decision 2's scope applies)";
   }
 
-  const changedFiles = changedFilesFor(repoRoot, arg("base", "origin/dev"));
+  const base = arg("base", "origin/dev");
+  const changedFiles = changedFilesFor(repoRoot, base);
   const elig = autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy });
   const autoDoneReason = elig.reason + lookupNote + primeNote + ladderNote;
 
@@ -739,27 +1275,151 @@ async function main() {
     class_autonomy: classAutonomy,
   };
 
+  // ---- AGT-67 pass one: hand the judgment everything, print the prompt, record NOTHING. -------
+  //
+  // THE CONTEXT FILE IS THE EVIDENCE, and it carries the gate outputs rather than an invitation to
+  // re-run them: the Verifier's own guardrails forbid it re-running the gates or trusting a claim of
+  // green without the output (`vf-guardrails.must_not`), which is only satisfiable if the output is
+  // in the payload. The diff is included by content, capped, with the cap declared -- a truncated
+  // diff the agent cannot tell is truncated would let it certify a change it never saw.
+  if (awaitingJudgment) {
+    const judgeCtx = {
+      backlog_id: ticket,
+      version: version || null,
+      base,
+      changed_files: changedFiles,
+      gates: gateResults,
+      gate_detail: gateDetail,
+      mechanical: { verdict, reasoning },
+      epic_name: epicName,
+      priority_class: priorityClass,
+      class_autonomy: classAutonomy,
+      epic_project_executing: epicProjectExecuting,
+      project_executing: projectExecuting,
+      // THE FULL REASON, not `elig` bare. Found by this ticket's own attended QA (verdict
+      // 5f414763, finding 2): the mechanical lane stores `elig.reason + lookupNote + primeNote +
+      // ladderNote` and a session-judged row was storing only `elig.reason` -- the same COLUMNS with
+      // less content, which is exactly the kind of lane-shaped difference the ledger must not have.
+      // "the ladder declined" and "nobody asked the ladder" live in those notes.
+      code_eligibility: { ...elig, reason: autoDoneReason },
+      self_certifying_paths: SELF_CERTIFYING_PATHS,
+      kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
+      diff: diffFor(repoRoot, base),
+    };
+    try {
+      fs.mkdirSync(path.dirname(contextPath), { recursive: true });
+      fs.writeFileSync(contextPath, JSON.stringify(judgeCtx, null, 2), "utf8");
+    } catch (e) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: e.message },
+        prose: `${prose}\n  could not write the judgment context to ${contextPath}: ${e.message}. Exiting 2 -- no verdict.` });
+    }
+    const rows = await judgmentRows(supabaseUrl, supabaseKey);
+    if (rows.error) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: rows.error },
+        prose: `${prose}\n  ${rows.error}\n  Exiting 2 -- no verdict.` });
+    }
+    // THE ASSEMBLY IS THE EXECUTOR'S, imported rather than restated (SES-331). Dynamic, so that a
+    // `--judge=none` run -- and every pure-helper import the regression suite makes -- never loads
+    // the api/ tree or needs its credentials.
+    let promptText;
+    try {
+      const { assemblePrompt } = await import("../api/prompt/db-assembly.js");
+      const { renderAssembly } = await import("./agent-prompt.js");
+      const assembly = await assemblePrompt({
+        capability_slug: VERIFY_CAPABILITY,
+        agent_id: VERIFIER_AGENT_ID,
+        tenant_id: arg("tenant", "global"),
+        task_context: judgeCtx,
+        intent_slug: rows.intentSlug,
+      });
+      const rendered = renderAssembly(assembly);
+      if (!rendered.system_prompt) throw new Error(`"${VERIFY_CAPABILITY}" assembled zero renderable sections for agent "${VERIFIER_AGENT_ID}"`);
+      promptText = `# ${assembly.agent_card?.name ?? VERIFIER_AGENT_ID} — ${assembly.agent_card?.role ?? ""} · capability ${assembly.capability_slug} · intent ${rows.intentSlug} · model ${assembly.llm?.model}\n${rendered.system_prompt}`;
+      if (rendered.omitted?.length) console.error(`verifier: prompt sections omitted (no stored content): ${rendered.omitted.join(", ")}`);
+    } catch (e) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: e.message },
+        prose: `${prose}\n  could not assemble the ${VERIFY_CAPABILITY} prompt: ${e.message}\n  Exiting 2 -- no verdict.` });
+    }
+    // The prompt goes to a FILE always and to stdout only when stdout is not carrying the machine
+    // payload. Found by this ticket's own attended QA (verdict 5f414763, finding 3): under `--json`
+    // emit() writes one JSON line to stdout, and a 97 KB prompt printed to the same stream ahead of
+    // it makes that line unparseable -- a `--json` contract broken by the one path that needed it.
+    const promptPath = contextPath.replace(/\.json$/, "") + ".prompt.txt";
+    try { fs.writeFileSync(promptPath, promptText, "utf8"); }
+    catch (e) { console.error(`verifier: could not write the prompt to ${promptPath}: ${e.message}`); }
+    if (!process.argv.includes("--json")) console.log(promptText);
+    return emit({
+      code: EXIT_AWAITING_JUDGMENT,
+      // NOT `...payload`. Same QA, finding 3: spreading the mechanical payload put `ok: true` and
+      // `exitCode: 0` on a run that exited 3 having recorded nothing -- this file's own header calls
+      // reading 3 as a verdict "the defect this numbering exists to make visible", and the script was
+      // seeding it. There is no verdict here, so the payload states none: `ok` is false because
+      // nothing was concluded, and the mechanical gate results ride under their own keys.
+      payload: {
+        ok: false, exitCode: EXIT_AWAITING_JUDGMENT, kind: "awaiting-judgment", recorded: false,
+        verdict: null, mechanical_verdict: verdict, gates: gateResults, gateDetail: gateDetail,
+        ticket: ticket || null, version: version || null,
+        context_file: contextPath, prompt_file: promptPath, intent_slug: rows.intentSlug,
+      },
+      prose: `${prose}\n  AWAITING JUDGMENT (exit ${EXIT_AWAITING_JUDGMENT}): the gates ran and NOTHING was recorded.\n` +
+        `  context: ${contextPath}\n  prompt:  ${promptPath}\n` +
+        `  Run that prompt as a ${VERIFIER_AGENT_ID} sub-agent with the context file as its task_context, save its JSON, then re-run with --verdict-file=<path>.`,
+    });
+  }
+
+  // ---- AGT-67 `--judge=executor`: one run, the executor's own POST. NOT PROVEN LIVE. ----------
+  if (judge === "executor") {
+    const rows = await judgmentRows(supabaseUrl, supabaseKey);
+    if (rows.error) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: rows.error },
+        prose: `${prose}\n  ${rows.error}\n  Exiting 2 -- no verdict.` });
+    }
+    const judgeCtx = {
+      backlog_id: ticket, version: version || null, base,
+      changed_files: changedFiles, gates: gateResults, gate_detail: gateDetail,
+      mechanical: { verdict, reasoning }, epic_name: epicName, priority_class: priorityClass,
+      class_autonomy: classAutonomy, code_eligibility: elig,
+      self_certifying_paths: SELF_CERTIFYING_PATHS,
+      kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
+      diff: diffFor(repoRoot, base),
+    };
+    const call = await callExecutor({ intentSlug: rows.intentSlug, taskContext: judgeCtx, tenant: arg("tenant", "global") });
+    if (call.error) {
+      return emit({ code: 2, payload: { ...payload, recorded: false, error: call.error },
+        prose: `${prose}\n  the capability executor could not be reached: ${call.error}\n  Exiting 2 -- no verdict. (--judge=executor is an unproven path; --judge=none is the degrade.)` });
+    }
+    const valid = validateAgentVerdict(rows.schema, call.verdict);
+    if (!valid.ok) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", schema_errors: valid.errors },
+        prose: `${prose}\n  the executor's verdict does not satisfy Intent "${rows.intentSlug}"'s schema:\n  - ${valid.errors.join("\n  - ")}\n  Exiting 2, recording nothing.` });
+    }
+    const wrongDelivery = verdictIdentityMismatch(call.verdict, { ticket, version });
+    if (wrongDelivery.length) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", identity_errors: wrongDelivery },
+        prose: `${prose}\n  the executor's verdict is not about this delivery:\n  - ${wrongDelivery.join("\n  - ")}\n  Exiting 2, recording nothing.` });
+    }
+    // The API dollars this path spends are the cycle's, and a cost nobody could read is recorded as
+    // unknown rather than as zero -- `api_cost_qa_usd` is a measurement, and a silent 0 would make
+    // the executor lane look free forever.
+    const cost = await executorCostFor(supabaseUrl, supabaseKey, call.traceId);
+    if (!dryRun && cycleId && cost.usd !== null) await addQaCost(supabaseUrl, supabaseKey, cycleId, cost.usd);
+    const stored = {
+      backlog_id: ticket, version: version || null, gates: gateResults, gate_detail: gateDetail,
+      mechanical: { verdict, reasoning }, epic_name: epicName, priority_class: priorityClass,
+      code_eligibility: { ...elig, reason: autoDoneReason },
+      note: `--judge=executor; trace ${call.traceId ?? "(none returned)"}; api cost ${cost.usd === null ? `UNKNOWN (${cost.note})` : `$${cost.usd}`}`,
+    };
+    return recordJudgedVerdict({ stored, agentVerdict: call.verdict, intentSlug: rows.intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey });
+  }
+
   if (dryRun) {
     return emit({ code: payload.exitCode, payload: { ...payload, recorded: false }, prose: prose + "\n  --dry-run: nothing recorded." });
   }
 
-  const ins = await rest(supabaseUrl, supabaseKey, "runner_verdicts", {
-    method: "POST",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({
-      cycle_id: cycleId,
-      backlog_id: ticket || null,
-      version: version || null,
-      verdict,
-      gate_build: gateResults.build,
-      gate_regression: gateResults.regression,
-      gate_hygiene: gateResults.hygiene,
-      reasoning: `${reasoning}\nGates: ${detailLine.replace(/\n\s+/g, " | ")}`,
-      auto_done_eligible: elig.eligible,
-      auto_done_reason: autoDoneReason,
-      epic_name: epicName,
-      priority_class: priorityClass,
-    }),
+  const ins = await insertVerdict({
+    supabaseUrl, supabaseKey, cycleId, ticket, version, verdict, gateResults,
+    reasoning: `${reasoning}\nGates: ${detailLine.replace(/\n\s+/g, " | ")}`,
+    eligible: elig.eligible, autoDoneReason, epicName, priorityClass,
   });
   if (ins.error) {
     // The verdict was reached but not recorded. That is a verifier failure, not a verdict on the
@@ -768,9 +1428,8 @@ async function main() {
       prose: `${prose}\n  RECORDING FAILED: ${ins.error}\n  Exiting 2 -- the verdict above was reached but is not in the ledger, so it is not assertable.` });
   }
 
-  const rowId = Array.isArray(ins.rows) && ins.rows[0] ? ins.rows[0].id : null;
-  return emit({ code: payload.exitCode, payload: { ...payload, recorded: true, verdict_id: rowId },
-    prose: `${prose}\n  recorded as runner_verdicts ${rowId}` });
+  return emit({ code: payload.exitCode, payload: { ...payload, recorded: true, verdict_id: ins.rowId },
+    prose: `${prose}\n  recorded as runner_verdicts ${ins.rowId}` });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
