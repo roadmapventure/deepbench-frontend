@@ -1,3 +1,16 @@
+// DeepBench v7.0.425 | tests/regression/SES-181-verifier.js | SES-340 -- THE SCOPE TEST IS A PROJECT
+// STATUS, so the fixtures carry `epicProjectExecuting` where they used to carry a Selfbuild-shaped
+// `epicName`, and the assertions follow. Two things are deliberately NOT the same edit:
+//
+//   * `scopeIsAnExecutingProjectOnly()` replaces `scopeIsTheSelfbuildFamilyOnly()`. The retired
+//     clause looped over `Selfbuild M0..M7` names and asserted each one qualified -- a test that
+//     the FENCE WAS A NAME. Its replacement asserts the opposite property, and it is the one that
+//     discriminates: two fixtures identical but for `epicProjectExecuting`, one eligible and one
+//     refused, plus a paused-project fixture whose epic is named `Selfbuild ...` and is REFUSED --
+//     which the retired implementation would have passed and is why this clause is not vacuous.
+//   * `AUTO_DONE_SCOPE` is imported and asserted to be a LABEL, never a predicate: nothing branches
+//     on its value, so a regex over it is only ever checking the wording the ledger stores.
+//
 // DeepBench v7.0.398 | tests/regression/SES-181-verifier.js | SES-122 (b) -- the ladder branches and
 // the spawn quoting. Two additions, both of which FAIL on unchanged source (autoDoneEligibility
 // ignored `classAutonomy`; spawnCommandFor did not exist):
@@ -34,7 +47,7 @@ import assert from "assert";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   GATES,
-  AUTO_DONE_EPIC_PREFIX,
+  AUTO_DONE_SCOPE,
   AUTO_DONE_CLASS_PREFIX,
   SELF_CERTIFYING_PATHS,
   gateStatus,
@@ -151,9 +164,14 @@ function approveIffAllGreenAcrossEveryCombination() {
 // ---------------------------------------------------------------------------
 // Auto-done scope -- charter decision 2, and nothing wider
 // ---------------------------------------------------------------------------
+// SES-340: the live shape this session ships under -- `Governance Agents M0 - Standard & Foundation`
+// on the `Governance Agents` project, status `executing`. The epic name is deliberately NOT
+// Selfbuild-shaped: under the retired implementation this fixture would have been INELIGIBLE, which
+// is what makes every clause below a real measurement of the new fence rather than a rename.
 const ELIGIBLE = Object.freeze({
   verdict: "approve",
-  epicName: `${AUTO_DONE_EPIC_PREFIX} M3 - Independent Verification`,
+  epicName: "Governance Agents M0 - Standard & Foundation",
+  epicProjectExecuting: true,
   priorityClass: `${AUTO_DONE_CLASS_PREFIX} - Tooling`,
   changedFiles: ["docs/runbooks/session-hygiene.md", "scripts/heal-engine.js"],
 });
@@ -177,25 +195,68 @@ function eligibilityNeverOutrunsTheVerdict() {
   assert.strictEqual(autoDoneEligibility(ELIGIBLE).eligible, true);
 }
 
-function scopeIsTheSelfbuildFamilyOnly() {
-  // The standing Automation epic is the nearest neighbour and the one most likely to be swept in.
-  const other = autoDoneEligibility({ ...ELIGIBLE, epicName: "Automation" });
+// SES-340 (replaces scopeIsTheSelfbuildFamilyOnly). The scope is a ROW, not a name.
+function scopeIsAnExecutingProjectOnly() {
+  // The paused `Automation` project is the nearest neighbour and the one most likely to be swept in.
+  const other = autoDoneEligibility({
+    ...ELIGIBLE, epicName: "Automation", epicProjectExecuting: false,
+  });
   assert.strictEqual(other.eligible, false,
-    "charter decision 2 supersedes SES-154's John-only-writer rule for the Selfbuild family and NOTHING " +
-    "else. A ticket in another epic still needs John's tap.");
-  assert.ok(new RegExp(AUTO_DONE_EPIC_PREFIX).test(other.reason));
+    "charter decision 2 supersedes SES-154's John-only-writer rule for an EXECUTING project's " +
+    "deliveries and NOTHING else. A ticket whose project is paused still needs John's tap.");
+  assert.ok(/executing project/.test(other.reason),
+    "the reason must name the rule it failed -- 'projects.status' is what a reader has to go look at");
 
-  // No epic at all fails closed rather than passing on a blank.
-  assert.strictEqual(autoDoneEligibility({ ...ELIGIBLE, epicName: null }).eligible, false);
-  assert.strictEqual(autoDoneEligibility({ ...ELIGIBLE, epicName: "" }).eligible, false);
+  // THE ASSERTION THAT CARRIES SES-340, and the reason this clause is not a rename: an epic named
+  // `Selfbuild M3 - ...` whose project is PAUSED is refused. The retired implementation --
+  // `epicName.startsWith("Selfbuild")` -- would have passed exactly this fixture, so the two
+  // implementations disagree here and only the shipped one is correct today.
+  const pausedButNamedSelfbuild = autoDoneEligibility({
+    ...ELIGIBLE, epicName: "Selfbuild M3 - Independent Verification", epicProjectExecuting: false,
+  });
+  assert.strictEqual(pausedButNamedSelfbuild.eligible, false,
+    "the Selfbuild project is `paused` live; a NAME cannot buy the bar back. If this ever passes, " +
+    "the fence has gone back to being a string test.");
 
-  // NEGATIVE CONTROL: every Selfbuild milestone name must still qualify, or the scope test is
-  // matching the exact string of one epic rather than the family.
-  for (const m of ["M0", "M1", "M2", "M3", "M7"]) {
-    assert.strictEqual(
-      autoDoneEligibility({ ...ELIGIBLE, epicName: `${AUTO_DONE_EPIC_PREFIX} ${m} - whatever` }).eligible,
-      true, `${AUTO_DONE_EPIC_PREFIX} ${m} is in the family`);
+  // Unknown fails closed rather than passing on a blank -- no epic on the ticket, a failed lookup
+  // and absent credentials all arrive here as null/undefined.
+  for (const unknown of [null, undefined]) {
+    assert.strictEqual(autoDoneEligibility({ ...ELIGIBLE, epicProjectExecuting: unknown }).eligible, false,
+      "an unread project is not an executing one");
   }
+  // ...and STRICT true, SES-243's lesson applied to this lookup: the truthy shapes a REST payload
+  // can hand back must not reach the permissive branch.
+  for (const notTrue of ["true", "executing", 1, {}, []]) {
+    assert.strictEqual(autoDoneEligibility({ ...ELIGIBLE, epicProjectExecuting: notTrue }).eligible, false,
+      `epicProjectExecuting=${JSON.stringify(notTrue)} is truthy but is not the boolean true`);
+  }
+
+  // NEGATIVE CONTROL, one variable: the identical fixture with the flag true IS eligible, so it is
+  // the flag doing the work rather than some other property of the row.
+  assert.strictEqual(autoDoneEligibility(ELIGIBLE).eligible, true);
+  // The epic NAME must now be irrelevant on the eligible side -- any name qualifies once the
+  // project executes. This is the inverse of the retired milestone-name loop.
+  for (const name of ["Governance Agents M5 - Doors", "Automation", "Selfbuild M7 - The Inventor", "anything at all"]) {
+    assert.strictEqual(autoDoneEligibility({ ...ELIGIBLE, epicName: name }).eligible, true,
+      `'${name}' must qualify while its project executes -- the fence is projects.status, not the name`);
+  }
+}
+
+// SES-340: AUTO_DONE_SCOPE replaced AUTO_DONE_EPIC_PREFIX, and the replacement changed KIND. The old
+// constant was the predicate (`epicName.startsWith(it)`); this one is only wording. Pinned so a
+// later editor does not quietly re-introduce a branch on it.
+function theScopeConstantIsALabelNotAPredicate() {
+  assert.strictEqual(typeof AUTO_DONE_SCOPE, "string");
+  assert.ok(AUTO_DONE_SCOPE.length > 0);
+  assert.ok(autoDoneEligibility(ELIGIBLE).reason.includes(AUTO_DONE_SCOPE),
+    "the granting reason must carry the scope's name, because the ledger is where a reader finds " +
+    "out WHICH rule granted the bar");
+  // The label is not a test: a fixture whose epic name IS the label still loses when its project is
+  // not executing, and one whose name is nothing like it still wins when the project executes.
+  assert.strictEqual(
+    autoDoneEligibility({ ...ELIGIBLE, epicName: AUTO_DONE_SCOPE, epicProjectExecuting: false }).eligible,
+    false);
+  assert.strictEqual(autoDoneEligibility({ ...ELIGIBLE, epicName: "zzz" }).eligible, true);
 }
 
 function scopeIsToolingOnly() {
@@ -260,9 +321,13 @@ function pathMatchingIsExactAndSeparatorAgnostic() {
 // work class `tooling`, rung 13, auto_done TRUE against runner_settings.auto_done_rung 3. The
 // TICKET carrying it is deliberately the awkward one -- a P9 class on a NON-Selfbuild epic -- so
 // nothing here can pass through charter decision 2's old path by accident.
+// SES-340: `epicProjectExecuting: false` is the live shape of the `Automation` epic today -- its
+// project is `paused` -- and it is what makes the ladder branch the ONLY way this fixture can reach
+// eligible. Under the retired code the same awkwardness was carried by a non-Selfbuild epic NAME.
 const LADDER_PROMOTED = Object.freeze({
   verdict: "approve",
   epicName: "Automation",
+  epicProjectExecuting: false,
   priorityClass: "P9 - Bug Fixes",
   changedFiles: ["docs/runbooks/runner-cycle.md", "scripts/heal-engine.js"],
   classAutonomy: Object.freeze({ auto_done: true, rung: 13, streak: 42, work_class: "tooling", auto_done_rung: 3 }),
@@ -292,9 +357,9 @@ function theLadderGrantsTheBarByRung() {
   assert.strictEqual(denied.eligible, false,
     "auto_done false is the ladder declining to grant the bar; the delivery stays `delivered` until " +
     "that class earns the rung");
-  assert.ok(new RegExp(AUTO_DONE_EPIC_PREFIX).test(denied.reason),
-    "and the reason must be CHARTER DECISION 2's floor talking, not the ladder's — the ticket is " +
-    "outside the Selfbuild family, which is why it failed");
+  assert.ok(/executing project/.test(denied.reason),
+    "and the reason must be CHARTER DECISION 2's floor talking, not the ladder's — the ticket's " +
+    "project is paused, which is why it failed");
   assert.ok(/rung 1/.test(denied.reason),
     "a refusal should still say what the ladder said, or 'the ladder declined' and 'nobody asked " +
     "the ladder' are indistinguishable in the ledger");
@@ -421,7 +486,8 @@ function run() {
   approveIffAllGreenAcrossEveryCombination();
   theInterimBarIsMet();
   eligibilityNeverOutrunsTheVerdict();
-  scopeIsTheSelfbuildFamilyOnly();
+  scopeIsAnExecutingProjectOnly();
+  theScopeConstantIsALabelNotAPredicate();
   scopeIsToolingOnly();
   aChangeToTheVerificationCannotTakeTheBar();
   anUnreadableDiffFailsClosed();

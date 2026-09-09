@@ -793,3 +793,94 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
   `git show bd8de880~1:docs/RUNNER-GOV-M5-REQUIREMENTS.md` for the row as it stood. To make it live
   again: restore the `statement` column, re-export `docs/governance/RULES-SNAPSHOT.md`, and revert
   `prime_directive_queue()`'s `buildable` CTE to an `INNER JOIN` in the same commit.
+
+### 43. Prime Directive `a0ef9525` §§1–6, as EXECUTION AUTHORITY (superseded)
+<!-- FEATURE: SES-340 — the code half lands in the SAME commit as this entry, per the
+     SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old authority nor
+     the new one is in force. The database half (migration `ses340_projects`, and the two directives
+     moving to `superseded`) shipped earlier the same sitting. -->
+- **Said, verbatim** (`runner_directives` `a0ef9525-eff0-4677-aedf-a1a5d7d3a546`, opening and §§1–2;
+  the row is 7,010 characters and stays readable in full at that id): *"THE SELFBUILD PRIME DIRECTIVE
+  — John, attended architect session 2026-08-29 ~15:2xZ, verbatim: 'run it' … §1 MISSION. Complete
+  Selfbuild — every milestone M0-M7, drain retired, gate review passed per
+  docs/SELFBUILD-CHARTER.md — before any other work on this platform. §2 SELECTION, every cycle, in
+  this order and NOTHING ELSE: (a) John's mission directives, oldest first; (b) the declared
+  Selfbuild drain; (c) any buildable Selfbuild-epic ticket M0-M7, oldest first … NO P1-P10 board
+  ticket is picked for any reason until Selfbuild is complete or John revokes this directive."*
+- **Lived:** as a `queued` `runner_directives` row, read as a PREDICATE by
+  `public.prime_directive_queue()` (`prime_standing` = a body-prefix match on this row),
+  `public.drain_chain_gate()` §2e (through that same function), and `scripts/verifier.js`
+  (`PRIME_DIRECTIVE_BODY_PREFIX`, the §2f class widening). Rendered verbatim as §17 of the briefing
+  page (`scripts/build-briefing.mjs`).
+- **Superseded by:** `SES-340`, 2026-09-09 (`v7.0.425`), gate decision
+  `96bbed72-b3d5-4258-86a0-cb0c6e634ab8`, migration `ses340_projects` — execution authority is now
+  `public.projects.status = 'executing'`, resolved per ticket by
+  `public.epic_project_executing(uuid)` through `epics.project_id`. The row is `status='done'`,
+  `outcome='superseded'`.
+- **Why:** John, 2026-09-09: *"I should be able to simply state 'build the Governance Agents
+  project' and away you go."* The directive made the mission a NAME — `e.name ILIKE 'Selfbuild%'` in
+  the pick path — so a second project could only be started by renaming its epics to match, or by
+  editing four function bodies. Starting one is now a single `status` write recorded as a decision,
+  and stopping one is the same write in reverse. The measured cost of the old shape at retirement:
+  no public function body contains `ILIKE 'Selfbuild%'` any longer (pg_proc, zero rows), where four
+  did.
+- **Survives:** everything except the fence. §2's *ORDER* is unchanged and still executes — layer
+  (1a) directives, (1b) the drain, (c) the admitted lane — and `prime_directive_queue()` is still
+  its one home; §2(d) PARKED, §3's near-free parked fire, and the whole selection ceremony in
+  `docs/runbooks/runner-cycle.md` step 5 are untouched. What lapsed is the *name* the fence tested
+  and the *row* that made it standing. The verbatim text stays readable at the directive id, and
+  the briefing's §17 now renders a retirement note in its place rather than dying on a missing row.
+- **NAMED DEVIATION carried by this ship rather than fixed by it**, cheap to close later and
+  deliberately out of `SES-340`'s scope: the pick LANE VALUE is still the string `selfbuild` in
+  `prime_directive_queue()` — `tests/regression/ses-281-m5-pick-enforcement.test.mjs` asserts on it,
+  so renaming it is a test change and a separate ticket. The lane's MEMBERSHIP is fully
+  project-fenced and is guarded by `tests/regression/ses-340-projects-govern.test.mjs`, so what
+  survives is a misleading NAME on a correct fence — the same shape this entry retires one level up,
+  which is why it is written down rather than left to be noticed.
+- **Restore:** reverse decision `96bbed72-b3d5-4258-86a0-cb0c6e634ab8` to put both directive rows
+  back to `queued`, then revert migration `ses340_projects` using the function definitions captured
+  in `runner_migration_downs` (`up_name = 'ses340_projects'`, row
+  `1258a034-5ea7-469f-b8ff-2fb9d3d01bd1`, `prior_ddl.captured` — full prior bodies of
+  `prime_directive_queue()`, `drain_epic_next(uuid)`, `drain_chain_gate(uuid)` and
+  `backlog_done_requires_verdict()`), plus `DROP FUNCTION public.epic_project_executing(uuid)`,
+  `DROP VIEW public.project_progress`, `DROP VIEW public.project_blockers`,
+  `DROP TABLE public.projects` and `ALTER TABLE public.epics DROP COLUMN project_id`. **The `epics`
+  ALTER is a captured REFUSAL, not an omission** — the row records *"the table already exists, so
+  the up ALTERs it — a lossless down for an in-place alteration is not derivable from the object's
+  current state alone"* (the `SES-269` precedent); that half is card-only. The repo half is
+  `git show <this commit>~1:` on `scripts/verifier.js`, `scripts/build-briefing.mjs`,
+  `docs/runbooks/runner-cycle.md` and the three regression files.
+
+### 44. Succession directive `0970abad` — the drain as the thing that admits work (superseded)
+- **Said, verbatim** (`runner_directives` `0970abad-ac14-44d7-9772-49bc7b769892`, opening):
+  *"John, attended architect session 2026-08-29 ~15:0xZ, verbatim: 'run both' (lever 2 of 2).
+  STANDING DRAIN SUCCESSION — PRE-AUTHORIZED DECLARATION: when a Selfbuild milestone's gate review
+  COMPLETES … and that review NAMES the next milestone's scope as a fixed member list (SES-142:
+  named at declaration, never the live bucket), the next milestone's drain-epic directive is
+  declared IMMEDIATELY under this standing authorization … and requires NO separate word from
+  John."*
+- **Lived:** as a `queued` `runner_directives` row; cited by `docs/runbooks/runner-cycle.md`'s
+  standing-prohibition block *"THE ONE DRAIN A CYCLE MAY WRITE"* (the carve-out to
+  `drain_epic_next` property 5), and amended once by `SES-312` (`v7.0.401`) to read *"decided and
+  not reversed"* rather than *"accepted"*.
+- **Superseded by:** the same `SES-340` ship and the same gate decision `96bbed72`. The row is
+  `status='done'`, `outcome='superseded'`.
+- **Why:** the succession existed because a drain was the thing that ADMITTED work — with no drain
+  declared, a cycle had nothing to build and the chain stopped, so the gap between one milestone's
+  gate review and the next drain's declaration was dead runner time this directive removed. Under
+  `projects.status` a drain no longer admits anything: `drain_chain_gate()`'s §2e branch continues
+  on the executing project's own lane when `drain_epic_next()` returns anything but `pick`, so a
+  drain is now an **optional scoping device** — it names a fixed member list and a finish line, and
+  its absence costs the milestone's finish line, never the runner's admission. A pre-authorisation
+  to remove dead time that can no longer occur is a standing grant with nothing left to grant.
+- **Survives:** the *composition* rule the directive taught is the one thing that had no second
+  home, so the runbook paragraph is **marked retired in place and kept verbatim** rather than
+  deleted — a drain's named list is the epic's then-open members plus the tickets filed straight
+  after the preceding gate review (M3: 19 + 4; M4: 4 + 4), already-`done` members deliberately not
+  named. `SES-312`'s decided-and-not-reversed precondition also survives wherever a drain is still
+  declared. Everything the directive explicitly refused to widen — no skipped gate review, no scope
+  beyond what a review named, no lifted hold — is unchanged, because none of it was ever this
+  directive's to grant.
+- **Restore:** as entry 43 — reverse decision `96bbed72-b3d5-4258-86a0-cb0c6e634ab8` (both rows
+  return to `queued` together), and revert `ses340_projects` from the captured downs. The runbook
+  paragraph needs only its *"RETIRED IN PLACE"* note removed; nothing was moved out of it.

@@ -1,4 +1,41 @@
 #!/usr/bin/env node
+// DeepBench v7.0.425 | scripts/verifier.js | SES-340 -- THE SCOPE TEST IS A PROJECT STATUS, NOT A
+// NAME, and the thing to read twice is that BOTH name-fenced facts in this file were reading a
+// string where a row now exists. Measured live 2026-09-09, not recalled: `public.projects` holds
+// `Governance Agents` (executing), `Selfbuild` (paused) and `Automation` (paused); every epic
+// carries `project_id`; `public.epic_project_executing(uuid)` is the one SQL home for "this epic's
+// project is executing"; and `prime_directive_queue()`'s `prime_standing` is now
+// `EXISTS (projects WHERE status='executing')`. John's ask behind it, 2026-09-09: *"I should be
+// able to simply state 'build the Governance Agents project' and away you go"* -- which is one
+// status write, and cannot be a name prefix that every future project would have to be renamed to
+// match.
+//
+// (1) THE EPIC TEST READS THE TICKET'S PROJECT. `AUTO_DONE_EPIC_PREFIX = "Selfbuild"` is gone;
+// eligibility now asks `epicProjectExecuting === true`, a boolean resolved in main() by embedding
+// `epics(name,project_id,projects(status))` through the `epics.project_id -> projects` foreign key.
+// FAIL CLOSED IS UNCHANGED AND IS THE WHOLE SAFETY: null (no epic on the ticket, a failed lookup, no
+// credentials) is NOT true, takes the narrow path, and is indistinguishable from a paused project in
+// the permissive direction on purpose. The ladder bypass and selfCertificationBlock() are untouched
+// -- a rung still skips the scope tests and still never skips charter premise 3.
+//
+// (2) THE §2f WIDENING LOOKUP OUTLIVED ITS ROW, WHICH IS THE DEFECT THIS HALF FIXES. §2f was keyed
+// on a queued `runner_directives` row whose body opens `THE SELFBUILD PRIME DIRECTIVE`; that
+// directive (`a0ef9525`) and the succession directive (`0970abad`) were closed `superseded` this
+// same sitting under gate decision `96bbed72`, so the lookup went quietly false and the widening
+// lapsed with nothing saying so. It is now `projects?select=id&status=eq.executing&limit=1` and the
+// flag is `projectExecuting` -- the same shape, the same fail-closed default, keyed on the row that
+// now carries the authority. `PRIME_DIRECTIVE_BODY_PREFIX` is deleted.
+//
+// THE TWO FLAGS ARE NOT ONE FLAG, and collapsing them is the mistake to avoid: `epicProjectExecuting`
+// is about THIS ticket's epic, `projectExecuting` is about the board. They usually agree live -- but
+// not always, and the disagreement is exactly the fail-closed case: the ticket lookup can succeed
+// while the projects lookup errors, which leaves `projectExecuting` false and correctly re-imposes
+// charter decision 2's class restriction on evidence that could not be read.
+//
+// NAMED DEVIATION (SES-196 convention): the LANE VALUE stayed `selfbuild` in
+// `prime_directive_queue()`. `tests/regression/ses-281-m5-pick-enforcement.test.mjs` asserts on it;
+// renaming it is out of this ticket's scope and is recorded in docs/SELFBUILD-RETIREMENT-LEDGER.md.
+//
 // DeepBench v7.0.398 | scripts/verifier.js | SES-122 (b) -- THE AUTO-DONE BAR IS NOW A LADDER FACT
 // THIS SCRIPT READS, AND THIS SCRIPT FINALLY RUNS ON WINDOWS. Two hardcoded facts and one
 // environment defect, all measured, all in this file.
@@ -108,8 +145,10 @@
 // directive a0ef9525 widened auto-done to "ANY Selfbuild-epic ship the verifier lane passes GREEN",
 // and this script did not know it -- so every non-P10 Selfbuild ship landed `delivered` and cost
 // John a tap he had already said should not be needed. The widening is read LIVE from the directive
-// row (see PRIME_DIRECTIVE_BODY_PREFIX) so it lapses on its own terms; the EPIC restriction and the
-// self-certification refusal below are untouched by it.
+// row so it lapses on its own terms; the EPIC restriction and the
+// self-certification refusal below are untouched by it. HISTORICAL AS OF SES-340 (v7.0.425): the
+// directive row is closed `superseded` and the lookup is now `projects.status = 'executing'`, so
+// this paragraph records the rule's shape, not today's query -- see the SES-340 stamp at the top.
 //
 // WHAT §2f's OTHER HALF IS AND WHY IT IS NOT HERE, named rather than left to be found. §2f also says
 // that where the verifier "structurally cannot grade" a ship -- a diff living in
@@ -168,11 +207,12 @@
 // Pure helpers (gateStatus, verdictFor, autoDoneEligibility, selfCertificationBlock,
 // summarizeGateOutput, parsePorcelainPath, spawnCommandFor) are exported so the regression suite
 // drives every branch with no network and no subprocesses -- the seam-proof convention this repo's
-// other checkers use. autoDoneEligibility takes { verdict, epicName, priorityClass, changedFiles,
-// primeDirectiveActive, classAutonomy }, where `classAutonomy` is class_autonomy()'s row (plus
-// `auto_done_rung` folded in for the reason) or NULL when it could not be read -- null takes charter
-// decision 2's narrow path, never the ladder's. Guarded by tests/regression/SES-181-verifier.js and
-// tests/regression/SES-243-prime-directive-autodone.js.
+// other checkers use. autoDoneEligibility takes { verdict, epicName, epicProjectExecuting,
+// priorityClass, changedFiles, projectExecuting, classAutonomy } (SES-340), where `classAutonomy` is
+// class_autonomy()'s row (plus `auto_done_rung` folded in for the reason) or NULL when it could not
+// be read -- null takes charter decision 2's narrow path, never the ladder's. Guarded by
+// tests/regression/SES-181-verifier.js, tests/regression/SES-243-prime-directive-autodone.js and
+// tests/regression/ses-340-projects-govern.test.mjs.
 
 import path from "path";
 import { spawnSync } from "child_process";
@@ -194,30 +234,13 @@ export const GATES = Object.freeze([
     cmd: process.execPath, argv: ["scripts/check-session-docs.js", "--gate"] }),
 ]);
 
-export const AUTO_DONE_EPIC_PREFIX = "Selfbuild";
+// SES-340: a LABEL, where `AUTO_DONE_EPIC_PREFIX = "Selfbuild"` was a TEST. The retired constant was
+// the scope rule itself -- `epicName.startsWith(it)` -- so the name and the fence were one thing and
+// a project that was not called Selfbuild could not be built. The fence is now
+// `epicProjectExecuting === true`, resolved from `projects.status`; this string only names it in the
+// reasons the ledger stores, and nothing branches on its value.
+export const AUTO_DONE_SCOPE = "executing project";
 export const AUTO_DONE_CLASS_PREFIX = "P10";
-
-// THE PRIME DIRECTIVE'S §2f WIDENING, AND WHY IT IS A LOOKUP RATHER THAN A CONSTANT (SES-243).
-// Charter decision 2 scopes auto-done to the Selfbuild family's `P10 - Tooling` deliveries. Prime
-// Directive a0ef9525 §2f (John, 2026-08-29 ~16:0xZ, verbatim "run it") widens that FOR THAT
-// DIRECTIVE'S DURATION to "ANY Selfbuild-epic ship the verifier lane passes GREEN" -- no class
-// restriction. Its own closing sentence is the reason this may not be hardcoded: "At Selfbuild
-// completion or revocation, §2f lapses and SES-154 resumes in full."
-//
-// So the widening is keyed on the DIRECTIVE ROW BEING LIVE, exactly as epic and priority class are
-// already read off the board rather than taken from argv (see the header). When John revokes the
-// directive -- or Selfbuild completes and it closes -- the row leaves `queued`, this lookup goes
-// false, and the class restriction resumes with no edit to this file and nothing for a cycle to
-// remember. A boolean constant here would have to be un-set by hand, which is the exact class of
-// rule this platform has watched go silently unfollowed eight times over.
-//
-// KEYED ON THE BODY PREFIX, NOT THE UUID, and that choice cuts both ways so it is stated rather than
-// implied. A uuid key cannot false-positive, but John has already re-declared this directive once
-// (071fc16a -> a0ef9525), and a re-declaration under a new uuid would silently lapse the widening he
-// had just restated. The body prefix tracks the re-declaration. The cost is a false-positive risk,
-// which is why the match is ANCHORED AT THE START of the body: rows that merely DISCUSS the Prime
-// Directive -- SES-243's own ticket text among them -- quote it mid-body and never open with it.
-export const PRIME_DIRECTIVE_BODY_PREFIX = "THE SELFBUILD PRIME DIRECTIVE";
 
 // The files that ARE the verification. A delivery whose diff touches one of these is graded by the
 // code it just changed, so it may not take the auto-done bar -- charter premise 3, "no change
@@ -338,19 +361,33 @@ export function selfCertificationBlock(changedFiles) {
   return { blocked: false, reason: "" };
 }
 
-// Charter decision 2's scope test, as widened for the Prime Directive's duration by §2f. Returns
-// { eligible, reason } -- the reason is stored either way, because "not eligible" with no reason is
-// indistinguishable from "nobody checked".
+// Charter decision 2's scope test, as re-homed on `projects.status` by SES-340 and as widened for an
+// executing project's duration by §2f's successor. Returns { eligible, reason } -- the reason is
+// stored either way, because "not eligible" with no reason is indistinguishable from "nobody
+// checked".
 //
-//   primeDirectiveActive  TRUE only when the directive row was READ AND FOUND LIVE. Absent,
-//                         undefined and false are all one answer -- "not proven live" -- and they
-//                         all keep charter decision 2's narrow P10 rule. That default is the whole
-//                         safety of this widening: a lookup that failed, a caller that never passed
-//                         the flag, and a genuinely revoked directive must not be distinguishable
-//                         from each other in the permissive direction, because the failure they
-//                         would share is the runner widening its own autonomy on an absence of
-//                         evidence. Unknown costs John one tap; the other direction costs him a
-//                         `done` he never authorised.
+//   epicProjectExecuting  SES-340. TRUE only when the ticket's epic was read AND its project's
+//                         status came back `executing`. This replaced
+//                         `epicName.startsWith("Selfbuild")`, and the replacement is the ticket: the
+//                         old test made eligibility a property of a NAME, which anything can be
+//                         given and which no second project could ever satisfy. It is now a property
+//                         of a row John changes with one status write. NULL is the unknown -- no
+//                         epic on the ticket, a failed lookup, no credentials -- and it fails closed
+//                         onto the narrow path, exactly as the old `!epicName` branch did.
+//                         `epicName` survives for the REASON TEXT only; nothing branches on it.
+//
+//   projectExecuting      TRUE only when a project was READ AND FOUND `executing`. Absent, undefined
+//                         and false are all one answer -- "not proven live" -- and they all keep
+//                         charter decision 2's narrow P10 rule. That default is the whole safety of
+//                         this widening: a lookup that failed, a caller that never passed the flag,
+//                         and a genuinely paused board must not be distinguishable from each other
+//                         in the permissive direction, because the failure they would share is the
+//                         runner widening its own autonomy on an absence of evidence. Unknown costs
+//                         John one tap; the other direction costs him a `done` he never authorised.
+//                         It is NOT the same fact as `epicProjectExecuting`: that one is about this
+//                         ticket's epic, this one is about the board, and the case where they
+//                         disagree is the case that matters -- a ticket lookup that succeeded beside
+//                         a projects lookup that errored.
 //
 //   classAutonomy         public.class_autonomy(priority_class)'s single row -- { work_class, rung,
 //                         auto_done, ... } -- with `auto_done_rung` folded in for the reason text,
@@ -360,7 +397,7 @@ export function selfCertificationBlock(changedFiles) {
 //                         read rather than recomputed, because `rung >= auto_done_rung` has one home
 //                         and it is the SQL function. NULL takes charter decision 2's path below --
 //                         unknown is not innocent (M6 gate, promise 2; SES-122).
-export function autoDoneEligibility({ verdict, epicName, priorityClass, changedFiles, primeDirectiveActive, classAutonomy }) {
+export function autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy }) {
   if (verdict !== "approve") {
     return { eligible: false, reason: `verdict is ${verdict}; the interim auto-done bar requires approve (all three gates green).` };
   }
@@ -370,26 +407,26 @@ export function autoDoneEligibility({ verdict, epicName, priorityClass, changedF
   // itself, because selfCertificationBlock() below is the thing it would have jumped over. Control
   // reaches that refusal on EVERY path through this function, ladder or no ladder.
   //
-  // The grant bypasses the EPIC test as well as the CLASS test. A rung is a measurement of a work
+  // The grant bypasses the PROJECT test as well as the CLASS test. A rung is a measurement of a work
   // CLASS -- the M6 gate's words on SES-122's row are "a rung buys auto-done eligibility for its
   // class" -- so a class that has earned it takes the bar wherever its ticket sits. Charter decision
-  // 2's Selfbuild/P10 rule and §2f's widening survive underneath as the floor for every class that
+  // 2's project/P10 rule and §2f's widening survive underneath as the floor for every class that
   // has NOT earned it.
   const ladderGranted = classAutonomy?.auto_done === true;
-  const widened = primeDirectiveActive === true;
+  const widened = projectExecuting === true;
 
   if (!ladderGranted) {
-    if (!epicName) {
-      return { eligible: false, reason: `no epic on the ticket -- charter decision 2 scopes auto-done to the ${AUTO_DONE_EPIC_PREFIX} epic family only, and an unknown epic fails closed. The ladder did not grant this class the bar either${describeLadder(classAutonomy)}.` };
+    // SES-340. STRICT TRUE, for SES-243's reason applied to a third lookup: a REST layer that hands
+    // back the string "false" is truthy, and every unknown here -- null, undefined, an epic with no
+    // project, a paused project -- is one answer that keeps the narrow path.
+    if (epicProjectExecuting !== true) {
+      return { eligible: false, reason: `epic '${epicName ?? "(none)"}' belongs to no executing project (projects.status), so charter decision 2's scope -- an ${AUTO_DONE_SCOPE}'s deliveries -- is not met; an unknown or paused project fails closed. The ladder did not grant this class the bar either${describeLadder(classAutonomy)}.` };
     }
-    if (!String(epicName).startsWith(AUTO_DONE_EPIC_PREFIX)) {
-      return { eligible: false, reason: `epic '${epicName}' is outside the ${AUTO_DONE_EPIC_PREFIX} family; charter decision 2 supersedes SES-154's John-only-writer rule for that family and nothing else. The ladder did not grant this class the bar either${describeLadder(classAutonomy)}.` };
-    }
-    // THE CLASS RESTRICTION IS CHARTER DECISION 2'S, AND §2f SUSPENDS IT -- it does not delete it.
-    // The epic test above still stands on both paths (§2f widens the CLASS, never the family), and so
-    // does the self-certification refusal below.
+    // THE CLASS RESTRICTION IS CHARTER DECISION 2'S, AND THE WIDENING SUSPENDS IT -- it does not
+    // delete it. The project test above still stands on both paths (the widening widens the CLASS,
+    // never the scope), and so does the self-certification refusal below.
     if (!widened && !String(priorityClass ?? "").startsWith(AUTO_DONE_CLASS_PREFIX)) {
-      return { eligible: false, reason: `priority class '${priorityClass ?? "(none)"}' is not ${AUTO_DONE_CLASS_PREFIX} - Tooling; charter decision 2 approves auto-accept for tooling deliveries only, and the Prime Directive's §2f widening is not proven live (a revoked, completed or unreadable directive all fail closed here). The ladder did not grant this class the bar either${describeLadder(classAutonomy)}.` };
+      return { eligible: false, reason: `priority class '${priorityClass ?? "(none)"}' is not ${AUTO_DONE_CLASS_PREFIX} - Tooling; charter decision 2 approves auto-accept for tooling deliveries only, and no executing project is proven live to widen it (a paused board and an unreadable projects table both fail closed here). The ladder did not grant this class the bar either${describeLadder(classAutonomy)}.` };
     }
   }
   // Checked LAST so that a ticket which otherwise qualifies gets the specific reason -- "you are
@@ -410,8 +447,8 @@ export function autoDoneEligibility({ verdict, epicName, priorityClass, changedF
   return {
     eligible: true,
     reason: widened
-      ? `all three gates green on a ${AUTO_DONE_EPIC_PREFIX}-epic delivery in class '${priorityClass ?? "(none)"}', and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- the Prime Directive's §2f widening is live, so the ${AUTO_DONE_CLASS_PREFIX} - Tooling restriction of charter decision 2 is suspended for its duration. Reverse stays one tap away.`
-      : `all three gates green on a ${AUTO_DONE_EPIC_PREFIX} ${AUTO_DONE_CLASS_PREFIX} - Tooling delivery, and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- the interim bar of charter decision 2 is met. Reverse stays one tap away.`,
+      ? `all three gates green on a delivery in an ${AUTO_DONE_SCOPE} (epic '${epicName ?? "(none)"}') in class '${priorityClass ?? "(none)"}', and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- a project is executing, so the ${AUTO_DONE_CLASS_PREFIX} - Tooling restriction of charter decision 2 is suspended for its duration. Reverse stays one tap away.`
+      : `all three gates green on a ${AUTO_DONE_CLASS_PREFIX} - Tooling delivery in an ${AUTO_DONE_SCOPE} (epic '${epicName ?? "(none)"}'), and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- the interim bar of charter decision 2 is met. Reverse stays one tap away.`,
   };
 }
 
@@ -585,35 +622,51 @@ async function main() {
   const { verdict, reasoning } = verdictFor(gateResults);
 
   // Eligibility reads the board, never the argv -- see the header.
+  //
+  // SES-340: the select EMBEDS THROUGH THE FOREIGN KEY (`epics.project_id -> projects`, constraint
+  // `epics_project_id_fkey`) rather than making a second round trip, so the epic and its project's
+  // status are ONE read and cannot describe two different instants. `epicProjectExecuting` stays
+  // NULL unless an epic row actually came back -- a ticket with no epic, a failed lookup and absent
+  // credentials are all the same unknown, and unknown is not innocent.
   let epicName = null;
+  let epicProjectExecuting = null;
   let priorityClass = null;
   let lookupNote = "";
   if (ticket && supabaseUrl && supabaseKey) {
-    const q = `backlog_items?select=priority_class,epics(name)&backlog_id=eq.${encodeURIComponent(ticket)}&limit=1`;
+    const q = `backlog_items?select=priority_class,epics(name,project_id,projects(status))&backlog_id=eq.${encodeURIComponent(ticket)}&limit=1`;
     const r = await rest(supabaseUrl, supabaseKey, q);
     if (r.error) lookupNote = ` (ticket lookup failed: ${r.error})`;
     else if (r.rows.length) {
       priorityClass = r.rows[0].priority_class ?? null;
-      epicName = r.rows[0].epics?.name ?? null;
+      const epic = r.rows[0].epics ?? null;
+      epicName = epic?.name ?? null;
+      // An epic with no project row is a DEFINITE "no executing project", not an unknown -- it read
+      // fine and the answer was nothing. Only a missing epic leaves this null.
+      if (epic) epicProjectExecuting = epic.projects?.status === "executing";
+      else lookupNote += ` (${ticket} carries no epic, so its project is unknown and the scope test fails closed)`;
     } else lookupNote = ` (no board row for ${ticket})`;
   } else if (!ticket) {
     lookupNote = " (no --ticket passed)";
   }
 
-  // §2f's widening, read live off the ledger for the reason given at PRIME_DIRECTIVE_BODY_PREFIX.
-  // Every failure path leaves this FALSE: no credentials, a REST error, or no matching row. The
-  // note says which, so "not widened" is never indistinguishable from "nobody looked".
-  let primeDirectiveActive = false;
+  // THE WIDENING, re-homed by SES-340 from a directive row onto `projects.status`. It was keyed on a
+  // queued runner_directives row opening `THE SELFBUILD PRIME DIRECTIVE`; that directive is closed
+  // `superseded` (gate decision 96bbed72), so the old lookup would now answer false forever and the
+  // widening would have lapsed silently -- the exact rot the lookup-not-a-constant shape existed to
+  // prevent, arriving through the row instead of through the constant.
+  //
+  // Every failure path still leaves this FALSE: no credentials, a REST error, or no executing
+  // project. The note says which, so "not widened" is never indistinguishable from "nobody looked".
+  let projectExecuting = false;
   let primeNote = "";
   if (supabaseUrl && supabaseKey) {
-    const pq = `runner_directives?select=id&type=eq.directive&status=eq.queued` +
-      `&body=like.${encodeURIComponent(PRIME_DIRECTIVE_BODY_PREFIX + "*")}&limit=1`;
+    const pq = `projects?select=id&status=eq.executing&limit=1`;
     const pr = await rest(supabaseUrl, supabaseKey, pq);
-    if (pr.error) primeNote = ` (Prime Directive lookup failed, §2f widening NOT applied: ${pr.error})`;
-    else if (pr.rows.length) primeDirectiveActive = true;
-    else primeNote = " (no live Prime Directive row; charter decision 2's P10 - Tooling scope applies)";
+    if (pr.error) primeNote = ` (projects lookup failed, the class widening NOT applied: ${pr.error})`;
+    else if (pr.rows.length) projectExecuting = true;
+    else primeNote = " (no project is executing; charter decision 2's P10 - Tooling scope applies)";
   } else {
-    primeNote = " (no credentials to read the Prime Directive; charter decision 2's P10 - Tooling scope applies)";
+    primeNote = " (no credentials to read projects; charter decision 2's P10 - Tooling scope applies)";
   }
 
   // FEATURE: SES-122 (b) -- the class_autonomy() lookup.
@@ -658,7 +711,7 @@ async function main() {
   }
 
   const changedFiles = changedFilesFor(repoRoot, arg("base", "origin/dev"));
-  const elig = autoDoneEligibility({ verdict, epicName, priorityClass, changedFiles, primeDirectiveActive, classAutonomy });
+  const elig = autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy });
   const autoDoneReason = elig.reason + lookupNote + primeNote + ladderNote;
 
   const detailLine = GATES.map(g => `${g.label}=${gateResults[g.key]} [${gateDetail[g.key]}]`).join("\n  ");
@@ -674,10 +727,12 @@ async function main() {
     verdict, gates: gateResults, gateDetail, reasoning,
     auto_done_eligible: elig.eligible, auto_done_reason: autoDoneReason,
     ticket: ticket || null, version: version || null, epic_name: epicName, priority_class: priorityClass,
-    // Reported, never stored in its own column: runner_verdicts carries no such field and adding one
-    // would be a schema change this ticket did not ask for. The fact reaches the ledger inside
+    // Reported, never stored in their own columns: runner_verdicts carries no such field and adding
+    // one would be a schema change this ticket did not ask for. The facts reach the ledger inside
     // auto_done_reason, which is the column that already exists to carry exactly this.
-    prime_directive_active: primeDirectiveActive,
+    // SES-340 renamed prime_directive_active -> project_executing and added the ticket's own answer.
+    project_executing: projectExecuting,
+    epic_project_executing: epicProjectExecuting,
     // Reported for the same reason and stored the same way: the ladder fact reaches the ledger
     // inside auto_done_reason, which is the free-text column that already exists to carry exactly
     // this. No new runner_verdicts column -- SES-122b asked for none.

@@ -325,8 +325,11 @@ async function theLivePickPathObeysTheFourRules() {
   const lane = rows.filter(r => r.lane === "selfbuild");
   assert.ok(
     lane.length > 0,
-    "the selfbuild lane came back empty -- either the Prime Directive is not standing or every " +
-      "Selfbuild ticket is unbuildable; both are findings, not a pass",
+    // SES-340: `prime_standing` is now `EXISTS (projects WHERE status='executing')` and lane (c)'s
+    // fence is `epic_project_executing()`. The LANE VALUE stays `selfbuild` -- a named deviation
+    // recorded in docs/SELFBUILD-RETIREMENT-LEDGER.md -- so this filter is unchanged on purpose.
+    "the selfbuild lane came back empty -- either no project is executing or every " +
+      "in-scope ticket is unbuildable; both are findings, not a pass",
   );
 
   // --- M5-02 + M5-07: the order the DATABASE returned is monotonic in (lane, queue, cycles).

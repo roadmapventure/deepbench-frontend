@@ -772,14 +772,23 @@ must(`the lane started <b>Aug 25</b> and has '\n    +'graded <b>20</b> tickets, 
 // THE AMENDMENT HISTORY IS DERIVED FROM THE BODY, never maintained beside it, for the same reason:
 // a hand-kept list is a second copy that goes stale the first time John amends the row and nobody
 // updates the table.
+// SES-340 (v7.0.425) — THE GUARD THAT USED TO SIT HERE ENCODED AN IMPLICATION THAT IS NO LONGER
+// TRUE, and it took the whole builder down with it. It read: `pdStanding && !pdRow` is impossible,
+// so die. That held while `prime_standing` MEANT "this directive row is queued". Migration
+// `ses340_projects` re-homed the predicate onto `EXISTS (projects WHERE status='executing')` and
+// closed a0ef9525 / 0970abad `superseded` (gate decision 96bbed72) — so `pdStanding` is true, the
+// row is gone, and the guard fired on every build. MEASURED, not inferred: on the unedited tree
+// 2026-09-09 `tests/regression/SES-135-briefing-render.js` failed with exit 2 on exactly this die,
+// i.e. the page could not be produced at all.
+//
+// The three states are now distinguished instead of two being asserted impossible. A missing row
+// under a standing project is the NORMAL state today, not a broken read; a missing row under a
+// stopped board is the pre-existing "not standing" state; and a row that IS present still renders
+// verbatim, because §7's contract — the row is the truth and the page is stale — binds for as long
+// as any such row exists.
 const pdRows = await sel("runner_directives?select=id,body,created_at&type=eq.directive"
   + "&status=eq.queued&body=like.THE%20SELFBUILD%20PRIME%20DIRECTIVE*&order=created_at.desc&limit=1");
 const pdRow = pdRows[0] || null;
-if (pdStanding && !pdRow) {
-  die('§17: prime_directive_queue() reports the Prime Directive standing but no matching '
-    + 'runner_directives row came back — refusing to publish the template\'s sample text over a '
-    + 'section whose whole contract is that the row is the truth.');
-}
 
 let pdBlock;
 if (pdRow) {
@@ -815,10 +824,20 @@ if (pdRow) {
               + `<td class="ttl2">&ldquo;${H(a.word)}&rdquo;</td><td class="dim">${H(a.what)}</td></tr>`)}\n    `).join('')
           + `+'</table></div>'\n    `
         : `+'<p class="empty">No amendments yet &mdash; the directive stands as first written.</p>'\n    `);
+} else if (pdStanding) {
+  // SES-340: RETIRED, NOT MISSING, and the two must not read alike. Execution authority is now
+  // `projects.status = 'executing'`, so §8 above is still showing the project's pick order — saying
+  // "no directive is standing" here would contradict the section the reader just scrolled past.
+  pdBlock = `+'<p class="empty">The Selfbuild Prime Directive retired into the projects table '\n    `
+    + `+'(<span class="mono">SES-340</span>, 2026-09-09). Execution authority is now '\n    `
+    + `+'<span class="mono">projects.status = executing</span> &mdash; one status write per project '\n    `
+    + `+'&mdash; and &sect;8 above renders that project&rsquo;s pick order. The retired directives '\n    `
+    + `+'(<span class="mono">a0ef9525</span>, <span class="mono">0970abad</span>) are closed '\n    `
+    + `+'superseded; the full entries are in docs/SELFBUILD-RETIREMENT-LEDGER.md.</p>'\n    `;
 } else {
   // NOT STANDING IS A REAL STATE AND SAYS SO. Rendering nothing would be indistinguishable from
   // the builder failing to find the row, which is the failure mode this section must not have.
-  pdBlock = `+'<p class="empty">No Prime Directive is standing &mdash; the P1-P10 board in '\n    `
+  pdBlock = `+'<p class="empty">No project is executing &mdash; the P1-P10 board in '\n    `
     + `+'&sect;8 is live and selection follows the ordinary class order.</p>'\n    `;
 }
 splice('// §17-BODY-START', '// §17-BODY-END', pdBlock, '§17 Prime Directive body');
