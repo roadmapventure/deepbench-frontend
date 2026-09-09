@@ -1,3 +1,7 @@
+// DeepBench v7.0.426 | api/prompt/ai-enrichment.js | SES-331 -- renderSection() exported, one word,
+// no behaviour change; see its own comment. scripts/agent-prompt.js reuses it plus the already-
+// exported assemblePhaseSplit() so a session-run agent's prompt goes through THE renderer and THE
+// joiner the executor uses, never a copy.
 // DeepBench v7.0.419 | api/prompt/ai-enrichment.js | LOG-143 (d1) -- a 'trace_facts' value in
 // fetchSection()'s generic fetch_instruction.source switch (the AA-107 / AA-162 route): given a
 // trace_id in task_context it reads that trace's own ai_activity_log rows server-side and renders
@@ -369,7 +373,12 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
 }
 
 // FEATURE: AA-44 — Format section gains title instruction for deliverable title generation
-function renderSection(section) {
+// FEATURE: SES-331 -- exported (the only change: the word `export`). scripts/agent-prompt.js renders
+// an agent's prompt for a session that is about to run that agent itself, and a hand-copied
+// `=== LABEL ===\ncontent` in the script would be a second renderer to keep in sync -- the exact
+// drift SES-331 exists to end. The joiner beside it (assemblePhaseSplit) was already exported for
+// the same reason; this completes the pair. No behaviour change, no new caller inside api/.
+export function renderSection(section) {
   if (!section.content) return null;
   let content = section.content;
   if (section.slug === 'format') {

@@ -13102,6 +13102,18 @@ entire content is already restated twice in live text — in §1 of the runbook 
 `SES-121` moved the body here in `v7.0.198`"*) and in `.claude/skills/session-setup/SKILL.md`'s loader
 sentence (*"the procedure lives in `docs/runbooks/session-setup.md` … it is the canonical copy"*).
 
+<!-- DeepBench v7.0.222 | docs/runbooks/session-setup.md | SES-175 — §2c's claim SQL gains a rendered rule block: a `{{rule:B40}}` marker comment above the committed text of rule B40, generated from `public.governance_rules` and checked by `scripts/render-rule-blocks.js`. John's call on gated card `a4e0254a` 2026-08-24: "Accept with C" — expand-in-place, so this file still carries the real sentence a session reads mid-run and the script is what stops that copy drifting from the registry. The text under the marker is NOT hand-maintained: edit the registry row, re-export `docs/governance/RULES-SNAPSHOT.md`, then `node scripts/render-rule-blocks.js --write`. Full rationale, the three options John chose between, and the QA: `docs/runbooks/runner-cycle.md`'s v7.0.222 stamp and `docs/kickoffs/v7.0.222-SES-175-rendered-rule-blocks.md` — cited here, not restated. -->
+
+**Retired by `SES-331` (`v7.0.426`, 2026-09-09) to hold the stamp count at 5.** `SES-164` step 2 was
+run FIRST by grep rather than from recollection: this stamp’s one editor warning — *"the text under
+the marker is NOT hand-maintained: edit the registry row, re-export `docs/governance/RULES-SNAPSHOT.md`,
+then `node scripts/render-rule-blocks.js --write`"* — is already restated **verbatim in the runbook’s
+own live body**, inside the `{{rule:B40}}` marker comment above §2c’s claim SQL, so nothing was
+relocated. Its two other clauses are pointers that still resolve: `docs/runbooks/runner-cycle.md`’s
+own `v7.0.222` stamp (archived to this file’s `runner-cycle.md` appendix by `SES-197`) and
+`docs/kickoffs/v7.0.222-SES-175-rendered-rule-blocks.md`. Body proven byte-identical across the
+rotation by sha256 over everything below the header.
+
 ## Appendix — retired `briefing-template.html` provenance comments (`SES-188`, v7.0.223, 2026-08-24)
 
 These are the **17** provenance comments that sat above the `briefing-state` block in
