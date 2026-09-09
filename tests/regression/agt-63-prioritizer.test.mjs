@@ -61,11 +61,13 @@ const AGENT_ID = "prioritizer";
 const CAPABILITIES = ["classify-ticket", "rank-backlog"];
 const SKILL_SLUGS = [
   "pz-identity", "pz-knowledge-classes", "pz-knowledge-john",
-  "pz-behavior", "pz-classify-intent", "pz-rank-intent", "pz-format", "pz-guardrails",
+  "pz-behavior", "pz-classify-intent", "pz-rank-intent", "pz-guardrails",
 ];
-// The six Skill types the capability must carry. Named as a SET rather than counted, because
+// The FIVE Skill types the capability carries (no Format Skill since the 2026-09-09 amendment on AGT-63: the
+// executor's Format branch overwrites the Intent's output contract, so the contract lives on the Intent traits).
+// Named as a SET rather than counted, because
 // `length === 6` passes against six copies of one type.
-const SKILL_TYPES = ["identity", "knowledge", "behavior", "intent", "format", "guardrails"];
+const SKILL_TYPES = ["identity", "knowledge", "behavior", "intent", "guardrails"];
 
 const FIXTURE_BACKLOG_ID = "ZZPRIOR-63";
 
@@ -144,9 +146,9 @@ export default async function run() {
   }
 
   const links = await rest(`capability_skill_profiles?capability_slug=in.(${CAPABILITIES.join(",")})&select=capability_slug,skill_profile_slug`);
-  assert.equal(links.length, 14, `expected 14 capability_skill_profiles rows, got ${links.length}`);
+  assert.equal(links.length, 12, `expected 12 capability_skill_profiles rows (6 per capability, no Format Skill), got ${links.length}`);
   for (const cap of CAPABILITIES) {
-    assert.equal(links.filter(l => l.capability_slug === cap).length, 7, `${cap} must link 7 Skill profiles`);
+    assert.equal(links.filter(l => l.capability_slug === cap).length, 6, `${cap} must link 6 Skill profiles (no Format Skill)`);
   }
   const assigns = await rest(`agent_capability_assignments?agent_id=eq.${AGENT_ID}&select=capability_slug`);
   assert.deepEqual(assigns.map(a => a.capability_slug).sort(), [...CAPABILITIES].sort());
