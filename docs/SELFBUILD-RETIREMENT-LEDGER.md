@@ -884,3 +884,73 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
 - **Restore:** as entry 43 — reverse decision `96bbed72-b3d5-4258-86a0-cb0c6e634ab8` (both rows
   return to `queued` together), and revert `ses340_projects` from the captured downs. The runbook
   paragraph needs only its *"RETIRED IN PLACE"* note removed; nothing was moved out of it.
+
+### 45. `runner-cycle.md` step 5 layer (3) — the class-sorted board read as the pick mechanism (retired in place)
+- **Said, verbatim (opening):** *"(3) The backlog by class — **read from `public.backlog_items` via
+  SQL, never by parsing the markdown files (`SES-83` (d), `v7.0.112`; John's "table is authority"
+  call, Accepted 2026-08-21T00:19Z).** … Recompute first, then read — two statements, both
+  verbatim"*, followed by the `recompute_backlog_queue()` call and a five-row `ORDER BY queue` read.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 5, layer (3).
+- **Why:** `prime_directive_queue()` reads `backlog_items.queue` itself and already IS layers
+  (1a)/(1b)/(3) in one ordered result — lane `directive`, lane `drain`, lane `selfbuild`, with
+  `SES-281`'s three ticket-ordering keys and a `buildable` CTE that already excludes deferred rows,
+  live claims, `needs-desktop`, an unresolved milestone design gate and a blocking dependency. A
+  cycle that recomputed and re-read the top five was doing the function's job in front of it, which
+  is a second copy of a predicate with one home — `SES-45`'s defect. Layer (3) is now two statements:
+  `classify-ticket` on the queue top **only when its `supports_class IS NULL`**, then
+  `SELECT * FROM public.prime_directive_queue()`, and **the pick is its first row**.
+- **Survives:** the whole passage is **kept verbatim, marked RETIRED IN PLACE** and re-labelled
+  `(3-legacy)`, because it is the only written record of why `queue IS NULL` means out of the
+  standings and why a gated ticket keeps its number — both still true of the column the function
+  reads. Nothing was moved out of it.
+- **Restore:** remove the `(3)` block and the RETIRED IN PLACE note above `(3-legacy)`, and rename
+  `(3-legacy)` back to `(3)`. Repo half: `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 46. `runner-cycle.md` step 5 — the removal-proposed procedural skip (moved into the Prioritizer)
+- **Said, verbatim (opening):** *"**A `removal proposed` ticket NOW HOLDS ITS NUMBER — and is skipped
+  procedurally, right here (`SES-113`, `v7.0.158`, migration
+  `ses113_removal_proposed_keeps_slot`).** John's ruling 2026-08-22, verbatim: **"what if I reject
+  the proposal?"**"* — through *"…the skip above is now **one of three**, read from the same query"*.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 5, immediately under layer (3)'s board read.
+- **Why:** it was a rule a *cycle* applied by hand at selection, and after entry 45 the cycle no
+  longer selects — The Prioritizer does. A rule whose only reader has been replaced is a rule nobody
+  applies.
+- **Survives:** **byte-identical** in `public.skill_profiles` `pz-guardrails`,
+  `guardrails.selection_rules.removal_proposed` (2,035 bytes, round-trip asserted at the write), with
+  a binding `must` clause: *"treat a `removal proposed` ticket as awaiting John's verdict … it keeps
+  its number and its class, and no ruling of yours resolves it"*. Recorded under decision
+  `21402e94-5d7c-4baf-a68b-13262b1ed1c3` (`kind='directive'`, `p_backlog_id='SES-333'`), which is an
+  **addition of John's existing rules**, not new judgment. Also kept verbatim in the runbook under a
+  RETIRED IN PLACE note, because a reader of step 5 still needs to know why the ticket keeps its
+  number.
+- **Restore:** reverse decision `21402e94-5d7c-4baf-a68b-13262b1ed1c3`, then remove the RETIRED IN
+  PLACE note. **THE REVERSE IS CARD-ONLY FOR THE SKILL ROW, MEASURED NOT ASSUMED:**
+  `reverse_decision()`'s `k_allowed` array is `backlog_items`, `runner_directives`,
+  `runner_drain_scope`, `runner_settings`, `governance_rules`, `epics`, `vision_claims` —
+  `skill_profiles` is **not** on it, so a Reverse reports the before-image `refused` rather than
+  restoring it. The before-image is written anyway (`runner_before_images`, `table_name`
+  `skill_profiles`, carrying `decision_id`) and the prior `guardrails` value is recoverable from its
+  `row_data` by hand. Widening the allowlist is a separate ticket, deliberately not taken here.
+
+### 47. `runner-cycle.md` step 5 — the blocked-prefix table and `NULL` is not `auto` (moved into the Prioritizer)
+- **Said, verbatim (openings):** *"**THE BLOCKED PREFIX IS READ AT A GLANCE, NOT RE-DERIVED EVERY
+  CYCLE (`SES-114`, `v7.0.165`).** Five different flags mean *this ticket keeps its number and you
+  step past it*…"* — through the six-row table and *"**A contested claim is still NOT a skip** — it
+  clears itself in 24h"*; and *"**`NULL` is not `auto`.** 545 open rows carry `NULL` and run the full
+  ceremony… no cycle may backfill `auto` onto a row nobody has classified."*
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 5.
+- **Why:** same reason as entry 46 — the reader they were written for no longer makes the pick. The
+  `NULL`-is-not-`auto` rule moves for a second reason of its own: the agent that *classes* tickets is
+  the one positioned to commit exactly that error, and until now the rule lived somewhere it would
+  never read.
+- **Survives:** **byte-identical** in `pz-guardrails` — `guardrails.selection_rules.blocked_prefix`
+  (3,003 bytes) and `guardrails.selection_rules.null_is_not_auto` (213 bytes), round-trip asserted at
+  the write, under the same decision `21402e94-5d7c-4baf-a68b-13262b1ed1c3`. Bound by one `must`
+  (*"step past a ticket carrying any blocked-prefix flag … the flag is who clears it, and none of
+  them is you"*) and one `must_not` (*"backfill `auto` onto a row nobody has classified"*). Both are
+  also kept verbatim in the runbook: the table's *who clears it* column is the only written record of
+  who owns each flag, and the `NULL`/`auto` sentence is what explains the `design_status` column to a
+  reader of step 5. `prime_directive_queue()` independently enforces the table's `needs-desktop` row
+  in SQL, which is unchanged by this move.
+- **Restore:** as entry 46 — the same decision reverses both, with the same card-only caveat for the
+  `skill_profiles` before-image.
