@@ -1,3 +1,4 @@
+// DeepBench v7.0.428 | agents.js | AGT-63 — AVATAR_CFG + AGENT_PRONOUNS entries for `prioritizer` (The Prioritizer, GV-03, lane `governance`). NOT added to the AGENTS array: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
 // DeepBench v6.2.12 | agents.js | RO-14 — Bench filter "mi" label renamed from the old Market Intel text to Channel Sales Intel (id unchanged)
 // DeepBench v6.1.42 | agents.js | RO-11 — Bench filter "nigp" label renamed to "Spend Analysis" (id unchanged)
 // DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
@@ -279,6 +280,19 @@ export const BENCH_FILTERS = [
   { id: "special",  label: "Special Interests" },
 ];
 
+// FEATURE: AGT-63 — agents that hold AVATAR_CFG / AGENT_PRONOUNS entries but are deliberately NOT
+// members of AGENTS. They are real, active `agents` rows in the `governance` lane (SES-330): the
+// delegation broker never sees them (lib/project-manager.js filters `lane=eq.product`) and the Bench
+// does not render them until the exit review rules on how a governance agent should appear. Their
+// ids still reach audit, decision and briefing surfaces, so a portrait and pronouns are needed.
+//
+// This list is what tells SE-03's orphan check the difference between "an entry for an agent that
+// was deleted" (stale data, the thing that check exists for) and "an entry for an agent that is not
+// on the Bench by design". Membership is an OBLIGATION, not a loophole: SE-03 asserts every id here
+// carries a complete AVATAR_CFG and AGENT_PRONOUNS entry, so an id added to escape a failure gets a
+// stricter check rather than a weaker one. Remove an id here the moment its agent is deleted.
+export const OFF_BENCH_AGENT_IDS = ["prioritizer"];
+
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
 export const AVATAR_CFG = {
   chloe:  { skin:"#e8c9a8", hair:"#6b3a1e", collar:"#f0e6d2", extra:"freckles", border:T.brass  },
@@ -310,6 +324,13 @@ export const AVATAR_CFG = {
   elena:  { skin:"#e8d4b8", hair:"#1a1a1a", collar:"#1a1a3a", extra:"bun",     border:T.navy  },
   // FEATURE: AGT-026 — Jordan Ellsworth avatar
   jordan: { skin:"#d0a888", hair:"#3a2e24", collar:"#1e3a44", extra:"headset", border:T.moss },
+  // FEATURE: AGT-63 — The Prioritizer (GV-03), the governance lane's classifier. Deliberately NOT
+  // in the AGENTS list below: governance agents stay off the Bench until the exit review decides
+  // how they render (agents.lane, SES-330). The avatar/pronoun entries exist anyway because every
+  // component that draws an agent id reads these two maps, and a governance agent's id already
+  // appears in audit and decision surfaces — a missing entry there is a blank portrait, not an
+  // absent one.
+  prioritizer: { skin:"#d8c0a0", hair:"#4a4a52", collar:"#2a2a3a", extra:"glasses", border:T.navy },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -342,6 +363,8 @@ export const AGENT_PRONOUNS = {
   elena:  { subject:"she",  object:"her",  possessive:"her"   },
   // FEATURE: AGT-026 — Jordan Ellsworth pronouns
   jordan: { subject:"he", object:"him", possessive:"his" },
+  // FEATURE: AGT-63 — The Prioritizer pronouns (they/them/their).
+  prioritizer: { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────

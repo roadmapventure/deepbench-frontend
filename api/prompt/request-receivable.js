@@ -1,3 +1,7 @@
+// DeepBench v7.0.428 | api/prompt/request-receivable.js | AGT-63 -- register the 'prioritizer-write'
+// handler (import + one HANDLERS entry; KNOWN_HANDLERS is derived and needs no edit). Nothing else in
+// this file changes: no capability slug, agent id, or intent name appears anywhere in the dispatch
+// path, so the Prioritizer reaches the board the same way every other write capability does.
 // DeepBench v7.0.258 | api/prompt/request-receivable.js | LOG-77 item 2 -- call_facts.output_schema_forced:
 // the constrained-decoding capture §19l names as the one genuinely-missing fact (ARCHITECTURE.md:1813).
 // Read off the body ACTUALLY SENT (callBody.tool_choice?.type === 'tool'), never re-derived from inputs:
@@ -63,6 +67,13 @@ import { handle as libraryLookupHandle } from '../_lib/handlers/library-lookup.j
 // ARCHITECTURE.md §19b holds. Registration is not optional -- KNOWN_HANDLERS below is derived from
 // this map and an unregistered slug 501s, so a data-only capability could never reach its store.
 import { handle as reportCardWriteHandle } from '../_lib/handlers/report-card-write.js';
+// FEATURE: AGT-63 -- The Prioritizer's backlog_items write handler registration. Same generic
+// mechanism as every line above it: this registry names no capability and no agent, and which
+// handler runs stays pure data (traits.handler on the Skill Profile), so ARCHITECTURE.md §19b and
+// .claude/rules/capabilities-are-data.md hold. Registration is not optional -- KNOWN_HANDLERS below
+// is derived from this map, so an unregistered slug 501s and pz-classify-intent / pz-rank-intent
+// could never reach the board.
+import { handle as prioritizerWriteHandle } from '../_lib/handlers/prioritizer-write.js';
 import { logActivity } from '../../lib/activity-log.js';
 // FEATURE: LOG-67 -- merges the fact-half (buildCallFacts) with the config-half signature snapshot
 // carried on the enriched prompt_request.
@@ -72,7 +83,8 @@ import { withRequestContext } from '../../lib/request-context.js';
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
 // FEATURE: LOG-143 -- 'report-card-write' joins the map; see the import comment above.
-const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle, 'report-card-write': reportCardWriteHandle };
+// FEATURE: AGT-63 -- 'prioritizer-write' likewise.
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle, 'report-card-write': reportCardWriteHandle, 'prioritizer-write': prioritizerWriteHandle };
 const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
