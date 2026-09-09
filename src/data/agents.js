@@ -1,3 +1,4 @@
+// DeepBench v7.0.429 | agents.js | AGT-64 — AVATAR_CFG + AGENT_PRONOUNS entries for `researcher` (The Researcher, GV-02, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same as AGT-63's `prioritizer`: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
 // DeepBench v7.0.428 | agents.js | AGT-63 — AVATAR_CFG + AGENT_PRONOUNS entries for `prioritizer` (The Prioritizer, GV-03, lane `governance`). NOT added to the AGENTS array: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
 // DeepBench v6.2.12 | agents.js | RO-14 — Bench filter "mi" label renamed from the old Market Intel text to Channel Sales Intel (id unchanged)
 // DeepBench v6.1.42 | agents.js | RO-11 — Bench filter "nigp" label renamed to "Spend Analysis" (id unchanged)
@@ -291,7 +292,9 @@ export const BENCH_FILTERS = [
 // on the Bench by design". Membership is an OBLIGATION, not a loophole: SE-03 asserts every id here
 // carries a complete AVATAR_CFG and AGENT_PRONOUNS entry, so an id added to escape a failure gets a
 // stricter check rather than a weaker one. Remove an id here the moment its agent is deleted.
-export const OFF_BENCH_AGENT_IDS = ["prioritizer"];
+// FEATURE: AGT-64 — `researcher` joins the list on the same terms: a real, active `governance`
+// lane row the Bench does not render, whose id still reaches audit and research surfaces.
+export const OFF_BENCH_AGENT_IDS = ["prioritizer", "researcher"];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
 export const AVATAR_CFG = {
@@ -331,6 +334,10 @@ export const AVATAR_CFG = {
   // appears in audit and decision surfaces — a missing entry there is a blank portrait, not an
   // absent one.
   prioritizer: { skin:"#d8c0a0", hair:"#4a4a52", collar:"#2a2a3a", extra:"glasses", border:T.navy },
+  // FEATURE: AGT-64 — The Researcher (GV-02), the governance lane's invention research pass.
+  // Off the Bench for the same reason as the entry above; the portrait exists because audit and
+  // decision surfaces already draw this id.
+  researcher:  { skin:"#c9a882", hair:"#2e2a26", collar:"#243a34", extra:"glasses", border:T.moss },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -365,6 +372,8 @@ export const AGENT_PRONOUNS = {
   jordan: { subject:"he", object:"him", possessive:"his" },
   // FEATURE: AGT-63 — The Prioritizer pronouns (they/them/their).
   prioritizer: { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-64 — The Researcher pronouns (they/them/their).
+  researcher:  { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
