@@ -1,3 +1,4 @@
+// DeepBench v7.0.434 | agents.js | AGT-68 — AVATAR_CFG + AGENT_PRONOUNS entries for `devmanager` (The Development Manager, GV-01, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66/67.
 // DeepBench v7.0.433 | agents.js | AGT-67 — AVATAR_CFG + AGENT_PRONOUNS entries for `verifier` (The Verifier, GV-06, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66.
 // DeepBench v7.0.432 | agents.js | AGT-66 — AVATAR_CFG + AGENT_PRONOUNS entries for `builder` (The Builder, GV-05, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65.
 // DeepBench v7.0.431 | agents.js | AGT-65 — AVATAR_CFG + AGENT_PRONOUNS entries for `designer` (The Designer, GV-04, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same as AGT-63/AGT-64: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
@@ -303,7 +304,9 @@ export const BENCH_FILTERS = [
 // lane row the Bench does not render, whose id still reaches audit and cycle surfaces.
 // FEATURE: AGT-67 — `verifier` joins the list on the same terms: a real, active `governance`
 // lane row the Bench does not render, whose id still reaches audit and verdict surfaces.
-export const OFF_BENCH_AGENT_IDS = ["prioritizer", "researcher", "designer", "builder", "verifier"];
+// FEATURE: AGT-68 — `devmanager` joins the list on the same terms: a real, active `governance`
+// lane row the Bench does not render, whose id still reaches audit, cycle and assignment surfaces.
+export const OFF_BENCH_AGENT_IDS = ["prioritizer", "researcher", "designer", "builder", "verifier", "devmanager"];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
 export const AVATAR_CFG = {
@@ -359,6 +362,10 @@ export const AVATAR_CFG = {
   // Off the Bench for the same reason as the four entries above; the portrait exists because the
   // verdict ledger and audit surfaces already draw this id.
   verifier:    { skin:"#d6bfa4", hair:"#33302c", collar:"#26323d", extra:"glasses", border:T.muted },
+  // FEATURE: AGT-68 — The Development Manager (GV-01), the governance lane’s project orchestrator.
+  // Off the Bench for the same reason as the five entries above; the portrait exists because the
+  // cycle, assignment and audit surfaces already draw this id.
+  devmanager:  { skin:"#caa984", hair:"#2b2724", collar:"#33384a", extra:"",        border:T.navy  },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -401,6 +408,8 @@ export const AGENT_PRONOUNS = {
   builder:     { subject:"they", object:"them", possessive:"their" },
   // FEATURE: AGT-67 — The Verifier pronouns (they/them/their).
   verifier:    { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-68 — The Development Manager pronouns (they/them/their).
+  devmanager:  { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
