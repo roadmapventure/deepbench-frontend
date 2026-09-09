@@ -757,7 +757,40 @@ export function renderBlock(facts, nowIso) {
   } else if (decisions.open.length === 0) {
     L.push("- **None open.**");
   } else {
+    // FEATURE: SES-334 close-out (design-runner-24h-0908, 2026-09-09) — A BATCH OF DECISIONS IS ONE
+    // LINE, NOT ONE LINE EACH. Measured before this shipped: the Prioritizer's first run (SES-332)
+    // wrote 567 `classification` decisions, one per ticket, and this block printed all of them, so
+    // the standing brief — a file every session reads at start — went from 18 KB to 149 KB in one
+    // ship. A kind with more than OPEN_DECISION_BATCH open rows on one CST day collapses to a single
+    // line carrying the count, the finalise span and the query that lists them; the kinds John reads
+    // one by one (gate, ship, directive, invention, reversal) stay one line each. The threshold is a
+    // DISPLAY constant, not a cadence — SES-146's "every cadence number is a column" does not reach it.
+    const OPEN_DECISION_BATCH = 20;
+    const byKindDay = new Map();
     for (const d of decisions.open) {
+      const day = d.expires_at ? new Date(d.expires_at).toLocaleDateString("en-US", { timeZone: "America/Chicago" }) : "—";
+      const key = `${d.kind || "—"}|${day}`;
+      if (!byKindDay.has(key)) byKindDay.set(key, []);
+      byKindDay.get(key).push(d);
+    }
+    const collapsed = new Set();
+    for (const [key, rows] of byKindDay) if (rows.length > OPEN_DECISION_BATCH) collapsed.add(key);
+    const printedBatch = new Set();
+    for (const d of decisions.open) {
+      const day = d.expires_at ? new Date(d.expires_at).toLocaleDateString("en-US", { timeZone: "America/Chicago" }) : "—";
+      const key = `${d.kind || "—"}|${day}`;
+      if (collapsed.has(key)) {
+        if (printedBatch.has(key)) continue;
+        printedBatch.add(key);
+        const rows = byKindDay.get(key);
+        const first = rows[0].expires_at ? cst(rows[0].expires_at) : "—";
+        const last = rows[rows.length - 1].expires_at ? cst(rows[rows.length - 1].expires_at) : "—";
+        L.push(`- **${rows.length} ${d.kind} decisions** finalising ${first} → ${last} · one batch, ` +
+          "listed by query rather than one line each: " +
+          `\`select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='${d.kind}' order by expires_at;\` · ` +
+          "reverse any one with `select public.reverse_decision('<id>','John','<why>');`");
+        continue;
+      }
       // The DISPLAYED id is the 8-char prefix John reads by; the id inside the call is the FULL
       // uuid, because that is what reverse_decision() takes.
       L.push(`- \`${String(d.id).slice(0, 8)}\` · ${d.kind || "—"} · ` +
