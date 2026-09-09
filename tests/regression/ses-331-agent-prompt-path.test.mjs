@@ -186,8 +186,18 @@ async function run() {
   }
 
   // (a) -- the discriminator.
+  //
+  // AMENDED BY SES-332, and the amendment is the point rather than a repair. This guard used to run
+  // the script with NO --intent and compare it against assemblePrompt() with `intent_slug` unset,
+  // because the two meant the same thing. They no longer do: an omitted --intent now resolves to the
+  // capability's own `capabilities.default_intent_slug` (the AGT-67 defect -- an omitted flag silently
+  // dropped every Intent Skill, so the prompt assembled with no schema, no handler and no output
+  // contract, and nothing errored). `--intent=none` is the flag that still means AA-188's deliberate
+  // no-intent assembly, so THAT is what this equality is driven with. The fallback itself is pinned
+  // as its own clause immediately below, because an equality run on one branch says nothing about the
+  // other -- and the other is the one that changed.
   const raw = execFileSync(process.execPath,
-    [PROMPT_SCRIPT, `--agent=${AGENT}`, `--capability=${CAPABILITY}`, "--json"],
+    [PROMPT_SCRIPT, `--agent=${AGENT}`, `--capability=${CAPABILITY}`, "--intent=none", "--json"],
     { encoding: "utf8", env: process.env });
   const fromScript = JSON.parse(raw);
 
@@ -206,6 +216,28 @@ async function run() {
   mutated.sections[0].content = `${mutated.sections[0].content} (mutant)`;
   assert.strictEqual(assemblyMatches(fromScript, mutated), false,
     "the comparison accepted a mutated assembly -- it cannot discriminate and is not a test");
+
+  // The other branch of the same contract (SES-332): an OMITTED --intent must equal the library
+  // called with the capability's stored default_intent_slug, and must NOT equal the no-intent
+  // assembly. The second half is the discriminator -- without it this clause passes on the old,
+  // broken behaviour, where omitting the flag produced exactly the no-intent assembly.
+  const defaultIntent = (await supabaseRows(
+    `capabilities?slug=eq.${encodeURIComponent(CAPABILITY)}&tenant_id=eq.${TENANT}&select=default_intent_slug`))[0]?.default_intent_slug;
+  assert.ok(defaultIntent,
+    `capability ${CAPABILITY} declares no default_intent_slug -- this clause would be vacuous`);
+  const fromScriptDefaulted = JSON.parse(execFileSync(process.execPath,
+    [PROMPT_SCRIPT, `--agent=${AGENT}`, `--capability=${CAPABILITY}`, "--json"],
+    { encoding: "utf8", env: process.env }));
+  const fromLibraryDefaulted = await assemblePrompt({
+    capability_slug: CAPABILITY, agent_id: AGENT, tenant_id: TENANT, task_context: {},
+    intent_slug: defaultIntent,
+  });
+  assert.ok(assemblyMatches(fromScriptDefaulted, fromLibraryDefaulted),
+    `an omitted --intent must assemble as intent_slug="${defaultIntent}" -- AGT-67's defect was that `
+    + "it silently assembled with NO Intent Skill, so the prompt carried no schema and no handler");
+  assert.strictEqual(assemblyMatches(fromScriptDefaulted, fromLibrary), false,
+    "the defaulted assembly is identical to the no-intent one -- the fallback is not firing, which is "
+    + "the exact broken state SES-332 fixed");
 
   // The rendered path too: the script's prompt must carry the section labels the assembly declares.
   const rendered = execFileSync(process.execPath,

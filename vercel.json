@@ -1,4 +1,7 @@
 {
+  "crons": [
+    { "path": "/api/cron/rank-backlog", "schedule": "10 9 * * *" }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)",     "destination": "/index.html" }

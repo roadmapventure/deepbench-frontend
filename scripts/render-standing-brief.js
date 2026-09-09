@@ -528,6 +528,88 @@ export function renderInventionUse(rows, stamp) {
   return L.join("\n");
 }
 
+/** How many ranked tickets the served-class block lists. The top of the order, never the whole board. */
+export const SERVED_TOP_N = 5;
+
+/**
+ * FEATURE: SES-334 — the `Board by served class` fact group. PURE: (served facts, stamp) in, markdown
+ * out, so tests/regression/ses-334-served-class-block.test.mjs drives it from a fixture the same way
+ * the SES-84 / SES-004 / LOG-143 guards drive the three groups above it. `served` is exactly what
+ * fetchFacts() reads: `{ counts, top, lastRankedAt }` — and NOTHING HERE COUNTS ANYTHING. The counts
+ * are grouped in fetchFacts() off the rows it already reads; this renders them.
+ *
+ * THE THREE BRANCHES ARE THE SAME THREE THE GROUPS ABOVE USE, for the same reason:
+ *   - `served` absent — SAID, never rendered as zeros;
+ *   - no ticket carrying a served class — said as "none carries one yet", which is a REAL state
+ *     (it was every open row until SES-332's first run) and not an error;
+ *   - `lastRankedAt` null — said, and said as *never*, because a schedule that has not fired yet and
+ *     a schedule that fired and wrote nothing are different facts and the brief must not blur them.
+ *
+ * `unserved` IS PRINTED EVEN AT ZERO, unlike SES-84's `unclassed` FLAG row. The reason they differ:
+ * an unclassed CLAIM is drift by construction after SES-84, so its row appearing is itself a signal.
+ * An unserved TICKET is ordinary — the served-class test (VC-MISSION-033) says most infrastructure
+ * serves nothing an evaluator can see, and an honest "none" is the Prioritizer's own conservative
+ * answer. Hiding the count would make the honest answer invisible.
+ */
+export function renderServedClass(served, stamp) {
+  const L = [];
+  L.push(`**Board by served class** — *${stamp}.* Which class each open ticket SERVES under the ` +
+    "served-class test (`VC-MISSION-033`), ruled by The Prioritizer's `classify-ticket` and stored " +
+    "on `backlog_items.supports_class` — a ticket's own class is a different question and is not " +
+    "restated here.");
+  L.push("");
+  if (!served || !Array.isArray(served.counts)) {
+    L.push("- *The served-class census was not read for this render* — which is **not** the same as " +
+      "*no ticket serves anything*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const serving = served.counts.filter(c => c.supports_class);
+  if (serving.length === 0) {
+    L.push("- *No open ticket carries a served class yet* — a real state, not a gap: it was every " +
+      "open row until `SES-332`'s first run.");
+  } else {
+    L.push("| serves | open tickets |");
+    L.push("|---|---:|");
+    for (const c of serving) L.push(`| \`${c.supports_class}\` | ${c.n} |`);
+    const none = served.counts.find(c => !c.supports_class);
+    L.push(`| *serves none* | ${none ? none.n : 0} |`);
+  }
+  L.push("");
+
+  const top = Array.isArray(served.top) ? served.top.slice(0, SERVED_TOP_N) : [];
+  if (top.length === 0) {
+    L.push(`- *No ticket carries an \`automation_rank\`* — the order has not been written yet.`);
+  } else {
+    // The negatives are not a bug and a reader must not read them as one. John's own automation queue
+    // was seeded with negative ranks so it sorts ahead of anything assigned later (SES-86 phase 3), so
+    // the nightly re-rank's 1..N necessarily lands BELOW his order. That is the intended precedence —
+    // his latest specific word outranks a standing ordering — and it is said here rather than left to
+    // look like a re-rank that did not take.
+    if (top.some(t => t.automation_rank < 0)) {
+      L.push("- *Negative ranks are John's own automation queue, seeded to sort ahead of anything "
+        + "assigned later (`SES-86`). The nightly re-rank writes 1..N and therefore sits below them — "
+        + "intended precedence, not a re-rank that failed.*");
+      L.push("");
+    }
+    L.push(`- **Top ${top.length} by \`automation_rank\`:**`);
+    // The title goes through summarise() for the same reason the decision bullets do: it is text
+    // past sessions wrote, some of it carrying backticks, and it ends inside a markdown line.
+    for (const t of top) {
+      L.push(`  ${t.automation_rank}. \`${t.backlog_id}\` — ${summarise(t.title, 90)}` +
+        (t.supports_class ? ` *(serves ${t.supports_class})*` : " *(serves none)*"));
+    }
+  }
+  L.push("");
+  L.push(served.lastRankedAt
+    ? `- Last scheduled re-rank: ${cst(served.lastRankedAt)}.`
+    : "- Last scheduled re-rank: *never* — the nightly `api/cron/rank-backlog` job has written no "
+      + "cycle row yet. Not the same as a run that ranked nothing.");
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -547,7 +629,9 @@ export function renderBlock(facts, nowIso) {
   // "zero". Renamed on the way in: `census` in this scope is the column-census helper above.
   // FEATURE: SES-004 — johnModel joins the destructure on the same terms as census: absent means
   // "not read", never "no pattern-citing decisions".
-  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse } = facts;
+  // FEATURE: SES-334 — served joins the destructure on the same terms as census/johnModel/inventionUse:
+  // absent means "not read", never "nothing serves anything".
+  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -710,6 +794,12 @@ export function renderBlock(facts, nowIso) {
   // counting nothing itself.
   L.push(renderInventionUse(inventionUse, stamp));
 
+  // ---- Board by served class (FEATURE: SES-334) --------------------------------------------
+  // After Invention in use, before the provenance line. Same contract as the three groups above it:
+  // a pure helper the guard can assert from a fixture, rendering what fetchFacts() grouped and
+  // counting nothing itself.
+  L.push(renderServedClass(served, stamp));
+
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
     "The stamp says when this was last read; the sha says whether it still matches the tables. " +
@@ -735,11 +825,15 @@ export function spliceBlock(original, block) {
 
 // --- data ------------------------------------------------------------------------------------------
 
-async function rest(base, key, pathAndQuery) {
-  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+// FEATURE: SES-334 — `init` is optional and additive; every existing call passes nothing and is
+// byte-identical. It exists so an RPC (`rpc/backlog_display_title`, a POST) can go through the SAME
+// die-on-non-2xx path as every read here rather than getting its own hand-rolled fetch with its own
+// error handling — which is the shape that lets one caller silently swallow a 403 the others refuse.
+async function rest(base, key, pathAndQuery, init = {}) {
+  const headers = { apikey: key, Authorization: `Bearer ${key}`, ...(init.body ? { "Content-Type": "application/json" } : {}) };
   let res;
   try {
-    res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, { headers });
+    res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, { ...init, headers });
   } catch (e) {
     die(`could not reach the Supabase REST endpoint: ${e.message}`);
   }
@@ -854,7 +948,69 @@ export async function fetchFacts(url, key) {
     "report_card_usage?select=window,ord,judge_runs,judge_runs_real_visitors,distinct_real_visitors,first_real_visitor_at,last_real_visitor_at&order=ord");
   if (!Array.isArray(inventionUse) || inventionUse.length === 0) die("report_card_usage came back empty — refusing to render invention-in-use from nothing (the view always returns its three window rows)");
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse };
+  // FEATURE: SES-334 — the served-class census and the top of the automation order.
+  //
+  // READ HERE RATHER THAN ADDED TO THE `items` PROJECTION ABOVE, deliberately. `items` is the board
+  // census every group above it counts from, and its column list is load-bearing (`.claude/rules/
+  // supabase-column-grants.md`: a star select is a 403 waiting to happen, and a widened projection
+  // silently changes what factsSha() hashes for every OTHER group). A separate named read keeps this
+  // group's facts this group's.
+  //
+  // NO VIEW, AND THAT IS A CHOICE. judgment_class_census / john_model_signal / report_card_usage are
+  // views because each applies a rule — a floor, a real-visitor predicate — that must have exactly one
+  // home. This group applies none: it is a GROUP BY over two stored columns. Inventing a view for it
+  // would add a migration and a second place to look for a number that is already on the row.
+  const servedRows = await rest(url, key,
+    "backlog_items?status=in.(open,partial)&select=backlog_id,title,description,supports_class,automation_rank&limit=5000");
+  if (!Array.isArray(servedRows)) die("the served-class read came back non-array — refusing to render it from nothing");
+  const servedCounts = new Map();
+  for (const r of servedRows) {
+    const k = r.supports_class || null;
+    servedCounts.set(k, (servedCounts.get(k) || 0) + 1);
+  }
+  // Named classes in P1→P10 order, then the serves-none bucket last — the same lower-number-wins
+  // order CLASS_ORDER pins for the group above, so the table never churns between renders.
+  const counts = [...servedCounts.entries()]
+    .map(([supports_class, n]) => ({ supports_class, n }))
+    .sort((a, b) => {
+      if (!a.supports_class) return 1;
+      if (!b.supports_class) return -1;
+      return Number(a.supports_class.match(/^P(\d+)/)[1]) - Number(b.supports_class.match(/^P(\d+)/)[1]);
+    });
+
+  // The top of the order. `backlog_display_title()` is the ONE sanctioned source for a ticket's
+  // display name (`docs/runbooks/runner-cycle.md`: never the raw title column, never the gist
+  // extract) — called as an RPC per row rather than reimplemented here, which is five calls and no
+  // second copy of the predicate.
+  const ranked = servedRows
+    .filter(r => Number.isInteger(r.automation_rank))
+    .sort((a, b) => a.automation_rank - b.automation_rank)
+    .slice(0, SERVED_TOP_N);
+  const top = [];
+  for (const r of ranked) {
+    const disp = await rest(url, key, "rpc/backlog_display_title", {
+      method: "POST",
+      body: JSON.stringify({ p_title: r.title, p_description: r.description }),
+    }).catch(() => null);
+    top.push({
+      backlog_id: r.backlog_id,
+      automation_rank: r.automation_rank,
+      title: typeof disp === "string" ? disp : (r.title || r.backlog_id),
+      supports_class: r.supports_class || null,
+    });
+  }
+
+  // When the schedule last wrote. The NOTES PREFIX is the key, not the trigger alone: the runner's
+  // own cycles are `scheduled` too, and counting one of those as a re-rank would report a re-rank
+  // that never happened.
+  const rankCycles = await rest(url, key,
+    `runner_cycles?select=started_at&trigger=eq.scheduled&notes=like.${encodeURIComponent("SCHEDULED-AGENT: rank-backlog%")}`
+    + "&order=started_at.desc&limit=1");
+  const lastRankedAt = Array.isArray(rankCycles) && rankCycles[0] ? rankCycles[0].started_at : null;
+
+  const served = { counts, top, lastRankedAt };
+
+  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served };
 }
 
 async function main() {

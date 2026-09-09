@@ -79,6 +79,8 @@ import { logActivity } from '../../lib/activity-log.js';
 // carried on the enriched prompt_request.
 import { mergeCallFacts } from './db-assembly.js';
 import { withRequestContext } from '../../lib/request-context.js';
+// FEATURE: SES-334 -- the model-capability fact buildCallBody() asks before forcing a tool choice.
+import { supportsForcedToolChoice, supportsTemperature } from '../../shared/models.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
@@ -240,7 +242,28 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
   const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search', ...(webSearchMaxUses ? { max_uses: webSearchMaxUses } : {}) }] : [];
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
-  const needsAutoChoice = harnessTools.length > 0 || webSearchTool.length > 0;
+  // FEATURE: SES-334 -- the second reason a call takes the auto branch, and it is a MODEL fact, not a
+  // capability one. The first reason (harness tools or web search offered) is about what the turn may
+  // do; this one is about what the model will ACCEPT. `claude-fable-*` rejects tool_choice `tool` and
+  // `any` outright -- measured against the live API, see shared/models.js -- so the forced branch below
+  // returned a hard 400 for every schema-only intent on the governance lane, which is every governance
+  // agent, since their Skill rows all carry claude-fable-5-1. Found by SES-334's first scheduled call.
+  //
+  // WHAT THIS COSTS, STATED RATHER THAN DISCOVERED LATER: on the auto branch the model MAY answer with
+  // text instead of calling the schema tool, and parseModelTurn() throws a missing-tool_use error when
+  // a schema tool was offered (AA-97's boundary is hasSchemaTool=false, which is not this case). That
+  // is a real, if unlikely, failure mode -- and it is strictly better than the certain 400 it replaces.
+  // The refusal stays loud either way; nothing here degrades to a silent free-written answer.
+  const forcedChoiceRejected = !supportsForcedToolChoice(model);
+  // FEATURE: SES-334 -- the same family also REJECTS `temperature` outright ("`temperature` is
+  // deprecated for this model"), so the field is dropped for it rather than sent and refused. This is
+  // resolved ONCE here and read by all four return branches below, because the old form repeated the
+  // same `temperature !== undefined && temperature !== null` test four times and a fifth branch added
+  // later would have silently kept sending it.
+  const temperatureField = (temperature !== undefined && temperature !== null && supportsTemperature(model))
+    ? { temperature }
+    : {};
+  const needsAutoChoice = harnessTools.length > 0 || webSearchTool.length > 0 || forcedChoiceRejected;
 
   // FEATURE: HAR-02c -- the split is "present" when either half carries real text. Both-empty
   // (ai-enrichment's degenerate guard path) takes the fallback exactly like a split-less caller.
@@ -263,13 +286,13 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
     if (hasSplit) {
       return {
         model, max_tokens, ...cachedSystem,
-        ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+        ...temperatureField,
         messages: splitMessages,
       };
     }
     return {
       model, max_tokens, system: systemPrompt,
-      ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+      ...temperatureField,
       messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: 'Please complete the task as instructed.' }],
     };
   }
@@ -285,7 +308,7 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
   if (hasSplit) {
     return {
       model, max_tokens, tools,
-      ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+      ...temperatureField,
       ...cachedSystem,
       tool_choice: needsAutoChoice
         ? { type: 'auto', disable_parallel_tool_use: !enableParallelToolUse } // FEATURE: LOO-28 -- trait-conditional on the auto branch ONLY
@@ -296,7 +319,7 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
 
   return {
     model, max_tokens, tools,
-    ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+    ...temperatureField,
     tool_choice: needsAutoChoice
       ? { type: 'auto', disable_parallel_tool_use: !enableParallelToolUse } // FEATURE: LOO-28 -- trait-conditional on the auto branch ONLY
       : { type: 'tool', name: schemaTool.name, disable_parallel_tool_use: true },

@@ -199,6 +199,15 @@ export const SERVICE_CATALOG = [
   // it reaches the handler; 'Guardrails / Output Filtering' because pz-guardrails refuses the
   // ruling, not just shapes it (a P1 with no named artifact is rejected, not softened).
   { slug: 'classify-ticket',         name: 'Classify Ticket (The Prioritizer)', serviceType: 'ai', patterns: ['Structured Output', 'Guardrails / Output Filtering'], roadmap: 'now' },
+
+  // FEATURE: SES-334 -- the Prioritizer's rank-backlog, the other half of AGT-63's pair, added here
+  // for the same reason classify-ticket was: api/cron/rank-backlog.js logs the SCHEDULE's own row and
+  // logActivity() would land an unnamed slug in By-Service without an entry. No AI_TYPE_TO_SERVICE
+  // entry needed: ai_type equals capability_slug ('rank-backlog').
+  // 'Structured Output' because the ordering is a schema-validated `ranked` array; NOT
+  // 'Guardrails / Output Filtering' -- pz-guardrails explicitly forbids re-judging a class inside
+  // rank-backlog, so the ranking turn filters nothing, it only orders what classify-ticket ruled.
+  { slug: 'rank-backlog',            name: 'Rank Backlog (The Prioritizer)',    serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge
