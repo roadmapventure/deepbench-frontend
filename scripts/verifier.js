@@ -1,4 +1,59 @@
 #!/usr/bin/env node
+// DeepBench v7.0.440 | scripts/verifier.js | SES-337 -- CHARTER PREMISE 3 REACHES THE ROWS, and the
+// thing to read twice is THAT THE RULE WAS ALREADY WRITTEN DOWN AND ONLY THE CODE WAS MISSING.
+// `vf-guardrails.must` has said, since AGT-67 seeded it: "refuse the auto-done bar to a diff
+// touching scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js **or the
+// Verifier's own Skill rows**". `SELF_CERTIFYING_PATHS` held the first three. The fourth had no
+// enforcement at all, so the Skill was telling the agent a rule the code did not hold -- the exact
+// shape of rule this file's own header calls "the class of rule this platform has now watched go
+// silently unfollowed eight times."
+//
+// (1) A SKILL ROW IS NOT A FILE, WHICH IS WHY THIS IS A SECOND CONSTANT. Since AGT-67 the judgment
+// IS `skill_profiles` rows (`vf-identity`, `vf-behavior`, `vf-knowledge-bar`, `vf-verdict-intent`,
+// `vf-guardrails` -- measured live 2026-09-09, five rows, all `vf-`-prefixed). A cycle can rewrite
+// what the Verifier believes without touching one byte of this file, and `selfCertificationBlock()`
+// matches repo-relative PATHS against a changed-file list, so it cannot see that. Adding `"vf-"` to
+// `SELF_CERTIFYING_PATHS` would have been worse than nothing: that constant is matched with
+// `norm.includes(p)`, so the entry would mean "a changed file whose path is exactly vf-" -- inert,
+// and indistinguishable from present. `selfCertifyingSkillEdit()` reads the cycle's
+// `runner_before_images` instead, which §19v's "no before-image, no write" makes the complete record
+// of the rows a cycle touched.
+//
+// (2) THREE STATES, NOT TWO, AND THAT IS THE WHOLE SAFETY. `[]` is "read, and no Skill row changed"
+// -> clean. `null` is "could not be read" -> BLOCKED, the same direction an unreadable diff fails.
+// And an image whose `row_data` is NULL (step 8b's INSERT convention) is resolved live from
+// `skill_profiles`; one that neither the image nor the lookup can name is UNKNOWN and blocks too.
+// Collapsing `[]` into `null` would refuse the bar to every clean delivery forever; collapsing
+// `null` into `[]` would bless every unreadable one. `tests/regression/SES-181-verifier.js`'s
+// `theVerifiersOwnSkillRowsCannotTakeTheBar()` asserts both directions, with the omitted-argument
+// mutant that proves the guard is what is doing the work.
+//
+// (3) THE SEED FILE IS COVERED BY THE SAME FUNCTION, DELIBERATELY NOT BY `SELF_CERTIFYING_PATHS`.
+// `docs/design/ga-agents-seed.sql` is where the `vf-*` rows come from, so changing it changes the
+// judgment -- but `tests/regression/agt-67-verifier.test.mjs` clause (5) binds every entry of
+// `SELF_CERTIFYING_PATHS` to a name in the guardrail clause, and that clause says "the Verifier's own
+// Skill rows", not a path. Putting the seed in the old constant would have turned a passing guard
+// red for a wording reason. `SELF_CERTIFYING_SKILL_FILES` is its home instead.
+//
+// (4) `skillRowEdit` UNDEFINED IS PERMISSIVE, AND THAT IS THE ONE PLACE THIS TICKET DOES NOT FAIL
+// CLOSED. The argument's absence means the CHECK WAS NOT APPLIED, which is a fact about the caller,
+// not about the delivery; treating it as a refusal would make a forgotten argument indistinguishable
+// from a real self-certification in the ledger. Every production path computes it, and the computed
+// value's own failure mode is `blocked: true`.
+//
+// WHAT THIS SHIP DID *NOT* DO, named rather than left to be discovered. SES-337's other half -- the
+// Verifier reproducing the last 30 recorded verdicts within 2 disagreements -- WAS RUN and DID NOT
+// PASS: 27 of 30 verdicts were reconstructable, and the Verifier disagreed with 8 of them, every one
+// the same shape (the ledger row was written by the mechanical lane on three green gates; the agent
+// blocked on evidence the kickoff promised and the delivery did not carry). A second finding came
+// out of the same run: 17 of 27 judgments exceeded `vf-verdict-intent`'s own `maxLength: 1200` on
+// `architect_lens`/`pm_lens`, so pass two would have rejected them with exit 2 and recorded no row
+// at all. Neither is fixed here -- the kickoff's own instruction is to report a failing reproduction
+// rather than edit the Skill to meet it -- and the evidence is
+// `tests/fixtures/verdicts-30.json` + `tests/fixtures/verdicts-30-judgments.json`, replayed by
+// `tests/verifier/ses-337-verifier-reproduction.test.mjs`. That file is RED and is deliberately NOT
+// registered in `tests/regression/run-all.js`.
+//
 // DeepBench v7.0.433 | scripts/verifier.js | AGT-67 -- THE JUDGMENT HALF BECOMES A CAPABILITY AND
 // THE SCRIPT KEEPS THE MECHANICAL GATES, and the thing to read twice is that THE AGENT CAN ONLY
 // TIGHTEN. Every rule this file already enforced is enforced in code AFTER the agent speaks, on the
@@ -357,6 +412,70 @@ export const SELF_CERTIFYING_PATHS = Object.freeze([
   "tests/regression/run-all.js",
 ]);
 
+// FEATURE: SES-337 -- THE OTHER HALF OF THE VERIFICATION IS NOT A FILE, and that is the whole
+// reason this is a second constant rather than a fourth entry in the list above.
+//
+// Since AGT-67 the Verifier's judgment is `skill_profiles` ROWS -- `vf-identity`, `vf-behavior`,
+// `vf-knowledge-bar`, `vf-verdict-intent`, `vf-guardrails` (measured live 2026-09-09: those five,
+// linked to `verify-ship`, all `vf-`-prefixed). A cycle can rewrite what the Verifier believes
+// without touching one byte of this file, and `selfCertificationBlock()` -- which matches repo-
+// relative PATHS against a changed-file list -- cannot see it. `SELF_CERTIFYING_PATHS` is matched
+// with `norm.includes(p)`, so adding "vf-" to it would silently mean "any changed file whose path
+// is exactly vf-", which is nothing at all: the guard would be inert and look present.
+//
+// `vf-guardrails.must` ALREADY promised this rule -- "refuse the auto-done bar to a diff touching
+// scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js **or the
+// Verifier's own Skill rows**" -- and until this ticket the code held only the first three. The
+// Skill was telling the agent a rule the code did not have.
+export const SELF_CERTIFYING_SKILL_PREFIX = "vf-";
+// The repo-side home of those rows. A change to the seed is a change to the Skills it seeds, and it
+// IS a path -- but it belongs here rather than in SELF_CERTIFYING_PATHS, because `vf-guardrails`
+// names "the Verifier's own Skill rows" and `tests/regression/agt-67-verifier.test.mjs` clause (5)
+// binds every SELF_CERTIFYING_PATHS entry to that clause by name.
+export const SELF_CERTIFYING_SKILL_FILES = Object.freeze(["docs/design/ga-agents-seed.sql"]);
+
+// Charter premise 3 over the DATABASE half of the verification.
+//
+//   beforeImages  the cycle's `runner_before_images` rows, as read from Supabase (§19v: no
+//                 before-image, no write -- so every row this cycle changed has one, and the images
+//                 are therefore the complete record of what it touched). NULL/undefined means the
+//                 images could not be read, which is NOT innocent: a verifier that cannot see what
+//                 rows changed cannot know whether it is grading its own instructions.
+//   changedFiles  the repo half, for SELF_CERTIFYING_SKILL_FILES. NULL is already handled by
+//                 selfCertificationBlock(); here it only adds, never subtracts.
+//   slugById      pk -> slug, for images whose `row_data` is NULL (step 8b's INSERT convention).
+//                 An image this map cannot resolve is UNKNOWN and blocks, for the same reason.
+//
+// Returns { blocked, reason } -- the reason is stored either way, because "checked and clean" and
+// "nobody checked" must not read the same in the ledger.
+export function selfCertifyingSkillEdit({ beforeImages, changedFiles, slugById } = {}) {
+  const files = Array.isArray(changedFiles)
+    ? changedFiles.map(f => String(f).replace(/\\/g, "/").replace(/^\.\//, ""))
+    : [];
+  const fileHits = SELF_CERTIFYING_SKILL_FILES.filter(p => files.includes(p));
+  if (fileHits.length) {
+    return { blocked: true, reason: `this delivery changes ${fileHits.join(", ")} -- the seed of the Verifier's own Skill rows. Charter premise 3: "no change certifies itself; a fresh-context verifier must pass it." The verdict stands; the auto-done bar does not apply.` };
+  }
+  if (beforeImages === null || beforeImages === undefined) {
+    return { blocked: true, reason: `the cycle's runner_before_images could not be read, so whether this delivery rewrites the Verifier's own Skill rows is unknown -- fails closed (charter premise 3, and §19v's "no before-image, no write" is what makes the images the complete record).` };
+  }
+  const skillRows = beforeImages.filter(r => r && r.table_name === "skill_profiles");
+  const unresolved = [];
+  const hits = [];
+  for (const r of skillRows) {
+    const slug = r.row_data?.slug ?? (slugById ? slugById[r.pk_value] : undefined);
+    if (slug === undefined || slug === null) { unresolved.push(String(r.pk_value)); continue; }
+    if (String(slug).startsWith(SELF_CERTIFYING_SKILL_PREFIX)) hits.push(String(slug));
+  }
+  if (hits.length) {
+    return { blocked: true, reason: `this delivery rewrites the Verifier's own Skill rows (${hits.join(", ")}) -- the judgment itself. Charter premise 3: "no change certifies itself; a fresh-context verifier must pass it." The verdict stands; the auto-done bar does not apply.` };
+  }
+  if (unresolved.length) {
+    return { blocked: true, reason: `this delivery changes skill_profiles row(s) ${unresolved.join(", ")} whose slug could not be resolved, so whether they are the Verifier's own (${SELF_CERTIFYING_SKILL_PREFIX}*) is unknown -- fails closed, exactly as an unreadable diff does.` };
+  }
+  return { blocked: false, reason: `${skillRows.length} skill_profiles row(s) changed by this cycle, none of them ${SELF_CERTIFYING_SKILL_PREFIX}*.` };
+}
+
 // FEATURE: AGT-67 -- the judgment half.
 // WHO THE JUDGMENT IS, as data rather than as a prompt. These two name the seeded rows (this
 // ticket's section of docs/design/ga-agents-seed.sql); the INTENT is deliberately NOT a constant
@@ -513,7 +632,17 @@ export function selfCertificationBlock(changedFiles) {
 //                         read rather than recomputed, because `rung >= auto_done_rung` has one home
 //                         and it is the SQL function. NULL takes charter decision 2's path below --
 //                         unknown is not innocent (M6 gate, promise 2; SES-122).
-export function autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy }) {
+//
+//   skillRowEdit          FEATURE: SES-337. selfCertifyingSkillEdit()'s own { blocked, reason },
+//                         computed by the caller because only the caller has the cycle id the
+//                         before-images hang off. UNDEFINED IS ITS OWN ANSWER AND IT IS THE SAFE
+//                         ONE: the check was not applied, so it cannot refuse anything -- and every
+//                         production path (main(), below) always passes a computed value, whose
+//                         own failure mode is `blocked: true`. The alternative -- treating an
+//                         absent argument as a refusal -- would make a caller's forgetfulness look
+//                         identical to a real self-certification, and the ledger would carry a
+//                         reason nobody could act on.
+export function autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy, skillRowEdit }) {
   if (verdict !== "approve") {
     return { eligible: false, reason: `verdict is ${verdict}; the interim auto-done bar requires approve (all three gates green).` };
   }
@@ -550,6 +679,12 @@ export function autoDoneEligibility({ verdict, epicName, epicProjectExecuting, p
   // wrong place. It is also the refusal a rung may never buy its way past: charter premise 3.
   const self = selfCertificationBlock(changedFiles);
   if (self.blocked) return { eligible: false, reason: self.reason };
+
+  // FEATURE: SES-337 -- the same refusal over the rows. Placed beside the path check and AFTER the
+  // ladder branch for the identical reason: a rung is a fact about a work class and buys nothing
+  // past charter premise 3. A cycle that rewrote `vf-guardrails` and then had the Verifier grade
+  // its own new instructions is the purest form of the thing that premise forbids.
+  if (skillRowEdit?.blocked === true) return { eligible: false, reason: skillRowEdit.reason };
 
   // The reason NAMES WHICH RULE GRANTED THE BAR, because the three are not the same authority and
   // the ledger is where that distinction has to survive: the ladder is a measurement M6 made
@@ -1247,8 +1382,42 @@ async function main() {
 
   const base = arg("base", "origin/dev");
   const changedFiles = changedFilesFor(repoRoot, base);
-  const elig = autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy });
-  const autoDoneReason = elig.reason + lookupNote + primeNote + ladderNote;
+
+  // FEATURE: SES-337 -- the DATABASE half of charter premise 3, read from this cycle's own
+  // before-images. §19v's "no before-image, no write" is what makes them the complete record of the
+  // rows this cycle touched, so a `skill_profiles` image is the only place a rewrite of the
+  // Verifier's own instructions shows up -- the diff never carries it.
+  //
+  // THREE STATES AND THEY ARE NOT TWO. `images = []` means "read, and this cycle changed no Skill
+  // row" -> clean. `images = null` means "could not be read" -> selfCertifyingSkillEdit() fails
+  // closed. And a run with NO CYCLE (a `--dry-run`, or a ticket-less invocation) has no images to
+  // read by construction: it is handed `[]` for the DB half and still gets the FILE half, because a
+  // dry run records nothing and refusing it a bar it cannot spend would only mislead its reader.
+  // The slug map covers step 8b's INSERT convention (`row_data = NULL`): the row exists live now, so
+  // the slug is one read away, and an image left unresolved by BOTH still blocks.
+  let skillImages = cycleId ? null : [];
+  let slugById;
+  let skillNote = cycleId ? "" : " (no cycle id, so no before-images to read for the Skill-row check; the file half still applied)";
+  if (cycleId && supabaseUrl && supabaseKey) {
+    const bi = await rest(supabaseUrl, supabaseKey,
+      `runner_before_images?select=table_name,pk_value,row_data&cycle_id=eq.${encodeURIComponent(cycleId)}&table_name=eq.skill_profiles`);
+    if (bi.error) skillNote = ` (runner_before_images unread, Skill-row self-certification check FAILS CLOSED: ${bi.error})`;
+    else {
+      skillImages = Array.isArray(bi.rows) ? bi.rows : [];
+      const needSlug = skillImages.filter(r => r && (r.row_data === null || r.row_data === undefined)).map(r => r.pk_value);
+      if (needSlug.length) {
+        const sp = await rest(supabaseUrl, supabaseKey,
+          `skill_profiles?select=id,slug&id=in.(${needSlug.map(encodeURIComponent).join(",")})`);
+        if (!sp.error && Array.isArray(sp.rows)) slugById = Object.fromEntries(sp.rows.map(r => [r.id, r.slug]));
+      }
+    }
+  } else if (cycleId) {
+    skillNote = " (no credentials to read runner_before_images; the Skill-row check FAILS CLOSED)";
+  }
+  const skillRowEdit = selfCertifyingSkillEdit({ beforeImages: skillImages, changedFiles, slugById });
+
+  const elig = autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy, skillRowEdit });
+  const autoDoneReason = elig.reason + lookupNote + primeNote + ladderNote + skillNote;
 
   const detailLine = GATES.map(g => `${g.label}=${gateResults[g.key]} [${gateDetail[g.key]}]`).join("\n  ");
   const prose =
@@ -1303,6 +1472,12 @@ async function main() {
       // "the ladder declined" and "nobody asked the ladder" live in those notes.
       code_eligibility: { ...elig, reason: autoDoneReason },
       self_certifying_paths: SELF_CERTIFYING_PATHS,
+      // FEATURE: SES-337 -- the agent is shown the ROW half too, and the code's answer on it, so it
+      // can make the same call from the same evidence. `vf-guardrails.must` already tells it to
+      // refuse the bar to "the Verifier's own Skill rows"; without this it had no way to check.
+      self_certifying_skill_prefix: SELF_CERTIFYING_SKILL_PREFIX,
+      self_certifying_skill_files: SELF_CERTIFYING_SKILL_FILES,
+      skill_row_self_certification: skillRowEdit,
       kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
       diff: diffFor(repoRoot, base),
     };
@@ -1380,6 +1555,12 @@ async function main() {
       mechanical: { verdict, reasoning }, epic_name: epicName, priority_class: priorityClass,
       class_autonomy: classAutonomy, code_eligibility: elig,
       self_certifying_paths: SELF_CERTIFYING_PATHS,
+      // FEATURE: SES-337 -- the agent is shown the ROW half too, and the code's answer on it, so it
+      // can make the same call from the same evidence. `vf-guardrails.must` already tells it to
+      // refuse the bar to "the Verifier's own Skill rows"; without this it had no way to check.
+      self_certifying_skill_prefix: SELF_CERTIFYING_SKILL_PREFIX,
+      self_certifying_skill_files: SELF_CERTIFYING_SKILL_FILES,
+      skill_row_self_certification: skillRowEdit,
       kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
       diff: diffFor(repoRoot, base),
     };

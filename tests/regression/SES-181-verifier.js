@@ -19,6 +19,17 @@
 //   theIntentSchemaIsTheContract()              validateAgentVerdict() against the Intent's own
 //                                               stored shape, with the mutants a model really emits
 //                                               (a "true" string, a missing lens, an over-long field).
+//   theVerifiersOwnSkillRowsCannotTakeTheBar()  FEATURE: SES-337. Charter premise 3 over the ROWS.
+//                                               Since AGT-67 the judgment is `vf-*` skill_profiles
+//                                               rows, and a cycle can rewrite what the Verifier
+//                                               believes without touching one byte of any file
+//                                               SELF_CERTIFYING_PATHS lists. Three negative controls
+//                                               keep it from going vacuous: a `pz-*` row IS
+//                                               eligible (it is the PREFIX doing the work, not the
+//                                               table), an empty image list IS eligible (read-and-
+//                                               clean is not the same answer as unread), and an
+//                                               omitted `skillRowEdit` IS eligible (an unapplied
+//                                               check must not look like a refusal).
 //   aVerdictMustBeAboutThisDelivery()           THE VERIFIER PUT THIS ONE HERE. Its first real run
 //                                               (verdict 5f414763, finding 1) noticed pass two never
 //                                               compared the agent's own backlog_id/version against
@@ -86,6 +97,10 @@ import {
   verdictFor,
   autoDoneEligibility,
   selfCertificationBlock,
+  // FEATURE: SES-337 -- charter premise 3 over the Verifier's own Skill rows.
+  SELF_CERTIFYING_SKILL_PREFIX,
+  SELF_CERTIFYING_SKILL_FILES,
+  selfCertifyingSkillEdit,
   spawnCommandFor,
   // FEATURE: AGT-67 -- the judgment half.
   JUDGE_MODES,
@@ -351,6 +366,87 @@ function pathMatchingIsExactAndSeparatorAgnostic() {
   assert.strictEqual(selfCertificationBlock(["./scripts/verifier.js"]).blocked, true);
   assert.strictEqual(selfCertificationBlock(["scripts/verifier.js.bak"]).blocked, false);
   assert.strictEqual(selfCertificationBlock(["docs/scripts/verifier.js"]).blocked, false);
+}
+
+// FEATURE: SES-337 -- the same premise over the rows, with the controls that make it discriminate.
+//
+// THE MUTANT IS THE ONE-LINE OMISSION, and it is what answers "would this pass if the guard did
+// nothing?": the same fixture WITHOUT `skillRowEdit` is eligible: true. So every `false` below is
+// the new guard firing, not the fixture failing some other test.
+function theVerifiersOwnSkillRowsCannotTakeTheBar() {
+  const img = (slug, pk = "11111111-1111-4111-8111-111111111111") =>
+    ({ table_name: "skill_profiles", pk_value: pk, row_data: slug === null ? null : { slug } });
+  const elig = beforeImages =>
+    autoDoneEligibility({ ...ELIGIBLE, skillRowEdit: selfCertifyingSkillEdit({ beforeImages, changedFiles: ELIGIBLE.changedFiles }) });
+
+  // THE MUTANT FIRST. Without the argument the identical delivery takes the bar -- which is the
+  // measurement that makes the assertions below non-vacuous.
+  assert.strictEqual(autoDoneEligibility(ELIGIBLE).eligible, true,
+    "the fixture must be eligible with the check unapplied, or nothing below is measuring the check");
+
+  // A `vf-*` row edit is refused, and the reason NAMES the slug.
+  const rewrote = elig([img("vf-guardrails")]);
+  assert.strictEqual(rewrote.eligible, false,
+    "a cycle that rewrote the Verifier's own guardrails and then had the Verifier grade its own new " +
+    "instructions is the purest form of what charter premise 3 forbids");
+  assert.ok(rewrote.reason.includes("vf-guardrails"),
+    "the reason must name the Skill row, or the next reader cannot tell which rule fired");
+  for (const slug of ["vf-identity", "vf-behavior", "vf-knowledge-bar", "vf-verdict-intent", "vf-guardrails"]) {
+    assert.strictEqual(elig([img(slug)]).eligible, false, `${slug} is one of the Verifier's own rows`);
+  }
+
+  // NEGATIVE CONTROL 1 -- IT IS THE PREFIX, NOT THE TABLE. Another agent's Skill rows are ordinary
+  // work; a guard that blocked on any `skill_profiles` image would refuse the bar to every agent
+  // build this project ships and would look identical from the ledger.
+  for (const slug of ["pz-guardrails", "ds-behavior", "bd-identity", "rs-knowledge", "dm-intent"]) {
+    assert.strictEqual(elig([img(slug)]).eligible, true, `${slug} is not the Verifier's own row`);
+  }
+
+  // NEGATIVE CONTROL 2 -- READ-AND-CLEAN IS NOT UNREAD. `[]` is a real answer; `null` is the absence
+  // of one. Collapsing them either blocks every clean delivery forever or blesses every unreadable
+  // one -- the same NULL-is-not-zero boundary anUnreadableDiffFailsClosed() keeps for the diff.
+  assert.strictEqual(elig([]).eligible, true, "no Skill row changed is a clean answer, not a refusal");
+  assert.strictEqual(selfCertifyingSkillEdit({ beforeImages: null, changedFiles: [] }).blocked, true,
+    "images that could not be read are unknown, and unknown is not innocent");
+  assert.strictEqual(selfCertifyingSkillEdit({ beforeImages: undefined, changedFiles: [] }).blocked, true);
+  assert.strictEqual(elig(null).eligible, false);
+
+  // NEGATIVE CONTROL 3 -- A ROW WHOSE SLUG NOBODY COULD RESOLVE BLOCKS. Step 8b writes
+  // `row_data = NULL` for an INSERT, so the image alone cannot say which Skill it is; unresolved
+  // must fail the same direction as `vf-`, and a resolver that CAN name it decides on the name.
+  assert.strictEqual(elig([img(null, "u1")]).eligible, false,
+    "a skill_profiles image whose slug is unknown could be the Verifier's own -- fails closed");
+  assert.strictEqual(
+    selfCertifyingSkillEdit({ beforeImages: [img(null, "u1")], changedFiles: [], slugById: { u1: "pz-guardrails" } }).blocked,
+    false, "a resolved non-vf slug is clean, or the fallback would block every INSERT forever");
+  assert.strictEqual(
+    selfCertifyingSkillEdit({ beforeImages: [img(null, "u1")], changedFiles: [], slugById: { u1: "vf-behavior" } }).blocked,
+    true);
+
+  // THE SEED FILE IS THE REPO-SIDE HOME OF THOSE ROWS, and it is deliberately NOT in
+  // SELF_CERTIFYING_PATHS: agt-67-verifier.test.mjs clause (5) binds every entry of that constant to
+  // a name in `vf-guardrails.must`, which says "the Verifier's own Skill rows" rather than a path.
+  for (const f of SELF_CERTIFYING_SKILL_FILES) {
+    assert.strictEqual(selfCertifyingSkillEdit({ beforeImages: [], changedFiles: ["docs/SESSIONS.md", f] }).blocked, true,
+      `${f} seeds the vf-* rows; changing it changes the judgment`);
+    assert.strictEqual(SELF_CERTIFYING_PATHS.includes(f), false,
+      `${f} must stay OUT of SELF_CERTIFYING_PATHS -- see agt-67-verifier.test.mjs clause (5)`);
+  }
+  assert.strictEqual(selfCertifyingSkillEdit({ beforeImages: [], changedFiles: ["docs/design/ga-agents-seed.sql.bak"] }).blocked, false,
+    "path matching stays exact here too, or a future .bak silently disarms every clean delivery");
+
+  // A RUNG BUYS NOTHING PAST THIS, same as the path check. `class_autonomy` granting auto_done is
+  // the permissive input; the refusal must survive it.
+  assert.strictEqual(
+    autoDoneEligibility({
+      ...ELIGIBLE,
+      classAutonomy: { work_class: "tooling", rung: 20, auto_done: true, auto_done_rung: 3 },
+      skillRowEdit: selfCertifyingSkillEdit({ beforeImages: [img("vf-behavior")], changedFiles: [] }),
+    }).eligible,
+    false, "a rung is a fact about a work class and never buys past charter premise 3");
+
+  // The prefix is the constant, not a literal sprinkled through the reasons.
+  assert.strictEqual(SELF_CERTIFYING_SKILL_PREFIX, "vf-");
 }
 
 // ---------------------------------------------------------------------------
@@ -794,6 +890,7 @@ function run() {
   aChangeToTheVerificationCannotTakeTheBar();
   anUnreadableDiffFailsClosed();
   pathMatchingIsExactAndSeparatorAgnostic();
+  theVerifiersOwnSkillRowsCannotTakeTheBar();   // FEATURE: SES-337
   theLadderGrantsTheBarByRung();
   aRungNeverBuysPastSelfCertification();
   theLadderIsReadStrictlyAndNullIsNotInnocent();

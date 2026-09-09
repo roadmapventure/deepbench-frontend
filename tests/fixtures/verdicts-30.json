@@ -1,0 +1,1762 @@
+{
+  "generated_by": "scripts/build-verdict-fixture.js (SES-337)",
+  "source": "public.runner_verdicts, newest first",
+  "requested": 30,
+  "returned": 30,
+  "usable": 27,
+  "excluded": 3,
+  "fixtures": [
+    {
+      "verdict_id": "98ae3cd2-7e6c-4350-a811-5ce5f9e891f6",
+      "created_at": "2026-09-09T23:03:07.961472+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-234",
+      "version": "v7.0.442",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "7e4d4cb2aefbd9d563b7793bd54d0c1931031aec",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.442 SES-234 every operational default becomes a rules-registry row, judged against the mission",
+      "inputs": {
+        "backlog_id": "SES-234",
+        "version": "v7.0.442",
+        "base": "7e4d4cb2aefbd9d563b7793bd54d0c1931031aec^",
+        "changed_files": [
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/design/2026-09-09-operational-defaults-census.md",
+          "docs/governance/RULES-SNAPSHOT.md",
+          "tests/regression/ses-234-operational-defaults.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: sections omitted (no stored content -- fetched per call by the executor): knowledge-rc-trace-knowledge] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M3 - Designer & Builder",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.442-SES-234-operational-defaults-registry.md",
+        "kickoff_source": "at the ship commit 7e4d4cb2",
+        "kickoff_bytes": 6134,
+        "kickoff_sha256": "173fdb98acc4ba9e2fa28a2fe4a5e203736b5e9e603bdac1fe0f7055ff015827",
+        "diff_bytes": 96862,
+        "diff_sha256": "cd1901b4b56155d3eb393233ac68d13726f703deeed3dafbb099b53b2df8be57"
+      }
+    },
+    {
+      "verdict_id": "d93bc09c-091c-4cd4-88ca-efea39643547",
+      "created_at": "2026-09-09T22:59:45.235653+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-234",
+      "version": "v7.0.442",
+      "recorded": {
+        "verdict": "block",
+        "auto_done_eligible": false,
+        "auto_done_reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "7e4d4cb2aefbd9d563b7793bd54d0c1931031aec",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.442 SES-234 every operational default becomes a rules-registry row, judged against the mission",
+      "inputs": {
+        "backlog_id": "SES-234",
+        "version": "v7.0.442",
+        "base": "7e4d4cb2aefbd9d563b7793bd54d0c1931031aec^",
+        "changed_files": [
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/design/2026-09-09-operational-defaults-census.md",
+          "docs/governance/RULES-SNAPSHOT.md",
+          "tests/regression/ses-234-operational-defaults.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "red",
+          "hygiene": "green"
+        },
+        "gate_detail": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=red [exit 1 -- [FAIL] ses-280-m5-governance-rules.test.mjs -- docs/governance/RULES-SNAPSHOT.md does not match public.governance_rules -- the snapshot is stale or was hand-edited. Regenerate: node scripts/export-governance-snapshot.js | [FAIL] ses-285-m6-autonomy.test.mjs -- docs/governance/RULES-SNAPSHOT.md does not match public.governance_rules -- the snapshot is stale or was hand-edited. Regenerate: node scripts/export-governance-snapshot.js | regression suite: 193/195 passed] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "block",
+          "reasoning": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed."
+        },
+        "epic_name": "Governance Agents M3 - Designer & Builder",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.442-SES-234-operational-defaults-registry.md",
+        "kickoff_source": "at the ship commit 7e4d4cb2",
+        "kickoff_bytes": 6134,
+        "kickoff_sha256": "173fdb98acc4ba9e2fa28a2fe4a5e203736b5e9e603bdac1fe0f7055ff015827",
+        "diff_bytes": 96862,
+        "diff_sha256": "cd1901b4b56155d3eb393233ac68d13726f703deeed3dafbb099b53b2df8be57"
+      }
+    },
+    {
+      "verdict_id": "33e1afc9-5715-4d3f-9300-825687bcd5af",
+      "created_at": "2026-09-09T22:56:30.357288+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-234",
+      "version": "v7.0.442",
+      "recorded": {
+        "verdict": "block",
+        "auto_done_eligible": false,
+        "auto_done_reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "7e4d4cb2aefbd9d563b7793bd54d0c1931031aec",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.442 SES-234 every operational default becomes a rules-registry row, judged against the mission",
+      "inputs": {
+        "backlog_id": "SES-234",
+        "version": "v7.0.442",
+        "base": "7e4d4cb2aefbd9d563b7793bd54d0c1931031aec^",
+        "changed_files": [
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/design/2026-09-09-operational-defaults-census.md",
+          "docs/governance/RULES-SNAPSHOT.md",
+          "tests/regression/ses-234-operational-defaults.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "red",
+          "hygiene": "green"
+        },
+        "gate_detail": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=red [exit 1 -- [FAIL] ses-330-governance-lane.test.mjs -- control premise: ses330-fixture-governance-agent already exists -- delete it manually before trusting this test | regression suite: 195/196 passed] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "block",
+          "reasoning": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed."
+        },
+        "epic_name": "Governance Agents M3 - Designer & Builder",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.442-SES-234-operational-defaults-registry.md",
+        "kickoff_source": "at the ship commit 7e4d4cb2",
+        "kickoff_bytes": 6134,
+        "kickoff_sha256": "173fdb98acc4ba9e2fa28a2fe4a5e203736b5e9e603bdac1fe0f7055ff015827",
+        "diff_bytes": 96862,
+        "diff_sha256": "cd1901b4b56155d3eb393233ac68d13726f703deeed3dafbb099b53b2df8be57"
+      }
+    },
+    {
+      "verdict_id": "e05f3713-deda-4724-a384-8dfe06711649",
+      "created_at": "2026-09-09T22:32:28.829132+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-334",
+      "version": "v7.0.443",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": false,
+      "unavailable_reason": "no commit whose subject is \"v7.0.443 ... SES-334 ...\"",
+      "sha": null,
+      "sha_source": null,
+      "commit_subject": null,
+      "inputs": null
+    },
+    {
+      "verdict_id": "1d180269-0419-497c-8b76-4fc12ec46d27",
+      "created_at": "2026-09-09T22:28:38.198628+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-336",
+      "version": "v7.0.439",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "bc73354ed31f9cb5adee117876827114f82f5b35",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.439 SES-336 Runbook steps 6 and 7 hand design and build to the Designer and the Builder; the shrink is measured and bounded",
+      "inputs": {
+        "backlog_id": "SES-336",
+        "version": "v7.0.439",
+        "base": "bc73354ed31f9cb5adee117876827114f82f5b35^",
+        "changed_files": [
+          "CLAUDE-STATE.md",
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/SESSIONS.md",
+          "docs/backlog/BACKLOG-SNAPSHOT.md",
+          "docs/runbooks/runner-cycle.md",
+          "docs/runbooks/standing-brief.md",
+          "tests/regression/ses-336-runbook-orchestration.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: sections omitted (no stored content -- fetched per call by the executor): knowledge-rc-trace-knowledge] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M3 - Designer & Builder",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.438-SES-335-336-runbook-handoffs.md",
+        "kickoff_source": "at the ship commit bc73354e",
+        "kickoff_bytes": 5031,
+        "kickoff_sha256": "30d0d6e660e9772545931c73ea95c0b91adf7c06a380666d9fafe6baf6a49d19",
+        "diff_bytes": 400168,
+        "diff_sha256": "6595a16d19307ab36591edc3895ee0b1c27b39d8a3223f645169fda6a4c66a54"
+      }
+    },
+    {
+      "verdict_id": "b81a95d0-b921-450b-8547-e462aea059e8",
+      "created_at": "2026-09-09T22:25:31.133374+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-335",
+      "version": "v7.0.438",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M2 - The Researcher'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "18ce23c724f73da9daebfdec0090001550617766",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.438 SES-335 Runbook step 4b hands the invention pass to The Researcher; its method moves into the rs-* Skills",
+      "inputs": {
+        "backlog_id": "SES-335",
+        "version": "v7.0.438",
+        "base": "18ce23c724f73da9daebfdec0090001550617766^",
+        "changed_files": [
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/SESSIONS.md",
+          "docs/kickoffs/v7.0.438-SES-335-336-runbook-handoffs.md",
+          "docs/runbooks/runner-cycle.md",
+          "tests/regression/ses-335-step4b-handoff.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: sections omitted (no stored content -- fetched per call by the executor): knowledge-rc-trace-knowledge] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M2 - The Researcher",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M2 - The Researcher'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.438-SES-335-336-runbook-handoffs.md",
+        "kickoff_source": "at the ship commit 18ce23c7",
+        "kickoff_bytes": 5031,
+        "kickoff_sha256": "30d0d6e660e9772545931c73ea95c0b91adf7c06a380666d9fafe6baf6a49d19",
+        "diff_bytes": 56872,
+        "diff_sha256": "fd5c93ae6d3e39e09e67115f18b612360227cc1cbeeb590107b0a2ac9d997e5a"
+      }
+    },
+    {
+      "verdict_id": "9c198beb-c7ea-4428-8dc8-40533313b2dd",
+      "created_at": "2026-09-09T21:51:32.878819+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-329",
+      "version": "v7.0.437",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 19 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M0 - Standard & Foundation'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": false,
+      "unavailable_reason": "no commit whose subject is \"v7.0.437 ... SES-329 ...\"",
+      "sha": null,
+      "sha_source": null,
+      "commit_subject": null,
+      "inputs": null
+    },
+    {
+      "verdict_id": "3305c654-8770-4998-a3a1-96dc0be72998",
+      "created_at": "2026-09-09T21:47:59.271031+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-333",
+      "version": "v7.0.436",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 19 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "9097f0869e2a18e0dd359f5dc14083ce10efcb3a",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.436 SES-333 Runbook step 5 hands the pick to the Prioritizer; its selection rules move into pz-guardrails",
+      "inputs": {
+        "backlog_id": "SES-333",
+        "version": "v7.0.436",
+        "base": "9097f0869e2a18e0dd359f5dc14083ce10efcb3a^",
+        "changed_files": [
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/SESSIONS.md",
+          "docs/runbooks/runner-cycle.md",
+          "tests/regression/ses-333-step5-handoff.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: sections omitted (no stored content -- fetched per call by the executor): knowledge-rc-trace-knowledge] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M1 - The Prioritizer",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.435-SES-332-333-334-prioritizer-goes-to-work.md",
+        "kickoff_source": "at the ship commit 9097f086",
+        "kickoff_bytes": 7157,
+        "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
+        "diff_bytes": 63464,
+        "diff_sha256": "02c82003259b4d9c6106b14e04094c5d5983e4a4ef243a86fd42af104dda70a0"
+      }
+    },
+    {
+      "verdict_id": "c27e670a-f046-4ad1-bd7a-17926ab8a05f",
+      "created_at": "2026-09-09T21:44:58.471179+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-332",
+      "version": "v7.0.435",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 19 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "5a0fcfb95acb965bb3139e1e7d5c147b58e60b84",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.435 SES-332 The Prioritizer's first run: type on every open ticket, served class on 103, John's classes untouched",
+      "inputs": {
+        "backlog_id": "SES-332",
+        "version": "v7.0.435",
+        "base": "5a0fcfb95acb965bb3139e1e7d5c147b58e60b84^",
+        "changed_files": [
+          "docs/design/2026-09-09-p1-served-list.md",
+          "docs/design/2026-09-09-prioritizer-class-disagreements.md",
+          "docs/kickoffs/v7.0.435-SES-332-333-334-prioritizer-goes-to-work.md",
+          "scripts/agent-prompt.js",
+          "scripts/prioritizer-first-run.mjs",
+          "shared/ai-patterns.js",
+          "tests/regression/ses-332-first-run.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: sections omitted (no stored content -- fetched per call by the executor): knowledge-rc-trace-knowledge] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M1 - The Prioritizer",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.435-SES-332-333-334-prioritizer-goes-to-work.md",
+        "kickoff_source": "at the ship commit 5a0fcfb9",
+        "kickoff_bytes": 7157,
+        "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
+        "diff_bytes": 115330,
+        "diff_sha256": "726bf79602c18647e6dea2104e3b2b3099fab7a8a3c605c450db1938f21dca13"
+      }
+    },
+    {
+      "verdict_id": "343b2883-bcd4-42b2-82ca-985c4e408f4f",
+      "created_at": "2026-09-09T21:41:29.496653+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-334",
+      "version": "v7.0.437",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 19 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "a6c3e8f34a610943cdb40315a9e3191786b36ec1",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.437 SES-334 The Prioritizer re-ranks nightly with no session, and two model-capability 400s found on its first call",
+      "inputs": {
+        "backlog_id": "SES-334",
+        "version": "v7.0.437",
+        "base": "a6c3e8f34a610943cdb40315a9e3191786b36ec1^",
+        "changed_files": [
+          "api/cron/rank-backlog.js",
+          "api/prompt/request-receivable.js",
+          "docs/runbooks/standing-brief.md",
+          "scripts/render-standing-brief.js",
+          "shared/ai-patterns.js",
+          "shared/models.js",
+          "tests/regression/ses-331-agent-prompt-path.test.mjs",
+          "tests/regression/ses-334-served-class-block.test.mjs",
+          "vercel.json"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: --intent omitted; using capabilities.default_intent_slug \"report-card-intent\" | agent-prompt: sections omitted (no stored content -- fetched per call by the executor): knowledge-rc-trace-knowledge] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M1 - The Prioritizer",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.435-SES-332-333-334-prioritizer-goes-to-work.md",
+        "kickoff_source": "at the ship commit a6c3e8f3",
+        "kickoff_bytes": 7157,
+        "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
+        "diff_bytes": 199580,
+        "diff_sha256": "4d607f1fe681400734cd31749791f26fefa4a79f817d75fd0a50c3b8d1af80d1"
+      }
+    },
+    {
+      "verdict_id": "d6e599e3-47d0-43ba-b48a-05ae5c35d9f6",
+      "created_at": "2026-09-09T21:38:27.34623+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-333",
+      "version": "v7.0.436",
+      "recorded": {
+        "verdict": "block",
+        "auto_done_eligible": false,
+        "auto_done_reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "9097f0869e2a18e0dd359f5dc14083ce10efcb3a",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.436 SES-333 Runbook step 5 hands the pick to the Prioritizer; its selection rules move into pz-guardrails",
+      "inputs": {
+        "backlog_id": "SES-333",
+        "version": "v7.0.436",
+        "base": "9097f0869e2a18e0dd359f5dc14083ce10efcb3a^",
+        "changed_files": [
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/SESSIONS.md",
+          "docs/runbooks/runner-cycle.md",
+          "tests/regression/ses-333-step5-handoff.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "red",
+          "hygiene": "green"
+        },
+        "gate_detail": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=red [exit 1 -- [FAIL] ses-331-agent-prompt-path.test.mjs -- scripts/agent-prompt.js did not produce assemblePrompt()'s own output -- it is assembling, not calling | regression suite: 191/192 passed] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "block",
+          "reasoning": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed."
+        },
+        "epic_name": "Governance Agents M1 - The Prioritizer",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.435-SES-332-333-334-prioritizer-goes-to-work.md",
+        "kickoff_source": "at the ship commit 9097f086",
+        "kickoff_bytes": 7157,
+        "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
+        "diff_bytes": 63464,
+        "diff_sha256": "02c82003259b4d9c6106b14e04094c5d5983e4a4ef243a86fd42af104dda70a0"
+      }
+    },
+    {
+      "verdict_id": "afe30176-1afc-45a7-afa7-a87fe53d407a",
+      "created_at": "2026-09-09T21:35:31.970676+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-332",
+      "version": "v7.0.435",
+      "recorded": {
+        "verdict": "block",
+        "auto_done_eligible": false,
+        "auto_done_reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "5a0fcfb95acb965bb3139e1e7d5c147b58e60b84",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.435 SES-332 The Prioritizer's first run: type on every open ticket, served class on 103, John's classes untouched",
+      "inputs": {
+        "backlog_id": "SES-332",
+        "version": "v7.0.435",
+        "base": "5a0fcfb95acb965bb3139e1e7d5c147b58e60b84^",
+        "changed_files": [
+          "docs/design/2026-09-09-p1-served-list.md",
+          "docs/design/2026-09-09-prioritizer-class-disagreements.md",
+          "docs/kickoffs/v7.0.435-SES-332-333-334-prioritizer-goes-to-work.md",
+          "scripts/agent-prompt.js",
+          "scripts/prioritizer-first-run.mjs",
+          "shared/ai-patterns.js",
+          "tests/regression/ses-332-first-run.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "red",
+          "hygiene": "green"
+        },
+        "gate_detail": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=red [exit 1 -- [FAIL] ses-331-agent-prompt-path.test.mjs -- scripts/agent-prompt.js did not produce assemblePrompt()'s own output -- it is assembling, not calling | regression suite: 190/191 passed] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "block",
+          "reasoning": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed."
+        },
+        "epic_name": "Governance Agents M1 - The Prioritizer",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.435-SES-332-333-334-prioritizer-goes-to-work.md",
+        "kickoff_source": "at the ship commit 5a0fcfb9",
+        "kickoff_bytes": 7157,
+        "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
+        "diff_bytes": 115330,
+        "diff_sha256": "726bf79602c18647e6dea2104e3b2b3099fab7a8a3c605c450db1938f21dca13"
+      }
+    },
+    {
+      "verdict_id": "a8971bb9-4abe-4612-8236-1e6b517fde7d",
+      "created_at": "2026-09-09T20:40:15.853399+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "AGT-68",
+      "version": "v7.0.434",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 19 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M4 - The Verifier'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "2126f7783e713261b90ba1755c0096c55fce285f",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.434 AGT-68 The Development Manager: judgment as the run-project capability, a driver that only ever claims",
+      "inputs": {
+        "backlog_id": "AGT-68",
+        "version": "v7.0.434",
+        "base": "2126f7783e713261b90ba1755c0096c55fce285f^",
+        "changed_files": [
+          "scripts/run-project.js",
+          "src/data/agents.js",
+          "tests/regression/agt-68-devmanager.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5-1` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix th] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M4 - The Verifier",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M4 - The Verifier'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.434-AGT-68-development-manager-agent.md",
+        "kickoff_source": "at the ship commit 2126f778",
+        "kickoff_bytes": 5139,
+        "kickoff_sha256": "c5db62bec8b66ccc29533194bbe15f97206490e575e68871302fd2d6646689ee",
+        "diff_bytes": 92676,
+        "diff_sha256": "9d60b11235a6415359c9f581f7ab6effb935066f93c1980f36c59a8a02650329"
+      }
+    },
+    {
+      "verdict_id": "aa2395ac-6426-4506-be0e-911faab0409b",
+      "created_at": "2026-09-09T20:06:15.881943+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "AGT-67",
+      "version": "v7.0.433",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": false,
+        "auto_done_reason": "this delivery changes scripts/verifier.js -- the verification itself. Charter premise 3: \"no change certifies itself; a fresh-context verifier must pass it.\" The verdict stands; the auto-done bar does not apply."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "255795f7caf74445403e3708fa40d4b04fbceef9",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.433 AGT-67 The Verifier: judgment half as the verify-ship capability, the script keeps the mechanical gates",
+      "inputs": {
+        "backlog_id": "AGT-67",
+        "version": "v7.0.433",
+        "base": "255795f7caf74445403e3708fa40d4b04fbceef9^",
+        "changed_files": [
+          "scripts/verifier.js",
+          "src/data/agents.js",
+          "tests/regression/SES-181-verifier.js",
+          "tests/regression/agt-67-verifier.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: APPROVE, auto-done REFUSED (self-certifying path). Findings:\n1. Gates: build exit 0, regression exit 0, hygiene exit 0 with GATE: clear. The 'WRONG PURPOSE TEXT / 1 finding(s)' tail in the regression detail is a deliberately-broken fixture written by tests/regression/ses-313-model-lanes.test.mjs:107-110 and detected as intended, not a failure. The hygiene check 5c WARN (CHI-96 in an inflight marker) is report-only and not in the gating classes 9/10/11. No red or missing gate.\n2. Task 1 (seed) verified live, not from the commit's claim: query on agents/capabilities/agent_capability_assignments/skill_profiles/capability_skill_profiles/runner_model_lanes returns verifier=GV-06/governance/active, verify-ship execution_type=ai default_intent_slug=vf-verdict-intent, five vf-* profiles over five distinct types all on claude-fable-5-1 = judgment lane model_id, five links, vf-knowledge-bar.traits.source=inline. The kickoff's 'six vf-* profiles' is stale against seed line 6 ('NO Format Skill is linked'); the delivery records the drift in agt-67-verifier.test.mjs header (1) rather than silently reconciling. PM-lens slippage, not a defect.\n3. Task 2 delivered: reconcileJudgment() at scripts/verifier.js:710 short-circuits to block on mechanical block (diff line 'if (mechVerdict === \"block\" && agent.verdict === \"approve\")' pushes an override, verdict stays block) and computes eligible = verdict==='approve' && codeEligibility.eligible===true && agent.auto_done_eligible===true. SELF_CERTIFYING_PATHS (verifier.js:355-358) unchanged. Intent slug read from capabilities.default_intent_slug; the AA-188 no-fallback claim is confirmed at api/prompt/db-assembly.js:678-696 (else branch filters every intent-type profile). assemblePrompt signature (db-assembly.js:564) accepts intent_slug; renderAssembly exported at scripts/agent-prompt.js:93.\n4. Task 3 delivered and discriminating: SES-181-verifier.js:554 asserts r.verdict==='block' on RED_MECHANICAL + AGENT_APPROVES, and asserts notStrictEqual against the guard-less computation; if the mechanical short-circuit were deleted, r.verdict would be 'approve' and the strictEqual fails. Same shape for invariant (b) over every SELF_CERTIFYING_PATHS entry. Six clauses registered at SES-181-verifier.js:802-807. run-all.js:123-125 discovers .mjs files, so agt-67-verifier.test.mjs runs. Deviation: the kickoff's '--judge=none still records a verdict identical in shape' is answered as a verdictRowFor() key-set comparison, not a recorded --judge=none row; acceptable (no fixture writes to the live ledger, per SES-181's own rule) and stated in the test header (6).\n5. Task 4 delivered: src/data/agents.js:306 (OFF_BENCH_AGENT_IDS), :361 (AVATAR_CFG.verifier, five keys), :403 (AGENT_PRONOUNS.verifier they/them/their). Attended QA verified by query: runner_verdicts 5f414763-c63c-452d-be63-d1086bbe2677 exists, cycle a8000000-0000-4000-8000-0000000000a8, AGT-67 v7.0.433, approve, three gates green, auto_done_eligible=false. That row's reasoning cites reconcileJudgment() at verifier.js:669; HEAD 255795f7 has it at :710, so the recorded verdict graded a PRE-FIX tree and the shipped commit's own judged row is this verdict, not 5f414763. Not a block: the kickoff asked for the QA on the commit before pushing, which was done, and the fixes it produced are in the diff.\n6. Kickoff Task 4 also described a deliberately-broken-regression-gate scratch run to test the Skill text. Neither the commit body nor the diff records that run. The code invariant (finding 4) makes the outcome the same either way, so this is slippage in the QA record, not a risk.\n7. Architect: scripts/verifier.js:1388 (--judge=executor, executor unreachable) emits code 2 with `{ ...payload, recorded: false, error }` -- the mechanical payload's ok/exitCode -- so under --json a failed executor call reports ok:true/exitCode:0 while exiting 2. This is the same defect class the header says finding 3 fixed for exit 3, inherited from the pre-existing insert-failure paths at :997 and :1427. Path is off by default and unproven live; file it, do not block.\n8. Architect: the executor lane's task_context passes code_eligibility: elig (verifier.js:1381, bare reason) while the session lane passes { ...elig, reason: autoDoneReason } (:1304) and the executor's stored row uses the full reason (:1409). The executor's agent sees less than the session's agent. Minor lane asymmetry; file with 7.\n9. Self-certification: changed_files includes scripts/verifier.js. code_eligibility.eligible=false for that reason; I concur. Diff also touches tests/regression/SES-181-verifier.js, which is not in SELF_CERTIFYING_PATHS -- SES-337's stated scope, not this ticket's.\n10. This prompt is itself live evidence: it carries ROLE, BEHAVIOR, CONSTRAINTS, INTENT, TASK DETAILS and BACKGROUND KNOWLEDGE sections, so the assembly with intent_slug and the inline Knowledge trait render as the delivery claims.\nPM lens: Delivered versus promised: all four tasks are present and the two invariants the kickoff named are in code and in tests that would fail if the guard were removed. Slippage: (a) the kickoff said six vf-* profiles, the seed and the live rows hold five -- the wording drift is recorded, not hidden; (b) the kickoff's live-arm wording ('--judge=none still records a verdict identical in shape') is satisfied by a pure key-set comparison rather than a recorded row; (c) the deliberately-broken-gate scratch run in Task 4 has no recorded evidence; (d) --judge=executor is written to spec but explicitly not proven live, and the delivery labels it so. Estimate: predicted 2 cycles, shipped in one attended session with the attended verdict recorded (5f414763). The ship carries three defects the Verifier's first run found and fixes them in the same commit, which is the lane working as designed. No scope creep: 4 files / 4 tasks within the P10 caps.\nChief Architect lens: Fits the architecture it claims. The prompt is imported from the executor's own assembly (SES-331) rather than restated; the Intent is read from capabilities.default_intent_slug and the AA-188 no-fallback behaviour it guards against is real at db-assembly.js:678-696. reconcileJudgment() is a conjunction with the code as ceiling, so the agent adds reasons and no permission -- charter premise 3 stays upstream of the model. One insert path (verdictRowFor/insertVerdict) keeps the two lanes on one row shape with no schema change. Assumptions disproved by the run: a schema-valid verdict can be about the wrong delivery (fixed, verdictIdentityMismatch), and spreading the mechanical payload onto a non-verdict exit lies under --json (fixed for exit 3, still present at :1388 for the executor error path and inherited at :997/:1427). Before the next one: give every code-2 emit its own payload; carry the full auto-done reason in the executor task_context (:1381 vs :1304); make addQaCost atomic. SES-337 should add SES-181-verifier.js and the vf-* Skill rows to SELF_CERTIFYING_PATHS -- this diff edits the test that proves the guard.\nMechanical: approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nThe code agreed with the agent on both the verdict and the auto-done bar.\nJudged by verifier/verify-ship (intent vf-verdict-intent).\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5-1` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix th] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M4 - The Verifier",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "this delivery changes scripts/verifier.js -- the verification itself. Charter premise 3: \"no change certifies itself; a fresh-context verifier must pass it.\" The verdict stands; the auto-done bar does not apply."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.433-AGT-67-verifier-agent.md",
+        "kickoff_source": "at the ship commit 255795f7",
+        "kickoff_bytes": 5812,
+        "kickoff_sha256": "2e9aa976ed1c84ac827fd8f077ad998a2dfe9fe8096140a96be0a4153ec9bd0e",
+        "diff_bytes": 93640,
+        "diff_sha256": "980020317dab1e125780c256537b9f1137af4477f8d42541d3c6ff2d4f48eb82"
+      }
+    },
+    {
+      "verdict_id": "5f414763-c63c-452d-be63-d1086bbe2677",
+      "created_at": "2026-09-09T19:51:34.449769+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "AGT-67",
+      "version": "v7.0.433",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": false,
+        "auto_done_reason": "this delivery changes scripts/verifier.js -- the verification itself. Charter premise 3: \"no change certifies itself; a fresh-context verifier must pass it.\" The verdict stands; the auto-done bar does not apply."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "255795f7caf74445403e3708fa40d4b04fbceef9",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.433 AGT-67 The Verifier: judgment half as the verify-ship capability, the script keeps the mechanical gates",
+      "inputs": {
+        "backlog_id": "AGT-67",
+        "version": "v7.0.433",
+        "base": "255795f7caf74445403e3708fa40d4b04fbceef9^",
+        "changed_files": [
+          "scripts/verifier.js",
+          "src/data/agents.js",
+          "tests/regression/SES-181-verifier.js",
+          "tests/regression/agt-67-verifier.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: APPROVE. Gates: build exit 0, regression exit 0, hygiene exit 0 (GATE: clear). The 'WRONG PURPOSE TEXT / 1 finding(s)' tail in the regression output is a fixture printed by tests/regression/ses-313-model-lanes.test.mjs, not a failure; the hygiene WARN (check 5c, CHI-96) is non-gating. Promise vs diff: Task 2 delivered -- reconcileJudgment() (scripts/verifier.js:669) short-circuits on mechanical block and requires codeEligibility.eligible === true before the agent's opinion counts; SELF_CERTIFYING_PATHS (verifier.js:337) unchanged. Task 3 delivered -- five new clauses registered in SES-181-verifier.js run() (lines 755-760); agt-67-verifier.test.mjs is discovered by run-all.js's readdirSync filter (run-all.js:123-124). Task 4 delivered -- src/data/agents.js AVATAR_CFG.verifier, AGENT_PRONOUNS.verifier, OFF_BENCH_AGENT_IDS. Task 1: the seed carries five vf-* profiles (docs/design/ga-agents-seed.sql:157-179), and this prompt was assembled from those rows with all five sections present, which is the checkable evidence the rows exist.\n\nFindings:\n1. Pass two never cross-checks the agent verdict's backlog_id/version against --ticket/--version or the context file (verifier.js:1076-1100; grep for agentVerdict.backlog_id returns nothing). A verdict JSON written for another ticket or a stale run passes schema validation and is recorded on this ticket's row. The schema requires both keys for exactly this match. Fail-closed gap; not in the kickoff's two named invariants, so not a block -- fix before SES-337 widens the lane. [Architect]\n2. A session-judged row records a thinner auto_done_reason than a --judge=none row: pass one stores code_eligibility: elig (verifier.js:1253) while the mechanical lane stores elig.reason + lookupNote + primeNote + ladderNote (verifier.js:1205) and the executor lane does carry them (verifier.js:1337). Same keys, less content -- the ledger loses the lookup/prime/ladder facts on the session lane. [Architect]\n3. The exit-3 payload spreads the mechanical payload's ok: verdict==='approve' and exitCode 0/1 (verifier.js:1214-1216) into the awaiting-judgment emit (verifier.js:1295-1297). Under --json a caller reads ok:true, exitCode:0 on a run that exited 3 with nothing recorded -- the collapse the header warns against, seeded by the script's own JSON. Also console.log(promptText) (1293) and emit's JSON line (848) share stdout, so --json is not single-line. [Architect]\n4. The SES-181 'mutants' (SES-181-verifier.js:523-531) are two-line stubs returning the agent's field, not 'the shipped function with exactly ONE guard deleted' as line 523 claims; the negative controls at 551 and 596 are tautologies. The PRIMARY assertions (545: red mechanical + agent approve -> block; 591: self-cert path -> eligible false) do fail against a guard-less reconcileJudgment, so the QA discriminates -- but the comment overclaims and the controls measure nothing. [PM]\n5. Kickoff Task 1/Task 3 say six vf-* profiles / six types; the seed and the test pin five (agt-67-verifier.test.mjs:8-12, 180-181). Drift recorded, not hidden. Kickoff wording is stale. [PM]\n6. --judge=executor (verifier.js:966-1003, 1304-1340) ships unexercised, labelled as such in the header; addQaCost (1005-1012) is a non-atomic read-then-PATCH. Kickoff required no live run. [Architect]\n7. Whether the agt-67 live arm ran or reported notRun under the regression gate is not visible in the truncated gate detail. Named in missing_evidence.\nPM lens: Delivered what was promised: all four kickoff tasks are present in the diff and the tests cover the two invariants the ticket named, with primary assertions that would fail if reconcileJudgment() dropped either guard (SES-181-verifier.js:545, 591). Slippage: none on scope; the kickoff's own wording drifted ('six vf-* profiles' vs the seed's five) and the delivery recorded the drift in the test header rather than silently matching it, which is the right call. Estimate: predicted 2 cycles; the diff is one coherent commit. Two quality notes: the negative-control 'mutants' are stubs that assert their own input (finding 4), so the file's claim about them overreads what they measure; and the executor lane is shipped dark. Neither breaks the promise. The attended QA (Task 4) is this run, and it produced findings that cite file:line and refused the bar on the self-certifying path, which is the kickoff's stated expected outcome.\nChief Architect lens: Fits the architecture it claims: the prompt is imported from db-assembly.js assemblePrompt() + agent-prompt.js renderAssembly() (verifier.js:1264-1272), not restated (SES-331); the intent slug is read from capabilities.default_intent_slug, and the AA-188 claim is true -- db-assembly.js:684-693 filters every intent-type profile when intent_slug is null. The one-row-builder verdictRowFor() (verifier.js:891) keeps both lanes on one payload shape. Assumptions disproved: none. What should change before the next one: (1) pass two must bind the verdict file to the delivery -- compare agentVerdict.backlog_id/version to the context (finding 1), otherwise the lane records identity it never checked; (2) the session lane should store the same autoDoneReason string the mechanical lane stores (finding 2) so the ledger is lane-agnostic in content, not only in keys; (3) the exit-3 payload should not carry a mechanical ok/exitCode (finding 3). Self-certification: the diff touches scripts/verifier.js; charter premise 3 refuses the bar and the code's own answer agrees.\nMissing evidence named by the agent: Whether tests/regression/agt-67-verifier.test.mjs's live arm ran green or reported notRun (no SUPABASE env) under the regression gate -- the gate detail is truncated and does not show it.\nMechanical: approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nThe code agreed with the agent on both the verdict and the auto-done bar.\nJudged by verifier/verify-ship (intent vf-verdict-intent).\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5-1` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix th] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M4 - The Verifier",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "this delivery changes scripts/verifier.js -- the verification itself. Charter premise 3: \"no change certifies itself; a fresh-context verifier must pass it.\" The verdict stands; the auto-done bar does not apply."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.433-AGT-67-verifier-agent.md",
+        "kickoff_source": "at the ship commit 255795f7",
+        "kickoff_bytes": 5812,
+        "kickoff_sha256": "2e9aa976ed1c84ac827fd8f077ad998a2dfe9fe8096140a96be0a4153ec9bd0e",
+        "diff_bytes": 93640,
+        "diff_sha256": "980020317dab1e125780c256537b9f1137af4477f8d42541d3c6ff2d4f48eb82"
+      }
+    },
+    {
+      "verdict_id": "a28a217f-d28c-4ce1-a9e6-915bdecbec44",
+      "created_at": "2026-09-09T19:19:14.057664+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "AGT-66",
+      "version": "v7.0.432",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 18 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "e3ac47cec25b88c7555875844d9fc28fd6d43cc3",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.432 AGT-66 The Builder: agent row, build-ticket capability, and a build that had to paste its own output",
+      "inputs": {
+        "backlog_id": "AGT-66",
+        "version": "v7.0.432",
+        "base": "e3ac47cec25b88c7555875844d9fc28fd6d43cc3^",
+        "changed_files": [
+          "src/data/agents.js",
+          "tests/regression/agt-66-builder.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M3 - Designer & Builder",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.431-AGT-65-66-designer-builder-agents.md",
+        "kickoff_source": "at the ship commit e3ac47ce",
+        "kickoff_bytes": 4977,
+        "kickoff_sha256": "640ba903ef2d90e66d6350728e3b26052fb294d18663811d7ed91b14e8c577b1",
+        "diff_bytes": 16407,
+        "diff_sha256": "3efd67c3d802a73f15333812973703158f316058fd557dcc298b58d31fef4530"
+      }
+    },
+    {
+      "verdict_id": "3319f488-daf2-475e-b8b2-f1ad6e1d2c6f",
+      "created_at": "2026-09-09T19:16:09.251124+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "AGT-65",
+      "version": "v7.0.431",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 18 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "a176cc64e06f726d53079b59b4b380d5de7cadd9",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.431 AGT-65 The Designer: agent row, design-kickoff capability, and the premise-revalidation gate proved live",
+      "inputs": {
+        "backlog_id": "AGT-65",
+        "version": "v7.0.431",
+        "base": "a176cc64e06f726d53079b59b4b380d5de7cadd9^",
+        "changed_files": [
+          "src/data/agents.js",
+          "tests/regression/agt-65-designer.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M3 - Designer & Builder",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M3 - Designer & Builder'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.431-AGT-65-66-designer-builder-agents.md",
+        "kickoff_source": "at the ship commit a176cc64",
+        "kickoff_bytes": 4977,
+        "kickoff_sha256": "640ba903ef2d90e66d6350728e3b26052fb294d18663811d7ed91b14e8c577b1",
+        "diff_bytes": 16914,
+        "diff_sha256": "c6ec07ce2c85a5b1b7b59444bfcd287862e5cebc14d3a58614d96636add6e60c"
+      }
+    },
+    {
+      "verdict_id": "24ad747b-2fcd-44c4-a8a4-79de2573763b",
+      "created_at": "2026-09-09T18:39:55.252698+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "AGT-64",
+      "version": "v7.0.429",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 18 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M2 - The Researcher'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "870ee2d0c919bdbb68e7ca6b714319e775b57719",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.429 AGT-64 The Researcher: agent row, research-class-lens, and the first cited invention pass",
+      "inputs": {
+        "backlog_id": "AGT-64",
+        "version": "v7.0.429",
+        "base": "870ee2d0c919bdbb68e7ca6b714319e775b57719^",
+        "changed_files": [
+          "docs/research/2026-09-09-invention-p3-investor-value.md",
+          "src/data/agents.js",
+          "tests/regression/agt-64-researcher.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M2 - The Researcher",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M2 - The Researcher'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.429-AGT-64-researcher-agent.md",
+        "kickoff_source": "at the ship commit 870ee2d0",
+        "kickoff_bytes": 5413,
+        "kickoff_sha256": "0c8d4bf628bcc46c4757e1b615092abff9dbedf4cbc5c7a4c5ec013138294c9d",
+        "diff_bytes": 28374,
+        "diff_sha256": "e5467b66cae304e9fe8e5bffae86a7e702b2b819150686f707a78b378791d965"
+      }
+    },
+    {
+      "verdict_id": "54758ce9-533f-46d2-984a-242c3ae616b9",
+      "created_at": "2026-09-09T18:08:45.581706+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-341",
+      "version": "v7.0.430",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 18 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "95468f1ad9ae8c3334bb166f854942b4bc111522",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.430 SES-341 a Knowledge Skill can carry its own text: traits.source = inline",
+      "inputs": {
+        "backlog_id": "SES-341",
+        "version": "v7.0.430",
+        "base": "95468f1ad9ae8c3334bb166f854942b4bc111522^",
+        "changed_files": [
+          "api/prompt/ai-enrichment.js",
+          "api/prompt/db-assembly.js",
+          "tests/regression/ses-341-inline-knowledge.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M1 - The Prioritizer",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.430-SES-341-inline-knowledge.md",
+        "kickoff_source": "at the ship commit 95468f1a",
+        "kickoff_bytes": 5363,
+        "kickoff_sha256": "dff1632d65cb5afd58215b1cf0af8793b6e95c12a77ecefcb2b3447d233ccf67",
+        "diff_bytes": 26695,
+        "diff_sha256": "51ff8bf63b43a347edaa08b0eb0c38bd204cefa6045d92efb94bec939b59c964"
+      }
+    },
+    {
+      "verdict_id": "a0ad16a5-5751-4cd0-abfa-869b0ff7baa1",
+      "created_at": "2026-09-09T17:45:41.072582+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "AGT-63",
+      "version": "v7.0.428",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 17 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "05478a4a24f04c764e43689de96135d2ac14424c",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.428 AGT-63 The Prioritizer: seed applied, prioritizer-write handler registered, bench entries",
+      "inputs": {
+        "backlog_id": "AGT-63",
+        "version": "v7.0.428",
+        "base": "05478a4a24f04c764e43689de96135d2ac14424c^",
+        "changed_files": [
+          "api/_lib/handlers/prioritizer-write.js",
+          "api/prompt/request-receivable.js",
+          "docs/design/agt-63-prioritizer-seed.sql",
+          "src/data/agents.js",
+          "tests/regression/SE-03-agent-fields.js",
+          "tests/regression/agt-63-prioritizer.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M1 - The Prioritizer",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M1 - The Prioritizer'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.428-AGT-63-prioritizer-agent.md",
+        "kickoff_source": "at the ship commit 05478a4a",
+        "kickoff_bytes": 7091,
+        "kickoff_sha256": "5ee6b33a6cb916dfa6499c01b80219a59b16d50c149a82c7a6edd08e1231ae9e",
+        "diff_bytes": 57657,
+        "diff_sha256": "9c55c9dd4e00a4e9b7ab6ddbab0ce0f570b242e533a17013f14a14b85c60d847"
+      }
+    },
+    {
+      "verdict_id": "6898bac8-e219-4ddd-9d6b-093d71afd682",
+      "created_at": "2026-09-09T17:11:57.390169+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-330",
+      "version": "v7.0.427",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 17 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M0 - Standard & Foundation'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "01795d9393c2dc1f69966251cf76db0fbc36a158",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.427 SES-330 governance agents hidden from the product broker and work-order screen",
+      "inputs": {
+        "backlog_id": "SES-330",
+        "version": "v7.0.427",
+        "base": "01795d9393c2dc1f69966251cf76db0fbc36a158^",
+        "changed_files": [
+          "lib/project-manager.js",
+          "src/screens/CreateWorkOrderScreen.jsx",
+          "tests/regression/ses-330-governance-lane.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M0 - Standard & Foundation",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M0 - Standard & Foundation'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.427-SES-330-governance-lane.md",
+        "kickoff_source": "at the ship commit 01795d93",
+        "kickoff_bytes": 4753,
+        "kickoff_sha256": "4d9d9d0eb93c93b06656ed2712b1bfef86065e67f7ce07ae10c92663559d0c58",
+        "diff_bytes": 22122,
+        "diff_sha256": "407a144759b8a8b316a84cd0f76eb98895fe842a4c3591d2bb754d2281c3afb5"
+      }
+    },
+    {
+      "verdict_id": "dc692f01-c2ab-4bcf-ac83-73fe1538c641",
+      "created_at": "2026-09-09T16:48:43.38757+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-331",
+      "version": "v7.0.426",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 17 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M0 - Standard & Foundation'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "9818443254c59bf3b52e4fcadbf25912c2c56c0b",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.426 SES-331 one prompt-assembly path for agents run inside a session",
+      "inputs": {
+        "backlog_id": "SES-331",
+        "version": "v7.0.426",
+        "base": "9818443254c59bf3b52e4fcadbf25912c2c56c0b^",
+        "changed_files": [
+          "api/prompt/ai-enrichment.js",
+          "docs/SESSIONS.md",
+          "docs/runbooks/session-setup.md",
+          "lib/activity-log.js",
+          "lib/request-context.js",
+          "scripts/agent-log.js",
+          "scripts/agent-prompt.js",
+          "tests/regression/ses-331-agent-prompt-path.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M0 - Standard & Foundation",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Governance Agents M0 - Standard & Foundation'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.426-SES-331-agent-prompt-path.md",
+        "kickoff_source": "at the ship commit 98184432",
+        "kickoff_bytes": 6497,
+        "kickoff_sha256": "545281da6ea7646934f03d893cbcd6ca65784a49106dd5a7544348bc42aea5c3",
+        "diff_bytes": 56680,
+        "diff_sha256": "c8ecef3fe00e3daf57545491806b425a24fbf4274527ac8b91c14ded3940b4c3"
+      }
+    },
+    {
+      "verdict_id": "03d97f4b-6b64-4646-b835-a4ff4316cebc",
+      "created_at": "2026-09-09T16:21:15.823236+00:00",
+      "cycle_id": "a8000000-0000-4000-8000-0000000000a8",
+      "cycle_stamp": "PROJECT-CREATE-GA-supervised-design-runner-24h-0908",
+      "backlog_id": "SES-340",
+      "version": "v7.0.425",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": false,
+        "auto_done_reason": "this delivery changes scripts/verifier.js -- the verification itself. Charter premise 3: \"no change certifies itself; a fresh-context verifier must pass it.\" The verdict stands; the auto-done bar does not apply."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "6bdf6a891d067d3b3e64186b8c4a65ede5d56c4b",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 23 of these verdicts)",
+      "commit_subject": "v7.0.425 SES-340 — the runner's pick path admits the active project by a setting, not by the Selfbuild name prefix: the verifier reads projects.status, and the retired Prime Directive is ledgered",
+      "inputs": {
+        "backlog_id": "SES-340",
+        "version": "v7.0.425",
+        "base": "6bdf6a891d067d3b3e64186b8c4a65ede5d56c4b^",
+        "changed_files": [
+          "docs/SELFBUILD-RETIREMENT-LEDGER.md",
+          "docs/SESSIONS.md",
+          "docs/runbooks/runner-cycle.md",
+          "scripts/build-briefing.mjs",
+          "scripts/verifier.js",
+          "tests/regression/SES-181-verifier.js",
+          "tests/regression/SES-243-prime-directive-autodone.js",
+          "tests/regression/ses-281-m5-pick-enforcement.test.mjs",
+          "tests/regression/ses-340-projects-govern.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Governance Agents M0 - Standard & Foundation",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "this delivery changes scripts/verifier.js -- the verification itself. Charter premise 3: \"no change certifies itself; a fresh-context verifier must pass it.\" The verdict stands; the auto-done bar does not apply."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.425-SES-340-projects-govern-pick-path.md",
+        "kickoff_source": "at HEAD -- the doc was committed after the ship it specced",
+        "kickoff_bytes": 9746,
+        "kickoff_sha256": "bc33dc186b2e1b3061c358a12bdfca6aba35a0db31e1756dfcce9b387726783a",
+        "diff_bytes": 126968,
+        "diff_sha256": "7957df0c6e3c533ecaff631498d665b82b4013ac4f746ad62fd903ad6ca98a75"
+      }
+    },
+    {
+      "verdict_id": "a92bb24e-9619-4f02-8105-87dd1eea84c4",
+      "created_at": "2026-09-04T15:21:43.292773+00:00",
+      "cycle_id": "3903a864-151f-4e07-8479-c4dea55fcb32",
+      "cycle_stamp": "QA-SES-319-supervised-design-m7-item1-0904",
+      "backlog_id": "SES-319",
+      "version": "v7.0.423",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 15 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Selfbuild M7 - The Inventor'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "2ce345e7accb70c3d1399b2868ca725f89c5561a",
+      "sha_source": "runner_cycles.push_sha (unique to this verdict)",
+      "commit_subject": "v7.0.423 SES-319 — the runner's silence is measured while it is open: runner_silence() reads the newest unattended fire against John's cadence and the pre-boot gate, and the hourly finaliser records it beside every run",
+      "inputs": {
+        "backlog_id": "SES-319",
+        "version": "v7.0.423",
+        "base": "2ce345e7accb70c3d1399b2868ca725f89c5561a^",
+        "changed_files": [
+          "docs/SESSIONS.md",
+          "docs/kickoffs/v7.0.423-SES-319-runner-silence.md",
+          "docs/runbooks/runner-cycle.md",
+          "tests/regression/ses-319-runner-silence.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Selfbuild M7 - The Inventor",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Selfbuild M7 - The Inventor'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.423-SES-319-runner-silence.md",
+        "kickoff_source": "at the ship commit 2ce345e7",
+        "kickoff_bytes": 9882,
+        "kickoff_sha256": "448a17df754a4950f3a6a37e8e5be8d46c266863e512cf82ccc00625159535bb",
+        "diff_bytes": 63312,
+        "diff_sha256": "f34052ebc0aff83a96b020cf0384efbacf0d55e439304b03416033a107e3b3f4"
+      }
+    },
+    {
+      "verdict_id": "ba145856-f593-4128-99fd-f6cff70befaa",
+      "created_at": "2026-09-04T15:17:28.392779+00:00",
+      "cycle_id": "9aadabfb-94b4-417f-8099-71ad3ce4de03",
+      "cycle_stamp": "QA-SES-320-supervised-design-m7-item1-0904",
+      "backlog_id": "SES-320",
+      "version": "v7.0.422",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 15 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Selfbuild M7 - The Inventor'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "3e181af727a348b7a61a58c3a1d0d5e60a0eab4b",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 3 of these verdicts)",
+      "commit_subject": "v7.0.422 SES-320 follow-up — the decision-window finaliser: pg_cron closes expired windows at :17 every hour, so a delivered ticket's exit and John's 72-hour handles no longer wait for a cycle",
+      "inputs": {
+        "backlog_id": "SES-320",
+        "version": "v7.0.422",
+        "base": "3e181af727a348b7a61a58c3a1d0d5e60a0eab4b^",
+        "changed_files": [
+          "docs/SESSIONS.md",
+          "docs/kickoffs/v7.0.422-SES-320b-window-finaliser.md",
+          "docs/runbooks/runner-cycle.md",
+          "inflight/design-m7-item1-0904.md",
+          "tests/regression/ses-320b-window-finaliser.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Selfbuild M7 - The Inventor",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Selfbuild M7 - The Inventor'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.422-SES-320b-window-finaliser.md",
+        "kickoff_source": "at the ship commit 3e181af7",
+        "kickoff_bytes": 10968,
+        "kickoff_sha256": "7a8ee79f2f99e54955a31578c404857373711e0a087a0b49bdeb3a5e95ff405d",
+        "diff_bytes": 65895,
+        "diff_sha256": "c09b3d897f729dd6549c05b026acbdeeb4b92ac0ee3f8322e666f7ddf8a22d0b"
+      }
+    },
+    {
+      "verdict_id": "80643e32-bf71-41a2-949c-a4f48827fd1c",
+      "created_at": "2026-09-04T15:13:38.789421+00:00",
+      "cycle_id": "9aadabfb-94b4-417f-8099-71ad3ce4de03",
+      "cycle_stamp": "QA-SES-320-supervised-design-m7-item1-0904",
+      "backlog_id": "SES-320",
+      "version": "v7.0.422",
+      "recorded": {
+        "verdict": "block",
+        "auto_done_eligible": false,
+        "auto_done_reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "3e181af727a348b7a61a58c3a1d0d5e60a0eab4b",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 3 of these verdicts)",
+      "commit_subject": "v7.0.422 SES-320 follow-up — the decision-window finaliser: pg_cron closes expired windows at :17 every hour, so a delivered ticket's exit and John's 72-hour handles no longer wait for a cycle",
+      "inputs": {
+        "backlog_id": "SES-320",
+        "version": "v7.0.422",
+        "base": "3e181af727a348b7a61a58c3a1d0d5e60a0eab4b^",
+        "changed_files": [
+          "docs/SESSIONS.md",
+          "docs/kickoffs/v7.0.422-SES-320b-window-finaliser.md",
+          "docs/runbooks/runner-cycle.md",
+          "inflight/design-m7-item1-0904.md",
+          "tests/regression/ses-320b-window-finaliser.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "red",
+          "hygiene": "green"
+        },
+        "gate_detail": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=red [exit 1 -- [FAIL] ses-286b-decision-runbooks.test.mjs -- runner-cycle.md must name sweep_decision_windows( EXACTLY once -- the serial tail's (7b) call. A second copy is a second home for an executable procedure, and one of the two then drifts. | regression suite: 178/179 passed] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "block",
+          "reasoning": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed."
+        },
+        "epic_name": "Selfbuild M7 - The Inventor",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.422-SES-320b-window-finaliser.md",
+        "kickoff_source": "at the ship commit 3e181af7",
+        "kickoff_bytes": 10968,
+        "kickoff_sha256": "7a8ee79f2f99e54955a31578c404857373711e0a087a0b49bdeb3a5e95ff405d",
+        "diff_bytes": 65895,
+        "diff_sha256": "c09b3d897f729dd6549c05b026acbdeeb4b92ac0ee3f8322e666f7ddf8a22d0b"
+      }
+    },
+    {
+      "verdict_id": "2dadc372-a8e7-4525-815b-0b4e112953f5",
+      "created_at": "2026-09-04T15:07:53.452751+00:00",
+      "cycle_id": "9aadabfb-94b4-417f-8099-71ad3ce4de03",
+      "cycle_stamp": "QA-SES-320-supervised-design-m7-item1-0904",
+      "backlog_id": "SES-320",
+      "version": "v7.0.422",
+      "recorded": {
+        "verdict": "block",
+        "auto_done_eligible": false,
+        "auto_done_reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "3e181af727a348b7a61a58c3a1d0d5e60a0eab4b",
+      "sha_source": "resolved from version+ticket (push_sha is shared by 3 of these verdicts)",
+      "commit_subject": "v7.0.422 SES-320 follow-up — the decision-window finaliser: pg_cron closes expired windows at :17 every hour, so a delivered ticket's exit and John's 72-hour handles no longer wait for a cycle",
+      "inputs": {
+        "backlog_id": "SES-320",
+        "version": "v7.0.422",
+        "base": "3e181af727a348b7a61a58c3a1d0d5e60a0eab4b^",
+        "changed_files": [
+          "docs/SESSIONS.md",
+          "docs/kickoffs/v7.0.422-SES-320b-window-finaliser.md",
+          "docs/runbooks/runner-cycle.md",
+          "inflight/design-m7-item1-0904.md",
+          "tests/regression/ses-320b-window-finaliser.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "red",
+          "hygiene": "green"
+        },
+        "gate_detail": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=red [exit 1 -- [FAIL] ses-286b-decision-runbooks.test.mjs -- control 1 for \"serial-tail-sweeps-before-the-chain-gate\" still passes after its own mutation -- the clause is not testing what it says | regression suite: 178/179 passed] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "block",
+          "reasoning": "block: RED: regression suite. Green: build, hygiene tripwire. A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed."
+        },
+        "epic_name": "Selfbuild M7 - The Inventor",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": false,
+          "reason": "verdict is block; the interim auto-done bar requires approve (all three gates green)."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.422-SES-320b-window-finaliser.md",
+        "kickoff_source": "at the ship commit 3e181af7",
+        "kickoff_bytes": 10968,
+        "kickoff_sha256": "7a8ee79f2f99e54955a31578c404857373711e0a087a0b49bdeb3a5e95ff405d",
+        "diff_bytes": 65895,
+        "diff_sha256": "c09b3d897f729dd6549c05b026acbdeeb4b92ac0ee3f8322e666f7ddf8a22d0b"
+      }
+    },
+    {
+      "verdict_id": "6a75df05-a607-47e9-8d5e-9c5fbbfc9d4e",
+      "created_at": "2026-09-03T18:20:48.330473+00:00",
+      "cycle_id": "a7000000-0000-4000-8000-0000000000a7",
+      "cycle_stamp": "GATE-REVIEW-M7-supervised-design-m7-build-0902",
+      "backlog_id": "SES-320",
+      "version": "v7.0.421",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 15 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Selfbuild M7 - The Inventor'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": false,
+      "unavailable_reason": "no commit whose subject is \"v7.0.421 ... SES-320 ...\"",
+      "sha": null,
+      "sha_source": null,
+      "commit_subject": null,
+      "inputs": null
+    },
+    {
+      "verdict_id": "310fbbc8-9020-4127-ab4a-0080f931c9f3",
+      "created_at": "2026-09-03T17:58:32.788295+00:00",
+      "cycle_id": "6f6493d5-e42f-4857-b890-40e69ee10b5d",
+      "cycle_stamp": "QA-LOG-143d3-supervised-design-m7-build-0902",
+      "backlog_id": "LOG-143",
+      "version": "v7.0.420",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green on a Selfbuild-epic delivery in class 'P1 - Improves John's Skills', and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- the Prime Directive's §2f widening is live, so the P10 - Tooling restriction of charter decision 2 is suspended for its duration. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "6fd8fdd10b51bd78fbb88d3b5638d03e2932efe9",
+      "sha_source": "runner_cycles.push_sha (unique to this verdict)",
+      "commit_subject": "v7.0.420 LOG-143 (d3) — a denied Library read is reported as a denial, never as an absent source; the Report Card's groundedness stays unknown on denial instead of inventing a low score",
+      "inputs": {
+        "backlog_id": "LOG-143",
+        "version": "v7.0.420",
+        "base": "6fd8fdd10b51bd78fbb88d3b5638d03e2932efe9^",
+        "changed_files": [
+          "api/prompt/ai-enrichment.js",
+          "lib/librarian.js",
+          "lib/search-harness.js",
+          "tests/regression/log-143d3-denial-is-not-absence.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Selfbuild M7 - The Inventor",
+        "priority_class": "P1 - Improves John's Skills",
+        "class_autonomy": {
+          "work_class": null,
+          "rung": null,
+          "streak": null,
+          "auto_done": false,
+          "extra_files": 0,
+          "extra_tasks": 0
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green on a delivery in an executing project (epic 'Selfbuild M7 - The Inventor') in class 'P1 - Improves John's Skills', and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- a project is executing, so the P10 - Tooling restriction of charter decision 2 is suspended for its duration. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.420-LOG-143d3-denial-is-not-absence.md",
+        "kickoff_source": "at the ship commit 6fd8fdd1",
+        "kickoff_bytes": 5825,
+        "kickoff_sha256": "b5680992fe350d5b5bb716eec2405f586f338092484535072739432b6dc08a58",
+        "diff_bytes": 22253,
+        "diff_sha256": "c3642cdaa075c45fdd48a9f620115c3a105f10297b214dd08a638443d2892e27"
+      }
+    },
+    {
+      "verdict_id": "6288cb03-f341-4e8c-b72d-683119a2e51f",
+      "created_at": "2026-09-03T17:43:03.261907+00:00",
+      "cycle_id": "839f1ce5-7823-4a68-87e4-6c645ddba264",
+      "cycle_stamp": "QA-SES-321-supervised-design-m7-build-0902",
+      "backlog_id": "SES-321",
+      "version": "v7.0.416",
+      "recorded": {
+        "verdict": "approve",
+        "auto_done_eligible": true,
+        "auto_done_reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 14 >= auto_done_rung 3, so the ladder granted this class the bar (M6, SES-122). Epic 'Selfbuild M7 - The Inventor'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+      },
+      "available": true,
+      "unavailable_reason": null,
+      "sha": "bd8de8801a5c84cd06cb0016fd6852c3af03840e",
+      "sha_source": "runner_cycles.push_sha (unique to this verdict)",
+      "commit_subject": "v7.0.416 SES-321 -- an admitted enhancement passes the Selfbuild fence: the register's promise is now the pick path's behaviour",
+      "inputs": {
+        "backlog_id": "SES-321",
+        "version": "v7.0.416",
+        "base": "bd8de8801a5c84cd06cb0016fd6852c3af03840e^",
+        "changed_files": [
+          "docs/RUNNER-GOV-ENHANCEMENT-LANE.md",
+          "docs/RUNNER-GOV-M5-REQUIREMENTS.md",
+          "docs/governance/RULES-SNAPSHOT.md",
+          "tests/regression/ses-321-enhancement-fence.test.mjs"
+        ],
+        "gates": {
+          "build": "green",
+          "regression": "green",
+          "hygiene": "green"
+        },
+        "gate_detail": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself.\nGates: build=green [exit 0 -- - Using dynamic import() to code-split the application | - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks | - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m] | regression suite=green [exit 0 -- committed: > **orchestrator** — `claude-opus-5` — WRONG PURPOSE TEXT / > **judgment** — `claude-fable-5` — also wrong / > **mechanical** — `claude-sonnet-5` — also wrong | snapshot:   > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21). / > **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21). / > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21). | 1 finding(s). Fix the ] | hygiene tripwire=green [exit 0 -- [check 5c, WARN] inflight marker \"design-arch-beta-0729\" mentions CHI-96, which has a row in docs/FEATURES-ARCHIVE.md -- read the prose before acting: citing an archived ID as context (the shipped mechanism being fixed, or a record of what this session logged) is legitimate and common. Only a marker presenting archived work as still pending is a real finding. | Report only -- nothing auto-fixed. Review before editing CLAUDE-STATE.md or the backlog (public.backlog_items; the FEATURES*.md files are legend-only stubs). | GATE: clear -- no FLAG findings in the gating classes (checks 9/10/11). Exit]",
+        "mechanical": {
+          "verdict": "approve",
+          "reasoning": "approve: all 3 mechanical gates green (build, regression suite, hygiene tripwire). Verdict-only -- this completes nothing and blocks nothing by itself."
+        },
+        "epic_name": "Selfbuild M7 - The Inventor",
+        "priority_class": "P10 - Tooling",
+        "class_autonomy": {
+          "work_class": "tooling",
+          "rung": 20,
+          "streak": 78,
+          "auto_done": true,
+          "extra_files": 7,
+          "extra_tasks": 7
+        },
+        "class_autonomy_source": "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        "epic_project_executing": true,
+        "project_executing": true,
+        "code_eligibility": {
+          "eligible": true,
+          "reason": "all three gates green, and the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js -- class 'P10 - Tooling' is work class 'tooling' at rung 20 >= auto_done_rung (unread), so the ladder granted this class the bar (M6, SES-122). Epic 'Selfbuild M7 - The Inventor'; a rung is a fact about the class, not about the epic. Reverse stays one tap away."
+        },
+        "kickoff_path": "docs/kickoffs/v7.0.416-SES-321-enhancement-fence.md",
+        "kickoff_source": "at the ship commit bd8de880",
+        "kickoff_bytes": 4885,
+        "kickoff_sha256": "10157f73fca989cf2e9102ae77c2e315618f4d440f4d78a2342cc3a83c1a31a1",
+        "diff_bytes": 24378,
+        "diff_sha256": "594c150839a0cb6a9ddd0a6c1584e998a3561b7554e6a47bd6e85e2646ab3d35"
+      }
+    }
+  ]
+}
