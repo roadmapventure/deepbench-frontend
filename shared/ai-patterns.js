@@ -188,6 +188,17 @@ export const SERVICE_CATALOG = [
   // the_library chunk TEXT by id yet, so groundedness returns `unknown` until then. Declared here
   // rather than added later so the service's pattern set does not churn mid-feature.
   { slug: 'bench-report-card',       name: 'Bench Report Card',         serviceType: 'ai',     patterns: ['LLM-as-Judge / Verifier', 'Structured Output', 'RAG'], roadmap: 'now' },
+
+  // FEATURE: SES-332 -- the Prioritizer's classify-ticket. AGT-63 shipped the capability, the Skill
+  // rows and the prioritizer-write handler but no catalog entry, so the first call through
+  // scripts/agent-log.js was refused ("not a SERVICE_CATALOG slug") -- the AI-audit rule working
+  // exactly as designed, caught on the first real run rather than after the audit had a nameless
+  // slug in it. No AI_TYPE_TO_SERVICE entry needed: ai_type equals capability_slug
+  // ('classify-ticket'), resolved by the existing `|| e.type` fallback, same as bench-report-card.
+  // 'Structured Output' because every ruling is validated against pz-classify-intent's schema before
+  // it reaches the handler; 'Guardrails / Output Filtering' because pz-guardrails refuses the
+  // ruling, not just shapes it (a P1 with no named artifact is rejected, not softened).
+  { slug: 'classify-ticket',         name: 'Classify Ticket (The Prioritizer)', serviceType: 'ai', patterns: ['Structured Output', 'Guardrails / Output Filtering'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge

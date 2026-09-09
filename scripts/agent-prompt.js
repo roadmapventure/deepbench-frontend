@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v7.0.426 | scripts/agent-prompt.js | SES-331 -- ONE prompt-assembly path for an agent
-// run inside a Claude session.
+// DeepBench v7.0.435 | scripts/agent-prompt.js | SES-331 -- ONE prompt-assembly path for an agent
+// run inside a Claude session. SES-332: --intent now falls back to the capability's stored
+// default_intent_slug instead of silently assembling with no Intent Skill at all.
 //
 // WHY THIS EXISTS. John, 2026-09-08: run the governance agents from a session over the database on
 // subscription tokens instead of API dollars. The risk named at that gate is the only thing this
@@ -28,8 +29,10 @@
 // FLAGS
 //   --agent=<agents.id>        required
 //   --capability=<slug>        required
-//   --intent=<slug>            optional; omitted means every Intent-type Skill is skipped, which is
-//                              assemblePrompt()'s own AA-188 behaviour, not a shortcut taken here
+//   --intent=<slug>            optional; omitted falls back to the capability's own
+//                              `capabilities.default_intent_slug` (SES-332 residue fix — see
+//                              resolveIntentSlug below). Pass --intent=none for the deliberate
+//                              no-intent assembly.
 //   --task=<json>              optional JSON object, the task_context (default {})
 //   --tenant=<id>              optional, default 'global'
 //   --json                     print the raw assembly object instead of the rendered prompt
@@ -50,6 +53,46 @@ const DEFAULT_TENANT = 'global';
 function fail(message) {
   console.error(`agent-prompt: ${message}`);
   process.exit(2);
+}
+
+// FEATURE: SES-332 -- the one-file residue fix for the defect AGT-67 found and SES-332 hit again.
+// db-assembly.js's AA-188 branch FILTERS OUT every Intent-type Skill when intent_slug is null (its
+// `skillProfiles.filter(sp => sp.skill_type_slug !== 'intent')`), which is correct for the routing
+// agent that genuinely could not map a request to one intent -- and silently wrong for a session
+// operator who simply did not type the flag. The observable symptom is not an error: the prompt
+// assembles, renders, and is missing its schema, its handler and its output contract entirely, so
+// the sub-agent free-writes. `capabilities.default_intent_slug` is the capability's own stored
+// answer to "which intent, if the caller names none" (classify-ticket -> pz-classify-intent,
+// rank-backlog -> pz-rank-intent, MEASURED this session) and is exactly what the omitted flag
+// should mean here.
+//
+// FIXED HERE AND NOT IN db-assembly.js ON PURPOSE. assemblePrompt() is the executor's own function;
+// changing what null means there would change every existing caller's prompt, including the routing
+// path AA-188 was written for, where "no intent" is a deliberate ruling and not an omission. This
+// script is the session-operator surface, and the operator's omission is the only case being
+// reinterpreted. `--intent=none` stays available for the deliberate no-intent assembly, so nothing
+// this script could do before became unreachable.
+export const NO_INTENT = 'none';
+
+export async function resolveIntentSlug({ intent, capability, tenant, fetchImpl = fetch }) {
+  if (intent === NO_INTENT) return { intentSlug: null, source: 'explicit-none' };
+  if (intent) return { intentSlug: intent, source: 'flag' };
+
+  const url = `${process.env.SUPABASE_URL}/rest/v1/capabilities`
+    + `?slug=eq.${encodeURIComponent(capability)}&tenant_id=eq.${encodeURIComponent(tenant)}`
+    + '&select=default_intent_slug&limit=1';
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  const r = await fetchImpl(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  if (!r.ok) return { error: `could not read default_intent_slug for capability "${capability}": HTTP ${r.status}` };
+  const rows = await r.json();
+  if (!Array.isArray(rows) || !rows[0]) return { error: `no capabilities row for slug "${capability}" in tenant "${tenant}"` };
+
+  const fallback = rows[0].default_intent_slug;
+  // A capability that declares no default intent keeps AA-188's behaviour -- this fix supplies a
+  // stored answer where one exists, it does not invent one where none does.
+  return fallback
+    ? { intentSlug: fallback, source: 'capability-default' }
+    : { intentSlug: null, source: 'no-default-declared' };
 }
 
 export function parseArgs(argv) {
@@ -107,14 +150,23 @@ async function main() {
   if (!process.env.SUPABASE_URL) fail('SUPABASE_URL not set');
   if (!process.env.SUPABASE_SERVICE_KEY) fail('SUPABASE_SERVICE_KEY not set');
 
+  const tenant = args.tenant || DEFAULT_TENANT;
+  const resolved = await resolveIntentSlug({ intent: args.intent, capability: args.capability, tenant });
+  if (resolved.error) fail(resolved.error);
+  if (resolved.source === 'capability-default') {
+    console.error(`agent-prompt: --intent omitted; using capabilities.default_intent_slug "${resolved.intentSlug}"`);
+  } else if (resolved.source === 'no-default-declared') {
+    console.error(`agent-prompt: --intent omitted and capability "${args.capability}" declares no default_intent_slug -- assembling with every Intent Skill skipped (AA-188)`);
+  }
+
   let assembly;
   try {
     assembly = await assemblePrompt({
       capability_slug: args.capability,
       agent_id: args.agent,
-      tenant_id: args.tenant || DEFAULT_TENANT,
+      tenant_id: tenant,
       task_context: args.taskContext,
-      intent_slug: args.intent || null,
+      intent_slug: resolved.intentSlug,
     });
   } catch (e) {
     // assemblePrompt() throws loudly on an intent_slug that matches no Intent Skill Profile
