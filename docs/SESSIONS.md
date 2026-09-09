@@ -12438,6 +12438,9 @@ Harvest (map, measurements, full QA table): `docs/harvests/LOG-138.md`. Kickoff:
 > rotation (hygiene check 8 tripwire at 1.5 MB) moves the tail. Never summarize on rotation.
 # Appendix — retired `runner-cycle.md` header stamps (moved by `SES-164`, v7.0.210)
 
+<!-- retired by SES-336, v7.0.439, 2026-09-09: stamp count held at 5 per session-hygiene check 7. SES-164 step 2 was run FIRST by grep over the body, not from recollection: run_window_finaliser (1 body hit), runner_finaliser_runs (2), the :17-against-cron_minute grid (4), FOR UPDATE SKIP LOCKED (2) and the card-only rollback class (8) all already had body homes. ONE fact had ZERO hits and was RELOCATED rather than archived: that the tail paragraph names sweep_decision_windows WITHOUT its argument list on purpose, because ses-286b-decision-runbooks.test.mjs's serial-tail clause mutates the ONE canonical call line and a second copy carrying its arguments survives that mutation and makes the guard report itself vacuous — it caught exactly that at v7.0.422, verdict 2dadc372, a block. It now sits beside that paragraph in the tail. Body proven byte-identical across the rotation, sha256 12ead8cbb174f96ee207f59793c5db8540b764d0c77a46281957cf99dbf4cc56. -->
+<!-- DeepBench v7.0.422 | runbooks/runner-cycle.md | SES-320 follow-up (attended session design-m7-item1-0904, no new ticket) — THE DECISION-WINDOW SWEEP GAINS A CALLER WITH ITS OWN CLOCK, and the thing to read twice is that NOTHING ABOUT THE SWEEP CHANGED. Measured before a line moved, not recalled: `public.runner_decisions` held 28 `open` rows and 0 `final` — no decision had EVER finalised — because the sweep's only callers were this tail's (7b) and an attended close-out, and the last unattended cycle started 2026-09-02 15:33Z. So `M6-02`'s window closed only with a person in the room, `SES-320`'s delivered exit had never fired live, and the M7 review's own 72-hour handle finalised only if a cycle happened to run after it. Migration `ses320b_window_finaliser`: `pg_cron` installed, `cron.job` `runner-window-finaliser` calls `public.run_window_finaliser()` at :17 every hour — the SAME `sweep_decision_windows` with session attribution (`NULL, 'pg-cron finaliser'`), re-implementing none of it — and writes one `public.runner_finaliser_runs` row per run (error text on failure, the sweep's partial writes rolled back with the subtransaction, so a broken finaliser is a row rather than a silence). :17 IS CHOSEN AGAINST THE RUNNER'S OWN GRID (`runner_settings.cron_minute = 40`): a window closes 23 minutes before the next scheduled fire, so a promotion lands where the NEXT cycle's step-4b read finds it, which is exactly (7b)'s not-at-step-1 argument kept rather than re-argued. THE TAIL CALL STAYS: idempotent, and the sweep's `FOR UPDATE SKIP LOCKED` makes the two callers safe together. Down captured first for the function and the table; the extension and the job row are card-only (uncapturable, the SES-269 precedent). PROVEN LIVE at this ship: the migration's own trailing DO block asserted one overload, EXECUTE closed to anon/authenticated and open to service_role, SELECT on the record closed to both public roles, one active job; one hand call finalised ONE decision whose window had already lapsed unnoticed (`46685148`, a reversal record, expired 2026-09-03 14:45Z) — the first finalisation in the platform's life — and the exception branch was exercised in a rolled-back transaction (the sweep renamed away, the call returned (0,0,0) and left an error row). THE VERIFIER MADE A TRUE CATCH AT THIS SHIP, recorded rather than lost (verdict `2dadc372`, block): the first draft of the (7b) paragraph wrote the sweep call with its arguments, and `ses-286b-decision-runbooks.test.mjs`'s serial-tail clause — which mutates the ONE canonical call line and then asserts the tail no longer sweeps before the chain gate — found a second copy of the sweep call surviving its mutation and reported itself vacuous; the paragraph now names the function without its argument list, the guard is discriminating again, and only the final verdict is fed to the ladder. Guarded by `tests/regression/ses-320b-window-finaliser.test.mjs`, whose credentialed arm reads the newest run row and FAILS on an error or a run older than three hours — a stalled finaliser is a red suite, the one thing a silence never was. Stamp count held at 5 per session-hygiene check 7: `v7.0.410` (`SES-004`) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep over this body — `pattern:N` (5 body hits), `pattern:0` (4), the NOTICE-not-error property (12) and the exporter's name (1) all already have a home at 7b; its one unhomed fact, that `public.john_model_signal` reads the `runner_decision_patterns` join, was RELOCATED beside that join's own sentence in 7b; its fifth-repo-file deviation note is about a rotation cost, not an instruction to an editor of this body, and travels with the archived stamp. Doc + one new test + one migration; no src/api/lib change, no site change. -->
+
 <!-- retired by SES-335, v7.0.438, 2026-09-09: stamp count held at 5 per session-hygiene check 7. SES-164 step 2 was run FIRST by grep over the body, not from recollection, and it found NOTHING to relocate: tripwire check 9 deciding within the enclosing block (2 body hits), step 6's size_stamp/gate_count filing-site list (1), the runner_items display_ref bullet (6), file_invention_proposal() as step 4b's current filing mechanism (3) and M5-01's amended scope fence (1) all already have body homes. Body proven byte-identical across the rotation, sha256 c41b1cab7149c28a2c4d57eb56aac09fed9cc913706383248f64650caa2d3d28. -->
 <!-- DeepBench v7.0.421 | runbooks/runner-cycle.md | M7 review prerequisites (close-out residue of SES-320 and SES-160, no new ticket) -- THE M7 GATE REVIEW'S PM LENS FOUND TWO RETIREMENTS WITH NO LEDGER LINE AND TWO SENTENCES STILL SPEAKING THE CARD IDIOM. Doc-only: docs/SELFBUILD-RETIREMENT-LEDGER.md gains entries 40 (SES-154's Accept-writes-done clause, superseded by SES-320's decision-window sweep's ship-finalisation branch), 41 (step 4b's card-route sentence, superseded by SES-160's file_invention_proposal()) and 42 (M5-01's pre-SES-321 wording, amended to let an EL-01-admitted enhancement pass the Selfbuild scope fence). This file gets two same-line annotations in the SES-289 shape -- tripwire check 9 decides within the enclosing block, so the retirement vocabulary sits beside the rule mention rather than in a separate paragraph: step 6's size-stamp/gate_count filing-site list ('step 4b's invention card when John accepts it' now names SES-160's file_invention_proposal() as the current mechanism) and the runner_items display_ref bullet (its old 'no ticket yet -- your Accept files one' example is annotated retired, since an invention proposal now carries a real backlog_id and needs no display_ref placeholder at all). Stamp count held at 5 per session-hygiene check 7: v7.0.405 (SES-315 (b)) moved VERBATIM to docs/SESSIONS.md's appendix, SES-164 step 2 run FIRST by grep over this body rather than from recollection -- every one of that stamp's editor warnings (the REVERT-FORWARD REQUESTED directive trigger, the Reverse ceremony not also calling apply_data_restore(), the ship-was-not-a-decision list, the No-unattended-removal supersession, the needs-john/needs-desktop c_flagged boundary, and the ladder passage keeping its arithmetic and losing its Accept trigger) already has a body home elsewhere in this file, so nothing was relocated. No src/api/lib change, no schema change, no site change. -->
 
@@ -13342,3 +13345,193 @@ and §5c's own *"new/empty project only"* precondition with the measured 0 relat
 
 <!-- DeepBench v7.0.308 | docs/SESSIONS.md | SES-222 — TWO SPLICES ESCAPED DATABASE TEXT THAT THE TEMPLATE ESCAPES AGAIN, and the thing to read twice is that the ticket predicted ONE site and the sweep it asked for found TWO. Cycle 08346174, scheduled. esc() is not idempotent, so a builder that pre-escapes an argument a template row helper will escape again renders the escape sequence to John. (1) THE FILED DEFECT, §15 msRow: build-briefing.mjs:498 spliced J(H(r.name)) while briefing-template.html:939 calls esc(name). public.epics holds exactly one name with an ampersand — "Selfbuild M0 - Backup & Rollback", read live, not recalled — so the chain was & -> &amp; -> &amp;amp; and M0's row read a literal "&amp;" every morning. Only M0 is affected, which is why eight ships walked past it. (2) FOUND BY THE SWEEP, §8 queueRow's priority_class: J(H(cls).replace(/'/g,'&rsquo;')) against esc(cls) — and it is NOT the ampersand. H() never touches an apostrophe; the substitution after it did, and esc() then made it &amp;rsquo;, so "P1 - Improves John's Skills" renders as "P1 - Improves John&rsquo;s Skills". STATED AS LATENT RATHER THAN CLAIMED AS A VISIBLE FIX: §8 shows the top 12 and no P1 ticket is in it today; it goes live the moment one reaches the head of the board — the class named after John. THE EDIT THIS SHIP FORBIDS, and it is the tempting consistency pass: dropping H() from classRow (§11) or from cut() on §8's title as well. Those are the MIRROR IMAGE — their template sides splice RAW, so the builder is the only escaper and removing it renders class names and ticket prose as live markup, SES-208's defect facing the other way; build-briefing.mjs:218-219 already says the asymmetry is deliberate and "a sweeper must not fix it". THE INTERNAL CONTROL that decides which side any new splice is on: §8 passes the SAME epic name RAW and has always rendered it correctly, while §15 pre-escaped it and did not. Dropping the &rsquo; substitution was CHECKED rather than assumed — J() already escapes a backslash then an apostrophe, so the literal stays well-formed. QA: npm install clean, npm run build exit 0, full suite 103/103 exit 0. Guarded by tests/regression/SES-222-double-escape.js — six source clauses each with its own breaks() mutation plus the SES-158 vacuity meta-check, and a BEHAVIOURAL half that slices the shipped esc() out of the template and the shipped H()/J() out of the builder (never a copy — SES-45) and renders both real strings through the real seam in jsdom. THE NEGATIVE CONTROL IS THE RETIRED FORM on the SAME fixture, asserted to LOSE: J(H(name)) renders the literal "&amp;" and the retired priority_class form renders "&rsquo;", so the guard proves a DIFFERENCE rather than a property both implementations share. File-level control against origin/dev's pre-change copy: 3 of 6 clauses fail there, 0 of 6 on the shipped one — the third is escape-rule-is-written-down, correctly failing because the pre-change header did not carry SES-208's rule; the three passing on both are the mirror-image clauses, which MUST pass on both because this ship deliberately did not change them. VERDICT APPROVE (runner_verdicts 0610e9c1, build/regression/hygiene all green) — auto-done ineligible, no epic on the ticket, so the ticket ships `delivered` and cards John. THE PICK BEFORE THIS ONE: SES-221's premise died under pick-time revalidation. Its whole ask — snapshot process.env around each test import — shipped as SES-215 (v7.0.305, f7f3cd0), and the suite measured 102/102 on an unedited tree with LOG-41 PASSING in-suite and declaring its anon arm NOT RUN, which is exactly the standalone behaviour SES-221 says is unreachable there; all seven tests it names as leaky ran and passed in the same process. Filed `removal proposed` with that evidence, queue number intact, no unattended removal. ONE FIGURE STATED SO IT CANNOT MISLEAD: this container's FIRST suite run read 75/102 with 27 "Cannot find package" failures — a fresh clone with no node_modules, not a defect on dev. TWO FURTHER FILINGS, both from measurements this cycle made rather than from the board: LOG-58 carded (canonical terminology, §19v gated lane, "needs John live" in its own words) because one answer from him unblocks LOG-44/45/47/48 sitting at queue 37-40 — which is also why this cycle built at queue 133; and SES-233 filed after the tripwire sweep printed `fatal: cannot change to 'C:/Projects/deepbench-frontend'` five times — check-session-docs.js's hardcoded SHARED_CHECKOUT means freshDevDirEntries() returns [] in the cloud, which is indistinguishable from "no inflight files on origin/dev", i.e. a FALSE ALL-CLEAR of the exact kind that file's own comment condemns, now quoted inside this cycle's own verdict row. NAMED DEVIATION (the SES-196 convention): no subagent was used. Register B21 routes mechanical sweeps to Sonnet 5, but this ticket arrived pre-diagnosed, size S, one file, and its sibling sweep is seven grep hits read on both sides — a hand-off would have added failure surface to a two-minute read, against "never grind". Doc + script + test; no src/api/lib change, no site change, no schema change. -->
 
+
+## Appendix — `runner-cycle.md` rationale retired by `SES-336` (v7.0.439, 2026-09-09)
+
+`docs/runbooks/runner-cycle.md` is read in full by every Automated cycle, so what it costs to read
+is a real per-cycle expense. `SES-336`'s test for every sentence: **if it tells the ORCHESTRATOR
+when to do something it stays; if it tells a ROLE how to judge something it belongs to that role's
+Skills; if it is history it belongs here.** The blocks below are the history — past measurements,
+censuses, incident narratives and superseded-wording records. Each was moved **verbatim**, with its
+sha256, and each left a one-line pointer at its old place naming the heading it landed under and the
+version it belongs to. Nothing here was summarised, and nothing was deleted.
+
+**What did NOT move, measured rather than judged by eye** (`SES-336`, over the tree at `v7.0.438`):
+of the 259,512 bytes outside the passages the kickoff protects verbatim, **148,047 bytes are the
+LAST home of at least one regression-test assertion** — removing them would leave a guard asserting
+about an archive instead of about the live instruction, which is the vacuous-guard failure this repo
+keeps paying for. Those stay in the runbook. The retirement ledger's entries 49 and 50 carry the
+role-Skill half of the same sweep.
+
+### A — `v7.0.365` / `v7.0.369` — how the pre-boot gate lost its cap and its staleness threshold (`SES-298`, then `SES-302`)
+
+*Moved out of `docs/runbooks/runner-cycle.md` from the pre-boot gate by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `6a002de8b433c711f46c6c6ee18d00f4935e7390769455435cc3a90ad06ceaca`. The pointer left in its place names this heading.*
+
+**AMENDED SAME DAY BY `SES-298` (v7.0.365) — A STALE READING NO LONGER REFUSES.** `M5-15` shipped
+worded as a refusal, and within the hour it was live-blocking the runner on a 32.66h-old reading.
+The only way to refresh that reading is John typing it (`SES-82`, the programmatic read, is
+unbuilt), so the refusal made **a number only John can produce into a precondition for autonomy —
+exactly what `M6-01` forbids**, and it did so in a rule written by the same session that retired the
+card surface. It also ignored a mechanism the platform already had: `runner_budget.stale_fallback_tokens`
+(3,000,000) exists precisely so a cycle can run under a smaller ceiling when the meter is old.
+**CORRECTED SAME NIGHT BY `SES-302` (v7.0.369) — THIS GATE OWNS NO CAP AND NO STALENESS THRESHOLD.**
+`SES-298`'s wording above was still wrong, one layer down: it gave this gate a `detail.token_cap` of
+`stale_fallback_tokens` at a **24h** threshold. But `resolve_day_token_cap()` **RUNG 2 has owned the
+staleness brake all along** — at **48h**, returning `cap_source = 'stale-floor'`, carrying the
+spec-verbatim comment *"The box does NOT defeat it"*. With the reading at 35.4h the two homes
+returned **opposite answers on the same fact**: the resolver said 196M (RUNG 3, the standing box),
+this gate said 3M. Nothing consumed the gate's field, but this runbook told a cycle to use it — so
+an unattended run would have capped itself at 3M and stalled M5 around its first ticket.
+
+### B — `v7.0.115`-`v7.0.121` — the evidence that a `.claude/` write parks on a permission prompt only John can see
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 0's `.claude/` clause by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `e21f7bc201ad38a81e163be70d5887d059949cc8f51d6f4cdc76b14f20226301`. The pointer left in its place names this heading.*
+
+**What that settles.** The path is **not blocked** — writes land, and `v7.0.121` proved it (an 18-minute stall that ended in a **successful** write). The gate is a **harness permission prompt that renders only in the human-facing session UI and never in the agent's transcript**. An agent therefore cannot see it, cannot report it, and cannot answer it: from inside, an unanswered prompt is indistinguishable from latency, from a suspend/resume, and from a hang. This is why every previous reading was defensible and wrong. `v7.0.121`'s register B38 got the location exactly right — *"permission-shaped… in the harness permission layer, not the shell"*, measured with `date +%s` printing the same second either side of the stalled command — and then concluded *"what is not happening is anyone being asked in a way they could answer."* Someone was asked. It was John, in a UI no cycle can see.
+
+**The measurement that makes it a rule rather than a story** — the partition by whether John was demonstrably in the app, his briefing taps as the timestamped proxy. His taps stop at `03:48Z` and resume at `12:50Z`, a nine-hour hole on the night of 2026-08-20→21:
+
+| Probe | Started | John in the app | Outcome |
+|---|---|---|---|
+| `c6c50bdc` (`v7.0.115`) | `02:06Z` | yes | returned, ~35 min |
+| `ba8f2ce3` | `03:52Z` | **no** | **parked ~9h20m** |
+| `633fe486` | `05:07Z` | **no** | **parked ~8h05m** |
+| `12953ca8` (`v7.0.117`) | `08:07Z` | **no** | **never returned** |
+| `55defd59` (`v7.0.121`) | `13:01Z` | yes | returned 18m04s; next call ~6 s |
+
+Every probe that cleared ran while he was at his desk; every probe that parked for hours ran inside the hole. The two parked cycles resumed **together, 13:09–13:12Z — eighteen minutes after his first tap of the morning.** So B38's *"a cost, not a prohibition — budget ~35 minutes"* was never a distribution; it was **a sample of the attended cases**. Unattended, the observed values are ~9h, ~8h, and never.
+
+### C — `2026-08-21` — two cycles pronounced dead at ~3h that came back nine hours later and finished
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 0b by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `70639ee88655abbae80e8c57cb3b05ae0c699b1605f0351decdb9d20094c01f5`. The pointer left in its place names this heading.*
+
+**Read this before you write anything about a predecessor, because the obvious version of this
+rule is wrong and was disproved live.** An open `runner_cycles` row past the 10-minute TTL (B42) means
+the cycle is **silent**. It does **not** mean the cycle is dead. Measured 2026-08-21: cycles
+`ba8f2ce3` (started 03:52Z) and `633fe486` (05:07Z) were closed `outcome='failed'` by a successor
+at 08:24Z on exactly that reasoning — and both were **still executing**. They resumed, finished
+their missions, wrote their own token accounting, discovered the live lease, correctly declined
+to push, and filed their findings as directives at 13:11Z and 13:12Z — **more than nine hours
+after they started and five hours after they were pronounced dead.** A harness suspend/resume,
+not a death. So:
+
+### D — `v7.0.296` — why `SES-219`'s predicate keys on the card's `backlog_id` alone and not on the filing cycle
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 2's Accept-clears-the-flag block by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `ea37b1539a98a543242c9e8ddae0eb8e0f8becab51e87cb3d275fe0cf9c76e88`. The pointer left in its place names this heading.*
+
+**Named deviation, disclosed rather than buried (the `SES-196` convention).** The ticket says *"the
+flag the accepted card itself carried — a card filed by the cycle that set `design_status` on that
+`backlog_id`"*, and the shipped predicate keys on the card's `backlog_id` **alone**, not on the
+filing cycle. The narrower reading was checked against the live cases and **misses them**: card
+`528ab5ba` was filed by cycle `69064827` while `SES-191`'s flag had been set by an earlier cycle, so
+a filing-cycle test would not have cleared the very flag John cleared by hand. `backlog_id` is the
+relatedness test the scope guard actually needs — *"an Accept on an unrelated card"* is an Accept
+naming a **different ticket**.
+
+### E — `v7.0.148` — why the streak reset existed, and why removing it alone would have been wrong
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 2's streak rule by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `a34924ac692d3037d83818102f648d79713390baf364623e5e7be1993c2e473e`. The pointer left in its place names this heading.*
+
+**Why the reset existed, and why removing it alone would have been wrong.** Written as *promote at
+5 **or more***, a streak left at 5 promotes again on the very next Accept, and again on the one
+after that — **a rung per tap, forever**. That runaway is not what John asked for either; it is
+simply the opposite failure, and it would have compounded the runner's own autonomy on a rule
+nobody wrote. The form that gives him exactly what he asked for **without** the runaway is the one
+now in force, and it is stated as a test so the ambiguity cannot come back:
+
+### F — `v7.0.346` — why `HAR-34`'s one historical IP block was not stamped already-notified
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 4a-quater by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `28fdbbe9ce188f3c1fca2231187fcecae2db340aa9751f4135e9d6811bfdffba`. The pointer left in its place names this heading.*
+
+**Nothing was backfilled, and the consequence is stated rather than left to be found.** The one
+historical block on the board at this ship (`2026-08-08`, 24 cached addresses, 1 blocked) was
+**never** alerted, so the alarm's first real fire carries it — dated, and named in the push as the
+inherited backlog rather than as something that just happened. Stamping it "already notified"
+would have been a value nobody observed, which is the `SES-104` defect (`ses103_permission_stall_tripwire`
+backfilled a constant heartbeat and a later reader could not tell it from a real one).
+
+### G — `v7.0.348` — why a "was there a day with no rows?" silence test does not fire on the incident it was written from
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 4a-quinquies by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `ea2d6115a25ccbb1d44921dec361db148b7cdc3bf2a05ebc847dc41de37a1a96`. The pointer left in its place names this heading.*
+
+**THE TICKET'S PREMISE CARRIES THE SECOND TRAP, AND IT WAS MEASURED RATHER THAN QUOTED.** `SES-269`
+says *"2026-08-27 produced ZERO rows"*. True of the **UTC** day — and on **John's** clock, the
+boundary this step-3 mandates for every *"today"* (directive `1d01ea85`, register B35 — superseded
+2026-09-01 by `M6-07`, `SES-285`, annotated `SES-289`; its clock answer is unaffected and binding),
+**2026-08-27 held two rows** (`03:42Z` and `04:42Z` UTC = 22:42 and 23:42 CST). So a
+*"was there a day with no rows?"* test — the obvious build, and the one the ticket's own title
+suggests — **does not fire on the incident the ticket is written from**, and no day-bucket form on
+any clock can see a hole shorter than a day. Both controls are in the guard.
+
+### H — `v7.0.165` — the re-derivation waste the blocked prefix ended, and the census that made the flag true
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 5's blocked-prefix block by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `a41d8d4bd45960ca504ec4bc7953a5b2d31eaaae7f6543c63da287fd7830f22c`. The pointer left in its place names this heading.*
+
+**Measured before this shipped, because the waste was real and this cycle paid it too.** The
+step-5 query projected `status` and nothing else, so a `needs-desktop` ticket looked exactly like
+a buildable one and the only way to tell was to read its description and reason the blocker out
+again. Live `runner_skips` at `23:10Z` 2026-08-22 held `SES-106` and `SES-110`, at queue **1** and
+**3** — the top of John's standing Automation drain — and their `skip_count` went 1 → 2 while this
+cycle re-established, for the third time that day, what two earlier cycles had already
+established. Three re-derivations of one answer, on a 3-hour cadence.
+
+**The honest half: the flag had to be made TRUE, not just visible.** Census at `23:11Z`, before a
+line changed: `design_status` was `designed` on 23 rows and `NULL` on the other 573 — **zero rows
+carried `needs-john` or `needs-desktop`**. Projecting the column alone would have shipped a skip
+that can never fire and a QA that passes while nothing changes. So the filing-time write below
+ships in the same commit, and the two live permission-gate rows were corrected to `needs-desktop`
+from **their own descriptions** (`SES-106`: *"that half needs a session John attends"*;
+`SES-110`: *"the `.claude/` session-setup half is needs-desktop"*), before-image first.
+`CHI-89` was deliberately left alone: `removal proposed` lives in `status`, and giving one fact a
+second home is how two copies start disagreeing.
+
+### I — `v7.0.295` — why `SES-218`'s `blocked_by` clause is status-agnostic rather than open-only
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 5's `blocked_by` block by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `a9f51755e72b7ede2eef879cf725079ffbcd8dde8e5cd08066c6cf2c8eb0994e`. The pointer left in its place names this heading.*
+
+**Named deviation, disclosed rather than buried (the `SES-196` convention): the clause is
+status-agnostic, not scoped to `partial`.** John's sentence says *"a partial whose…"*. It is not a
+widening: `blocked_by` is a **new column, `NULL` on every row of the board**, written only ever
+deliberately, so partial-only and status-agnostic are byte-identical on today's board and can differ
+only on a row some future cycle explicitly marks — where making the column inert because the row is
+`open` rather than `partial` would give one column two meanings depending on a second column.
+`partial` was the symptom; `blocked_by` is the fact, and the predicate reads the fact. **No row was
+backfilled at this ship** — `SES-216` was already `delivered`, so setting it on `SES-191` would have
+stranded a ticket whose dependency had landed.
+
+### J — `v7.0.162` — every skip this platform ever made lived as prose in `runner_cycles.notes`
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 5's `record_skip()` block by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `a2da852d77de29be8e29f16ce0a9c0b92a52e1584f06f89442ebff259a5e62ac`. The pointer left in its place names this heading.*
+
+**Measured, because this was already failing silently.** Before this shipped, fifteen
+`public.runner_*` tables existed and **none stored a skip** — so every skip this platform ever
+made lived as prose inside `runner_cycles.notes` (live example: cycle `1df7d9c6`, 19:12Z, *"Step
+5: queue #1 `SES-110` skipped per B24 …"*, a 2026-08 quotation — B24 was superseded 2026-09-01 by
+`M6-06`, `SES-285`, annotated `SES-289`). That sentence is real, correct, and completely
+invisible to John, who does not read the ledger. §10 of the briefing is what it feeds.
+
+### K — `v7.0.299` — all 26 `block` rows carried one triple, and the discriminator was whether the predecessor shipped
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 7a by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `f4c769c5a2cf7807873f35654baafa2fc03d44b1ad994707df848730ba94a276`. The pointer left in its place names this heading.*
+
+  **Measured, not argued (`SES-213`, `v7.0.299`).** All **26** `block` rows in `runner_verdicts` at
+  that ship carried the identical triple `build=green / regression=red / hygiene=green`, against 30
+  `approve` rows carrying all-green — and the discriminator is exactly whether the predecessor
+  shipped: a predecessor that closed `gated_before_build` or `did_not_run` never joins the shipped
+  set, so the file still matches and the gate is green. The building cycle watched the transition
+  happen to it on an unedited tree: `--check` **exit 0** at `23:44Z`, cycle `dc047a05` closed
+  `shipped` at `23:46:57Z`, `--check` **exit 1** minutes later with **zero file changes** in between.
+
+### L — `v7.0.356` — the standing brief claimed it was rendered at every ship, and nothing ever invoked it
+
+*Moved out of `docs/runbooks/runner-cycle.md` from step 7's standing-brief bullet by `SES-336` (`v7.0.439`, 2026-09-09), verbatim. sha256 `bee65610076218c38bc7577556d15412e63a5cfb7f6866042b482431cfb7597d`. The pointer left in its place names this heading.*
+
+  **WHY THIS HAD TO BECOME A LISTED STEP, and it is the whole of `SES-265`.** `standing-brief.md`'s
+  own block has claimed since `v7.0.236` that it is *"rendered from the tables by
+  `scripts/render-standing-brief.js` at every ship"* — and **this runbook never invoked it**, so
+  nothing rendered it at any ship. Measured at this fix rather than argued: the block was stamped
+  `2026-08-24 23:32Z`, **seven days and ~120 versions stale**, and its numbers were not merely old
+  but *operationally wrong* — it advertised **9** `needs-john` tickets against a live **32**, a
+  standing daily max of **40M** against John's **196M**, and a standing drain of
+  **M2, 3 of 10 open** when the live drain is **M5, 11 of 11**. Every session reads that block at
+  start. This is `SES-177` (b)'s own defect class reproduced inside the file that shipped to kill it.

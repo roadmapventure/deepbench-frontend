@@ -985,3 +985,97 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
   back to `1`–`4`. **The Skill rows were seeded by `AGT-64`, not by this ticket, so there is
   nothing here to reverse on the database side** — this entry retires a runbook passage, not a
   decision. Repo half: `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 49. `runner-cycle.md` step 6 — the design ceremony (moved into The Designer)
+- **Said, verbatim (opening):** *"Then: read the item's backlog row, the governing
+  `ARCHITECTURE.md` section(s), every `.claude/rules/` file whose paths you will touch, and the real
+  source files. Inventions additionally pass the R&D gate first … Write the kickoff doc
+  (`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within the scope caps (one item, ≤3 files,
+  ≤4 tasks)."* — and, in the step header, *"before designing anything, re-verify the ticket's premise
+  against live code/data"*.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 6.
+- **Why:** it told a ROLE how to design, not the orchestrator when to act, and since `AGT-65`
+  (`v7.0.431`) that role is an agent with rows. Step 6 is now three orchestration statements:
+  assemble `design-kickoff` with the ticket, the claimed version, the class caps and the worktree;
+  act on `premise = dead` (removal proposed, evidence, recompute, next pick); on `premise = alive`
+  write the returned kickoff and set `kickoff_link` + `design_status = 'designed'` in one write.
+- **Survives:** in `public.skill_profiles`, as the Skills `design-kickoff` assembles —
+  `ds-knowledge-standard` (the design standard by file and section: `CLAUDE-DESIGN.md` Step 4,
+  `STANDARDS.md` §§2/3/4/8/11/12, `ARCHITECTURE.md` §19, `.claude/rules/*`, and this step),
+  `ds-behavior` (revalidate first and measure, name the governing section, cheapest variant, a QA
+  that would fail if the change did nothing) and `ds-guardrails` (never design a dead premise, never
+  exceed one item, never write code). **Also kept verbatim in the runbook**, relabelled
+  `(ceremony-legacy)` under a RETIRED IN PLACE note — on the entry-45/48 precedent, and for one
+  reason of its own: `ds-knowledge-standard` cites *"docs/runbooks/runner-cycle.md step 6"* BY NAME,
+  so a summary here would leave that citation pointing at a paraphrase of itself.
+- **The revalidation moved differently, and this entry says so rather than blurring it:** the
+  *performance* of it moved into the Designer (`ds-identity`'s first act); the *outcome handling* —
+  `status = 'removal proposed'`, the card with the evidence, `recompute_backlog_queue()`, drop to
+  the next queued ticket, never remove unattended — stayed in step 6 and is annotated as amended
+  rather than retired.
+- **Restore:** delete the three orchestration statements and rename `(ceremony-legacy)` back to its
+  unlabelled form. The `ds-*` rows were seeded by `AGT-65`, not by this ticket, so there is nothing
+  to reverse on the database side. Repo half: `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 50. `runner-cycle.md` step 7 — the QA bar as a cycle's own checklist (moved into The Builder)
+- **Said, verbatim (opening):** *"- `npm install && npm run build` green (a `src/`/`api/`/`lib/`
+  change that fails build never ships). - The regression suite green where it applies
+  (`tests/regression/run-all.js`). - A **discriminating** self-QA on the new path — state the test,
+  then ask: would it still pass if the change did nothing? …"*
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 7, the bullets above `7a`.
+- **Why:** the bar is what the thing that BUILDS is held to, and since `AGT-66` (`v7.0.432`) the
+  thing that builds is an agent with rows. Step 7 is now three orchestration statements: assemble
+  `build-ticket` with the kickoff path, worktree, branch, version, cycle id and caps; on
+  `outcome = 'pushed'` read `push_sha` (the ship point) and keep `build` / `regression_summary`
+  verbatim; on `outcome = 'blocked'` ship nothing and never finish it by hand.
+- **Survives:** in `public.skill_profiles` — `bd-knowledge-standards` (the standard by file and
+  section), `bd-behavior` (diagnose before fixing, one task at a time, stop and report a blocker)
+  and `bd-guardrails` (build and regression green before every commit, the migration down captured
+  first, push `HEAD:dev` after fetch and rebase, outputs verbatim, never `main`, never a file the
+  kickoff does not name). **Kept verbatim in the runbook** under a RETIRED IN PLACE note for two
+  reasons: `bd-knowledge-standards` cites *"runner-cycle.md step 6 and 7 — … the QA bar … one ship
+  point"* by name, and an **attended** cycle runs no Builder and still grades its own ship against
+  this bar.
+- **What did NOT move, stated so a later editor does not "finish" this:** the verdict (7a), the
+  close-out status write, the snapshot, the scoreboard stamp, the standing brief, the version-claim
+  proof, the push, the claim release and `record_ship_decision()` all stayed. `bd-guardrails`
+  forbids the Builder writing a status or a verdict in its own words, so moving any of them would
+  hand a write to an agent whose own rules refuse it.
+- **Restore:** delete the three orchestration statements and the RETIRED IN PLACE note. As entry 49,
+  there is no database-side reversal: the `bd-*` rows were seeded by `AGT-66`.
+
+### 51. `runner-cycle.md` — twelve rationale blocks moved to `docs/SESSIONS.md` (history, not instruction)
+- **Said, verbatim:** twelve whole paragraphs, archived byte-for-byte with a `sha256` each. The
+  pre-boot gate's `SES-298`/`SES-302` wording corrections; step 0's five-probe `.claude/`
+  permission-gate evidence table; step 0b's 2026-08-21 measurement of two cycles pronounced dead
+  that came back nine hours later; step 2's `SES-219` named deviation and its "why the reset
+  existed" argument; step 4a-quater's "nothing was backfilled"; step 4a-quinquies' second trap;
+  step 5's blocked-prefix waste measurement and census, its `SES-218` named deviation, and
+  `record_skip()`'s "measured, because this was already failing silently"; step 7a's 26-block
+  measurement; and step 7's "why the standing brief had to become a listed step".
+- **Lived:** `docs/runbooks/runner-cycle.md`, at the steps named above.
+- **Why:** `SES-336`'s test — a sentence that tells the ORCHESTRATOR when to act stays; a sentence
+  that tells a ROLE how to judge belongs in that role's Skills; a sentence that is HISTORY belongs
+  in `docs/SESSIONS.md`. These twelve are history: past measurements, censuses, incident narratives
+  and superseded-wording records. Every cycle pays to read them and none of them changes what a
+  cycle does.
+- **Survives:** `docs/SESSIONS.md`, appendix *"`runner-cycle.md` rationale retired by `SES-336`
+  (v7.0.439, 2026-09-09)"*, entries A–L, **verbatim with a `sha256` per block**. Each left a
+  one-line pointer in the runbook naming the entry, so the fact is still findable from the step it
+  belonged to. Nothing was summarised and nothing was deleted.
+- **THE HONEST LIMIT, MEASURED RATHER THAN JUDGED BY EYE, because the ticket asked for a 40 KB file
+  and this is why it is not one.** Over the tree at `v7.0.438`: the runbook was **363,501 bytes**;
+  the passages the kickoff protects VERBATIM (the standing prohibitions, gates 1b/3/4/4a/8a, the
+  record at 9 and the chain) are **80,959** of them on their own — already twice the target — and of
+  the remaining 259,512, **148,047 bytes are the LAST home of at least one regression-test
+  assertion**. Removing those would leave roughly twenty guards asserting about an archive instead
+  of about the live instruction, which is the vacuous-guard failure `LOO-013` and `SES-158` are both
+  written from. Of the ~111,000 movable bytes, almost all carry a live imperative at sub-paragraph
+  granularity; the twelve blocks here (**11,255 bytes**) are what moved cleanly. **The runbook
+  cannot reach 40 KB — or anything near it — until the roles that would own those rules exist:**
+  step 2's harvest, step 5's selection beyond the pick, and steps 8b / 8b-bis / 8c / 8d's sweeps have
+  no agent yet, so their rules have no reader to move to. That is a scoping finding for the next
+  milestone, not a defect in this one.
+- **Restore:** cut each entry from the `SES-336` appendix in `docs/SESSIONS.md` and paste it over
+  its pointer; the `sha256` printed with each entry proves the paste is the original. Repo half:
+  `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
