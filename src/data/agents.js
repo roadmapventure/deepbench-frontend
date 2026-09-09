@@ -1,3 +1,4 @@
+// DeepBench v7.0.431 | agents.js | AGT-65 — AVATAR_CFG + AGENT_PRONOUNS entries for `designer` (The Designer, GV-04, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same as AGT-63/AGT-64: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
 // DeepBench v7.0.429 | agents.js | AGT-64 — AVATAR_CFG + AGENT_PRONOUNS entries for `researcher` (The Researcher, GV-02, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same as AGT-63's `prioritizer`: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
 // DeepBench v7.0.428 | agents.js | AGT-63 — AVATAR_CFG + AGENT_PRONOUNS entries for `prioritizer` (The Prioritizer, GV-03, lane `governance`). NOT added to the AGENTS array: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
 // DeepBench v6.2.12 | agents.js | RO-14 — Bench filter "mi" label renamed from the old Market Intel text to Channel Sales Intel (id unchanged)
@@ -294,7 +295,9 @@ export const BENCH_FILTERS = [
 // stricter check rather than a weaker one. Remove an id here the moment its agent is deleted.
 // FEATURE: AGT-64 — `researcher` joins the list on the same terms: a real, active `governance`
 // lane row the Bench does not render, whose id still reaches audit and research surfaces.
-export const OFF_BENCH_AGENT_IDS = ["prioritizer", "researcher"];
+// FEATURE: AGT-65 — `designer` joins the list on the same terms: a real, active `governance`
+// lane row the Bench does not render, whose id still reaches audit and kickoff surfaces.
+export const OFF_BENCH_AGENT_IDS = ["prioritizer", "researcher", "designer"];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
 export const AVATAR_CFG = {
@@ -338,6 +341,10 @@ export const AVATAR_CFG = {
   // Off the Bench for the same reason as the entry above; the portrait exists because audit and
   // decision surfaces already draw this id.
   researcher:  { skin:"#c9a882", hair:"#2e2a26", collar:"#243a34", extra:"glasses", border:T.moss },
+  // FEATURE: AGT-65 — The Designer (GV-04), the governance lane’s kickoff author.
+  // Off the Bench for the same reason as the two entries above; the portrait exists because audit
+  // and decision surfaces already draw this id.
+  designer:    { skin:"#dcbf9c", hair:"#3a3340", collar:"#1f2f47", extra:"bun",     border:T.navy },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -374,6 +381,8 @@ export const AGENT_PRONOUNS = {
   prioritizer: { subject:"they", object:"them", possessive:"their" },
   // FEATURE: AGT-64 — The Researcher pronouns (they/them/their).
   researcher:  { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-65 — The Designer pronouns (they/them/their).
+  designer:    { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
