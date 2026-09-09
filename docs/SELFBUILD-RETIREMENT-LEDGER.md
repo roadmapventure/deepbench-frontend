@@ -954,3 +954,34 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
   in SQL, which is unchanged by this move.
 - **Restore:** as entry 46 — the same decision reverses both, with the same card-only caveat for the
   `skill_profiles` before-image.
+
+### 48. `runner-cycle.md` step 4b items (1)–(4) — the invention pass's research method (moved into The Researcher)
+- **Said, verbatim (openings):** *"1. **Egress probe (precondition C3, measured not assumed):** one
+  live WebSearch…"*; *"2. **Research, with a class lens:** read `public.judgment_class_census` and
+  take the P1-P4 class with fewest ratified, then fewest proposed claims (P1 first on a full tie,
+  register A4) as this pass's lens…"*; *"3. **Generate exactly `allowed` proposals**…"*;
+  *"4. **Score against the vision corpus** and run §19v's R&D gate…"*.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 4b, the numbered pass.
+- **Why:** the method told a ROLE how to judge, not the orchestrator when to act, and since
+  `AGT-64` (`v7.0.429`) that role is an agent with rows. A cycle that ran the method by hand was a
+  second copy of instructions the agent already carries — `SES-45`'s defect, the same one entry 45
+  retired one step later. Step 4b is now four orchestration statements: assemble
+  `research-class-lens` over the `SES-331` path, obey the returned `egress`, file each survivor,
+  commit the returned research doc.
+- **Survives:** in `public.skill_profiles`, as the Skills `research-class-lens` assembles —
+  `rs-knowledge-corpus` (the corpus, the lens rule, the two legs, the `LOG-143` template and the
+  filing contract), `rs-research-intent` (the task shape and the JSON output schema),
+  `rs-behavior` (the scoring frame and the pull-test tiebreaker) and `rs-guardrails` (cite a dated
+  source or drop the finding, honour `allowed`, never re-propose a `VC-REJ-*`). **Also kept
+  verbatim in the runbook**, relabelled `(1-legacy)`–`(4-legacy)` under a RETIRED IN PLACE note, on
+  the entry-45/46/47 precedent and for its reason: the body is the only written record of *what the
+  method is* for the person debugging a pass, and a summary would be the second, drifting copy the
+  move exists to end.
+- **One thing that did NOT move, because it was never method:** the key rename. The Intent returns
+  `priority_class`; `public.file_invention_proposal()` reads `p ->> 'class'`. That mapping is the
+  orchestrator's job at the handoff and is stated in step 4b item 3, guarded by `covers()` in
+  `tests/regression/agt-64-researcher.test.mjs`.
+- **Restore:** remove the four new orchestration statements and rename `(1-legacy)`–`(4-legacy)`
+  back to `1`–`4`. **The Skill rows were seeded by `AGT-64`, not by this ticket, so there is
+  nothing here to reverse on the database side** — this entry retires a runbook passage, not a
+  decision. Repo half: `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
