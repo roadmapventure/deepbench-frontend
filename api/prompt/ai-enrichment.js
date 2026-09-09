@@ -1,3 +1,9 @@
+// DeepBench v7.0.430 | api/prompt/ai-enrichment.js | SES-341 -- fetchSection() gains an inline
+// branch: a knowledge section whose fetch_instruction declares method/source "inline" renders its
+// own text through db-assembly.js renderInlineKnowledge() and performs NO retrieval (it must sit
+// ahead of the source dispatch, or the final else would fire a real queryRAG for a profile with no
+// chunks). Empty text -> omitted by the existing !content guard; no _rag_* fields and no fetch
+// frame are emitted, because no fetch happened.
 // DeepBench v7.0.426 | api/prompt/ai-enrichment.js | SES-331 -- renderSection() exported, one word,
 // no behaviour change; see its own comment. scripts/agent-prompt.js reuses it plus the already-
 // exported assemblePhaseSplit() so a session-run agent's prompt goes through THE renderer and THE
@@ -66,6 +72,10 @@ import { queryRAG } from "../../lib/rag.js";
 import { queryContent, readContentByIds } from "../../lib/search-harness.js";
 import { getRosterCandidates } from "../../lib/project-manager.js";
 import { logActivity } from '../../lib/activity-log.js';
+// FEATURE: SES-341 -- the inline Knowledge renderer, imported rather than re-implemented (see its
+// own comment in db-assembly.js). db-assembly.js imports nothing from this file, so there is no
+// cycle; api/capabilities/execute.js already imports both.
+import { renderInlineKnowledge } from './db-assembly.js';
 import { withRequestContext } from '../../lib/request-context.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
@@ -272,6 +282,19 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
 
   if (section.type === "rag") {
     const fi = section.fetch_instruction;
+    // FEATURE: SES-341 -- inline knowledge: the Skill Profile carries its own text, so there is
+    // nothing to retrieve and no store to reach. This branch must come BEFORE the try below or the
+    // source dispatch inside it would fall through its final `else` and fire a real queryRAG()
+    // against a profile that has no chunks -- a live retrieval per call whose only possible answer
+    // is empty, which is the defect SES-341 exists to remove. Rendered through db-assembly.js's own
+    // renderInlineKnowledge(), the same function that filled `content` at assembly time, so the two
+    // paths cannot drift. Empty text renders null -> "" and the section is omitted by STEP 2's
+    // existing `if (!s.content)` guard, exactly as an empty RAG result is today. No `_rag_*` fields
+    // are stamped: nothing was fetched, so there is no count, no chunk id and no method to report,
+    // and inventing zeros would put a phantom retrieval on the Evidence card.
+    if (fi && (fi.method === "inline" || fi.source === "inline")) {
+      return { ...section, content: renderInlineKnowledge(fi) || "" };
+    }
     try {
       // FEATURE: AA-107 -- fi.source === "the_library" and "the_reasoning" both route through
       // lib/search-harness.js's queryContent() -- the single public entry point for either store
@@ -480,7 +503,11 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
     // FEATURE: LOG-143 (d1) -- the raw task_context rides alongside the flattened string; only the
     // trace_facts source reads it, every other branch ignores the extra argument.
     nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id, span_id, task_context).then(fetched => {
-      if (s.type === "rag" && !fetched._fetch_error) {
+      // FEATURE: SES-341 -- an inline Knowledge section performs no fetch, so it emits no fetch
+      // frame, for the same reason the comment above gives for `stored`: no work happened. Emitting
+      // one would put a "retrieved 0 records" line on the Evidence card for a section whose text
+      // was never retrieved at all -- the exact false-empty signal this ticket removes.
+      if (s.type === "rag" && s.fetch_instruction?.method !== "inline" && !fetched._fetch_error) {
         const source = s.fetch_instruction?.source ?? 'knowledge';
         emit({ type: 'assembly_work_complete', work: 'fetch',
           agentId: ASSEMBLY_ATTRIBUTION[source] ?? effectiveAgentId ?? null,
