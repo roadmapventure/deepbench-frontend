@@ -2611,7 +2611,7 @@ lines below; edit the table's rows, then run `node scripts/render-rule-blocks.js
 
 <!-- {{lanes}} · rendered from public.runner_model_lanes — do not hand-edit the quoted lines below. Edit the rows, then run `node scripts/render-rule-blocks.js --write`. -->
 > **orchestrator** — `claude-opus-5` — Parent cycle: orchestrates, codes, QAs, ships (register B21).
-> **judgment** — `claude-fable-5` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21).
+> **judgment** — `claude-fable-5-1` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21).
 > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21).
 
 State the clone's absolute path in
