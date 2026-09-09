@@ -1079,3 +1079,59 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
 - **Restore:** cut each entry from the `SES-336` appendix in `docs/SESSIONS.md` and paste it over
   its pointer; the `sha256` printed with each entry proves the paste is the original. Repo half:
   `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 52. "Unwritten law" retired as a permissible state — every operational default now has a registry row and a named home
+- **Said, verbatim — and the point is that nothing said it.** Forty-four numbers, orders and
+  branches that the machine runs on were stated by NO governance rule: the six queue sort keys in
+  `recompute_backlog_queue()`, the three pick lanes in `prime_directive_queue()`, the drain's own
+  three order keys, the filing-lane cut date (three hand-copied literals), the 24-hour claim expiry,
+  the `needs-desktop` block list, the two different "finished" status sets, the design-gate title
+  pattern, the 32-retirement runaway guard, the required-set finish line, the cron minute / hour
+  grid / grid tolerance, the scheduler gate's fail-open literals and its manual-fire and clock-grid
+  tests, the finaliser's `:17` and the re-rank's `10 9 * * *`, the five chain gates, the no-ship
+  ceiling and its 6-hour lookback, the disabled undecided-card ceiling, the five token-cap rungs,
+  the 48-hour reading staleness, the stale floor and uncalibrated default (each duplicated as a
+  COALESCE literal), the weekly rest wall, the standing daily box, the America/Chicago day boundary
+  and the per-cycle-start wall approximation, the auto-done and cap-relax rungs, the 3-file /
+  4-task baseline, the ladder's starting rung, the class-to-work-class map, the invention floor and
+  per-rung pace and its EL-02 precedence, the reversal window, the brief's `OPEN_DECISION_BATCH`,
+  the publish lease's 10-minute TTL, the re-rank's 60-candidate cap, the Prioritizer's own sort
+  order, and the 0.39% cost-per-cycle fallback.
+- **Lived:** as SQL literals inside `recompute_backlog_queue()`, `prime_directive_queue()`,
+  `drain_epic_next()`, `drain_chain_gate()`, `scheduler_gate()`, `resolve_day_token_cap()`,
+  `invention_due()`, `class_autonomy()`, `ladder_work_class()`, `runner_pct_per_cycle()`; as columns
+  of `runner_settings`, `runner_budget` and `runner_ladder`; as constants in
+  `scripts/render-standing-brief.js` and `api/cron/rank-backlog.js`; in `vercel.json` and
+  `cron.job`; in `public.skill_profiles`' `pz-rank-intent` row; and as procedure in
+  `docs/runbooks/runner-cycle.md` steps 3, 5a and 9.
+- **Why:** the retirement ledger, `public.governance_rules` and the gate reviews see only what is
+  WRITTEN as a rule, so none of the three could see any of the above. John caught five of them in
+  one afternoon (2026-08-29, *"file both"*). **What is retired here is not a rule — it is a
+  permissible STATE:** "the machine runs on this number and no row states it" stops being an
+  ordinary condition of the codebase and becomes a named class of defect with a home. A default
+  with no `operational-defaults` row after this entry is a finding for the next audit, by that
+  audit's own terms rather than by anyone noticing.
+- **Survives:** `public.governance_rules`, `source_group = 'operational-defaults'`, rows
+  `OD-01`–`OD-44`, all `status = 'live'`; canonical home
+  `docs/design/2026-09-09-operational-defaults-census.md`, whose anchored entry per row carries the
+  statement byte-for-byte plus where the value physically lives, what pins it, and a keep / amend /
+  retire judgment against the charter's goals. `tests/regression/ses-234-operational-defaults.test.mjs`
+  pins the identity in both directions and, on its live arm, proves every stored-column home is a
+  column that exists. **Nothing operational was changed** — eleven amend / retire proposals are
+  batched in that doc for John, two of them named contradictions (`OD-43`, the Prioritizer sorting
+  class-before-lane while the picker sorts lane-before-class; `OD-35`, `ladder_work_class()`
+  returning NULL for P1 / P3 / P4 / P6 so the class a FAANG-showcase ticket is promoted into can
+  never auto-done).
+- **Two named deviations from the kickoff, both forced by the schema rather than chosen.** (1)
+  `canonical_doc` points at the census doc's own anchor for every row rather than at "the file or
+  table that holds it": truth-tripwire check 10 is GATING at FLAG severity and flags a
+  `canonical_doc` that is not an existing file, so a row homed on `public.runner_settings` or on a
+  function body would redden CI. The real home is named inline in each statement (`canonical: …`)
+  and in the entry's **Lives in** line. (2) `enforcement` carries the CATEGORY, not the pinning
+  test: `governance_rules_enforcement_check` admits only `hook` / `script` / `reviewer` / `prose`.
+  The pinning test is the entry's **Pinned by** line, and `none` there is itself a finding.
+- **Restore:** `delete from public.governance_rules where source_group = 'operational-defaults';`
+  then revert migration `ses234_operational_defaults_source_group` (drop and re-add
+  `governance_rules_source_group_check` without the seventh value), re-run
+  `node scripts/export-governance-snapshot.js`, and delete the census doc and the test. Decision
+  handle: `f6c99ec8-249a-48f6-8e88-4bd5fc57a30f`.
