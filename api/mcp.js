@@ -1,3 +1,12 @@
+// DeepBench v7.0.445 | api/mcp.js | SES-339 -- the Verifier's judgment is callable through MCP for
+// any repository. `tools/call` used to accept ANY `task_context` object, so a partial submission
+// bought a real model call and came back with a verdict reached on evidence that was never there.
+// TOOL_INPUT_SCHEMAS (below) is the INPUT half of a contract whose OUTPUT half already shipped
+// (the Intent Skill's `traits.schema` -> `outputSchema`): it is published in `tools/list` and
+// enforced in `tools/call` BEFORE dispatch, so a missing field is a -32602 naming it and no
+// executor call, never a model call spent on a judgment it cannot honestly make. Foreign-repository
+// recipe: docs/runbooks/mcp-server.md, "Verify a foreign repository".
+//
 // DeepBench v7.0.444 | api/mcp.js | MCP-3 -- the generic capability executor, projected as an MCP
 // server. Every DeepBench capability becomes an MCP tool with ZERO per-capability code: the tool
 // list is a read of `capabilities` x `agent_capability_assignments` x `agents`, and `tools/call`
@@ -192,12 +201,166 @@ export function visibleRows(rows, { governanceUnlocked }) {
   return rows.filter(r => r.lane === 'product' || governanceUnlocked === true);
 }
 
+// ---------------------------------------------------------------------------------------------
+// FEATURE: SES-339 -- the INPUT contract
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The three gates by name, in one place so the published schema and the validator below cannot
+ * disagree about which three they are. These are `scripts/verifier.js`'s own GATES keys.
+ */
+export const GATE_KEYS_REQUIRED = Object.freeze(['build', 'regression', 'hygiene']);
+
+/**
+ * PER-CAPABILITY INPUT REQUIREMENTS, AS DATA. A lookup table, not a conditional: nothing here
+ * changes WHAT runs or WHO runs it -- the row still decides the agent, the intent and the executor,
+ * and there is still exactly one execution path. What a registry entry decides is only whether the
+ * arguments carry the evidence the capability's own Guardrails already demand, and it decides that
+ * by table lookup on the slug the client named. Adding a capability to this table is a data edit;
+ * an `if` on a slug would be a second code path, and this file still must never grow one.
+ *
+ * WHY IT LIVES IN CODE TODAY AND WHERE IT BELONGS TOMORROW. The natural home is the Intent Skill
+ * row that already carries the OUTPUT half (`skill_profiles.traits.schema` -> `outputSchema`), as
+ * a sibling `traits.input_schema`. That is one clean generic read and no table at all -- but
+ * `vf-verdict-intent` is one of the Verifier's OWN Skill rows, and SES-337 makes a cycle that
+ * rewrites those ineligible for its own auto-done bar by construction. So the first entry ships as
+ * code deliberately, and the SECOND capability that needs one is the signal to move the whole table
+ * onto `traits.input_schema` and delete it. One entry is a table; two is a pattern hardening.
+ *
+ * THE `verify-ship` ENTRY IS THE VERIFIER'S OWN METHOD, TRANSCRIBED. `vf-verdict-intent.method`
+ * says: "Your task_context carries backlog_id, version, the kickoff Markdown, the diff (or its
+ * path), the three gate outputs with exit codes, the changed-file list, the class and its ladder
+ * answer, and the standards excerpts... If any of those is missing, return block with
+ * missing_evidence naming it." That instruction was the ONLY enforcement, which means the fail was
+ * a model call away and depended on the model obeying. Required here are the four a judgment is
+ * impossible without -- the diff (what changed), the kickoff (what was promised), the three gate
+ * outputs (whether it works), and the changed-file list (the self-certification check). Class,
+ * ladder and standards stay OPTIONAL because they bear on the auto-done bar, not on the verdict: a
+ * foreign repository has no DeepBench class and no trust ladder, and refusing it those would make
+ * the tool unusable for the case this ticket exists to serve.
+ */
+export const TOOL_INPUT_SCHEMAS = Object.freeze({
+  'verify-ship': Object.freeze({
+    description:
+      'Everything the Verifier needs to grade one delivery. Run the three gates yourself and hand ' +
+      'in their exit codes and output -- the Verifier never re-runs them and never accepts a claim ' +
+      'of green without the output.',
+    required: ['diff', 'kickoff', 'gates', 'changed_files'],
+    properties: {
+      diff: { type: 'string', description: 'The complete diff being graded, as text. Say so inside the text if it is truncated.' },
+      kickoff: { type: 'string', description: 'What this change promised, as Markdown or prose. The promise the diff is graded against.' },
+      gates: {
+        type: 'object',
+        description: 'The three gate results you ran yourself. Each is { exit: integer, output: string }.',
+        required: GATE_KEYS_REQUIRED,
+        properties: Object.fromEntries(
+          GATE_KEYS_REQUIRED.map(k => [k, { type: 'object', required: ['exit', 'output'], properties: { exit: { type: 'integer' }, output: { type: 'string' } } }]),
+        ),
+      },
+      changed_files: { type: 'array', items: { type: 'string' }, description: 'Every path this change touches. The self-certification check reads it.' },
+      backlog_id: { type: 'string', description: 'Optional. The ticket id, echoed back in the verdict.' },
+      version: { type: 'string', description: 'Optional. The version being graded, echoed back in the verdict.' },
+      standards: { type: 'string', description: 'Optional. The standards excerpts this change should be held to.' },
+      // OPTIONAL, BUT NOT FREE, and the description says so because the refusal cannot. Measured on
+      // this ticket's own foreign-repository QA: the Verifier's Intent tells it to block naming any
+      // missing input, and its Background Knowledge names DeepBench's own three gate commands -- so
+      // a call that simply OMITS these blocks on "class and class_autonomy ladder answer absent"
+      // and on gates that "are not the platform's three mechanical gates", every time. Saying
+      // "not applicable, this is not a DeepBench repository" turns both blocks into an approve on
+      // the same evidence. Named-as-absent and absent are different facts to a judge, exactly as
+      // they are to scripts/verifier.js's own ladder note. Recipe: docs/runbooks/mcp-server.md.
+      priority_class: { type: 'string', description: 'DeepBench P1-P10 class. Optional, but say "not applicable -- not a DeepBench repository" rather than omitting it: an omitted input is a block naming it.' },
+      ladder: { type: 'object', description: 'The trust ladder answer for that class (verifier.js writes it as `class_autonomy`). Optional, but state it as not applicable rather than omitting it -- see priority_class.' },
+    },
+  }),
+});
+
+/**
+ * ACCEPTS BOTH EVIDENCE SHAPES, and that is not laxity. `scripts/verifier.js --judge=session` pass
+ * one writes the judgment context this tool was specced to accept verbatim, and it writes the gates
+ * as `{ build: "pass", ... }` with the exit codes and output tails alongside in `gate_detail`. A
+ * contract that refused the platform's OWN evidence file would be broken on arrival, so a status
+ * string paired with its `gate_detail` entry counts as that gate's evidence. What is NOT negotiable
+ * in either shape: three gates, each with something a reader could check. A bare "pass" with no
+ * detail is a claim of green with no output, which is the one thing `vf-guardrails.must_not`
+ * forbids the Verifier to accept.
+ */
+export function normalizeGateEvidence(gates, gateDetail) {
+  const missing = [];
+  if (!gates || typeof gates !== 'object' || Array.isArray(gates)) return { missing: ['gates'] };
+  for (const key of GATE_KEYS_REQUIRED) {
+    const value = gates[key];
+    if (value === undefined || value === null || value === '') { missing.push(`gates.${key}`); continue; }
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      if (!Number.isInteger(value.exit)) missing.push(`gates.${key}.exit`);
+      if (typeof value.output !== 'string' || !value.output.trim()) missing.push(`gates.${key}.output`);
+      continue;
+    }
+    if (typeof value === 'string') {
+      const detail = gateDetail && typeof gateDetail === 'object' ? gateDetail[key] : undefined;
+      if (typeof detail !== 'string' || !detail.trim()) missing.push(`gates.${key}.output`);
+      continue;
+    }
+    missing.push(`gates.${key}`);
+  }
+  return { missing };
+}
+
+/**
+ * THE ENFORCEMENT. Pure, exported, and it names every field it is missing in one answer rather than
+ * one per round trip -- a caller assembling evidence for a foreign repository should learn the whole
+ * gap on the first refusal.
+ *
+ * A capability with no registry entry is unconstrained, exactly as before this ticket: the generic
+ * `task_context` object check in callToolThroughExecutor() is still the floor for all 25 tools.
+ */
+export function validateToolInput(slug, taskContext) {
+  const spec = TOOL_INPUT_SCHEMAS[slug];
+  if (!spec) return { ok: true, missing: [] };
+  if (!taskContext || typeof taskContext !== 'object' || Array.isArray(taskContext)) {
+    return { ok: false, missing: spec.required.slice() };
+  }
+  const missing = [];
+  for (const field of spec.required) {
+    const value = taskContext[field];
+    if (field === 'gates') {
+      missing.push(...normalizeGateEvidence(value, taskContext.gate_detail).missing);
+      continue;
+    }
+    const declared = spec.properties[field] || {};
+    if (declared.type === 'array') {
+      // An EMPTY array is a missing field, not a satisfied one. "This change touches no files" is
+      // not a delivery to grade, and treating [] as present is how a fail-closed check goes green
+      // on nothing.
+      if (!Array.isArray(value) || value.length === 0 || value.some(v => typeof v !== 'string' || !v.trim())) missing.push(field);
+      continue;
+    }
+    if (typeof value !== 'string' || !value.trim()) missing.push(field);
+  }
+  return { ok: missing.length === 0, missing };
+}
+
 export function toTool(row) {
   const holder = row.agent_role ? `${row.agent_name} -- ${row.agent_role}` : row.agent_name;
   const lane = row.lane ? `${row.lane} lane` : 'unclassified lane';
   const description =
     `${row.description}`.trim() +
     `\n\nRun by ${holder} (${lane}), ${row.execution_type} execution.`;
+  // SES-339: a registry entry PUBLISHES what tools/call enforces, so a client learns the contract
+  // from the list instead of from a refusal. `additionalProperties` is deliberately left open --
+  // every extra key is still serialized into the prompt, which is the executor's whole design.
+  const inputSpec = TOOL_INPUT_SCHEMAS[row.slug];
+  const taskContextSchema = {
+    type: 'object',
+    description: inputSpec
+      ? `${inputSpec.description} Every extra key you supply is serialized into the agent's prompt too.`
+      : 'The task, as an object. Every non-empty key is serialized into the agent\'s prompt, ' +
+        'so field names are part of the instruction.',
+  };
+  if (inputSpec) {
+    taskContextSchema.properties = inputSpec.properties;
+    taskContextSchema.required = inputSpec.required;
+  }
   const tool = {
     name: row.slug,
     title: row.name,
@@ -205,12 +368,7 @@ export function toTool(row) {
     inputSchema: {
       type: 'object',
       properties: {
-        task_context: {
-          type: 'object',
-          description:
-            'The task, as an object. Every non-empty key is serialized into the agent\'s prompt, ' +
-            'so field names are part of the instruction.',
-        },
+        task_context: taskContextSchema,
         intent_slug: {
           type: 'string',
           description: row.default_intent_slug
@@ -380,7 +538,31 @@ export function toToolResult(result, row) {
   return out;
 }
 
-async function callToolThroughExecutor({ name, args, rows }) {
+/**
+ * THE EXECUTOR SEAM. Extracted by SES-339 so the refusal guard can be proven to stop SHORT of it:
+ * a test that only watched the return value would pass whether or not the schema was enforced,
+ * because both paths end in "no verdict". A spy passed in here can only be called if the guard let
+ * the request through. Production never passes `execute`.
+ */
+async function runThroughExecutor({ row, intentSlug, taskContext }) {
+  const ctx = getRequestContext();
+  return runWithCallSource(
+    'mcp',
+    () =>
+      runCapability({
+        capability_slug: row.slug,
+        intent_slug: intentSlug,
+        agent_id: row.agent_id,
+        task_context: taskContext,
+        tenant_id: row.tenant_id,
+      }),
+    // Spread first: runWithCallSource writes callSource last, so the real caller's ip / device /
+    // visitor attribution rides through untouched while screen_origin becomes 'mcp'.
+    { ...ctx, screenOrigin: 'mcp' },
+  );
+}
+
+export async function callToolThroughExecutor({ name, args, rows, execute = runThroughExecutor }) {
   const row = rows.find(r => r.slug === name);
   if (!row) {
     // The SAME message whether the tool does not exist or exists in the governance lane and this
@@ -391,6 +573,20 @@ async function callToolThroughExecutor({ name, args, rows }) {
   if (!taskContext || typeof taskContext !== 'object' || Array.isArray(taskContext)) {
     throw new RpcError(INVALID_PARAMS, `${name} requires a "task_context" object argument`);
   }
+  // FEATURE: SES-339 -- BEFORE DISPATCH, and the ordering is the ticket. A partial submission used
+  // to reach the executor, spend a real model call, and come back with a verdict reached on evidence
+  // that was never in the prompt. -32602 is a PROTOCOL error rather than an isError result on
+  // purpose: the arguments are wrong, the tool never ran, and a client that re-plans on isError
+  // would be re-planning around an answer nobody gave.
+  const inputCheck = validateToolInput(row.slug, taskContext);
+  if (!inputCheck.ok) {
+    throw new RpcError(
+      INVALID_PARAMS,
+      `${name} requires task_context.${inputCheck.missing.join(', task_context.')} -- missing or empty, so the call was refused before it reached the agent`,
+      { missing: inputCheck.missing },
+    );
+  }
+
   const intentSlug =
     args && typeof args.intent_slug === 'string' && args.intent_slug
       ? args.intent_slug
@@ -399,22 +595,8 @@ async function callToolThroughExecutor({ name, args, rows }) {
   // AA-188: runCapability() does NOT fall back to capabilities.default_intent_slug when intent_slug
   // is null -- it assembles with every Intent Skill skipped. Resolving the default HERE is therefore
   // load-bearing, not a convenience, and it is a generic column read, never a slug conditional.
-  const ctx = getRequestContext();
   try {
-    const result = await runWithCallSource(
-      'mcp',
-      () =>
-        runCapability({
-          capability_slug: row.slug,
-          intent_slug: intentSlug,
-          agent_id: row.agent_id,
-          task_context: taskContext,
-          tenant_id: row.tenant_id,
-        }),
-      // Spread first: runWithCallSource writes callSource last, so the real caller's ip / device /
-      // visitor attribution rides through untouched while screen_origin becomes 'mcp'.
-      { ...ctx, screenOrigin: 'mcp' },
-    );
+    const result = await execute({ row, intentSlug, taskContext });
     return toToolResult(result, row);
   } catch (e) {
     // MCP's own rule: a TOOL failure is a result with isError, not a protocol error, so the calling
