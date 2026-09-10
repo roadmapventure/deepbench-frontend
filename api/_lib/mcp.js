@@ -1,3 +1,15 @@
+// DeepBench v7.0.446 | api/_lib/mcp.js | SES-346 -- THIS FILE MOVED OUT OF api/ AND IS NO LONGER A
+// SERVERLESS FUNCTION. Vercel's Hobby plan caps a deployment at 12 serverless functions and every
+// top-level file under api/ outside an underscore-prefixed directory is one; MCP-3 made it 13 and
+// SES-334's cron route had already made it 14, so EVERY dev deploy from v7.0.437 to v7.0.445 was
+// REFUSED at build and dev served v7.0.434 for hours. The transport now rides the executor's own
+// function: `/api/mcp` is a vercel.json rewrite to `/api/capabilities/execute?transport=mcp`, and
+// that route's handler delegates here on its first statement. THE PUBLIC URL DID NOT CHANGE and
+// nothing inside this file changed but the three relative import paths and the export's name --
+// `export default` became `export const mcpHandler`, because a file under api/_lib/ is imported,
+// never routed to. If you are about to move this back under api/, count the functions first:
+// `node scripts/check-api-function-count.js --worktree=<path>` and
+// `tests/regression/ses-346-twelve-functions.test.mjs` are the two that will tell you no.
 // DeepBench v7.0.445 | api/mcp.js | SES-339 -- the Verifier's judgment is callable through MCP for
 // any repository. `tools/call` used to accept ANY `task_context` object, so a partial submission
 // bought a real model call and came back with a verdict reached on evidence that was never there.
@@ -68,15 +80,15 @@
 
 import { createRequire } from 'node:module';
 import { timingSafeEqual } from 'node:crypto';
-import { runCapability } from './capabilities/execute.js';
-import { withRequestContext, getRequestContext, runWithCallSource } from '../lib/request-context.js';
+import { runCapability } from '../capabilities/execute.js';
+import { withRequestContext, getRequestContext, runWithCallSource } from '../../lib/request-context.js';
 
 // package.json is read through createRequire rather than an import attribute so the Vercel builder
 // traces it as a plain dependency. A failure here costs the server its version string and nothing
 // else, so it degrades to a literal rather than refusing to boot.
 let PACKAGE_VERSION = '0.0.0';
 try {
-  PACKAGE_VERSION = createRequire(import.meta.url)('../package.json').version || '0.0.0';
+  PACKAGE_VERSION = createRequire(import.meta.url)('../../package.json').version || '0.0.0';
 } catch {
   // keep the fallback
 }
@@ -676,4 +688,4 @@ async function handler(req, res) {
   return res.status(200).json(response);
 }
 
-export default withRequestContext(handler);
+export const mcpHandler = withRequestContext(handler);

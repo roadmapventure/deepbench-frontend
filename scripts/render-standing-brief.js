@@ -604,8 +604,8 @@ export function renderServedClass(served, stamp) {
   L.push("");
   L.push(served.lastRankedAt
     ? `- Last scheduled re-rank: ${cst(served.lastRankedAt)}.`
-    : "- Last scheduled re-rank: *never* — the nightly `api/cron/rank-backlog` job has written no "
-      + "cycle row yet. Not the same as a run that ranked nothing.");
+    : "- Last scheduled re-rank: *never* — the daily `scripts/rank-backlog.js` pass (runner-cycle "
+      + "step 4c) has written no cycle row yet. Not the same as a run that ranked nothing.");
   L.push("");
   return L.join("\n");
 }

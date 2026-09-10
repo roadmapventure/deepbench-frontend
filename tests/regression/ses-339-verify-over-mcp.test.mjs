@@ -29,7 +29,8 @@
 //
 // DRY-RUN against the unchanged tree (measured 2026-09-09, before the change): every part fails at
 // import -- `validateToolInput`, `TOOL_INPUT_SCHEMAS`, `normalizeGateEvidence` and the exported
-// `callToolThroughExecutor` did not exist in api/mcp.js. 4 of 4 parts red pre-change.
+// `callToolThroughExecutor` did not exist in the MCP server (then api/mcp.js, moved to api/_lib/mcp.js
+// by SES-346). 4 of 4 parts red pre-change.
 
 import assert from "assert";
 import { selfRun, notRun } from "./_lib/self-run.js";
@@ -42,12 +43,12 @@ import {
   normalizeGateEvidence,
   TOOL_INPUT_SCHEMAS,
   GATE_KEYS_REQUIRED,
-} from "../../api/mcp.js";
+} from "../../api/_lib/mcp.js";
 
 const VERIFY_SLUG = Object.keys(TOOL_INPUT_SCHEMAS)[0];
 
 // ---------------------------------------------------------------------------------------------
-// Fixtures -- shaped like the four REST reads api/mcp.js makes, so the rows under test are built
+// Fixtures -- shaped like the four REST reads api/_lib/mcp.js makes, so the rows under test are built
 // by the SHIPPED assembler rather than hand-written into the shape it happens to produce.
 // ---------------------------------------------------------------------------------------------
 const FIXTURE = {
@@ -320,7 +321,7 @@ async function partD_live() {
     `TOOL_INPUT_SCHEMAS names ${JSON.stringify(ghosts)}, which is not a capability slug -- an input contract keyed to a slug that does not exist enforces nothing, silently`);
   results.push("live-every-registry-key-is-a-real-capability");
 
-  // ...and the capability must have an ACTIVE holder, or api/mcp.js drops the row before the
+  // ...and the capability must have an ACTIVE holder, or api/_lib/mcp.js drops the row before the
   // registry is ever consulted and the contract is dead code.
   const assignments = await get(`agent_capability_assignments?select=agent_id,capability_slug&capability_slug=in.(${slugs.map(encodeURIComponent).join(",")})`);
   const agentIds = [...new Set(assignments.map(a => a.agent_id))];
@@ -329,7 +330,7 @@ async function partD_live() {
   for (const slug of slugs) {
     const holders = assignments.filter(a => a.capability_slug === slug && activeIds.has(a.agent_id));
     assert.ok(holders.length > 0,
-      `capability "${slug}" carries an input contract but has no ACTIVE holder -- api/mcp.js drops the row from tools/list, so the contract is dead code`);
+      `capability "${slug}" carries an input contract but has no ACTIVE holder -- api/_lib/mcp.js drops the row from tools/list, so the contract is dead code`);
   }
   results.push("live-registry-capabilities-have-active-holders");
 

@@ -5,7 +5,11 @@
 # The DeepBench MCP server
 
 `POST /api/mcp` — JSON-RPC 2.0 over the MCP **Streamable HTTP** transport, implemented in
-`api/mcp.js` with no SDK and no new dependency. Methods: `initialize`,
+`api/_lib/mcp.js` with no SDK and no new dependency. **The URL is a `vercel.json` rewrite onto
+`/api/capabilities/execute?transport=mcp`, not a route of its own (`SES-346`, `v7.0.446`):** the
+Hobby plan caps a deployment at 12 serverless functions and this file was the 13th, which refused
+every dev build for eight versions. Nothing a client sees changed — same URL, same methods, same
+headers. Do not move it back under `api/`. Methods: `initialize`,
 `notifications/initialized`, `ping`, `tools/list`, `tools/call`. Protocol versions offered:
 `2025-11-25` (default) and `2025-06-18` — the handshake-based revisions, not the current
 `2026-07-28` `server/discover` revision. `GET` returns 405 (no server-initiated SSE stream);
@@ -41,7 +45,7 @@ whose only holder is inactive (the executor would refuse it), and anything that 
 — there are no MCP resources or prompts, and `capabilities` in `initialize` is exactly `{ tools: {} }`.
 
 **Per-tool input contracts (`SES-339`).** Most tools take any `task_context` object. A capability
-listed in `TOOL_INPUT_SCHEMAS` (`api/mcp.js`) also declares which `task_context` fields it *requires*:
+listed in `TOOL_INPUT_SCHEMAS` (`api/_lib/mcp.js`) also declares which `task_context` fields it *requires*:
 the list publishes them inside `inputSchema.properties.task_context`, and `tools/call` enforces them
 **before dispatch** — a missing or empty required field is a `-32602` naming every field it is short
 (`error.data.missing` carries the machine-readable list) and **no model call is spent**. Extra keys
@@ -50,7 +54,7 @@ one entry, `verify-ship`, below.
 
 Every `tools/call` runs the one generic executor (`runCapability`), so it logs an agent turn with
 `call_source = 'mcp'` and `screen_origin = 'mcp'`. That pair is the only evidence an outside client
-ever used DeepBench; `api/mcp.js` writes no `ai_activity_log` row of its own.
+ever used DeepBench; `api/_lib/mcp.js` writes no `ai_activity_log` row of its own.
 
 ## Claude Desktop
 

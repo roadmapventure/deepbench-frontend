@@ -202,9 +202,12 @@ export const SERVICE_CATALOG = [
   { slug: 'classify-ticket',         name: 'Classify Ticket (The Prioritizer)', serviceType: 'ai', patterns: ['Structured Output', 'Guardrails / Output Filtering'], roadmap: 'now' },
 
   // FEATURE: SES-334 -- the Prioritizer's rank-backlog, the other half of AGT-63's pair, added here
-  // for the same reason classify-ticket was: api/cron/rank-backlog.js logs the SCHEDULE's own row and
-  // logActivity() would land an unnamed slug in By-Service without an entry. No AI_TYPE_TO_SERVICE
-  // entry needed: ai_type equals capability_slug ('rank-backlog').
+  // for the same reason classify-ticket was: logActivity() would land an unnamed slug in By-Service
+  // without an entry. No AI_TYPE_TO_SERVICE entry needed: ai_type equals capability_slug
+  // ('rank-backlog'). SES-346: the writer is now scripts/rank-backlog.js via scripts/agent-log.js
+  // (the retired api/cron/rank-backlog.js route logged nothing itself, because the EXECUTOR had), so
+  // this entry matters MORE than it did -- it is the only thing naming the slug the session path
+  // writes.
   // 'Structured Output' because the ordering is a schema-validated `ranked` array; NOT
   // 'Guardrails / Output Filtering' -- pz-guardrails explicitly forbids re-judging a class inside
   // rank-backlog, so the ranking turn filters nothing, it only orders what classify-ticket ruled.

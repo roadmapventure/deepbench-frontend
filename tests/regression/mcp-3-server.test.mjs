@@ -1,6 +1,11 @@
+// DeepBench v7.0.446 | tests/regression/mcp-3-server.test.mjs | SES-346 -- the server moved to
+// api/_lib/mcp.js and `/api/mcp` is now a vercel.json rewrite onto the executor's function, so the
+// imports here point at api/_lib/ and NEW PART (f) drives the delegation seam through the real
+// api/capabilities/execute.js default export. Historical dry-run notes below still name api/mcp.js,
+// because that is where the file was when they were measured.
 // DeepBench v7.0.444 | tests/regression/mcp-3-server.test.mjs | MCP-3
 //
-// FEATURE: MCP-3 -- the DeepBench MCP server at api/mcp.js. Two things have to stay true forever:
+// FEATURE: MCP-3 -- the DeepBench MCP server at api/_lib/mcp.js. Two things have to stay true forever:
 // the JSON-RPC subset answers correctly, and the governance lane does not leak to a caller without
 // the key. Both are asserted here, each with a control that fails when the guard is removed.
 //
@@ -18,7 +23,7 @@
 //       structuredContent (a client validates one against the other, so publishing an unvalidated
 //       one is the bug).
 //   (d) STATIC -- lib/request-context.js's ALLOWED_CALL_SOURCES contains 'mcp', with a stripped
-//       control; and api/mcp.js carries no capability-slug conditional
+//       control; and api/_lib/mcp.js carries no capability-slug conditional
 //       (.claude/rules/capabilities-are-data.md).
 //   (e) LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY, else NOT RUN) -- tools/list built from the REAL
 //       rows lists `bench-report-card` without the key and never a governance holder; with the key
@@ -26,8 +31,9 @@
 //       ai_activity_log row with call_source = 'mcp' exists, which can only have been written by a
 //       tools/call that actually reached runCapability().
 //
-// DRY-RUN against the unchanged tree (measured 2026-09-09, before api/mcp.js existed): parts (a),
-// (b), (c) and (e) fail at import -- `Cannot find module ../../api/mcp.js`; part (d)'s positive
+// DRY-RUN against the unchanged tree (measured 2026-09-09, before the MCP server existed -- the file was
+// then api/mcp.js, moved to api/_lib/ by SES-346): parts (a), (b), (c) and (e) fail at import --
+// `Cannot find module`; part (d)'s positive
 // check on ALLOWED_CALL_SOURCES fails ('mcp' absent) while its stripped control passes trivially.
 // 5 of 5 content assertions red pre-change.
 
@@ -49,13 +55,13 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
   LATEST_PROTOCOL_VERSION,
   SERVER_INFO,
-} from "../../api/mcp.js";
+} from "../../api/_lib/mcp.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 
 // ---------------------------------------------------------------------------------------------
-// Fixtures -- shaped exactly like the four REST reads api/mcp.js makes, never like its output.
+// Fixtures -- shaped exactly like the four REST reads api/_lib/mcp.js makes, never like its output.
 // ---------------------------------------------------------------------------------------------
 const FIXTURE = {
   capabilities: [
@@ -96,7 +102,7 @@ function depsFor({ governanceUnlocked }) {
       callTool: async ({ name, args }) => {
         const row = rows.find(r => r.slug === name);
         if (!row) {
-          // Mirrors api/mcp.js's own refusal shape, which the dispatcher turns into -32602.
+          // Mirrors api/_lib/mcp.js's own refusal shape, which the dispatcher turns into -32602.
           const err = new Error(`Unknown tool: ${name}`);
           err.code = -32602;
           const rpc = Object.assign(err, { code: -32602 });
@@ -315,7 +321,7 @@ function partD_static() {
   results.push("control-stripped-allowlist-fails");
 
   // .claude/rules/capabilities-are-data.md: no conditional keyed to a capability slug or agent id.
-  const mcpSrc = read("api/mcp.js");
+  const mcpSrc = read("api/_lib/mcp.js");
   const codeOnly = mcpSrc
     .split("\n")
     .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
@@ -328,18 +334,18 @@ function partD_static() {
     return /(capability_slug|intent_slug|\bslug|agent_id)\s*(===|!==)\s*['"]/.test(withoutTypeChecks);
   };
   assert.ok(!hasIdentityConditional(codeOnly),
-    "api/mcp.js contains a conditional keyed to a literal slug or agent id -- capabilities are data, never code");
+    "api/_lib/mcp.js contains a conditional keyed to a literal slug or agent id -- capabilities are data, never code");
   const mutated = codeOnly.replace("const row = rows.find(", "if (row.slug === 'classify-ticket') return null;\n  const row = rows.find(");
   assert.notStrictEqual(mutated, codeOnly,
     "control setup failed: the `const row = rows.find(` anchor was not found -- fix the mutation string, not the assertion");
   assert.ok(hasIdentityConditional(mutated),
     "control: a spliced-in `row.slug === 'classify-ticket'` conditional is not caught -- the check does not discriminate");
   assert.ok(/runCapability\(/.test(codeOnly),
-    "api/mcp.js must call runCapability() -- it must never grow a second execution path");
+    "api/_lib/mcp.js must call runCapability() -- it must never grow a second execution path");
   assert.ok(/runWithCallSource\(\s*['"]mcp['"]/.test(codeOnly),
-    "api/mcp.js must establish call_source = 'mcp' through runWithCallSource()");
+    "api/_lib/mcp.js must establish call_source = 'mcp' through runWithCallSource()");
   assert.ok(/screenOrigin:\s*['"]mcp['"]/.test(codeOnly),
-    "api/mcp.js must establish screen_origin = 'mcp'");
+    "api/_lib/mcp.js must establish screen_origin = 'mcp'");
   results.push("mcp-route-is-data-driven-and-attributed");
 
   return results;
@@ -402,10 +408,88 @@ async function partE_live(ctx = {}) {
   const logRows = await res.json();
   console.log(`  [MCP-3] newest call_source='mcp' row: ${JSON.stringify(logRows)}`);
   assert.strictEqual(logRows.length, 1,
-    "no ai_activity_log row carries call_source = 'mcp' -- no tools/call has ever reached runCapability() through api/mcp.js");
+    "no ai_activity_log row carries call_source = 'mcp' -- no tools/call has ever reached runCapability() through api/_lib/mcp.js");
   assert.strictEqual(logRows[0].screen_origin, "mcp",
     `the mcp row's screen_origin must be 'mcp', got ${JSON.stringify(logRows[0])}`);
   results.push("live-executor-logged-an-mcp-call");
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part (f) -- SES-346: the transport rides the executor's function
+//
+// api/mcp.js was the 13th serverless function on a 12-function Hobby plan and refused every dev
+// deploy from v7.0.437 to v7.0.445. `/api/mcp` is now a vercel.json rewrite to
+// `/api/capabilities/execute?transport=mcp`, and the executor's handler delegates on its first
+// statement. That seam is what this part drives -- through the REAL default export of
+// api/capabilities/execute.js, never a re-implementation of the branch (Section 4's SES-45 rule),
+// and entirely offline: `initialize` needs no Supabase read and makes no model call.
+//
+// WOULD THIS PASS IF THE DELEGATION DID NOTHING? No, and the pair is what makes that true. The
+// POSITIVE drive answers with the MCP server's own serverInfo, which only the dispatcher produces.
+// The NEGATIVE control sends the identical GET with a DIFFERENT transport value and requires the
+// EXECUTOR's own 405 body -- so a delegation that fired unconditionally (the plausible wrong fix,
+// which would break every capability call on the platform) fails here rather than passing.
+// ---------------------------------------------------------------------------------------------
+function fixtureRes() {
+  const captured = { statusCode: null, body: undefined, headers: {}, ended: false };
+  const res = {
+    setHeader(k, v) { captured.headers[String(k).toLowerCase()] = v; },
+    status(code) { captured.statusCode = code; return res; },
+    json(payload) { captured.body = payload; captured.ended = true; return res; },
+    end() { captured.ended = true; return res; },
+    write() {},
+  };
+  return { res, captured };
+}
+
+async function partF_transportDelegation() {
+  const results = [];
+  const { default: executeRoute } = await import("../../api/capabilities/execute.js");
+
+  // The POSITIVE: a POST carrying transport=mcp is answered by the MCP dispatcher.
+  const post = fixtureRes();
+  await executeRoute(
+    {
+      method: "POST",
+      headers: {},
+      query: { transport: "mcp" },
+      body: { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LATEST_PROTOCOL_VERSION } },
+    },
+    post.res,
+  );
+  assert.strictEqual(post.captured.statusCode, 200,
+    `transport=mcp must reach the MCP dispatcher, got ${post.captured.statusCode} ${JSON.stringify(post.captured.body)}`);
+  assert.strictEqual(post.captured.body?.result?.serverInfo?.name, SERVER_INFO.name,
+    `the executor answered transport=mcp with something other than the MCP server's serverInfo: ${JSON.stringify(post.captured.body)}`);
+  assert.strictEqual(post.captured.body?.result?.protocolVersion, LATEST_PROTOCOL_VERSION);
+  results.push("executor-delegates-transport-mcp-to-the-dispatcher");
+
+  // The seam is keyed on the query value: same method, MCP's own 405 explanation.
+  const getMcp = fixtureRes();
+  await executeRoute({ method: "GET", headers: {}, query: { transport: "mcp" } }, getMcp.res);
+  assert.strictEqual(getMcp.captured.statusCode, 405);
+  assert.ok(/POST-only/.test(String(getMcp.captured.body?.error)),
+    `a GET with transport=mcp must get the MCP transport's own 405, got ${JSON.stringify(getMcp.captured.body)}`);
+
+  // THE NEGATIVE CONTROL. Identical request, a transport value that is not `mcp`: the executor's
+  // OWN 405 body, proving the branch discriminates instead of swallowing every request.
+  const getPlain = fixtureRes();
+  await executeRoute({ method: "GET", headers: {}, query: { transport: "not-mcp" } }, getPlain.res);
+  assert.strictEqual(getPlain.captured.statusCode, 405);
+  assert.strictEqual(getPlain.captured.body?.error, "Method not allowed",
+    `a non-mcp transport must fall through to the executor's own handler, got ${JSON.stringify(getPlain.captured.body)}`);
+  assert.notStrictEqual(getPlain.captured.body?.error, getMcp.captured.body?.error,
+    "control: the two 405 bodies are identical, so this part cannot tell the two handlers apart");
+  results.push("control-non-mcp-transport-stays-in-the-executor");
+
+  // And no `query` at all (an in-process caller, a fixture, a local runtime) must not throw.
+  const noQuery = fixtureRes();
+  await executeRoute({ method: "GET", headers: {} }, noQuery.res);
+  assert.strictEqual(noQuery.captured.body?.error, "Method not allowed",
+    "a request with no `query` object at all must fall through, never throw on the delegation line");
+  results.push("absent-query-object-is-safe");
 
   return results;
 }
@@ -416,6 +500,7 @@ async function run() {
   results.push(...(await partB_laneVisibility()));
   results.push(...partC_resultShaping());
   results.push(...partD_static());
+  results.push(...(await partF_transportDelegation()));
   results.push(...(await partE_live()));
   return results;
 }

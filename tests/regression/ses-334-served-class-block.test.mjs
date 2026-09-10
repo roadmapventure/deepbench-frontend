@@ -1,3 +1,11 @@
+// DeepBench v7.0.446 | tests/regression/ses-334-served-class-block.test.mjs | SES-346 -- PART (b) IS
+// REPOINTED, NOT THINNED. The re-rank stopped being a Vercel cron (`api/cron/rank-backlog.js` was the
+// 13th serverless function on a 12-function Hobby plan and refused every dev deploy from v7.0.437); it is
+// `scripts/rank-backlog.js` run from runbook step 4c now. Every clause below kept its MEANING and changed
+// its SUBJECT -- the schedule's declaration, the picker-lane candidate read, the no-double-count rule and
+// the tokens-are-measured-not-assumed rule each still have an assertion, against the file that now holds
+// them. `SES-197`'s boundary: when a rule moves, the guard is retargeted, never deleted.
+//
 // DeepBench v7.0.437 | tests/regression/ses-334-served-class-block.test.mjs | SES-334 -- the nightly
 // re-rank, and the `Board by served class` block it feeds.
 //
@@ -36,9 +44,15 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import { renderServedClass, SERVED_TOP_N } from "../../scripts/render-standing-brief.js";
 import { buildCallBody } from "../../api/prompt/request-receivable.js";
 import { supportsForcedToolChoice, supportsTemperature } from "../../shared/models.js";
+// SES-346: the token rule is asserted on the REAL function that now holds it, not on a regex over a
+// deleted route -- Section 4's "a test must assert against the REAL implementation" (SES-45).
+import { tokensFrom } from "../../scripts/rank-backlog.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const ROUTE = path.join(ROOT, "api/cron/rank-backlog.js");
+// SES-346: the route is gone; the same job is this script, invoked by runbook step 4c.
+const SCRIPT = path.join(ROOT, "scripts/rank-backlog.js");
+const RUNBOOK = path.join(ROOT, "docs/runbooks/runner-cycle.md");
+const LEDGER = path.join(ROOT, "docs/SELFBUILD-RETIREMENT-LEDGER.md");
 const VERCEL_JSON = path.join(ROOT, "vercel.json");
 const BRIEF = path.join(ROOT, "docs/runbooks/standing-brief.md");
 
@@ -130,29 +144,65 @@ async function run() {
   assert.strictEqual(SERVED_TOP_N, 5, "the top-N constant is part of the block's contract");
   console.log("  (a) renderer: populated / unread / empty / negative-rank branches all distinct -- PASS");
 
-  // ---- (b) the schedule is declared, and the route exists ---------------------------------------
+  // ---- (b) the schedule is declared, and the job exists ------------------------------------------
+  // REPOINTED BY SES-346, CLAUSE FOR CLAUSE. The job is no longer a Vercel cron -- that route was the
+  // 13th serverless function on a 12-function Hobby plan and REFUSED every dev deploy from v7.0.437
+  // to v7.0.445. Each assertion below kept its MEANING and changed its SUBJECT; retirement-ledger
+  // entry 53 records the move, and nothing here was dropped (SES-197's retarget-never-delete rule).
   const vercel = JSON.parse(fs.readFileSync(VERCEL_JSON, "utf8"));
-  assert.ok(Array.isArray(vercel.crons), "vercel.json must declare a crons array");
-  const job = vercel.crons.find(c => c.path === "/api/cron/rank-backlog");
-  assert.ok(job, "vercel.json must schedule /api/cron/rank-backlog -- without it the route is dead code");
-  assert.strictEqual(job.schedule, "10 9 * * *",
-    "the schedule must be 09:10 UTC (03:10 CDT / 02:10 CST): off the runner's :40 grid and the "
-    + "finaliser's :17");
-  assert.ok(fs.existsSync(ROUTE), "api/cron/rank-backlog.js must exist");
-  const route = fs.readFileSync(ROUTE, "utf8");
-  assert.ok(/pg_net/.test(route),
-    "the route must record WHY it is a Vercel cron rather than the finaliser's cron.job pattern -- "
-    + "pg_net's absence is the whole reason and is the first thing a later reader will re-litigate");
-  assert.ok(/prime_directive_queue/.test(route),
+  assert.ok(!vercel.crons,
+    "vercel.json must declare NO crons -- /api/cron/rank-backlog was the 13th of 12 permitted "
+    + "serverless functions and its presence refuses the WHOLE deployment, silently");
+  assert.ok(!fs.existsSync(path.join(ROOT, "api/cron/rank-backlog.js")),
+    "api/cron/rank-backlog.js is back under api/ -- it is a serverless function there and the plan has "
+    + "no room for it (scripts/check-api-function-count.js is the count)");
+
+  // The SCHEDULE's declaration moved from vercel.json to the runbook, so that is where it is asserted:
+  // a job nothing invokes is dead code, which is exactly what the retired clause protected against.
+  assert.ok(fs.existsSync(SCRIPT), "scripts/rank-backlog.js must exist -- it is the re-rank now");
+  const step4c = fs.readFileSync(RUNBOOK, "utf8").split("**4c.")[1];
+  assert.ok(step4c, "docs/runbooks/runner-cycle.md must carry step 4c -- without it nothing runs the re-rank");
+  const step4cBody = step4c.split("**5. Pick ONE item.**")[0];
+  assert.ok(/scripts\/rank-backlog\.js/.test(step4cBody),
+    "step 4c must name scripts/rank-backlog.js -- a schedule that names no runnable thing is not a schedule");
+  assert.ok(/once per CST day/.test(step4cBody),
+    "step 4c must state the cadence: what the 09:10 UTC cron actually satisfied was 'overnight, once a "
+    + "day', and the cadence is the half that has to survive the move");
+
+  const script = fs.readFileSync(SCRIPT, "utf8");
+  // The pg_net reasoning survives -- in the ledger entry, which is where a reader looking for a retired
+  // rule is told to look, and the script points at it so the chain cannot silently break.
+  assert.ok(/pg_net/.test(fs.readFileSync(LEDGER, "utf8")),
+    "the WHY-not-a-cron.job reasoning (pg_net is not installed on this project) must survive the "
+    + "retirement -- it is the first thing a later reader will re-litigate");
+  assert.ok(/SELFBUILD-RETIREMENT-LEDGER/.test(script),
+    "scripts/rank-backlog.js must point at the ledger entry carrying the retired route's reasoning");
+  assert.ok(/prime_directive_queue/.test(script),
     "the candidate read must come from prime_directive_queue(), not a re-derived buildable filter");
-  // Asserted on the IMPORT and the CALL shape, not on the word: the route's comment explains at
-  // length why it does not log, and a bare /logActivity/ match reddens on the explanation itself.
-  assert.ok(!/^\s*import[^\n]*logActivity/m.test(route) && !/logActivity\(\{/.test(route),
-    "the route must NOT write its own ai_activity_log row -- the executor already logged the turn, and "
-    + "a second row double-counts the call in the AI Audit");
-  assert.ok(/pollForTurns/.test(route),
-    "the cost read-back must poll -- logActivity() is fire-and-forget and a single read reports 0 tokens");
-  console.log("  (b) cron declared at 09:10 UTC, route reads the picker's own lanes -- PASS");
+
+  // INVERTED, AND THE INVERSION IS THE POINT. The route deliberately wrote no ai_activity_log row
+  // because the EXECUTOR had already logged the turn. On the session path no executor call happens, so
+  // a script that logged nothing would make the re-rank invisible to the AI Audit -- unmeasured spend,
+  // not a saving (.claude/rules/capability-logging.md). What must NOT come back is a SECOND HOME for
+  // the write: the row goes through scripts/agent-log.js, never a hand-rolled logActivity() here.
+  assert.ok(/agent-log\.js/.test(script),
+    "the session path must write its own ai_activity_log row through scripts/agent-log.js -- the executor "
+    + "is not running, so nothing else will");
+  assert.ok(!/^\s*import[^\n]*logActivity/m.test(script) && !/logActivity\(\{/.test(script),
+    "the script must not call logActivity() directly -- agent-log.js is the one home, and a second write "
+    + "path is how the nine bespoke payload shapes AA-190 replaced came to exist");
+
+  // The polling existed because the executor's own log write is fire-and-forget, so a single read
+  // reported 0 tokens on every successful run forever. There is no executor row to wait for now, so what
+  // survives is the RULE the polling served -- a run that reports zero tokens has not been measured, it
+  // has been assumed -- asserted on the REAL tokensFrom(), both directions, with the 0-vs-null control.
+  assert.strictEqual(tokensFrom({}).total, null,
+    "an unreported token count must be null, never 0 -- a stored 0 says the run was free (SES-147)");
+  assert.strictEqual(tokensFrom({ input_tokens: 0, output_tokens: 0 }).total, 0,
+    "a genuinely REPORTED zero is a different fact from an unreported one and must survive as 0");
+  assert.strictEqual(tokensFrom({ input_tokens: 6707, output_tokens: 1651 }).total, 8358,
+    "a reported pair must sum -- these are the real numbers from SES-334's own first live run");
+  console.log("  (b) no crons in vercel.json, step 4c names the script, tokens null-vs-zero holds -- PASS");
 
   // ---- (c) the two model-capability predicates, at the call site --------------------------------
   assert.strictEqual(supportsForcedToolChoice(RESTRICTED), false);

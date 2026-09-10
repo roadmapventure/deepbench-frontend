@@ -1135,3 +1135,47 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
   `governance_rules_source_group_check` without the seventh value), re-run
   `node scripts/export-governance-snapshot.js`, and delete the census doc and the test. Decision
   handle: `f6c99ec8-249a-48f6-8e88-4bd5fc57a30f`.
+
+### 53. The Vercel cron that re-ranked the board — retired to the runner's own cycle, because it was the 13th of 12 serverless functions
+- **Said, verbatim (the route's own header):** *"WHY A VERCEL CRON AND NOT THE FINALISER'S PATTERN.
+  `runner-window-finaliser` (`SES-320b`) is a `cron.job` row calling a SQL function on the database's own
+  clock, and it is the better shape — no deploy, no bypass header, no cold start. It cannot be used
+  here: this job has to make an HTTP call to the executor, and a Postgres function cannot. `pg_net` is the
+  extension that would give it one. MEASURED 2026-09-09, not assumed — `select extname from
+  pg_extension` returns pg_cron, pg_stat_statements, pgcrypto, plpgsql, supabase_vault, uuid-ossp, vector.
+  No pg_net."* Plus the schedule's own defence: *"THE SCHEDULE IS 09:10 UTC AND THAT IS 03:10
+  AMERICA/CHICAGO ONLY IN SUMMER … the job's requirement is 'overnight, off the runner's own grid'."*
+- **Lived:** `api/cron/rank-backlog.js` (254 lines, `SES-334`, `v7.0.437`) and `vercel.json`'s `crons`
+  block; the runbook had no step for it at all, which is part of why nothing noticed.
+- **Why retired:** it was **right about Postgres and wrong about the alternatives**, and the bill came due
+  as an outage. Vercel's Hobby plan caps a deployment at **12** serverless functions; every top-level file
+  under `api/` outside an underscore-prefixed directory is one. This route was the **13th** and `MCP-3`'s
+  `api/mcp.js` the **14th**, so from `v7.0.437` Vercel **refused every dev build**: `dev` served
+  `v7.0.434` while ten later commits sat undeployed. Two functions had to go and neither capability could.
+  The re-rank never needed a function — **the runner is already a caller with a clock**, it runs on
+  subscription tokens instead of API dollars, and `docs/runbooks/runner-cycle.md` step 4b already runs the
+  invention pass on exactly that schedule. A plan upgrade was never on the table: John ruled the free tier
+  stays (2026-08-31, `SES-47` "option 1"; `SES-183` part 1 "no cost option"), and money is his call.
+- **Survives:** `scripts/rank-backlog.js` — the same job as a two-pass session script (`--cycle=` prints
+  the Prioritizer's prompt and exits **3**; `--answer=<file>` validates against `pz-rank-intent`'s own
+  stored schema and hands the ranking to `prioritizer-write.js` in-process), invoked by **new runbook step
+  4c**. Nothing about the run changed but the runner: the same `prime_directive_queue()` candidates, the
+  same 60-candidate output-budget cap, the same `assemblePrompt()`, the same handler, and the same
+  `trigger = 'scheduled'` cycle row under the same `SCHEDULED-AGENT: rank-backlog` notes prefix — which
+  is what keeps `tests/regression/ses-334-served-class-block.test.mjs`'s live arm finding these runs. The
+  `pg_net` reasoning survives in this entry: **if pg_net is ever installed, the finaliser's `cron.job`
+  pattern becomes available and this script is the thing to retire into it.** The MCP half of the same
+  ship is not a retirement — `api/mcp.js` moved to `api/_lib/mcp.js` and `/api/mcp` is now a
+  `vercel.json` rewrite onto the executor's function, so the public URL and every behaviour are unchanged.
+- **One thing this ship deliberately did NOT fix, named rather than left to be found.** Two
+  `public.governance_rules` rows now describe a cron that does not exist: **`OD-19`** (the `10 9 * * *`
+  schedule, canonical `vercel.json` `crons[0]`) and **`OD-42`** (the 60-candidate cap, whose *Lives in*
+  names the deleted route). Their statements are pinned **byte-for-byte** to
+  `docs/design/2026-09-09-operational-defaults-census.md` by
+  `tests/regression/ses-234-operational-defaults.test.mjs`, so editing either half alone reddens CI and
+  editing both is a **registry amendment**, which entry 52's own batch says is John's to rule on. Filed
+  here as the finding, not taken as a licence.
+- **Restore:** `git show 5f55eb23:api/cron/rank-backlog.js > api/cron/rank-backlog.js`, then re-add
+  `{"crons": [{"path": "/api/cron/rank-backlog", "schedule": "10 9 * * *"}]}` to `vercel.json` — **and
+  first remove some other function, because `api/` sits at 12/12 and the 13th refuses the whole
+  deployment silently.** `node scripts/check-api-function-count.js --worktree=<path>` is the check.

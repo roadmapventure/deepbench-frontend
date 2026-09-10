@@ -124,6 +124,11 @@ import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolveP
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow, patchDurableHopRowChecked } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
 import { withRequestContext } from '../../lib/request-context.js';
+// FEATURE: SES-346 -- TRANSPORT DELEGATION ONLY. api/_lib/mcp.js used to be api/mcp.js, a 13th
+// serverless function on a 12-function Hobby plan, and its presence REFUSED every dev deploy from
+// v7.0.437 to v7.0.445. The MCP server now rides THIS function; nothing about capability execution
+// changed and nothing may be added to this seam beyond the one-line handoff in handler() below.
+import { mcpHandler } from '../_lib/mcp.js';
 
 export const config = { maxDuration: 60, runtime: "nodejs" };
 
@@ -2203,6 +2208,14 @@ async function streamResult(res, run) {
 }
 
 async function handler(req, res) {
+  // FEATURE: SES-346 -- the MCP transport, delegated before anything else in this function runs.
+  // `/api/mcp` is a vercel.json rewrite to `/api/capabilities/execute?transport=mcp`, so the query
+  // parameter is the only thing that tells the two callers apart. This is a TRANSPORT branch, not a
+  // capability conditional: no capability slug and no agent id is read here, so
+  // .claude/rules/capabilities-are-data.md is untouched -- mcpHandler() reaches the SAME
+  // runCapability() the lines below reach, by the same executor, with the same logging.
+  if (req.query?.transport === "mcp") return mcpHandler(req, res);
+
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
