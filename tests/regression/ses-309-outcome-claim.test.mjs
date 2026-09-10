@@ -187,8 +187,18 @@ async function run(ctx = {}) {
   for (const id of STAMPED) {
     const row = rows.find(r => r.backlog_id === id);
     assert.ok(row, `${id} has a ship stamp but no ticket_outcome row`);
-    assert.strictEqual(row.verdict, "pending",
-      `${id} reads ${row.verdict}; it has no after-row yet, so pending must win over every later branch`);
+    // 2026-09-10 (design-runner-24h-0908 close-out): this clause used to pin `pending`, which was a
+    // fact about the LIVE LEDGER at ship time (no after-row yet), not about the view. The first
+    // scoreboard snapshot taken after these three shipped (81b653f7, trigger ship, SES-346) gave them
+    // an after-row, and a `none:` claim with an after-row reads `unmeasurable` BY DESIGN (the header's
+    // own measured fixture: "unmeasurable ('none: qa')"). What this clause actually guards is that the
+    // new `unclaimed` branch never swallows a row that DID declare a claim -- so it now accepts the
+    // two verdicts a declared `none:` claim can legitimately read, and refuses the one it never may.
+    assert.ok(row.verdict === "pending" || row.verdict === "unmeasurable",
+      `${id} reads ${row.verdict}; a declared "none:" claim reads pending (no after-row yet) or ` +
+      `unmeasurable (after-row landed) -- never unclaimed, and never a measured verdict`);
+    assert.notStrictEqual(row.verdict, "unclaimed",
+      `${id} declared a claim and reads unclaimed -- the unclaimed branch swallowed a declared none: claim`);
     assert.strictEqual(row.claim_metric, null,
       `${id} declared "none:" -- claim_metric must be NULL, not ${JSON.stringify(row.claim_metric)}`);
   }
