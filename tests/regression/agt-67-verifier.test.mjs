@@ -1,3 +1,8 @@
+// DeepBench v7.0.447 | tests/regression/agt-67-verifier.test.mjs | SES-347 -- the required-key
+// guard and GOOD_VERDICT retargeted from `reasoning` to `findings`. The Intent's property was
+// renamed because the Anthropic API refused every request pairing that name with the injected
+// `account` receipt (5/5 refusals; 0/5 renamed). The guard still requires a written judgment --
+// it moved with the rule rather than being relaxed or deleted (STANDARDS.md Section 4 clause 1).
 // DeepBench v7.0.433 | tests/regression/agt-67-verifier.test.mjs | AGT-67 -- The Verifier:
 // the seed rows are real, the Intent's schema is the contract the SHIPPED validator is driven
 // against, the Skill text is bound to the code constant it claims to enforce, and a judged row is
@@ -93,7 +98,10 @@ export const GOOD_VERDICT = Object.freeze({
   backlog_id: "AGT-67",
   version: "v7.0.433",
   verdict: "block",
-  reasoning: "scripts/verifier.js:400 -- autoDoneEligibility() is unchanged, so the bar is intact.",
+  // SES-347: this key is `findings`. It was `reasoning` until the Anthropic API began refusing
+  // every request whose tool schema paired that name with the injected `account` receipt. The guard
+  // is RETARGETED, not relaxed -- the contract still requires a written judgment, under its new name.
+  findings: "scripts/verifier.js:400 -- autoDoneEligibility() is unchanged, so the bar is intact.",
   pm_lens: "Four tasks promised, four delivered.",
   architect_lens: "The assembly is imported, not restated (SES-331).",
   auto_done_eligible: false,
@@ -218,7 +226,8 @@ export default async function run() {
     "the Intent's traits.schema must parse as an object schema with a `required` array");
   assert.deepEqual(schema.properties.verdict.enum, ["approve", "block"],
     "verdict must be a two-value enum -- a third state is where 'probably fine' would live");
-  for (const k of ["reasoning", "pm_lens", "architect_lens", "auto_done_eligible", "auto_done_reason", "missing_evidence"]) {
+  // SES-347: "findings", formerly "reasoning" -- see GOOD_VERDICT above. Retargeted, never dropped.
+  for (const k of ["findings", "pm_lens", "architect_lens", "auto_done_eligible", "auto_done_reason", "missing_evidence"]) {
     assert.ok(schema.required.includes(k),
       `the Intent must REQUIRE "${k}" -- a verdict with no ${k} is a judgment with a hole in it, and ` +
       `"both lenses reported even when they agree" is only enforceable if the contract makes them unsayable-away. ` +

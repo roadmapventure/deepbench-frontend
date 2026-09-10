@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// DeepBench v7.0.447 | scripts/verifier.js | SES-347 -- reconcile() reads the agent's `findings`,
+// the Intent schema property that used to be called `reasoning`. THE RENAME IS THE FIX, and the
+// measurement is the reason: the Anthropic API refused the real assembled `verify-ship` request
+// before the model saw it -- stop_reason "refusal", stop_details.category "reasoning_extraction",
+// empty content -- whenever the tool definition paired db-assembly.js's platform-injected `account`
+// receipt (LAV-28b) with a schema property literally named `reasoning`. Replayed on the captured
+// production request body, one mutation at a time: `reasoning` 5/5 refusals, `findings` 0/5, and
+// that holds with the account description at its shipped 398 characters AND at a shortened 118, so
+// SES-339's "shortening the account description clears it" did not transfer to the shipped request
+// shape. Trivial system prompt and trivial user message refuse identically, so it is the tool
+// definition alone. `runner_verdicts.reasoning` -- the column -- is untouched.
 // DeepBench v7.0.440 | scripts/verifier.js | SES-337 -- CHARTER PREMISE 3 REACHES THE ROWS, and the
 // thing to read twice is THAT THE RULE WAS ALREADY WRITTEN DOWN AND ONLY THE CODE WAS MISSING.
 // `vf-guardrails.must` has said, since AGT-67 seeded it: "refuse the auto-done bar to a diff
@@ -883,8 +894,14 @@ export function reconcileJudgment({ mechanical, agent, codeEligibility }) {
     lens.push(`Missing evidence named by the agent: ${agent.missing_evidence.join("; ")}`);
   }
 
+  // FEATURE: SES-347 -- `agent.findings`, not `agent.reasoning`. The Intent's schema property was
+  // renamed because the Anthropic API refused every request whose tool definition paired the
+  // platform-injected `account` receipt with a property literally named `reasoning`
+  // (stop_reason "refusal", stop_details.category "reasoning_extraction", empty content, 5/5 on the
+  // real request; 0/5 renamed). This reads the AGENT's field only -- `runner_verdicts.reasoning`,
+  // the column the line below builds, is unchanged and stays the home of the written judgment.
   const reasoning = [
-    `${verdict}: ${agent.reasoning ?? "(the agent returned no reasoning)"}`,
+    `${verdict}: ${agent.findings ?? "(the agent returned no findings)"}`,
     ...lens,
     `Mechanical: ${mechanical?.reasoning ?? "(none)"}`,
     overrides.length

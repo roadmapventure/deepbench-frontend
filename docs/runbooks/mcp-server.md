@@ -1,3 +1,8 @@
+<!-- DeepBench v7.0.447 | docs/runbooks/mcp-server.md | SES-347 -- the "known blocker" section is
+     replaced: the API refusal is FIXED (vf-verdict-intent's `reasoning` property renamed to
+     `findings`), SES-339's "shortening the account description clears it" is corrected with the 2x2
+     that disproves it, and the 55-second per-request abort ceiling the refusal was hiding is named
+     as a separate open defect -->
 <!-- DeepBench v7.0.445 | docs/runbooks/mcp-server.md | SES-339 -- "Verify a foreign repository" added
      below; per-tool input contracts noted under "What is and is not exposed" -->
 <!-- DeepBench v7.0.444 | docs/runbooks/mcp-server.md | MCP-3 -- the DeepBench MCP server -->
@@ -197,7 +202,7 @@ The answer comes back as `structuredContent` against `vf-verdict-intent`'s schem
 | Field | What it means |
 |---|---|
 | `verdict` | `approve` or `block` — does this change keep its promise. |
-| `reasoning` | The findings, each with the evidence it rests on. This is the part worth reading. |
+| `findings` | The findings, each with the evidence it rests on. This is the part worth reading. **Called `reasoning` before `SES-347`** — renamed because the API refused every request carrying a property of that name; see the section below. |
 | `pm_lens` / `architect_lens` | The two positions the Verifier holds simultaneously: did it deliver what was asked, and is it built in a way the codebase can carry. |
 | `missing_evidence` | Non-empty means it graded around a hole. A `block` with this populated is "I could not tell", not "this is bad". |
 | `auto_done_eligible` / `auto_done_reason` | **DeepBench-internal. Ignore it outside this platform.** |
@@ -209,31 +214,61 @@ nothing acts on; the verdict and its reasoning are the whole deliverable. Nothin
 DeepBench ledger by this call either — the only trace is the `ai_activity_log` row every capability
 turn writes, carrying `call_source = 'mcp'`.
 
-### Known blocker, found by this ticket's own QA (2026-09-09) — the answer does not come back yet
+### The refusal that used to block this, and what replaced it (`SES-347`, 2026-09-09)
 
-A complete, contract-satisfying `verify-ship` call reaches the executor, assembles, and posts to the
-Anthropic API — and the API refuses the request before the model sees it, deterministically, 6 runs
-out of 6. The tool result is a non-terminal `{"status":"in_progress", ...}` with a `recovery` block,
+**Fixed.** `SES-339`'s QA found that a complete, contract-satisfying `verify-ship` call reached the
+executor, assembled, posted to the Anthropic API — and the API refused it before the model saw it,
+`stop_reason: "refusal"`, `stop_details.category: "reasoning_extraction"`, empty content, 6 runs out
+of 6. The tool result was a non-terminal `{"status":"in_progress", ...}` with a `recovery` block,
 never a verdict.
 
-**Root cause, isolated against the live API rather than reasoned about.** The refusal is
-`stop_reason: "refusal"`, `stop_details.category: "reasoning_extraction"`, with empty content — the
-API's own classifier, not a model choice and not a DeepBench error. The trigger is the **tool
-definition**, not the prompt: a trivial system prompt and a trivial user message with this tool
-attached refuse identically. Within the tool, it is the pairing of `db-assembly.js`'s
-platform-injected `account` field (`ACCOUNT_FIELD_SPEC`, LAV-28b — *"the act you performed this
-turn… state only what you did"*) with a schema property literally named **`reasoning`**. Dropping
-`account`, shortening its description, dropping `reasoning`, or renaming `reasoning` to `findings`
-each clears the refusal on the otherwise byte-identical request; `max_tokens`, the cache split and
-`tool_choice` do not. Three Intent Skills declare a `reasoning` property — `vf-verdict-intent`,
-`agent-selection-intent`, `pattern-vocabulary-review-intent` — so this is platform-wide, not a
-Verifier quirk. It is invisible everywhere else because the forced-`tool_choice` branch is only
-taken by models that accept it, and this family (`claude-fable-*`, every governance agent since
-`SES-334`) takes the auto branch.
+**The cause was the property NAME, and this is the correction to `SES-339`'s own write-up.** The
+trigger is the **tool definition**, not the prompt — a trivial system prompt and a trivial user
+message with this tool attached refuse identically. Within the tool it is the pairing of
+`db-assembly.js`'s platform-injected `account` receipt (`ACCOUNT_FIELD_SPEC`, LAV-28b) with a schema
+property literally named **`reasoning`**. `SES-339` also reported that SHORTENING the `account`
+description clears it. **It does not, on the request the platform actually sends.** Replaying the
+captured production request body one mutation at a time, five runs per cell:
 
-The judgment itself is sound once the request is accepted: the replayed foreign-repository call
-returned a real `approve` with both lens positions, `auto_done_eligible: false` for the right reason
-(no ladder governs that repository), and `missing_evidence: []`. Nothing above is a defect in the
-MCP route or in the input contract this ticket added — the refusal happens two layers below both.
+| `account` description | property name | refusals |
+|---|---|---|
+| 398 chars (as shipped) | `reasoning` | 5/5 |
+| 118 chars (shortened) | `reasoning` | 5/5 |
+| 398 chars (as shipped) | `findings` | 0/5 |
+| 118 chars (shortened) | `findings` | 0/5 |
+
+`SES-339`'s opposite result came from a probe with a different `max_tokens` and no `tool_choice`;
+that shape sits on the other side of the classifier's threshold, where the short description does
+clear it. **A probe that is not the shipped request shape is not a measurement of the shipped
+request** — this cost `SES-347` a false green before its own end-to-end call caught it.
+
+**The fix:** `vf-verdict-intent`'s `reasoning` property is now **`findings`** (stored schema and
+`method`, decision `821638ba`, before-image kept), and `scripts/verifier.js`'s `reconcileJudgment()`
+reads `agent.findings`. `ACCOUNT_FIELD_SPEC` is deliberately unchanged — it is measurably not the
+cause, and it is the half that cannot move anyway, since every capability's contract carries it. The
+other two Intents declaring `reasoning` — `agent-selection-intent`,
+`pattern-vocabulary-review-intent` — were measured in the shipped request shape at **0/3 refusals**
+and are deliberately left alone.
+
+Proven end to end after the rename: the foreign-repository call returned a real `block` with both
+lens positions, `auto_done_eligible: false` for the right reason (no ladder governs that repository),
+populated `missing_evidence`, and the `account` receipt — `ai_activity_log` row `41374`, trace
+`c2ec0419-cbb2-438b-b98b-5f56176cd1db`, 1276 in / 3568 out on `claude-fable-5-1`.
+
+**Never name a schema property `reasoning`.** Any Intent reachable through the executor gets
+`account` injected beside it and the whole request is then refused — and it presents as silence
+(`in_progress` forever), not as an error. `tests/regression/ses-347-account-field-refusal.test.mjs`
+sweeps every Intent for the name and fails on a new one.
+
+### Still open, and it is NOT the refusal — the 55-second per-request ceiling
+
+With the refusal cleared, a full `verify-ship` verdict takes **54–57 s** to generate (~3,800 output
+tokens on `claude-fable-5-1`), and `api/prompt/request-receivable.js`'s
+`postToAnthropicWithRetry()` aborts every single request at `Math.min(55000, remainingMs)` — a hard
+cap a longer `_deadline` does not lift. So the call lands on either side of the line run to run: it
+returned a complete verdict in 54 s, and `{"status":"in_progress"}` with
+`recovery.fault: "TimeoutError"` at 56 s and 57 s. This is a **separate, pre-existing defect** that
+the refusal was hiding, not part of `SES-347`; it needs its own ticket (raise the cap for this lane,
+stream the response, or resume the checkpoint the recovery block already wrote).
 
 Regression cover: `tests/regression/ses-339-verify-over-mcp.test.mjs`.
