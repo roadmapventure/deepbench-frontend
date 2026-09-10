@@ -1,3 +1,4 @@
+// DeepBench v7.0.441 | shared/ai-patterns.js | SES-338 -- the last two governance capabilities enter the catalog: `verify-ship` and `run-project`. Found by a REFUSAL, not by inspection -- SES-337's reproduction ran 43 verify-ship turns this sitting and scripts/agent-log.js refused every one ("not a SERVICE_CATALOG slug"), so the mandatory Layer-3 log could not be written at all. Same shape and same cause as classify-ticket (SES-332) and rank-backlog (SES-334): the capability shipped with its Skill rows and no catalog entry. NAMED DEVIATION: the SES-337/338 kickoff's section 3 says "No new catalog entry"; that sentence was measurably wrong about the live catalog, and .claude/rules/capability-logging.md (every Layer-3 execution logs, no exceptions) outranks it. No AI_TYPE_TO_SERVICE entry for either -- ai_type equals capability_slug, resolved by the existing `|| e.type` fallback.
 // DeepBench v6.3.116 | shared/ai-patterns.js | AI-35 -- pattern-vocabulary-review SERVICE_CATALOG entry (Susan Smith's self-maintenance broker)
 // DeepBench v6.3.0 | shared/ai-patterns.js | AA-190b -- canonical PATTERN_CATALOG, extracted so
 // both the Vite frontend (src/hooks/useAIActivity.js) and Vercel serverless backend
@@ -208,6 +209,32 @@ export const SERVICE_CATALOG = [
   // 'Guardrails / Output Filtering' -- pz-guardrails explicitly forbids re-judging a class inside
   // rank-backlog, so the ranking turn filters nothing, it only orders what classify-ticket ruled.
   { slug: 'rank-backlog',            name: 'Rank Backlog (The Prioritizer)',    serviceType: 'ai', patterns: ['Structured Output'], roadmap: 'now' },
+
+  // FEATURE: SES-338 -- the last two governance capabilities the catalog was missing, added for the
+  // same reason and by the same measurement as classify-ticket and rank-backlog above: AGT-67 and
+  // AGT-68 shipped `verify-ship` and `run-project` with their Skill rows and no catalog entry, so
+  // scripts/agent-log.js refuses the row ("not a SERVICE_CATALOG slug") and the mandatory Layer-3
+  // log cannot be written at all. FOUND BY THE REFUSAL, not by inspection: SES-337's reproduction
+  // ran 43 `verify-ship` turns on claude-fable-5-1 this sitting and could not log one of them until
+  // this entry existed. `.claude/rules/capability-logging.md` -- every Layer-3 execution logs, no
+  // exceptions -- outranks the SES-337/338 kickoff's §3 sentence "No new catalog entry", which was
+  // simply wrong about the live catalog; the deviation is named in the ship.
+  // No AI_TYPE_TO_SERVICE entry is needed for either: ai_type equals capability_slug, resolved by
+  // the existing `|| e.type` fallback, the same path bench-report-card and classify-ticket take.
+  //
+  // verify-ship: 'Structured Output' because every verdict is validated against
+  // vf-verdict-intent's stored schema before it is recorded, and 'LLM-as-Judge / Verifier' because the turn IS
+  // the judgment -- grading one delivery against its kickoff and its gate outputs is the pattern's
+  // definition, not an analogy for it. NOT 'Guardrails / Output Filtering': the agent's verdict is
+  // filtered by CODE afterwards (reconcileJudgment() -- judgment may tighten, never loosen), which
+  // is the script's guarantee, not the model turn's behaviour.
+  { slug: 'verify-ship',             name: 'Verify Ship (The Verifier)',        serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+
+  // run-project: 'Structured Output' because the manager's answer is validated against
+  // dm-run-intent's schema before scripts/run-project.js will act on it, and 'Orchestrator-Workers'
+  // because the turn's whole product is WHO DOES WHAT NEXT -- it assigns a capability to a ticket
+  // and fires no work itself.
+  { slug: 'run-project',             name: 'Run Project (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'Orchestrator-Workers'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge
