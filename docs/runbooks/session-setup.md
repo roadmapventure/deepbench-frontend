@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.455 | runbooks/session-setup.md | SES-374 — §3g: the meter reader. The pace gate's sensor is a CLI on John's machine; a scheduled task now feeds it every 30 minutes, credentials DPAPI-encrypted under his profile (never .env.local, ruling d7670e18), exit 2 on anything it cannot prove. -->
 <!-- DeepBench v7.0.426 | docs/runbooks/session-setup.md | SES-331 — NEW §3f: running a governance agent from a session. Two scripts (`scripts/agent-prompt.js`, `scripts/agent-log.js`) and the three rules that make them one path rather than a second one — the prompt is never hand-built (the script calls `assemblePrompt()` and the executor’s own `renderSection()`/`assemblePhaseSplit()`, so a session cannot fork the assembly), the model comes from the assembly’s `llm.model` (or `runner_model_lanes` where the capability names none), and the `ai_activity_log` row is mandatory with call_source `session` — a fifth allowlisted source added in `lib/request-context.js` after measuring that none of the four existing ones means “a session ran the agent” (null 30,351 / ui 4,110 / regression 1,055 / script 19 / session-test 6, whole log, 2026-09-09). `logActivity()` now returns its write promise so the CLI can exit 2 on a write that did not land instead of succeeding silently; the request path is unchanged (no caller reads the return, the POST body is byte-identical, waitUntil() gets the same promise). Stamp count held at 5 per session-hygiene check 7: `v7.0.222` (`SES-175`) moved VERBATIM to `docs/SESSIONS.md`’s `session-setup.md` appendix, `SES-164` step 2 run FIRST by grep — its one editor warning (the text under a `{{rule:ID}}` marker is not hand-maintained: edit the registry row, re-export `docs/governance/RULES-SNAPSHOT.md`, then `node scripts/render-rule-blocks.js --write`) is already restated verbatim in this file’s own live body at the `{{rule:B40}}` marker in §2c, so nothing was relocated. Body proven byte-identical across the rotation by sha256. -->
 <!-- DeepBench v7.0.412 | docs/runbooks/session-setup.md | SES-320 — the close-out sweep returns a THIRD number and the Reverse section says what a finalised ship's undo now covers. `sweep_decision_windows()` gained an OUT column `closed` (migration `ses320_delivered_exit`): a `kind='ship'` decision it finalises whose ticket is still `delivered` gets that ticket written `done`, any class, any epic — the finalisation IS the delivered exit, and since `SES-285` retired the Accept tap it is the only one there is. The Reverse paragraph gains the other half: the sweep's close carries a before-image under THE SHIP DECISION'S OWN id, so reversing that decision undoes the close in the same restore — the ticket comes back out of `done` to the state its oldest image records, which is what it held BEFORE the ship, not `delivered`. THE THING A LATER EDITOR MUST NOT "TIDY": the sweep's close writes `status` and NOT `updated_at`, because `reverse_decision()` refuses any row whose live `updated_at` postdates the decision's `decided_at` (`SES-316`) and the close runs 72 hours after it — measured both ways on rolled-back fixtures at this ship (`applied`/`restored 1`/`written_since 0` as shipped; `refused`/`restored 0`/`written_since 1` with the bump simulated). Stamp count held at 5 per session-hygiene check 7: `v7.0.198` (`SES-121`) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep rather than from recollection — its entire content (the body moved verbatim from `.claude/skills/session-setup/SKILL.md`, register B39, "this file is the canonical copy") is already restated in §1's own B39 paragraph and in that skill's loader sentence, so nothing was relocated. -->
 <!-- DeepBench v7.0.411 | docs/runbooks/session-setup.md | SES-004 (b) — 3d gains one sentence after its `DO $$` example: an attended decision's `reasoning` also names the criteria it relied on as `pattern:N` tokens, exactly as `docs/runbooks/runner-cycle.md` step 7b requires of a cycle's own decisions (`pattern:0` = no standing pattern applied — new judgment); the same trigger on `runner_decisions` stores them in `public.runner_decision_patterns` for both paths. Part (b) of `SES-004`'s remainder — part (a) (`v7.0.410`, push `ddef954c`) shipped the rows, the trigger and 7b's own citation rule and stopped at the file cap owing this sentence and the md-header paragraph in `docs/JOHN-DECISION-PATTERNS.md`. No SQL changed, no criterion text touched. -->
@@ -506,6 +507,40 @@ node scripts/agent-log.js --agent=… --capability=… --model=… --ai-type=…
   `SERVICE_CATALOG` slug; the script refuses an unknown one rather than inventing it.
 - Neither script makes a model call, and `agent-prompt.js` performs no retrieval — a
   fetched-per-call `knowledge` section renders empty and is named on stderr.
+
+### 3g. The meter reader — John's machine feeds the pace gate (`SES-374`, `v7.0.455`)
+
+The weekly pace gate (`M5-16`) and the rest wall (`M5-06`) read the freshest
+`public.runner_usage_readings` row. A cloud cycle cannot take a reading — the meter is the Claude
+Code CLI's `/usage` under John's subscription login, on his machine. `scripts/read-usage-meter.js`
+is that read, made a scheduled task:
+
+```
+node scripts/read-usage-meter.js --dry-run     # parse only, prints the three numbers
+node scripts/read-usage-meter.js               # writes one row, source 'meter-reader'
+```
+
+- **Credentials are not in `.env.local`** (ruling `d7670e18`, 1b above). They live DPAPI-encrypted at
+  `%USERPROFILE%\.deepbench\supabase-meter-reader.dpapi`, readable only by John's account on this
+  machine, written once by `node scripts/read-usage-meter.js --store-credentials` with
+  `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` in the environment (neither value is printed). A session
+  running the script by hand with those two variables set uses them instead.
+- **Install, once, as John (the task runs only while he is logged on):**
+
+```
+schtasks /Create /F /SC MINUTE /MO 30 /TN "DeepBench meter reader" /TR "\"C:\Program Files\nodejs\node.exe\" --no-deprecation C:\Projects\deepbench-frontend\scripts\read-usage-meter.js"
+```
+
+  Check it: `schtasks /Query /TN "DeepBench meter reader" /V /FO LIST` shows *Last Result: 0*; the
+  table gains a `source = 'meter-reader'` row every 30 minutes. Remove it with
+  `schtasks /Delete /F /TN "DeepBench meter reader"`.
+- **Exit 2 is a finding, never a fake row:** the CLI logged out (`claude auth login` fixes it), the
+  output did not parse (the CLI changed its wording — `tests/regression/ses-374-meter-reader.test.mjs`
+  pins the 2026-09-11 shape), missing credentials, or a refused insert. A reading older than 2h with
+  the task installed means the task is failing; read *Last Result* first.
+- **The script runs from the shared checkout** (`C:Projectsdeepbench-frontend`), which is the one
+  place the task can find a stable path; it reads no file there but itself, so the worktree rule is
+  not crossed.
 
 ### 4. Fetch, rebase, then push `HEAD:dev`
 
