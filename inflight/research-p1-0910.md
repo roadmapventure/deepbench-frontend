@@ -1,0 +1,1 @@
+research-p1-0910 — attended review session 2026-09-10: techops audit tickets (SES-349..360, DAT-27..30, AGT-69/70, LOG-149), harvest files for AGT-70/SES-359, and the Researcher's first P1-lens run (docs/research/2026-09-10-p1-skills-lens.md pending John's approval of the 25).
