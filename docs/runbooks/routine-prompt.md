@@ -12,6 +12,16 @@ retired mechanism or unknown model id), commit, then — on John's word — push
 to the routine with `RemoteTrigger {action: "update"}` and read it back with `get`. Enabling the
 routine is never part of that step.
 
+**The update call replaces `job_config.ccr` whole — found live 2026-09-11, the first push of this
+file.** An update carrying only `environment_id` + `events` succeeded (HTTP 200, prompt correct)
+and silently reset `session_context`: the model pin went to empty, `allowed_tools` fell back to a
+default preset, and `session_request.config` read `null`. Always send the full `ccr` object —
+`environment_id`, `events`, **and** `session_context` (`allowed_tools`, `model`, `outcomes`,
+`sources`, `autofix_on_pr_create`) copied from a fresh `get` — then read back `derived_state.model`
+and `session_request.config.allowed_tools` before calling the update done. Restored in the same
+sitting (model `claude-opus-5`, the ten tools as before); nothing fired in between (routine
+disabled).
+
 **What the prompt deliberately does NOT restate.** Selection order, walls, ceremony, ship point
 and record are `docs/runbooks/runner-cycle.md`'s; the prompt points at them and summarises only
 what a cycle needs before it has read the runbook. A rule stated here a second time is the
