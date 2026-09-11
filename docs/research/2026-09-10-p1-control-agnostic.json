@@ -1,0 +1,369 @@
+{
+  "pass": "control, industry-agnostic",
+  "egress": "Leg 1 only: 56 live web searches, 63 web fetches (about 26 returned 403/404/410/expired/empty and were replaced by mirrors or search-result snippets carrying a date; McKinsey, Gartner newsroom, OpenAI, Google Careers, Ladders/Glassdoor/Dice pages were the main blockers). Drops: physical AI/robotics, digital provenance, confidential computing, geopatriation (Gartner 2026 trends but not business features a product leader ships); R&D/drug-development agents (one Deloitte and one OpenAI anecdote, no posting); process-intelligence rescue (Forrester, a practice not a feature); Marriott VP AI Technology posting (404, unusable); Lorikeet resolution benchmarks (page dated 2026-09-11, after today, not cited); AI-shopping assistants folded into marketing personalization; multi-agent orchestration folded into the agent-platform row. Leg 2 (platform usage: ai_activity_log, report_card_usage, bench_report_card_rollup) was SKIPPED by design: this is a control pass with no platform to ground in and no database queries were run. Nothing was filed.",
+  "survivors": [
+    {
+      "rank": 1,
+      "title": "Customer-service agent that resolves cases end-to-end across chat, email and voice",
+      "use_case": "A customer asks a question or requests a change (rebook, refund, billing fix); the agent looks up the account, takes the action in the backend, and closes the case without a human, escalating only the exceptions.",
+      "trend": "Agentic AI in customer service (autonomous resolution)",
+      "skill_set": "Conversational AI product ownership; agent orchestration with tool/function calling into CRM and backend systems; resolution-rate and containment metrics; escalation and human-handoff design; evaluation of multi-turn conversations",
+      "industries_in_demand": ["Technology/SaaS", "Telecom", "Financial services and insurance", "Retail and e-commerce", "Travel and airlines", "Healthcare payers"],
+      "sources": [
+        "https://almcorp.com/blog/openai-state-of-enterprise-ai-report-2025/ (OpenAI State of Enterprise AI, report dated 2025-12-11: customer service is the #1 enterprise use case at 45%; Oscar Health 39% of benefits messages without escalation; Intercom Fin Voice resolves 53% of calls)",
+        "https://www.cxtoday.com/contact-center/agentic-ai-gartner-predicts-80-of-customer-problems-solved-without-human-help-by-2029/ (2025-03-05, Gartner: agentic AI to autonomously resolve 80% of common issues by 2029)",
+        "https://www.deloitte.com/global/en/issues/generative-ai/state-of-ai-in-enterprise.html (2026, survey fielded 2025-08/09: customer support is where agentic AI is expected to have the highest impact; airline agents rebook flights and reroute bags)",
+        "https://careers.salesforce.com/en/jobs/jr342470/senior-director-product-management-agentforce-voice-ai/ (posted 2026-05: Senior Director PM owns autonomous agents that 'resolve complex customer issues end-to-end without human intervention')",
+        "https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-brings-Autonomous-Workforce-to-every-major-business-function/default.aspx (2026-05-05: CRM case-management specialist triages, solves and escalates cases across channels)"
+      ]
+    },
+    {
+      "rank": 2,
+      "title": "Enterprise agent platform: build, evaluate, deploy and govern agents at scale",
+      "use_case": "Business and IT teams assemble their own agents from a shared platform (orchestration, memory and context management, tool registry, permissions, audit) instead of each team hand-rolling one; the platform owner ships the reusable pieces.",
+      "trend": "Agent orchestration platforms and multiagent systems",
+      "skill_set": "Agent architectures (planning, memory, tool orchestration); 0-to-1 and 1-to-N platform product management; governance, auditability and observability as platform features; recent hands-on shipping of agentic products; working in codebases and prototypes",
+      "industries_in_demand": ["Technology/SaaS and cloud platforms", "Financial services", "Healthcare", "Large enterprises building internal AI platforms"],
+      "sources": [
+        "https://jobs.smartrecruiters.com/ServiceNow/744000140792139-director-product-management-ai-agent-products (fetched 2026-09-10: Director PM for 'long-running, self-evolving autonomous agents'; roadmap covers orchestration, memory and context management, action execution; requires 'recent hands-on experience shipping agentic products in the last 12-18 months')",
+        "https://job-boards.greenhouse.io/coherehealth/jobs/7790936003 (seen in search 2026-09-10: VP, AI Engineering and Agent Platforms; build the enterprise agent platform so teams 'rapidly develop, evaluate, deploy, govern, and operate AI agents at scale')",
+        "https://www.google.com/about/careers/applications/jobs/results/134899458549654214-group-product-manager-gemini-enterprise-agent-platform (seen in search 2026-09-10: Group PM, Gemini Enterprise Agent Platform)",
+        "https://www.amazon.jobs/en/jobs/3185564/principal-product-manager-technical-external-services-agentcore (fetched 2026-09-10: Principal PM-T for Bedrock AgentCore; 'experience developing, deploying and managing AI products at scale')",
+        "https://www.idea11.com.au/insights/gartners-top-10-strategic-technology-trends-for-2026-leveraging-ai-for-success/ (2026-02-23, mirror of Gartner 2025-10-20 trends: multiagent systems and AI-native development platforms)",
+        "https://www.gartner.com/en/newsroom/press-releases/2025-08-26-gartner-predicts-40-percent-of-enterprise-apps-will-feature-task-specific-ai-agents-by-2026-up-from-less-than-5-percent-in-2025 (2025-08-26: 40% of enterprise apps to embed task-specific agents by end of 2026)"
+      ]
+    },
+    {
+      "rank": 3,
+      "title": "AI coding agents embedded in the software delivery lifecycle",
+      "use_case": "Engineers hand whole tasks (bug fix, feature, refactor, test generation, migration) to a coding agent that reads the repo, edits, runs tests and opens a pull request; the product owner ships the agent, its guardrails and its developer workflow.",
+      "trend": "AI-native software development (agentic coding, 'vibe engineering')",
+      "skill_set": "Developer-tools product management; agent tool use in codebases; code-quality and review gates; policy controls for enterprise rollout; usage and adoption metrics for developer platforms",
+      "industries_in_demand": ["Technology/SaaS", "Financial services (large engineering orgs)", "Every enterprise with an internal platform team"],
+      "sources": [
+        "https://www.anthropic.com/research/anthropic-economic-index-september-2025-report (2025-09-15: software development is about half of first-party API traffic; 77% of business API use is automation)",
+        "https://blog.jetbrains.com/research/2026/08/ai-coding-agent-adoption-2026/ (2026-08: 90% of professional developers use AI coding agents weekly, 68% daily; Claude Code 39%, Copilot 21%, Codex 16%)",
+        "https://www.forrester.com/blogs/predictions-2026-automation-at-the-crossroads/ (2025-11-03, Forrester Predictions 2026; search result 2026-09-10 names software development as the #1 AI use case for 2026)",
+        "https://www.google.com/about/careers/applications/jobs/results/130499168085910214-director/ (seen in search 2026-09-10: Director, Product Management, Gemini CLI, owning the developer agent interface)",
+        "https://www.snowflake.com/en/news/press-releases/snowflake-unveils-cortex-code-an-ai-coding-agent-that-drastically-increases-productivity-by-understanding-your-enterprise-data-context/ (2026-02-03: enterprise vendor ships a coding agent grounded in enterprise data context)"
+      ]
+    },
+    {
+      "rank": 4,
+      "title": "Permission-aware enterprise knowledge assistant (RAG over company systems)",
+      "use_case": "An employee asks a question in plain language and gets an answer grounded in the company's documents, tickets, wikis and CRM, with citations and only from sources that person is allowed to see.",
+      "trend": "Retrieval-augmented generation and enterprise search; knowledge-management agents ('deep research')",
+      "skill_set": "RAG architecture (chunking, embeddings, hybrid search, reranking, grounding); connector and permission model design; answer-quality evaluation and hallucination control; knowledge-base curation",
+      "industries_in_demand": ["Financial services", "Technology/SaaS", "Professional services", "Healthcare", "Any large enterprise with 100+ knowledge sources"],
+      "sources": [
+        "https://cosupport.ai/articles/the-state-of-ai-mckinsey-report-key-findings (mirror of McKinsey State of AI, 2025-11-12: agent use is most common in IT and knowledge management, e.g. deep research)",
+        "https://www.capitalonecareers.com/job/mclean/director-product-management-enterprise-ai/1732/94459487696 (2026-07-29: Director PM, Enterprise AI; expertise with 'Claude, Gemini, Glean' and agentic frameworks)",
+        "https://www.experis.com/en/job/409445/vp-ai-platform-engineer (2026-09-09: VP AI Platform builds 'Retrieval-Augmented Generation and Agentic orchestration layers'; Azure AI Search, Databricks Vector Search)",
+        "https://www.microsoft.com/en-us/worklab/work-trend-index/agents-human-agency-and-the-opportunity-for-every-organization (2026-05-05: 15% of agent conversations are finding information; agents grew 15x in Microsoft 365)",
+        "https://www.deloitte.com/global/en/issues/generative-ai/state-of-ai-in-enterprise.html (2026: 'search and knowledge management' is a top generative-AI focus area)"
+      ]
+    },
+    {
+      "rank": 5,
+      "title": "Employee-service and IT service-desk agents (L1 IT, HR, finance, legal, procurement requests)",
+      "use_case": "An employee reports a laptop problem or asks about a payroll deduction; the agent diagnoses, resolves or fulfills the request in the ticketing and HR systems, and only reassigns the cases it cannot finish.",
+      "trend": "Agentic AI for IT service management and employee experience; AIOps",
+      "skill_set": "ITSM and employee-experience product ownership; agent integration with ticketing, identity and HR systems; deflection and reassignment metrics; bounded-autonomy design",
+      "industries_in_demand": ["Technology", "Financial services", "Healthcare", "Public sector", "Any enterprise with a shared-services function"],
+      "sources": [
+        "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai (2025-11-12, via search results: service-desk management in IT is where agentic use cases have developed fastest)",
+        "https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-brings-Autonomous-Workforce-to-every-major-business-function/default.aspx (2026-05-05: L1 IT service-desk specialist resolves cases 99% faster; employee-services specialist resolves 91% of cases without reassignment)",
+        "https://www.capitalonecareers.com/job/mclean/director-product-management-enterprise-ai/1732/94459487696 (2026-07-29: Director PM directs a team 'incorporating core services with AI agents' across Associate Experience tooling)",
+        "https://www.gartner.com/en/newsroom/press-releases/2025-10-02-gartner-says-chros-top-priorities-for-2026-center-around-realizing-ai-value-and-driving-performance-amid-uncertainty (2025-10-02; search result: 82% of HR leaders plan agentic AI in their function)"
+      ]
+    },
+    {
+      "rank": 6,
+      "title": "Production quality gate for an AI feature: evaluation sets, LLM-as-judge and observability",
+      "use_case": "Before and after every model or prompt change, a repeatable eval suite scores the feature on representative inputs, traces go to an observability tool, and the product owner decides ship/no-ship from the numbers rather than demos.",
+      "trend": "AI evaluation ('evals') and LLMOps/observability",
+      "skill_set": "Defining and owning eval datasets and quality thresholds; LLM-as-judge and human review loops; eval and observability tooling (LangSmith, Braintrust or home-grown); incident and rollback planning for non-deterministic failures",
+      "industries_in_demand": ["Technology/SaaS", "Financial services", "Healthcare", "Any employer shipping model-powered features"],
+      "sources": [
+        "https://www.kore1.com/ai-product-manager-job-description-template/ (2026-06-07: AI PM must 'define and maintain evaluation sets', with LangSmith/Braintrust experience; one shipped model-powered feature required)",
+        "https://jobs.anitab.org/companies/microsoft/jobs/75872147-principal-product-manager-microsoft-ai-and-copilot (2026-04-22: Microsoft Principal PM must lead quality evaluation and adjust release decisions on metrics and feedback)",
+        "https://jobs.cvshealth.com/us/en/job/R0957974/Director-Product-Management-AI-Claims-Platform (posted 2026-08, per search: Director must bring 'a clear point of view on where human oversight belongs, guardrails and evaluation strategy')",
+        "https://www.kore1.com/agentic-ai-hiring-2026/ (2026-06-26, updated 2026-08-23: employers screen for 'evaluation harness development' and reliability under repetition)",
+        "https://a16z.com/ai-enterprise-2025/ (2025-06-10: enterprises combine external benchmarks with internal test sets when choosing models)"
+      ]
+    },
+    {
+      "rank": 7,
+      "title": "Agent governance: tiered autonomy, guardrails, human-approval boundaries and audit trails",
+      "use_case": "Each agent action is classified by risk; low-risk actions run autonomously, higher-risk ones wait for a human approval, every action is logged for audit, and anomalous behavior is flagged in real time.",
+      "trend": "AI governance and responsible AI for agents ('guardian agents', agent sprawl management)",
+      "skill_set": "AI risk management frameworks; policy and permission design for agents; audit logging and monitoring; model and LLM lifecycle governance; bias, privacy and compliance oversight",
+      "industries_in_demand": ["Financial services (most postings)", "Healthcare", "Professional services", "Public sector", "Technology"],
+      "sources": [
+        "https://www.gartner.com/en/newsroom/press-releases/2026-05-26-gartner-says-applying-uniform-governance-across-ai-agents-will-lead-to-enterprise-ai-agent-failure (2026-05-26: by 2027, 40% of enterprises will demote or decommission agents over governance gaps found after incidents)",
+        "https://www.deloitte.com/us/en/insights/topics/emerging-technologies/ai-agents-scaling-faster.html (2026-04-24: only 21% of enterprises have mature agentic-AI governance: decision boundaries, real-time monitoring, audit trails)",
+        "https://www.opentalent.in/jobs/ai-product-manager-llm-governance-executive-director-jpmorganchase (2026-06-08: JPMorgan Executive Director, AI Product Manager for LLM Governance; RAG, fine-tuning, agents, bias audits, compliance)",
+        "https://www.capitalonecareers.com/job/mclean/director-product-management-enterprise-ai/1732/94459487696 (2026-07-29: 'implementing governance standards for AI risk')",
+        "https://www.gartner.com/en/newsroom/press-releases/2026-04-28-gartner-identifies-six-steps-to-manage-artificial-intelligence-agent-sprawl (2026-04-28, seen in search)"
+      ]
+    },
+    {
+      "rank": 8,
+      "title": "Intelligent document processing with LLMs: claims, invoices, contracts and forms",
+      "use_case": "Unstructured documents arrive (a claim, a supplier invoice, a contract, an onboarding form); the system extracts and validates the fields, decides what can be auto-adjudicated or auto-matched, and routes the rest to a person with a summary.",
+      "trend": "Generative-AI-enabled intelligent document processing (IDP); agentic document workflows",
+      "skill_set": "Document extraction and classification with LLMs and vision models; straight-through-processing and exception design; accuracy and cost metrics; integration with ERP, claims and contract systems",
+      "industries_in_demand": ["Insurance and healthcare payers", "Banking and financial services", "Accounts payable in every industry", "Legal and procurement operations", "Public sector"],
+      "sources": [
+        "https://jobs.cvshealth.com/us/en/job/R0957974/Director-Product-Management-AI-Claims-Platform (posted 2026-08: Director PM owns 'AI-powered agentic claims advisor platform and auto adjudication systems and knowledge bases')",
+        "https://www.anthropic.com/research/economic-index-march-2026-report (2026-03-24, via search results: enterprises automate back-office work such as email classification and invoice processing)",
+        "https://ideaforgestudios.com/2026/07/19/intelligent-document-processing-2026-agentic-business-case/ (2026-07-19: invoices, contracts, claims, onboarding forms as the named agentic-IDP use cases; Gartner warns 40% of agentic projects canceled by 2027)",
+        "https://blog.workday.com/en-us/leading-brands-drove-value-workday-ai-q2.html (Q2 FY2027 post, fetched 2026-09-10: Contract Intelligence Agent in production at named customers)"
+      ]
+    },
+    {
+      "rank": 9,
+      "title": "Tool and connector integration through Model Context Protocol (MCP) into systems of record",
+      "use_case": "An agent can read and act in the CRM, ticketing, ERP or data warehouse through a standard connector layer with enterprise authorization, so one integration serves every agent and every model.",
+      "trend": "Model Context Protocol and open agent interoperability standards; 'LLM orchestration protocols'",
+      "skill_set": "MCP server and client design; enterprise-managed authorization, least-privilege permission scoping; connector gateways; identity (SSO/SCIM) integration for agents",
+      "industries_in_demand": ["Technology/SaaS vendors (shipping MCP servers)", "Financial services", "Enterprises standardizing agent integration"],
+      "sources": [
+        "https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation (2025-12-09: MCP donated to the Agentic AI Foundation; 10,000+ published servers; adopted by Claude, ChatGPT, Copilot, Gemini, Cursor, VS Code)",
+        "https://www.capitalonecareers.com/job/mclean/director-product-management-enterprise-ai/1732/94459487696 (2026-07-29: 'Experience establishing and working with agentic frameworks and LLM orchestration protocols')",
+        "https://jobs.khoslaventures.com/companies/openai/jobs/62462358-product-manager-enterprise-platform (fetched 2026-09-10: OpenAI PM for the 'enterprise data control plane' and connector gateway)",
+        "https://www.cdata.com/blog/2026-year-enterprise-ready-mcp-adoption (2025-12-11: security, permission scoping and audit as the defining requirements of enterprise MCP adoption)",
+        "https://www.forrester.com/predictions/ (Forrester Predictions 2026, seen in search 2026-09-10: 30% of enterprise app vendors will launch their own MCP servers)"
+      ]
+    },
+    {
+      "rank": 10,
+      "title": "Sales prospecting and qualification agents (research, lead scoring, outreach drafting, quoting)",
+      "use_case": "The agent researches an account, qualifies the lead against the ideal-customer profile, drafts the outreach, and produces the quote from the call transcript; the seller reviews and sends.",
+      "trend": "AI-driven sales development and next-best-action selling",
+      "skill_set": "CRM-integrated agent design; lead-scoring and enrichment pipelines; content generation with brand and compliance guardrails; pipeline-velocity and conversion measurement",
+      "industries_in_demand": ["Technology/SaaS", "Business services", "Financial services", "Manufacturing and distribution B2B"],
+      "sources": [
+        "https://www.salesforce.com/news/stories/state-of-sales-report-announcement-2026/ (2026-02-03: 54% of sellers have used agents; sellers expect agents to cut research time 34% and email drafting 36%)",
+        "https://www.anthropic.com/research/economic-index-march-2026-report (2026-03-24: 'B2B lead qualification research, customer data enrichment, cold-email drafting' named as emerging enterprise automation)",
+        "https://www.gartner.com/en/newsroom/press-releases/2026-05-20-gartner-survey-finds-sales-organizations-that-provide-ai-enabled-next-best-actions-are-two-point-six-times-more-likely-to-achieve-commercial-growth (2026-05-20, seen in search)",
+        "https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-brings-Autonomous-Workforce-to-every-major-business-function/default.aspx (2026-05-05: sales-qualification and quoting specialist generates custom quotes from meeting transcripts)"
+      ]
+    },
+    {
+      "rank": 11,
+      "title": "Agentic analytics: natural-language questions over governed data, KPI monitoring and anomaly investigation",
+      "use_case": "A business user asks 'why did margin drop in the Northeast last month' and the agent writes the queries against the semantic layer, decomposes the change, and returns a narrative with the evidence.",
+      "trend": "Agentic analytics and conversational analytics (NL-to-SQL over a semantic layer)",
+      "skill_set": "Semantic-layer and data-governance design; NL-to-SQL accuracy evaluation; data-platform product management (Snowflake/Databricks-class tools); analytics agents with autonomous investigation",
+      "industries_in_demand": ["Technology and data platforms", "Financial services", "Retail and CPG", "Every enterprise with a BI function"],
+      "sources": [
+        "https://almcorp.com/blog/openai-state-of-enterprise-ai-report-2025/ (report dated 2025-12-11: data analysis is the #2 enterprise use case at 35%)",
+        "https://www.tellius.com/resources/blog/best-ai-data-analysis-agents-in-2026-12-platforms-compared-for-nl-to-sql-autonomous-investigation-and-governance (2026-03-17: Gartner 2026 Market Guide for Agentic Analytics definition; Gartner predicts 60% of agentic-analytics initiatives relying only on MCP fail by 2028 without a semantic layer)",
+        "https://www.gartner.com/en/newsroom/press-releases/2026-03-11-gartner-announces-top-predictions-for-data-and-analytics-in-2026 (2026-03-11, seen in search)",
+        "https://bebee.com/us/jobs/principal-product-manager-snowflake-san-francisco-bay-area--theirstack-729320011 (posted 2026-06-16: Snowflake Principal PM for Cortex Agents, Cortex Analyst, Cortex Search; hands-on use of AI and coding agents required)"
+      ]
+    },
+    {
+      "rank": 12,
+      "title": "Voice AI agents for the contact center (low-latency streaming, interruption handling, real-time reasoning)",
+      "use_case": "A caller speaks to the agent, which understands, reasons over the account in real time, handles interruptions and emotion, and completes the transaction on the call.",
+      "trend": "Agentic voice / conversational AI for CCaaS",
+      "skill_set": "Speech-to-text and text-to-speech pipelines; latency budgets and streaming architecture; multi-turn dialogue logic; telephony compliance; call-resolution measurement",
+      "industries_in_demand": ["Telecom", "Financial services and insurance", "Utilities", "Retail", "Healthcare providers and payers"],
+      "sources": [
+        "https://careers.salesforce.com/en/jobs/jr342470/senior-director-product-management-agentforce-voice-ai/ (posted 2026-05: Senior Director PM owns 'low-latency streaming, real-time reasoning, and multi-turn conversational logic'; 15+ years PM, 5+ in conversational AI/CCaaS)",
+        "https://almcorp.com/blog/openai-state-of-enterprise-ai-report-2025/ (report dated 2025-12-11: Intercom Fin Voice resolves 53% of calls end-to-end)",
+        "https://www.cxtoday.com/contact-center/agentic-ai-gartner-predicts-80-of-customer-problems-solved-without-human-help-by-2029/ (2025-03-05: Gartner, 70% of service journeys to begin and end with conversational assistants by 2028)"
+      ]
+    },
+    {
+      "rank": 13,
+      "title": "Enterprise deployment controls for AI: SSO/SCIM, RBAC, data retention, audit logs and cost metering",
+      "use_case": "An IT admin can roll an AI product out to 50,000 employees with identity integration, role-based permissions, retention and encryption policies, audit logs, spend limits and usage dashboards.",
+      "trend": "Enterprise-grade trust and administration for AI ('trustworthy and deployable')",
+      "skill_set": "Enterprise identity (SSO/SAML, SCIM), RBAC and admin tooling; data governance (retention, encryption, audit); usage metering and budgeting; SOC 2 / HIPAA-class compliance",
+      "industries_in_demand": ["AI labs and technology vendors", "Financial services", "Healthcare", "Regulated enterprises broadly"],
+      "sources": [
+        "https://jobs.khoslaventures.com/companies/openai/jobs/62462358-product-manager-enterprise-platform (fetched 2026-09-10: OpenAI PM owns access control models, SSO/SAML, SCIM, audit logs, retention, metering and budgeting)",
+        "https://builtin.com/job/product-manager-enterprise-claudeai/3802469 (2025 posting, removed 2025-04-01: Anthropic PM roadmaps for RBAC, audit logging, vertical compliance, Slack/CRM/data-warehouse integration)",
+        "https://pasqualepillitteri.it/en/news/755/anthropic-managed-agents-cowork-ga-april-9-2026 (2026-04-09: Claude Cowork GA shipped RBAC, group spend limits, usage analytics, OpenTelemetry for enterprise rollout)",
+        "https://jobs.anitab.org/companies/microsoft/jobs/75872147-principal-product-manager-microsoft-ai-and-copilot (2026-04-22: 'enterprise trust frameworks covering governance, admin controls, safety constraints')"
+      ]
+    },
+    {
+      "rank": 14,
+      "title": "Marketing content generation and one-to-one personalization (including AI shopping assistants)",
+      "use_case": "Marketers generate and atomize campaign content per segment, the site assistant guides a shopper to the right product, and next-best-action logic personalizes each touch; conversion and campaign speed are the measures.",
+      "trend": "Generative AI for marketing and agentic one-to-one customer interactions",
+      "skill_set": "Content-generation pipelines with brand and compliance guardrails; personalization and recommendation systems; A/B and conversion measurement; customer-data integration",
+      "industries_in_demand": ["Retail and e-commerce", "Consumer goods", "Media", "Financial services marketing", "B2B demand generation"],
+      "sources": [
+        "https://almcorp.com/blog/openai-state-of-enterprise-ai-report-2025/ (report dated 2025-12-11: marketing automation is the #3 use case at 30%; 85% of marketing users report faster campaigns; Lowe's conversion more than doubles with the assistant)",
+        "https://www.gartner.com/en/newsroom/press-releases/2026-01-15-gartner-predicts-60-percent-of-brands-will-use-agentic-ai-to-deliver-streamlined-one-to-one-interactions-by-2028 (2026-01-15, seen in search)",
+        "https://www.anthropic.com/research/anthropic-economic-index-september-2025-report (2025-09-15: creating marketing materials is 4.7% of enterprise API use)"
+      ]
+    },
+    {
+      "rank": 15,
+      "title": "Back-office workflow automation on unstructured communications (email triage, meeting-action capture, scheduling, follow-up tracking)",
+      "use_case": "Inbound email is classified and routed, meeting transcripts become action items with owners, reminders and follow-ups are drafted and tracked, and calendars are scheduled without a coordinator.",
+      "trend": "Automation-first enterprise AI (task delegation to agents in the back office)",
+      "skill_set": "Classification and extraction over email and transcripts; workflow and RPA integration; automation-versus-augmentation design; exception handling and audit",
+      "industries_in_demand": ["Financial services", "Professional services", "Healthcare administration", "Shared services in every industry"],
+      "sources": [
+        "https://www.anthropic.com/research/anthropic-economic-index-september-2025-report (2025-09-15: 77% of business API use is automation; office and administrative tasks about 10% of traffic)",
+        "https://www.anthropic.com/research/economic-index-march-2026-report (2026-03-24, via search results: email classification, invoice processing and calendar scheduling named as automated back-office workflows)",
+        "https://www.deloitte.com/global/en/issues/generative-ai/state-of-ai-in-enterprise.html (2026: financial-services firm builds agents to capture meeting actions, draft reminders and track follow-through)",
+        "https://www.microsoft.com/en-us/worklab/work-trend-index/agents-human-agency-and-the-opportunity-for-every-organization (2026-05-05: frontier firms run documented, repeatable agent workflows at team and function level)"
+      ]
+    },
+    {
+      "rank": 16,
+      "title": "Finance operations agents: invoice matching, reconciliation, close acceleration and anomaly detection",
+      "use_case": "The agent matches payments and invoices, reconciles accounts, flags outliers and prepares close entries so the controller reviews exceptions instead of spreadsheets.",
+      "trend": "AI agents in the finance function ('human + agent' finance workflows)",
+      "skill_set": "ERP and ledger integration; matching and reconciliation logic with confidence thresholds; controls and audit evidence; ROI/payback measurement",
+      "industries_in_demand": ["Every industry's finance function", "Financial services", "Manufacturing", "Retail"],
+      "sources": [
+        "https://www.deloitte.com/us/en/about/press-room/deloitte-q4-2025-cfo-signals-survey.html (2026-01-13: 87% of CFOs say AI is extremely or very important in 2026; 54% name integrating AI agents in finance a transformation priority)",
+        "https://blog.workday.com/en-us/leading-brands-drove-value-workday-ai-q2.html (Q2 FY2027 post, fetched 2026-09-10: Payroll Agent and Contract Intelligence Agent in production; 5,500+ customers on agents)",
+        "https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-brings-Autonomous-Workforce-to-every-major-business-function/default.aspx (2026-05-05: employee-services agents span finance and procurement)"
+      ]
+    },
+    {
+      "rank": 17,
+      "title": "HR and talent agents: candidate experience, recruiting coordination, onboarding and employee questions",
+      "use_case": "Candidates get answers and interview scheduling around the clock, new hires are onboarded by an agent, and employees ask policy questions and get answers from HR systems.",
+      "trend": "Agentic AI in HR / human capital management",
+      "skill_set": "HCM integration; conversational agent design for candidates and employees; fairness, privacy and compliance controls in hiring; adoption measurement",
+      "industries_in_demand": ["Every large employer", "Professional services", "Healthcare", "Retail and hospitality"],
+      "sources": [
+        "https://www.gartner.com/en/newsroom/press-releases/2025-10-02-gartner-says-chros-top-priorities-for-2026-center-around-realizing-ai-value-and-driving-performance-amid-uncertainty (2025-10-02; search result 2026-09-10: 82% of HR leaders plan agentic AI within 12 months)",
+        "https://blog.workday.com/en-us/leading-brands-drove-value-workday-ai-q2.html (Q2 FY2027 post, fetched 2026-09-10: Candidate Experience Agent and Recruiting Agent adopted by BWX Technologies, Cars.com, ICON, Lithia; agents up 35% in a quarter)",
+        "https://www.anthropic.com/research/anthropic-economic-index-september-2025-report (2025-09-15: processing business and recruitment data among named enterprise API tasks)"
+      ]
+    },
+    {
+      "rank": 18,
+      "title": "Computer-use and browser agents that operate legacy applications without APIs",
+      "use_case": "Where no API exists, the agent opens the application, navigates screens, fills forms and completes the task the way a person would, under enterprise permissions and audit.",
+      "trend": "Computer-use agents / GUI agents ('desktop execution')",
+      "skill_set": "Computer-use model integration; sandboxing, permissions and audit for agent actions; task reliability measurement; scheduled and background agents",
+      "industries_in_demand": ["Financial services and insurance (legacy systems)", "Healthcare administration", "Public sector", "Technology vendors"],
+      "sources": [
+        "https://pasqualepillitteri.it/en/news/755/anthropic-managed-agents-cowork-ga-april-9-2026 (2026-04-09: Claude Cowork GA with computer use, scheduled tasks, background agents; early adopters Notion, Asana, Sentry)",
+        "https://jobs.smartrecruiters.com/ServiceNow/744000140792139-director-product-management-ai-agent-products (fetched 2026-09-10: agents span 'desktop execution to orchestrated workflows across systems')",
+        "https://zylos.ai/research/2026-02-08-computer-use-gui-agents/ (2026-02-08, seen in search: computer-use agents as a production category with Anthropic, Microsoft Magentic and OpenAI Operator)"
+      ]
+    },
+    {
+      "rank": 19,
+      "title": "Multi-model routing, LLM gateway and AI cost management",
+      "use_case": "Requests are routed to the cheapest model that meets the quality bar per use case, with caching, budgets, alerts and per-team cost visibility, so AI spend is predictable as agent workloads grow.",
+      "trend": "Multi-model enterprise architecture; AI FinOps / cost and latency engineering",
+      "skill_set": "Model selection and routing policy; gateway and caching architecture; metering, dashboards and budgeting; cost-per-task and latency measurement",
+      "industries_in_demand": ["Technology/SaaS", "Financial services", "Any enterprise running 5+ models in production"],
+      "sources": [
+        "https://a16z.com/ai-enterprise-2025/ (2025-06-10: 37% of enterprises run 5+ models in production, differentiated by use case; budgets up ~75%)",
+        "https://jobs.khoslaventures.com/companies/openai/jobs/62462358-product-manager-enterprise-platform (fetched 2026-09-10: PM owns metering, dashboards, alerts and budgeting for predictable pricing)",
+        "https://www.kore1.com/agentic-ai-hiring-2026/ (2026-06-26, updated 2026-08-23: 'cost and latency awareness' is a screened competency)"
+      ]
+    },
+    {
+      "rank": 20,
+      "title": "Legal contract review, drafting and clause deviation reporting",
+      "use_case": "A contract is compared against the company's standard positions; deviations are listed with risk notes and suggested redlines, and routine drafting and research are produced for lawyer review.",
+      "trend": "Generative and agentic AI in legal and professional services",
+      "skill_set": "Long-document reasoning and RAG over clause libraries; review-workflow design with attorney oversight; accuracy and citation controls; matter-system integration",
+      "industries_in_demand": ["Corporate legal departments in every industry", "Law firms", "Financial services", "Procurement and vendor management"],
+      "sources": [
+        "https://www.thomsonreuters.com/en/reports/2026-ai-in-professional-services-report (2026: 47% of corporate legal departments use GenAI, up from 23%; contract review, document drafting and research are the named use cases; 15% use agentic AI, 53% planning)",
+        "https://blog.workday.com/en-us/leading-brands-drove-value-workday-ai-q2.html (Q2 FY2027 post, fetched 2026-09-10: Contract Intelligence Agent in production)",
+        "https://almcorp.com/blog/openai-state-of-enterprise-ai-report-2025/ (report dated 2025-12-11: BBVA legal verification chatbot handles 9,000+ queries a year)"
+      ]
+    },
+    {
+      "rank": 21,
+      "title": "Supply-chain planning agents: demand forecasting, inventory optimization, order fulfillment and renewals",
+      "use_case": "Agents update forecasts from signals, propose inventory and routing decisions, and execute order-fulfillment and renewal workflows, escalating trade-offs to planners.",
+      "trend": "Agentic AI in supply chain management software",
+      "skill_set": "Forecasting and optimization models paired with LLM agents; ERP/SCM integration; decision-execution guardrails; service-level and inventory metrics",
+      "industries_in_demand": ["Manufacturing", "Retail and CPG", "Logistics", "Distribution"],
+      "sources": [
+        "https://www.gartner.com/en/newsroom/press-releases/2026-04-07-gartner-forecasts-supply-chain-management-software-with-agentic-ai-will-grow-to-53-billion-in-spend-by-2030 (2026-04-07, seen in search: agentic SCM software from under $2B in 2025 to $53B by 2030)",
+        "https://www.deloitte.com/global/en/issues/generative-ai/state-of-ai-in-enterprise.html (2026: supply chain management named among the highest-potential agentic use cases)",
+        "https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-brings-Autonomous-Workforce-to-every-major-business-function/default.aspx (2026-05-05: order fulfillment and renewals specialist)"
+      ]
+    },
+    {
+      "rank": 22,
+      "title": "Security and risk operations agents: SOC incident triage, vulnerability remediation, third-party risk, fraud and AML investigation",
+      "use_case": "The agent triages alerts, investigates the case across systems, drafts the remediation or the suspicious-activity narrative, and acts within human-approved bounds.",
+      "trend": "AI-driven security operations and financial-crime investigation; preemptive cybersecurity",
+      "skill_set": "Agent design with strict human oversight; SIEM/SOAR and case-management integration; false-positive reduction measurement; regulatory and audit controls",
+      "industries_in_demand": ["Banking and payments", "Insurance", "Technology", "Any enterprise SOC"],
+      "sources": [
+        "https://www.gartner.com/en/newsroom/press-releases/2026-03-17-gartner-predicts-ai-applications-will-drive-50-percent-of-cybersecurity-incident-response-efforts-by-2028 (2026-03-17, seen in search)",
+        "https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-brings-Autonomous-Workforce-to-every-major-business-function/default.aspx (2026-05-05: security and risk specialists triage and remediate vulnerabilities, contain SOC incidents with human oversight, screen vendor risk)",
+        "https://fintech.global/2026/01/14/why-ai-is-becoming-essential-for-aml-in-2026/ (2026-01-14: AML and fraud prevention cited by UK firms as the areas of greatest AI benefit; agentic investigation of cases)",
+        "https://www.deloitte.com/global/en/issues/generative-ai/state-of-ai-in-enterprise.html (2026: cybersecurity among the highest-potential agentic use cases)"
+      ]
+    },
+    {
+      "rank": 23,
+      "title": "Domain-specific and fine-tuned models for a regulated vertical",
+      "use_case": "A model tuned on the company's or industry's data (SFT, RLHF, domain corpus) answers or classifies more accurately than a general model in the domain, and the product owner runs the data, evaluation and release loop.",
+      "trend": "Domain-specific language models; fine-tuning and alignment (SFT/RLHF)",
+      "skill_set": "Fine-tuning and alignment workflows; data curation and labeling; benchmark and eval design for the domain; model-lifecycle governance",
+      "industries_in_demand": ["Financial services", "Healthcare and life sciences", "Legal", "Technology vendors building vertical models"],
+      "sources": [
+        "https://www.idea11.com.au/insights/gartners-top-10-strategic-technology-trends-for-2026-leveraging-ai-for-success/ (2026-02-23, mirror of Gartner 2025-10-20: domain-specific language models are a top-10 2026 trend)",
+        "https://www.theladders.com/job/ai-llm-product-director-executive-director-jpmorganchase-new-york-ny_87624037 (seen in search 2026-09-10: JPMorgan AI/LLM Product Director requires SFT, RLHF, RAG and agents)",
+        "https://www.google.com/about/careers/applications/jobs/results/85250059125301958 (seen in search 2026-09-10: Model Product Manager, Gemini for Enterprise Verticals, translating customer needs into model-improvement roadmap)"
+      ]
+    },
+    {
+      "rank": 24,
+      "title": "Legacy code modernization with agents (COBOL and mainframe to modern stacks)",
+      "use_case": "Specialized agents analyze a legacy codebase, map dependencies, convert modules to a modern language and generate tests and documentation, with engineers validating each increment.",
+      "trend": "Agentic application modernization",
+      "skill_set": "Multi-agent pipelines for code analysis and transformation; context management over large codebases; verification and test-equivalence strategy; migration program metrics",
+      "industries_in_demand": ["Banking and insurance", "Public sector", "Airlines and logistics", "Any mainframe-heavy enterprise"],
+      "sources": [
+        "https://devblogs.microsoft.com/all-things-azure/how-we-use-ai-agents-for-cobol-migration-and-mainframe-modernization/ (2025-07-09: analyzer, converter and dependency-mapper agents for COBOL to Java; Bankdata's 70M-line mainframe estate)",
+        "https://ascendion.com/ai-basic/mainframe-and-cobol-modernization-with-agentic-ai-whats-actually-possible-in-2026/ (2026, seen in search: Morgan Stanley modernized 17M+ lines with an in-house GenAI platform; most migrations still fail on overestimated AI capability)"
+      ]
+    },
+    {
+      "rank": 25,
+      "title": "Ambient clinical documentation (AI scribe) integrated with the EHR",
+      "use_case": "The visit is transcribed and turned into a structured note in the clinician's EHR for review and sign-off, cutting documentation time and after-hours charting.",
+      "trend": "Ambient AI / clinical documentation automation",
+      "skill_set": "Speech and summarization pipelines; EHR (Epic-class) integration; clinical accuracy evaluation and clinician-in-the-loop review; privacy (HIPAA) controls",
+      "industries_in_demand": ["Healthcare providers (health systems, ambulatory, home health)"],
+      "sources": [
+        "https://www.aha.org/aha-center-health-innovation-market-scan/2026-04-14-6-health-systems-enhancing-care-delivery-ambient-ai-scribes (2026-04-14: Emory, Mass General Brigham, Cleveland Clinic, Cooper, Mercy, Intermountain report 14 minutes/day to 27% note-time reductions)",
+        "https://hai.stanford.edu/ai-index/2026-ai-index-report (2026-04-13; search result 2026-09-10 cites reduced clinical documentation time as a measured productivity effect)"
+      ]
+    }
+  ],
+  "trends_index": [
+    {"trend": "Agentic AI (agents that plan, act and complete multi-step work)", "one_line": "The organizing theme of 2025-2026 postings and analyst reports; McKinsey finds 62% experimenting but under 10% scaling in any function, and Gartner expects 40% of enterprise apps to embed task-specific agents by end of 2026.", "survivor_ranks": [1, 2, 3, 5, 8, 10, 11, 12, 15, 16, 17, 18, 21, 22]},
+    {"trend": "Agent orchestration platforms and multiagent systems", "one_line": "Gartner 2026 trend; platform roles at ServiceNow, Google, Amazon and Cohere Health ask for orchestration, memory, tool use and governance as reusable capabilities.", "survivor_ranks": [2, 9, 18, 24]},
+    {"trend": "Retrieval-augmented generation (RAG) and grounding", "one_line": "Named in VP and Director postings (JPMorgan, Experis, Capital One) as the baseline for trustworthy enterprise answers and knowledge agents.", "survivor_ranks": [4, 8, 11, 20, 23]},
+    {"trend": "AI-native software development and coding agents", "one_line": "Forrester's #1 use case for 2026 and about half of Anthropic's enterprise API traffic; 90% of developers use coding agents weekly per JetBrains.", "survivor_ranks": [3, 24]},
+    {"trend": "AI evaluation ('evals'), LLMOps and observability", "one_line": "Postings now ask the product owner to own the eval set and the release decision; a shipped feature with a real eval story is the screening bar.", "survivor_ranks": [6, 12, 23]},
+    {"trend": "AI governance, guardrails and human-in-the-loop", "one_line": "Gartner: 40% of enterprises will demote agents by 2027 over governance gaps; Deloitte: only 21% have mature agent governance; JPMorgan and Capital One hire Director-level owners for it.", "survivor_ranks": [7, 13, 18, 22]},
+    {"trend": "Model Context Protocol and open interoperability standards", "one_line": "MCP moved to the Linux Foundation in December 2025 with 10,000+ servers; Forrester expects 30% of app vendors to ship MCP servers; postings call it 'LLM orchestration protocols'.", "survivor_ranks": [9, 11, 18]},
+    {"trend": "Enterprise trust and administration (SSO/SCIM, RBAC, audit, retention, metering)", "one_line": "OpenAI, Anthropic and Microsoft PM postings define enterprise readiness as identity, controls, audit and cost visibility, not model quality alone.", "survivor_ranks": [13, 9, 19]},
+    {"trend": "Automation-first back-office AI", "one_line": "77% of business API use is full task delegation; email classification, invoice processing, scheduling and meeting follow-up are the named workloads.", "survivor_ranks": [8, 15, 16, 17]},
+    {"trend": "Conversational and voice AI for customer service", "one_line": "OpenAI's #1 enterprise use case and Gartner's 80%-by-2029 autonomous-resolution prediction; Salesforce hires a Senior Director for agentic voice.", "survivor_ranks": [1, 12, 14]},
+    {"trend": "Agentic analytics and conversational data access", "one_line": "Gartner's 2026 Market Guide defines agents across the data-to-insight workflow; data analysis is OpenAI's #2 enterprise use case.", "survivor_ranks": [11, 16, 21]},
+    {"trend": "Multi-model architecture and AI cost engineering", "one_line": "a16z: 37% of enterprises run 5+ models by use case; postings screen for cost and latency awareness and metering ownership.", "survivor_ranks": [19, 13, 2]},
+    {"trend": "Domain-specific language models and fine-tuning (SFT/RLHF)", "one_line": "Gartner 2026 trend; regulated-industry postings (JPMorgan) list SFT, RLHF, RAG and agents together.", "survivor_ranks": [23, 25, 20]},
+    {"trend": "Computer-use / GUI agents", "one_line": "Claude Cowork GA (2026-04) and OpenAI agent mode made desktop and browser operation a production category; ServiceNow's agent roadmap includes desktop execution.", "survivor_ranks": [18, 24]},
+    {"trend": "Workflow redesign over layering AI onto legacy processes", "one_line": "McKinsey high performers are 3x likelier to pursue transformative use cases and redesign workflows; Deloitte calls this the AI-native approach; Microsoft's frontier firms document repeatable agent workflows.", "survivor_ranks": [1, 5, 8, 15, 16]}
+  ],
+  "usage_note": "Approximately 150k tokens consumed on this pass (56 searches and 63 fetches returned the bulk); no database or repository access."
+}
