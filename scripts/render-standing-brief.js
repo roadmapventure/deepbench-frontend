@@ -1,4 +1,26 @@
 #!/usr/bin/env node
+// DeepBench v7.0.454 | scripts/render-standing-brief.js | SES-360 — ARE THE PLATFORM'S OWN AGENTS
+// DOING THE DEVELOPMENT WORK? The standing brief answers it as a RENDERED FACT. A new group,
+// `Governance agents, last 7 days`, lands AFTER `Board by served class` and BEFORE the provenance
+// footer: calls and token sums per governance-lane agent x call_source, and how many of the window's
+// ships carried all four of SES-345's handoff rows.
+//
+// Measured 2026-09-11 before a line changed: answering it took FIVE queries, and the first silently
+// TRUNCATED — PostgREST caps a page at 1,000 rows and the governance agents had written 1,311 in
+// seven days. So the aggregation lives in two views, `public.governance_agent_usage` and
+// `public.ship_handoff_census`, not in a GROUP BY here: rest() sends no Range header and does not
+// page, and a second home for the number would be that truncated number again. The four-leg rule is
+// SES-345's, so when its verdict-side sha lands, the leg moves in the VIEW, one place, not here.
+//
+// THE ROSTER IS READ BY LANE, NEVER BY ID (Rule #1, §19b/§19e): no agent id appears in this file, and
+// no branch is keyed to one. A GROUP BY cannot return an agent with no rows and a silent Builder is
+// the row John most needs to see, so the renderer walks the roster and says *no calls in the window*
+// — a MEASURED zero, because the view was read. A NULL call_source prints as *unlabelled* and is
+// never folded into a named source (LOG-128: an absent attribution is not evidence of automation).
+// NO RATE, EVER, on the same terms as the group below: counts and token sums side by side.
+// The window ROLLS (now() - 7 days in the view), so the payload sha moves as rows age out — the same
+// accepted behaviour finalWeek/reversedWeek already have.
+//
 // DeepBench v7.0.418 | scripts/render-standing-brief.js | LOG-143 (c) — CRITERION 7 GETS ITS
 // INSTRUMENT: real-visitor use of the first platform-originated feature is a view the standing
 // brief renders, so the exit exam reads a number instead of an assertion. A new fact group,
@@ -263,6 +285,26 @@ export function factsSha(facts) {
           r.window, Number(r.judge_runs), Number(r.judge_runs_real_visitors),
           Number(r.distinct_real_visitors), r.first_real_visitor_at || null, r.last_real_visitor_at || null,
         ]).sort()
+      : null,
+    // FEATURE: SES-360 — the governance rows, the ship census and the ROSTER IDS, so a new logged
+    // call, a ship gaining a leg, or a seventh governance agent appearing (even before it logs)
+    // each move the sha. `role` text is deliberately absent: the id identifies the agent, and a
+    // retitled role is not a usage change. Numbers are coerced because PostgREST returns bigint
+    // sums as strings and a fixture writes JS numbers — the sha must not depend on which.
+    governance: facts.governance
+      ? {
+          roster: Array.isArray(facts.governance.roster) ? facts.governance.roster.map(r => r.id).sort() : null,
+          usage: Array.isArray(facts.governance.usage)
+            ? facts.governance.usage.map(u => [
+                u.agent_id, u.call_source == null ? null : String(u.call_source),
+                Number(u.calls), Number(u.input_tokens), Number(u.output_tokens), Number(u.untokened),
+              ]).sort()
+            : null,
+          ships: facts.governance.ships
+            ? ["ships", "ships_all_four", "missing_rank", "missing_kickoff", "missing_sha", "missing_verdict"]
+                .map(k => Number(facts.governance.ships[k]))
+            : null,
+        }
       : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
@@ -610,6 +652,62 @@ export function renderServedClass(served, stamp) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: SES-360 — the `Governance agents, last 7 days` fact group. PURE: (gov, stamp) in, markdown
+ * out, the same contract as the four groups above it, so
+ * tests/regression/ses-360-governance-agents-block.test.mjs drives it from fixtures. `gov` is exactly
+ * what fetchFacts() reads: `{ roster, usage, ships }` — the roster from `agents` by LANE (never by
+ * id — Rule #1, §19e), usage from `public.governance_agent_usage`, ships from
+ * `public.ship_handoff_census`. NOTHING HERE COUNTS, SUMS OR DECIDES: the views are the one home for
+ * the window, the join and SES-345's four-leg rule; this prints what came back.
+ *
+ * THREE BRANCHES, the same three the siblings use:
+ *   - any of the three parts absent — SAID, never rendered as zeros;
+ *   - a roster agent the view returned no row for — "no calls in the window", a MEASURED zero,
+ *     because the view was read; a silent Builder is the row John most needs to see;
+ *   - a NULL call_source — printed as *unlabelled*, never folded into a named source (LOG-128:
+ *     an absent attribution is not evidence of automation).
+ * Roles go through summarise(): they are agents-table text landing inside a markdown table row.
+ * NO RATE, EVER — counts and token sums, printed side by side, never divided.
+ */
+export function renderGovernanceAgents(gov, stamp) {
+  const L = [];
+  L.push(`**Governance agents, last 7 days** — *${stamp}.* Whether the platform's own agents ` +
+    "(`agents.lane = 'governance'`) are doing the development work, live from " +
+    "`public.governance_agent_usage` and `public.ship_handoff_census` (`SES-360`). A **rolling 7 days** " +
+    "back from render time, like the decision counts above. Counts and token sums only, never a rate.");
+  L.push("");
+  if (!gov || !Array.isArray(gov.roster) || !Array.isArray(gov.usage) || !gov.ships) {
+    L.push("- *The governance census was not read for this render* — which is **not** the same as " +
+      "*no calls*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+  L.push("| role | source | calls | input tokens | output tokens |");
+  L.push("|---|---|---:|---:|---:|");
+  for (const a of gov.roster) {
+    const role = summarise(a.role, 60);
+    const rows = gov.usage.filter(u => u.agent_id === a.id);
+    if (rows.length === 0) { L.push(`| ${role} | *no calls in the window* | 0 | — | — |`); continue; }
+    for (const u of rows) {
+      const src = u.call_source == null ? "*unlabelled*" : `\`${u.call_source}\``;
+      const un = Number(u.untokened) > 0 ? ` (${Number(u.untokened)} untokened)` : "";
+      L.push(`| ${role} | ${src} | ${Number(u.calls)}${un} | ${Number(u.input_tokens)} | ${Number(u.output_tokens)} |`);
+    }
+  }
+  L.push("");
+  const s = gov.ships;
+  L.push(`- **Ships with all four handoff rows: ${Number(s.ships_all_four)} of ${Number(s.ships)}** ships in the ` +
+    "window (`SES-345`'s four: `automation_rank`, `kickoff_link`, a per-ticket push sha, a verdict row). " +
+    `Missing per leg: kickoff_link ${Number(s.missing_kickoff)}, per-ticket sha ${Number(s.missing_sha)}, ` +
+    `automation_rank ${Number(s.missing_rank)}, verdict ${Number(s.missing_verdict)}.`);
+  L.push("- *unlabelled* is a NULL `call_source` — the pre-attribution unknown, never read as automation " +
+    "(`LOG-128`); `untokened` rows carry no token counts at all (deterministic handler rows), so a " +
+    "large call count beside a small token sum is that, not a cheap model.");
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -631,7 +729,9 @@ export function renderBlock(facts, nowIso) {
   // "not read", never "no pattern-citing decisions".
   // FEATURE: SES-334 — served joins the destructure on the same terms as census/johnModel/inventionUse:
   // absent means "not read", never "nothing serves anything".
-  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served } = facts;
+  // FEATURE: SES-360 — governance joins the destructure on the same terms as served/inventionUse:
+  // absent means "not read", never "no governance agent called anything".
+  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -832,6 +932,12 @@ export function renderBlock(facts, nowIso) {
   // a pure helper the guard can assert from a fixture, rendering what fetchFacts() grouped and
   // counting nothing itself.
   L.push(renderServedClass(served, stamp));
+
+  // ---- Governance agents, last 7 days (FEATURE: SES-360) ------------------------------------
+  // After Board by served class, before the provenance line. Same contract as the four groups
+  // above it: a pure helper the guard can assert from a fixture, rendering what the views returned
+  // and counting nothing itself.
+  L.push(renderGovernanceAgents(governance, stamp));
 
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
@@ -1043,7 +1149,29 @@ export async function fetchFacts(url, key) {
 
   const served = { counts, top, lastRankedAt };
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served };
+  // FEATURE: SES-360 — governance-agent usage and the four-row ship census, read from VIEWS and
+  // never re-derived here. THE VIEW IS NOT OPTIONAL: ai_activity_log exceeds a REST page (1,311
+  // governance rows in 7 days against PostgREST's 1,000-row cap, measured 2026-09-11) and rest()
+  // neither pages nor forwards a Range header, so a GROUP BY in this file would be the truncated
+  // number the ticket was filed to end. Both views are service_role only (the SES-78a rule), the
+  // same key everything above needs. Columns are named rather than `*` — this file's own rule.
+  //
+  // THE ROSTER IS READ BY LANE, NEVER BY ID (Rule #1, §19e): a GROUP BY cannot return an agent
+  // with no rows, and a silent agent is the row John most needs to see, so the renderer walks the
+  // roster and says "no calls in the window" for one the view did not return. `order=code` pins
+  // GV-01..GV-06 so the table never churns between renders.
+  const govRoster = await rest(url, key, "agents?select=id,role,code&lane=eq.governance&order=code");
+  if (!Array.isArray(govRoster) || govRoster.length === 0) die("no governance-lane agents came back — refusing to render the governance group from nothing (SES-338 shipped six)");
+  const govUsage = await rest(url, key,
+    "governance_agent_usage?select=code,agent_id,role,call_source,calls,input_tokens,output_tokens,untokened&order=code,call_source.nullslast");
+  if (!Array.isArray(govUsage)) die("governance_agent_usage came back non-array — refusing to render it from nothing");
+  // An EMPTY usage array is a real state (no governance call in 7 days), not a failed read.
+  const shipCensus = await rest(url, key,
+    "ship_handoff_census?select=ships,ships_all_four,missing_rank,missing_kickoff,missing_sha,missing_verdict");
+  if (!Array.isArray(shipCensus) || shipCensus.length !== 1) die("ship_handoff_census must return exactly one row (an aggregate with no GROUP BY) — refusing to render it from nothing");
+  const governance = { roster: govRoster, usage: govUsage, ships: shipCensus[0] };
+
+  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance };
 }
 
 async function main() {
