@@ -4,7 +4,7 @@
 # The cloud routine's prompt — canonical copy
 
 **What this is.** The prompt the claude.ai routine `deepbench-runner`
-(`trig_017TZ3JZcLBK6AYH6DKURqMH`, cron `40 * * * *` UTC, model `claude-opus-5`) sends to every
+(`trig_017TZ3JZcLBK6AYH6DKURqMH`, cron `40 */3 * * *` UTC since 2026-09-11 — John: "set it to three hours", so one orientation per fresh fire and the drain chain carries the tickets in between; model `claude-opus-5`) sends to every
 cycle. **This file is the source; the routine holds a copy.** A cycle that finds the two differ
 notes the drift in its cycle row and follows the runbook, which outranks both.
 
