@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.448 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | SES-368 — M5-16, the weekly pace gate, joins the register (sixteen rows now; `tests/regression/ses-280-m5-governance-rules.test.mjs` quantifies over M5-01..M5-16). John's rule of 2026-09-11 in his words, encoded whole-days-at-100% at his instruction, enforced by `public.runner_should_boot()` as the refusal `weekly_pace` (migration `ses368_weekly_pace_gate`). Row inserted, snapshot re-exported, this file reconciled — in that order, one commit. -->
 <!-- DeepBench v7.0.412 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | SES-320 — M5-14 gains a dated note NAMING THE MECHANISM that performs it, and the rule STATEMENT is untouched: no registry row edit, no re-export of docs/governance/RULES-SNAPSHOT.md, so the byte-for-byte registry↔doc equality tests/regression/ses-280-m5-governance-rules.test.mjs pins is unaffected. What the rule lacked was an executor for “closes on verifier pass once its reversal window elapses”: sweep_decision_windows finalised the decision and never touched backlog_items, so from SES-285 (which retired the Accept tap) to this ship a `delivered` ticket had NO exit and sixteen rows sat there. Migration ses320_delivered_exit makes the sweep write `done` on a still-`delivered` ticket whose kind=ship decision it has just finalised — any class, any epic — returning the count as a third OUT column `closed`. The timing distinction M5-14 draws is preserved exactly (original / gate-review may still auto-done at ship through 7a’s rung; discovered / john-named reach done only on verdict PLUS window), and a block finalises nothing because record_ship_decision refuses a non-approve verdict. THE SES-154 RETIREMENT LIVES HERE RATHER THAN IN docs/SELFBUILD-RETIREMENT-LEDGER.md, deliberately and on the kickoff’s own §7 instruction — the ledger entry would have been this session’s fifth repo file, so it folds into the same note; it names what SURVIVES (the `delivered` status, its pick-predicate exclusion, its silent step-past, its kept queue slot) and a restore path that must remove the sweep’s ship branch in the same change, because leaving both would close one delivery twice. -->
 <!-- DeepBench v7.0.390 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | close-out of session design-m5-fixes-0902 (attended, Fable 5.1 design, Opus 5 coding agents) — the SES-184 gate record gains its completion amendment: SES-308 (v7.0.389) and SES-309 (v7.0.390) are done with live QA, so M5 is complete against the 9-ticket required set. Doc-only plus the backlog snapshot re-export; the status writes, before-images and scoreboard stamps are in Supabase. No rule STATEMENT changed. -->
 <!-- DeepBench v7.0.388 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | M5 gate review (session design-m5-gate-review-0902, attended, Fable 5.1) — the SES-184 gate record gains one amendment: John's "yes, file the two tickets" adds SES-308 and SES-309 to the M5 required set (9 tickets, 16 cycles) and supersedes the "M5 COMPLETE" paragraph. Doc-only plus the backlog snapshot re-export; the rows, drain-scope entries and before-images are in Supabase. No rule STATEMENT changed, so the ses-280 registry↔doc equality guard is untouched. -->
@@ -308,6 +309,39 @@ still graded and still reported (`detail.reading_stale`, `detail.reading_age_hou
 consequence changed, from `should_boot = false` to `reason = 'pickable_degraded'` with
 `detail.token_cap` carrying the fallback.
 
+
+### <a id="M5-16"></a>M5-16 — the weekly pace gate: a cycle fires only below the day-of-week share (`script`)
+
+> A cycle fires only while the freshest `runner_usage_readings.all_models_pct` is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` and before `no_budget_row`; no other gate carries its own pace.
+
+**Added 2026-09-11 (`SES-368`, `v7.0.448`), and it is John's rule in John's words.** Verbatim: *"One
+thing i want you to verify before every automated ticket is ran is only fire if usage is below the
+daily limit. Where daily limit is where the 'weekly all models %' is divided by 7 days, each week
+restarts at 1am central on Fridays."* And on granularity, when the first draft interpolated by the
+hour: *"right now you are too detailed, by looking at hourly usage - let's just do daily at 100%, so
+the next fire will take place."* So: whole days, the full share, no hourly curve.
+
+**Why a pace and not only a wall.** The runner shares John's subscription. `M5-06`'s rest wall
+(`weekly_rest_pct`, 85%) stops the runner near the end of the allowance, but nothing stopped it from
+spending most of the week's allowance in its first two days and leaving John's own attended sessions
+starved for the remaining five. The pace makes the runner's share of the week track the calendar.
+
+**Mechanism, measured at the ship rather than described.** `public.runner_should_boot()`'s `week`
+CTE finds the most recent Friday 01:00 `America/Chicago` at or before `now()` (00:30 on a Friday is
+still day 7 of the prior week), `week_day_index` = whole days elapsed + 1 clamped to 1..7,
+`pace_limit_pct` = index × 100/7 (day 1 = 14.29, day 2 = 28.57, day 7 = 100). The refusal fires when
+the freshest reading's `all_models_pct` is **at or above** the limit — NULL-safe like the wall, so a
+missing reading falls through to `no_budget_row` rather than blaming the pace. Precedence:
+`scheduler_off`, `weekly_wall`, **`weekly_pace`**, `no_budget_row`, `nothing_pickable`,
+`unaffordable`. Fixtures inside a rolled-back DO block on day 1: reading 20 → `weekly_pace`; 14.28 →
+`pickable`; 14.29 → `weekly_pace`; 90 → `weekly_wall` (the wall still wins). Live board at 6% →
+`pickable`. The calendar was checked at fixed instants across the Friday boundary, the day-1/day-2
+boundary and the November DST end.
+
+**What this rule is not.** It is not a cap (`M5-15`: the ceiling has one home,
+`resolve_day_token_cap()`), it carries no staleness threshold of its own, and it does not read the
+per-model Fable meter — only `all_models_pct`, the number John named. The 5-hour session meter is
+not consulted.
 ---
 
 ## Amendment note — `SES-285`, 2026-09-01 (`v7.0.359`)

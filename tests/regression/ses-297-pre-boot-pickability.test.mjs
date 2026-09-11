@@ -1,3 +1,8 @@
+// DeepBench v7.0.448 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-368 -- the gate gains
+// its third refusal, `weekly_pace` (M5-16): John's day-of-week share of the subscription week
+// (day index x 100/7, week starting Friday 01:00 America/Chicago, whole days). The oracle grows one
+// branch in the ladder's real position, a fixed-instant calendar check guards the week arithmetic
+// independently of the database, and the three new detail keys are asserted against the oracle.
 // DeepBench v7.0.364 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-297
 //
 // FEATURE: SES-297 -- guards public.runner_should_boot(), the pre-boot pickability gate that makes
@@ -70,6 +75,9 @@ export const REASONS = [
   // staleness brake (48h, stale-floor, box may not override). This gate carries no cap and no
   // threshold of its own; SES-298 gave it both at 24h and the two homes disagreed on live data.
   "weekly_wall",
+  // SES-368 / M5-16: John's pace. Sits between the wall and the budget-row check, and like the wall
+  // it compares NULL-safely -- no reading, no pace verdict.
+  "weekly_pace",
   "no_budget_row",
   "nothing_pickable",
   "unaffordable",
@@ -130,12 +138,12 @@ export const CLAUSES = [
   {
     id: "all-six-refusals-are-named",
     detail:
-      "every one of the six reasons must appear by its exact string, with M5-15 / M5-06 / M6-09 " +
+      "every one of the six reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 " +
       "attributed -- a cycle that meets a reason this file does not name cannot write a truthful " +
       "last_step, and a reader cannot tell a refusal from a failure",
     test: s =>
       REASONS.every(r => s.includes(`\`${r}\``)) &&
-      /M5-15/.test(s) && /M5-06/.test(s) && /M6-09/.test(s),
+      /M5-16/.test(s) && /M5-15/.test(s) && /M5-06/.test(s) && /M6-09/.test(s),
     breaks: s => s.split("`no_budget_row`").join("`some other refusal`"),
   },
   {
@@ -386,6 +394,69 @@ export function chicagoMonth(now = new Date()) {
   return `${y}-${m}`;
 }
 
+// SES-368 / M5-16: John's week, computed here from the clock alone so the oracle does not read the
+// gate's own week_started_at back to itself. Week start = the most recent Friday 01:00
+// America/Chicago at or before `nowMs`; day index = whole days elapsed + 1, clamped 1..7; pace
+// limit = index x 100/7 rounded to 2dp (the SQL rounds the same way). No timeZoneName parsing:
+// the Chicago offset at an instant is recovered by formatting the instant in Chicago wall-clock
+// terms and differencing against Date.UTC of those parts, which works on every ICU build.
+const CHICAGO = "America/Chicago";
+function chicagoParts(ms) {
+  const f = new Intl.DateTimeFormat("en-US", {
+    timeZone: CHICAGO, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "short",
+  });
+  const p = Object.fromEntries(f.formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  const wall = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return {
+    y: +p.year, mo: +p.month, d: +p.day,
+    dow: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday),
+    offsetMin: Math.round((wall - Math.floor(ms / 1000) * 1000) / 60000),
+  };
+}
+function chicagoWallToMs(y, mo, d, h) {
+  let ms = Date.UTC(y, mo - 1, d, h);
+  for (let i = 0; i < 2; i++) ms = Date.UTC(y, mo - 1, d, h) - chicagoParts(ms).offsetMin * 60000;
+  return ms;
+}
+export function chicagoWeek(nowMs = Date.now()) {
+  const p = chicagoParts(nowMs);
+  const back = (p.dow + 2) % 7; // days since Friday
+  const startOf = daysBack => {
+    const l = new Date(Date.UTC(p.y, p.mo - 1, p.d - daysBack));
+    return chicagoWallToMs(l.getUTCFullYear(), l.getUTCMonth() + 1, l.getUTCDate(), 1);
+  };
+  let weekStartedAt = startOf(back);
+  if (weekStartedAt > nowMs) weekStartedAt = startOf(back + 7);
+  const weekDayIndex = Math.min(7, Math.max(1, Math.floor((nowMs - weekStartedAt) / 86400000) + 1));
+  const paceLimitPct = Math.round((weekDayIndex * 100 / 7) * 100) / 100;
+  return { weekStartedAt, weekDayIndex, paceLimitPct };
+}
+
+// Always runs. The same instants the migration was checked against, so the JS calendar and the
+// SQL calendar are pinned to one table of expectations rather than to each other.
+function theOracleCalendarMatchesTheFixedInstants() {
+  const cases = [
+    ["Fri 2026-09-11 00:30 CT, before the reset", Date.UTC(2026, 8, 11, 5, 30), Date.UTC(2026, 8, 4, 6), 7, 100],
+    ["Fri 2026-09-11 01:00 CT, the reset", Date.UTC(2026, 8, 11, 6), Date.UTC(2026, 8, 11, 6), 1, 14.29],
+    ["Sat 2026-09-12 00:59 CT, end of day 1", Date.UTC(2026, 8, 12, 5, 59), Date.UTC(2026, 8, 11, 6), 1, 14.29],
+    ["Sat 2026-09-12 01:00 CT, day 2", Date.UTC(2026, 8, 12, 6), Date.UTC(2026, 8, 11, 6), 2, 28.57],
+    ["Thu 2026-09-17 23:00 CT, day 7", Date.UTC(2026, 8, 18, 4), Date.UTC(2026, 8, 11, 6), 7, 100],
+    ["Mon 2026-11-02 12:00 CST, after the DST end", Date.UTC(2026, 10, 2, 18), Date.UTC(2026, 9, 30, 6), 4, 57.14],
+  ];
+  for (const [label, now, start, idx, limit] of cases) {
+    const w = chicagoWeek(now);
+    assert.strictEqual(w.weekStartedAt, start, `${label}: week start ${new Date(w.weekStartedAt).toISOString()} != ${new Date(start).toISOString()}`);
+    assert.strictEqual(w.weekDayIndex, idx, `${label}: day index ${w.weekDayIndex} != ${idx}`);
+    assert.strictEqual(w.paceLimitPct, limit, `${label}: pace limit ${w.paceLimitPct} != ${limit}`);
+  }
+  // Negative control: a calendar that starts the week on Friday 00:00 instead of 01:00 answers the
+  // pre-reset instant as day 1 of the NEW week. If that variant passed the table, the table would
+  // not be testing the 01:00 boundary at all.
+  const wrong = Date.UTC(2026, 8, 11, 5, 30) >= Date.UTC(2026, 8, 11, 5);
+  assert.ok(wrong, "control: the 00:00 variant must classify 00:30 as the new week (so the 01:00 table discriminates)");
+}
+
 // THE INDEPENDENT ORACLE. Deliberately fed from the RAW TABLES rather than from the gate's own
 // detail payload, so it can disagree with the function. It is not a second implementation of the
 // pick predicate -- prime_directive_queue() is READ, never re-derived (the SES-45 boundary); what
@@ -396,6 +467,12 @@ export function expectedReason(f) {
   // real position so this oracle keeps grading the shipped precedence, not a remembered one.
   if (f.weeklyRestPct !== null && f.allModelsPct !== null && f.allModelsPct >= f.weeklyRestPct)
     return "weekly_wall";
+  // SES-368 / M5-16: the pace, in the ladder's real position -- after the wall, before the budget
+  // row. At-or-above refuses (14.29 on day 1 refuses; 14.28 boots), and NULL on either side falls
+  // through, exactly as the wall does.
+  if (f.paceLimitPct !== null && f.paceLimitPct !== undefined && f.allModelsPct !== null &&
+      f.allModelsPct >= f.paceLimitPct)
+    return "weekly_pace";
   if (!f.budgetRowExists) return "no_budget_row";
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
@@ -471,6 +548,7 @@ async function theLiveGateObeysItsOwnLadder() {
   const takenAt = readings[0]?.taken_at ? Date.parse(readings[0].taken_at) : null;
   const allModelsPct = readings[0]?.all_models_pct === undefined || readings[0]?.all_models_pct === null
     ? null : Number(readings[0].all_models_pct);
+  const week = chicagoWeek();
   const facts = {
     schedulerOn: settings[0]?.scheduler_on ?? null,
     readingAgeHours: takenAt === null ? null : Math.round(((Date.now() - takenAt) / 3.6e6) * 100) / 100,
@@ -478,6 +556,9 @@ async function theLiveGateObeysItsOwnLadder() {
     weeklyRestPct: budget[0]?.weekly_rest_pct ?? null,
     budgetRowExists: budget.length > 0,
     weeklyHeadroomPct: allModelsPct === null ? null : 100 - allModelsPct,
+    weekStartedAt: week.weekStartedAt,
+    weekDayIndex: week.weekDayIndex,
+    paceLimitPct: week.paceLimitPct,
     pickableCount: lanes.length,
     cheapestPctOfWeek: priced.length ? Math.min(...priced) : null,
   };
@@ -499,6 +580,15 @@ async function theLiveGateObeysItsOwnLadder() {
             Object.prototype.hasOwnProperty.call(d, "unpriced_pickable"),
     "detail must always carry pickable_count and unpriced_pickable -- they are how a reader tells " +
     "'no work' from 'work nobody priced'");
+  // SES-368 / M5-16: the pace facts the verdict owes its reader, graded against the clock-only
+  // oracle. A gate that computed the week from UTC, or from Friday 00:00, disagrees here.
+  assert.strictEqual(Date.parse(d.week_started_at), facts.weekStartedAt,
+    `detail.week_started_at=${d.week_started_at} but the clock says ${new Date(facts.weekStartedAt).toISOString()} ` +
+    "(most recent Friday 01:00 America/Chicago)");
+  assert.strictEqual(Number(d.week_day_index), facts.weekDayIndex,
+    `detail.week_day_index=${d.week_day_index} but the clock says day ${facts.weekDayIndex}`);
+  assert.strictEqual(Number(d.pace_limit_pct), facts.paceLimitPct,
+    `detail.pace_limit_pct=${d.pace_limit_pct} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct}`);
   assert.strictEqual(d.pickable_count, lanes.length,
     `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
     "drain/selfbuild rows -- the gate and the picker are reading different boards");
@@ -579,6 +669,7 @@ async function run() {
   everyClauseHasTeeth();
   aVacuousMutationFailsItsOwnControl();
   theRunbookStampCapHeld();
+  theOracleCalendarMatchesTheFixedInstants();
   await theLiveGateObeysItsOwnLadder();
 
   notRun(

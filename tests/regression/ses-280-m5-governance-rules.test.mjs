@@ -1,6 +1,8 @@
+// DeepBench v7.0.448 | tests/regression/ses-280-m5-governance-rules.test.mjs | SES-368 -- the register
+// grows to sixteen rows (M5-16, the weekly pace gate). M5_IDS is the only place the count lives.
 // DeepBench v7.0.358 | tests/regression/ses-280-m5-governance-rules.test.mjs | SES-280
 //
-// FEATURE: SES-280 -- guards the M5 prioritization + auto-close rule set (M5-01..M5-15) in
+// FEATURE: SES-280 -- guards the M5 prioritization + auto-close rule set (M5-01..M5-16) in
 // public.governance_rules, B3's supersession by M5-02, and the byte-for-byte identity between each
 // registry row's `statement` and its canonical home docs/RUNNER-GOV-M5-REQUIREMENTS.md.
 //
@@ -43,7 +45,7 @@ const SNAPSHOT = path.join(ROOT, "docs/governance/RULES-SNAPSHOT.md");
 const CANONICAL_REL = "docs/RUNNER-GOV-M5-REQUIREMENTS.md";
 const CANONICAL = path.join(ROOT, CANONICAL_REL);
 
-export const M5_IDS = Array.from({ length: 15 }, (_, i) => `M5-${String(i + 1).padStart(2, "0")}`);
+export const M5_IDS = Array.from({ length: 16 }, (_, i) => `M5-${String(i + 1).padStart(2, "0")}`);
 export const ENFORCEMENT_VALUES = new Set(["script", "prose", "reviewer"]);
 
 // ---------------------------------------------------------------------------
@@ -121,9 +123,9 @@ export function parseCanonicalDoc(text) {
 
 export const ASSERTIONS = [
   {
-    id: "1-fifteen-rows-live-and-shaped",
+    id: "1-sixteen-rows-live-and-shaped",
     detail:
-      "all fifteen ids M5-01..M5-15 exist with status='live', a non-null canonical_doc, and an " +
+      "all sixteen ids M5-01..M5-16 exist with status='live', a non-null canonical_doc, and an " +
       "enforcement in (script, prose, reviewer)",
     test: rules => {
       const byId = new Map(rules.map(r => [r.id, r]));
@@ -183,7 +185,7 @@ export const ASSERTIONS = [
       "each M5 row's statement is byte-for-byte the blockquote under its anchor in " +
       `${CANONICAL_REL}. The registry is authoritative and the doc is its canonical home; a ` +
       "paraphrase in either direction is exactly the drift the registry was built to end",
-    // Quantified over the fifteen expected ids for the same reason assertion 2 is -- see there.
+    // Quantified over the sixteen expected ids for the same reason assertion 2 is -- see there.
     test: (rules, doc) => {
       const byId = new Map(rules.map(r => [r.id, r]));
       return M5_IDS.every(id => {
@@ -243,7 +245,7 @@ function theSnapshotCarriesTheRegistry(doc) {
       "snapshot is truncated; regenerate with node scripts/export-governance-snapshot.js",
   );
   // Assertion 5 of the kickoff, stated as its own arm because it grades the EXPORT rather than the
-  // registry: fifteen ids present in the generated file proves the re-export actually ran.
+  // registry: sixteen ids present in the generated file proves the re-export actually ran.
   for (const id of M5_IDS) {
     assert.ok(
       rules.some(r => r.id === id),

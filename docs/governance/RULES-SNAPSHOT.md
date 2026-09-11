@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 160 · **By status:** 143 live · 7 retired · 10 superseded · **Payload sha256:** `1bbb2468dcef4f675b7f92f96f9e6cb7a92480b95a9020806e530d6c3eaac99c`
+**Rules:** 161 · **By status:** 144 live · 7 retired · 10 superseded · **Payload sha256:** `98eb29a3dc7adec1498c8c53e05cca256b9a270002387367e8edea1f9d306cbf`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -130,6 +130,7 @@ exactly one space per side, and a reader removes one character per side rather t
 | M5-13 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-13 |  | A ship writes `session_ref` and `item_id` in the same transaction as the status change; a ship with either field null is rejected, not warned. |
 | M5-14 | live | reviewer | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-14 |  | Auto-close never applies to a ticket whose `scope_origin` is not `original` or `gate-review`; `discovered` and `john-named` work closes on verifier pass once its reversal window elapses. |
 | M5-15 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-15 |  | Staleness of the freshest `runner_usage_readings` row never refuses a run — it lowers the ceiling, and `public.resolve_day_token_cap()` RUNG 2 is the single authority that applies it (48h, `stale-floor`, which a standing daily max may not override). No other gate carries its own staleness threshold or its own cap. |
+| M5-16 | live | script | selfbuild-m5-register | docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-16 |  | A cycle fires only while the freshest `runner_usage_readings.all_models_pct` is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` and before `no_budget_row`; no other gate carries its own pace. |
 | M6-01 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-01 |  | No cycle may block on a human decision; `needs-john` is retired as a blocking state and a cycle decides with recorded reasoning instead of asking. |
 | M6-02 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-02 |  | A decision executes immediately and is reversible for 72 hours; silence is assent, never a park. Supersedes B14 and B23's silence-parks-forever. |
 | M6-03 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-03 |  | A ticket whose premise fails revalidation twice consecutively is removed automatically, reversible inside its window; no removal waits on a human Accept. Supersedes B7. |

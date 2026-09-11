@@ -1,3 +1,6 @@
+// DeepBench v7.0.448 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-368 -- the register
+// grew to sixteen anchored sections (M5-16, the weekly pace gate); EXPECTED_M5_SECTIONS is the one
+// place this file holds the count, in step with ses-280's M5_IDS.
 // DeepBench v7.0.363 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-281
 //
 // FEATURE: SES-281 -- Phase 2 of SES-280. Guards that M5-01 (structural epic fence), M5-02 (the
@@ -254,9 +257,12 @@ function aVacuousMutationFailsItsOwnControl() {
   );
 }
 
-// The SES-280 register test requires this file to carry exactly fifteen anchored rule sections and
+// SES-368: sixteen since M5-16 (v7.0.448). Held in one constant so the next rule is a one-line change.
+const EXPECTED_M5_SECTIONS = 16;
+
+// The SES-280 register test requires this file to carry exactly EXPECTED_M5_SECTIONS anchored rule sections and
 // each rule's statement to match its registry row byte-for-byte. An amendment note that rewrote a
-// statement, or introduced a sixteenth `### <a id="M5-nn">` heading, would break that test rather
+// statement, or introduced an extra `### <a id="M5-nn">` heading, would break that test rather
 // than this one -- which is the wrong place for the failure to surface. Assert it here too, where
 // the edit was made.
 function theAmendmentDidNotDisturbTheAnchoredRuleSections() {
@@ -264,11 +270,11 @@ function theAmendmentDidNotDisturbTheAnchoredRuleSections() {
   const anchors = [...lf.matchAll(/^###\s+<a id="(M5-\d\d)"><\/a>/gm)].map(m => m[1]);
   assert.strictEqual(
     anchors.length,
-    15,
-    `${CANONICAL_REL} carries ${anchors.length} anchored M5 rule sections, expected 15 -- the ` +
+    EXPECTED_M5_SECTIONS,
+    `${CANONICAL_REL} carries ${anchors.length} anchored M5 rule sections, expected ${EXPECTED_M5_SECTIONS} -- the ` +
       "SES-281 amendment note must ADD prose, never a rule heading (ses-280 grades this too)",
   );
-  assert.strictEqual(new Set(anchors).size, 15, "two M5 rule sections share an anchor id");
+  assert.strictEqual(new Set(anchors).size, EXPECTED_M5_SECTIONS, "two M5 rule sections share an anchor id");
 }
 
 // ---------------------------------------------------------------------------
