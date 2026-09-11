@@ -527,7 +527,8 @@ node scripts/read-usage-meter.js               # writes one row, source 'meter-r
 - **Install, once, as John (the task runs only while he is logged on):**
 
 ```
-schtasks /Create /F /SC MINUTE /MO 30 /TN "DeepBench meter reader" /TR "\"C:\Program Files\nodejs\node.exe\" --no-deprecation C:\Projects\deepbench-frontend\scripts\read-usage-meter.js"
+copy /Y C:\Projects\deepbench-frontend\scripts\read-usage-meter.js %USERPROFILE%\.deepbench\read-usage-meter.js
+schtasks /Create /F /SC MINUTE /MO 30 /TN "DeepBench meter reader" /TR "\"C:\Program Files\nodejs\node.exe\" --no-deprecation %USERPROFILE%\.deepbench\read-usage-meter.js"
 ```
 
   **Then lift the power condition — found live at the first install (2026-09-11, a laptop on battery):**
@@ -545,9 +546,12 @@ powershell -NoProfile -Command "Set-ScheduledTask -TaskName 'DeepBench meter rea
   output did not parse (the CLI changed its wording — `tests/regression/ses-374-meter-reader.test.mjs`
   pins the 2026-09-11 shape), missing credentials, or a refused insert. A reading older than 2h with
   the task installed means the task is failing; read *Last Result* first.
-- **The script runs from the shared checkout** (`C:Projectsdeepbench-frontend`), which is the one
-  place the task can find a stable path; it reads no file there but itself, so the worktree rule is
-  not crossed.
+- **The task runs a COPY under `%USERPROFILE%.deepbench`, never the repo** — found live at the first
+  install: the shared checkout sits on `dev-stale-local-do-not-use` and did not carry the script, so
+  the task exited 1 (module not found) with no row. The script is self-contained (no repo imports),
+  so the copy is the whole install. When `scripts/read-usage-meter.js` changes, re-run the `copy`
+  line; `tests/regression/ses-374-meter-reader.test.mjs` guards the repo copy, and a task whose
+  copy is stale shows up as *Last Result* ≠ 0 or a parser exit 2, never as a wrong number.
 
 ### 4. Fetch, rebase, then push `HEAD:dev`
 
