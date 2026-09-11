@@ -530,6 +530,14 @@ node scripts/read-usage-meter.js               # writes one row, source 'meter-r
 schtasks /Create /F /SC MINUTE /MO 30 /TN "DeepBench meter reader" /TR "\"C:\Program Files\nodejs\node.exe\" --no-deprecation C:\Projects\deepbench-frontend\scripts\read-usage-meter.js"
 ```
 
+  **Then lift the power condition — found live at the first install (2026-09-11, a laptop on battery):**
+  `schtasks /Create` defaults to *start only on AC power*, so the task sits *Queued* and never runs
+  unplugged. One line, PowerShell, as John:
+
+```
+powershell -NoProfile -Command "Set-ScheduledTask -TaskName 'DeepBench meter reader' -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 5)) | Out-Null; Start-ScheduledTask -TaskName 'DeepBench meter reader'"
+```
+
   Check it: `schtasks /Query /TN "DeepBench meter reader" /V /FO LIST` shows *Last Result: 0*; the
   table gains a `source = 'meter-reader'` row every 30 minutes. Remove it with
   `schtasks /Delete /F /TN "DeepBench meter reader"`.
