@@ -1,3 +1,16 @@
+# DeepBench v7.0.452 | .github/workflows/ci.yml | SES-352 — THIS JOB NOW WRITES THE GREEN ANCHOR,
+# not just the grade. `trg_anchor_green_from_ci` on public.ci_run_conclusions inserts the
+# runner_green_states row the moment the curl below lands an all-success run, stamping
+# migration_watermark_at(concluded_at) — the schema as it stood when CI concluded. Measured before
+# this ship: newest anchor 2026-09-02, newest all-success row 2026-09-10, 63 greens in between with
+# no anchor, because runner-cycle.md step 4a only records one when a cycle is up AND dev's head is
+# green at that minute. `ref` is the one new field and it is LOAD-BEARING: ci.yml runs on pushes to
+# dev AND main, origin/main is NOT an ancestor of origin/dev, and an anchor for a main-only sha
+# would hand the rollback engine `git revert <non-ancestor>..<head>`. The trigger anchors ref='dev'
+# only; a NULL ref — a run still on the pre-ship workflow — anchors nothing. GITHUB_REF_NAME is a
+# default runner variable: no `env:` line, NO NEW SECRET. Guarded by
+# tests/regression/SES-352-green-anchor-from-ci.js.
+#
 # DeepBench v7.0.339 | .github/workflows/ci.yml | SES-255 — CI PUBLISHES ITS OWN GRADE, because
 # nothing an unattended cycle can reach is able to read it. runner-cycle.md step 4a needs this run's
 # conclusion to record the green anchor SES-182's auto-rollback measures every later red against;
@@ -270,9 +283,10 @@ jobs:
           jq -n \
             --arg sha "${GITHUB_SHA}" \
             --argjson run_id "${GITHUB_RUN_ID}" \
+            --arg ref "${GITHUB_REF_NAME}" \
             --arg build "${BUILD_RESULT}" \
             --arg checks "${CHECKS_RESULT}" \
-            '{commit_sha: $sha, run_id: $run_id, jobs: [
+            '{commit_sha: $sha, run_id: $run_id, ref: $ref, jobs: [
                {name: "Build (blocking)", conclusion: $build},
                {name: "Tripwire + regression (blocking)", conclusion: $checks}
              ]}' > /tmp/ci-conclusion.json
