@@ -1902,7 +1902,23 @@ normally** — the re-rank is bookkeeping, never this cycle's build.
 
 **5. Pick ONE item.** Selection layers, in order (register B30):
 **(1a) One-off directives** — `runner_directives` `WHERE type='directive' AND status='queued'`,
-oldest first: a directive is the mission, mark it `in_progress`. **`SES-340` (`v7.0.425`) changed
+oldest first: a directive is the mission, mark it `in_progress`.
+
+<!-- FEATURE: SES-353 — standing decisions carry status='standing' and are never the pick. -->
+**`status = 'standing'` IS NOT THIS LAYER (`SES-353`, `v7.0.453`, migration
+`ses353_standing_decisions_leave_pick_lane`).** John's standing decisions — channel `58db64ae` and
+every ruling recorded after it — carry `status = 'standing'`: a row every cycle **reads**
+(`SELECT body FROM public.runner_directives WHERE status = 'standing' ORDER BY created_at` — they
+bind you, do not re-ask them, do not re-flag them) and **no cycle picks**.
+`prime_directive_queue()`'s directive lane admits `status = 'queued'` only, which is why its first
+row is a ticket unless John has queued a mission, and why this layer and `runner_should_boot()`'s
+`nothing_pickable` now read one board. A mission is still `queued` (a `REVERT-FORWARD REQUESTED`
+row from `reverse_decision()`, a one-off like `c98048a5`) — `item_ref` says nothing about which is
+which, and the ticket's column-presence gate was rejected for exactly that reason. Sixteen rows
+were migrated with a before-image each; the seventeenth (`dc6cd3a5`) was a resolved `PARKED:` alarm
+and was closed through `close_directive()`.
+
+**`SES-340` (`v7.0.425`) changed
 nothing about this layer and everything about what "standing" means underneath it: standing is now
 `EXISTS (projects WHERE status = 'executing')`, and lane (c)'s admission fence is
 `public.epic_project_executing(<epic>)` — both READ FROM `prime_directive_queue()`, never

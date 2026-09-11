@@ -43,10 +43,12 @@
 // pick", which is why that row is always emitted (the SES-147 "NULL is not zero" boundary).
 // TWO NAMED DEVIATIONS, disclosed rather than buried (the SES-196 convention): §2(c)'s prose says
 // "oldest first" while the SHIPPED picker orders by `queue`, and the page must match the picker,
-// not the prose (question q-pd-oldest-first); and runner_directives has no column separating a
-// mission from a standing authorization, so the directive lane renders EVERY open queued directive
-// — which is what a cycle actually reads at layer 1a — rather than inventing the split in a LIKE
-// heuristic (question q-pd-mission-flag).
+// not the prose (question q-pd-oldest-first); and runner_directives HAD no column separating a
+// mission from a standing authorization, so the directive lane rendered EVERY open queued directive
+// rather than inventing the split in a LIKE heuristic (question q-pd-mission-flag). SINCE SES-353
+// (v7.0.453) THE SPLIT IS `status`: `queued` = mission, `standing` = a read-only ruling every cycle
+// reads and no cycle picks, and the directive lane renders `queued` rows only — the same rows layer
+// 1a picks. q-pd-mission-flag is answered; only the oldest-first deviation above is still open.
 // Guarded by tests/regression/SES-236-prime-directive-briefing.js.
 //
 // DeepBench v7.0.308 | scripts/build-briefing.mjs | SES-222 — TWO SPLICES ESCAPED DATABASE TEXT THAT
@@ -363,6 +365,7 @@ const newest = dirs[0];
 const lastDirectiveCst = newest ? cstStamp(new Date(newest.created_at)) : '—';
 const lastDirectiveTail = !newest ? '&mdash; none recorded yet.'
   : newest.status === 'queued' ? '&mdash; not picked up yet; the next cycle takes it first.'
+  : newest.status === 'standing' ? '&mdash; a standing decision; read by every cycle, never picked.'
   : newest.outcome ? `&mdash; ${newest.outcome}.`
   : '&mdash; closed with no outcome recorded.';
 

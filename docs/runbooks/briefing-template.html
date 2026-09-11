@@ -1056,6 +1056,7 @@
     if (type === 'budget_override')
       return overrideLive ? 'active until <b>'+esc(expires)+'</b>'
                           : '<span class="dim">expired '+esc(expires)+'</span>';
+    if (status === 'standing') return 'standing decision &mdash; read by every cycle, never picked';
     return 'waiting &mdash; the next cycle picks it up first';
   }
   // SES-127 — ONE §10 ROW. Nine columns, Unblock first (the spec's order: the action comes

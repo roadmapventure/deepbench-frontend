@@ -775,7 +775,8 @@ Five things here are not style:
   never consumed, so it sits at `status='queued'` **by design** while it is actively serving
   John every cycle. "Waiting to be picked up" would be the opposite of the truth about the
   directive he is currently being run by. Same for an unexpired `budget_override`: it renders
-  *active until `<ts>`*.
+  *active until `<ts>`*. Same for a `status='standing'` directive (`SES-353`): it renders
+  *standing decision — read by every cycle, never picked*, never "waiting".
 - **The word is "recorded", not "saved" — and the limit is stated on the page itself.**
   `briefing-state`'s `directive` is a bare string with **no timestamp** (where `reading` carries
   an `at`), so the only time available is `created_at`, i.e. when a **cycle harvested** it — up

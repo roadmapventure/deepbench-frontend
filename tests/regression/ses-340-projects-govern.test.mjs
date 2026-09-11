@@ -203,21 +203,25 @@ async function theProjectsTableGovernsTheLiveBoard() {
   }
 
   // ---- (c) the retired Prime Directive is really retired -- no queued row keys the old widening.
-  const queued = await pg(url, key, "runner_directives?select=id,body&type=eq.directive&status=eq.queued&limit=200");
+  // SES-353 (v7.0.453) widened this read from status=eq.queued to status=in.(queued,standing): the
+  // sixteen rulings moved to the new 'standing' status, so `queued` alone is now 0 rows and the
+  // non-vacuity control below would fail on an empty result while proving nothing. The clause's
+  // meaning is unchanged -- no LIVE row (mission or standing) carries the retired prefix.
+  const queued = await pg(url, key, "runner_directives?select=id,body&type=eq.directive&status=in.(queued,standing)&limit=200");
   const stillStanding = queued.filter(d => String(d.body ?? "").startsWith(RETIRED_DIRECTIVE_PREFIX));
   assert.deepStrictEqual(
     stillStanding.map(d => String(d.id).slice(0, 8)),
     [],
-    `${stillStanding.length} queued directive(s) still open with the retired body prefix ` +
-      `'${RETIRED_DIRECTIVE_PREFIX}'. a0ef9525 and 0970abad were closed 'superseded' under gate ` +
-      "decision 96bbed72; a row still standing means two execution authorities are live at once " +
-      "and the ledger entry is wrong about which one governs.",
+    `${stillStanding.length} directive(s) still live (queued or standing) with the retired body ` +
+      `prefix '${RETIRED_DIRECTIVE_PREFIX}'. a0ef9525 and 0970abad were closed 'superseded' under ` +
+      "gate decision 96bbed72; a row still standing means two execution authorities are live at " +
+      "once and the ledger entry is wrong about which one governs.",
     );
   // NON-VACUITY for (c): the read must have found SOMETHING, or an empty queue would satisfy it.
   assert.ok(
     queued.length > 0,
-    "no queued directives came back at all -- an empty result cannot demonstrate that ONE " +
-      "particular directive is gone",
+    "no live directives came back at all (queued or standing) -- an empty result cannot " +
+      "demonstrate that ONE particular directive is gone",
   );
 
   // ---- (d) project_blockers answers "what do you need from me to unblock <project>" -- and it has
