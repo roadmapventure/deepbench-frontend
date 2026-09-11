@@ -1,4 +1,33 @@
 #!/usr/bin/env node
+// DeepBench v7.0.451 | scripts/render-claude-state.js | SES-354 — A SHIP IS A CYCLE ROW THAT RECORDS A
+// PUSH (`push_sha IS NOT NULL`), not one whose `outcome` reached `shipped`. The retired predicate read a
+// CYCLE-OUTCOME vocabulary (ARCHITECTURE.md §19v) as if it were a statement about what reached dev, and
+// it was wrong in both directions. Measured against the live ledger 2026-09-11:
+//   - INVISIBLE SHIPS. `a8000000-0000-4000-8000-0000000000a8` carries `version=v7.0.447`,
+//     `push_sha=a6add235`, `outcome=gated_before_build`, `trigger=supervised` — an attended multi-ship
+//     session that really did put v7.0.447 on dev and that this renderer could not see. On 2026-09-10 it
+//     rendered "Version in dev: v7.0.423" (`3903a864`) while dev was at v7.0.447. Not a one-off: of 252
+//     rows with a `push_sha`, 18 are `gated_before_build`, three of them carrying a version (447/324/302).
+//   - PHANTOM SESSIONS. `922fa07f` — a `SCHEDULED-AGENT: rank-backlog` re-rank — is `outcome=shipped`
+//     with `push_sha=null` and `version=null`. Nothing from it ever landed on dev, yet it was bullet 3 of
+//     the committed file (and on 2026-09-10 all three bullets were rows of that kind).
+// `push_sha` is the honest predicate on both counts: no `failed` or `did_not_run` row has one, so "has a
+// push_sha" and "reached dev" are the same population. It is used in THREE places that must agree — the
+// REST filter (`LEDGER_FILTER`), `checkAgainstPin`, and the guards — via the one exported `isLedgerShip`.
+//
+// TWO VARIANTS REJECTED WITH LIVE EVIDENCE, recorded because both read as the obvious fix:
+//   (a) "read the version from the highest issued version." `issued_versions`' top row is v7.0.451,
+//       issued to the cycle writing this line, while dev's head is v7.0.450. ISSUED IS NOT PUSHED — that
+//       form lies on every cycle between claim and push, and it breaks SES-261 outright: `--check`
+//       re-renders byte-exact from the PINNED rows, and a counter read at render time is not pinned, so
+//       the committed file would go red the moment any concurrent session claimed a number.
+//   (b) "list sessions from `runner_decisions kind='ship'`." That table has no `version` column (42703),
+//       and `a8000000` carries 4 ship decisions and 0 ship cards for 24 versions. Not a population.
+//
+// The 15 version-less `gated_before_build` pushes are the sanctioned tail snapshot re-exports. They did
+// commit to dev, and they render through the "(no version claimed) … no ticket" bullet this file already
+// reserves for publish-only cycles — nothing new was invented for them.
+//
 // DeepBench v7.0.356 | scripts/render-claude-state.js | SES-265 — the two standing-brief sentences this
 // script EMITS ("maintained by hand", "never regenerated") were false from v7.0.236 and shipped into
 // CLAUDE-STATE.md on every render; both now name the generated block and the hand prose separately. See
@@ -85,6 +114,45 @@ export function bodyKeepsStandingLink(body) {
   return typeof body === "string" && body.includes(STANDING_REL);
 }
 
+// THE SHIP PREDICATE (SES-354). One definition, three call sites: LEDGER_FILTER below sends it to
+// PostgREST, checkAgainstPin applies it to the pinned rows, and the guards import THIS function rather
+// than a copy. Do not re-admit `outcome` here: `outcome` is cycle-outcome vocabulary, and
+// `gated_before_build` describes how a cycle ENDED, not whether it pushed. See the header.
+export function isLedgerShip(cycle) {
+  return Boolean(cycle && cycle.push_sha);
+}
+
+// The REST tail main() actually sends, EXPORTED so the guard asserts the string the script uses rather
+// than a copy of it (the DIR-603f44ea / SES-176 precedent — a test that retypes the query passes forever
+// while the shipped filter rots).
+//
+// `push_sha=not.is.null`, not `outcome=eq.shipped`: see the header. It admits the attended multi-ship
+// rows whose outcome is `gated_before_build`, and it drops the rank-backlog rows that close `shipped`
+// having pushed nothing. It also drops the IN-FLIGHT cycle, which has claimed a version but not yet
+// pushed — so this file never publishes a version that is not on dev.
+//
+// 10, not 3: the bullets need 3 pushed cycles but the version lines need the two highest versions among
+// the pushed rows, and those can sit further back when publish-only cycles push in between. Bounded
+// rather than unbounded -- a version older than ten ships is not "prior", it is history, and
+// docs/SESSIONS.md is where history lives.
+export const LEDGER_FILTER = "&push_sha=not.is.null&order=started_at.desc&limit=10";
+
+// Both spellings occur on real pushed rows — `7.0.337`, `7.0.292`, `7.0.232` sit alongside `v7.0.x` —
+// so the `v` is optional. Anything unparseable ranks -1 and is excluded, never sorted as zero.
+export function versionRank(v) {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(typeof v === "string" ? v.trim() : "");
+  if (!m) return -1;
+  return Number(m[1]) * 1e6 + Number(m[2]) * 1e3 + Number(m[3]);
+}
+
+// The two highest versions among the fetched rows, NOT the two newest by `started_at`. Sort is stable,
+// so equal ranks keep REST order.
+export function pickVersioned(cycles) {
+  const ranked = (cycles || []).filter(c => versionRank(c && c.version) >= 0);
+  const sorted = ranked.slice().sort((a, b) => versionRank(b.version) - versionRank(a.version));
+  return [sorted[0], sorted[1]];
+}
+
 export function cstDate(iso) {
   return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 }
@@ -150,9 +218,9 @@ export function checkAgainstPin(fileText, rows, cardsByTicket) {
   if (missing.length) {
     return { code: 1, reason: `the ledger no longer carries ${missing.length} pinned cycle(s): ${missing.join(", ")}` };
   }
-  const notShipped = pin.filter(id => byId.get(id).outcome !== "shipped");
-  if (notShipped.length) {
-    return { code: 1, reason: `pinned cycle(s) are no longer outcome=shipped: ${notShipped.join(", ")}` };
+  const noPush = pin.filter(id => !isLedgerShip(byId.get(id)));
+  if (noPush.length) {
+    return { code: 1, reason: `pinned cycle(s) no longer record a push_sha: ${noPush.join(", ")}` };
   }
   const ordered = pin.map(id => byId.get(id));
   const body = renderBody(ordered, cardsByTicket);
@@ -167,9 +235,17 @@ export function renderBody(cycles, cardsByTicket) {
   // publish-only cycle ships real work and is a real session, but it is not a version. Taking
   // cycles[0..1] instead renders "(no version claimed)" as the current version of dev, which is not a
   // gap being surfaced honestly, it is the wrong question answered. The bullets below DO list every
-  // shipped cycle, version or not, because there the question is *what happened*.
-  const versioned = cycles.filter(c => c.version);
-  const [current, prior] = versioned;
+  // pushed cycle, version or not, because there the question is *what happened*, and there `started_at`
+  // order is the right order.
+  //
+  // THE VERSION LINES TAKE THE TWO HIGHEST PUSHED VERSIONS, NOT THE TWO NEWEST-STARTED (SES-354).
+  // `started_at` is not version order, for the same reason SES-261's pin is an id list and not a
+  // timestamp cutoff (see the note above renderPin): a cloud or attended cycle can span wall-clock gaps
+  // and push long after it started. Live proof: `a8000000` STARTED 2026-09-08 and pushed v7.0.447 on
+  // 2026-09-10, so any scheduled cycle starting after 09-08 and pushing a LOWER number outranked it on
+  // start order and would have been published as the version in dev. Numeric rank is the question the
+  // line actually asks.
+  const [current, prior] = pickVersioned(cycles);
   const lines = ["# DeepBench — Current State", CHARTER, ""];
 
   lines.push(
@@ -231,13 +307,8 @@ async function main() {
   }
 
   const cycles = await rest(url, key,
-    "runner_cycles?select=id,started_at,trigger,model,version,item_id,push_sha,outcome" +
-    // 10, not 3: the bullets need 3 shipped cycles but the version lines need the two most recent
-    // cycles that actually CLAIMED a version, and those can sit further back when a publish-only
-    // cycle ships in between. Bounded rather than unbounded -- a version older than ten ships is not
-    // "prior", it is history, and docs/SESSIONS.md is where history lives.
-    "&outcome=eq.shipped&order=started_at.desc&limit=10");
-  if (!Array.isArray(cycles) || cycles.length === 0) die("no shipped cycles on record — nothing to render");
+    "runner_cycles?select=id,started_at,trigger,model,version,item_id,push_sha,outcome" + LEDGER_FILTER);
+  if (!Array.isArray(cycles) || cycles.length === 0) die("no pushed cycles on record — nothing to render");
 
   const tickets = [...new Set(cycles.map(c => c.item_id).filter(Boolean))];
   const cardsByTicket = new Map();
@@ -286,7 +357,7 @@ async function main() {
       // Non-gating freshness signal: visibility without re-importing the race the pin just removed.
       const liveNewest = cycles[0] ? String(cycles[0].id) : null;
       if (liveNewest && pin[0] !== liveNewest) {
-        console.log(`render-claude-state --check: WARN -- the file is authentic but not current; the ledger's newest shipped cycle is ${liveNewest.slice(0, 8)} and the file pins ${String(pin[0]).slice(0, 8)}. The next render folds it in. Not a failure.`);
+        console.log(`render-claude-state --check: WARN -- the file is authentic but not current; the ledger's newest pushed cycle is ${liveNewest.slice(0, 8)} and the file pins ${String(pin[0]).slice(0, 8)}. The next render folds it in. Not a failure.`);
       }
       console.log(`render-claude-state --check: no drift -- ${verdict.reason}.`);
       process.exit(0);

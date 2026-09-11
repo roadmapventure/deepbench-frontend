@@ -1,3 +1,9 @@
+// DeepBench v7.0.451 | tests/regression/SES-261-ledger-pin.js | SES-354 — aPinTheLedgerCannotAnswerIsDrift's
+// second fixture was RETARGETED, not deleted (STANDARDS §4 clause 1): the ledger's ship predicate moved
+// from `outcome === "shipped"` to `push_sha IS NOT NULL`, so the fixture now drops the pinned row's
+// push instead of flipping its outcome. Every other assertion here is unchanged and still passes — the
+// CY() fixture already carried `push_sha`.
+//
 // DeepBench v7.0.347 | tests/regression/SES-261-ledger-pin.js | SES-261
 //
 // Guards the LEDGER PIN in scripts/render-claude-state.js — the fix for "every runner ship makes CI
@@ -112,10 +118,15 @@ function aPinTheLedgerCannotAnswerIsDrift() {
   assert.strictEqual(checkAgainstPin(file, short, NO_CARDS).code, 1,
     "a pinned cycle missing from the ledger must be drift, not a pass");
 
-  // A pinned row that is no longer `shipped` — e.g. reopened or reverted.
-  const reverted = LEDGER.map((c, i) => (i === 0 ? { ...c, outcome: "reverted" } : c));
-  assert.strictEqual(checkAgainstPin(file, reverted, NO_CARDS).code, 1,
-    "a pinned cycle that is no longer outcome=shipped must be drift");
+  // A pinned row that no longer records a push. RETARGETED BY SES-354, not deleted (STANDARDS §4
+  // clause 1): this half used to flip `outcome` to "reverted", because the ledger's ship predicate WAS
+  // `outcome === "shipped"`. SES-354 moved it to `push_sha IS NOT NULL` — outcome is cycle-outcome
+  // vocabulary and says nothing about what reached dev — so the same question ("the ledger no longer
+  // agrees the pinned row is a ship") is now asked of the push, and an outcome flip is correctly no
+  // longer drift on its own. The assertion is kept pointed at the live predicate rather than dropped.
+  const unpushed = LEDGER.map((c, i) => (i === 0 ? { ...c, push_sha: null } : c));
+  assert.strictEqual(checkAgainstPin(file, unpushed, NO_CARDS).code, 1,
+    "a pinned cycle that no longer records a push must be drift");
 }
 
 // A deleted row (drift, 1) and a REST failure (could not run, 2) are DIFFERENT verdicts. The pure

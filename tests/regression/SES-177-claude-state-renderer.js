@@ -1,3 +1,9 @@
+// DeepBench v7.0.451 | tests/regression/SES-177-claude-state-renderer.js | SES-354 — three functions added
+// for the ship predicate (`push_sha IS NOT NULL`, not `outcome=eq.shipped`): an attended multi-ship
+// fixture, the version-order-vs-start-order pick, and the REST filter the script actually sends. Each
+// runs the RETIRED outcome-based form on the same fixture and asserts it loses. The eight functions
+// above them are unchanged.
+//
 // DeepBench v7.0.228 | tests/regression/SES-177-claude-state-renderer.js | SES-177
 //
 // Guards scripts/render-claude-state.js and the CLAUDE-STATE.md / standing-brief.md split.
@@ -22,7 +28,10 @@ import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { bodyKeepsStandingLink, renderBullet, stripId, renderBody } from "../../scripts/render-claude-state.js";
+import {
+  bodyKeepsStandingLink, renderBullet, stripId, renderBody,
+  isLedgerShip, versionRank, pickVersioned, LEDGER_FILTER,
+} from "../../scripts/render-claude-state.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const STATE = path.join(ROOT, "CLAUDE-STATE.md");
@@ -138,6 +147,94 @@ function renderIsPureAndDeterministic() {
   assert.strictEqual(renderBody(cycles, new Map()), renderBody(cycles, new Map()), "the same input must render the same bytes");
 }
 
+// ---------------------------------------------------------------------------
+// SES-354 — A SHIP IS A ROW THAT RECORDS A PUSH. The load-bearing assertion in each of these is a
+// DIFFERENCE (the SES-261 pattern): the retired outcome-based predicate is run on the SAME fixture and
+// must LOSE. A test that only asserted "the new form renders something" is satisfied by a predicate
+// that is always true, which is precisely the failure mode here — always-true admits the in-flight
+// cycle that claimed v7.0.451 and pushed nothing.
+// ---------------------------------------------------------------------------
+
+// Four rows modelled on the live ids, in REST order (started_at desc).
+const LEDGER_354 = [
+  { id: "544d175b-309c-4683-91d0-7e0ee0425944", started_at: "2026-09-11T17:42:00Z", trigger: "scheduled",
+    model: "claude-opus-5", version: "v7.0.451", item_id: "SES-354", push_sha: null, outcome: null },
+  { id: "922fa07f-9d25-4128-9641-717fa56fbfa8", started_at: "2026-09-11T15:09:00Z", trigger: "scheduled",
+    model: "claude-fable-5-1", version: null, item_id: null, push_sha: null, outcome: "shipped" },
+  { id: "a8000000-0000-4000-8000-0000000000a8", started_at: "2026-09-08T21:08:12Z", trigger: "supervised",
+    model: "claude-fable-5-1", version: "v7.0.447", item_id: null, push_sha: "a6add235", outcome: "gated_before_build" },
+  { id: "3903a864-151f-4e07-8479-c4dea55fcb32", started_at: "2026-09-04T15:05:33Z", trigger: "supervised",
+    model: "claude-fable-5-1", version: "v7.0.423", item_id: "SES-319", push_sha: "2ce345e7", outcome: "shipped" },
+];
+
+function anAttendedMultiShipCycleIsTheVersionInDev() {
+  const shipped = renderBody(LEDGER_354.filter(isLedgerShip), new Map());
+  const verLine = shipped.split("\n").find(l => l.startsWith("**Version in dev:**"));
+
+  assert.ok(verLine.includes("v7.0.447"),
+    "the attended cycle a8000000 pushed v7.0.447 to dev; outcome=gated_before_build describes how the "
+    + "CYCLE ended, not what reached dev, and the version line must see it");
+  assert.ok(!verLine.includes("v7.0.451"),
+    "the in-flight cycle CLAIMED v7.0.451 and has pushed nothing — issued is not pushed. If this fails, "
+    + "the predicate is admitting unpushed rows (an always-true predicate fails exactly here)");
+  assert.ok(!verLine.includes("no version claimed"), "Version in dev must never render the placeholder");
+
+  assert.ok(!shipped.includes("922fa07f"),
+    "the rank-backlog row closes outcome=shipped with push_sha null; nothing from it reached dev, so it "
+    + "is not a session bullet");
+  assert.ok(shipped.includes("a8000000"), "the attended pushed cycle must be listed as a session");
+  assert.ok(shipped.includes("3903a864"), "the ordinary shipped-and-pushed cycle must still be listed");
+
+  // THE RETIRED PREDICATE, run on the same fixture, must lose.
+  const retired = renderBody(LEDGER_354.filter(c => c.outcome === "shipped"), new Map());
+  const retiredVer = retired.split("\n").find(l => l.startsWith("**Version in dev:**"));
+  assert.ok(retiredVer.includes("v7.0.423"),
+    "the retired outcome=shipped predicate must publish v7.0.423 here — the exact SES-354 symptom "
+    + "(rendered 2026-09-10 while dev was at v7.0.447). If it does not, this control proves nothing");
+  assert.ok(retired.includes("922fa07f"),
+    "and it must carry the phantom rank-backlog bullet. If it does not, this control proves nothing");
+  assert.notStrictEqual(shipped, retired,
+    "old and new must DISAGREE on this fixture; a control asserting a property both forms share is vacuous");
+}
+
+function versionInDevIsTheHighestPushedVersionNotTheNewestStart() {
+  // REST order is started_at desc, so the LOWER version sorts first — the live shape of a8000000,
+  // which started 09-08 and pushed v7.0.447 on 09-10.
+  const rows = [
+    { id: "bbbbbbbb-0000-4000-8000-000000000001", started_at: "2026-09-09T10:00:00Z", trigger: "scheduled",
+      model: "claude-opus-5", version: "v7.0.446", item_id: "SES-446", push_sha: "sha446", outcome: "shipped" },
+    { id: "a8000000-0000-4000-8000-0000000000a8", started_at: "2026-09-08T21:08:12Z", trigger: "supervised",
+      model: "claude-fable-5-1", version: "v7.0.447", item_id: null, push_sha: "a6add235", outcome: "gated_before_build" },
+  ];
+  const [current, prior] = pickVersioned(rows);
+  assert.strictEqual(current.version, "v7.0.447", "Version in dev is the highest pushed version, not the newest-started");
+  assert.strictEqual(prior.version, "v7.0.446", "Prior is the next-highest pushed version");
+
+  const retiredPick = rows.filter(c => c.version)[0].version;
+  assert.strictEqual(retiredPick, "v7.0.446",
+    "the retired newest-started pick must choose v7.0.446 here — if it agrees, this control proves nothing");
+  assert.notStrictEqual(current.version, retiredPick, "old and new must DISAGREE on start-order vs version-order");
+
+  // Both spellings occur on real pushed rows; the bare one must not silently rank last.
+  const bare = [...rows, { ...rows[0], id: "cccccccc-0000-4000-8000-000000000002", version: "7.0.448" }];
+  assert.strictEqual(pickVersioned(bare)[0].version, "7.0.448", "a bare `7.0.448` outranks `v7.0.447`");
+  assert.ok(versionRank("7.0.448") > versionRank("v7.0.447"), "the `v` is optional, not part of the rank");
+  assert.strictEqual(versionRank("junk"), -1, "an unparseable version ranks -1 and is excluded, never sorted as zero");
+  assert.strictEqual(versionRank(null), -1, "a null version must rank -1, not throw");
+
+  assert.strictEqual(isLedgerShip({ push_sha: "abc" }), true, "a row with a push_sha is a ship");
+  assert.strictEqual(isLedgerShip({ push_sha: null, outcome: "shipped" }), false,
+    "outcome=shipped with no push is NOT a ship — that is the rank-backlog row");
+  assert.strictEqual(isLedgerShip(null), false, "a missing row must be false, not throw");
+}
+
+function theQuerySendsThePushPredicate() {
+  assert.ok(LEDGER_FILTER.includes("push_sha=not.is.null"),
+    "the REST filter the script actually sends must select on the push, not the outcome");
+  assert.ok(!LEDGER_FILTER.includes("outcome=eq.shipped"),
+    "the retired outcome filter must be gone from the live query string, not merely unused");
+}
+
 // The credentialed half: --check against the live ledger. Declared, never inferred (SES-180 (b)).
 function checkModeAgreesWithTheCommittedFile() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
@@ -163,6 +260,9 @@ function run() {
   aCycleWithNoShipCardRendersWithoutInventingASummary();
   theIdIsNotStutteredWhenTheCardTitleAlreadyCarriesIt();
   renderIsPureAndDeterministic();
+  anAttendedMultiShipCycleIsTheVersionInDev();
+  versionInDevIsTheHighestPushedVersionNotTheNewestStart();
+  theQuerySendsThePushPredicate();
   checkModeAgreesWithTheCommittedFile();
 }
 
