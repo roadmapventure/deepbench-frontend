@@ -5,6 +5,65 @@
 
 ---
 
+## session/cycle-20260911-1840 (v7.0.452, 2026-09-11, runner cycle `17bc6e76-ea60-4cec-99c7-b19cd40b71d6`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-352` — **the green anchor stops depending on a cycle being awake at the right minute, and the thing to read twice is that the ticket's own diagnosis was narrower than the defect.**
+
+### The ticket said the routine was off; it was not
+
+`SES-352` was filed reading *"the routine has been off since 2026-09-03"*. Measured this cycle rather than
+taken on trust: `runner_cycles WHERE trigger = 'scheduled'` shows 1 cycle on 09-02, **5 on 09-09** and
+**6 on 09-11**. The routine has been firing. The actual defect is that runbook step 4a records a green
+**only when a cycle happens to be up and `dev`'s head happens to be green at that minute** — 09-09 had
+five cycles and sixteen green CI runs and anchored **none** of them, and 09-11's cycles all ran step 4a
+against a red head. Same fix, wider hole: the anchor's dependence is on a cycle's timing, not on the
+scheduler's switch. Recorded here because the next reader of that ticket would otherwise inherit a
+diagnosis the evidence does not support.
+
+### The premise, revalidated live before a line was written
+
+`runner_green_states` newest row: `0125a062`, watermark `20260902145738`, `observed_at 2026-09-02 15:08:17Z`.
+`ci_run_conclusions`: 189 rows, **91 all-success**, newest green `af981b16` at `2026-09-10 03:24:59Z`.
+**81 greens carried no anchor; 63 of them concluded after the newest anchor.** A red on `dev` was being
+measured against a commit nine days and sixty-three greens old.
+
+### The ticket's first variant was rejected on evidence, not taste
+
+`latest_green_state()` — derive the anchor at read time — loses to `rollback-on-red.js`'s
+`rangeIsCodeOnly()` (line 152), which compares the anchor's `migration_watermark` against the current one.
+A derived anchor would stamp **today's** watermark onto a week-old green, making every range look
+code-only and auto-reverting schema changes in the belief they were text. That is the one direction the
+engine's own header says must never be wrong. The shipped design is the ticket's second variant: a
+row-level trigger that writes the anchor at the instant CI publishes the conclusion, stamping
+`migration_watermark_at(concluded_at)` — which reproduces **9 of 9** recorded anchor watermarks.
+
+### A hazard the ticket did not see, closed before it could fire
+
+`ci.yml` runs on pushes to `dev` **and `main`**, and `git merge-base --is-ancestor origin/main origin/dev`
+is **false** (16 merge commits). A green published for a `main` merge commit would have become the newest
+anchor and `revertPlanFor()` would have emitted `git revert <main-sha>..<dev-head>` — a revert reaching
+far past the red range. All 189 existing rows were verified `dev` ancestors (189/189), so the backfill was
+safe; the future is guarded by publishing `ref` from the reporter and anchoring `ref = 'dev'` only. A NULL
+`ref` anchors nothing.
+
+### The verdict was a block, and it is not this ship's red
+
+`dev`'s regression suite has been red since 2026-09-10 on two **live-board data assertions** —
+`log-143c-invention-use` (`judge_runs must be >= 1 … got 0`) and `ses-285-m6-autonomy`
+(`6-nothing-blocks-on-a-human`). Neither is code. The bar handed to The Builder was therefore
+**no new red**, not green, with the baseline measured on the unchanged tree first (`200/202`); the ship
+came back `201/203` — the same two failures, same messages verbatim, no third, the new guard passing.
+`npm run build` was genuinely green. The verifier still blocked, correctly, because its regression gate
+reads exit code and the suite exits 1: verdict `03196573`, `build=green / regression=red / hygiene=green`.
+Per `SES-181` a block is not a wall — the ticket ships `delivered`, the `tooling` streak resets (0 → 0)
+and its rung is untouched (21), and `record_ship_decision()` refuses a non-`approve` verdict, so **this
+ship has no Reverse handle**. That absence is the honest consequence of the standing red, not an omission.
+
+### The standing red is filed, not fixed
+
+Chasing it would have been a second ticket inside this cycle. It is named on the ship card and in the
+cycle row instead, with both failing assertions quoted.
+
+---
+
 ## session/cycle-20260902-1505 (v7.0.376, 2026-09-02, runner cycle `de1e78a8-2578-46be-b5fc-2ae3c3dee3ba`, `trigger = scheduled`, `scheduler_gate` verdict `run` (started off the cron grid, so exempt from pacing) — Opus 5 orchestrator, **with a Fable 5 subagent delegated to for the invention pass**, per register B21) — `SES-161` — **the token wall's number finally gets checked against the platform's own figure, and the thing to read twice is that the ticket's own candidate first step was already dead.**
 
 ### The ticket proposed a measurement the platform no longer permits
