@@ -5,6 +5,38 @@
 
 ---
 
+## session/cycle-20260911-1940 (v7.0.454, 2026-09-11, runner cycle `56b5a66e-f377-4640-944a-97afe08e504f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (2 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-360` — **"are the DeepBench agents doing the development work" stops being five queries and becomes a rendered block, and the thing to read twice is that the question could not be answered correctly by the method the ticket proposed.**
+
+### The premise revalidation found a defect in the ticket's own measurement path
+
+The ticket's BUILD line says to read `ai_activity_log` joined to `agents.lane = 'governance'`. The Designer ran exactly that and got **1,000 rows** — then paged it and got **1,311**. One thousand is PostgREST's page cap, not a count. So the ticket's own instrument silently truncates by a quarter at today's volume and would truncate further every week, and *that* is why the aggregation ships as two views (`public.governance_agent_usage`, `public.ship_handoff_census`) rather than as a query inside the renderer. A block that reads a capped page is worse than no block: it is a wrong number wearing a rendered number's authority.
+
+### What the block says, live at this ship
+
+Nine `agent × call_source` rows over a rolling 7 days. The Prioritizer dominates — 575 `session` calls, 1 `mcp`, and **723 with a NULL `call_source`, 719 of them carrying no token counts at all**. The Verifier's 5 session calls cost 5.35M input tokens, the most expensive lane on the board. The Builder: **1**. The Designer: **2**.
+
+And the census the epic exists for: **4 of 28 ships in the window carried all four `SES-345` handoff rows.** Missing per leg — `kickoff_link` 24, per-ticket push sha 22, `automation_rank` 1, verdict 0. The handoff rows are not a thing the platform is failing at occasionally; three of the four legs are absent from the large majority of ships.
+
+### A NULL `call_source` is rendered as *unlabelled*, never as automation
+
+`LOG-128`'s rule, applied at render time: the 723-row Prioritizer bucket is the **pre-attribution unknown**. The Builder traced it to `api/_lib/handlers/prioritizer-write.js:165`, which logs through `logActivity()` with no call-source context — **filed as a discovery, not fixed**, exactly as the kickoff's STOP LINE directs. A cycle that quietly repaired it would have widened its own scope past a cap it was inside.
+
+### The verdict is a block, and it is the same standing red for the third ship running
+
+`build=green / regression=red / hygiene=green` → verdict `bed9f826`. The two failing arms are `log-143c-invention-use.test.mjs` (*judge_runs must be >= 1*) and `ses-285-m6-autonomy.test.mjs` (*live board: zero `needs-john` rows, zero undecided gated cards*) — **both live-board population assertions, neither reachable from this diff**, which touches one renderer, one new test and one generated file. The Builder did not assert that from inspection: it added a clean `44da215` worktree and ran the full credentialed suite there, getting `regression suite: 198/203 passed` against its own `199/204` — the identical five failures, one more file, one more pass, **zero new reds**. Three of those five (`SES-177-claude-state-renderer.js`, `SES-261-ledger-pin.js`, `ses-340-projects-govern.test.mjs`) cleared before the verdict, two by `SES-353`'s ship landing mid-build and one by this step's own `render-claude-state.js`.
+
+`tooling` streak resets 0 → 0, rung holds at 21. `record_ship_decision()` refuses a non-`approve` verdict, so **this ship has no Reverse handle either** — undoing it means reverting `83fbcd74` by hand and running the captured down. That is now three ships in a row with no handle (`v7.0.452`, `v7.0.453`, `v7.0.454`), and the standing red is the whole cause.
+
+### Two things the ship did that the kickoff did not plan for, both named rather than buried
+
+`SES-353` shipped **during** this build and re-rendered the same generated file, so the push rebase conflicted on `docs/runbooks/standing-brief.md`. The Builder resolved it the way a generated file must be resolved — took upstream, completed the rebase, re-ran the renderer against the rebased base, re-ran the guard and `--check`, amended — so the shipped brief is a real render of post-`SES-353` `dev`, never a hand-merged file. And the kickoff's QA-3 bar (*a diff carrying only the as-of stamp*) could not hold verbatim: `SES-353`'s own ship card landed mid-QA and moved `ships` 27 → 28 and `ships_all_four` 3 → 4 while the QA was running. Determinism was proven at the block instead, plus a strictly stronger round trip on a settled window — payload sha `1082421c25516735` → fixture `5a5947650ed3f678` → cleanup `1082421c25516735`, exact.
+
+### The migration
+
+`ses360_governance_agent_usage`, two views, `security_invoker`, `service_role`-only grants. Down captured **before** the apply (`auto-downable`, 2 objects, 0 refusals), so this range stays revertible rather than card-only. Grants asserted both directions per `.claude/rules/supabase-column-grants.md`: `anon` gets 401/42501 on both views against a working `anon` control, the service key gets 200.
+
+---
+
 ## session/cycle-20260911-1937 (v7.0.453, 2026-09-11, runner cycle `f20d68ee-4366-46ca-abd1-c8dccdd08f19`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` (*"not a scheduled cycle — your scheduler setting governs scheduled fires only"*) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-353` — **standing decisions leave the pick lane, and the thing to read twice is that the orchestrator hit this defect from the inside one cycle earlier and resolved it by precedent rather than by a rule.**
 
 ### The evidence is first-hand, not filed
