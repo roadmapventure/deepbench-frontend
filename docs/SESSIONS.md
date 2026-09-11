@@ -13244,6 +13244,11 @@ inserted nothing.
 
 ## Appendix — retired `session-setup.md` header stamps (opened by `SES-320`, v7.0.412, 2026-09-02)
 
+<!-- DeepBench v7.0.400 | docs/runbooks/session-setup.md | SES-311 — the attended close-out gains the verifier step it never had. New step 3e (run `scripts/verifier.js` before writing `done`, feed `verdict_ladder_signal`) plus a one-line pointer in step 4. It is not advice: migration `ses311_done_requires_verdict` puts a BEFORE UPDATE trigger on `backlog_items` that refuses `status='done'` on a Selfbuild-epic ticket with no `runner_verdicts` row. Measured 2026-09-02: 58 of 112 Selfbuild `done` tickets carried no verdict, four of them M5 required ships. Every exemption lives in that migration's header, never on this page. -->
+
+**Retired by `SES-374` (`v7.0.455`, 2026-09-11) to hold the stamp count at 5 — session-hygiene check 7.** `SES-164` step 2 by grep: its facts — step 3e (run the verifier before `done`), the `ses311_done_requires_verdict` trigger and its exemptions living in the migration header — are all restated in §3e of the live body, so nothing was relocated. Body byte-identical across the rotation apart from the new §3g this ship added.
+
+
 <!-- DeepBench v7.0.198 | docs/runbooks/session-setup.md | SES-121 — body moved verbatim from .claude/skills/session-setup/SKILL.md (which remains as a thin loader); .claude/ is not writable by unattended cycles (register B39), this runbook is. This file is the canonical copy. -->
 
 **Retired by `SES-320` (`v7.0.412`, 2026-09-02) to hold the stamp count at 5** — `docs/runbooks/session-setup.md`
