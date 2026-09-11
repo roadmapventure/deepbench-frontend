@@ -1,3 +1,4 @@
+// DeepBench v7.0.450 | useAIActivity.js | LOG-149 -- the pricing table stops living here. COST_PER_1K_INPUT/COST_PER_1K_OUTPUT, MODEL_ID_NORMALIZE and computeCallCost() all MOVE to shared/models.js and are imported back, because this module is a browser hook and lib/activity-log.js (the single server-side ai_activity_log writer) cannot import it -- which is exactly why two rate tables existed, why both stopped at Sonnet 4.6, and why claude-fable-5-1 and claude-opus-5 (every governance call the platform makes) were unpriced while the Anthropic Console billed real dollars. computeCallCost is RE-EXPORTED from here, so useAgents.js, HarnessTraceConsole.jsx and LiveAgentViewScreen.jsx keep their existing import path unchanged; read-time pricing keeps its job for the pre-LOG-149 rows, which carry NULL cost_usd (the hydrate already prefers a non-NULL one). MODEL_PROVIDER also gains the three runner_model_lanes models so the AI Audit stops labelling every governance row "Unknown provider" (STANDARDS §12) -- deliberately a separate table from the rates, since a model can be priced and unlabelled or labelled and unpriced.
 // DeepBench v7.0.306 | useAIActivity.js | LOG-104 -- hydrateFromSupabase() pages with a UNIQUE sort key. It ordered by created_at DESC alone, and created_at is not unique (320 of 34,812 rows share one with another row, measured live 2026-08-29), so Postgres was free to order a tie group differently between two .range() calls and a row straddling a page boundary could be served twice or never -- silently, with the shortfall landing in Total Calls, Total Cost, By LLM, By Agent and By Service alike. Appending .order('id') makes (created_at, id) a total order, so the window is deterministic. created_at stays FIRST: the row set is consumed newest-first and this only decides ties that previously had no defined answer. The obvious "page it twice and diff" test is deliberately NOT the guard -- the reordering is permitted, not guaranteed, so that test passes while the bug is fully present; tests/regression/LOG-104-deterministic-paging.js asserts the code pairs every .range() with the primary key instead, and its negative control is this file's own pre-change chain
 // DeepBench v7.0.293 | useAIActivity.js | LOG-145 -- fetchPatternClassification() gains the module-level cache its four sibling reads already have (success cached, failure never, in-flight promise shared), so the two mount sites stop re-paying a ~2,194ms anon rollup read and re-shipping 190,808 bytes of log_ids on every SPA navigation between AI Audit and the MI Agents drawer. The log_ids payload itself STAYS and is now pinned as un-removable: all four consumers join server-side classification to client-only facts (pricing, AI-51 pairing, countability, scope/window/latency) and that join is row identity -- the "cutover" to ai_pattern_agent_hop_rollup the ticket imagined is structurally impossible, not deferred (kickoff §2)
 // DeepBench v7.0.152 | useAIActivity.js | LOG-128 -- By Caller stops merging automated traffic into a named org's row: identityForRow()/buildByCaller() take an opts arg, and behind the default-off `log-128-automated-caller-split` flag a no-visitor-id row whose call_source is regression/script/session-test gets its own `ip:<addr>|automated` bucket. NULL and 'ui' sources keep their existing key byte-for-byte; buildBySource() is untouched (it calls identityForRow with two args, and only for 'ui' rows)
@@ -31,6 +32,13 @@ import { useFeatureFlag } from '../lib/featureFlags.js';
 // solely to keep the existing re-export alive for AIActivityPanel.jsx's Platform Roadmap section
 // (LOG-56), which renders patterns precisely BECAUSE they have no logs and is out of scope here.
 import { PATTERN_CATALOG, SERVICE_CATALOG, SERVICE_SLUG } from '../../shared/ai-patterns.js';
+// FEATURE: LOG-149 -- the pricing table, the legacy-id normalizer and computeCallCost() all MOVED to
+// shared/models.js so lib/activity-log.js can price a row as it writes it (a browser hook is not
+// importable server-side, which is why two rate tables existed and both stopped at Sonnet 4.6).
+// RE-EXPORTED below, not re-implemented: useAgents.js, HarnessTraceConsole.jsx and
+// LiveAgentViewScreen.jsx all import computeCallCost FROM THIS MODULE and are untouched by the move.
+import { computeCallCost, MODEL_ID_NORMALIZE } from '../../shared/models.js';
+export { computeCallCost };
 export { PATTERN_CATALOG, SERVICE_CATALOG };
 
 // FEATURE: AI-51 — moved from useAgents.js (S-MI-20 origin) so this canonical shared cost/pattern
@@ -987,27 +995,22 @@ export const AI_TYPES = {
   hitl_review_rate:   { label:"Human Review Rate",            desc:"% of HITL steps that required an override — tracks agent autonomy over time",                                        model:"TBD",                   location:"Planned",                        phase:2 },
 };
 
-// FEATURE: AA-181 -- real Anthropic per-model input/output rates (verified 2026-07-14
-// against published Claude pricing: Haiku 4.5 $1/$5 per 1M tokens, Sonnet 4.6 $3/$15 per
-// 1M). Split input/output replaces the old single blended rate, which understated Haiku
-// cost 4x and ignored Sonnet's 5x output premium entirely.
-const COST_PER_1K_INPUT = {
-  "claude-haiku-4-5": 0.001,
-  "claude-haiku-4-5-20251001": 0.001,
-  "claude-sonnet-4-5": 0.003,
-  "claude-sonnet-4-6": 0.003,
-  "text-embedding-3-small": 0.00002,
-};
-const COST_PER_1K_OUTPUT = {
-  "claude-haiku-4-5": 0.005,
-  "claude-haiku-4-5-20251001": 0.005,
-  "claude-sonnet-4-5": 0.015,
-  "claude-sonnet-4-6": 0.015,
-  "text-embedding-3-small": 0.00002,
-};
+// FEATURE: AA-181 -- real Anthropic per-model input/output rates.
+// FEATURE: LOG-149 -- COST_PER_1K_INPUT/COST_PER_1K_OUTPUT DELETED from here; the rates are now
+// shared/models.js's MODEL_PRICING, imported at the top of this file. Two tables that both stopped
+// at Sonnet 4.6 is how claude-fable-5-1 and claude-opus-5 -- every governance call on the platform --
+// went unpriced while the Console billed real dollars.
 
 // FEATURE: BUG-20 — add canonical versioned model IDs; keep legacy short-form for historical rows
+// FEATURE: LOG-149 -- the three lane models added (runner_model_lanes 2026-09-11: orchestrator
+// claude-opus-5, judgment claude-fable-5-1, mechanical claude-sonnet-5). Without them the AI Audit
+// labelled every governance row "Unknown provider" (STANDARDS §12) -- a provider label, deliberately
+// separate from MODEL_PRICING: a model can be priced and unlabelled, or labelled and unpriced, and
+// collapsing the two would hide exactly the gap part (e) of the LOG-149 guard exists to find.
 const MODEL_PROVIDER = {
+  "claude-fable-5-1":            "Anthropic",
+  "claude-opus-5":               "Anthropic",
+  "claude-sonnet-5":             "Anthropic",
   "claude-haiku-4-5":            "Anthropic",
   "claude-haiku-4-5-20251001":   "Anthropic",
   "claude-sonnet-4-5":           "Anthropic",
@@ -1029,10 +1032,9 @@ export const isLogHydrated = () => _hydrated;
 const notify = () => _listeners.forEach(fn => fn([..._log]));
 
 // FEATURE: BUG-20 — normalize short-form model IDs to canonical versioned IDs at write time
-const MODEL_ID_NORMALIZE = {
-  'claude-haiku-4-5':  'claude-haiku-4-5-20251001',
-  'claude-sonnet-4-5': 'claude-sonnet-4-6',
-};
+// FEATURE: LOG-149 -- MOVED to shared/models.js and imported at the top of this file, unchanged.
+// Both remaining readers in this module (logAICall()'s resolvedModel below, and the by-model
+// rollup's fold) use the imported binding and behave identically.
 
 // FEATURE: AA-181 -- single source of truth for call cost, used at both write time
 // (logAICall(), for the legacy client-driven AI types) and read time
@@ -1046,16 +1048,11 @@ const MODEL_ID_NORMALIZE = {
 // fields (all historical rows, every caller that omits the params) price byte-identically to
 // before -- the two new terms are exactly 0 when the params are null/undefined/0. Rates stay in
 // the one existing per-model table (COST_PER_1K_INPUT/OUTPUT); no new rates constant.
-export function computeCallCost(model, inputTokens, outputTokens, cacheCreationInputTokens = null, cacheReadInputTokens = null) {
-  const resolvedModel = MODEL_ID_NORMALIZE[model] || model;
-  const inRate = COST_PER_1K_INPUT[resolvedModel] ?? COST_PER_1K_INPUT[model];
-  const outRate = COST_PER_1K_OUTPUT[resolvedModel] ?? COST_PER_1K_OUTPUT[model];
-  if (inRate == null && outRate == null) return null;
-  return ((inputTokens || 0) / 1000) * (inRate || 0)
-    + ((cacheCreationInputTokens || 0) / 1000) * (inRate || 0) * 1.25
-    + ((cacheReadInputTokens || 0) / 1000) * (inRate || 0) * 0.10
-    + ((outputTokens || 0) / 1000) * (outRate || 0);
-}
+// FEATURE: LOG-149 -- MOVED VERBATIM-IN-BEHAVIOUR to shared/models.js (see the import at the top of
+// this file, which also re-exports it so every existing `import { computeCallCost } from
+// './useAIActivity.js'` keeps working). Two differences, both deliberate and both stated in the new
+// home's comment: a call with NO token field at all now prices to null rather than 0 (unknown is not
+// free), and a model that publishes its own cache-read rate uses it instead of the flat 0.10x.
 
 // FEATURE: AI-16 — logAICall Supabase persistence
 // FEATURE: AA-44 — logAICall gains optional patterns_used param

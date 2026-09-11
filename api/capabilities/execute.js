@@ -1,3 +1,14 @@
+// DeepBench v7.0.450 | api/capabilities/execute.js | LOG-149 -- the runLoop() catch seam writes the
+// ledger row BEFORE it classifies. Both exits from that catch -- the HAR-17 transient
+// checkpoint-resume and persistFailureAndRethrow() -- returned without ever reaching logAgentTurn(),
+// so a model call the API refused, aborted or rejected left no ai_activity_log row at all. One row per
+// failed CALL: a recovered hop's resumed call writes its own, so a recovery reads as two calls because
+// it was two. logAgentTurn() gains five optional params (stopReason / refusalCategory / fault /
+// tokensEstimated / costUsd) so the platform keeps ONE turn writer instead of growing a second one
+// beside it; the four facts fold into call_facts under the same omit-when-empty contract tool_calls
+// already uses, and every pre-existing caller's row is byte-identical. classifyModelCallFailure()
+// needed no edit -- a refusal arrives already stamped `failureClass: 'permanent'` and takes the
+// surface path. Nothing in this change branches on a capability slug, intent slug or agent id.
 // DeepBench v7.0.72 | api/capabilities/execute.js | LOO-33 -- a dispatch's intent_slug is now
 // resolved by the harness from its own roster data on BOTH dispatch seams, never trusted from the
 // model's echo of the candidate list (which drops the optional field ~1 in 5 brokered picks, filing
@@ -406,7 +417,14 @@ export function __resetCapabilityPhraseCache() {
 // split, now captured on the agent-turn row too. This row is the SINGLE log record for a loop-path
 // model call (LOG-91 absorbed the wrapper row), so without these params every loop-path row would
 // keep NULL cache fields forever. Plumbing values like input_tokens -- never call_facts keys.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, cache_creation_input_tokens = null, cache_read_input_tokens = null, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null }) {
+// FEATURE: LOG-149 -- five optional params so the ONE existing turn writer can also write a FAILED
+// turn, instead of a second bespoke writer growing beside it. Every pre-existing caller omits all
+// five and its row is byte-identical: the four facts fold in under the same omit-when-empty shape
+// tool_calls already uses, and costUsd stays `undefined` so logActivity() prices from the tokens.
+// stopReason/refusalCategory/fault/tokensEstimated are §19k DIAGNOSTIC facts under the LOG-109
+// posture (.claude/rules/ai-pattern-signature.md) -- bounded enums and a boolean, never a count, and
+// deliberately not added to SIGNATURE_FIELDS.
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, cache_creation_input_tokens = null, cache_read_input_tokens = null, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null, stopReason = null, refusalCategory = null, fault = null, tokensEstimated = false, costUsd = undefined }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -434,6 +452,15 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     // literal agent ids in them -- never legal criteria keys (§19k locked constraint 2).
     ...(delegationTarget ? { delegation_target: delegationTarget } : {}),
     ...(taskProvenance ? { task_provenance: taskProvenance } : {}),
+    // FEATURE: LOG-149 -- the failed-call facts, same omit-when-empty contract as every key above.
+    // ABSENT MEANS "NOT A FAILURE", never false: a normal turn writes none of these four, which is
+    // what keeps the §19k signature of the ~600 normal rows a month from fragmenting. tokens_estimated
+    // is the one that must never be silently dropped -- it is the label that stops an aborted call's
+    // input-side FLOOR from being read as a measured count.
+    ...(stopReason ? { stop_reason: stopReason } : {}),
+    ...(refusalCategory ? { refusal_category: refusalCategory } : {}),
+    ...(fault ? { fault } : {}),
+    ...(tokensEstimated ? { tokens_estimated: true } : {}),
   };
   // FEATURE: LOG-91 -- the turn's own call_facts exactly as before (fact-half + config-half);
   // when wrapperFacts rides along, layer it UNDER the turn half (mergeCallFacts's second arg wins,
@@ -478,6 +505,10 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     // FEATURE: LOG-91 -- the absorbed wrapper's model-through-dispatch latency, into its own
     // column (never call_facts). Null for every pre-existing caller.
     dispatchLatencyMs,
+    // FEATURE: LOG-149 -- passed straight through: `undefined` (every pre-existing caller) means
+    // logActivity() prices the row from its own tokens; an explicit 0 is the failure seam asserting
+    // an unbilled call. Never computed here -- one pricing site, and it is logActivity().
+    costUsd,
   });
 }
 
@@ -1189,6 +1220,41 @@ async function runLoop({
       // checkpoint-resume recovery per hop before surfacing. Hop identity = conversationHistory.length
       // at the top of the hop -- stable across checkpoint/resume (depth is NOT: a resumed continuation
       // re-enters at the decision hop's depth), monotonic within a chain.
+      // FEATURE: LOG-149 -- THE ROW IS WRITTEN BEFORE THE BRANCH, and the ordering is the whole
+      // point: below this, a transient failure returns a checkpoint and a permanent one calls
+      // persistFailureAndRethrow(), and NEITHER path reaches logAgentTurn() -- which is why every
+      // refused, aborted and rejected executor call on 2026-09-09 left no ai_activity_log row at all
+      // while the Console billed for the aborted ones. Writing here covers both branches with one
+      // call, and it is exactly one row per failed CALL: if the hop then recovers, the resumed hop
+      // makes a NEW call that writes its own row, so a recovery reads as two calls because it was two.
+      //
+      // GATED ON `sent`, NOT on the error existing: a config fault, a raw TypeError from our own
+      // bookkeeping, or a deadline-starved hop carries no modelCall and writes nothing. Nothing here
+      // reads capability_slug, intent_slug or agent_id as a CONDITION -- they are passed through as
+      // the row's own identity fields exactly as the success path passes them (§19b/§19d).
+      if (e?.modelCall?.sent) {
+        const mc = e.modelCall;
+        logAgentTurn({
+          capability_slug, intent_slug, agent_id, tenant_id,
+          model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
+          is_delegate_call: false, api_retry_count: mc.api_retry_count || 0,
+          // Reported usage first, the labelled estimate second, NULL last. Output tokens are never
+          // estimated: an unknowable count stays NULL rather than becoming a confident zero.
+          input_tokens: mc.usage?.input_tokens ?? mc.estimated_input_tokens ?? null,
+          output_tokens: mc.usage?.output_tokens ?? null,
+          cache_creation_input_tokens: mc.usage?.cache_creation_input_tokens ?? null,
+          cache_read_input_tokens: mc.usage?.cache_read_input_tokens ?? null,
+          intent_technical_services: enriched.intent_technical_services || [],
+          trace_id, spanId: span_id, parentSpanId: parent_span_id, signatureConfig,
+          stopReason: mc.stop_reason ?? null,
+          refusalCategory: mc.refusal_category ?? null,
+          fault: mc.fault ?? null,
+          tokensEstimated: mc.tokens_estimated === true,
+          // A refusal and a rejection are unbilled: 0, asserted. An abort IS billed, so it is left to
+          // price from the estimated floor rather than claiming it was free.
+          costUsd: mc.billed === false ? 0 : undefined,
+        });
+      }
       const hopOrdinal = conversationHistory.length;
       const alreadyRecovered = recoveryLedger.some(r => r.o === hopOrdinal);
       if (classifyModelCallFailure(e) === 'transient' && !alreadyRecovered) {

@@ -1,3 +1,11 @@
+<!-- DeepBench v7.0.450 | docs/runbooks/mcp-server.md | LOG-149 -- the `reasoning` refusal no longer
+     "presents as silence". That sentence was true and is now dated: since LOG-149 a refusal is caught
+     in callModel() before parseModelTurn() ever sees the empty content, surfaces as a PERMANENT
+     `anthropic-refusal` fault instead of an `in_progress` recovery, and lands a $0 ledger row carrying
+     `call_facts.stop_reason = 'refusal'` -- so the failure is now visible in the log rather than
+     inferable only from a hung job. The rename rule itself is unchanged and still binding: never name
+     a schema property `reasoning`. One sentence amended; ses-347-account-field-refusal.test.mjs and
+     its Intent sweep are untouched and still green. -->
 <!-- DeepBench v7.0.447 | docs/runbooks/mcp-server.md | SES-347 -- the "known blocker" section is
      replaced: the API refusal is FIXED (vf-verdict-intent's `reasoning` property renamed to
      `findings`), SES-339's "shortening the account description clears it" is corrected with the 2x2
@@ -257,7 +265,9 @@ populated `missing_evidence`, and the `account` receipt — `ai_activity_log` ro
 
 **Never name a schema property `reasoning`.** Any Intent reachable through the executor gets
 `account` injected beside it and the whole request is then refused — and it presents as silence
-(`in_progress` forever), not as an error. `tests/regression/ses-347-account-field-refusal.test.mjs`
+(`in_progress` forever), not as an error — before `LOG-149` (`v7.0.450`); since then a refusal
+surfaces as a permanent `anthropic-refusal` failure and lands a $0 ledger row with
+`call_facts.stop_reason = 'refusal'`. `tests/regression/ses-347-account-field-refusal.test.mjs`
 sweeps every Intent for the name and fails on a new one.
 
 ### Still open, and it is NOT the refusal — the 55-second per-request ceiling

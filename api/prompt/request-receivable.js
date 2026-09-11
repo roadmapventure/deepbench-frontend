@@ -1,3 +1,19 @@
+// DeepBench v7.0.450 | api/prompt/request-receivable.js | LOG-149 -- EVERY CALL THAT REACHED THE API
+// NOW LEAVES A ROW, and a refusal is no longer treated as a parse problem. callModel() was the only
+// place `usage` and `stop_reason` ever exist, and it threw all three "reached the API" failures
+// straight past every logging site: a refusal (HTTP 200, empty content) failed parseModelTurn(), was
+// retried once with the identical body, was refused again, and surfaced as a 422 with nothing logged;
+// a TimeoutError/AbortError and a 4xx/5xx rejection propagated the same way. Measured on the night of
+// 2026-09-09: the two rank-backlog cycles that died on "Anthropic call failed: 400" (21:10Z, 21:13Z)
+// have NO ai_activity_log row at all, while the Console billed for the aborted ceiling runs.
+//
+// Three things changed and nothing else: a refusal throws immediately as a PERMANENT
+// `anthropic-refusal` (§19o -- SES-347 measured the same body refused 5/5, so the retry was a
+// guaranteed second refusal, not a second chance); every sent-call error now carries `modelCall`, the
+// facts a catch needs to write one row; and sendRequest()'s non-precomputed branch, which had no
+// catch whatsoever, writes that row and rethrows unchanged. No capability slug, agent id or intent
+// name is read as a condition anywhere in this change (.claude/rules/capabilities-are-data.md) --
+// every branch keys on a model-response fact or an error name.
 // DeepBench v7.0.428 | api/prompt/request-receivable.js | AGT-63 -- register the 'prioritizer-write'
 // handler (import + one HANDLERS entry; KNOWN_HANDLERS is derived and needs no edit). Nothing else in
 // this file changes: no capability slug, agent id, or intent name appears anywhere in the dispatch
@@ -474,9 +490,24 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
       throw Object.assign(new Error(`Insufficient time remaining for Anthropic call (${remainingMs}ms left)`),
         { status: 504, failureClass: 'transient', faultCode: 'time-budget-exhausted' });
     }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(55000, remainingMs)),
-    });
+    // FEATURE: LOG-149 -- an ABORT is the one failure on this path that IS billed: the API finished
+    // generating and we hung up (SES-348's 56-57s TimeoutErrors on 2026-09-09 are the measured case),
+    // so its dollars are real and were previously invisible. The attempt counter is stamped HERE
+    // because this loop is the only scope that knows it; callModel()'s wrapper adds the model and the
+    // input estimate, which are the only two facts IT knows. The error object is rethrown unchanged
+    // otherwise -- HAR-17 classifies on `name`, and renaming or re-wrapping it would silently turn a
+    // recoverable transient into a permanent surface.
+    let res;
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(55000, remainingMs)),
+      });
+    } catch (e) {
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        e.modelCall = { sent: true, billed: true, fault: e.name, api_retry_count: attempt };
+      }
+      throw e;
+    }
     if (res.ok) return { res, apiRetryCount: attempt };
     if (attempt >= MAX_ANTHROPIC_ATTEMPTS - 1 || !TRANSIENT_ANTHROPIC_STATUS.has(res.status)) {
       const text = await res.text();
@@ -484,12 +515,60 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
       // upstreamStatus carries Anthropic's real status; failureClass is what HAR-17 must gate its
       // one auto-resume on -- never `status`, which is 502 for every upstream failure incl. 400s.
       const { failureClass, faultCode } = classifyAnthropicFailure(res.status, text);
+      // FEATURE: LOG-149 -- modelCall: the facts a downstream catch needs to write ONE ledger row for
+      // a call that reached the API and failed. `sent: true` is the whole discriminator: before this,
+      // a rejected call threw from here and both catch sites (execute.js's runLoop, sendRequest's own
+      // path) returned without ever reaching logActivity() -- the two rank-backlog cycles that died
+      // on "Anthropic call failed: 400" at 21:10Z and 21:13Z on 2026-09-09 have no log row at all.
+      // `billed: false` because a request Anthropic REJECTED is not charged; the row costs 0, which
+      // is a measured fact and not the same thing as an unknown. `model` is absent here on purpose --
+      // postToAnthropicWithRetry() is not told which model it is posting; callModel()'s wrapper adds
+      // it, so this object stays a fact about the HTTP exchange this function actually performed.
       throw Object.assign(new Error(`Anthropic call failed: ${res.status}`), {
         status: 502, upstreamStatus: res.status, failureClass, faultCode, detail: text,
+        modelCall: { sent: true, billed: false, fault: faultCode, upstream_status: res.status, api_retry_count: attempt },
       });
     }
     await new Promise(resolve => setTimeout(resolve, API_RETRY_BACKOFF_MS[attempt]));
   }
+}
+
+// FEATURE: LOG-149 -- a LABELLED input-token floor for a call we aborted. The exact count is
+// unknowable to us on this path: the API never returned a usage block, count_tokens is a second
+// network round trip on a path that just ran out of time (the abort fires at <=55s inside a 60s
+// maxDuration), and the exact free source -- streaming's message_start.usage.input_tokens -- is
+// SES-348's design decision, not this ticket's. So we estimate, and every row built from this
+// carries call_facts.tokens_estimated = true so no reader can mistake the floor for a measurement.
+//
+// ~4 chars/token over the serialized prompt-shaping fields only (system/messages/tools -- the parts
+// that actually become input tokens; max_tokens and temperature do not). Deliberately crude and
+// deliberately an UNDER-count for English prose, because a floor that reads low is a known-direction
+// error, while an over-count would put dollars in the ledger the Console never charged.
+export function estimateInputTokens(callBody) {
+  const { system, messages, tools } = callBody || {};
+  return Math.ceil(JSON.stringify({ system, messages, tools }).length / 4);
+}
+
+// FEATURE: LOG-149 -- the §19k fact-half for a failed model call, in ONE place because both failure
+// seams (this file's sendRequest() and api/capabilities/execute.js's runLoop() catch) must write the
+// same key names or the Displayer sees two vocabularies for one event.
+//
+// EVERY KEY IS OMITTED WHEN EMPTY, never written false or null, and that is the §19k contract rather
+// than tidiness: call_facts is the signature base, an absent key means "not a failure", and a
+// `stop_reason: null` on every normal row would fragment the signature of the whole log. Same
+// omit-when-empty shape logAgentTurn()'s tool_calls already uses.
+//
+// ALL FOUR VALUES ARE BOUNDED: an error name, a faultCode from HAR-15's fixed set, Anthropic's
+// stop_reason, and a refusal category. No count, no millisecond, no id -- per
+// .claude/rules/ai-pattern-signature.md these are captured as LOG-109 diagnostic facts and are
+// deliberately NOT added to SIGNATURE_FIELDS; promoting one is Susan's review path, not this ship's.
+export function failureFacts(mc) {
+  return {
+    ...(mc?.stop_reason ? { stop_reason: mc.stop_reason } : {}),
+    ...(mc?.refusal_category ? { refusal_category: mc.refusal_category } : {}),
+    ...(mc?.fault ? { fault: mc.fault } : {}),
+    ...(mc?.tokens_estimated ? { tokens_estimated: true } : {}),
+  };
 }
 
 // FEATURE: HAR-20 -- extracted from callModel()'s inline correction-message construction (was:
@@ -555,8 +634,57 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
 
   const callBody = buildCallBody({ format_contract, systemPrompt, systemPromptStable: system_prompt_stable, systemPromptVolatile: system_prompt_volatile, model, max_tokens, temperature, canRequestHelp, enableWebSearch, webSearchMaxUses, enableParallelToolUse, conversation_history });
 
-  const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
+  // FEATURE: LOG-149 -- the two facts only THIS scope knows (which model was asked, and what the
+  // request body was) are folded onto any error that already says a request was sent. Written as a
+  // decorate-and-rethrow rather than a new error so `name`, `status`, `failureClass` and `faultCode`
+  // all survive byte-identical: HAR-17's one-recovery rule gates on those, and a call starved of time
+  // (time-budget-exhausted -- no request made) correctly picks up NO sent-call facts here, which is
+  // what stops a row being written for a call that never happened.
+  const withModelCallFacts = async (fn) => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e?.modelCall?.sent) {
+        e.modelCall.model = model;
+      } else if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        e.modelCall = { sent: true, billed: true, fault: e.name, api_retry_count: 0, ...(e.modelCall || {}), model };
+      }
+      if (e?.modelCall?.fault === 'TimeoutError' || e?.modelCall?.fault === 'AbortError') {
+        e.modelCall.estimated_input_tokens = estimateInputTokens(callBody);
+        e.modelCall.tokens_estimated = true;
+      }
+      throw e;
+    }
+  };
+
+  const { res: llmRes, apiRetryCount } = await withModelCallFacts(
+    () => postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline));
   let llmData = await llmRes.json();
+  // FEATURE: LOG-149 -- A REFUSAL IS A FAILURE, NOT A PARSE PROBLEM, and it must be caught HERE,
+  // before parseModelTurn(). Measured 2026-09-09 (SES-347, five runs per cell): a classifier refusal
+  // returns HTTP 200 with stop_reason 'refusal' and ZERO content blocks, so parseModelTurn() threw
+  // "No tool_use block", the block below sent a SECOND copy of the identical body, and that second
+  // request was refused too -- 5/5, deterministic on the same body. Retrying it is not a dice roll
+  // with a second chance, it is a guaranteed second refusal, which is why §19o and
+  // .claude/rules/transient-failure-recovery.md class this permanent and why the throw is here rather
+  // than inside the catch.
+  //
+  // NOT BILLED, AND THE ROW MUST SAY SO WITH A 0. Anthropic's published semantics: a refusal that
+  // fires BEFORE any output is charged no input and no output tokens (only a mid-stream refusal bills
+  // the streamed partial). A priced figure on this row would be the phantom-dollar defect §19v
+  // records from 2026-08-20 -- dollars in the ledger the Console never charged. `usage` is carried as
+  // the API reported it, unnormalized, because it is evidence about the call rather than a meter.
+  if (llmData.stop_reason === 'refusal') {
+    throw Object.assign(new Error(`Anthropic refused the request (${llmData.stop_details?.category ?? 'uncategorized'})`), {
+      status: 502, upstreamStatus: 200, failureClass: 'permanent', faultCode: 'anthropic-refusal',
+      detail: JSON.stringify(llmData.stop_details ?? null),
+      modelCall: {
+        sent: true, billed: false, model, stop_reason: 'refusal',
+        refusal_category: llmData.stop_details?.category ?? null,
+        usage: llmData.usage ?? null, api_retry_count: apiRetryCount,
+      },
+    });
+  }
   // FEATURE: HAR-02a -- normalize the two cache-token fields to 0 whether or not Anthropic sent
   // them. Until S-HAR-02b/c enable prompt caching they arrive as undefined and stay 0; once
   // caching is live, input_tokens means UNCACHED input only and these two carry the remainder.
@@ -614,7 +742,20 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
         console.error(`[request-receivable] callModel retry skipped: insufficient time remaining (${retryRemainingMs}ms) firstFailure="${parseErr.message}"`);
         throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: `Retry skipped -- insufficient time remaining (${retryRemainingMs}ms left, need ${MIN_VIABLE_CALL_MS}ms)` });
       }
-      const retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(Math.min(55000, retryRemainingMs)) });
+      // FEATURE: LOG-149 -- the parse-failure retry is a SECOND real request and can abort exactly
+      // like the first, so it gets the same sent-call facts. Same decorate-and-rethrow, same
+      // unchanged error identity; api_retry_count is 0 because this is the retry's own first attempt
+      // (it has no internal retry loop of its own).
+      let retryRes;
+      try {
+        retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(Math.min(55000, retryRemainingMs)) });
+      } catch (e) {
+        if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+          e.modelCall = { sent: true, billed: true, model, fault: e.name, api_retry_count: 0,
+            estimated_input_tokens: estimateInputTokens(retryBody), tokens_estimated: true };
+        }
+        throw e;
+      }
       // FEATURE: AA-157 -- surface the retry's OWN rejection reason (this distinct HTTP call's real
       // status/body), not the ORIGINAL parse error that triggered the retry. Before this fix, every
       // occurrence of this 422 reported parseErr.message as `detail` -- why the FIRST call failed to
@@ -634,6 +775,22 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
         throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: retryDetail });
       }
       llmData = await retryRes.json();
+      // FEATURE: LOG-149 -- the same refusal gate on the retry's response. A mid-conversation refusal
+      // (the corrective turn tripped a classifier the first turn did not) is the same permanent class
+      // and the same unbilled 0; without this it would fall through to parseModelTurn() and surface
+      // as the generic "Parse failed and retry also failed" 422, which names the wrong cause and,
+      // being a 422, HAR-17 classes TRANSIENT -- an auto-resume into a third refused request.
+      if (llmData.stop_reason === 'refusal') {
+        throw Object.assign(new Error(`Anthropic refused the request (${llmData.stop_details?.category ?? 'uncategorized'})`), {
+          status: 502, upstreamStatus: 200, failureClass: 'permanent', faultCode: 'anthropic-refusal',
+          detail: JSON.stringify(llmData.stop_details ?? null),
+          modelCall: {
+            sent: true, billed: false, model, stop_reason: 'refusal',
+            refusal_category: llmData.stop_details?.category ?? null,
+            usage: llmData.usage ?? null, api_retry_count: apiRetryCount,
+          },
+        });
+      }
       // FEATURE: HAR-02a -- the retry merge sums the cache-token fields too, same || 0 guards.
       usage = {
         input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0),
@@ -1006,7 +1163,40 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     // existing caller) is byte-identical.
     // FEATURE: HAR-27 -- webSearchMaxUses read off the same llm object destructured above;
     // undefined for every capability without the trait (byte-identical).
-    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, enableWebSearch, webSearchMaxUses: llm?.web_search_max_uses, conversation_history: [], deadline });
+    // FEATURE: LOG-149 -- this branch had NO catch at all, so any model call it made that the API
+    // refused, aborted or rejected threw straight past STEP 4's logActivity() and left no ledger row
+    // whatsoever. The row is written here, once, and the error is rethrown unchanged so every
+    // existing caller's error handling is byte-identical.
+    //
+    // THE GATE IS `e.modelCall?.sent`, NEVER "an error happened": a config fault (no API key) or a
+    // deadline-starved call carries no sent-call facts and must write NOTHING -- a row for a call
+    // that never reached the API is a phantom dollar with a timestamp on it.
+    const callStart = Date.now();
+    let turn;
+    try {
+      turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, enableWebSearch, webSearchMaxUses: llm?.web_search_max_uses, conversation_history: [], deadline });
+    } catch (e) {
+      if (e?.modelCall?.sent) {
+        const mc = e.modelCall;
+        logActivity({
+          tenantId: tenant_id || 'global',
+          aiType: capability_slug || 'request-receivable',
+          feature: 'request-receivable',
+          model, agentId: agent_id || null, taskId: task_id || null,
+          // The API's own count when it gave one; the labelled estimate when we aborted and it could
+          // not; null when neither exists. Output is NEVER estimated -- unknowable stays NULL.
+          inputTokens: mc.usage?.input_tokens ?? mc.estimated_input_tokens ?? null,
+          outputTokens: mc.usage?.output_tokens ?? null,
+          latencyMs: Date.now() - callStart,
+          traceId: trace_id, spanId: span_id, parentSpanId: parent_span_id,
+          callFacts: mergeCallFacts(failureFacts(mc), prompt_request?.signature_config ?? null),
+          // An unbilled outcome (refusal, rejection) asserts 0; an abort leaves it undefined so
+          // logActivity() prices the estimate as the floor it is.
+          costUsd: mc.billed === false ? 0 : undefined,
+        });
+      }
+      throw e;
+    }
     parsedResponse = turn.tool_input;
     usage = turn.usage;
     retryCount = turn.retryCount;
