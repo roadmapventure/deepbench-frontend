@@ -1,3 +1,4 @@
+// DeepBench v7.0.456 | tests/regression/agt-64-researcher.test.mjs | AGT-69 — the off-bench clause is retired: OFF_BENCH_AGENT_IDS no longer exists, so the import drops it and the assertion that the Researcher was ON that list is deleted outright. What survives is the half that still means something — the Researcher is NOT an AGENTS member — now for the AGT-69 reason: the governance agents render on the Bench's Governance section from live lane=governance rows, never from the static list. SE-03's orphan exemption moved to the live agents table in the same ship.
 // DeepBench v7.0.429 | tests/regression/agt-64-researcher.test.mjs | AGT-64 -- The Researcher:
 // the seed rows are real, leg 1 can actually reach the web from the executor, and the Intent's
 // survivor shape still COVERS what file_invention_proposal() demands.
@@ -98,13 +99,10 @@ export default async function run() {
   assert.ok(/researcher:\s*\{\s*subject:\s*"they",\s*object:\s*"them",\s*possessive:\s*"their"\s*\}/.test(agentsSrc),
     "AGENT_PRONOUNS.researcher must be they/them/their");
 
-  const { AGENTS, OFF_BENCH_AGENT_IDS } = await import("../../src/data/agents.js");
+  const { AGENTS } = await import("../../src/data/agents.js");
   assert.ok(!AGENTS.some(a => a && a.id === AGENT_ID),
     "the Researcher must NOT be in the static AGENTS list (AGT-64 Task 2) -- governance agents " +
-    "stay off the Bench until the exit review rules on how they render");
-  assert.ok(OFF_BENCH_AGENT_IDS.includes(AGENT_ID),
-    "the Researcher must be in OFF_BENCH_AGENT_IDS, or SE-03 reports its avatar/pronoun entries " +
-    "as stale orphans -- a false red, and the list is also SE-03's obligation to check them harder");
+    "render on the Bench's Governance section from live rows (AGT-69), never from the static list");
 
   const doc = read(RESEARCH_DOC_REL);
   assert.ok(VC_REF_RE.test(doc),

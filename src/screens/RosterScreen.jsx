@@ -20,6 +20,7 @@ import { CURRENT_USER } from "../config.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { BENCH_FILTERS } from "../data/agents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
+import GovernanceSection from "../components/GovernanceSection.jsx"; // FEATURE: AGT-69 — flag-guarded inside the component
 
 // FEATURE: RO-04 — AgentAvatar illustrated SVG portrait in agent cards
 // FEATURE: RO-02 — Agent cards + workload, AiBadge on Add Training
@@ -373,6 +374,7 @@ export default function RosterScreen() {
               <div style={{padding:"3px 10px",background:"rgba(182,135,58,.2)",border:`1px solid rgba(182,135,58,.6)`,fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:1.2,textTransform:"uppercase",fontWeight:700}}>+ Build Agent</div>
             </div>
           </div>
+          <GovernanceSection />
         </div>
       </div>
     </AppShell>

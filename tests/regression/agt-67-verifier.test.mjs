@@ -1,3 +1,4 @@
+// DeepBench v7.0.456 | tests/regression/agt-67-verifier.test.mjs | AGT-69 — the off-bench clause is retired: OFF_BENCH_AGENT_IDS no longer exists, so the import drops it and the assertion that the Verifier was ON that list is deleted outright. The surviving NOT-in-AGENTS clause now reads for the AGT-69 reason: the governance agents render on the Bench's Governance section from live lane=governance rows, never from the static list.
 // DeepBench v7.0.447 | tests/regression/agt-67-verifier.test.mjs | SES-347 -- the required-key
 // guard and GOOD_VERDICT retargeted from `reasoning` to `findings`. The Intent's property was
 // renamed because the Anthropic API refused every request pairing that name with the injected
@@ -118,13 +119,10 @@ export default async function run() {
   assert.ok(/verifier:\s*\{\s*subject:\s*"they",\s*object:\s*"them",\s*possessive:\s*"their"\s*\}/.test(agentsSrc),
     "AGENT_PRONOUNS.verifier must be they/them/their");
 
-  const { AGENTS, OFF_BENCH_AGENT_IDS } = await import("../../src/data/agents.js");
+  const { AGENTS } = await import("../../src/data/agents.js");
   assert.ok(!AGENTS.some(a => a && a.id === VERIFIER_AGENT_ID),
-    "the Verifier must NOT be in the static AGENTS list (AGT-67 Task 4) -- governance agents stay " +
-    "off the Bench until the exit review rules on how they render");
-  assert.ok(OFF_BENCH_AGENT_IDS.includes(VERIFIER_AGENT_ID),
-    "the Verifier must be in OFF_BENCH_AGENT_IDS, or SE-03 reports its avatar/pronoun entries as " +
-    "stale orphans -- a false red, and the list is also SE-03's obligation to check them harder");
+    "the Verifier must NOT be in the static AGENTS list (AGT-67 Task 4) -- governance agents " +
+    "render on the Bench's Governance section from live rows (AGT-69), never from the static list");
 
   // -- The row shape, with no write (header note 6) ---------------------------------------------
   const mechanicalRow = verdictRowFor({

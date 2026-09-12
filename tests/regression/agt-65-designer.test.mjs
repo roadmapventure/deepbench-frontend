@@ -1,3 +1,4 @@
+// DeepBench v7.0.456 | tests/regression/agt-65-designer.test.mjs | AGT-69 — the off-bench clause is retired: OFF_BENCH_AGENT_IDS no longer exists, so the import drops it and the assertion that the Designer was ON that list is deleted outright. The surviving NOT-in-AGENTS clause now reads for the AGT-69 reason: the governance agents render on the Bench's Governance section from live lane=governance rows, never from the static list.
 // DeepBench v7.0.431 | tests/regression/agt-65-designer.test.mjs | AGT-65 -- The Designer:
 // the seed rows are real, the Intent's contract still parses, and the ONE database rule the
 // Designer's handoff depends on -- ck_design_status_kickoff -- is still enforced.
@@ -74,13 +75,10 @@ export default async function run() {
   assert.ok(/designer:\s*\{\s*subject:\s*"they",\s*object:\s*"them",\s*possessive:\s*"their"\s*\}/.test(agentsSrc),
     "AGENT_PRONOUNS.designer must be they/them/their");
 
-  const { AGENTS, OFF_BENCH_AGENT_IDS } = await import("../../src/data/agents.js");
+  const { AGENTS } = await import("../../src/data/agents.js");
   assert.ok(!AGENTS.some(a => a && a.id === AGENT_ID),
-    "the Designer must NOT be in the static AGENTS list (AGT-65 Task 2) -- governance agents stay " +
-    "off the Bench until the exit review rules on how they render");
-  assert.ok(OFF_BENCH_AGENT_IDS.includes(AGENT_ID),
-    "the Designer must be in OFF_BENCH_AGENT_IDS, or SE-03 reports its avatar/pronoun entries as " +
-    "stale orphans -- a false red, and the list is also SE-03's obligation to check them harder");
+    "the Designer must NOT be in the static AGENTS list (AGT-65 Task 2) -- governance agents " +
+    "render on the Bench's Governance section from live rows (AGT-69), never from the static list");
 
   // -- Live arm --------------------------------------------------------------------------------
   const url = process.env.SUPABASE_URL;

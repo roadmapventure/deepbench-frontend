@@ -1,3 +1,4 @@
+// DeepBench v7.0.456 | tests/regression/agt-68-devmanager.test.mjs | AGT-69 — the off-bench clause is retired: OFF_BENCH_AGENT_IDS no longer exists, so the import drops it and the assertion that the Development Manager was ON that list is deleted outright. The surviving NOT-in-AGENTS clause now reads for the AGT-69 reason: the governance agents render on the Bench's Governance section from live lane=governance rows, never from the static list.
 // DeepBench v7.0.434 | tests/regression/agt-68-devmanager.test.mjs | AGT-68 -- The Development
 // Manager: the seed rows are real, the manager's judgment is bound to the pick path rather than to
 // its own opinion of the board, and the ONE row action this ticket ships -- the ticket claim -- is
@@ -166,13 +167,10 @@ export default async function run() {
   assert.ok(/devmanager:\s*\{\s*subject:\s*"they",\s*object:\s*"them",\s*possessive:\s*"their"\s*\}/.test(agentsSrc),
     "AGENT_PRONOUNS.devmanager must be they/them/their");
 
-  const { AGENTS, OFF_BENCH_AGENT_IDS } = await import("../../src/data/agents.js");
+  const { AGENTS } = await import("../../src/data/agents.js");
   assert.ok(!AGENTS.some(a => a && a.id === DEVMANAGER_AGENT_ID),
     "the Development Manager must NOT be in the static AGENTS list (AGT-68 Task 4) -- governance " +
-    "agents stay off the Bench until the exit review rules on how they render");
-  assert.ok(OFF_BENCH_AGENT_IDS.includes(DEVMANAGER_AGENT_ID),
-    "the Development Manager must be in OFF_BENCH_AGENT_IDS, or SE-03 reports its avatar/pronoun " +
-    "entries as stale orphans -- a false red, and the list is also SE-03's obligation to check them harder");
+    "agents render on the Bench's Governance section from live rows (AGT-69), never from the static list");
 
   // == Pure arm: the walls, failing closed in both directions ==================================
   const clearWalls = {

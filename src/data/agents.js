@@ -1,3 +1,4 @@
+// DeepBench v7.0.456 | agents.js | AGT-69 — OFF_BENCH_AGENT_IDS deleted with its comment (John's ruling 2026-09-11, decision 146256c1): the governance agents render on the Bench's Governance section from live lane=governance rows (src/components/GovernanceSection.jsx, view governance_agent_activity_7d), never from a list here. Their AVATAR_CFG / AGENT_PRONOUNS entries stay — the portraits render from them.
 // DeepBench v7.0.434 | agents.js | AGT-68 — AVATAR_CFG + AGENT_PRONOUNS entries for `devmanager` (The Development Manager, GV-01, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66/67.
 // DeepBench v7.0.433 | agents.js | AGT-67 — AVATAR_CFG + AGENT_PRONOUNS entries for `verifier` (The Verifier, GV-06, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66.
 // DeepBench v7.0.432 | agents.js | AGT-66 — AVATAR_CFG + AGENT_PRONOUNS entries for `builder` (The Builder, GV-05, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65.
@@ -284,29 +285,6 @@ export const BENCH_FILTERS = [
   { id: "nigp",     label: "Spend Analysis"    }, // FEATURE: RO-11 — relabeled, was the old NIGP label
   { id: "special",  label: "Special Interests" },
 ];
-
-// FEATURE: AGT-63 — agents that hold AVATAR_CFG / AGENT_PRONOUNS entries but are deliberately NOT
-// members of AGENTS. They are real, active `agents` rows in the `governance` lane (SES-330): the
-// delegation broker never sees them (lib/project-manager.js filters `lane=eq.product`) and the Bench
-// does not render them until the exit review rules on how a governance agent should appear. Their
-// ids still reach audit, decision and briefing surfaces, so a portrait and pronouns are needed.
-//
-// This list is what tells SE-03's orphan check the difference between "an entry for an agent that
-// was deleted" (stale data, the thing that check exists for) and "an entry for an agent that is not
-// on the Bench by design". Membership is an OBLIGATION, not a loophole: SE-03 asserts every id here
-// carries a complete AVATAR_CFG and AGENT_PRONOUNS entry, so an id added to escape a failure gets a
-// stricter check rather than a weaker one. Remove an id here the moment its agent is deleted.
-// FEATURE: AGT-64 — `researcher` joins the list on the same terms: a real, active `governance`
-// lane row the Bench does not render, whose id still reaches audit and research surfaces.
-// FEATURE: AGT-65 — `designer` joins the list on the same terms: a real, active `governance`
-// lane row the Bench does not render, whose id still reaches audit and kickoff surfaces.
-// FEATURE: AGT-66 — `builder` joins the list on the same terms: a real, active `governance`
-// lane row the Bench does not render, whose id still reaches audit and cycle surfaces.
-// FEATURE: AGT-67 — `verifier` joins the list on the same terms: a real, active `governance`
-// lane row the Bench does not render, whose id still reaches audit and verdict surfaces.
-// FEATURE: AGT-68 — `devmanager` joins the list on the same terms: a real, active `governance`
-// lane row the Bench does not render, whose id still reaches audit, cycle and assignment surfaces.
-export const OFF_BENCH_AGENT_IDS = ["prioritizer", "researcher", "designer", "builder", "verifier", "devmanager"];
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits
 export const AVATAR_CFG = {

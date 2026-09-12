@@ -1,4 +1,24 @@
 #!/usr/bin/env node
+// DeepBench v7.0.456 | tests/regression/SE-03-agent-fields.js | AGT-69 -- the orphan exemption is
+// the LIVE `agents` TABLE now, not a list in src/. AGT-63 declared the six governance ids in
+// src/data/agents.js's OFF_BENCH_AGENT_IDS; AGT-69 deleted that list the moment the Bench grew a
+// Governance section that renders those agents from live lane=governance rows, so the exemption
+// follows the truth it was always a copy of: an id is exempt because the DATABASE says it is an
+// active governance agent, never because a constant in the tree says so.
+//
+// BOTH OF AGT-63's GUARDS SURVIVE THE MOVE INTACT, which is the point of doing it this way rather
+// than simply deleting the clause: an exempt id must not also be an AGENTS member, and it must
+// still be reported as an orphan when the exemption is emptied. Adding an agent to escape a
+// failure therefore still buys a STRICTER check (a complete portrait and pronoun entry are owed),
+// not a weaker one -- and now the exemption cannot be granted by editing a file at all.
+//
+// WITHOUT CREDENTIALS THE CLAUSE IS DECLARED NOT RUN, NEVER QUIETLY SOFTENED. The uncredentialed
+// path runs the real-roster check with an EMPTY exemption and drops `orphan-avatar` /
+// `orphan-pronouns` problems, which would otherwise report every governance portrait as stale --
+// so the orphan direction is genuinely unverified on that run and says so through notRun(), rather
+// than reading as a pass (SES-180 / SES-61). Everything else STANDARDS.md Section 11 states about
+// the FILE is asserted on every run, credentials or not.
+//
 // DeepBench v7.0.428 | tests/regression/SE-03-agent-fields.js | AGT-63 -- the orphan clause learns
 // the difference between a STALE entry and an OFF-BENCH one. A governance-lane agent (SES-330) is a
 // real, active `agents` row that the Bench deliberately does not render, so its AVATAR_CFG /
@@ -46,7 +66,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { AGENTS, AVATAR_CFG, AGENT_PRONOUNS, OFF_BENCH_AGENT_IDS } from "../../src/data/agents.js";
+import { AGENTS, AVATAR_CFG, AGENT_PRONOUNS } from "../../src/data/agents.js";
 import { T } from "../../src/tokens.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -90,13 +110,15 @@ function typeOk(value, declared) {
 
 // The whole check over one roster. Exported so the negative controls can run it against planted
 // rosters -- the same shape SE-01/SE-02's checkWorktree() takes, and for the same reason.
-// FEATURE: AGT-63 -- `offBench` is the set of ids that hold AVATAR_CFG / AGENT_PRONOUNS entries
-// WITHOUT being AGENTS members, because they are governance-lane agents the Bench does not render
-// (src/data/agents.js's OFF_BENCH_AGENT_IDS -- read from the roster module, never a literal here,
-// so this test keeps having one source of truth). It narrows the orphan clause and NOTHING else:
-// an id not in that list is still reported exactly as before, which is what the planted
-// "orphan-avatar" control below proves. Defaulted to empty so every existing caller -- the nine
-// planted-defect shapes -- is byte-identical.
+// FEATURE: AGT-63, amended by AGT-69 -- `offBench` is the set of ids that hold AVATAR_CFG /
+// AGENT_PRONOUNS entries WITHOUT being AGENTS members, because they are governance-lane agents.
+// Its SOURCE changed at AGT-69 and its meaning did not: the caller now reads the ids from the live
+// `agents` table (lane='governance', is_active), never from a list in src/ and never as a literal
+// here, so this test keeps having one source of truth and that source is the database the Bench's
+// Governance section itself renders. It narrows the orphan clause and NOTHING else: an id not in
+// that set is still reported exactly as before, which is what the planted "orphan-avatar" control
+// below proves. Defaulted to empty so every existing caller -- the nine planted-defect shapes --
+// is byte-identical.
 export function checkRoster(agents, avatars, pronouns, required, offBench = []) {
   const problems = [];
   const ids = new Set(offBench);
@@ -218,38 +240,65 @@ export default async function run() {
     `an agent with only an id must report 22 missing fields (23 minus id), got ${many.length}`
   );
 
-  // FEATURE: AGT-63 -- the exemption is asserted to be NARROW before it is used. Two clauses, and
-  // they pull in opposite directions on purpose: an id declared off-bench must not silently be a
-  // Bench member as well, and the exemption must not swallow a genuinely stale entry.
-  assert.ok(Array.isArray(OFF_BENCH_AGENT_IDS),
-    "OFF_BENCH_AGENT_IDS must be an array exported by src/data/agents.js");
-  const benchIds = new Set(AGENTS.map(a => a && a.id));
-  for (const id of OFF_BENCH_AGENT_IDS) {
-    assert.ok(!benchIds.has(id),
-      `${id} is declared off-bench but is also an AGENTS member -- an id belongs to exactly one of them`);
-  }
-  // An id NOT on the list is still an orphan: run the checker with the list emptied and confirm the
-  // very entries it exempts come back. Without this, `offBench` could be anything at all.
-  const unexempted = checkRoster(AGENTS, AVATAR_CFG, AGENT_PRONOUNS, required, []);
-  for (const id of OFF_BENCH_AGENT_IDS) {
-    assert.ok(unexempted.some(p => p.id === id && p.kind === "orphan-avatar"),
-      `control: with the exemption list emptied, ${id} must be reported as an orphan -- if it is not, ` +
-      "the list is not what is silencing it and this clause is measuring nothing");
-  }
-  // FEATURE: AGT-63 -- and membership is an OBLIGATION: an off-bench agent still owes a COMPLETE
-  // portrait and pronoun entry, because its id reaches audit, decision and briefing surfaces. So an
-  // id added here to escape a failure meets a stricter check than the one it escaped.
-  for (const id of OFF_BENCH_AGENT_IDS) {
-    const av = AVATAR_CFG[id];
-    assert.ok(av, `off-bench agent ${id} has no AVATAR_CFG entry`);
-    for (const k of AVATAR_KEYS) assert.ok(av[k] !== undefined, `off-bench agent ${id} AVATAR_CFG is missing ${k}`);
-    const pr = AGENT_PRONOUNS[id];
-    assert.ok(pr, `off-bench agent ${id} has no AGENT_PRONOUNS entry`);
-    for (const k of PRONOUN_KEYS) assert.ok(pr[k] !== undefined, `off-bench agent ${id} AGENT_PRONOUNS is missing ${k}`);
+  // FEATURE: AGT-69 -- the exemption is READ LIVE and asserted to be NARROW before it is used.
+  // AGT-63's two clauses are unchanged in substance and pull in opposite directions on purpose: an
+  // exempt id must not silently be a Bench member as well, and the exemption must not swallow a
+  // genuinely stale entry. What changed is where the exemption comes from -- the `agents` table,
+  // which is also what the Bench's Governance section renders (src/components/GovernanceSection.jsx).
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  let governanceIds = null;
+
+  if (url && key) {
+    const res = await fetch(
+      `${url.replace(/\/+$/, "")}/rest/v1/agents?lane=eq.governance&is_active=eq.true&select=id`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    // assert.fail(), not assert.ok(..., `...${await res.text()}`): the template is built before the
+    // assertion is evaluated, so the ok() form consumes the body and the json() read below then
+    // throws "Body has already been read" on every successful run. Found here, 2026-09-12.
+    if (!res.ok) assert.fail(`GET agents?lane=eq.governance failed: HTTP ${res.status} ${await res.text()}`);
+    governanceIds = (await res.json()).map(r => r.id);
+    assert.ok(governanceIds.length > 0,
+      "the live agents table lists no active governance agent -- the exemption would be empty and " +
+      "the three clauses below vacuous. Confirm the lane before relaxing this.");
+
+    const benchIds = new Set(AGENTS.map(a => a && a.id));
+    for (const id of governanceIds) {
+      assert.ok(!benchIds.has(id),
+        `${id} is an active governance agent but is ALSO an AGENTS member -- an id belongs to ` +
+        "exactly one of them; the Bench renders governance agents from live rows, never from AGENTS");
+    }
+    // An id NOT exempt is still an orphan: run the checker with the exemption emptied and confirm
+    // the very entries it exempts come back. Without this, the exemption could be anything at all.
+    const unexempted = checkRoster(AGENTS, AVATAR_CFG, AGENT_PRONOUNS, required, []);
+    for (const id of governanceIds) {
+      assert.ok(unexempted.some(p => p.id === id && p.kind === "orphan-avatar"),
+        `control: with the exemption emptied, ${id} must be reported as an orphan -- if it is not, ` +
+        "the governance lane is not what is silencing it and this clause is measuring nothing");
+    }
+    // FEATURE: AGT-63, kept -- membership is an OBLIGATION: a governance agent still owes a
+    // COMPLETE portrait and pronoun entry, because its id reaches audit, decision and briefing
+    // surfaces, and since AGT-69 the Bench itself renders that portrait.
+    for (const id of governanceIds) {
+      const av = AVATAR_CFG[id];
+      assert.ok(av, `governance agent ${id} has no AVATAR_CFG entry`);
+      for (const k of AVATAR_KEYS) assert.ok(av[k] !== undefined, `governance agent ${id} AVATAR_CFG is missing ${k}`);
+      const pr = AGENT_PRONOUNS[id];
+      assert.ok(pr, `governance agent ${id} has no AGENT_PRONOUNS entry`);
+      for (const k of PRONOUN_KEYS) assert.ok(pr[k] !== undefined, `governance agent ${id} AGENT_PRONOUNS is missing ${k}`);
+    }
+  } else {
+    notRun("SE-03 orphan clause (governance exemption)",
+      "needs SUPABASE_URL/SUPABASE_SERVICE_KEY -- since AGT-69 the exemption is the live agents " +
+      "table, not a list in src/");
   }
 
   // --- 4. THE REAL ROSTER, AND NOW ITS SILENCE MEANS SOMETHING --------------------------------
-  const live = checkRoster(AGENTS, AVATAR_CFG, AGENT_PRONOUNS, required, OFF_BENCH_AGENT_IDS);
+  // Credentialed: the live governance ids are the exemption and every other orphan is still a
+  // failure. Uncredentialed: the exemption is empty, so the orphan direction is dropped entirely
+  // (it was declared not-run above) rather than reported against portraits that are correct.
+  const live = checkRoster(AGENTS, AVATAR_CFG, AGENT_PRONOUNS, required, governanceIds ?? [])
+    .filter(p => governanceIds !== null || (p.kind !== "orphan-avatar" && p.kind !== "orphan-pronouns"));
   assert.deepStrictEqual(
     live, [],
     "STANDARDS.md §11 is violated by the shipped roster:\n" +
