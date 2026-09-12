@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.457 | scripts/agent-prompt.js | SES-367 -- renderAssembly() now renders the
+// ASSEMBLED output contract as text. The executor states the contract by handing the schema to the
+// model as the tool `input_schema` (request-receivable.js buildCallBody); a session sub-agent has no
+// tool, so before this the prompt named none of its required keys and the answer came back without
+// the `account` receipt (LAV-28b) the drivers then refused.
 // DeepBench v7.0.435 | scripts/agent-prompt.js | SES-331 -- ONE prompt-assembly path for an agent
 // run inside a Claude session. SES-332: --intent now falls back to the capability's stored
 // default_intent_slug instead of silently assembling with no Intent Skill at all.
@@ -130,6 +135,20 @@ export function parseArgs(argv) {
   return out;
 }
 
+// FEATURE: SES-367 -- the assembled (post-injection) contract as text; the executor sends it as the
+// tool input_schema and a session sub-agent has no tool. Keyed on shape, never on a slug.
+export function renderFormatContract(formatContract) {
+  if (formatContract?.output_type !== 'json') return null;
+  const schema = formatContract.schema;
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema) || !schema.properties) return null;
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  return [
+    'OUTPUT CONTRACT. Return ONE JSON object and nothing else, matching this schema exactly -- the same schema the',
+    `executor hands its model as the tool definition; the driver refuses any missing required key. Required: ${required.map(k => `"${k}"`).join(', ') || '(none)'}.`,
+    JSON.stringify(schema, null, 2),
+  ].join('\n');
+}
+
 // The executor's own two steps, in the executor's own order, over the executor's own functions.
 // Nothing about the section shape is re-derived here: `order` already sorts stable before volatile
 // (db-assembly.js's HAR-02b renumbering) and `prompt_phase` is read straight off the section.
@@ -140,6 +159,13 @@ export function renderAssembly(assembly) {
     const text = renderSection(s);
     if (!text) { omitted.push(s.slug); continue; }
     entries.push({ slug: s.slug, order: s.order || 0, prompt_phase: s.prompt_phase === 'stable' ? 'stable' : 'volatile', text });
+  }
+  const contract = renderFormatContract(assembly.format_contract);
+  if (contract) {
+    // Inside INTENT (keeps HAR-02b-patch3's intent->task adjacency); else format; else its own stable block.
+    const host = entries.find(e => e.slug === 'intent') || entries.find(e => e.slug === 'format');
+    if (host) host.text = `${host.text}\n\n${contract}`;
+    else entries.push({ slug: 'format-contract', order: 5, prompt_phase: 'stable', text: `=== OUTPUT CONTRACT ===\n${contract}` });
   }
   return { ...assemblePhaseSplit(entries), omitted };
 }
