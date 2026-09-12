@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260912-0941 (v7.0.457, 2026-09-12, runner cycle `8ac204d8-bbc4-48a4-80c7-070660495082`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (4 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-367` — **a governance agent on the session lane was being handed a contract it was never shown, and the thing to read twice is that the orchestrator's own premise evidence was wrong in the direction that would have made the fix smaller.**
+
+### The bug, measured twice and by two different readers
+
+`api/prompt/db-assembly.js`'s `injectAccountField()` adds a required `account` property to every JSON output contract at assembly, and `assemblePrompt()` returns it as `format_contract`. The executor sends that schema to its model *as the tool definition*, so an executor-lane agent sees it. `scripts/agent-prompt.js` — the **session** lane, which is where `SES-359`/`SES-345` put the unattended Designer/Builder/Verifier chain — renders only `assembly.sections` in `renderAssembly()` and never reads `assembly.format_contract`. A session sub-agent therefore cannot know to return a key that `validateAgentVerdict()` then demands, which is why `rank-backlog.js` pass two refused the Prioritizer's ranking on 2026-09-11 with *missing required key account*.
+
+Measured on `370b313` before anything was touched: the rendered Prioritizer prompt is **15,876 chars containing `"account"` zero times**, while the same assembly returns `format_contract.schema.required = ["ranked","account"]`. After `54d40e15`: **17,201 chars, `"account"` ×3, `"ranked"` ×3, one `OUTPUT CONTRACT` block**. The orchestrator re-ran both halves itself against a `git show 370b313d:scripts/agent-prompt.js` copy rather than accepting the Builder's figures.
+
+### The orchestrator's own premise brief was wrong, and the Designer caught it
+
+The cycle told The Designer that `ds-kickoff-intent` *did* render `account`, and offered that as a nuance to design around ("do not double-render for the rows that already declare it"). **That was a false reading**: it was a substring match against the whole rendered file, and the match came from the task JSON the cycle itself passed in, not from rendered Intent text. The Designer measured it properly and returned the correction: **no Intent renders stored schema text at all** — `db-assembly.js`'s intent branch renders `objective`/`method`/`analysis_instructions` only — so `account` appears in **zero** rendered prompts, and the four LAV-26 rows whose stored schemas declare it (`qg-review-intent`, `library-evidence-intent`, `ci-answer-intent`, `library-record-lookup-intent`; 41 intent rows, 34 with a schema, 0 naming it in prose) never reach the prompt either. There was no double-render to guard against, and the fix is a single unconditional render keyed on contract *shape*, per `.claude/rules/capabilities-are-data.md`. Recorded here because the delegation is what caught it: a judgment-lane agent that re-measures its brief is the whole point of the lane, and a cycle that had "verified" its own premise and then designed alone would have shipped a conditional it did not need.
+
+### The deviation the Designer took on purpose, and why an editor must not finish it
+
+The ticket's third BUILD item asks that the refusal message also say *the prompt should have shown it*. Its one home is `validateAgentVerdict()` at `scripts/verifier.js:786`, which is a `SELF_CERTIFYING_PATH`: one string there and the verifier grades a diff it is part of, refusing this ship the auto-done bar under charter premise 3. It was declined with the reason, not dropped. The message already names the missing key; the rendered block now says where the key comes from.
+
+### The verdict is a block, and it is the same standing red for the FIFTH ship running
+
+`build=green / regression=red / hygiene=green` → verdict `01516a1d`. `record_ship_decision()` refused it in its own words (*"a block writes `delivered` and cards John, so there is nothing for a Reverse to undo"*), so this is the **fifth consecutive ship with no Reverse handle** (`v7.0.452`, `v7.0.453`, `v7.0.454`, `v7.0.456`, `v7.0.457`). Undoing this one means reverting `54d40e15` by hand. `bug_fix` streak resets 0 → 0, rung holds at 1 — a block costs the streak, never the rung.
+
+Both standing reds have named owners on the board and were deliberately not re-filed: `ses-285-m6-autonomy.test.mjs` is **`SES-373`** (queue 12, and position 2 in this cycle's own admitted queue), `log-143c-invention-use.test.mjs` is **`SES-371`** (queue 24).
+
+### The baseline moved for a reason worth writing down: this push makes dev's CI *less* red
+
+At cycle start the suite was **203/207** with four failures, not the predecessor's two — the extra pair being `SES-177-claude-state-renderer.js` and `SES-261-ledger-pin.js`, both *"the committed `CLAUDE-STATE.md` must be a byte-exact render of the ledger"*. That is `SES-213`'s known lag arriving on `dev` rather than a new defect: the predecessor rendered and pushed, then its own row reached `shipped` in its tail, so the committed file has been one cycle stale on `dev` ever since. Step 7a's `render-claude-state.js` cleared both — after the render the suite read **206/208** — and this cycle's close-out commits that rendered file, so `54d40e15`'s successor removes two of the four failures CI has been reporting on `dev` since 2026-09-11 22:12Z. `dev` had been CI-red on six consecutive pushes before this cycle; `rollback-on-red.js` correctly returned `action: none`, because head `370b313` was an attended push and *"an attended push or an unattributable one is not this machine's to undo"*.
+
+---
+
 ## session/cycle-20260912-0640 (v7.0.456, 2026-09-12, runner cycle `fc9cd33a-06b0-4287-a537-f14a02309836`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Prioritizer, a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-69` — **the six governance agents become visible to John for the first time, and the thing to read twice is that the ticket's own join does not exist.**
 
 ### The ticket asked for "the cycles it took part in" and there is no column that answers it
