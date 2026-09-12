@@ -25,6 +25,32 @@ Two doc surfaces went stale on this ship and both were left alone under the 3-fi
 
 ---
 
+## session/cycle-20260912-2209 (v7.0.467, 2026-09-12, runner cycle `c060742e-b419-4900-b856-484e3a4318b4`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-70` slice 3 of 4 — **The Auditor lands on the board and the brief, and the thing to read twice is that `SES-380` turned out to be a coupling rather than a cap.**
+
+### The landing, with the gate that decides what reaches the board
+
+A ledger nobody reads is a diary. This slice gives it three exits: a **standing-brief group** (counts and the open table, never a rate; absent facts render as *"not read for this render"* rather than as zeros), a **`tripwire-to-backlog.js --from-ledger`** path, and **runbook step 4d** — the weekly fire rule.
+
+The filing gate is the part worth stating plainly: a finding reaches the board only when it is **`open`, `high`, and carries a `ruled_by`** — that is, John read it and *left it open*, which is the ledger's only "real, still open" outcome. It dedupes on the fingerprint slice 1 designed, caps at **3 rows per ISO week** counted from the table (so a second cycle in the same week sees what the first filed), and **defaults to a dry run**. Today it correctly finds **0** eligible rows, because nothing has been ruled yet — the right first state for a path whose whole risk is board flooding.
+
+Step 4d's precondition is the detail that makes it honest: it keys on **the run's own `ai_activity_log` rows**, not a notes prefix and not a file. A cycle that ran and died before writing its notes leaves log rows; a file's existence proves only that someone once wrote a file. Twelve rows already exist for `2026-W37`, so 4d reads "already run" this week and the first live fire is the first cycle of `2026-W38`.
+
+**The coupling the Designer caught in advance:** `runner-cycle.md` now has a generated view — `cycle-card.md`, shipped hours earlier as `SES-377` — so adding a step *requires* a `NOTES` entry plus a card re-render in the same commit, or the suite goes red. It was scoped as its own task and done.
+
+### `SES-380` was real but mis-stated, and the correction is a measurement
+
+dev went red on **two** tests, `SES-177-claude-state-renderer.js` and `SES-261-ledger-pin.js`, with one root cause: *the committed `CLAUDE-STATE.md` must be a byte-exact render of the cycles it pins*. A peer cycle (`v7.0.466`) rendered and committed it; four more cycles then shipped and moved the ledger under it.
+
+**Rendering fixed both** — 5,886 bytes, under the ~6k guard, both `[PASS]`. So the file is not permanently over-cap, as this chain's earlier 6,443-byte measurement implied. `SES-380`'s row now carries the correction in its own words: **two failure modes, one coupling** — render and a verbose run of ship cards can exceed the size guard; don't render and the two drift guards go red. The fix has to bound what the renderer emits *and* settle whose job the render is. The rendered file ships in this close-out, which returns dev to green.
+
+Verdict **`approve`**, all three gates green; `tooling` promoted to rung 24. The ticket stays **`partial`** — slice 4 (negative-control corpus, self-audit, week-two dedupe) remains, as does the gated seed.
+
+### A peer, observed and left alone
+
+`scheduler_gate` named a predecessor this chain did not open: a **scheduled** fire on the `40 */3` grid, working `SES-348`, holding `v7.0.466`. `stall_watchdog` returned 0 rows, so it was live rather than silent, and B42's rule applied — parallel cycles are the design, a peer's row is never a successor's to adjudicate. It pushed mid-build; the Builder's rebase conflicted on the **generated** `standing-brief.md` and was resolved by re-running the generator, never by hand-merging a generated file.
+
+---
+
 ## session/cycle-20260912-2108 (v7.0.465, 2026-09-12, runner cycle `02ee73ed-137c-4793-8cd6-a432b80ad83e`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-70` slice 2 of 4 — **The Auditor gets judgment before it gets a body, and the thing to read twice is that the run had to be blind to mean anything.**
 
 ### The agent does not exist, so the run had to be designed around that rather than into it
