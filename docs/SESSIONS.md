@@ -5,6 +5,22 @@
 
 ---
 
+## session/cycle-20260912-2232 (v7.0.468, 2026-09-12, runner cycle `6fb43838-8f81-42c7-a684-3e51b939817d`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-343` — **the verdict contract stops voiding valid judgments, and the thing to read twice is that the ship was blocked by a guard neither it nor any other ticket can currently satisfy.**
+
+### Seventeen of twenty-seven judgments were being thrown away by a presentation field
+
+The Designer re-measured rather than quoting the ticket: replaying `tests/fixtures/verdicts-30-judgments.json` through the real `validateAgentVerdict()` rejects **17 of 27** — `architect_lens` over 1200 chars in 17 (range 1212–1464), `pm_lens` in 3 (1208–1261), and **none on any other key**. Every schema miss was fatal (`scripts/verifier.js:832-834`), so pass two exited 2 and recorded no row at all for a judgment the model had actually reached. The fix is the shape the Chief Architect lens already named: non-decisive presentation fields truncate with a note and still record; the decisive keys — `verdict`, `backlog_id`, `version`, `auto_done_eligible` — stay strict. The fixtures now go 27/27 valid with exactly 17 cut, the no-option control still rejects the same 17, and the `SES-337` reproduction's contract line moves `17/27 REJECTED` → `0/27`.
+
+### Opt-in in code, not a severity on the Intent row — and that was a scope decision, not a preference
+
+`vf-verdict-intent` is an active governance agent's Skill row, so editing it is reserved by the roster rule and §19v. More to the point, the strict path had to stay byte-identical for `run-project.js` and `rank-backlog.js`, which is what an opt-in third parameter guarantees and a changed schema does not.
+
+### The block: a generated file that cannot pass its own guard in either state
+
+The verifier returned **block** — build green, hygiene green, regression red — and the red is not this diff's. `CLAUDE-STATE.md` is generated, and step 7a mandates re-rendering it before every verdict. Committed as it stood, it fails `SES-177`'s drift clause and `SES-261`'s byte-exact clause (213/215). Freshly rendered, it clears both and trips `SES-177`'s *other* clause — 6,082 chars against a ~6,000 bar (214/215). There is no state of that file today that passes `SES-177`. dev CI had already been red on the same job since 22:42Z, on a peer's push, before this cycle pushed anything. Filed as `SES-381` with the measurement and three candidate fixes; the rollback engine, handed the facts, classified the red **card-only** and filed its own incident card rather than reverting anything. A block is not a wall: the ship stands `delivered` and waits on John.
+
+---
+
 ## session/cycle-20260912-2141 (v7.0.466, 2026-09-12, runner cycle `56357816-51f0-43d6-9f17-1059e74d7a76`, `trigger = scheduled` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-348` — **a model call now runs to the caller's deadline, and the thing to read twice is that the 60-second ceiling was ours, not Vercel's.**
 
 ### The ticket named three fixes and the measurement chose a fourth
