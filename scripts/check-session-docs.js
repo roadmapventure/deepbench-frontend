@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// DeepBench v7.0.463 | scripts/check-session-docs.js | SES-377 -- PROCEDURE_GENERATED_DOCS, the
+// second exemption check 13 has ever had, and it is a narrower one than PROCEDURE_HISTORY_DOCS.
+// A history doc is exempt because it QUOTES a procedure as a record. A generated doc is exempt
+// because it is not a second home at all: docs/runbooks/cycle-card.md is rendered from
+// docs/runbooks/runner-cycle.md by scripts/render-cycle-card.js, and
+// tests/regression/ses-377-cycle-card.test.mjs holds it byte-identical to that render on every
+// suite run. Check 13 exists because "two live copies of an executable procedure drift silently
+// and one of them is then wrong" -- a copy a regression test cannot let drift is the one case
+// where that sentence is not true. The exemption is by exact relative path and by nothing else:
+// any doc that wants it must be generated AND guarded, or it is a second home wearing a costume.
 // DeepBench v7.0.331 | scripts/check-session-docs.js | SES-248 -- THE origin/dev READER STOPS
 // SPELLING "I COULD NOT LOOK" THE SAME WAY IT SPELLS "THERE WAS NOTHING TO FIND", and that equality
 // is the whole defect. freshDevDirEntries() shelled `git -C SHARED_CHECKOUT`, SHARED_CHECKOUT is a
@@ -1426,6 +1436,11 @@ function checkRuleTextOutsideHome(findings, rules, docCache) {
 // is then wrong, which is a different and worse thing than a restated sentence.
 const PROCEDURE_MIN_CHARS = 60;
 const PROCEDURE_HISTORY_DOCS = new Set(["docs/SESSIONS.md", "docs/FEATURES-ARCHIVE.md"]);
+// SES-377 -- GENERATED views, not second homes. A doc listed here is rendered from another doc by
+// a script and held byte-identical to that render by a regression test, so it cannot drift away
+// from its source and be silently wrong, which is the only thing check 13 is protecting against.
+// Being merely "generated once" does not qualify: without the guard it is an ordinary copy.
+const PROCEDURE_GENERATED_DOCS = new Set(["docs/runbooks/cycle-card.md"]);
 
 // Comment lines are stripped before hashing so the same procedure carrying two different
 // explanatory headers still reads as one procedure -- which is the case worth catching.
@@ -1465,7 +1480,7 @@ function duplicateProcedureHomes(docs) {
 
 function buildProcedureDocs(findings) {
   const rels = [];
-  const push = rel => { if (!PROCEDURE_HISTORY_DOCS.has(rel)) rels.push(rel); };
+  const push = rel => { if (!PROCEDURE_HISTORY_DOCS.has(rel) && !PROCEDURE_GENERATED_DOCS.has(rel)) rels.push(rel); };
   try {
     for (const f of fs.readdirSync(WORKTREE)) if (f.endsWith(".md")) push(f);
     for (const f of fs.readdirSync(path.join(WORKTREE, "docs"))) if (f.endsWith(".md")) push(`docs/${f}`);
@@ -1783,6 +1798,10 @@ export {
   RULE_COPY_OVERLAP,
   PROCEDURE_MIN_CHARS,
   PROCEDURE_HISTORY_DOCS,
+  // SES-377 -- the generated-view exemption, exported so ses-377-cycle-card.test.mjs asserts the
+  // real Set rather than a copy of it (the same reason GATING_CHECKS above is imported, not
+  // restated): a card exempted here and a card guarded there must be the same card.
+  PROCEDURE_GENERATED_DOCS,
   // SES-45 -- check 14, pure pieces only (findings in, findings out; no disk, no exit).
   section8Region,
   codeFencesInRegion,

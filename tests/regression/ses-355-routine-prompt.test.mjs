@@ -69,6 +69,8 @@ export const RETIRED = [
 // canonical home. Each has a control that removes the pointer.
 export const REQUIRED = [
   { id: "runbook", re: /docs\/runbooks\/runner-cycle\.md/, breaks: s => s.replace(/runner-cycle\.md/g, "runner-cycle.txt") },
+  // SES-377 -- the prompt must send a cycle to the card, not to a 363,840-byte top-to-bottom read.
+  { id: "card-first", re: /docs\/runbooks\/cycle-card\.md/, breaks: s => s.replace(/cycle-card\.md/g, "cycle-card.txt") },
   { id: "pre-boot-gate", re: /runner_should_boot\(\)/, breaks: s => s.replace(/runner_should_boot/g, "runner_may_boot") },
   { id: "six-refusals-named", re: /scheduler_off, weekly_wall, weekly_pace, no_budget_row, nothing_pickable, unaffordable/, breaks: s => s.replace("weekly_pace, ", "") },
   { id: "queue-is-the-pick", re: /prime_directive_queue\(\)/, breaks: s => s.replace(/prime_directive_queue/g, "the queue") },
@@ -90,6 +92,17 @@ export function grade(prompt, lanes) {
   for (const q of REQUIRED) {
     assert.ok(q.re.test(prompt), `${PROMPT_REL} must point at ${q.id} (${q.re})`);
   }
+  // SES-377 -- ORDER, not just presence. Both files are named in step 3, and a prompt that names
+  // the runbook first is the 363,840-byte top-to-bottom read this ticket ended, wearing a mention
+  // of the card. Presence alone would pass that prompt, which is why this clause is separate.
+  const cardAt = prompt.indexOf("docs/runbooks/cycle-card.md");
+  const runbookAt = prompt.indexOf("docs/runbooks/runner-cycle.md");
+  assert.ok(
+    cardAt >= 0 && runbookAt >= 0 && cardAt < runbookAt,
+    `${PROMPT_REL} must name docs/runbooks/cycle-card.md BEFORE docs/runbooks/runner-cycle.md ` +
+      `(card@${cardAt}, runbook@${runbookAt}) — the card is what a cycle reads first; the runbook ` +
+      "is what it opens at an L-anchor. Naming the runbook first restores the undirected read.",
+  );
   // Model ids: every id the prompt names is a lane's id, and every lane's id is named. A prompt that
   // names a model the lanes table does not carry is exactly the claude-fable-5 drift this ticket found.
   const laneIds = new Set(lanes.values());
@@ -116,6 +129,15 @@ function everyClauseHasTeeth(prompt, lanes) {
     assert.notStrictEqual(broken, prompt, `control for ${q.id} changed nothing (the SES-158 failure)`);
     assert.throws(() => grade(broken, lanes), `control for ${q.id}: the broken prompt still passes`);
   }
+  // SES-377 -- the order clause's own control. Both paths stay present and every other clause
+  // still passes; only their positions swap. A grade() that merely counted mentions would be
+  // green on this, which is exactly the prompt the ticket replaced.
+  const swapped = prompt
+    .replace(/docs\/runbooks\/cycle-card\.md/g, " CARD ")
+    .replace(/docs\/runbooks\/runner-cycle\.md/g, "docs/runbooks/cycle-card.md")
+    .replace(/ CARD /g, "docs/runbooks/runner-cycle.md");
+  assert.notStrictEqual(swapped, prompt, "control for card-first order changed nothing (the SES-158 failure)");
+  assert.throws(() => grade(swapped, lanes), "control: a prompt naming the runbook before the card still passes");
   // A foreign model id must be caught.
   assert.throws(() => grade(prompt + " Use claude-fable-5 when in doubt.", lanes), "control: an old model id slipped through");
   assert.throws(() => grade(prompt + " Escalate to claude-opus-6.", lanes), "control: an unknown model id slipped through");
