@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.470 | scripts/render-claude-state.js | SES-381 — `skeletonChars()` added and exported for
+// the SES-177 size guard, which now measures the SPLIT (everything that is not a session bullet) instead of
+// the whole file. No other change here: `renderBody`'s bytes are identical, so no committed file flips to
+// drift. The reasoning for the bound lives beside the function.
+//
 // DeepBench v7.0.451 | scripts/render-claude-state.js | SES-354 — A SHIP IS A CYCLE ROW THAT RECORDS A
 // PUSH (`push_sha IS NOT NULL`), not one whose `outcome` reached `shipped`. The retired predicate read a
 // CYCLE-OUTCOME vocabulary (ARCHITECTURE.md §19v) as if it were a statement about what reached dev, and
@@ -179,6 +184,20 @@ export function stripId(title, id) {
   if (!id) return title;
   const re = new RegExp("^\\s*" + id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*[—-]\\s*");
   return title.replace(re, "");
+}
+
+// THE SKELETON (SES-381, v7.0.470) — everything in the file that is NOT a session bullet, i.e. every line
+// without the `- ` prefix `renderBullet` emits: the charter, the two version lines, the standing-brief
+// paragraph, the heading and the generated marker with its ledger pin.
+//
+// The SES-177 size guard reads THIS and not the file's length, because the split it guards moved 7,643
+// chars — the `**Next session:**` standing paragraph — out of exactly this part of the file. The skeleton
+// is bounded by construction (2,070 chars live at SES-381, 2,096 on the long-sha fixture); the bullets are
+// ship-card prose that nothing bounds, so a whole-file bar fails on honest renders — it did, on a 6,082-char
+// file, 2026-09-12. A re-inlining of the moved paragraph adds >= 7,643 chars to the skeleton, so the clause
+// still has teeth against the thing it was written to catch.
+export function skeletonChars(fileText) {
+  return String(fileText || "").split("\n").filter(l => !l.startsWith("- ")).join("\n").length;
 }
 
 // THE LEDGER PIN (SES-261, v7.0.347) — the ids this file was rendered FROM, carried in the file.
