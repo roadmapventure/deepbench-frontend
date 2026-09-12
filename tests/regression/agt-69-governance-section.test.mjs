@@ -1,3 +1,7 @@
+// DeepBench v7.0.460 | tests/regression/agt-69-governance-section.test.mjs | AGT-80 -- the section is
+// the Bench's "Product Team" filter (John, 2026-09-12). Check (b) grades the new contract: one import
+// line carrying the filter id/label/hook, one mount under the filter, the entry LAST in the nav and
+// flag-gated, the hire-able bench not mounted under it. (a), (c), (d), (r) and the live arm are unchanged.
 // DeepBench v7.0.456 | tests/regression/agt-69-governance-section.test.mjs | AGT-69 -- the Bench
 // grows a read-only Governance section, and the six governance agents become visible on EXACTLY
 // that one surface and on no other.
@@ -180,13 +184,26 @@ function checkA_listDeletedFromSrc() {
 // (b) RED pre-change -- one import, one mount, and the screen gains nothing else.
 function checkB_rosterMount() {
   const code = stripComments(read(ROSTER_REL));
-  const importLine = `import GovernanceSection from "../components/GovernanceSection.jsx"`;
+  // AGT-80: one import line (default + the filter id, label and hook), one mount, under the filter.
+  const importLine = `import GovernanceSection, { PRODUCT_TEAM_FILTER, PRODUCT_TEAM_LABEL, useProductTeam } from "../components/GovernanceSection.jsx"`;
   assert.strictEqual(countOccurrences(code, importLine), 1,
     `${ROSTER_REL} must carry EXACTLY one \`${importLine}\` (found ${countOccurrences(code, importLine)})`);
-  assert.strictEqual(countOccurrences(code, "<GovernanceSection />"), 1,
-    `${ROSTER_REL} must mount <GovernanceSection /> EXACTLY once (found ` +
-    `${countOccurrences(code, "<GovernanceSection />")}) -- one import + one mount is the whole ` +
-    "permitted change to an existing screen (.claude/rules/autonomous-surface-changes.md)");
+  const mount = "{isProductTeam && <GovernanceSection rows={productTeam.rows} embedded />}";
+  assert.strictEqual(countOccurrences(code, mount), 1,
+    `${ROSTER_REL} must mount the section EXACTLY once, under the Product Team filter (found ` +
+    `${countOccurrences(code, mount)})`);
+  assert.strictEqual(countOccurrences(code, "<GovernanceSection />"), 0,
+    `${ROSTER_REL} must not carry the AGT-69 unconditional mount any more -- John moved the section under the filter`);
+  // The entry is LAST ("last on the list") and flag-gated; the label is the component's constant.
+  assert.ok(code.includes("return [all, ...groups, ...productTeamEntry];"),
+    `${ROSTER_REL} must append the Product Team entry AFTER the BENCH_FILTERS groups`);
+  assert.ok(code.includes("const productTeamEntry = productTeam.on"),
+    `${ROSTER_REL} must gate the Product Team entry on the flag (productTeam.on)`);
+  assert.ok(code.includes("label: PRODUCT_TEAM_LABEL"),
+    `${ROSTER_REL} must label the entry from PRODUCT_TEAM_LABEL, never a second string`);
+  // The hire-able bench is not mounted under the filter.
+  assert.ok(code.includes("{!isProductTeam && (<>"),
+    `${ROSTER_REL} must hide the stats strip, agent grid and vacancy card under the Product Team filter`);
   // The flag read lives INSIDE the component. A flag read on the screen would be the second line
   // of change the rule forbids, and would also put the slug in two places.
   assert.ok(!code.includes(FLAG_SLUG),
@@ -203,6 +220,8 @@ function checkC_componentContract() {
     ".from(GOVERNANCE_VIEW)",
     `GOVERNANCE_FLAG = "${FLAG_SLUG}"`,
     `GOVERNANCE_VIEW = "${VIEW_NAME}"`,
+    `PRODUCT_TEAM_FILTER = "product-team"`,
+    `PRODUCT_TEAM_LABEL = "Product Team"`,
   ]) {
     assert.ok(code.includes(needle), `${COMPONENT_REL} must contain \`${needle}\``);
   }

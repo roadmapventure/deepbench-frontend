@@ -1,3 +1,9 @@
+// DeepBench v7.0.460 | GovernanceSection.jsx | AGT-80 — the section becomes the Bench's "Product Team"
+// filter (John, 2026-09-12, verbatim: "place the governance agents as a filter in the Bench on the left
+// hand side as 'Product Team', last on the list"). Exports PRODUCT_TEAM_FILTER / PRODUCT_TEAM_LABEL and
+// useProductTeam() (flag + rows in one hook) so RosterScreen.jsx adds ONE nav entry and ONE mount; the
+// default export now takes the rows in and renders embedded (no top margin) in the grid area. Read-only,
+// rows-from-the-view and no-ids-in-code are unchanged.
 // DeepBench v7.0.456 | GovernanceSection.jsx | AGT-69 — the Bench's read-only Governance section:
 // the live is_active lane=governance agents with portrait, role, specialty and their 7-day calls,
 // tokens and cycles, read from public.governance_agent_activity_7d (one row per agent, aggregated
@@ -34,6 +40,10 @@ import { AgentAvatar, Corners, FeatureBadge } from "./SharedUI.jsx";
 
 /** The data row that gates this section. On by default on dev since 2026-09-12; John flips it off (src/lib/featureFlags.js). */
 export const GOVERNANCE_FLAG = "agt-69-governance-section";
+
+/** AGT-80 — the Bench filter id and label. The label is the one John gave, verbatim. */
+export const PRODUCT_TEAM_FILTER = "product-team";
+export const PRODUCT_TEAM_LABEL = "Product Team";
 
 /** The anon-readable aggregate view. Definer-style: anon holds no grant on runner_cycles. */
 export const GOVERNANCE_VIEW = "governance_agent_activity_7d";
@@ -126,11 +136,11 @@ function GovernanceCard({ row }) {
  *
  * @param {{rows: Array<object>, isMobile: boolean}} props
  */
-export function GovernanceSectionView({ rows, isMobile }) {
+export function GovernanceSectionView({ rows, isMobile, embedded = false }) {
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
   return (
-    <div style={{marginTop:32}}>
+    <div style={{marginTop: embedded ? 0 : 32}}>
       <div style={{fontFamily:mono,fontSize:10,color:T.brass,letterSpacing:3,fontWeight:600,marginBottom:6}}>
         GOVERNANCE
       </div>
@@ -150,11 +160,29 @@ export function GovernanceSectionView({ rows, isMobile }) {
   );
 }
 
-export default function GovernanceSection() {
+/**
+ * AGT-80 — one hook for the Bench: the flag and the roster together, so the screen can add the
+ * "Product Team" nav entry (with its count) without reading the flag slug or the view itself.
+ *
+ * @returns {{on: boolean, rows: Array<object>|null}}
+ */
+export function useProductTeam() {
   const on = useFeatureFlag(GOVERNANCE_FLAG);
   const rows = useGovernanceRoster();
+  return { on, rows };
+}
+
+/**
+ * The mounted section. With `rows` passed in (the Bench's Product Team filter, AGT-80) it renders
+ * those rows embedded in the grid area; without them it reads the flag and the view itself, the
+ * AGT-69 shape, kept for any other caller.
+ */
+export default function GovernanceSection({ rows: rowsIn = null, embedded = false }) {
+  const on = useFeatureFlag(GOVERNANCE_FLAG);
+  const rowsOwn = useGovernanceRoster();
   const isMobile = useIsMobile();
+  const rows = rowsIn ?? rowsOwn;
 
   if (!on || !rows) return null;
-  return <GovernanceSectionView rows={rows} isMobile={isMobile} />;
+  return <GovernanceSectionView rows={rows} isMobile={isMobile} embedded={embedded} />;
 }

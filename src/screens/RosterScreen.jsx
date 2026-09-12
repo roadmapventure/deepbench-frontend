@@ -1,3 +1,7 @@
+// DeepBench v7.0.460 | RosterScreen.jsx | AGT-80 — the governance agents are the last left-hand filter,
+// "Product Team" (John, 2026-09-12): the nav gains one flag-gated entry with the live count after the
+// BENCH_FILTERS groups; under it the grid area shows the read-only Governance cards in place of the
+// stats strip, the agent grid and the vacancy card; under every other filter the six are not mounted.
 // DeepBench v6.2.17 | RosterScreen.jsx | RO-15 — mobile filter chip row gets a scroll-hint fade + chevron (SH-21 pattern reuse)
 // DeepBench v6.2.12 | RosterScreen.jsx | RO-14 — filter-name comment updated: "Market Intel" → "Channel Sales Intel"
 // DeepBench v6.2.5 | RosterScreen.jsx | S-MOBILE-ROSTER-01 — mobile-responsive layout (RO-13):
@@ -20,7 +24,7 @@ import { CURRENT_USER } from "../config.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { BENCH_FILTERS } from "../data/agents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
-import GovernanceSection from "../components/GovernanceSection.jsx"; // FEATURE: AGT-69 — flag-guarded inside the component
+import GovernanceSection, { PRODUCT_TEAM_FILTER, PRODUCT_TEAM_LABEL, useProductTeam } from "../components/GovernanceSection.jsx"; // FEATURE: AGT-69 / AGT-80 — flag read inside the component
 
 // FEATURE: RO-04 — AgentAvatar illustrated SVG portrait in agent cards
 // FEATURE: RO-02 — Agent cards + workload, AiBadge on Add Training
@@ -171,6 +175,9 @@ export default function RosterScreen() {
   const isMobile = useIsMobile();
 
   const [activeFilter, setActiveFilter] = useState("all");
+  // FEATURE: AGT-80 — the Product Team filter: flag + rows from the component's own hook
+  const productTeam = useProductTeam();
+  const isProductTeam = activeFilter === PRODUCT_TEAM_FILTER;
 
   const sortedAgents = useMemo(() => {
     return [...agents].sort((a, b) => {
@@ -190,8 +197,13 @@ export default function RosterScreen() {
       label: f.label,
       count: agents.filter(a => a.benchGroups.includes(f.id)).length,
     }));
-    return [all, ...groups];
-  }, [agents]);
+    // FEATURE: AGT-80 — "Product Team" is the LAST entry (John's word), present only while the
+    // AGT-69 flag row is on; its count is the live governance roster, never a constant.
+    const productTeamEntry = productTeam.on
+      ? [{ id: PRODUCT_TEAM_FILTER, label: PRODUCT_TEAM_LABEL, count: productTeam.rows ? productTeam.rows.length : 0 }]
+      : [];
+    return [all, ...groups, ...productTeamEntry];
+  }, [agents, productTeam.on, productTeam.rows]);
 
   // FEATURE: RO-10 — filtering happens on the already-sorted array, so
   // RO-09's sort order is preserved within the filtered subset.
@@ -293,6 +305,12 @@ export default function RosterScreen() {
             </div>
           )}
 
+          {/* FEATURE: AGT-80 — under the Product Team filter the grid area is the read-only
+              Governance cards; the stats strip, agent grid and vacancy card belong to the hire-able
+              bench and are not mounted here. */}
+          {isProductTeam && <GovernanceSection rows={productTeam.rows} embedded />}
+
+          {!isProductTeam && (<>
           {/* Bench stats strip */}
           {/* FEATURE: RO-02 */}
           {/* FEATURE: RO-13 — mobile: 3-col stat grid + full-width button, workspace tag dropped */}
@@ -374,7 +392,7 @@ export default function RosterScreen() {
               <div style={{padding:"3px 10px",background:"rgba(182,135,58,.2)",border:`1px solid rgba(182,135,58,.6)`,fontFamily:mono,fontSize:9.5,color:T.brassDeep,letterSpacing:1.2,textTransform:"uppercase",fontWeight:700}}>+ Build Agent</div>
             </div>
           </div>
-          <GovernanceSection />
+          </>)}
         </div>
       </div>
     </AppShell>
