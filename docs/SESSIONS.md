@@ -5,6 +5,36 @@
 
 ---
 
+## session/cycle-20260912-1841 (v7.0.461, 2026-09-12, runner cycle `ca22dcb2-6f5e-40b4-b242-f1521a58f7b0`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Prioritizer, a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-371` — **the suite's own clock stops failing it, and the thing to read twice is that four consecutive cycles were blocked by an assertion no commit ever broke.**
+
+### The red was the calendar, and it was measured before it was touched
+
+`public.report_card_usage` read live at 18:49Z: **7d=0, 30d=3, all=3**. The three `bench-report-card` agent-turn rows in `ai_activity_log` are all 2026-09-03 (16:03/17:21/17:24Z), so the 7-day cutoff passed the earliest at **2026-09-10T16:03Z** and `log-143c-invention-use.test.mjs:232` — `judge_runs >= 1` asserted on *every* window — began failing with no code change behind it. `ci_run_conclusions` by UTC day: 09-09 16/19 all-green, 09-10 5/7, 09-11 **0/30**, 09-12 **0/14**. The flip sits exactly on the window boundary. Running the file on the unmodified tree at cycle start reproduced it verbatim: `[FAIL] ... 7d: judge_runs must be >= 1 at this ship's population, got 0`.
+
+This is the failure `SES-376`, `SES-373`, `SES-367` and `AGT-69` each recorded as *"the one red this ship does not own"*. It was nobody's ship; it was the clock.
+
+### The view's own definition is what decides which window carries the claim
+
+`pg_get_viewdef`, read rather than recalled: `windows(win, ord, cutoff) AS (VALUES ('7d',1,now()-'7 days'), ('30d',2,now()-'30 days'), ('all',3,'-infinity'))`. So 7d and 30d are `now()`-relative cutoffs **by construction** and `all` is the population. The original kickoff's load-bearing phrase was *"at this ship's population"* — which is the `all` window and never shrinks. The fix retargets the claim there, and gives 7d/30d the structural property they can actually keep: `7d <= 30d <= all`. A broken cutoff or a swapped `ord` still fails; a quiet week no longer does.
+
+**Rejected, with the reason recorded rather than left implicit:** gating the 7d arm on there having been a run inside the window and declaring it NOT RUN. Honest, but John runs the judge rarely, so `NOT A FULL RUN` would become the suite's steady state — and `STANDARDS.md` §4 clause 3 makes that line mandatory reading. A line that is always there is a line nobody reads. Also rejected without discussion: seeding a judge run every cycle to keep a window populated, which spends a model call to keep a test green and pollutes the criterion-7 instrument with runner traffic.
+
+### The guard is retargeted, not disabled — and that is the half the QA had to prove
+
+The row assertions moved into one pure `assertUsageWindows(rows)` so a fixture can drive them, and a new SOURCE arm runs four shapes through it: today's live shape (7d=0/30d=3/all=3) passes, the `v7.0.418` shape passes, `all`=0 throws `/all: judge_runs must be >= 1/`, 7d=2/30d=1/all=1 throws `/monotone/`, and a two-row result throws. That is the ticket's own discriminating bar — *with a fixture whose `all` window is 0 the shipped test still FAILS* — and it is why the live arm was lifted into a function rather than patched in place. `judge_runs) >= 1` now occurs exactly once in the file and reads `rows[2]`.
+
+### The suite went green, and the number is the point
+
+`node tests/regression/run-all.js` with credentials: **210/210 passed**, zero `[FAIL]` lines, exit 0 — the line quoted verbatim into the cycle row rather than described, per `bd-identity`. Both single-file arms confirmed: with credentials `[PASS]`, with `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` unset `[PASS]` plus one `[NOT RUN]` carrying the re-measured figures. `npm run build` green, only the two pre-existing chunk-size advisories.
+
+`approve` (`runner_verdicts 579c33a6`), all three mechanical gates green, and the run reported `auto_done_eligible` — an executing project suspends charter decision 2's `P10 - Tooling` restriction for its duration, and the diff touches none of the three self-certifying paths. So the close-out wrote **`done`**, not `delivered`. `verdict_ladder_signal` applied `promote`: `bug_fix` streak 0 → 1, rung 1 unmoved (a rung lands on every fifth).
+
+### Two things this cycle did not do
+
+Step 4a's actuator returned `action: none` on the standing red — the sha was claimed by no runner cycle, so it was an attended or unattributable push and not the machine's to undo. Correct, and it is why the red survived four cycles: the rollback engine yields to humans, and no human was looking. **The residue, stated and not filed:** `judge_runs_real_visitors = 0` is still asserted in every window. The day a real visitor first runs the judge that flips — but that is an *event the test is supposed to notice* (criterion 7's milestone), not calendar decay, so it stays. The next reader should not mistake it for this same defect.
+
+---
+
 ## session/cycle-20260912-1540 (v7.0.459, 2026-09-12, runner cycle `8342bf68-f0b3-4ac2-b1d6-310bc3389a38`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-376` — **the kickoff gets a size cap, and the thing to read twice is that the half of it worth having is the half an unattended cycle may never ship.**
 
 ### The premise was measured, and the kickoff was written under the cap it designs
