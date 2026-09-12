@@ -1,5 +1,30 @@
 #!/usr/bin/env node
-// DeepBench v7.0.335 | scripts/rollback-on-red.js | SES-182 slices 1-4
+// DeepBench v7.0.458 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373
+//
+// -- SES-373 (v7.0.458): A CARD-ONLY OUTCOME RECORDS ITSELF ---------------------------------
+// Until this ship the CARD_ONLY branch filed its incident card with `decision NULL`, and ses-285
+// assertion 6 reads that column as "a human is being waited on" (M6-01). That reading was wrong
+// about these cards and right about the column: a held rollback IS the whole of the action taken,
+// so there was never an ask for anybody to answer. Five live cards stood undecided for a defect the
+// engine could not name. It names it now: on CARD_ONLY the engine records a `kind = 'rollback'`
+// `runner_decisions` row UNDER THE CYCLE ID PASSED IN, then files the card `decision = 'retired'`
+// naming that row.
+//
+// WHY THIS IS NOT THE BOUNDARY MOVING, which is the objection to answer rather than dodge. The
+// header's boundary below names two things the script never does: it never pushes and it never
+// applies DDL. Both are ACTING ON THE WORLD. Recording the outcome decide() already reached, in the
+// decision ledger, attributed to the `--cycle-id` handed in, is the LEDGER WRITER half this header
+// already claims -- exactly as it already writes the before-images, the card and the green pointer
+// under that same id. Three things hold the line: `p_backlog_id` is NULL, `p_ladder_work_class` is
+// NULL (finalising a hold moves no rung), and **nothing is recorded for REVERT_AND_CARD**. That
+// branch's action is executed by the CYCLE behind its push gates, so its record belongs to the cycle
+// at the moment it pushes -- the revert branch is byte-identical in behaviour here except the
+// pk_value fix, and its card is still filed undecided ON PURPOSE. Do not "finish" it here.
+//
+// FAIL DIRECTION: no decision -> NO CARD -> exit 2 (*could not run*, never a pass). A card with no
+// decision is the defect SES-373 closes, not a lesser evil, so filing one anyway is the retired
+// form. Guarded by tests/regression/ses-373-card-only-self-decides.test.mjs.
+//
 // FEATURE: SES-182 -- auto-rollback on red. Slice 1 of the kickoff v7.0.324 design: record the
 // rolling "last green state", and on an attributable CI red decide between reverting a CODE-ONLY
 // range and carding everything else. John authorised the build 2026-08-30 (card 2c136c5b, Q2
@@ -132,6 +157,26 @@ export const ACTIONS = {
   CARD_ONLY: "card-only",
   NONE: "none",
 };
+
+// SES-373. `runner_decisions.kind` carries no CHECK constraint (read from pg_catalog at this ship),
+// so the vocabulary lives here as data the guard can assert rather than in a literal inside a body.
+// `rollback` was already an admissible-and-unused kind; the backfill that closed the five standing
+// cards used `rollback-backfill`, mirroring the existing `ship-backfill` precedent.
+export const ROLLBACK_DECISION_KIND = "rollback";
+
+// `runner_items_decision_check` admits exactly accept | reverse | rework | retired. `retired` is
+// SES-300's *withdrawn as an ask; a record, never an open question*, and card c580d0fa is the live
+// precedent on this exact card shape. NOT `accept` -- that reads as an approval nobody gave, and it
+// is the one value `trg_runner_items_accept_clears_flag` keys on. NOT `reverse` (means undo) and NOT
+// `rework` (means John asked for another pass; SES-300 measured the cost of overloading it).
+export const CARD_ONLY_DECISION = "retired";
+
+// Deliberately NOT ses-285's "Closed by SES-285 (v7.0.359)" marker: that test's assertion 7 selects
+// on its own prefix and then demands a backlog_id that RESOLVES, which an incident card carries none
+// of by design (SES-116 -- backlog_id is a JOIN KEY).
+export const CARD_ONLY_REASON_PREFIX = "Recorded by rollback-on-red (SES-373):";
+
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
 // Pure half -- facts in, a decision out. No network, no disk, no process.exit,
@@ -426,6 +471,77 @@ export function signatureOf(trigger, headSha) {
   return crypto.createHash("sha256").update(`rollback|${trigger}|${headSha}`).digest("hex").slice(0, 12);
 }
 
+// SES-373. The `rpc/record_decision` body for a card-only hold. PURE -- built and asserted without a
+// network, which is the only way the attribution rule below is testable at all.
+//
+// IT THROWS ON A MISSING CYCLE ID RATHER THAN PASSING NULL THROUGH. `record_decision()` RAISES
+// unless exactly one of cycle_id / session_name is set (`ck_decision_attribution`), so the database
+// would refuse it anyway -- but refusing here means the caller is stopped before the first write of
+// the sequence, and the message says which half is missing instead of surfacing a constraint name.
+// Attribution is not optional: an unattributed decision is a value with nobody behind it.
+// `trigger` and `headSha` are ADDITIONAL optional ctx fields the kickoff's named signature
+// (`{ cycleId, version }`) does not list, and they are here because the summary it specifies
+// interpolates both and `decide()` returns neither: the trigger is nowhere on the decision object at
+// all, and parsing it back out of `decision.reason` would be trusting prose the engine wrote about
+// itself -- the exact reading this file's own header rejects for the watermark. Purely additive: a
+// call written `{ cycleId, version }` still works, and headSha falls back to the attributed push sha.
+// `version` is accepted and deliberately unused -- the version belongs on the card and the commit,
+// and duplicating it inside the reasoning text would be a second home for it.
+export function rollbackDecisionArgs(decision, ctx = {}) {
+  const { cycleId = null, trigger = "ci-red", headSha = null } = ctx;
+  if (!cycleId) {
+    throw new Error(
+      "rollbackDecisionArgs: cycleId is required -- record_decision() raises unless exactly one of " +
+        "cycle_id / session_name is set (ck_decision_attribution), and an unattended cycle sets the cycle."
+    );
+  }
+  const shortSha = headSha
+    ? String(headSha).slice(0, 7)
+    : String(decision?.attribution?.sha ?? "").slice(0, 7) || "(unknown sha)";
+  return {
+    p_cycle_id: cycleId,
+    p_session_name: null,
+    p_kind: ROLLBACK_DECISION_KIND,
+    // An incident is not a board ticket (SES-116), and finalising a hold moves no rung -- so both
+    // the join key and the ladder class are NULL, and record_decision() finalises without touching
+    // either. That is half of what keeps this inside the ledger-writer boundary.
+    p_backlog_id: null,
+    p_summary: `Auto-rollback held: ${trigger} on ${shortSha} was not reverted (card-only)`,
+    p_reasoning:
+      `${decision?.reason ?? "(no reason recorded)"} Held, not asked: this record is the decision ` +
+      `(M6-01) and carries the 72-hour reversal handle (M6-02); no rung moves ` +
+      `(ladder_work_class NULL). pattern:0`,
+    p_ladder_work_class: null,
+  };
+}
+
+// SES-373. A COPY of the card, decided. Pure and non-mutating: the caller keeps the undecided card
+// it built, which is what lets the guard assert the revert branch is NOT stamped from the same
+// builder output.
+//
+// It throws on a falsy decision id for the same reason rollbackDecisionArgs does: `decision =
+// 'retired'` with nothing behind it is the defect this ticket closes wearing a value. The reason text
+// NAMES the uuid because that text plus `runner_before_images.decision_id` IS the link -- there is no
+// decision_id column on runner_items, exactly as for every other decided row on the board today.
+export function stampCardOnly(card, decisionId, now = new Date()) {
+  if (!decisionId) {
+    throw new Error(
+      "stampCardOnly: a decision id is required -- filing 'retired' with no decision row behind it " +
+        "is the SES-373 defect wearing a value rather than closing it."
+    );
+  }
+  return {
+    ...card,
+    decision: CARD_ONLY_DECISION,
+    decision_reason:
+      `${CARD_ONLY_REASON_PREFIX} a card-only hold is a decision, not an ask. Decision ${decisionId} ` +
+      `(runner_decisions, kind ${ROLLBACK_DECISION_KIND}) is its record and its 72-hour reversal ` +
+      `handle; nothing waits on a human (M6-01). '${CARD_ONLY_DECISION}' = withdrawn as an ask ` +
+      `(SES-300), never 'accept' -- accept would read as an approval nobody gave.`,
+    decided_at: now.toISOString(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Supabase REST -- the impure half
 // ---------------------------------------------------------------------------
@@ -561,13 +677,47 @@ export function summarizeRestorePlan(plan, imageCount = 0) {
 // §19v: no before-image logged -> the write does not happen. row_data = NULL encodes "this row did
 // not exist before", so a Reverse of a filing is a DELETE of that pk -- the INSERT convention
 // SES-89 introduced and runbook step 8b writes down.
-async function insertBeforeImage(base, key, cycleId, tableName, pkValue) {
+// SES-373 threads `decisionId` through: `runner_before_images.decision_id` is an FK to
+// runner_decisions and IS the link between a decision and the rows it touched. NULL on every caller
+// that has no decision to name (recordGreenState), exactly as before.
+async function insertBeforeImage(base, key, cycleId, tableName, pkValue, decisionId = null) {
   const r = await rest(base, key, "runner_before_images", {
     method: "POST",
     headers: { "Content-Type": "application/json", Prefer: "return=representation" },
-    body: JSON.stringify({ cycle_id: cycleId, table_name: tableName, pk_value: pkValue, row_data: null }),
+    body: JSON.stringify({
+      cycle_id: cycleId,
+      table_name: tableName,
+      pk_value: pkValue,
+      row_data: null,
+      decision_id: decisionId,
+    }),
   });
   return r.error ? { error: `before-image insert failed: ${r.error}` } : { ok: true };
+}
+
+// SES-373. POST rpc/record_decision and hand back the uuid it minted.
+//
+// PostgREST returns a scalar-returning function's value as the BARE JSON SCALAR, not as a row -- so
+// the body is a JSON string, and `rows[0]` or `rows.id` would both read `undefined` and sail on with
+// an id of nothing. A non-uuid answer is therefore an ERROR here rather than a value: the whole point
+// of this call is to produce something the card can name.
+export async function recordRollbackDecision(base, key, args) {
+  const r = await rest(base, key, "rpc/record_decision", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify(args),
+  });
+  if (r.error) return { error: `record_decision failed: ${r.error}` };
+  const raw = r.rows;
+  const id = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : raw?.id ?? null;
+  if (typeof id !== "string" || !UUID_SHAPE.test(id)) {
+    return {
+      error:
+        `record_decision returned ${JSON.stringify(raw)}, which is not a uuid -- refusing to file a ` +
+        `card naming a decision that may not exist.`,
+    };
+  }
+  return { id };
 }
 
 export async function recordGreenState(base, key, row) {
@@ -581,15 +731,22 @@ export async function recordGreenState(base, key, row) {
   return r.error ? { error: `green state upsert failed: ${r.error}` } : { ok: true, row: r.rows[0] ?? null };
 }
 
-export async function fileIncidentCard(base, key, card) {
-  const img = await insertBeforeImage(base, key, card.cycle_id, "runner_items", card.display_ref);
+// SES-373 fixed the pk_value, and it is a correctness fix on BOTH branches rather than a tidy-up.
+// The image used to address the row by `card.display_ref`; runbook step 7b's measured note says
+// pk_value is the row's PRIMARY KEY, because reverse_decision() addresses a row by its pk and
+// REFUSES one it cannot cast to a uuid. A display_ref pk_value could never be reversed at all. So the
+// id is minted here, imaged, and POSTed with the card -- runner_items.id defaults to
+// gen_random_uuid() and accepts a client-supplied uuid (read from the catalog at this ship).
+export async function fileIncidentCard(base, key, card, decisionId = null) {
+  const id = card.id ?? crypto.randomUUID();
+  const img = await insertBeforeImage(base, key, card.cycle_id, "runner_items", id, decisionId);
   if (img.error) return img;
   const r = await rest(base, key, "runner_items", {
     method: "POST",
     headers: { "Content-Type": "application/json", Prefer: "return=representation" },
-    body: JSON.stringify(card),
+    body: JSON.stringify({ ...card, id }),
   });
-  return r.error ? { error: `incident card insert failed: ${r.error}` } : { ok: true, id: r.rows[0]?.id ?? null };
+  return r.error ? { error: `incident card insert failed: ${r.error}` } : { ok: true, id: r.rows[0]?.id ?? id };
 }
 
 // ---------------------------------------------------------------------------
@@ -696,14 +853,31 @@ async function main() {
   const planRes = await readRestorePlan(base, key, attributedCycle);
   if (planRes.error) console.error(planRes.error);
 
-  const card = buildIncidentCard(decision, {
+  let card = buildIncidentCard(decision, {
     cycleId,
     headSha,
     beforeImages: imgRes.images,
     restorePlan: planRes.plan ?? null,
     trigger,
   });
-  const filed = await fileIncidentCard(base, key, card);
+
+  // SES-373. A CARD-ONLY HOLD IS THE WHOLE OF THE ACTION TAKEN, so it is filed DECIDED, under a
+  // decision row recorded first. REVERT_AND_CARD deliberately records nothing here -- see the header.
+  let decisionId = null;
+  if (decision.action === ACTIONS.CARD_ONLY) {
+    const dec = await recordRollbackDecision(
+      base,
+      key,
+      rollbackDecisionArgs(decision, { cycleId, version, trigger, headSha })
+    );
+    // Exit 2 is *could not run*, never a pass (step 4a already says how it is noted).
+    if (dec.error) fail(2, "card-only decision could not be recorded, so no card was filed (a card " +
+      "with no decision is the defect SES-373 closes, not a lesser evil): " + dec.error);
+    card = stampCardOnly(card, dec.id);
+    decisionId = dec.id;
+  }
+
+  const filed = await fileIncidentCard(base, key, card, decisionId);
   if (filed.error) fail(2, filed.error);
 
   finish(
@@ -712,10 +886,12 @@ async function main() {
       decision,
       applied: true,
       cardId: filed.id,
+      decisionId,
       revertPlan: decision.revertPlan ?? null,
       schemaPlan: decision.schemaPlan ?? null,
     },
     `${decision.action}: ${decision.reason}\ncard ${filed.id}` +
+      (decisionId ? `\ndecision ${decisionId} (runner_decisions, kind ${ROLLBACK_DECISION_KIND}; reversible for 72h)` : "") +
       (decision.revertPlan ? `\nrun this behind the cycle's push gates:\n  ${decision.revertPlan.command}` : "") +
       (decision.schemaPlan?.reversible
         ? `\nthen apply these downs newest-first, through apply_migration, behind the same gates:\n` +

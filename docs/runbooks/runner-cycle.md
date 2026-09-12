@@ -1487,6 +1487,20 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/rollback-on-red.js --appl
   --migrations='[{"version":"…","name":"…"}, …]'
 ```
 
+**A CARD-ONLY OUTCOME RECORDS ITSELF (`SES-373`, `v7.0.458`).** On `action: card-only` the engine
+records a `kind = 'rollback'` `runner_decisions` row **under the cycle id you passed in** and files
+the incident card `decision = 'retired'` naming it; the JSON carries `decisionId`, so copy that into
+your notes. **You record nothing further for it, and you never hand-write `decision` on that card** —
+a second record under the same handle is two homes for one decision. `retired` is `SES-300`'s
+*withdrawn as an ask; a record, never an open question*: the hold WAS the whole of the action taken,
+so there is no ask for anybody to answer, and `accept` would read as an approval nobody gave. A
+decided card leaves briefing §6 (`briefing_open_cards()` filters `decision is null`) and surfaces on
+the standing brief's open-decisions ledger instead. **Fail direction: no decision → no card → exit
+2** (*could not run*, noted exactly as above). **The `revert-and-card` branch is unchanged and its
+card is still filed undecided on purpose** — that branch's action is executed by *you*, behind the
+push gates, so its record belongs to the cycle at the moment it pushes; that record is not built
+(open, `SES-373` §7). Guarded by `tests/regression/ses-373-card-only-self-decides.test.mjs`.
+
 **`--migrations` is `SES-182` slice 2 (`v7.0.333`) and it matters only on a RED**, so a green sweep
 may omit it. It is the migrations that landed in the range, read with **one call** —
 `SELECT * FROM public.migrations_in_range('<green anchor watermark>', '<current watermark>');` —
