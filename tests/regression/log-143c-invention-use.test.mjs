@@ -1,3 +1,4 @@
+// DeepBench v7.0.461 | tests/regression/log-143c-invention-use.test.mjs | SES-371 — the live arm's judge_runs >= 1 moves to the `all` window; 7d/30d are calendar windows and empty legitimately (last run 2026-09-03, 7d emptied 2026-09-10).
 // DeepBench v7.0.418 | tests/regression/log-143c-invention-use.test.mjs | LOG-143 (c) — CRITERION
 // 7 GETS ITS INSTRUMENT. Parts (a) (v7.0.415, push fed9391e) and (b) (v7.0.417, push 7b545d44)
 // shipped the judge and its surfaces; this part gives "at least one platform-originated feature
@@ -26,7 +27,8 @@
 //   3. LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY; DECLARED not-run otherwise): report_card_usage
 //      answers with exactly its three window rows (7d/30d/all), and at this ship's population —
 //      the two bench-report-card rows logged by part (a)'s own live QA run, both attended, from
-//      John's machine — judge_runs >= 1 and judge_runs_real_visitors = 0 in every window, which is
+//      John's machine — judge_runs >= 1 in the `all` window only (7d/30d decay by the calendar —
+//      SES-371) and judge_runs_real_visitors = 0 in every window, which is
 //      also Manual QA step 1 of the kickoff.
 //
 // Invocation: node tests/regression/log-143c-invention-use.test.mjs
@@ -194,6 +196,31 @@ function theRendererReadsTheViewAndNothingElse() {
     "the renderer must not read visitor_labels directly — the real-visitor predicate lives only in report_card_usage");
 }
 
+// THE RETARGET, DRIVEN FROM FIXTURES BOTH WAYS (SES-371). The live arm can only ever see today's
+// calendar; this one proves WHICH branch of assertUsageWindows() fires, on shapes chosen to
+// separate "the guard moved to the `all` window" from "the guard was deleted".
+function theWindowGuardDiscriminatesTheAllWindowNotTheCalendar() {
+  // Today's live shape, measured 2026-09-12T18:49Z: the 7d window has emptied by the calendar
+  // (last judge run 2026-09-03) while `all` still carries its three. This must PASS.
+  const LIVE_0912 = ZERO.map(r => ({ ...r, judge_runs: r.window === "7d" ? 0 : 3 }));
+  assertUsageWindows(LIVE_0912);
+
+  // And the v7.0.418 shape the original guard was written against still passes — a retarget, not
+  // a rewrite of what the file claims.
+  assertUsageWindows(ZERO);
+
+  // THE GUARD IS NOT DISABLED: with `all` at zero — the population really gone, which is the
+  // defect this arm exists to catch — it still throws.
+  assert.throws(() => assertUsageWindows(ZERO.map(r => ({ ...r, judge_runs: 0 }))), /all: judge_runs must be >= 1/);
+
+  // The view's own structural property: a 7d count above the 30d count is impossible by
+  // construction, so it is a view defect, not a quiet week.
+  assert.throws(() => assertUsageWindows(ZERO.map(r => ({ ...r, judge_runs: r.window === "7d" ? 2 : 1 }))), /monotone/);
+
+  // The row-count claim survived the extraction.
+  assert.throws(() => assertUsageWindows(ZERO.slice(0, 2)), /exactly its three window rows/);
+}
+
 // ---------------------------------------------------------------------------
 // Arm 2 — DOC.
 // ---------------------------------------------------------------------------
@@ -220,21 +247,34 @@ async function rest(url, key, q) {
   return res.json();
 }
 
-async function theViewAnswersWithThreeWindowRows(url, key) {
-  const rows = await rest(url, key,
-    "report_card_usage?select=window,ord,judge_runs,judge_runs_real_visitors,distinct_real_visitors,first_real_visitor_at,last_real_visitor_at&order=ord");
+// THE WINDOW GUARD, PURE — rows in, throw or return. Extracted from the live arm (SES-371) so the
+// SOURCE arm can drive it from fixtures both ways: the calendar cannot be fixtured, the shape can.
+//
+// Manual QA step 1 of the kickoff said "at this ship's population" — that population is the `all`
+// window, which never shrinks. 7d and 30d are `now() - interval` cutoffs by definition, so
+// `judge_runs >= 1` there asserts the calendar, not the code, and goes red on a quiet week with no
+// defect to find (it did, 2026-09-10, stalling every cycle's commit gate). What survives here is
+// what does not decay: the real-visitor counts, the NULL first-use, the view's own structural
+// `7d <= 30d <= all`, and the >= 1 claim on `all`.
+function assertUsageWindows(rows) {
   assert.strictEqual(rows.length, 3, `report_card_usage must always return exactly its three window rows, got ${rows.length}`);
   assert.deepStrictEqual(rows.map(r => r.window), ["7d", "30d", "all"], "window order must be 7d, 30d, all");
 
-  // Manual QA step 1 of the kickoff, asserted live: after part (a)'s own attended QA run,
-  // judge_runs >= 1 and judge_runs_real_visitors = 0 — John's own machine is not a real visitor.
   for (const r of rows) {
-    assert.ok(Number(r.judge_runs) >= 1, `${r.window}: judge_runs must be >= 1 at this ship's population, got ${r.judge_runs}`);
     assert.strictEqual(Number(r.judge_runs_real_visitors), 0,
       `${r.window}: judge_runs_real_visitors must be 0 — every logged run so far is John's own attended QA call`);
     assert.strictEqual(Number(r.distinct_real_visitors), 0, `${r.window}: distinct_real_visitors must be 0`);
     assert.strictEqual(r.first_real_visitor_at, null, `${r.window}: no real-visitor use yet, so first_real_visitor_at must be NULL`);
   }
+
+  assert.ok(Number(rows[2].judge_runs) >= 1, `all: judge_runs must be >= 1 — this ship's population never shrinks (SES-371), got ${rows[2].judge_runs}`);
+  assert.ok(Number(rows[0].judge_runs) <= Number(rows[1].judge_runs) && Number(rows[1].judge_runs) <= Number(rows[2].judge_runs), `judge_runs must be monotone 7d <= 30d <= all, got ${rows.map(r => r.judge_runs).join("/")}`);
+}
+
+async function theViewAnswersWithThreeWindowRows(url, key) {
+  const rows = await rest(url, key,
+    "report_card_usage?select=window,ord,judge_runs,judge_runs_real_visitors,distinct_real_visitors,first_real_visitor_at,last_real_visitor_at&order=ord");
+  assertUsageWindows(rows);
 }
 
 async function run(ctx = {}) {
@@ -252,6 +292,9 @@ async function run(ctx = {}) {
   theRendererReadsTheViewAndNothingElse();
   results.push("source-renderblock-placement-sha-and-fetch-contract");
 
+  theWindowGuardDiscriminatesTheAllWindowNotTheCalendar();
+  results.push("source-window-guard-all-carries-the-claim");
+
   theShippedBriefCarriesTheInventionInUseBlock();
   results.push("doc-shipped-brief-carries-the-block-in-order");
 
@@ -263,7 +306,8 @@ async function run(ctx = {}) {
       "judge_runs_real_visitors = 0 in every window at this ship's population)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent; run with --env-file-if-exists=.env.local or export " +
       "the two names read from public.runner_secrets. Measured over the MCP when this shipped " +
-      "(2026-09-03): 3 rows (7d/30d/all), judge_runs=1 and judge_runs_real_visitors=0 in every window " +
+      "(2026-09-03): 3 rows (7d/30d/all), judge_runs=1 in every window; re-measured 2026-09-12 (SES-371): " +
+      "7d=0, 30d=3, all=3, and the claim now lives on the all window " +
       "— the two bench-report-card rows logged so far are both John's own attended QA call " +
       "(visitor_id NULL, call_source 'script', the Vercel preview host).",
     );
