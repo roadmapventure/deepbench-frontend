@@ -5,6 +5,30 @@
 
 ---
 
+## session/cycle-20260912-1909 (v7.0.462, 2026-09-12, runner cycle `64ac63af-0882-444e-95dd-bc0b7aef4fc2`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` (*"not a scheduled cycle — your scheduler setting governs scheduled fires only"*) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-359` — **the kickoff declares its lanes, and the thing to read twice is that this cycle's own grader was blind to the change it was grading.**
+
+### The scope split was the design, and the gated half has paste-ready text
+
+The ticket asks for a `lanes` array on `ds-kickoff-intent`'s schema — an **active** agent's `skill_profiles` row, the lane `.claude/rules/agent-roster-inert.md` and this runbook's standing prohibitions put beyond every rung. This cycle held `tooling` at rung **22** and it bought exactly nothing there, which is the same answer `SES-376` got this morning at rung 21. So the Designer scoped eight tasks an unattended cycle may actually ship and wrote the held half's exact replacement text — schema fragment, method step (7), seed edit — into `docs/harvests/SES-359-design.md` so the attended session pastes rather than re-derives.
+
+What shipped: `kickoffLaneFinding()` in `scripts/verifier.js` on both the `--check-kickoff` branch and the verdict path, the two assembled runs written into `session-setup.md` §3f, the hand-composed coding prompt RETIRED IN PLACE in `CLAUDE-DESIGN.md` (ledger entry 54), the lane wording byte-identical in `STANDARDS.md`, `agent-log.js` finally named in `runner-cycle.md` at steps 6 and 7 — it appeared **0** times before and 2 after — and a new guard. Suite **211/211**.
+
+### The QA discriminates, and it was re-run by the orchestrator rather than taken on report
+
+With no credentials in env: `--check-kickoff` on `v7.0.448-SES-368-weekly-pace-gate.md` exits **1** naming `kickoff-no-lanes` where it exited 0 on `origin/dev`, while `v7.0.459-SES-376-kickoff-size-cap.md` and this ticket's own kickoff exit **0** both times. The lane rule run on itself, as `SES-376`'s cap was.
+
+### The finding: step 7a's verifier grades an EMPTY diff, so charter premise 3 has had no enforcement unattended since `v7.0.439`
+
+The run reported `auto-done eligible: YES` with the reason *"the diff touches none of `scripts/verifier.js`, `scripts/check-session-docs.js`, `tests/regression/run-all.js`"*. **That is false** — push `74b9d2fa` changes `scripts/verifier.js` by 77 lines. Read out of the code rather than inferred: `verifier.js:1578` takes `base = arg("base", "origin/dev")` and `changedFilesFor()` is `git diff --name-only <base>...HEAD` plus `git status --porcelain`. Since `SES-336` the **Builder owns the push**, so by the time 7a runs `origin/dev` **is** HEAD. Measured at this ship: `git diff --name-only origin/dev...HEAD` returned nothing and `status` showed only `CLAUDE-STATE.md` from the orchestrator's own render — against a push of 10 files and 538 insertions. With zero changed files no `SELF_CERTIFYING_PATHS` entry can match, so `selfCertificationBlock()` cannot fire on the unattended path at all.
+
+**Empty read as clean** — the "NULL is not zero" direction this codebase has paid for repeatedly. So the close-out **wrote `delivered`, not `done`**, refusing a grant whose stated basis is factually wrong (decision `a57a3d0b`, reversible to 2026-09-15). The verdict itself stands: three genuinely green mechanical gates, and the discriminating QA re-run independently. Filed as **`SES-379`** rather than patched inline, because `scripts/verifier.js` is precisely the file this cycle may not self-certify. `verdict_ladder_signal` applied `promote`: `tooling` streak 7 → 8, rung 22 unmoved.
+
+### An orchestrator error, caught before the commit and named rather than buried
+
+Writing the Designer's `harvest_markdown` to `docs/harvests/SES-359.md` **overwrote a file that already existed** — the ticket's own full text, moved there under `CLAUDE-DESIGN.md` step 9's over-cap rule, whose header reads *"Move, never delete"* and which `backlog_items.description` points at. Restored byte-for-byte from HEAD (3,011 bytes) and the reasoning relocated to `docs/harvests/SES-359-design.md`, with the Builder messaged mid-run so its commit set named the new path. **The general defect is not this cycle's alone:** `SES-376` gave `harvest_markdown` the fixed path `docs/harvests/<ID>.md`, which is the *same* path an over-cap description is moved to — so the harvest convention silently clobbers the ticket text of any ticket that took that route. `SES-371` missed it only because no prior harvest existed.
+
+---
+
 ## session/cycle-20260912-1841 (v7.0.461, 2026-09-12, runner cycle `ca22dcb2-6f5e-40b4-b242-f1521a58f7b0`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Prioritizer, a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-371` — **the suite's own clock stops failing it, and the thing to read twice is that four consecutive cycles were blocked by an assertion no commit ever broke.**
 
 ### The red was the calendar, and it was measured before it was touched
