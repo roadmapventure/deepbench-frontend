@@ -1,3 +1,13 @@
+// DeepBench v7.0.466 | api/prompt/request-receivable.js | SES-348 -- A MODEL CALL RUNS TO THE
+// CALLER'S DEADLINE. postToAnthropicWithRetry() clamped every request's abort signal to the lesser
+// of a 55 s literal and the remaining time (and the parse-failure retry fetch did the
+// same), so HAR-04's threaded deadline was honoured only below 55 s and a caller with a genuinely
+// larger budget got its request hung up on anyway. Measured 2026-09-10: ai_activity_log 41374, a
+// verify-ship verdict, terminal at 51,749 ms -- three minutes later durable_hops ff28e187 recorded
+// the same capability as in_progress with recovery_ledger[0].fault = TimeoutError. A 54-57 s turn
+// was a coin flip. Both fetches now abort at the remaining time the caller actually granted; the
+// MIN_VIABLE_CALL_MS floor is unchanged and is still what refuses a call with no room to finish.
+//
 // DeepBench v7.0.450 | api/prompt/request-receivable.js | LOG-149 -- EVERY CALL THAT REACHED THE API
 // NOW LEAVES A ROW, and a refusal is no longer treated as a parse problem. callModel() was the only
 // place `usage` and `stop_reason` ever exist, and it threw all three "reached the API" failures
@@ -481,6 +491,10 @@ const MIN_VIABLE_CALL_MS = 8000;
 // callModel(), which defaults it to Date.now() + 55000 when its own caller passes nothing -- see
 // callModel() below). remainingMs is recomputed on every retry attempt, not just once at entry, so a
 // slow transient-error backoff loop can't silently overrun the caller's real budget.
+// FEATURE: SES-348 -- the abort fires at the caller's deadline and nowhere else. The signal used to
+// be clamped to the lesser of a 55 s literal and remainingMs, so a caller that threaded a longer
+// deadline through still had every request hard-aborted at 55 s -- HAR-04's whole point, silently capped.
+// The floor above is the only other bound: below MIN_VIABLE_CALL_MS we don't start the call at all.
 async function postToAnthropicWithRetry(body, headers, deadline) {
   for (let attempt = 0; ; attempt++) {
     const remainingMs = deadline - Date.now();
@@ -500,7 +514,7 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
     let res;
     try {
       res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(55000, remainingMs)),
+        method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(remainingMs),
       });
     } catch (e) {
       if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
@@ -535,8 +549,9 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
 
 // FEATURE: LOG-149 -- a LABELLED input-token floor for a call we aborted. The exact count is
 // unknowable to us on this path: the API never returned a usage block, count_tokens is a second
-// network round trip on a path that just ran out of time (the abort fires at <=55s inside a 60s
-// maxDuration), and the exact free source -- streaming's message_start.usage.input_tokens -- is
+// network round trip on a path that just ran out of time (SES-348: the abort fires at the caller's
+// deadline, whatever the calling function's declared ceiling allows -- it is no longer a 55s literal
+// inside a 60s maxDuration), and the exact free source -- streaming's message_start.usage.input_tokens -- is
 // SES-348's design decision, not this ticket's. So we estimate, and every row built from this
 // carries call_facts.tokens_estimated = true so no reader can mistake the floor for a measurement.
 //
@@ -748,7 +763,7 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
       // (it has no internal retry loop of its own).
       let retryRes;
       try {
-        retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(Math.min(55000, retryRemainingMs)) });
+        retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(retryRemainingMs) });
       } catch (e) {
         if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
           e.modelCall = { sent: true, billed: true, model, fault: e.name, api_retry_count: 0,

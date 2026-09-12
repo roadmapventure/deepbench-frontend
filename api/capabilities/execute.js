@@ -1,3 +1,13 @@
+// DeepBench v7.0.466 | api/capabilities/execute.js | SES-348 -- THE EXECUTOR DECLARES ITS REAL
+// CEILING AND DERIVES ITS DEADLINES FROM IT. `config.maxDuration` was 60 on a project whose Fluid-
+// compute default timeout is 300 s, and both deadline computations (the fresh top-level call and the
+// checkpoint resume) restated that 60 as a literal. Paired with request-receivable.js's 55 s abort
+// clamp, every governance verdict -- the MCP server rides this same function after SES-346, and
+// scripts/verifier.js POSTs it directly -- ran a 54-57 s model turn inside a 55 s window: 2026-09-10
+// left one terminal row at 51,749 ms and, three minutes later, one in_progress checkpoint whose
+// recovery_ledger fault was TimeoutError. The ceiling is now stated once, in the config export, and
+// both deadlines read it. No capability slug, agent id or intent branch was added (§19b/§19d).
+//
 // DeepBench v7.0.450 | api/capabilities/execute.js | LOG-149 -- the runLoop() catch seam writes the
 // ledger row BEFORE it classifies. Both exits from that catch -- the HAR-17 transient
 // checkpoint-resume and persistFailureAndRethrow() -- returned without ever reaching logAgentTurn(),
@@ -141,7 +151,12 @@ import { withRequestContext } from '../../lib/request-context.js';
 // changed and nothing may be added to this seam beyond the one-line handoff in handler() below.
 import { mcpHandler } from '../_lib/mcp.js';
 
-export const config = { maxDuration: 60, runtime: "nodejs" };
+// FEATURE: SES-348 -- 60 was a self-cap, not the platform's limit: project prj_sQyHlk19MUKmXyaAhXc4
+// FBImdTMd runs Fluid compute with a functionDefaultTimeout of 300 s. Every governance verdict (the
+// MCP server rides this function per SES-346's rewrite, and scripts/verifier.js POSTs the executor
+// directly) is a 54-57 s model turn, so a 60 s declared ceiling made each one a coin flip. The two
+// deadlines below derive from THIS number rather than restating it, so the ceiling is declared once.
+export const config = { maxDuration: 300, runtime: "nodejs" };
 
 // FEATURE: AA-80 — platform-level hard ceiling on delegate hops per top-level request. Not
 // data-overridable by any Skill Profile — infrastructure, same category as the maxDuration/
@@ -1856,9 +1871,12 @@ export async function runCapability({
   const critiqueIntentSlug = promptRequest.critiqueIntentSlug || null;
 
   // FEATURE: AA-139 -- computed only when this is the top-level call (no _deadline passed in).
-  // SAFETY_MARGIN_MS is reserved off the real 60s ceiling for the checkpoint write + response
-  // round trip on whichever hop ultimately triggers it.
-  const deadline = _deadline || (Date.now() + 60000 - SAFETY_MARGIN_MS);
+  // SAFETY_MARGIN_MS is reserved off the ceiling for the checkpoint write + response round trip on
+  // whichever hop ultimately triggers it.
+  // FEATURE: SES-348 -- the ceiling is whatever this module's own `config` export declares (line
+  // 144), read rather than restated: a literal here could drift from the maxDuration Vercel actually
+  // enforces, and the drifting copy is the one that silently truncates the run.
+  const deadline = _deadline || (Date.now() + config.maxDuration * 1000 - SAFETY_MARGIN_MS);
 
   try {
     return await runLoop({
@@ -1919,7 +1937,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
     format_contract: row.format_contract,
     llm: row.llm,
   };
-  const deadline = Date.now() + 60000 - SAFETY_MARGIN_MS;
+  // FEATURE: SES-348 -- same derivation as runCapability()'s fresh deadline: the resume gets a new
+  // invocation's full declared budget, off config.maxDuration rather than a second literal.
+  const deadline = Date.now() + config.maxDuration * 1000 - SAFETY_MARGIN_MS;
   // FEATURE: MI-42 -- same no-op-default pattern as runCapability() above.
   const onEvent = _onEvent || (() => {});
 
