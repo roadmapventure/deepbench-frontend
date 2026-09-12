@@ -5,6 +5,32 @@
 
 ---
 
+## session/cycle-20260912-2108 (v7.0.465, 2026-09-12, runner cycle `02ee73ed-137c-4793-8cd6-a432b80ad83e`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-70` slice 2 of 4 — **The Auditor gets judgment before it gets a body, and the thing to read twice is that the run had to be blind to mean anything.**
+
+### The agent does not exist, so the run had to be designed around that rather than into it
+
+Slice 1 ruled creating `GV-07`'s rows gated and left the seed written-and-unapplied, so `agent-prompt.js --agent=auditor` can assemble nothing today. Two measurements shaped the way through. First, **the Builder cannot spawn a sub-agent** — `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` and the Builder is already one — so the cluster calls shell `claude -p` headlessly, the pattern `read-usage-meter.js` already uses. Second, and more interesting: **the prompt has one home in both states.** The method text lives only in the `au-*` rows — today as text in `docs/design/agt-70-auditor-seed.sql`, tomorrow as `skill_profiles` rows — and `--run` copies not a word of it. Today's prompt is orientation only and points the sub-process at the seed file; the moment an `agents` row `auditor` exists, the same code assembles through `agent-prompt.js` instead. The switch is a data fact, not a flag anyone has to remember, and the result file records which source ran.
+
+### "Re-find by fingerprint" could not be literal, and saying so was the design
+
+The fingerprint includes `normalize(governing_fact)` — free text the model writes. A blind run that finds the *same* dispute words it differently and mints a *different* fingerprint, which is exactly how a weekly audit would file six copies of its own first week. So the slice reconciles in **code**: a finding sharing ≥ 2 location homes with a ledger row is the same dispute, reported `re-found` and withheld from the candidates; exact fingerprint matches are counted for the record, never asserted. The fingerprint itself is slice 1's decision and was not touched.
+
+And one honest limit, reported rather than hidden: **`4ef228c3` cannot be re-found at all.** The corpus holds the seven `pz-*/temperature=0` statements but **zero** statements of their contradicting side — that the judgment lane's API rejects `temperature` lives only in `api/`, which is not one of the five homes. That absence is itself a finding about the corpus, and it is on the card.
+
+### The discipline slice 1 set was kept: twelve calls, twenty-four candidates, nothing filed
+
+12 clusters (4 prior + 8 anchor, 0 prior unrunnable), 12 live judgment-lane calls, 12 `agent-log.js` rows. Verified independently after the ship: **`audit_findings` still holds exactly 6 rows**, `ai_activity_log` gained **12** `auditor` rows, and `agents` / `skill_profiles` still hold **0**. The 24 new candidates went to `docs/audits/2026-W37-candidates.json` — committed, readable, and ingestible by one command — and the ingest ran **without `--apply`**. Slice 1's sentence still governs: an unknown number of rows into a ledger that renders on the standing brief is board flooding wearing a script's clothes.
+
+The detector also stopped crying wolf: live `duplicates` went **9 → 0** by exempting what was already governed — `cycle-card.md` (the `SES-377` generated view, via the same `PROCEDURE_GENERATED_DOCS` set `check-session-docs.js` owns, imported rather than restated), fenced blocks (check 13's), and a rendered `> **Rule B40** —` line. The fixture corpus still prints `duplicates 1`, so the exemptions narrowed nothing that mattered.
+
+### `SES-380` changed how this cycle ran step 7a, and the change is recorded rather than silent
+
+The predecessor filed `SES-380`: `render-claude-state.js` now produces a file over its own size guard. `SES-213` puts that render first at 7a so the verdict grades a current tree — but running it here would have injected a red that is **not this ship's**. Tested rather than assumed: the committed `CLAUDE-STATE.md` **passes unrendered**, so the drift arm is satisfied and only the render breaks it. This cycle therefore skipped the render and said so. Verdict **`approve`**, all three gates green; `verdict_ladder_signal` promoted `tooling` streak 1 → 2, rung 23 held.
+
+The run also reported `auto-done eligible: YES` — and this time the claim is true on its facts, since the diff touches none of the three self-certifying paths. It changed nothing: **the ticket stays `partial`**, because slices 3 and 4 are unbuilt and a finished-looking status on an unfinished ticket is worse than an honest one.
+
+---
+
 ## session/cycle-20260912-2020 (v7.0.464, 2026-09-12, runner cycle `2c62d37b-5711-4862-aa3c-b943acb44117`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-70` slice 1 of 4 — **The Auditor gets a ledger before it gets a voice, and the thing to read twice is that the cycle's own grader went red on the cycle's own productivity.**
 
 ### Slice 1 of 4, and the slicing was the first judgment
