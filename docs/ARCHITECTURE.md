@@ -2593,7 +2593,10 @@ is the table's git-history and offline copy.
 ### Lane routing — what ships unattended vs. what waits for John
 
 **The exposure rule:** *changes what an approved surface looks like, or adds a surface →
-default-off feature flag (a data row, `HAR-41` — never a code constant). Only makes an approved
+feature flag (a data row, `HAR-41` — never a code constant), **on by default on dev** — John's
+rule of 2026-09-12, verbatim: *"when ever anything is created in dev environment, it is flipped on
+by default. I can then choose later to flip off"* (`feature_flags.enabled` defaults `true`, migration
+`john_dev_flags_default_on`; a row is set `false` only by his word; dev → main stays his sign-off). Only makes an approved
 surface do what it was already supposed to do → ships live.* A flag governs **exposure, never
 correctness** — a bug fix behind an off flag is a fix that did nothing, and it makes the
 regression test vacuous (the `LOO-013` failure shape).

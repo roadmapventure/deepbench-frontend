@@ -2849,7 +2849,9 @@ against, and an attended cycle runs no Builder.
   (import the repo's own module against real Supabase) is acceptable and **must be labeled a
   seam proof** in the evidence. Every Supabase write your QA makes gets a before-image row
   first and is cleaned up after.
-- Exposure rule: surface-visible work ships behind a default-off flag; fixes ship live (§19v).
+- Exposure rule: surface-visible work ships behind a flag that is ON by default on dev (John,
+  2026-09-12: "flipped on by default. I can then choose later to flip off"; `feature_flags.enabled`
+  defaults `true`); fixes ship live (§19v). Never INSERT a flag row with `enabled = false`.
 - **The ship is inside THIS cycle's caps — the `files N (+k) / tasks M (+k)` numbers step 5a wrote
   into `notes`, never a remembered 3/4** (`CAP-SCOPE-FILES` / `CAP-SCOPE-TASKS` as amended by
   `SES-122` (c), `v7.0.399`; both rows are `live` and their text is in Section 2 of

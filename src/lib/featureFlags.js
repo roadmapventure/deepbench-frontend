@@ -1,15 +1,22 @@
 // DeepBench v7.0.109 | featureFlags.js | HAR-41 — the §19v exposure-rule flag mechanism
 // FEATURE: HAR-41 — flags are DATA ROWS (public.feature_flags), not code constants: a new flag
-// is an INSERT, not a deploy. One shared reader for the whole frontend. Default OFF, always.
+// is an INSERT, not a deploy. One shared reader for the whole frontend.
+//
+// TWO DEFAULTS, AND THEY ARE NOT THE SAME THING (John, 2026-09-12). The DATA default is ON:
+// feature_flags.enabled defaults true (migration john_dev_flags_default_on), because John ruled
+// "when ever anything is created in dev environment, it is flipped on by default. I can then
+// choose later to flip off." The READER's default for an unknown answer stays OFF: no row, a failed
+// fetch or a malformed override resolve false, because that is a network or data failure, not a
+// decision, and the failure mode must never be "every visitor sees a surface nobody inserted."
 //
 // Resolution order, highest first:
 //   1. URL override   ?ff=slug-a,!slug-b   (slug-a forced ON, slug-b forced OFF)
 //   2. the data row    feature_flags.enabled
 //   3. false           — no row, failed fetch, unknown slug, malformed param
 //
-// Every unknown answer is OFF. That direction is deliberate: §19v ships a new surface behind a
-// default-off flag, so the failure mode of this module must be "John doesn't see the new thing
-// yet", never "every visitor sees an unapproved surface because a network call failed."
+// Every unknown answer is OFF. That direction is deliberate: the failure mode of this module must
+// be "the new thing is not shown this load", never "every visitor sees a surface whose row was
+// never written because a network call failed." The row itself is ON by default (above).
 //
 // The URL override is the preview mechanism John approved on 2026-08-20 ("url overide is fine"):
 // a briefing link carrying ?ff=<slug> shows him a flagged feature switched on while every other

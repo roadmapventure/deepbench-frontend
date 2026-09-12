@@ -11,7 +11,8 @@ Manual Design & Build sessions are untouched by this file.
 
 - Zero deleted lines in existing `src/screens/*` and `src/AppShell.jsx` (`git diff --numstat`
   vs origin/dev). Additions to an existing screen: one import + one flag-guarded mount, only.
-- New screens ship route AND nav entry inert behind a default-off flag (a data row, `HAR-41` —
+- New screens ship route AND nav entry behind a flag (a data row, `HAR-41`, ON by default on dev
+  since 2026-09-12 — John: "flipped on by default. I can then choose later to flip off" —
   never a code constant). New work lives in new files.
 - A diff that deletes lines here is an appearance change: flagged or gated, never shipped bare.
 

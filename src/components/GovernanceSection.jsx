@@ -4,7 +4,7 @@
 // server-side so the browser reads six rows rather than thirteen hundred log lines). John ruled
 // shape (a) on 2026-09-11, decision 146256c1-f29a-4fb5-8854-9489eecd6d7e.
 //
-// FLAGGED, DEFAULT OFF, AND THE FLAG READ LIVES HERE. ARCHITECTURE.md §19v's exposure rule applies
+// FLAGGED (ON BY DEFAULT ON DEV SINCE 2026-09-12, John's rule), AND THE FLAG READ LIVES HERE. ARCHITECTURE.md §19v's exposure rule applies
 // even to a shape John has already ruled on: an appearance change on an approved surface ships
 // behind a data row (HAR-41), so his Accept is one UPDATE and his Reverse is the same UPDATE with
 // `false`. Preview without the flip: /bench?ff=agt-69-governance-section. Keeping the flag read
@@ -32,7 +32,7 @@ import { useFeatureFlag } from "../lib/featureFlags.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AgentAvatar, Corners, FeatureBadge } from "./SharedUI.jsx";
 
-/** The data row that gates this section. Default off, always (src/lib/featureFlags.js). */
+/** The data row that gates this section. On by default on dev since 2026-09-12; John flips it off (src/lib/featureFlags.js). */
 export const GOVERNANCE_FLAG = "agt-69-governance-section";
 
 /** The anon-readable aggregate view. Definer-style: anon holds no grant on runner_cycles. */
