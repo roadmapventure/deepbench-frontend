@@ -5,6 +5,42 @@
 
 ---
 
+## session/cycle-20260912-0640 (v7.0.456, 2026-09-12, runner cycle `fc9cd33a-06b0-4287-a537-f14a02309836`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (1 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Prioritizer, a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-69` — **the six governance agents become visible to John for the first time, and the thing to read twice is that the ticket's own join does not exist.**
+
+### The ticket asked for "the cycles it took part in" and there is no column that answers it
+
+`AGT-69`'s BUILD line asks each card to show the cycles an agent took part in. The Designer went looking for the key and measured that there isn't one: `ai_activity_log.trace_id` matches a `runner_cycles.id` in **0 of ~600 distinct values**, and `call_facts` carries a `cycle_id` on **0 rows**. Participation is recoverable only by time window — `started_at <= created_at <= coalesce(ended_at, now())` — which is a server-side join, not a browser one. So the aggregate ships as a definer-style anon-readable view, `public.governance_agent_activity_7d`, modelled on the existing `runner_public_cycles` precedent: `anon` holds no grant on `runner_cycles` and was never going to get one for a Bench section. The browser reads **6 rows**, not the 1,351 log rows behind them.
+
+### The exposure rule binds even a shape John already ruled
+
+John ruled shape (a) on 2026-09-11 (decision `146256c1`). That settles *what* to build and says nothing about *when it appears*: §19v's exposure rule and `.claude/rules/autonomous-surface-changes.md` still govern an Automated-mode appearance change, so the section ships behind a **default-off** `feature_flags` row `agt-69-governance-section`, previewable at `/bench?ff=agt-69-governance-section`. His Accept is one flip and a Reverse is the same flip. The view, the component and the deletion of `OFF_BENCH_AGENT_IDS` are all live — the flag governs exposure only.
+
+### Ten files for a three-file feature, and the arithmetic is the point
+
+`OFF_BENCH_AGENT_IDS` was the mechanism keeping the six off every screen, so deleting it is the feature. But **six regression files import it** — `SE-03-agent-fields.js` plus `agt-64` through `agt-68` — and a deleted export with six importers is a red suite, not a ship. Retargeting those six to the live `lane = 'governance'` rows is what takes the count from 3 files to 10, inside the 11 the `tooling` rung bought (`class_autonomy('P10 - Tooling')`: rung 21, +8 files, +8 tasks).
+
+### A latent bug found inside the retarget, in a file the kickoff already named
+
+`SE-03` went red on its first credentialed run for a reason that had nothing to do with governance agents: `assert.ok(res.ok, \`…${await res.text()}\`)` builds its message template **before** the assertion is evaluated, so the body is consumed on the *success* path and the following `res.json()` throws *"Body has already been read"*. Fixed in place to `if (!res.ok) assert.fail(…)`. The Builder flagged it as worth a sweep: the same shape may sit in other credentialed tests, silently passing until the day something else makes them look.
+
+### The verdict is a block, and it is the same standing red for the FOURTH ship running
+
+`build=green / regression=red / hygiene=green` → verdict `bb9592e9`. The two failing arms are `log-143c-invention-use.test.mjs` (*judge_runs must be >= 1, got 0*) and `ses-285-m6-autonomy.test.mjs` (*live board: zero `needs-john` rows, zero undecided gated cards*) — and this cycle did not infer that they were pre-existing, it **measured the baseline before touching anything**: `regression suite: 204/206 passed` on the unmodified `b8c87b6`, same two names. After the build: `205/207`. The failure set is unchanged; the denominator moved because this ship adds one passing test.
+
+`ses-285` is already filed as **`SES-373`**, which sat at queue position 3 in this cycle's own queue read — so the standing red has a named owner on the board and was deliberately not re-filed. But the cost is now visible and compounding: `record_ship_decision()` refuses a non-`approve` verdict, so this is the **fourth consecutive ship with no Reverse handle** (`v7.0.452`, `v7.0.453`, `v7.0.454`, `v7.0.456`). Undoing this one means reverting `c42c8c70` by hand and running the captured down. Four ships deep, "the standing red blocks the ladder" has stopped being an annoyance and become the thing deciding whether John can undo his platform's work with a tap.
+
+`tooling` streak resets 0 → 0, rung holds at 21 — a block costs the streak, never the rung.
+
+### The migration
+
+`agt69_governance_agent_activity_7d`, one view. Down captured **before** the apply (`auto-downable`, 1 object, 0 refusals), so this range stays revertible rather than card-only. Grants asserted both directions per `.claude/rules/supabase-column-grants.md`: the view returns 6 rows to `anon` while `runner_cycles` still `42501`s for the same key.
+
+### One deviation the Builder disclosed that an editor should not "fix"
+
+The kickoff's Task 6 gate asks for `grep -rn OFF_BENCH_AGENT_IDS src/ → nothing`, while the same kickoff's §4e prescribes a header stamp whose text *names* `OFF_BENCH_AGENT_IDS`, and `src/data/agents.js` already carries five historical `AGT-63..68` stamps that name it. Satisfying the raw grep would mean deleting six provenance lines the same section says to leave alone. The claim under test — no file under `src/` still **uses** the export — is a claim about code, so the check is asserted over source with comments stripped, and was re-measured **red** in that form against the unchanged tree before the first edit. The discrimination survives; the raw-text form was the wrong instrument.
+
+---
+
 ## session/cycle-20260911-1940 (v7.0.454, 2026-09-11, runner cycle `56b5a66e-f377-4640-944a-97afe08e504f`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (2 PM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-360` — **"are the DeepBench agents doing the development work" stops being five queries and becomes a rendered block, and the thing to read twice is that the question could not be answered correctly by the method the ticket proposed.**
 
 ### The premise revalidation found a defect in the ticket's own measurement path
