@@ -85,24 +85,35 @@ const readJson = p => JSON.parse(fs.readFileSync(p, "utf8"));
 // attended dispatcher and this file's assertions cannot compute it two different ways.
 export function replayOne(fixture, judgment, schema) {
   const errors = [];
-  const val = validateAgentVerdict(schema, judgment);
+  // SES-343: `{ truncate: true }` is what pass two now passes, and this file's whole claim is that
+  // it replays the SHIPPED path -- validating strictly here would grade these judgments against a
+  // contract the platform no longer applies to them, and the 17 "rejections" below would be an
+  // artifact of the replay rather than a fact about the ledger.
+  const val = validateAgentVerdict(schema, judgment, { truncate: true });
   if (!val.ok) errors.push(`the judgment does not satisfy the Intent's schema: ${val.errors.join("; ")}`);
   const mism = verdictIdentityMismatch(judgment, { ticket: fixture.backlog_id, version: fixture.version });
   if (mism.length) errors.push(...mism);
 
-  // TWO REPLAYS, BECAUSE "WHAT THE AGENT SAID" AND "WHAT THE PLATFORM WOULD HAVE RECORDED" CAME
-  // APART AT THIS SHIP AND THE GAP IS THE FINDING. A judgment that fails the Intent's schema is
-  // rejected by pass two -- exit 2, no row -- so the strict replay hands `reconcileJudgment()` a
-  // null agent and gets the degrade path. The verdict-only replay honours the agent's `verdict`
-  // regardless, which is what the disagreement bar is actually about. Collapsing them would either
-  // hide 17 contract failures behind a verdict that happened to match, or throw away every verdict
-  // the model reached because its prose ran long.
+  // TWO REPLAYS, BECAUSE "WHAT THE AGENT SAID" AND "WHAT THE PLATFORM WOULD HAVE RECORDED" CAN COME
+  // APART, AND THE GAP IS THE FINDING. A judgment that fails the Intent's schema is still rejected
+  // by pass two -- exit 2, no row -- so the strict replay hands `reconcileJudgment()` a null agent
+  // and gets the degrade path. The verdict-only replay honours the agent's `verdict` regardless,
+  // which is what the disagreement bar is actually about.
+  //
+  // WHAT SES-343 CHANGED, AND WHAT IT DID NOT. The gap this file measured at the SES-337 ship was 17
+  // contract failures, every one of them a `pm_lens` or `architect_lens` over the Intent's 1,200
+  // maxLength -- a present judgment thrown away for its prose length. Pass two now CUTS a
+  // non-decisive overflow and records the verdict, so the strict replay is handed `val.value` (the
+  // cut object the platform would write), not the raw judgment: replaying the uncut text would grade
+  // a row that no longer gets written that way. A miss on `verdict`, `backlog_id`, `version` or
+  // `auto_done_eligible` is still fatal and still lands in `errors`, so the contract arm keeps its
+  // teeth; `truncated` below is what the cut costs, reported rather than hidden.
   const reconcileWith = agent => reconcileJudgment({
     mechanical: fixture.inputs.mechanical,
     agent,
     codeEligibility: fixture.inputs.code_eligibility,
   });
-  const strict = reconcileWith(val.ok ? judgment : null);
+  const strict = reconcileWith(val.ok ? val.value : null);
   const verdictOnly = reconcileWith(judgment);
   return {
     verdict_id: fixture.verdict_id,
@@ -114,6 +125,7 @@ export function replayOne(fixture, judgment, schema) {
     agrees: verdictOnly.verdict === fixture.recorded.verdict,
     agent_verdict: judgment?.verdict ?? null,
     schema_ok: val.ok,
+    truncated: val.truncations.length,   // SES-343: how many presentation fields pass two would cut
     overrides: verdictOnly.overrides,
     errors,
   };

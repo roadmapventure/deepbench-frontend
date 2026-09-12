@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// DeepBench v7.0.468 | scripts/verifier.js | SES-343 -- THE OUTPUT CONTRACT STOPS VOIDING VALID
+// VERDICTS, and the thing to read twice is that the contract did not get looser: it got a SEVERITY
+// MODEL. `validateAgentVerdict()` made every schema miss fatal, so a judgment whose `architect_lens`
+// ran 1,464 characters against the Intent's 1,200 was thrown away whole -- exit 2, no
+// `runner_verdicts` row, the model's actual verdict on the ship lost. Measured 2026-09-12 by
+// replaying the 27 recorded judgments in tests/fixtures/verdicts-30-judgments.json against the
+// fixture's own `intent_schema`: 17 of 27 rejected, 17 on `architect_lens` (1,212-1,464 chars), 3 on
+// `pm_lens`, and NONE on any other key. A decisive miss stays fatal; a presentation overflow is cut
+// to the schema's own maxLength, recorded in `truncations`, and said out loud on the row. The
+// schema itself is untouched -- it is data on the Intent row (ARCHITECTURE §19b), and the fix
+// belongs in the reader because an active governance agent's Skill row is gated (§19v).
+//
 // DeepBench v7.0.462 | scripts/verifier.js | SES-359 -- THE KICKOFF DECLARES ITS LANES, and the
 // thing to read twice is that this is a SECOND refusal wired through the SAME two ends SES-376
 // built, not a new mechanism: `--check-kickoff=<path>` refuses the DRAFT that carries no `Lanes:`
@@ -378,7 +390,10 @@
 //   0  verdict APPROVE  -- all three gates green
 //   1  verdict BLOCK    -- a gate was red, or could not run
 //   2  the VERIFIER could not run (missing env, missing --cycle-id, the insert failed, an agent
-//      verdict that does not satisfy the Intent's schema). Distinct from 1 on purpose: 1 is a
+//      verdict that misses the Intent's schema on a DECISIVE key -- `verdict`, `backlog_id`,
+//      `version`, `auto_done_eligible` -- or in any other way the schema names. SES-343: a
+//      presentation field over its maxLength is NOT one of those; both judged lanes cut it to the
+//      schema's own limit, note the cut on the row, and record the verdict). Distinct from 1 on purpose: 1 is a
 //      judgement about the change, 2 is the absence of a judgement, and an unrunnable verifier must
 //      never be reported as either a pass or a block on the work.
 //   3  AGT-67 -- AWAITING JUDGMENT. The gates ran, the context was written, the prompt was printed,
@@ -800,8 +815,26 @@ export function judgeContextPathFor(scratchDir, ticket) {
 // judgment. Recording it as `block` would put a fabricated verdict in the ledger; recording the
 // mechanical verdict instead would silently launder an `approve` the agent never validly gave. So
 // pass two exits 2 with the errors named and writes nothing (see the header's exit-code table).
-export function validateAgentVerdict(schema, value) {
+//
+// SES-343 -- THAT REASONING IS ABOUT THE DECISIVE KEYS, AND ONLY THEM. `verdict`, `backlog_id`,
+// `version` and `auto_done_eligible` ARE the judgment: a miss on any of them is still fatal, for
+// exactly the reason above. A `pm_lens` or `architect_lens` that ran 1,464 characters against a
+// 1,200 maxLength is not an absent judgment -- it is a present one whose PRESENTATION field ran
+// long, and throwing the whole row away over it records nothing at all. Measured on
+// tests/fixtures/verdicts-30-judgments.json: 17 of 27 real judgments are rejected today, every one
+// of them on a lens length and on nothing else. Under `{ truncate: true }` a non-decisive overflow
+// is cut to the schema's own maxLength, recorded in `truncations`, and said out loud in the row's
+// reasoning through truncationNote(); the default is byte-identical to the old behaviour, so
+// run-project.js and rank-backlog.js keep the strict contract they were written against.
+export const DECISIVE_KEYS = Object.freeze(["backlog_id", "version", "verdict", "auto_done_eligible"]);
+
+export function validateAgentVerdict(schema, value, { truncate = false } = {}) {
   const errors = [];
+  const truncations = [];
+  // The input is NEVER mutated: `out` stays the caller's own object until something is actually
+  // cut, and becomes a shallow copy at that moment. A caller that keeps its original (the SES-337
+  // replay does) must still see what the agent really said.
+  let out = value;
   const typeOf = v => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
   const typeOk = (v, t) => {
     const want = Array.isArray(t) ? t : [t];
@@ -811,10 +844,10 @@ export function validateAgentVerdict(schema, value) {
       : typeOf(v) === w));
   };
   if (!schema || typeof schema !== "object") {
-    return { ok: false, errors: ["no schema was read from the Intent Skill, so the agent's verdict could not be validated -- unknown is not innocent"] };
+    return { ok: false, errors: ["no schema was read from the Intent Skill, so the agent's verdict could not be validated -- unknown is not innocent"], truncations, value };
   }
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, errors: [`the agent's verdict must be a JSON object; got ${typeOf(value)}`] };
+    return { ok: false, errors: [`the agent's verdict must be a JSON object; got ${typeOf(value)}`], truncations, value };
   }
   for (const key of schema.required || []) {
     if (!(key in value)) errors.push(`missing required key "${key}"`);
@@ -830,14 +863,35 @@ export function validateAgentVerdict(schema, value) {
       errors.push(`"${key}" must be one of ${JSON.stringify(spec.enum)}; got ${JSON.stringify(v)}`);
     }
     if (spec.maxLength !== undefined && typeof v === "string" && v.length > spec.maxLength) {
-      errors.push(`"${key}" is ${v.length} characters, over the schema's maxLength ${spec.maxLength}`);
+      if (truncate && !DECISIVE_KEYS.includes(key)) {
+        truncations.push({ key, from: v.length, to: spec.maxLength });
+        if (out === value) out = { ...value };
+        out[key] = v.slice(0, spec.maxLength);
+      } else {
+        errors.push(`"${key}" is ${v.length} characters, over the schema's maxLength ${spec.maxLength}`);
+      }
     }
     if (spec.items && spec.items.type && Array.isArray(v)) {
       const badAt = v.findIndex(item => !typeOk(item, spec.items.type));
       if (badAt !== -1) errors.push(`"${key}"[${badAt}] must be ${JSON.stringify(spec.items.type)}`);
     }
   }
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, truncations, value: out };
+}
+
+// The cut, said out loud on the row itself. A truncation nobody can read in `runner_verdicts` is
+// indistinguishable from a lens the agent wrote short, and the whole point of cutting rather than
+// rejecting is that the reader can still tell what happened to the text they are reading.
+//
+// THE DECISIVE KEYS ARE NAMED IN THE PROSE ON PURPOSE, so the row says what was NOT touched as well
+// as what was. tests/regression/ses-343-verdict-severity.test.mjs asserts every DECISIVE_KEYS entry
+// appears here -- adding a fifth decisive key and leaving this sentence behind goes red there
+// rather than quietly promising something the code no longer does.
+export function truncationNote(truncations) {
+  if (!Array.isArray(truncations) || truncations.length === 0) return "";
+  const list = truncations.map(t => `${t.key} ${t.from}->${t.to}`).join(", ");
+  return `Truncated to the Intent's maxLength before recording (SES-343): ${list} chars; `
+    + `verdict, backlog_id, version and auto_done_eligible were not touched.`;
 }
 
 // THE VERDICT MUST BE ABOUT THIS DELIVERY. Found by this ticket's own attended QA -- the Verifier's
@@ -1208,7 +1262,7 @@ async function insertVerdict(args) {
 
 // Both judged lanes end here: reconcile, then record. The reconciliation is reconcileJudgment()'s
 // and nothing about the two invariants is re-decided at this call site.
-async function recordJudgedVerdict({ stored, agentVerdict, intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey }) {
+async function recordJudgedVerdict({ stored, agentVerdict, truncations = [], intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey }) {
   const gateResults = stored.gates || {};
   const mechanical = stored.mechanical || verdictFor(gateResults);
   const codeEligibility = stored.code_eligibility || { eligible: false, reason: "the pass-one context carried no code eligibility, so the bar fails closed" };
@@ -1216,16 +1270,22 @@ async function recordJudgedVerdict({ stored, agentVerdict, intentSlug, cycleId, 
 
   const detailLine = GATES.map(g => `${g.label}=${gateResults[g.key] ?? "skipped"} [${(stored.gate_detail || {})[g.key] ?? "no detail recorded"}]`).join("\n  ");
   const reasoning = `${r.reasoning}\nJudged by ${VERIFIER_AGENT_ID}/${VERIFY_CAPABILITY} (intent ${intentSlug}).${stored.note ? ` ${stored.note}` : ""}\nGates: ${detailLine.replace(/\n\s+/g, " | ")}`;
+  // SES-343: the cut is on the row (through `stored.note` -> `reasoning` above) AND on the console,
+  // because the reader of a verdict whose lens stops mid-sentence is owed the reason in the place
+  // they are reading it. Silent when nothing was cut.
+  const truncatedLine = truncations.length
+    ? `\n  truncated: ${truncations.map(t => `${t.key} ${t.from}->${t.to}`).join(", ")}`
+    : "";
   const prose =
     `verifier verdict: ${r.verdict.toUpperCase()}${ticket ? ` on ${ticket}` : ""}${version ? ` (${version})` : ""} -- judged\n` +
     `  ${detailLine}\n` +
     `  ${r.reasoning.replace(/\n/g, "\n  ")}\n` +
-    `  auto-done eligible: ${r.eligible ? "YES" : "no"} -- ${r.reason}`;
+    `  auto-done eligible: ${r.eligible ? "YES" : "no"} -- ${r.reason}${truncatedLine}`;
   const payload = {
     ok: r.verdict === "approve",
     exitCode: r.verdict === "approve" ? 0 : 1,
     verdict: r.verdict, gates: gateResults, gateDetail: stored.gate_detail || {},
-    reasoning, agent_verdict: agentVerdict.verdict, overrides: r.overrides,
+    reasoning, agent_verdict: agentVerdict.verdict, overrides: r.overrides, truncations,
     auto_done_eligible: r.eligible, auto_done_reason: r.reason,
     ticket: ticket || null, version: version || null,
     epic_name: stored.epic_name ?? null, priority_class: stored.priority_class ?? null,
@@ -1417,17 +1477,23 @@ async function main() {
       return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: rows.error },
         prose: `verifier: ${rows.error}. Exiting 2 -- no verdict.` });
     }
-    const valid = validateAgentVerdict(rows.schema, agentVerdict);
+    // SES-343: `{ truncate: true }` -- a decisive miss still exits 2 below; a presentation field
+    // over the Intent's maxLength is cut here and the cut is carried to the row rather than costing
+    // the whole judgment. Everything downstream reads `valid.value`, never the raw file, so the
+    // identity check and the recorded verdict grade the SAME object that gets written.
+    const valid = validateAgentVerdict(rows.schema, agentVerdict, { truncate: true });
     if (!valid.ok) {
       return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", schema_errors: valid.errors },
         prose: `verifier: the agent's verdict does not satisfy Intent "${rows.intentSlug}"'s schema:\n  - ${valid.errors.join("\n  - ")}\nExiting 2 and recording NOTHING -- a verdict that fails its own contract is not a judgment about the change, and writing the mechanical verdict in its place would launder an approve the agent never validly gave.` });
     }
-    const wrongDelivery = verdictIdentityMismatch(agentVerdict, { ticket, version });
+    const judged = valid.value;
+    const wrongDelivery = verdictIdentityMismatch(judged, { ticket, version });
     if (wrongDelivery.length) {
       return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", identity_errors: wrongDelivery },
         prose: `verifier: the agent's verdict is not about this delivery:\n  - ${wrongDelivery.join("\n  - ")}\nExiting 2 and recording NOTHING -- a stale or foreign verdict file passes the schema perfectly, and runner_verdicts is exactly the row nobody re-derives later.` });
     }
-    return recordJudgedVerdict({ stored, agentVerdict, intentSlug: rows.intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey });
+    stored.note = [stored.note, truncationNote(valid.truncations)].filter(Boolean).join(" ");
+    return recordJudgedVerdict({ stored, agentVerdict: judged, truncations: valid.truncations, intentSlug: rows.intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey });
   }
 
   const gateResults = {};
@@ -1783,12 +1849,15 @@ async function main() {
       return emit({ code: 2, payload: { ...payload, recorded: false, error: call.error },
         prose: `${prose}\n  the capability executor could not be reached: ${call.error}\n  Exiting 2 -- no verdict. (--judge=executor is an unproven path; --judge=none is the degrade.)` });
     }
-    const valid = validateAgentVerdict(rows.schema, call.verdict);
+    // SES-343: the same severity model as the session lane above -- one rule for both judged lanes,
+    // so an executor verdict and a session verdict cannot be graded by two different contracts.
+    const valid = validateAgentVerdict(rows.schema, call.verdict, { truncate: true });
     if (!valid.ok) {
       return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", schema_errors: valid.errors },
         prose: `${prose}\n  the executor's verdict does not satisfy Intent "${rows.intentSlug}"'s schema:\n  - ${valid.errors.join("\n  - ")}\n  Exiting 2, recording nothing.` });
     }
-    const wrongDelivery = verdictIdentityMismatch(call.verdict, { ticket, version });
+    const judged = valid.value;
+    const wrongDelivery = verdictIdentityMismatch(judged, { ticket, version });
     if (wrongDelivery.length) {
       return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", identity_errors: wrongDelivery },
         prose: `${prose}\n  the executor's verdict is not about this delivery:\n  - ${wrongDelivery.join("\n  - ")}\n  Exiting 2, recording nothing.` });
@@ -1804,7 +1873,8 @@ async function main() {
       code_eligibility: { ...elig, reason: autoDoneReason },
       note: `--judge=executor; trace ${call.traceId ?? "(none returned)"}; api cost ${cost.usd === null ? `UNKNOWN (${cost.note})` : `$${cost.usd}`}`,
     };
-    return recordJudgedVerdict({ stored, agentVerdict: call.verdict, intentSlug: rows.intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey });
+    stored.note = [stored.note, truncationNote(valid.truncations)].filter(Boolean).join(" ");
+    return recordJudgedVerdict({ stored, agentVerdict: judged, truncations: valid.truncations, intentSlug: rows.intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey });
   }
 
   if (dryRun) {
