@@ -68,7 +68,6 @@ const WITHIN_CAP = [
 ];
 
 const SES_360_KICKOFF = `${KICKOFF_DIR}/v7.0.454-SES-360-governance-agents-brief-block.md`;
-const SES_368_KICKOFF = `${KICKOFF_DIR}/v7.0.448-SES-368-weekly-pace-gate.md`;
 const SES_360_BYTES = "55824";
 
 // The attended card that unblocks (D) and (E). Written once, here.
@@ -158,9 +157,17 @@ export default async function run() {
     `the over-cap output must name the measured size ${SES_360_BYTES} -- a refusal that does not ` +
     `say how big the file was cannot be acted on. got: ${over.output.trim()}`);
 
-  const within = runVerifier(SES_368_KICKOFF);
+  // THE EXIT-0 CASE IS THIS TICKET'S OWN KICKOFF, NOT SES-368's, AS OF SES-359. It was
+  // `v7.0.448-SES-368-weekly-pace-gate.md` -- 3,445 bytes, comfortably within the cap and therefore
+  // a clean 0 for this clause's purpose. SES-359 added a SECOND refusal behind the same flag and the
+  // same exit code (a kickoff with no `Lanes:` line), and that kickoff has none, so it now exits 1
+  // on lanes while remaining perfectly within the size cap. Swapping in `ownRel` keeps this clause
+  // measuring the one thing it is for -- that the branch runs AHEAD of the credential check, proven
+  // by a 0 rather than a 2 -- instead of quietly turning into an assertion about lanes. SES-368's
+  // cap behaviour is untouched and still asserted above, through `WITHIN_CAP` in clause (A).
+  const within = runVerifier(ownRel);
   assert.equal(within.status, 0,
-    `verifier.js --check-kickoff on the 3,445-byte SES-368 kickoff must exit 0 with no credentials ` +
+    `verifier.js --check-kickoff on ${ownRel} must exit 0 with no credentials ` +
     `in the child env. got ${within.status}: ${within.output.trim()}`);
   assert.ok(/within 8192/.test(within.output),
     `the within-cap output must say so and name the cap. got: ${within.output.trim()}`);

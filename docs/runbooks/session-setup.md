@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.462 | docs/runbooks/session-setup.md | SES-359 — §3f GAINS THE TWO RUNS EVERY ATTENDED SESSION MAKES, AND THE THING TO READ TWICE IS THAT §3f ALREADY SAID *MAY* AND NOTHING ANYWHERE SAID *DOES*. Measured 2026-09-12, every number a query: `ai_activity_log` by agent holds 2 Designer and 1 Builder rows, all 2026-09-09 fixtures, across the 12 kickoffs written since; the attended ships `SES-347`, `SES-355` and `SES-368` all carry `kickoff_link IS NULL`; and §3e's verifier line passed no `--kickoff=` at all, so the `SES-376` size cap's delivery half has been inert on every attended run since it shipped. So the design and the build were being hand-composed in attended sessions — the second assembly §3f's own first bullet forbids — arriving through the one door nobody watches. The new block states both runs as commands rather than as an encouragement: (a) `design-kickoff` on the `judgment` lane with `cycle_id` = the SUPERVISED cycle id (not a fresh one — the attended row is what the verdict hangs off), `--check-kickoff` BEFORE the save, `kickoff_markdown` → `kickoff_path` and `harvest_markdown` → `docs/harvests/<ID>.md` in ONE commit, then the before-image + `kickoff_link`/`design_status` write as ONE act per `SES-112`'s check, then the log row; (b) `build-ticket` on the `orchestrator` lane, spawned via `Agent` with `model` = the assembly's own `llm.model` (an omitted `model` inherits the design session's and burns the wrong quota — the 2026-08-01 correction), worktree line and stop-line prepended, `push_sha` → `runner_cycles.push_sha` on `pushed`, then its log row; (c) the ONE exception, narrow on purpose: a ticket editing the governance agents' own Skill rows (self-certification, `AGT-67`) may compose by hand and says so in its SESSION section. §3e's verifier command gains `--kickoff=<the ticket's kickoff_link>` — the flag that arms BOTH delivery-side kickoff checks, the `SES-376` cap and this ticket's lane declaration; absent, they measure nothing and say nothing, which is the worst of the three possible states. THE GATED HALF, HELD AND NOT TAKEN: `ds-kickoff-intent`'s schema gaining a required `lanes` array and its method step (7) — that is an ACTIVE agent's `skill_profiles` row, reserved to John by `.claude/rules/agent-roster-inert.md` (§19v P5) on the `SES-376` precedent, so this ship writes the checker and the runbooks and files the row edit rather than reaching for it. Stamp count held at 5 per session-hygiene check 7: `v7.0.403` (`SES-316`) dropped rather than relocated, `SES-164` step 2 run FIRST by grep over this body rather than from recollection — `reverse_decision` 7 body hits, `refused_written_since` 3 (the Reverse section at §5 states the `refused` / `refused_written_since` distinction in full), the `decided_at` reference point and the one-`DO`-block rule both stated at the 2c paragraph — so every fact it carried is already homed here and nothing was lost to the rotation. Doc only; no src/api/lib change, no schema change, no site change. -->
 <!-- DeepBench v7.0.455 | runbooks/session-setup.md | SES-374 — §3g: the meter reader. The pace gate's sensor is a CLI on John's machine; a scheduled task now feeds it every 30 minutes, credentials DPAPI-encrypted under his profile (never .env.local, ruling d7670e18), exit 2 on anything it cannot prove. -->
 <!-- DeepBench v7.0.426 | docs/runbooks/session-setup.md | SES-331 — NEW §3f: running a governance agent from a session. Two scripts (`scripts/agent-prompt.js`, `scripts/agent-log.js`) and the three rules that make them one path rather than a second one — the prompt is never hand-built (the script calls `assemblePrompt()` and the executor’s own `renderSection()`/`assemblePhaseSplit()`, so a session cannot fork the assembly), the model comes from the assembly’s `llm.model` (or `runner_model_lanes` where the capability names none), and the `ai_activity_log` row is mandatory with call_source `session` — a fifth allowlisted source added in `lib/request-context.js` after measuring that none of the four existing ones means “a session ran the agent” (null 30,351 / ui 4,110 / regression 1,055 / script 19 / session-test 6, whole log, 2026-09-09). `logActivity()` now returns its write promise so the CLI can exit 2 on a write that did not land instead of succeeding silently; the request path is unchanged (no caller reads the return, the POST body is byte-identical, waitUntil() gets the same promise). Stamp count held at 5 per session-hygiene check 7: `v7.0.222` (`SES-175`) moved VERBATIM to `docs/SESSIONS.md`’s `session-setup.md` appendix, `SES-164` step 2 run FIRST by grep — its one editor warning (the text under a `{{rule:ID}}` marker is not hand-maintained: edit the registry row, re-export `docs/governance/RULES-SNAPSHOT.md`, then `node scripts/render-rule-blocks.js --write`) is already restated verbatim in this file’s own live body at the `{{rule:B40}}` marker in §2c, so nothing was relocated. Body proven byte-identical across the rotation by sha256. -->
 <!-- DeepBench v7.0.412 | docs/runbooks/session-setup.md | SES-320 — the close-out sweep returns a THIRD number and the Reverse section says what a finalised ship's undo now covers. `sweep_decision_windows()` gained an OUT column `closed` (migration `ses320_delivered_exit`): a `kind='ship'` decision it finalises whose ticket is still `delivered` gets that ticket written `done`, any class, any epic — the finalisation IS the delivered exit, and since `SES-285` retired the Accept tap it is the only one there is. The Reverse paragraph gains the other half: the sweep's close carries a before-image under THE SHIP DECISION'S OWN id, so reversing that decision undoes the close in the same restore — the ticket comes back out of `done` to the state its oldest image records, which is what it held BEFORE the ship, not `delivered`. THE THING A LATER EDITOR MUST NOT "TIDY": the sweep's close writes `status` and NOT `updated_at`, because `reverse_decision()` refuses any row whose live `updated_at` postdates the decision's `decided_at` (`SES-316`) and the close runs 72 hours after it — measured both ways on rolled-back fixtures at this ship (`applied`/`restored 1`/`written_since 0` as shipped; `refused`/`restored 0`/`written_since 1` with the bump simulated). Stamp count held at 5 per session-hygiene check 7: `v7.0.198` (`SES-121`) moved VERBATIM to `docs/SESSIONS.md`'s appendix, `SES-164` step 2 run FIRST by grep rather than from recollection — its entire content (the body moved verbatim from `.claude/skills/session-setup/SKILL.md`, register B39, "this file is the canonical copy") is already restated in §1's own B39 paragraph and in that skill's loader sentence, so nothing was relocated. -->
 <!-- DeepBench v7.0.411 | docs/runbooks/session-setup.md | SES-004 (b) — 3d gains one sentence after its `DO $$` example: an attended decision's `reasoning` also names the criteria it relied on as `pattern:N` tokens, exactly as `docs/runbooks/runner-cycle.md` step 7b requires of a cycle's own decisions (`pattern:0` = no standing pattern applied — new judgment); the same trigger on `runner_decisions` stores them in `public.runner_decision_patterns` for both paths. Part (b) of `SES-004`'s remainder — part (a) (`v7.0.410`, push `ddef954c`) shipped the rows, the trigger and 7b's own citation rule and stopped at the file cap owing this sentence and the md-header paragraph in `docs/JOHN-DECISION-PATTERNS.md`. No SQL changed, no criterion text touched. -->
-<!-- DeepBench v7.0.403 | docs/runbooks/session-setup.md | SES-316 — A CLAIM IS NOT A JUDGMENT WRITE, and the thing to read twice is THAT THE WRITTEN-SINCE GUARD DID NOT GO AWAY — IT CHANGED REFERENCE POINT. 2c's claim and release both dropped `updated_at = now()`; 7b's own list of what is not a decision already said a claim isn't one, so this is that definition honoured in the SQL rather than a new rule. MEASURED AT THE M6 GATE (decision `c3e86310`, 2026-09-02), not reasoned about: `reverse_decision()` refused any row whose live `updated_at` postdated the BEFORE-IMAGE's `created_at` and still returned `outcome = 'applied'` with the row counted `refused` — so every decision that touched a ticket became un-restorable the moment the continuous drain claimed it (minutes, not days), silently. Migration `ses316_reversal_survives_claims` re-points that guard at the decision's own `decided_at` (`now()` is frozen per transaction, so every write the decision made carries exactly that stamp — the decision's own writes can therefore never trip the guard, and anything strictly later is genuinely somebody else's) and adds `refused_written_since` beside `refused`, because the two mean different things: `refused` is "that row was never this decision's to undo", `refused_written_since` is "your undo did not happen". THE ONE FACT AN EDITOR WILL GET WRONG: there is NO `updated_at` trigger on `backlog_items` (read out of `pg_trigger` before a line changed — the only trigger is `backlog_done_requires_verdict`, BEFORE UPDATE OF status), which is what makes dropping the column from these two statements actually work rather than cosmetic; and `recompute_backlog_queue()` writes `queue` and `pinned_position` ONLY, never `updated_at`, so a recompute between a decision and its reversal is harmless. The one-`DO`-block rule is UNCHANGED and still load-bearing — split the decision from its write and `decided_at` lands in the first transaction while the row lands in the second, which the new guard refuses just as the old one did (now honestly, as `refused`, instead of a silent `applied`). Guarded by `tests/regression/ses-286a-reversal-window.test.mjs`. -->
 
 # Session Setup — Worktree, Counters, Inflight, Push
 
@@ -447,8 +447,14 @@ written to a file, never printed (`SES-260`; `vercel env pull` returns these EMP
 
 ```
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js \
-  --cycle-id=<the id returned above> --ticket=<TICKET-ID> --version=<vX.Y.Z> --base=origin/dev
+  --cycle-id=<the id returned above> --ticket=<TICKET-ID> --version=<vX.Y.Z> --base=origin/dev \
+  --kickoff=<the ticket's kickoff_link>
 ```
+
+`--kickoff=` is not optional decoration (`SES-359`): it is what arms the verifier's delivery-side
+kickoff checks — the `SES-376` size cap and this ticket's lane declaration both sit behind it, and
+with the flag absent they measure nothing and the run is silently ungraded on both. The value is the
+ticket's own `backlog_items.kickoff_link`, the path step 3e's cycle row already names.
 
 Exit codes — the same convention step 7a uses:
 
@@ -506,6 +512,83 @@ node scripts/agent-log.js --agent=… --capability=… --model=… --ai-type=…
   `SERVICE_CATALOG` slug; the script refuses an unknown one rather than inventing it.
 - Neither script makes a model call, and `agent-prompt.js` performs no retrieval — a
   fetched-per-call `knowledge` section renders empty and is named on stderr.
+
+#### The two runs every attended session makes (`SES-359`)
+
+§3f says a session *may* run a governance agent. These two it **does**: the design and the build are
+The Designer's and The Builder's work in an attended session exactly as they are in an unattended
+cycle (`runner-cycle.md` steps 6 and 7), and an attended session that hand-designs or hand-builds is
+a second assembly — the drift the bullet above forbids, arriving through the one door nobody watches.
+Measured 2026-09-12: `ai_activity_log` held **2** Designer and **1** Builder rows, all 2026-09-09
+fixtures, across the 12 kickoffs written since; the attended ships `SES-347`, `SES-355` and `SES-368`
+carry `kickoff_link IS NULL`. Both runs are yours, in order:
+
+**(a) The design run — `design-kickoff`, the `judgment` lane.** The command is `runner-cycle.md`
+step 6 statement 1's, unchanged, with `cycle_id` set to the **supervised** cycle id you inserted in
+§3e (not a new one — the attended cycle row is the one the verdict will hang off):
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
+  --agent=designer --capability=design-kickoff --intent=ds-kickoff-intent \
+  --task='{"ticket":{…},"version":"v<your version>","cycle_id":"<the supervised cycle id>","caps":{"files":N,"tasks":M},"worktree":"<absolute path>"}'
+```
+
+Run the rendered prompt as a sub-agent on the `judgment` lane (`runner_model_lanes`, read — never a
+literal). Then, on its answer:
+
+```
+node scripts/verifier.js --check-kickoff=<the returned kickoff_path>
+```
+
+**Before** you save anything. Exit 1 is a named deviation, never a quiet trim — re-assemble, do not
+edit the kickoff by hand. On exit 0, write the returned `kickoff_markdown` to the returned
+`kickoff_path` and a non-null `harvest_markdown` to `docs/harvests/<ID>.md`, both in **one** commit.
+Then ONE write, before-image first, because `SES-112`'s check refuses `designed` without a link:
+
+```sql
+INSERT INTO runner_before_images (session_name, table_name, pk_value, row_data)
+SELECT '<session>', 'backlog_items', id::text, to_jsonb(b) FROM backlog_items b WHERE backlog_id = '<ID>';
+UPDATE backlog_items SET kickoff_link = '<kickoff_path>', design_status = 'designed' WHERE backlog_id = '<ID>';
+```
+
+Then log the run — mandatory per the bullet above, not a courtesy:
+
+```
+node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<the assembly's llm.model> \
+  --ai-type=agent-turn --feature=design-kickoff:ds-kickoff-intent:depth0 \
+  --input-tokens=N --output-tokens=N --cycle=<the supervised cycle id>
+```
+
+Exit 2 is a finding: the row did not land, so the run is unattributable and the count above stays
+wrong. Fix it; never carry on around it.
+
+**(b) The build run — `build-ticket`, the `orchestrator` lane.** The command is `runner-cycle.md`
+step 7 statement 1's, unchanged:
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
+  --agent=builder --capability=build-ticket --intent=bd-build-intent \
+  --task='{"kickoff_path":"docs/kickoffs/…","worktree":"<absolute path>","branch":"<your session branch>","version":"v<your version>","cycle_id":"<the supervised cycle id>","caps":{"files":N,"tasks":M}}'
+```
+
+Spawn the rendered prompt via the `Agent` tool with `model` set to the assembly's own `llm.model`
+(read it out of `--json`; an omitted `model` inherits this session's and burns the wrong quota), and
+prepend the worktree line and the stop-line to it — the same two orientation lines `CLAUDE-DESIGN.md`
+Step 5a has always prepended, which are *where* to work and where the job ends, never task content.
+On `outcome = 'pushed'`, that `push_sha` is the ship point: write it to your cycle row
+(`runner_cycles.push_sha`). On `outcome = 'blocked'`, nothing shipped — do not finish it by hand.
+Then log this run too:
+
+```
+node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the assembly's llm.model> \
+  --ai-type=agent-turn --feature=build-ticket:bd-build-intent:depth0 \
+  --input-tokens=N --output-tokens=N --cycle=<the supervised cycle id>
+```
+
+**(c) The one exception, and it is narrow:** a session whose ticket edits the governance agents' own
+Skill rows (self-certification, `AGT-67`) may compose its prompt by hand and says so in its SESSION
+section. Nothing else qualifies — "the agent was slow", "the ticket is small" and "I already know
+what it would say" are the three that have to stay refused for the rule to mean anything.
 
 ### 3g. The meter reader — John's machine feeds the pace gate (`SES-374`, `v7.0.455`)
 

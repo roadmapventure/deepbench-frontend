@@ -79,7 +79,7 @@ predates the 2026-07-07 worktree discipline.)*
 
 Every kickoff doc must have these 11 sections in order:
 
-1. **SESSION** header (name, version, branch, files to read first)
+1. **SESSION** header (name, version, branch, files to read first, lane declaration)
 2. **CONTEXT** (what the feature does, why it exists)
 3. **AI PATTERN CHECK** — does this feature have an opportunity to use an AI pattern not yet wired in? Name the pattern + service. If N/A, one line is enough (e.g. "N/A — no api/ route touched this session") — do not write a justifying paragraph. Never skip the section itself.
 4. **STUB definitions** if any (e.g. `const MICHELLE = {...}`)
@@ -91,12 +91,17 @@ Every kickoff doc must have these 11 sections in order:
 10. **COMMIT instruction** — must include `git push origin HEAD:dev` after the commit (never bare `git push origin dev` — canonical statement and rationale: `CLAUDE.md`'s "Push with `HEAD:dev`, never bare `dev`" hard rule)
 11. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
 
+Lane declaration (`SES-359`): the SESSION section carries one `Lanes:` line naming the lane of every model call the build will make — `session` (subscription; the default for governance and tooling work), `executor` (API dollars; only when the executor is the thing under test or the ticket is product-facing live QA — with a dollar band, e.g. `$1-3`) or `none` (no model call) — each with one line of reason. `node scripts/verifier.js --check-kickoff=<path>` refuses a kickoff without it.
+
+It is part of section 1, not a twelfth section — the count above stays **11**. The reason it is a declaration rather than a measurement is that nothing can currently read the lane off the log after the fact: measured 2026-09-12, `ai_activity_log` held 2 Designer and 1 Builder rows across the 12 kickoffs since, and `lib/request-context.js`'s `call_source` values include no executor at all. Until they do, the kickoff says it in one line, before the build starts, where it can still change what gets spent.
+
 **Standing rules by reference (added 2026-07-01).** Claude Code carries persistent cross-session memory now — the "Claude Code has no memory" premise this rule used to rest on is out of date. A kickoff doc no longer needs to restate a standing rule in full prose; naming it is enough (e.g. "STANDARDS.md Section 11 applies to all 6 agents" instead of re-listing all 23 fields; "Category M applies — see STANDARDS.md Section 5" instead of re-deriving the checklist). This applies specifically to **standing rules** — things that are true every session and don't change: the 23-field agent standard, the AI Audit wiring requirement, the Always Required / Category J/K/L/M checklist items in Section 5, the known bug patterns in Section 8.
 
 It does **not** apply to **session-specific facts** — the exact field values, exact file paths, exact scope boundaries, exact test assertions for *this* session. Those still must be fully spelled out. "As discussed" or "refer to standards" is still forbidden when what's being deferred is content specific to this session, not a standing rule. The test: could Claude Code look this up in `STANDARDS.md`, `docs/ARCHITECTURE.md`, or its own memory and get the exact same answer regardless of which session is running? If yes, reference it. If the answer depends on *this* session's specifics, spell it out.
 
 **Kickoff doc compliance check before issuing:**
 - [ ] All 11 sections present
+- [ ] Lane declaration present (`Lanes:` line — SES-359)
 - [ ] Architect Review complete: no duplicate functionality introduced — grepped for existing implementations
 - [ ] Architect Review complete: all cross-references verified consistent across every file that shares them
 - [ ] Architect Review complete: DB columns verified against actual schema before speccing any read/write

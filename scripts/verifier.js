@@ -1,4 +1,18 @@
 #!/usr/bin/env node
+// DeepBench v7.0.462 | scripts/verifier.js | SES-359 -- THE KICKOFF DECLARES ITS LANES, and the
+// thing to read twice is that this is a SECOND refusal wired through the SAME two ends SES-376
+// built, not a new mechanism: `--check-kickoff=<path>` refuses the DRAFT that carries no `Lanes:`
+// line, and the verdict block refuses a DELIVERY whose `--kickoff=` carries none. Size and lanes
+// are graded in that order at both ends -- an over-cap kickoff is refused on size first, because a
+// kickoff nobody will accept at all should not be told about its second defect.
+//
+// WHY A DECLARATION AND NOT A MEASUREMENT. Measured live 2026-09-12: `ai_activity_log` holds 2
+// Designer and 1 Builder rows, all 2026-09-09 fixtures, from 12 kickoffs since -- the runs are not
+// logged, so which lane paid for a kickoff cannot be read off the log after the fact. Until it can,
+// the kickoff says so itself, in one line, before the build starts. `lib/request-context.js`'s six
+// `call_source` values still include no executor (the declared remainder), which is exactly why an
+// `executor` lane must carry a dollar band: the band is the only number anyone can check it against.
+//
 // DeepBench v7.0.459 | scripts/verifier.js | SES-376 -- THE KICKOFF HAS A SIZE CAP, measured in
 // BYTES, and the thing to read twice is that NOTHING MEASURED A KICKOFF BEFORE THIS. `KICKOFF_CAP`
 // (60,000 chars) only ever truncated the judge's copy; it refuses nothing, and at that limit it has
@@ -1101,6 +1115,38 @@ export function kickoffCapFinding(text) {
   };
 }
 
+// FEATURE: SES-359 -- THE LANE DECLARATION, graded on the LINE rather than on the document.
+//
+// THE LINE, NOT THE FILE, and that is the whole shape of the check. A kickoff that says the word
+// "executor" anywhere in its TASKS -- and several do, because the executor is a thing this platform
+// builds -- would satisfy or violate a document-wide regex for reasons that have nothing to do with
+// what it is declaring. So the first line carrying `Lanes` and a colon is located once, and every
+// subsequent test reads THAT STRING. A kickoff with no such line is refused, which is the case the
+// check exists for: `v7.0.447-SES-347` and `v7.0.448-SES-368` shipped with no lane declaration at
+// all, and nothing anywhere said so.
+//
+// CASE-SENSITIVE `Lanes`, deliberately. `lanes = []` in a code block is not a declaration, and a
+// case-insensitive match would read it as one -- the regression test pins that string as a negative
+// control rather than leaving the choice to look like an oversight.
+//
+// THE EXECUTOR CLAUSE IS THE ONLY CONDITIONAL ONE. `session` and `none` cost subscription tokens or
+// nothing, so naming them is the whole declaration. `executor` spends API dollars, and a declaration
+// that spends dollars without saying how many is not a declaration -- so an `executor` lane must
+// either be disclaimed (`executor none`, the ordinary case) or carry a band (`$1-3`). `\W{0,8}`
+// between the word and `none` is what lets the real wordings through: "`executor` none",
+// "executor — none", "executor: none" are all the same statement in different punctuation.
+export function kickoffLaneFinding(text) {
+  const line = String(text ?? "").match(/^[^\n]*\bLanes\b[^\n]*:[^\n]*$/m);
+  const declared = line
+    && /\b(session|executor|none)\b/.test(line[0])
+    && (!/\bexecutor\b/.test(line[0]) || /\bexecutor\b\W{0,8}none\b/.test(line[0]) || /\$\s?\d/.test(line[0]));
+  if (declared) return null;
+  return {
+    kind: "kickoff-no-lanes",
+    reason: "kickoff has no lane declaration (SES-359) -- add one Lanes: line in SESSION: session | executor ($ band) | none",
+  };
+}
+
 function cap(text, limit, what) {
   const s = String(text ?? "");
   if (s.length <= limit) return s;
@@ -1301,6 +1347,13 @@ async function main() {
     if (finding) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "kickoff-over-cap", ...finding }, prose: finding.reason });
     }
+    // SES-359: the lane declaration, graded AFTER the cap and only when the cap passed. Same exit
+    // code, because both are the same verdict to the caller -- "this draft is not the kickoff yet"
+    // -- and runbook step 6 already treats exit 1 as a named deviation to re-assemble against.
+    const lanes = kickoffLaneFinding(text);
+    if (lanes) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, ...lanes }, prose: lanes.reason });
+    }
     return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes: Buffer.byteLength(text, "utf8"), cap: KICKOFF_BYTE_CAP },
       prose: `kickoff ${Buffer.byteLength(text, "utf8")} bytes, within ${KICKOFF_BYTE_CAP} (SES-376)` });
   }
@@ -1415,6 +1468,22 @@ async function main() {
   if (kickoffOverCap) {
     verdict = "block";
     reasoning = kickoffOverCap.reason + " | " + reasoning;
+  }
+
+  // FEATURE: SES-359 -- the delivery half of the lane declaration, computed exactly as the cap
+  // finding above is and for the same reason: the draft check can only be trusted if the ship
+  // cannot be reached around it. Same one direction (approve -> block, never the reverse), same
+  // PREPEND rather than replace (a red gate stays the reason it already was), and the same inertness
+  // as shipped -- it fires only once a caller passes `--kickoff=`, which task 2 of this ticket adds
+  // to the attended runbook line and card 1d57ebca still owes step 7a.
+  let kickoffNoLanes = null;
+  if (kickoffPath) {
+    try { kickoffNoLanes = kickoffLaneFinding(fs.readFileSync(path.resolve(repoRoot, kickoffPath), "utf8")); }
+    catch { kickoffNoLanes = null; }
+  }
+  if (kickoffNoLanes) {
+    verdict = "block";
+    reasoning = kickoffNoLanes.reason + " | " + reasoning;
   }
 
   // Eligibility reads the board, never the argv -- see the header.
@@ -1572,6 +1641,9 @@ async function main() {
     // is over. Reported, never stored in its own column -- it reaches the ledger through `reasoning`
     // above, which the block already prepended it to.
     kickoff_over_cap: kickoffOverCap,
+    // SES-359: same shape, same reasons -- null when the kickoff declares its lanes or none was
+    // passed, the finding object when it does not. Reported, never stored in its own column.
+    kickoff_no_lanes: kickoffNoLanes,
   };
 
   // ---- AGT-67 pass one: hand the judgment everything, print the prompt, record NOTHING. -------
@@ -1615,6 +1687,10 @@ async function main() {
       // carrying less content in one lane than the other is the lane-shaped difference this file's
       // own SES-337 note calls out as a defect.
       kickoff_over_cap: kickoffOverCap,
+      // SES-359: given to BOTH judge lanes, for the reason the key above records -- the same
+      // evidence carrying less content in one lane than the other is the lane-shaped difference
+      // this file's own SES-337 note calls out as a defect.
+      kickoff_no_lanes: kickoffNoLanes,
       diff: diffFor(repoRoot, base),
     };
     try {
@@ -1699,6 +1775,7 @@ async function main() {
       skill_row_self_certification: skillRowEdit,
       kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
       kickoff_over_cap: kickoffOverCap,   // SES-376 -- see the session lane's note above.
+      kickoff_no_lanes: kickoffNoLanes,   // SES-359 -- same.
       diff: diffFor(repoRoot, base),
     };
     const call = await callExecutor({ intentSlug: rows.intentSlug, taskContext: judgeCtx, tenant: arg("tenant", "global") });

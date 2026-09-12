@@ -1179,3 +1179,32 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
   `{"crons": [{"path": "/api/cron/rank-backlog", "schedule": "10 9 * * *"}]}` to `vercel.json` — **and
   first remove some other function, because `api/` sits at 12/12 and the 13th refuses the whole
   deployment silently.** `node scripts/check-api-function-count.js --worktree=<path>` is the check.
+
+### 54. `CLAUDE-DESIGN.md` — the hand-composed coding prompt a design session pasted into `Agent`
+- **Said:** the bordered block at `CLAUDE-DESIGN.md` 49-53 — three lines a design session wrote out
+  itself and pasted into the `Agent` tool as the coding sub-agent's whole prompt: the worktree line
+  ("Operate against …/.claude/worktrees/<short-name>/ — never the shared checkout … do not switch it
+  back"), the kickoff-read line ("Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute
+  it"), and `SES-020`'s stop-line ("Stop once your own Node.js test passes, npm run build succeeds,
+  and you've committed and pushed … do NOT run the Manual QA Checklist … do NOT remove this worktree").
+  Step 4.13 and Step 5a both named it as *the full bordered code block*.
+- **Lived:** `CLAUDE-DESIGN.md`, the 2026-07-22 branch-switch block in the Automated Design→Code→Verify
+  Loop rule, and by reference at Step 4 item 13 and Step 5a.
+- **Why retired:** it is a **second assembly** — the exact drift `SES-331` ended by shipping
+  `scripts/agent-prompt.js`, and `SES-336` then moved the unattended design and build onto. This block
+  was the last live instruction still requiring one, so attended sessions kept hand-composing both
+  halves. Measured 2026-09-12: `ai_activity_log` by agent holds **2** Designer and **1** Builder rows,
+  all 2026-09-09 fixtures, across the **12** kickoffs written since; the attended ships `SES-347`,
+  `SES-355` and `SES-368` all carry `kickoff_link IS NULL`; and `session-setup.md` §3e passed no
+  `--kickoff=`, so `SES-376`'s delivery-side cap was inert on every attended run.
+- **Survives:** the prompt is now the **`build-ticket` assembly** — `docs/runbooks/session-setup.md`
+  §3f, the same command `runner-cycle.md` step 7 runs — and **two of the block's own lines survive
+  verbatim, prepended to the rendered prompt rather than folded into it**: the worktree line and the
+  stop-line, which are orientation (*where* to work, where the job ends), not task content. The block
+  itself is **kept verbatim in place** on the `SES-336` precedent, since it is the only written record
+  of what those two lines say. **The one exception:** a session whose ticket edits the governance
+  agents' own Skill rows (self-certification, `AGT-67`) may compose its prompt by hand and says so in
+  its SESSION section.
+- **Restore:** git history of `CLAUDE-DESIGN.md` — but the block is still present in the live file, so
+  there is nothing to recover; what a restore would undo is the retirement notice above it and the
+  §3f pointers at Step 4.13 and Step 5a.
