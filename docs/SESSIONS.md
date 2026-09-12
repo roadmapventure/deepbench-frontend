@@ -5,6 +5,42 @@
 
 ---
 
+## session/cycle-20260912-1241 (v7.0.458, 2026-09-12, runner cycle `a6a8b73d-a126-41ec-9f9b-4808ce04efed`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (7 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-373` — **a card-only rollback decision records itself, and the thing to read twice is that the runner had built a loop where its own incident card reddened the gate that graded the next ship.**
+
+### The defect was a feedback loop, not a missing column
+
+`scripts/rollback-on-red.js` decides `card-only` whenever a red range carries a migration it cannot down (29 of 33, measured at `SES-354`), and filed its incident card with `decision NULL`. `tests/regression/ses-285-m6-autonomy.test.mjs` assertion 6 reads the **live board** and requires ZERO `gated_before_build` rows with `decision IS NULL` — the M6 promise that nothing waits on a human. So each cycle that observed the standing CI red filed a card that reddened the verifier's own regression gate for every later ship. Measured at cycle start: **five** such cards, one per cycle from 2026-09-11 17:45Z to 2026-09-12 07:30Z (`5810863d`, `7ea4e930`, `5d5f5f7b`, `18a0b7b6`, `b990edc4`), and `ses-285` failing on assertion 6 **and only there** (`needs_john_open` = 0, the 44 `CLOSE_MARKER` rows all resolve). Two mechanisms shipped under opposite rules: M6 says nothing blocks on a human, `SES-182`'s card says ask one.
+
+The ticket named two branches and preferred (a) — the card records its own decision — because (b), loosening the assertion, would make M6 false on paper to make it true in CI. (a) shipped.
+
+### The engine records the outcome it already reached, and that is not a widening of its authority
+
+`decide()` had already chosen `card-only` before anything was written; what was missing was the ledger row. The card-only path now calls `record_decision(kind = 'rollback')` **under the cycle id passed in on `--cycle-id`** and files the card `decision = 'retired'` naming that uuid. The script's header boundary — *"the script never mints its own authority"* — names acting on the world: it never pushes and never applies DDL. Writing a decision row under the id handed to it is the *ledger writer* half that header already claims, the same way it already writes the before-images, the card and the green pointer under that same id. What holds the line: `p_backlog_id` NULL, `p_ladder_work_class` NULL (so a finalise moves no rung), and **nothing recorded on the revert branch** — that branch's action is executed by the cycle behind its push gates, so its record belongs to the cycle at the moment it pushes.
+
+`retired` is the value, not `accept`. `SES-300` defines it as *withdrawn as an ask — a record, never an open question*, `briefing_open_cards()` filters on `decision IS NULL` so a retired card leaves §6 and surfaces on the standing brief's open-decisions ledger instead, and card `c580d0fa` (2026-08-31) was already carrying `retired` on this exact card shape. `accept` would have read as an approval nobody gave, and it is the one value `trg_runner_items_accept_clears_flag` keys on.
+
+**A second, smaller fix rode along and is worth knowing:** `fileIncidentCard` wrote its before-image with `pk_value = card.display_ref`. `reverse_decision()` addresses a row by primary key, so every incident card ever filed was un-reversible by construction. The card's uuid is now minted client-side and used as both the `pk_value` and the row's `id`, on both branches.
+
+### The five standing cards were backfilled, because the assertion reads live rows
+
+A forward-only fix cannot turn assertion 6 green while five NULL rows stand. One `DO` block, decision **`6c19edb2-0106-4ce9-b8ce-6189fc7a08ab`** (kind `rollback-backfill`, `backlog_id SES-373`, ladder NULL, expires 2026-09-15 13:06:33Z), five `runner_before_images` rows each carrying the **full prior row** via `to_jsonb(r)`, then five UPDATEs in the same transaction. Undecided gated cards **5 → 0**. Stated rather than discovered later: `runner_items` has no `updated_at`, so `reverse_decision()` will count these rows `unverifiable` and restore nothing automatically — the before-images hold every full prior row for a byte-exact hand restore, and the decision's own reasoning says so.
+
+### The QA discriminated, and the live apply proved the new path end to end
+
+Pre-change dry run on the unchanged tree: arms (A) and (B) failed at import — `SyntaxError: … does not provide an export named 'CARD_ONLY_DECISION'` — and arm (C) failed with 5 undecided rows. After: `[PASS] ses-285-m6-autonomy.test.mjs`, `[PASS] ses-373-card-only-self-decides.test.mjs`, and the control `[PASS] SES-182-rollback-on-red.js` unchanged. The end-to-end apply ran against `5e39e62b` (cycle `544d175b`'s own push, whose `ci_run_conclusions` row carries `Tripwire + regression (blocking)=failure`, so the condition held rather than being assumed): `action: card-only`, decision **`0fdb9d10-fc95-4037-8ea6-3bd5cac14daf`**, card `9afb9c08` filed `retired` naming it, its before-image `pk_value` = the card's own uuid with `row_data NULL` (the INSERT convention) — the pk fix proven on a live row.
+
+### The verdict, and the one red this ship does not own
+
+Verifier: `build=green / regression=red / hygiene=green` → **block**, verdict `2bd36f77-1d72-4a53-929f-51a72d4fd17e`. The gate's own line reads **`regression suite: 208/209 passed`** with a single failure, `log-143c-invention-use.test.mjs` (*7d: judge_runs must be >= 1 … got 0*) — LOG-143's judge has never run, which is **`SES-371`** (queue 24) and was deliberately not re-filed. So the honest claim is **`ses-285` green, CI red on `log-143c` only**, never "CI green". `record_ship_decision()` refuses a non-`approve` verdict, so this is the **sixth consecutive ship with no Reverse handle** (`v7.0.452`-`v7.0.454`, `v7.0.456`-`v7.0.458`); undoing this one means reverting `3ecfa840` by hand. `tooling` streak resets 0 → 0, rung holds at **21** — a block costs the streak, never the rung.
+
+**This push makes dev's CI less red, and by more than the predecessor's did.** At cycle start the suite was 204/208 with four failures; `SES-177-claude-state-renderer.js` and `SES-261-ledger-pin.js` were `SES-213`'s known one-cycle `CLAUDE-STATE.md` lag and step 7a's render cleared both, and this ship closes `ses-285`. Of the four reds CI has been reporting on `dev`, three are gone after this commit set and only `SES-371`'s remains.
+
+### Two discoveries reported, not fixed and not filed
+
+(1) `REVERT_AND_CARD` (`decide()` L323-345) still files its card undecided — deliberate, since that branch's action is executed by the cycle behind its push gates — and `title like 'Auto-rollback: %'` is **0**, so it has never fired live; it will red assertion 6 the first time it does. (2) Five cards are five cycles carding **one** red: `signatureOf(trigger, headSha)` already exists in the engine and is unused, so a dedup on the red's signature is a separate ticket. Also measured and left alone: step 4a's engine run on dev head `3cddea3f` returned `action: none` — *"an attended push or an unattributable one is not this machine's to undo"* — so no sixth card was filed on the way in.
+
+---
+
 ## session/cycle-20260912-0941 (v7.0.457, 2026-09-12, runner cycle `8ac204d8-bbc4-48a4-80c7-070660495082`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (4 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-367` — **a governance agent on the session lane was being handed a contract it was never shown, and the thing to read twice is that the orchestrator's own premise evidence was wrong in the direction that would have made the fix smaller.**
 
 ### The bug, measured twice and by two different readers
