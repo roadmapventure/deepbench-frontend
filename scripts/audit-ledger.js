@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v7.0.464 | scripts/audit-ledger.js | AGT-70
+// DeepBench v7.0.467 | scripts/audit-ledger.js | AGT-70
 // FEATURE: AGT-70 slice 1 -- the Auditor's findings ledger, its fingerprint, and the weekly report.
 // This script is the ONLY writer of public.audit_findings: the table's trigger refuses every DELETE
 // and every UPDATE outside {status, ruling, ruled_by, ruled_at}, so an append here is permanent.
@@ -69,6 +69,43 @@ export function normalize(s) {
     .replace(/[`"']/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// THE ISO WEEK IS THIS FILE'S JOB BECAUSE THE LEDGER'S `iso_week` COLUMN IS (AGT-70 slice 3).
+// `--ingest`/`--report` already take a `YYYY-Www` on the command line, and step 4d's shell computes
+// it with `date -u +%G-W%V`; these two exports are that same calendar in JS, so a caller that has a
+// Date rather than a shell (tripwire-to-backlog.js's `--from-ledger` weekly cap) asks the ledger
+// what week it is instead of carrying a second copy of the rule.
+//
+// ISO-8601 AND UTC, both load-bearing. The week a date belongs to is the week holding that date's
+// THURSDAY -- which is why `2027-01-01` is `2026-W53` and not `2027-W01`, and the reason this is
+// not `Math.floor(dayOfYear / 7)`. UTC and not local: `date -u +%G-W%V` is UTC, `ruled_at` is a
+// timestamptz read back as UTC, and a local-time week boundary would put a Sunday-evening ruling in
+// the wrong week on half the planet -- silently, and only for the rows nearest the cap.
+export function isoWeek(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) throw new Error(`isoWeek: not a date: ${d}`);
+  // Midnight UTC of that calendar day, then walk to the week's Thursday.
+  const t = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+  const day = t.getUTCDay() || 7; // Sunday is 7, not 0 -- the ISO week runs Monday..Sunday.
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const year = t.getUTCFullYear();
+  const jan1 = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil(((t - jan1) / 86400000 + 1) / 7);
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
+
+// The Monday 00:00Z that opens the ISO week the given date falls in, as an ISO string. This is the
+// `created_at >= …` floor `--from-ledger` counts its weekly filings from: a cap of 3 PER ISO WEEK
+// needs a week boundary that moves only on Mondays, never a rolling 7-day window (which would let
+// four rows file across any eight days and never once look over the cap).
+export function isoWeekStart(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) throw new Error(`isoWeekStart: not a date: ${d}`);
+  const t = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() - (day - 1));
+  return t.toISOString();
 }
 
 // `docs/runbooks/runner-cycle.md:626` -> `docs/runbooks/runner-cycle.md`

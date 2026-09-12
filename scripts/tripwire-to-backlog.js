@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v7.0.301 | scripts/tripwire-to-backlog.js | SES-205
+// DeepBench v7.0.467 | scripts/tripwire-to-backlog.js | SES-205 + AGT-70 slice 3 (--from-ledger)
 // FEATURE: SES-205 -- the truth tripwire's findings become `public.backlog_items` rows instead of
 // console output nobody re-reads. Third and last piece of the SES-176 remainder (pieces 1 and 2
 // shipped as SES-200, v7.0.243).
@@ -60,9 +60,36 @@
 // if its member set later turns over completely. That is the right default for an unattended
 // loop, and the live member list is always one command away (`node scripts/check-session-docs.js`).
 //
+// -- `--from-ledger` SWITCHES THE SOURCE AND NOTHING ELSE (AGT-70 slice 3, v7.0.467) --------
+// The Auditor's weekly judgment run files nothing to the board. Its findings land in
+// `public.audit_findings`, John reads them, and a finding he RULED and left `open` is the ledger's
+// "file it" state -- that, and only that, becomes a backlog row here. So this flag re-points the
+// detector at a second source; the filing half underneath it (dedup by substring, before-image
+// first, ids passed in, the 0/1/2 exit contract) is the same code path the tripwire uses, because
+// two filing engines is the drift this script was written to end.
+//
+// THREE GATES, and each is a decision rather than a filter that happened to be convenient:
+//   * `ruled_by IS NOT NULL` -- the Auditor never files its own findings. A model finding a
+//     contradiction is a candidate; John reading it is what makes it work. Without this gate the
+//     weekly run writes straight to the board and the ledger's whole point is gone.
+//   * `status = 'open'` -- `resolved` and `not-a-defect` are John's other two answers. A ruled row
+//     left open is the one that means "yes, and it still needs doing".
+//   * `confidence = 'high'` -- the corpus detector's own grading. Medium and low rows are for the
+//     weekly report to show him, not for the board to carry.
+// And one cap: LEDGER_WEEKLY_CAP rows per ISO WEEK, counted from `backlog_items.created_at` against
+// isoWeekStart() -- a Monday 00:00Z floor, never a rolling 7 days (which lets four rows file across
+// any eight days without once looking over the cap). The cap is the blast radius: a bad week of
+// rulings costs the board three rows, not thirty.
+//
 // Usage:
 //   node scripts/tripwire-to-backlog.js [--apply] [--cycle-id=<uuid>] [--backlog-ids=<ids>]
 //                                       [--max-filings=<n>] [--json]
+//   node scripts/tripwire-to-backlog.js --from-ledger [--apply] [--cycle-id=<uuid>]
+//                                       [--backlog-ids=<ids>] [--json]
+//
+//   --from-ledger     File from public.audit_findings (ruled, open, high) instead of the tripwire.
+//                     DRY RUN by default, exactly like the tripwire path -- --apply is still the
+//                     only thing that writes.
 //
 //   --apply           Actually file tickets. Default is a DRY RUN that writes nothing.
 //   --cycle-id=<uuid> Required with --apply. The open runner_cycles row every before-image row is
@@ -87,10 +114,21 @@ import {
   GATING_CHECKS,
   GATING_SEVERITY,
 } from "./check-session-docs.js";
+// AGT-70 slice 3: the ISO-week calendar is IMPORTED from the ledger's own script, never re-derived
+// here. `iso_week` is that file's column and `date -u +%G-W%V` in runbook step 4d is that file's
+// week -- a second implementation of "which week is it" is a cap that disagrees with the report.
+import { isoWeekStart } from "./audit-ledger.js";
 
 export const TRIPWIRE_SOURCE_FILE = "tripwire-to-backlog";
 export const TRIPWIRE_PREFIX = "SES";
 export const DEFAULT_MAX_FILINGS = 3;
+
+// AGT-70 slice 3. `source_file` is the dedup scope AND the ignore-key any future markdown→DB
+// reconciliation must carry (the same note heal-engine's rows have in runner-cycle.md step 8b).
+export const LEDGER_SOURCE_FILE = "audit-ledger";
+// Three per ISO week. Deliberately NOT --max-filings: that flag caps one RUN, and a cap that resets
+// every run caps nothing when the runner fires every few hours.
+export const LEDGER_WEEKLY_CAP = 3;
 
 // A check with more members than this is stamped 'M' rather than 'S': eighteen over-cap
 // descriptions is not a one-shape one-cycle fix. John's filing rule, directive db84b784.
@@ -243,6 +281,130 @@ export function parseBacklogIds(raw, prefix = TRIPWIRE_PREFIX) {
 }
 
 // ---------------------------------------------------------------------------
+// Pure half, ledger source (AGT-70 slice 3) -- rows in, drafts out. Same contract as the tripwire
+// half above it: no network, no disk, no process.exit, so the regression test drives the REAL
+// functions against fixtures.
+// ---------------------------------------------------------------------------
+
+// The three gates, then one row per FINGERPRINT. The fingerprint is the ledger's identity (it
+// survives a re-wrap and a line-number shift -- scripts/audit-ledger.js's header says why), so the
+// same contradiction found again in a later week is the SAME finding and must not file twice. When
+// a fingerprint appears more than once, the EARLIEST `ruled_at` wins: that is the ruling that made
+// it filable, and keeping the latest would let a re-ruling walk the row forward in the queue.
+// Input order is preserved for the survivors -- the CLI reads `order=ruled_at`, so the caller's
+// order is already "oldest ruling first", which is the order they should file in.
+export function ledgerEligible(rows) {
+  const keep = new Map();
+  for (const r of rows ?? []) {
+    if (!r) continue;
+    if (r.status !== "open") continue;
+    if (r.confidence !== "high") continue;
+    if (r.ruled_by == null || String(r.ruled_by) === "") continue;
+    const fp = String(r.fingerprint);
+    const seen = keep.get(fp);
+    // String compare is right for an ISO-8601 timestamp and for `null` handled explicitly: a row
+    // with no ruled_at cannot be "earlier" than one that has one, it is simply not preferred.
+    if (!seen) { keep.set(fp, r); continue; }
+    const a = seen.ruled_at == null ? "" : String(seen.ruled_at);
+    const b = r.ruled_at == null ? "" : String(r.ruled_at);
+    if (b !== "" && (a === "" || b < a)) keep.set(fp, r);
+  }
+  return [...keep.values()];
+}
+
+// `existingDescriptions` is the description strings of already-filed LEDGER tickets; membership is
+// a substring test on the FINGERPRINT, which is exactly what the description carries and exactly
+// what the REST dedup query pulls -- the same shape detect() uses with the tripwire's sig hash.
+//
+// THE CAP IS APPLIED AFTER THE DEDUP, NOT BEFORE, and that ordering is load-bearing: a row that is
+// already filed must never consume a slot, or three filed findings would wedge the cap shut for
+// every ISO week that followed.
+export function ledgerDetect(eligible, existingDescriptions = [], opts = {}) {
+  const weeklyCap = Number.isFinite(opts.weeklyCap) ? opts.weeklyCap : LEDGER_WEEKLY_CAP;
+  const filedThisWeek = Number.isFinite(opts.filedThisWeek) ? opts.filedThisWeek : 0;
+  const capLeft = Math.max(0, weeklyCap - filedThisWeek);
+
+  const alreadyFiled = [];
+  const unfiled = [];
+  for (const row of eligible ?? []) {
+    const fp = String(row?.fingerprint ?? "");
+    const filed = fp !== "" && (existingDescriptions ?? []).some(
+      (d) => typeof d === "string" && d.includes(fp),
+    );
+    if (filed) alreadyFiled.push(row);
+    else unfiled.push(row);
+  }
+  return { detections: unfiled.slice(0, capLeft), alreadyFiled, capLeft };
+}
+
+export function ledgerSizeStampFor(row) {
+  return (row?.locations?.length ?? 0) > SIZE_S_MAX_MEMBERS ? "M" : "S";
+}
+
+// Builds the exact row that will be inserted. Pure, so the guard can assert that the FINGERPRINT is
+// present in the description -- which is what makes the dedup above work at all. Deliberately the
+// same shape as buildTicketDraft(): same tier, same type, same priority_class, same gate_count, no
+// `scope_origin` on either. Two filing paths that stamp their rows differently are two boards.
+export function buildLedgerTicketDraft(row, backlogId, opts = {}) {
+  const now = opts.now ?? new Date();
+  const locations = Array.isArray(row?.locations) ? row.locations : [];
+  const title = `[Auditor] ${row.kind}: ${firstClause(row.governing_fact)}`;
+
+  const locationLines = locations
+    .map((l) => `  - \`${l?.location ?? ""}\` — "${l?.text ?? ""}"`)
+    .join("\n");
+
+  const description = [
+    `**P10 - Tooling.** **Auto-filed from the Auditor's ledger (\`AGT-70\`) on John's ruling — not yet a fix.**`,
+    ``,
+    `\`public.audit_findings\` row \`${row.fingerprint}\` (${row.kind}, confidence ${row.confidence}, ` +
+      `first seen ${row.iso_week}) was ruled by ${row.ruled_by} on ${String(row.ruled_at ?? "").slice(0, 10)} ` +
+      `and left \`open\`, which is the ledger's "file it" state.`,
+    ``,
+    `Ledger fingerprint: \`${row.fingerprint}\``,
+    `Ruling: ${row.ruling}`,
+    `Filed at: ${now.toISOString()}`,
+    ``,
+    `**Fact in dispute:** ${row.governing_fact}`,
+    ``,
+    `**Locations (verbatim at filing):**`,
+    locationLines,
+    ``,
+    `**Proposed resolution:** ${row.proposed_resolution}`,
+    ``,
+    `Reproduce:`,
+    "```",
+    `node scripts/audit-ledger.js --report=${row.iso_week}`,
+    "```",
+    ``,
+    `Filing is not fixing — this ticket rides the normal queue and the full session ceremony, as ` +
+      `tripwire and heal tickets do. The fingerprint above is the dedupe key: the same finding files ` +
+      `once, and a re-run files nothing. At most ${LEDGER_WEEKLY_CAP} ledger rows file per ISO week ` +
+      `(\`LEDGER_WEEKLY_CAP\`).`,
+  ].join("\n");
+
+  const ordinal = Number.parseInt(String(backlogId).split("-")[1], 10);
+
+  return {
+    backlog_id: backlogId,
+    tier: "next",
+    type: "Tooling",
+    priority_class: "P10 - Tooling",
+    title,
+    description,
+    status: "open",
+    source_file: LEDGER_SOURCE_FILE,
+    row_ordinal: ordinal,
+    // The member list here is the finding's LOCATIONS -- the passages in dispute. Eight homes to
+    // reconcile is not a one-shape one-cycle fix, which is the same reading sizeStampFor() gives
+    // the tripwire's member count.
+    size_stamp: ledgerSizeStampFor(row),
+    gate_count: 0,
+    session_ref: `S-${backlogId} (auto-filed from the Auditor's ledger, AGT-70)`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Supabase REST
 // ---------------------------------------------------------------------------
 
@@ -270,6 +432,62 @@ async function fetchTripwireDescriptions(base, key) {
     return { descriptions: rows.map((r) => r.description) };
   } catch (e) {
     return { error: `tripwire ticket read returned unparseable JSON: ${e.message}` };
+  }
+}
+
+// AGT-70 slice 3. The three gates are pushed into the QUERY as well as being re-asserted by
+// ledgerEligible(): the query keeps the read small and the pure function keeps the rule testable
+// from fixtures. Columns are NAMED and never `select=*` -- `.claude/rules/supabase-column-grants.md`
+// (a column-list grant turns a star select into a 403), and naming them is also what makes it
+// visible that this read touches no column outside the ledger's own.
+async function fetchLedgerRows(base, key) {
+  const url =
+    `${base}/rest/v1/audit_findings?select=id,fingerprint,iso_week,kind,locations,governing_fact,` +
+    `confidence,proposed_resolution,status,ruling,ruled_by,ruled_at` +
+    `&status=eq.open&confidence=eq.high&ruled_by=not.is.null&order=ruled_at`;
+  let res;
+  try {
+    res = await fetch(url, { headers: restHeaders(key) });
+  } catch (e) {
+    return { error: `could not read the Auditor's ledger: ${e.message}` };
+  }
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch { /* best effort */ }
+    return { error: `audit_findings read returned HTTP ${res.status}: ${body}` };
+  }
+  try {
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return { error: "audit_findings read came back non-array" };
+    return { rows };
+  } catch (e) {
+    return { error: `audit_findings read returned unparseable JSON: ${e.message}` };
+  }
+}
+
+// `created_at` rides along with the description because BOTH dedup facts come off the same rows:
+// which fingerprints are filed at all (any week), and how many landed since this ISO week's Monday.
+// One read, two questions -- a second count query could disagree with the first by a row.
+async function fetchLedgerFilings(base, key) {
+  const url =
+    `${base}/rest/v1/backlog_items?select=description,created_at` +
+    `&source_file=eq.${encodeURIComponent(LEDGER_SOURCE_FILE)}`;
+  let res;
+  try {
+    res = await fetch(url, { headers: restHeaders(key) });
+  } catch (e) {
+    return { error: `could not read already-filed ledger tickets: ${e.message}` };
+  }
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch { /* best effort */ }
+    return { error: `ledger ticket read returned HTTP ${res.status}: ${body}` };
+  }
+  try {
+    const rows = await res.json();
+    return { rows: Array.isArray(rows) ? rows : [] };
+  } catch (e) {
+    return { error: `ledger ticket read returned unparseable JSON: ${e.message}` };
   }
 }
 
@@ -322,6 +540,7 @@ async function insertTicket(base, key, row) {
 const ARGV = process.argv.slice(2);
 const JSON_OUT = ARGV.includes("--json");
 const APPLY = ARGV.includes("--apply");
+const FROM_LEDGER = ARGV.includes("--from-ledger");
 
 function argValue(name, fallback) {
   const hit = ARGV.find((a) => a.startsWith(`--${name}=`));
@@ -340,10 +559,90 @@ function finish(code, payload, prose) {
   process.exit(code);
 }
 
+// AGT-70 slice 3. The ledger source, end to end. Everything below the detect() call is the same
+// sequence the tripwire path runs -- before-image, insert, one id per filing, never an id minted
+// here -- because the filing contract is the thing that must not have two versions.
+async function mainFromLedger(base, key) {
+  const led = await fetchLedgerRows(base, key);
+  if (led.error) fail(2, led.error);
+  const filings = await fetchLedgerFilings(base, key);
+  if (filings.error) fail(2, filings.error);
+
+  const now = new Date();
+  const weekStart = isoWeekStart(now);
+  const filedThisWeek = filings.rows.filter(
+    (r) => typeof r.created_at === "string" && r.created_at >= weekStart,
+  ).length;
+
+  const eligible = ledgerEligible(led.rows);
+  const { detections, alreadyFiled, capLeft } = ledgerDetect(
+    eligible,
+    filings.rows.map((r) => r.description),
+    { filedThisWeek, weeklyCap: LEDGER_WEEKLY_CAP },
+  );
+
+  const payload = {
+    source: "ledger",
+    apply: APPLY,
+    ruledOpen: eligible.length,
+    filedThisWeek,
+    weeklyCap: LEDGER_WEEKLY_CAP,
+    capLeft,
+    alreadyFiled: alreadyFiled.map((r) => ({ fingerprint: r.fingerprint, kind: r.kind })),
+    detections: detections.map((r) => ({
+      fingerprint: r.fingerprint, kind: r.kind, sizeStamp: ledgerSizeStampFor(r),
+    })),
+  };
+
+  if (!APPLY) {
+    const prose =
+      `tripwire-to-backlog --from-ledger: ${eligible.length} ruled finding(s), ` +
+      `${alreadyFiled.length} already filed, ${detections.length} to file ` +
+      `(cap ${capLeft} left this week)`;
+    if (detections.length === 0) return finish(0, payload, prose);
+    const lines = detections
+      .map((r) => `  - [${r.fingerprint}] ${r.kind}, size ${ledgerSizeStampFor(r)} — ruled by ${r.ruled_by}`)
+      .join("\n");
+    return finish(1, payload,
+      `${prose}\n${lines}\n\n` +
+      `Claim ${detections.length} ${TRIPWIRE_PREFIX} id(s) as ONE feature_id_counter block, then ` +
+      `re-run with --from-ledger --apply --cycle-id=<uuid> --backlog-ids=<ids>.`);
+  }
+
+  const cycleId = argValue("cycle-id", "");
+  if (!cycleId) fail(2, "--apply requires --cycle-id=<uuid> (every before-image row is bound to it)");
+  const parsed = parseBacklogIds(argValue("backlog-ids", ""));
+  if (parsed.error) fail(2, parsed.error);
+
+  const toFile = detections.slice(0, parsed.ids.length);
+  const filed = [];
+  for (let i = 0; i < toFile.length; i += 1) {
+    const row = toFile[i];
+    const backlogId = parsed.ids[i];
+    const img = await insertBeforeImage(base, key, cycleId, backlogId);
+    if (img.error) fail(2, `${backlogId}: ${img.error}`);
+    const ins = await insertTicket(base, key, buildLedgerTicketDraft(row, backlogId, { now }));
+    if (ins.error) fail(2, `${backlogId}: ${ins.error}`);
+    filed.push({ backlogId, fingerprint: row.fingerprint, kind: row.kind });
+  }
+
+  return finish(0,
+    { ...payload, filed },
+    filed.length === 0
+      ? "tripwire-to-backlog --from-ledger: nothing to file."
+      : `tripwire-to-backlog --from-ledger: filed ${filed.length} ticket(s):\n` +
+        filed.map((f) => `  - ${f.backlogId} — ${f.kind} (fingerprint ${f.fingerprint})`).join("\n"));
+}
+
 async function main() {
   const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   if (!base || !key) fail(2, "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set (exit 2 = could not run, never a pass).");
+
+  // The SOURCE branches here and nowhere else: the tripwire's own collect/aggregate/detect is not
+  // even reached on a --from-ledger run, so a check-session-docs.js failure cannot take the ledger
+  // path down with it.
+  if (FROM_LEDGER) return mainFromLedger(base, key);
 
   const maxFilings = Number.parseInt(argValue("max-filings", String(DEFAULT_MAX_FILINGS)), 10);
   if (!Number.isFinite(maxFilings) || maxFilings < 1) fail(2, "--max-filings must be a positive integer");

@@ -1,4 +1,28 @@
-// DeepBench v7.0.465 | tests/regression/agt-70-auditor.test.mjs | AGT-70
+// DeepBench v7.0.467 | tests/regression/agt-70-auditor.test.mjs | AGT-70
+//
+// FEATURE: AGT-70 slice 3 -- the landing: ruled findings become board rows under a weekly cap, the
+// standing brief grows an `Auditor's ledger` group, and runbook step 4d is where the weekly audit
+// fires. Parts A-I below are slices 1 and 2's and are unchanged.
+//
+// FOUR MORE PARTS, each with its own control:
+//   J   LEDGER FILING (pure) -- ledgerEligible's three gates and its earliest-ruling collapse,
+//       ledgerDetect's dedup-before-cap ordering (a row already filed must never consume a weekly
+//       slot), and buildLedgerTicketDraft's row. The cap is asserted in BOTH directions: at
+//       filedThisWeek 3 nothing files, and at 2 exactly one of two eligible rows does.
+//   K   BRIEF GROUP (pure + doc) -- renderAuditLedger over the six live findings' shape, byte-stable
+//       on a second call, and the branch that matters: `undefined` says "not read" and must NOT say
+//       "0 findings". factsSha moves when a row is ruled and when a row leaves for the board.
+//   L   STEP 4d AND THE CARD (source, always runs) -- 4d sits between 4c and 5, its NOTES entry
+//       exists and is under the outcome cap, and the step body carries the three things that make
+//       it safe: the --from-ledger sweep, a DRY --ingest (no line carries both --ingest= and
+//       --apply, which is the "a cycle never ingests" rule as a grep), and the ISO-week
+//       precondition. Control: rename the step and the renderer must REFUSE, not silently omit it.
+//   M   LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY; notRun otherwise) -- the CLI's --from-ledger dry
+//       run against the real ledger, and the two counts this slice promised not to move.
+//
+// DRY-RUN against the tree before this ticket (v7.0.465): J and M FAIL at import (ledgerDetect and
+// its siblings do not exist); K FAILS (renderAuditLedger is not exported and standing-brief.md has
+// no `**Auditor's ledger**`); L FAILS (parseSteps returns no `4d` and NOTES has no entry for it).
 //
 // FEATURE: AGT-70 slice 2 -- the judgment lane (scripts/audit-cluster.js): the clusterer, the
 // locate/validate/reconcile trio around the model call, and the two detector exemptions the first
@@ -68,7 +92,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { fingerprint, locationKey, normalize, renderReport } from "../../scripts/audit-ledger.js";
+import { fingerprint, locationKey, normalize, renderReport, isoWeek, isoWeekStart } from "../../scripts/audit-ledger.js";
+import {
+  ledgerEligible, ledgerDetect, buildLedgerTicketDraft, LEDGER_SOURCE_FILE, LEDGER_WEEKLY_CAP,
+} from "../../scripts/tripwire-to-backlog.js";
+import { renderAuditLedger, factsSha, BEGIN, END } from "../../scripts/render-standing-brief.js";
+import { render as renderCard, parseSteps, NOTES } from "../../scripts/render-cycle-card.js";
 import { extractMarkdown, extractSkillRows, detectDuplicates, corpusFiles } from "../../scripts/audit-corpus.js";
 import { PROCEDURE_GENERATED_DOCS } from "../../scripts/check-session-docs.js";
 import {
@@ -704,6 +733,265 @@ function theCorpusDropsGeneratedDocsByTheRealSet() {
   }
 }
 
+// --- J. ledger filing (pure) ---------------------------------------------------------------------
+
+// Fingerprints are 16 hex because the ledger's are, and they are LITERAL rather than computed: this
+// part is about the gates and the cap, and a computed fingerprint would couple these assertions to
+// part A's hashing rule so a change there would redden both for one reason.
+const LOC = n => Array.from({ length: n }, (_, i) => ({ location: `docs/x${i}.md:${i + 1}`, text: `passage ${i}` }));
+const FP = {
+  a: "aaaaaaaaaaaaaaaa", b: "bbbbbbbbbbbbbbbb", c: "cccccccccccccccc",
+  d: "dddddddddddddddd", e: "eeeeeeeeeeeeeeee",
+};
+const ledgerRow = (fp, over = {}) => ({
+  id: `id-${fp}`,
+  fingerprint: fp,
+  iso_week: "2026-W37",
+  kind: "contradiction",
+  locations: LOC(2),
+  governing_fact: "the runner's scheduling interval in hours -- a second clause the title must cut",
+  confidence: "high",
+  proposed_resolution: "state the interval once, in runner_settings, and cite it everywhere else",
+  status: "open",
+  ruling: "real, and still open",
+  ruled_by: "john",
+  ruled_at: "2026-09-13T00:00:00.000Z",
+  ...over,
+});
+
+const R1 = ledgerRow(FP.a);
+const R2 = ledgerRow(FP.b, { ruled_by: null, ruled_at: null });
+const R3 = ledgerRow(FP.c, { confidence: "medium" });
+const R4 = ledgerRow(FP.d, { status: "not-a-defect" });
+const R5 = ledgerRow(FP.e, { locations: LOC(8) });
+// The SAME finding, ruled again later. The ledger's identity is the fingerprint, so this is one row.
+const R1_PRIME = ledgerRow(FP.a, { ruled_at: "2026-09-20T00:00:00.000Z", ruling: "re-ruled later" });
+
+function theLedgerFilesOnlyRuledOpenHighRowsUnderTheCap() {
+  const eligible = ledgerEligible([R1, R2, R3, R4, R5, R1_PRIME]);
+  assert.deepStrictEqual(eligible, [R1, R5],
+    "only the ruled, open, high rows are eligible, one per fingerprint, earliest ruling kept -- " +
+    "R2 is unruled (the Auditor must never file its own finding), R3 is medium, R4 is not-a-defect, " +
+    "and R1' is R1 found again");
+
+  // Each gate on its own, so a pass here cannot come from the wrong one doing the work.
+  assert.deepStrictEqual(ledgerEligible([{ ...R1, ruled_by: null }]), [],
+    "control: an UNRULED open/high row must not be eligible -- that gate is the whole ledger");
+  assert.deepStrictEqual(ledgerEligible([{ ...R1, confidence: "medium" }]), [],
+    "control: a medium-confidence ruled open row must not be eligible");
+
+  // Already filed, with room in the cap: the filed row is set aside, the other files.
+  const withFiled = ledgerDetect(eligible, [`... ${R5.fingerprint} ...`], { filedThisWeek: 0, weeklyCap: 3 });
+  assert.deepStrictEqual(withFiled.detections, [R1], "a fingerprint already in a description must not re-file");
+  assert.deepStrictEqual(withFiled.alreadyFiled, [R5], "the filed row must be reported as filed, not dropped silently");
+  assert.strictEqual(withFiled.capLeft, 3, "nothing filed this week leaves the whole cap");
+
+  // The cap shut. Nothing files even though R1 is eligible and undeduped.
+  const capped = ledgerDetect(eligible, [], { filedThisWeek: 3, weeklyCap: 3 });
+  assert.deepStrictEqual(capped.detections, [], "at the weekly cap nothing files, however eligible it is");
+  assert.strictEqual(capped.capLeft, 0, "capLeft must be 0, not negative");
+
+  // The cap half-open: two eligible rows, one slot, and the ORDER decides which -- oldest ruling.
+  const partial = ledgerDetect(eligible, [], { filedThisWeek: 2, weeklyCap: 3 });
+  assert.deepStrictEqual(partial.detections, [R1], "one slot left must file exactly one, the earliest-ruled");
+  assert.strictEqual(partial.capLeft, 1, "3 - 2 = 1 slot left this week");
+
+  assert.strictEqual(LEDGER_WEEKLY_CAP, 3, "the standing weekly cap is 3 (runbook step 4d states the same number)");
+
+  // The draft. The fingerprint in the description is what makes the dedup above work at all.
+  const now = new Date("2026-09-14T10:00:00.000Z");
+  const draft = buildLedgerTicketDraft(R1, "SES-999", { now });
+  assert.strictEqual(draft.source_file, LEDGER_SOURCE_FILE, "the ledger's rows carry source_file audit-ledger");
+  assert.strictEqual(draft.source_file, "audit-ledger", "and that constant is the literal the REST dedup query filters on");
+  assert.strictEqual(draft.tier, "next", "doc/tooling drift is `next`, never `now` -- it must not jump John's named drain");
+  assert.strictEqual(draft.row_ordinal, 999, "row_ordinal is the numeric half of the claimed id");
+  assert.strictEqual(draft.size_stamp, "S", "two locations is a one-shape fix");
+  assert.strictEqual(draft.gate_count, 0, "a ledger fix crosses no external gate");
+  assert.strictEqual(buildLedgerTicketDraft(R5, "SES-1000", { now }).size_stamp, "M",
+    "eight locations to reconcile is NOT a one-shape one-cycle fix -- the stamp must move with the member count");
+  assert.ok(draft.title.startsWith("[Auditor] contradiction:"),
+    `the title names the Auditor and the kind; got: ${draft.title}`);
+  assert.ok(draft.description.includes(R1.fingerprint),
+    "the fingerprint MUST be in the description -- it is the dedup key, and without it every run re-files");
+  assert.ok(draft.description.includes(R1.ruling), "John's ruling is why the row is on the board; it must be quoted");
+  for (const l of R1.locations) {
+    assert.ok(draft.description.includes(l.location),
+      `the description must carry every location verbatim at filing; missing ${l.location}`);
+  }
+  assert.ok(draft.description.includes(`--report=${R1.iso_week}`),
+    "the Reproduce line must point at the week's own report");
+
+  // The calendar the cap counts against.
+  assert.strictEqual(isoWeek(new Date("2026-09-12T22:12:00Z")), "2026-W37", "the live week at this ship");
+  assert.strictEqual(isoWeek(new Date("2027-01-01T12:00:00Z")), "2026-W53",
+    "ISO-8601: the week belongs to its THURSDAY, so 1 Jan 2027 is 2026-W53 -- the case a dayOfYear/7 gets wrong");
+  assert.strictEqual(isoWeek(new Date("2026-01-01T12:00:00Z")), "2026-W01", "and the other side of the same rule");
+  assert.strictEqual(isoWeekStart(new Date("2026-09-12T22:12:00Z")), "2026-09-07T00:00:00.000Z",
+    "the cap counts from Monday 00:00Z, never a rolling 7 days");
+}
+
+// --- K. the brief group (pure + doc) -------------------------------------------------------------
+
+// The six live fingerprints' SHAPE: four open with nobody's ruling on them, two resolved, nothing
+// filed. This is the state the ledger is actually in at this ship, so a drift in the renderer shows
+// up here as the wrong sentence about the real board.
+const AUDIT = (over = {}) => ({
+  rows: [
+    { fingerprint: "4637961d21e1076a", iso_week: "2026-W37", kind: "contradiction", confidence: "high", status: "open", governing_fact: "the order of the board's ranking keys", ruled_by: null },
+    { fingerprint: "4ef228c361f9a904", iso_week: "2026-W37", kind: "stale-or-irrelevant", confidence: "high", status: "open", governing_fact: "temperature stored for a model whose API rejects temperature", ruled_by: null },
+    { fingerprint: "b057c6f102845074", iso_week: "2026-W37", kind: "stale-or-irrelevant", confidence: "high", status: "open", governing_fact: "whether the Selfbuild has started executing", ruled_by: null },
+    { fingerprint: "e141f20a37d1fbe9", iso_week: "2026-W37", kind: "contradiction", confidence: "high", status: "open", governing_fact: "the runner's scheduling interval in hours", ruled_by: null },
+    { fingerprint: "b62c4ab018d78468", iso_week: "2026-W37", kind: "contradiction", confidence: "high", status: "resolved", governing_fact: "already answered", ruled_by: "hand:review-govtooling-0910" },
+    { fingerprint: "22925b8015372812", iso_week: "2026-W37", kind: "contradiction", confidence: "high", status: "resolved", governing_fact: "also answered", ruled_by: "hand:review-govtooling-0910" },
+  ],
+  filed: 0,
+  ...over,
+});
+
+const ruledOne = () => {
+  const a = AUDIT();
+  a.rows = a.rows.map(r => (r.fingerprint === "4637961d21e1076a" ? { ...r, ruled_by: "john" } : r));
+  return a;
+};
+
+// A minimal facts object: one board row and every other group absent, so factsSha's movement can
+// only have come from the `audit` key.
+const F = over => ({ items: [{ id: 1, status: "open", design_status: null, queue: 1 }], ...over });
+
+function theBriefGroupCountsWithoutInventingZeros() {
+  const out = renderAuditLedger(AUDIT(), "as of X");
+  assert.ok(out.startsWith("**Auditor's ledger** — *as of X.*"), `the group leads with its own name and the stamp; got: ${out.slice(0, 80)}`);
+  assert.ok(out.includes("**6 findings (4 open · 2 resolved · 0 not a defect)**"), `the week's census; got: ${out}`);
+  assert.ok(out.includes("**0 ruled**"), "nobody has ruled an open finding yet, and the brief must say so as a MEASURED zero");
+  assert.ok(out.includes("**0 filed**"), "nothing has left the ledger for the board yet");
+  assert.ok(!out.includes("%"), "counts only, never a rate -- the same rule the governance group keeps");
+
+  const tableRows = out.split("\n").filter(l => l.startsWith("| `"));
+  assert.strictEqual(tableRows.length, 4,
+    `the table is the latest week's OPEN rows only -- 4 of the 6; got ${tableRows.length}`);
+
+  assert.strictEqual(renderAuditLedger(AUDIT(), "as of X"), out,
+    "the renderer is pure and byte-stable: a second call over the same facts must not reshuffle a generated doc");
+
+  const ruled = renderAuditLedger(ruledOne(), "as of X");
+  assert.ok(ruled.includes("**1 ruled**"), "one ruled open finding is one row --from-ledger will file next cycle");
+  const johnRow = ruled.split("\n").find(l => l.startsWith("| `4637961d21e1076a`"));
+  assert.ok(johnRow && johnRow.endsWith("| john |"), `the ruled row must name its ruler; got: ${johnRow}`);
+
+  // THE BRANCH THAT MATTERS. "I could not read the ledger" and "the ledger found nothing" are the
+  // same bytes to a reader and opposite facts.
+  const absent = renderAuditLedger(undefined, "as of X");
+  assert.ok(absent.includes("was not read for this render"), "an absent read must SAY so");
+  assert.ok(!absent.includes("0 findings"),
+    "a read that did not happen must never render as a measured zero -- this group is the one John would read as 'the audit found nothing wrong'");
+
+  // The sha moves on a ruling and on a filing, and on nothing else here.
+  assert.strictEqual(factsSha(F({ audit: AUDIT() })), factsSha(F({ audit: AUDIT() })), "the sha is stable over identical facts");
+  assert.notStrictEqual(factsSha(F({ audit: AUDIT() })), factsSha(F({ audit: ruledOne() })),
+    "John ruling a finding must move the payload sha -- it is what --check exists to report");
+  assert.notStrictEqual(factsSha(F({ audit: AUDIT() })), factsSha(F({ audit: AUDIT({ filed: 1 }) })),
+    "a row leaving the ledger for the board must move the payload sha");
+
+  // And the group really is in the generated doc, in its place.
+  const brief = read("docs/runbooks/standing-brief.md");
+  const begin = brief.indexOf(BEGIN);
+  const end = brief.indexOf(END);
+  const group = brief.indexOf("**Auditor's ledger**");
+  assert.ok(begin >= 0 && end > begin, "standing-brief.md must carry both generated markers");
+  assert.ok(group > begin && group < end,
+    "the group must be INSIDE the generated markers -- outside them it is hand-maintained prose the script never refreshes");
+  const gov = brief.indexOf("**Governance agents, last 7 days**");
+  const prov = brief.indexOf("*Provenance:");
+  assert.ok(gov > begin && gov < group, "the ledger group sits after Governance agents");
+  assert.ok(group < prov, "and before the provenance line, like every other fact group");
+}
+
+// --- L. step 4d and the card (source, always runs) -----------------------------------------------
+
+function stepFourDIsInTheRunbookAndOnTheCard() {
+  const md = read("docs/runbooks/runner-cycle.md");
+  const labels = parseSteps(md).map(s => s.label);
+  const i = labels.indexOf("4d");
+  assert.ok(i > 0, "docs/runbooks/runner-cycle.md must carry a step 4d");
+  assert.strictEqual(labels[i - 1], "4c", "4d runs after the board re-rank");
+  assert.strictEqual(labels[i + 1], "5", "and BEFORE selection -- an audit that fires after the pick is a different step");
+  // The count is the measured one, pinned so an accidental new or lost step marker is a red here
+  // rather than a silent card line. NOTES and the runbook must agree or render() refuses (control).
+  assert.strictEqual(labels.length, 26, `the runbook parses to 26 steps; got ${labels.length}`);
+  assert.strictEqual(labels.length, Object.keys(NOTES).length,
+    "every step has a NOTES entry and NOTES names no step the runbook lacks -- render() refuses otherwise");
+
+  assert.ok(NOTES["4d"], "scripts/render-cycle-card.js must carry a NOTES entry for 4d");
+  assert.ok(NOTES["4d"].outcome.length <= 90,
+    `the card's outcome cap is 90 chars; 4d's is ${NOTES["4d"].outcome.length}`);
+
+  const from = md.indexOf("**4d. ");
+  const to = md.indexOf("**5. ", from);
+  assert.ok(from > 0 && to > from, "could not isolate the 4d body");
+  const body = md.slice(from, to);
+
+  assert.ok(body.includes("tripwire-to-backlog.js --from-ledger"),
+    "step 4d must run the ledger sweep -- without it the weekly audit files nothing and the ledger is a dead end");
+  assert.ok(body.includes("audit-ledger.js --ingest="),
+    "step 4d must run the ingest, which is what turns candidates into a record John can rule");
+  // THE RULE AS A GREP: a cycle never ingests. --apply on the ingest line would make the Auditor
+  // file its own findings, which is the one thing the ledger exists to prevent.
+  for (const line of body.split("\n")) {
+    assert.ok(!(line.includes("--ingest=") && line.includes("--apply")),
+      `step 4d must never pair --ingest= with --apply -- only John's hand ingests. Offending line: ${line}`);
+  }
+  assert.ok(body.includes("date_trunc('week'"),
+    "the precondition is an ISO-WEEK window over the run's own log rows, not a day and not a notes prefix");
+
+  const stamps = md.split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
+  assert.strictEqual(stamps.length, 5, `session-hygiene check 7 caps the runbook at 5 header stamps; got ${stamps.length}`);
+  assert.ok(read("docs/SESSIONS.md").includes("<!-- DeepBench v7.0.446 | runbooks/runner-cycle.md | SES-346"),
+    "the rotated v7.0.446 stamp must land in docs/SESSIONS.md VERBATIM -- a stamp dropped instead of moved loses the only written record of that ship");
+
+  // CONTROL: rename the step and the renderer must REFUSE. A renderer that silently omitted a step
+  // it had no note for would leave a cycle executing a procedure the card does not mention.
+  assert.throws(() => renderCard(md.replace("**4d. ", "**4e. ")),
+    "control: a runbook step with no NOTES entry rendered anyway -- the card would silently omit it");
+}
+
+// --- M. live --------------------------------------------------------------------------------------
+
+async function theLedgerSweepRunsDryAgainstTheRealBoard() {
+  const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const key = process.env.SUPABASE_SERVICE_KEY ?? "";
+  if (!url || !key) {
+    notRun("live ledger sweep (part M)",
+      "SUPABASE_URL + SUPABASE_SERVICE_KEY absent -- the --from-ledger dry run, the weekly cap and the two untouched counts are unverified here. Run: node --env-file=.env.local tests/regression/agt-70-auditor.test.mjs");
+    return;
+  }
+
+  let out = "";
+  try {
+    out = execFileSync(process.execPath,
+      [path.join(ROOT, "scripts", "tripwire-to-backlog.js"), "--from-ledger", "--json"],
+      { encoding: "utf8", cwd: ROOT });
+  } catch (e) {
+    throw new Error(`--from-ledger with no ruled findings must exit 0; exited ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
+  }
+  const json = JSON.parse(out.trim());
+  assert.strictEqual(json.source, "ledger", "the JSON must name its SOURCE -- the tripwire path and this one share every other key");
+  assert.strictEqual(json.weeklyCap, 3, "the live cap is the constant, not a flag");
+  assert.strictEqual(json.filedThisWeek, 0, "nothing has been filed from the ledger this ISO week");
+  assert.ok(Array.isArray(json.detections), "detections is always an array, even when empty");
+
+  const get = async q => {
+    const res = await fetch(`${url}/rest/v1/${q}`, { headers: restHeaders(key) });
+    if (!res.ok) throw new Error(`GET ${q} -> HTTP ${res.status}: ${await res.text().catch(() => "")}`);
+    return res.json();
+  };
+  // THE TWO COUNTS THIS SLICE PROMISED NOT TO MOVE. The sweep is a DRY RUN by default, so running
+  // it -- here, and in the QA above -- must leave both exactly where it found them.
+  assert.strictEqual((await get("audit_findings?select=id")).length, 6,
+    "the ledger still holds exactly 6 rows; this slice ingests nothing");
+  assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, 0,
+    "no board row has been filed from the ledger; --from-ledger defaults to a dry run and there is nothing ruled to file anyway");
+}
+
 export async function run() {
   theFingerprintHoldsTheRightThingsStill();
   bMdMarksItsRetiredTwinAndNothingElse();
@@ -715,12 +1003,19 @@ export async function run() {
   theClusterCliRuns();
   theDetectorExemptsFencesAndRuleRenders();
   theCorpusDropsGeneratedDocsByTheRealSet();
+  theLedgerFilesOnlyRuledOpenHighRowsUnderTheCap();
+  theBriefGroupCountsWithoutInventingZeros();
+  stepFourDIsInTheRunbookAndOnTheCard();
   await theLedgerIsAppendOnly();
+  await theLedgerSweepRunsDryAgainstTheRealBoard();
   console.log("  [PASS] agt-70-auditor.test.mjs");
   console.log("         fingerprint: line-invariant, kind/file-sensitive · retirement: b.md P2 retired, P1 and a.md P2 live");
   console.log("         detector: 1 finding (P1) with 4 controls (0 / 2 / rule-exempt / same-file) · report byte-stable · CLI duplicates 1");
   console.log("         clusters: 1 anchor, spread 2, 1200-char cut · locate/validate/reconcile: invented + paraphrase dropped, 2-home re-found, 1-home new");
   console.log("         exemptions: fenced 0 / unfenced 1 · rule render 0 with the rule, 1 without · cycle-card.md out by PROCEDURE_GENERATED_DOCS");
+  console.log("         ledger filing: 2 of 6 eligible, cap 3 → 0 at filedThisWeek 3, 1 at 2 · draft S/M by locations · isoWeek 2027-01-01 = 2026-W53");
+  console.log("         brief group: 6 findings (4 open · 2 resolved) 0 ruled 0 filed · absent says 'not read', never 0 · factsSha moves on a ruling and on a filing");
+  console.log("         step 4d: between 4c and 5, 26 steps, NOTES 85 chars, no --ingest= line carries --apply, 5 header stamps, v7.0.446 in SESSIONS.md");
 }
 
 selfRun(import.meta.url, run);

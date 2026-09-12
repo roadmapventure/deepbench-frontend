@@ -306,6 +306,22 @@ export function factsSha(facts) {
             : null,
         }
       : null,
+    // FEATURE: AGT-70 slice 3 — the ledger's identity, week, status and RULER, plus the filed count,
+    // so a new finding, John ruling one, a status moving to resolved, or a row leaving for the board
+    // each move the sha and --check reports the drift. `kind`, `confidence` and `governing_fact` are
+    // deliberately absent: the fingerprint IS the identity (it is a hash over kind, the location
+    // homes and the normalised fact — scripts/audit-ledger.js), so a row whose fingerprint is
+    // unchanged is the same finding and a re-wrap of its text is not a ledger change. `ruled_by` is
+    // stringified because it is the one field a fixture writes as a plain name and PostgREST can
+    // return as null — the sha must not depend on which produced it.
+    audit: facts.audit
+      ? {
+          rows: facts.audit.rows.map(r => [
+            r.fingerprint, r.iso_week, r.status, r.ruled_by == null ? null : String(r.ruled_by),
+          ]).sort(),
+          filed: Number(facts.audit.filed),
+        }
+      : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
 }
@@ -708,6 +724,87 @@ export function renderGovernanceAgents(gov, stamp) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: AGT-70 slice 3 — the `Auditor's ledger` fact group. PURE: (audit, stamp) in, markdown
+ * out, the same contract as the five groups above it, so tests/regression/agt-70-auditor.test.mjs
+ * drives it from fixtures. `audit` is exactly what fetchFacts() builds: `{ rows, filed }` — rows
+ * from `public.audit_findings` (every week, newest first), `filed` the count of `backlog_items`
+ * carrying `source_file = 'audit-ledger'`. NOTHING HERE RULES OR FILES: it prints what the ledger
+ * holds and what has left it for the board.
+ *
+ * THE THREE BRANCHES ARE THE SIBLINGS' THREE, and the middle one is why this group exists:
+ *   - `audit` absent or malformed — SAID, never rendered as zeros. "0 findings" and "I could not
+ *     read the ledger" are the same bytes to a reader and opposite facts, and this group is the one
+ *     John would read as "the audit found nothing wrong this week".
+ *   - `rows` empty — a MEASURED zero, because the table was read. An em dash for the week, because
+ *     there is no latest week when there are no rows.
+ *   - rows present — the LATEST week's counts, and its `open` rows in the table. Older weeks are
+ *     deliberately not listed: the ledger is cumulative and the brief is a standing page, so the
+ *     whole history belongs in `docs/audits/<week>.md`, which `--report` already generates.
+ *
+ * NO RATE, EVER — counts side by side, never divided, the same rule the governance group keeps.
+ * A `ruled` count is the interesting one: it is what `tripwire-to-backlog.js --from-ledger` will
+ * file on the next cycle, so a number climbing here with `filed` flat means the cap is biting or
+ * nobody has run the sweep.
+ */
+export function renderAuditLedger(audit, stamp) {
+  const L = [];
+  const lead = `**Auditor's ledger** — *${stamp}.* What \`public.audit_findings\` (\`AGT-70\`) holds ` +
+    "and what has left it for the board. Counts only, never a rate.";
+
+  if (!audit || !Array.isArray(audit.rows)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The ledger was not read for this render* — which is **not** the same as *no findings*. " +
+      "Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const rows = audit.rows;
+  // The latest week by ISO label. String compare is correct for `YYYY-Www` and is deliberately not
+  // a date parse: the column IS the label, and re-deriving a date from it would be a second home
+  // for the calendar rule that lives in scripts/audit-ledger.js.
+  const week = rows.length ? rows.map(r => String(r.iso_week)).sort().slice(-1)[0] : null;
+  const inWeek = week == null ? [] : rows.filter(r => String(r.iso_week) === week);
+  const count = s => inWeek.filter(r => r.status === s).length;
+  const ruled = inWeek.filter(r => r.status === "open" && r.ruled_by != null).length;
+
+  L.push(`${lead} Latest week ${week ?? "—"}: ` +
+    `**${inWeek.length} findings (${count("open")} open · ${count("resolved")} resolved · ` +
+    `${count("not-a-defect")} not a defect)** — **${ruled} ruled** open findings (a ruled, open, ` +
+    "`high` row is what `tripwire-to-backlog.js --from-ledger` files, at most 3 per ISO week); " +
+    `**${Number(audit.filed)} filed** to the board from the ledger so far ` +
+    "(`source_file = 'audit-ledger'`).");
+  L.push("");
+
+  if (!rows.length) {
+    L.push("- *The ledger holds no rows yet.*");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const CONF = { high: 0, medium: 1, low: 2 };
+  const open = inWeek
+    .filter(r => r.status === "open")
+    .sort((a, b) =>
+      (CONF[a.confidence] ?? 99) - (CONF[b.confidence] ?? 99) ||
+      String(a.fingerprint).localeCompare(String(b.fingerprint)));
+
+  L.push("| fingerprint | kind | confidence | fact | ruled |");
+  L.push("|---|---|---|---|---|");
+  for (const r of open) {
+    L.push(`| \`${r.fingerprint}\` | ${r.kind} | ${r.confidence} | ${summarise(r.governing_fact, 80)} | ` +
+      `${r.ruled_by == null ? "—" : r.ruled_by} |`);
+  }
+  L.push("");
+  L.push("- *A finding leaves this table only by John's ruling — `resolved`, `not-a-defect`, or ruled " +
+    "and left `open` to file. Candidates a run found but nobody ingested live in " +
+    "`docs/audits/<week>-candidates.json`, not here.*");
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -731,7 +828,9 @@ export function renderBlock(facts, nowIso) {
   // absent means "not read", never "nothing serves anything".
   // FEATURE: SES-360 — governance joins the destructure on the same terms as served/inventionUse:
   // absent means "not read", never "no governance agent called anything".
-  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance } = facts;
+  // FEATURE: AGT-70 slice 3 — audit joins the destructure on the same terms as governance: absent
+  // means "not read", never "the ledger holds no findings".
+  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -938,6 +1037,12 @@ export function renderBlock(facts, nowIso) {
   // above it: a pure helper the guard can assert from a fixture, rendering what the views returned
   // and counting nothing itself.
   L.push(renderGovernanceAgents(governance, stamp));
+
+  // ---- Auditor's ledger (FEATURE: AGT-70 slice 3) -------------------------------------------
+  // After Governance agents, before the provenance line. Same contract as the five groups above it:
+  // a pure helper the guard can assert from a fixture, rendering what the table returned and
+  // counting nothing the table could have counted itself.
+  L.push(renderAuditLedger(audit, stamp));
 
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
@@ -1171,7 +1276,27 @@ export async function fetchFacts(url, key) {
   if (!Array.isArray(shipCensus) || shipCensus.length !== 1) die("ship_handoff_census must return exactly one row (an aggregate with no GROUP BY) — refusing to render it from nothing");
   const governance = { roster: govRoster, usage: govUsage, ships: shipCensus[0] };
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance };
+  // FEATURE: AGT-70 slice 3 — the Auditor's ledger and what has left it for the board.
+  //
+  // NO VIEW, AND THAT IS THE SAME CHOICE SES-334 MADE ABOVE: this group applies no rule a view would
+  // have to own — it is the table's own rows and one COUNT over a `source_file` — and the counting
+  // that does happen (per status, per week) happens in renderAuditLedger() where a fixture can drive
+  // it. Columns are NAMED, never `select=*` (.claude/rules/supabase-column-grants.md).
+  //
+  // AN EMPTY LEDGER IS A REAL STATE and must not die() the way the view reads above do: a fresh
+  // database with no findings yet renders "the ledger holds no rows yet", which is true. What is NOT
+  // a real state is a read that did not happen — that comes back non-array and refuses here, so the
+  // brief never publishes a measured-looking zero it did not measure.
+  const auditRows = await rest(url, key,
+    "audit_findings?select=fingerprint,iso_week,kind,confidence,status,governing_fact,ruled_by" +
+    "&order=iso_week.desc,fingerprint&limit=1000");
+  if (!Array.isArray(auditRows)) die("the audit_findings read came back non-array — refusing to render the ledger group from nothing");
+  const auditFiled = await rest(url, key,
+    "backlog_items?select=id&source_file=eq.audit-ledger&limit=1000");
+  if (!Array.isArray(auditFiled)) die("the audit-ledger filing read came back non-array — refusing to render the ledger group from nothing");
+  const audit = { rows: auditRows, filed: auditFiled.length };
+
+  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit };
 }
 
 async function main() {
