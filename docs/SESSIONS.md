@@ -5,6 +5,26 @@
 
 ---
 
+## session/cycle-20260912-2141 (v7.0.466, 2026-09-12, runner cycle `56357816-51f0-43d6-9f17-1059e74d7a76`, `trigger = scheduled` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-348` — **a model call now runs to the caller's deadline, and the thing to read twice is that the 60-second ceiling was ours, not Vercel's.**
+
+### The ticket named three fixes and the measurement chose a fourth
+
+`SES-348` offered "raise the cap for the governance lane, stream the response, or resume the checkpoint." The Designer's revalidation killed all three as written: the live MCP path (`api/_lib/mcp.js:564`) passes **no** `_deadline` at all, so there is no lane cap to raise — the executor's own deadline is a literal, `Date.now() + 60000 - SAFETY_MARGIN_MS`, in two places. Streaming cannot outlive the 60-second function that would be doing the streaming, and resuming the checkpoint re-runs the same coin flip. The fix that follows from the measurement is the abort honouring `remainingMs` (`request-receivable.js` R1/R2) plus the executor deriving both deadlines from the ceiling it declares (`execute.js` E1–E4).
+
+### The 60 was a self-cap under a 300-second platform default
+
+Read from the Vercel API for project `prj_sQyHlk19MUKmXyaAhXc4FBImbTMd` rather than assumed: plan `hobby`, `resourceConfig.fluid: true`, `defaultResourceConfig.functionDefaultTimeout: 300`. So `maxDuration: 60` was a number this repo chose, not a tier limit — and the kickoff still made the deploy prove it, because a build Vercel refuses over `maxDuration` serves the old version silently (the `SES-346` shape). `check-deploy-current.js` returned exit 0, `LIVE -- the preview is serving c6c53bb`.
+
+### The proof is three live verdicts past the old wall
+
+The guard test is discriminating in both directions: on this branch `(a)`, `(b)`, `(c)` pass; run against `origin/dev` `63b7a35` the same file fails `(a)` with `TimeoutError ... after 55021 ms` and `(c)` with "found 2" clamps. Then the live half, which is the part a seam proof cannot claim: three `verify-ship` calls through `/api/mcp` returned **3/3 terminal verdicts** at `latency_ms` **86,008 / 89,906 / 82,273** (`ai_activity_log` 42708–42710), with **zero** `durable_hops` rows left `in_progress`. Every one of those three is past the 55-second cap that made half of them `in_progress` before. Baseline for the comparison, 2026-09-10: one terminal call at 51,749 ms and one `TimeoutError` checkpoint three minutes apart — the two sides of the line.
+
+### Residue, reported rather than folded in
+
+Two doc surfaces went stale on this ship and both were left alone under the 3-file cap: `docs/runbooks/mcp-server.md` 273–284 (the "Still open" paragraph, which this fix closes) and `resumeCapability()`'s doc comment still reading "its own real 60s budget". Both are named on the ship card. One transient: the first regression run was 213/214 on a Supabase `HTTP 504` reading `skill_types` in `AGT-44`; it re-ran green and the full re-run reported `regression suite: 214/214 passed`. QA cost $1.25 in real API dollars — the three live calls — against a kickoff estimate of ~$0.19 each, because the diff payload ran 9,664 input tokens rather than row 41374's 1,276; still inside the declared $1–2 band.
+
+---
+
 ## session/cycle-20260912-2108 (v7.0.465, 2026-09-12, runner cycle `02ee73ed-137c-4793-8cd6-a432b80ad83e`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-70` slice 2 of 4 — **The Auditor gets judgment before it gets a body, and the thing to read twice is that the run had to be blind to mean anything.**
 
 ### The agent does not exist, so the run had to be designed around that rather than into it
