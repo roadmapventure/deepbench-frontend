@@ -5,6 +5,32 @@
 
 ---
 
+## session/cycle-20260912-1950 (v7.0.463, 2026-09-12, runner cycle `20601eae-cb08-4b24-9ce0-f5aeaba41d10`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-377` — **the runbook gets a 7.5 KB front door, and the thing to read twice is that this cycle was its own evidence.**
+
+### The premise was this chain's own first cycle
+
+`docs/runbooks/runner-cycle.md` is **363,840 bytes, 4,409 lines**, and the first cycle of this three-cycle chain read it end to end — roughly **90K tokens** — before it could pick. `docs/runbooks/cycle-card.md` did not exist; `routine-prompt.md` step 3 said *"Read docs/runbooks/runner-cycle.md … execute it EXACTLY, top to bottom"*. John filed this after watching the first unattended day, in one word: *"file them"*.
+
+### A generated view, never a second home — which is the whole design
+
+The card is **not hand-written**. `scripts/render-cycle-card.js` parses the runbook's 25 step markers (24 `**<n><letter>. ` plus the pre-boot gate; `7a` is a list item inside step 7 and is deliberately not one) and its 55 fenced blocks, and copies the command text **byte-for-byte**. The only hand-maintained content is `NOTES` — 25 one-line outcomes and two block-index overrides — and `NOTES` cannot invent a command, only choose which runbook block to show. Carrying every block would be 14,880 bytes, over the ticket's own ceiling before a line of prose, so blocks over 400 bytes render as an L-anchor pointer.
+
+The guard is **equality, not presence**: `render(runbook)` must equal the committed card byte-for-byte, which subsumes every weaker check — and tests (B), (C) and (F) restate step coverage, block identity and the runbook sha independently, so a bug in `render` cannot make (A) vacuous. That is `SES-158`'s lesson applied in advance. The honest cost is stated rather than hidden: any edit that moves a line above a step turns the suite red until `--write` is re-run, and the failure names that command.
+
+Shipped at **7,531 bytes** — 25 step lines, 16 blocks carried in full, header stamped with the runbook's own sha256. Suite **212/212**. The orchestrator re-ran the discriminating QA rather than taking the report: card bytes in band, 25 step lines, `render-cycle-card.js` exit 0 against the committed file, `routine-prompt.md` naming the card 3 times where it named it 0.
+
+### `SES-379` reproduces one cycle after it was filed, and that is the finding
+
+The run reported `auto-done eligible: YES` because *"the diff touches none of `scripts/verifier.js`, `scripts/check-session-docs.js`, `tests/regression/run-all.js`"*. **Push `fadf84ac` changes `scripts/check-session-docs.js`** — the second of those three. Same mechanism the previous cycle measured and filed as `SES-379`: `base` is `origin/dev`, the Builder pushed first, so `git diff --name-only origin/dev...HEAD` is empty and no `SELF_CERTIFYING_PATHS` entry can match.
+
+**Two consecutive cycles, two different self-certifying paths, one blind check.** That is what turns `SES-379` from a finding into a pattern, and its row now carries the second instance. This ticket was written **`delivered`**, not `done`, for it. `verdict_ladder_signal` applied `promote`: `tooling` streak 10 → 11, rung 23 unmoved.
+
+### What is still John's
+
+The card and the prompt's **canonical copy** shipped; pushing that block to the live `deepbench-runner` routine is his word alone (`SES-355`), and the acceptance measurement rides on it — the first fresh scheduled cycle after that push should record **under 20,480** `docs/runbooks` bytes read before its pick, against the 100–180 KB paid today. Paste-ready text is in `docs/harvests/SES-377.md`. Until then the card is shipped and unread by the thing it exists for, which is the honest state and is named on the ship card.
+
+---
+
 ## session/cycle-20260912-1909 (v7.0.462, 2026-09-12, runner cycle `64ac63af-0882-444e-95dd-bc0b7aef4fc2`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` (*"not a scheduled cycle — your scheduler setting governs scheduled fires only"*) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-359` — **the kickoff declares its lanes, and the thing to read twice is that this cycle's own grader was blind to the change it was grading.**
 
 ### The scope split was the design, and the gated half has paste-ready text
