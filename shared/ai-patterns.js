@@ -1,3 +1,4 @@
+// DeepBench v7.0.465 | shared/ai-patterns.js | AGT-70 -- the Auditor's `audit-agent-data` and `audit-governance-corpus` enter the catalog BEFORE their Skill rows exist, so the judgment lane's mandatory agent-log.js row can be written on its first run rather than refused. See the comment above the two entries.
 // DeepBench v7.0.441 | shared/ai-patterns.js | SES-338 -- the last two governance capabilities enter the catalog: `verify-ship` and `run-project`. Found by a REFUSAL, not by inspection -- SES-337's reproduction ran 43 verify-ship turns this sitting and scripts/agent-log.js refused every one ("not a SERVICE_CATALOG slug"), so the mandatory Layer-3 log could not be written at all. Same shape and same cause as classify-ticket (SES-332) and rank-backlog (SES-334): the capability shipped with its Skill rows and no catalog entry. NAMED DEVIATION: the SES-337/338 kickoff's section 3 says "No new catalog entry"; that sentence was measurably wrong about the live catalog, and .claude/rules/capability-logging.md (every Layer-3 execution logs, no exceptions) outranks it. No AI_TYPE_TO_SERVICE entry for either -- ai_type equals capability_slug, resolved by the existing `|| e.type` fallback.
 // DeepBench v6.3.116 | shared/ai-patterns.js | AI-35 -- pattern-vocabulary-review SERVICE_CATALOG entry (Susan Smith's self-maintenance broker)
 // DeepBench v6.3.0 | shared/ai-patterns.js | AA-190b -- canonical PATTERN_CATALOG, extracted so
@@ -232,6 +233,27 @@ export const SERVICE_CATALOG = [
   // filtered by CODE afterwards (reconcileJudgment() -- judgment may tighten, never loosen), which
   // is the script's guarantee, not the model turn's behaviour.
   { slug: 'verify-ship',             name: 'Verify Ship (The Verifier)',        serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+
+  // FEATURE: AGT-70 -- the Auditor's two capabilities, entered BEFORE their Skill rows exist rather
+  // than after, which is the whole point. classify-ticket (SES-332), rank-backlog (SES-334) and the
+  // pair above (SES-338) were all found the same way: the capability shipped, scripts/agent-log.js
+  // refused every run of it ("not a SERVICE_CATALOG slug"), and the mandatory Layer-3 log for that
+  // work simply did not exist until somebody noticed. AGT-70's judgment lane logs through that same
+  // script, so without these two entries the first live cluster run would refuse its first call and
+  // stop -- by design (the log row is mandatory, not best-effort), but for a reason that is pure
+  // bookkeeping. The catalog entry is the cheap half and it goes first.
+  //
+  // No AI_TYPE_TO_SERVICE entry for either: ai_type equals capability_slug, resolved by the existing
+  // `|| e.type` fallback, the same path verify-ship and run-project take.
+  //
+  // Both carry 'Structured Output' because every answer is validated against the intent row's stored
+  // traits.schema before scripts/audit-cluster.js will keep a finding, and 'LLM-as-Judge / Verifier'
+  // because the turn IS the judgment -- reading two statements and ruling whether they disagree is
+  // the pattern's definition. NOT 'Guardrails / Output Filtering': the verbatim-quotation rule and
+  // the location check are enforced by CODE after the turn (validateFindings()), never by the model
+  // declining to answer, and slice 2's design is explicit that quotation is never trusted.
+  { slug: 'audit-agent-data',        name: 'Audit Agent Data (The Auditor)',    serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  { slug: 'audit-governance-corpus', name: 'Audit Governance Corpus (The Auditor)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // run-project: 'Structured Output' because the manager's answer is validated against
   // dm-run-intent's schema before scripts/run-project.js will act on it, and 'Orchestrator-Workers'

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v7.0.464 | scripts/audit-corpus.js | AGT-70
+// DeepBench v7.0.465 | scripts/audit-corpus.js | AGT-70
+// FEATURE: AGT-70 slice 2 -- two measured exemptions (generated docs out of the file list, fenced
+// procedures and prefixed rule renders out of the detector); see corpusFiles/detectDuplicates below.
 // FEATURE: AGT-70 slice 1 -- the statement extractor. Turns the five homes the platform's rules
 // actually live in into one flat statement table, and runs the ONE deterministic detector that
 // needs no model at all: byte-equal text in two homes.
@@ -60,7 +62,7 @@ import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
 import { fileURLToPath } from "url";
-import { RETIREMENT_VOCAB, enclosingParagraph } from "./check-session-docs.js";
+import { RETIREMENT_VOCAB, enclosingParagraph, PROCEDURE_GENERATED_DOCS } from "./check-session-docs.js";
 import { normalize, locationKey } from "./audit-ledger.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -190,11 +192,36 @@ export function extractSkillRows(rows) {
   return out;
 }
 
+// AGT-70 slice 2. Two exemptions the first live run measured, both narrowing the detector rather
+// than loosening it -- 9 duplicates on this tree, 9 of them already somebody else's finding.
+//
+// (1) A FENCED BLOCK IS CHECK 13'S, NOT THIS ONE'S. check-session-docs.js check 13 reads a wider
+// document set than this detector does and already flags identical fenced procedures as "one
+// procedure, two live homes" -- with its own comment-stripping normalizer and its own generated-doc
+// exemption. Two tools filing the same defect into an APPEND-ONLY ledger is not redundancy, it is a
+// permanent double row; and the weaker of the two reads would be this one. So a statement whose
+// text opens a fence is skipped here entirely and the procedure question stays in one place.
+// MEASURED on this tree: the `UPDATE public.backlog_items ... claimed_by` claim SQL, live in
+// docs/GOVERNANCE-MODES.md:48 and docs/runbooks/runner-cycle.md:2585, which check 13 names today.
+//
+// (2) A RULE RENDERED WITH ITS OWN PREFIX IS STILL THE SANCTIONED RESTATEMENT. The exact-equality
+// test slice 1 shipped misses the shape the repo actually uses: scripts/render-rule-blocks.js emits
+// `> **Rule B40** — <statement>`, so the normalized statement is a SUFFIX of the rendered key, never
+// equal to it. That rendered block appears in every doc the rule governs by design. `endsWith` is
+// the right relation and not a fuzzy one: the rule's own text must still be present byte-for-byte
+// after normalization, only the render's lead-in may differ. Empty rule texts are dropped first --
+// `"".endsWith` is true of everything and would exempt the whole corpus.
 export function detectDuplicates(statements, ruleTexts = []) {
-  const ruleSet = new Set((ruleTexts ?? []).map(t => normalize(typeof t === "string" ? t : t?.statement)));
+  const ruleNorms = (ruleTexts ?? [])
+    .map(t => normalize(typeof t === "string" ? t : t?.statement))
+    .filter(t => t.length > 0);
+  const ruleSet = new Set(ruleNorms);
+  const isSanctionedRestatement = key => ruleSet.has(key) || ruleNorms.some(r => key.endsWith(r));
+
   const groups = new Map();
   for (const s of statements) {
     if (s.retired) continue;
+    if (/^\s*(```|~~~)/.test(String(s.text))) continue; // a fenced procedure is check 13's finding
     const key = normalize(s.text);
     if (key.length < MIN_DUPLICATE_CHARS) continue;
     if (!groups.has(key)) groups.set(key, []);
@@ -203,7 +230,7 @@ export function detectDuplicates(statements, ruleTexts = []) {
 
   const findings = [];
   for (const [key, members] of groups) {
-    if (ruleSet.has(key)) continue; // a live rule quoted in its own home is the sanctioned restatement
+    if (isSanctionedRestatement(key)) continue; // a live rule quoted in its own home is not a defect
     const homes = new Set(members.map(m => locationKey(m.location)));
     if (homes.size < 2) continue;
     findings.push({
@@ -241,6 +268,16 @@ function globMd(dirRel) {
 }
 
 // The five homes' file half. `.claude/` is a READ source here and is never written.
+//
+// AGT-70 slice 2 -- PROCEDURE_GENERATED_DOCS is subtracted, and it is IMPORTED from
+// check-session-docs.js rather than restated. A doc in that Set is rendered from another doc by a
+// script and held byte-identical to it by a regression test (SES-377: docs/runbooks/cycle-card.md is
+// rendered from docs/runbooks/runner-cycle.md). Extracting both sides puts every rendered passage in
+// the corpus twice, so the detector reports the render as a second home -- 7 of the 9 duplicates
+// this tree carried. A GENERATED view cannot drift from its source, which is the only thing a
+// duplicate finding is protecting against. Importing the Set is the load-bearing half: the day a
+// second generated doc is added there, this list follows it without an edit here, and the
+// regression test asserts exactly that (part E+) rather than asserting a literal filename.
 export function corpusFiles() {
   const rels = [
     "CLAUDE.md", "CLAUDE-DESIGN.md", "CLAUDE-RULES.md", "CLAUDE-STATE.md",
@@ -249,7 +286,9 @@ export function corpusFiles() {
     ...globMd("docs/runbooks"),
     ...globMd(".claude/rules"),
   ];
-  return [...new Set(rels)].filter(rel => fs.existsSync(path.join(ROOT, rel)));
+  return [...new Set(rels)]
+    .filter(rel => !PROCEDURE_GENERATED_DOCS.has(rel))
+    .filter(rel => fs.existsSync(path.join(ROOT, rel)));
 }
 
 function flattenJson(rel, value, prefix, depth, out) {

@@ -1,8 +1,34 @@
-// DeepBench v7.0.464 | tests/regression/agt-70-auditor.test.mjs | AGT-70
+// DeepBench v7.0.465 | tests/regression/agt-70-auditor.test.mjs | AGT-70
 //
-// FEATURE: AGT-70 slice 1 -- the Auditor's findings ledger (public.audit_findings + its append-only
-// guard), the statement extractor (scripts/audit-corpus.js) and the ingest/report engine
-// (scripts/audit-ledger.js).
+// FEATURE: AGT-70 slice 2 -- the judgment lane (scripts/audit-cluster.js): the clusterer, the
+// locate/validate/reconcile trio around the model call, and the two detector exemptions the first
+// live corpus run measured. Parts A-F below are slice 1's and are unchanged.
+//
+// FIVE MORE PARTS, each with its own control:
+//   G   CLUSTERS -- buildClusters over five inline statements is exactly one cluster on the
+//       `interval_hours` anchor, with the 1,200-char cut and its `truncated` flag proven on the one
+//       statement that exceeds it. Controls: collapse the homes to ONE and the cluster must vanish
+//       (a cluster is 2+ homes, never one home repeating itself); give a SECOND anchor the same
+//       statement set and the count must stay 1 (the Jaccard merge, which is the only thing
+//       standing between a 12-call budget and paying twice for the same four statements).
+//   H   LOCATE / VALIDATE / RECONCILE -- the three pure functions the model's answer passes
+//       through, each with the negative case beside it: a ledger quote locates its statement and
+//       does NOT locate a different one; an invented location and a paraphrase are both DROPPED
+//       while a verbatim sub-span is kept; two shared location homes are a re-found finding, one
+//       shared home is a new one, and the same two homes on a not-a-defect row are ruled out.
+//   I   CLI -- real subprocess runs of --build and --collect with --no-db, because G and H import
+//       the pure halves and would stay green if the CLI wiring broke entirely.
+//   C+  DETECTOR EXEMPTIONS -- the two narrowings slice 2 added, each asserted in BOTH directions:
+//       a fenced block is 0 findings and the same text unfenced is 1 (so the exemption is the
+//       fence, not a text difference); a `> **Rule X** — <s>` render is 0 findings with that rule
+//       live and 1 with no rules (so the exemption is the rule, not the prefix).
+//   E+  THE FILE LIST -- corpusFiles() excludes docs/runbooks/cycle-card.md, and the Set doing the
+//       excluding is check-session-docs.js's own PROCEDURE_GENERATED_DOCS, asserted by IMPORTING
+//       it. A literal filename here would pass while the real exclusion had drifted away.
+//
+// DRY-RUN against the tree before this ticket (v7.0.464): G, H and I FAIL at import
+// (scripts/audit-cluster.js does not exist); C+ FAILS both ways (the detector had no fence skip and
+// only an exact rule match); E+ FAILS (cycle-card.md was in the corpus and nothing was imported).
 //
 // SIX PARTS, and every one of them has a control that says what it would take to make it red:
 //   A  FINGERPRINT -- invariant to a `:line` suffix (the same passage after an edit above it is ONE
@@ -37,12 +63,17 @@
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { fingerprint, locationKey, normalize, renderReport } from "../../scripts/audit-ledger.js";
-import { extractMarkdown, extractSkillRows, detectDuplicates } from "../../scripts/audit-corpus.js";
+import { extractMarkdown, extractSkillRows, detectDuplicates, corpusFiles } from "../../scripts/audit-corpus.js";
+import { PROCEDURE_GENERATED_DOCS } from "../../scripts/check-session-docs.js";
+import {
+  buildClusters, locateStatements, priorClusters, capabilityFor, validateFindings, reconcile,
+} from "../../scripts/audit-cluster.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CORPUS_REL = "tests/fixtures/agt-70/corpus";
@@ -375,16 +406,321 @@ async function theLedgerIsAppendOnly() {
     `the fingerprint must recognise all six findings as already filed; got: ${out.trim()}`);
 }
 
+// --- G. the clusterer ------------------------------------------------------------------------
+
+// Five inline statements, not a fixture file: the clusterer's inputs are the statement TABLE's
+// shape, and writing them here keeps the anchor set under the test's own control -- a stray
+// backticked identifier in a fixture doc would mint a second anchor and the "exactly one cluster"
+// assertion would then be measuring the fixture, not the function.
+const S1 = { id: "s1", corpus: "governance", source: "runner_settings", location: "runner_settings/1/interval_hours", text: "interval_hours=1", retired: false };
+const S2 = { id: "s2", corpus: "governance", source: "file", location: "x.md:10", text: "A scheduled fire runs when the hour divides by `interval_hours` on the wall clock, never on elapsed time.", retired: false };
+const S3 = { id: "s3", corpus: "governance", source: "file", location: "y.md:4", text: "The standing value of `interval_hours` is stated here as three, which is the grid John reads every day.", retired: false };
+const S4 = { id: "s4", corpus: "governance", source: "file", location: "x.md:20", text: "The gate is closed whenever `scheduler_on` is false, and nothing else in this paragraph is shared.", retired: false };
+const LONG_TAIL = "the same sentence of padding repeated to carry this statement past the twelve hundred character cut. ";
+const S5 = { id: "s5", corpus: "governance", source: "file", location: "z.md:1", text: `A third home also names \`interval_hours\` and then runs long: ${LONG_TAIL.repeat(15)}`, retired: false };
+
+function theClustererFindsOneAnchorAndCutsTheLongOne() {
+  assert.ok(S5.text.length > 1400, `S5 must exceed the 1,200-char cap to prove the cut; it is ${S5.text.length}`);
+
+  const clusters = buildClusters([S1, S2, S3, S4, S5]);
+  assert.strictEqual(clusters.length, 1,
+    `exactly one anchor spans 2+ homes here; got ${clusters.map(c => c.name).join(", ") || "none"}`);
+  const c = clusters[0];
+  assert.strictEqual(c.name, "interval_hours", "the anchor is the snake_case setting the four statements share");
+  assert.strictEqual(c.kind, "anchor");
+  assert.strictEqual(c.statements.length, 4,
+    "S4 mentions only scheduler_on and must stay out -- a cluster is the statements that share the anchor, not the file");
+  assert.strictEqual(c.spread, 2,
+    "spread counts distinct SOURCES (runner_settings + file) -- it is what orders the run, so a wrong value spends the budget on the wrong clusters");
+  assert.strictEqual(c.homes, 4, "four distinct locationKeys carry the anchor");
+
+  const e5 = c.statements.find(s => s.id === "s5");
+  assert.strictEqual(e5.text.length, 1200, "the emitted text is cut to exactly the 1,200-char cap");
+  assert.strictEqual(e5.truncated, true, "a cut statement must SAY it was cut -- validateFindings reads the full text by id, and a silent cut would look like an invented quotation");
+  const e2 = c.statements.find(s => s.id === "s2");
+  assert.strictEqual(e2.truncated, false, "a statement under the cap must not be flagged truncated");
+  assert.strictEqual(e2.text, S2.text, "an uncut statement is emitted byte-for-byte");
+
+  // CONTROL 1 -- one home. The harvest names S1 and S3; S5's own z.md home has to collapse too or
+  // two homes still stand, so all three move into x.md and the reason under test is unambiguous.
+  const oneHome = buildClusters([
+    { ...S2 },
+    { ...S3, location: "x.md:30" },
+    { ...S4 },
+    { ...S5, location: "x.md:40" },
+  ]);
+  assert.strictEqual(oneHome.length, 0,
+    "with every carrier of the anchor in ONE file there is no disagreement to find -- if this still clusters, the homes.size >= 2 gate is gone");
+
+  // CONTROL 2 -- a second anchor over the identical statement set must MERGE, not double the bill.
+  const withGrid = [S1, S2, S3, S5].map(s => ({ ...s, text: `${s.text} \`grid_minutes\`` })).concat([S4]);
+  const merged = buildClusters(withGrid);
+  assert.strictEqual(merged.length, 1,
+    `two anchors over the same four statements are one cluster (Jaccard 1.0 >= 0.6); got ${merged.map(m => m.name).join(", ")}`);
+  assert.strictEqual(merged[0].name, "grid_minutes",
+    "the survivor is the first in the sort order (equal spread and homes, then name ascending) -- which is what makes the merge deterministic");
+
+  // Routing, on the same material: all-agent-data goes to the agent-data capability, anything else
+  // to the corpus one.
+  assert.deepStrictEqual(capabilityFor(c), { capability: "audit-governance-corpus", intent: "au-corpus-intent" });
+  assert.deepStrictEqual(capabilityFor({ statements: [{ corpus: "agent-data" }, { corpus: "agent-data" }] }),
+    { capability: "audit-agent-data", intent: "au-agent-data-intent" });
+  assert.deepStrictEqual(capabilityFor({ statements: [{ corpus: "agent-data" }, { corpus: "governance" }] }),
+    { capability: "audit-governance-corpus", intent: "au-corpus-intent" },
+    "a MIXED cluster takes the corpus capability -- its knowledge section covers both homes, the agent-data one does not");
+}
+
+// --- H. locate / validate / reconcile ----------------------------------------------------------
+
+const LEDGER_LOC = {
+  location: "c.md:262-264",
+  text: "## Execution status — **Awaiting the mark.** On go: step 0 runs first and must verify restorable;",
+};
+const MOVED_STATEMENT = {
+  id: "m1", corpus: "governance", source: "file", location: "c.md:264",
+  text: "**Awaiting the mark.** On go: step 0 runs first and must verify restorable; nothing else fires until it does.",
+  retired: false,
+};
+const OTHER_STATEMENT = {
+  id: "m2", corpus: "governance", source: "file", location: "c.md:264",
+  text: "The charter's execution section says something else entirely about who holds the mark and when it is given.",
+  retired: false,
+};
+
+function theLocatorTheValidatorAndTheReconcilerHoldTheirLines() {
+  // LOCATE -- the ledger's quote carries a heading the statement does not, and the line number
+  // moved. A whole-string match would miss it; the 40/20 windows do not.
+  const hit = locateStatements([MOVED_STATEMENT, OTHER_STATEMENT], LEDGER_LOC);
+  assert.strictEqual(hit.length, 1, `the quote must locate exactly its own statement; got ${hit.map(h => h.id).join(", ") || "none"}`);
+  assert.strictEqual(hit[0].id, "m1");
+  assert.strictEqual(locateStatements([OTHER_STATEMENT], LEDGER_LOC).length, 0,
+    "different prose in the same file must NOT locate -- otherwise every prior cluster is built from whatever happens to live at that path");
+
+  // PRIOR CLUSTERS -- runnable and unrunnable, side by side.
+  const rows = [
+    { fingerprint: "aaaaaaaaaaaaaaaa", status: "open", locations: [LEDGER_LOC, { location: "d.md:5", text: MOVED_STATEMENT.text }] },
+    { fingerprint: "bbbbbbbbbbbbbbbb", status: "open", locations: [LEDGER_LOC, { location: "api/only.js:1", text: "a side of this finding the corpus does not hold at all" }] },
+  ];
+  const dStatement = { ...MOVED_STATEMENT, id: "m3", location: "d.md:5" };
+  const prior = priorClusters(rows, [MOVED_STATEMENT, OTHER_STATEMENT, dStatement]);
+  assert.strictEqual(prior.clusters.length, 1, "only the row whose two sides both resolve is runnable");
+  assert.strictEqual(prior.clusters[0].name, "prior-aaaaaaaaaaaaaaaa");
+  assert.strictEqual(prior.clusters[0].kind, "prior");
+  assert.deepStrictEqual(prior.clusters[0].statements.map(s => s.id).sort(), ["m1", "m3"]);
+  assert.deepStrictEqual(prior.unrunnable, [{ fingerprint: "bbbbbbbbbbbbbbbb", located: 1, total: 2 }],
+    "a row the corpus can only half-see is REPORTED, never quietly dropped -- it is a fact about the extractor");
+
+  // VALIDATE -- three findings, one legitimate. The cluster's copy of s5 is CUT; the verbatim span
+  // is taken from past the cut, so keeping it proves the validator reads the full text by id.
+  const cluster = buildClusters([S1, S2, S3, S4, S5])[0];
+  const byId = new Map([S1, S2, S3, S4, S5].map(s => [s.id, s]));
+  const verbatim = S2.text.slice(12, 70);
+  const result = {
+    cluster: cluster.name,
+    findings: [
+      { kind: "contradiction", confidence: "high", governing_fact: "an invented home", proposed_resolution: "none",
+        locations: [{ location: "q.md:1", text: "a location no statement in the cluster has" }] },
+      { kind: "contradiction", confidence: "high", governing_fact: "a paraphrase", proposed_resolution: "none",
+        locations: [{ location: "x.md:10", text: "the fire happens when the hour divides evenly" }] },
+      { kind: "contradiction", confidence: "medium", governing_fact: "the standing interval", proposed_resolution: "one home wins",
+        locations: [{ location: "x.md:10", text: verbatim }] },
+    ],
+  };
+  const v = validateFindings(result, cluster, byId);
+  assert.strictEqual(v.kept.length, 1, `only the verbatim finding survives; kept ${v.kept.map(k => k.governing_fact).join(", ")}`);
+  assert.strictEqual(v.kept[0].governing_fact, "the standing interval");
+  assert.strictEqual(v.dropped.length, 2, "the invented location and the paraphrase are BOTH dropped");
+  assert.match(v.dropped[0].reason, /q\.md:1/, "a dropped finding must say which location failed");
+
+  // The load-bearing half of the validator: a quote that lives only PAST the 1,200-char cut is
+  // still verbatim, and must be kept.
+  const pastTheCut = S5.text.slice(1300, 1380);
+  const deep = validateFindings({
+    findings: [{ kind: "duplicate", confidence: "low", governing_fact: "padding repeats", proposed_resolution: "trim",
+      locations: [{ location: "z.md:1", text: pastTheCut }] }],
+  }, cluster, byId);
+  assert.strictEqual(deep.kept.length, 1,
+    "a quotation from past the cluster's 1,200-char cut must validate against the FULL statement -- otherwise the cut invents false paraphrases");
+  assert.strictEqual(validateFindings({ findings: "not an array" }, cluster, byId).kept.length, 0);
+
+  // RECONCILE -- two shared homes is the same dispute, one is not. The row's fingerprint is
+  // COMPUTED by the ledger's own function rather than written as a literal, so the `exact` band
+  // below is testing fingerprint agreement and not a string somebody typed twice.
+  const ledgerRow = {
+    status: "open", kind: "contradiction", governing_fact: "the standing interval",
+    locations: [{ location: "x.md:10", text: "" }, { location: "y.md:4", text: "" }],
+  };
+  ledgerRow.fingerprint = fingerprint(ledgerRow);
+  const ledgerRows = [ledgerRow];
+  const twoKeys = { kind: "contradiction", governing_fact: "worded another way entirely",
+    locations: [{ location: "x.md:99", text: "" }, { location: "y.md:2", text: "" }] };
+  const r1 = reconcile([twoKeys], ledgerRows);
+  assert.strictEqual(r1.verdicts[0].verdict, "re-found");
+  assert.strictEqual(r1.verdicts[0].match, ledgerRow.fingerprint,
+    "the match names the fingerprint, and the LINE NUMBERS differ on purpose -- reconciliation is by home, not by line");
+  assert.strictEqual(r1.summary.exact, 0, "a differently worded fact is re-found but NOT byte-equal");
+
+  const ruledOut = reconcile([twoKeys], [{ ...ledgerRow, status: "not-a-defect" }]);
+  assert.strictEqual(ruledOut.verdicts[0].verdict, "ruled-out",
+    "John's not-a-defect ruling must survive the model re-finding it -- refiling a ruled row is the one thing the ledger cannot undo");
+  assert.strictEqual(ruledOut.summary.ruledOut, 1);
+
+  const oneKey = { kind: "contradiction", governing_fact: "something else",
+    locations: [{ location: "x.md:10", text: "" }, { location: "z.md:1", text: "" }] };
+  assert.strictEqual(reconcile([oneKey], ledgerRows).verdicts[0].verdict, "new",
+    "ONE shared home is not the same dispute -- at one key almost anything citing a busy doc would read as re-found");
+
+  // The exact count: byte-equal kind + homes + governing fact is a fingerprint collision, which is
+  // the only case where the ledger itself would refuse the row.
+  const exact = { kind: "contradiction", governing_fact: "the standing interval",
+    locations: [{ location: "x.md:10", text: "" }, { location: "y.md:4", text: "" }] };
+  const r2 = reconcile([exact], ledgerRows);
+  assert.strictEqual(r2.summary.exact, 1, "a byte-equal governing fact over the same homes must fingerprint identically");
+  assert.strictEqual(fingerprint(exact), ledgerRow.fingerprint,
+    "and the fingerprint really is the ledger's own function, not a second copy of it");
+  assert.strictEqual(r2.verdicts[0].verdict, "re-found", "an exact match is still a re-found finding, never a new one");
+}
+
+// --- I. the cluster CLI, as real subprocesses ---------------------------------------------------
+
+function runClusterCli(args) {
+  return execFileSync(process.execPath, [path.join(ROOT, "scripts", "audit-cluster.js"), ...args],
+    { encoding: "utf8", cwd: ROOT });
+}
+
+function theClusterCliRuns() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "agt-70-"));
+  try {
+    const statementsFile = path.join(tmp, "statements.json");
+    fs.writeFileSync(statementsFile, JSON.stringify([S1, S2, S3, S4, S5]), "utf8");
+    const dir = path.join(tmp, "c");
+
+    let out = "";
+    try {
+      out = runClusterCli(["--build", `--statements=${statementsFile}`, "--week=2026-W37", `--out-dir=${dir}`, "--no-db", "--max-clusters=3"]);
+    } catch (e) {
+      throw new Error(`--build --no-db must exit 0 without credentials; exited ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
+    }
+    assert.match(out, /build 2026-W37: 1 clusters \(0 prior, 1 anchor\), 0 prior unrunnable/,
+      `the build line must count what it wrote; got: ${out.trim()}`);
+    const taskFile = path.join(dir, "01-interval_hours.task.json");
+    assert.ok(fs.existsSync(taskFile), `--build must write 01-interval_hours.task.json; got ${fs.readdirSync(dir).join(", ")}`);
+    const task = JSON.parse(fs.readFileSync(taskFile, "utf8"));
+    assert.strictEqual(task.capability, "audit-governance-corpus");
+    assert.strictEqual(task.intent, "au-corpus-intent");
+    assert.strictEqual(task.cluster_kind, "anchor");
+    assert.strictEqual(task.task_context.cluster, "interval_hours");
+    assert.deepStrictEqual(Object.keys(task.task_context.statements[0]).sort(),
+      ["id", "location", "retired", "source", "text", "truncated"],
+      "the task file's statement shape is the design's six fields -- the model is handed evidence, not the corpus's own bookkeeping");
+    assert.deepStrictEqual(task.task_context.prior, [], "--no-db reads no ledger, so there are no prior fingerprints to declare");
+
+    // A result the run would have written: one verbatim finding and one citing a location the
+    // cluster does not hold. --collect must keep the first and drop the second.
+    fs.writeFileSync(path.join(dir, "01-interval_hours.result.json"), JSON.stringify({
+      cluster: "interval_hours",
+      findings: [
+        { kind: "contradiction", confidence: "high",
+          governing_fact: "the standing value of interval_hours",
+          proposed_resolution: "runner_settings/1/interval_hours wins; the docs cite it",
+          locations: [
+            { location: "runner_settings/1/interval_hours", text: "interval_hours=1" },
+            { location: "x.md:10", text: S2.text.slice(12, 70) },
+          ] },
+        { kind: "contradiction", confidence: "low", governing_fact: "an invented home",
+          proposed_resolution: "none",
+          locations: [{ location: "nowhere.md:1", text: "no cluster statement lives here" }] },
+      ],
+      account: "x",
+      run: { model: "test-model", prompt_source: "exception:seed-file", input_tokens: 1, output_tokens: 1, duration_api_ms: 1 },
+    }, null, 2), "utf8");
+
+    const candFile = path.join(tmp, "cand.json");
+    let collected = "";
+    try {
+      collected = runClusterCli(["--collect", `--dir=${dir}`, `--statements=${statementsFile}`, "--week=2026-W37", `--out=${candFile}`, "--no-db"]);
+    } catch (e) {
+      throw new Error(`--collect --no-db must exit 0; exited ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
+    }
+    assert.match(collected, /1 clusters, 2 returned, 1 dropped, 0 re-found \[\], 0 exact, 0 ruled-out, 1 new/,
+      `the collect line must count every band; got: ${collected.trim()}`);
+    const cand = JSON.parse(fs.readFileSync(candFile, "utf8"));
+    assert.strictEqual(cand.findings.length, 1, "only the verbatim finding reaches the candidates file");
+    assert.strictEqual(cand.found_by, "auditor:judgment:test-model",
+      "found_by names the model that actually answered, read off the result rather than assumed");
+    assert.strictEqual(cand.week, "2026-W37");
+    assert.match(cand.note, /NOT ingested/,
+      "the candidates file must say on its face that nothing was filed -- it is the one thing standing between a model run and an append-only ledger");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// --- C+. the two detector exemptions, both directions -------------------------------------------
+
+const FENCED_BODY = "UPDATE public.backlog_items SET claimed_by = 'x', claimed_at = now() WHERE backlog_id = 'T-1' AND status <> 'done' RETURNING backlog_id;";
+const RULE_TEXT = "Claim a backlog ticket atomically via claimed_by/claimed_at columns at pick time (any session, manual or scheduled); a claim expires after 24h so a dead session cannot strand a ticket.";
+
+function theDetectorExemptsFencesAndRuleRenders() {
+  assert.ok(normalize(FENCED_BODY).length >= 120 && normalize(RULE_TEXT).length >= 120,
+    "both fixtures must clear the 120-char duplicate floor, or these controls prove nothing");
+
+  const fenced = `# One\n\n\`\`\`sql\n${FENCED_BODY}\n\`\`\`\n`;
+  const fencedFindings = detectDuplicates(statementsFrom([["p.md", fenced], ["q.md", fenced]]), []);
+  assert.strictEqual(fencedFindings.length, 0,
+    "an identical fenced procedure in two docs is check-session-docs.js check 13's finding, not this detector's -- two tools filing one defect into an append-only ledger is a permanent double row");
+
+  const unfenced = `# One\n\n${FENCED_BODY}\n`;
+  const unfencedFindings = detectDuplicates(statementsFrom([["p.md", unfenced], ["q.md", unfenced]]), []);
+  assert.strictEqual(unfencedFindings.length, 1,
+    "the SAME text unfenced must still be a finding -- this is what proves the exemption is the fence and not a text difference");
+
+  const rendered = `# Two\n\n> **Rule B40** — ${RULE_TEXT}\n`;
+  const exempt = detectDuplicates(statementsFrom([["p.md", rendered], ["q.md", rendered]]), [RULE_TEXT]);
+  assert.strictEqual(exempt.length, 0,
+    "a live rule RENDERED with its own `> **Rule X** —` prefix is the sanctioned restatement; slice 1's exact-equality test could never see it, because the prefix makes the rule a suffix of the statement");
+
+  const notExempt = detectDuplicates(statementsFrom([["p.md", rendered], ["q.md", rendered]]), []);
+  assert.strictEqual(notExempt.length, 1,
+    "with no live rule behind it the same rendered block IS a duplicate -- the exemption is the rule, not the prefix");
+
+  // And the suffix relation is a real one: an empty rule text must exempt nothing.
+  assert.strictEqual(detectDuplicates(statementsFrom([["p.md", rendered], ["q.md", rendered]]), [""]).length, 1,
+    "an empty rule statement must not exempt the corpus -- ''.endsWith() is true of every string");
+}
+
+// --- E+. the file list, and WHOSE Set excludes from it -------------------------------------------
+
+function theCorpusDropsGeneratedDocsByTheRealSet() {
+  const files = corpusFiles();
+  assert.ok(files.includes("docs/runbooks/runner-cycle.md"),
+    "the SOURCE runbook must stay in the corpus -- it is the largest single home of live procedure");
+  assert.ok(!files.includes("docs/runbooks/cycle-card.md"),
+    "the GENERATED view must not be extracted; it is held byte-identical to its source by a regression test and cannot drift, so every passage it shares is not a second home");
+  assert.ok(PROCEDURE_GENERATED_DOCS.has("docs/runbooks/cycle-card.md"),
+    "the exclusion must come from check-session-docs.js's own PROCEDURE_GENERATED_DOCS -- a literal filename in audit-corpus.js would pass this test while the real Set had moved on");
+  for (const rel of PROCEDURE_GENERATED_DOCS) {
+    assert.ok(!files.includes(rel), `${rel} is in PROCEDURE_GENERATED_DOCS and must be out of the corpus`);
+  }
+}
+
 export async function run() {
   theFingerprintHoldsTheRightThingsStill();
   bMdMarksItsRetiredTwinAndNothingElse();
   theDetectorFindsP1AndOnlyP1();
   theReportIsByteStable();
   theCorpusCliRuns();
+  theClustererFindsOneAnchorAndCutsTheLongOne();
+  theLocatorTheValidatorAndTheReconcilerHoldTheirLines();
+  theClusterCliRuns();
+  theDetectorExemptsFencesAndRuleRenders();
+  theCorpusDropsGeneratedDocsByTheRealSet();
   await theLedgerIsAppendOnly();
   console.log("  [PASS] agt-70-auditor.test.mjs");
   console.log("         fingerprint: line-invariant, kind/file-sensitive · retirement: b.md P2 retired, P1 and a.md P2 live");
   console.log("         detector: 1 finding (P1) with 4 controls (0 / 2 / rule-exempt / same-file) · report byte-stable · CLI duplicates 1");
+  console.log("         clusters: 1 anchor, spread 2, 1200-char cut · locate/validate/reconcile: invented + paraphrase dropped, 2-home re-found, 1-home new");
+  console.log("         exemptions: fenced 0 / unfenced 1 · rule render 0 with the rule, 1 without · cycle-card.md out by PROCEDURE_GENERATED_DOCS");
 }
 
 selfRun(import.meta.url, run);
