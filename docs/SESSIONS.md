@@ -5,6 +5,28 @@
 
 ---
 
+## session/cycle-20260912-2020 (v7.0.464, 2026-09-12, runner cycle `2c62d37b-5711-4862-aa3c-b943acb44117`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-70` slice 1 of 4 — **The Auditor gets a ledger before it gets a voice, and the thing to read twice is that the cycle's own grader went red on the cycle's own productivity.**
+
+### Slice 1 of 4, and the slicing was the first judgment
+
+`AGT-70` is `size_stamp L`, `predicted_cycles 4` — not a one-cycle build, and a kickoff that tried to be one would be the caps breach the kickoff exists to prevent. The Designer scoped the half that every later slice stands on: the append-only ledger `public.audit_findings` (one row per finding per ISO week, fingerprint = kind + location homes *without line numbers* + normalised governing fact, so next week's sighting is the same finding), `scripts/audit-ledger.js`, `scripts/audit-corpus.js` with the one detector that needs no judgment, and the six hand-found contradictions ingested as this week's real report. Slices 2–4 (the judgment-lane comparison, the standing-brief and tripwire landing, the negative-control corpus and self-audit) are named on the ticket, which stays **`partial`** and re-pickable.
+
+**Premise re-measured rather than quoted:** four of the ticket's six contradictions are still live (`interval_hours = 1` against the runbook's "standing 3" and a `*/3` cron; `OD-01` and `OD-43` both `live` with opposite key orders; seven `pz-*` rows storing `temperature = 0` for a model whose API rejects it; the charter still "Awaiting John's mark"). Two were fixed — **and neither fix is recorded anywhere as a finding**, which is the ticket's own argument for a ledger.
+
+### The gating ruling, made on evidence rather than on the rule's surface
+
+Creating `GV-07`'s rows looked like it might fall outside "edit rows belonging to an **active** agent". The Designer ruled **inside**, on four things it read: a governance-lane agent lands `is_active = true` at INSERT, so there is no inactive state for GV-07 to occupy; `ARCHITECTURE.md` closes the lane with *"Uncertain classification → gated, always"*; and `runner_before_images` attribution shows **every** prior GV agent row was written by a `supervised` cycle — Skill-row images by any unattended cycle: **zero**. So the seed was **written** to `docs/design/agt-70-auditor-seed.sql`, paste-ready, and **not applied**. Verified after the ship: 0 `auditor` agent rows, 0 `au-*` Skills, 0 `audit-*` capabilities.
+
+The Builder also caught something the DDL's own comment asserted but Postgres did not deliver: the new table landed with `SELECT` for `anon`/`authenticated` from defaults — `DAT-18` closed the default **write** grants, not read. It added a REVOKE migration and proved **both directions** per `.claude/rules/supabase-column-grants.md`. Suite **213/213**, ledger `open 4 / resolved 2`, `docs/audits/2026-W37.md` published, live corpus `statements 4094 … duplicates 9` measured and deliberately not ingested.
+
+### The block is real, and it is this chain's own doing
+
+`verifier.js` returned **`block`** on a red regression gate minutes after the Builder's own run was green. One `[FAIL]`: `SES-177-claude-state-renderer.js` — *"CLAUDE-STATE.md is 6401 chars … past ~6k the split has quietly been undone."* Measured: the committed file on `origin/dev` is **4,818 bytes and passes**; a fresh render of the same ledger produces **6,443 and fails**; `git checkout --` restores the pass. **dev is green; the defect is ahead of it.**
+
+The growth source is the renderer's own inputs — it builds its session bullets from each ship card's `plain_after` / `plain_worth`, prose whose length nothing bounds, and this chain wrote four ships in an afternoon. **That is `SES-371` in a second costume: a guard going red on something other than the code — there the calendar, here throughput.** The over-cap render was deliberately **not committed**, so the board stays green, and the collision is filed as **`SES-380`** with the cap's one-home requirement spelled out. `verdict_ladder_signal` applied `reset`: `tooling` streak 12 → 0, rung 23 held.
+
+---
+
 ## session/cycle-20260912-1950 (v7.0.463, 2026-09-12, runner cycle `20601eae-cb08-4b24-9ce0-f5aeaba41d10`, `trigger = chained (drain continuation)`, `scheduler_gate` verdict `run` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-377` — **the runbook gets a 7.5 KB front door, and the thing to read twice is that this cycle was its own evidence.**
 
 ### The premise was this chain's own first cycle
