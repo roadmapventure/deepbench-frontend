@@ -1,5 +1,26 @@
 #!/usr/bin/env node
-// DeepBench v7.0.465 | scripts/audit-cluster.js | AGT-70
+// DeepBench v7.0.469 | scripts/audit-cluster.js | AGT-70
+// FEATURE: AGT-70 slice 4 -- two additions, one of them a bug fix the negative-control corpus found.
+//
+// (1) locateStatements() NOW SKIPS `retired` STATEMENTS, and priorClusters/--build/carryForward all
+// inherit that. The defect was live: this repo keeps superseded wording in place under a
+// `RETIRED IN PLACE` marker, so a ledger quotation taken from the LIVE passage still matches its
+// retired twin byte-for-byte. MEASURED on the resolved corpus fixture: two prior rows
+// (`4637961d…`, `b057c6f1…`) located two sides each and were handed to the model as runnable
+// clusters when BOTH of their second sides were retired paragraphs -- i.e. the lane would have paid
+// for a call re-deciding a question the repo had already answered, and reported the finding as
+// still live. The extractor has carried `retired` since slice 1; the locator simply never read it.
+// The fix is one line here rather than a filter at each of the three call sites, because "a retired
+// passage is not a home" is a fact about location, not about any one caller.
+//
+// (2) carryForward() IS WEEK TWO. Slices 1-3 could file a week; nothing could say what happened to
+// last week's open findings. A finding is CARRIED when its locations still resolve (2+ of them, the
+// same bar priorClusters uses to call a cluster runnable) and GONE when they no longer do -- which
+// is the corpus telling us the passages moved, were edited, or were retired, never a judgment that
+// the defect was fixed. A carried finding is re-filed into the new week with its own fingerprint
+// byte-equal to the row's, so the ledger reads as one finding across weeks rather than as a new one
+// each Monday; `found_by` records the week it was carried FROM.
+//
 // FEATURE: AGT-70 slice 2 -- the judgment lane. Slice 1 turned the five homes into 4,054 statements
 // and ran the one detector that needs no model (byte-equal text in two homes). Everything the
 // Auditor actually exists for -- two live statements that disagree on one number, a parameter the
@@ -198,11 +219,17 @@ function windowsOf(text) {
   return out;
 }
 
+// A RETIRED STATEMENT IS NOT A HOME (AGT-70 slice 4). The `retired` flag has been on every
+// statement since slice 1 and this filter is the one place that reads it for location purposes, so
+// priorClusters(), --build and carryForward() all get the same answer. Without it a ledger
+// quotation lifted from a live passage also matches the `RETIRED IN PLACE` twin the repo keeps
+// beside it, and a finding whose only surviving second side is history looks like a live dispute.
 export function locateStatements(statements, loc) {
   const key = locationKey(loc?.location ?? "");
   const windows = windowsOf(loc?.text ?? "");
   if (!windows.length) return [];
   return (statements ?? []).filter(s => {
+    if (s.retired) return false;
     if (locationKey(s.location) !== key) return false;
     const hay = normalize(s.text);
     return windows.some(w => hay.includes(w));
@@ -233,6 +260,68 @@ export function priorClusters(rows, statements, { textCap = TEXT_CAP } = {}) {
     }
   }
   return { clusters, unrunnable };
+}
+
+// WEEK TWO (AGT-70 slice 4). Pure: ledger rows + this week's statements + the week being collected,
+// out come the findings that must be re-filed into it and the ones whose homes have stopped
+// resolving.
+//
+// THE LATEST ROW PER FINGERPRINT IS THE ONE THAT DECIDES, and `iso_week` compares as a STRING
+// because `YYYY-Www` is already ordered that way -- no date parsing, and no second calendar beside
+// audit-ledger.js's isoWeek(). A fingerprint whose latest row is `resolved` or `not-a-defect` never
+// carries: the ruling is the ledger's answer and re-filing it would ask the same question again
+// next Monday, forever. A fingerprint already observed IN the week being collected
+// (`iso_week < week` is false) never carries either -- that is the idempotence guard, and it is why
+// running --collect twice in one week cannot mint a second copy.
+//
+// CARRIED VS GONE IS ABOUT THE CORPUS, NEVER ABOUT THE DEFECT. `located >= 2` is priorClusters'
+// own bar, deliberately the same number: below it the corpus no longer holds both sides, which
+// says the passages moved, were rewritten, or were retired. That is a fact worth printing; it is
+// NOT "fixed", and nothing here ever sets a status other than `open`.
+//
+// The carried finding copies `kind`, `locations` and `governing_fact` VERBATIM so that
+// fingerprint() over it is byte-equal to the row's -- the identity is the whole point, and a
+// re-worded carry would file a second row for one finding. `found_by` records the week it came
+// from, which is the only new fact the carry adds.
+export function carryForward(rows, statements, week) {
+  const latest = new Map();
+  for (const row of rows ?? []) {
+    const cur = latest.get(row.fingerprint);
+    if (!cur || String(row.iso_week) > String(cur.iso_week)) latest.set(row.fingerprint, row);
+  }
+
+  const carried = [];
+  const gone = [];
+  for (const row of latest.values()) {
+    if (row.status !== "open") continue;
+    if (!(String(row.iso_week) < String(week))) continue;
+    const locations = Array.isArray(row.locations) ? row.locations : [];
+    let located = 0;
+    for (const loc of locations) if (locateStatements(statements, loc).length) located++;
+    if (located >= 2) {
+      carried.push({
+        kind: row.kind,
+        locations: row.locations,
+        governing_fact: row.governing_fact,
+        confidence: row.confidence,
+        proposed_resolution: row.proposed_resolution,
+        status: "open",
+        ruling: row.ruling ?? null,
+        ruled_by: row.ruled_by ?? null,
+        ruled_at: row.ruled_at ?? null,
+        found_by: `carry:${row.iso_week}`,
+      });
+    } else {
+      gone.push({
+        fingerprint: row.fingerprint,
+        from_week: row.iso_week,
+        located,
+        total: locations.length,
+        governing_fact: row.governing_fact,
+      });
+    }
+  }
+  return { carried, gone };
 }
 
 // Routing, not judgment: a cluster made only of agent-data statements is the Auditor's
@@ -647,17 +736,25 @@ async function doCollect(argv) {
     }
   }
 
+  // Week two rides on --collect rather than on a command of its own, because the carry is decided
+  // by exactly the material --collect already has in hand: this week's statements and the ledger.
+  // With --no-db `rows` is [] and both lists are empty, which is the honest answer -- a run that
+  // read no ledger cannot know what last week left open.
+  const { carried, gone } = carryForward(rows, statements, week);
+
   const outAbs = path.resolve(out);
   const doc = {
     week,
-    found_by: `auditor:judgment:${firstModel}`,
+    found_by: `auditor:judgment:${firstModel || "none"}`,
     note: `candidates from the judgment run — NOT ingested; John reads, then node scripts/audit-ledger.js --ingest=${out} --week=${week} --cycle-id=<cycle> --apply`,
     findings: newFindings,
+    carried,
+    gone,
   };
   fs.mkdirSync(path.dirname(outAbs), { recursive: true });
   fs.writeFileSync(outAbs, JSON.stringify(doc, null, 2), "utf8");
 
-  console.log(`collect ${week}: ${clusters} clusters, ${returned} returned, ${dropped} dropped, ${reFound} re-found [${reFoundFps.join(",")}], ${exact} exact, ${ruledOut} ruled-out, ${newFindings.length} new -> ${out}`);
+  console.log(`collect ${week}: ${clusters} clusters, ${returned} returned, ${dropped} dropped, ${reFound} re-found [${reFoundFps.join(",")}], ${exact} exact, ${ruledOut} ruled-out, ${newFindings.length} new, ${carried.length} carried, ${gone.length} gone -> ${out}`);
   process.exit(0);
 }
 

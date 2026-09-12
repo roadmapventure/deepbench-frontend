@@ -1,5 +1,30 @@
 #!/usr/bin/env node
-// DeepBench v7.0.467 | scripts/audit-ledger.js | AGT-70
+// DeepBench v7.0.469 | scripts/audit-ledger.js | AGT-70
+// FEATURE: AGT-70 slice 4 -- WEEK TWO HAS FOUR ANSWERS, NOT TWO. Slices 1-3 knew `new` and `seen`,
+// which is all a first week needs and is wrong from the second week on: a finding filed in W37 and
+// re-found in W38 was `new` (its (fingerprint, W38) pair did not exist), so the ledger would have
+// grown a fresh row every Monday for one unchanged dispute, and a finding John had already ruled
+// `not-a-defect` would have come straight back as new work. classifyIngest() below is the four-way
+// verdict, and the ORDER of its tests is the whole design:
+//
+//   seen        the (fingerprint, week) pair already exists, OR an earlier finding in THIS call
+//               carried the same fingerprint. First, because it is the only verdict that makes the
+//               row physically un-appendable -- UNIQUE (fingerprint, iso_week) refuses it anyway.
+//   ruled-out   a `not-a-defect` row carries this fingerprint, or shares 2+ location HOMES with it.
+//               Second, and deliberately ABOVE `recurring`: John's ruling is the ledger's answer,
+//               and a ruled question that comes back re-worded (a different fingerprint over the
+//               same two homes) is the same question. Two homes and not one, for reconcile()'s
+//               measured reason: a single shared home would rule out almost anything.
+//   recurring   the fingerprint exists in ANOTHER week. This is the carry landing: it appends a row
+//               for the new week, which is what makes "still open in W38" a fact the report can
+//               render, rather than a silence.
+//   new         nothing above held.
+//
+// `recurring` APPENDS AND `seen` DOES NOT, and that asymmetry is the reason the dry run's exit code
+// counts `new + recurring` rather than `new` alone -- both are work the ledger does not yet hold
+// for this week. `ruled-out` never appends and never exits 1: re-filing a ruling is how an
+// append-only ledger turns one closed question into a permanent weekly reminder.
+//
 // FEATURE: AGT-70 slice 1 -- the Auditor's findings ledger, its fingerprint, and the weekly report.
 // This script is the ONLY writer of public.audit_findings: the table's trigger refuses every DELETE
 // and every UPDATE outside {status, ruling, ruled_by, ruled_at}, so an append here is permanent.
@@ -37,8 +62,9 @@
 //                                [--cycle-id=<uuid> --apply]
 //   node scripts/audit-ledger.js --report=<YYYY-Www> [--write]
 //
-//   --ingest=<json>   A file in the fixture's shape: {week, found_by, findings:[...]}. Its
-//                     top-level `week` and `found_by` are DEFAULTS; the flags win when given.
+//   --ingest=<json>   A file in the fixture's shape: {week, found_by, findings:[...], carried:[...]}.
+//                     Its top-level `week` and `found_by` are DEFAULTS; the flags win when given.
+//                     `carried` (audit-cluster.js --collect) is ingested with `findings`.
 //   --apply           Actually append. Default is a DRY RUN that writes nothing at all.
 //   --cycle-id=<uuid> Required with --apply: the open runner_cycles row every before-image binds to.
 //   --report=<week>   Render that week's rows. --write puts them in docs/audits/<week>.md.
@@ -169,6 +195,12 @@ export function renderReport(week, rows) {
 }
 
 // Rows as they go to PostgREST. Pure so the test can read the shape without a network.
+//
+// AGT-70 slice 4 -- `found_by`, `ruled_by` and `ruled_at` now PASS THROUGH from the finding when it
+// carries them, and fall back to the run's own values when it does not. The carry is why: a finding
+// produced by carryForward() already knows it came from `carry:2026-W37`, and stamping this run's
+// `--found-by` over it would erase the only fact the carry added. The fallback is unchanged for
+// every hand-written or model-produced finding, which carries none of the three.
 export function toRow(finding, { week, foundBy, cycleId, id }) {
   const status = finding.status ?? "open";
   const ruled = status !== "open";
@@ -183,11 +215,65 @@ export function toRow(finding, { week, foundBy, cycleId, id }) {
     proposed_resolution: finding.proposed_resolution,
     status,
     ruling: finding.ruling ?? null,
-    ruled_by: ruled ? foundBy : null,
-    ruled_at: ruled ? new Date().toISOString() : null,
-    found_by: foundBy,
+    ruled_by: finding.ruled_by ?? (ruled ? foundBy : null),
+    ruled_at: finding.ruled_at ?? (ruled ? new Date().toISOString() : null),
+    found_by: finding.found_by ?? foundBy,
     cycle_id: cycleId ?? null,
   };
+}
+
+// The four-way verdict (AGT-70 slice 4). Pure: findings + whatever ledger rows the caller read +
+// the week being ingested. See this file's header for why the tests run in this order.
+//
+// `rows` is deliberately whatever the one REST read returned -- every row sharing a fingerprint
+// with this batch, PLUS every `not-a-defect` row regardless of fingerprint (the ruled-out test
+// matches on location homes, so it needs rows this batch's fingerprints would never fetch).
+export function classifyIngest(findings, rows, week) {
+  const ledger = rows ?? [];
+  const notADefect = ledger.filter(r => r.status === "not-a-defect");
+  const inWeek = new Set(ledger.filter(r => r.iso_week === week).map(r => r.fingerprint));
+  const anyWeek = new Set(ledger.map(r => r.fingerprint));
+
+  const verdicts = [];
+  const summary = { new: 0, seen: 0, recurring: 0, ruledOut: 0 };
+  const alreadyInThisCall = new Set();
+
+  for (const finding of findings ?? []) {
+    const fp = fingerprint(finding);
+    const homes = new Set((finding?.locations ?? []).map(l => locationKey(l.location)));
+
+    let verdict;
+    let match = null;
+    if (inWeek.has(fp) || alreadyInThisCall.has(fp)) {
+      verdict = "seen";
+      match = fp;
+    } else {
+      const ruled = notADefect.find(r => {
+        if (r.fingerprint === fp) return true;
+        const rowHomes = new Set((r.locations ?? []).map(l => locationKey(l.location)));
+        let shared = 0;
+        for (const h of homes) if (rowHomes.has(h)) shared++;
+        return shared >= 2;
+      });
+      if (ruled) {
+        verdict = "ruled-out";
+        match = ruled.fingerprint;
+      } else if (anyWeek.has(fp)) {
+        verdict = "recurring";
+        match = fp;
+      } else {
+        verdict = "new";
+      }
+    }
+
+    alreadyInThisCall.add(fp);
+    if (verdict === "new") summary.new++;
+    else if (verdict === "seen") summary.seen++;
+    else if (verdict === "recurring") summary.recurring++;
+    else summary.ruledOut++;
+    verdicts.push({ finding, fingerprint: fp, verdict, match });
+  }
+  return { verdicts, summary };
 }
 
 // --- CLI --------------------------------------------------------------------------------------
@@ -272,37 +358,47 @@ async function doIngest(argv) {
   const foundBy = arg(argv, "found-by") ?? doc.found_by;
   if (!week || !/^\d{4}-W\d{2}$/.test(String(week))) fail(2, `--week must be YYYY-Www (got ${week ?? "nothing"}).`);
   if (!foundBy) fail(2, "--found-by=<s> is required when the input file carries no top-level found_by.");
-  const findings = Array.isArray(doc.findings) ? doc.findings : null;
-  if (!findings) fail(2, "the --ingest file has no top-level `findings` array.");
+  // AGT-70 slice 4 -- `carried` is ingested alongside `findings`, from the same file and in the
+  // same pass. A separate --carry flag would let a cycle file this week's discoveries and silently
+  // drop last week's still-open ones, which is the exact failure week two exists to prevent. A doc
+  // without a `carried` key (every slice-1 fixture, and any hand-written file) reads as [].
+  const own = Array.isArray(doc.findings) ? doc.findings : null;
+  if (!own) fail(2, "the --ingest file has no top-level `findings` array.");
+  const findings = [...own, ...(Array.isArray(doc.carried) ? doc.carried : [])];
 
   const { base, key } = creds();
   const fps = findings.map(fingerprint);
-  const existing = await restGet(base, key, `audit_findings?select=fingerprint&iso_week=eq.${week}&fingerprint=in.(${fps.join(",")})`);
-  const seenSet = new Set(existing.map(r => r.fingerprint));
+  // ONE read, and it deliberately over-reads: every row sharing a fingerprint with this batch, in
+  // ANY week (that is what tells `recurring` from `new`), plus every `not-a-defect` row whatever
+  // its fingerprint (the ruled-out test matches on location homes, which no fingerprint filter
+  // would fetch). A second round-trip per finding would be the same answer at N times the cost.
+  const filter = fps.length
+    ? `or=(fingerprint.in.(${fps.join(",")}),status.eq.not-a-defect)`
+    : `status=eq.not-a-defect`;
+  const rows = await restGet(base, key, `audit_findings?select=fingerprint,iso_week,status,locations&${filter}`);
 
-  // Two findings in ONE file that fingerprint alike are the same finding: the ledger's UNIQUE
-  // (fingerprint, iso_week) would refuse the second anyway, so it is counted seen, not appended.
-  const filed = new Set(seenSet);
-  let created = 0;
-  let seen = 0;
-  for (let i = 0; i < findings.length; i++) {
-    if (filed.has(fps[i])) { seen++; continue; }
-    filed.add(fps[i]);
-    created++;
-    if (!apply) continue;
-    const id = randomUUID();
-    const before = await restPost(base, key, "runner_before_images", {
-      cycle_id: cycleId, table_name: "audit_findings", pk_value: id, row_data: null,
-    });
-    if (before.error) fail(2, `${before.error} -- no before-image, so the append does not happen (§19v).`);
-    const row = await restPost(base, key, "audit_findings", toRow(findings[i], { week, foundBy, cycleId, id }));
-    if (row.error) fail(2, row.error);
+  const { verdicts, summary } = classifyIngest(findings, rows, week);
+
+  if (apply) {
+    // `new` and `recurring` append; `seen` cannot (UNIQUE (fingerprint, iso_week) refuses it) and
+    // `ruled-out` must not (re-filing John's ruling turns one closed question into a weekly one).
+    for (const v of verdicts) {
+      if (v.verdict !== "new" && v.verdict !== "recurring") continue;
+      const id = randomUUID();
+      const before = await restPost(base, key, "runner_before_images", {
+        cycle_id: cycleId, table_name: "audit_findings", pk_value: id, row_data: null,
+      });
+      if (before.error) fail(2, `${before.error} -- no before-image, so the append does not happen (§19v).`);
+      const row = await restPost(base, key, "audit_findings", toRow(v.finding, { week, foundBy, cycleId, id }));
+      if (row.error) fail(2, row.error);
+    }
   }
 
-  console.log(`ingest ${week}: ${findings.length} findings, ${created} new, ${seen} seen`);
+  console.log(`ingest ${week}: ${findings.length} findings, ${summary.new} new, ${summary.seen} seen, ${summary.recurring} recurring, ${summary.ruledOut} ruled-out`);
   // A dry run that found unfiled work is the signal to re-run with --apply; an --apply run that
-  // filed that work is a clean run.
-  process.exit(!apply && created > 0 ? 1 : 0);
+  // filed that work is a clean run. `recurring` counts as unfiled work -- the row for THIS week
+  // does not exist yet -- while `ruled-out` never does.
+  process.exit(!apply && (summary.new + summary.recurring) > 0 ? 1 : 0);
 }
 
 async function doReport(argv) {

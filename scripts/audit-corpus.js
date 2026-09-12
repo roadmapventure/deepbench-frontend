@@ -1,5 +1,29 @@
 #!/usr/bin/env node
-// DeepBench v7.0.465 | scripts/audit-corpus.js | AGT-70
+// DeepBench v7.0.469 | scripts/audit-corpus.js | AGT-70
+// FEATURE: AGT-70 slice 4 -- the SECOND deterministic detector, and the Auditor auditing itself.
+//
+// detectStaleParameters() finds a stored parameter the model's own API rejects: a `temperature` on
+// a Skill row whose `llm_model` is a family listed in shared/models.js's NO_TEMPERATURE_PREFIXES.
+// That is one of the five kinds (`stale-or-irrelevant`) and it needs no model to see -- the fact is
+// two columns of one row read against one exported list.
+//
+// THE LIST IS IMPORTED, NEVER RESTATED, and the finding's own last location names the file it came
+// from. shared/models.js:70 is the ONE code home for which models reject the parameter (SES-334
+// wrote it there after a live 400), and a copy of `["claude-fable-"]` in this file would be a
+// second home for exactly the kind of claim this tool exists to find -- the detector would be a
+// defect of the class it detects. Citing the list as a LOCATION is the other half: a reader of the
+// finding is sent to the authority, not to the detector.
+//
+// ONE FINDING, NOT ONE PER ROW. Twenty-two Skill rows carrying a stale temperature are twenty-two
+// symptoms of one fact, and the ledger is append-only: twenty-two rows to rule individually is the
+// board flooding the whole ticket is written to prevent. The locations list carries every offender,
+// so nothing is lost -- the finding is navigable to all of them.
+//
+// --agent=<id> RE-AIMS THE SAME CORPUS AT ONE AGENT, through the link tables rather than a name
+// match: agent_capability_assignments -> capabilities -> capability_skill_profiles -> skill_profiles.
+// It is the self-audit the Auditor's own seed has to pass before John applies it, and it is a
+// generic table read with a filter -- never a route, never a write, never a model call.
+//
 // FEATURE: AGT-70 slice 2 -- two measured exemptions (generated docs out of the file list, fenced
 // procedures and prefixed rule renders out of the detector); see corpusFiles/detectDuplicates below.
 // FEATURE: AGT-70 slice 1 -- the statement extractor. Turns the five homes the platform's rules
@@ -41,9 +65,13 @@
 //
 // Usage:
 //   node scripts/audit-corpus.js [--corpus=<dir>] [--no-db] [--out=<json>] [--detect[=<json>]]
+//   node scripts/audit-corpus.js --agent=<id> [--out=<json>] [--detect[=<json>]]
 //
 //   --corpus=<dir>  Extract markdown from this directory's *.md INSTEAD of the real file list.
 //                   Used by the regression test's fixture corpus.
+//   --agent=<id>    Audit ONE agent's own rows, reached through the capability link tables. DB
+//                   only: refuses --no-db and --corpus, and exits 2 when the agent has no Skill
+//                   rows (exit 2 is "could not run", never "clean").
 //   --no-db         Skip every database source. Without it, credentials are required.
 //   --out=<json>    Write the statement table to that path.
 //   --detect[=json] Write the findings to that path (bare --detect prints them instead).
@@ -64,6 +92,7 @@ import { createHash } from "crypto";
 import { fileURLToPath } from "url";
 import { RETIREMENT_VOCAB, enclosingParagraph, PROCEDURE_GENERATED_DOCS } from "./check-session-docs.js";
 import { normalize, locationKey } from "./audit-ledger.js";
+import { supportsTemperature, NO_TEMPERATURE_PREFIXES } from "../shared/models.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -246,6 +275,58 @@ export function detectDuplicates(statements, ruleTexts = []) {
   return findings;
 }
 
+// AGT-70 slice 4. The second deterministic detector -- see this file's header for why the list is
+// imported and cited rather than restated, and why twenty-two offending rows are ONE finding.
+//
+// THE MODEL COMES FROM THE SIBLING STATEMENT, not from the row object, because this function's
+// input is the statement TABLE -- the same flat shape the file corpus and the database corpus both
+// reduce to, which is what lets the test feed it fixture rows and the CLI feed it live ones.
+// `skill_profiles/<slug>/temperature` and `skill_profiles/<slug>/llm_model` are emitted as a pair
+// by extractSkillRows(), so the slug is the join key.
+//
+// A TEMPERATURE STATEMENT WITH NO SIBLING MODEL STATEMENT IS SKIPPED, never assumed. Unknown model
+// means unknown capability, and supportsTemperature()'s own contract for an unknown id is "keep
+// today's behaviour" -- filing a finding on a row whose lane nobody could read would be the
+// detector inventing the fact it is supposed to measure.
+//
+// `temperature=null` is the CORRECT state and is skipped by text rather than by parsing: that is
+// exactly the string extractSkillRows() writes for a null column, so the check reads the statement
+// as it will appear in the ledger. Any other value -- 0 included, and 0 is the live case -- stands.
+export function detectStaleParameters(statements) {
+  const modelBySlug = new Map();
+  for (const s of statements ?? []) {
+    const m = /^skill_profiles\/(.+)\/llm_model$/.exec(String(s?.location ?? ""));
+    if (m) modelBySlug.set(m[1], String(s.text ?? "").replace(/^llm_model=/, ""));
+  }
+
+  const offenders = [];
+  for (const s of statements ?? []) {
+    const m = /^skill_profiles\/(.+)\/temperature$/.exec(String(s?.location ?? ""));
+    if (!m) continue;
+    const text = String(s.text ?? "");
+    if (text === "temperature=null") continue;
+    if (!modelBySlug.has(m[1])) continue;
+    if (supportsTemperature(modelBySlug.get(m[1]))) continue;
+    offenders.push({ location: s.location, text });
+  }
+  if (!offenders.length) return [];
+
+  offenders.sort((a, b) => String(a.location).localeCompare(String(b.location)));
+  return [{
+    kind: "stale-or-irrelevant",
+    confidence: "high",
+    governing_fact: "temperature stored for a model whose API rejects temperature",
+    locations: [
+      ...offenders,
+      {
+        location: "shared/models.js:NO_TEMPERATURE_PREFIXES",
+        text: `NO_TEMPERATURE_PREFIXES=${JSON.stringify(NO_TEMPERATURE_PREFIXES)}`,
+      },
+    ],
+    proposed_resolution: "Set temperature NULL on every row whose llm_model starts with a NO_TEMPERATURE_PREFIXES prefix (shared/models.js): the executor drops the field for that family, so the stored value is a statement that is false in live voice. Skill-row edits are gated — one directive, one edit.",
+  }];
+}
+
 // --- sources -----------------------------------------------------------------------------------
 
 function readIfPresent(rel) {
@@ -380,6 +461,51 @@ async function databaseStatements(base, key) {
   return { statements: out, liveRuleTexts: rules.filter(r => r.status === "live").map(r => r.statement) };
 }
 
+// AGT-70 slice 4 -- ONE agent's own material, reached through the link tables. §19b/Rule #1: these
+// are generic table reads with an id filter, never a route and never a per-agent code path; the
+// same five reads serve any agent id, and the Auditor is simply the first caller.
+//
+// THE WALK IS agent -> agent_capability_assignments -> capabilities -> capability_skill_profiles
+// -> skill_profiles, and it has to be, because a Skill row's slug prefix is a naming convention and
+// not a link. Matching `au-*` by name would audit whatever happened to be called that, would miss a
+// row the agent really holds under another prefix, and would report a clean result for an agent
+// whose capability links were never made -- which is the exact failure this returns exit 2 for.
+async function agentStatements(base, key, agentId) {
+  const out = [];
+  const agents = await restGet(base, key, `agents?select=id,bio&id=eq.${encodeURIComponent(agentId)}`);
+
+  const assignments = await restGet(base, key, `agent_capability_assignments?select=capability_slug&agent_id=eq.${encodeURIComponent(agentId)}`);
+  const caps = [...new Set(assignments.map(a => a.capability_slug).filter(Boolean))];
+
+  let capRows = [];
+  let slugs = [];
+  if (caps.length) {
+    capRows = await restGet(base, key, `capabilities?select=slug,description&slug=in.(${caps.join(",")})`);
+    const links = await restGet(base, key, `capability_skill_profiles?select=skill_profile_slug&capability_slug=in.(${caps.join(",")})`);
+    slugs = [...new Set(links.map(l => l.skill_profile_slug).filter(Boolean))];
+  }
+
+  let skills = [];
+  if (slugs.length) {
+    skills = await restGet(base, key, `skill_profiles?select=slug,objective,method,output_desc,description,notes,traits,guardrails,llm_model,temperature,max_tokens&slug=in.(${slugs.join(",")})`);
+  }
+  // ZERO SKILL ROWS IS EXIT 2, NOT A CLEAN PASS. An agent with no rows has nothing to be stale, so
+  // every detector returns [] and the summary line would read `duplicates 0 stale 0` -- a green
+  // that means "could not run" is the one outcome the whole exit-code contract exists to refuse.
+  if (!skills.length) return { statements: null, skillCount: 0 };
+
+  out.push(...extractSkillRows(skills));
+  for (const c of capRows) {
+    if (c.description == null || String(c.description).trim() === "") continue;
+    out.push(mkStatement("agent-data", "capabilities", `capabilities/${c.slug}/description`, String(c.description)));
+  }
+  for (const a of agents) {
+    if (a.bio == null || String(a.bio).trim() === "") continue;
+    out.push(mkStatement("agent-data", "agents", `agents/${a.id}/bio`, String(a.bio)));
+  }
+  return { statements: out, skillCount: skills.length };
+}
+
 // --- CLI ---------------------------------------------------------------------------------------
 
 function arg(argv, name) {
@@ -393,8 +519,41 @@ async function main() {
   const argv = process.argv.slice(2);
   const corpusDir = arg(argv, "corpus");
   const noDb = arg(argv, "no-db") === true;
+  const agentId = arg(argv, "agent");
 
   const statements = [];
+
+  // --agent is a DIFFERENT corpus, not a filter over the normal one: no files, no config, no
+  // script headers, and no live rule texts (a rule is not an agent's own statement, and passing
+  // them here would exempt a Skill row for quoting one). Combining it with --no-db or --corpus is
+  // refused rather than silently narrowed -- both would leave it reading nothing it was asked for.
+  if (typeof agentId === "string") {
+    if (noDb || typeof corpusDir === "string") {
+      console.error("audit-corpus: --agent=<id> reads the database and only the database; it cannot be combined with --no-db or --corpus (exit 2 = could not run, never a pass).");
+      process.exit(2);
+    }
+    const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+    const key = process.env.SUPABASE_SERVICE_KEY ?? "";
+    if (!base || !key) {
+      console.error("audit-corpus: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set for --agent=<id> (exit 2 = could not run, never a pass).");
+      process.exit(2);
+    }
+    let walked;
+    try {
+      walked = await agentStatements(base, key, agentId);
+    } catch (e) {
+      console.error(`audit-corpus: ${e.message}`);
+      process.exit(2);
+    }
+    if (!walked.statements) {
+      console.error(`audit-corpus: --agent=${agentId} has no Skill rows (no such agent, or no capability links) -- not run (exit 2 = could not run, never a pass).`);
+      process.exit(2);
+    }
+    statements.push(...walked.statements);
+    report(argv, statements, []);
+    return;
+  }
+
   if (typeof corpusDir === "string") {
     const rels = globMd(corpusDir.replace(/\\/g, "/").replace(/\/+$/, ""));
     if (!rels.length) {
@@ -434,7 +593,17 @@ async function main() {
     }
   }
 
-  const findings = detectDuplicates(statements, liveRuleTexts);
+  report(argv, statements, liveRuleTexts);
+}
+
+// Both detectors run on every path -- the bare `--detect` and the `--detect=<json>` file and the
+// summary line all read the SAME two arrays, so the printed `duplicates d stale s` is always the
+// real pair. The stale finding prints as a count rather than as its locations because it carries
+// twenty-three of them live and a summary that scrolls is not a summary.
+function report(argv, statements, liveRuleTexts) {
+  const duplicates = detectDuplicates(statements, liveRuleTexts);
+  const stale = detectStaleParameters(statements);
+  const findings = [...duplicates, ...stale];
 
   const outPath = arg(argv, "out");
   if (typeof outPath === "string") {
@@ -446,15 +615,18 @@ async function main() {
     fs.mkdirSync(path.dirname(path.resolve(detect)), { recursive: true });
     fs.writeFileSync(path.resolve(detect), JSON.stringify({ findings }, null, 2), "utf8");
   } else if (detect === true) {
-    for (const f of findings) {
+    for (const f of duplicates) {
       console.log(`  duplicate · ${f.locations.map(l => l.location).join(" == ")}`);
+    }
+    for (const f of stale) {
+      console.log(`  stale-or-irrelevant · ${f.locations.length} locations`);
     }
   }
 
   const gov = statements.filter(s => s.corpus === "governance").length;
   const agentData = statements.filter(s => s.corpus === "agent-data").length;
   const retired = statements.filter(s => s.retired).length;
-  console.log(`statements ${statements.length} (governance ${gov}, agent-data ${agentData}, retired ${retired}) duplicates ${findings.length}`);
+  console.log(`statements ${statements.length} (governance ${gov}, agent-data ${agentData}, retired ${retired}) duplicates ${duplicates.length} stale ${stale.length}`);
   process.exit(0);
 }
 

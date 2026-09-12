@@ -1,4 +1,38 @@
-// DeepBench v7.0.467 | tests/regression/agt-70-auditor.test.mjs | AGT-70
+// DeepBench v7.0.469 | tests/regression/agt-70-auditor.test.mjs | AGT-70
+//
+// FEATURE: AGT-70 slice 4 -- the negative control, week two, and the Auditor audited. Parts A-M
+// below are slices 1-3's and are unchanged (L still asserts 26 steps).
+//
+// FOUR MORE PARTS, each with its own control:
+//   N   THE NEGATIVE CONTROL -- a corpus in which every one of the first week's four open findings
+//       has been RESOLVED, so the right answer is "nothing". This is the arm no earlier slice had:
+//       parts C and G prove the tools find what is there, and nothing proved they stop finding it
+//       once it is gone. It is also the arm that caught the live bug -- priorClusters() returned
+//       TWO runnable clusters off `RETIRED IN PLACE` twins. The control is the load-bearing half:
+//       force `retired: false` on the same statements and those two clusters come straight back,
+//       which proves the exclusion is the FLAG and not a difference in the text.
+//   O   WEEK TWO (pure) -- carryForward() over live-shaped statements carries all four with their
+//       fingerprints byte-equal to the rows', and over the resolved corpus carries none and reports
+//       four gone. Its three guards are asserted separately: the same week carries nothing, a
+//       fingerprint already observed in the week being collected carries nothing, and a latest row
+//       that is `resolved` never carries. classifyIngest()'s four verdicts each get their own case,
+//       including the ordering one (`ruled-out` beats `recurring`) and the two-homes-not-one bar.
+//   P   THE SELF-AUDIT -- detectStaleParameters() over the Auditor's OWN seed rows as written is
+//       []; flip one temperature to 0 and it is exactly one finding citing that row and
+//       shared/models.js. Controls: the same 0 on a `claude-opus-5` row is [] (the LIST decides,
+//       never the number), and the models.js location's text is built from the IMPORTED constant,
+//       so a copy of the list in audit-corpus.js could not pass here. The seed file itself is
+//       grepped: 6 rows at `6000, NULL`, 0 at `6000, 0`.
+//   Q   LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY; notRun otherwise) -- the three CLIs run for
+//       real, at the week that does not exist yet: a W38 dry ingest of the first week's file must
+//       exit 1 as `recurring` (never `new`), --agent=auditor must exit 2 while the seed is
+//       unapplied, and --collect at W38 must carry exactly the fingerprints whose latest row is
+//       open. Ends on the two counts every AGT-70 slice promised not to move: 6 and 0.
+//
+// DRY-RUN against the tree before this ticket (v7.0.467): N FAILS at the clusters assertion
+// (priorClusters returns 2, not 0) and at the CLI (`stale 0` is not in the summary line); O and P
+// FAIL at import (carryForward, classifyIngest and detectStaleParameters do not exist); Q FAILS at
+// its first spawn (the W38 ingest prints `6 new` and the `recurring` band does not exist).
 //
 // FEATURE: AGT-70 slice 3 -- the landing: ruled findings become board rows under a weekly cap, the
 // standing brief grows an `Auditor's ledger` group, and runbook step 4d is where the weekly audit
@@ -92,20 +126,31 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { fingerprint, locationKey, normalize, renderReport, isoWeek, isoWeekStart } from "../../scripts/audit-ledger.js";
+import {
+  fingerprint, locationKey, normalize, renderReport, isoWeek, isoWeekStart, classifyIngest, toRow,
+} from "../../scripts/audit-ledger.js";
 import {
   ledgerEligible, ledgerDetect, buildLedgerTicketDraft, LEDGER_SOURCE_FILE, LEDGER_WEEKLY_CAP,
 } from "../../scripts/tripwire-to-backlog.js";
 import { renderAuditLedger, factsSha, BEGIN, END } from "../../scripts/render-standing-brief.js";
 import { render as renderCard, parseSteps, NOTES } from "../../scripts/render-cycle-card.js";
-import { extractMarkdown, extractSkillRows, detectDuplicates, corpusFiles } from "../../scripts/audit-corpus.js";
+import {
+  extractMarkdown, extractSkillRows, detectDuplicates, detectStaleParameters, corpusFiles,
+} from "../../scripts/audit-corpus.js";
 import { PROCEDURE_GENERATED_DOCS } from "../../scripts/check-session-docs.js";
 import {
   buildClusters, locateStatements, priorClusters, capabilityFor, validateFindings, reconcile,
+  carryForward,
 } from "../../scripts/audit-cluster.js";
+// IMPORTED, never restated: part P asserts that the detector's models.js location carries the
+// value of THIS constant, so a second copy of the prefix list inside audit-corpus.js would be red
+// here rather than a silently agreeing duplicate -- which is the very defect class the detector
+// exists to find.
+import { supportsTemperature, NO_TEMPERATURE_PREFIXES } from "../../shared/models.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CORPUS_REL = "tests/fixtures/agt-70/corpus";
+const RESOLVED_REL = "tests/fixtures/agt-70/corpus-resolved";
 const FINDINGS_REL = "tests/fixtures/agt-70/findings-2026-W37.json";
 const WEEK = "2026-W37";
 const SESSION_TAG = "agt-70-regression";
@@ -992,6 +1037,364 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
     "no board row has been filed from the ledger; --from-ledger defaults to a dry run and there is nothing ruled to file anyway");
 }
 
+// --- N. the negative control ----------------------------------------------------------------------
+
+// The fixture's three markdown files stand in for the three REAL homes the first week's open
+// findings cite, each rewritten as it would read AFTER the finding was resolved (the live sentence
+// now points at the row, the superseded wording kept beside it under a RETIRED IN PLACE marker --
+// which is what this repo actually does). Mapping each file to its real rel is the whole trick: the
+// ledger's stored locations resolve against the fixture without editing a single one of them.
+const RESOLVED_REL_MAP = {
+  "runner-cycle.md": "docs/runbooks/runner-cycle.md",
+  "SELFBUILD-CHARTER.md": "docs/SELFBUILD-CHARTER.md",
+  "standing-brief.md": "docs/runbooks/standing-brief.md",
+};
+
+function resolved() {
+  const out = JSON.parse(read(`${RESOLVED_REL}/db.json`));
+  for (const [file, rel] of Object.entries(RESOLVED_REL_MAP)) {
+    out.push(...extractMarkdown(rel, read(`${RESOLVED_REL}/${file}`)));
+  }
+  return out;
+}
+
+// The first week's file read back as LEDGER ROWS -- the same shape the REST read returns, so the
+// pure functions under test are handed exactly what the CLI hands them.
+const FIXTURE = JSON.parse(read(FINDINGS_REL));
+const ROWS = FIXTURE.findings.map(f => ({
+  ...f, fingerprint: fingerprint(f), status: f.status ?? "open", iso_week: WEEK,
+}));
+
+const OPEN_FOUR = ["4637961d21e1076a", "4ef228c361f9a904", "b057c6f102845074", "e141f20a37d1fbe9"];
+
+function aResolvedCorpusFindsNothingAndTheFlagIsWhy() {
+  assert.deepStrictEqual(ROWS.filter(r => r.status === "open").map(r => r.fingerprint).sort(), OPEN_FOUR,
+    "the fixture must fingerprint to the four open findings the LIVE ledger holds -- if these drift apart this whole part is measuring a different week than the one it names");
+
+  const sts = resolved();
+  assert.strictEqual(sts.length, 25, `the resolved corpus is 18 database statements plus 7 from the three files; got ${sts.length}`);
+  assert.deepStrictEqual(sts.filter(s => s.retired).map(s => s.location), [
+    "governance_rules/OD-43",
+    "docs/runbooks/runner-cycle.md:5",
+    "docs/runbooks/runner-cycle.md:7",
+    "docs/SELFBUILD-CHARTER.md:7",
+    "docs/SELFBUILD-CHARTER.md:9",
+  ], "the retired set is the marker paragraph and the passage under it, in both files, plus the superseded rule");
+
+  // THE ANSWER A RESOLVED CORPUS MUST GIVE: nothing runnable, and every prior row reported as
+  // unrunnable with the count it actually located -- never quietly skipped.
+  const { clusters, unrunnable } = priorClusters(ROWS, sts);
+  assert.strictEqual(clusters.length, 0,
+    `a corpus in which all four findings are resolved must yield NO runnable prior cluster; got ${clusters.map(c => c.name).join(", ")}`);
+  assert.deepStrictEqual(unrunnable, [
+    { fingerprint: "e141f20a37d1fbe9", located: 0, total: 3 },
+    { fingerprint: "4637961d21e1076a", located: 1, total: 3 },
+    { fingerprint: "4ef228c361f9a904", located: 0, total: 8 },
+    { fingerprint: "b057c6f102845074", located: 1, total: 2 },
+  ], "each prior row must report how many of its own locations still resolve -- that count is a fact about the corpus, and it is the whole report when nothing is runnable");
+
+  // THE CONTROL, and it is the load-bearing assertion of this part. Force `retired` false on the
+  // SAME statements -- not different text, not a different corpus -- and the two clusters come
+  // back. That is what proves the exclusion is the flag. This is also the live bug: before slice 4
+  // locateStatements() ignored `retired`, so these two ran, and the lane would have paid for a
+  // model call re-deciding a question the repo had already answered in place.
+  const forced = priorClusters(ROWS, sts.map(s => ({ ...s, retired: false })));
+  assert.deepStrictEqual(forced.clusters.map(c => c.name), ["prior-4637961d21e1076a", "prior-b057c6f102845074"],
+    "with `retired` forced false the same statements must make exactly these two clusters -- if they do not, the 0 above is measuring a text difference rather than the retirement flag");
+
+  const charter = ROWS.find(r => r.fingerprint === "b057c6f102845074")
+    .locations.find(l => l.location.startsWith("docs/SELFBUILD-CHARTER.md"));
+  assert.strictEqual(locateStatements(sts, charter).length, 0,
+    "the charter's retired twin still carries the quotation byte-for-byte; the locator must refuse it anyway");
+  assert.strictEqual(locateStatements(sts.map(s => ({ ...s, retired: false })), charter).length, 1,
+    "and the SAME statement with the flag off must locate -- otherwise the 0 above proves nothing about the flag");
+
+  assert.strictEqual(detectDuplicates(sts, []).length, 0,
+    "the resolved corpus holds a retired twin of two live passages and must still report no duplicate -- the retirement rule is what stops the first weekly report being a list of the repo's own good habits");
+  assert.deepStrictEqual(detectStaleParameters(sts), [],
+    "every Skill row in the resolved corpus stores temperature=null, which is the corrected state; the stale detector must say nothing at all");
+}
+
+function theResolvedCorpusCliRuns() {
+  let out = "";
+  try {
+    out = execFileSync(process.execPath,
+      [path.join(ROOT, "scripts", "audit-corpus.js"), `--corpus=${RESOLVED_REL}`, "--no-db"],
+      { encoding: "utf8", cwd: ROOT });
+  } catch (e) {
+    throw new Error(`audit-corpus.js over the resolved corpus must exit 0; exited ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
+  }
+  assert.match(out, /statements 7 \(governance 7, agent-data 0, retired 4\) duplicates 0 stale 0/,
+    `the CLI's own summary must report the clean corpus, stale band included; got: ${out.trim()}`);
+}
+
+// --- O. week two (pure) ---------------------------------------------------------------------------
+
+// One statement per location of every open row, all live: the corpus as it stands when nothing has
+// changed since last week. Built from the rows rather than written out, so it cannot drift from
+// the locations the carry is actually asked about.
+const LIVE_LIKE = ROWS.filter(r => r.status === "open").flatMap((r, i) =>
+  r.locations.map((l, j) => ({
+    id: `l${i}-${j}`, corpus: "governance", source: "x", location: l.location, text: l.text, retired: false,
+  })));
+
+function weekTwoCarriesWhatIsStillThereAndNamesWhatIsGone() {
+  const still = carryForward(ROWS, LIVE_LIKE, "2026-W38");
+  assert.strictEqual(still.carried.length, 4, "all four open findings still resolve, so all four carry");
+  assert.strictEqual(still.gone.length, 0, "nothing is gone when every location still resolves");
+  for (const c of still.carried) {
+    const row = ROWS.find(r => r.fingerprint === fingerprint(c));
+    assert.ok(row, `a carried finding must fingerprint back to its own row; ${fingerprint(c)} matched none`);
+    assert.strictEqual(c.found_by, `carry:${WEEK}`, "the carry records the week it came FROM -- the only fact it adds");
+    assert.strictEqual(c.status, "open", "a carry never rules; it re-files the open finding as open");
+    assert.strictEqual(c.ruled_by, null, "an unruled finding carries an unruled ruling band");
+  }
+
+  // THE NEGATIVE ARM, over the same rows: the resolved corpus carries nothing and reports all four
+  // gone with the counts part N measured. Same function, opposite corpus.
+  const away = carryForward(ROWS, resolved(), "2026-W38");
+  assert.strictEqual(away.carried.length, 0, "a resolved corpus carries nothing forward");
+  assert.deepStrictEqual(away.gone.map(g => g.located), [0, 1, 0, 1],
+    "each gone entry reports how many of its locations still resolved -- 'gone' is a statement about the corpus, never a claim the defect was fixed");
+  assert.ok(away.gone.every(g => g.from_week === WEEK), "every gone entry names the week it was last open in");
+
+  // GUARD 1: the week being collected is not 'earlier than' itself, so a re-run inside one week
+  // carries nothing. This is what stops --collect minting a second copy on Tuesday.
+  const sameWeek = carryForward(ROWS, LIVE_LIKE, WEEK);
+  assert.strictEqual(sameWeek.carried.length, 0, "nothing earlier than the week being collected means nothing to carry");
+  assert.strictEqual(sameWeek.gone.length, 0, "and nothing to report gone either");
+
+  // GUARD 2: the LATEST row per fingerprint decides. A finding already observed in W38 must not
+  // carry into W38, and must carry into W39 naming W38 as its origin.
+  const withW38 = [...ROWS, { ...ROWS[1], iso_week: "2026-W38" }];
+  assert.strictEqual(carryForward(withW38, LIVE_LIKE, "2026-W38").carried.length, 3,
+    "a fingerprint already observed in the week being collected is not carried into it again");
+  const w39 = carryForward(withW38, LIVE_LIKE, "2026-W39");
+  assert.strictEqual(w39.carried.length, 4, "and at W39 it carries again, from its newest week");
+  const moved = w39.carried.find(c => fingerprint(c) === ROWS[1].fingerprint);
+  assert.strictEqual(moved.found_by, "carry:2026-W38",
+    "the carry names the LATEST week the finding was seen in, not the first -- otherwise the trail through the weeks is lost");
+
+  // GUARD 3: a resolved latest row closes the fingerprint. The ruling is the ledger's answer.
+  const withResolved = [...ROWS, { ...ROWS[1], iso_week: "2026-W38", status: "resolved" }];
+  assert.strictEqual(carryForward(withResolved, LIVE_LIKE, "2026-W39").carried.length, 3,
+    "a fingerprint whose latest row is resolved must never carry -- re-filing a closed finding would ask the same answered question every Monday");
+}
+
+const TWO_HOMES = {
+  kind: "contradiction", confidence: "medium", governing_fact: "worded another way",
+  proposed_resolution: "x",
+  locations: [{ location: "governance_rules/OD-01", text: "" }, { location: "governance_rules/OD-43", text: "" }],
+};
+
+function theFourVerdictsFireInTheRightOrder() {
+  assert.deepStrictEqual(classifyIngest(FIXTURE.findings, ROWS, WEEK).summary, { new: 0, seen: 6, recurring: 0, ruledOut: 0 },
+    "re-ingesting the week that is already filed is six `seen` -- the (fingerprint, week) pair exists and the table would refuse the row anyway");
+  assert.deepStrictEqual(classifyIngest(FIXTURE.findings, ROWS, "2026-W38").summary, { new: 0, seen: 0, recurring: 6, ruledOut: 0 },
+    "the SAME six at the next week are `recurring`, never `new` -- this is the whole reason slice 4 exists; `new` here would grow a fresh row for one unchanged dispute every Monday");
+
+  const ruledRows = ROWS.map(r => r.fingerprint === "4637961d21e1076a" ? { ...r, status: "not-a-defect" } : r);
+  const ruled = classifyIngest(FIXTURE.findings, ruledRows, "2026-W38");
+  const v = ruled.verdicts.find(x => x.fingerprint === "4637961d21e1076a");
+  assert.strictEqual(v.verdict, "ruled-out", "a fingerprint John ruled not-a-defect must never come back as work");
+  assert.strictEqual(v.match, "4637961d21e1076a", "the verdict names the row that ruled it, so the report can cite the ruling");
+  assert.strictEqual(ruled.summary.recurring, 5,
+    "and the other five are unaffected -- the ruling closes one question, not the batch (this is also the ORDER assertion: ruled-out is tested before recurring)");
+
+  // TWO shared homes and not one -- reconcile()'s measured bar, re-asserted for the ruling path.
+  assert.strictEqual(classifyIngest([TWO_HOMES], ruledRows, "2026-W38").verdicts[0].verdict, "ruled-out",
+    "a re-worded finding over the same two homes as a not-a-defect row is the same ruled question, whatever its fingerprint");
+  assert.strictEqual(classifyIngest([TWO_HOMES], ROWS, "2026-W38").verdicts[0].verdict, "new",
+    "CONTROL: with no not-a-defect row behind them those same two homes are new -- the exemption is the RULING, not the locations");
+  const oneHome = { ...TWO_HOMES, locations: [TWO_HOMES.locations[0]] };
+  assert.strictEqual(classifyIngest([oneHome], ruledRows, "2026-W38").verdicts[0].verdict, "new",
+    "one shared home is not enough: a single-home overlap would rule out almost anything ever filed about that file");
+  assert.strictEqual(classifyIngest([oneHome], ROWS, "2026-W38").verdicts[0].verdict, "new",
+    "and it is new against the unruled rows too, which is what makes the line above a real control");
+
+  assert.deepStrictEqual(
+    classifyIngest([FIXTURE.findings[0], FIXTURE.findings[0]], ROWS, "2026-W38").verdicts.map(x => x.verdict),
+    ["recurring", "seen"],
+    "the same finding twice in ONE file appends once: the second is `seen` because an earlier finding of this call already claimed the fingerprint");
+
+  // toRow's pass-through, which is what keeps a carry's own provenance instead of stamping the run's.
+  const carried = toRow(
+    { ...FIXTURE.findings[0], found_by: `carry:${WEEK}`, ruled_by: "john", ruled_at: "2026-09-15T00:00:00.000Z" },
+    { week: "2026-W38", foundBy: "x", id: "i" });
+  assert.strictEqual(carried.found_by, `carry:${WEEK}`, "a carried finding keeps the week it was carried from");
+  assert.strictEqual(carried.ruled_by, "john", "and keeps whoever ruled it");
+  assert.strictEqual(carried.ruled_at, "2026-09-15T00:00:00.000Z", "and when");
+  assert.strictEqual(carried.status, "open", "an open finding carried forward is still open");
+  const plain = toRow(FIXTURE.findings[0], { week: "2026-W38", foundBy: "x", id: "i" });
+  assert.strictEqual(plain.found_by, "x", "CONTROL: a finding carrying none of the three still takes the run's own --found-by");
+  assert.strictEqual(plain.ruled_by, null, "and an open row is unruled, exactly as before slice 4");
+}
+
+// --- P. the self-audit ------------------------------------------------------------------------------
+
+// The Auditor's own seed rows, in the shape skill_profiles stores them. Written here rather than
+// parsed out of the .sql, because the point is the DETECTOR's answer on those values; the seed file
+// itself is grepped separately below so the two cannot silently disagree.
+const SEED_SHAPED = [
+  { slug: "au-identity", objective: "o", llm_model: "claude-fable-5-1", temperature: null, max_tokens: 6000 },
+  { slug: "au-behavior", traits: { reasoning_style: "r" }, llm_model: "claude-fable-5-1", temperature: null, max_tokens: 6000 },
+];
+
+function theAuditorPassesItsOwnAudit() {
+  assert.deepStrictEqual(detectStaleParameters(extractSkillRows(SEED_SHAPED)), [],
+    "the Auditor's own rows store temperature NULL, so the detector it ships must find nothing to say about them");
+
+  const withTemp = SEED_SHAPED.map(r => r.slug === "au-behavior" ? { ...r, temperature: 0 } : r);
+  const findings = detectStaleParameters(extractSkillRows(withTemp));
+  assert.strictEqual(findings.length, 1,
+    "one offending row is ONE finding -- twenty-two symptoms of one fact must never become twenty-two rows in an append-only ledger");
+  const [f] = findings;
+  assert.strictEqual(f.kind, "stale-or-irrelevant");
+  assert.strictEqual(f.confidence, "high");
+  assert.strictEqual(f.governing_fact, "temperature stored for a model whose API rejects temperature");
+  assert.deepStrictEqual(f.locations.map(l => l.location),
+    ["skill_profiles/au-behavior/temperature", "shared/models.js:NO_TEMPERATURE_PREFIXES"],
+    "the finding cites the offending row AND the list that condemns it -- a reader is sent to the authority, not to the detector");
+  assert.strictEqual(f.locations[0].text, "temperature=0", "the quotation is the statement as the corpus holds it");
+  assert.strictEqual(f.locations[1].text, `NO_TEMPERATURE_PREFIXES=${JSON.stringify(NO_TEMPERATURE_PREFIXES)}`,
+    "and the list's text is built from the IMPORTED constant -- a copy of ['claude-fable-'] inside audit-corpus.js would be a second home for exactly the kind of claim this tool exists to find");
+  assert.ok(f.proposed_resolution.length <= 400,
+    `the ledger caps a proposed resolution at 400 chars; got ${f.proposed_resolution.length}`);
+
+  // CONTROL: the LIST decides, never the number. The same temperature 0 on a model that accepts it
+  // is not a finding, which is what separates this detector from "temperature must be null".
+  assert.deepStrictEqual(
+    detectStaleParameters(extractSkillRows([{ slug: "x-opus", objective: "o", llm_model: "claude-opus-5", temperature: 0, max_tokens: 6000 }])),
+    [], "a temperature of 0 on a model whose API accepts temperature is correct, not stale");
+  assert.strictEqual(supportsTemperature("claude-fable-5-1"), false, "the family the seed targets really does reject it");
+  assert.strictEqual(supportsTemperature("claude-opus-5"), true, "and the control family really does accept it");
+
+  // THE SEED AS WRITTEN, grepped: the self-audit applied to the file John will apply.
+  const seed = read("docs/design/agt-70-auditor-seed.sql");
+  assert.strictEqual((seed.match(/6000, NULL, 'platform'/g) ?? []).length, 6,
+    "all six Auditor Skill rows must be seeded with temperature NULL");
+  assert.strictEqual((seed.match(/6000, 0, 'platform'/g) ?? []).length, 0,
+    "and none with 0 -- the seed must not ship the very finding its own detector would file against it");
+}
+
+// --- Q. live ----------------------------------------------------------------------------------------
+
+async function weekTwoRunsAgainstTheRealLedger() {
+  const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const key = process.env.SUPABASE_SERVICE_KEY ?? "";
+  if (!url || !key) {
+    notRun("live week two (part Q)",
+      "SUPABASE_URL + SUPABASE_SERVICE_KEY absent -- the W38 recurring ingest, the --agent self-audit, the live stale detector, the carry and the two untouched counts are unverified here. Run: node --env-file=.env.local tests/regression/agt-70-auditor.test.mjs");
+    return;
+  }
+
+  const spawn = (script, args) => execFileSync(process.execPath, [path.join(ROOT, "scripts", script), ...args],
+    { encoding: "utf8", cwd: ROOT });
+
+  // (1) THE WEEK THAT DOES NOT EXIST YET. The first week's own file, ingested dry at W38, must come
+  // back as six RECURRING and exit 1 -- work the ledger does not hold for that week. Before slice 4
+  // this printed `6 new`, which would have doubled the ledger on the first Monday of week two.
+  let w38 = "";
+  try {
+    spawn("audit-ledger.js", [`--ingest=${FINDINGS_REL}`, "--week=2026-W38", "--found-by=hand:review-govtooling-0910"]);
+    throw new Error("a dry ingest with unfiled work must exit 1, not 0");
+  } catch (e) {
+    assert.strictEqual(e.status, 1, `the dry W38 ingest must exit 1 (the runner's re-run signal); got ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
+    w38 = String(e.stdout ?? "");
+  }
+  assert.match(w38, /6 findings, 0 new, 0 seen, 6 recurring, 0 ruled-out/,
+    `every one of the six must be recognised as the SAME finding in a new week; got: ${w38.trim()}`);
+
+  // (2) CONTROL, same file same command, at the week it really was filed in: six seen, exit 0.
+  const w37 = spawn("audit-ledger.js", [`--ingest=${FINDINGS_REL}`, `--week=${WEEK}`, "--found-by=hand:review-govtooling-0910"]);
+  assert.match(w37, /0 new, 6 seen, 0 recurring, 0 ruled-out/,
+    `at its own week the same file is six seen -- which is what proves the line above is about the WEEK and not about the file; got: ${w37.trim()}`);
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "agt-70-w2-"));
+  try {
+    fs.mkdirSync(path.join(tmp, "empty"));
+
+    // (3) THE SELF-AUDIT, either side of John's gate. The seed is unapplied today, so --agent must
+    // REFUSE with exit 2; once John applies it the same command must run clean. Both are green
+    // here, and the branch that ran is printed -- an assertion that silently accepted either would
+    // be worthless, so anything else fails.
+    let agentBranch = "";
+    try {
+      const ok = spawn("audit-corpus.js", ["--agent=auditor", `--out=${path.join(tmp, "a.json")}`]);
+      assert.match(ok, /stale 0/, `with the seed applied the Auditor's own rows must audit clean; got: ${ok.trim()}`);
+      agentBranch = "seed APPLIED: --agent=auditor ran and reported stale 0";
+    } catch (e) {
+      assert.strictEqual(e.status, 2, `--agent=auditor must either exit 0 clean or exit 2 'not run'; got ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
+      assert.match(String(e.stderr ?? ""), /no Skill rows/,
+        `exit 2 must say WHY -- an agent with no rows makes every detector return [] and 'stale 0' would be a false all-clear; got: ${e.stderr ?? ""}`);
+      agentBranch = "seed UNAPPLIED: --agent=auditor exited 2 'no Skill rows'";
+    }
+
+    // (4) THE LIVE CORPUS, both detectors. The stale finding is asserted by SHAPE rather than by a
+    // count, because the count is whatever the live Skill rows currently store -- an assertion on
+    // 22 would go red the day John fixes them, which is the wrong direction for a regression.
+    const corpus = spawn("audit-corpus.js", [`--out=${path.join(tmp, "s.json")}`, `--detect=${path.join(tmp, "d.json")}`]);
+    assert.match(corpus, /duplicates 0 stale [01]\b/,
+      `the live corpus must report both detector bands; got: ${corpus.trim()}`);
+    const detected = JSON.parse(fs.readFileSync(path.join(tmp, "d.json"), "utf8"));
+    for (const f of detected.findings.filter(x => x.kind === "stale-or-irrelevant")) {
+      assert.strictEqual(f.governing_fact, "temperature stored for a model whose API rejects temperature",
+        "every stale finding is the detector's one sentence -- a second wording would be a second fingerprint for one fact");
+      for (const l of f.locations) {
+        assert.ok(l.location.endsWith("/temperature") || l.location === "shared/models.js:NO_TEMPERATURE_PREFIXES",
+          `a stale finding may cite only the offending temperature rows and the list that condemns them; got ${l.location}`);
+      }
+    }
+
+    // (5) THE CARRY, live, against an EMPTY task dir: no clusters, no model call, and the carry
+    // computed from the real ledger. carried + gone must be exactly the fingerprints whose latest
+    // row is open -- the arithmetic is asserted against the ledger itself, not against a literal.
+    const collected = spawn("audit-cluster.js", ["--collect", `--dir=${path.join(tmp, "empty")}`,
+      `--statements=${path.join(tmp, "s.json")}`, "--week=2026-W38", `--out=${path.join(tmp, "w38.json")}`]);
+    const m = collected.match(/0 clusters, 0 returned, 0 dropped, 0 re-found \[\], 0 exact, 0 ruled-out, 0 new, (\d+) carried, (\d+) gone/);
+    assert.ok(m, `--collect over an empty dir must report every band at 0 and then the carry; got: ${collected.trim()}`);
+    const [carriedN, goneN] = [Number(m[1]), Number(m[2])];
+
+    const res = await fetch(`${url}/rest/v1/audit_findings?select=fingerprint,iso_week,status`, { headers: restHeaders(key) });
+    if (!res.ok) throw new Error(`GET audit_findings -> HTTP ${res.status}`);
+    const latest = new Map();
+    for (const r of await res.json()) {
+      const cur = latest.get(r.fingerprint);
+      if (!cur || r.iso_week > cur.iso_week) latest.set(r.fingerprint, r);
+    }
+    const stillOpen = [...latest.values()].filter(r => r.status === "open").length;
+    assert.strictEqual(carriedN + goneN, stillOpen,
+      `every fingerprint whose latest ledger row is open must land in exactly one of carried/gone; ledger says ${stillOpen}, the run said ${carriedN} + ${goneN}`);
+
+    // ...and the carry must arrive at the ledger as RECURRING, which is the two scripts' seam.
+    let ingest = "";
+    try {
+      ingest = spawn("audit-ledger.js", [`--ingest=${path.join(tmp, "w38.json")}`, "--week=2026-W38"]);
+      assert.strictEqual(carriedN, 0, `a dry ingest carrying ${carriedN} findings must exit 1, not 0`);
+    } catch (e) {
+      assert.strictEqual(e.status, 1, `the carry's dry ingest must exit 1 when it carries anything; got ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
+      ingest = String(e.stdout ?? "");
+    }
+    assert.match(ingest, new RegExp(`${carriedN} recurring`),
+      `the carried findings must reach the ledger as recurring, not new -- that seam is the whole of week two; got: ${ingest.trim()}`);
+
+    console.log(`         [part Q] ${agentBranch} · live carry ${carriedN} carried, ${goneN} gone of ${stillOpen} open`);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+
+  // (6) THE TWO COUNTS. Nothing above passed --apply, so the ledger and the board are untouched.
+  const get = async q => {
+    const r = await fetch(`${url}/rest/v1/${q}`, { headers: restHeaders(key) });
+    if (!r.ok) throw new Error(`GET ${q} -> HTTP ${r.status}`);
+    return r.json();
+  };
+  assert.strictEqual((await get("audit_findings?select=id")).length, 6,
+    "the ledger still holds exactly 6 rows -- every command in this part is a dry run");
+  assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, 0,
+    "and no board row has been filed from the ledger");
+}
+
 export async function run() {
   theFingerprintHoldsTheRightThingsStill();
   bMdMarksItsRetiredTwinAndNothingElse();
@@ -1006,8 +1409,14 @@ export async function run() {
   theLedgerFilesOnlyRuledOpenHighRowsUnderTheCap();
   theBriefGroupCountsWithoutInventingZeros();
   stepFourDIsInTheRunbookAndOnTheCard();
+  aResolvedCorpusFindsNothingAndTheFlagIsWhy();
+  theResolvedCorpusCliRuns();
+  weekTwoCarriesWhatIsStillThereAndNamesWhatIsGone();
+  theFourVerdictsFireInTheRightOrder();
+  theAuditorPassesItsOwnAudit();
   await theLedgerIsAppendOnly();
   await theLedgerSweepRunsDryAgainstTheRealBoard();
+  await weekTwoRunsAgainstTheRealLedger();
   console.log("  [PASS] agt-70-auditor.test.mjs");
   console.log("         fingerprint: line-invariant, kind/file-sensitive · retirement: b.md P2 retired, P1 and a.md P2 live");
   console.log("         detector: 1 finding (P1) with 4 controls (0 / 2 / rule-exempt / same-file) · report byte-stable · CLI duplicates 1");
@@ -1016,6 +1425,10 @@ export async function run() {
   console.log("         ledger filing: 2 of 6 eligible, cap 3 → 0 at filedThisWeek 3, 1 at 2 · draft S/M by locations · isoWeek 2027-01-01 = 2026-W53");
   console.log("         brief group: 6 findings (4 open · 2 resolved) 0 ruled 0 filed · absent says 'not read', never 0 · factsSha moves on a ruling and on a filing");
   console.log("         step 4d: between 4c and 5, 26 steps, NOTES 85 chars, no --ingest= line carries --apply, 5 header stamps, v7.0.446 in SESSIONS.md");
+  console.log("         negative control: resolved corpus → 0 clusters, 4 unrunnable (0/3, 1/3, 0/8, 1/2); retired forced false → the 2 come back · CLI duplicates 0 stale 0");
+  console.log("         week two: 4 carried over live homes / 0 carried + 4 gone over the resolved corpus · same week 0 · resolved latest row never carries");
+  console.log("         verdicts: W37 6 seen, W38 6 recurring, a not-a-defect row → 1 ruled-out + 5 recurring · 2 homes rule out, 1 home does not · carry keeps its own found_by");
+  console.log("         self-audit: seed rows as written 0 findings, one temperature 0 → 1 finding citing the row + the imported list · opus at 0 → 0 · seed 6 NULL / 0 zero");
 }
 
 selfRun(import.meta.url, run);

@@ -1,0 +1,20 @@
+[
+  { "id": "r01", "corpus": "governance", "source": "runner_settings", "location": "runner_settings/1/interval_hours", "text": "interval_hours=3", "retired": false },
+  { "id": "r02", "corpus": "governance", "source": "governance_rules", "location": "governance_rules/OD-01", "text": "The pickable board's stored order is produced by exactly six ranking keys applied in this sequence: `automation_rank` nulls last, then tier (`now` before `next` before everything else), then the numeric part of `priority_class` ascending, then the M5-02 filing lane, then `predicted_cycles`, then queue.", "retired": false },
+  { "id": "r03", "corpus": "governance", "source": "governance_rules", "location": "governance_rules/OD-43", "text": "`pz-rank-intent` instructs the Prioritizer to order tickets by project milestone order, then `supports_class` (P1 first, none last), then `priority_class`, then the filing lane, then `predicted_cycles`, then queue — an order that does NOT agree with the one the picker actually uses", "retired": true },
+  { "id": "r04", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-rank-intent/method", "text": "Order them exactly as public.recompute_backlog_queue() does: automation_rank nulls last, then tier (now before next), then the numeric part of priority_class ascending, then the M5-02 filing lane, then predicted_cycles cheapest first, then queue.", "retired": false },
+  { "id": "t0", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-identity/temperature", "text": "temperature=null", "retired": false },
+  { "id": "m0", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-identity/llm_model", "text": "llm_model=claude-fable-5-1", "retired": false },
+  { "id": "t1", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-knowledge-classes/temperature", "text": "temperature=null", "retired": false },
+  { "id": "m1", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-knowledge-classes/llm_model", "text": "llm_model=claude-fable-5-1", "retired": false },
+  { "id": "t2", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-knowledge-john/temperature", "text": "temperature=null", "retired": false },
+  { "id": "m2", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-knowledge-john/llm_model", "text": "llm_model=claude-fable-5-1", "retired": false },
+  { "id": "t3", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-behavior/temperature", "text": "temperature=null", "retired": false },
+  { "id": "m3", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-behavior/llm_model", "text": "llm_model=claude-fable-5-1", "retired": false },
+  { "id": "t4", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-classify-intent/temperature", "text": "temperature=null", "retired": false },
+  { "id": "m4", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-classify-intent/llm_model", "text": "llm_model=claude-fable-5-1", "retired": false },
+  { "id": "t5", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-rank-intent/temperature", "text": "temperature=null", "retired": false },
+  { "id": "m5", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-rank-intent/llm_model", "text": "llm_model=claude-fable-5-1", "retired": false },
+  { "id": "t6", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-guardrails/temperature", "text": "temperature=null", "retired": false },
+  { "id": "m6", "corpus": "agent-data", "source": "skill_profiles", "location": "skill_profiles/pz-guardrails/llm_model", "text": "llm_model=claude-fable-5-1", "retired": false }
+]
