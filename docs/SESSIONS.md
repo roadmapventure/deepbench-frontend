@@ -5,6 +5,38 @@
 
 ---
 
+## session/cycle-20260912-1540 (v7.0.459, 2026-09-12, runner cycle `8342bf68-f0b3-4ac2-b1d6-310bc3389a38`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (10 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-376` — **the kickoff gets a size cap, and the thing to read twice is that the half of it worth having is the half an unattended cycle may never ship.**
+
+### The premise was measured, and the kickoff was written under the cap it designs
+
+The Designer revalidated live rather than from the ticket: `docs/kickoffs/v7.0.450`–`454` are **46,492 / 17,862 / 35,129 / 21,295 / 55,824** bytes against attended `v7.0.447-SES-347` at 4,924 and `v7.0.448-SES-368` at 3,445 — the ticket's own numbers, re-derived. Live `ds-kickoff-intent.method` carries no size or harvest wording and its schema has no `harvest_markdown`; `bd-build-intent` says *"read the kickoff and every file it names"* and excludes nothing; `verifier.js:1053` `KICKOFF_CAP = 60_000` only truncates the **judge's copy**; step 7a passes no `--kickoff=`. Nothing measures a kickoff today. The kickoff it returned is **8,180 bytes** — under the 8,192 cap it proposes — with its workings in `docs/harvests/SES-376.md` (7,165 bytes), which is the ticket's own QA run on itself.
+
+### The ticket splits on the gated lane, and the rung buys nothing there
+
+Task 1 rewrites `ds-kickoff-intent` and `bd-build-intent`. Measured, not recalled: `public.agents` has `designer` and `builder` both `is_active = true`, and those are their `skill_profiles` rows. `.claude/rules/agent-roster-inert.md` ends *"Automated-mode sessions never edit rows belonging to an active agent (gated, §19v P5)"*, and `ARCHITECTURE.md:2619-2622` puts edits to active agents in the lane **no trust rung unlocks**. This cycle held `tooling` rung 21 and it bought exactly nothing. John had filed the same split himself — *"Lanes: session for the Skill edit (one decision, before-images); the runner builds it."*
+
+**Task 3 — the runbook refusal — was held back WITH task 1 although it is only a doc edit, and that is the judgment to read twice.** Armed while the Designer's Skill row still carries no cap, `--check-kickoff` would refuse every later cycle's kickoff, re-assemble once against an instruction that row was never given, and close `gated_before_build`. A gate whose counterpart is missing does not protect the runner, it wedges it. Decision `42e8442d` records it (`pattern:66`, `79`, `90`, `96`, `120`), reversible to 2026-09-15.
+
+### What shipped is the mechanism, deliberately inert
+
+`scripts/verifier.js` gains `KICKOFF_BYTE_CAP = 8192`, `kickoffCapFinding()`, the `--check-kickoff=<path>` branch placed **before** the credential check so it runs with no secrets, and the over-cap verdict block carrying `kickoff_over_cap` in `payload` and both judge lanes' `judgeCtx` (the Builder widened that from the kickoff's single site on this file's own `SES-337` lane-parity note, and named it). Measured with no credentials in env: the `SES-360` kickoff exits **1** at `55824 bytes > 8192`, `SES-368` exits **0**, this ticket's own kickoff exits **0** at 8,180, a missing path exits **2**. `tests/regression/ses-376-kickoff-size-cap.test.mjs` guards both directions with a byte-not-char control — `"é".repeat(4097)` is 4,097 chars and 8,194 bytes, and a char count passes it. Its clauses (D)/(E), which would assert the seed and live-row text, are `[NOT RUN]` naming the card rather than assertions over text this cycle was barred from shipping.
+
+### The gated card reddened the gate that graded this ship — the same loop `SES-373` closed one door over
+
+Filing the card per step 5 put a `gated_before_build` row on the board with `decision IS NULL`, and `tests/regression/ses-285-m6-autonomy.test.mjs` assertion 6 and `ses-373-card-only-self-decides.test.mjs` assertion 1 both read the **live board** for exactly that. The suite went 207/210, and the Builder diagnosed it rather than touching it: neither test imports `verifier.js`, and both failed identically with the diff stashed back to `origin/dev`. The card was then decided `retired` under `SES-300`/`SES-373`'s own rule — *withdrawn as an ask, a record never an open question* — because the decision **was** the whole action taken and it has a handle; the ask that a session paste the text lives where `M6-01` put it, `runner_skips 54a492d3` (§10) and `design_status = needs-desktop`. Both tests then passed and the suite closed at **209/210**.
+
+**The residue is a real gap and it is named, not filed silently:** `SES-373` taught the rollback engine's card to record its own decision, but **step 5's hand-filed gated card still arrives undecided**, so any cycle obeying that instruction reddens the same two live assertions until it thinks to decide its own card. That is the `SES-373` loop one door over.
+
+### The verdict, and the one red this ship does not own
+
+`block` (`runner_verdicts 8248f20c`) — build green, hygiene green, regression red on **`log-143c-invention-use.test.mjs -- 7d: judge_runs must be >= 1 at this ship's population, got 0`** alone. That failure was measured on the **unmodified** `origin/dev` tree at cycle start (208/209, exit 1) before any edit, and it has blocked `SES-373`, `SES-367` and `AGT-69` in turn. Dev's CI has been red on it since at least 2026-09-11T22:31Z; step 4a's actuator returned `action: none` because the sha is claimed by no runner cycle — an attended or unattributable push the machine yields on. `verdict_ladder_signal` applied `reset`: `tooling` streak 0, rung **21** unmoved. Auto-done was refused twice over — the verdict is a block, and the diff touches `scripts/verifier.js`, a self-certifying path.
+
+### Two discoveries reported, not fixed
+
+`docs/STANDARDS.md` Section 3 still specifies **11** kickoff sections while the governance agents and every attended kickoff use **seven** — surfaced by the Designer, left out of scope. And the step-5 undecided-card loop above. Neither was patched inline (`pattern:96`).
+
+---
+
 ## session/cycle-20260912-1241 (v7.0.458, 2026-09-12, runner cycle `a6a8b73d-a126-41ec-9f9b-4808ce04efed`, `trigger = scheduled`, `scheduler_gate` verdict `run` on John's 1h clock grid (7 AM America/Chicago) — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-373` — **a card-only rollback decision records itself, and the thing to read twice is that the runner had built a loop where its own incident card reddened the gate that graded the next ship.**
 
 ### The defect was a feedback loop, not a missing column
