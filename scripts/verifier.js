@@ -1,4 +1,18 @@
 #!/usr/bin/env node
+// DeepBench v7.0.459 | scripts/verifier.js | SES-376 -- THE KICKOFF HAS A SIZE CAP, measured in
+// BYTES, and the thing to read twice is that NOTHING MEASURED A KICKOFF BEFORE THIS. `KICKOFF_CAP`
+// (60,000 chars) only ever truncated the judge's copy; it refuses nothing, and at that limit it has
+// never fired. Measured 2026-09-12: the five unattended kickoffs v7.0.450-454 are 46,492 / 17,862 /
+// 35,129 / 21,295 / 55,824 bytes, against attended ones at 4,924 and 3,445. `KICKOFF_BYTE_CAP` is
+// the refusal at 8,192, and it has two ends: `--check-kickoff=<path>` refuses the DRAFT (the first
+// branch of main(), ahead of the credential check, because step 6 runs before a cycle has anything
+// to authenticate for), and the verdict block after `verdictFor()` refuses a DELIVERY whose
+// `--kickoff=` is over cap, for the case where the first was skipped or the file was edited after.
+//
+// AS SHIPPED THE SECOND END IS INERT, and that is deliberate rather than unfinished: runbook step 7a
+// does not pass `--kickoff=` yet, so `kickoffPath` is empty on every production run. Arming it is an
+// attended runbook edit (card 1d57ebca). The code lands first so arming is one line in a doc.
+//
 // DeepBench v7.0.447 | scripts/verifier.js | SES-347 -- reconcile() reads the agent's `findings`,
 // the Intent schema property that used to be called `reasoning`. THE RENAME IS THE FIX, and the
 // measurement is the reason: the Anthropic API refused the real assembled `verify-ship` request
@@ -329,7 +343,13 @@
 //   --verdict-file=<p>  AGT-67, `--judge=session` pass two: the sub-agent's JSON verdict.
 //   --context-file=<p>  AGT-67: override the derived `<scratch>/verify-<ticket>.json` path.
 //   --scratch=<dir>     AGT-67: where the judgment context is written. Defaults to os.tmpdir().
-//   --kickoff=<path>    AGT-67: the kickoff doc handed to the agent as part of its evidence.
+//   --kickoff=<path>    AGT-67: the kickoff doc handed to the agent as part of its evidence. Since
+//                       SES-376 an over-cap kickoff here also forces the verdict to BLOCK.
+//   --check-kickoff=<p> SES-376: measure ONE kickoff against KICKOFF_BYTE_CAP and exit. Runs no
+//                       gate, reads no board, needs no credentials -- it is the FIRST branch of
+//                       main(), ahead of the credential check, so step 6 can call it at the moment
+//                       the kickoff is drafted (before the cycle has anything else to check).
+//                       0 = within cap, 1 = over cap, 2 = the file could not be read.
 //
 // The `--judge=session` two-pass shape (AGT-67):
 //   node scripts/verifier.js --judge=session --ticket=AGT-67 --version=v7.0.433 \
@@ -1052,6 +1072,35 @@ function emit({ code, payload, prose }) {
 export const DIFF_CAP = 400_000;
 export const KICKOFF_CAP = 60_000;
 
+// FEATURE: SES-376 -- THE KICKOFF HAS A SIZE CAP, and this is a SECOND constant beside KICKOFF_CAP
+// on purpose: the two measure different things in different units for different readers.
+// `KICKOFF_CAP` is a truncation limit in CHARACTERS on the judge's copy -- it protects the prompt,
+// it never refuses anything, and at 60,000 it has never fired on a real kickoff. This one is a
+// REFUSAL threshold in BYTES on what the Designer is allowed to hand the Builder at all.
+//
+// BYTES, NOT CHARACTERS, and that is not pedantry -- it is the mutant the guard is written around.
+// Measured 2026-09-12 on the five unattended kickoffs v7.0.450-454: each is 157-314 bytes longer
+// than its `.length`, because em dashes, arrows and typographic quotes are multi-byte in UTF-8. A
+// `.length` comparison would quietly grant a kickoff up to ~4% more than the cap says, and the size
+// of that grant would vary with how much punctuation the Designer happened to use. `"é".repeat(4097)`
+// -- 4,097 characters, 8,194 bytes -- is the case the regression test uses to prove which unit is
+// doing the work.
+export const KICKOFF_BYTE_CAP = 8192;
+
+// Null is the answer for "within cap", never `false`: the caller carries this straight into the
+// payload as `kickoff_over_cap`, where a `false` would read as a measurement that was taken and a
+// `null` reads as nothing to report. The reason text names the ticket AND the remedy, because the
+// agent that reads it is the Designer being asked to re-assemble, not a human with the runbook open.
+export function kickoffCapFinding(text) {
+  const bytes = Buffer.byteLength(String(text ?? ""), "utf8");
+  if (bytes <= KICKOFF_BYTE_CAP) return null;
+  return {
+    bytes,
+    cap: KICKOFF_BYTE_CAP,
+    reason: `kickoff over cap: ${bytes} bytes > ${KICKOFF_BYTE_CAP} (SES-376) -- seven sections only; reasoning belongs in docs/harvests/<ID>.md`,
+  };
+}
+
 function cap(text, limit, what) {
   const s = String(text ?? "");
   if (s.length <= limit) return s;
@@ -1226,6 +1275,36 @@ async function judgmentRows(supabaseUrl, supabaseKey) {
 
 async function main() {
   const repoRoot = arg("repo", path.resolve(__dirname, ".."));
+
+  // ---- SES-376: the kickoff size check, and it is the FIRST branch on purpose. ----------------
+  //
+  // It runs BEFORE the credential check below because of WHEN its caller calls it: runbook step 6
+  // measures a kickoff the Designer has just drafted, before the delivery exists, and a measurement
+  // that demanded SUPABASE_URL to count bytes in a local file would be unrunnable exactly there --
+  // and an unrunnable check is a check that gets dropped. Nothing in this branch reads the board,
+  // runs a gate, or writes a row, so there is nothing for a credential to authorise.
+  //
+  // 2 for an unreadable file, never 1. Same distinction the exit-code table already draws: 1 is a
+  // judgement about the kickoff ("it is too big"), 2 is the absence of one ("there was nothing to
+  // measure"). A caller that collapses them would treat a typo'd path as a passing cap check.
+  const checkKickoffPath = arg("check-kickoff", "");
+  if (checkKickoffPath) {
+    const abs = path.resolve(repoRoot, checkKickoffPath);
+    let text;
+    try {
+      text = fs.readFileSync(abs, "utf8");
+    } catch (e) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: `kickoff unreadable: ${e.message}`, path: checkKickoffPath },
+        prose: `verifier: could not read the kickoff at ${checkKickoffPath} (${e.message}). Exiting 2 -- this is NOT a cap verdict, it is the absence of one.` });
+    }
+    const finding = kickoffCapFinding(text);
+    if (finding) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "kickoff-over-cap", ...finding }, prose: finding.reason });
+    }
+    return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes: Buffer.byteLength(text, "utf8"), cap: KICKOFF_BYTE_CAP },
+      prose: `kickoff ${Buffer.byteLength(text, "utf8")} bytes, within ${KICKOFF_BYTE_CAP} (SES-376)` });
+  }
+
   const dryRun = process.argv.includes("--dry-run");
   const cycleId = arg("cycle-id", "");
   const ticket = arg("ticket", "");
@@ -1306,7 +1385,37 @@ async function main() {
     gateDetail[gate.key] = r.detail;
   }
 
-  const { verdict, reasoning } = verdictFor(gateResults);
+  let { verdict, reasoning } = verdictFor(gateResults);
+
+  // FEATURE: SES-376 -- an over-cap kickoff BLOCKS the delivery it belongs to, not just the draft.
+  //
+  // WHY BOTH ENDS. The step-6 `--check-kickoff` branch above refuses the kickoff at the moment it is
+  // written; this refuses a DELIVERY whose kickoff is over cap, which is the case where step 6 was
+  // skipped, bypassed, or the kickoff was edited after it passed. The gate half can only be trusted
+  // if the ship half cannot be reached around it.
+  //
+  // ONE DIRECTION ONLY, like every other rule in this file: it can turn approve into block, never
+  // block into approve. `reasoning` is PREPENDED rather than replaced -- the red gate that was
+  // already the reason is still the reason, and an over-cap kickoff must not erase it from the row.
+  //
+  // DELIBERATELY INERT AS SHIPPED, and named so nobody reads the silence as a bug: runbook step 7a
+  // does not yet pass `--kickoff=`, so `kickoffPath` is empty on every production run and this block
+  // does nothing. Arming it is an attended edit to the runbook (card 1d57ebca). The code lands first
+  // so that arming it is one line in a doc rather than a code change nobody wants to make under time
+  // pressure at the ship point.
+  //
+  // An UNREADABLE kickoff leaves the finding null here rather than blocking: `readCapped()` below
+  // already puts `[UNREADABLE: ...]` into the agent's evidence, where the judgment can see it and
+  // act, and manufacturing a cap block out of a missing file would report the wrong defect.
+  let kickoffOverCap = null;
+  if (kickoffPath) {
+    try { kickoffOverCap = kickoffCapFinding(fs.readFileSync(path.resolve(repoRoot, kickoffPath), "utf8")); }
+    catch { kickoffOverCap = null; }
+  }
+  if (kickoffOverCap) {
+    verdict = "block";
+    reasoning = kickoffOverCap.reason + " | " + reasoning;
+  }
 
   // Eligibility reads the board, never the argv -- see the header.
   //
@@ -1459,6 +1568,10 @@ async function main() {
     // inside auto_done_reason, which is the free-text column that already exists to carry exactly
     // this. No new runner_verdicts column -- SES-122b asked for none.
     class_autonomy: classAutonomy,
+    // SES-376: null when the kickoff is within cap or none was passed; the finding object when it
+    // is over. Reported, never stored in its own column -- it reaches the ledger through `reasoning`
+    // above, which the block already prepended it to.
+    kickoff_over_cap: kickoffOverCap,
   };
 
   // ---- AGT-67 pass one: hand the judgment everything, print the prompt, record NOTHING. -------
@@ -1496,6 +1609,12 @@ async function main() {
       self_certifying_skill_files: SELF_CERTIFYING_SKILL_FILES,
       skill_row_self_certification: skillRowEdit,
       kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
+      // SES-376: the agent sees the cap finding beside the kickoff text, so it can see that the
+      // mechanical lane already blocked on size rather than having to re-measure to agree. Given to
+      // BOTH judge lanes for the reason `code_eligibility` above records: the same evidence key
+      // carrying less content in one lane than the other is the lane-shaped difference this file's
+      // own SES-337 note calls out as a defect.
+      kickoff_over_cap: kickoffOverCap,
       diff: diffFor(repoRoot, base),
     };
     try {
@@ -1579,6 +1698,7 @@ async function main() {
       self_certifying_skill_files: SELF_CERTIFYING_SKILL_FILES,
       skill_row_self_certification: skillRowEdit,
       kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
+      kickoff_over_cap: kickoffOverCap,   // SES-376 -- see the session lane's note above.
       diff: diffFor(repoRoot, base),
     };
     const call = await callExecutor({ intentSlug: rows.intentSlug, taskContext: judgeCtx, tenant: arg("tenant", "global") });
