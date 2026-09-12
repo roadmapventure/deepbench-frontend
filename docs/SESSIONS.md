@@ -5,6 +5,26 @@
 
 ---
 
+## session/cycle-20260912-2314 (v7.0.470, 2026-09-12, runner cycle `81a712b9-ee14-464b-9b06-2fc5e4a69016`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with The Designer on the judgment lane, re-run one tier up on the orchestrator lane after a platform error, and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-381` — **the size guard measures the split, not the ledger; dev CI is green again.**
+
+### The pick was a deliberate preemption, and it is on the record as one
+
+The queue's first admitted row was `SES-344`. This cycle took `SES-381` instead, under step 4's rule that a blocker is fixed first — because the standing red was not costing a test, it was costing **verdicts**: the previous cycle's own ship took `block` with build and hygiene green, and every further ship in the chain would have taken the same false block. Recorded as decision `87805ede`, reversible for 72 hours, so if John reads the preemption as the wrong call it undoes in one line.
+
+### What the guard was actually written to protect
+
+`CLAUDE-STATE.md` is generated in full — there is no hand-maintained half left — and `SES-177` asserted `state.length < 6000` over the whole file. Of the failing 6,082 chars, **4,012 were generated session bullets and 2,070 the skeleton**. The bar was written when the file was split, to catch the split being undone; what it was actually catching was the ledger growing, which is the one thing about that file nobody controls. It crossed 6k three times in one evening with no code change at all: 6,443 → 4,818 → 6,082 → 5,044. So the clause now measures `skeletonChars()` — every line that is not a `- ` session bullet — under 3,000, plus a clause that the brief's moved `**Next session:**` paragraph is absent. The skeleton is bounded by construction (2,089 live; 2,057 on a ten-row fixture), while re-inlining that paragraph takes it to 9,715.
+
+### Not vacuous, and proven in both directions
+
+A guard that cannot fail is worse than the bug it replaced, so the new clause ships with a control that asserts the two forms **disagree**: a verbose-card fixture renders 17,435 chars (old bar fails) at skeleton 2,057 (new passes). And where they must agree, they do — the paste-back fixture fails both. Suite `215/215 passed`, both named guards `[PASS]` individually, build exit 0, and the same numbers re-run on the pushed head. dev CI had been red on four consecutive heads since 22:42Z; this is the push that clears it.
+
+### The Designer was refused once, and the re-run had to change lanes
+
+`--check-kickoff` rejected the first draft — no `Lanes:` line (`SES-359`) — which is a named deviation, not a quiet trim: the draft was not written as the kickoff, `design_status` was not set, and the premature local commit was reset. The single sanctioned re-assembly then died on a platform API error on the judgment lane, not on a judgment, so per register B21 the piece re-ran **one tier up** on the orchestrator lane and finished there. Both runs are in `ai_activity_log`; there was no second attempt at the judgment tier.
+
+---
+
 ## session/cycle-20260912-2232 (v7.0.468, 2026-09-12, runner cycle `6fb43838-8f81-42c7-a684-3e51b939817d`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-343` — **the verdict contract stops voiding valid judgments, and the thing to read twice is that the ship was blocked by a guard neither it nor any other ticket can currently satisfy.**
 
 ### Seventeen of twenty-seven judgments were being thrown away by a presentation field
