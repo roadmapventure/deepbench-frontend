@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.476 | scripts/build-verdict-fixture.js | SES-344 slice 3 -- THE DIGESTS SURVIVE THE
+// CLONE'S SHAPE. `rawInputs()` now renders the diff with `--full-index`, because the plain rendering
+// abbreviates its `index a..b` blob ids by `core.abbrev=auto` -- a property of how many objects the
+// CLONE holds, not of the tree -- so every recorded `diff_sha256` failed in a small clone while
+// history had not moved at all. The full reasoning, the 27/27 measurement and the kickoff-digest
+// control are at `rawInputs()` and at `redigestFixture()` below; `--redigest` is the one-time
+// re-hash that carries the recorded rows onto the stable rendering.
+//
 // DeepBench v7.0.473 | scripts/build-verdict-fixture.js | SES-344 slice 2 -- THE KNOWN-BAD MUTANTS,
 // and the thing to read twice is WHY A MUTANT IS A FUNCTION OF A REAL FIXTURE RATHER THAN A
 // HAND-WRITTEN PAYLOAD. `MAX_FALSE_APPROVES = 0` has never been exercised: nothing on the recorded
@@ -158,7 +166,19 @@ function findKickoff(version, ticket) {
 // treat it as such. Silence on a rewritten history is exactly the failure the digests exist for.
 export function rawInputs(repo, sha, kickoffPath) {
   const errors = [];
-  const rawDiff = gitIn(repo, ["diff", `${sha}^`, sha]);
+  // SES-344 slice 3: `--full-index` IS LOAD-BEARING, AND THE BUG IT FIXES IS THAT THE DIGEST WAS A
+  // FACT ABOUT THE CLONE RATHER THAN ABOUT THE TREE. A plain `git diff` abbreviates the blob ids on
+  // its `index a..b` lines by `core.abbrev=auto`, which is a function of how many objects the clone
+  // happens to hold -- 8 hex digits in the clone the fixture was recorded in, 7 in a clone under
+  // 16,384 objects. MEASURED 2026-09-13 in a 926-commit shallow clone: every recorded diff came back
+  // exactly 2 characters shorter per changed file, `materializeInputs()` reported `no longer hashes`
+  // on 27/27 usable fixtures and `materializeMutant()` on 3/3, and `git -c core.abbrev=8 diff`
+  // reproduced the recorded `diff_sha256` on 27/27 -- history had not moved at all. Under
+  // `--full-index` the blob ids are written in full, so the rendering is byte-identical under
+  // `core.abbrev=7` and `=12` (27/27, asserted with its negative control in
+  // tests/regression/ses-344c-digests-survive-clone-shape.test.mjs). Changing this re-digests every
+  // fixture row once (`--redigest`); it does not change what history says.
+  const rawDiff = gitIn(repo, ["diff", "--full-index", `${sha}^`, sha]);
   let diff = null;
   if (rawDiff === null) errors.push(`git diff ${String(sha).slice(0, 8)}^..${String(sha).slice(0, 8)} could not be read in ${repo}`);
   else diff = cap(rawDiff, DIFF_CAP, "diff");
@@ -357,7 +377,46 @@ function writeMutantDigests() {
   if (failed) process.exit(2);
 }
 
+// `--redigest`: re-hash every available row's DIFF in place, and nothing else. Git only, no
+// Supabase -- a full rebuild would re-read `runner_verdicts` and could quietly pick up a different
+// set of verdicts, which is a new fixture rather than the same fixture re-rendered.
+//
+// THE KICKOFF DIGEST IS THE CONTROL, AND IT IS WHY THIS MODE IS SAFE TO RUN. `rawInputs()` produces
+// the diff and the kickoff from the same commit by the same call; if only the diff's RENDERING
+// changed, the kickoff must still hash to exactly what was recorded. A kickoff digest that moved
+// means history really did move under the fixture, and re-digesting would then launder a rewritten
+// tree into a clean replay -- so that row is a hard exit, never a rewrite. `generated_by` is left
+// alone on purpose: tests/fixtures/verdicts-30-judgments.json pins it, and the judgments were given
+// on these same 27 deliveries.
+function redigestFixture() {
+  const fxPath = path.resolve(REPO, arg("out", "tests/fixtures/verdicts-30.json"));
+  const fx = JSON.parse(fs.readFileSync(fxPath, "utf8"));
+  const rows = (fx.fixtures || []).filter(f => f.available);
+  let moved = 0;
+  for (const f of rows) {
+    const got = rawInputs(REPO, f.sha, f.inputs.kickoff_path);
+    if (got.errors.length) {
+      console.error(`build-verdict-fixture --redigest: ${f.backlog_id} ${f.version} (${String(f.sha).slice(0, 8)}) could not be rebuilt: ${got.errors.join("; ")}`);
+      process.exit(2);
+    }
+    if (f.inputs.kickoff_sha256 && sha256(got.kickoff) !== f.inputs.kickoff_sha256) {
+      console.error(`build-verdict-fixture --redigest: ${f.backlog_id} ${f.version} (${String(f.sha).slice(0, 8)}): ${f.inputs.kickoff_path} no longer hashes to the copy this verdict was judged on -- history moved under the fixture, so this is NOT a re-rendering and the diff digest must not be rewritten`);
+      process.exit(2);
+    }
+    const oldBytes = f.inputs.diff_bytes;
+    f.inputs.diff_bytes = got.diff.length;
+    f.inputs.diff_sha256 = sha256(got.diff);
+    moved++;
+    console.log(`  ${f.backlog_id} ${f.version} ${String(f.sha).slice(0, 8)} bytes ${oldBytes} -> ${f.inputs.diff_bytes}`);
+  }
+  fx.diff_form = "git diff --full-index (SES-344 slice 3)";
+  fx.redigested_at = new Date().toISOString();
+  fs.writeFileSync(fxPath, JSON.stringify(fx, null, 2), "utf8");
+  console.log(`build-verdict-fixture --redigest: ${moved}/${rows.length} available rows re-digested, 0 kickoff digests moved -> ${path.relative(REPO, fxPath)}`);
+}
+
 async function main() {
+  if (process.argv.includes("--redigest")) return redigestFixture();
   if (process.argv.includes("--mutants")) return writeMutantDigests();
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;

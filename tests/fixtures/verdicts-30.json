@@ -64,8 +64,8 @@
         "kickoff_source": "at the ship commit 7e4d4cb2",
         "kickoff_bytes": 6134,
         "kickoff_sha256": "173fdb98acc4ba9e2fa28a2fe4a5e203736b5e9e603bdac1fe0f7055ff015827",
-        "diff_bytes": 96862,
-        "diff_sha256": "cd1901b4b56155d3eb393233ac68d13726f703deeed3dafbb099b53b2df8be57"
+        "diff_bytes": 97118,
+        "diff_sha256": "c7788d22b71c4c115e04ef5437b0354c9ca9194940b7fe08a2d1b36bef42d4ec"
       }
     },
     {
@@ -126,8 +126,8 @@
         "kickoff_source": "at the ship commit 7e4d4cb2",
         "kickoff_bytes": 6134,
         "kickoff_sha256": "173fdb98acc4ba9e2fa28a2fe4a5e203736b5e9e603bdac1fe0f7055ff015827",
-        "diff_bytes": 96862,
-        "diff_sha256": "cd1901b4b56155d3eb393233ac68d13726f703deeed3dafbb099b53b2df8be57"
+        "diff_bytes": 97118,
+        "diff_sha256": "c7788d22b71c4c115e04ef5437b0354c9ca9194940b7fe08a2d1b36bef42d4ec"
       }
     },
     {
@@ -188,8 +188,8 @@
         "kickoff_source": "at the ship commit 7e4d4cb2",
         "kickoff_bytes": 6134,
         "kickoff_sha256": "173fdb98acc4ba9e2fa28a2fe4a5e203736b5e9e603bdac1fe0f7055ff015827",
-        "diff_bytes": 96862,
-        "diff_sha256": "cd1901b4b56155d3eb393233ac68d13726f703deeed3dafbb099b53b2df8be57"
+        "diff_bytes": 97118,
+        "diff_sha256": "c7788d22b71c4c115e04ef5437b0354c9ca9194940b7fe08a2d1b36bef42d4ec"
       }
     },
     {
@@ -273,7 +273,7 @@
         "kickoff_bytes": 5031,
         "kickoff_sha256": "30d0d6e660e9772545931c73ea95c0b91adf7c06a380666d9fafe6baf6a49d19",
         "diff_bytes": 400168,
-        "diff_sha256": "6595a16d19307ab36591edc3895ee0b1c27b39d8a3223f645169fda6a4c66a54"
+        "diff_sha256": "c4486de5b160c7efbb4bcabadf7183c842a0ea5e5acd2d1dc9f30c4395a563a1"
       }
     },
     {
@@ -335,8 +335,8 @@
         "kickoff_source": "at the ship commit 18ce23c7",
         "kickoff_bytes": 5031,
         "kickoff_sha256": "30d0d6e660e9772545931c73ea95c0b91adf7c06a380666d9fafe6baf6a49d19",
-        "diff_bytes": 56872,
-        "diff_sha256": "fd5c93ae6d3e39e09e67115f18b612360227cc1cbeeb590107b0a2ac9d997e5a"
+        "diff_bytes": 57192,
+        "diff_sha256": "fd8907030cacbfa224a608853c88e1edc248e1029656f79558795409a806fb08"
       }
     },
     {
@@ -416,8 +416,8 @@
         "kickoff_source": "at the ship commit 9097f086",
         "kickoff_bytes": 7157,
         "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
-        "diff_bytes": 63464,
-        "diff_sha256": "02c82003259b4d9c6106b14e04094c5d5983e4a4ef243a86fd42af104dda70a0"
+        "diff_bytes": 63720,
+        "diff_sha256": "d61ef14e87a8922f1405e775dc1f2b063f8424e2540a6260f9983579ddd5293d"
       }
     },
     {
@@ -481,8 +481,8 @@
         "kickoff_source": "at the ship commit 5a0fcfb9",
         "kickoff_bytes": 7157,
         "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
-        "diff_bytes": 115330,
-        "diff_sha256": "726bf79602c18647e6dea2104e3b2b3099fab7a8a3c605c450db1938f21dca13"
+        "diff_bytes": 115778,
+        "diff_sha256": "cfa3b9a21c1a768b67ace61593290747c242aa13e4ea8021ed740c0e61169628"
       }
     },
     {
@@ -548,8 +548,8 @@
         "kickoff_source": "at the ship commit a6c3e8f3",
         "kickoff_bytes": 7157,
         "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
-        "diff_bytes": 199580,
-        "diff_sha256": "4d607f1fe681400734cd31749791f26fefa4a79f817d75fd0a50c3b8d1af80d1"
+        "diff_bytes": 200156,
+        "diff_sha256": "9b10958c25ec8e13a27b33bf5b34f5f493a49dfdf4b2acfe7bd8ed617bfbb14e"
       }
     },
     {
@@ -610,8 +610,8 @@
         "kickoff_source": "at the ship commit 9097f086",
         "kickoff_bytes": 7157,
         "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
-        "diff_bytes": 63464,
-        "diff_sha256": "02c82003259b4d9c6106b14e04094c5d5983e4a4ef243a86fd42af104dda70a0"
+        "diff_bytes": 63720,
+        "diff_sha256": "d61ef14e87a8922f1405e775dc1f2b063f8424e2540a6260f9983579ddd5293d"
       }
     },
     {
@@ -675,8 +675,8 @@
         "kickoff_source": "at the ship commit 5a0fcfb9",
         "kickoff_bytes": 7157,
         "kickoff_sha256": "7d13c2e5e4991185bd12b1b9638b9cd97e31565748074bb767a06efde8d800c3",
-        "diff_bytes": 115330,
-        "diff_sha256": "726bf79602c18647e6dea2104e3b2b3099fab7a8a3c605c450db1938f21dca13"
+        "diff_bytes": 115778,
+        "diff_sha256": "cfa3b9a21c1a768b67ace61593290747c242aa13e4ea8021ed740c0e61169628"
       }
     },
     {
@@ -736,8 +736,8 @@
         "kickoff_source": "at the ship commit 2126f778",
         "kickoff_bytes": 5139,
         "kickoff_sha256": "c5db62bec8b66ccc29533194bbe15f97206490e575e68871302fd2d6646689ee",
-        "diff_bytes": 92676,
-        "diff_sha256": "9d60b11235a6415359c9f581f7ab6effb935066f93c1980f36c59a8a02650329"
+        "diff_bytes": 92868,
+        "diff_sha256": "df7b81d0b56215480388d996001b9cbad8e9a1ce7e31514c1254c648537710fe"
       }
     },
     {
@@ -798,8 +798,8 @@
         "kickoff_source": "at the ship commit 255795f7",
         "kickoff_bytes": 5812,
         "kickoff_sha256": "2e9aa976ed1c84ac827fd8f077ad998a2dfe9fe8096140a96be0a4153ec9bd0e",
-        "diff_bytes": 93640,
-        "diff_sha256": "980020317dab1e125780c256537b9f1137af4477f8d42541d3c6ff2d4f48eb82"
+        "diff_bytes": 93896,
+        "diff_sha256": "65d80105d6d3cc95826a02a269c7dae7f5ad93066a69795868aecec50ea1df20"
       }
     },
     {
@@ -860,8 +860,8 @@
         "kickoff_source": "at the ship commit 255795f7",
         "kickoff_bytes": 5812,
         "kickoff_sha256": "2e9aa976ed1c84ac827fd8f077ad998a2dfe9fe8096140a96be0a4153ec9bd0e",
-        "diff_bytes": 93640,
-        "diff_sha256": "980020317dab1e125780c256537b9f1137af4477f8d42541d3c6ff2d4f48eb82"
+        "diff_bytes": 93896,
+        "diff_sha256": "65d80105d6d3cc95826a02a269c7dae7f5ad93066a69795868aecec50ea1df20"
       }
     },
     {
@@ -920,8 +920,8 @@
         "kickoff_source": "at the ship commit e3ac47ce",
         "kickoff_bytes": 4977,
         "kickoff_sha256": "640ba903ef2d90e66d6350728e3b26052fb294d18663811d7ed91b14e8c577b1",
-        "diff_bytes": 16407,
-        "diff_sha256": "3efd67c3d802a73f15333812973703158f316058fd557dcc298b58d31fef4530"
+        "diff_bytes": 16535,
+        "diff_sha256": "e0903b2735a2b75eccb1ad20ba009913c51a684b7f555a59aeab9bd6585ad1bf"
       }
     },
     {
@@ -980,8 +980,8 @@
         "kickoff_source": "at the ship commit a176cc64",
         "kickoff_bytes": 4977,
         "kickoff_sha256": "640ba903ef2d90e66d6350728e3b26052fb294d18663811d7ed91b14e8c577b1",
-        "diff_bytes": 16914,
-        "diff_sha256": "c6ec07ce2c85a5b1b7b59444bfcd287862e5cebc14d3a58614d96636add6e60c"
+        "diff_bytes": 17042,
+        "diff_sha256": "d7337cd0f7b8f61579f9712adfb2fbed34743e73317fcc63af42a249ab3cd275"
       }
     },
     {
@@ -1041,8 +1041,8 @@
         "kickoff_source": "at the ship commit 870ee2d0",
         "kickoff_bytes": 5413,
         "kickoff_sha256": "0c8d4bf628bcc46c4757e1b615092abff9dbedf4cbc5c7a4c5ec013138294c9d",
-        "diff_bytes": 28374,
-        "diff_sha256": "e5467b66cae304e9fe8e5bffae86a7e702b2b819150686f707a78b378791d965"
+        "diff_bytes": 28566,
+        "diff_sha256": "2a006ea3ceb190eb1fe07e45daed65c894e7defdc7ac394f9ef6fb463a92d327"
       }
     },
     {
@@ -1102,8 +1102,8 @@
         "kickoff_source": "at the ship commit 95468f1a",
         "kickoff_bytes": 5363,
         "kickoff_sha256": "dff1632d65cb5afd58215b1cf0af8793b6e95c12a77ecefcb2b3447d233ccf67",
-        "diff_bytes": 26695,
-        "diff_sha256": "51ff8bf63b43a347edaa08b0eb0c38bd204cefa6045d92efb94bec939b59c964"
+        "diff_bytes": 26887,
+        "diff_sha256": "45b56328d44885dc31058a909689a411a398033bba38b3817bd3bb88288cca03"
       }
     },
     {
@@ -1166,8 +1166,8 @@
         "kickoff_source": "at the ship commit 05478a4a",
         "kickoff_bytes": 7091,
         "kickoff_sha256": "5ee6b33a6cb916dfa6499c01b80219a59b16d50c149a82c7a6edd08e1231ae9e",
-        "diff_bytes": 57657,
-        "diff_sha256": "9c55c9dd4e00a4e9b7ab6ddbab0ce0f570b242e533a17013f14a14b85c60d847"
+        "diff_bytes": 58041,
+        "diff_sha256": "8062f3b4be239a282ae3385e8402f8502c6f7372005ab9a798517b2d525465fe"
       }
     },
     {
@@ -1227,8 +1227,8 @@
         "kickoff_source": "at the ship commit 01795d93",
         "kickoff_bytes": 4753,
         "kickoff_sha256": "4d9d9d0eb93c93b06656ed2712b1bfef86065e67f7ce07ae10c92663559d0c58",
-        "diff_bytes": 22122,
-        "diff_sha256": "407a144759b8a8b316a84cd0f76eb98895fe842a4c3591d2bb754d2281c3afb5"
+        "diff_bytes": 22314,
+        "diff_sha256": "df5ed11fa9f9da7e188fb921b8a827ac72caef630e91d34a4f0f8007161e55cc"
       }
     },
     {
@@ -1293,8 +1293,8 @@
         "kickoff_source": "at the ship commit 98184432",
         "kickoff_bytes": 6497,
         "kickoff_sha256": "545281da6ea7646934f03d893cbcd6ca65784a49106dd5a7544348bc42aea5c3",
-        "diff_bytes": 56680,
-        "diff_sha256": "c8ecef3fe00e3daf57545491806b425a24fbf4274527ac8b91c14ded3940b4c3"
+        "diff_bytes": 57192,
+        "diff_sha256": "6436026f9649c7f2e8ead8fdf90c0fb50c68f98b3edcddfb6571824d623f7de9"
       }
     },
     {
@@ -1360,8 +1360,8 @@
         "kickoff_source": "at HEAD -- the doc was committed after the ship it specced",
         "kickoff_bytes": 9746,
         "kickoff_sha256": "bc33dc186b2e1b3061c358a12bdfca6aba35a0db31e1756dfcce9b387726783a",
-        "diff_bytes": 126968,
-        "diff_sha256": "7957df0c6e3c533ecaff631498d665b82b4013ac4f746ad62fd903ad6ca98a75"
+        "diff_bytes": 127544,
+        "diff_sha256": "bb006d07ced87f2d88deca6f14b4ab641f963ea174a7e2882daa271b6b8f7524"
       }
     },
     {
@@ -1422,8 +1422,8 @@
         "kickoff_source": "at the ship commit 2ce345e7",
         "kickoff_bytes": 9882,
         "kickoff_sha256": "448a17df754a4950f3a6a37e8e5be8d46c266863e512cf82ccc00625159535bb",
-        "diff_bytes": 63312,
-        "diff_sha256": "f34052ebc0aff83a96b020cf0384efbacf0d55e439304b03416033a107e3b3f4"
+        "diff_bytes": 63568,
+        "diff_sha256": "9b3ac096a46af6ec5f20e6d10a3efbd13370a861eab5ea993c705027abad5291"
       }
     },
     {
@@ -1485,8 +1485,8 @@
         "kickoff_source": "at the ship commit 3e181af7",
         "kickoff_bytes": 10968,
         "kickoff_sha256": "7a8ee79f2f99e54955a31578c404857373711e0a087a0b49bdeb3a5e95ff405d",
-        "diff_bytes": 65895,
-        "diff_sha256": "c09b3d897f729dd6549c05b026acbdeeb4b92ac0ee3f8322e666f7ddf8a22d0b"
+        "diff_bytes": 66215,
+        "diff_sha256": "1f61aacbe25ad24208e2d833d6920b184f99b6bcc5b72b32db2c2dabfa76c879"
       }
     },
     {
@@ -1548,8 +1548,8 @@
         "kickoff_source": "at the ship commit 3e181af7",
         "kickoff_bytes": 10968,
         "kickoff_sha256": "7a8ee79f2f99e54955a31578c404857373711e0a087a0b49bdeb3a5e95ff405d",
-        "diff_bytes": 65895,
-        "diff_sha256": "c09b3d897f729dd6549c05b026acbdeeb4b92ac0ee3f8322e666f7ddf8a22d0b"
+        "diff_bytes": 66215,
+        "diff_sha256": "1f61aacbe25ad24208e2d833d6920b184f99b6bcc5b72b32db2c2dabfa76c879"
       }
     },
     {
@@ -1611,8 +1611,8 @@
         "kickoff_source": "at the ship commit 3e181af7",
         "kickoff_bytes": 10968,
         "kickoff_sha256": "7a8ee79f2f99e54955a31578c404857373711e0a087a0b49bdeb3a5e95ff405d",
-        "diff_bytes": 65895,
-        "diff_sha256": "c09b3d897f729dd6549c05b026acbdeeb4b92ac0ee3f8322e666f7ddf8a22d0b"
+        "diff_bytes": 66215,
+        "diff_sha256": "1f61aacbe25ad24208e2d833d6920b184f99b6bcc5b72b32db2c2dabfa76c879"
       }
     },
     {
@@ -1692,8 +1692,8 @@
         "kickoff_source": "at the ship commit 6fd8fdd1",
         "kickoff_bytes": 5825,
         "kickoff_sha256": "b5680992fe350d5b5bb716eec2405f586f338092484535072739432b6dc08a58",
-        "diff_bytes": 22253,
-        "diff_sha256": "c3642cdaa075c45fdd48a9f620115c3a105f10297b214dd08a638443d2892e27"
+        "diff_bytes": 22509,
+        "diff_sha256": "9e4f1be3c5552f9134232a640467de632fee3c8386d208d68709e08840d37bd2"
       }
     },
     {
@@ -1754,9 +1754,11 @@
         "kickoff_source": "at the ship commit bd8de880",
         "kickoff_bytes": 4885,
         "kickoff_sha256": "10157f73fca989cf2e9102ae77c2e315618f4d440f4d78a2342cc3a83c1a31a1",
-        "diff_bytes": 24378,
-        "diff_sha256": "594c150839a0cb6a9ddd0a6c1584e998a3561b7554e6a47bd6e85e2646ab3d35"
+        "diff_bytes": 24634,
+        "diff_sha256": "3d09fe186430f6d6f0458efb7b683132ee099ceed04d77b0eb8aedb39429a98d"
       }
     }
-  ]
+  ],
+  "diff_form": "git diff --full-index (SES-344 slice 3)",
+  "redigested_at": "2026-09-13T04:01:53.036Z"
 }
