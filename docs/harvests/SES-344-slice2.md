@@ -1,0 +1,148 @@
+# SES-344 — Reasoning behind the kickoff `docs/kickoffs/v7.0.471-SES-344-adjudicated-verifier-bar.md` (slice 1)
+
+<!-- DeepBench v7.0.471 | docs/harvests/SES-344.md | Written by The Designer (design-kickoff, judgment lane, claude-fable-5-1) in cycle 1bd980f6, 2026-09-13. Not required reading for the build, EXCEPT the section "A1 rows" below, which task 1 copies verbatim. -->
+
+## Premise revalidation (measured, not recalled)
+
+- `node tests/verifier/ses-337-verifier-reproduction.test.mjs` on branch `session/cycle-20260912-2356` (2026-09-13): **19/27 reproduced, 8 disagreements**, every one ledger `approve` / replay `block` with the agent saying `block`; **contract 0/27 rejected** (SES-343 `v7.0.468` landed — the ticket's "17/27" is stale); control A (`vf-behavior` blanked, n=8) 1 vs 1; control B (`vf-behavior,vf-guardrails`, n=8) 2. `MAX_DISAGREEMENTS = 2` at L77 is still the bar and the file is red on it. Ledger-known-bad: 6 recorded blocks among the 27, **0** approved by the agent (no false approve on the ledger's own bad rows).
+- Input contract, live: session `judgeCtx` `scripts/verifier.js` L1723-1761 and executor `judgeCtx` L1830-1846 carry `backlog_id, version, base, changed_files, gates, gate_detail, mechanical, epic_name, priority_class, class_autonomy, …, kickoff, diff` — no commit body, no `runner_cycles.notes`. The replay's `taskContext` (L267-284 of the reproduction) mirrors pass one key for key. Runbook step 7 (`docs/runbooks/runner-cycle.md` L2880-2886) makes the Builder's `build` and `regression_summary` go into `runner_cycles.notes` verbatim — so for unattended ships the ship report exists and is never handed to the judge. Measured: cycle `81a712b9` notes = 8,598 bytes with a `STEP 7 BUILD:` block; attended cycle `a8000000` (23 of the 27 verdicts) notes = 0 bytes; `839f1ce5` (SES-321) notes = 0 bytes.
+- `DIFF_CAP = 400_000` (L1140); `diffFor` (L1218-1226) concatenates `git diff base...HEAD` then `git diff` in git's alphabetical path order and caps the whole. SES-336 `bc73354e`: 639,956 chars; the cut landed inside `docs/backlog/BACKLOG-SNAPSHOT.md` (519 changed lines of board rows, per the commit's file stats) before `docs/runbooks/runner-cycle.md` (240), `docs/runbooks/standing-brief.md` (40) and the new test (251). The recorded judgment says "no 'diff --git a/docs/runbooks/runner-cycle.md' line exists". Non-snapshot changed lines total ~826 across six files — the ticket's own hunks would fit under the cap if the snapshot were diffed last (task 6 measures this; expected yes).
+- `vf-guardrails.must` (live row, read 2026-09-13): "block on any missing input, naming it", "cite evidence for every finding"; `must_not`: "read or ask for the builder's conversation". A commit body and the cycle's own notes are delivery artifacts (charter Multi-agent-verification item 1: "reads canonical rules + diff, never the author's conversation"), not the conversation.
+- Ticket state: `SES-344` open, `design_status` null, `kickoff_link` null, `revalidated_at` null, `predicted_cycles` 2. `SES-337` `partial`, `SES-338` `done`. Caps from the cycle row: files 14 / tasks 15 (P10 - Tooling, rung 24). The kickoff uses 5 / 6.
+
+**Premise: alive.**
+
+## The adjudication (each of the 8, against the ship commit body — read over the GitHub API, no git run in design)
+
+| verdict | ticket | sha | class | what the body carries | still absent |
+|---|---|---|---|---|---|
+| 1d180269 | SES-336 v7.0.439 | bc73354e | **harness** | the diff was cut at DIFF_CAP inside the snapshot hunk; body carries the 40 KB "NOT MET AND CANNOT BE" statement, 363,501 → 366,792 bytes, the 381,000-byte ceiling, "NO PIN WAS BROKEN AND NO TEST WAS REPOINTED" | the §6 supervised dry-run listing |
+| a8971bb9 | AGT-68 v7.0.434 | 2126f778 | elsewhere | the manager's answer (SES-329, design-kickoff, engine session, no wall), `ai_activity_log id 39604`, seed counts (1 agent, 1 capability, 5 profiles, 5 links) | run-all summary line; gate per-test line |
+| a28a217f | AGT-66 v7.0.432 | e3ac47ce | elsewhere | seed before/after counts, "no Format Skill", the attended QA verbatim (`regression suite: 186/186 passed`, `built in 5.19s`, local commit `5be94585…`, `ai_activity_log 39458`) | gate per-test line for agt-66 |
+| 3319f488 | AGT-65 v7.0.431 | a176cc64 | elsewhere | both fixture runs (dead: `premise dead, kickoff_path null`; live: `grep -n signle docs/STANDARDS.md` → one hit, 1 file / 3 tasks), `ai_activity_log 39445 and 39446`, "no Format Skill per the 2026-09-09 amendment" | gate per-test line for agt-65 |
+| 24ad747b | AGT-64 v7.0.429 | 870ee2d0 | elsewhere | `agt-64-researcher.test.mjs PASS on both`, LF `186/186 passed`, `enable_web_search true and web_search_max_uses 8` set as traits (deviation 1), `ai_activity_log id 39378`, `findings: 14 -- 8 market` + 6 usage | — |
+| 54758ce9 | SES-341 v7.0.430 | 95468f1a | elsewhere | decision `5eb84f7a-8c2a-470c-a4af-e3ba18cfdf2c` with `2 before-images`, agent-prompt "six sections, both markers present, nothing omitted", run-all `175/185 on this CRLF worktree` | before-image row ids; LF summary; whether part (c) ran credentialed |
+| a0ad16a5 | AGT-63 v7.0.428 | 05478a4a | elsewhere | the three classify outputs (ADM-1 / LOG-126 MATCH, AGT-015 MISS — "a finding on the Skill text"), `capability_skill_profiles 14`, roster read 22 rows, `check-model-ids` `0 CRITICAL, 12 pre-existing WARNING`, run-all `175/184` | agent-log ids for the three runs |
+| 6288cb03 | SES-321 v7.0.416 | bd8de880 | **absent** | body is one line (`Co-Authored-By` only); cycle `839f1ce5` notes 0 bytes; migration `ses321_enhancement_passes_fence` exists live (`20260903172820`) but nothing in the delivery cites it | all six items — the block stands (charter item 4) |
+
+Reading: 7 of the 8 "disagreements" measure the **input contract** (1 harness cap, 6 evidence the platform had in the commit body and never handed over); 1 is the agent being right where the mechanical lane was blind. The old bar counted all 8 as the agent's error.
+
+## A1 rows (task 1 copies this block verbatim into `tests/fixtures/verdicts-30-adjudication.json`)
+
+```json
+{
+  "adjudicated_at": "2026-09-13",
+  "adjudicated_by": "SES-344 design (The Designer, claude-fable-5-1, cycle 1bd980f6)",
+  "contract_version": 1,
+  "contract": "SES-337 recording: gates, gate_detail, changed_files, kickoff, diff (DIFF_CAP 400000); no ship report, no cycle notes",
+  "rows": [
+    { "verdict_id": "1d180269-0419-497c-8b76-4fc12ec46d27", "backlog_id": "SES-336", "version": "v7.0.439", "sha": "bc73354ed31f9cb5adee117876827114f82f5b35", "class": "harness", "judgment_quote": "400,000 of 639,956",
+      "quotes": ["TARGET IS NOT MET AND CANNOT BE", "381,000-byte ceiling", "NO PIN WAS BROKEN AND NO TEST WAS REPOINTED"],
+      "absent": ["the supervised dry-run listing every step's one-line action (kickoff section 6)"] },
+    { "verdict_id": "a8971bb9-4abe-4612-8236-1e6b517fde7d", "backlog_id": "AGT-68", "version": "v7.0.434", "sha": "2126f7783e713261b90ba1755c0096c55fce285f", "class": "elsewhere",
+      "quotes": ["the manager named SES-329", "ai_activity_log id 39604", "5 skill_profiles across five types, 5 links"],
+      "absent": ["run-all.js summary line", "gate per-test line for agt-68-devmanager.test.mjs"] },
+    { "verdict_id": "a28a217f-d28c-4ce1-a9e6-915bdecbec44", "backlog_id": "AGT-66", "version": "v7.0.432", "sha": "e3ac47cec25b88c7555875844d9fc28fd6d43cc3", "class": "elsewhere",
+      "quotes": ["no Format Skill", "regression suite: 186/186 passed", "5be94585d82a77685431579f6a2f50651d825b0d", "agent_capability_assignments 1, skill_profiles 5"],
+      "absent": ["gate per-test line for agt-66-builder.test.mjs"] },
+    { "verdict_id": "3319f488-daf2-475e-b8b2-f1ad6e1d2c6f", "backlog_id": "AGT-65", "version": "v7.0.431", "sha": "a176cc64e06f726d53079b59b4b380d5de7cadd9", "class": "elsewhere",
+      "quotes": ["returned premise dead, kickoff_path null", "grep -n signle docs/STANDARDS.md", "ai_activity_log 39445 and 39446", "2026-09-09 amendment"],
+      "absent": ["gate per-test line for agt-65-designer.test.mjs"] },
+    { "verdict_id": "24ad747b-2fcd-44c4-a8a4-79de2573763b", "backlog_id": "AGT-64", "version": "v7.0.429", "sha": "870ee2d0c919bdbb68e7ca6b714319e775b57719", "class": "elsewhere",
+      "quotes": ["agt-64-researcher.test.mjs PASS on both", "enable_web_search true and web_search_max_uses 8", "ai_activity_log id 39378", "findings: 14 -- 8 market", "LF export of this exact tree: 186/186 passed"],
+      "absent": [] },
+    { "verdict_id": "54758ce9-533f-46d2-984a-242c3ae616b9", "backlog_id": "SES-341", "version": "v7.0.430", "sha": "95468f1ad9ae8c3334bb166f854942b4bc111522", "class": "elsewhere",
+      "quotes": ["5eb84f7a-8c2a-470c-a4af-e3ba18cfdf2c", "2 before-images", "six sections, both markers present, nothing omitted", "175/185 on this CRLF worktree"],
+      "absent": ["runner_before_images row ids", "an LF run-all summary", "whether ses-341 part (c) ran under credentials in the gate"] },
+    { "verdict_id": "a0ad16a5-5751-4cd0-abfa-869b0ff7baa1", "backlog_id": "AGT-63", "version": "v7.0.428", "sha": "05478a4a24f04c764e43689de96135d2ac14424c", "class": "elsewhere",
+      "quotes": ["AGT-015 is a finding on the Skill text", "0 CRITICAL, 12 pre-existing WARNING", "capability_skill_profiles 14", "175/184, the nine known Windows CRLF false-reds"],
+      "absent": ["scripts/agent-log.js ids for the three classify runs"] },
+    { "verdict_id": "6288cb03-f341-4e8c-b72d-683119a2e51f", "backlog_id": "SES-321", "version": "v7.0.416", "sha": "bd8de8801a5c84cd06cb0016fd6852c3af03840e", "class": "absent",
+      "quotes": [],
+      "absent": ["Migration ses321_enhancement_passes_fence SQL, or pg_get_functiondef('prime_directive_queue') after apply, showing the LEFT JOIN and the (Selfbuild OR admitted) predicate", "Output of the rolled-back fixture run (ZFIX-SES321): prime_directive_queue() result with the claim present (served) and with enhancement_claim blanked (not served)", "pg_proc overload count for prime_directive_queue() and the grant-assertion DO block output (EXECUTE revoked from PUBLIC/anon/authenticated, held by service_role)", "drain_chain_gate() and runner_should_boot() bodies or a cited grep showing neither restates the epic fence", "runner_decisions row 182655e3-f559-4b46-9457-7d3df8bbf998 with the M5-01 before-image, or the governance_rules UPDATE output", "run-all.js output for tests/regression/ses-321-enhancement-fence.test.mjs with creds, showing which arms ran versus notRun"],
+      "note": "migration ses321_enhancement_passes_fence exists live (20260903172820); the ship commit body is one line and cycle 839f1ce5 notes are empty -- the delivery cites nothing checkable, so the block stands" }
+  ]
+}
+```
+
+**Builder note:** every `verdict_id` above is read from `tests/fixtures/verdicts-30.json` (test 5(f) asserts ids ⊆ the fixture). Every `quotes` string was checked against the fetched commit body at design time and is a single-line exact substring (no line breaks inside a quote).
+
+## The shape, and why slice 1 stops where it does
+
+The ticket names three pieces: adjudicate, widen, restate. A single cycle can land the adjudication as a checkable artifact (quotes verified against git, not an opinion), the contract widening (one evidence key in both judge lanes plus the diff ordering), and the reproduction's partition with the bar restated — all without a model call. What it cannot honestly land is the number the restated bar is asserted on: the 27 recorded judgments were produced against the narrow contract, so grading them against the widened one measures the delta the contract introduces, not the agent — exactly the instrument error SES-338's two lenses named. Re-judging is 8+ attended model calls and 3 known-bad mutant fixtures (red gate; promised file absent from the diff; kickoff over cap) for the false-approve arm. That is slice 2, and the kickoff's STOP LINE names it so the ticket stays re-pickable. The reproduction test declares the bar NOT RUN until a `contract_version: 2` recording exists rather than asserting a vacuous green.
+
+Alternatives not taken:
+
+- **Raise `DIFF_CAP`.** Any fixed number re-creates SES-336 at a bigger snapshot; ordering the re-rendered artifacts last fixes the mechanism (the ticket's hunks are what the judge needs; the board re-render is what nobody needs). `DIFF_LAST` is a code list rather than a data row because the render scripts that produce those files are code (`render-claude-state.js`, `export-backlog-snapshot.js`, `render-standing-brief.js`, the RULES-SNAPSHOT export).
+- **Hand the judge `git show` access / re-run gates.** `vf-guardrails.must_not` forbids re-running gates and the charter wants the evidence in the payload; a key is the cheapest widening.
+- **Change the Verifier's Skill rows** (e.g. "treat a commit body as evidence"). Active governance agent rows are John's (`.claude/rules/agent-roster-inert.md`, §19v); the widening is code + data-shaped `task_context`, so no Skill row moves.
+- **Regenerate the fixture** to carry `ship_report` digests. The 30 most recent verdicts have moved since 2026-09-09; regenerating would invalidate the 27 recorded judgments. `ship_report` is materialised from git at replay time instead; slice 2 records its own digest.
+- **Keep counting SES-321 against the agent.** Its named evidence exists nowhere the platform can hand over (one-line body, empty notes); charter item 4 says that blocks. It is the one true block in the eight, and the old bar was counting the agent's correct call as an error.
+
+## What the QA discriminates
+
+- Reproduction on origin/dev fails at the old bar (8 > 2); after the change it passes with the partition printed and the bar declared NOT RUN — a file that "did nothing" would still fail at 8 > 2.
+- Test 5(b)'s control asserts raw git order puts the snapshot first while `diffFor` does not: an implementation that forgot the reorder passes neither the order clause nor the 3,000-char cut clause.
+- Test 5(f) re-derives every adjudication quote from `git log -1 --format=%B <sha>`: a fabricated quote fails by sha and string.
+- Pass one on this ship carries `ship_report` (this commit's subject; this cycle's notes start `CONTINUATION`); on origin/dev the key is absent.
+
+Residue that fits the closing scope: `MAX_DISAGREEMENTS` is also cited by `docs/kickoffs/v7.0.468-SES-343-verdict-severity-model.md` (a historical doc, left as is). Genuine follow-ups, not filed here: whether John wants the false-block bar to stay at 2 once slice 2 produces a v2 number; whether `runner_cycles.notes` for attended sessions should carry a ship report at all (today it is empty).
+
+
+---
+
+# SES-344 slice 2 — Reasoning behind `docs/kickoffs/v7.0.473-SES-344-rejudge-dispatcher-mutants.md`
+
+<!-- DeepBench v7.0.473 | docs/harvests/SES-344.md (slice 2 section, appended below slice 1's) | Written by The Designer (design-kickoff, judgment lane, claude-fable-5-1) in cycle 04a3ac3b, 2026-09-13. Not required reading for the build. -->
+
+## Premise revalidation (measured this session, on branch `session/cycle-20260913-0054`)
+
+- `node tests/verifier/ses-337-verifier-reproduction.test.mjs` printed, verbatim: `SES-337 reproduction: 19/27 reproduced, 8 disagreement(s), 8 of them the agent tightening a green-gate ship` (the eight named), `SES-337 contract: 0/27 judgments would be REJECTED by pass two`, `SES-344 adjudicated: 8 raw / 1 harness / 6 contract false blocks / 1 true block (SES-344 design …, 2026-09-13)`, control A 1 vs 1 (n=8), control B 2 (n=8), then `[PASS]` with `[NOT RUN] the adjudicated bar -- the 27 judgments in tests/fixtures/verdicts-30-judgments.json are recorded against contract v1 -- re-judge under the widened contract (slice 2), which records contract_version 2.` Exit 0. Slice 1 landed exactly as specced; the bar is declared, not asserted.
+- `tests/fixtures/verdicts-30-judgments.json`: no `contract_version` key at all (read as v1), 27 judgments recorded 2026-09-09T23:32Z by `claude-fable-5-1` session sub-agents, `intent_schema` snapshot still requires `reasoning` (the property SES-347 later renamed to `findings` — the live `vf-verdict-intent` schema now requires `findings`). So a v2 recording cannot simply replace `intent_schema`: the 27 v1 rows would go invalid under the new snapshot and the `invalid === 0` assertion would paint the file red for a reason that is not a finding. Hence `intent_schema_v2` beside the old one, chosen per judgment.
+- `--write-prompts` into the scratchpad under the widened contract: 27 prompts, 2,809,176 chars total; smallest AGT-65 v7.0.431 at 35,420, largest SES-336 v7.0.439 at 424,868 (the DIFF_CAP-cut fixture — its v1 diff digest is what the fixture pins, so the replay still hands the judge the alphabetical 400,000-char cut; the ship report is the new evidence there, not a reordered diff). `index.json`: `contract_version: 2`, `cycle_notes_read: true`, model `claude-fable-5-1`, no omitted sections.
+- **The "attended" claim, tested.** `ai_activity_log` rows 42708, 42709, 42710 (2026-09-12 22:17–22:20Z): `agent_id verifier`, `call_source mcp`, `model claude-fable-5-1`, `ai_type agent-turn`, 9,664 input / 6,135–6,550 output tokens, `cost_usd` 0.4227 / 0.4245 / 0.4065, latency 82–90 s. Those are `verify-ship` executions through `runCapability()` reached from `api/_lib/mcp.js` (`runThroughExecutor`, L559-575) — the generic executor already judges a ship without a person in the loop. `scripts/verifier.js`'s header still calls `--judge=executor` "NOT PROVEN LIVE"; that sentence is about the HTTP POST path (`callExecutor`, needs the Vercel bypass secrets), not about the executor itself. The in-process import works from a script: `import('./api/capabilities/execute.js')` resolves and exports `runCapability`; `lib/request-context.js` L78 allowlists `script` and L305 exports `runWithCallSource`. `config.maxDuration` is 300 s (SES-348) and `_deadline` is an explicit parameter, so a 425k-char prompt is not at the mercy of a Vercel timeout when run in-process.
+- **Spend, measured not guessed.** Output dominates: ~6.3k output tokens per verdict at $50/MTok ≈ $0.32, plus input at $10/MTok. All 27 real fixtures ≈ 2.81M chars ≈ 0.75–0.85M tokens ≈ $8 input + 27 × $0.32 ≈ $8.6 output → ≈ $17 (band $12–20 once the mutants are added). The runner's day wall is $5 (`docs/runbooks/runner-cycle.md` step 3, §19v), and this cycle's notes read `day $1.25/$5` — the full run cannot fit inside one unattended cycle. That is the only genuinely non-mechanical thing in slice 2, and it is a spend decision, not a judgment.
+- Ticket state: `SES-344` `partial` / `design_status designed` / kickoff_link slice 1 / `predicted_cycles 2`; `SES-337` `partial`; `SES-338` `done`. Cycle row caps 14 / 15. Lanes table: orchestrator `claude-opus-5`, mechanical `claude-sonnet-5`, judgment `claude-fable-5-1`.
+
+**Premise: alive.** Slice 1's STOP LINE said "attended"; the evidence says "unattended, capped by dollars".
+
+## The ruling: what is unattended, what is John's
+
+| Part of slice 2 | Attended? | Why |
+|---|---|---|
+| Producing a `contract_version: 2` judgment for any fixture | **No** | One `runCapability()` call per fixture with the same `task_context` `writePrompts` already assembles; provable by the merged judgments file (`trace_id` per row) and the matching `ai_activity_log` rows. |
+| The three known-bad mutants (false-approve arm) | **No** | Declared transformations of real fixtures, digest-pinned, judged by the same call. Entirely unattended. |
+| Grading mutants on `agent_verdict` rather than `replayed` | **No** (a design fact, fixed here) | `reconcileJudgment` L984 forces `block` whenever the mechanical verdict is block, so a red-gate mutant graded on the reconciled verdict could never register a false approve. The bar would be a check that cannot fail. |
+| The full 27-fixture recording in one go | **Spend approval** | ≈ $15–17 against a $5/day wall with $1.25 spent. Either John files a `budget_override` directive (`max_usd ≥ 20`) or the runner re-picks the partial ticket for ~4 cycles at ≤ $3 each. No judgment involved; the dispatcher is resumable by construction. |
+| Reading a red bar on the full recording | **John** | The remedy for "the Verifier false-blocks 3+ ships under the widened contract" or "approves a mutant" is a change to a `vf-*` Skill row — active governance-agent rows are John's (`.claude/rules/agent-roster-inert.md`, §19v). Whether a commit-body citation satisfies charter item 4 is the same question in different clothes. |
+| Moving `MAX_FALSE_BLOCKS` off 2 | **John** | His number (2026-09-08). |
+
+So the kickoff builds everything in the first three rows, spends ≤ $3 proving the mechanism end to end (3 mutants + the true block SES-321 + the cheapest "elsewhere" AGT-65), and leaves exactly one command for the rest.
+
+## Why these three mutants, and why one differs from slice 1's STOP LINE
+
+Slice 1 named "red gate; promised file absent from the diff; kickoff over cap". The third is replaced by **ship-report-contradicts-diff**:
+
+- `kickoff_over_cap` is not a key the v1 fixtures carry (their `inputs` predate SES-376), and the mechanical lane blocks an over-cap kickoff by string length before the judge ever sees it — the agent is never the one catching it, so it measures nothing about the agent.
+- The widening slice 1 shipped is the ship report. Its one new risk is that the judge takes the delivery's own account of itself on faith. A mutant whose commit body claims a test file the diff does not contain (M3, base SES-330: `tests/regression/ses-330-lane-migration.test.mjs`, `188/188 passed`) is the direct test of that risk. The mutation function refuses to build the mutant unless the named file is genuinely absent from the diff — the contradiction must be real, or the mutant is not known-bad.
+- M2 (promised file absent, base AGT-64): the kickoff's task 3 names `tests/regression/agt-64-researcher.test.mjs` and the ship commit added it (224 lines); the mutant removes that `diff --git` section and the path from `changed_files`, and the ship report (unchanged) still claims `agt-64-researcher.test.mjs PASS on both` — kickoff and report promise a file the diff lacks.
+- M1 (red gate, base AGT-65): `gates.regression = "red"`, `mechanical.verdict = "block"`. The floor of the arm; the agent is told the gate is red and must say block. It can fail (the model could still approve) — it is simply the least likely to.
+
+Bases are the smallest usable green-approve fixtures (35–50k chars) so the proof run stays under $3.
+
+## Alternatives not taken
+
+- **`--judge=executor` over HTTP** (`callExecutor`): needs `VERCEL_AUTOMATION_BYPASS_SECRET` and `GATE_BYPASS_SECRET`, runs under Vercel's function timeout, and is the one path with no live proof. In-process is the same executor (§19b: `runCapability()` is the mechanism; the route is a thin wrapper) with a proven precedent in `api/_lib/mcp.js`.
+- **A direct Anthropic SDK call with the rendered prompt.** Cheapest to write, and exactly the hand-rolled parallel route §19b bans (`.claude/rules/capabilities-are-data.md`); it would also skip `logAICall()` and the `account` injection, so the recording would not be the production contract.
+- **Re-judge only the 8 disagreements.** A mixed-contract file: the 19 agreeing approves could flip to block under v2 (more evidence can only tighten), and the false-approve arm on the 6 ledger-blocked rows needs v2 rows too. The file-level `contract_version` is computed from completeness so a partial run can never claim v2.
+- **Regenerate the fixture to carry `ship_report` digests.** Still invalidates the 27 v1 judgments (slice 1's reasoning stands); mutants pin their own digests instead.
+- **Ask for the day wall to be lifted inside the kickoff.** A kickoff cannot grant spend; it declares the band (`Lanes:`) and leaves the directive to John.
+
+## What the QA discriminates
+
+- (a) is the check that would otherwise be vacuous: a grader on `replayed` reports 0 false approves for an approving M1 judgment; the shipped grader must report 1.
+- (b) proves the mutation is real in both directions — the section is gone, and a mutant that would mutate nothing throws.
+- (c) proves a partial v2 run cannot flip the file's contract; (d) proves the spend cap stops before the call that would exceed it, with unknown cost counted at $1.50 rather than $0; (e) proves no flag → no call.
+- The live proof run is judged on evidence (rows, trace ids, per-call cost), never on the verdicts matching a prediction — a mutant approve is reported as a finding, not hidden, and the bar stays NOT RUN until the recording is whole.
+
+Residue that fits the closing scope: none. Genuine follow-ups, not filed here: the `scripts/verifier.js` header's "NOT PROVEN LIVE" sentence about `--judge=executor` now has a live in-process precedent and could be reworded; whether attended sessions should write `runner_cycles.notes` at all (still 0 bytes for cycle `a8000000`).
