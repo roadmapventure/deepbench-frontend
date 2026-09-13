@@ -1,4 +1,4 @@
-// DeepBench v7.0.473 | tests/verifier/ses-337-verifier-reproduction.test.mjs | SES-344 slice 2 --
+// DeepBench v7.0.481 | tests/verifier/ses-337-verifier-reproduction.test.mjs | SES-344 slice 4 --
 // THE RE-JUDGMENT IS A SCRIPT RUN, NOT A SITTING, and the thing to read twice is that slice 1's
 // "attended" was stale. `--judge-live=<index.json>` drives the SAME `verify-ship` capability through
 // `runCapability()` in this process, under `runWithCallSource("script")`, so the calls are the
@@ -134,6 +134,29 @@ export const INTENT_SLUG = "vf-verdict-intent";
 // `verify-ship` call has ever cost on this platform (measured 2026-09-12: $0.41-0.42 for 82-90 s),
 // rounded up hard, so an unpriced run stops early rather than overspending silently.
 export const UNKNOWN_CALL_USD = 1.5;
+// SES-344 slice 4: THE FLOOR ABOVE IS NOT A CEILING, AND A BIG PROMPT PROVES IT. `UNKNOWN_CALL_USD`
+// was measured on 35-40k-char prompts; the ledger's largest is 424,866 chars, ~12x the input tokens,
+// and charging it $1.50 before the call admits a ~$2.17 call. Measured from the five recorded calls
+// (`ai_activity_log` 43197-43223): $10/MTok in, $50/MTok out, and log 43222 -- 35,548 prompt chars
+// billed as 14,833 input tokens -- gives 2.4 chars per token. The output ceiling is 8,000 tokens at
+// $50/MTok = $0.40, above every recorded run (4.3-7.2k).
+export const CHARS_PER_TOKEN = 2.4;
+export const INPUT_USD_PER_MTOK = 10;
+export const OUTPUT_CEILING_USD = 0.4;
+// The pre-call charge for an entry of a known size. Never below `UNKNOWN_CALL_USD`: a small prompt
+// keeps the measured floor, a large one is charged what its own size says it will cost.
+export function worstCaseUsd(promptBytes) {
+  return Math.max(
+    UNKNOWN_CALL_USD,
+    (Number(promptBytes) || 0) / CHARS_PER_TOKEN / 1e6 * INPUT_USD_PER_MTOK + OUTPUT_CEILING_USD,
+  );
+}
+// 0 when the index carries no file, or the file is gone: the `ses-344b` seam index has no prompt
+// files at all, and an unsized entry must fall back to the measured floor rather than throw.
+export function promptBytesOf(entry) {
+  try { return entry?.prompt_file ? fs.statSync(entry.prompt_file).size : 0; }
+  catch { return 0; }
+}
 export const LIVE_ENV_FLAG = "SES344_LIVE_REJUDGE";
 export const LIVE_REQUIRED_ENV = ["ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
 // The cost read races the executor's own activity-log write (found live 2026-09-13, below).
@@ -618,6 +641,7 @@ export async function judgeLive({
   indexPath,
   only = null,
   maxUsd = 3,
+  pending = false,
   judgmentsPath = JUDGMENTS,
   env = process.env,
   log = console.log,
@@ -643,7 +667,25 @@ export async function judgeLive({
   const idx = readJson(indexPath);
   const prefixes = String(only || "").split(",").map(s => s.trim()).filter(Boolean);
   const idOf = e => e.mutant_id || e.verdict_id;
-  const entries = (idx.prompts || []).filter(e => !prefixes.length || prefixes.some(p => String(idOf(e)).startsWith(p)));
+  let entries = (idx.prompts || []).filter(e => !prefixes.length || prefixes.some(p => String(idOf(e)).startsWith(p)));
+
+  // `--pending`: THE WORK LIST IS WHAT IS NOT YET RECORDED, READ OFF THE RECORDING ITSELF. `--only`
+  // re-judges whatever it names, so resuming a run across day-walls with it means hand-maintaining a
+  // fresh id list every cycle and paying again for anything mis-copied. Here the judgments file is
+  // the ledger of what is done, and the run is ordered CHEAPEST FIRST so a cap that stops the run
+  // stops it having bought the most judgments the money could buy.
+  if (pending) {
+    const done = fs.existsSync(judgmentsPath) ? readJson(judgmentsPath) : {};
+    const doneVerdicts = new Set((done.judgments_v2 || []).map(j => j.verdict_id));
+    const doneMutants = new Set((done.mutant_judgments || []).map(m => m.mutant_id));
+    const total = entries.length;
+    const already = entries.filter(e => (e.verdict_id && doneVerdicts.has(e.verdict_id)) || (e.mutant_id && doneMutants.has(e.mutant_id)));
+    entries = entries
+      .filter(e => !already.includes(e))
+      .sort((a, b) => promptBytesOf(a) - promptBytesOf(b));
+    log(`judge-live: pending ${entries.length} of ${total} (skipped ${already.length} already judged: ${already.map(idOf).join(", ") || "none"})`);
+  }
+
   if (!entries.length) {
     log(`judge-live: no entry in ${indexPath} matches ${prefixes.join(",") || "(everything)"} -- nothing to judge.`);
     return { exit: 2, calls: 0, spent_usd: 0, judged: [], refused: [], skipped: [] };
@@ -668,9 +710,15 @@ export async function judgeLive({
     const id = idOf(entry);
     // STOP BEFORE THE CALL, NOT AFTER IT. The worst case of the NEXT call is what is compared to the
     // cap, so the run can never discover it is over budget by going over budget.
-    if (spent + UNKNOWN_CALL_USD > maxUsd) {
+    //
+    // AND THE WORST CASE IS THE ENTRY'S OWN SIZE, NOT A FLAT RATE. A flat $1.50 admitted the 424,866-
+    // char SES-336 prompt -- a ~$2.17 call -- at $3.40 spent, ending the run at ~$5.57 against John's
+    // $5/day wall. `worstCaseUsd()` prices the entry from its prompt file and keeps the measured
+    // floor for everything small.
+    const worst = worstCaseUsd(promptBytesOf(entry));
+    if (spent + worst > maxUsd) {
       refused.push(id);
-      log(`judge-live: REFUSING ${id} -- $${spent.toFixed(2)} spent and the next call could cost $${UNKNOWN_CALL_USD.toFixed(2)}, which would cross --max-usd=${maxUsd}.`);
+      log(`judge-live: REFUSING ${id} -- $${spent.toFixed(2)} spent and the next call could cost $${worst.toFixed(2)}, which would cross --max-usd=${maxUsd}.`);
       continue;
     }
 
@@ -744,7 +792,7 @@ export async function judgeLive({
     };
     if (entry.mutant_id) mutantJudged.push({ ...row, mutant_id: entry.mutant_id, kind: entry.kind, base_verdict_id: f.verdict_id, expected_agent_verdict: entry.expected_agent_verdict ?? "block" });
     else judged.push({ ...row, verdict_id: f.verdict_id });
-    table.push(`${id}: ${content.verdict} | trace ${result?.trace_id ?? "none"} | ${costUsd === null ? "UNKNOWN" : `$${Number(costUsd).toFixed(4)}`} | ${seconds}s`);
+    table.push(`${id}: ${content.verdict} | trace ${result?.trace_id ?? "none"} | est $${worst.toFixed(2)} | ${costUsd === null ? "UNKNOWN" : `$${Number(costUsd).toFixed(4)}`} | ${seconds}s`);
     log(`judge-live: ${table[table.length - 1]}`);
   }
 
@@ -774,7 +822,8 @@ if (promptsFlag) {
 } else if (judgeFlag) {
   const only = (process.argv.find(a => a.startsWith("--only=")) || "").split("=")[1] || null;
   const maxUsdFlag = (process.argv.find(a => a.startsWith("--max-usd=")) || "").split("=")[1];
-  judgeLive({ indexPath: judgeFlag.split("=").slice(1).join("="), only, maxUsd: maxUsdFlag ? Number(maxUsdFlag) : 3 })
+  const pending = process.argv.includes("--pending");
+  judgeLive({ indexPath: judgeFlag.split("=").slice(1).join("="), only, pending, maxUsd: maxUsdFlag ? Number(maxUsdFlag) : 3 })
     .then(r => process.exit(r.exit))
     .catch(e => { console.error(`judge-live: ${e.stack || e.message}`); process.exit(2); });
 } else {

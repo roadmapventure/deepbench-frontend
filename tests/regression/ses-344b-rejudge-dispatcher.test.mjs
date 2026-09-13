@@ -1,4 +1,4 @@
-// DeepBench v7.0.473 | tests/regression/ses-344b-rejudge-dispatcher.test.mjs | SES-344 slice 2 --
+// DeepBench v7.0.481 | tests/regression/ses-344b-rejudge-dispatcher.test.mjs | SES-344 slice 4 --
 // THE RE-JUDGMENT DISPATCHER AND THE FALSE-APPROVE ARM, GRADED WITHOUT SPENDING A CENT, and the
 // thing to read twice is WHICH COLUMN A MUTANT IS GRADED ON.
 //
@@ -35,6 +35,22 @@
 // (e) NO ENV FLAG, NO CALL AT ALL. The same spy must record ZERO calls when `SES344_LIVE_REJUDGE`
 //     is absent, and the dispatcher must exit 2. `--judge-live` on its own is not consent to spend.
 //
+// (f) THE PRE-CALL CHARGE IS THE ENTRY'S OWN SIZE, WITH THE MEASURED FLOOR UNDER IT. `worstCaseUsd()`
+//     must return the $1.50 floor for an unsized and for a small prompt, and STRICTLY MORE than the
+//     floor for the ledger's largest (424,866 chars -> ~$2.17). A flat rate is the bug this replaces:
+//     it is the floor in both directions, so it under-charges exactly the call that can cross a wall.
+//
+// (g) `--pending` IS READ OFF THE RECORDING, AND THE ORDER IS CHEAPEST FIRST. A judgments file that
+//     already holds M1 must leave M1 uncalled and NAMED as skipped, and the two that remain must
+//     reach the executor smallest-prompt-first -- so a run stopped by the cap has bought the most
+//     judgments the money could buy. The control is the SAME index under `pending: false`: 3 calls.
+//     Without it, "2 calls" could be an index the dispatcher only half-read.
+//
+// (h) THE SIZE-AWARE CAP ACTUALLY REFUSES, AND ONLY FOR SIZE. A 500,000-byte prompt under
+//     `--max-usd=2` is refused by name at $2.48 with ZERO calls; the SAME entry with a 1,000-byte
+//     prompt file and the same cap is called. One variable changes -- the prompt's size -- so the
+//     refusal cannot be an unrelated skip, a bad index, or an env gate.
+//
 // NO NETWORK, NO MODEL, NO WRITE OUTSIDE A TEMP DIR. Every seam that would reach one is injected;
 // the judgments file this suite asserts against is never the one these parts write.
 
@@ -56,6 +72,8 @@ import {
   judgeLive,
   UNKNOWN_CALL_USD,
   ADJUDICATED_CONTRACT_VERSION,
+  worstCaseUsd,
+  promptBytesOf,
 } from "../verifier/ses-337-verifier-reproduction.test.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -277,6 +295,125 @@ async function run() {
     assert.ok(refusedLines.some(l => l.includes("SES344_LIVE_REJUDGE")), `the refusal must name the flag it wants. Log: ${refusedLines.join(" / ")}`);
 
     console.log(`  SES-344b (d) cap: 2 stub calls at $${UNKNOWN_CALL_USD} each, ${capped.refused[0]} refused by name at --max-usd=3; (e) no flag: exit ${gated.exit}, 0 calls`);
+
+    // ---- (f) the size-aware charge -----------------------------------------------------------
+    // The floor holds where it was measured, and only a genuinely large prompt lifts it.
+    assert.strictEqual(worstCaseUsd(0), UNKNOWN_CALL_USD,
+      `an unsized entry must keep the measured floor of $${UNKNOWN_CALL_USD}; worstCaseUsd(0) is $${worstCaseUsd(0)}`);
+    assert.strictEqual(worstCaseUsd(35791), UNKNOWN_CALL_USD,
+      `AGT-66's 35,791-char prompt is the size the floor was measured on and must still charge $${UNKNOWN_CALL_USD}; it charges $${worstCaseUsd(35791)}`);
+    const biggest = worstCaseUsd(424866);
+    assert.ok(Math.abs(biggest - 2.17) <= 0.01,
+      `the ledger's largest prompt (424,866 chars) must price at $2.17 +/- $0.01; it prices at $${biggest.toFixed(4)}`);
+    // THE DISCRIMINATING HALF: a flat rate would satisfy the two floor cases above and still be the
+    // bug. This is the assertion a flat rate cannot pass.
+    assert.ok(biggest > UNKNOWN_CALL_USD,
+      `the largest prompt must charge MORE than the flat $${UNKNOWN_CALL_USD} -- that under-charge is what admitted a $2.17 call at $3.40 spent and would have crossed the $5 day wall`);
+    console.log(`  SES-344b (f) worstCaseUsd: 0 and 35,791 chars -> $${UNKNOWN_CALL_USD.toFixed(2)} (floor), 424,866 chars -> $${biggest.toFixed(2)} (> floor)`);
+
+    // ---- (g) --pending, cheapest first -------------------------------------------------------
+    // Real prompt files, because `promptBytesOf()` stats the file: M1 30 bytes, M2 20, M3 10, so
+    // the cheapest-first order (M3, M2) is the REVERSE of the index order and cannot be an accident
+    // of reading the index in sequence.
+    const sizes = { [M1]: 30, "M2-promised-file-absent": 20, "M3-ship-report-contradicts-diff": 10 };
+    const sizedIndexPath = path.join(dir, "sized-index.json");
+    fs.writeFileSync(sizedIndexPath, JSON.stringify({
+      count: MUTANTS.mutants.length,
+      contract_version: ADJUDICATED_CONTRACT_VERSION,
+      prompts: MUTANTS.mutants.map(m => {
+        const file = path.join(dir, `${m.mutant_id}.prompt.txt`);
+        fs.writeFileSync(file, "x".repeat(sizes[m.mutant_id]), "utf8");
+        return {
+          mutant_id: m.mutant_id, kind: m.kind, base_verdict_id: m.base_verdict_id,
+          expected_agent_verdict: m.expected_agent_verdict, backlog_id: "mutant", version: "mutant",
+          prompt_file: file,
+        };
+      }),
+    }, null, 2), "utf8");
+    for (const [id, size] of Object.entries(sizes)) {
+      assert.strictEqual(promptBytesOf({ prompt_file: path.join(dir, `${id}.prompt.txt`) }), size,
+        `${id}'s prompt file is not ${size} bytes, so the ordering below proves nothing about size`);
+    }
+
+    const pendingPath = path.join(dir, "pending-judgments.json");
+    fs.writeFileSync(pendingPath, JSON.stringify({
+      judgments: [],
+      mutant_judgments: [{ mutant_id: M1, verdict: "block", contract_version: ADJUDICATED_CONTRACT_VERSION }],
+    }, null, 2), "utf8");
+
+    const pendingCalls = [];
+    const pendingSpy = async args => { pendingCalls.push(args); return stubRun(args); };
+    const pendingLines = [];
+    const pendingRun = await judgeLive({
+      indexPath: sizedIndexPath, judgmentsPath: pendingPath, maxUsd: 10, pending: true, env: liveEnv,
+      runCapability: pendingSpy, rest: stubRest, log: l => pendingLines.push(String(l)),
+    });
+    assert.strictEqual(pendingCalls.length, 2,
+      `M1 already carries a v2 judgment, so --pending must reach the executor exactly twice; the spy recorded ${pendingCalls.length} call(s)`);
+    assert.deepStrictEqual(pendingRun.judged.map(j => j.mutant_id || j.verdict_id),
+      ["M3-ship-report-contradicts-diff", "M2-promised-file-absent"],
+      "--pending did not judge the two unjudged mutants SMALLEST PROMPT FIRST (M3 is 10 bytes, M2 is 20) -- a cap that stops the run must have bought the most judgments the money could buy");
+    assert.ok(pendingLines.some(l => l.includes("pending 2 of 3") && l.includes(M1)),
+      `--pending must say how many it skipped and NAME them, so a resumed run is visibly partial. Log: ${pendingLines.join(" / ")}`);
+    assert.strictEqual(pendingRun.refused.length, 0, "an entry was refused under a $10 cap that fits all of them");
+
+    // THE CONTROL: same index, same stubs, same cap, `pending: false` -> all 3. So the missing third
+    // call above is the JUDGMENTS FILE, not a short index or the budget.
+    const allCalls = [];
+    const allRun = await judgeLive({
+      indexPath: sizedIndexPath, judgmentsPath: path.join(dir, "all-judgments.json"), maxUsd: 10,
+      pending: false, env: liveEnv,
+      runCapability: async args => { allCalls.push(args); return stubRun(args); },
+      rest: stubRest, log: () => {},
+    });
+    assert.strictEqual(allRun.calls, 3,
+      `without --pending the same index must judge all 3 entries; it judged ${allRun.calls}. Then the 2 above were not the recording's doing`);
+    assert.strictEqual(allCalls.length, 3, `the spy recorded ${allCalls.length} calls without --pending, not 3`);
+    console.log(`  SES-344b (g) --pending: 2 of 3 called in size order ${pendingRun.judged.map(j => j.mutant_id).join(" -> ")}, ${M1} skipped by name; pending:false on the same index -> ${allRun.calls}`);
+
+    // ---- (h) the cap refuses on size, and only on size ---------------------------------------
+    const bigFile = path.join(dir, "big.prompt.txt");
+    const smallFile = path.join(dir, "small.prompt.txt");
+    fs.writeFileSync(bigFile, "x".repeat(500_000), "utf8");
+    fs.writeFileSync(smallFile, "x".repeat(1_000), "utf8");
+    const oneEntry = file => {
+      const p = path.join(dir, `one-${path.basename(file)}.json`);
+      fs.writeFileSync(p, JSON.stringify({
+        count: 1, contract_version: ADJUDICATED_CONTRACT_VERSION,
+        prompts: [{
+          mutant_id: M1, kind: m1.kind, base_verdict_id: m1.base_verdict_id,
+          expected_agent_verdict: m1.expected_agent_verdict, backlog_id: "mutant", version: "mutant",
+          prompt_file: file,
+        }],
+      }, null, 2), "utf8");
+      return p;
+    };
+
+    const bigCalls = [];
+    const bigLines = [];
+    const tooBig = await judgeLive({
+      indexPath: oneEntry(bigFile), judgmentsPath: path.join(dir, "big-judgments.json"), maxUsd: 2, env: liveEnv,
+      runCapability: async args => { bigCalls.push(args); return stubRun(args); },
+      rest: stubRest, log: l => bigLines.push(String(l)),
+    });
+    assert.strictEqual(bigCalls.length, 0,
+      `a 500,000-byte prompt costs more than --max-usd=2 before it is sent and must never reach the executor; the spy recorded ${bigCalls.length} call(s)`);
+    assert.deepStrictEqual(tooBig.refused, [M1], `the oversized entry must be refused by name; refused = ${JSON.stringify(tooBig.refused)}`);
+    assert.ok(bigLines.some(l => l.includes("REFUSING") && l.includes(M1) && l.includes("$2.48")),
+      `the refusal must name the entry AND the $2.48 its own size would cost -- a flat $1.50 would have let this through. Log: ${bigLines.join(" / ")}`);
+    assert.strictEqual(tooBig.spent_usd, 0, `nothing was called, so nothing was spent; the run accounted $${tooBig.spent_usd}`);
+
+    // ONE VARIABLE: the same entry, the same cap, a smaller prompt file.
+    const smallCalls = [];
+    const fits = await judgeLive({
+      indexPath: oneEntry(smallFile), judgmentsPath: path.join(dir, "small-judgments.json"), maxUsd: 2, env: liveEnv,
+      runCapability: async args => { smallCalls.push(args); return stubRun(args); },
+      rest: stubRest, log: () => {},
+    });
+    assert.strictEqual(smallCalls.length, 1,
+      `the SAME entry with a 1,000-byte prompt is $${UNKNOWN_CALL_USD.toFixed(2)} under a $2 cap and must be called; the spy recorded ${smallCalls.length} call(s). Then the refusal above was not about size`);
+    assert.strictEqual(fits.refused.length, 0, "the small-prompt entry was refused under a cap that fits it");
+    console.log(`  SES-344b (h) size cap: 500,000-byte prompt refused by name at $2.48 under --max-usd=2 (0 calls); the same entry at 1,000 bytes -> ${smallCalls.length} call`);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
