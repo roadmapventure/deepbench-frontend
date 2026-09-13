@@ -1,0 +1,49 @@
+{
+  "now": "2026-09-13T02:00:00Z",
+  "rate": 0.5,
+  "board": {
+    "items": [
+      { "id": "00000000-0000-4000-8000-000000000001", "backlog_id": "QA-79-01", "status": "open", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": null, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": null, "cost_cycles_snapshot": null, "revalidated_at": null, "filed_at": "2026-09-10T00:00:00+00:00", "created_at": "2026-09-10T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": null },
+      { "id": "00000000-0000-4000-8000-000000000002", "backlog_id": "QA-79-02", "status": "open", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": null, "size_stamp": null, "design_status": null, "kickoff_link": null, "cost_pct_snapshot": null, "cost_cycles_snapshot": null, "revalidated_at": null, "filed_at": "2026-08-01T00:00:00+00:00", "created_at": "2026-08-01T00:00:00+00:00", "updated_at": "2026-08-01T00:00:00+00:00", "actual_tokens_attended": null },
+      { "id": "00000000-0000-4000-8000-000000000003", "backlog_id": "QA-79-03", "status": "done", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 2, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": null, "cost_cycles_snapshot": null, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": null },
+      { "id": "00000000-0000-4000-8000-000000000004", "backlog_id": "QA-79-04", "status": "done", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": null, "cost_cycles_snapshot": null, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": null },
+      { "id": "00000000-0000-4000-8000-000000000005", "backlog_id": "QA-79-05", "status": "done", "type": "Tooling", "tier": "next", "claimed_by": "stale-session", "claimed_at": "2026-09-01T00:00:00+00:00", "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": 0.44, "cost_cycles_snapshot": 1, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": 0 },
+      { "id": "00000000-0000-4000-8000-000000000006", "backlog_id": "QA-79-06", "status": "open", "type": "Tooling", "tier": "next", "claimed_by": "cyc-live", "claimed_at": "2026-09-11T20:00:00+00:00", "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": null, "cost_cycles_snapshot": null, "revalidated_at": null, "filed_at": "2026-09-11T00:00:00+00:00", "created_at": "2026-09-11T00:00:00+00:00", "updated_at": "2026-09-11T20:00:00+00:00", "actual_tokens_attended": null },
+      { "id": "00000000-0000-4000-8000-000000000007", "backlog_id": "QA-79-07", "status": "open", "type": "Tooling", "tier": "next", "claimed_by": "cyc-dead", "claimed_at": "2026-09-11T20:00:00+00:00", "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": null, "cost_cycles_snapshot": null, "revalidated_at": null, "filed_at": "2026-09-11T00:00:00+00:00", "created_at": "2026-09-11T00:00:00+00:00", "updated_at": "2026-09-11T20:00:00+00:00", "actual_tokens_attended": null },
+      { "id": "00000000-0000-4000-8000-000000000008", "backlog_id": "QA-79-08", "status": "done", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": 0.44, "cost_cycles_snapshot": 1, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": 0 },
+      { "id": "00000000-0000-4000-8000-000000000009", "backlog_id": "QA-79-09", "status": "done", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": null, "cost_cycles_snapshot": null, "revalidated_at": null, "filed_at": "2026-07-01T00:00:00+00:00", "created_at": "2026-07-01T00:00:00+00:00", "updated_at": "2026-08-01T00:00:00+00:00", "actual_tokens_attended": 0 },
+      { "id": "00000000-0000-4000-8000-000000000010", "backlog_id": "QA-79-10", "status": "delivered", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": 0.44, "cost_cycles_snapshot": 1, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-11T01:00:00+00:00", "actual_tokens_attended": 0 },
+      { "id": "00000000-0000-4000-8000-000000000011", "backlog_id": "QA-79-11", "status": "delivered", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": 0.44, "cost_cycles_snapshot": 1, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-11T01:00:00+00:00", "actual_tokens_attended": 0 },
+      { "id": "00000000-0000-4000-8000-000000000012", "backlog_id": "QA-79-12", "status": "done", "type": "feature", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": 0.44, "cost_cycles_snapshot": 1, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": 0 },
+      { "id": "00000000-0000-4000-8000-000000000013", "backlog_id": "QA-79-13", "status": "done", "type": null, "tier": "later", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": null, "kickoff_link": null, "cost_pct_snapshot": 0.44, "cost_cycles_snapshot": 1, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": 0 },
+      { "id": "00000000-0000-4000-8000-000000000014", "backlog_id": "QA-79-14", "status": "done", "type": "Tooling", "tier": "next", "claimed_by": null, "claimed_at": null, "predicted_cycles": 1, "size_stamp": "S", "design_status": "designed", "kickoff_link": "docs/kickoffs/v0.0.0-QA-79-14-fixture.md", "cost_pct_snapshot": 1.33, "cost_cycles_snapshot": 3, "revalidated_at": null, "filed_at": "2026-09-05T00:00:00+00:00", "created_at": "2026-09-05T00:00:00+00:00", "updated_at": "2026-09-10T00:00:00+00:00", "actual_tokens_attended": 0 }
+    ],
+    "matrix": [
+      { "backlog_id": "QA-79-01", "actual_cycles": 0, "predicted_cycles": null },
+      { "backlog_id": "QA-79-02", "actual_cycles": 0, "predicted_cycles": null },
+      { "backlog_id": "QA-79-03", "actual_cycles": 2, "predicted_cycles": 2 },
+      { "backlog_id": "QA-79-04", "actual_cycles": 0, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-05", "actual_cycles": 1, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-06", "actual_cycles": 0, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-07", "actual_cycles": 0, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-08", "actual_cycles": 1, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-09", "actual_cycles": 1, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-10", "actual_cycles": 1, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-11", "actual_cycles": 1, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-12", "actual_cycles": 1, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-13", "actual_cycles": 1, "predicted_cycles": 1 },
+      { "backlog_id": "QA-79-14", "actual_cycles": 3, "predicted_cycles": 1 }
+    ],
+    "verdicts": [
+      { "backlog_id": "QA-79-03" }, { "backlog_id": "QA-79-04" }, { "backlog_id": "QA-79-05" }, { "backlog_id": "QA-79-10" },
+      { "backlog_id": "QA-79-11" }, { "backlog_id": "QA-79-12" }, { "backlog_id": "QA-79-13" }, { "backlog_id": "QA-79-14" }
+    ],
+    "accepts": [
+      { "backlog_id": "QA-79-11", "decided_at": "2026-09-12T00:00:00+00:00" }
+    ],
+    "decisions": [],
+    "openCycles": [
+      { "id": "cyc-live" }
+    ]
+  }
+}
