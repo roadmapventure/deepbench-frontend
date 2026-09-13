@@ -1,4 +1,18 @@
 #!/usr/bin/env node
+// DeepBench v7.0.472 | scripts/verifier.js | SES-345 -- THE VERDICT ROW CARRIES THE SHA IT GRADED,
+// and the thing to read twice is that leg 4 of the handoff was never missing a FACT, it was missing a
+// JOIN KEY. `ship_handoff_census` has asked "does this ship have a sha?" since it was built, but it
+// asked it of `runner_cycles.item_id` -- the CYCLE's claim about which ticket it ran. Measured live
+// 2026-09-13: of 56 verdicts in 7 days, 32 hang off one shared attended cycle (`a8000000`, 23
+// tickets, one `push_sha`), so for those the census's answer was about a cycle that graded 22 other
+// tickets too. `graded_sha` is the VERDICT's own claim about the TREE, written by the lane that ran
+// the gates, and `left(…,7)` is the join because attended cycles store short shas.
+//
+// READ ONCE, IN THE MECHANICAL LANE, AND CARRIED. Both judged lanes take the value out of the
+// pass-one context file rather than calling `gradedShaFor()` again: pass two runs after the sub-agent
+// has spoken, and a `git rev-parse` at that point names the tree the JUDGMENT was filed on. The whole
+// point of the key is that it names the tree the GATES ran on, and those are not always the same tree.
+//
 // DeepBench v7.0.471 | scripts/verifier.js | SES-344 slice 1 -- THE SHIP REPORT ENTERS THE JUDGE'S
 // CONTRACT, and the thing to read twice is that SEVEN OF THE EIGHT DISAGREEMENTS THE REPRODUCTION
 // COUNTED AGAINST THE AGENT WERE DEFECTS IN WHAT THIS FILE HANDED IT. Adjudicated 2026-09-13
@@ -1302,6 +1316,29 @@ export function shipReportFor(repoRoot, base) {
   return cap(r.stdout, SHIP_REPORT_CAP, "ship report");
 }
 
+// FEATURE: SES-345 -- THE VERDICT ROW CARRIES THE SHA IT GRADED, and the thing to read twice is that
+// this is the handoff's FOURTH row gaining its JOIN KEY, not a new fact being measured. The census
+// already asked "does this ship have a sha?" -- but it asked `runner_cycles.item_id`, which is the
+// CYCLE's claim about which ticket it ran, never the VERDICT's claim about which tree it graded. A
+// verdict and a push could disagree about the tree and nothing in the ledger could tell.
+//
+// `null` IS A REAL ANSWER AND IT IS NOT AN EXCEPTION. A run outside a git checkout, a `git` that is
+// not on PATH, a repo root that does not exist: every one of them returns `null` and the row records
+// `null`, because a verdict whose sha could not be read is still a verdict about the change, and
+// throwing here would cost a valid judgment over a missing join key. The CHECK constraint on the
+// column is what makes `null` distinguishable from a malformed value -- a non-hex string cannot
+// reach the table at all.
+export function gradedShaFor(repoRoot) {
+  try {
+    const r = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" });
+    if (r.error || r.status !== 0) return null;
+    const m = String(r.stdout || "").trim().match(/^[0-9a-f]{40}$/);
+    return m ? m[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 // FEATURE: SES-344 -- the OTHER half of the delivery: runbook step 7 stores the Builder's report on
 // `runner_cycles.notes`, and an unattended cycle's fullest account of what it did lives there and
 // nowhere else the judge could see.
@@ -1328,7 +1365,7 @@ export async function cycleNotesFor(supabaseUrl, supabaseKey, cycleId) {
 // live verdict ledger -- `runner_verdicts` gained no column for this ticket, and the agent's lens
 // findings reach it through `reasoning`, which is the column that already exists to carry exactly
 // that. A judged row that grew a key would be a schema change nobody asked for.
-export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, reasoning, eligible, autoDoneReason, epicName, priorityClass }) {
+export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, reasoning, eligible, autoDoneReason, epicName, priorityClass, gradedSha }) {
   const g = gateResults || {};
   return {
     cycle_id: cycleId,
@@ -1343,6 +1380,10 @@ export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, 
     auto_done_reason: autoDoneReason,
     epic_name: epicName ?? null,
     priority_class: priorityClass ?? null,
+    // SES-345: LAST key, deliberately -- the agt-67 shape guard compares key SETS between the two
+    // lanes, so a key added here must be added for BOTH or that guard goes red, which is exactly the
+    // protection it exists to give. `null` when the sha could not be read (gradedShaFor()'s note).
+    graded_sha: gradedSha ?? null,
   };
 }
 
@@ -1374,10 +1415,16 @@ async function recordJudgedVerdict({ stored, agentVerdict, truncations = [], int
   const truncatedLine = truncations.length
     ? `\n  truncated: ${truncations.map(t => `${t.key} ${t.from}->${t.to}`).join(", ")}`
     : "";
+  // SES-345: THE SHA THE GATES RAN ON, read from the pass-one context file and never re-read here.
+  // Pass two runs after the sub-agent has spoken, which can be minutes and (on a rebase) a different
+  // HEAD; re-reading `git rev-parse` at this point would record the tree the JUDGMENT was filed on,
+  // not the tree the GATES graded, and the whole value of the key is that it names the latter.
+  const gradedSha = stored.graded_sha ?? null;
   const prose =
     `verifier verdict: ${r.verdict.toUpperCase()}${ticket ? ` on ${ticket}` : ""}${version ? ` (${version})` : ""} -- judged\n` +
     `  ${detailLine}\n` +
     `  ${r.reasoning.replace(/\n/g, "\n  ")}\n` +
+    `  graded sha: ${gradedSha ?? "UNREADABLE"}\n` +
     `  auto-done eligible: ${r.eligible ? "YES" : "no"} -- ${r.reason}${truncatedLine}`;
   const payload = {
     ok: r.verdict === "approve",
@@ -1387,6 +1434,7 @@ async function recordJudgedVerdict({ stored, agentVerdict, truncations = [], int
     auto_done_eligible: r.eligible, auto_done_reason: r.reason,
     ticket: ticket || null, version: version || null,
     epic_name: stored.epic_name ?? null, priority_class: stored.priority_class ?? null,
+    graded_sha: gradedSha,   // SES-345 -- the tree the gates ran on, as recorded on the row.
     judged_by: `${VERIFIER_AGENT_ID}/${VERIFY_CAPABILITY}`, intent_slug: intentSlug,
   };
 
@@ -1397,6 +1445,7 @@ async function recordJudgedVerdict({ stored, agentVerdict, truncations = [], int
     supabaseUrl, supabaseKey, cycleId, ticket, version, verdict: r.verdict, gateResults,
     reasoning, eligible: r.eligible, autoDoneReason: r.reason,
     epicName: stored.epic_name ?? null, priorityClass: stored.priority_class ?? null,
+    gradedSha,
   });
   if (ins.error) {
     return emit({ code: 2, payload: { ...payload, recorded: false, error: ins.error },
@@ -1741,6 +1790,10 @@ async function main() {
 
   const base = arg("base", "origin/dev");
   const changedFiles = changedFilesFor(repoRoot, base);
+  // FEATURE: SES-345 -- read ONCE, here, beside the diff the gates were run against, and carried from
+  // this point into every lane. Both judged lanes read it back out of the context file rather than
+  // calling this again: see recordJudgedVerdict()'s note on why a second read is a different fact.
+  const gradedSha = gradedShaFor(repoRoot);
 
   // FEATURE: SES-337 -- the DATABASE half of charter premise 3, read from this cycle's own
   // before-images. §19v's "no before-image, no write" is what makes them the complete record of the
@@ -1783,12 +1836,17 @@ async function main() {
     `verifier verdict: ${verdict.toUpperCase()}${ticket ? ` on ${ticket}` : ""}${version ? ` (${version})` : ""}\n` +
     `  ${detailLine}\n` +
     `  ${reasoning}\n` +
+    `  graded sha: ${gradedSha ?? "UNREADABLE"}\n` +
     `  auto-done eligible: ${elig.eligible ? "YES" : "no"} -- ${autoDoneReason}`;
 
   const payload = {
     ok: verdict === "approve",
     exitCode: verdict === "approve" ? 0 : 1,
     verdict, gates: gateResults, gateDetail, reasoning,
+    // SES-345: UNLIKE the reported-only keys below, this one IS stored in its own column -- the
+    // handoff's fourth row needs a join key to `runner_cycles.push_sha`, and free text in
+    // `auto_done_reason` is not joinable.
+    graded_sha: gradedSha,
     auto_done_eligible: elig.eligible, auto_done_reason: autoDoneReason,
     ticket: ticket || null, version: version || null, epic_name: epicName, priority_class: priorityClass,
     // Reported, never stored in their own columns: runner_verdicts carries no such field and adding
@@ -1822,6 +1880,10 @@ async function main() {
       backlog_id: ticket,
       version: version || null,
       base,
+      // SES-345: given to BOTH judge lanes, same key, same content, for the reason
+      // `code_eligibility` below records -- and it is the value pass two writes to the row, so the
+      // sha the agent was shown is provably the sha the ledger records.
+      graded_sha: gradedSha,
       changed_files: changedFiles,
       gates: gateResults,
       gate_detail: gateDetail,
@@ -1934,6 +1996,7 @@ async function main() {
     }
     const judgeCtx = {
       backlog_id: ticket, version: version || null, base,
+      graded_sha: gradedSha,              // SES-345 -- see the session lane's note above.
       changed_files: changedFiles, gates: gateResults, gate_detail: gateDetail,
       mechanical: { verdict, reasoning }, epic_name: epicName, priority_class: priorityClass,
       class_autonomy: classAutonomy, code_eligibility: elig,
@@ -1977,7 +2040,8 @@ async function main() {
     const cost = await executorCostFor(supabaseUrl, supabaseKey, call.traceId);
     if (!dryRun && cycleId && cost.usd !== null) await addQaCost(supabaseUrl, supabaseKey, cycleId, cost.usd);
     const stored = {
-      backlog_id: ticket, version: version || null, gates: gateResults, gate_detail: gateDetail,
+      backlog_id: ticket, version: version || null, graded_sha: gradedSha,   // SES-345
+      gates: gateResults, gate_detail: gateDetail,
       mechanical: { verdict, reasoning }, epic_name: epicName, priority_class: priorityClass,
       code_eligibility: { ...elig, reason: autoDoneReason },
       note: `--judge=executor; trace ${call.traceId ?? "(none returned)"}; api cost ${cost.usd === null ? `UNKNOWN (${cost.note})` : `$${cost.usd}`}`,
@@ -1993,7 +2057,7 @@ async function main() {
   const ins = await insertVerdict({
     supabaseUrl, supabaseKey, cycleId, ticket, version, verdict, gateResults,
     reasoning: `${reasoning}\nGates: ${detailLine.replace(/\n\s+/g, " | ")}`,
-    eligible: elig.eligible, autoDoneReason, epicName, priorityClass,
+    eligible: elig.eligible, autoDoneReason, epicName, priorityClass, gradedSha,
   });
   if (ins.error) {
     // The verdict was reached but not recorded. That is a verifier failure, not a verdict on the
