@@ -5,6 +5,26 @@
 
 ---
 
+## session/cycle-20260913-0135 (v7.0.474, 2026-09-13, runner cycle `dde4670d-e87f-4538-9b56-e920ff00ba64`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Prioritizer and Designer, Opus 5 Builder, per register B21 and `public.runner_model_lanes` read live) — `AGT-79` slice 1 of 3 — **the census that writes nothing, and the table it created was born readable by the whole internet.**
+
+### A new table is not born closed, whatever the rule file says
+
+The Builder's own task-1 assertion caught it: `public.ticket_owner_findings` was created by a migration that grants nothing to `anon` or `authenticated`, and `information_schema.role_table_grants` showed table-level **SELECT for both** the moment it existed. Root cause read from `pg_default_acl` rather than recalled — the default ACL for tables created by `postgres` carries `anon=rm/postgres, authenticated=rm/postgres`, so **every** new public table is born publicly readable. `.claude/rules/supabase-column-grants.md`'s `DAT-18` addendum says *"Default privileges are closed … a new table gets NO public write grants automatically"*; that is true of **writes**, and its fail-closed framing reads as covering reads, which is exactly how this cycle's own kickoff came to assert *"No public grant"* and be wrong. The Builder reported it instead of widening scope, which was right; the orchestrator closed it under feature-owns-its-bugs (§19v) before the table's first row, in migration `agt79_findings_no_public_read`, asserting **both** directions as the rule file demands — `anon` and `authenticated` now hold zero privileges on it, and `service_role` still reads. `capture_migration_down()` classified that migration `refused` (a grants change, refused by design), so its range is **card-only**. The general case is not this ticket's and is filed as **`SES-384`** with its own id rather than patched inline (pattern:96), decision `1dc648dd`, reversible until Tue 9:30 PM CST.
+
+### The slice is a census that writes nothing, and that is the point
+
+Eleven date-fenced checks over 853 in-scope rows, each classified DERIVABLE or JUDGMENT, fixes computed exactly as slice 2 will write them and written nowhere. The fences matter more than the checks: `size_stamp` was born 2026-08-28, `predicted_cycles` and the `cost_*` columns 2026-09-01, `runner_verdicts` 2026-08-25, so of 486 open rows missing a quote only **3** were filed after the column existed — the rest are a backlog count reported once, never a nightly flag. Live: 853 rows, 210 findings, 40 derivable; `SES-141` is the only claim on a closed row; `LOG-143` (6>3) and `SES-245` (2>1) are the only two over quote; `ticket_owner_findings` 0 → 0 and `backlog_items` 892 → 892 across the run. The roster seed is **written** to `docs/design/agt-79-ticket-owner-seed.sql` and never applied — `.claude/rules/agent-roster-inert.md` reserves an active governance row to John — and it says `GV-08` because AGT-70's unapplied seed already holds `GV-07`.
+
+### The kickoff was refused once, and the refusal was obeyed rather than argued around
+
+`verifier.js --check-kickoff` exit 1: *"kickoff has no lane declaration (SES-359)"* — at 8,176 bytes, so the cap was not the issue. Per step 6 statement 3 the draft was **not** written as the kickoff, `design_status` was **not** set, the file and its harvest were removed from the tree, and `design-kickoff` was re-assembled exactly **once** with the refusal in `task_context`. The second draft overshot at 8,217, trimmed prose rather than facts, and landed at 8,188 with exit 0.
+
+### Verdict and the standing red
+
+Verdict `cdaeb692`, **block** — `build` green, `hygiene` green, regression red on `ses-285-m6-autonomy` and `ses-373-card-only-self-decides`, both grading **live board rows** rather than code and both reproduced by the Builder on a clean detached checkout of `origin/dev`. Two further reds it hit at its own gate, `SES-177-claude-state-renderer` and `SES-261-ledger-pin`, were the known `SES-213` one-row lag and cleared when 7a re-rendered `CLAUDE-STATE.md` before the verdict — which is the whole reason that render is 7a's first line. Ship wrote `partial`, re-pickable with no `blocked_by` and no defer: slices 2 and 3 are ordinary cycle work, which is John's own criterion for leaving a partial pickable. `graded_sha` on the verdict equals the push sha `b70ebadd` — `SES-345`, shipped one cycle earlier tonight, working on its second consecutive ship.
+
+---
+
 ## session/cycle-20260913-0040 (v7.0.472, 2026-09-13, runner cycle `ed021e91-48af-4ad2-9445-9eb593fed30c`, `trigger = scheduled` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder, per register B21 and `public.runner_model_lanes` read live) — `SES-345` — **leg four of the handoff contract exists, and the pick that got there was the second one: the first was work no unattended cycle is allowed to do.**
 
 ### The queue's first row was finished work wearing a partial's clothes
