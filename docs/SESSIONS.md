@@ -5,6 +5,22 @@
 
 ---
 
+## session/cycle-20260913-0509 (v7.0.479, 2026-09-13, runner cycle `724b1d1b-11e9-4bbc-ba65-e8a175c54bdb`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Prioritizer) — `AGT-79` — **gated before build, and the gate is named twice: John's roster row, and a weekly-usage warning this cycle chose not to spend into.**
+
+### The Chicago day rolled over mid-chain, and three scheduled agents came due at once
+
+At 05:00Z the America/Chicago day turned, and with it the day-keyed preconditions the previous five cycles had all answered *already run today*. **4c fired:** two Moat Support candidates re-ranked by the Prioritizer on the judgment lane — `AGT-79` to rank 1, `SES-344` to rank 2, both on key 2 (served class: P1 beats P3), logged `ai_activity_log 43662`, decision `bf3b98e7`. **4e fired for the second night of its life** — the step that shipped four hours earlier — recording its own cycle row `27cef94a`: **856 rows, 170 findings, 0 derivable, no decision opened.** Zero derivable two nights running is the design's own evidence that last night's forty corrections held. 4b was not due (rung-0 floor), 4d already ran this ISO week, and the API day reset to **$0 of $5**.
+
+### The pick's remainder is genuinely John's, and the part that is not was declined on purpose
+
+`AGT-79` came back at position 1 carrying `design_status = 'designed'` against the **spent** `v7.0.477` kickoff — the fifth sighting of `SES-385` tonight — cleared under decision `33e81841` with a full-row before-image, `kickoff_link` kept as leg 2 of the `SES-345` census. Its remainder is the `--judge` pass, and `public.capabilities where slug = 'audit-board'` reads **0**: the seed is written and deliberately unapplied at `docs/design/agt-79-ticket-owner-seed.sql`, because `.claude/rules/agent-roster-inert.md` reserves an active governance row to John's word. That half cannot run here at all. **The half that could** — `assemblePrompt` plus the two-pass `exit 3` shape, fixture-tested, exactly as `AGT-70` shipped `audit-cluster.js` ahead of its own seed — was **not built, and the reason is recorded rather than dressed up as a gate**: at 05:12Z the harness reported its seven-day usage window in `allowed_warning`, and a Designer-plus-Builder slice is the most expensive thing a cycle does (~600,000 subscription tokens) for a payoff nobody can exercise until the seed is applied. The runner's own governor still read clear — meter 25% against an 85% wall, 0 of 196M spent in the new day — so this is a judgment made on **fresher first-hand evidence than the 11.5-hour-old typed reading**, written into decision `20d03633` where John can overrule it in one line. Nothing was deferred and no flag was written: the ticket stays open and re-pickable, so the next cycle reading a clear window builds the code half without waiting for anyone.
+
+### The card asks the one thing that is actually his
+
+Card `1f248380`, `AGT-79`'s **first** gated card (the three standing undecided ones are all `AGT-70`'s, and a fourth duplicate would have been noise): apply the seed, and the nightly pass gains its judgment half — it rules the findings it can defend and leaves the rest with a reason instead of a count. `SES-344`, at rank 2, stayed unpicked for the arithmetic it has carried all night: its remainder is 25 re-judgments at $0.37–0.51, about **$9–13 against a $5 day cap** — over the wall even on a freshly reset day, and the override is John's word alone.
+
+---
+
 ## session/cycle-20260913-0447 (v7.0.476 landed + v7.0.478 close-out, 2026-09-13, runner cycle `39aec61d-7344-4474-99c9-49459887adc7`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, no sub-agent and no model call) — `SES-344` slice 3 — **the work already existed: a peer built it, proved it, refused to push it, and named the branch it left it on.**
 
 ### Nothing was designed and nothing was built, because both had already happened
