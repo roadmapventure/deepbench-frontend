@@ -1,5 +1,5 @@
-// DeepBench v7.0.474 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 -- THE TICKET
-// OWNER'S CENSUS, pinned at the level that can actually go red.
+// DeepBench v7.0.475 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slices 1-2 -- THE
+// TICKET OWNER'S CENSUS AND WRITE PASS, pinned at the level that can actually go red.
 //
 // WHY EVERY ARM CARRIES A CONTROL. Ten of the eleven checks produce a SHORT list on a healthy
 // board, and the failure mode of a census is not a wrong list -- it is an EMPTY one. A check that
@@ -29,9 +29,25 @@
 // agent) is asserted with its own control -- the regex is proven to match when a name IS present,
 // so a passing grep means the file is clean rather than the pattern being broken.
 //
-// (E) LIVE, and it asserts the NEGATIVE that defines this slice: the census read the real board
-// and ticket_owner_findings is still empty, with backlog_items unchanged. Declared notRun without
-// credentials rather than skipped silently.
+// (E) LIVE, and it asserts what the CENSUS alone does: it read the real board and changed nothing
+// on its own. Declared notRun without credentials rather than skipped silently.
+//
+// (F) THE PLAN, PURE. planWrites() is where a census becomes a set of writes, so every list it
+// produces is pinned by identity, not by length: which rows get patched, which findings are new,
+// which are re-seen, which are cleared. Its two controls are the ones that can silently invert --
+// an empty board must CLEAR the whole open ledger (not leave it alone), and a prior row matching
+// tonight must move from `insert` to `reseen` (not appear in both). Plus the two arguments that
+// must refuse before touching the network: a fix with no primary key, and an attribution that
+// names both a cycle and a session or neither.
+//
+// (G) LIVE, WRITTEN, AND ROLLED BACK. Four ZZTO-79* fixture rows are inserted into the real
+// backlog_items, censused, planned, applied, asserted, reversed through the real
+// reverse_decision(), and deleted in a finally. This is the only arm that can prove the property
+// the whole slice exists for: that one decision id puts every cell back. It asserts the FULL-row
+// image (title present, not just the changed column), updated_at UNCHANGED by the patch (SES-316 --
+// a bumped stamp makes reverse_decision() refuse the row), the null-row images that stand for the
+// findings the night invented, and a second night over the same board writing nothing but a
+// last_seen_at touch. The cleanup is unconditional; the four zero-row counts are asserted after it.
 
 import assert from "assert";
 import fs from "fs";
@@ -40,7 +56,7 @@ import os from "os";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { classifyBoard, renderCensus, CHECKS, TYPE_TAXONOMY, TYPE_MAP, FENCES } from "../../scripts/ticket-owner.js";
+import { classifyBoard, renderCensus, planWrites, applyPlan, CHECKS, TYPE_TAXONOMY, TYPE_MAP, FENCES } from "../../scripts/ticket-owner.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = "scripts/ticket-owner.js";
@@ -218,8 +234,8 @@ async function main() {
   assert.ok(cNoCreds.stderr.includes("SUPABASE_URL"), `the refusal must name what is missing; got: ${cNoCreds.stderr}`);
 
   const cApply = spawnCli([`--board=${FIXTURE_REL}`, "--apply"]);
-  assert.strictEqual(cApply.status, 2, "--apply must be refused, not ignored: this slice writes nothing");
-  assert.ok(cApply.stderr.includes("unknown flag"), `got: ${cApply.stderr}`);
+  assert.strictEqual(cApply.status, 2, "--apply over a fixture must be refused, not ignored: fixture ids do not address live rows");
+  assert.ok(cApply.stderr.includes("never written"), `got: ${cApply.stderr}`);
 
   assert.strictEqual(spawnCli(["--board=tests/fixtures/agt-79/nope.json"]).status, 2, "an unreadable board is exit 2");
 
@@ -250,18 +266,95 @@ async function main() {
   const valuesLines = seed.split("\n").filter(l => l.includes("GV-07") && !l.trimStart().startsWith("--"));
   assert.deepStrictEqual(valuesLines, [], "GV-07 may be discussed in the comment, never claimed in a VALUES line");
 
+  // --- F: the plan, pure ------------------------------------------------------------------------
+  // The open ledger as it would stand from a previous night: one finding that is still true
+  // (QA-79-01 quote-missing), one that is not (QA-79-06 claim-expired), and one that tonight
+  // classifies as DERIVABLE rather than judgment (QA-79-03) -- which must still clear, because a
+  // gap the census now fixes itself is no longer an open judgment call.
+  const P = [
+    { id: "p1", backlog_id: "QA-79-01", check_slug: "quote-missing" },
+    { id: "p2", backlog_id: "QA-79-06", check_slug: "claim-expired" },
+    { id: "p3", backlog_id: "QA-79-03", check_slug: "cost-snapshot-missing" },
+  ];
+  const plan = planWrites(r, P, F.board.items, { rate: F.rate });
+
+  assert.deepStrictEqual(plan.fixes.map(f => f.backlog_id), ["QA-79-03", "QA-79-05", "QA-79-07", "QA-79-12"],
+    "every derivable finding becomes exactly one fix, in the census's own order");
+  assert.deepStrictEqual(plan.fixes.map(f => f.id.slice(-4)), ["0003", "0005", "0007", "0012"],
+    "a fix addresses its row by primary key, resolved from the board read -- never by backlog_id");
+  for (const f of plan.fixes) {
+    assert.deepStrictEqual(f.patch, only(r, f.backlog_id, f.check).fix,
+      `${f.backlog_id}'s patch is not the finding's fix -- the plan must carry the write the census computed`);
+  }
+
+  const ins = plan.ledger.insert;
+  assert.deepStrictEqual(ins.map(f => [f.backlog_id, f.check_slug]).sort(), [
+    ["QA-79-04", "actual-unknown"],
+    ["QA-79-08", "verdict-missing"],
+    ["QA-79-10", "delivered-unaccepted"],
+    ["QA-79-13", "type-off-taxonomy"],
+    ["QA-79-14", "cycles-over-quote"],
+    ["QA-79-14", "designed-closed"],
+  ], "every judgment finding NOT already on the ledger becomes one new row, and two checks on one ticket are two rows");
+  for (const f of ins) {
+    assert.ok(/^[0-9a-f-]{36}$/.test(f.id), `ledger insert ${f.backlog_id}/${f.check_slug} has no uuid: ${f.id}`);
+    assert.strictEqual(f.verdict, "judgment", "only judgment findings reach the ledger; a derivable one is a write");
+    assert.ok(typeof f.detail === "string" && f.detail.length > 0, `${f.backlog_id}/${f.check_slug} filed with no detail sentence`);
+  }
+  assert.deepStrictEqual(plan.ledger.reseen, ["p1"], "a prior finding still true tonight is touched, never re-inserted");
+  assert.deepStrictEqual(plan.ledger.clear, ["p2", "p3"], "every prior finding not seen tonight clears -- including one the census now fixes itself");
+  assert.deepStrictEqual(plan.meta.counts, r.counts);
+  assert.strictEqual(plan.meta.rate, 0.5, "the decision text quotes the rate the arithmetic used");
+
+  // (i) CONTROL -- an empty board must CLEAR the whole open ledger. Without this arm, a planner
+  // that simply never cleared anything would read green above.
+  const emptyPlan = planWrites(
+    run({ board: { items: [], matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] } }),
+    P, [], { rate: F.rate });
+  assert.deepStrictEqual(emptyPlan.fixes, []);
+  assert.deepStrictEqual(emptyPlan.ledger.insert, []);
+  assert.deepStrictEqual(emptyPlan.ledger.reseen, []);
+  assert.deepStrictEqual(emptyPlan.ledger.clear, ["p1", "p2", "p3"], "a board with nothing wrong clears every open finding");
+
+  // (ii) CONTROL -- add a prior row matching tonight: it moves OUT of insert and INTO reseen, so
+  // the two lists are proven disjoint rather than merely both populated.
+  const p4 = planWrites(r, [...P, { id: "p4", backlog_id: "QA-79-04", check_slug: "actual-unknown" }], F.board.items, { rate: F.rate });
+  assert.strictEqual(p4.ledger.insert.length, 5, "a finding already on the ledger must not be inserted a second time");
+  assert.deepStrictEqual(p4.ledger.reseen, ["p1", "p4"]);
+
+  // (iii) A fix with no primary key is not a write -- it throws rather than planning a PATCH it
+  // cannot address.
+  assert.throws(() => planWrites(r, [], []), /QA-79-03/,
+    "a derivable finding whose row is missing from the board read must refuse, naming the ticket");
+
+  // (iv) Attribution is exactly one of cycle / session (ck_decision_attribution), refused before
+  // any request leaves the process.
+  await assert.rejects(() => applyPlan("x", "y", plan, {}), /exactly one/,
+    "a write with neither a cycle nor a session is unattributable");
+  await assert.rejects(() => applyPlan("x", "y", plan, { cycleId: "a", sessionName: "b" }), /exactly one/,
+    "a write claiming both a cycle and a session violates ck_decision_attribution");
+
   // --- E: live ---------------------------------------------------------------------------------
   const base = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!base || !key) {
-    notRun("live census (part E)",
-      "SUPABASE_URL / SUPABASE_SERVICE_KEY are not set; run with node --env-file-if-exists=.env.local tests/regression/run-all.js");
+    const why = "SUPABASE_URL / SUPABASE_SERVICE_KEY are not set; run with node --env-file-if-exists=.env.local tests/regression/run-all.js";
+    notRun("live census (part E)", why);
+    notRun("write pass (part G)", why);
     return;
+  }
+
+  const url = base.replace(/\/+$/, "");
+  const H = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+  async function rest(pathAndQuery, init = {}) {
+    const res = await fetch(`${url}/rest/v1/${pathAndQuery}`, { ...init, headers: { ...H, ...(init.headers ?? {}) } });
+    const body = await res.text();   // read once: reading it inside the assert message consumes it
+    assert.ok(res.ok, `${init.method ?? "GET"} ${pathAndQuery} returned HTTP ${res.status} ${res.statusText}: ${body}`);
+    return body.trim() === "" ? null : JSON.parse(body);
   }
 
   const findingsBefore = await restCount(base, key, "ticket_owner_findings");
   const itemsBefore = await restCount(base, key, "backlog_items");
-  assert.strictEqual(findingsBefore, 0, "slice 1 writes no findings row; the ledger must still be empty");
 
   const outFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "agt79-")), "census.json");
   const live = spawnCli(["--census", `--out=${outFile}`, "--json"], { withCreds: true });
@@ -272,17 +365,40 @@ async function main() {
   assert.ok(typeof census.rate === "number" && census.rate > 0.1 && census.rate < 1,
     `the cost rate must be a real fraction, got ${census.rate}`);
 
+  // SES-141 IS the board's one claim left on a closed ticket, and SES-131 / SES-208 ARE its only
+  // two one-to-one type spellings. But this slice's write pass exists precisely to close those
+  // gaps, so after it has run they are FIXED rather than found. Each is therefore asserted as a
+  // pair: the census still reports it with the exact fix, OR the live row already carries that
+  // fix. Both halves are a real statement about the ticket; "neither" is the failure, and a
+  // derivable finding on any OTHER row still fails outright.
   const claimOnClosed = census.findings.filter(f => f.check === "claim-on-closed");
-  assert.strictEqual(claimOnClosed.length, 1, `expected one claim on a closed ticket, got ${claimOnClosed.map(f => f.backlog_id).join(", ")}`);
-  assert.strictEqual(claimOnClosed[0].backlog_id, "SES-141");
-  assert.deepStrictEqual(claimOnClosed[0].fix, { claimed_by: null, claimed_at: null });
+  assert.deepStrictEqual(claimOnClosed.map(f => f.backlog_id), claimOnClosed.length ? ["SES-141"] : [],
+    `claim-on-closed must name SES-141 and nothing else, got ${claimOnClosed.map(f => f.backlog_id).join(", ")}`);
+  if (claimOnClosed.length === 1) {
+    assert.deepStrictEqual(claimOnClosed[0].fix, { claimed_by: null, claimed_at: null });
+  } else {
+    const row = (await rest("backlog_items?backlog_id=eq.SES-141&select=status,claimed_by,claimed_at"))[0];
+    assert.ok(row, "SES-141 must still be on the board");
+    assert.ok(["done", "delivered"].includes(row.status), `SES-141 is ${row.status}, so it was never a claim-on-closed row at all`);
+    assert.strictEqual(row.claimed_by, null, "SES-141 is off the claim-on-closed list, so its claim must already be cleared");
+    assert.strictEqual(row.claimed_at, null, "a cleared claim clears both columns, never just the holder");
+  }
 
   const over = census.findings.filter(f => f.check === "cycles-over-quote").map(f => f.backlog_id);
   assert.ok(over.includes("LOG-143") && over.includes("SES-245"), `cycles-over-quote read ${over.join(", ")}`);
 
   const typeDerivable = census.findings.filter(f => f.check === "type-off-taxonomy" && f.verdict === "derivable")
     .map(f => f.backlog_id).sort();
-  assert.deepStrictEqual(typeDerivable, ["SES-131", "SES-208"], "only the two one-to-one spellings are derivable");
+  assert.ok(typeDerivable.every(id => id === "SES-131" || id === "SES-208"),
+    `only the two one-to-one spellings may be derivable, got ${typeDerivable.join(", ")}`);
+  for (const [id, mapped] of [["SES-131", "Feature"], ["SES-208", "Bug"]]) {
+    if (typeDerivable.includes(id)) {
+      assert.deepStrictEqual(census.findings.find(f => f.backlog_id === id && f.check === "type-off-taxonomy").fix, { type: mapped });
+    } else {
+      const row = (await rest(`backlog_items?backlog_id=eq.${id}&select=type`))[0];
+      assert.strictEqual(row.type, mapped, `${id} is off the derivable list, so its type must already read ${mapped}`);
+    }
+  }
 
   const unaccepted = census.findings.filter(f => f.check === "delivered-unaccepted");
   assert.ok(unaccepted.length >= 4, `expected at least four delivered-unaccepted rows, got ${unaccepted.length}`);
@@ -292,9 +408,222 @@ async function main() {
       `${f.backlog_id}'s cost fix does not match the rate it claims to have used`);
   }
 
-  // THE NEGATIVE THAT DEFINES THIS SLICE: the census read the whole board and changed nothing.
-  assert.strictEqual(await restCount(base, key, "ticket_owner_findings"), 0, "the census must not have written a findings row");
+  // THE NEGATIVE THAT DEFINES A CENSUS: the same binary that CAN write read the whole board with
+  // no --apply and changed nothing. Now that the write pass exists, this is the arm that proves
+  // writing is a flag rather than a default.
+  assert.strictEqual(await restCount(base, key, "ticket_owner_findings"), findingsBefore,
+    "a census without --apply must not write, touch or clear a findings row");
   assert.strictEqual(await restCount(base, key, "backlog_items"), itemsBefore, "the census must not have touched the board");
+
+  // --- G: the write pass, live and rolled back --------------------------------------------------
+  const S = `agt-79-qa:${Date.now()}`;
+  const RATE = 0.444444444444444;
+  const now = new Date().toISOString();
+  const T49 = new Date(Date.now() - 49 * 3600 * 1000).toISOString();
+  const PROJECTION = "id,backlog_id,status,type,tier,claimed_by,claimed_at,predicted_cycles,size_stamp," +
+    "design_status,kickoff_link,cost_pct_snapshot,cost_cycles_snapshot,revalidated_at,filed_at,created_at," +
+    "updated_at,actual_tokens_attended";
+  const readFixture = () => rest(`backlog_items?backlog_id=like.ZZTO-79*&order=backlog_id&select=${PROJECTION}`);
+
+  async function countWhere(table, query) {
+    const res = await fetch(`${url}/rest/v1/${table}?${query}&select=id`, {
+      headers: { ...H, Prefer: "count=exact", Range: "0-0" },
+    });
+    await res.text();
+    const total = Number((res.headers.get("content-range") || "").split("/")[1]);
+    assert.ok(Number.isFinite(total), `could not count ${table}?${query}`);
+    return total;
+  }
+
+  let passed = false;
+  try {
+    // (1) Four one-variable fixture rows on the REAL board. A previous run that died mid-way would
+    // leave residue behind, so this clears first rather than colliding on backlog_id.
+    await rest("backlog_items?backlog_id=like.ZZTO-79*", { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    const FIXTURE_ROWS = [
+        { backlog_id: "ZZTO-791", tier: "later", type: "Tooling", priority_class: "P10 - Tooling", status: "done",
+          title: "AGT-79 fixture: done row still claimed — inserted and deleted by agt-79-ticket-owner.test.mjs",
+          description: "Fixture. Never a real ticket.", source_file: "tests/regression/agt-79-ticket-owner.test.mjs", row_ordinal: 999791,
+          claimed_by: "zz-stale", claimed_at: "2026-09-01T00:00:00+00:00", predicted_cycles: 1, size_stamp: "S",
+          cost_pct_snapshot: 0.44, cost_cycles_snapshot: 1, cost_snapshot_rate: 0.444444444444444, cost_snapshot_at: "2026-09-10T00:00:00+00:00" },
+        { backlog_id: "ZZTO-792", tier: "later", type: "Tooling", priority_class: "P10 - Tooling", status: "delivered",
+          title: "AGT-79 fixture: delivered 49 h ago, never accepted — inserted and deleted by agt-79-ticket-owner.test.mjs",
+          description: "Fixture. Never a real ticket.", source_file: "tests/regression/agt-79-ticket-owner.test.mjs", row_ordinal: 999792,
+          predicted_cycles: 1, size_stamp: "S", cost_pct_snapshot: 0.44, cost_cycles_snapshot: 1,
+          cost_snapshot_rate: 0.444444444444444, cost_snapshot_at: "2026-09-10T00:00:00+00:00", updated_at: T49 },
+        { backlog_id: "ZZTO-793", tier: "later", type: "Tooling", priority_class: "P10 - Tooling", status: "open",
+          title: "AGT-79 fixture: open, quoted nothing — inserted and deleted by agt-79-ticket-owner.test.mjs",
+          description: "Fixture. Never a real ticket.", source_file: "tests/regression/agt-79-ticket-owner.test.mjs", row_ordinal: 999793,
+          size_stamp: "S" },
+        { backlog_id: "ZZTO-794", tier: "later", type: "Tooling", priority_class: "P10 - Tooling", status: "open",
+          title: "AGT-79 fixture: filed before the fences — inserted and deleted by agt-79-ticket-owner.test.mjs",
+          description: "Fixture. Never a real ticket.", source_file: "tests/regression/agt-79-ticket-owner.test.mjs", row_ordinal: 999794,
+          filed_at: "2026-08-01T00:00:00+00:00", created_at: "2026-08-01T00:00:00+00:00", updated_at: "2026-08-01T00:00:00+00:00" },
+    ];
+    // The four rows deliberately carry DIFFERENT key sets -- that IS the one-variable discipline --
+    // and a PostgREST bulk insert refuses a ragged array outright ("All object keys must match").
+    // Naming the union in ?columns= does not rescue it either: an omitted key is then inserted as
+    // NULL rather than taking the column's default, which trips created_at's NOT NULL. So the
+    // array is squared off here: every row carries every key, the three NOT NULL stamps fall back
+    // to this run's clock, and every other absence is an explicit null (which is what the fixture
+    // meant by omitting it). A row that names a stamp itself -- 792's T49, 794's pre-fence dates --
+    // keeps its own.
+    const COLUMNS = [...new Set(FIXTURE_ROWS.flatMap(Object.keys))];
+    const STAMPS = { created_at: now, filed_at: now, updated_at: now };
+    const inserted = await rest("backlog_items", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(FIXTURE_ROWS.map(row =>
+        Object.fromEntries(COLUMNS.map(c => [c, c in row ? row[c] : (STAMPS[c] ?? null)])))),
+    });
+    assert.strictEqual(inserted.length, 4, "the four fixture rows must all insert");
+    const id791 = inserted.find(x => x.backlog_id === "ZZTO-791").id;
+    const upd791 = inserted.find(x => x.backlog_id === "ZZTO-791").updated_at;
+
+    // (2) Census the four rows through the REAL projection readBoard() uses -- a column the census
+    // reads but this test forgot to select would classify as null and quietly change the answer.
+    const board = { items: await readFixture(), matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] };
+    const r1 = classifyBoard(board, { now, rate: RATE });
+    assert.deepStrictEqual(r1.counts, { rows: 4, findings: 5, derivable: 1, judgment: 4 },
+      "the four fixture rows must classify to exactly one derivable fix and four judgment findings");
+    assert.deepStrictEqual(byCheck(r1, "claim-on-closed"), ["ZZTO-791"]);
+
+    // (3) Plan against an empty ledger: everything is new tonight.
+    const plan1 = planWrites(r1, [], board.items, { rate: RATE });
+    assert.strictEqual(plan1.fixes.length, 1);
+    assert.strictEqual(plan1.fixes[0].id, id791, "the fix must address ZZTO-791 by the primary key the insert returned");
+    assert.strictEqual(plan1.ledger.insert.length, 4);
+
+    // (4) THE WRITE.
+    const res1 = await applyPlan(url, key, plan1, { sessionName: S, now });
+    assert.strictEqual(res1.fixed, 1);
+    assert.strictEqual(res1.inserted, 4);
+    assert.strictEqual(res1.reseen, 0);
+    assert.strictEqual(res1.cleared, 0);
+    assert.strictEqual(typeof res1.decision, "string", "the write pass must return the decision id John reverses");
+    assert.strictEqual(typeof res1.expires_at, "string", "a decision John cannot see the expiry of is not reversible in practice");
+
+    // (5) The board moved exactly where it was told to, and nowhere else.
+    const after = (await readFixture()).find(x => x.backlog_id === "ZZTO-791");
+    assert.strictEqual(after.claimed_by, null, "the claim must actually be cleared on the live row");
+    assert.strictEqual(after.claimed_at, null);
+    assert.strictEqual(after.status, "done", "the write pass never writes status");
+    assert.strictEqual(after.updated_at, upd791,
+      "updated_at must be untouched -- a stamp later than the decision's decided_at makes reverse_decision() refuse this row (SES-316)");
+    const fixtureAfter = await readFixture();
+    assert.strictEqual(fixtureAfter.find(x => x.backlog_id === "ZZTO-792").status, "delivered",
+      "a judgment finding writes the ledger, never the row it is about");
+    assert.strictEqual(fixtureAfter.find(x => x.backlog_id === "ZZTO-793").predicted_cycles, null,
+      "the write pass never fills a quote -- that is John's number, not arithmetic");
+
+    const dec = (await rest(`runner_decisions?id=eq.${res1.decision}&select=kind,backlog_id,session_name,cycle_id,ladder_work_class,status,summary,reasoning`))[0];
+    assert.strictEqual(dec.kind, "hygiene");
+    assert.strictEqual(dec.backlog_id, "AGT-79");
+    assert.strictEqual(dec.session_name, S);
+    assert.strictEqual(dec.cycle_id, null, "exactly one of cycle_id / session_name -- this run is the session side");
+    assert.strictEqual(dec.ladder_work_class, null, "hygiene moves no rung on the ladder");
+    assert.strictEqual(dec.status, "open");
+    assert.ok(dec.summary.startsWith("Ticket Owner: 1 derivable cell fix(es) on 1 row(s)"), `summary reads: ${dec.summary}`);
+    assert.ok(dec.reasoning.includes("pattern:0"), "the reasoning must carry the no-standing-pattern handle");
+
+    const imgs = await rest(`runner_before_images?decision_id=eq.${res1.decision}&select=table_name,pk_value,row_data`);
+    assert.strictEqual(imgs.length, 1, `expected exactly one before-image under decision ${res1.decision}, got ${imgs.length}`);
+    assert.strictEqual(imgs[0].table_name, "backlog_items");
+    assert.strictEqual(imgs[0].pk_value, id791, "the image addresses the row by primary key, not by backlog_id");
+    assert.strictEqual(imgs[0].row_data.claimed_by, "zz-stale", "the image must hold the PRIOR state -- an image of the new state restores nothing");
+    assert.strictEqual(typeof imgs[0].row_data.title, "string",
+      "the image must be the FULL row: reverse_decision() rewrites every column from row_data, so a partial image restores a partial row");
+
+    const nullImgs = await rest(`runner_before_images?session_name=eq.${encodeURIComponent(S)}&table_name=eq.ticket_owner_findings&select=pk_value,row_data,decision_id`);
+    assert.strictEqual(nullImgs.length, 4, "every ledger row the night invented gets its own null-row image");
+    for (const img of nullImgs) {
+      assert.strictEqual(img.row_data, null, "a null row_data is how the chain says this row did not exist before");
+      assert.strictEqual(img.decision_id, null, "the findings images hang off the session, not off the board's decision");
+    }
+
+    const led = await rest("ticket_owner_findings?backlog_id=like.ZZTO-79*&order=backlog_id,check_slug&select=id,backlog_id,check_slug,verdict,first_seen_at,last_seen_at,cleared_at,cycle_id");
+    assert.deepStrictEqual(led.map(x => [x.backlog_id, x.check_slug]), [
+      ["ZZTO-791", "verdict-missing"],
+      ["ZZTO-792", "delivered-unaccepted"],
+      ["ZZTO-792", "verdict-missing"],
+      ["ZZTO-793", "quote-missing"],
+    ], "exactly the four judgment findings reach the ledger, one row per (ticket, check)");
+    for (const x of led) {
+      assert.strictEqual(x.verdict, "judgment");
+      assert.strictEqual(x.cleared_at, null, "a finding filed tonight is open, never born cleared");
+      assert.strictEqual(x.cycle_id, null, "a session-attributed run files no cycle id");
+      assert.strictEqual(Date.parse(x.first_seen_at), Date.parse(x.last_seen_at), "a finding's first night is also its latest");
+    }
+
+    // (6) SECOND NIGHT, unchanged board: the fix is already made, so nothing is written but a touch.
+    const now2 = new Date(Date.now() + 1000).toISOString();
+    const board2 = { ...board, items: await readFixture() };
+    const r2 = classifyBoard(board2, { now: now2, rate: RATE });
+    assert.strictEqual(r2.counts.derivable, 0, "the cell the first night fixed must not be found again");
+    assert.strictEqual(r2.counts.findings, 4);
+    const priorLed = led.map(x => ({ id: x.id, backlog_id: x.backlog_id, check_slug: x.check_slug }));
+    const plan2 = planWrites(r2, priorLed, board2.items, { rate: RATE });
+    assert.deepStrictEqual(plan2.fixes, []);
+    assert.deepStrictEqual(plan2.ledger.insert, [], "a finding already on the ledger is touched, never duplicated");
+    assert.strictEqual(plan2.ledger.reseen.length, 4);
+    assert.deepStrictEqual(plan2.ledger.clear, []);
+
+    const res2 = await applyPlan(url, key, plan2, { sessionName: S, now: now2 });
+    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 4, cleared: 0 },
+      "a night with nothing to fix records NO decision -- an empty decision row is noise John has to read");
+    assert.strictEqual((await rest(`runner_decisions?session_name=eq.${encodeURIComponent(S)}&select=id`)).length, 1,
+      "two nights, one decision: the second wrote no board cell, so it decided nothing");
+
+    const led2 = await rest("ticket_owner_findings?backlog_id=like.ZZTO-79*&order=backlog_id,check_slug&select=id,first_seen_at,last_seen_at,cleared_at");
+    assert.deepStrictEqual(led2.map(x => x.id), priorLed.map(x => x.id), "the second night must touch the SAME rows, not replace them");
+    for (const x of led2) {
+      assert.ok(Date.parse(x.last_seen_at) > Date.parse(x.first_seen_at), "a re-seen finding advances last_seen_at and keeps first_seen_at -- the age of a gap is the point");
+      assert.strictEqual(x.cleared_at, null);
+    }
+
+    // (7) CLEAR CONTROL, pure: a prior finding the board no longer shows must clear. Without this,
+    // a planner that never cleared anything would pass every arm above.
+    const ghosted = planWrites(r2, [...priorLed, { id: "ghost", backlog_id: "ZZTO-791", check_slug: "claim-on-closed" }], board2.items, { rate: RATE });
+    assert.deepStrictEqual(ghosted.ledger.clear, ["ghost"], "a finding that is no longer true tonight clears");
+
+    // (8) THE WHOLE POINT: one decision id puts every cell back.
+    const rev = (await rest("rpc/reverse_decision", {
+      method: "POST",
+      body: JSON.stringify({ p_decision: res1.decision, p_actor: S, p_reason: "fixture rollback" }),
+    }))[0];
+    assert.strictEqual(rev.outcome, "applied", `reverse_decision returned ${JSON.stringify(rev)}`);
+    assert.strictEqual(rev.restored, 1);
+    assert.strictEqual(rev.refused, 0);
+    assert.strictEqual(rev.refused_written_since, 0, "a refusal here means the write pass bumped updated_at and locked itself out");
+    assert.strictEqual(typeof rev.reversal_id, "string");
+
+    const restored = (await readFixture()).find(x => x.backlog_id === "ZZTO-791");
+    assert.strictEqual(restored.claimed_by, "zz-stale", "the reversal must put the ORIGINAL claim back");
+    assert.strictEqual(Date.parse(restored.claimed_at), Date.parse("2026-09-01T00:00:00+00:00"));
+    assert.strictEqual(restored.status, "done", "the reversal restores the whole row, including the columns nobody wrote");
+
+    console.log(`[AGT-79] part G: decision ${res1.decision} (expires ${res1.expires_at}) — 1 fix, 4 findings, reversed: ` +
+      `restored ${rev.restored} refused ${rev.refused}`);
+    passed = true;
+  } finally {
+    // Order matters: runner_before_images.decision_id FKs runner_decisions, and the reversal row
+    // references the decision it reverses.
+    const del = q => fetch(`${url}/rest/v1/${q}`, { method: "DELETE", headers: H }).catch(() => {});
+    await del("ticket_owner_findings?backlog_id=like.ZZTO-79*");
+    await del(`runner_before_images?session_name=eq.${encodeURIComponent(S)}`);
+    await del(`runner_decisions?session_name=eq.${encodeURIComponent(S)}&kind=eq.reversal`);
+    await del(`runner_decisions?session_name=eq.${encodeURIComponent(S)}`);
+    await del("backlog_items?backlog_id=like.ZZTO-79*");
+  }
+
+  // Asserted AFTER the finally, and only when the arms above actually passed: a test that leaves
+  // fixture rows on the live board is a worse failure than the one it was trying to report.
+  if (passed) {
+    assert.strictEqual(await countWhere("ticket_owner_findings", "backlog_id=like.ZZTO-79*"), 0, "part G left findings rows on the live ledger");
+    assert.strictEqual(await countWhere("backlog_items", "backlog_id=like.ZZTO-79*"), 0, "part G left fixture tickets on the live board");
+    assert.strictEqual(await countWhere("runner_before_images", `session_name=eq.${encodeURIComponent(S)}`), 0, "part G left before-images behind");
+    assert.strictEqual(await countWhere("runner_decisions", `session_name=eq.${encodeURIComponent(S)}`), 0, "part G left decision rows behind");
+  }
 }
 
 export default main;

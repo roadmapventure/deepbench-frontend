@@ -1,14 +1,26 @@
 #!/usr/bin/env node
-// DeepBench v7.0.474 | scripts/ticket-owner.js | AGT-79 slice 1 -- THE TICKET OWNER'S CENSUS: one
-// mechanical pass over the whole board that CLASSIFIES and never writes.
+// DeepBench v7.0.475 | scripts/ticket-owner.js | AGT-79 slices 1-2 -- THE TICKET OWNER'S CENSUS:
+// one mechanical pass over the whole board that CLASSIFIES, and (slice 2, only under --apply) the
+// WRITE PASS that lands every derivable fix under a single reversible decision.
 //
 // WHAT THIS FILE IS. The Ticket Owner owns a ticket's ROW after it is filed -- its quote, its
 // actual, its status and its close-out. Eleven date-fenced checks read the board once and sort
 // every gap into two kinds: DERIVABLE (another column already holds the value, so the fix is
 // computed here and carried on the finding) and JUDGMENT (a capability has to decide it, so the
-// finding carries a sentence and no fix). This slice computes both and writes NOTHING -- not to
-// backlog_items, not to ticket_owner_findings. The write pass is slice 2, under one
-// record_decision row with before-images.
+// finding carries a sentence and no fix). The census half computes both and writes NOTHING.
+//
+// THE WRITE PASS (slice 2, --apply only). planWrites() turns a census into a PLAN -- the derivable
+// fixes as row patches, and the judgment findings as ledger inserts / re-seens / clears against
+// what ticket_owner_findings already holds. applyPlan() lands that plan in five REST steps under
+// ONE record_decision row, having first imaged the FULL prior row of every cell it touches. Full
+// rows, because reverse_decision() rewrites every column of a backlog_items row from the image --
+// a partial image would restore a partial row. And no PATCH ever names updated_at, because
+// reverse_decision() refuses a row whose updated_at is later than the decision (SES-316): a write
+// pass that bumped the stamp would make itself unreversible on the spot.
+//
+// ONE DECISION FOR THE WHOLE NIGHT is the design, not an optimisation. John reverses a night of
+// hygiene with a single reverse_decision() call, or he reverses none of it; forty decisions would
+// mean forty calls to undo one wrong rate.
 //
 // THE FENCES ARE THE POINT, not decoration. Every column this censuses was added to backlog_items
 // on a known date; a row filed before its column existed is not a fault, it is a row that predates
@@ -16,17 +28,21 @@
 // behind a check's fence lands in a COUNT (backlog.*_prefence) and never in findings. A filing-time
 // gap is fenced on the ticket's filed_at; a close-out gap on its updated_at.
 //
-// PURE BY CONSTRUCTION. classifyBoard() and renderCensus() take data and return data -- no fetch,
+// PURE BY CONSTRUCTION. classifyBoard(), renderCensus() and planWrites() take data and return data -- no fetch,
 // no disk, no process.exit, no clock (the caller passes `now`). That is what lets the regression
 // test drive fourteen one-variable rows through the real code instead of a copy of it, and what
-// lets slice 2 reuse the same classification it will write from. The CLI half below is the only
-// part that reads credentials, and importing this module never runs it.
+// lets the write pass plan from the same classification it writes from. applyPlan() and the CLI
+// below are the only parts that read credentials, and importing this module never runs the CLI.
 //
-// EXIT CODES: 0 the census ran; 2 it could not run -- missing credentials, a REST read that failed
-// or came back truncated, unreadable input, or an unknown flag. There is deliberately no --apply.
+// EXIT CODES: 0 the census (and, under --apply, the write pass) ran; 2 it could not run or could
+// not finish -- missing credentials, a REST read that failed or came back truncated, unreadable
+// input, an unknown flag, --apply without a cycle id, or any write step that did not land. A
+// failed step exits 2 naming the step and the decision id, so a half-applied night is traceable
+// to the one call that stopped it.
 
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 
 // --- constants (exported; the regression test asserts each one) --------------------------------
@@ -264,28 +280,86 @@ export function renderCensus(result, nowIso) {
   return lines.join("\n") + "\n";
 }
 
+// planWrites(result, prior, items, {rate}) -> {fixes, ledger: {insert, reseen, clear}, meta}
+//
+// The census says what is wrong; this says what will be WRITTEN, and nothing here touches the
+// network. `prior` is the open ledger (uncleared ticket_owner_findings rows) as
+// [{id, backlog_id, check_slug}]; `items` is the board read, the only place a backlog_id can be
+// resolved to the primary key a PATCH addresses.
+//
+// A finding is identified by (row, check) and by nothing else -- that pair is what makes tonight's
+// census comparable with last night's ledger, and it is why a judgment finding already on the
+// ledger is a RE-SEEN (touch last_seen_at) rather than a second row. The three ledger lists are
+// exhaustive over `prior` by construction: every open row is either seen again tonight or cleared.
+// Clearing is not deletion -- a cleared row keeps its history and simply stops being open.
+export function planWrites(result, prior, items, { rate } = {}) {
+  const byId = new Map((items ?? []).map(i => [i.backlog_id, i.id]));
+  const key = f => `${f.backlog_id} ${f.check ?? f.check_slug}`;
+
+  // A fix without a primary key is not a write, so this throws rather than silently planning a
+  // PATCH it cannot address -- a dropped fix would read as a clean board on the next census.
+  const fixes = result.findings.filter(f => f.verdict === "derivable").map(f => {
+    const id = byId.get(f.backlog_id);
+    if (id === undefined) {
+      throw new Error(`planWrites: no backlog_items id for ${f.backlog_id} (${f.check}) — a fix without a primary key is not a write`);
+    }
+    return { backlog_id: f.backlog_id, id, check: f.check, patch: f.fix };
+  });
+
+  const judgment = result.findings.filter(f => f.verdict === "judgment");
+  const tonight = new Set(judgment.map(key));
+  const priorKeys = new Set((prior ?? []).map(key));
+
+  const insert = judgment.filter(f => !priorKeys.has(key(f))).map(f => ({
+    id: randomUUID(),
+    backlog_id: f.backlog_id,
+    check_slug: f.check,
+    verdict: "judgment",
+    detail: f.detail,
+  }));
+  const reseen = (prior ?? []).filter(p => tonight.has(key(p))).map(p => p.id);
+  const clear = (prior ?? []).filter(p => !tonight.has(key(p))).map(p => p.id);
+
+  return { fixes, ledger: { insert, reseen, clear }, meta: { counts: result.counts, rate } };
+}
+
 // --- the CLI half (credentials, disk, exit codes) ----------------------------------------------
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ALLOWED_FLAGS = new Set(["census", "board", "out", "json"]);
+const ALLOWED_FLAGS = new Set(["census", "board", "out", "json", "apply", "cycle-id"]);
 
 function fail(message) {
   process.stderr.write(`ticket-owner: ${message}\n`);
   process.exit(2);
 }
 
-// Same shape as render-standing-brief.js:1076 -- one fetch path every read goes through, so no
-// caller gets its own error handling and its own chance to swallow a 403.
-async function rest(base, key, pathAndQuery, init = {}) {
-  const headers = { apikey: key, Authorization: `Bearer ${key}`, ...(init.body ? { "Content-Type": "application/json" } : {}) };
+// Same shape as render-standing-brief.js:1076 -- one fetch path every read AND every write goes
+// through, so no caller gets its own error handling and its own chance to swallow a 403. `label`
+// names the write step for the exit-2 message; a read passes none.
+async function rest(base, key, pathAndQuery, init = {}, label = null) {
+  const at = label ? `${label}: ` : "";
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    ...(init.body ? { "Content-Type": "application/json" } : {}),
+    ...(init.headers ?? {}),
+  };
   let res;
   try {
     res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, { ...init, headers });
   } catch (e) {
-    fail(`could not reach the Supabase REST endpoint: ${e.message}`);
+    fail(`${at}could not reach the Supabase REST endpoint: ${e.message}`);
   }
-  if (!res.ok) fail(`Supabase REST returned HTTP ${res.status} ${res.statusText}: ${await res.text().catch(() => "")}`);
-  return res.json();
+  const body = await res.text().catch(() => "");
+  if (!res.ok) fail(`${at}Supabase REST returned HTTP ${res.status} ${res.statusText}: ${body}`);
+  // A write with Prefer: return=minimal answers 201/204 with no body at all; that is a success,
+  // not a parse error.
+  if (body.trim() === "") return null;
+  try {
+    return JSON.parse(body);
+  } catch (e) {
+    fail(`${at}Supabase REST returned a body that is not JSON: ${e.message}`);
+  }
 }
 
 // A TRUNCATED BOARD IS NOT A CENSUS. Every read names its columns and carries a limit; a response
@@ -323,6 +397,149 @@ async function readRate(base, key) {
   return rate;
 }
 
+// applyPlan(base, key, plan, {cycleId, sessionName, now}) -> {decision, expires_at, fixed,
+// inserted, reseen, cleared}
+//
+// The five steps, in this order and no other. The ORDER is the safety property: the decision row
+// exists before any image, every image exists before the cell it images is touched, and the ledger
+// is written last. If step 3 dies halfway, the rows already patched are all imaged under a
+// decision that exists, so one reverse_decision() still puts them back -- which is exactly what
+// "a half-applied plan must still be reversible" means.
+//
+// ck_decision_attribution takes exactly one of cycle_id / session_name: the nightly run is a
+// cycle, the regression fixture is a session. Passing both (or neither) is a programming error and
+// throws before a single request leaves the process.
+export async function applyPlan(base, key, plan, { cycleId, sessionName, now } = {}) {
+  if ((cycleId == null) === (sessionName == null)) {
+    throw new Error("applyPlan: pass exactly one of cycleId / sessionName — every write is attributed to one or the other");
+  }
+  const A = { cycle_id: cycleId ?? null, session_name: sessionName ?? null };
+  const { insert, reseen, clear } = plan.ledger;
+  const ids = [...new Set(plan.fixes.map(f => f.id))];
+
+  let decision = null;
+  let expires_at = null;
+  // Once a decision exists, every later failure message carries it -- so an operator reading the
+  // exit-2 line has the one id they need to reverse whatever did land.
+  const where = step => `${step}${decision ? ` (decision ${decision})` : ""}`;
+
+  // 1 -- the decision, and only if there is something to decide. A night with no derivable fix
+  // records no decision at all rather than an empty one.
+  if (plan.fixes.length > 0) {
+    const nCost = plan.fixes.filter(f => f.check === "cost-snapshot-missing").length;
+    const nClaim = plan.fixes.filter(f => f.check === "claim-on-closed" || f.check === "claim-expired").length;
+    const nType = plan.fixes.filter(f => f.check === "type-off-taxonomy").length;
+    const counts = plan.meta.counts;
+    const rate = plan.meta.rate;
+    const p_summary = `Ticket Owner: ${plan.fixes.length} derivable cell fix(es) on ${ids.length} row(s) — cost ${nCost} · claim ${nClaim} · type ${nType}`;
+    const p_reasoning = `Nightly census ${now}: ${counts.rows} rows read, ${counts.findings} findings (${counts.derivable} derivable, ${counts.judgment} judgment). Each fix is arithmetic (cost_pct_snapshot = round(actual_cycles × runner_pct_per_cycle(), 2) at rate ${rate}), the claim column's own rule (a closed row, or 24 h past with no live cycle), or a one-to-one type spelling (feature → Feature, Bug Fixes → Bug). Whole rows imaged under this decision; no status, quote or design_status written; judgment findings filed in ticket_owner_findings, not here. pattern:0`;
+
+    decision = await rest(base, key, "rpc/record_decision", {
+      method: "POST",
+      body: JSON.stringify({
+        p_cycle_id: cycleId ?? null,
+        p_session_name: sessionName ?? null,
+        p_kind: "hygiene",
+        p_backlog_id: "AGT-79",
+        p_summary,
+        p_reasoning,
+        p_ladder_work_class: null,
+      }),
+    }, "record_decision");
+    if (typeof decision !== "string" || decision.length !== 36) {
+      fail(`record_decision: returned ${JSON.stringify(decision)}, which is not a decision id`);
+    }
+    const dec = await rest(base, key, `runner_decisions?id=eq.${decision}&select=expires_at`, {}, where("record_decision"));
+    expires_at = Array.isArray(dec) && dec[0] ? dec[0].expires_at : null;
+
+    // 2 -- image the FULL rows, before a single cell moves. select=* because reverse_decision()
+    // restores every column from row_data.
+    const rows = await rest(base, key, `backlog_items?id=in.(${ids.join(",")})&select=*`, {}, where("image rows"));
+    if (!Array.isArray(rows) || rows.length !== ids.length) {
+      fail(`${where("image rows")}: read ${Array.isArray(rows) ? rows.length : 0} of ${ids.length}`);
+    }
+    await rest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(rows.map(r => ({ ...A, table_name: "backlog_items", pk_value: r.id, row_data: r, decision_id: decision }))),
+    }, where("image rows"));
+
+    // 3 -- the patches, one row at a time, each one READ BACK. A PATCH that PostgREST accepted and
+    // silently did not apply (a column the role cannot write) answers 200 with the old value, so
+    // the returned representation is compared key by key rather than trusted.
+    for (const fix of plan.fixes) {
+      const step = where(`patch ${fix.backlog_id}`);
+      const back = await rest(base, key, `backlog_items?id=eq.${fix.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify(fix.patch),
+      }, step);
+      const row = Array.isArray(back) ? back[0] : null;
+      if (!row) fail(`${step}: the PATCH returned no row`);
+      for (const k of Object.keys(fix.patch)) {
+        const got = row[k];
+        const want = fix.patch[k];
+        const numeric = got != null && want != null && Number.isFinite(Number(got)) && Number.isFinite(Number(want));
+        const ok = String(got ?? null) === String(want ?? null)
+          || (numeric && Number(got) === Number(want))
+          || (k === "cost_snapshot_at" && Number.isFinite(Date.parse(got)) && Date.parse(got) === Date.parse(want));
+        if (!ok) fail(`${step}: ${k} read ${JSON.stringify(got)}`);
+      }
+    }
+  }
+
+  // 4 -- the ledger inserts, each preceded by a NULL-row image. A null row_data is how the
+  // reversal chain says "this row did not exist before"; without it a reversal would have nothing
+  // to say about a finding the night invented.
+  if (insert.length > 0) {
+    await rest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(insert.map(f => ({ ...A, table_name: "ticket_owner_findings", pk_value: f.id, row_data: null }))),
+    }, where("image findings"));
+    await rest(base, key, "ticket_owner_findings", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(insert.map(f => ({
+        id: f.id,
+        backlog_id: f.backlog_id,
+        check_slug: f.check_slug,
+        verdict: "judgment",
+        detail: f.detail,
+        first_seen_at: now,
+        last_seen_at: now,
+        cycle_id: cycleId ?? null,
+      }))),
+    }, where("insert findings"));
+  }
+
+  // 5 -- the touches. Re-seen rows keep their first_seen_at (the age of a gap is the point);
+  // cleared rows keep everything and simply stop being open.
+  if (reseen.length > 0) {
+    await rest(base, key, `ticket_owner_findings?id=in.(${reseen.join(",")})`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ last_seen_at: now }),
+    }, where("reseen"));
+  }
+  if (clear.length > 0) {
+    await rest(base, key, `ticket_owner_findings?id=in.(${clear.join(",")})`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ cleared_at: now }),
+    }, where("clear"));
+  }
+
+  return {
+    decision,
+    expires_at,
+    fixed: plan.fixes.length,
+    inserted: insert.length,
+    reseen: reseen.length,
+    cleared: clear.length,
+  };
+}
+
 function arg(argv, name) {
   const hit = argv.find(a => a === `--${name}` || a.startsWith(`--${name}=`));
   if (hit === undefined) return undefined;
@@ -334,7 +551,7 @@ async function main() {
   for (const a of argv) {
     const name = a.replace(/^--/, "").split("=")[0];
     if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
-      fail(`unknown flag ${a} — this script reads and reports; it has no --apply (the write pass is slice 2).`);
+      fail(`unknown flag ${a} — this script takes --census, --board=<json>, --apply, --cycle-id=<uuid>, --out=<json> and --json.`);
     }
   }
 
@@ -347,7 +564,19 @@ async function main() {
     fail("--census and --board are two different sources; pass one.");
   }
 
-  let board, now, rate;
+  // --apply is gated twice, and both gates are about attribution rather than convenience. A
+  // fixture board holds ids that do not address live rows, so writing from one is never right;
+  // and a write with no cycle is a change nobody can trace back to the run that made it.
+  const applyArg = arg(argv, "apply");
+  const cycleId = arg(argv, "cycle-id");
+  if (applyArg !== undefined) {
+    if (boardArg !== undefined) fail("--apply writes the live board; a --board fixture is never written.");
+    if (typeof cycleId !== "string" || cycleId.length !== 36) {
+      fail("--apply needs --cycle-id=<uuid> — every write is attributed to a cycle.");
+    }
+  }
+
+  let board, now, rate, base, key;
   if (boardArg !== undefined) {
     // Fixture mode: no credentials are read at all, so a machine without them can still run the
     // census over a board. The fixture's own `now` and `rate` win -- a fixture whose clock came
@@ -365,8 +594,8 @@ async function main() {
     now = parsed.now;
     rate = parsed.rate;
   } else {
-    const base = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_KEY;
+    base = process.env.SUPABASE_URL;
+    key = process.env.SUPABASE_SERVICE_KEY;
     if (!base) fail("SUPABASE_URL is not set — the live census reads the board over REST.");
     if (!key) fail("SUPABASE_SERVICE_KEY is not set — the live census reads the board over REST.");
     now = new Date().toISOString();
@@ -390,6 +619,22 @@ async function main() {
     findings: result.findings,
   };
 
+  // The write pass. Everything above this line is byte-identical to a read-only night; without
+  // --apply nothing below runs, so the census output never depends on whether writing was armed.
+  let applied = null;
+  if (applyArg !== undefined) {
+    const prior = await readAll(base, key, "ticket_owner_findings",
+      "ticket_owner_findings?select=id,backlog_id,check_slug&cleared_at=is.null&limit=10000", 10000);
+    let plan;
+    try {
+      plan = planWrites(result, prior, board.items, { rate });
+    } catch (e) {
+      fail(e.message);
+    }
+    applied = await applyPlan(base, key, plan, { cycleId, now });
+    out.apply = applied;
+  }
+
   const outPath = arg(argv, "out");
   if (outPath !== undefined) {
     if (outPath === true) fail("--out needs a path: --out=<json>.");
@@ -402,7 +647,20 @@ async function main() {
     }
   }
 
-  process.stdout.write(arg(argv, "json") !== undefined ? JSON.stringify(out) + "\n" : renderCensus(result, now));
+  if (arg(argv, "json") !== undefined) {
+    process.stdout.write(JSON.stringify(out) + "\n");
+  } else {
+    let text = renderCensus(result, now);
+    if (applied) {
+      // The reversal SQL is printed ready to paste, with only the reason left to fill in: a write
+      // pass whose undo has to be reconstructed from documentation is not reversible in practice.
+      const head = `ticket-owner apply: fixed ${applied.fixed} · findings +${applied.inserted} ~${applied.reseen} −${applied.cleared}`;
+      text += applied.decision
+        ? `${head} · decision ${applied.decision} — reversible until ${applied.expires_at}: select public.reverse_decision('${applied.decision}','John','<why>');\n`
+        : `${head} · no decision (nothing to fix)\n`;
+    }
+    process.stdout.write(text);
+  }
   process.exit(0);
 }
 
