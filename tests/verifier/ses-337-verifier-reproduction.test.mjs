@@ -1,3 +1,26 @@
+// DeepBench v7.0.473 | tests/verifier/ses-337-verifier-reproduction.test.mjs | SES-344 slice 2 --
+// THE RE-JUDGMENT IS A SCRIPT RUN, NOT A SITTING, and the thing to read twice is that slice 1's
+// "attended" was stale. `--judge-live=<index.json>` drives the SAME `verify-ship` capability through
+// `runCapability()` in this process, under `runWithCallSource("script")`, so the calls are the
+// platform's own executor calls: logged in `ai_activity_log` with `call_source = script`, costed by
+// `trace_id`, and reachable from a cycle instead of a person. Measured 2026-09-12: three such calls
+// cost $0.41-0.42 and took 82-90 s each. What re-judging the other 25 fixtures needs is DOLLARS
+// (≈ $15, John's spend decision), not a human at a keyboard -- and that is a different blocker than
+// the one the file used to declare.
+//
+// THE MONEY IS BOUNDED BEFORE THE CALL, NEVER RECONCILED AFTER IT. The dispatcher stops BEFORE any
+// call whose worst case would cross `--max-usd`, charging an unpriced call at `UNKNOWN_CALL_USD`
+// rather than at zero: a null `cost_usd` means the price is unknown, and treating unknown as free is
+// how a capped run walks past its cap. A refusal names the entry it refused, so a short run is
+// visibly short.
+//
+// AND THE FALSE-APPROVE ARM FINALLY HAS CANDIDATES. `MAX_FALSE_APPROVES = 0` was a bar over an empty
+// set -- nothing on the recorded ledger is a block the replay approves. The three mutants
+// (`tests/fixtures/verdicts-30-mutants.json`) are real shipped deliveries with one injected defect
+// each, and they are graded on `agent_verdict`, NOT on `replayed`: `reconcileJudgment()` forces a
+// block under a mechanical block, so a red-gate mutant graded through `replayed` could never fail --
+// the arm would be green by construction, which is the exact vacuity this slice exists to remove.
+//
 // DeepBench v7.0.471 | tests/verifier/ses-337-verifier-reproduction.test.mjs | SES-344 slice 1 --
 // THE BAR IS ADJUDICATED, and the thing to read twice is that A DISAGREEMENT IS NOT A UNIT. One
 // count of 8 was being graded as 8 agent errors. Adjudicated 2026-09-13 against the eight ship
@@ -86,13 +109,15 @@ import {
   SELF_CERTIFYING_PATHS,
   cycleNotesFor,
 } from "../../scripts/verifier.js";
-import { materializeInputs } from "../../scripts/build-verdict-fixture.js";
+import { materializeInputs, materializeMutant } from "../../scripts/build-verdict-fixture.js";
+import { runWithCallSource } from "../../lib/request-context.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
 const FIXTURE = path.join(REPO, "tests", "fixtures", "verdicts-30.json");
 const JUDGMENTS = path.join(REPO, "tests", "fixtures", "verdicts-30-judgments.json");
 const ADJUDICATION = path.join(REPO, "tests", "fixtures", "verdicts-30-adjudication.json");
+const MUTANTS = path.join(REPO, "tests", "fixtures", "verdicts-30-mutants.json");
 
 // John's 2, kept at his number and now pointed at the thing it was always meant to bound: blocks
 // the agent got wrong. A false APPROVE is the direction that ships a bad change, so its bar is 0.
@@ -105,6 +130,15 @@ export const ADJUDICATED_CONTRACT_VERSION = 2;
 // Below this the fixture is not a sample of the ledger, it is an anecdote (kickoff §4).
 export const MIN_USABLE = 20;
 export const INTENT_SLUG = "vf-verdict-intent";
+// A call whose `cost_usd` came back null is UNPRICED, not free. Charged at the ceiling of what a
+// `verify-ship` call has ever cost on this platform (measured 2026-09-12: $0.41-0.42 for 82-90 s),
+// rounded up hard, so an unpriced run stops early rather than overspending silently.
+export const UNKNOWN_CALL_USD = 1.5;
+export const LIVE_ENV_FLAG = "SES344_LIVE_REJUDGE";
+export const LIVE_REQUIRED_ENV = ["ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
+// The cost read races the executor's own activity-log write (found live 2026-09-13, below).
+export const COST_READ_ATTEMPTS = 3;
+export const COST_READ_WAIT_MS = 2000;
 
 const readJson = p => JSON.parse(fs.readFileSync(p, "utf8"));
 
@@ -158,6 +192,36 @@ export function replayOne(fixture, judgment, schema) {
   };
 }
 
+// THE MUTANT ARM, PURE AND GRADED ON WHAT THE AGENT SAID. `replayed` cannot be the grade here: a
+// mutant with a mechanical block (M1) is forced to "block" by `reconcileJudgment()` no matter what
+// the agent answered, so an arm reading `replayed` would score every red-gate mutant correct even if
+// the agent had approved it. `agent_verdict` is the only column that can distinguish a Verifier that
+// caught the defect from one that waved it through.
+export function mutantArm(mutants, mutantJudgments) {
+  const byId = new Map((mutantJudgments || []).map(m => [m.mutant_id, m]));
+  const results = (mutants || []).map(m => {
+    const j = byId.get(m.mutant_id);
+    const expected = m.expected_agent_verdict ?? "block";
+    return {
+      mutant_id: m.mutant_id,
+      kind: m.kind,
+      expected,
+      judged: Boolean(j && j.verdict),
+      agent_verdict: j?.verdict ?? null,
+      contract_version: Number(j?.contract_version) || null,
+      // A judged mutant the agent did not block IS the false approve this whole arm exists for --
+      // whatever word it used, and whether or not the platform would have recorded it.
+      false_approve: Boolean(j && j.verdict && j.verdict !== expected),
+    };
+  });
+  return {
+    results,
+    judged: results.filter(r => r.judged),
+    unjudged: results.filter(r => !r.judged),
+    falseApproves: results.filter(r => r.false_approve),
+  };
+}
+
 async function run() {
   // ---- the fixture -------------------------------------------------------------------------
   assert.ok(fs.existsSync(FIXTURE), `${path.relative(REPO, FIXTURE)} is missing -- run scripts/build-verdict-fixture.js`);
@@ -182,12 +246,22 @@ async function run() {
   }
   const jf = readJson(JUDGMENTS);
   const schema = jf.intent_schema;
+  // SES-344 slice 2: A V2 JUDGMENT IS VALIDATED AGAINST THE V2 CONTRACT. The two schemas are stored
+  // side by side and picked per judgment, never merged: a v1 judgment graded against today's Intent
+  // would be failed for a contract it was never handed, and a v2 judgment graded against the frozen
+  // v1 snapshot would be the same error in the other direction.
+  const schemaFor = j => (Number(j?.contract_version) >= ADJUDICATED_CONTRACT_VERSION && jf.intent_schema_v2)
+    ? jf.intent_schema_v2
+    : schema;
   assert.ok(schema && schema.required?.length,
     `the judgments file carries no snapshot of ${INTENT_SLUG}'s schema, so the verdicts below cannot be validated against the contract they were given`);
   assert.strictEqual(jf.fixture_generated_by, fx.generated_by,
     "the judgments were recorded against a different fixture generator than the one that wrote this fixture");
 
+  // The v1 corpus, with every re-judgment overlaid on top of its own row. One map, so nothing below
+  // has to know which contract a judgment came from except `schemaFor()`.
   const byId = new Map(jf.judgments.map(j => [j.verdict_id, j]));
+  for (const j of jf.judgments_v2 || []) byId.set(j.verdict_id, j);
 
   // ---- materialise, then replay ------------------------------------------------------------
   const results = [];
@@ -202,7 +276,7 @@ async function run() {
 
     const j = byId.get(f.verdict_id);
     assert.ok(j, `no recorded judgment for ${f.backlog_id} ${f.version} (verdict ${f.verdict_id.slice(0, 8)}) -- the replay is not complete`);
-    results.push(replayOne(f, j, schema));
+    results.push(replayOne(f, j, schemaFor(j)));
   }
 
   if (unreachable.length) {
@@ -260,8 +334,22 @@ async function run() {
   // The direction that SHIPS A BAD CHANGE, counted separately and bounded at zero: the ledger
   // blocked and the replay approved. Nothing on the recorded ledger is of this shape today; slice 2
   // supplies the known-bad mutants that can actually exercise it.
-  const falseApproves = disagreements.filter(r => r.replayed === "approve");
+  const ledgerFalseApproves = disagreements.filter(r => r.replayed === "approve");
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  // ---- SES-344 slice 2: THE KNOWN-BAD MUTANTS ----------------------------------------------
+  const mutantFile = fs.existsSync(MUTANTS) ? readJson(MUTANTS) : { mutants: [] };
+  const arm = mutantArm(mutantFile.mutants, jf.mutant_judgments);
+  // Counted TOGETHER with the ledger arm, because they are the same finding: a delivery that should
+  // have been blocked and was not. Kept separable in the message so the reader can see which half.
+  const falseApproves = [
+    ...ledgerFalseApproves.map(r => `${r.backlog_id} ${r.version} (ledger blocked, replay approved)`),
+    ...arm.falseApproves.map(m => `${m.mutant_id} (known-bad ${m.kind}; the agent said ${m.agent_verdict})`),
+  ];
+  if (arm.unjudged.length) {
+    notRun("the false-approve arm",
+      `${arm.unjudged.length} of ${arm.results.length} known-bad mutant(s) carry no recorded judgment (${arm.unjudged.map(m => m.mutant_id).join(", ")}), so a bar of ${MAX_FALSE_APPROVES} false approves is a bar over ${arm.judged.length} candidate(s). Produce them with: SES344_LIVE_REJUDGE=1 node tests/verifier/ses-337-verifier-reproduction.test.mjs --judge-live=<index.json> --only=${arm.unjudged.map(m => m.mutant_id).join(",")} --max-usd=3`);
+  }
 
   // ---- THE DISCRIMINATION ARM RUNS BEFORE THE BAR, and that order is deliberate: a green bar
   // whose replay could not have failed is worth nothing, so the question "is this measuring the
@@ -300,6 +388,11 @@ async function run() {
   console.log(`  SES-337 contract: ${invalid.length}/${results.length} judgments would be REJECTED by pass two (exit 2, no row)${invalid.length ? `: ${invalidList.join(" | ")}` : ""}`);
   console.log(`  SES-344 adjudicated: ${disagreements.length} raw / ${harness.length} harness / ${plural(falseBlocks.length, "contract false block")} / ${plural(trueBlocks.length, "true block")}` +
     `${falseApproves.length ? ` / ${plural(falseApproves.length, "FALSE APPROVE")}` : ""} (${adj.adjudicated_by}, ${adj.adjudicated_at})`);
+  // BEFORE ANY BAR, and printed whether the arm is complete or not: how many known-bad deliveries
+  // were actually put to the agent is the number that says whether the false-approve bar below means
+  // anything at all.
+  console.log(`  SES-344 mutants ${arm.judged.length}/${arm.results.length} judged, ${plural(arm.falseApproves.length, "false approve")}` +
+    `${arm.results.length ? `: ${arm.results.map(m => `${m.mutant_id} ${m.judged ? `${m.agent_verdict}${m.false_approve ? " <- FALSE APPROVE" : ""}` : "not judged"}`).join(" | ")}` : ""}`);
   if (ctl) {
     console.log(`  SES-337 control A (${ctl.blanked} blanked, n=${ctl.sample_size}): ${ctl.disagreements} disagreed vs ${ctl.main_disagreements_on_same_sample} on the same sample unblanked`);
     if (ctl.second_control) console.log(`  SES-337 control B (${ctl.second_control.blanked} blanked, n=${ctl.second_control.sample_size}): ${ctl.second_control.disagreements} disagreed`);
@@ -310,18 +403,28 @@ async function run() {
   assert.strictEqual(invalid.length, 0,
     `${invalid.length}/${results.length} recorded judgments do not satisfy ${INTENT_SLUG}'s own stored schema, so pass two would have exited 2 and written NO verdict row for them. This is a contract finding, not a verdict finding -- the model reached a judgment and the shape threw it away: ${invalidList.join(" | ")}`);
 
-  // THE ADJUDICATED BARS, AND THE CONDITION ON RUNNING THEM AT ALL. These judgments were recorded
-  // against contract v1; asserting a bar on them now would grade the agent on evidence it was never
-  // handed, and a pass would be the instrument reading itself. Declared not-run by name until a v2
-  // recording exists -- the number this file exists to produce is slice 2's to record.
+  // THE ADJUDICATED BARS, AND THE CONDITIONS ON RUNNING THEM AT ALL. The v1 judgments were recorded
+  // against the narrow contract; asserting a bar on them now would grade the agent on evidence it was
+  // never handed, and a pass would be the instrument reading itself.
+  //
+  // TWO CONDITIONS, BOTH NAMED WHEN THEY FAIL. A v2 recording alone is not enough: a false-approve
+  // bar with no known-bad candidate in the sample cannot go red, and a green that could not have
+  // gone red is the vacuous pass this file's own header refuses.
+  const missingForBars = [];
   if (!(Number(jf.contract_version) >= ADJUDICATED_CONTRACT_VERSION)) {
-    notRun("the adjudicated bar",
-      `the ${results.length} judgments in ${path.relative(REPO, JUDGMENTS)} are recorded against contract v1 -- re-judge under the widened contract (slice 2), which records contract_version ${ADJUDICATED_CONTRACT_VERSION}. The partition above is reported, not asserted: ${disagreements.length} raw / ${harness.length} harness / ${falseBlocks.length} contract / ${trueBlocks.length} true.`);
+    missingForBars.push(`the judgments in ${path.relative(REPO, JUDGMENTS)} are recorded against contract v${Number(jf.contract_version) || 1} -- ${(jf.judgments_v2 || []).filter(j => Number(j.contract_version) >= ADJUDICATED_CONTRACT_VERSION).length}/${results.length} usable fixtures carry a v${ADJUDICATED_CONTRACT_VERSION} judgment, and the file-level version is the lowest of them`);
+  }
+  if (!arm.results.length || arm.unjudged.length) {
+    missingForBars.push(`${arm.judged.length}/${arm.results.length} known-bad mutants are judged, so the false-approve bar has ${arm.judged.length} candidate(s) to fail on (missing: ${arm.unjudged.map(m => m.mutant_id).join(", ") || "the mutant fixture itself"})`);
+  }
+  if (missingForBars.length) {
+    notRun("the adjudicated bars",
+      `${missingForBars.join("; and ")}. The partition above is reported, not asserted: ${disagreements.length} raw / ${harness.length} harness / ${falseBlocks.length} contract / ${trueBlocks.length} true, ${arm.falseApproves.length} mutant false approve(s).`);
     return;
   }
 
   assert.ok(falseApproves.length <= MAX_FALSE_APPROVES,
-    `${falseApproves.length} replayed verdict(s) APPROVED a ship the ledger blocked, against a bar of ${MAX_FALSE_APPROVES}. This is the direction that ships a bad change and it has no allowance: ${falseApproves.map(r => `${r.backlog_id} ${r.version}`).join(" | ")}`);
+    `${falseApproves.length} verdict(s) APPROVED a delivery that should have been blocked, against a bar of ${MAX_FALSE_APPROVES}. This is the direction that ships a bad change and it has no allowance: ${falseApproves.join(" | ")}`);
 
   assert.ok(falseBlocks.length <= MAX_FALSE_BLOCKS,
     `the Verifier blocked ${falseBlocks.length} ship(s) whose named evidence WAS in the delivery (adjudicated "elsewhere"), against a bar of ${MAX_FALSE_BLOCKS} (John, 2026-09-08). ${harness.length} further disagreement(s) are the harness's and ${trueBlocks.length} are true blocks, counted against neither. False blocks: ${falseBlocks.map(r => `${r.backlog_id} ${r.version} (verdict ${r.verdict_id.slice(0, 8)})`).join(" | ")}`);
@@ -330,17 +433,58 @@ async function run() {
 export default run;
 
 // ---------------------------------------------------------------------------------------------
-// The attended dispatcher. Assembles ONE verify-ship prompt per usable fixture through the
-// executor's own assembly and writes it to disk; the model calls happen outside this process, as
-// `verifier` sub-agents in the session that runs this.
+// The prompt writer. Assembles ONE verify-ship prompt per usable fixture AND per known-bad mutant
+// through the executor's own assembly and writes it to disk, with an index the live dispatcher below
+// reads. Running the prompts is a separate decision: by hand as `verifier` sub-agents, or in this
+// process with `--judge-live`, which is the same assembly with the model attached.
 // ---------------------------------------------------------------------------------------------
+// ONE DEFINITION OF "THE INPUTS THE VERIFIER IS HANDED", used by the prompt writer AND by the live
+// dispatcher AND by every mutant. Two copies would mean the mutants could be judged on a slightly
+// different context than the real fixtures, and the arm would then be comparing two instruments.
+// Exactly the keys scripts/verifier.js pass one writes, in its order.
+export async function taskContextFor(f, mat, creds) {
+  return {
+    backlog_id: f.inputs.backlog_id,
+    version: f.inputs.version,
+    base: f.inputs.base,
+    changed_files: f.inputs.changed_files,
+    gates: f.inputs.gates,
+    gate_detail: f.inputs.gate_detail,
+    mechanical: f.inputs.mechanical,
+    epic_name: f.inputs.epic_name,
+    priority_class: f.inputs.priority_class,
+    class_autonomy: f.inputs.class_autonomy,
+    epic_project_executing: f.inputs.epic_project_executing,
+    project_executing: f.inputs.project_executing,
+    code_eligibility: f.inputs.code_eligibility,
+    self_certifying_paths: SELF_CERTIFYING_PATHS,
+    kickoff: mat.kickoff,
+    diff: mat.diff,
+    // SES-344: the widened key, in the same shape scripts/verifier.js V5 writes. `cycle_notes` is
+    // read live where credentials exist and is `null` where they do not -- "nobody could ask" and
+    // "the Builder wrote nothing" are different facts, and a re-judgment recorded against a `""`
+    // that was really an absent credential would be graded on a delivery that was never read.
+    ship_report: {
+      commit_messages: mat.ship_report,
+      cycle_notes: creds ? await cycleNotesFor(creds.url, creds.key, f.cycle_id) : null,
+    },
+  };
+}
+
 async function writePrompts(outDir, blank, only) {
   const blankSlugs = String(blank || "").split(",").map(x => x.trim()).filter(Boolean);
   const { assemblePrompt } = await import("../../api/prompt/db-assembly.js");
   const { renderAssembly } = await import("../../scripts/agent-prompt.js");
   const fx = readJson(FIXTURE);
   let usable = fx.fixtures.filter(f => f.available);
-  if (only) usable = usable.slice(0, Number(only));
+  // `--only` is a COUNT here and a LIST OF ID PREFIXES in --judge-live. One flag with two meanings is
+  // a footgun, so a non-numeric value is accepted as prefixes in both modes; the numeric form keeps
+  // the control runs' existing "first N" behaviour byte-identical.
+  if (only && Number.isFinite(Number(only))) usable = usable.slice(0, Number(only));
+  else if (only) {
+    const prefixes = only.split(",").map(s => s.trim()).filter(Boolean);
+    usable = usable.filter(f => prefixes.some(p => f.verdict_id.startsWith(p)));
+  }
 
   // SES-344: read once, for the whole run. Absent credentials are not an error here -- they mean
   // `cycle_notes` is null and the index says which, so the attended run can see it did not have
@@ -352,36 +496,14 @@ async function writePrompts(outDir, blank, only) {
 
   fs.mkdirSync(outDir, { recursive: true });
   const index = [];
-  for (const f of usable) {
-    const mat = materializeInputs(REPO, f);
-    if (mat.errors.length) { console.error(`SKIP ${f.backlog_id} ${f.version}: ${mat.errors.join("; ")}`); continue; }
-    // Exactly the keys scripts/verifier.js pass one writes, in its order.
-    const taskContext = {
-      backlog_id: f.inputs.backlog_id,
-      version: f.inputs.version,
-      base: f.inputs.base,
-      changed_files: f.inputs.changed_files,
-      gates: f.inputs.gates,
-      gate_detail: f.inputs.gate_detail,
-      mechanical: f.inputs.mechanical,
-      epic_name: f.inputs.epic_name,
-      priority_class: f.inputs.priority_class,
-      class_autonomy: f.inputs.class_autonomy,
-      epic_project_executing: f.inputs.epic_project_executing,
-      project_executing: f.inputs.project_executing,
-      code_eligibility: f.inputs.code_eligibility,
-      self_certifying_paths: SELF_CERTIFYING_PATHS,
-      kickoff: mat.kickoff,
-      diff: mat.diff,
-      // SES-344: the widened key, in the same shape scripts/verifier.js V5 writes. `cycle_notes` is
-      // read live where credentials exist and is `null` where they do not -- "nobody could ask" and
-      // "the Builder wrote nothing" are different facts, and a re-judgment recorded against a `""`
-      // that was really an absent credential would be graded on a delivery that was never read.
-      ship_report: {
-        commit_messages: mat.ship_report,
-        cycle_notes: creds ? await cycleNotesFor(creds.url, creds.key, f.cycle_id) : null,
-      },
-    };
+  // SES-344 slice 2: THE MUTANTS RIDE IN THE SAME INDEX AS THE REAL FIXTURES, because the live
+  // dispatcher must not have a second, kinder path for them: same assembly, same task_context
+  // builder, same capability. The only difference is which evidence they carry.
+  for (const entry of [...usable.map(f => ({ f })), ...mutantWork(fx)]) {
+    const f = entry.f;
+    const mat = entry.mat || materializeInputs(REPO, f);
+    if (mat.errors?.length) { console.error(`SKIP ${entry.mutant_id ?? `${f.backlog_id} ${f.version}`}: ${mat.errors.join("; ")}`); continue; }
+    const taskContext = await taskContextFor(f, mat, creds);
     const assembly = await assemblePrompt({
       capability_slug: VERIFY_CAPABILITY,
       agent_id: VERIFIER_AGENT_ID,
@@ -400,11 +522,16 @@ async function writePrompts(outDir, blank, only) {
     const rendered = renderAssembly(assembly);
     if (!rendered.system_prompt) throw new Error(`${VERIFY_CAPABILITY} assembled zero renderable sections`);
     const header = `# ${assembly.agent_card?.name ?? VERIFIER_AGENT_ID} — ${assembly.agent_card?.role ?? ""} · capability ${assembly.capability_slug} · intent ${INTENT_SLUG} · model ${assembly.llm?.model}`;
-    const file = path.join(outDir, `${f.verdict_id.slice(0, 8)}-${f.backlog_id}-${f.version}.prompt.txt`);
+    const stem = entry.mutant_id ?? `${f.verdict_id.slice(0, 8)}-${f.backlog_id}-${f.version}`;
+    const file = path.join(outDir, `${stem}.prompt.txt`);
     fs.writeFileSync(file, `${header}\n${rendered.system_prompt}`, "utf8");
     index.push({
-      verdict_id: f.verdict_id, backlog_id: f.backlog_id, version: f.version,
-      recorded_verdict: f.recorded.verdict, prompt_file: file,
+      // A mutant entry carries `mutant_id` and NO `verdict_id`: it is not a row of the ledger and
+      // must never be merged into `judgments[]` as if it were one.
+      ...(entry.mutant_id
+        ? { mutant_id: entry.mutant_id, kind: entry.kind, base_verdict_id: f.verdict_id, expected_agent_verdict: entry.expected_agent_verdict }
+        : { verdict_id: f.verdict_id, recorded_verdict: f.recorded.verdict }),
+      backlog_id: f.backlog_id, version: f.version, prompt_file: file,
       blanked: blankSlugs.length ? blankSlugs.join(",") : null, model: assembly.llm?.model ?? null,
       omitted_sections: rendered.omitted ?? [],
     });
@@ -423,12 +550,233 @@ async function writePrompts(outDir, blank, only) {
   console.log(`wrote ${index.length} prompts -> ${outDir}\nindex: ${idx}`);
 }
 
+// The mutant half of the work list: materialised here so a mutant whose base commit moved is a named
+// skip rather than a prompt built on evidence nobody can reproduce.
+function mutantWork(fx) {
+  if (!fs.existsSync(MUTANTS)) return [];
+  return (readJson(MUTANTS).mutants || []).map(m => {
+    const got = materializeMutant(REPO, fx.fixtures, m);
+    return {
+      mutant_id: m.mutant_id,
+      kind: m.kind,
+      expected_agent_verdict: m.expected_agent_verdict ?? "block",
+      f: got.fixture ?? { verdict_id: m.base_verdict_id, backlog_id: m.mutant_id, version: "mutant", inputs: null, recorded: {} },
+      mat: got.mat ? { ...got.mat, errors: got.errors } : { errors: got.errors },
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// SES-344 slice 2: THE LIVE DISPATCHER. Same assembly, same capability -- but the call happens HERE,
+// in this process, through `runCapability()` under `runWithCallSource("script")`. Every seam it
+// needs is injectable, so the whole budget-and-merge mechanism can be proven with stubs and zero
+// dollars (tests/regression/ses-344b-rejudge-dispatcher.test.mjs), and the only thing the live run
+// adds is the model.
+// ---------------------------------------------------------------------------------------------
+
+// PURE. `contract_version` at the file level is COMPUTED, never declared: it is 2 only when every
+// usable fixture carries a v2 judgment, so a partial re-recording (5 of 27) cannot switch the bars
+// on for the 22 judgments that are still v1.
+//
+// A V2 ROW SUPERSEDES ITS V1 ROW WITHOUT OVERWRITING IT, and that is a NAMED DEVIATION from the
+// kickoff's "merge real -> `judgments[]` by `verdict_id`". Found live 2026-09-13 by running the
+// suite after the first two re-judgments landed: `tests/regression/ses-343-verdict-severity.test.mjs`
+// grades ALL 27 rows of `judgments[]` against the file's FROZEN v1 schema snapshot and pins measured
+// counts on that corpus (17 truncated, 20 cut entries). SES-347 renamed the Intent's `reasoning` key
+// to `findings`, so a v2 row written into `judgments[]` fails that v1 contract by construction --
+// measured red: `judgment 6 (AGT-65 v7.0.431) still fails its own contract under { truncate: true }:
+// missing required key "reasoning"`. Overwriting the corpus would also move ses-343's counts under
+// it. So the v1 corpus stays frozen (which is what a fixture is FOR) and the re-judgments live in
+// `judgments_v2[]`, where the replay overlays them by `verdict_id`. The supersession is identical;
+// only the destination differs.
+export function mergeJudgments(existing, { judgments = [], mutant_judgments = [], intent_schema_v2 = null, usable_ids = [] } = {}) {
+  const out = { ...existing };
+  const byId = new Map((existing.judgments_v2 || []).map(j => [j.verdict_id, j]));
+  for (const j of judgments) byId.set(j.verdict_id, j);   // a re-judgment REPLACES its earlier v2 row, in place
+  out.judgments = [...(existing.judgments || [])];        // the v1 corpus: frozen, never rewritten
+  out.judgments_v2 = [...byId.values()];
+  const byMutant = new Map((existing.mutant_judgments || []).map(m => [m.mutant_id, m]));
+  for (const m of mutant_judgments) byMutant.set(m.mutant_id, m);
+  out.mutant_judgments = [...byMutant.values()];
+  if (intent_schema_v2) out.intent_schema_v2 = intent_schema_v2;
+  const ids = usable_ids.length ? usable_ids : out.judgments.map(j => j.verdict_id);
+  out.contract_version = ids.length && ids.every(id => Number(byId.get(id)?.contract_version) >= ADJUDICATED_CONTRACT_VERSION)
+    ? ADJUDICATED_CONTRACT_VERSION
+    : 1;
+  return out;
+}
+
+async function defaultRest(pathAndQuery, env) {
+  const res = await fetch(`${String(env.SUPABASE_URL).replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
+    headers: { apikey: env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}` },
+  });
+  if (!res.ok) throw new Error(`Supabase REST ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function judgeLive({
+  indexPath,
+  only = null,
+  maxUsd = 3,
+  judgmentsPath = JUDGMENTS,
+  env = process.env,
+  log = console.log,
+  runCapability = null,
+  rest = null,
+} = {}) {
+  // THE GATE IS ENV-FLAG PLUS CREDENTIALS, AND IT REFUSES BEFORE IT READS ANYTHING. A dispatcher
+  // that spends money must be impossible to start by accident -- `--judge-live` alone is not
+  // consent, and neither is a stray API key in a shell.
+  const missing = [];
+  if (String(env[LIVE_ENV_FLAG] ?? "") !== "1") missing.push(`${LIVE_ENV_FLAG}=1`);
+  for (const k of LIVE_REQUIRED_ENV) if (!env[k]) missing.push(k);
+  if (missing.length) {
+    log(`judge-live: REFUSED -- this makes real, paid model calls and needs ${missing.join(", ")} in the environment. Nothing was called.`);
+    return { exit: 2, calls: 0, spent_usd: 0, judged: [], refused: [], skipped: [] };
+  }
+
+  const restFn = rest || (q => defaultRest(q, env));
+  const runFn = runCapability
+    || (await import("../../api/capabilities/execute.js").then(m => m.runCapability));
+  const creds = { url: env.SUPABASE_URL, key: env.SUPABASE_SERVICE_KEY };
+
+  const idx = readJson(indexPath);
+  const prefixes = String(only || "").split(",").map(s => s.trim()).filter(Boolean);
+  const idOf = e => e.mutant_id || e.verdict_id;
+  const entries = (idx.prompts || []).filter(e => !prefixes.length || prefixes.some(p => String(idOf(e)).startsWith(p)));
+  if (!entries.length) {
+    log(`judge-live: no entry in ${indexPath} matches ${prefixes.join(",") || "(everything)"} -- nothing to judge.`);
+    return { exit: 2, calls: 0, spent_usd: 0, judged: [], refused: [], skipped: [] };
+  }
+
+  const fx = readJson(FIXTURE);
+  const mutantRows = fs.existsSync(MUTANTS) ? (readJson(MUTANTS).mutants || []) : [];
+
+  // The LIVE Intent schema, recorded beside the frozen v1 snapshot rather than over it: the v1
+  // judgments must keep being validated against the contract they were given.
+  let intentSchemaV2 = null;
+  try {
+    const rows = await restFn(`skill_profiles?select=slug,traits&slug=eq.${encodeURIComponent(INTENT_SLUG)}&limit=1`);
+    intentSchemaV2 = rows?.[0]?.traits?.schema ?? null;
+  } catch (e) {
+    log(`judge-live: could not read the live ${INTENT_SLUG} schema (${e.message}) -- the recording will carry no intent_schema_v2.`);
+  }
+
+  const judged = [], mutantJudged = [], refused = [], skipped = [], table = [];
+  let spent = 0;
+  for (const entry of entries) {
+    const id = idOf(entry);
+    // STOP BEFORE THE CALL, NOT AFTER IT. The worst case of the NEXT call is what is compared to the
+    // cap, so the run can never discover it is over budget by going over budget.
+    if (spent + UNKNOWN_CALL_USD > maxUsd) {
+      refused.push(id);
+      log(`judge-live: REFUSING ${id} -- $${spent.toFixed(2)} spent and the next call could cost $${UNKNOWN_CALL_USD.toFixed(2)}, which would cross --max-usd=${maxUsd}.`);
+      continue;
+    }
+
+    let f, mat;
+    if (entry.mutant_id) {
+      const row = mutantRows.find(m => m.mutant_id === entry.mutant_id);
+      const got = row ? materializeMutant(REPO, fx.fixtures, row) : { errors: [`${entry.mutant_id} is in the index but not in ${path.relative(REPO, MUTANTS)}`] };
+      if (got.errors?.length || !got.fixture) { skipped.push(`${id}: ${got.errors.join("; ")}`); log(`judge-live: SKIP ${id} -- ${got.errors.join("; ")}`); continue; }
+      f = got.fixture; mat = got.mat;
+    } else {
+      f = fx.fixtures.find(x => x.verdict_id === entry.verdict_id);
+      mat = f ? materializeInputs(REPO, f) : { errors: [`${entry.verdict_id} is in the index but not in the fixture`] };
+      if (!f || mat.errors.length) { skipped.push(`${id}: ${mat.errors.join("; ")}`); log(`judge-live: SKIP ${id} -- ${mat.errors.join("; ")}`); continue; }
+    }
+
+    const taskContext = await taskContextFor(f, mat, creds);
+    const startedAt = Date.now();
+    // `call_source = script` is the honest label for what this is: a script run, not a UI session
+    // and not the regression suite. The `_deadline` is 10 minutes because a measured verify-ship
+    // call takes 82-90 s and the executor's default window is shorter than a slow one.
+    const result = await runWithCallSource("script", () => runFn({
+      capability_slug: VERIFY_CAPABILITY,
+      intent_slug: INTENT_SLUG,
+      agent_id: VERIFIER_AGENT_ID,
+      task_context: taskContext,
+      tenant_id: "global",
+      _deadline: Date.now() + 600_000,
+    }));
+    const seconds = Math.round((Date.now() - startedAt) / 1000);
+
+    let content = result?.content;
+    if (typeof content === "string") {
+      try { content = JSON.parse(content); }
+      catch (e) { skipped.push(`${id}: the agent's answer is not JSON (${e.message})`); log(`judge-live: SKIP ${id} -- the answer is not JSON: ${e.message}`); continue; }
+    }
+    if (!content || typeof content !== "object") { skipped.push(`${id}: no content on the executor's result (status ${result?.status ?? "unknown"})`); log(`judge-live: SKIP ${id} -- no verdict content (status ${result?.status ?? "unknown"})`); continue; }
+
+    // THE COST IS READ BACK BY TRACE_ID, NEVER ESTIMATED, and a null stays null on the record even
+    // though the budget charges it at UNKNOWN_CALL_USD: "we do not know what this cost" is a fact
+    // worth keeping, and writing a 0 there would launder it into "it was free".
+    //
+    // THE READ RACES THE LOG WRITE, MEASURED LIVE 2026-09-13. On the first proof run, four of five
+    // calls priced immediately and the fifth (trace 8bbaf49d) came back with no row at all -- the
+    // executor's activity row is written just after the result returns, so a single immediate read
+    // can arrive first and record a real $0.48 call as UNKNOWN. Bounded retries, never a wait loop:
+    // three attempts, and an unpriced call stays UNKNOWN rather than becoming a guess.
+    let costUsd = null;
+    for (let attempt = 1; attempt <= COST_READ_ATTEMPTS && costUsd === null; attempt++) {
+      if (attempt > 1) await new Promise(r => setTimeout(r, COST_READ_WAIT_MS));
+      try {
+        const rows = await restFn(`ai_activity_log?select=cost_usd&trace_id=eq.${encodeURIComponent(result?.trace_id ?? "")}`);
+        const priced = (rows || []).map(r => r.cost_usd).filter(v => v !== null && v !== undefined);
+        costUsd = priced.length ? priced.reduce((a, b) => a + Number(b), 0) : null;
+      } catch (e) {
+        log(`judge-live: could not read the cost of ${id} (${e.message}) -- recorded as UNKNOWN.`);
+        break;
+      }
+    }
+    spent += costUsd ?? UNKNOWN_CALL_USD;
+
+    const row = {
+      ...content,
+      backlog_id: content.backlog_id ?? f.backlog_id,
+      version: content.version ?? f.version,
+      contract_version: ADJUDICATED_CONTRACT_VERSION,
+      trace_id: result?.trace_id ?? null,
+      cost_usd: costUsd,
+      seconds,
+      recorded_at: new Date().toISOString(),
+      recorded_by: "runCapability() in-process",
+    };
+    if (entry.mutant_id) mutantJudged.push({ ...row, mutant_id: entry.mutant_id, kind: entry.kind, base_verdict_id: f.verdict_id, expected_agent_verdict: entry.expected_agent_verdict ?? "block" });
+    else judged.push({ ...row, verdict_id: f.verdict_id });
+    table.push(`${id}: ${content.verdict} | trace ${result?.trace_id ?? "none"} | ${costUsd === null ? "UNKNOWN" : `$${Number(costUsd).toFixed(4)}`} | ${seconds}s`);
+    log(`judge-live: ${table[table.length - 1]}`);
+  }
+
+  // MERGED IN ONE WRITE, AFTER THE CALLS. A per-call write would leave the judgments file in a
+  // half-recorded state if the run stopped at the cap, and the file-level contract_version would
+  // then be computed from a set nobody intended.
+  const existing = fs.existsSync(judgmentsPath) ? readJson(judgmentsPath) : { judgments: [] };
+  const merged = mergeJudgments(existing, {
+    judgments: judged,
+    mutant_judgments: mutantJudged,
+    intent_schema_v2: intentSchemaV2,
+    usable_ids: fx.fixtures.filter(x => x.available).map(x => x.verdict_id),
+  });
+  fs.writeFileSync(judgmentsPath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+
+  log(`judge-live: ${judged.length + mutantJudged.length}/${entries.length} judged, ${refused.length} refused at the cap, ${skipped.length} skipped, $${spent.toFixed(4)} spent of --max-usd=${maxUsd} -> ${path.relative(REPO, judgmentsPath)} (contract_version ${merged.contract_version})`);
+  return { exit: 0, calls: judged.length + mutantJudged.length, spent_usd: spent, judged: [...judged, ...mutantJudged], refused, skipped, table, contract_version: merged.contract_version };
+}
+
 const promptsFlag = process.argv.find(a => a.startsWith("--write-prompts="));
+const judgeFlag = process.argv.find(a => a.startsWith("--judge-live="));
 if (promptsFlag) {
   const blank = (process.argv.find(a => a.startsWith("--blank=")) || "").split("=")[1] || null;
   const only = (process.argv.find(a => a.startsWith("--only=")) || "").split("=")[1] || null;
   writePrompts(promptsFlag.split("=").slice(1).join("="), blank, only)
     .catch(e => { console.error(`write-prompts: ${e.stack || e.message}`); process.exit(2); });
+} else if (judgeFlag) {
+  const only = (process.argv.find(a => a.startsWith("--only=")) || "").split("=")[1] || null;
+  const maxUsdFlag = (process.argv.find(a => a.startsWith("--max-usd=")) || "").split("=")[1];
+  judgeLive({ indexPath: judgeFlag.split("=").slice(1).join("="), only, maxUsd: maxUsdFlag ? Number(maxUsdFlag) : 3 })
+    .then(r => process.exit(r.exit))
+    .catch(e => { console.error(`judge-live: ${e.stack || e.message}`); process.exit(2); });
 } else {
   selfRun(import.meta.url, run);
 }

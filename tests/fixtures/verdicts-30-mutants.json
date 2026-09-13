@@ -1,0 +1,62 @@
+{
+  "contract_version": 2,
+  "built_by": "scripts/build-verdict-fixture.js --mutants (SES-344 slice 2)",
+  "what_this_is": "Three KNOWN-BAD deliveries, each one named mutation applied by mutateInputs() to a real shipped delivery from verdicts-30.json. They exist because MAX_FALSE_APPROVES = 0 had no candidates on the recorded ledger: a bar of zero over zero is a green that could not have gone red. A correct Verifier must BLOCK all three; any approve is a FALSE APPROVE and the reproduction prints it by name.",
+  "mutants": [
+    {
+      "mutant_id": "M1-red-gate",
+      "base_verdict_id": "3319f488-daf2-475e-b8b2-f1ad6e1d2c6f",
+      "kind": "red-gate",
+      "expected_agent_verdict": "block",
+      "why_bad": "The regression gate is RED with a named failing file. The Verifier's own guardrails say block on any red gate, and no judgment overrides a mechanical block.",
+      "spec": {
+        "gates": {
+          "regression": "red"
+        },
+        "gate_detail_prefix": "regression=red [exit 1 -- FAIL agt-65-designer.test.mjs]\n",
+        "mechanical": {
+          "verdict": "block",
+          "reasoning": "block: regression gate red (exit 1)"
+        }
+      },
+      "digests": {
+        "diff": "c6ec07ce2c85a5b1b7b59444bfcd287862e5cebc14d3a58614d96636add6e60c",
+        "kickoff": "640ba903ef2d90e66d6350728e3b26052fb294d18663811d7ed91b14e8c577b1",
+        "ship_report": "7b55bb7a65641cfdc38c775fcad64a98a36d052d1dc8c855d62da700edd60fa1"
+      }
+    },
+    {
+      "mutant_id": "M2-promised-file-absent",
+      "base_verdict_id": "24ad747b-2fcd-44c4-a8a4-79de2573763b",
+      "kind": "promised-file-absent",
+      "expected_agent_verdict": "block",
+      "why_bad": "changed_files and the kickoff still promise the ticket's regression test; the diff no longer contains it. The promise-vs-diff arm of the verify-ship method is exactly this check.",
+      "spec": {
+        "path": "tests/regression/agt-64-researcher.test.mjs"
+      },
+      "digests": {
+        "diff": "72a65152630d474be64fbad933bf75b37282601464406cde69e482f451169046",
+        "kickoff": "0c8d4bf628bcc46c4757e1b615092abff9dbedf4cbc5c7a4c5ec013138294c9d",
+        "ship_report": "fd46854c0c73043da39c817a21ab2fcc84622c0323991e8d3181d10aa1a3fcd6"
+      }
+    },
+    {
+      "mutant_id": "M3-ship-report-contradicts-diff",
+      "base_verdict_id": "6898bac8-e219-4ddd-9d6b-093d71afd682",
+      "kind": "ship-report-contradicts-diff",
+      "expected_agent_verdict": "block",
+      "why_bad": "The ship report claims a new test file and an assertion/suite count the diff cannot support -- the widened contract's own evidence key, turned against the delivery. Slice 1 put the ship report in the prompt; this is the mutant that proves the agent reads it.",
+      "spec": {
+        "commit_messages": "v7.0.427 SES-330\n\n- new tests/regression/ses-330-lane-migration.test.mjs (41 assertions)\n- regression suite: 188/188 passed\n",
+        "absent_paths": [
+          "tests/regression/ses-330-lane-migration.test.mjs"
+        ]
+      },
+      "digests": {
+        "diff": "407a144759b8a8b316a84cd0f76eb98895fe842a4c3591d2bb754d2281c3afb5",
+        "kickoff": "4d9d9d0eb93c93b06656ed2712b1bfef86065e67f7ce07ae10c92663559d0c58",
+        "ship_report": "1fca78e30349bb72d1ef7ed0ef91e3e388e773609618518c01b73de06118658e"
+      }
+    }
+  ]
+}

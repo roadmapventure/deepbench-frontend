@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+// DeepBench v7.0.473 | scripts/build-verdict-fixture.js | SES-344 slice 2 -- THE KNOWN-BAD MUTANTS,
+// and the thing to read twice is WHY A MUTANT IS A FUNCTION OF A REAL FIXTURE RATHER THAN A
+// HAND-WRITTEN PAYLOAD. `MAX_FALSE_APPROVES = 0` has never been exercised: nothing on the recorded
+// ledger is a block the replay approves, so a bar of zero over zero candidates is a green that
+// could not have gone red. The false-approve arm needs deliveries a correct Verifier MUST block --
+// and a hand-typed one would be a straw man, gradeable only against itself. So each mutant is ONE
+// named, pure mutation (`mutateInputs()`) applied to a real shipped delivery whose diff and kickoff
+// still hash to what was judged: everything else the agent sees is the genuine article, and the
+// only thing it can be blocking on is the defect that was injected.
+//
+// THE DIGESTS ARE THE MUTANT'S, NOT THE BASE'S. `materializeMutant()` re-derives the three evidence
+// strings and checks them against `mutant.digests`, so a base commit whose history moved -- or a
+// spec edited without re-running `--mutants` -- is a loud error rather than a silently different
+// test. `--mutants` is the one writer of those digests.
+//
 // DeepBench v7.0.471 | scripts/build-verdict-fixture.js | SES-344 slice 1 -- `rawInputs()` also
 // rebuilds the SHIP REPORT (`git log -1 --format=%B <sha>`, capped at `SHIP_REPORT_CAP`) and
 // `materializeInputs()` passes it through as `ship_report`, so the replay can hand a fixture the
@@ -193,7 +208,157 @@ export function materializeInputs(repo, fixture) {
   return { ...got, ship_report: got.shipReport, errors };
 }
 
+// ---------------------------------------------------------------------------------------------
+// SES-344 slice 2: THE MUTANTS
+// ---------------------------------------------------------------------------------------------
+
+export const MUTANTS_PATH = "tests/fixtures/verdicts-30-mutants.json";
+export const MUTANT_KINDS = ["red-gate", "promised-file-absent", "ship-report-contradicts-diff"];
+
+// PURE, AND IT THROWS RATHER THAN MUTATING NOTHING. A mutation that silently no-ops produces a
+// mutant identical to a real approved ship -- which the Verifier would then correctly approve, and
+// the arm would score that approve as a FALSE one. Every kind below asserts its own precondition
+// against the evidence it was handed, so "the defect is present" is proven before the agent is
+// asked about it, never assumed from the spec's wording.
+//
+// `inputs` is the fixture's `inputs` widened with the three materialised evidence strings
+// (`diff`, `kickoff`, `ship_report: { commit_messages }`) -- the shape the task_context is built
+// from, so a mutation can reach the gate columns and the evidence in one object.
+export function mutateInputs(kind, inputs, spec = {}) {
+  if (!inputs || typeof inputs !== "object") throw new Error("mutateInputs: inputs object required");
+  const out = {
+    ...inputs,
+    gates: { ...(inputs.gates || {}) },
+    changed_files: [...(inputs.changed_files || [])],
+    ship_report: { ...(inputs.ship_report || {}) },
+  };
+
+  if (kind === "red-gate") {
+    // A RED GATE IS THE ONE BLOCK NO JUDGMENT GETS TO OVERRIDE, so this mutant makes the mechanical
+    // lane and the gate output agree that the suite failed. `gate_detail` is PREFIXED rather than
+    // replaced: the rest of the recorded gate output is what the agent reads for context, and
+    // throwing it away would leave a delivery nobody could grade for any other reason.
+    out.gates.regression = "red";
+    // CROSS-CHECKED AGAINST THE SHIPPED FUNCTION, never just against the spec's own wording: a
+    // mutant whose `mechanical` disagreed with what `verdictFor()` derives from its own gate
+    // columns would be an incoherent delivery, and an agent blocking it would be blocking the
+    // incoherence rather than the red gate. The spec supplies the reasoning text the recording is
+    // pinned to; the VERDICT has to be the one the platform would have written.
+    const mech = verdictFor(out.gates);
+    if (!spec.mechanical || spec.mechanical.verdict !== mech.verdict) {
+      throw new Error(`red-gate: spec.mechanical.verdict is ${JSON.stringify(spec.mechanical?.verdict)} but the shipped verdictFor() derives ${JSON.stringify(mech.verdict)} from these gates`);
+    }
+    out.mechanical = spec.mechanical;
+    out.gate_detail = `${spec.gate_detail_prefix ?? ""}${inputs.gate_detail ?? ""}`;
+    return out;
+  }
+
+  if (kind === "promised-file-absent") {
+    // The kickoff and the changed-files list still promise the file; the diff no longer contains it.
+    const p = spec.path;
+    if (!p) throw new Error("promised-file-absent: spec.path is required");
+    const diff = String(inputs.diff ?? "");
+    const marker = `diff --git a/${p} b/${p}`;
+    const at = diff.indexOf(marker);
+    if (at < 0) {
+      throw new Error(`promised-file-absent: the diff carries no "${marker}" section, so this mutation would change nothing and the mutant would be a real, correctly-approved ship`);
+    }
+    const next = diff.indexOf("\ndiff --git ", at + marker.length);
+    out.diff = next < 0 ? diff.slice(0, at) : diff.slice(0, at) + diff.slice(next + 1);
+    out.changed_files = out.changed_files.filter(f => f !== p);
+    if (out.changed_files.length === (inputs.changed_files || []).length) {
+      throw new Error(`promised-file-absent: changed_files does not name "${p}", so the delivery never claimed the file this mutation removes`);
+    }
+    return out;
+  }
+
+  if (kind === "ship-report-contradicts-diff") {
+    // The commit body claims files and counts the diff does not contain. Asserted against the diff
+    // the agent will actually be handed, because a "contradiction" that is really present in the
+    // delivery is not a contradiction at all.
+    for (const p of spec.absent_paths || []) {
+      if (String(inputs.diff ?? "").includes(p)) {
+        throw new Error(`ship-report-contradicts-diff: "${p}" DOES occur in the diff, so the ship report below does not contradict it and this mutant is not known-bad`);
+      }
+    }
+    if (!spec.commit_messages) throw new Error("ship-report-contradicts-diff: spec.commit_messages is required");
+    out.ship_report = { ...out.ship_report, commit_messages: spec.commit_messages };
+    return out;
+  }
+
+  throw new Error(`unknown mutant kind "${kind}" (known: ${MUTANT_KINDS.join(", ")})`);
+}
+
+// One mutant -> the fixture row and the three evidence strings the dispatcher hands the agent.
+// Shaped like `materializeInputs()`'s return on purpose: the caller builds the SAME task_context
+// for a mutant as for a real fixture, so a mutant cannot be judged through a second, friendlier
+// path than the one the reproduction uses.
+export function materializeMutant(repo, fixtures, mutant) {
+  const base = (fixtures || []).find(f => f.verdict_id === mutant?.base_verdict_id);
+  const fail = msg => ({ mutant_id: mutant?.mutant_id ?? null, fixture: null, mat: null, digests: null, errors: [msg] });
+  if (!mutant?.mutant_id) return fail("a mutant row carries no mutant_id");
+  if (!base) return fail(`${mutant.mutant_id}: no fixture carries base_verdict_id ${mutant.base_verdict_id}`);
+  if (!base.available) return fail(`${mutant.mutant_id}: its base fixture ${base.backlog_id} ${base.version} is unavailable (${base.unavailable_reason})`);
+
+  const mat = materializeInputs(repo, base);
+  if (mat.errors.length) return fail(`${mutant.mutant_id}: its base evidence could not be rebuilt -- ${mat.errors.join("; ")}`);
+
+  let mutated;
+  try {
+    mutated = mutateInputs(mutant.kind, {
+      ...base.inputs,
+      diff: mat.diff,
+      kickoff: mat.kickoff,
+      ship_report: { commit_messages: mat.ship_report },
+    }, mutant.spec || {});
+  } catch (e) {
+    return fail(`${mutant.mutant_id}: ${e.message}`);
+  }
+
+  const { diff, kickoff, ship_report, ...inputs } = mutated;
+  const digests = { diff: sha256(diff), kickoff: sha256(kickoff), ship_report: sha256(ship_report.commit_messages) };
+  const errors = [];
+  for (const k of ["diff", "kickoff", "ship_report"]) {
+    const want = mutant.digests?.[k];
+    if (want && want !== digests[k]) {
+      errors.push(`${mutant.mutant_id}: the mutated ${k} no longer hashes to what this mutant was built from (recorded ${String(want).slice(0, 12)}, now ${digests[k].slice(0, 12)}) -- the base commit or the spec moved; re-run scripts/build-verdict-fixture.js --mutants`);
+    }
+  }
+  return {
+    mutant_id: mutant.mutant_id,
+    kind: mutant.kind,
+    base_verdict_id: mutant.base_verdict_id,
+    expected_agent_verdict: mutant.expected_agent_verdict ?? "block",
+    // The fixture row a mutant is judged as: the base row, carrying the MUTATED gate columns.
+    fixture: { ...base, inputs },
+    mat: { diff, kickoff, ship_report: ship_report.commit_messages },
+    digests,
+    errors,
+  };
+}
+
+// `--mutants`: re-derive every mutant and write its digests back. No Supabase -- this reads the
+// frozen fixture and git only, so it runs in any clone that has the base commits.
+function writeMutantDigests() {
+  const fxPath = path.resolve(REPO, arg("out", "tests/fixtures/verdicts-30.json"));
+  const mPath = path.resolve(REPO, arg("mutants-out", MUTANTS_PATH));
+  const fx = JSON.parse(fs.readFileSync(fxPath, "utf8"));
+  const mf = JSON.parse(fs.readFileSync(mPath, "utf8"));
+  let failed = 0;
+  for (const m of mf.mutants) {
+    const got = materializeMutant(REPO, fx.fixtures, { ...m, digests: null });
+    if (!got.digests) { failed++; console.log(`  ERROR ${m.mutant_id}: ${got.errors.join("; ")}`); continue; }
+    m.digests = got.digests;
+    console.log(`  ${m.mutant_id} (${m.kind}, base ${String(m.base_verdict_id).slice(0, 8)}): diff ${got.digests.diff.slice(0, 12)} kickoff ${got.digests.kickoff.slice(0, 12)} ship_report ${got.digests.ship_report.slice(0, 12)}`);
+  }
+  mf.built_by = "scripts/build-verdict-fixture.js --mutants (SES-344 slice 2)";
+  fs.writeFileSync(mPath, `${JSON.stringify(mf, null, 2)}\n`, "utf8");
+  console.log(`build-verdict-fixture --mutants: ${mf.mutants.length - failed}/${mf.mutants.length} mutants materialised -> ${path.relative(REPO, mPath)}`);
+  if (failed) process.exit(2);
+}
+
 async function main() {
+  if (process.argv.includes("--mutants")) return writeMutantDigests();
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) { console.error("build-verdict-fixture: SUPABASE_URL and SUPABASE_SERVICE_KEY are required."); process.exit(2); }
