@@ -1,4 +1,21 @@
 #!/usr/bin/env node
+// DeepBench v7.0.477 | scripts/render-standing-brief.js | AGT-79 slice 3 — WHAT DID THE TICKET
+// OWNER LEAVE ON THE BOARD LAST NIGHT? A new group, `Ticket hygiene, last night`, lands AFTER
+// `Auditor's ledger` and BEFORE the provenance footer: the open `public.ticket_owner_findings`
+// rows grouped by check with the age of the oldest, the newest `hygiene` decision with its
+// reversal line, and the newest nightly cycle row.
+//
+// THE RUN LINE IS THE ROW'S OWN WORDS, NOT A SECOND COUNT. `scripts/ticket-owner.js --nightly`
+// writes its census line, its four write counts and its decision handle into `runner_cycles.notes`;
+// this group PRINTS that string with the `SCHEDULED-AGENT: audit-board — ` prefix stripped and
+// recomputes nothing from it. A brief that re-derived the night's numbers from the board would be
+// reporting the board as it is NOW against a run that happened hours ago, and the two disagreeing
+// would look like drift rather than like time passing.
+//
+// ABSENT IS `not read`, NEVER ZERO, the same rule every group below keeps — and here it matters
+// most, because "no open findings" is exactly the sentence a broken read would print. A measured
+// zero says so in those words; an unread ledger says it was not read.
+//
 // DeepBench v7.0.454 | scripts/render-standing-brief.js | SES-360 — ARE THE PLATFORM'S OWN AGENTS
 // DOING THE DEVELOPMENT WORK? The standing brief answers it as a RENDERED FACT. A new group,
 // `Governance agents, last 7 days`, lands AFTER `Board by served class` and BEFORE the provenance
@@ -320,6 +337,23 @@ export function factsSha(facts) {
             r.fingerprint, r.iso_week, r.status, r.ruled_by == null ? null : String(r.ruled_by),
           ]).sort(),
           filed: Number(facts.audit.filed),
+        }
+      : null,
+    // FEATURE: AGT-79 slice 3 — the open ledger's SHAPE (per-check counts), the newest hygiene
+    // decision's identity and status, and the newest nightly run's identity and end time, so a gap
+    // appearing or clearing, John reversing or finalising the decision, or a night running each
+    // move the sha and --check reports the drift. `first_seen_at` is deliberately ABSENT and the
+    // count is what stands in its place: a RE-SEEN row is the pass touching last_seen_at on a gap
+    // John already knows about — nothing he reads changed — while a row arriving or leaving moves
+    // its check's count. Including the timestamps would report drift on every nightly run.
+    hygiene: facts.hygiene
+      ? {
+          open: Array.isArray(facts.hygiene.open)
+            ? [...facts.hygiene.open.reduce((m, r) => m.set(String(r.check_slug), (m.get(String(r.check_slug)) || 0) + 1), new Map())]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+            : null,
+          decision: facts.hygiene.decision ? [facts.hygiene.decision.id, facts.hygiene.decision.status] : null,
+          run: facts.hygiene.run ? [facts.hygiene.run.id, facts.hygiene.run.ended_at] : null,
         }
       : null,
   });
@@ -805,6 +839,85 @@ export function renderAuditLedger(audit, stamp) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: AGT-79 slice 3 — `Ticket hygiene, last night`: what the Ticket Owner's nightly pass left
+ * on the board. Pure, like every group above it — `hygiene` is what fetchFacts() read, and nothing
+ * here goes near the network or the clock beyond the `nowIso` the caller passes.
+ *
+ * THREE FACTS, THREE HOMES, NO RATE. The open ledger grouped by check (with the age of the oldest
+ * row in each, which is the number that says whether a gap is being ignored); the newest `hygiene`
+ * decision with its reverse_decision() line ready to paste; and the newest nightly cycle row,
+ * printed VERBATIM from its own notes.
+ *
+ * `nights open` IS A FLOOR, NOT A ROUNDING: Math.floor over whole days means a gap first seen
+ * yesterday evening reads 0 until it has actually survived a night. A gap that reads 4 has been
+ * looked at by four runs and left alone, which is the thing worth seeing.
+ *
+ * ABSENT IS NOT ZERO. A missing or non-array `open` renders "the hygiene ledger was not read",
+ * never "no open findings" — the two sentences describe opposite situations and only one of them
+ * is a measurement.
+ */
+export function renderTicketHygiene(hygiene, stamp, nowIso) {
+  const L = [];
+  const lead = `**Ticket hygiene, last night** — *${stamp}.* What the Ticket Owner (\`AGT-79\`) left ` +
+    "on the board: `public.ticket_owner_findings` open rows by check, the newest `hygiene` decision " +
+    "and the newest nightly cycle row. Counts only, never a rate.";
+
+  if (!hygiene || !Array.isArray(hygiene.open)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The hygiene ledger was not read for this render* — which is **not** the same as *a " +
+      "clean board*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const open = hygiene.open;
+  const by = new Map();
+  for (const r of open) {
+    const slug = String(r.check_slug);
+    const cur = by.get(slug);
+    if (!cur) by.set(slug, { slug, n: 1, oldest: r.first_seen_at });
+    else {
+      cur.n++;
+      if (Date.parse(r.first_seen_at) < Date.parse(cur.oldest)) cur.oldest = r.first_seen_at;
+    }
+  }
+  const groups = [...by.values()].sort((a, b) => b.n - a.n || a.slug.localeCompare(b.slug));
+
+  L.push(`${lead} **${open.length} open findings** across ${groups.length} check(s).`);
+  L.push("");
+
+  if (open.length === 0) {
+    L.push("- **No open findings** — a measured zero: the ledger was read and holds no open row.");
+    L.push("");
+  } else {
+    L.push("| check | open | oldest | nights open |");
+    L.push("|---|---:|---|---:|");
+    for (const g of groups) {
+      const nights = Math.floor((Date.parse(nowIso) - Date.parse(g.oldest)) / 86400000);
+      L.push(`| \`${g.slug}\` | ${g.n} | ${cst(g.oldest)} | ${nights} |`);
+    }
+    L.push("");
+  }
+
+  const run = hygiene.run;
+  L.push(run
+    ? `- Last run: \`${String(run.id).slice(0, 8)}\` · ${run.outcome} · ${cst(run.ended_at)} · ` +
+      `${String(run.notes).replace(/^SCHEDULED-AGENT: audit-board — /, "")}`
+    : "- *No nightly run on record yet* — runbook step 4e has not fired; the counts above are the " +
+      "ledger as it stands.");
+
+  const d = hygiene.decision;
+  L.push(d
+    ? `- Decision \`${String(d.id).slice(0, 8)}\` · ${d.status} · ${summarise(d.summary)} · finalises ` +
+      `${d.expires_at ? cst(d.expires_at) : "—"} · \`select public.reverse_decision('${d.id}','John','<why>');\``
+    : "- *No hygiene decision on record.*");
+
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -830,7 +943,9 @@ export function renderBlock(facts, nowIso) {
   // absent means "not read", never "no governance agent called anything".
   // FEATURE: AGT-70 slice 3 — audit joins the destructure on the same terms as governance: absent
   // means "not read", never "the ledger holds no findings".
-  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit } = facts;
+  // FEATURE: AGT-79 slice 3 — hygiene joins the destructure on the same terms as audit: absent
+  // means "not read", never "the Ticket Owner found nothing".
+  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1043,6 +1158,12 @@ export function renderBlock(facts, nowIso) {
   // a pure helper the guard can assert from a fixture, rendering what the table returned and
   // counting nothing the table could have counted itself.
   L.push(renderAuditLedger(audit, stamp));
+
+  // ---- Ticket hygiene, last night (FEATURE: AGT-79 slice 3) ---------------------------------
+  // After the Auditor's ledger, before the provenance line. Same contract as the six groups above
+  // it: a pure helper the guard can assert from a fixture, rendering what the tables returned and
+  // printing the night's own notes rather than recounting the board behind them.
+  L.push(renderTicketHygiene(hygiene, stamp, nowIso));
 
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
@@ -1296,7 +1417,30 @@ export async function fetchFacts(url, key) {
   if (!Array.isArray(auditFiled)) die("the audit-ledger filing read came back non-array — refusing to render the ledger group from nothing");
   const audit = { rows: auditRows, filed: auditFiled.length };
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit };
+  // FEATURE: AGT-79 slice 3 — the Ticket Owner's ledger, its decision, and the night that wrote it.
+  //
+  // THREE READS, NO VIEW, AND NO JOIN: the group prints three independent facts and does its one
+  // piece of counting (per check) in renderTicketHygiene() where a fixture can drive it. Columns are
+  // NAMED, never `select=*` (.claude/rules/supabase-column-grants.md).
+  //
+  // The run read is `notes=like.<prefix>%` against the same NIGHTLY_PREFIX scripts/ticket-owner.js
+  // writes and reads for its own precondition — one string, one meaning, both ends.
+  //
+  // AN EMPTY LEDGER IS A REAL STATE (it renders as a measured zero) but a read that did not happen
+  // is not: a non-array refuses here rather than publishing a clean-looking board nobody measured.
+  const hygOpen = await rest(url, key,
+    "ticket_owner_findings?select=check_slug,first_seen_at&cleared_at=is.null&order=check_slug,first_seen_at&limit=10000");
+  if (!Array.isArray(hygOpen)) die("the ticket_owner_findings read came back non-array — refusing to render the hygiene group from nothing");
+  const hygDec = await rest(url, key,
+    "runner_decisions?select=id,status,summary,expires_at,decided_at&kind=eq.hygiene&order=decided_at.desc&limit=1");
+  if (!Array.isArray(hygDec)) die("the hygiene decision read came back non-array — refusing to render the hygiene group from nothing");
+  const hygRun = await rest(url, key,
+    "runner_cycles?select=id,ended_at,outcome,notes&notes=like." + encodeURIComponent("SCHEDULED-AGENT: audit-board%") +
+    "&ended_at=not.is.null&order=ended_at.desc&limit=1");
+  if (!Array.isArray(hygRun)) die("the nightly cycle read came back non-array — refusing to render the hygiene group from nothing");
+  const hygiene = { open: hygOpen, decision: hygDec[0] ?? null, run: hygRun[0] ?? null };
+
+  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene };
 }
 
 async function main() {

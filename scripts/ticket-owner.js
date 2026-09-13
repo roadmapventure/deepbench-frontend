@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-// DeepBench v7.0.475 | scripts/ticket-owner.js | AGT-79 slices 1-2 -- THE TICKET OWNER'S CENSUS:
-// one mechanical pass over the whole board that CLASSIFIES, and (slice 2, only under --apply) the
-// WRITE PASS that lands every derivable fix under a single reversible decision.
+// DeepBench v7.0.477 | scripts/ticket-owner.js | AGT-79 slices 1-3 -- THE TICKET OWNER'S CENSUS:
+// one mechanical pass over the whole board that CLASSIFIES, (slice 2, only under --apply) the
+// WRITE PASS that lands every derivable fix under a single reversible decision, and (slice 3,
+// --nightly) the ONCE-PER-CHICAGO-NIGHT run that is its own precondition: it reads the newest
+// cycle row it wrote, answers `already run today` on exit 0 without reading the board, and
+// otherwise records itself as one scheduled cycle row whose notes ARE the night's report.
 //
 // WHAT THIS FILE IS. The Ticket Owner owns a ticket's ROW after it is filed -- its quote, its
 // actual, its status and its close-out. Eleven date-fenced checks read the board once and sort
@@ -33,6 +36,12 @@
 // test drive fourteen one-variable rows through the real code instead of a copy of it, and what
 // lets the write pass plan from the same classification it writes from. applyPlan() and the CLI
 // below are the only parts that read credentials, and importing this module never runs the CLI.
+//
+// THE NIGHT IS KEYED BY A CALENDAR DAY, NEVER BY AN OFFSET (slice 3). CDT midnight is 05:00Z and
+// CST midnight 06:00Z, so "has it already run tonight" cannot be answered by subtracting hours.
+// sameChicagoDay() asks the only question that survives the DST boundary: do these two instants
+// fall on the same America/Chicago calendar date. The precondition is the command itself -- a
+// cycle never compares dates by hand.
 //
 // EXIT CODES: 0 the census (and, under --apply, the write pass) ran; 2 it could not run or could
 // not finish -- missing credentials, a REST read that failed or came back truncated, unreadable
@@ -87,6 +96,11 @@ export const CHECKS = Object.freeze([
   "delivered-unaccepted",
   "cycles-over-quote",
 ]);
+
+// The nightly run's signature in runner_cycles.notes. It is a PREFIX and not a column because the
+// precondition read is `notes=like.<prefix>%` -- one indexable question ("has this agent run?")
+// that needs no schema change, and the same string the standing brief strips before printing.
+export const NIGHTLY_PREFIX = "SCHEDULED-AGENT: audit-board";
 
 const CLOSED = new Set(["done", "delivered"]);
 const LIVE = new Set(["open", "partial"]);
@@ -257,16 +271,24 @@ export function classifyBoard(board, { now, rate }) {
   };
 }
 
+// censusLine(result) -> the one-line summary of a census, WITHOUT the timestamp prefix. One
+// function, two readers: renderCensus prints it after `ticket-owner census <iso>: `, and the
+// nightly cycle row carries it verbatim in `notes` so the standing brief prints the night's own
+// words rather than recomputing a fence from a second reading of the board.
+export function censusLine(result) {
+  const b = result.backlog;
+  const c = result.counts;
+  return `${c.rows} rows · ${c.findings} findings (${c.derivable} derivable · ${c.judgment} judgment)` +
+    ` · behind the fences: quote ${b.quote_prefence} · size ${b.size_prefence} · cost ${b.cost_prefence}` +
+    ` · verdict ${b.verdict_prefence} · unrevalidated>30d ${b.unrevalidated_30d} · attended-actual null ${b.attended_actual_null}`;
+}
+
 // renderCensus(result, nowIso) -> the census text. Pure, and byte-stable for a given result: the
 // nightly report is diffed night over night, so a rendering that reordered anything would read as
 // a change on the board that never happened.
 export function renderCensus(result, nowIso) {
-  const b = result.backlog;
-  const c = result.counts;
   const lines = [
-    `ticket-owner census ${nowIso}: ${c.rows} rows · ${c.findings} findings (${c.derivable} derivable · ${c.judgment} judgment)` +
-    ` · behind the fences: quote ${b.quote_prefence} · size ${b.size_prefence} · cost ${b.cost_prefence}` +
-    ` · verdict ${b.verdict_prefence} · unrevalidated>30d ${b.unrevalidated_30d} · attended-actual null ${b.attended_actual_null}`,
+    `ticket-owner census ${nowIso}: ${censusLine(result)}`,
   ];
   for (const check of CHECKS) {
     const mine = result.findings.filter(f => f.check === check);
@@ -323,10 +345,37 @@ export function planWrites(result, prior, items, { rate } = {}) {
   return { fixes, ledger: { insert, reseen, clear }, meta: { counts: result.counts, rate } };
 }
 
+// sameChicagoDay(aIso, bIso) -> do these two instants fall on the same America/Chicago calendar
+// date. The ONLY correct form of "already run tonight": CDT midnight is 05:00Z and CST midnight
+// 06:00Z, so any fixed-offset arithmetic is wrong twice a year and silently. Throws on an
+// unparseable date rather than answering false -- a precondition that cannot be evaluated must
+// stop the run, never wave it through into a second write pass on the same night.
+export function sameChicagoDay(aIso, bIso) {
+  const opts = { timeZone: "America/Chicago" };
+  const day = v => {
+    const d = new Date(v);
+    if (!Number.isFinite(d.getTime())) throw new Error(`sameChicagoDay: not a parseable instant (got ${v})`);
+    return d.toLocaleDateString("en-CA", opts);
+  };
+  return day(aIso) === day(bIso);
+}
+
+// nightlyNotes(line, applied) -> the cycle row's notes: the prefix the precondition reads, the
+// census line verbatim, the four write counts, and the decision handle with its reversal window.
+// This string is the night's whole report -- the standing brief prints it rather than recomputing
+// it, so what John reads is what the run actually said about itself.
+export function nightlyNotes(line, applied) {
+  const a = applied ?? {};
+  const head = `${NIGHTLY_PREFIX} — ${line} · fixed ${a.fixed} · findings +${a.inserted} ~${a.reseen} −${a.cleared}`;
+  return head + (a.decision
+    ? ` · decision ${a.decision} — reversible until ${a.expires_at}`
+    : " · no decision (nothing to fix)");
+}
+
 // --- the CLI half (credentials, disk, exit codes) ----------------------------------------------
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ALLOWED_FLAGS = new Set(["census", "board", "out", "json", "apply", "cycle-id"]);
+const ALLOWED_FLAGS = new Set(["census", "board", "out", "json", "apply", "cycle-id", "nightly"]);
 
 function fail(message) {
   process.stderr.write(`ticket-owner: ${message}\n`);
@@ -540,6 +589,35 @@ export async function applyPlan(base, key, plan, { cycleId, sessionName, now } =
   };
 }
 
+// recordNightly(...) -> the runner_cycles row the night wrote about itself. The parent cycle is
+// read for its `model` and for nothing else: the nightly pass calls no model, so copying the
+// parent's is the only honest answer to a NOT NULL column (`model` is non-null on all 446 rows).
+// Reading it also proves the cycle id addresses a real row before a second row is written against
+// it -- a nightly row attributed to a cycle that does not exist is worse than no row.
+async function recordNightly(base, key, { cycleId, startedAt, line, applied }) {
+  const parent = await rest(base, key, `runner_cycles?id=eq.${cycleId}&select=model`, {}, "record cycle");
+  if (!Array.isArray(parent) || parent.length !== 1) {
+    fail(`record cycle: parent cycle ${cycleId} not found`);
+  }
+  const rows = await rest(base, key, "runner_cycles", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      started_at: startedAt,
+      ended_at: new Date().toISOString(),
+      stamp: `session ticket-owner (in cycle ${cycleId})`,
+      trigger: "scheduled",
+      model: parent[0].model,
+      outcome: "shipped",
+      item_id: null,
+      notes: nightlyNotes(line, applied),
+    }),
+  }, "record cycle");
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) fail("record cycle: the POST returned no row");
+  return row;
+}
+
 function arg(argv, name) {
   const hit = argv.find(a => a === `--${name}` || a.startsWith(`--${name}=`));
   if (hit === undefined) return undefined;
@@ -551,13 +629,17 @@ async function main() {
   for (const a of argv) {
     const name = a.replace(/^--/, "").split("=")[0];
     if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
-      fail(`unknown flag ${a} — this script takes --census, --board=<json>, --apply, --cycle-id=<uuid>, --out=<json> and --json.`);
+      fail(`unknown flag ${a} — this script takes --census, --board=<json>, --apply, --nightly, --cycle-id=<uuid>, --out=<json> and --json.`);
     }
   }
 
   const boardArg = arg(argv, "board");
   const census = arg(argv, "census");
-  if (boardArg === undefined && census === undefined) {
+  // --nightly IS --census --apply, plus the once-a-night precondition and the cycle row. It is
+  // folded in here rather than at the source checks so that --nightly --board still lands on the
+  // apply gate's `never written` refusal instead of a confusing "two different sources".
+  const nightly = arg(argv, "nightly");
+  if (boardArg === undefined && census === undefined && nightly === undefined) {
     fail("nothing to do: pass --census (live) or --board=<json> (fixture).");
   }
   if (boardArg !== undefined && census !== undefined) {
@@ -567,16 +649,16 @@ async function main() {
   // --apply is gated twice, and both gates are about attribution rather than convenience. A
   // fixture board holds ids that do not address live rows, so writing from one is never right;
   // and a write with no cycle is a change nobody can trace back to the run that made it.
-  const applyArg = arg(argv, "apply");
+  const applyArg = nightly !== undefined ? true : arg(argv, "apply");
   const cycleId = arg(argv, "cycle-id");
   if (applyArg !== undefined) {
     if (boardArg !== undefined) fail("--apply writes the live board; a --board fixture is never written.");
     if (typeof cycleId !== "string" || cycleId.length !== 36) {
-      fail("--apply needs --cycle-id=<uuid> — every write is attributed to a cycle.");
+      fail("--apply/--nightly needs --cycle-id=<uuid> — every write is attributed to a cycle.");
     }
   }
 
-  let board, now, rate, base, key;
+  let board, now, rate, base, key, startedAt = null;
   if (boardArg !== undefined) {
     // Fixture mode: no credentials are read at all, so a machine without them can still run the
     // census over a board. The fixture's own `now` and `rate` win -- a fixture whose clock came
@@ -598,6 +680,23 @@ async function main() {
     key = process.env.SUPABASE_SERVICE_KEY;
     if (!base) fail("SUPABASE_URL is not set — the live census reads the board over REST.");
     if (!key) fail("SUPABASE_SERVICE_KEY is not set — the live census reads the board over REST.");
+
+    // THE PRECONDITION IS THE COMMAND. Step 4e fires this on every cycle of the day and lets the
+    // script answer; the newest row this pass wrote is the only record of whether tonight is done.
+    // It runs before readRate and before readBoard, so a second cycle on the same Chicago night
+    // costs one indexed read and touches nothing at all.
+    if (nightly !== undefined) {
+      startedAt = new Date().toISOString();
+      const prev = await rest(base, key,
+        "runner_cycles?select=id,ended_at&notes=like." + encodeURIComponent(NIGHTLY_PREFIX + "%") +
+        "&ended_at=not.is.null&order=ended_at.desc&limit=1");
+      if (!Array.isArray(prev)) fail("the nightly precondition read came back non-array — refusing to run a second pass on an unknown night");
+      if (prev[0] && sameChicagoDay(prev[0].ended_at, startedAt)) {
+        process.stdout.write(`ticket-owner nightly: already run today (America/Chicago) — cycle ${prev[0].id} ended ${prev[0].ended_at}; board not read, nothing written\n`);
+        process.exit(0);
+      }
+    }
+
     now = new Date().toISOString();
     rate = await readRate(base, key);
     board = await readBoard(base, key);
@@ -633,6 +732,14 @@ async function main() {
     }
     applied = await applyPlan(base, key, plan, { cycleId, now });
     out.apply = applied;
+
+    // Last, and only after the plan landed: the run records ITSELF. Writing the cycle row before
+    // the write pass would let a failed pass look like a finished night and lock the next cycle
+    // out until tomorrow -- exit 2 anywhere above this line writes no cycle row at all.
+    if (nightly !== undefined) {
+      const row = await recordNightly(base, key, { cycleId, startedAt, line: censusLine(result), applied });
+      out.nightly = { cycle: row.id, notes: row.notes };
+    }
   }
 
   const outPath = arg(argv, "out");
@@ -659,6 +766,7 @@ async function main() {
         ? `${head} · decision ${applied.decision} — reversible until ${applied.expires_at}: select public.reverse_decision('${applied.decision}','John','<why>');\n`
         : `${head} · no decision (nothing to fix)\n`;
     }
+    if (out.nightly) text += `ticket-owner nightly: cycle ${out.nightly.cycle} recorded\n`;
     process.stdout.write(text);
   }
   process.exit(0);

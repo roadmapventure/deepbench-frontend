@@ -1,5 +1,6 @@
-// DeepBench v7.0.475 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slices 1-2 -- THE
-// TICKET OWNER'S CENSUS AND WRITE PASS, pinned at the level that can actually go red.
+// DeepBench v7.0.477 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slices 1-3 -- THE
+// TICKET OWNER'S CENSUS, WRITE PASS AND NIGHTLY LANDING, pinned at the level that can actually go
+// red.
 //
 // WHY EVERY ARM CARRIES A CONTROL. Ten of the eleven checks produce a SHORT list on a healthy
 // board, and the failure mode of a census is not a wrong list -- it is an EMPTY one. A check that
@@ -48,6 +49,21 @@
 // a bumped stamp makes reverse_decision() refuse the row), the null-row images that stand for the
 // findings the night invented, and a second night over the same board writing nothing but a
 // last_seen_at touch. The cleanup is unconditional; the four zero-row counts are asserted after it.
+//
+// (H) THE STANDING BRIEF'S HYGIENE GROUP, pure, plus the doc it lands on. Its two controls are the
+// pair that look alike and mean opposite things -- an unread ledger and a measured zero -- and the
+// sha arm pins the one movement that must NOT count as drift: a re-seen touch on a gap John has
+// already read about.
+//
+// (I) STEP 4e AND THE CARD IT GENERATES, from source, with the renderer's own refusal as the
+// control. The card is a generated view held byte-identical, so this arm is what turns "I edited
+// the runbook" into "the runbook, the NOTES entry and the regenerated card shipped together."
+//
+// (J) THE NIGHTLY, pure plus the CLI's three refusals. Both DST boundaries are pinned by instant
+// (05:00Z in September, 06:00Z in January): a Chicago night cannot be measured with an offset, and
+// an arm that only tested one season would pass for six months. H, I and J are all pure or
+// source-only, so they run BEFORE part E's credential gate returns -- a clean checkout still
+// exercises them.
 
 import assert from "assert";
 import fs from "fs";
@@ -56,7 +72,12 @@ import os from "os";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { classifyBoard, renderCensus, planWrites, applyPlan, CHECKS, TYPE_TAXONOMY, TYPE_MAP, FENCES } from "../../scripts/ticket-owner.js";
+import {
+  classifyBoard, renderCensus, planWrites, applyPlan, CHECKS, TYPE_TAXONOMY, TYPE_MAP, FENCES,
+  censusLine, sameChicagoDay, nightlyNotes, NIGHTLY_PREFIX,
+} from "../../scripts/ticket-owner.js";
+import { renderTicketHygiene, factsSha, cst, BEGIN, END } from "../../scripts/render-standing-brief.js";
+import { parseSteps, render, NOTES, CARD_REL, RUNBOOK_REL } from "../../scripts/render-cycle-card.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = "scripts/ticket-owner.js";
@@ -237,6 +258,22 @@ async function main() {
   assert.strictEqual(cApply.status, 2, "--apply over a fixture must be refused, not ignored: fixture ids do not address live rows");
   assert.ok(cApply.stderr.includes("never written"), `got: ${cApply.stderr}`);
 
+  // AGT-79 slice 3: --nightly is a REAL flag now, so the refusals it hits must be its own gates
+  // and never the unknown-flag catch-all. A run refused for the wrong reason is a run that starts
+  // working the day someone "fixes" the flag list.
+  const cNightlyNoCycle = spawnCli(["--nightly"]);
+  assert.strictEqual(cNightlyNoCycle.status, 2, "--nightly writes and so needs an attribution");
+  assert.ok(!cNightlyNoCycle.stderr.includes("unknown flag"), `--nightly must be a known flag; got: ${cNightlyNoCycle.stderr}`);
+  assert.ok(cNightlyNoCycle.stderr.includes("needs --cycle-id"), `got: ${cNightlyNoCycle.stderr}`);
+
+  const cNightlyBoard = spawnCli(["--nightly", "--cycle-id=00000000-0000-4000-8000-000000000000", `--board=${FIXTURE_REL}`]);
+  assert.strictEqual(cNightlyBoard.status, 2, "--nightly over a fixture is refused on the same terms as --apply");
+  assert.ok(cNightlyBoard.stderr.includes("never written"), `got: ${cNightlyBoard.stderr}`);
+
+  const cNightlyNoCreds = spawnCli(["--nightly", "--cycle-id=00000000-0000-4000-8000-000000000000"]);
+  assert.strictEqual(cNightlyNoCreds.status, 2, "a live nightly without credentials is not a pass");
+  assert.ok(cNightlyNoCreds.stderr.includes("SUPABASE_URL"), `got: ${cNightlyNoCreds.stderr}`);
+
   assert.strictEqual(spawnCli(["--board=tests/fixtures/agt-79/nope.json"]).status, 2, "an unreadable board is exit 2");
 
   // --- D: the seed file (source, always runs) --------------------------------------------------
@@ -333,6 +370,169 @@ async function main() {
     "a write with neither a cycle nor a session is unattributable");
   await assert.rejects(() => applyPlan("x", "y", plan, { cycleId: "a", sessionName: "b" }), /exactly one/,
     "a write claiming both a cycle and a session violates ck_decision_attribution");
+
+  // --- H: the standing brief's hygiene group, pure + doc ---------------------------------------
+  // The fixture is the live shape, not a convenient one: three rows of one check and one of
+  // another, so the sort by count is actually exercised, and a run row whose notes are a real
+  // nightly string so the prefix strip is proven on the thing it has to strip.
+  const HYG = () => ({
+    open: [
+      { check_slug: "quote-missing", first_seen_at: "2026-09-13T03:31:46.538+00:00" },
+      { check_slug: "quote-missing", first_seen_at: "2026-09-13T03:31:46.538+00:00" },
+      { check_slug: "quote-missing", first_seen_at: "2026-09-13T03:31:46.538+00:00" },
+      { check_slug: "delivered-unaccepted", first_seen_at: "2026-09-10T03:00:00+00:00" },
+    ],
+    decision: {
+      id: "77afdcbc-32dc-4505-bfda-724acc1f8b07",
+      status: "open",
+      summary: "Ticket Owner: 40 derivable cell fix(es) on 40 row(s) — cost 37 · claim 1 · type 2",
+      expires_at: "2026-09-16T03:31:48+00:00",
+      decided_at: "2026-09-13T03:31:48+00:00",
+    },
+    run: {
+      id: "11111111-2222-4333-8444-555555555555",
+      outcome: "shipped",
+      ended_at: "2026-09-13T03:40:00+00:00",
+      notes: "SCHEDULED-AGENT: audit-board — 855 rows · 170 findings (0 derivable · 170 judgment) · behind the fences: quote 526 · size 494 · cost 45 · verdict 97 · unrevalidated>30d 427 · attended-actual null 260 · fixed 0 · findings +0 ~170 −0 · no decision (nothing to fix)",
+    },
+  });
+  const NOW = "2026-09-14T04:00:00Z";
+  const hOut = renderTicketHygiene(HYG(), "as of X", NOW);
+
+  assert.ok(hOut.startsWith("**Ticket hygiene, last night** — *as of X.*"), `the group must lead with its own name and stamp; got: ${hOut.slice(0, 80)}`);
+  assert.ok(hOut.includes("**4 open findings** across 2 check(s)"), "the lead counts rows and checks, never a rate");
+
+  const hRows = hOut.split("\n").filter(l => l.startsWith("| `"));
+  assert.strictEqual(hRows.length, 2, "one table row per check, and the two checks must not collapse into one");
+  assert.ok(hRows[0].startsWith("| `quote-missing` | 3 |") && hRows[0].endsWith("| 1 |"),
+    `the busiest check sorts first and its oldest row is 1 night old; got: ${hRows[0]}`);
+  assert.ok(hRows[1].startsWith("| `delivered-unaccepted` | 1 |") && hRows[1].endsWith("| 4 |"),
+    `the older, smaller check sorts second and reads 4 nights open; got: ${hRows[1]}`);
+  assert.ok(hRows[0].includes(cst("2026-09-13T03:31:46.538+00:00")),
+    "the oldest column is the brief's ONE CST formatter, not a second date format for John to learn");
+
+  assert.ok(hOut.includes("- Last run: `11111111` · shipped ·"), "the run line carries the short id and the outcome");
+  assert.ok(hOut.includes("· 855 rows · 170 findings"), "the run line prints the night's OWN notes, never a recount");
+  assert.ok(!hOut.includes("SCHEDULED-AGENT"), "the machine-readable prefix is stripped before John reads the line");
+  assert.ok(hOut.includes("- Decision `77afdcbc` · open ·"), "the decision line carries the short handle and its status");
+  assert.ok(hOut.includes("reverse_decision('77afdcbc-32dc-4505-bfda-724acc1f8b07','John','<why>')"),
+    "the reversal line carries the FULL uuid — a short handle is not something John can paste");
+  assert.ok(!hOut.includes("%"), "no percentage anywhere: counts side by side, never a rate");
+  assert.strictEqual(renderTicketHygiene(HYG(), "as of X", NOW), hOut, "the group is pure — same facts, same bytes");
+
+  // The four branches, each with the sentence that distinguishes it from the one it could be
+  // mistaken for. `not read` and `no open findings` are opposite situations that look alike.
+  const hUnread = renderTicketHygiene(undefined, "as of X", NOW);
+  assert.ok(hUnread.includes("was not read for this render"), "an absent ledger says it was not read");
+  assert.ok(!hUnread.includes("0 open"), "an unread ledger must never render as a measured zero");
+  assert.ok(renderTicketHygiene({ ...HYG(), open: [] }, "as of X", NOW).includes("**0 open findings**"),
+    "a read, empty ledger IS a measured zero and says so");
+  assert.ok(renderTicketHygiene({ ...HYG(), open: [] }, "as of X", NOW).includes("No open findings"),
+    "the measured zero is named in words as well as in the count");
+  assert.ok(renderTicketHygiene({ ...HYG(), run: null }, "as of X", NOW).includes("No nightly run on record yet"),
+    "no cycle row yet is its own sentence, not a blank line");
+  assert.ok(renderTicketHygiene({ ...HYG(), decision: null }, "as of X", NOW).includes("No hygiene decision on record"),
+    "no decision yet is its own sentence too");
+
+  // The sha moves on what John reads and stands still on what he does not. A re-seen touch is the
+  // nightly pass saying "still there" about a gap already on the page -- not drift.
+  const Fs = over => ({ items: [{ id: 1, status: "open", design_status: null, queue: 1 }], ...over });
+  assert.strictEqual(factsSha(Fs({ hygiene: HYG() })), factsSha(Fs({ hygiene: HYG() })), "the same facts must hash the same");
+  const dropped = HYG();
+  dropped.open = dropped.open.slice(1);
+  assert.notStrictEqual(factsSha(Fs({ hygiene: dropped })), factsSha(Fs({ hygiene: HYG() })), "a finding clearing must move the sha");
+  const laterRun = HYG();
+  laterRun.run.ended_at = "2026-09-14T03:40:00+00:00";
+  assert.notStrictEqual(factsSha(Fs({ hygiene: laterRun })), factsSha(Fs({ hygiene: HYG() })), "a new night's run must move the sha");
+  const finalised = HYG();
+  finalised.decision.status = "final";
+  assert.notStrictEqual(factsSha(Fs({ hygiene: finalised })), factsSha(Fs({ hygiene: HYG() })), "the decision finalising must move the sha");
+  const touched = HYG();
+  touched.open[0].first_seen_at = "2026-09-13T09:00:00+00:00";
+  assert.strictEqual(factsSha(Fs({ hygiene: touched })), factsSha(Fs({ hygiene: HYG() })),
+    "a re-seen touch is not a change John reads — including first_seen_at would report drift every single night");
+
+  // The doc half: the group is actually ON the page, in its place, inside the generated block.
+  const brief = fs.readFileSync(path.join(ROOT, "docs/runbooks/standing-brief.md"), "utf8");
+  const iLedger = brief.indexOf("**Auditor's ledger**");
+  const iHyg = brief.indexOf("**Ticket hygiene, last night**");
+  const iProv = brief.indexOf("*Provenance:");
+  assert.ok(iLedger > 0 && iHyg > 0 && iProv > 0, "the brief must carry the ledger, the hygiene group and the provenance line");
+  assert.ok(iLedger < iHyg && iHyg < iProv, "the hygiene group lands AFTER the Auditor's ledger and BEFORE the provenance footer");
+  assert.ok(iHyg > brief.indexOf(BEGIN) && iHyg < brief.indexOf(END), "the group is generated, so it lives inside the generated markers");
+
+  // --- I: step 4e and the card it generates (source, always runs) -------------------------------
+  const runbookMd = fs.readFileSync(path.join(ROOT, RUNBOOK_REL), "utf8");
+  const labels = parseSteps(runbookMd).map(s => s.label);
+  const i4e = labels.indexOf("4e");
+  assert.ok(i4e > 0, "step 4e must parse as a step, not as prose inside 4d");
+  assert.strictEqual(labels[i4e - 1], "4d", "4e sits directly after the weekly audit");
+  assert.strictEqual(labels[i4e + 1], "5", "4e sits directly before selection — hygiene happens BEFORE the pick");
+  assert.strictEqual(labels.length, 27, "the runbook parses to 27 steps");
+  assert.strictEqual(labels.length, Object.keys(NOTES).length, "every step has a NOTES entry — the renderer exits 2 otherwise");
+  assert.ok(NOTES["4e"].outcome.length <= 90, `a card outcome is <= 90 chars; 4e is ${NOTES["4e"].outcome.length}`);
+  assert.strictEqual(NOTES["4e"].block, 1, "the card carries 4e's first fenced block: the command IS the precondition");
+
+  // Whitespace-normalised, deliberately: the runbook is hard-wrapped, so a phrase that happens to
+  // straddle a line break is the same sentence and a raw substring match would pin the wrap
+  // instead of the words.
+  const raw4e = runbookMd.slice(runbookMd.indexOf("**4e. "), runbookMd.indexOf("**5. ", runbookMd.indexOf("**4e. ")));
+  const body4e = raw4e.replace(/\s+/g, " ");
+  assert.ok(body4e.includes("ticket-owner.js --nightly --cycle-id="), "the step names the command a cycle actually runs");
+  assert.ok(body4e.includes("SCHEDULED-AGENT: audit-board"), "the step names the notes prefix its precondition reads");
+  assert.ok(body4e.includes("already run today"), "the step names the exit-0 answer that sends a cycle on to step 5");
+  assert.ok(body4e.includes("continue to step 5 normally"), "exit 2 is a refusal, never a stop — the hygiene pass is bookkeeping");
+  assert.ok(!body4e.includes("--judge"), "the judgment run is NOT this slice and must not be documented as available");
+
+  const card = fs.readFileSync(path.join(ROOT, CARD_REL), "utf8");
+  assert.strictEqual(card, render(runbookMd), "the card is a GENERATED view — it must be the byte-exact render of the runbook in this same commit");
+  const cardLine = card.split("\n").find(l => l.startsWith("**4e.** Ticket hygiene · L"));
+  assert.ok(cardLine, "the card must carry a 4e line naming the step");
+  const cardBlocks = card.split("```");
+  assert.ok(cardBlocks.some(b => b.includes("--nightly --cycle-id=")), "the card carries 4e's command block in full");
+  assert.ok(runbookMd.split("\n").filter(l => l.startsWith("<!-- DeepBench v")).length <= 5,
+    "session-hygiene check 7: at most 5 header stamps on the runbook");
+  assert.ok(fs.readFileSync(path.join(ROOT, "docs/SESSIONS.md"), "utf8").includes("<!-- DeepBench v7.0.452 | runbooks/runner-cycle.md | SES-352"),
+    "the retired stamp was RELOCATED to docs/SESSIONS.md, not dropped");
+
+  // The control: the renderer refuses a step it has no NOTES entry for, which is what makes the
+  // assertion above a guard rather than a coincidence.
+  assert.throws(() => render(runbookMd + "\n**10. Nothing.**\n"), "a step with no NOTES entry must refuse to render");
+
+  // --- J: the nightly, pure + CLI ---------------------------------------------------------------
+  // The DST boundary is the whole point: CDT midnight is 05:00Z, CST midnight is 06:00Z, so a
+  // fixed-offset answer is wrong twice a year and silently. Both boundaries are pinned.
+  assert.strictEqual(sameChicagoDay("2026-09-13T04:59:00Z", "2026-09-13T05:01:00Z"), false, "CDT midnight is 05:00Z — these are two different Chicago days");
+  assert.strictEqual(sameChicagoDay("2026-09-13T05:01:00Z", "2026-09-14T04:59:00Z"), true, "a whole CDT day is one Chicago day");
+  assert.strictEqual(sameChicagoDay("2026-01-13T05:59:00Z", "2026-01-13T06:01:00Z"), false, "CST midnight is 06:00Z — these are two different Chicago days");
+  assert.strictEqual(sameChicagoDay("2026-01-13T06:01:00Z", "2026-01-14T05:59:00Z"), true, "a whole CST day is one Chicago day");
+  assert.throws(() => sameChicagoDay("x", "2026-01-01T00:00:00Z"), "a precondition that cannot be evaluated must throw, never answer false");
+
+  assert.strictEqual(renderCensus(r, F.now).split("\n")[0], `ticket-owner census ${F.now}: ${censusLine(r)}`,
+    "renderCensus's first line IS censusLine — one string, two readers, byte-identical");
+  assert.ok(censusLine(r).startsWith("14 rows · 11 findings (4 derivable · 7 judgment) · behind the fences: quote "),
+    `the census line carries the counts and the fences in order; got: ${censusLine(r).slice(0, 90)}`);
+
+  const n1 = nightlyNotes(censusLine(r), { fixed: 1, inserted: 4, reseen: 0, cleared: 0, decision: "d1", expires_at: "2026-09-16T00:00:00Z" });
+  assert.ok(n1.startsWith(`${NIGHTLY_PREFIX} — 14 rows · 11 findings`), `the notes lead with the prefix the precondition reads; got: ${n1.slice(0, 60)}`);
+  assert.ok(n1.endsWith(" · fixed 1 · findings +4 ~0 −0 · decision d1 — reversible until 2026-09-16T00:00:00Z"),
+    `a night that fixed something ends in its decision handle and window; got: ${n1.slice(-90)}`);
+  const n2 = nightlyNotes(censusLine(r), { fixed: 0, inserted: 0, reseen: 170, cleared: 0, decision: null, expires_at: null });
+  assert.ok(n2.endsWith(" · fixed 0 · findings +0 ~170 −0 · no decision (nothing to fix)"),
+    `a night with nothing to fix records no decision and SAYS so; got: ${n2.slice(-70)}`);
+  assert.strictEqual(NIGHTLY_PREFIX, "SCHEDULED-AGENT: audit-board", "the prefix is the contract between the script, the runbook and the brief");
+
+  // The three refusals, spawned with the credentials deleted. Each must name what stopped it: a
+  // nightly run that fell through to a live read without a cycle id would write unattributably.
+  const nNoCycle = spawnCli(["--nightly"]);
+  assert.strictEqual(nNoCycle.status, 2, "--nightly writes, so it needs a cycle to attribute the write to");
+  assert.ok(nNoCycle.stderr.includes("needs --cycle-id"), `the refusal must name the missing id; got: ${nNoCycle.stderr}`);
+  const nBoard = spawnCli(["--nightly", "--cycle-id=00000000-0000-4000-8000-000000000000", `--board=${FIXTURE_REL}`]);
+  assert.strictEqual(nBoard.status, 2, "--nightly over a fixture board must be refused, not ignored");
+  assert.ok(nBoard.stderr.includes("never written"), `the refusal must say a fixture is never written; got: ${nBoard.stderr}`);
+  const nNoCreds = spawnCli(["--nightly", "--cycle-id=00000000-0000-4000-8000-000000000000"]);
+  assert.strictEqual(nNoCreds.status, 2, "a live nightly without credentials is not a pass");
+  assert.ok(nNoCreds.stderr.includes("SUPABASE_URL"), `the refusal must name what is missing; got: ${nNoCreds.stderr}`);
 
   // --- E: live ---------------------------------------------------------------------------------
   const base = process.env.SUPABASE_URL;

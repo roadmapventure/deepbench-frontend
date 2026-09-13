@@ -1,7 +1,7 @@
 // DeepBench v7.0.469 | tests/regression/agt-70-auditor.test.mjs | AGT-70
 //
 // FEATURE: AGT-70 slice 4 -- the negative control, week two, and the Auditor audited. Parts A-M
-// below are slices 1-3's and are unchanged (L still asserts 26 steps).
+// below are slices 1-3's and are unchanged (L still asserts 27 steps).
 //
 // FOUR MORE PARTS, each with its own control:
 //   N   THE NEGATIVE CONTROL -- a corpus in which every one of the first week's four open findings
@@ -959,10 +959,14 @@ function stepFourDIsInTheRunbookAndOnTheCard() {
   const i = labels.indexOf("4d");
   assert.ok(i > 0, "docs/runbooks/runner-cycle.md must carry a step 4d");
   assert.strictEqual(labels[i - 1], "4c", "4d runs after the board re-rank");
-  assert.strictEqual(labels[i + 1], "5", "and BEFORE selection -- an audit that fires after the pick is a different step");
+  // AGT-79 slice 3 put step 4e (ticket hygiene) between 4d and selection, so the property is
+  // "4d runs BEFORE the pick", not "4d is immediately followed by the pick" -- an audit that fires
+  // after the pick is a different step, and that is still what this pins.
+  assert.strictEqual(labels[i + 1], "4e", "4d is followed by the ticket-hygiene pass (AGT-79 slice 3)");
+  assert.ok(labels.indexOf("5") > i, "and BEFORE selection -- an audit that fires after the pick is a different step");
   // The count is the measured one, pinned so an accidental new or lost step marker is a red here
   // rather than a silent card line. NOTES and the runbook must agree or render() refuses (control).
-  assert.strictEqual(labels.length, 26, `the runbook parses to 26 steps; got ${labels.length}`);
+  assert.strictEqual(labels.length, 27, `the runbook parses to 27 steps; got ${labels.length}`);
   assert.strictEqual(labels.length, Object.keys(NOTES).length,
     "every step has a NOTES entry and NOTES names no step the runbook lacks -- render() refuses otherwise");
 
@@ -971,7 +975,9 @@ function stepFourDIsInTheRunbookAndOnTheCard() {
     `the card's outcome cap is 90 chars; 4d's is ${NOTES["4d"].outcome.length}`);
 
   const from = md.indexOf("**4d. ");
-  const to = md.indexOf("**5. ", from);
+  // Bounded at 4e, not at 5: since AGT-79 slice 3 the hygiene step sits between them, and a body
+  // that ran on to selection would let 4d's greps pass on another step's text.
+  const to = md.indexOf("**4e. ", from);
   assert.ok(from > 0 && to > from, "could not isolate the 4d body");
   const body = md.slice(from, to);
 
@@ -1424,7 +1430,7 @@ export async function run() {
   console.log("         exemptions: fenced 0 / unfenced 1 · rule render 0 with the rule, 1 without · cycle-card.md out by PROCEDURE_GENERATED_DOCS");
   console.log("         ledger filing: 2 of 6 eligible, cap 3 → 0 at filedThisWeek 3, 1 at 2 · draft S/M by locations · isoWeek 2027-01-01 = 2026-W53");
   console.log("         brief group: 6 findings (4 open · 2 resolved) 0 ruled 0 filed · absent says 'not read', never 0 · factsSha moves on a ruling and on a filing");
-  console.log("         step 4d: between 4c and 5, 26 steps, NOTES 85 chars, no --ingest= line carries --apply, 5 header stamps, v7.0.446 in SESSIONS.md");
+  console.log("         step 4d: between 4c and 5, 27 steps, NOTES 85 chars, no --ingest= line carries --apply, 5 header stamps, v7.0.446 in SESSIONS.md");
   console.log("         negative control: resolved corpus → 0 clusters, 4 unrunnable (0/3, 1/3, 0/8, 1/2); retired forced false → the 2 come back · CLI duplicates 0 stale 0");
   console.log("         week two: 4 carried over live homes / 0 carried + 4 gone over the resolved corpus · same week 0 · resolved latest row never carries");
   console.log("         verdicts: W37 6 seen, W38 6 recurring, a not-a-defect row → 1 ruled-out + 5 recurring · 2 homes rule out, 1 home does not · carry keeps its own found_by");

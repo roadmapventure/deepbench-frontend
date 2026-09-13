@@ -125,6 +125,7 @@ export const NOTES = {
   "4b":       { outcome: "due false → write INVENTION PASS: <reason> in notes and skip the rest", block: 1 },
   "4c":       { outcome: "exit 2 is a refusal and nothing was written — continue to step 5 normally", block: 0 },
   "4d":       { outcome: "audited this ISO week → skip; else run, collect, dry-file; exit 2 noted, on to step 5", block: 1 },
+  "4e":       { outcome: "already run today → step 5; else fix cells under ONE decision, file gaps; exit 2 → step 5", block: 1 },
   "5":        { outcome: "the queue's first admitted row is the pick; ONE item; rename at the pick", block: 1 },
   "5a":       { outcome: "write files N (+k) / tasks M (+k) into notes; step 7 grades the ship on them", block: 1 },
   "6":        { outcome: "premise holds → revalidated_at = now() and build; dead → removal proposed", block: 1 },
