@@ -5,6 +5,26 @@
 
 ---
 
+## session/cycle-20260913-0353 (v7.0.477, 2026-09-13, runner cycle `a8434575-ff7d-4d43-b547-572f8d5e61e2`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder, per register B21 and `public.runner_model_lanes` read live) — `AGT-79` slice 3 of 3 — **the nightly landing: a new runbook step, a scheduled fire that filed nothing, and the ledger reached the standing brief.**
+
+### A new step is three artifacts in one commit, and the card is what proves it
+
+Step **4e — Ticket hygiene** landed between `4d` and `5`: the runbook body, `NOTES["4e"]` in `scripts/render-cycle-card.js`, and the regenerated `docs/runbooks/cycle-card.md` in ONE commit, which is the coupling `SES-377` built and the only shape that keeps `tests/regression/ses-377-cycle-card.test.mjs` green. Measured after the push rather than recalled: the renderer reads **27 steps** (was 26), the card is **7,950 bytes** of a 10,240 cap and reports itself *current* against runbook sha256 `0ded46ef…`, and the header stamps held at 5 — line 5 (`v7.0.452`, `SES-352`, 2,870 B) moved **verbatim** into this file under `SES-164` step 2 rather than being dropped by the rotation. `agt-70-auditor.test.mjs` pins the step count in three places; all three moved 26 → 27.
+
+### The nightly fired once, filed nothing, and that is the design working
+
+`--nightly` (implies `--census --apply`, refuses `--board`, requires `--cycle-id`) ran live and wrote its own cycle row `3cd2c80e`, `trigger = scheduled`, `outcome = shipped`, stamp *"session ticket-owner (in cycle a8434575…)"*: **856 rows · 170 findings (0 derivable · 170 judgment) · fixed 0 · findings +0 ~170 −0 · no decision (nothing to fix)**. Zero derivable is the correct number and the evidence that slice 2 held — its forty fixes are still fixed, so tonight had nothing to correct and opened no second decision. The re-run answered `already run today (America/Chicago)` and exited **0** without reading the board, on `sameChicagoDay` over `toLocaleDateString("en-CA", { timeZone: "America/Chicago" })` rather than a UTC date, which is what stops a 7 PM CST fire and a 1 AM CST fire counting as two nights. `runner_cycles` rows with the `SCHEDULED-AGENT: audit-board` prefix: 0 before, **1** after, 1 after the re-run.
+
+### The findings stopped being a table nobody opens
+
+`renderTicketHygiene` put the ledger in `docs/runbooks/standing-brief.md` as **Ticket hygiene, last night** — open rows by check, the newest `hygiene` decision with its full reverse handle, and the newest nightly row's notes. Live at this close-out: **170 open findings** across 8 checks (`actual-unknown` 63, `verdict-missing` 41, `designed-closed` 28, `size-missing` 16, …), decision `77afdcbc`. Absent inputs read *"not read"*, never `0` — a blank metric and a zero say opposite things to a reviewer and only one of them is honest.
+
+### Four verdicts, four blocks, and the fourth was the same board state as the first three
+
+Verdict `308eb1b2`, **block**, `graded_sha b9d5a050…` — the `SES-345` leg shipped three cycles earlier now doing its job. The reds are `SES-386`'s population again: guards that grade live board state rather than code. The Builder's suite read **209/219**, and rather than assert flake it re-ran all nine reds against a stashed clean `origin/dev` and showed them failing identically there — the only form of that claim worth reading. Two deviations named: part I normalises whitespace around the hard-wrapped *"continue to step 5 / normally"*, and `agt-70-auditor.test.mjs` needed two changes beyond the 26 → 27 the kickoff named. `governance_agent_activity_7d` read 7 against an expected 6 during the suite and 6 when measured immediately after — the same transient-board class, stated rather than smoothed over.
+
+---
+
 ## session/cycle-20260913-0239 (v7.0.475, 2026-09-13, runner cycle `eb001bcd-66c9-4731-ae5b-3ee4d7ac5dd5`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder, per register B21) — `AGT-79` slice 2 of 3 — **forty cells corrected under one handle, and the night's fourth block was the board, not the code.**
 
 ### The pick was released without being built, on a peer's measurement
