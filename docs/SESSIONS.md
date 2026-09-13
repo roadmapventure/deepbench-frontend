@@ -5,6 +5,30 @@
 
 ---
 
+## session/cycle-20260912-2257 (v7.0.469, 2026-09-12, runner cycle `e68b9db0-dda3-4868-a944-5a879c6aafba`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with a Fable 5.1 subagent as The Designer and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `AGT-70` slice 4 of 4 — **the Auditor's second week, and the thing to read twice is that building the negative control is what found the bug it was meant to rule out.**
+
+### The control found a defect instead of confirming its absence
+
+The ticket's QA asks for "no false positive on the RETIRED IN PLACE passages that are supposed to differ from their live twins." Building that fixture corpus is what exposed `locateStatements` (`scripts/audit-cluster.js:201`) never reading `s.retired`: on the resolved fixture two of the four open findings — `4637961d` through a retired `governance_rules` OD-43, `b057c6f1` through the charter's own RETIRED IN PLACE paragraph — rebuilt as *runnable* prior clusters out of passages that exist only as the record of superseded wording. Measured both ways in the shipped test: retired-aware, `priorClusters` returns 0 clusters and four unrunnable rows at `0/3, 1/3, 0/8, 1/2`; with `retired` forced false on the same statements, the two come back by name. The exclusion is the flag, not the text — which is the only form of that control worth having.
+
+### Monday had no path, and the fix is code that observes plus a hand that lands
+
+`2026-W38` opens 2026-09-14 and is the first week step 4d fires with a populated ledger. Read from the code rather than assumed: `--collect` wrote only *new* findings, so nothing re-observed an open one under its own fingerprint; `--ingest` filtered `audit_findings` by `iso_week=eq.<week>`, so a W37 fingerprint arriving in W38 read as `new` — and a `not-a-defect` fingerprint re-ingested landed `open`, the one thing the seed's guardrail forbids. Now `carryForward` re-observes an open finding only where this week's corpus still holds ≥ 2 of its sides, copying the finding fields byte-for-byte so the fingerprint is identical, and `classifyIngest` grades every row `seen` / `ruled-out` / `recurring` / `new`. Ruled-out matches by fingerprint **or** by ≥ 2 shared homes, because a model re-finding a ruled dispute words the fact differently — the same 2-home rule `reconcile` already uses. The cycle still ingests nothing: step 4d rule (1) stands, the dry run's exit 1 now just means "carried rows and any new findings await John's `--apply`."
+
+### The lane audits its own rows, by import rather than by literal
+
+`detectStaleParameters` reads the rejecting family from `shared/models.js`'s `NO_TEMPERATURE_PREFIXES` and cites that symbol as the finding's last location. Restating `claude-fable-5-1` here would have been a third home for the fact — the exact duplication this agent exists to find. Live it returns one finding with 23 locations (22 `claude-fable-*` Skill rows storing `temperature = 0`, plus the code home); against the seed's own rows it returns `[]`, and `--agent=auditor` exits **2** with `no Skill rows` — a refusal, never a pass, because those rows do not exist yet.
+
+### What this slice does not close, and who closes it
+
+`AGT-70` stays **`partial`** and no status was written. Every instrument the ticket names now exists and is tested; the *agent* does not — `agents.auditor`, the two `audit-*` capabilities and the six `au-*` Skill rows are still only `docs/design/agt-70-auditor-seed.sql`, and a governance-lane row lands `is_active = true`, which `.claude/rules/agent-roster-inert.md` reserves. Closing owner is John, one attended session, in order: decide the `auditor-write` handler (register it in `api/prompt/request-receivable.js`, or strip `traits.handler` from both Intent rows); apply the seed under `record_decision` with a before-image per inserted row; add `AVATAR_CFG.auditor` / `AGENT_PRONOUNS.auditor`; run `--agent=auditor` (expect `stale 0`) and one assembled `--run`; delete `EXCEPTION_PROMPT`; rule the open four; read the 24 candidates in `docs/audits/2026-W37-candidates.json`. A fifth unattended cycle would find nothing it is allowed to do.
+
+### Two process facts worth the ink
+
+`SES-376`'s kickoff cap fired at 8,234 bytes against 8,192. The named-deviation rule was obeyed rather than argued around: nothing was written, `design_status` was not set, and the kickoff was re-assembled exactly once with `over_cap` — landing at 7,858 bytes with all eight files and seven tasks intact. And `SES-379` reproduced for the **third** consecutive cycle: at step 7a `git diff --name-only origin/dev...HEAD` returned **0 files**, because the Builder owns the push since `SES-336`, so the verifier's `auto-done eligible: YES -- the diff touches none of scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js` was vacuously true again. Harmless on this diff — none of the eight files is a self-certifying path — but that is luck, not the gate working. Verdict `8862f53f`, **approve**, all three mechanical gates green; the ladder moved `tooling` streak 1 → 2 with the rung at 24. One transient on the way: `ses-331-agent-prompt-path.test.mjs` went red on a stale fixture row left by a concurrent peer cycle ("the fixture trace id already has 1 row(s)") and passed on re-run; the suite is 215/215 with no red of this ship's making.
+
+---
+
 ## session/cycle-20260912-2314 (v7.0.470, 2026-09-12, runner cycle `81a712b9-ee14-464b-9b06-2fc5e4a69016`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with The Designer on the judgment lane, re-run one tier up on the orchestrator lane after a platform error, and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-381` — **the size guard measures the split, not the ledger; dev CI is green again.**
 
 ### The pick was a deliberate preemption, and it is on the record as one
