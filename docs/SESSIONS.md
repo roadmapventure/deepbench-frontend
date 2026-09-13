@@ -49,6 +49,22 @@ The ticket's QA asks for "no false positive on the RETIRED IN PLACE passages tha
 
 ---
 
+## session/cycle-20260913-0054 (v7.0.473, 2026-09-13, runner cycle `04a3ac3b-3d09-4f0b-8fb1-abcaf5866ebb`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder) — `SES-344` slice 2 — **the "attended" half turned out to be mostly mechanical, and the thing that was actually John's was dollars, not judgment.**
+
+### Testing the previous slice's own label instead of inheriting it
+
+Slice 1's STOP LINE called slice 2 "the attended re-judgment", and the cheap move was to believe it and stop. The Designer was asked to test it instead, and the evidence says otherwise: `verify-ship` had already run three times on 2026-09-12 with nobody in the loop, through `runCapability()` and the generic executor — `ai_activity_log` 42708–42710, $0.41–0.42 and 82–90 s each. So producing `contract_version: 2` judgments is mechanical, the three known-bad mutants are mechanical, and the false-approve arm is mechanical. What genuinely needs John is the **$15–17** to re-judge all 27 fixtures against a $5/day wall — a spend decision, not a judgment one. This cycle bought the mechanism instead, for $2.27.
+
+### One correctness catch decided the design
+
+The mutant arm has to be graded on `agent_verdict`, not on the reconciled verdict: `reconcileJudgment` forces `block` whenever a mechanical gate is red, so a red-gate mutant graded on the reconciled value could never fail — a bar that cannot fail, which is the exact defect this ticket exists to remove. The proof run bears it out: all three mutants blocked **for their own injected defect** ("the failing file is the delivery's own new test", "the promised regression test is not in the delivery", "the commit record names a file that does not exist in this diff"), with zero false approves.
+
+### Money, and a wrong inference corrected inside the hour
+
+Checking headroom before authorising the run turned up a real defect: today's audit reads **$58.06** where only **$3.52** was billable, because 32 `call_source='session'` rows — sub-agent turns, subscription tokens — are being priced as dollars, against `agent-log.js`'s own header saying they carry none. `runner_cycles`, which the day wall actually sums, read **$1.25**. Three numbers for one quantity. Filed as `SES-383`. The cycle also got one thing wrong and corrected it in place: the $2.27 of script-source spend was read as a peer's, which made the run look like a near-breach. It was this build's own proof run, finished before the re-cap message landed. The wall was never at risk; the mispricing is.
+
+---
+
 ## session/cycle-20260912-2356 (v7.0.471, 2026-09-13, runner cycle `1bd980f6-03ac-4b88-81cf-07b32c4132b3`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder, per register B21) — `SES-344` slice 1 — **the eight disagreements were adjudicated instead of counted, and six of them turn out to be the input contract's fault.**
 
 ### Counting disagreements was never going to answer the question
