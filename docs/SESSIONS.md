@@ -29,6 +29,22 @@ The ticket's QA asks for "no false positive on the RETIRED IN PLACE passages tha
 
 ---
 
+## session/cycle-20260912-2356 (v7.0.471, 2026-09-13, runner cycle `1bd980f6-03ac-4b88-81cf-07b32c4132b3`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder, per register B21) — `SES-344` slice 1 — **the eight disagreements were adjudicated instead of counted, and six of them turn out to be the input contract's fault.**
+
+### Counting disagreements was never going to answer the question
+
+`SES-337`'s bar was "no more than 2 disagreements against the ledger", and the reproduction returned 8. Both gate-review lenses had already said the instrument was wrong; nobody had done the one thing that settles it, which is to look at each of the 8 and ask whether the evidence the agent said was missing is actually missing. Against the real ship commit bodies: **one is a harness artifact** (`SES-336`'s diff was cut at 400,000 chars inside `BACKLOG-SNAPSHOT.md`, before the hunk it was asked to judge), **six named evidence that exists in the commit body the agent was never given**, and **one is a true block** (`SES-321`: a one-line body, empty cycle notes, and a live migration nothing in the delivery cites). A bar that counts all eight the same way measures the input contract, not the judgment.
+
+### So slice 1 widens the contract and restates the bar
+
+`ship_report` — commit bodies plus `runner_cycles.notes` — now reaches both judge lanes, and the diff is ordered so re-rendered artifacts come last: the `SES-336` hunk sat at offset 547,418 in raw git order, past the cap, and at 38,822 once ordered. `MAX_DISAGREEMENTS <= 2` is retired for `MAX_FALSE_BLOCKS` / `MAX_FALSE_APPROVES`, asserted only against a `contract_version: 2` recording and printing `[NOT RUN]` until one exists — because judging the old recordings under the new contract would be grading answers to a question nobody asked. Slice 2, named in the STOP LINE and left re-pickable: the attended re-judgment plus three known-bad mutants for the false-approve arm.
+
+### The verdict was a block, and what turned it red is worth more than the block
+
+Build green, hygiene green, regression red — on two **live-board** assertions that passed 35 minutes earlier in this same session. What changed in between was not code: three peer cycles filed three `gated_before_build` cards on `AGT-70` between 00:26 and 00:31, and `M6-01` is the rule that says that surface no longer arrives. A fourth peer left `AGT-70` deferred while still carrying queue number 19. None of it is this diff's and none of it is this cycle's to decide — a successor never adjudicates a peer's card — so it is reported rather than touched, and `SES-344` closes `partial` with slice 2 outstanding.
+
+---
+
 ## session/cycle-20260912-2314 (v7.0.470, 2026-09-12, runner cycle `81a712b9-ee14-464b-9b06-2fc5e4a69016`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, **with The Designer on the judgment lane, re-run one tier up on the orchestrator lane after a platform error, and an Opus 5 subagent as The Builder**, per register B21 and `public.runner_model_lanes` read live) — `SES-381` — **the size guard measures the split, not the ledger; dev CI is green again.**
 
 ### The pick was a deliberate preemption, and it is on the record as one
