@@ -20,7 +20,7 @@
         }
       },
       "digests": {
-        "diff": "c6ec07ce2c85a5b1b7b59444bfcd287862e5cebc14d3a58614d96636add6e60c",
+        "diff": "d7337cd0f7b8f61579f9712adfb2fbed34743e73317fcc63af42a249ab3cd275",
         "kickoff": "640ba903ef2d90e66d6350728e3b26052fb294d18663811d7ed91b14e8c577b1",
         "ship_report": "7b55bb7a65641cfdc38c775fcad64a98a36d052d1dc8c855d62da700edd60fa1"
       }
@@ -35,7 +35,7 @@
         "path": "tests/regression/agt-64-researcher.test.mjs"
       },
       "digests": {
-        "diff": "72a65152630d474be64fbad933bf75b37282601464406cde69e482f451169046",
+        "diff": "f09a67126ee573b00ab47e236e4574e728583687f0e0359b2e70380087e00ad3",
         "kickoff": "0c8d4bf628bcc46c4757e1b615092abff9dbedf4cbc5c7a4c5ec013138294c9d",
         "ship_report": "fd46854c0c73043da39c817a21ab2fcc84622c0323991e8d3181d10aa1a3fcd6"
       }
@@ -53,7 +53,7 @@
         ]
       },
       "digests": {
-        "diff": "407a144759b8a8b316a84cd0f76eb98895fe842a4c3591d2bb754d2281c3afb5",
+        "diff": "df5ed11fa9f9da7e188fb921b8a827ac72caef630e91d34a4f0f8007161e55cc",
         "kickoff": "4d9d9d0eb93c93b06656ed2712b1bfef86065e67f7ce07ae10c92663559d0c58",
         "ship_report": "1fca78e30349bb72d1ef7ed0ef91e3e388e773609618518c01b73de06118658e"
       }
