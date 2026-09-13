@@ -1,4 +1,27 @@
 #!/usr/bin/env node
+// DeepBench v7.0.471 | scripts/verifier.js | SES-344 slice 1 -- THE SHIP REPORT ENTERS THE JUDGE'S
+// CONTRACT, and the thing to read twice is that SEVEN OF THE EIGHT DISAGREEMENTS THE REPRODUCTION
+// COUNTED AGAINST THE AGENT WERE DEFECTS IN WHAT THIS FILE HANDED IT. Adjudicated 2026-09-13
+// against the eight ship commit bodies (`tests/fixtures/verdicts-30-adjudication.json`, quotes
+// re-derived from `git log -1 --format=%B <sha>`): 1 is the harness (SES-336's 639,956-char diff
+// cut at 400,000 inside `docs/backlog/BACKLOG-SNAPSHOT.md`, ahead of the runbook hunk the judgment
+// needed), 6 named evidence that WAS in the commit body the contract never carried, and 1
+// (SES-321) names evidence that exists nowhere the platform can hand over -- one-line body, cycle
+// notes 0 bytes -- so that block stands. The old bar counted all 8 as the agent's error.
+//
+// SO TWO KEYS MOVE, AND NEITHER IS A LOOSENING OF THE BAR. `ship_report` carries
+// `commit_messages` (`git log --format=%B <base>..HEAD`) and `cycle_notes`
+// (`runner_cycles.notes`, where runbook step 7 stores the Builder's report) into BOTH judge lanes
+// -- the same evidence key in each, for the reason `code_eligibility` below already records: the
+// same key carrying less content in one lane than the other is the lane-shaped difference this
+// file's own SES-337 note calls a defect. And `diffFor()` now ORDERS the diff instead of raising
+// `DIFF_CAP`: the ticket's own hunks first, the four re-rendered artifacts (`DIFF_LAST`) last.
+//
+// ORDERING, NOT A BIGGER CAP, deliberately. Any fixed number re-creates SES-336 at a bigger
+// snapshot; git's alphabetical order is what put a re-rendered board ahead of the code under
+// judgment, and that is the thing to fix. The cap stays declared and stays visible in the payload
+// -- an agent that cannot tell its diff was cut would certify a change it never saw.
+//
 // DeepBench v7.0.468 | scripts/verifier.js | SES-343 -- THE OUTPUT CONTRACT STOPS VOIDING VALID
 // VERDICTS, and the thing to read twice is that the contract did not get looser: it got a SEVERITY
 // MODEL. `validateAgentVerdict()` made every schema miss fatal, so a judgment whose `architect_lens`
@@ -1140,6 +1163,31 @@ function emit({ code, payload, prose }) {
 export const DIFF_CAP = 400_000;
 export const KICKOFF_CAP = 60_000;
 
+// FEATURE: SES-344 -- the ship report's own cap, and the four files that go LAST in the diff.
+//
+// `SHIP_REPORT_CAP` is the same shape as `KICKOFF_CAP`: a declared truncation on the judge's copy,
+// never a refusal. 60,000 characters is roughly twenty of this repo's longest commit bodies; it has
+// never fired on a real `<base>..HEAD` range, and when it does the reader is told in the marker
+// `cap()` appends rather than being handed a silently short report.
+//
+// `DIFF_LAST` IS AN ORDERING, NOT AN EXCLUSION, and the difference is the whole point: every one of
+// these four files still reaches the judge, they just reach it after the hunks the ticket is about.
+// They are the platform's RE-RENDERED ARTIFACTS -- `export-backlog-snapshot.js`,
+// `render-claude-state.js`, `render-standing-brief.js` and the RULES-SNAPSHOT export write them
+// wholesale on almost every ship, so their diffs are large, mechanical, and never the thing under
+// judgment. Measured on SES-336 (`bc73354e`): a 639,956-character diff cut by `DIFF_CAP` at 400,000
+// INSIDE `docs/backlog/BACKLOG-SNAPSHOT.md`, alphabetically ahead of the
+// `docs/runbooks/runner-cycle.md` hunk that was the ticket -- so the agent blocked, correctly, on a
+// file it had been sent and could not see. A code list rather than a data row because the scripts
+// that produce these files are code; a new re-rendered artifact is a one-line change here.
+export const SHIP_REPORT_CAP = 60_000;
+export const DIFF_LAST = Object.freeze([
+  "docs/backlog/BACKLOG-SNAPSHOT.md",
+  "CLAUDE-STATE.md",
+  "docs/runbooks/standing-brief.md",
+  "docs/governance/RULES-SNAPSHOT.md",
+]);
+
 // FEATURE: SES-376 -- THE KICKOFF HAS A SIZE CAP, and this is a SECOND constant beside KICKOFF_CAP
 // on purpose: the two measure different things in different units for different readers.
 // `KICKOFF_CAP` is a truncation limit in CHARACTERS on the judge's copy -- it protects the prompt,
@@ -1215,14 +1263,64 @@ function readCapped(absPath, limit) {
 
 // Committed-vs-base plus the working tree, the same two views changedFilesFor() takes its paths
 // from, so the file list and the diff cannot describe two different trees.
-function diffFor(repoRoot, base) {
+//
+// SES-344: each view is now read TWICE -- once excluding `DIFF_LAST`, once for `DIFF_LAST` alone --
+// and the two outputs are pushed in that order, so the cap (when it fires at all) falls inside a
+// re-rendered board rather than inside the ticket. Each section says which half it is in its own
+// header, because a judge told "you have the diff" and handed the artifacts first has been sent the
+// same bytes and shown a different change. `limit` is a parameter rather than the constant so a
+// test can drive the truncation path without a 400,000-character fixture; production passes none.
+export function diffFor(repoRoot, base, { limit = DIFF_CAP } = {}) {
   const parts = [];
-  for (const argv of [["diff", base + "...HEAD"], ["diff"]]) {
-    const r = spawnSync("git", argv, { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-    if (r.error || r.status !== 0) return `[UNREADABLE: git ${argv.join(" ")} failed -- the diff could not be read, which is missing evidence and fails closed]`;
-    if (String(r.stdout).trim()) parts.push(`--- git ${argv.join(" ")} ---\n${r.stdout}`);
+  for (const view of [["diff", base + "...HEAD"], ["diff"]]) {
+    const runs = [
+      { argv: [...view, "--", ".", ...DIFF_LAST.map(p => `:(exclude)${p}`)], label: "ticket files" },
+      { argv: [...view, "--", ...DIFF_LAST], label: "re-rendered artifacts" },
+    ];
+    for (const { argv, label } of runs) {
+      const r = spawnSync("git", argv, { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+      if (r.error || r.status !== 0) return `[UNREADABLE: git ${argv.join(" ")} failed -- the diff could not be read, which is missing evidence and fails closed]`;
+      if (String(r.stdout).trim()) parts.push(`--- git ${argv.join(" ")} (${label}) ---\n${r.stdout}`);
+    }
   }
-  return cap(parts.join("\n"), DIFF_CAP, "diff");
+  return cap(parts.join("\n"), limit, "diff");
+}
+
+// FEATURE: SES-344 -- THE COMMIT BODY IS EVIDENCE, and until this it was the only place six of the
+// eight adjudicated disagreements' named evidence existed. The Builder's report is written into the
+// commit message by contract (STANDARDS.md Section 1; the runbook's own report shape), and the
+// judge was being asked whether the delivery carried its promised evidence while being handed
+// everything about the delivery EXCEPT the place that evidence is written down.
+//
+// THE WHOLE RANGE, not `-1`: a cycle can land more than one commit between base and HEAD, and
+// grading the last one is grading part of the delivery. Failure returns the same declared-unreadable
+// marker shape the diff uses -- a missing ship report is missing evidence and fails closed, never a
+// silently empty string that reads as "the Builder wrote nothing".
+export function shipReportFor(repoRoot, base) {
+  const r = spawnSync("git", ["log", "--format=%B", `${base}..HEAD`], { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (r.error || r.status !== 0) return "[UNREADABLE: git log failed -- ship report missing, fails closed]";
+  return cap(r.stdout, SHIP_REPORT_CAP, "ship report");
+}
+
+// FEATURE: SES-344 -- the OTHER half of the delivery: runbook step 7 stores the Builder's report on
+// `runner_cycles.notes`, and an unattended cycle's fullest account of what it did lives there and
+// nowhere else the judge could see.
+//
+// `null` WITHOUT A CYCLE ID, AND "" IS NOT THE SAME ANSWER. `null` means nobody asked (a
+// `--cycle-id`-less run: the local checks, the regression suite's imports); `""` means the row was
+// read and the Builder wrote nothing -- which is exactly the finding SES-321's block rests on, so
+// collapsing the two would erase it. An unreachable row is the declared-unreadable marker again,
+// never a silent empty: "the notes could not be read" and "the notes are empty" are different facts
+// about the delivery and the judge grades them differently.
+export async function cycleNotesFor(supabaseUrl, supabaseKey, cycleId) {
+  if (!cycleId) return null;
+  try {
+    const r = await rest(supabaseUrl, supabaseKey, `runner_cycles?select=notes&id=eq.${encodeURIComponent(cycleId)}&limit=1`);
+    if (r.error) throw new Error(r.error);
+    return r.rows?.[0]?.notes ?? "";
+  } catch (e) {
+    return `[UNREADABLE: runner_cycles.notes -- ${e.message}]`;
+  }
 }
 
 // THE ROW, as one pure function both lanes call. Exported so a guard can assert that the JUDGED
@@ -1758,6 +1856,13 @@ async function main() {
       // this file's own SES-337 note calls out as a defect.
       kickoff_no_lanes: kickoffNoLanes,
       diff: diffFor(repoRoot, base),
+      // SES-344: the delivery's own account of itself, in both halves -- the commit bodies between
+      // base and HEAD, and the cycle row's notes. Given to BOTH judge lanes, same key, same content,
+      // for the reason `code_eligibility` above records.
+      ship_report: {
+        commit_messages: shipReportFor(repoRoot, base),
+        cycle_notes: await cycleNotesFor(supabaseUrl, supabaseKey, cycleId),
+      },
     };
     try {
       fs.mkdirSync(path.dirname(contextPath), { recursive: true });
@@ -1843,6 +1948,10 @@ async function main() {
       kickoff_over_cap: kickoffOverCap,   // SES-376 -- see the session lane's note above.
       kickoff_no_lanes: kickoffNoLanes,   // SES-359 -- same.
       diff: diffFor(repoRoot, base),
+      ship_report: {                      // SES-344 -- see the session lane's note above.
+        commit_messages: shipReportFor(repoRoot, base),
+        cycle_notes: await cycleNotesFor(supabaseUrl, supabaseKey, cycleId),
+      },
     };
     const call = await callExecutor({ intentSlug: rows.intentSlug, taskContext: judgeCtx, tenant: arg("tenant", "global") });
     if (call.error) {

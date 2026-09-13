@@ -1,3 +1,23 @@
+// DeepBench v7.0.471 | tests/verifier/ses-337-verifier-reproduction.test.mjs | SES-344 slice 1 --
+// THE BAR IS ADJUDICATED, and the thing to read twice is that A DISAGREEMENT IS NOT A UNIT. One
+// count of 8 was being graded as 8 agent errors. Adjudicated 2026-09-13 against the eight ship
+// commit bodies (`tests/fixtures/verdicts-30-adjudication.json`, every quote an exact substring of
+// `git log -1 --format=%B <sha>`): 1 HARNESS (SES-336 -- the judgment quotes "400,000 of 639,956",
+// the diff this file handed it cut inside a re-rendered board), 6 CONTRACT FALSE BLOCKS (the named
+// evidence was in the commit body the contract never carried), 1 TRUE BLOCK (SES-321: one-line
+// body, cycle notes 0 bytes -- that evidence exists nowhere, and the block stands). So
+// `MAX_DISAGREEMENTS` is gone and two bars replace it: `MAX_FALSE_BLOCKS` (John's 2, kept at his
+// number) and `MAX_FALSE_APPROVES` (0 -- the direction that ships a bad change).
+//
+// AND THE BARS ARE NOT ASSERTED YET, WHICH IS THE POINT OF THE SLICE. The 27 judgments in
+// `verdicts-30-judgments.json` were recorded against the NARROW contract (no ship report, the
+// alphabetical diff). Grading them against the widened one measures the delta the contract
+// introduced, not the agent -- the instrument error SES-338's two lenses named. So the bar runs
+// only when the judgments file records `contract_version >= 2`, and until then it is DECLARED NOT
+// RUN by name. A vacuous green here would be worse than the red it replaced: the red at least said
+// something true. Slice 2 re-judges the 8 attended under the widened contract and adds three
+// known-bad mutant fixtures as the false-approve arm.
+//
 // DeepBench v7.0.440 | tests/verifier/ses-337-verifier-reproduction.test.mjs | SES-337 -- THE
 // VERIFIER IS REPLAYED AGAINST ITS OWN LEDGER, and the thing to read twice is WHERE THE MODEL CALL
 // IS AND WHY IT IS NOT IN THIS FILE.
@@ -64,6 +84,7 @@ import {
   VERIFIER_AGENT_ID,
   VERIFY_CAPABILITY,
   SELF_CERTIFYING_PATHS,
+  cycleNotesFor,
 } from "../../scripts/verifier.js";
 import { materializeInputs } from "../../scripts/build-verdict-fixture.js";
 
@@ -71,10 +92,16 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
 const FIXTURE = path.join(REPO, "tests", "fixtures", "verdicts-30.json");
 const JUDGMENTS = path.join(REPO, "tests", "fixtures", "verdicts-30-judgments.json");
+const ADJUDICATION = path.join(REPO, "tests", "fixtures", "verdicts-30-adjudication.json");
 
-// John's bar, 2026-09-08. A literal here on purpose: it is a decision, not a measurement, and it
-// has one home.
-export const MAX_DISAGREEMENTS = 2;
+// John's 2, kept at his number and now pointed at the thing it was always meant to bound: blocks
+// the agent got wrong. A false APPROVE is the direction that ships a bad change, so its bar is 0.
+// Literals here on purpose: they are decisions, not measurements, and they have one home.
+export const MAX_FALSE_BLOCKS = 2;
+export const MAX_FALSE_APPROVES = 0;
+// The judgments file must say it was recorded against the WIDENED contract before either bar
+// above means anything -- see this file's header.
+export const ADJUDICATED_CONTRACT_VERSION = 2;
 // Below this the fixture is not a sample of the ledger, it is an anecdote (kickoff §4).
 export const MIN_USABLE = 20;
 export const INTENT_SLUG = "vf-verdict-intent";
@@ -194,6 +221,48 @@ async function run() {
   const disagreements = results.filter(r => !r.agrees);
   const list = disagreements.map(r => `${r.backlog_id} ${r.version} (verdict ${r.verdict_id.slice(0, 8)}): ledger ${r.recorded}, replay ${r.replayed} (agent said ${r.agent_verdict})`);
 
+  // ---- SES-344: THE ADJUDICATION, READ AS DATA AND CHECKED AGAINST GIT ----------------------
+  //
+  // EVERY DISAGREEMENT MUST HAVE A ROW. A disagreement this file cannot classify is not a
+  // disagreement it gets to drop: an adjudication that silently covers 7 of 8 would move the bar by
+  // omission, which is the failure mode of every hand-maintained exception list. Missing rows fail
+  // BY NAME so the next run knows which ship to adjudicate.
+  assert.ok(fs.existsSync(ADJUDICATION),
+    `${path.relative(REPO, ADJUDICATION)} is missing -- the disagreements below cannot be classified, so no bar can be applied to them`);
+  const adj = readJson(ADJUDICATION);
+  const adjById = new Map((adj.rows || []).map(r => [r.verdict_id, r]));
+  const unadjudicated = disagreements.filter(r => !adjById.has(r.verdict_id));
+  assert.strictEqual(unadjudicated.length, 0,
+    `${unadjudicated.length} disagreement(s) carry no row in ${path.relative(REPO, ADJUDICATION)}, so they cannot be counted as harness, contract or true: ` +
+    unadjudicated.map(r => `${r.backlog_id} ${r.version} (verdict ${r.verdict_id.slice(0, 8)})`).join(" | "));
+
+  // THE HARNESS CLASS IS THE ONE THAT HAS TO PROVE ITSELF HERE. "The agent blocked because the diff
+  // was truncated" is a claim about what the MODEL SAID, and the only evidence for it is the model's
+  // own recorded words -- so `judgment_quote` must occur in the judgment this file already holds. A
+  // harness row nobody can find the quote for is an excuse, and it fails.
+  for (const r of disagreements) {
+    const row = adjById.get(r.verdict_id);
+    if (row.class !== "harness") continue;
+    const j = byId.get(r.verdict_id);
+    const said = [j?.reasoning ?? j?.findings, ...(j?.missing_evidence || [])].join("\n");
+    assert.ok(row.judgment_quote && said.includes(row.judgment_quote),
+      `${r.backlog_id} ${r.version} is adjudicated "harness", but its judgment_quote (${JSON.stringify(row.judgment_quote)}) does not occur in the recorded judgment's own reasoning or missing_evidence -- the harness claim has no evidence in the judgment it is about`);
+  }
+
+  const classOf = r => adjById.get(r.verdict_id)?.class ?? "unclassified";
+  const harness = disagreements.filter(r => classOf(r) === "harness");
+  // A FALSE BLOCK IS A BLOCK THE CONTRACT CAUSED: the evidence the agent said was missing was in
+  // the delivery, in a place the payload did not carry (the commit body, the cycle notes). A TRUE
+  // BLOCK is one where the evidence exists nowhere -- the agent was right and the ledger row was
+  // the error.
+  const falseBlocks = disagreements.filter(r => classOf(r) === "elsewhere");
+  const trueBlocks = disagreements.filter(r => classOf(r) === "absent");
+  // The direction that SHIPS A BAD CHANGE, counted separately and bounded at zero: the ledger
+  // blocked and the replay approved. Nothing on the recorded ledger is of this shape today; slice 2
+  // supplies the known-bad mutants that can actually exercise it.
+  const falseApproves = disagreements.filter(r => r.replayed === "approve");
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
   // ---- THE DISCRIMINATION ARM RUNS BEFORE THE BAR, and that order is deliberate: a green bar
   // whose replay could not have failed is worth nothing, so the question "is this measuring the
   // agent at all?" has to be answered whichever way the count goes.
@@ -229,6 +298,8 @@ async function run() {
 
   console.log(`  SES-337 reproduction: ${results.length - disagreements.length}/${results.length} reproduced, ${disagreements.length} disagreement(s), ${tightened.length} of them the agent tightening a green-gate ship${disagreements.length ? `: ${list.join(" | ")}` : ""}`);
   console.log(`  SES-337 contract: ${invalid.length}/${results.length} judgments would be REJECTED by pass two (exit 2, no row)${invalid.length ? `: ${invalidList.join(" | ")}` : ""}`);
+  console.log(`  SES-344 adjudicated: ${disagreements.length} raw / ${harness.length} harness / ${plural(falseBlocks.length, "contract false block")} / ${plural(trueBlocks.length, "true block")}` +
+    `${falseApproves.length ? ` / ${plural(falseApproves.length, "FALSE APPROVE")}` : ""} (${adj.adjudicated_by}, ${adj.adjudicated_at})`);
   if (ctl) {
     console.log(`  SES-337 control A (${ctl.blanked} blanked, n=${ctl.sample_size}): ${ctl.disagreements} disagreed vs ${ctl.main_disagreements_on_same_sample} on the same sample unblanked`);
     if (ctl.second_control) console.log(`  SES-337 control B (${ctl.second_control.blanked} blanked, n=${ctl.second_control.sample_size}): ${ctl.second_control.disagreements} disagreed`);
@@ -239,8 +310,21 @@ async function run() {
   assert.strictEqual(invalid.length, 0,
     `${invalid.length}/${results.length} recorded judgments do not satisfy ${INTENT_SLUG}'s own stored schema, so pass two would have exited 2 and written NO verdict row for them. This is a contract finding, not a verdict finding -- the model reached a judgment and the shape threw it away: ${invalidList.join(" | ")}`);
 
-  assert.ok(disagreements.length <= MAX_DISAGREEMENTS,
-    `the Verifier reproduced ${results.length - disagreements.length}/${results.length} recorded verdicts; ${disagreements.length} disagreements exceeds the bar of ${MAX_DISAGREEMENTS} (John, 2026-09-08). Every one is the same shape -- the ledger row was written by the mechanical lane on three green gates, and the agent blocked on evidence the kickoff promised and the delivery did not carry. Disagreements: ${list.join(" | ")}`);
+  // THE ADJUDICATED BARS, AND THE CONDITION ON RUNNING THEM AT ALL. These judgments were recorded
+  // against contract v1; asserting a bar on them now would grade the agent on evidence it was never
+  // handed, and a pass would be the instrument reading itself. Declared not-run by name until a v2
+  // recording exists -- the number this file exists to produce is slice 2's to record.
+  if (!(Number(jf.contract_version) >= ADJUDICATED_CONTRACT_VERSION)) {
+    notRun("the adjudicated bar",
+      `the ${results.length} judgments in ${path.relative(REPO, JUDGMENTS)} are recorded against contract v1 -- re-judge under the widened contract (slice 2), which records contract_version ${ADJUDICATED_CONTRACT_VERSION}. The partition above is reported, not asserted: ${disagreements.length} raw / ${harness.length} harness / ${falseBlocks.length} contract / ${trueBlocks.length} true.`);
+    return;
+  }
+
+  assert.ok(falseApproves.length <= MAX_FALSE_APPROVES,
+    `${falseApproves.length} replayed verdict(s) APPROVED a ship the ledger blocked, against a bar of ${MAX_FALSE_APPROVES}. This is the direction that ships a bad change and it has no allowance: ${falseApproves.map(r => `${r.backlog_id} ${r.version}`).join(" | ")}`);
+
+  assert.ok(falseBlocks.length <= MAX_FALSE_BLOCKS,
+    `the Verifier blocked ${falseBlocks.length} ship(s) whose named evidence WAS in the delivery (adjudicated "elsewhere"), against a bar of ${MAX_FALSE_BLOCKS} (John, 2026-09-08). ${harness.length} further disagreement(s) are the harness's and ${trueBlocks.length} are true blocks, counted against neither. False blocks: ${falseBlocks.map(r => `${r.backlog_id} ${r.version} (verdict ${r.verdict_id.slice(0, 8)})`).join(" | ")}`);
 }
 
 export default run;
@@ -257,6 +341,14 @@ async function writePrompts(outDir, blank, only) {
   const fx = readJson(FIXTURE);
   let usable = fx.fixtures.filter(f => f.available);
   if (only) usable = usable.slice(0, Number(only));
+
+  // SES-344: read once, for the whole run. Absent credentials are not an error here -- they mean
+  // `cycle_notes` is null and the index says which, so the attended run can see it did not have
+  // that half rather than discovering it in the verdicts.
+  const creds = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY
+    ? { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY }
+    : null;
+  if (!creds) console.error("write-prompts: no SUPABASE credentials in env -- every prompt's ship_report.cycle_notes will be null (the commit bodies are still read from git).");
 
   fs.mkdirSync(outDir, { recursive: true });
   const index = [];
@@ -281,6 +373,14 @@ async function writePrompts(outDir, blank, only) {
       self_certifying_paths: SELF_CERTIFYING_PATHS,
       kickoff: mat.kickoff,
       diff: mat.diff,
+      // SES-344: the widened key, in the same shape scripts/verifier.js V5 writes. `cycle_notes` is
+      // read live where credentials exist and is `null` where they do not -- "nobody could ask" and
+      // "the Builder wrote nothing" are different facts, and a re-judgment recorded against a `""`
+      // that was really an absent credential would be graded on a delivery that was never read.
+      ship_report: {
+        commit_messages: mat.ship_report,
+        cycle_notes: creds ? await cycleNotesFor(creds.url, creds.key, f.cycle_id) : null,
+      },
     };
     const assembly = await assemblePrompt({
       capability_slug: VERIFY_CAPABILITY,
@@ -310,7 +410,16 @@ async function writePrompts(outDir, blank, only) {
     });
   }
   const idx = path.join(outDir, "index.json");
-  fs.writeFileSync(idx, JSON.stringify({ count: index.length, blanked: blankSlugs.length ? blankSlugs.join(",") : null, prompts: index }, null, 2), "utf8");
+  // `contract_version` IS THE RECORD OF WHAT THESE PROMPTS CARRIED, and the assertion phase reads
+  // the same number off the judgments file before it applies any bar. Written by the phase that
+  // ACTUALLY ASSEMBLED the wider context, so it cannot claim a contract the prompts did not have.
+  fs.writeFileSync(idx, JSON.stringify({
+    count: index.length,
+    contract_version: ADJUDICATED_CONTRACT_VERSION,
+    cycle_notes_read: Boolean(creds),
+    blanked: blankSlugs.length ? blankSlugs.join(",") : null,
+    prompts: index,
+  }, null, 2), "utf8");
   console.log(`wrote ${index.length} prompts -> ${outDir}\nindex: ${idx}`);
 }
 

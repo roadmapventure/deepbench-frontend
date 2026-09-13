@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.471 | scripts/build-verdict-fixture.js | SES-344 slice 1 -- `rawInputs()` also
+// rebuilds the SHIP REPORT (`git log -1 --format=%B <sha>`, capped at `SHIP_REPORT_CAP`) and
+// `materializeInputs()` passes it through as `ship_report`, so the replay can hand a fixture the
+// same evidence key scripts/verifier.js now puts in both judge lanes. Digest-free by decision --
+// the reason is at the `shipReport` line below.
+//
 // DeepBench v7.0.440 | scripts/build-verdict-fixture.js | SES-337 -- THE 30 RECORDED VERDICTS
 // BECOME A FIXTURE THE VERIFIER IS REPLAYED AGAINST, and the thing to read twice is WHY THE
 // RECONSTRUCTION DOES NOT COME FROM `runner_cycles.push_sha`.
@@ -44,7 +50,7 @@ import path from "path";
 import crypto from "crypto";
 import { spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
-import { verdictFor, autoDoneEligibility, DIFF_CAP, KICKOFF_CAP } from "./verifier.js";
+import { verdictFor, autoDoneEligibility, DIFF_CAP, KICKOFF_CAP, SHIP_REPORT_CAP } from "./verifier.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..");
@@ -159,12 +165,21 @@ export function rawInputs(repo, sha, kickoffPath) {
       else { kickoff = cap(atHead, KICKOFF_CAP, "document"); kickoffSource = "at HEAD -- the doc was committed after the ship it specced"; }
     }
   }
-  return { diff, kickoff, kickoffSource, errors };
+  // SES-344: THE SHIP REPORT IS MATERIALISED FROM GIT, NOT STORED, and it carries NO DIGEST -- which
+  // is the one place this differs from the diff and the kickoff beside it, on purpose. The 27
+  // recorded judgments were produced against a contract that did not include a ship report, so
+  // hashing one here would pin a value nothing was ever judged on and fail every replay the first
+  // time a body was amended. `-1` rather than a range because a fixture row IS one ship commit.
+  // Slice 2 re-judges under the widened contract and records its own digest; until then this is
+  // evidence the replay can show, never evidence it can check a recording against.
+  const shipReport = cap(gitIn(repo, ["log", "-1", "--format=%B", sha]) ?? "", SHIP_REPORT_CAP, "ship report");
+
+  return { diff, kickoff, kickoffSource, shipReport, errors };
 }
 
 export function materializeInputs(repo, fixture) {
   const i = fixture?.inputs;
-  if (!fixture?.sha || !i) return { diff: null, kickoff: null, errors: ["the fixture carries no resolved sha"] };
+  if (!fixture?.sha || !i) return { diff: null, kickoff: null, ship_report: null, errors: ["the fixture carries no resolved sha"] };
   const got = rawInputs(repo, fixture.sha, i.kickoff_path);
   const errors = [...got.errors];
   if (got.diff !== null && i.diff_sha256 && sha256(got.diff) !== i.diff_sha256) {
@@ -173,7 +188,9 @@ export function materializeInputs(repo, fixture) {
   if (got.kickoff !== null && i.kickoff_sha256 && sha256(got.kickoff) !== i.kickoff_sha256) {
     errors.push(`${i.kickoff_path} at ${fixture.sha.slice(0, 8)} no longer hashes to the copy this verdict was judged on`);
   }
-  return { ...got, errors };
+  // `ship_report` in the returned shape, `shipReport` in `rawInputs`: the caller puts this straight
+  // into a `task_context` key, and that key's name is the contract's (scripts/verifier.js V5).
+  return { ...got, ship_report: got.shipReport, errors };
 }
 
 async function main() {
