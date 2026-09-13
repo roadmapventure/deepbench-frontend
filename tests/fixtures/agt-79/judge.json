@@ -1,0 +1,134 @@
+{
+  "schema": {
+    "type": "object",
+    "required": [
+      "window",
+      "fixes",
+      "findings",
+      "report",
+      "account"
+    ],
+    "properties": {
+      "window": {
+        "type": "string"
+      },
+      "fixes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "backlog_id",
+            "check",
+            "apply",
+            "reason"
+          ],
+          "properties": {
+            "backlog_id": {
+              "type": "string"
+            },
+            "check": {
+              "type": "string"
+            },
+            "apply": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "findings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "backlog_id",
+            "check",
+            "detail"
+          ],
+          "properties": {
+            "backlog_id": {
+              "type": "string"
+            },
+            "check": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 300
+            }
+          }
+        }
+      },
+      "report": {
+        "type": "string",
+        "maxLength": 6000
+      },
+      "account": {
+        "type": "string",
+        "maxLength": 100
+      }
+    }
+  },
+  "prior": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000a1",
+      "backlog_id": "QA-79-08",
+      "check_slug": "verdict-missing",
+      "first_seen_at": "2026-09-10T02:00:00+00:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a2",
+      "backlog_id": "QA-79-02",
+      "check_slug": "quote-missing",
+      "first_seen_at": "2026-09-09T02:00:00+00:00"
+    }
+  ],
+  "answer": {
+    "window": "2026-09-12",
+    "fixes": [
+      {
+        "backlog_id": "QA-79-03",
+        "check": "cost-snapshot-missing",
+        "apply": true,
+        "reason": "ticket_matrix.actual_cycles 2 at rate 0.5 is 1.00; the column contract yields it."
+      },
+      {
+        "backlog_id": "QA-79-05",
+        "check": "claim-on-closed",
+        "apply": false,
+        "reason": "The close-out may still be in flight; the capability that closes tickets decides whether the claim is live."
+      },
+      {
+        "backlog_id": "QA-79-07",
+        "check": "claim-expired",
+        "apply": true,
+        "reason": "claimed_at is past 24 hours and no open cycle holds cyc-dead."
+      },
+      {
+        "backlog_id": "QA-79-12",
+        "check": "type-off-taxonomy",
+        "apply": true,
+        "reason": "feature to Feature is the one-to-one spelling."
+      }
+    ],
+    "findings": [
+      {
+        "backlog_id": "QA-79-01",
+        "check": "quote-missing",
+        "detail": "The row carries no predicted_cycles; the capability that quotes tickets decides it."
+      },
+      {
+        "backlog_id": "QA-79-05",
+        "check": "claim-on-closed",
+        "detail": "A done row is still claimed; the capability that closes tickets decides whether the claim is live."
+      }
+    ],
+    "report": "Cells fixed: QA-79-03 — cost_pct_snapshot — null → 1; QA-79-07 — claimed_by — cyc-dead → null; QA-79-12 — type — feature → Feature.\nFindings by check: quote-missing QA-79-01 — 0 nights; claim-on-closed QA-79-05 — 0 nights; verdict-missing QA-79-08 — 3 nights.\nBacklog behind the fences: quote 1 · size 1 · cost 1 · verdict 1.",
+    "account": "Confirmed three cell fixes, refused one",
+    "input_tokens": 12000,
+    "output_tokens": 800
+  }
+}

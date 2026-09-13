@@ -1,6 +1,6 @@
-// DeepBench v7.0.477 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slices 1-3 -- THE
-// TICKET OWNER'S CENSUS, WRITE PASS AND NIGHTLY LANDING, pinned at the level that can actually go
-// red.
+// DeepBench v7.0.480 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slices 1-4 -- THE
+// TICKET OWNER'S CENSUS, WRITE PASS, NIGHTLY LANDING AND JUDGMENT PASS, pinned at the level that
+// can actually go red.
 //
 // WHY EVERY ARM CARRIES A CONTROL. Ten of the eleven checks produce a SHORT list on a healthy
 // board, and the failure mode of a census is not a wrong list -- it is an EMPTY one. A check that
@@ -64,6 +64,25 @@
 // an arm that only tested one season would pass for six months. H, I and J are all pure or
 // source-only, so they run BEFORE part E's credential gate returns -- a clean checkout still
 // exercises them.
+//
+// (K) THE JUDGMENT PASS (slice 4), and its whole subject is what the code does with an answer it
+// did not write. The merge is driven by the real fixture answer and then by TEN mutations of it,
+// each of which must be REFUSED BY NAME -- a window from another night, a fix naming a judgment
+// finding, a fix naming a ticket that is not on this board, a sentence about a fix the answer
+// confirmed, a duplicate, an over-long reason, a non-boolean apply, an empty detail, a missing
+// required key, and an array that is not an array. Without the mutations the accept arm proves
+// only that a valid answer is accepted, which is the half that cannot silently invert.
+//
+// Its control is the one that decides the safety property: remove ONE fix from the answer and the
+// finding it named must become a JUDGMENT finding with no `fix` -- not stay derivable, and not
+// quietly get written anyway. Silence is not consent, and an ingest that failed open would read
+// green on every other arm here.
+//
+// The gate arm is LIVE and branches on the row rather than asserting one outcome, because this
+// half shipped AHEAD of its seed: with no `audit-board` capability row the command must exit 2
+// having printed nothing and written no state file, and once John applies the seed the SAME
+// command must exit 3. Either way the four write-table counts are equal before and after -- pass
+// one never writes a row, and that is the property the arm actually exists to pin.
 
 import assert from "assert";
 import fs from "fs";
@@ -75,7 +94,9 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   classifyBoard, renderCensus, planWrites, applyPlan, CHECKS, TYPE_TAXONOMY, TYPE_MAP, FENCES,
   censusLine, sameChicagoDay, nightlyNotes, NIGHTLY_PREFIX,
+  chicagoDay, judgeTask, ingestJudgment, statePathFor, EXIT_AWAITING_ANSWER,
 } from "../../scripts/ticket-owner.js";
+import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 import { renderTicketHygiene, factsSha, cst, BEGIN, END } from "../../scripts/render-standing-brief.js";
 import { parseSteps, render, NOTES, CARD_REL, RUNBOOK_REL } from "../../scripts/render-cycle-card.js";
 
@@ -534,6 +555,178 @@ async function main() {
   assert.strictEqual(nNoCreds.status, 2, "a live nightly without credentials is not a pass");
   assert.ok(nNoCreds.stderr.includes("SUPABASE_URL"), `the refusal must name what is missing; got: ${nNoCreds.stderr}`);
 
+  // --- K: the judgment pass, pure + no-creds CLI (slice 4) --------------------------------------
+  const J = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/fixtures/agt-79/judge.json"), "utf8"));
+  const ZERO = "00000000-0000-4000-8000-000000000000";
+  // The census exactly as the CLI hands it to the prompt, and the state file pass one would write.
+  const out = { measured_at: F.now, rate: F.rate, fences: FENCES, counts: r.counts, backlog: r.backlog, findings: r.findings };
+  const state = {
+    version: 1, started_at: F.now, cycle_id: ZERO, nightly: false,
+    capability: "audit-board", intent: "to-audit-intent", agent: "ticketowner",
+    model: "claude-fable-5-1", schema: J.schema, now: F.now, rate: F.rate, window: "2026-09-12",
+    census: out, prior: J.prior, items: F.board.items.map(i => ({ id: i.id, backlog_id: i.backlog_id })),
+  };
+
+  // The catalog entry is what lets the mandatory agent-log.js row be written at all: without it the
+  // very first judged night is refused at its log row (SES-332 / SES-334 / SES-338, each found by a
+  // refusal). And the fixture's schema must be the SEED's schema byte for byte, or the regression
+  // is validating answers against a contract the live Intent row will never carry.
+  const svc = SERVICE_CATALOG.find(s => s.slug === "audit-board");
+  assert.ok(svc, "audit-board must be a SERVICE_CATALOG slug — agent-log.js refuses any other --ai-type");
+  assert.strictEqual(svc.serviceType, "ai");
+  assert.ok(svc.patterns.includes("Structured Output"), `audit-board's patterns read ${JSON.stringify(svc.patterns)}`);
+  assert.ok(seed.includes(JSON.stringify(J.schema)),
+    "the judge fixture's schema must be the seed's to-audit-intent schema, byte for byte");
+  assert.ok(!seed.includes(JSON.stringify({ ...J.schema, required: [] })),
+    "the seed-substring control did not fire — the check would pass for any schema, so it proves nothing");
+  assert.strictEqual(EXIT_AWAITING_ANSWER, 3, "3 is AWAITING THE JUDGMENT and is not 2 — pass one ran its half correctly");
+
+  // The DST boundaries again, now on the single-instant function the window is keyed by. A window
+  // computed with a fixed offset is wrong twice a year and silently, and the window is what decides
+  // whether an answer is about tonight at all.
+  assert.strictEqual(chicagoDay("2026-09-13T04:59:00Z"), "2026-09-12", "CDT midnight is 05:00Z");
+  assert.strictEqual(chicagoDay("2026-09-13T05:01:00Z"), "2026-09-13", "CDT midnight is 05:00Z");
+  assert.strictEqual(chicagoDay("2026-01-13T05:59:00Z"), "2026-01-12", "CST midnight is 06:00Z");
+  assert.strictEqual(chicagoDay("2026-01-13T06:01:00Z"), "2026-01-13", "CST midnight is 06:00Z");
+  assert.throws(() => chicagoDay("x"), "a window that cannot be computed must throw, never answer a wrong day");
+
+  const sp = statePathFor("/t", "a-b/../c");
+  assert.ok(sp.endsWith("ticket-owner-judge-a-bc.json"), `a cycle id reaching a filesystem path must be sanitised; got ${sp}`);
+  assert.ok(sp.startsWith("/t"), `the state file must land in the directory it was given; got ${sp}`);
+
+  // judgeTask: three members, and the ledger REPROJECTED — `check`, never `check_slug`, and no row
+  // id. Handing a model a primary key invites an answer that names one.
+  const jt = judgeTask(out, J.prior, F.now);
+  assert.strictEqual(jt.window, "2026-09-12");
+  assert.strictEqual(jt.census, out, "the task carries the census itself, never a re-derived copy");
+  assert.deepStrictEqual(jt.prior, [
+    { backlog_id: "QA-79-08", check: "verdict-missing", first_seen_at: "2026-09-10T02:00:00+00:00" },
+    { backlog_id: "QA-79-02", check: "quote-missing", first_seen_at: "2026-09-09T02:00:00+00:00" },
+  ], "the prior rows reach the prompt as {backlog_id, check, first_seen_at} and nothing else");
+
+  // The accept arm, over the real fixture answer.
+  const stateBefore = JSON.stringify(state);
+  const g = ingestJudgment(J.answer, state);
+  assert.deepStrictEqual(g.errors, [], `the fixture answer must be accepted; got ${g.errors.join(" | ")}`);
+  assert.deepStrictEqual(g.judged, {
+    confirmed: 3, refused: 1, unconfirmed: 0, sentences: 2,
+    model: "claude-fable-5-1", report: J.answer.report,
+  });
+  assert.deepStrictEqual(g.result.counts, { rows: 14, findings: 11, derivable: 3, judgment: 8 },
+    "a refused fix moves one finding from derivable to judgment and changes no other count");
+  assert.deepStrictEqual(
+    g.result.findings.map(f => `${f.backlog_id} ${f.check}`),
+    r.findings.map(f => `${f.backlog_id} ${f.check}`),
+    "the merge keeps the census's own order — a reordering would read as movement on the board");
+  assert.deepStrictEqual(g.result.backlog, r.backlog, "the behind-the-fence counts are the census's, untouched");
+
+  const q5 = only(g.result, "QA-79-05", "claim-on-closed");
+  assert.strictEqual(q5.verdict, "judgment", "a REFUSED fix becomes a judgment finding");
+  assert.ok(!("fix" in q5), "a refused fix must carry no `fix` object at all — a fix that survives is a write");
+  assert.ok(q5.detail.startsWith("judge refused: "), `got: ${q5.detail.slice(0, 40)}`);
+  assert.deepStrictEqual(only(g.result, "QA-79-03", "cost-snapshot-missing").fix,
+    only(r, "QA-79-03", "cost-snapshot-missing").fix, "a CONFIRMED fix is the census's own fix, unaltered");
+  assert.strictEqual(only(g.result, "QA-79-01", "quote-missing").detail, J.answer.findings[0].detail,
+    "a judgment finding the answer wrote a sentence for carries THAT sentence");
+  assert.strictEqual(only(g.result, "QA-79-04", "actual-unknown").detail, only(r, "QA-79-04", "actual-unknown").detail,
+    "a judgment finding the answer said nothing about keeps the census's detail");
+
+  const pj = planWrites(g.result, J.prior, F.board.items, { rate: F.rate });
+  assert.deepStrictEqual(pj.fixes.map(f => f.backlog_id), ["QA-79-03", "QA-79-07", "QA-79-12"],
+    "only the confirmed fixes become writes");
+  assert.strictEqual(pj.ledger.insert.length, 7, "eight judgment pairs minus the one already on the ledger");
+  assert.deepStrictEqual(pj.ledger.reseen, ["00000000-0000-4000-8000-0000000000a1"]);
+  assert.deepStrictEqual(pj.ledger.clear, ["00000000-0000-4000-8000-0000000000a2"]);
+
+  assert.strictEqual(JSON.stringify(state), stateBefore, "ingestJudgment must not mutate the state it was handed");
+  assert.ok(only(r, "QA-79-05", "claim-on-closed").fix, "the census object itself must survive the merge untouched");
+
+  // THE CONTROL, and it is the safety property: drop ONE fix and its finding must FAIL CLOSED —
+  // judgment, no `fix`, and counted as unconfirmed. An ingest that failed open would pass every
+  // other arm above.
+  const a2 = clone(J.answer);
+  a2.fixes = a2.fixes.filter(f => f.backlog_id !== "QA-79-12");
+  const g2 = ingestJudgment(a2, state);
+  assert.deepStrictEqual(g2.errors, [], "an answer that simply says less is still a valid answer");
+  assert.strictEqual(g2.judged.unconfirmed, 1, "a derivable finding with no fix entry is UNCONFIRMED, never assumed");
+  assert.strictEqual(g2.judged.confirmed, 2);
+  assert.strictEqual(g2.result.counts.derivable, 2, "silence is not consent — the unconfirmed fix is not written");
+  const q12 = only(g2.result, "QA-79-12", "type-off-taxonomy");
+  assert.strictEqual(q12.verdict, "judgment");
+  assert.ok(!("fix" in q12));
+  assert.ok(q12.detail.startsWith("judge: not confirmed"), `got: ${q12.detail.slice(0, 40)}`);
+
+  // TEN MUTATIONS, each REFUSED BY NAME. `result` and `judged` null on every one: a refusal that
+  // still returned a merge would let a caller write half an answer.
+  const mutations = [
+    ["a missing required key", a => { delete a.account; }, 'missing required key "account"'],
+    ["an answer about another night", a => { a.window = "2026-09-13"; }, "about window"],
+    ["a fix naming a judgment finding", a => { a.fixes.push({ backlog_id: "QA-79-01", check: "quote-missing", apply: true, reason: "x" }); }, "not a derivable finding"],
+    ["a fix naming a ticket off this board", a => { a.fixes.push({ backlog_id: "QA-79-99", check: "claim-expired", apply: true, reason: "x" }); }, "not a derivable finding"],
+    ["a sentence about a confirmed fix", a => { a.findings.push({ backlog_id: "QA-79-03", check: "cost-snapshot-missing", detail: "x" }); }, "neither a judgment finding"],
+    ["a duplicated fix", a => { a.fixes.push(clone(a.fixes[2])); }, "twice"],
+    ["an over-long reason", a => { a.fixes[0].reason = "r".repeat(201); }, "at most 200"],
+    ["a non-boolean apply", a => { a.fixes[0].apply = "yes"; }, "apply must be a boolean"],
+    ["an empty detail", a => { a.findings[0].detail = ""; }, "detail must be a non-empty string"],
+    ["fixes that is not an array", a => { a.fixes = "none"; }, '"fixes" must be'],
+  ];
+  for (const [name, mutate, fragment] of mutations) {
+    const bad = clone(J.answer);
+    mutate(bad);
+    const gm = ingestJudgment(bad, state);
+    assert.ok(gm.errors.length >= 1, `${name} must be refused, and was not`);
+    assert.strictEqual(gm.result, null, `${name} was refused but still returned a result to write`);
+    assert.strictEqual(gm.judged, null, `${name} was refused but still returned a judged summary`);
+    assert.ok(gm.errors.join("\n").includes(fragment),
+      `${name}: the refusal must name it ("${fragment}"); got ${gm.errors.join(" | ")}`);
+  }
+
+  // The CLI's five refusals and the one run that works, all with the credentials deleted. Each must
+  // be stopped by its OWN gate: a judge run refused as an unknown flag would start writing the day
+  // somebody "fixes" the flag list.
+  const kNoCycle = spawnCli(["--judge"]);
+  assert.strictEqual(kNoCycle.status, 2, "--judge writes, so it needs a cycle to attribute the write to");
+  assert.ok(!kNoCycle.stderr.includes("unknown flag"), `--judge must be a known flag; got: ${kNoCycle.stderr}`);
+  assert.ok(kNoCycle.stderr.includes("needs --cycle-id"), `got: ${kNoCycle.stderr}`);
+  const kBoard = spawnCli(["--judge", `--cycle-id=${ZERO}`, `--board=${FIXTURE_REL}`]);
+  assert.strictEqual(kBoard.status, 2, "--judge over a fixture board is refused on the same terms as --apply");
+  assert.ok(kBoard.stderr.includes("never written"), `got: ${kBoard.stderr}`);
+  const kNoCreds = spawnCli(["--judge", `--cycle-id=${ZERO}`]);
+  assert.strictEqual(kNoCreds.status, 2, "pass one reads the live board, so it needs credentials");
+  assert.ok(kNoCreds.stderr.includes("SUPABASE_URL"), `got: ${kNoCreds.stderr}`);
+  const kOrphan = spawnCli(["--answer=x.json"]);
+  assert.strictEqual(kOrphan.status, 2, "--answer without --judge is a flag that would otherwise be silently ignored");
+  assert.ok(kOrphan.stderr.includes("belong to --judge"), `got: ${kOrphan.stderr}`);
+  const kDryAlone = spawnCli(["--judge", `--cycle-id=${ZERO}`, "--dry-run"]);
+  assert.strictEqual(kDryAlone.status, 2, "--dry-run has nothing to dry-run without an answer");
+  assert.ok(kDryAlone.stderr.includes("belongs to --judge --answer"), `got: ${kDryAlone.stderr}`);
+
+  const D = fs.mkdtempSync(path.join(os.tmpdir(), "agt79k-"));
+  const statePath = path.join(D, "state.json");
+  const answerPath = path.join(D, "answer.json");
+  const badPath = path.join(D, "bad.json");
+  fs.writeFileSync(statePath, JSON.stringify(state), "utf8");
+  fs.writeFileSync(answerPath, JSON.stringify(J.answer), "utf8");
+  const noAccount = clone(J.answer);
+  delete noAccount.account;
+  fs.writeFileSync(badPath, JSON.stringify(noAccount), "utf8");
+
+  // The whole two-pass merge with the writer removed: no credentials, no network, one JSON line.
+  const kDry = spawnCli(["--judge", `--answer=${answerPath}`, `--state-file=${statePath}`, "--dry-run"]);
+  assert.strictEqual(kDry.status, 0, `--answer --dry-run needs no cycle and no creds; stderr: ${kDry.stderr}`);
+  assert.deepStrictEqual(JSON.parse(kDry.stdout), {
+    ok: true, dry_run: true, confirmed: 3, refused: 1, unconfirmed: 0,
+    fixes: 3, insert: 7, reseen: 1, clear: 1,
+  }, "the dry run must report the same plan the pure half computes");
+
+  const kNoState = spawnCli(["--judge", `--answer=${answerPath}`, `--state-file=${path.join(D, "missing.json")}`, "--dry-run"]);
+  assert.strictEqual(kNoState.status, 2, "an answer with no state is an answer about an unknown board");
+  assert.ok(kNoState.stderr.includes("run pass one first"), `got: ${kNoState.stderr}`);
+  const kRefused = spawnCli(["--judge", `--answer=${badPath}`, `--state-file=${statePath}`, "--dry-run"]);
+  assert.strictEqual(kRefused.status, 2, "a refused answer is exit 2, even on a dry run");
+  assert.ok(kRefused.stderr.includes("REFUSED and nothing was written"), `got: ${kRefused.stderr}`);
+  assert.ok(kRefused.stderr.includes('"account"'), `the refusal must name the offending key; got: ${kRefused.stderr}`);
+
   // --- E: live ---------------------------------------------------------------------------------
   const base = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
@@ -541,6 +734,7 @@ async function main() {
     const why = "SUPABASE_URL / SUPABASE_SERVICE_KEY are not set; run with node --env-file-if-exists=.env.local tests/regression/run-all.js";
     notRun("live census (part E)", why);
     notRun("write pass (part G)", why);
+    notRun("judge gate (part K live)", why);
     return;
   }
 
@@ -614,6 +808,43 @@ async function main() {
   assert.strictEqual(await restCount(base, key, "ticket_owner_findings"), findingsBefore,
     "a census without --apply must not write, touch or clear a findings row");
   assert.strictEqual(await restCount(base, key, "backlog_items"), itemsBefore, "the census must not have touched the board");
+
+  // --- K live: the capability gate ---------------------------------------------------------------
+  // This half shipped AHEAD of its seed, so the arm branches on the ROW rather than asserting one
+  // outcome: exit 2 while `capabilities` has no audit-board row, exit 3 once John applies the seed.
+  // What does NOT branch is the negative — pass one never writes, whichever side of the gate it
+  // lands on, and that is the property this arm exists to pin.
+  const WRITE_TABLES = ["runner_cycles", "runner_decisions", "ticket_owner_findings", "runner_before_images"];
+  const kBefore = [];
+  for (const t of WRITE_TABLES) kBefore.push(await restCount(base, key, t));
+
+  const liveStatePath = statePathFor(os.tmpdir(), ZERO);
+  try {
+    const g1 = spawnCli(["--judge", `--cycle-id=${ZERO}`], { withCreds: true });
+    assert.ok(!g1.stderr.includes("unknown flag"), `--judge must be a known flag live too; got: ${g1.stderr}`);
+    if (g1.status === 2) {
+      assert.ok(g1.stderr.includes("no audit-board row"),
+        `without the seed the gate must say which row is missing; got: ${g1.stderr}`);
+      assert.ok(g1.stderr.includes("agt-79-ticket-owner-seed.sql"),
+        `the refusal must name the file John has to apply; got: ${g1.stderr}`);
+      assert.strictEqual(g1.stdout, "", "a refused pass one prints no prompt at all");
+      assert.ok(!fs.existsSync(liveStatePath), "a refused pass one writes no state file");
+    } else {
+      assert.strictEqual(g1.status, EXIT_AWAITING_ANSWER,
+        `the seed has landed, so pass one must assemble and exit 3; stderr: ${g1.stderr}`);
+      assert.ok(g1.stdout.length > 1000, `exit 3 means a prompt was printed; got ${g1.stdout.length} bytes`);
+      assert.ok(g1.stderr.includes("pass one complete"), `got: ${g1.stderr}`);
+      assert.ok(fs.existsSync(liveStatePath), "pass one's whole product is the state file and the prompt");
+    }
+    console.log(`[AGT-79] part K live: gate answered ${g1.status}`);
+  } finally {
+    if (fs.existsSync(liveStatePath)) fs.unlinkSync(liveStatePath);
+  }
+
+  for (let i = 0; i < WRITE_TABLES.length; i++) {
+    assert.strictEqual(await restCount(base, key, WRITE_TABLES[i]), kBefore[i],
+      `pass one wrote a ${WRITE_TABLES[i]} row — it must read and print, never write`);
+  }
 
   // --- G: the write pass, live and rolled back --------------------------------------------------
   const S = `agt-79-qa:${Date.now()}`;
