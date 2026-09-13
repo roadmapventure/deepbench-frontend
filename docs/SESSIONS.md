@@ -5,6 +5,26 @@
 
 ---
 
+## session/cycle-20260913-0239 (v7.0.475, 2026-09-13, runner cycle `eb001bcd-66c9-4731-ae5b-3ee4d7ac5dd5`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder, per register B21) — `AGT-79` slice 2 of 3 — **forty cells corrected under one handle, and the night's fourth block was the board, not the code.**
+
+### The pick was released without being built, on a peer's measurement
+
+The chain gate returned `SES-344`, and a *parallel* chain had spent the night on it: `1bd980f6` shipped slice 1, `04a3ac3b` shipped slice 2 for **$2.2656 of real billable dollars**, and its third cycle `b09e7802` closed `did_not_run` at 01:58Z with `last_step` *"step 3 — API-dollar wall"*. Its numbers, quoted rather than re-derived: the remainder is 25 `contract_version` 2 re-judgments at **$0.369430–$0.512367 each ≈ $11–12**, against **$1.4807** of headroom on the $5 America/Chicago day cap, and the dispatcher computes `contract_version` from completeness by design so a partial run cannot fake it. The claim succeeded (its holder releases after pushing) and was released unbuilt. **Deliberately not deferred:** `defer_status` is for a condition somebody must clear, and this one clears itself at the CST day rollover two hours later — a flag nobody remembers to clear would strand a ticket whose blocker expires tonight. This is `pattern:159` exactly: John's own cap is the only thing holding it, he raises caps for the day freely rather than let the system idle, and the override is his word alone. Carried on the card and the push, never taken.
+
+### The spent design advertises itself, for the third time in one night
+
+The next row, `AGT-79`, carried `design_status = 'designed'` and a `kickoff_link` pointing at its **own slice-1 kickoff**, every task of which had shipped one cycle earlier at `b70ebadd`. Step 6's fast path would have handed a Builder a contract with nothing left in it. `AGT-70` did the same thing at this session's opening pick. Cleared to NULL under decision `b8204c1d`, with `kickoff_link` deliberately left in place — it is a real kickoff for this ticket and it is leg 2 of the `SES-345` handoff census that only just reached 1 of 44. The general defect is **`SES-385`**, filed in the same transaction with both sightings, the three candidate fixes, and the warning that nulling the link would break that census.
+
+### Forty cells, one handle, and the arithmetic is the whole argument
+
+`--apply` wrote every derivable fix under ONE `kind = 'hygiene'` decision `77afdcbc`, reversible until Tue: **37** `cost-snapshot-missing` (`round(actual_cycles × runner_pct_per_cycle(), 2)`), **1** `claim-on-closed` (`SES-141`, claimed since 2026-08-23), **2** `type-off-taxonomy` (`SES-131` feature→Feature, `SES-208` Bug Fixes→Bug), plus **170** judgment findings filed into the ledger. Proved rather than asserted: 40 before-images, all **full rows** — `reverse_decision()` repopulates every column from `row_data`, so a projection image would restore a row with 25 NULLs — `updated_at` drift **0.000000 s** on all 40 (`SES-316`: the PATCH never writes it, and nothing on `backlog_items` triggers it), `status` / `predicted_cycles` / `design_status` / `tier` / `title` unchanged on all 40, board count 894 unchanged, and the re-run reads `fixed 0 · +0 ~170 −0 · no decision`. `ladder_work_class` is NULL on purpose: forty nightly cell fixes must never count toward a work class's promotion streak. The judgment run stays out — `capabilities where slug = 'audit-board'` is 0 live because the roster seed is John's to apply.
+
+### Every verdict tonight was a block, and none of them was about the code
+
+Verdict `afd41248`, **block**, on `ses-285-m6-autonomy`, `ses-373-card-only-self-decides` and — new this cycle — `ses-281-m5-pick-enforcement`: *"the selfbuild lane came back empty."* It was empty, and the reason is ordinary: `prime_directive_queue()` admits exactly two tickets and both were held by **live** cycles (`AGT-79` by this one, `SES-344` by peer `169d01cc` at 03:44:22Z). Register **B42** makes parallel cycles the design and says a contested claim is explicitly *not* a skip. So three guards now grade **board state** rather than code, and the cost is structural rather than cosmetic: a block writes `delivered`, `record_ship_decision()` refuses a non-`approve` verdict, and **none of tonight's four deliveries carries a one-tap Reverse handle** — the exact absence `M6-01` was built to close, reopened by a red suite nobody owns. Filed as **`SES-386`** with all four verdict ids. The Builder also declined to wave off a flaky `LOG-132` timing red (2 of 5 runs, 2102 ms against a 2000 ms bar, 3/3 green in isolation) and named it instead.
+
+---
+
 ## session/cycle-20260913-0135 (v7.0.474, 2026-09-13, runner cycle `dde4670d-e87f-4538-9b56-e920ff00ba64`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Prioritizer and Designer, Opus 5 Builder, per register B21 and `public.runner_model_lanes` read live) — `AGT-79` slice 1 of 3 — **the census that writes nothing, and the table it created was born readable by the whole internet.**
 
 ### A new table is not born closed, whatever the rule file says
