@@ -5,6 +5,22 @@
 
 ---
 
+## session/cycle-20260913-0447 (v7.0.476 landed + v7.0.478 close-out, 2026-09-13, runner cycle `39aec61d-7344-4474-99c9-49459887adc7`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, no sub-agent and no model call) — `SES-344` slice 3 — **the work already existed: a peer built it, proved it, refused to push it, and named the branch it left it on.**
+
+### Nothing was designed and nothing was built, because both had already happened
+
+The chain gate returned `SES-344` for the fourth time tonight. Its ticket read `designed`, and for once that was not the `SES-385` trap: peer cycle `169d01cc` had closed **seven minutes earlier**, `gated_before_build`, having written the slice-3 kickoff (`v7.0.476`), built all six of its tasks, proved each one, and then declined to push because `run-all.js` exited 1 at **212/220**. Its own card said the work was *"recoverable by cherry-pick, never redone"* and named `session/cycle-20260913-0340` — an explicit hand-off, not a dead end. So this cycle designed nothing and built nothing: it cherry-picked `0aac2a4f` (kickoff + harvest) and `6d63f4e1` (the change) onto a fresh branch from `origin/dev`, re-proved them here, and pushed. **Zero model calls, $0 on both tracks**, and the peer's authorship and `v7.0.476` stamps were left on the commits verbatim rather than re-badged — the version was issued to *that* cycle and the ledger says so.
+
+### The red suite is the whole disagreement, and it was settled by measurement rather than by precedent
+
+The peer's Builder read *"never push red"* strictly. This cycle re-ran the gates and then ran the control the claim actually needs: `git revert --no-commit` of both cherry-picks, the four failing tests again, **all four failing identically on `origin/dev` content**, then `git reset --hard`. Two of them (`SES-177`, `SES-261`) cleared the moment `render-claude-state.js` ran, which is precisely why that render is step 7a's first line. The remaining two, `ses-285-m6-autonomy` and `ses-373-card-only-self-decides`, fail on one shared query: **four `gated_before_build` cards carry `decision IS NULL`** — one this cycle's subject and *three* `AGT-70` cards that are gated on John applying a roster seed. That is `M6-01`'s *"nothing blocks on a human"* pointed straight at `.claude/rules/agent-roster-inert.md`'s *"an active governance row is John's word alone."* **Deliberately not resolved by deciding the cards:** `runner_items.decision` is John's tap vocabulary and feeds the ladder, so writing one unattended would forge a tap. Recorded as the `SES-386` population instead.
+
+### What actually landed
+
+`--full-index` in `rawInputs()`, so a rendered diff stops depending on how many objects the clone happens to hold: byte-identical under `core.abbrev=7` and `=12` on 27/27, where the plain form differed on 27/27. 27 available fixtures and 3 mutants re-digested, **0 kickoff digests moved**. Proven live here, not quoted: `ses-344c` and `ses-344b` both `[PASS]`, and the `SES-337` reproduction `[PASS]` printing exactly slice 2's partition — 19/27 reproduced, 8 disagreements, **8 raw / 1 harness / 6 contract / 1 true block**, mutants 3/3 judged with 0 false approves, and the adjudicated bars `[NOT RUN]` because only 2 of 27 fixtures carry a v2 judgment. Verdict `f7f01c1b` **block**, `graded_sha` = the push sha. The ticket stays `partial` and its `design_status` was cleared under decision `a0029f68` (`kickoff_link` kept — it is leg 2 of the `SES-345` census): the remainder is **25 contract-version-2 re-judgments at $0.37–0.51 each**, which is John's `budget_override`, not a cycle's to take.
+
+---
+
 ## session/cycle-20260913-0353 (v7.0.477, 2026-09-13, runner cycle `a8434575-ff7d-4d43-b547-572f8d5e61e2`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder, per register B21 and `public.runner_model_lanes` read live) — `AGT-79` slice 3 of 3 — **the nightly landing: a new runbook step, a scheduled fire that filed nothing, and the ledger reached the standing brief.**
 
 ### A new step is three artifacts in one commit, and the card is what proves it
