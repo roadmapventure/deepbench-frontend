@@ -641,6 +641,19 @@ powershell -NoProfile -Command "Set-ScheduledTask -TaskName 'DeepBench meter rea
   line; `tests/regression/ses-374-meter-reader.test.mjs` guards the repo copy, and a task whose
   copy is stale shows up as *Last Result* ≠ 0 or a parser exit 2, never as a wrong number.
 
+- **The always-on reader (`SES-388`, 2026-09-14, John: "we need to be able to update the meter when my
+  computer is off").** `.github/workflows/meter-reader.yml` runs the SAME script every 30 minutes on
+  GitHub, signed in with repository secret `CLAUDE_CODE_OAUTH_TOKEN` (minted once by
+  `claude setup-token` on John's machine) and the `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` secrets CI
+  already holds. The script is unchanged -- environment credentials precede the DPAPI file -- and a
+  GitHub row is told from a machine row by the hostname in `note`. Both writers may run; the gate
+  reads the newest row. A cloud routine cannot be the reader: measured 2026-09-13 (probe run
+  `cse_01XgcrXWKfp2qZ4BokzfrL22`), `claude -p "/usage"` in the cloud prints the session cost summary,
+  not the meter, because the harness signs in with a session token. A failed run fails the job and
+  GitHub emails it; a token that expired shows as exit 2 (`cli-logged-out`) -- re-run `setup-token`
+  and replace the secret. Trigger it by hand from the Actions tab (`workflow_dispatch`) after any
+  change. The workflow file can only be pushed by John (the sessions' PAT lacks the workflow scope).
+
 ### 4. Fetch, rebase, then push `HEAD:dev`
 
 Before any push to `dev` (kickoff commit, close-out commit — anything), from inside the worktree:
