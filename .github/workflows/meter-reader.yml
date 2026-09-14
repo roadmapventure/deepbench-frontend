@@ -70,6 +70,11 @@ jobs:
           chmod 600 ~/.claude/.credentials.json
           env -u CLAUDE_CODE_OAUTH_TOKEN claude -p "/usage" --model claude-haiku-4-5 --max-turns 1 --output-format text 2>&1 | head -c 1500 || true
           rm -f ~/.claude/.credentials.json
+          echo; echo "== D. rate-limit headers on a one-token inference call (headers only)"
+          curl -s -D /tmp/h.txt -o /dev/null -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" -H "anthropic-beta: oauth-2025-04-20" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" https://api.anthropic.com/v1/messages -d '{"model":"claude-haiku-4-5-20251001","max_tokens":1,"system":"You are Claude Code, Anthropic'"'"'s official CLI for Claude.","messages":[{"role":"user","content":"hi"}]}' || true
+          head -1 /tmp/h.txt; grep -i -E "ratelimit|retry-after" /tmp/h.txt || echo "(no ratelimit headers)"
+          echo; echo "== E. the CLI's own rate_limit_event"
+          claude -p "say ok" --model claude-haiku-4-5 --max-turns 1 --output-format stream-json --verbose 2>&1 | grep -i "rate_limit" | head -c 900 || true
 
       - name: Read /usage and write one runner_usage_readings row
         env:
