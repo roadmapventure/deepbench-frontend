@@ -3,24 +3,30 @@
 # WHY. The weekly pace gate (M5-16, SES-368) and the stale-meter refusal (SES-389) read the freshest
 # public.runner_usage_readings row. Until 2026-09-14 the only writer was a scheduled task on John's
 # machine (SES-374), so a sleeping laptop meant a sleeping runner: three fires refused meter_stale on
-# the night of 2026-09-13. A cloud routine cannot read the meter (measured 2026-09-13, probe run
+# the night of 2026-09-13. A cloud routine cannot be the reader either (measured 2026-09-13, probe run
 # cse_01XgcrXWKfp2qZ4BokzfrL22: the cloud harness signs in with a session token, not the subscription).
 #
-# WHAT. Every 30 minutes GitHub runs scripts/read-usage-meter.js UNCHANGED under John's subscription
-# token -- repository secret CLAUDE_CODE_OAUTH_TOKEN, minted once by `claude setup-token` -- with the
-# Supabase secrets CI already holds. The script takes environment credentials before its DPAPI file, so
-# nothing in it knows it is on GitHub; the row's `note` carries this runner's hostname, which is how a
-# GitHub row is told from a row from John's machine. Both writers may run; the gate reads the newest.
+# WHY THERE IS NO CLI HERE, MEASURED RATHER THAN ASSUMED. The first shape of this workflow installed the
+# Claude Code CLI and ran `claude -p "/usage"` under a `claude setup-token` token. That token signs in
+# (`claude auth status` -> oauth_token) but it does not carry the scope the meter needs: on runner
+# 34864955276, /api/oauth/usage answered 403 oauth_scope_insufficient (needs user:profile) and /usage
+# printed the session cost summary instead of the three meter lines. So the CLI is not installed at all.
 #
-# FAILURE IS VISIBLE. The script exits 2 when the CLI is logged out (the token expired -- run
-# `claude setup-token` again and replace the secret), when /usage changed its wording, or when the
-# insert is refused; a non-zero exit fails this job and GitHub emails the failure. That is SES-392's
-# visible failure for this host. A reading older than 2h while this workflow is enabled means it is
-# failing: read the Actions tab first.
+# WHAT RUNS INSTEAD. `node scripts/read-usage-meter.js --via-headers` takes the same three numbers off
+# the RATE-LIMIT HEADERS of two one-token POSTs to /v1/messages under the same token -- measured on runs
+# 34864955276 and 34865128090: anthropic-ratelimit-unified-5h-utilization and -7d-utilization (plus both
+# -reset epochs) on claude-haiku-4-5-20251001, and -7d_oi-utilization (the Fable week) on
+# claude-fable-5-1. Two output tokens per reading, no prompt content, no logAICall (this is a script,
+# not an api/ route). The row is written with the Supabase secrets CI already holds; its source is
+# 'meter-reader-headers' and its note carries this runner's hostname, which is how a GitHub row is told
+# from a row from John's machine. Both writers may run; the gate reads the newest row whatever wrote it.
 #
-# PINNED CLI. 2.1.218 is the version the parser's fixture (tests/regression/ses-374-meter-reader.test.mjs,
-# 2026-09-11 output shape) was taken on and the version John minted the token with. Bump it on purpose,
-# with the fixture, never by floating to latest.
+# FAILURE IS VISIBLE. The script exits 2 when the token is missing or expired ('no-token' /
+# 'headers-refused' -- mint a new one with `claude setup-token` and replace the secret), when a header
+# the parser needs is gone ('parse', naming it -- tests/regression/ses-374-meter-reader.test.mjs pins
+# the 2026-09-14 header shape), or when the insert is refused. A non-zero exit fails this job and GitHub
+# emails the failure; that is SES-392's visible failure for this host. A reading older than 2h while
+# this workflow is enabled means it is failing: read the Actions tab first.
 name: meter-reader
 
 on:
@@ -53,35 +59,9 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install the Claude Code CLI (pinned)
-        run: npm install -g @anthropic-ai/claude-code@2.1.218
-
-      - name: Diagnose how the meter can be read with a setup-token (percentages only, no secrets)
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: |
-          echo "== A. auth status"; claude auth status 2>&1 | head -c 600 || true
-          echo; echo "== B. the CLI's own usage endpoint with the token"
-          curl -s -o /tmp/usage.json -w "http=%{http_code}" -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" -H "anthropic-beta: oauth-2025-04-20" -H "Accept: application/json" https://api.anthropic.com/api/oauth/usage || true
-          head -c 1500 /tmp/usage.json || true
-          echo; echo "== C. /usage with a credentials file instead of the env var"
-          mkdir -p ~/.claude
-          printf '{"claudeAiOauth":{"accessToken":"%s","refreshToken":"","expiresAt":4102444800000,"scopes":["user:inference","user:profile"],"subscriptionType":"max"}}' "$CLAUDE_CODE_OAUTH_TOKEN" > ~/.claude/.credentials.json
-          chmod 600 ~/.claude/.credentials.json
-          env -u CLAUDE_CODE_OAUTH_TOKEN claude -p "/usage" --model claude-haiku-4-5 --max-turns 1 --output-format text 2>&1 | head -c 1500 || true
-          rm -f ~/.claude/.credentials.json
-          echo; echo "== D. rate-limit headers on a one-token inference call (headers only)"
-          curl -s -D /tmp/h.txt -o /dev/null -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" -H "anthropic-beta: oauth-2025-04-20" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" https://api.anthropic.com/v1/messages -d '{"model":"claude-haiku-4-5-20251001","max_tokens":1,"system":"You are Claude Code, Anthropic'"'"'s official CLI for Claude.","messages":[{"role":"user","content":"hi"}]}' || true
-          head -1 /tmp/h.txt; grep -i -E "ratelimit|retry-after" /tmp/h.txt || echo "(no ratelimit headers)"
-          echo; echo "== D2. the same one-token call on claude-fable-5-1 (headers only)"
-          curl -s -D /tmp/h2.txt -o /tmp/b2.json -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" -H "anthropic-beta: oauth-2025-04-20" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" https://api.anthropic.com/v1/messages -d '{"model":"claude-fable-5-1","max_tokens":1,"system":"You are Claude Code, Anthropic'"'"'s official CLI for Claude.","messages":[{"role":"user","content":"hi"}]}' || true
-          head -1 /tmp/h2.txt; grep -i -E "ratelimit|retry-after" /tmp/h2.txt || echo "(no ratelimit headers)"; head -c 300 /tmp/b2.json | grep -i error || true
-          echo; echo "== E. the CLI's own rate_limit_event"
-          claude -p "say ok" --model claude-haiku-4-5 --max-turns 1 --output-format stream-json --verbose 2>&1 | grep -i "rate_limit" | head -c 900 || true
-
-      - name: Read /usage and write one runner_usage_readings row
+      - name: Read the meter from rate-limit headers and write one runner_usage_readings row
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: node scripts/read-usage-meter.js
+        run: node scripts/read-usage-meter.js --via-headers
