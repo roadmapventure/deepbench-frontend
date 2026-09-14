@@ -41,8 +41,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
+      # ref: dev -- this file must live on main (GitHub schedules only from the default branch), but the
+      # script lives on dev; main sits at v7.0.90 and does not carry it. Found live on the first run.
       - uses: actions/checkout@v4
         with:
+          ref: dev
           sparse-checkout: scripts/read-usage-meter.js
           sparse-checkout-cone-mode: false
 
