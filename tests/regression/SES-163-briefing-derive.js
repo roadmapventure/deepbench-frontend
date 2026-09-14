@@ -190,9 +190,16 @@ function statsUseTheResolvedCap() {
 
   // A model with no cycles today renders 0 rather than being dropped: a missing row reads as
   // "this model was not offered", which is a different and untrue claim.
-  const html = modelRowsHtml(cycles, 37);
+  const html = modelRowsHtml(cycles, { all: 37, fable: 83 });
   assert.ok(html.includes("Fable 5") && html.includes("Sonnet 5"), "all three models render");
-  assert.ok(html.includes("37%"), "John's meter reading appears against the first row");
+  // SES-390: each meter cell names the meter it carries. The Fable row printed the ALL-MODELS
+  // number under a header reading "Your weekly meter", so the row named one meter and showed
+  // another -- 57 against a Fable 90 on 2026-09-14.
+  assert.ok(html.includes("Fable 83%"), "the Fable row carries the FABLE meter, labelled");
+  assert.ok(html.includes("all models 37%"), "the all-models meter stays on the second row, labelled");
+  assert.ok(!html.includes('class="num">37%<'),
+    "no meter cell may print a bare number: an unlabelled percentage under 'Your weekly meter' is " +
+    "the defect -- it reads as the meter for the model on that row");
 }
 
 // ---------------------------------------------------------------------------

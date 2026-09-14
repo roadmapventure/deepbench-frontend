@@ -133,10 +133,17 @@ const MODELS = [
   ['Sonnet 5', 'claude-sonnet-5'],
 ];
 
-/** §4's model table body (HTML). `meterPct` is John's latest all-models reading, or null. */
-export function modelRowsHtml(cycles, meterPct) {
-  const meterCell = i => (i === 0 ? (meterPct == null ? '&mdash;' : `${meterPct}%`)
-    : i === 1 ? (meterPct == null ? 'all models &mdash;' : `all models ${meterPct}%`) : '');
+/**
+ * §4's model table body (HTML). `meter` is John's latest reading as `{ all, fable }`, or null.
+ * SES-390: the column header is *Your weekly meter* and the `Fable 5` row's cell was printing the
+ * ALL-MODELS number — 57 against a Fable 83 — so the row named one meter and showed another. Each
+ * cell now labels the meter it carries.
+ */
+export function modelRowsHtml(cycles, meter) {
+  const all = meter?.all ?? null;
+  const fable = meter?.fable ?? null;
+  const meterCell = i => (i === 0 ? (fable == null ? 'Fable &mdash;' : `Fable ${fable}%`)
+    : i === 1 ? (all == null ? 'all models &mdash;' : `all models ${all}%`) : '');
   return MODELS.map(([label, id], i) => {
     const n = cycles.filter(c => c.model === id)
       .reduce((a, c) => a + Number(c.est_tokens_dev || 0) + Number(c.est_tokens_qa || 0), 0);

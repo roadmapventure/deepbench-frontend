@@ -143,14 +143,18 @@ for repeatedly.**
    wall and the pace because both of those grade a number this one has just called out of date. 22
    cycles shipped between 2026-09-12 18:42Z and 2026-09-13 09:41Z on one reading written 17:45Z on
    the 12th — that is the defect, and it is why the age is now graded rather than merely printed.
-3. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` is at or above
+3. `weekly_wall` — **`M5-06`**: the freshest reading's higher weekly meter — `detail.gated_pct` =
+   `GREATEST(all_models_pct, fable_pct)`, `detail.gated_meter` naming which (`SES-390`: at 57 / 90 on
+   2026-09-14 the gate booted) — is at or above <!-- FEATURE: SES-390 -->
    `runner_budget.weekly_rest_pct` for the current **`America/Chicago`** month (register `B35`, superseded
    2026-09-01 by `M6-07` (`SES-285`; annotated `SES-289`) — **scope matters here: only B35's
    Reverse-on-gated answer lost its subject. The America/Chicago boundary is its answer (2),
    explicitly unaffected and still binding** — the month boundary is John's clock, never UTC).
 4. `weekly_pace` — **`M5-16`** (`SES-368`, John's rule of 2026-09-11 in his words: *"only fire if
    usage is below the daily limit … divided by 7 days, each week restarts at 1am central on
-   Fridays"*, *"daily at 100%"*): the freshest reading's `all_models_pct` is at or above
+   Fridays"*, *"daily at 100%"*): the freshest reading's higher weekly meter — `detail.gated_pct` =
+   `GREATEST(all_models_pct, fable_pct)`, `detail.gated_meter` naming which (`SES-390`: at 57 / 90 on
+   2026-09-14 the gate booted) — is at or above
    `detail.pace_limit_pct` = `week_day_index` × 100/7, where the week starts at the most recent
    Friday 01:00 **`America/Chicago`** (`detail.week_started_at`) and the day index is whole days
    elapsed + 1, clamped 1..7. Day 1 allows 14.29, day 2 28.57, day 7 100. The wall (2) still wins
@@ -166,7 +170,8 @@ for repeatedly.**
 6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row.
 7. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
-   the remaining weekly headroom (`100 − all_models_pct`).
+   the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
+   is calibrated from all-models deltas.
 
 Everything else is `pickable` — one pass reason, no degraded variant (`SES-302`). A stale reading
 now has **two** consequences with one home each (`M5-15`, `SES-389`): **past

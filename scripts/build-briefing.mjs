@@ -354,8 +354,8 @@ const apiMonthUsd = monthCycles.reduce((a, c) =>
 const [cap] = await rpc('resolve_day_token_cap', { p_cycle_id: null });
 const st = deriveStats(cyclesToday, { apiMonthUsd, dayCap: cap.day_cap });
 
-const [reading] = await sel('runner_usage_readings?select=all_models_pct&order=taken_at.desc&limit=1');
-const modelRows = modelRowsHtml(cyclesToday, reading ? reading.all_models_pct : null);
+const [reading] = await sel('runner_usage_readings?select=all_models_pct,fable_pct&order=taken_at.desc&limit=1');
+const modelRows = modelRowsHtml(cyclesToday, reading ? { all: reading.all_models_pct, fable: reading.fable_pct } : null);
 const droRows = droRowsHtml(await rpc('daily_reading_output'));
 
 // §7 / §7.1 — his own words, newest first.

@@ -146,6 +146,18 @@ B32 bounds a **day**. Nothing bounded the **week**, which is the wall that actua
 at 1,663,212 tokens for an average completed ticket, a single start can consume the remaining weekly
 headroom and strand itself mid-build.
 
+**Annotated 2026-09-14 (`SES-390`, `v7.0.483`) — the wall grades *two* meters now, and the statement
+above did not need to change to say so.** The subscription carries a per-model Fable meter alongside
+the all-models one, and the judgment lane runs on `claude-fable-5-1`: when Fable is spent, every
+judgment call in a cycle fails while a gate reading `all_models_pct` alone happily boots it. Measured
+2026-09-13 11:12 CT: all models 53, Fable 83 — the gate saw 53 and answered `pickable`. So
+`public.runner_should_boot()` now grades `detail.gated_pct` = `GREATEST(all_models_pct, fable_pct)`
+against the one `runner_budget.weekly_rest_pct`, and `detail.gated_meter` names which meter that
+number came from (a tie reads as `all_models`). **What did not move: the headroom arithmetic.**
+`detail.weekly_headroom_pct` is still `100 − all_models_pct`, because `runner_pct_per_cycle()` is
+calibrated from all-models deltas and pricing a ticket against the Fable meter would compare two
+different units. One wall, two meters, one set of units for cost.
+
 ### <a id="M5-07"></a>M5-07 — cheapest-first within a lane (`script`)
 
 > Within the same lane and priority class, break queue ties by lowest `predicted_cycles` first.
@@ -334,7 +346,7 @@ consequence changed, from `should_boot = false` to `reason = 'pickable_degraded'
 
 ### <a id="M5-16"></a>M5-16 — the weekly pace gate: a cycle fires only below the day-of-week share (`script`)
 
-> A cycle fires only while the freshest `runner_usage_readings.all_models_pct` is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` and before `no_budget_row`; no other gate carries its own pace.
+> A cycle fires only while the freshest `runner_usage_readings` row's higher weekly meter — `GREATEST(all_models_pct, fable_pct)` (`SES-390`) — is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` (which grades the same number) and before `no_budget_row`, naming the graded meter as `detail.gated_meter`; no other gate carries its own pace.
 
 **Added 2026-09-11 (`SES-368`, `v7.0.448`), and it is John's rule in John's words.** Verbatim: *"One
 thing i want you to verify before every automated ticket is ran is only fire if usage is below the
@@ -364,7 +376,8 @@ boundary and the November DST end.
 `resolve_day_token_cap()`), the staleness threshold it grades against is not its own — it is
 `meter_stale`'s, at `runner_settings.meter_stale_hours` (`M5-15`, `SES-389`), and it sits *above*
 the pace in the ladder, so the pace never grades a reading the gate has already called out of date —
-and it does not read the per-model Fable meter — only `all_models_pct`, the number John named. The
+and since `SES-390` it grades the higher of `all_models_pct` and `fable_pct`, because the judgment
+lane runs on Fable and has its own weekly cap. The
 5-hour session meter is not consulted.
 ---
 

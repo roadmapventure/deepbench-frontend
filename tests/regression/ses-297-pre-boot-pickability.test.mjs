@@ -219,6 +219,19 @@ export const CLAUSES = [
     breaks: s => s.split("NULL-safe").join("convenient"),
   },
   {
+    id: "the-wall-and-pace-grade-the-higher-meter",
+    detail:
+      "SES-390: the block must say the wall and the pace grade `detail.gated_pct` = " +
+      "GREATEST(all_models_pct, fable_pct) and that `detail.gated_meter` names which meter that was " +
+      "-- the judgment lane runs on Fable and carries its OWN weekly cap, so a gate reading " +
+      "all_models_pct alone boots cycles straight into a Fable wall (measured 2026-09-14: all " +
+      "models 57, Fable 90, gate answered pickable). Drop the names and the next editor grades one " +
+      "meter again and the refusal cannot say which one refused",
+    test: s =>
+      /gated_pct/.test(s) && /gated_meter/.test(s) && /fable_pct/.test(s) && /GREATEST/.test(s),
+    breaks: s => s.split("gated_meter").join("some field"),
+  },
+  {
     id: "m5-06-asks-the-cheapest-not-the-pick",
     detail:
       "the block must say the affordability test is asked of the CHEAPEST pickable ticket and " +
@@ -503,13 +516,15 @@ export function expectedReason(f) {
   // threshold still boots -- the SQL uses > and this oracle must not quietly use >=.
   if (f.meterStaleHours != null && f.readingAgeHours !== null && f.readingAgeHours > f.meterStaleHours)
     return "meter_stale";
-  if (f.weeklyRestPct !== null && f.allModelsPct !== null && f.allModelsPct >= f.weeklyRestPct)
+  // SES-390: the wall grades the HIGHER weekly meter, not all_models_pct. GREATEST ignores a NULL
+  // side and is NULL only when both are, so the NULL-safe fall-through is unchanged.
+  if (f.weeklyRestPct !== null && f.gatedPct !== null && f.gatedPct >= f.weeklyRestPct)
     return "weekly_wall";
-  // SES-368 / M5-16: the pace, in the ladder's real position -- after the wall, before the budget
-  // row. At-or-above refuses (14.29 on day 1 refuses; 14.28 boots), and NULL on either side falls
-  // through, exactly as the wall does.
-  if (f.paceLimitPct !== null && f.paceLimitPct !== undefined && f.allModelsPct !== null &&
-      f.allModelsPct >= f.paceLimitPct)
+  // SES-368 / M5-16, SES-390: the pace, in the ladder's real position -- after the wall, before the
+  // budget row, grading the SAME number the wall did. At-or-above refuses (14.29 on day 1 refuses;
+  // 14.28 boots), and NULL on either side falls through, exactly as the wall does.
+  if (f.paceLimitPct !== null && f.paceLimitPct !== undefined && f.gatedPct !== null &&
+      f.gatedPct >= f.paceLimitPct)
     return "weekly_pace";
   if (!f.budgetRowExists) return "no_budget_row";
   if (f.pickableCount === 0) return "nothing_pickable";
@@ -558,7 +573,7 @@ async function theLiveGateObeysItsOwnLadder() {
   const settings = asArray(
     await pg(url, key, "runner_settings?select=id,scheduler_on,meter_stale_hours&id=eq.1"), "runner_settings");
   const readings = asArray(
-    await pg(url, key, "runner_usage_readings?select=taken_at,all_models_pct&order=taken_at.desc&limit=1"),
+    await pg(url, key, "runner_usage_readings?select=taken_at,all_models_pct,fable_pct&order=taken_at.desc&limit=1"),
     "runner_usage_readings");
   const month = chicagoMonth();
   const budget = asArray(
@@ -587,6 +602,16 @@ async function theLiveGateObeysItsOwnLadder() {
   const takenAt = readings[0]?.taken_at ? Date.parse(readings[0].taken_at) : null;
   const allModelsPct = readings[0]?.all_models_pct === undefined || readings[0]?.all_models_pct === null
     ? null : Number(readings[0].all_models_pct);
+  // SES-390: the second weekly meter. The judgment lane is claude-fable-5-1 and Fable carries its
+  // own weekly cap, so the walls grade the higher of the two -- and gatedMeter records WHICH, with
+  // a tie reading as all_models exactly as the SQL's CASE does.
+  const fablePct = readings[0]?.fable_pct === undefined || readings[0]?.fable_pct === null
+    ? null : Number(readings[0].fable_pct);
+  const gatedPct = allModelsPct === null && fablePct === null
+    ? null
+    : Math.max(...[allModelsPct, fablePct].filter(x => x !== null));
+  const gatedMeter =
+    fablePct !== null && (allModelsPct === null || fablePct > allModelsPct) ? "fable" : "all_models";
   const week = chicagoWeek();
   const facts = {
     schedulerOn: settings[0]?.scheduler_on ?? null,
@@ -595,8 +620,14 @@ async function theLiveGateObeysItsOwnLadder() {
     meterStaleHours: settings[0]?.meter_stale_hours == null ? null : Number(settings[0].meter_stale_hours),
     readingAgeHours: takenAt === null ? null : Math.round(((Date.now() - takenAt) / 3.6e6) * 100) / 100,
     allModelsPct,
+    fablePct,
+    gatedPct,
+    gatedMeter,
     weeklyRestPct: budget[0]?.weekly_rest_pct ?? null,
     budgetRowExists: budget.length > 0,
+    // SES-390: headroom stays ALL-MODELS on purpose. runner_pct_per_cycle() is calibrated from
+    // all-models deltas, so pricing a ticket against the Fable meter would compare two different
+    // units. The walls moved; the affordability arithmetic did not.
     weeklyHeadroomPct: allModelsPct === null ? null : 100 - allModelsPct,
     weekStartedAt: week.weekStartedAt,
     weekDayIndex: week.weekDayIndex,
@@ -631,6 +662,32 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.week_day_index=${d.week_day_index} but the clock says day ${facts.weekDayIndex}`);
   assert.strictEqual(Number(d.pace_limit_pct), facts.paceLimitPct,
     `detail.pace_limit_pct=${d.pace_limit_pct} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct}`);
+  // SES-390: the number the wall and the pace actually graded, and the name of the meter it came
+  // from -- both read back against the raw-table oracle so a gate that quietly reverted to
+  // all_models_pct disagrees here the moment the two meters differ (57 vs 90 on 2026-09-14).
+  assert.strictEqual(
+    Number(d.gated_pct), facts.gatedPct,
+    `detail.gated_pct=${d.gated_pct} but the freshest reading says GREATEST(all_models_pct=` +
+      `${facts.allModelsPct}, fable_pct=${facts.fablePct}) = ${facts.gatedPct}`,
+  );
+  assert.strictEqual(
+    d.gated_meter, facts.gatedMeter,
+    `detail.gated_meter=${JSON.stringify(d.gated_meter)} but the raw reading says ` +
+      `${facts.gatedMeter} (all_models=${facts.allModelsPct}, fable=${facts.fablePct}; a tie is ` +
+      "all_models). A refusal that cannot say WHICH meter refused cannot be acted on",
+  );
+  assert.strictEqual(
+    d.fable_pct === null || d.fable_pct === undefined ? null : Number(d.fable_pct), facts.fablePct,
+    `detail.fable_pct=${d.fable_pct} but runner_usage_readings says ${facts.fablePct} -- null-safe: ` +
+      "a reading with no Fable number must report null, never 0, or the gate grades a meter nobody read",
+  );
+  if (v.reason === "weekly_wall" || v.reason === "weekly_pace") {
+    assert.ok(
+      ["all_models", "fable"].includes(d.gated_meter),
+      `a '${v.reason}' verdict named gated_meter=${JSON.stringify(d.gated_meter)}; the closed set is ` +
+        "all_models | fable, and this is the branch whose refusal is only auditable if it says which",
+    );
+  }
   assert.strictEqual(d.pickable_count, lanes.length,
     `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
     "drain/selfbuild rows -- the gate and the picker are reading different boards");
@@ -764,7 +821,29 @@ async function run() {
       "scheduler on. pg_proc after the migration: exactly 1 runner_should_boot overload, " +
       "provolatile='s'. Live board at the ship: reason=meter_stale, reading_age_hours=14.74 against " +
       "threshold 2, reading taken 2026-09-13T16:15:27Z -- every hourly fire refuses until the " +
-      "reader writes, which is the ticket's intent; SES-388 / SES-392 own the reader.",
+      "reader writes, which is the ticket's intent; SES-388 / SES-392 own the reader. " +
+      "SES-390 (v7.0.483, migration ses390_fable_meter_gate) MEASURED THE SAME WAY on 2026-09-14, " +
+      "one variable each, every assertion on the REASON and on detail.gated_meter, all rolled back: " +
+      "all_models 20 / Fable 90 -> weekly_wall, gated_meter='fable', gated_pct=90 -- and that is the " +
+      "SEAM, because grading all_models_pct alone answers pickable at those same inputs (rest 85, " +
+      "pace 57.14), so the case discriminates the change rather than the gate; all_models 90 / Fable " +
+      "20 -> weekly_wall, gated_meter='all_models', gated_pct=90, which is the mirror control proving " +
+      "the higher meter is taken from either side; all_models 20 / Fable 20 -> pickable, " +
+      "gated_meter='all_models' (a tie is all_models), gated_pct=20; all_models 20 / Fable at the " +
+      "live pace_limit_pct + 0.5 -> weekly_pace with gated_meter='fable', and the SAME reading at " +
+      "pace_limit_pct - 0.5 -> pickable, which is the boundary control; all_models 20 / Fable NULL " +
+      "-> pickable, gated_pct=20, gated_meter='all_models' (GREATEST ignores the null side, so a " +
+      "reader that never wrote a Fable number cannot refuse a cycle); scheduler_on=false WITH the " +
+      "20/90 wall case -> scheduler_off, and that same case taken 3h ago -> meter_stale, so the two " +
+      "branches above the wall still outrank it after the wall changed the number it grades. " +
+      "weekly_headroom_pct stayed 100 - all_models_pct in every case: runner_pct_per_cycle() is " +
+      "calibrated from all-models deltas and the affordability arithmetic did not move. Zero fixture " +
+      "residue on re-read: 37 readings, 0 rows with source='ses390-qa', newest reading still the " +
+      "meter-reader's 2026-09-14T15:45:06Z, scheduler on. pg_proc after the migration: exactly 1 " +
+      "runner_should_boot overload, provolatile='s', prosrc containing fable_pct and gated_meter. " +
+      "Live board at the ship: reason=weekly_wall, gated_meter='fable', gated_pct=90 against " +
+      "weekly_rest_pct 85 while all_models_pct was 57 -- fires park until the Fable meter is back " +
+      "under 85, which is exactly the wall this ticket exists to stop booting into.",
   );
 }
 
