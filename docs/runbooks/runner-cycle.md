@@ -117,24 +117,38 @@ RETURNING id;
 
 **The two wording corrections this rule cost — `SES-298` (`v7.0.365`) making a stale reading refuse, and `SES-302` (`v7.0.369`) taking the cap and the staleness threshold back off this gate — are archived VERBATIM in `docs/SESSIONS.md`, appendix *runner-cycle.md rationale retired by `SES-336`*, entry A** (ledger entry 51). The live rule is the paragraph immediately below, and it is the whole of it.
 
-**So: the gate reports `reading_age_hours` and a `cap_authority` pointer, and stops there.** It
-carries no `token_cap`, grades no staleness, and emits no `pickable_degraded` reason. **The day cap
-has exactly one home — `public.resolve_day_token_cap()`, read at step 3** — and staleness lowers the
-ceiling there, never here. A stale reading still grades the weekly wall in (2): a stale 63% is
-better evidence than none.
+**So: the gate reports `reading_age_hours` and a `cap_authority` pointer, and grades that age
+against one setting and nothing else.** <!-- FEATURE: SES-389 --> It carries no `token_cap` and
+refuses `meter_stale` past `runner_settings.meter_stale_hours` (`SES-389`, default 2 — the reader
+writes every 30 min, so 2h is four missed readings), naming `reading_taken_at` and the threshold;
+the **ceiling** stays RUNG 2's at 48h. It emits no `pickable_degraded` reason. **The day cap has
+exactly one home — `public.resolve_day_token_cap()`, read at step 3** — and staleness lowers the
+ceiling there, never here. A reading inside the threshold still grades the weekly wall in (3): a
+63% taken an hour ago is better evidence than none.
 
-**The six refusal reasons, in the precedence the function applies them.**
+**The seven refusal reasons, in the precedence the function applies them.**
 Each names itself, always: **a bare `false` is the "NULL is not zero" defect this codebase has paid
 for repeatedly.**
 
 1. `scheduler_off` — `runner_settings.scheduler_on` is false. John's own switch, the same one step
    1b's `scheduler_gate()` honours.
-2. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` is at or above
+2. `meter_stale` — **`M5-15`** (`SES-389`): the freshest reading's age exceeds
+   `runner_settings.meter_stale_hours` (default 2, John's number — the reader writes every 30 min,
+   so 2h is four missed readings). `detail` names `reading_taken_at` and `meter_stale_hours`
+   alongside `reading_age_hours`, so the refusal can be audited from its own payload. **NULL-safe
+   like the wall: with no reading at all the comparison is NULL and the ladder falls through**, so a
+   missing reading is still (5)'s question, never this one's. This is the gate's *own* threshold and
+   it is not the spend brake's — `resolve_day_token_cap()` RUNG 2 keeps 48h and `stale-floor`. Sits
+   below `scheduler_off` because John's switch is a decision and this is an observation; above the
+   wall and the pace because both of those grade a number this one has just called out of date. 22
+   cycles shipped between 2026-09-12 18:42Z and 2026-09-13 09:41Z on one reading written 17:45Z on
+   the 12th — that is the defect, and it is why the age is now graded rather than merely printed.
+3. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` is at or above
    `runner_budget.weekly_rest_pct` for the current **`America/Chicago`** month (register `B35`, superseded
    2026-09-01 by `M6-07` (`SES-285`; annotated `SES-289`) — **scope matters here: only B35's
    Reverse-on-gated answer lost its subject. The America/Chicago boundary is its answer (2),
    explicitly unaffected and still binding** — the month boundary is John's clock, never UTC).
-3. `weekly_pace` — **`M5-16`** (`SES-368`, John's rule of 2026-09-11 in his words: *"only fire if
+4. `weekly_pace` — **`M5-16`** (`SES-368`, John's rule of 2026-09-11 in his words: *"only fire if
    usage is below the daily limit … divided by 7 days, each week restarts at 1am central on
    Fridays"*, *"daily at 100%"*): the freshest reading's `all_models_pct` is at or above
    `detail.pace_limit_pct` = `week_day_index` × 100/7, where the week starts at the most recent
@@ -144,20 +158,23 @@ for repeatedly.**
    carries no staleness threshold of its own (`M5-15`). Guarded by
    `tests/regression/ses-297-pre-boot-pickability.test.mjs`, which carries this reason in `REASONS`,
    the oracle branch, a fixed-instant calendar check and the three `detail` keys.
-4. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
+5. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
    that stopped the runner and then sat unread in a card, and it now has a name instead of a silent
-   pass.** (2) and (3) preceding (4) is deliberate and NULL-safe: with the row absent, (2)'s comparison
-   is NULL rather than true, and with no reading at all (3)'s is too, so the ladder falls through to
-   (4) instead of blaming the wall or the pace for a missing row.
-5. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
+   pass.** (3) and (4) preceding (5) is deliberate and NULL-safe: with the row absent, (3)'s comparison
+   is NULL rather than true, and with no reading at all (4)'s is too, so the ladder falls through to
+   (5) instead of blaming the wall or the pace for a missing row.
+6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row.
-6. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
+7. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`).
 
 Everything else is `pickable` — one pass reason, no degraded variant (`SES-302`). A stale reading
-does not change this verdict; it changes the **ceiling**, and that is `resolve_day_token_cap()`'s
-RUNG 2 to apply at step 3, never this gate's. Read `detail.reading_age_hours` if you want to know
-how old the meter is; read the resolver if you want to know what you may spend.
+now has **two** consequences with one home each (`M5-15`, `SES-389`): **past
+`meter_stale_hours` this gate refuses at (2)**, and past 48h it lowers the **ceiling**, which is
+`resolve_day_token_cap()`'s RUNG 2 to apply at step 3 and never this gate's. **Under** the threshold
+the age is reported and nothing more. Read `detail.reading_age_hours` and `detail.meter_stale_hours`
+if you want to know how old the meter is and what it was graded against; read the resolver if you
+want to know what you may spend.
 
 **This gate and `scheduler_gate()` answer different questions and both hold.** `scheduler_gate()`
 asks *is this fire admissible on John's clock grid*; this one asks *is there anything to do at all*.
@@ -187,9 +204,10 @@ Four properties that are load-bearing. **Do not re-derive any of them by hand:**
   The tail's own first act is re-fetching and re-parsing the live briefing page — **473.1 KB at
   `v7.0.348`**, the single most expensive read in a cycle, and precisely the orientation cost this
   gate exists not to pay — while a refusal has nothing for it to write: no pick, no card, no ladder
-  move, no ship. What a refusing fire therefore does **not** do is **harvest John's taps**. Four of
-  the six reasons clear themselves (a reading gets taken, the wall recedes, a month rolls over, a
-  budget row is inserted) and `scheduler_off` is John's own deliberate choice; **`nothing_pickable`
+  move, no ship. What a refusing fire therefore does **not** do is **harvest John's taps**. Five of
+  the seven reasons clear themselves (a reading gets taken — which clears `meter_stale` and may
+  clear the wall and the pace with it, a month rolls over, a budget row is inserted) and
+  `scheduler_off` is John's own deliberate choice; **`nothing_pickable`
   is the unbounded one** — an empty drain means no fire boots and therefore no fire harvests until
   an attended session runs. That remainder is named on `SES-297`'s card. It is **not** a gap to close
   by quietly restoring the tail here: doing so restores the full page read on exactly the path this

@@ -277,9 +277,31 @@ re-adding an Accept-driven `done` write to the step-9 harvest is not sufficient 
 own — the `kind = 'ship'` branch must come out of `sweep_decision_windows()` in the same change,
 because leaving both would close one delivery twice.
 
-### <a id="M5-15"></a>M5-15 — staleness lowers the ceiling, and one place applies it (`script`)
+### <a id="M5-15"></a>M5-15 — staleness has two consequences, and each has exactly one home (`script`)
 
-> Staleness of the freshest `runner_usage_readings` row never refuses a run — it lowers the ceiling, and `public.resolve_day_token_cap()` RUNG 2 is the single authority that applies it (48h, `stale-floor`, which a standing daily max may not override). No other gate carries its own staleness threshold or its own cap.
+> Staleness of the freshest `runner_usage_readings` row has two consequences and each has exactly one home: past `runner_settings.meter_stale_hours` (default 2, John's number, `SES-389`) `public.runner_should_boot()` refuses the boot as `meter_stale`, naming `reading_taken_at` and the threshold; past 48h `public.resolve_day_token_cap()` RUNG 2 lowers the ceiling to `stale-floor`, which a standing daily max may not override. No other gate carries a staleness threshold or a cap.
+
+**Amended 2026-09-14 (`SES-389`, `v7.0.482`, migration `ses389_meter_stale_gate`).**
+<!-- FEATURE: SES-389 — the rule STATEMENT changed, so the row and this blockquote move in one
+     commit or check 9/10/11 reads a live rule against stale doc text. -->
+**The third rewrite, and it is not a reversal of the second — it is the distinction the second one
+was missing.** `SES-302` was right that *the cap* has one home and that a second copy of it here
+disagreed with `resolve_day_token_cap()` on live data. What it then did was drop the consequence
+*and* the threshold together, leaving the age **printed and not graded** — and the bill arrived:
+**between 2026-09-12 18:42Z and 2026-09-13 09:41Z, 22 cycles shipped against one reading written
+17:45Z on the 12th**, each one answering *"is there weekly headroom"* from a number up to 22 hours
+old. A 22-hour-old meter is not a measurement of now; it is a measurement of yesterday wearing
+today's label. So there are **two** consequences, not one, and they were never the same question:
+*may this fire start at all* (the reading's currency — this gate, `meter_stale_hours`, default 2)
+and *what may it spend* (the ceiling — RUNG 2, 48h, `stale-floor`). The 2026-09-01 defect was **one
+consequence with two homes at two thresholds**; this is two different consequences with one home
+each, which is why the two numbers may legitimately differ. Default 2 is John's: the reader writes
+every 30 minutes, so 2h is four missed readings — a signal, not a blip. It is a `runner_settings`
+column rather than a literal precisely so moving it is not a migration. **The refusal `SES-280`
+shipped at 24h and `SES-298` withdrew is NOT what came back:** that one made a number only John
+could type into a precondition for autonomy (`M6-01`), and the reason it is safe now is that the
+reader is being automated (`SES-388` / `SES-392`) — the refusal names `reading_taken_at` and the
+threshold in its `detail` so a parked runner says exactly which reading it is waiting past.
 
 **Rewritten twice on 2026-09-01/02, and the second rewrite is the instructive one.** `SES-280`
 shipped this as a *refusal* at 24h; within the hour it live-blocked the drain, because the only way
@@ -332,16 +354,18 @@ still day 7 of the prior week), `week_day_index` = whole days elapsed + 1 clampe
 `pace_limit_pct` = index × 100/7 (day 1 = 14.29, day 2 = 28.57, day 7 = 100). The refusal fires when
 the freshest reading's `all_models_pct` is **at or above** the limit — NULL-safe like the wall, so a
 missing reading falls through to `no_budget_row` rather than blaming the pace. Precedence:
-`scheduler_off`, `weekly_wall`, **`weekly_pace`**, `no_budget_row`, `nothing_pickable`,
-`unaffordable`. Fixtures inside a rolled-back DO block on day 1: reading 20 → `weekly_pace`; 14.28 →
+`scheduler_off`, `meter_stale` (`SES-389`), `weekly_wall`, **`weekly_pace`**, `no_budget_row`,
+`nothing_pickable`, `unaffordable`. Fixtures inside a rolled-back DO block on day 1: reading 20 → `weekly_pace`; 14.28 →
 `pickable`; 14.29 → `weekly_pace`; 90 → `weekly_wall` (the wall still wins). Live board at 6% →
 `pickable`. The calendar was checked at fixed instants across the Friday boundary, the day-1/day-2
 boundary and the November DST end.
 
 **What this rule is not.** It is not a cap (`M5-15`: the ceiling has one home,
-`resolve_day_token_cap()`), it carries no staleness threshold of its own, and it does not read the
-per-model Fable meter — only `all_models_pct`, the number John named. The 5-hour session meter is
-not consulted.
+`resolve_day_token_cap()`), the staleness threshold it grades against is not its own — it is
+`meter_stale`'s, at `runner_settings.meter_stale_hours` (`M5-15`, `SES-389`), and it sits *above*
+the pace in the ladder, so the pace never grades a reading the gate has already called out of date —
+and it does not read the per-model Fable meter — only `all_models_pct`, the number John named. The
+5-hour session meter is not consulted.
 ---
 
 ## Amendment note — `SES-285`, 2026-09-01 (`v7.0.359`)

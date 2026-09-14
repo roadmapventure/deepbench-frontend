@@ -1,3 +1,11 @@
+// DeepBench v7.0.482 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-389 -- the gate gains
+// its SECOND refusal, `meter_stale` (M5-15, rewritten): the freshest reading's age is now GRADED
+// against runner_settings.meter_stale_hours (default 2) instead of merely printed, and the refusal
+// names reading_taken_at and the threshold it was graded against. The oracle grows the branch in the
+// ladder's real position -- below scheduler_off, above the wall -- and the live arm reads the
+// threshold out of runner_settings so a hard-coded 2 in either place is a failure, not a pass.
+// M5-15's other consequence is UNCHANGED and the clause below says so: resolve_day_token_cap()
+// RUNG 2 still owns the CEILING at 48h. Two consequences, one home each.
 // DeepBench v7.0.448 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-368 -- the gate gains
 // its third refusal, `weekly_pace` (M5-16): John's day-of-week share of the subscription week
 // (day index x 100/7, week starting Friday 01:00 America/Chicago, whole days). The oracle grows one
@@ -24,7 +32,7 @@
 //     themselves (the SES-158 lesson -- a control that changes nothing proves nothing).
 //   * The LIVE arm runs only with SUPABASE_URL + SUPABASE_SERVICE_KEY and is DECLARED not-run
 //     otherwise (SES-180 notRun()), never silently skipped. It calls rpc/runner_should_boot over
-//     PostgREST and grades the six-branch PRECEDENCE LADDER against an INDEPENDENT ORACLE built
+//     PostgREST and grades the seven-branch PRECEDENCE LADDER against an INDEPENDENT ORACLE built
 //     from the raw tables -- runner_settings, runner_usage_readings, runner_budget and
 //     rpc/prime_directive_queue -- so it asserts the REASON, never merely should_boot=false. Five
 //     branches could be dead and a should_boot-only assertion would still pass.
@@ -46,7 +54,7 @@
 // WHAT THIS FILE DOES NOT COVER, declared rather than implied -- see the notRun() at the foot: the
 // function BODY ships as a Supabase migration and lives in the database, and this suite reaches
 // Supabase only over PostgREST, which cannot read pg_proc.provolatile, pg_proc.prosrc or
-// pg_get_functiondef, and cannot open a transaction -- so the six-refusal fixture matrix cannot be
+// pg_get_functiondef, and cannot open a transaction -- so the seven-refusal fixture matrix cannot be
 // a permanent test without a permanent test that MUTATES runner_budget, runner_settings and the
 // standing Prime Directive on the live board. It must not. Those measurements were taken live at
 // this ship inside a deliberately failing DO block, all rolled back, and are recorded verbatim below.
@@ -66,14 +74,18 @@ const SESSIONS = path.join(ROOT, SESSIONS_REL);
 const BLOCK_START = "**PRE-BOOT GATE — ONE QUERY";
 const BLOCK_END = "**0. Bootstrap.**";
 
-// The six refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
+// The seven refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
 // what each one MEANS is read out of the runbook by the clauses below, never restated.
 export const REASONS = [
   "scheduler_off",
-  // SES-302: neither 'usage_reading_stale' nor 'pickable_degraded' is here. Staleness does not
-  // refuse a run AND does not change this gate's verdict -- resolve_day_token_cap() RUNG 2 owns the
-  // staleness brake (48h, stale-floor, box may not override). This gate carries no cap and no
-  // threshold of its own; SES-298 gave it both at 24h and the two homes disagreed on live data.
+  // SES-389 / M5-15 (rewritten): the age is GRADED here now, against
+  // runner_settings.meter_stale_hours. What SES-302 actually settled -- and what still holds -- is
+  // that the CAP has one home: this gate carries no token_cap and does not second-guess
+  // resolve_day_token_cap() RUNG 2's 48h ceiling brake. The 2026-09-01 defect was two homes for one
+  // consequence at two thresholds; this is two DIFFERENT consequences with one home each. Sits
+  // second: John's switch outranks it, and the wall and the pace both grade a number this branch
+  // has just called out of date. 'pickable_degraded' is still not here.
+  "meter_stale",
   "weekly_wall",
   // SES-368 / M5-16: John's pace. Sits between the wall and the budget-row check, and like the wall
   // it compares NULL-safely -- no reading, no pace verdict.
@@ -136,9 +148,25 @@ export const CLAUSES = [
     breaks: s => s.replace(/611,321/g, "quite a lot"),
   },
   {
+    id: "a-stale-meter-refuses-and-names-its-threshold",
+    detail:
+      "the block must say the gate REFUSES `meter_stale` past runner_settings.meter_stale_hours, " +
+      "must name reading_taken_at and meter_stale_hours as the detail a refusal owes its reader, " +
+      "and must keep the CEILING's separate 48h brake visible -- drop the threshold's name and the " +
+      "next editor hard-codes a literal; drop the 48h and M5-15's two consequences collapse back " +
+      "into the one-home-at-one-threshold confusion SES-302 paid for. 22 cycles shipped on a " +
+      "reading written 17:45Z on 2026-09-12 while the age was printed and not graded",
+    test: s =>
+      /`meter_stale`/.test(s) &&
+      /meter_stale_hours/.test(s) &&
+      /reading_taken_at/.test(s) &&
+      /48h/.test(s),
+    breaks: s => s.split("meter_stale_hours").join("some number"),
+  },
+  {
     id: "all-six-refusals-are-named",
     detail:
-      "every one of the six reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 " +
+      "every one of the seven reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 " +
       "attributed -- a cycle that meets a reason this file does not name cannot write a truthful " +
       "last_step, and a reader cannot tell a refusal from a failure",
     test: s =>
@@ -183,7 +211,12 @@ export const CLAUSES = [
       /2026-09-01/.test(s) &&
       /falls through/i.test(s) &&
       /`no_budget_row`/.test(s) && /`weekly_wall`/.test(s),
-    breaks: s => s.replace(/NULL-safe/i, "convenient"),
+    // SES-389: replace-all, not first-only. The block now says "NULL-safe" twice (meter_stale is
+    // NULL-safe for the same reason the wall is), and a first-occurrence control left the second
+    // standing -- so the mutated block still passed and the control proved nothing. This is the
+    // SES-158 failure mode arriving by ADDITION rather than by edit: sibling controls in this file
+    // already use split/join for exactly this reason.
+    breaks: s => s.split("NULL-safe").join("convenient"),
   },
   {
     id: "m5-06-asks-the-cheapest-not-the-pick",
@@ -460,11 +493,16 @@ function theOracleCalendarMatchesTheFixedInstants() {
 // THE INDEPENDENT ORACLE. Deliberately fed from the RAW TABLES rather than from the gate's own
 // detail payload, so it can disagree with the function. It is not a second implementation of the
 // pick predicate -- prime_directive_queue() is READ, never re-derived (the SES-45 boundary); what
-// is reimplemented is only the six-branch LADDER, which is the thing under test.
+// is reimplemented is only the seven-branch LADDER, which is the thing under test.
 export function expectedReason(f) {
   if (f.schedulerOn === false) return "scheduler_off";
-  // SES-298: staleness is graded LAST and degrades rather than refusing. Held here in the ladder's
-  // real position so this oracle keeps grading the shipped precedence, not a remembered one.
+  // SES-389 / M5-15: the meter's age, graded against the SETTING rather than a literal, in the
+  // ladder's real position -- second, below John's switch and above the wall. NULL-safe on both
+  // sides exactly as the wall is: no reading (readingAgeHours null) falls through, so a missing
+  // reading is still no_budget_row's question. Strictly greater-than, so a reading exactly AT the
+  // threshold still boots -- the SQL uses > and this oracle must not quietly use >=.
+  if (f.meterStaleHours != null && f.readingAgeHours !== null && f.readingAgeHours > f.meterStaleHours)
+    return "meter_stale";
   if (f.weeklyRestPct !== null && f.allModelsPct !== null && f.allModelsPct >= f.weeklyRestPct)
     return "weekly_wall";
   // SES-368 / M5-16: the pace, in the ladder's real position -- after the wall, before the budget
@@ -476,7 +514,8 @@ export function expectedReason(f) {
   if (!f.budgetRowExists) return "no_budget_row";
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
-  // SES-302: no staleness branch. The reading's age is reported, never graded, by this gate.
+  // SES-302 still holds for the CAP: no token_cap branch, no pickable_degraded. The age is graded
+  // at (2) above; what this gate never does is decide what a cycle may SPEND.
   return PASS_REASON;
 }
 
@@ -517,7 +556,7 @@ async function theLiveGateObeysItsOwnLadder() {
 
   // --- Build the oracle from the raw tables.
   const settings = asArray(
-    await pg(url, key, "runner_settings?select=id,scheduler_on&id=eq.1"), "runner_settings");
+    await pg(url, key, "runner_settings?select=id,scheduler_on,meter_stale_hours&id=eq.1"), "runner_settings");
   const readings = asArray(
     await pg(url, key, "runner_usage_readings?select=taken_at,all_models_pct&order=taken_at.desc&limit=1"),
     "runner_usage_readings");
@@ -551,6 +590,9 @@ async function theLiveGateObeysItsOwnLadder() {
   const week = chicagoWeek();
   const facts = {
     schedulerOn: settings[0]?.scheduler_on ?? null,
+    // SES-389: read, never assumed. A test that hard-codes 2 here passes after John moves the
+    // threshold and stops grading the branch it claims to guard.
+    meterStaleHours: settings[0]?.meter_stale_hours == null ? null : Number(settings[0].meter_stale_hours),
     readingAgeHours: takenAt === null ? null : Math.round(((Date.now() - takenAt) / 3.6e6) * 100) / 100,
     allModelsPct,
     weeklyRestPct: budget[0]?.weekly_rest_pct ?? null,
@@ -568,7 +610,7 @@ async function theLiveGateObeysItsOwnLadder() {
     v.reason, want,
     `runner_should_boot() answered "${v.reason}" but the raw tables say "${want}". Oracle facts: ` +
       JSON.stringify(facts) + ". This is the assertion that would catch a dead branch: five of the " +
-      "six refusals could never fire and a should_boot-only check would still pass",
+      "six of the seven refusals could never fire and a should_boot-only check would still pass",
   );
 
   // ASSERT ON WHICH BRANCH FIRED, and on the detail that branch owes its reader (the LOO-013
@@ -604,8 +646,24 @@ async function theLiveGateObeysItsOwnLadder() {
     "detail.cap_authority must name the resolver, so a reader of this payload is pointed at the " +
     "one place the ceiling is decided rather than inferring it from a field that is not here");
   assert.ok(d.reading_age_hours === null || typeof Number(d.reading_age_hours) === "number",
-    "the reading's age is still REPORTED even though it is no longer graded here -- dropping it " +
-    "would leave a reader unable to see a stale meter at all");
+    "the reading's age must be REPORTED on every verdict -- dropping it would leave a reader " +
+    "unable to see a stale meter at all");
+  // SES-389 / M5-15: the threshold the age was graded against, read back out of runner_settings.
+  // This is what makes `meter_stale` auditable from the payload alone, and what catches a literal
+  // creeping back into the SQL: move the setting and a hard-coded gate disagrees here immediately.
+  assert.strictEqual(
+    Number(d.meter_stale_hours), facts.meterStaleHours,
+    `detail.meter_stale_hours=${d.meter_stale_hours} but runner_settings.meter_stale_hours is ` +
+      `${facts.meterStaleHours}. The gate must grade the age against the SETTING, not a literal`,
+  );
+  if (v.reason === "meter_stale") {
+    assert.ok(d.reading_taken_at,
+      "a 'meter_stale' verdict must name reading_taken_at -- 'the meter is old' with no instant " +
+      "attached is not something John can act on, and the age alone does not say WHICH reading");
+    assert.ok(Number(d.reading_age_hours) > Number(d.meter_stale_hours),
+      `'meter_stale' fired with age ${d.reading_age_hours} against threshold ${d.meter_stale_hours} ` +
+      "-- the refusal must be justified by its own payload");
+  }
   if (v.reason === PASS_REASON) {
     assert.ok(d.pick && d.pick.backlog_id,
       "a 'pickable' verdict must name the ticket it would pick -- 'there is work' with no ticket is " +
@@ -673,7 +731,7 @@ async function run() {
   await theLiveGateObeysItsOwnLadder();
 
   notRun(
-    "runner_should_boot()'s pg_proc facts (provolatile, overload count, prosrc) and the six-refusal " +
+    "runner_should_boot()'s pg_proc facts (provolatile, overload count, prosrc) and the seven-refusal " +
       "fixture matrix",
     "the body ships as migration ses297_runner_should_boot and lives in the database, not this repo; " +
       "this suite reaches Supabase only over PostgREST, which cannot read pg_proc and cannot open a " +
@@ -692,7 +750,21 @@ async function run() {
       "fixture residue on re-read: 0 fixture readings, 2 runner_budget rows, weekly_rest_pct 85, " +
       "scheduler on, 1 queued Prime Directive, 41 priced Selfbuild tickets. pg_proc at the same ship: " +
       "provolatile='s', exactly 1 overload, prosrc free of 'drain_epic_next', EXECUTE granted to " +
-      "service_role only. Cost: 16.794 ms execution, 9.819 ms planning, 3,518 shared buffer hits.",
+      "service_role only. Cost: 16.794 ms execution, 9.819 ms planning, 3,518 shared buffer hits. " +
+      "SES-389 (v7.0.482, migration ses389_meter_stale_gate) MEASURED THE SAME WAY on 2026-09-14, " +
+      "one variable each, every assertion on the REASON: a 3h-old reading at all_models_pct 10 with " +
+      "every other input clear -> meter_stale, should_boot=f, detail.reading_age_hours=3.00, " +
+      "detail.meter_stale_hours=2, detail.reading_taken_at equal to the fixture's taken_at; a " +
+      "reading at now() -> pickable at age 0.00; that SAME 3h reading with meter_stale_hours moved " +
+      "to 6 -> pickable, which is the negative control (nothing about the reading changed, only the " +
+      "threshold, so the branch is reading the setting and not a literal); the boundary at 2.99 -> " +
+      "meter_stale and 3.01 -> pickable; and scheduler_on=false WHILE the reading was ALSO stale -> " +
+      "scheduler_off, so precedence 1-over-2 is a difference and not a coincidence. Zero fixture " +
+      "residue on re-read: 34 readings, 0 rows with source='ses389-qa', meter_stale_hours=2, " +
+      "scheduler on. pg_proc after the migration: exactly 1 runner_should_boot overload, " +
+      "provolatile='s'. Live board at the ship: reason=meter_stale, reading_age_hours=14.74 against " +
+      "threshold 2, reading taken 2026-09-13T16:15:27Z -- every hourly fire refuses until the " +
+      "reader writes, which is the ticket's intent; SES-388 / SES-392 own the reader.",
   );
 }
 
