@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// DeepBench v7.0.486 | scripts/agent-prompt.js | SES-395 -- the judgment lane falls back to the
+// orchestrator model when Fable is past its daily share. resolveJudgmentModel() asks
+// public.judgment_model() and the printed model is the one the call actually runs on; the header
+// gains a `# lane:` line and `--json` an `llm.lane_note` only where the lane moved.
 // DeepBench v7.0.457 | scripts/agent-prompt.js | SES-367 -- renderAssembly() now renders the
 // ASSEMBLED output contract as text. The executor states the contract by handing the schema to the
 // model as the tool `input_schema` (request-receivable.js buildCallBody); a session sub-agent has no
@@ -98,6 +102,55 @@ export async function resolveIntentSlug({ intent, capability, tenant, fetchImpl 
   return fallback
     ? { intentSlug: fallback, source: 'capability-default' }
     : { intentSlug: null, source: 'no-default-declared' };
+}
+
+// FEATURE: SES-395 -- the judgment lane DEGRADES instead of the gate refusing. John, 2026-09-14:
+// "The self governance meter should also see if Fable is past its daily limit, drop down to Opus."
+//
+// WHY THIS SEAM IS HERE AND NOT IN THE ASSEMBLY. `assembly.llm.model` is the Skill rows' answer to
+// "which model does this capability run on" -- a STORED fact, correct at every moment, and all six
+// governance agents store `claude-fable-5-1`. What it cannot know is whether Fable has any share of
+// the week left RIGHT NOW, which is a reading, not a configuration. So the stored answer stays
+// untouched in the database and this script -- the one place a session learns which model to spawn
+// a sub-agent on -- asks `public.judgment_model()` and prints the model actually in force. Nothing
+// else in the pipeline changes: the executor's own prompt is byte-identical, because this touches
+// only `llm`, never a section.
+//
+// THE OVERRIDE IS FENCED TO THE JUDGMENT LANE BY EQUALITY, never by agent id or capability slug.
+// An assembly whose model is the orchestrator's (the Builder's own, say) is left exactly alone --
+// degrading it would "drop" it to the model it is already on, and a fence keyed on a slug would
+// need editing every time an agent moves lane.
+export async function resolveJudgmentModel(assembly, { supabaseUrl, headers, fetchImpl = fetch } = {}) {
+  const assemblyModel = assembly?.llm?.model;
+  const base = { model: assemblyModel, reason: 'lane' };
+  const root = String(supabaseUrl || '').replace(/\/+$/, '');
+  try {
+    const lanesRes = await fetchImpl(`${root}/rest/v1/runner_model_lanes?select=lane,model_id`, { headers });
+    if (!lanesRes.ok) throw new Error(`runner_model_lanes returned HTTP ${lanesRes.status}`);
+    const lanes = await lanesRes.json();
+    const judgment = Array.isArray(lanes) ? lanes.find(l => l.lane === 'judgment') : null;
+    if (!judgment?.model_id) throw new Error('runner_model_lanes carries no `judgment` row');
+    // Not a judgment-lane call -- nothing to degrade, and no reason to spend the RPC.
+    if (assemblyModel !== judgment.model_id) return base;
+
+    const rpcRes = await fetchImpl(`${root}/rest/v1/rpc/judgment_model`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!rpcRes.ok) throw new Error(`rpc/judgment_model returned HTTP ${rpcRes.status}`);
+    const rows = await rpcRes.json();
+    const answer = Array.isArray(rows) ? rows[0] : rows;
+    if (!answer?.model_id) throw new Error('rpc/judgment_model returned no model_id');
+    // The function agreeing with the lane is the ordinary case, not a degrade.
+    if (answer.model_id === assemblyModel) return { model: assemblyModel, reason: answer.reason || 'lane' };
+    return { model: answer.model_id, reason: answer.reason || 'degraded', from: assemblyModel };
+  } catch (e) {
+    // FAIL TO THE STORED ANSWER, LOUDLY. An unreachable REST surface must not stop a session running
+    // an agent -- the lane's own model is still a correct model to run on, just possibly an expensive
+    // one. Exit 2 here would make a governance outage out of a meter outage. The caller prints this.
+    return { ...base, warning: `judgment-lane check failed (${e.message}); using the assembly's own model "${assemblyModel}"` };
+  }
 }
 
 export function parseArgs(argv) {
@@ -201,6 +254,20 @@ async function main() {
     fail(e.message);
   }
 
+  // FEATURE: SES-395 -- applied BEFORE either output path, so `--json` and the text header can
+  // never disagree about which model the call runs on. Sections are untouched either way.
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  const lane = await resolveJudgmentModel(assembly, {
+    supabaseUrl: process.env.SUPABASE_URL,
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (lane.warning) console.error(`agent-prompt: ${lane.warning}`);
+  const degraded = Boolean(lane.from);
+  if (assembly.llm) {
+    assembly.llm.model = lane.model;
+    assembly.llm.lane_note = lane.reason;
+  }
+
   if (args.json) {
     process.stdout.write(JSON.stringify(assembly, null, 2) + '\n');
     return;
@@ -211,7 +278,9 @@ async function main() {
   if (!system_prompt) fail(`capability "${args.capability}" assembled zero renderable sections for agent "${args.agent}"`);
 
   const header = `# ${assembly.agent_card.name} — ${assembly.agent_card.role} · capability ${assembly.capability_slug} · model ${assembly.llm?.model}`;
-  process.stdout.write(header + '\n' + system_prompt + '\n');
+  // Only when it actually moved. A note on every run is a note nobody reads.
+  const laneLine = degraded ? `\n# lane: judgment degraded to ${lane.model} (${lane.reason})` : '';
+  process.stdout.write(header + laneLine + '\n' + system_prompt + '\n');
   if (omitted.length) {
     console.error(`agent-prompt: sections omitted (no stored content -- fetched per call by the executor): ${omitted.join(', ')}`);
   }

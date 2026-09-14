@@ -346,7 +346,7 @@ consequence changed, from `should_boot = false` to `reason = 'pickable_degraded'
 
 ### <a id="M5-16"></a>M5-16 — the weekly pace gate: a cycle fires only below the day-of-week share (`script`)
 
-> A cycle fires only while the freshest `runner_usage_readings` row's higher weekly meter — `GREATEST(all_models_pct, fable_pct)` (`SES-390`) — is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` (which grades the same number) and before `no_budget_row`, naming the graded meter as `detail.gated_meter`; no other gate carries its own pace.
+> A cycle fires only while the freshest `runner_usage_readings` row's `all_models_pct` is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` (which grades the same number) and before `no_budget_row`. Fable past its own share is NOT a refusal (`SES-395`): `public.judgment_model()` degrades the judgment lane to the orchestrator model and the gate reports it as `detail.judgment_model` / `detail.judgment_reason`.
 
 **Added 2026-09-11 (`SES-368`, `v7.0.448`), and it is John's rule in John's words.** Verbatim: *"One
 thing i want you to verify before every automated ticket is ran is only fire if usage is below the
@@ -375,10 +375,31 @@ boundary and the November DST end.
 **What this rule is not.** It is not a cap (`M5-15`: the ceiling has one home,
 `resolve_day_token_cap()`), the staleness threshold it grades against is not its own — it is
 `meter_stale`'s, at `runner_settings.meter_stale_hours` (`M5-15`, `SES-389`), and it sits *above*
-the pace in the ladder, so the pace never grades a reading the gate has already called out of date —
-and since `SES-390` it grades the higher of `all_models_pct` and `fable_pct`, because the judgment
-lane runs on Fable and has its own weekly cap. The
+the pace in the ladder, so the pace never grades a reading the gate has already called out of date.
+The
 5-hour session meter is not consulted.
+
+**Amendment — `SES-395`, 2026-09-14 (`v7.0.486`, migration `ses395_judgment_lane_fallback`): the
+pace grades `all_models_pct` again, and Fable's own share became a LANE, not a refusal.** `SES-390`
+had the wall and the pace grade `GREATEST(all_models_pct, fable_pct)`, on the reasoning that the
+judgment lane runs on Fable and carries its own weekly cap. That is true about the *lane* and wrong
+about the *cycle*: measured 2026-09-14 11:42 CT, the first continuation under `SES-390` refused
+`weekly_wall` on `gated_meter = 'fable'` at 93 vs 85 while all-models read 59 — i.e. a whole cycle,
+orchestrator and mechanical lanes included, parked because one delegated lane was spent. John,
+2026-09-14, verbatim: *"The self governance meter should also see if Fable is past its daily limit,
+drop down to Opus."* So the consequence moved to where it belongs. `public.judgment_model()` grades
+the freshest `fable_pct` against the same rest wall and the same day-of-week share and answers
+`fable_rest` / `fable_pace` / `lane` with the `runner_model_lanes` model id to use — the
+`orchestrator` lane's for either Fable reason, the `judgment` lane's otherwise, and `lane` on a NULL
+`fable_pct`, because a meter nobody read cannot degrade anything. `scripts/agent-prompt.js` prints
+that model, so the model a session spawns a sub-agent on is the one in force rather than the one
+stored. `detail.gated_pct` and `detail.gated_meter` are KEPT as keys (`all_models` by construction)
+so no existing reader of the payload breaks. Measured at the ship inside a rolled-back `DO` block,
+one variable each, every assertion on the REASON: Fable 30 → `claude-fable-5-1` / `lane`; Fable 70
+(above the day-4 share 57.14, below the wall 85) → `claude-opus-5` / `fable_pace`; Fable 90 with
+all-models 20 → `claude-opus-5` / `fable_rest` **and the gate answering `pickable`**, which is the
+seam — `SES-390`'s gate answered `weekly_wall` on those same inputs; Fable NULL → `claude-fable-5-1`
+/ `lane`. Zero fixture residue on re-read (0 rows with `source = 'ses395-qa'`, 41 readings).
 ---
 
 ## Amendment note — `SES-285`, 2026-09-01 (`v7.0.359`)

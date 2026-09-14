@@ -27,7 +27,13 @@
 // Part (e) drives the real runWithCallSource() and asserts both directions -- 'session' survives,
 // an invented source still lands null.
 //
-// WHICH BRANCH FIRED IS ANNOUNCED. Parts (c), (d) and (e) are source/in-process and always run.
+// (4) SES-395 ADDS PART (f): the judgment lane falls back to the orchestrator model when
+// public.judgment_model() says Fable is past its share. It is a stub-fetch seam proof -- fetchImpl
+// is injected, so it always runs -- and its discriminator is the NON-judgment assembly driven
+// through the SAME stub: a function that overrode everything would pass a degrade-only clause while
+// silently dropping the Builder's own orchestrator-lane call onto whatever the RPC said.
+//
+// WHICH BRANCH FIRED IS ANNOUNCED. Parts (c), (d), (e) and (f) are source/in-process and always run.
 // Parts (a) and (b) touch Supabase and declare themselves NOT RUN via notRun() when the credentials
 // are absent, rather than passing quietly -- an invisible gap is indistinguishable from coverage.
 
@@ -174,6 +180,88 @@ async function run() {
   const tagged = runWithCallSource(CALL_SOURCE, () => getRequestContext(), { visitorId: "cycle-1" });
   assert.strictEqual(tagged.visitorId, "cycle-1", "`extra` must fill the visitorId slot --cycle uses");
   console.log("  (e) call_source allowlist: 'session' in, invented out, no override -- PASS");
+
+  // ---------------------------------------------------------------------------------------------
+  // (f) SES-395 SEAM PROOF over scripts/agent-prompt.js's resolveJudgmentModel(). No credentials,
+  //     no network: fetchImpl is injected, so this half ALWAYS runs.
+  //
+  //     WHAT WOULD PASS VACUOUSLY, and is therefore controlled for. A clause that only asserts the
+  //     degraded case passes against a function that overrides EVERY assembly -- which would drop
+  //     the Builder's own orchestrator-lane call onto whatever the RPC said, silently. So the
+  //     non-judgment assembly is asserted in the same shape, against the same stub, and the RPC is
+  //     asserted NEVER TO HAVE BEEN CALLED for it: the fence is equality against the judgment
+  //     lane's model_id, and a fence that still spends the round trip is a fence that is not there.
+  // ---------------------------------------------------------------------------------------------
+  const { resolveJudgmentModel } = await import("../../scripts/agent-prompt.js");
+  const LANES = [
+    { lane: "orchestrator", model_id: "claude-opus-5" },
+    { lane: "judgment", model_id: "claude-fable-5-1" },
+    { lane: "mechanical", model_id: "claude-sonnet-5" },
+  ];
+  // Returns the stub plus the URLs it was asked for, so "was the RPC spent?" is assertable.
+  const stub = (rpcRows, { lanesStatus = 200, rpcStatus = 200 } = {}) => {
+    const seen = [];
+    const fetchImpl = async (url) => {
+      seen.push(String(url));
+      const rpc = String(url).includes("/rpc/judgment_model");
+      const status = rpc ? rpcStatus : lanesStatus;
+      return { ok: status >= 200 && status < 300, status, json: async () => (rpc ? rpcRows : LANES) };
+    };
+    return { fetchImpl, seen };
+  };
+  const OPTS = { supabaseUrl: "https://seam.example/", headers: { apikey: "seam" } };
+
+  // (f1) the judgment lane, past its share: the override and the note.
+  const degradedStub = stub([{ model_id: "claude-opus-5", reason: "fable_rest", fable_pct: 94, fable_share: 57.14 }]);
+  const degraded = await resolveJudgmentModel(
+    { llm: { model: "claude-fable-5-1" } }, { ...OPTS, fetchImpl: degradedStub.fetchImpl });
+  assert.deepStrictEqual(degraded, { model: "claude-opus-5", reason: "fable_rest", from: "claude-fable-5-1" },
+    "a judgment-lane assembly whose judgment_model() answers the orchestrator model must be overridden, " +
+    "and must carry both the reason and the model it came FROM -- a bare model id cannot be audited");
+  assert.ok(degradedStub.seen.some(u => u.includes("/rpc/judgment_model")),
+    "the degrade path must actually ask public.judgment_model() -- a hard-coded answer is not a reading");
+
+  // (f2) THE CONTROL: the orchestrator's own assembly, the SAME stub answering the same way.
+  const untouchedStub = stub([{ model_id: "claude-opus-5", reason: "fable_rest" }]);
+  const untouched = await resolveJudgmentModel(
+    { llm: { model: "claude-opus-5" } }, { ...OPTS, fetchImpl: untouchedStub.fetchImpl });
+  assert.deepStrictEqual(untouched, { model: "claude-opus-5", reason: "lane" },
+    "a NON-judgment assembly must never be overridden and must never claim a degrade -- the fence is " +
+    "equality against runner_model_lanes' judgment row, not the agent or the capability");
+  assert.ok(!untouchedStub.seen.some(u => u.includes("/rpc/judgment_model")),
+    "a non-judgment assembly still spent the judgment_model() round trip -- the equality fence is not fencing");
+
+  // (f3) Fable inside its share: same lane, no degrade, and `from` stays absent so the caller's
+  //      `Boolean(lane.from)` test cannot print a lane line for a lane that did not move.
+  const laneStub = stub([{ model_id: "claude-fable-5-1", reason: "lane" }]);
+  const held = await resolveJudgmentModel(
+    { llm: { model: "claude-fable-5-1" } }, { ...OPTS, fetchImpl: laneStub.fetchImpl });
+  assert.deepStrictEqual(held, { model: "claude-fable-5-1", reason: "lane" },
+    "judgment_model() returning the lane's own model is the ordinary case, not a degrade");
+
+  // (f4) A REST failure keeps the stored model and WARNS -- never silent, never a throw. The gate
+  //      degrading the lane must not be able to stop a session running an agent at all.
+  const brokenStub = stub([], { rpcStatus: 500 });
+  const broken = await resolveJudgmentModel(
+    { llm: { model: "claude-fable-5-1" } }, { ...OPTS, fetchImpl: brokenStub.fetchImpl });
+  assert.strictEqual(broken.model, "claude-fable-5-1", "a REST failure must keep the assembly's own model");
+  assert.strictEqual(broken.reason, "lane");
+  assert.ok(/HTTP 500/.test(broken.warning || ""),
+    "a REST failure must surface the status in a warning the caller prints -- a silent fallback is " +
+    "indistinguishable from Fable having headroom");
+  assert.ok(!("from" in broken), "a failed check must not report itself as a degrade");
+
+  // (f5) The script's own two output seams, read out of the source rather than restated: the JSON
+  //      note key and the text lane line. Without this, (f1)-(f4) could all pass while main() never
+  //      applied the answer to anything.
+  const promptSrc = fs.readFileSync(PROMPT_SCRIPT, "utf8");
+  assert.ok(/lane_note/.test(promptSrc), "scripts/agent-prompt.js must set llm.lane_note for the --json reader");
+  assert.ok(/# lane: judgment degraded to \$\{lane\.model\} \(\$\{lane\.reason\}\)/.test(promptSrc),
+    "scripts/agent-prompt.js must print the `# lane: judgment degraded to <model> (<reason>)` header line");
+  assert.ok(/const degraded = Boolean\(lane\.from\)/.test(promptSrc),
+    "the lane line must be gated on `from` -- printing it every run is a note nobody reads, and " +
+    "printing it never is the SES-395 change not shipping");
+  console.log("  (f) SES-395 judgment-lane fallback: degrade, fence, hold, REST-failure warn -- PASS");
 
   // ---------------------------------------------------------------------------------------------
   // (a) + (b) LIVE ARMS.

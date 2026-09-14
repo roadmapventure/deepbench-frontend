@@ -1,3 +1,11 @@
+// DeepBench v7.0.486 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-395 -- the wall and
+// the pace grade `all_models_pct` again, and Fable past its own share DEGRADES the judgment lane
+// instead of refusing the cycle. The doc clause flips to `judgment_model` / `fable_rest` /
+// `fable_pace` and now asserts the ABSENCE of GREATEST; the oracle's gatedPct is allModelsPct and
+// gatedMeter the constant 'all_models', guarded by an up-front assertion that the two meters
+// actually differ so the clause cannot go vacuously green; and the live arm calls
+// `rpc/judgment_model`, grading its model_id against `runner_model_lanes` rather than a literal and
+// its reason against the closed set, then reads the same three facts back out of the gate's detail.
 // DeepBench v7.0.482 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-389 -- the gate gains
 // its SECOND refusal, `meter_stale` (M5-15, rewritten): the freshest reading's age is now GRADED
 // against runner_settings.meter_stale_hours (default 2) instead of merely printed, and the refusal
@@ -219,17 +227,19 @@ export const CLAUSES = [
     breaks: s => s.split("NULL-safe").join("convenient"),
   },
   {
-    id: "the-wall-and-pace-grade-the-higher-meter",
+    id: "the-wall-and-pace-grade-all-models-and-fable-degrades-the-lane",
     detail:
-      "SES-390: the block must say the wall and the pace grade `detail.gated_pct` = " +
-      "GREATEST(all_models_pct, fable_pct) and that `detail.gated_meter` names which meter that was " +
-      "-- the judgment lane runs on Fable and carries its OWN weekly cap, so a gate reading " +
-      "all_models_pct alone boots cycles straight into a Fable wall (measured 2026-09-14: all " +
-      "models 57, Fable 90, gate answered pickable). Drop the names and the next editor grades one " +
-      "meter again and the refusal cannot say which one refused",
+      "SES-395: the block must say the wall and the pace grade `all_models_pct` and that Fable past " +
+      "its own share DEGRADES the judgment lane -- naming `detail.judgment_model` and both Fable " +
+      "reasons, `fable_rest` and `fable_pace` -- and it must no longer carry GREATEST anywhere. " +
+      "SES-390 graded GREATEST(all_models_pct, fable_pct) at both walls, which parks a WHOLE cycle " +
+      "because one delegated lane is spent: measured 2026-09-14 11:42 CT, weekly_wall on " +
+      "gated_meter='fable' at 93 vs 85 while all-models read 59. Leave GREATEST in the prose and " +
+      "the next editor restores the refusal this ticket replaced with a lane",
     test: s =>
-      /gated_pct/.test(s) && /gated_meter/.test(s) && /fable_pct/.test(s) && /GREATEST/.test(s),
-    breaks: s => s.split("gated_meter").join("some field"),
+      /judgment_model/.test(s) && /fable_pace/.test(s) && /fable_rest/.test(s) &&
+      /all_models_pct/.test(s) && !/GREATEST/.test(s),
+    breaks: s => s.split("judgment_model").join("some field"),
   },
   {
     id: "m5-06-asks-the-cheapest-not-the-pick",
@@ -516,11 +526,12 @@ export function expectedReason(f) {
   // threshold still boots -- the SQL uses > and this oracle must not quietly use >=.
   if (f.meterStaleHours != null && f.readingAgeHours !== null && f.readingAgeHours > f.meterStaleHours)
     return "meter_stale";
-  // SES-390: the wall grades the HIGHER weekly meter, not all_models_pct. GREATEST ignores a NULL
-  // side and is NULL only when both are, so the NULL-safe fall-through is unchanged.
+  // SES-395: the wall grades ALL-MODELS again. Fable past its own share is not a refusal here --
+  // it degrades the judgment lane (public.judgment_model(), asserted separately below). NULL-safe
+  // exactly as before: no reading, no wall verdict.
   if (f.weeklyRestPct !== null && f.gatedPct !== null && f.gatedPct >= f.weeklyRestPct)
     return "weekly_wall";
-  // SES-368 / M5-16, SES-390: the pace, in the ladder's real position -- after the wall, before the
+  // SES-368 / M5-16, SES-395: the pace, in the ladder's real position -- after the wall, before the
   // budget row, grading the SAME number the wall did. At-or-above refuses (14.29 on day 1 refuses;
   // 14.28 boots), and NULL on either side falls through, exactly as the wall does.
   if (f.paceLimitPct !== null && f.paceLimitPct !== undefined && f.gatedPct !== null &&
@@ -602,16 +613,16 @@ async function theLiveGateObeysItsOwnLadder() {
   const takenAt = readings[0]?.taken_at ? Date.parse(readings[0].taken_at) : null;
   const allModelsPct = readings[0]?.all_models_pct === undefined || readings[0]?.all_models_pct === null
     ? null : Number(readings[0].all_models_pct);
-  // SES-390: the second weekly meter. The judgment lane is claude-fable-5-1 and Fable carries its
-  // own weekly cap, so the walls grade the higher of the two -- and gatedMeter records WHICH, with
-  // a tie reading as all_models exactly as the SQL's CASE does.
+  // SES-395: the second weekly meter is still READ and still reported, and it no longer grades the
+  // boot decision. Fable past its own share degrades the judgment lane instead of refusing the
+  // cycle, so gatedPct IS allModelsPct and gatedMeter is 'all_models' by construction. Both keys
+  // are kept -- every existing reader of this payload still resolves -- and the oracle carries the
+  // constant rather than dropping the assertion, so a gate that quietly reverted to GREATEST
+  // disagrees here the moment the two meters differ (60 vs 94 on 2026-09-14).
   const fablePct = readings[0]?.fable_pct === undefined || readings[0]?.fable_pct === null
     ? null : Number(readings[0].fable_pct);
-  const gatedPct = allModelsPct === null && fablePct === null
-    ? null
-    : Math.max(...[allModelsPct, fablePct].filter(x => x !== null));
-  const gatedMeter =
-    fablePct !== null && (allModelsPct === null || fablePct > allModelsPct) ? "fable" : "all_models";
+  const gatedPct = allModelsPct;
+  const gatedMeter = "all_models";
   const week = chicagoWeek();
   const facts = {
     schedulerOn: settings[0]?.scheduler_on ?? null,
@@ -662,32 +673,70 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.week_day_index=${d.week_day_index} but the clock says day ${facts.weekDayIndex}`);
   assert.strictEqual(Number(d.pace_limit_pct), facts.paceLimitPct,
     `detail.pace_limit_pct=${d.pace_limit_pct} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct}`);
-  // SES-390: the number the wall and the pace actually graded, and the name of the meter it came
-  // from -- both read back against the raw-table oracle so a gate that quietly reverted to
-  // all_models_pct disagrees here the moment the two meters differ (57 vs 90 on 2026-09-14).
-  assert.strictEqual(
-    Number(d.gated_pct), facts.gatedPct,
-    `detail.gated_pct=${d.gated_pct} but the freshest reading says GREATEST(all_models_pct=` +
-      `${facts.allModelsPct}, fable_pct=${facts.fablePct}) = ${facts.gatedPct}`,
+  // SES-395: the number the wall and the pace actually graded is all_models_pct, and gated_meter
+  // says so. This is the assertion that catches a revert to GREATEST: with the live meters at 60
+  // and 94 a GREATEST gate reports 94 here and fails, which is the discrimination -- the pair only
+  // proves anything while the two meters differ, so the divergence is asserted first.
+  assert.notStrictEqual(
+    facts.fablePct, facts.allModelsPct,
+    `the two meters are equal (${facts.allModelsPct}) right now, so the gated_pct assertion below ` +
+      "cannot discriminate all-models from GREATEST. That is a fixture problem, not a pass: read " +
+      "runner_usage_readings and say so rather than letting the clause go quietly vacuous",
   );
   assert.strictEqual(
-    d.gated_meter, facts.gatedMeter,
-    `detail.gated_meter=${JSON.stringify(d.gated_meter)} but the raw reading says ` +
-      `${facts.gatedMeter} (all_models=${facts.allModelsPct}, fable=${facts.fablePct}; a tie is ` +
-      "all_models). A refusal that cannot say WHICH meter refused cannot be acted on",
+    Number(d.gated_pct), facts.gatedPct,
+    `detail.gated_pct=${d.gated_pct} but the freshest reading's all_models_pct is ${facts.allModelsPct} ` +
+      `(fable_pct ${facts.fablePct} is NOT graded here since SES-395 -- it degrades the judgment lane)`,
+  );
+  assert.strictEqual(
+    d.gated_meter, "all_models",
+    `detail.gated_meter=${JSON.stringify(d.gated_meter)}; since SES-395 the boot decision is on the ` +
+      "all-models meter alone and this key is 'all_models' by construction. A 'fable' here is the " +
+      "refusal SES-395 replaced with a lane, back again",
   );
   assert.strictEqual(
     d.fable_pct === null || d.fable_pct === undefined ? null : Number(d.fable_pct), facts.fablePct,
     `detail.fable_pct=${d.fable_pct} but runner_usage_readings says ${facts.fablePct} -- null-safe: ` +
-      "a reading with no Fable number must report null, never 0, or the gate grades a meter nobody read",
+      "a reading with no Fable number must report null, never 0, and it must still be REPORTED even " +
+      "though it no longer grades the boot decision, or nobody can audit the lane it degraded",
   );
-  if (v.reason === "weekly_wall" || v.reason === "weekly_pace") {
-    assert.ok(
-      ["all_models", "fable"].includes(d.gated_meter),
-      `a '${v.reason}' verdict named gated_meter=${JSON.stringify(d.gated_meter)}; the closed set is ` +
-        "all_models | fable, and this is the branch whose refusal is only auditable if it says which",
-    );
-  }
+  // SES-395: the lane the Fable meter actually costs. Graded against runner_model_lanes and the
+  // function's own closed reason set, not against a literal -- a hard-coded 'claude-opus-5' here
+  // would pass after John moves the orchestrator lane and stop guarding anything.
+  const modelLanes = asArray(
+    await pg(url, key, "runner_model_lanes?select=lane,model_id"), "runner_model_lanes");
+  const laneModels = new Set(modelLanes.map(l => l.model_id));
+  const laneOf = name => modelLanes.find(l => l.lane === name)?.model_id ?? null;
+  const judgment = asArray(
+    await pg(url, key, "rpc/judgment_model", { method: "POST", body: "{}" }), "rpc/judgment_model");
+  assert.strictEqual(judgment.length, 1, `judgment_model() returned ${judgment.length} rows, expected exactly 1`);
+  const j = judgment[0];
+  assert.ok(laneModels.has(j.model_id),
+    `judgment_model() answered model_id=${JSON.stringify(j.model_id)}, which is not a ` +
+      `runner_model_lanes model id (${[...laneModels].join(", ")}). The fallback must name a LANE's ` +
+      "model, never a literal -- a literal survives John moving a lane and silently spawns the wrong model");
+  assert.ok(["fable_rest", "fable_pace", "lane"].includes(j.reason),
+    `judgment_model() answered reason=${JSON.stringify(j.reason)}; the closed set is fable_rest | fable_pace | lane`);
+  // WHICH BRANCH FIRED, graded against the raw reading rather than read back off the function.
+  const wantJudgmentModel = j.reason === "lane" ? laneOf("judgment") : laneOf("orchestrator");
+  assert.strictEqual(j.model_id, wantJudgmentModel,
+    `judgment_model() answered ${j.model_id} on reason '${j.reason}', but the ${j.reason === "lane" ? "judgment" : "orchestrator"} ` +
+      `lane's model is ${wantJudgmentModel} -- the two Fable reasons take the orchestrator's model, 'lane' the judgment lane's`);
+  assert.strictEqual(
+    j.fable_pct === null || j.fable_pct === undefined ? null : Number(j.fable_pct), facts.fablePct,
+    `judgment_model().fable_pct=${j.fable_pct} but the freshest reading says ${facts.fablePct} -- it must ` +
+      "grade the same reading the gate does, or the lane and the gate disagree about the same week");
+  assert.strictEqual(Number(j.fable_share), facts.paceLimitPct,
+    `judgment_model().fable_share=${j.fable_share} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct} -- ` +
+      "Fable's share is John's share on the same calendar; a second calendar here is free to disagree with the gate's");
+  // The gate must carry the SAME answer in its own payload, so a reader of a refusal never has to
+  // make a second call to learn which model the cycle's judgment steps would have run on.
+  assert.strictEqual(d.judgment_model, j.model_id,
+    `detail.judgment_model=${JSON.stringify(d.judgment_model)} but judgment_model() says ${j.model_id}`);
+  assert.strictEqual(d.judgment_reason, j.reason,
+    `detail.judgment_reason=${JSON.stringify(d.judgment_reason)} but judgment_model() says ${j.reason}`);
+  assert.strictEqual(Number(d.fable_share), Number(j.fable_share),
+    `detail.fable_share=${d.fable_share} but judgment_model() says ${j.fable_share}`);
   assert.strictEqual(d.pickable_count, lanes.length,
     `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
     "drain/selfbuild rows -- the gate and the picker are reading different boards");
@@ -843,7 +892,27 @@ async function run() {
       "runner_should_boot overload, provolatile='s', prosrc containing fable_pct and gated_meter. " +
       "Live board at the ship: reason=weekly_wall, gated_meter='fable', gated_pct=90 against " +
       "weekly_rest_pct 85 while all_models_pct was 57 -- fires park until the Fable meter is back " +
-      "under 85, which is exactly the wall this ticket exists to stop booting into.",
+      "under 85, which is exactly the wall this ticket exists to stop booting into. " +
+      "SES-395 (v7.0.486, migration ses395_judgment_lane_fallback) MEASURED THE SAME WAY on " +
+      "2026-09-14, one variable each, every assertion on the REASON and on the lane, all rolled " +
+      "back inside a deliberately failing DO block: Fable 30 -> judgment_model() = " +
+      "claude-fable-5-1 / 'lane' and the gate pickable with gated_meter='all_models'; Fable 70 -- " +
+      "ABOVE the day-4 share 57.14 and BELOW the rest wall 85 -> claude-opus-5 / 'fable_pace', " +
+      "which is the middle branch neither wall would ever have reached; Fable 90 with all_models " +
+      "20 -> claude-opus-5 / 'fable_rest' AND THE GATE ANSWERING pickable, which is THE SEAM -- " +
+      "SES-390's gate answered weekly_wall on those exact inputs, so the case discriminates the " +
+      "change rather than the gate; Fable NULL -> claude-fable-5-1 / 'lane', because a meter " +
+      "nobody read cannot degrade a lane. Live board at the ship: reason=weekly_pace on " +
+      "all_models_pct 60 against pace_limit_pct 57.14, gated_meter='all_models', " +
+      "detail.judgment_model='claude-opus-5', detail.judgment_reason='fable_rest', " +
+      "detail.fable_share=57.14 while fable_pct read 94 -- i.e. the 11:42 CT weekly_wall refusal " +
+      "on gated_meter='fable' (93 vs 85, all-models 59) is gone and its consequence is a lane. " +
+      "Zero fixture residue on re-read: 41 readings, 0 rows with source='ses395-qa', newest " +
+      "reading still 2026-09-14T17:15:14Z. pg_proc after the migration, asserted inside the " +
+      "migration's own trailing DO block rather than afterwards: exactly 1 runner_should_boot " +
+      "overload and exactly 1 judgment_model overload, EXECUTE denied to anon AND authenticated " +
+      "and granted to service_role (both directions, per .claude/rules/supabase-column-grants.md's " +
+      "SES-315 addendum -- functions default OPEN and a PUBLIC-only revoke leaves them open).",
   );
 }
 

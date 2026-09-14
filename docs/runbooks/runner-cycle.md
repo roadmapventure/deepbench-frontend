@@ -143,23 +143,30 @@ for repeatedly.**
    wall and the pace because both of those grade a number this one has just called out of date. 22
    cycles shipped between 2026-09-12 18:42Z and 2026-09-13 09:41Z on one reading written 17:45Z on
    the 12th — that is the defect, and it is why the age is now graded rather than merely printed.
-3. `weekly_wall` — **`M5-06`**: the freshest reading's higher weekly meter — `detail.gated_pct` =
-   `GREATEST(all_models_pct, fable_pct)`, `detail.gated_meter` naming which (`SES-390`: at 57 / 90 on
-   2026-09-14 the gate booted) — is at or above <!-- FEATURE: SES-390 -->
+3. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` — carried as
+   `detail.gated_pct`, with `detail.gated_meter` reading `all_models` by construction (`SES-395`:
+   **Fable past its own share DEGRADES the judgment lane to `detail.judgment_model` instead of
+   refusing the cycle**, so the boot decision is back on the all-models meter and a refusal on the
+   Fable meter alone no longer exists; `detail.fable_pct` is still reported, and
+   `detail.judgment_reason` says what it cost) — is at or above <!-- FEATURE: SES-395 -->
    `runner_budget.weekly_rest_pct` for the current **`America/Chicago`** month (register `B35`, superseded
    2026-09-01 by `M6-07` (`SES-285`; annotated `SES-289`) — **scope matters here: only B35's
    Reverse-on-gated answer lost its subject. The America/Chicago boundary is its answer (2),
    explicitly unaffected and still binding** — the month boundary is John's clock, never UTC).
 4. `weekly_pace` — **`M5-16`** (`SES-368`, John's rule of 2026-09-11 in his words: *"only fire if
    usage is below the daily limit … divided by 7 days, each week restarts at 1am central on
-   Fridays"*, *"daily at 100%"*): the freshest reading's higher weekly meter — `detail.gated_pct` =
-   `GREATEST(all_models_pct, fable_pct)`, `detail.gated_meter` naming which (`SES-390`: at 57 / 90 on
-   2026-09-14 the gate booted) — is at or above
+   Fridays"*, *"daily at 100%"*): the freshest reading's `all_models_pct` — the same
+   `detail.gated_pct` the wall graded (`SES-395`) — is at or above
    `detail.pace_limit_pct` = `week_day_index` × 100/7, where the week starts at the most recent
    Friday 01:00 **`America/Chicago`** (`detail.week_started_at`) and the day index is whole days
    elapsed + 1, clamped 1..7. Day 1 allows 14.29, day 2 28.57, day 7 100. The wall (2) still wins
    when both are true. This is a pace, not a cap: it says nothing about tokens per cycle, and it
-   carries no staleness threshold of its own (`M5-15`). Guarded by
+   carries no staleness threshold of its own (`M5-15`). **Fable has its own day-of-week share and it
+   is not graded here.** `public.judgment_model()` grades `fable_pct` against `detail.fable_share`
+   (the same day index × 100/7) and against the same `weekly_rest_pct`, and reports
+   `detail.judgment_reason` = `fable_rest` \| `fable_pace` \| `lane` with `detail.judgment_model`
+   naming the model a judgment-lane call runs on right now — the orchestrator's for either Fable
+   reason, the judgment lane's otherwise (`SES-395`). Guarded by
    `tests/regression/ses-297-pre-boot-pickability.test.mjs`, which carries this reason in `REASONS`,
    the oracle branch, a fixed-instant calendar check and the three `detail` keys.
 5. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
@@ -2887,7 +2894,10 @@ lines below; edit the table's rows, then run `node scripts/render-rule-blocks.js
 > **judgment** — `claude-fable-5-1` — Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21).
 > **mechanical** — `claude-sonnet-5` — Mechanical delegated steps: doc sweeps, imports, formatting (register B21).
 
-State the clone's absolute path in
+**The judgment model for a cycle is what `scripts/agent-prompt.js` PRINTS for the call, which is the
+judgment lane's row above unless `public.judgment_model()` has degraded it to the orchestrator model
+because Fable is past its daily share (`SES-395`) — read the printed `model` and the `# lane:` line,
+never the lane table alone.** <!-- FEATURE: SES-395 --> State the clone's absolute path in
 every subagent prompt. Attempts-per-tier ≤ 1 — a failed attempt re-runs that piece one tier
 up or files a gated-before-build item; never grind. If the Agent tool is unavailable in this
 environment, note that in the cycle row and continue on Opus 5 — the first cycle to try it is
