@@ -56,12 +56,21 @@ jobs:
       - name: Install the Claude Code CLI (pinned)
         run: npm install -g @anthropic-ai/claude-code@2.1.218
 
-      - name: Show what /usage prints here (percentages only, no secrets; kept for the day the wording changes)
+      - name: Diagnose how the meter can be read with a setup-token (percentages only, no secrets)
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          claude --version
-          claude -p "/usage" --model claude-haiku-4-5 --max-turns 1 --output-format text 2>&1 | head -c 2500 || true
+          echo "== A. auth status"; claude auth status 2>&1 | head -c 600 || true
+          echo; echo "== B. the CLI's own usage endpoint with the token"
+          curl -s -o /tmp/usage.json -w "http=%{http_code}
+" -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" -H "anthropic-beta: oauth-2025-04-20" -H "Accept: application/json" https://api.anthropic.com/api/oauth/usage || true
+          head -c 1500 /tmp/usage.json || true
+          echo; echo "== C. /usage with a credentials file instead of the env var"
+          mkdir -p ~/.claude
+          printf '{"claudeAiOauth":{"accessToken":"%s","refreshToken":"","expiresAt":4102444800000,"scopes":["user:inference","user:profile"],"subscriptionType":"max"}}' "$CLAUDE_CODE_OAUTH_TOKEN" > ~/.claude/.credentials.json
+          chmod 600 ~/.claude/.credentials.json
+          env -u CLAUDE_CODE_OAUTH_TOKEN claude -p "/usage" --model claude-haiku-4-5 --max-turns 1 --output-format text 2>&1 | head -c 1500 || true
+          rm -f ~/.claude/.credentials.json
 
       - name: Read /usage and write one runner_usage_readings row
         env:
