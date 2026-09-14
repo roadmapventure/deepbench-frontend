@@ -62,8 +62,7 @@ jobs:
         run: |
           echo "== A. auth status"; claude auth status 2>&1 | head -c 600 || true
           echo; echo "== B. the CLI's own usage endpoint with the token"
-          curl -s -o /tmp/usage.json -w "http=%{http_code}
-" -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" -H "anthropic-beta: oauth-2025-04-20" -H "Accept: application/json" https://api.anthropic.com/api/oauth/usage || true
+          curl -s -o /tmp/usage.json -w "http=%{http_code}" -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" -H "anthropic-beta: oauth-2025-04-20" -H "Accept: application/json" https://api.anthropic.com/api/oauth/usage || true
           head -c 1500 /tmp/usage.json || true
           echo; echo "== C. /usage with a credentials file instead of the env var"
           mkdir -p ~/.claude
