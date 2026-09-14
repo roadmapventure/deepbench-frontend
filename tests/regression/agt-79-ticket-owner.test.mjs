@@ -1,3 +1,13 @@
+// DeepBench v7.0.485 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-70 -- THE LIVE
+// DELIVERED-UNACCEPTED ARM ASSUMED BOARD STATE. It asserted at least four delivered-unaccepted
+// rows, which is not a property of the census -- it is a property of how many tickets John has
+// left unaccepted that day. He accepted 22 on 2026-09-14 and the board fell to 2, so a correct
+// census reading a healthy board turned the suite red. The arm now DECLARES ITSELF NOT RUN with
+// the live count when the board holds fewer than four, instead of asserting -- the SES-180 shape:
+// a part that could not be exercised says so rather than counting as a pass or a failure. The
+// fixture arms are untouched, and they are where this check is actually pinned: the fourteen-row
+// fixture drives delivered-unaccepted with its own control (wind `now` back an hour and it must
+// empty), so the discriminating half of this check does not depend on the live board at all.
 // DeepBench v7.0.480 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slices 1-4 -- THE
 // TICKET OWNER'S CENSUS, WRITE PASS, NIGHTLY LANDING AND JUDGMENT PASS, pinned at the level that
 // can actually go red.
@@ -795,7 +805,17 @@ async function main() {
   }
 
   const unaccepted = census.findings.filter(f => f.check === "delivered-unaccepted");
-  assert.ok(unaccepted.length >= 4, `expected at least four delivered-unaccepted rows, got ${unaccepted.length}`);
+  if (unaccepted.length < 4) {
+    // The return is the kickoff's shape, and it takes the rest of E, K live and G with it -- so
+    // each is DECLARED here rather than dropped into the silence a bare return would leave
+    // (SES-180: a part the run could not exercise says so, and is never counted as a pass).
+    const why = `board holds ${unaccepted.length} delivered-unaccepted rows, needs 4`;
+    notRun("live delivered-unaccepted arm", why);
+    notRun("live census no-write negative (rest of part E)", why);
+    notRun("judge gate (part K live)", why);
+    notRun("write pass (part G)", why);
+    return;
+  }
 
   for (const f of census.findings.filter(f => f.check === "cost-snapshot-missing")) {
     assert.strictEqual(f.fix.cost_pct_snapshot, Math.round(f.fix.cost_cycles_snapshot * census.rate * 100) / 100,

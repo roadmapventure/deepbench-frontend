@@ -100,6 +100,13 @@ import { handle as reportCardWriteHandle } from '../_lib/handlers/report-card-wr
 // is derived from this map, so an unregistered slug 501s and pz-classify-intent / pz-rank-intent
 // could never reach the board.
 import { handle as prioritizerWriteHandle } from '../_lib/handlers/prioritizer-write.js';
+// FEATURE: AGT-70 -- The Auditor's audit_findings write handler registration. Same generic
+// mechanism as every line above it: this registry names no capability and no agent, and which
+// handler runs stays pure data (traits.handler on the Skill Profile), so ARCHITECTURE.md 19b and
+// .claude/rules/capabilities-are-data.md hold. Registration is not optional -- KNOWN_HANDLERS below
+// is derived from this map, so an unregistered slug 501s and au-agent-data-intent / au-corpus-intent
+// could never reach the ledger.
+import { handle as auditorWriteHandle } from '../_lib/handlers/auditor-write.js';
 import { logActivity } from '../../lib/activity-log.js';
 // FEATURE: LOG-67 -- merges the fact-half (buildCallFacts) with the config-half signature snapshot
 // carried on the enriched prompt_request.
@@ -112,7 +119,8 @@ export const config = { maxDuration: 60, runtime: 'nodejs' };
 
 // FEATURE: LOG-143 -- 'report-card-write' joins the map; see the import comment above.
 // FEATURE: AGT-63 -- 'prioritizer-write' likewise.
-const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle, 'report-card-write': reportCardWriteHandle, 'prioritizer-write': prioritizerWriteHandle };
+// FEATURE: AGT-70 -- 'auditor-write' likewise.
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle, 'report-card-write': reportCardWriteHandle, 'prioritizer-write': prioritizerWriteHandle, 'auditor-write': auditorWriteHandle };
 const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --

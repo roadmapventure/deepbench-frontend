@@ -1,3 +1,12 @@
+// DeepBench v7.0.485 | tests/regression/agt-69-governance-section.test.mjs | AGT-70 -- THE ROSTER
+// MAY GROW. Arms (e) and (f) asserted the literal 6, which is not the truth either of them means:
+// the section is the LIVE is_active lane='governance' set, and (e) already proves that by set
+// equality against `agents` in the same call. AGT-70 and AGT-79 landed `auditor` (GV-07) and
+// `ticketowner` (GV-08) as active governance rows and the view went to 8, so the literal failed
+// while the set equality it sits next to still passed -- a count that goes red on a correct hire
+// is measuring the roster's size, not the section's contract. Both arms now floor at >= 6 (the six
+// GV-01..GV-06 rows AGT-69 shipped are still a real regression if they disappear) and the set
+// equality is untouched, which is the assertion that can still go red for the right reason.
 // DeepBench v7.0.460 | tests/regression/agt-69-governance-section.test.mjs | AGT-80 -- the section is
 // the Bench's "Product Team" filter (John, 2026-09-12). Check (b) grades the new contract: one import
 // line carrying the filter id/label/hook, one mount under the filter, the entry LAST in the nav and
@@ -303,8 +312,10 @@ async function getJson(base, hdr, pathAndQuery) {
 async function checkE_viewMatchesLiveRows(base, hdr) {
   const view = await getJson(base, hdr, `${VIEW_NAME}?select=agent_id,calls,cycles`);
   assert.ok(view.ok, `GET ${VIEW_NAME} failed: HTTP ${view.status} ${view.body}`);
-  assert.strictEqual(view.body.length, 6,
-    `${VIEW_NAME} returned ${view.body.length} rows, expected 6`);
+  assert.ok(view.body.length >= 6,
+    `${VIEW_NAME} returned ${view.body.length} rows, expected at least 6 -- the governance roster ` +
+    "may grow (GV-07/GV-08 landed with AGT-70/AGT-79), but it must never fall below the six " +
+    "GV-01..GV-06 rows AGT-69 shipped. The exact membership is the deepStrictEqual below");
 
   const agents = await getJson(base, hdr, "agents?lane=eq.governance&is_active=eq.true&select=id");
   assert.ok(agents.ok, `GET agents failed: HTTP ${agents.status} ${agents.body}`);
@@ -320,7 +331,9 @@ async function checkF_brokerStillExcludesThem(base, hdr) {
   const agents = await getJson(base, hdr, "agents?lane=eq.governance&is_active=eq.true&select=id");
   assert.ok(agents.ok, `GET agents failed: HTTP ${agents.status} ${agents.body}`);
   const govIds = agents.body.map(r => r.id);
-  assert.strictEqual(govIds.length, 6, `expected 6 governance agents, found ${govIds.length}`);
+  assert.ok(govIds.length >= 6,
+    `expected at least 6 governance agents, found ${govIds.length} -- the roster may grow; this is ` +
+    "the floor that proves the query found the lane at all, and the leak check below is the arm");
 
   const { getRosterCandidates } = await import("../../lib/project-manager.js");
   const roster = await getRosterCandidates({ requestingAgentId: "michelle" });

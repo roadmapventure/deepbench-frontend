@@ -1,14 +1,8 @@
+// DeepBench v7.0.485 | agents.js | AGT-70 — AVATAR_CFG + AGENT_PRONOUNS entries for `auditor` (The Auditor, GV-07) and `ticketowner` (The Ticket Owner, GV-08, AGT-79), both lane `governance` and is_active true in `public.agents`. Same terms as AGT-63..AGT-69: NOT in the AGENTS array — the Bench's Governance section renders them from the live `lane = 'governance'` rows, and these entries exist only so the portrait and pronouns resolve wherever an audit, cycle or decision surface already draws those two ids. The header is trimmed to the newest five stamps in this same edit (the session-hygiene check 7 shape): every retired line was either a historical label rename or is restated by a stamp still standing above it.
 // DeepBench v7.0.456 | agents.js | AGT-69 — OFF_BENCH_AGENT_IDS deleted with its comment (John's ruling 2026-09-11, decision 146256c1): the governance agents render on the Bench's Governance section from live lane=governance rows (src/components/GovernanceSection.jsx, view governance_agent_activity_7d), never from a list here. Their AVATAR_CFG / AGENT_PRONOUNS entries stay — the portraits render from them.
 // DeepBench v7.0.434 | agents.js | AGT-68 — AVATAR_CFG + AGENT_PRONOUNS entries for `devmanager` (The Development Manager, GV-01, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66/67.
 // DeepBench v7.0.433 | agents.js | AGT-67 — AVATAR_CFG + AGENT_PRONOUNS entries for `verifier` (The Verifier, GV-06, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66.
 // DeepBench v7.0.432 | agents.js | AGT-66 — AVATAR_CFG + AGENT_PRONOUNS entries for `builder` (The Builder, GV-05, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65.
-// DeepBench v7.0.431 | agents.js | AGT-65 — AVATAR_CFG + AGENT_PRONOUNS entries for `designer` (The Designer, GV-04, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same as AGT-63/AGT-64: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
-// DeepBench v7.0.429 | agents.js | AGT-64 — AVATAR_CFG + AGENT_PRONOUNS entries for `researcher` (The Researcher, GV-02, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same as AGT-63's `prioritizer`: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
-// DeepBench v7.0.428 | agents.js | AGT-63 — AVATAR_CFG + AGENT_PRONOUNS entries for `prioritizer` (The Prioritizer, GV-03, lane `governance`). NOT added to the AGENTS array: governance agents stay off the Bench until the exit review rules on how they render, so nothing this file exports to a Bench component changes.
-// DeepBench v6.2.12 | agents.js | RO-14 — Bench filter "mi" label renamed from the old Market Intel text to Channel Sales Intel (id unchanged)
-// DeepBench v6.1.42 | agents.js | RO-11 — Bench filter "nigp" label renamed to "Spend Analysis" (id unchanged)
-// DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
-// DeepBench v6.0.40 | agents.js | MI-18 — removed dead isAppleChannel field, superseded by page-local proposedAgentIds
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -344,6 +338,14 @@ export const AVATAR_CFG = {
   // Off the Bench for the same reason as the five entries above; the portrait exists because the
   // cycle, assignment and audit surfaces already draw this id.
   devmanager:  { skin:"#caa984", hair:"#2b2724", collar:"#33384a", extra:"",        border:T.navy  },
+  // FEATURE: AGT-70 — The Auditor (GV-07), the governance lane’s weekly contradiction pass.
+  // Off the Bench for the same reason as the six entries above; the portrait exists because the
+  // findings ledger and audit surfaces already draw this id.
+  auditor:     { skin:"#d0b28e", hair:"#3c3630", collar:"#2d3a2e", extra:"glasses", border:T.muted },
+  // FEATURE: AGT-79 — The Ticket Owner (GV-08), the governance lane’s board census and judgment pass.
+  // Off the Bench for the same reason as the seven entries above; the portrait exists because the
+  // census, findings and board surfaces already draw this id.
+  ticketowner: { skin:"#c6ad8d", hair:"#302a30", collar:"#40323c", extra:"",        border:T.muted },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -388,6 +390,10 @@ export const AGENT_PRONOUNS = {
   verifier:    { subject:"they", object:"them", possessive:"their" },
   // FEATURE: AGT-68 — The Development Manager pronouns (they/them/their).
   devmanager:  { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-70 — The Auditor pronouns (they/them/their).
+  auditor:     { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-79 — The Ticket Owner pronouns (they/them/their).
+  ticketowner: { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
