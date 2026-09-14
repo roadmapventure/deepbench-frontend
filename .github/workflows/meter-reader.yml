@@ -1,0 +1,61 @@
+# DeepBench | .github/workflows/meter-reader.yml | SES-388 -- the pace gate's sensor runs where nothing sleeps.
+#
+# WHY. The weekly pace gate (M5-16, SES-368) and the stale-meter refusal (SES-389) read the freshest
+# public.runner_usage_readings row. Until 2026-09-14 the only writer was a scheduled task on John's
+# machine (SES-374), so a sleeping laptop meant a sleeping runner: three fires refused meter_stale on
+# the night of 2026-09-13. A cloud routine cannot read the meter (measured 2026-09-13, probe run
+# cse_01XgcrXWKfp2qZ4BokzfrL22: the cloud harness signs in with a session token, not the subscription).
+#
+# WHAT. Every 30 minutes GitHub runs scripts/read-usage-meter.js UNCHANGED under John's subscription
+# token -- repository secret CLAUDE_CODE_OAUTH_TOKEN, minted once by `claude setup-token` -- with the
+# Supabase secrets CI already holds. The script takes environment credentials before its DPAPI file, so
+# nothing in it knows it is on GitHub; the row's `note` carries this runner's hostname, which is how a
+# GitHub row is told from a row from John's machine. Both writers may run; the gate reads the newest.
+#
+# FAILURE IS VISIBLE. The script exits 2 when the CLI is logged out (the token expired -- run
+# `claude setup-token` again and replace the secret), when /usage changed its wording, or when the
+# insert is refused; a non-zero exit fails this job and GitHub emails the failure. That is SES-392's
+# visible failure for this host. A reading older than 2h while this workflow is enabled means it is
+# failing: read the Actions tab first.
+#
+# PINNED CLI. 2.1.218 is the version the parser's fixture (tests/regression/ses-374-meter-reader.test.mjs,
+# 2026-09-11 output shape) was taken on and the version John minted the token with. Bump it on purpose,
+# with the fixture, never by floating to latest.
+name: meter-reader
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meter-reader
+  cancel-in-progress: false
+
+jobs:
+  read:
+    name: Read the usage meter
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/read-usage-meter.js
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install the Claude Code CLI (pinned)
+        run: npm install -g @anthropic-ai/claude-code@2.1.218
+
+      - name: Read /usage and write one runner_usage_readings row
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/read-usage-meter.js
