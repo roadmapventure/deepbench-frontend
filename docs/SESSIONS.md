@@ -5,6 +5,22 @@
 
 ---
 
+## session/cycle-20260914-1540 (v7.0.483, 2026-09-14, runner cycle `c36db726-7902-40dd-ae24-03a14b4085c7`, `trigger = scheduled` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder) — `SES-390` — **shipped, verdict block: the gate now grades the higher of the two weekly meters, and the ticket's own subject bit the cycle building it.**
+
+### The premise was alive on the cycle's own meter, not on a remembered one
+
+The Designer's revalidation read the live gate at 15:46Z and got `pickable` back while `runner_usage_readings d8031a63` carried `all_models_pct` **57** and `fable_pct` **90** — against a rest wall of 85. `runner_should_boot()`'s body contained no occurrence of `fable`. So the judgment lane (`claude-fable-5-1`: Designer, Prioritizer, Researcher, Verifier judge) stood 5 points over the wall on its own meter while the gate, reading all-models only, would have kept booting cycles into it. Migration `ses390_fable_meter_gate` (down captured first, 1 object, 0 refusals) regrades `weekly_wall` and `weekly_pace` against `gated_pct = GREATEST(all_models_pct, fable_pct)` and names the meter it graded as `detail.gated_meter`; headroom stays all-models, because `runner_pct_per_cycle()` is calibrated from all-models deltas. `M5-16`'s statement moved byte-identically in row, doc and snapshot.
+
+### The ticket's own subject decided how the second design run was routed
+
+The first kickoff came back at 8,187 of 8,192 bytes and failed `verifier.js --check-kickoff` exit 1 — *"kickoff has no lane declaration (SES-359)"*. Step 6 says re-assemble **once**; model discipline says a failed attempt re-runs **one tier up, never a second attempt at the same tier**. One tier up from judgment is the orchestrator, so the re-assembled `design-kickoff` ran on Opus 5 rather than spending a second ~190,000 Fable tokens against a meter already at 90% — the exact resource this ticket exists to protect. Corrected kickoff 8,118 bytes, check exit 0.
+
+### The verdict is a block, and it is not this ship's red
+
+`run-all.js` exits 1 at **214/220**. All six failures were measured red on the stashed clean `origin/dev` tree before a line was edited (`SE-03-agent-fields`, `agt-69-governance-section`, `agt-79-ticket-owner`, `ses-285` live arm, `ses-334-served-class-block`, `ses-373-card-only-self-decides`) — the same standing red CI has been publishing since at least 2026-09-13, and step 4a's engine had already classified head `bfbb87a9` as **not this machine's to undo** (an attended push, unclaimed by any runner cycle). This ship took the board from 211/220 to 214/220. The verdict is honest about that anyway: red suite is red, `block`, `tooling` streak reset with its rung held at 24, no ship decision recorded (`record_ship_decision()` refuses a non-`approve` verdict), ticket written `delivered` rather than `done`. Graded sha equals the push sha, `9b9a39d0`.
+
+---
+
 ## session/cycle-20260913-0509 (v7.0.479, 2026-09-13, runner cycle `724b1d1b-11e9-4bbc-ba65-e8a175c54bdb`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Fable 5.1 Prioritizer) — `AGT-79` — **gated before build, and the gate is named twice: John's roster row, and a weekly-usage warning this cycle chose not to spend into.**
 
 ### The Chicago day rolled over mid-chain, and three scheduled agents came due at once
