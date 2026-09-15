@@ -1,0 +1,29 @@
+# Environment facts
+
+<!-- DeepBench v7.0.495 | docs/runbooks/environment-facts.md | SES-396 slice 1 -->
+
+What this platform has **measured** about the environment it builds itself in — the facts a cycle
+would otherwise re-discover, or worse, guess at. Validated by `scripts/check-environment-facts.js`;
+`--render` prints the exact body of the future `ds-knowledge-environment` Knowledge Skill Profile
+(that row is gated — ARCHITECTURE §19v P5, the Designer is an active agent).
+
+**Append-only, newest last.** A line is added only for a fact **no reading of the ticket or the code
+could show** — something true of the machine, the clock, the clone or the account, learned by
+running into it. A fact re-readable from a ticket belongs in the ticket.
+
+Format, exactly: `- YYYY-MM-DD | SOURCE | fact`. `SOURCE` is a ticket id (`SES-396`) that must exist
+on the board, or a cycle (`cycle:601227fb`). No pipes inside the fact.
+
+## Facts
+
+- 2026-09-12 | SES-384 | Every new public table is born readable by anon: the default ACL grants a SELECT no migration asked for.
+- 2026-09-12 | SES-374 | The usage meter is written by a scheduled reader every 30 minutes, so any reading may be that stale.
+- 2026-09-13 | SES-382 | Cycles run in parallel (register B42); shared-database regression fixtures collide between them.
+- 2026-09-13 | SES-393 | CI clones at depth 1 (actions/checkout@v4, no fetch-depth), so a test rebuilding evidence from git history goes NOT RUN there.
+- 2026-09-15 | SES-399 | reverse_decision()'s allowed-table list excludes ai_activity_log, so a Reverse restores nothing there.
+- 2026-09-15 | cycle:601227fb | The default branch is main and stale; all work is on dev. Push HEAD:dev, never bare dev, never main.
+- 2026-09-15 | cycle:601227fb | runner-cycle.md is 380,902 bytes against the SES-336 ceiling of 381,000; a step edit must first remove bytes.
+- 2026-09-15 | cycle:601227fb | runner_before_images has a CHECK refusing cycle_id and session_name together; pass exactly one.
+- 2026-09-15 | cycle:601227fb | feature_id_counter can drift behind the board (seen this cycle: it offered SES-389 while the board already held 398); claim with GREATEST(counter, max)+1, never the counter alone.
+- 2026-09-15 | cycle:601227fb | Since SES-336 the Builder owns the push, so at step 7a origin/dev IS HEAD and a git-derived changed-file list is empty (SES-379).
+- 2026-09-15 | cycle:601227fb | Several scripts still emit "cannot change to 'C:/Projects/deepbench-frontend'", a laptop path dead in the cloud clone.
