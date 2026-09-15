@@ -5,6 +5,38 @@
 
 ---
 
+## session/design-app-shell-0915 (v7.0.496, 2026-09-15, supervised cycle `3a456cd8-2939-4f6b-993a-92f9d6429150`, `trigger = supervised` — attended; Opus 5 session, Opus 5 Designer (judgment lane degraded, `SES-395`), Opus 5 Builder) — `MOB-22` — **delivered, verdict block on pre-existing reds: the app frame is now the visible screen on phones, and production gets it as its own release branch (PR #11), not as `dev → main`.**
+
+### John's ask was two asks, and the second one shaped the build
+
+*"is there a way to make it more like an app, and it doesn't bounce around? Perhaps just the header is static in no movement… Also, want to be able to push this as its own release outside of everything else."* The release half is why this ship touches only lines that are identical on `origin/main` and `origin/dev`, and why `src/screens/MarketIntelligenceScreen.jsx` deliberately gets **no line-1 version header** (a `STANDARDS.md` §1 deviation, named in the kickoff): dev carries 23 header lines main does not, so a line-1 insert is the one hunk that would have conflicted on the cherry-pick.
+
+### Measured before designing: the header already holds still on a computer
+
+All 12 production routes at 1024x768 and 1280x800 had `scrollHeight == clientHeight` — the page never scrolled. The bounce is a phone story, and it was three things: `--shell-h` defined only inside `@media (min-width: 769px)` (`tokens.js:89`) so the frame fell back to `100vh`, which a phone sizes as if the address bar were hidden; no `overscroll-behavior` anywhere in `src/`; and `/channel-intelligence` 410px wide on a 375px phone, because `#mobile-chat-input` is `flex:1` with no `minWidth:0` (`MOB-14`, filed 2026-08-07, folded in and closed here).
+
+### The `@supports` guard is the load-bearing half of a three-line fix
+
+`--shell-h:100dvh` unguarded is worse than the bug where `dvh` is unsupported: a custom property accepts the value, `height: var(--shell-h, 100vh)` never sees an unset variable, and the shell computes to `height: auto` — the `MI-32` collapse. The block ships inside `@supports (height: 100dvh)` and after `CHI-100`'s desktop block, so the `dvh` values win on desktop by order while `zoom: 0.8` is untouched.
+
+### The release without a second worktree: `git merge-tree`
+
+`git merge-tree --write-tree --merge-base=<sha>^ origin/main <sha>` is a cherry-pick's own three-way merge with no checkout to switch: exit 0, then `commit-tree` with `-p origin/main`, then `push <commit>:refs/heads/release/…`. Proven equal rather than assumed — the change content of the release commit `a4d50cc9` diffs byte-identical to dev's `821f59a3`. This is the mechanism for any "ship one change to production while dev is 700 commits ahead" release; the `release/bench-product-team-0915` branch (merged the same day as PR #10) did it by copying whole files, which only works when the file is byte-identical on both branches.
+
+### Give the Builder the suite baseline, or it blocks on someone else's red
+
+The suite on John's CRLF worktree was **207/227 before a line was edited**. A Builder told only "never push red" would have stopped there. The spawn prompt carried the 20 red filenames as orientation, the Builder shipped at 209/228 with `[PASS] MOB-22-locked-app-frame.js`, and the verifier's own LF snapshot of the same tree read **225/228** — 3 reds, all on that list (`agt-70`, `agt-79`, `ses-394`). Verdict `c6fcb96a` is a **block** for those plus the rule-B35 hygiene drift (`SES-400`), none of it this change's: `delivered`, per `session-setup.md` §3e.
+
+### QA that could fail, on two previews
+
+The emulator sizes `100vh` and `100dvh` identically, so "the shell fits the screen" cannot fail before the change — the discriminating checks are the computed ones: `overscroll-behavior-y` `auto → none`, `overflow-y` `visible → hidden`, `--shell-h` unset → `100dvh` (`calc(100dvh / 0.8)` at 1280x800), the served bundle's `100dvh` count 0 → 6, and `/channel-intelligence` 410 → 375 wide with CLEAR's right edge 410 → 347. All 14 dev routes at 375x812 and 1280x800, four routes at 375x667 and 667x375, then the release preview `522368l2q` at both main sizes; every inner panel still scrolls to its end; no console errors.
+
+### Filed on the way past
+
+`AGR-4` (**P9 - Bug Fixes**, `later`) — Test My Team's "↑ Back to Top" calls `window.scrollTo` on a page that never scrolls; the results scroll inside the panel. Code-read finding, not clicked live.
+
+---
+
 ## session/cycle-20260915-0940 (v7.0.487, 2026-09-15, runner cycle `92878301-5db3-455d-b665-5045a81513fd`, `trigger = scheduled` — Opus 5 orchestrator, Opus 5 Designer (judgment lane degraded, `SES-395`), Opus 5 Builder) — `SES-386` — **shipped, verdict approve: three regression guards stopped grading the day's board and started grading the change.**
 
 ### The judgment lane ran on Opus, and the assembler said so while a peer script did not
