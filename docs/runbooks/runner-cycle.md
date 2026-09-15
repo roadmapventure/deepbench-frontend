@@ -99,10 +99,8 @@ query** (`docs/runbooks/routine-prompt.md` step 1, `SES-398`). One pinned Bash c
 account's `unifiedWindows` off a one-line `claude -p` call's `rate_limit_event` and prints either one
 `INSERT` into `runner_usage_readings` (`source = 'routine-self-read'`, `fable_pct` NULL when the call
 carried no Fable window), which the cycle runs so the reading this gate grades is minutes old, or one
-`NO_READING <reason>` line, which writes nothing and goes into the cycle row's notes as
-`METER SELF-READ:`. It reads no repo file and needs no secret, so the ordering above stands: nothing
-else precedes this query. Measured 2026-09-15, three fires refused `meter_stale` in one morning
-(cycles `1e058d0f`, `4d4f5e6c`, `fae57bad`) because no reader had written for over two hours.
+`NO_READING <reason>` line, written into the cycle row's notes as `METER SELF-READ:`. It reads no
+repo file and needs no secret.
 
 - **`should_boot = true`** (`reason = 'pickable'`) → continue to step 0. `detail` already names the
   ticket the pick path would return, with its title (`backlog_display_title`, per the ID + title
@@ -125,7 +123,9 @@ RETURNING id;
 
   Then **end**. No push notification, no session rename, no serial tail, no successor fire.
 
-**The two wording corrections this rule cost — `SES-298` (`v7.0.365`) making a stale reading refuse, and `SES-302` (`v7.0.369`) taking the cap and the staleness threshold back off this gate — are archived VERBATIM in `docs/SESSIONS.md`, appendix *runner-cycle.md rationale retired by `SES-336`*, entry A** (ledger entry 51). The live rule is the paragraph immediately below, and it is the whole of it.
+**Two earlier wording corrections (`SES-298`, `SES-302`) are archived VERBATIM in `docs/SESSIONS.md`**
+(appendix *runner-cycle.md rationale retired by `SES-336`*, entry A, ledger 51) — the live rule is
+the paragraph below, in full.
 
 **So: the gate reports `reading_age_hours` and a `cap_authority` pointer, and grades that age
 against one setting and nothing else.** <!-- FEATURE: SES-389 --> It carries no `token_cap` and
@@ -147,21 +147,19 @@ for repeatedly.**
    so 2h is four missed readings). `detail` names `reading_taken_at` and `meter_stale_hours`
    alongside `reading_age_hours`, so the refusal can be audited from its own payload. **NULL-safe
    like the wall: with no reading at all the comparison is NULL and the ladder falls through**, so a
-   missing reading is still (5)'s question, never this one's. This is the gate's *own* threshold and
+   missing reading is still (4)'s question, never this one's. This is the gate's *own* threshold and
    it is not the spend brake's — `resolve_day_token_cap()` RUNG 2 keeps 48h and `stale-floor`. Sits
    below `scheduler_off` because John's switch is a decision and this is an observation; above the
-   wall and the pace because both of those grade a number this one has just called out of date. 22
-   cycles shipped between 2026-09-12 18:42Z and 2026-09-13 09:41Z on one reading written 17:45Z on
-   the 12th — that is the defect, and it is why the age is now graded rather than merely printed.
+   wall because it grades a number the wall has just called out of date.
 3. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` — carried as
    `detail.gated_pct`, with `detail.gated_meter` reading `all_models` by construction (`SES-395`:
    **Fable past its own share DEGRADES the judgment lane to `detail.judgment_model` instead of
    refusing the cycle**, so the boot decision is back on the all-models meter and a refusal on the
    Fable meter alone no longer exists; `detail.fable_pct` is still reported, and
    `detail.judgment_reason` (`fable_rest` \| `fable_pace` \| `lane`) says what it cost — graded
-   against the newest reading SINCE THE WEEK START that carries a Fable number, `SES-398`, since the
-   routine's own meter self-read writes `fable_pct` NULL whenever its call carried no Fable window)
-   — is at or above <!-- FEATURE: SES-395 --> `runner_budget.weekly_rest_pct` for the current
+   against the newest SAME-WEEK reading carrying a Fable number, `SES-398`, since a self-read's
+   `fable_pct` is NULL whenever its call carried no Fable window) — is at or above
+   <!-- FEATURE: SES-395 --> `runner_budget.weekly_rest_pct` for the current
    **`America/Chicago`** month (register `B35`; the month boundary is John's clock, never UTC).
 4. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
    that stopped the runner and then sat unread in a card, and it now has a name instead of a silent
@@ -174,28 +172,14 @@ for repeatedly.**
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
 
-**The pace signal — `M5-16` (`SES-368`), retired as a refusal `2026-09-15` (live fix, John in chat:
-*"just make it so it degrades with weekly daily averages"*).** The freshest reading's
-`all_models_pct` — the same `detail.gated_pct` the wall grades — being at or above
-`detail.pace_limit_pct` = `week_day_index` × 100/7 (week starts the most recent Friday 01:00
-**`America/Chicago`**, day index whole days elapsed + 1, clamped 1..7; day 1 allows 14.29, day 2
-28.57, day 7 100) **no longer refuses the cycle.** It degrades the **orchestrator lane** instead,
-exactly as Fable's own pace/rest already degrades the judgment lane (`SES-395`):
-`public.orchestrator_model()` grades `all_models_pct` against this same `pace_limit_pct` and
-returns `detail.orchestrator_model` = the mechanical lane's model (`claude-sonnet-5`) with
-`detail.orchestrator_reason` = `orchestrator_pace`, or the orchestrator lane's own model
-(`claude-opus-5`) with reason `lane` otherwise. The wall (3, `weekly_rest_pct`) is untouched and
-still refuses outright — it is the harder ceiling protecting John's own reserved weekly headroom,
-never a pace, and continuing on a cheaper model would still spend it. **Fable has its own
-day-of-week share, graded the same way, and is not touched by this change:**
-`public.judgment_model()` grades `fable_pct` against `detail.fable_share` (the same day index ×
-100/7) and against the same `weekly_rest_pct`, and reports `detail.judgment_reason` = `fable_rest`
-\| `fable_pace` \| `lane` with `detail.judgment_model` naming the model a judgment-lane call runs
-on right now — the orchestrator's for either Fable reason, the judgment lane's otherwise
-(`SES-395`). Guarded by `tests/regression/ses-297-pre-boot-pickability.test.mjs`, which carries the
-closed `REASONS` set (six, not seven), the oracle branch, a fixed-instant calendar check, and the
-`orchestrator_model()`/`detail.orchestrator_*` assertions alongside the existing `judgment_model()`
-ones.
+**The pace signal — `M5-16`, retired as a refusal `2026-09-15`** (John: *"degrades with weekly
+daily averages"*). `all_models_pct` at or above `detail.pace_limit_pct` (same calendar as the
+wall) **no longer refuses** — it degrades the **orchestrator lane**, `SES-395`'s own treatment of
+the judgment lane: `public.orchestrator_model()` returns `claude-sonnet-5` /
+`detail.orchestrator_reason` = `orchestrator_pace` past threshold, else `claude-opus-5` / `lane`.
+The wall (3) still refuses outright — John's reserved headroom, which a cheaper model still
+spends. Guarded by `tests/regression/ses-297-pre-boot-pickability.test.mjs` (six `REASONS`; adds
+`orchestrator_model()` assertions beside `judgment_model()`'s).
 
 Everything else is `pickable` — one pass reason, no degraded variant (`SES-302`). A stale reading
 now has **two** consequences with one home each (`M5-15`, `SES-389`): **past
@@ -253,11 +237,17 @@ kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.cla
 
 > *"Those sessions came back alive because I opened them and allowed permissions. That should not be happening."*
 
-**The evidence behind this rule — what John's one sentence settled, the partition by whether he was demonstrably in the app, and the five-probe table (`c6c50bdc`, `ba8f2ce3`, `633fe486`, `12953ca8`, `55defd59`) whose parks ran ~9h, ~8h and never — is archived VERBATIM in `docs/SESSIONS.md`, appendix *runner-cycle.md rationale retired by `SES-336`*, entry B** (ledger entry 51). Read it before you touch the rule; the rule itself is next.
+**The evidence behind this rule is archived VERBATIM in `docs/SESSIONS.md`** (appendix
+*runner-cycle.md rationale retired by `SES-336`*, entry B, ledger 51). Read it before you touch
+the rule; the rule itself is next.
 
 **Therefore, the rule, and note what it is NOT.** It is not "never edit `.claude/`" — that edit is legitimate work. It is: **an unattended cycle has no bounded recovery from this gate, so it does not enter it.** A cloud cycle that needs a `.claude/` edit **files a card carrying the exact replacement text**, names it as needing *a session John is attending* (not merely "a laptop session" — attendance is the operative property, not the machine), and moves on. It never spends the cycle on the attempt, and — `CLAUDE.md`, `SES-019` — never retries the same write through a different tool to get around it. **The rule exists to protect John's attention, on his instruction:** *"That should not be happening"* means his opening a session to clear a prompt is the failure being designed out, never the recovery path a cycle may plan around.
 
-**Do not re-soften this on another latency reading.** That is exactly how it was softened last time, and a fast `.claude/` write is not evidence the gate is gone — it is evidence somebody was watching. **What would legitimately reopen it:** a prompt actually captured, or a pre-approval John grants these sessions that is then shown to survive an unattended run. Three things stay labelled inference, not fact: no prompt has ever been directly captured; `v7.0.115`'s 35-minute clearance has no identified clearer; and `ba8f2ce3`'s fast `Write`/`Edit` calls are not ordered against John's approval, so "`Write`/`Edit` never prompts" is not excluded. Read `runner_secrets` via the Supabase
+**Do not re-soften this on another latency reading.** A fast `.claude/` write is not evidence the
+gate is gone — it is evidence somebody was watching. **What would legitimately reopen it:** a
+prompt actually captured, or a pre-approval John grants these sessions that is then shown to
+survive an unattended run — neither has happened yet (detail: `docs/SESSIONS.md` entry B above).
+Read `runner_secrets` via the Supabase
 connector and export what a step needs as env vars — secrets never go into files, commits, or
 logs.
 
