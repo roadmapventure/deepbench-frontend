@@ -1,3 +1,7 @@
+// DeepBench v7.0.489 | tests/regression/ses-355-routine-prompt.test.mjs | SES-398 -- step 1 runs the meter
+// self-read BEFORE the gate: `seven-refusals-named` replaces `six-refusals-named` (meter_stale was
+// missing), and `self-read-before-gate` grades the ORDER of `claude -p` against the first
+// runner_should_boot(), with a swap control. The command's bytes are ses-398-meter-self-read's.
 // DeepBench v7.0.449 | tests/regression/ses-355-routine-prompt.test.mjs | SES-355
 //
 // FEATURE: SES-355 -- the cloud routine's prompt lives in the repo (docs/runbooks/routine-prompt.md)
@@ -72,7 +76,11 @@ export const REQUIRED = [
   // SES-377 -- the prompt must send a cycle to the card, not to a 363,840-byte top-to-bottom read.
   { id: "card-first", re: /docs\/runbooks\/cycle-card\.md/, breaks: s => s.replace(/cycle-card\.md/g, "cycle-card.txt") },
   { id: "pre-boot-gate", re: /runner_should_boot\(\)/, breaks: s => s.replace(/runner_should_boot/g, "runner_may_boot") },
-  { id: "six-refusals-named", re: /scheduler_off, weekly_wall, weekly_pace, no_budget_row, nothing_pickable, unaffordable/, breaks: s => s.replace("weekly_pace, ", "") },
+  // SES-398 -- seven, not six: the gate has refused `meter_stale` since SES-389, and three fires on
+  // 2026-09-15 did exactly that while the prompt named six.
+  { id: "seven-refusals-named", re: /scheduler_off, meter_stale, weekly_wall, weekly_pace, no_budget_row, nothing_pickable, unaffordable/, breaks: s => s.replace("meter_stale, ", "") },
+  // SES-398 -- the meter self-read is in the prompt at all (its ORDER against the gate is graded in grade()).
+  { id: "self-read-present", re: /claude -p /, breaks: s => s.split("claude -p ").join("claude --print ") },
   { id: "queue-is-the-pick", re: /prime_directive_queue\(\)/, breaks: s => s.replace(/prime_directive_queue/g, "the queue") },
   { id: "lanes-are-the-authority", re: /runner_model_lanes/, breaks: s => s.replace(/runner_model_lanes/g, "the lanes") },
   { id: "canonical-home", re: /docs\/runbooks\/routine-prompt\.md/, breaks: s => s.replace(/routine-prompt\.md/g, "prompt.md") },
@@ -102,6 +110,16 @@ export function grade(prompt, lanes) {
     `${PROMPT_REL} must name docs/runbooks/cycle-card.md BEFORE docs/runbooks/runner-cycle.md ` +
       `(card@${cardAt}, runbook@${runbookAt}) — the card is what a cycle reads first; the runbook ` +
       "is what it opens at an L-anchor. Naming the runbook first restores the undirected read.",
+  );
+  // SES-398 -- self-read-before-gate: ORDER, not presence. runner_should_boot() grades the newest
+  // reading, so a prompt that asks the gate first grades the stale row the self-read exists to
+  // replace (cycles 1e058d0f, 4d4f5e6c, fae57bad refused meter_stale on 2026-09-15).
+  const selfReadAt = prompt.indexOf("claude -p ");
+  const gateAt = prompt.indexOf("runner_should_boot()");
+  assert.ok(
+    selfReadAt >= 0 && gateAt >= 0 && selfReadAt < gateAt,
+    `${PROMPT_REL} must run the meter self-read (claude -p) BEFORE the first runner_should_boot() ` +
+      `(self-read@${selfReadAt}, gate@${gateAt}) — the gate grades the newest reading, so asking it first grades a stale one.`,
   );
   // Model ids: every id the prompt names is a lane's id, and every lane's id is named. A prompt that
   // names a model the lanes table does not carry is exactly the claude-fable-5 drift this ticket found.
@@ -138,6 +156,14 @@ function everyClauseHasTeeth(prompt, lanes) {
     .replace(/ CARD /g, "docs/runbooks/runner-cycle.md");
   assert.notStrictEqual(swapped, prompt, "control for card-first order changed nothing (the SES-158 failure)");
   assert.throws(() => grade(swapped, lanes), "control: a prompt naming the runbook before the card still passes");
+  // SES-398 -- the self-read-before-gate order clause's own control: both strings stay present, only
+  // their positions swap, so presence alone (self-read-present, pre-boot-gate) still passes.
+  const gateFirst = prompt
+    .replace(/claude -p /g, " SELFREAD ")
+    .replace(/runner_should_boot\(\)/g, "claude -p ")
+    .replace(/ SELFREAD /g, "runner_should_boot()");
+  assert.notStrictEqual(gateFirst, prompt, "control for self-read-before-gate changed nothing (the SES-158 failure)");
+  assert.throws(() => grade(gateFirst, lanes), "control: a prompt asking the gate before the meter self-read still passes");
   // A foreign model id must be caught.
   assert.throws(() => grade(prompt + " Use claude-fable-5 when in doubt.", lanes), "control: an old model id slipped through");
   assert.throws(() => grade(prompt + " Escalate to claude-opus-6.", lanes), "control: an unknown model id slipped through");

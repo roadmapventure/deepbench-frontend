@@ -94,6 +94,16 @@ average 611,321 each, shipping nothing**, more than `M5`'s whole 31.9M predicted
 SELECT * FROM public.runner_should_boot();
 ```
 
+<!-- FEATURE: SES-398 --> **On the cloud routine, the meter self-read is the one action before this
+query** (`docs/runbooks/routine-prompt.md` step 1, `SES-398`). One pinned Bash command reads the
+account's `unifiedWindows` off a one-line `claude -p` call's `rate_limit_event` and prints either one
+`INSERT` into `runner_usage_readings` (`source = 'routine-self-read'`, `fable_pct` NULL when the call
+carried no Fable window), which the cycle runs so the reading this gate grades is minutes old, or one
+`NO_READING <reason>` line, which writes nothing and goes into the cycle row's notes as
+`METER SELF-READ:`. It reads no repo file and needs no secret, so the ordering above stands: nothing
+else precedes this query. Measured 2026-09-15, three fires refused `meter_stale` in one morning
+(cycles `1e058d0f`, `4d4f5e6c`, `fae57bad`) because no reader had written for over two hours.
+
 - **`should_boot = true`** (`reason = 'pickable'`) → continue to step 0. `detail` already names the
   ticket the pick path would return, with its title (`backlog_display_title`, per the ID + title
   rule above) and its predicted cost. That is **reporting, never a reservation** — step 5 still
@@ -162,8 +172,11 @@ for repeatedly.**
    elapsed + 1, clamped 1..7. Day 1 allows 14.29, day 2 28.57, day 7 100. The wall (2) still wins
    when both are true. This is a pace, not a cap: it says nothing about tokens per cycle, and it
    carries no staleness threshold of its own (`M5-15`). **Fable has its own day-of-week share and it
-   is not graded here.** `public.judgment_model()` grades `fable_pct` against `detail.fable_share`
-   (the same day index × 100/7) and against the same `weekly_rest_pct`, and reports
+   is not graded here.** `public.judgment_model()` grades the newest same-week reading that carries a
+   Fable number <!-- FEATURE: SES-398 --> (`fable_pct IS NOT NULL` and `taken_at` at or after
+   `detail.week_started_at`, `SES-398` — so a meter self-read with no Fable window never lifts a
+   same-week degrade, and a Fable number from before the reset never degrades the new week) against
+   `detail.fable_share` (the same day index × 100/7) and against the same `weekly_rest_pct`, and reports
    `detail.judgment_reason` = `fable_rest` \| `fable_pace` \| `lane` with `detail.judgment_model`
    naming the model a judgment-lane call runs on right now — the orchestrator's for either Fable
    reason, the judgment lane's otherwise (`SES-395`). Guarded by

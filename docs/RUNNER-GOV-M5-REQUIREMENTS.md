@@ -400,6 +400,14 @@ one variable each, every assertion on the REASON: Fable 30 → `claude-fable-5-1
 all-models 20 → `claude-opus-5` / `fable_rest` **and the gate answering `pickable`**, which is the
 seam — `SES-390`'s gate answered `weekly_wall` on those same inputs; Fable NULL → `claude-fable-5-1`
 / `lane`. Zero fixture residue on re-read (0 rows with `source = 'ses395-qa'`, 41 readings).
+<!-- FEATURE: SES-398 --> **`SES-398`, 2026-09-15 (`v7.0.489`, migration
+`ses398_judgment_reads_week_fable`):** `judgment_model()` now grades the newest reading since the
+week's Friday 01:00 `America/Chicago` start that carries a Fable number rather than the newest reading,
+because the routine's own meter self-read (`source = 'routine-self-read'`) writes `fable_pct` NULL
+whenever its call carried no Fable window — measured inside a rolled-back `DO` block with every
+same-week Fable number nulled, Fable 90 an hour ago under a NULL-Fable newest row answers
+`claude-opus-5` / `fable_rest` / 90 (the prior form answered `claude-fable-5-1` / `lane`), and a Fable
+95 from before the reset answers `lane` under both forms, with 0 rows of `source = 'ses398-qa'` left.
 ---
 
 ## Amendment note — `SES-285`, 2026-09-01 (`v7.0.359`)

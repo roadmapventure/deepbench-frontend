@@ -1,3 +1,8 @@
+// DeepBench v7.0.489 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-398 -- the live arm
+// grades `judgment_model().fable_pct` against the newest reading SINCE THE WEEK START that carries a
+// Fable number (its own PostgREST read: fable_pct=not.is.null, taken_at=gte.<chicagoWeek start>),
+// not against the gate's newest row -- migration ses398_judgment_reads_week_fable, because the
+// routine's meter self-read writes fable_pct NULL whenever its call carried no Fable window.
 // DeepBench v7.0.486 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-395 -- the wall and
 // the pace grade `all_models_pct` again, and Fable past its own share DEGRADES the judgment lane
 // instead of refusing the cycle. The doc clause flips to `judgment_model` / `fable_rest` /
@@ -722,10 +727,22 @@ async function theLiveGateObeysItsOwnLadder() {
   assert.strictEqual(j.model_id, wantJudgmentModel,
     `judgment_model() answered ${j.model_id} on reason '${j.reason}', but the ${j.reason === "lane" ? "judgment" : "orchestrator"} ` +
       `lane's model is ${wantJudgmentModel} -- the two Fable reasons take the orchestrator's model, 'lane' the judgment lane's`);
+  // SES-398: the lane grades the newest SAME-WEEK reading that CARRIES a Fable number, not the newest
+  // reading. The routine's own meter self-read writes fable_pct NULL whenever its call carried no Fable
+  // window, and grading that NULL as 'lane' would lift a same-week degrade. So the oracle is its own
+  // query from the raw table -- filtered the way migration ses398_judgment_reads_week_fable filters,
+  // on the week start the clock-only oracle computed -- never the gate's newest-row fablePct.
+  const weekFable = asArray(
+    await pg(url, key,
+      "runner_usage_readings?select=fable_pct&fable_pct=not.is.null" +
+        `&taken_at=gte.${encodeURIComponent(new Date(week.weekStartedAt).toISOString())}&order=taken_at.desc&limit=1`),
+    "runner_usage_readings (same-week Fable)");
+  const weekFablePct = weekFable.length ? Number(weekFable[0].fable_pct) : null;
   assert.strictEqual(
-    j.fable_pct === null || j.fable_pct === undefined ? null : Number(j.fable_pct), facts.fablePct,
-    `judgment_model().fable_pct=${j.fable_pct} but the freshest reading says ${facts.fablePct} -- it must ` +
-      "grade the same reading the gate does, or the lane and the gate disagree about the same week");
+    j.fable_pct === null || j.fable_pct === undefined ? null : Number(j.fable_pct), weekFablePct,
+    `judgment_model().fable_pct=${j.fable_pct} but the newest reading since ${new Date(week.weekStartedAt).toISOString()} ` +
+      `that carries a Fable number says ${weekFablePct} -- a newer reading with no Fable window must not lift ` +
+      "a same-week degrade, and a Fable number from before the Friday 01:00 reset must not degrade the new week");
   assert.strictEqual(Number(j.fable_share), facts.paceLimitPct,
     `judgment_model().fable_share=${j.fable_share} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct} -- ` +
       "Fable's share is John's share on the same calendar; a second calendar here is free to disagree with the gate's");

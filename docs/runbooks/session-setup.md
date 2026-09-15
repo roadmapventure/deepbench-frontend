@@ -598,15 +598,24 @@ what it would say" are the three that have to stay refused for the rule to mean 
 ### 3g. The meter reader — John's machine feeds the pace gate (`SES-374`, `v7.0.455`)
 
 The weekly pace gate (`M5-16`) and the rest wall (`M5-06`) read the freshest
-`public.runner_usage_readings` row. A cloud cycle cannot take a reading — the meter is the Claude
-Code CLI's `/usage` under John's subscription login, on his machine. `scripts/read-usage-meter.js`
-is that read, made a scheduled task:
+`public.runner_usage_readings` row. The meter was first readable only on John's machine — the Claude
+Code CLI's `/usage` under his subscription login — and since `SES-398` the routine reads it itself
+(first bullet below). `scripts/read-usage-meter.js` is the machine read, made a scheduled task:
 
 ```
 node scripts/read-usage-meter.js --dry-run     # parse only, prints the three numbers
 node scripts/read-usage-meter.js               # writes one row, source 'meter-reader'
 ```
 
+- <!-- FEATURE: SES-398 --> **The primary writer is the routine itself: `source = 'routine-self-read'`
+  (`SES-398`, `v7.0.489`).** Every fire's first action (`docs/runbooks/routine-prompt.md` step 1)
+  runs one pinned `claude -p` call, turns its `rate_limit_event` into one `INSERT` (or one
+  `NO_READING <reason>` line, which writes nothing and lands in the cycle row's notes), and only then
+  asks `runner_should_boot()` — so a firing routine grades a reading minutes old. `fable_pct` is NULL
+  when the call carried no Fable window, never a guess; `judgment_model()` then grades the newest
+  same-week reading that does carry one. The laptop task and the GitHub workflow below are unchanged
+  and are the backups: they keep the meter fresh between fires and whenever a self-read prints
+  `NO_READING`.
 - **Credentials are not in `.env.local`** (ruling `d7670e18`, 1b above). They live DPAPI-encrypted at
   `%USERPROFILE%\.deepbench\supabase-meter-reader.dpapi`, readable only by John's account on this
   machine, written once by `node scripts/read-usage-meter.js --store-credentials` with
@@ -663,8 +672,13 @@ powershell -NoProfile -Command "Set-ScheduledTask -TaskName 'DeepBench meter rea
   that went missing** — `tests/regression/ses-374-meter-reader.test.mjs` pins the 2026-09-14 header shape
   beside the 2026-09-11 CLI shape, so a header rename shows up as a red test rather than as a silent
   stream of exit-2s. Trigger it by hand from the Actions tab (`workflow_dispatch`) after any change. A
-  cloud routine cannot be the reader at all: measured 2026-09-13 (probe run
-  `cse_01XgcrXWKfp2qZ4BokzfrL22`), the cloud harness signs in with a session token. The workflow file can
+  cloud routine cannot read `/usage` — measured 2026-09-13 (probe run
+  `cse_01XgcrXWKfp2qZ4BokzfrL22`), the cloud harness signs in with a session token — but it CAN be
+  the reader <!-- FEATURE: SES-398 -->: measured 2026-09-15 (run `cse_01Xayc1PeKmwhEgJamT6PFuX`,
+  Claude Code 2.1.272), a one-line `claude -p --output-format stream-json --verbose` call's
+  `rate_limit_event` carries `rate_limit_info.unifiedWindows` — `five_hour` 0.05, `seven_day` 0.63 and,
+  on `claude-fable-5-1` only, `seven_day_overage_included` 0.94 — which is the self-read in the first
+  bullet; John's laptop Claude Code 2.1.218 emits no such field. The workflow file can
   only be pushed by John (the sessions' PAT lacks the workflow scope), and GitHub schedules only from the
   default branch — so the copy that actually fires is the one on `main`.
 
