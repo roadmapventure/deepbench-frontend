@@ -1300,11 +1300,21 @@ Four things about this boundary, each of which has already bitten or would have:
   §19v's budget paragraph, not from memory.
 
 - **API dollars (real money, hard wall):** SELECT `runner_budget` for the current month — no
-  row → `did_not_run`, END. Sum this month's and today's `api_cost_dev_usd + api_cost_qa_usd`
-  from `runner_cycles`; over the month cap → `did_not_run`, END; over the day default →
-  `did_not_run` END unless an unexpired `budget_override` directive covers it (then its
+  row → `did_not_run`, END. Sum `ai_activity_log.cost_usd` over the month and over today:
+  `select coalesce(sum(cost_usd),0) from ai_activity_log where created_at >= <period start UTC>
+  and created_at < <period end UTC>`; over the month cap → `did_not_run`, END; over the day
+  default → `did_not_run` END unless an unexpired `budget_override` directive covers it (then its
   `max_usd` is your ceiling this cycle). **Only true billable API calls count here** — your own
   session's thinking is subscription usage, tracked in tokens below, never in dollars.
+  - **Note the query has NO `call_source` filter, on purpose (SES-383).** A non-billable row
+    carries `cost_usd = NULL` — not 0 — and NULL adds nothing to a SUM, so such rows exclude
+    themselves by their own value. That is what makes this **one** number instead of two filters
+    someone has to remember to keep in step. Adding a filter here would re-open the split.
+  - **`runner_cycles.api_cost_dev_usd` / `api_cost_qa_usd` are no longer the wall's input.** They
+    remain the cycle's own record of what a cycle believed it spent, and close-out still writes
+    them; the wall reads the log. Before SES-383 the wall summed those two columns while the AI
+    Audit summed the log, and the two disagreed by the full amount of every session turn (measured
+    live 2026-09-15: **$0.00 from `runner_cycles` against $220.40 from the log, same day**).
 - **Subscription tokens (the governor that replaced the phantom-dollar wall):**
   read the latest `runner_usage_readings` row (John's typed-in meter percentages).
   (a) `all_models_pct ≥ weekly_rest_pct` (85) → rest: `did_not_run`, reason "weekly meter at
