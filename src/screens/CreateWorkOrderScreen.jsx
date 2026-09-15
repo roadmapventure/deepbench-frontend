@@ -1,3 +1,6 @@
+// DeepBench v7.0.427 | src/screens/CreateWorkOrderScreen.jsx | SES-330 — the one client-side
+// `from('agents')` read is scoped to lane='product' so a governance-lane row can never leak
+// through this customer-facing screen. No visual change.
 // DeepBench v6.2.14 | src/screens/CreateWorkOrderScreen.jsx | AA-70 Alex attribution + BUG-14 double-count fix
 // FEATURE: AW-24 — Renamed to Create Work Order
 // FEATURE: AW-25 — PM agent picker
@@ -302,10 +305,14 @@ export default function CreateWorkOrderScreen() {
       setRoadmapDeliverables(roadmap);
 
       // Fetch Victoria's agent card for UI chip
+      // FEATURE: SES-330 -- governance agents hold capabilities never offered on this
+      // customer-facing screen; scoped to lane='product' so a governance-lane row can never
+      // leak through this client-side read. No visual change.
       const { data: vc } = await supabase
         .from('agents')
         .select('name, role, code')
         .eq('id', 'victoria')
+        .eq('lane', 'product')
         .single();
       if (vc) setVictoriaCard(vc);
     } catch (e) {
