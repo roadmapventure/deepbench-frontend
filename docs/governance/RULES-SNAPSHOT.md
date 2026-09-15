@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 161 · **By status:** 144 live · 7 retired · 10 superseded · **Payload sha256:** `975586b008087b374f5d278102ef99ec0a0de13b11fc57c02895ac0712c37062`
+**Rules:** 162 · **By status:** 145 live · 7 retired · 10 superseded · **Payload sha256:** `30a832076324f5852c960c3886c3f9d0596718e6bb445106eb5bbf14d73da92b`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -13,6 +13,7 @@ exactly one space per side, and a reader removes one character per side rather t
 
 | Rule | Status | Enforcement | Source group | Canonical doc | Superseded by | Statement |
 |---|---|---|---|---|---|---|
+| AGENT-ROW-AGREED-TICKET | live | reviewer | claude-md-hard-rules | .claude/rules/agent-roster-inert.md |  | Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\nReserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\nFlipping agents.is_active on is unchanged and remains John's hire card.\nJohn 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out. |
 | HR-ATOMIC-COUNTERS | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Claim version numbers and feature/backlog IDs atomically from Supabase, never by reading the highest value and incrementing it yourself, and never hand-count a multi-row claim. |
 | HR-HOOKS-BACKSTOP | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Treat local PreToolUse/PostToolUse hooks as a backstop that may not exist in every environment, never as the source of truth for the six rules they enforce. |
 | HR-KICKOFF | live | prose | claude-md-hard-rules | CLAUDE.md#hard-rules |  | Precede every coding session with a design session that produced a kickoff doc. |

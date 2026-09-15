@@ -2608,10 +2608,28 @@ component file, the approved screen gains only an import + one guarded mount; th
 assertion is **zero deleted lines** in existing `src/screens/*` / `src/AppShell.jsx`.
 **P6** (agent enhancement) — no unattended edits to any **active** agent's Skills/Capabilities
 (the moment a row changes, every live run uses it — maximum blast radius, no inert state);
-auto-lane only against agents still `is_active = false`. **P7** (agent creation) — `is_active =
+auto-lane only against agents still `is_active = false` — **except under rule
+`AGENT-ROW-AGREED-TICKET` (`SES-394`, 2026-09-15), where a ticket John has agreed to makes the
+edit build work with a before-image rather than a card.** The blast-radius reasoning is unchanged
+and is why the carve-out is narrow: it turns on *his having agreed to this ticket*, never on a
+trust rung, and the write still lands under one decision handle with its own
+`runner_before_images` row. **P7** (agent creation) — `is_active =
 false` *is* the flag: new agents are born invisible (excluded from the delegation roster,
 `LOO-37`) and unreachable (the `execute.js` gate, `LOO-004`); **John flipping `is_active` is
-signing the hire card**. **P8** (determinism removal) — ships live in data and platform-service
+signing the hire card**. Seeding those rows for an agent whose ticket he has agreed to is
+likewise build work under the same rule — what stays his is an agent he **has not seen**, and the
+activation itself.
+
+<!-- {{rule:AGENT-ROW-AGREED-TICKET}} · rendered from public.governance_rules — do not hand-edit the quoted lines below. Edit the registry row, then run `node scripts/render-rule-blocks.js --write`. -->
+> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.
+> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.
+> Flipping agents.is_active on is unchanged and remains John's hire card.
+> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out.
+
+The callable form is `scripts/agent-row-gate.js` — `classifyAgentRowWrite({ action, scopeOrigin,
+decisionNamesTicket, agentKnownToJohn })`, and `node scripts/agent-row-gate.js --ticket=<ID>
+--action=create|edit-active|activate`, which reads the ticket's `scope_origin` live and exits `0`
+on build work, `1` on gated. Pinned by `tests/regression/ses-394-agent-row-gate.test.mjs`. **P8** (determinism removal) — ships live in data and platform-service
 modules; **gated in the four harness files** (`api/capabilities/execute.js`,
 `api/prompt/db-assembly.js` / `ai-enrichment.js` / `request-receivable.js`) — there the engine
 may diagnose, write the diff, and prove it with a full regression run, but it lands as a
@@ -2621,7 +2639,9 @@ ships live.
 
 **The gated lane (never unattended, no trust rung ever unlocks it):** terminology and canonical
 naming; architecture supersessions and LOCKED-section changes; schema-destructive migrations;
-anything §19e-owned; edits to active agents; the four harness files; dev→main. **Uncertain
+anything §19e-owned; edits to active agents *other than those rule `AGENT-ROW-AGREED-TICKET`
+releases* (`SES-394` — an agreed ticket's own edit; everything else here is unchanged, and no
+trust rung unlocks any of it); the four harness files; dev→main. **Uncertain
 classification → gated, always.**
 
 ### Reversibility — every change undone by one action of John's
