@@ -237,8 +237,7 @@ kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.cla
 
 > *"Those sessions came back alive because I opened them and allowed permissions. That should not be happening."*
 
-**The evidence behind this rule is archived VERBATIM in `docs/SESSIONS.md`** (appendix
-*runner-cycle.md rationale retired by `SES-336`*, entry B, ledger 51). Read it before you touch
+**The evidence behind this rule is archived VERBATIM in `docs/SESSIONS.md`** (appendix *runner-cycle.md rationale retired by `SES-336`*, entry B, ledger 51). Read it before you touch
 the rule; the rule itself is next.
 
 **Therefore, the rule, and note what it is NOT.** It is not "never edit `.claude/`" — that edit is legitimate work. It is: **an unattended cycle has no bounded recovery from this gate, so it does not enter it.** A cloud cycle that needs a `.claude/` edit **files a card carrying the exact replacement text**, names it as needing *a session John is attending* (not merely "a laptop session" — attendance is the operative property, not the machine), and moves on. It never spends the cycle on the attempt, and — `CLAUDE.md`, `SES-019` — never retries the same write through a different tool to get around it. **The rule exists to protect John's attention, on his instruction:** *"That should not be happening"* means his opening a session to clear a prompt is the failure being designed out, never the recovery path a cycle may plan around.
