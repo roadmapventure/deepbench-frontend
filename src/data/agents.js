@@ -1,7 +1,8 @@
-// DeepBench v6.2.12 | agents.js | RO-14 — Bench filter "mi" label renamed from the old Market Intel text to Channel Sales Intel (id unchanged)
-// DeepBench v6.1.42 | agents.js | RO-11 — Bench filter "nigp" label renamed to "Spend Analysis" (id unchanged)
-// DeepBench v5.3.2 | agents.js | AG-27 Eleanor Voss (LB-01) The Librarian added
-// DeepBench v6.0.40 | agents.js | MI-18 — removed dead isAppleChannel field, superseded by page-local proposedAgentIds
+// DeepBench v7.0.485 | agents.js | AGT-70 — AVATAR_CFG + AGENT_PRONOUNS entries for `auditor` (The Auditor, GV-07) and `ticketowner` (The Ticket Owner, GV-08, AGT-79), both lane `governance` and is_active true in `public.agents`. Same terms as AGT-63..AGT-69: NOT in the AGENTS array — the Bench's Governance section renders them from the live `lane = 'governance'` rows, and these entries exist only so the portrait and pronouns resolve wherever an audit, cycle or decision surface already draws those two ids. The header is trimmed to the newest five stamps in this same edit (the session-hygiene check 7 shape): every retired line was either a historical label rename or is restated by a stamp still standing above it.
+// DeepBench v7.0.456 | agents.js | AGT-69 — OFF_BENCH_AGENT_IDS deleted with its comment (John's ruling 2026-09-11, decision 146256c1): the governance agents render on the Bench's Governance section from live lane=governance rows (src/components/GovernanceSection.jsx, view governance_agent_activity_7d), never from a list here. Their AVATAR_CFG / AGENT_PRONOUNS entries stay — the portraits render from them.
+// DeepBench v7.0.434 | agents.js | AGT-68 — AVATAR_CFG + AGENT_PRONOUNS entries for `devmanager` (The Development Manager, GV-01, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66/67.
+// DeepBench v7.0.433 | agents.js | AGT-67 — AVATAR_CFG + AGENT_PRONOUNS entries for `verifier` (The Verifier, GV-06, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66.
+// DeepBench v7.0.432 | agents.js | AGT-66 — AVATAR_CFG + AGENT_PRONOUNS entries for `builder` (The Builder, GV-05, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65.
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -310,6 +311,41 @@ export const AVATAR_CFG = {
   elena:  { skin:"#e8d4b8", hair:"#1a1a1a", collar:"#1a1a3a", extra:"bun",     border:T.navy  },
   // FEATURE: AGT-026 — Jordan Ellsworth avatar
   jordan: { skin:"#d0a888", hair:"#3a2e24", collar:"#1e3a44", extra:"headset", border:T.moss },
+  // FEATURE: AGT-63 — The Prioritizer (GV-03), the governance lane's classifier. Deliberately NOT
+  // in the AGENTS list below: governance agents stay off the Bench until the exit review decides
+  // how they render (agents.lane, SES-330). The avatar/pronoun entries exist anyway because every
+  // component that draws an agent id reads these two maps, and a governance agent's id already
+  // appears in audit and decision surfaces — a missing entry there is a blank portrait, not an
+  // absent one.
+  prioritizer: { skin:"#d8c0a0", hair:"#4a4a52", collar:"#2a2a3a", extra:"glasses", border:T.navy },
+  // FEATURE: AGT-64 — The Researcher (GV-02), the governance lane's invention research pass.
+  // Off the Bench for the same reason as the entry above; the portrait exists because audit and
+  // decision surfaces already draw this id.
+  researcher:  { skin:"#c9a882", hair:"#2e2a26", collar:"#243a34", extra:"glasses", border:T.moss },
+  // FEATURE: AGT-65 — The Designer (GV-04), the governance lane’s kickoff author.
+  // Off the Bench for the same reason as the two entries above; the portrait exists because audit
+  // and decision surfaces already draw this id.
+  designer:    { skin:"#dcbf9c", hair:"#3a3340", collar:"#1f2f47", extra:"bun",     border:T.navy },
+  // FEATURE: AGT-66 — The Builder (GV-05), the governance lane’s kickoff executor.
+  // Off the Bench for the same reason as the three entries above; the portrait exists because
+  // audit and cycle surfaces already draw this id.
+  builder:     { skin:"#c2a179", hair:"#241f1c", collar:"#3a2f22", extra:"",        border:T.brass },
+  // FEATURE: AGT-67 — The Verifier (GV-06), the governance lane’s fresh-context grader.
+  // Off the Bench for the same reason as the four entries above; the portrait exists because the
+  // verdict ledger and audit surfaces already draw this id.
+  verifier:    { skin:"#d6bfa4", hair:"#33302c", collar:"#26323d", extra:"glasses", border:T.muted },
+  // FEATURE: AGT-68 — The Development Manager (GV-01), the governance lane’s project orchestrator.
+  // Off the Bench for the same reason as the five entries above; the portrait exists because the
+  // cycle, assignment and audit surfaces already draw this id.
+  devmanager:  { skin:"#caa984", hair:"#2b2724", collar:"#33384a", extra:"",        border:T.navy  },
+  // FEATURE: AGT-70 — The Auditor (GV-07), the governance lane’s weekly contradiction pass.
+  // Off the Bench for the same reason as the six entries above; the portrait exists because the
+  // findings ledger and audit surfaces already draw this id.
+  auditor:     { skin:"#d0b28e", hair:"#3c3630", collar:"#2d3a2e", extra:"glasses", border:T.muted },
+  // FEATURE: AGT-79 — The Ticket Owner (GV-08), the governance lane’s board census and judgment pass.
+  // Off the Bench for the same reason as the seven entries above; the portrait exists because the
+  // census, findings and board surfaces already draw this id.
+  ticketowner: { skin:"#c6ad8d", hair:"#302a30", collar:"#40323c", extra:"",        border:T.muted },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -342,6 +378,22 @@ export const AGENT_PRONOUNS = {
   elena:  { subject:"she",  object:"her",  possessive:"her"   },
   // FEATURE: AGT-026 — Jordan Ellsworth pronouns
   jordan: { subject:"he", object:"him", possessive:"his" },
+  // FEATURE: AGT-63 — The Prioritizer pronouns (they/them/their).
+  prioritizer: { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-64 — The Researcher pronouns (they/them/their).
+  researcher:  { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-65 — The Designer pronouns (they/them/their).
+  designer:    { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-66 — The Builder pronouns (they/them/their).
+  builder:     { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-67 — The Verifier pronouns (they/them/their).
+  verifier:    { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-68 — The Development Manager pronouns (they/them/their).
+  devmanager:  { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-70 — The Auditor pronouns (they/them/their).
+  auditor:     { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-79 — The Ticket Owner pronouns (they/them/their).
+  ticketowner: { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
