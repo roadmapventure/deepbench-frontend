@@ -3622,7 +3622,8 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           paths blur the input so the on-screen keyboard drops on send.
           FEATURE: MOB-001 — Clear's vertical padding matches Send's own 9px in this same row, taking its
           measured 36×13px tap target (mobile-ui-audit-0717) to ~30px+; font/color/weight and the
-          no-confirm-dialog Clear behavior are unchanged. */}
+          no-confirm-dialog Clear behavior are unchanged.
+          FEATURE: MOB-22 (v7.0.496) — minWidth 0 lets this input shrink, so Clear fits a 375px phone (MOB-14). */}
       <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
         {mobileTab === "chat" ? (
           <>
@@ -3630,7 +3631,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
           <div style={{flexShrink:0,padding:"9px 14px 8px",display:"flex",alignItems:"center",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
             <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
               onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; e.target.blur(); } }}
-              style={{flex:1,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:16,background:T.card,color:T.ink}}/>
+              style={{flex:1,minWidth:0,padding:"9px 12px",border:`1px solid ${T.lineSoft}`,fontFamily:body,fontSize:16,background:T.card,color:T.ink}}/>
             <button onClick={() => { const el = document.getElementById("mobile-chat-input"); onSubmit(el.value); el.value = ""; el.blur(); }} disabled={loading}
               style={{padding:"9px 16px",background:T.navy,color:T.card,border:"none",fontFamily:body,fontSize:13,cursor:loading?"default":"pointer",flexShrink:0}}>
               Send

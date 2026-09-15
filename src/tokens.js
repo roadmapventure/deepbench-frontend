@@ -1,3 +1,4 @@
+// DeepBench v7.0.496 | tokens.js | MOB-22 -- guarded 100dvh app-frame block ends GLOBAL_CSS
 // DeepBench v7.0.81 | tokens.js | LAV-38 -- inkTanPulse keyframe for the Answer drawer's armed-header title pulse
 // DeepBench v7.0.73 | tokens.js | CHI-100 -- desktop 80% render default: GLOBAL_CSS media block + vh compensation variable (see below)
 // DeepBench v7.0.4 | tokens.js | LAV-1e -- focus-area status flip: channelSales Beta->Alpha, projectMgmt/spendAnalysis Alpha->Pre-Alpha, new liveAgentView key (Beta)
@@ -87,6 +88,16 @@ input[type=range]{cursor:pointer}
    with calc(100vh / 0.8). */
 @media (min-width: 769px){
   #root { zoom: 0.8; min-height: calc(100vh / 0.8); --shell-h: calc(100vh / 0.8); }
+}
+/* FEATURE: MOB-22 -- frame = the visible screen; the page never scrolls or bounces. Guarded:
+   unguarded, --shell-h:100dvh computes AppShell's height to auto where dvh is unsupported. */
+@supports (height: 100dvh){
+  html, body { height:100%; overflow:hidden; overscroll-behavior:none; }
+  html, body, #root { min-height:100dvh; }
+  #root { --shell-h:100dvh; }
+  @media (min-width: 769px){
+    #root { min-height:calc(100dvh / 0.8); --shell-h:calc(100dvh / 0.8); }
+  }
 }
 `;
 
