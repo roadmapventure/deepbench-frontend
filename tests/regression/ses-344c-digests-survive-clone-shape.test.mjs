@@ -1,4 +1,4 @@
-// DeepBench v7.0.476 | tests/regression/ses-344c-digests-survive-clone-shape.test.mjs | SES-344
+// DeepBench v7.0.490 | tests/regression/ses-344c-digests-survive-clone-shape.test.mjs | SES-344, SES-393
 // slice 3 -- THE FIXTURE DIGESTS ARE A FACT ABOUT THE TREE, NOT ABOUT THE CLONE, and the thing to
 // read twice is WHY (b) CARRIES A NEGATIVE CONTROL INSTEAD OF JUST ASSERTING THAT THE DIGEST MATCHES.
 //
@@ -27,6 +27,20 @@
 // it would make this guard unrunnable in the very environment it was written for. Each one is named
 // in the declaration, and the two counts are printed together, so a run where everything skipped
 // cannot be mistaken for a run where everything passed.
+//
+// SES-393 (v7.0.490): THAT RULE DID NOT HOLD WHEN *EVERY* FIXTURE WAS UNREADABLE, and the chosen
+// shape is TEST-SIDE, not `fetch-depth: 0` in `.github/workflows/ci.yml`. Measured, not recalled:
+// `actions/checkout@v4` at lines 172/191 of ci.yml carries no `fetch-depth:` key, so both CI jobs
+// check out at depth 1; every one of the 27 usable fixtures then declared itself unreadable and the
+// `ok > 0` assertion below turned the all-skipped run into a FAIL. `Tripwire + regression
+// (blocking)` was red on every dev head for it -- CI run 34752717596, dev head bfdf3e55. The fix is
+// not in ci.yml because THE PAT AN UNATTENDED CYCLE HOLDS CANNOT PUSH `.github/workflows`, so a
+// `fetch-depth: 0` edit cannot land from this lane at all; and the suite's own convention already
+// covers exactly this case (`SES-244-tap-buffer.js:146`, `SES-215-env-isolation.js:303`,
+// `SES-256-rollback-drill.js:226`, `ses-320-delivered-exit.test.mjs:253` each declare an
+// unreachable pinned sha NOT RUN and name it). So `reachable()` below gates the whole guard on
+// depth, through the same `notRun()` vocabulary -- no second vocabulary invented
+// (`docs/STANDARDS.md` Section 13).
 
 import assert from "assert";
 import fs from "fs";
@@ -69,6 +83,16 @@ function diffAt(sha, abbrev, fullIndex) {
 
 const unreadable = e => /could not be read/.test(String(e));
 
+// THE DISCRIMINATOR BETWEEN "THIS CHECKOUT IS SHALLOW" AND "THE DIGEST ROTTED". A fixture's base is
+// the range `sha^..sha`, so it is the PARENT a depth-1 checkout lacks, not the commit itself -- a
+// depth-1 clone holds its own HEAD and nothing before it. `git cat-file -e <sha>^^{commit}` is a
+// pure reachability probe: non-zero in the depth-1 clone, zero in a full one (measured both ways,
+// 2026-09-15). Only `!reachable(sha)` may take the NOT RUN arm below; a materialise error on a sha
+// this clone CAN read is a real failure and stays red.
+function reachable(sha) {
+  return spawnSync("git", ["cat-file", "-e", `${sha}^^{commit}`], { cwd: REPO }).status === 0;
+}
+
 async function run() {
   // ---- (a) every usable fixture materialises, or is named as unreadable ----------------------
   const usable = FIXTURE.fixtures.filter(f => f.available);
@@ -89,6 +113,17 @@ async function run() {
     ok++;
   }
   assert.strictEqual(ok + skipped.length, usable.length, "a usable fixture was neither materialised nor declared");
+  // NOTHING REPLAYED *AND* NOTHING REACHABLE IS THIS CHECKOUT'S DEPTH, NOT A ROTTED DIGEST -- and
+  // the second half of that conjunction is the whole gate. Parts (b) and (c) are past this return,
+  // so PINNED_SHA8 and the mutant loop are covered by the same declaration rather than each
+  // inventing its own skip. If ok === 0 while some base IS reachable, the assertion below still
+  // fires: that is a digest that really rotted, and widening it into a skip would make this guard
+  // unable to report the only defect it exists to catch.
+  if (ok === 0 && !usable.some(f => reachable(f.sha))) {
+    notRun("ses-344c",
+      "this checkout cannot read any fixture base commit (e.g. 7e4d4cb2^, a176cc64^); a shallow clone is missing evidence about its own depth");
+    return;
+  }
   assert.ok(ok > 0,
     `every usable fixture was declared unreadable (${skipped.join(", ")}) -- this clone can replay nothing, so a green here would be vacuous`);
   console.log(`  SES-344c (a) ${ok}/${usable.length} usable fixtures materialise with no errors${skipped.length ? `; ${skipped.length} unreadable in this clone, named: ${skipped.join(", ")}` : ", 0 unreadable in this clone"}`);
