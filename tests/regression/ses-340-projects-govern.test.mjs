@@ -1,3 +1,10 @@
+// DeepBench v7.0.497 | tests/regression/ses-340-projects-govern.test.mjs | SES-401 -- clause (b) is
+// extracted into theLaneServesOnlyTheExecutingProject() and now reads the four-state board
+// classification (tests/regression/_lib/board-state.js) before it asserts. `held` and `drained` are
+// declared not-run -- an empty lane cannot demonstrate a fence in either direction -- while
+// `starved` still fails in the original words. The extraction is what lets clause (b) return
+// without taking clauses (c) and (d) down with it.
+//
 // DeepBench v7.0.425 | tests/regression/ses-340-projects-govern.test.mjs | SES-340
 //
 // FEATURE: SES-340 -- the runner's pick path admits the active project by a SETTING, not by the
@@ -32,6 +39,7 @@
 
 import assert from "assert";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { readBoardState, isDeclarable } from "./_lib/board-state.js";
 
 // The lane value `prime_directive_queue()` still uses for in-scope tickets. SES-340 kept it on
 // purpose -- ses-281 asserts on it and renaming it was out of that ticket's scope -- so this
@@ -77,8 +85,6 @@ async function theProjectsTableGovernsTheLiveBoard() {
   const projects = await pg(url, key, "projects?select=id,slug,name,status,priority&limit=200");
   const progress = await pg(url, key, "project_progress?select=slug,project,status,epics,tickets,done,open_&limit=200");
   const epics = await pg(url, key, "epics?select=id,name,project_id&limit=500");
-  const lane = (await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" }))
-    .filter(r => r.lane === IN_SCOPE_LANE);
 
   // ---- (a) EXACTLY ONE project is executing, and the table can actually show the difference.
   assert.ok(projects.length > 0, "public.projects came back empty -- migration ses340_projects is not live");
@@ -119,8 +125,74 @@ async function theProjectsTableGovernsTheLiveBoard() {
   }
 
   // ---- (b) EVERY ref the pick lane serves belongs to an epic whose project is executing.
-  // This is the assertion the whole ticket reduces to: before SES-340 the same lane was
-  // `e.name ILIKE 'Selfbuild%'`, so a Governance Agents ticket could not appear here at all.
+  await theLaneServesOnlyTheExecutingProject(url, key, { projects, epics, executing });
+
+  // ---- (c) the retired Prime Directive is really retired -- no queued row keys the old widening.
+  // SES-353 (v7.0.453) widened this read from status=eq.queued to status=in.(queued,standing): the
+  // sixteen rulings moved to the new 'standing' status, so `queued` alone is now 0 rows and the
+  // non-vacuity control below would fail on an empty result while proving nothing. The clause's
+  // meaning is unchanged -- no LIVE row (mission or standing) carries the retired prefix.
+  const queued = await pg(url, key, "runner_directives?select=id,body&type=eq.directive&status=in.(queued,standing)&limit=200");
+  const stillStanding = queued.filter(d => String(d.body ?? "").startsWith(RETIRED_DIRECTIVE_PREFIX));
+  assert.deepStrictEqual(
+    stillStanding.map(d => String(d.id).slice(0, 8)),
+    [],
+    `${stillStanding.length} directive(s) still live (queued or standing) with the retired body ` +
+      `prefix '${RETIRED_DIRECTIVE_PREFIX}'. a0ef9525 and 0970abad were closed 'superseded' under ` +
+      "gate decision 96bbed72; a row still standing means two execution authorities are live at " +
+      "once and the ledger entry is wrong about which one governs.",
+    );
+  // NON-VACUITY for (c): the read must have found SOMETHING, or an empty queue would satisfy it.
+  assert.ok(
+    queued.length > 0,
+    "no live directives came back at all (queued or standing) -- an empty result cannot " +
+      "demonstrate that ONE particular directive is gone",
+  );
+
+  // ---- (d) project_blockers answers "what do you need from me to unblock <project>" -- and it has
+  // a project-scope row for the executing project, not only per-ticket rows.
+  const blockers = await pg(url, key, "project_blockers?select=project,project_status,scope,backlog_id&limit=1000");
+  for (const p of executing) {
+    const row = blockers.find(b => b.scope === "project" && b.project === p.slug);
+    assert.ok(
+      row,
+      `project_blockers has no scope='project' row for the executing project '${p.slug}'. The view's ` +
+        "whole job is to answer John's question at the PROJECT level; a table of per-ticket rows " +
+        `with no project row makes him aggregate it himself. Scopes present: ` +
+        [...new Set(blockers.map(b => `${b.scope}/${b.project}`))].join(", "),
+    );
+    assert.strictEqual(row.project_status, "executing");
+  }
+  // NON-VACUITY for (d): the view must also be carrying ticket-scope rows, or `scope` is a constant
+  // column and the assertion above is checking nothing.
+  assert.ok(
+    blockers.some(b => b.scope === "ticket"),
+    "project_blockers returned no scope='ticket' rows, so `scope` is not discriminating and the " +
+      "project-row assertion above is vacuous",
+  );
+}
+
+// ---- (b), extracted at SES-401 so the empty-lane branch can return without taking clauses (c) and
+// (d) down with it. Before SES-401 this clause was an unconditional `lane.length > 0`, and it went
+// red the moment the executing project finished -- the platform succeeding read as a defect and
+// blocked every verdict behind it. The four-state classification has ONE home
+// (tests/regression/_lib/board-state.js): `held` and `drained` are declared not-run, because an
+// empty lane cannot demonstrate a fence either way; `starved` still fails, in the original words.
+//
+// This is the assertion the whole ticket reduces to: before SES-340 the same lane was
+// `e.name ILIKE 'Selfbuild%'`, so a Governance Agents ticket could not appear here at all.
+async function theLaneServesOnlyTheExecutingProject(url, key, { projects, epics, executing }) {
+  const board = await readBoardState(pg, url, key);
+  if (isDeclarable(board.state)) {
+    notRun(
+      `SES-340 clause (b) -- the pick lane's project fence, board state '${board.state}'`,
+      `${board.reason} Clause (b) grades WHICH project the served rows belong to, so with no rows ` +
+        "served there is nothing to grade and an empty lane cannot demonstrate a fence. Clauses " +
+        "(a), (c) and (d) above and below still ran.",
+    );
+    return;
+  }
+  const lane = board.laneRows;
   const projectStatus = new Map(projects.map(p => [p.id, p.status]));
   const epicById = new Map(epics.map(e => [e.id, e]));
   assert.ok(
@@ -201,50 +273,6 @@ async function theProjectsTableGovernsTheLiveBoard() {
         "the paused-project clause did not actually fire",
     );
   }
-
-  // ---- (c) the retired Prime Directive is really retired -- no queued row keys the old widening.
-  // SES-353 (v7.0.453) widened this read from status=eq.queued to status=in.(queued,standing): the
-  // sixteen rulings moved to the new 'standing' status, so `queued` alone is now 0 rows and the
-  // non-vacuity control below would fail on an empty result while proving nothing. The clause's
-  // meaning is unchanged -- no LIVE row (mission or standing) carries the retired prefix.
-  const queued = await pg(url, key, "runner_directives?select=id,body&type=eq.directive&status=in.(queued,standing)&limit=200");
-  const stillStanding = queued.filter(d => String(d.body ?? "").startsWith(RETIRED_DIRECTIVE_PREFIX));
-  assert.deepStrictEqual(
-    stillStanding.map(d => String(d.id).slice(0, 8)),
-    [],
-    `${stillStanding.length} directive(s) still live (queued or standing) with the retired body ` +
-      `prefix '${RETIRED_DIRECTIVE_PREFIX}'. a0ef9525 and 0970abad were closed 'superseded' under ` +
-      "gate decision 96bbed72; a row still standing means two execution authorities are live at " +
-      "once and the ledger entry is wrong about which one governs.",
-    );
-  // NON-VACUITY for (c): the read must have found SOMETHING, or an empty queue would satisfy it.
-  assert.ok(
-    queued.length > 0,
-    "no live directives came back at all (queued or standing) -- an empty result cannot " +
-      "demonstrate that ONE particular directive is gone",
-  );
-
-  // ---- (d) project_blockers answers "what do you need from me to unblock <project>" -- and it has
-  // a project-scope row for the executing project, not only per-ticket rows.
-  const blockers = await pg(url, key, "project_blockers?select=project,project_status,scope,backlog_id&limit=1000");
-  for (const p of executing) {
-    const row = blockers.find(b => b.scope === "project" && b.project === p.slug);
-    assert.ok(
-      row,
-      `project_blockers has no scope='project' row for the executing project '${p.slug}'. The view's ` +
-        "whole job is to answer John's question at the PROJECT level; a table of per-ticket rows " +
-        `with no project row makes him aggregate it himself. Scopes present: ` +
-        [...new Set(blockers.map(b => `${b.scope}/${b.project}`))].join(", "),
-    );
-    assert.strictEqual(row.project_status, "executing");
-  }
-  // NON-VACUITY for (d): the view must also be carrying ticket-scope rows, or `scope` is a constant
-  // column and the assertion above is checking nothing.
-  assert.ok(
-    blockers.some(b => b.scope === "ticket"),
-    "project_blockers returned no scope='ticket' rows, so `scope` is not discriminating and the " +
-      "project-row assertion above is vacuous",
-  );
 }
 
 async function run() {

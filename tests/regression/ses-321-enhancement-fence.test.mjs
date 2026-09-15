@@ -1,3 +1,8 @@
+// DeepBench v7.0.497 | tests/regression/ses-321-enhancement-fence.test.mjs | SES-401 --
+// theCharteredLaneStillWorks() now reads the four-state board classification from
+// tests/regression/_lib/board-state.js before it asserts. `held` and `drained` are declared not-run
+// (neither says anything about the widened fence); `starved` still fails in the original words.
+//
 // DeepBench v7.0.416 | tests/regression/ses-321-enhancement-fence.test.mjs | SES-321
 //
 // FEATURE: SES-321 -- an EL-01-admitted enhancement now passes M5-01's Selfbuild epic fence.
@@ -38,6 +43,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { readBoardState, isDeclarable } from "./_lib/board-state.js";
 import { parseSnapshot, parseCanonicalDoc } from "./ses-280-m5-governance-rules.test.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -242,10 +248,24 @@ async function theLiveBoardNeverServesAnUnadmittedEnhancement(url, key) {
 async function theCharteredLaneStillWorks(url, key) {
   // Non-vacuity for "chartered work is unaffected": the selfbuild lane must still be non-empty on
   // the real board, or this whole migration's blast radius cannot be observed live at all.
-  const lanes = await pg(url, key, "rpc/prime_directive_queue", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
-  });
-  const selfbuild = (Array.isArray(lanes) ? lanes : []).filter(r => r.lane === "selfbuild");
+  //
+  // SES-401: "non-empty" is the right requirement for THIS clause and the wrong FAILURE for two of
+  // the four reasons a lane can be empty. A board `held` by a parallel cycle's atomic claims, or
+  // `drained` because the executing project has no open queued work left, says nothing about the
+  // widened fence -- so it is DECLARED not-run. A `starved` board (work remains, nothing holds it)
+  // still fails, in the original words below, because that IS the finding this clause was written
+  // for. The four-state discrimination has one home: tests/regression/_lib/board-state.js.
+  const board = await readBoardState(pg, url, key);
+  if (isDeclarable(board.state)) {
+    notRun(
+      `the chartered lane is still served, as an OBSERVED property -- board state '${board.state}'`,
+      `${board.reason} The doc arm and the unadmitted-enhancement arm above both still ran; only ` +
+        "this non-vacuity clause could not be graded, because an empty lane cannot show whether " +
+        "the widened fence broke chartered picking.",
+    );
+    return;
+  }
+  const selfbuild = board.laneRows;
   assert.ok(
     selfbuild.length > 0,
     "the selfbuild lane came back empty -- either nothing is buildable or the widened fence broke " +

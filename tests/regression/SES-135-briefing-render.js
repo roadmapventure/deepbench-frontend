@@ -1,3 +1,10 @@
+// DeepBench v7.0.497 | tests/regression/SES-135-briefing-render.js | SES-401 -- the board state is
+// read BEFORE the builder is spawned. On a `held` or `drained` board scripts/build-briefing.mjs
+// correctly refuses to publish a Prime-Directive board with an empty pick list and exits non-zero,
+// which this file used to report as "the builder could not produce a page". That refusal is the
+// design and is not touched here; the render check is DECLARED not-run instead. A `starved` board
+// still reaches the spawn and the original assertion. See the block before the spawn.
+//
 // DeepBench v7.0.256 | tests/regression/SES-135-briefing-render.js | SES-135 (part 1 of 2)
 //
 // THE PERMANENT BRIEFING RENDER TEST. John answered YES to q-briefing-dom-fixture on 2026-08-23 and
@@ -50,6 +57,7 @@ import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { JSDOM, VirtualConsole } from "jsdom";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { readBoardState, isDeclarable } from "./_lib/board-state.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const TEMPLATE = path.join(ROOT, "docs/runbooks/briefing-template.html");
@@ -102,6 +110,25 @@ export function isAscending(labels) {
 // unconditional, so its absence is a defect rather than a state.
 export const CONDITIONAL_SECTIONS = ["9.1"];
 
+// SES-401: the PostgREST helper _lib/board-state.js reads the board through. Signature
+// `(url, key, pathAndQuery, init)`, matching the four other live-arm guards, so the shared module
+// never has to grow an HTTP client of its own. Read-only.
+async function pg(url, key, pathAndQuery, init) {
+  const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
+    ...init,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!res.ok) throw new Error(`${pathAndQuery} returned HTTP ${res.status} ${res.statusText}`);
+  const body = await res.json();
+  if (!Array.isArray(body)) throw new Error(`${pathAndQuery} returned a non-array payload`);
+  return body;
+}
+
 export default async function run() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
     notRun(
@@ -111,6 +138,36 @@ export default async function run() {
       "than reading a snapshot -- a snapshot would pass forever while the builder rots. Run the " +
       "suite per STANDARDS.md Section 2 rule 5 (node --env-file-if-exists=.env.local " +
       "tests/regression/run-all.js), which is the invocation that supplies them."
+    );
+    return true;
+  }
+
+  // SES-401: THE BUILDER IS CORRECT TO REFUSE, SO THE GUARD MUST NOT CALL THE REFUSAL A DEFECT.
+  //
+  // scripts/build-briefing.mjs:541 die()s with "a genuinely empty pick list is the PARKED state
+  // (§2(d)), not a page" whenever the Prime Directive stands and prime_directive_queue() returns no
+  // picks. That die() is RIGHT and this ship does not touch it -- publishing a P1-P10 board under a
+  // Prime-Directive heading with nothing in it, or falling back to the template's sample rows, is
+  // exactly the page nobody should ever see. But the assertion below reads `exit != 0` as "the
+  // builder could not run", which on a DRAINED board accuses the builder of breaking at the moment
+  // it behaved correctly -- and takes every other clause in this file down with it, because the
+  // page it needs was never produced.
+  //
+  // So the board state is read BEFORE the spawn, not after the failure. `held` and `drained` are
+  // declared not-run -- there is no page to render and refusing to render one is the design. A
+  // `starved` board falls straight through to the spawn and to the original assertion, unchanged:
+  // a lane emptied while unheld in-scope work remains is still the finding it always was. The
+  // four-state classification has one home: tests/regression/_lib/board-state.js.
+  const board = await readBoardState(pg, process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+  if (isDeclarable(board.state)) {
+    notRun(
+      "the whole briefing render check (section order, no-swallowed-markup, the masthead counter, " +
+      `the plain-language contract and §4's reading slots) -- board state '${board.state}'`,
+      `${board.reason} This test BUILDS the real page, and scripts/build-briefing.mjs correctly ` +
+      "refuses to publish a Prime-Directive board with an empty pick list (\"a genuinely empty " +
+      "pick list is the PARKED state (§2(d)), not a page\"). With no page there is nothing to " +
+      "render and nothing here to grade; the builder's refusal is the design, not a defect, and " +
+      "this file does not change it. Re-run when the lane serves again."
     );
     return true;
   }

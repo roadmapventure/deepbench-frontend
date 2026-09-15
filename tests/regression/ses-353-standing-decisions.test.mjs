@@ -1,3 +1,9 @@
+// DeepBench v7.0.497 | tests/regression/ses-353-standing-decisions.test.mjs | SES-401 -- clause
+// (c)(iii) is extracted into theTwoReadersAgree() and reads the four-state board classification
+// (tests/regression/_lib/board-state.js) first. On a `held` or `drained` board there is no ranked
+// row at all, so the queue-head-equals-gate-pick property is undecidable rather than violated and
+// is DECLARED not-run; a `starved` board still reaches the original assertion, unchanged.
+//
 // DeepBench v7.0.453 | tests/regression/ses-353-standing-decisions.test.mjs | SES-353 -- standing
 // decisions leave the pick lane.
 //
@@ -32,6 +38,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { readBoardState, isDeclarable } from "./_lib/board-state.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const RUNBOOK = path.join(ROOT, "docs/runbooks/runner-cycle.md");
@@ -167,6 +174,51 @@ async function run() {
   }
 
   // (iii) the two readers agree -- but only in the world where John has queued no mission.
+  await theTwoReadersAgree(url, key, { ranked, queuedMissions, missionRefs });
+
+  // (iv) the open question this ship answers is recorded as answered.
+  const [q] = await pg(url, key,
+    "runner_questions?select=qid,status,answer,answer_note&qid=eq.q-pd-mission-flag");
+  assert.ok(q, "runner_questions has no q-pd-mission-flag row to grade");
+  assert.strictEqual(q.status, "answered",
+    `q-pd-mission-flag is '${q.status}'. SES-353 IS its answer (the split is a status, not a ` +
+    "column); leaving it open re-asks John a question the platform already decided");
+  assert.ok(/standing/.test(String(q.answer_note ?? "")),
+    "q-pd-mission-flag's answer_note does not mention the 'standing' status -- the recorded answer " +
+    "must say what shipped, and runner_questions.answer itself is a yes/no column (CHECK), so the " +
+    "substance lives in the note");
+
+  console.log(`  (c) live: ${standing.length} standing row(s), ${queuedMissions.length} queued ` +
+    `mission(s), ${ranked.filter(r => r.lane === "directive").length} directive-lane row(s), ` +
+    "q-pd-mission-flag answered -- PASS");
+}
+
+// ---- (c)(iii), extracted at SES-401 ------------------------------------------------------------
+//
+// `first` is the queue's lowest-`pos` row, and on a DRAINED board there is no such row: the `board`
+// row carries pos NULL, every lane row is gone, so `ranked` is empty and `assert.ok(first, …)` --
+// "prime_directive_queue() returned no ranked row at all" -- went red the moment the executing
+// project finished. That is the platform succeeding, and the guard read it as a defect.
+//
+// A THIRD WORLD, alongside the two this clause already knew about. It had "no queued mission" (the
+// assertion runs) and "John queued a mission" (declared not-run, the ref printed). SES-401 adds
+// "there is no ranked row to compare", and only two of the four board states belong in it: `held`
+// (a live cycle holds every candidate) and `drained` (no open queued work is left in the executing
+// project). A `starved` board -- work remains, nothing holds it -- falls straight through to the
+// original assertion and its original words, because that is still the finding it always was. The
+// classification has ONE home: tests/regression/_lib/board-state.js.
+async function theTwoReadersAgree(url, key, { ranked, queuedMissions, missionRefs }) {
+  const board = await readBoardState(pg, url, key);
+  if (isDeclarable(board.state)) {
+    notRun(
+      `(c)(iii) queue head equals the gate's pick -- board state '${board.state}'`,
+      `${board.reason} With no ranked row there is no queue head to compare against ` +
+        "runner_should_boot()'s pick, so the agreement property is undecidable here rather than " +
+        "violated. Clauses (a), (b), (c)(i), (c)(ii) and (c)(iv) all still ran.",
+    );
+    return;
+  }
+
   const [boot] = await pg(url, key, "rpc/runner_should_boot", { method: "POST", body: "{}" });
   assert.ok(boot && boot.detail, "runner_should_boot() returned no detail object to read the pick from");
   const bootPick = boot.detail.pick ? boot.detail.pick.backlog_id : null;
@@ -193,22 +245,6 @@ async function run() {
         "reads legitimately differ until the mission is closed",
     );
   }
-
-  // (iv) the open question this ship answers is recorded as answered.
-  const [q] = await pg(url, key,
-    "runner_questions?select=qid,status,answer,answer_note&qid=eq.q-pd-mission-flag");
-  assert.ok(q, "runner_questions has no q-pd-mission-flag row to grade");
-  assert.strictEqual(q.status, "answered",
-    `q-pd-mission-flag is '${q.status}'. SES-353 IS its answer (the split is a status, not a ` +
-    "column); leaving it open re-asks John a question the platform already decided");
-  assert.ok(/standing/.test(String(q.answer_note ?? "")),
-    "q-pd-mission-flag's answer_note does not mention the 'standing' status -- the recorded answer " +
-    "must say what shipped, and runner_questions.answer itself is a yes/no column (CHECK), so the " +
-    "substance lives in the note");
-
-  console.log(`  (c) live: ${standing.length} standing row(s), ${queuedMissions.length} queued ` +
-    `mission(s), ${ranked.filter(r => r.lane === "directive").length} directive-lane row(s), ` +
-    "q-pd-mission-flag answered -- PASS");
 }
 
 export default run;

@@ -1,3 +1,10 @@
+// DeepBench v7.0.497 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-401 -- the
+// empty-lane clause is now one shared discrimination (`_lib/board-state.js`) over four states, and
+// it joins live cycles on `runner_cycles.item_id`. SES-386's block below joined `claimed_by` (text,
+// a session label) against a set of cycle uuids, so it matched nothing and never once fired: every
+// empty lane -- including a DRAINED board, the project finishing -- reached the assert and went red.
+// `starved` still fails, with the same words. See the block at the empty-lane branch below.
+//
 // DeepBench v7.0.487 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-386 -- the live
 // arm's first clause (`lane.length > 0`) becomes a B42 PROPERTY rather than a flat requirement. An
 // empty selfbuild lane has two causes: nothing buildable (the finding it always was, still a FAIL
@@ -64,6 +71,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { readBoardState, isDeclarable } from "./_lib/board-state.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CANONICAL_REL = "docs/RUNNER-GOV-M5-REQUIREMENTS.md";
@@ -351,34 +359,35 @@ async function theLivePickPathObeysTheFourRules() {
   // reason that the platform was working. A contested claim is not a skip, and a lane emptied by
   // claims is not an empty board.
   //
-  // THE DISCRIMINATION IS THE LIVENESS OF THE HOLDER, and that is the whole clause: a claim held by
-  // a cycle that has ENDED is a stale claim, which IS a defect and still fails below. Only a claim
-  // held by a cycle with `ended_at IS NULL` explains the absence.
+  // FEATURE: SES-401 -- AND THE THIRD CAUSE IS THE BOARD BEING FINISHED. SES-386's block, which
+  // stood here, was DEAD CODE from the day it shipped: it tested `liveCycles.map(c => c.id)` (uuid)
+  // for membership of `backlog_items.claimed_by`, which is `text` holding a session label such as
+  // `run-project:moat-support:1`. Measured live 2026-09-15: 3 claimed tickets, 2 live cycles, ZERO
+  // matches, and `runner_cycles` has no `session_name` column to join on either. So the `held`
+  // branch never once fired and every empty lane reached the assert. The discrimination now lives in
+  // tests/regression/_lib/board-state.js -- ONE home for all five guards that carried this clause --
+  // and it joins `runner_cycles.item_id`, which is the key that actually matches.
+  //
+  // THE TEETH ARE THAT `starved` STILL FAILS, in the words below, unchanged. A lane emptied while
+  // unheld in-scope work remains means no project is executing or the fence broke, and that was
+  // always the finding. Only `held` (a live cycle holds the candidates) and `drained` (the executing
+  // project has no open queued work left) are declared.
   if (lane.length === 0) {
-    const claimed = await pg(
-      url, key,
-      "backlog_items?select=backlog_id,claimed_by&status=in.(open,partial)&queue=not.is.null&claimed_by=not.is.null&limit=2000",
-    );
-    const liveCycles = await pg(url, key, "runner_cycles?select=id&ended_at=is.null&limit=1000");
-    const live = new Set(liveCycles.map(c => String(c.id)));
-    const heldByLive = claimed.filter(i => live.has(String(i.claimed_by)));
+    const board = await readBoardState(pg, url, key);
     assert.ok(
-      heldByLive.length >= 1,
-      // The OLD WORDS, kept verbatim: with nothing held by a live cycle, an empty lane means exactly
-      // what it always meant and this is still the finding it always was.
+      isDeclarable(board.state),
+      // The OLD WORDS, kept verbatim: with nothing held by a live cycle and work still on the
+      // board, an empty lane means exactly what it always meant and this is still the finding it
+      // always was.
       "the selfbuild lane came back empty -- either no project is executing or every " +
         "in-scope ticket is unbuildable; both are findings, not a pass",
     );
     notRun(
-      "the live lane arms (M5-02/M5-07/M5-09)",
-      `the lane is empty and ${heldByLive.length} admitted ticket(s) are held by live cycles ` +
-        `(${heldByLive.slice(0, 5).map(i => i.backlog_id).join(", ")}${heldByLive.length > 5 ? ", …" : ""}` +
-        `; ${live.size} cycle(s) with ended_at IS NULL) -- under B42 that is not a skip. Parallel ` +
-        "cycles coordinate by atomic claims, so a contested claim withholding every candidate is the " +
-        "design working, not a board with nothing on it. SAID IN FULL: this returns, so the three " +
+      `the live lane arms (M5-02/M5-07/M5-09) -- board state '${board.state}'`,
+      `${board.reason} SAID IN FULL: this returns, so the three ` +
         "clauses that follow the lane arms -- M6-01's zero open 'john-paced', the 'needs-desktop " +
         "survived' control, and SES-299's stored-queue ordering -- did not run either. Re-run when " +
-        "no cycle holds the queue, or read the order off prime_directive_queue() by hand.",
+        "the lane serves again, or read the order off prime_directive_queue() by hand.",
     );
     return;
   }
