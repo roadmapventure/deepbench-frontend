@@ -397,6 +397,15 @@
 //                       not, because it cannot be established.
 //   --version=<vX.Y.Z>  The version being shipped, for the ledger.
 //   --base=<ref>        Base ref the delivery's diff is taken against. Defaults to origin/dev.
+//   --changed-files=<p> SES-379. A file holding THIS DELIVERY'S changed-file list -- a JSON array of
+//                       repo-relative paths, or one path per line. It is the Builder's own `files`
+//                       array, passed IN the way step 4a passes CI's conclusion in, because since
+//                       SES-336 the Builder PUSHES BEFORE 7a RUNS: `origin/dev` and `HEAD` are then
+//                       one commit and the git half below is empty BY CONSTRUCTION, not because
+//                       nothing changed. Git stays the fallback when the flag is absent. A list that
+//                       resolves EMPTY or UNREADABLE becomes null, which BLOCKS -- a caller who
+//                       passed the flag and got nothing is never silently downgraded to the git
+//                       list, because that downgrade is indistinguishable from a clean delivery.
 //   --dry-run           Run the gates and print the verdict; write nothing, need no credentials.
 //   --json              Single-line machine-readable output.
 //   --repo=<path>       Repo root the gates run in. Defaults to this file's parent directory.
@@ -1050,6 +1059,18 @@ export function reconcileJudgment({ mechanical, agent, codeEligibility }) {
 // The delivery's changed files: committed-vs-base plus anything still in the working tree, because a
 // cycle runs this BEFORE its push and the change may be either. Returns null when git cannot answer
 // -- selfCertificationBlock() reads null as "fails closed", never as "nothing changed".
+//
+// SES-379: "BEFORE ITS PUSH" HAS NOT BEEN TRUE SINCE SES-336, AND THIS FUNCTION'S EMPTY ANSWER IS
+// THE SHAPE OF THAT. The Builder now pushes as part of finishing, so by the time step 7a runs
+// `origin/dev` and `HEAD` are ONE COMMIT and the working tree is clean: both views return nothing
+// and this returns `[]` on every unattended cycle, whatever the delivery changed. `[]` is not a
+// lie -- it is the honest answer to the question git was asked -- but it is the answer to the WRONG
+// question, and selfCertificationBlock([]) does not block (SES-181 pins that boundary, correctly).
+// So this is now the FALLBACK, not the source: resolveDeliveryFiles() below prefers the list the
+// Builder hands in through --changed-files, and an empty resolution becomes null rather than a
+// clean bill. Measured 2026-09-15: verdicts SES-377/v7.0.463 and SES-359/v7.0.462 both recorded
+// `auto_done_eligible = true` with "the diff touches none of ..." on pushes that had changed
+// scripts/check-session-docs.js.
 // ONE PORCELAIN LINE -> ONE PATH. Pure and exported because the shape of this string is the whole
 // of charter premise 3's reach, and it was WRONG (found live 2026-08-29 by SES-243's own QA, on the
 // cycle that was editing scripts/verifier.js and was told its diff touched nothing).
@@ -1083,6 +1104,86 @@ function changedFilesFor(repoRoot, base) {
     }
   }
   return out;
+}
+
+// FEATURE: SES-379 -- WHICH LIST THE CHARTER-PREMISE-3 CHECK IS ACTUALLY GRADED ON.
+//
+// Pure, exported, and the ONLY place `[]` becomes `null`. That placement is the whole ticket:
+// SES-181 pins `selfCertificationBlock([]).blocked === false` with a comment forbidding the
+// coercion, and it is right to -- down there `[]` means "I read the delivery and nothing relevant
+// changed", which must stay a real answer or every clean delivery blocks forever. Up HERE `[]`
+// means something different and opposite: "the resolution produced no list at all", which is the
+// SES-336 post-push git answer and the caller who passed a flag pointing at an empty file. Same
+// bytes, different question, so the conversion belongs at the seam that knows which question was
+// asked -- never at the boundary that only sees the answer.
+//
+//   explicit  the caller's own list (the Builder's `files` array), or null/undefined when no
+//             --changed-files flag was given. AN ARRAY IS A CLAIM AND AN EMPTY ARRAY IS A FAILED
+//             ONE: it resolves to null and blocks.
+//   gitList   changedFilesFor()'s answer -- the fallback, and null when git could not be read.
+//
+// The non-empty explicit case takes the UNION with git rather than replacing it, because every
+// extra path can only move the result toward refusal: a path the Builder forgot to declare but git
+// saw is exactly the path premise 3 exists to catch, and nothing in SELF_CERTIFYING_PATHS is made
+// safer by dropping it.
+export function resolveDeliveryFiles({ explicit, gitList } = {}) {
+  const clean = list => {
+    const out = [];
+    for (const p of list) {
+      const s = String(p ?? "").trim();
+      if (s && !out.includes(s)) out.push(s);
+    }
+    return out;
+  };
+
+  if (Array.isArray(explicit)) {
+    // THE EMPTY CLAIM IS TESTED BEFORE THE UNION, and that order is the fail-closed half of this
+    // ticket rather than a style choice: unioning first would let a caller whose flag file was
+    // empty or unreadable land on git's list -- the exact silent downgrade --changed-files exists
+    // to refuse -- and on a PRE-push cycle, where git is not yet empty, it would look like it
+    // worked. Cleaned first too, so a file of nothing but blank lines is the same empty claim.
+    const want = clean(explicit);
+    if (!want.length) return null;
+    return clean([...want, ...(Array.isArray(gitList) ? gitList : [])]);
+  }
+  if (!Array.isArray(gitList)) return null;      // git could not answer -- unknown is not innocent
+  return gitList.length ? gitList : null;        // SES-336: empty here means "asked after the push"
+}
+
+// The --changed-files reader. Returns { files, source } rather than a bare array so main() can tell
+// "the flag named a file holding nothing" from "the flag named a file that could not be read" --
+// both block, but the ledger has to say WHICH, for the same reason `auto_done_reason` distinguishes
+// "the ladder declined" from "nobody asked the ladder".
+//
+// UNREADABLE AND UNPARSEABLE BOTH COME BACK AS AN EMPTY LIST, never as "no flag": resolveDeliveryFiles
+// above turns an empty explicit array into null, so a broken flag lands on the block and can never
+// fall through to the git list it was passed to replace.
+export function readChangedFilesFile(absPath) {
+  let raw;
+  try { raw = fs.readFileSync(absPath, "utf8"); }
+  catch (e) { return { files: [], source: "UNREADABLE", detail: e.message }; }
+
+  const text = String(raw).trim();
+  let items;
+  // `{` counts as JSON HERE, not just `[`, and it is the fail-closed half of this reader: a caller
+  // who wrote `{"files":[...]}` handed us a document, and line-splitting it would produce one
+  // "path" that matches nothing in SELF_CERTIFYING_PATHS -- a non-empty list that silently grades
+  // the delivery clean. A shape we do not understand is UNREADABLE, never one long filename.
+  if (text.startsWith("[") || text.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) return { files: [], source: "UNREADABLE", detail: "JSON is not an array of paths" };
+      items = parsed;
+    } catch (e) { return { files: [], source: "UNREADABLE", detail: `unparseable JSON: ${e.message}` }; }
+  } else {
+    items = text.split("\n");
+  }
+  const files = [];
+  for (const it of items) {
+    const s = String(it ?? "").trim();
+    if (s && !files.includes(s)) files.push(s);
+  }
+  return { files, source: "builder list", detail: "" };
 }
 
 // FEATURE: SES-122 (b) -- the verifier runs on Windows.
@@ -1789,7 +1890,26 @@ async function main() {
   }
 
   const base = arg("base", "origin/dev");
-  const changedFiles = changedFilesFor(repoRoot, base);
+  // FEATURE: SES-379 -- THE RESOLUTION SEAM, and the only place `[]` becomes `null`. See
+  // resolveDeliveryFiles() for why it may not live one level down in selfCertificationBlock().
+  const gitChangedFiles = changedFilesFor(repoRoot, base);
+  const changedFilesArg = arg("changed-files", null);
+  const explicitRead = changedFilesArg
+    ? readChangedFilesFile(path.resolve(repoRoot, changedFilesArg))
+    : null;
+  const changedFiles = resolveDeliveryFiles({
+    explicit: explicitRead ? explicitRead.files : null,
+    gitList: gitChangedFiles,
+  });
+  // Stored in auto_done_reason because the ledger is the only place this survives, and a verdict
+  // that blocked on "could not be read" is unactionable without knowing which half was empty.
+  const changedFileSource = explicitRead
+    ? (explicitRead.source === "UNREADABLE"
+        ? `UNREADABLE (${changedFilesArg}: ${explicitRead.detail})`
+        : `builder list, ${changedFiles ? changedFiles.length : 0} paths`)
+    : (gitChangedFiles === null
+        ? "UNREADABLE (git could not answer)"
+        : `git diff vs ${base}, ${gitChangedFiles.length} paths`);
   // FEATURE: SES-345 -- read ONCE, here, beside the diff the gates were run against, and carried from
   // this point into every lane. Both judged lanes read it back out of the context file rather than
   // calling this again: see recordJudgedVerdict()'s note on why a second read is a different fact.
@@ -1829,7 +1949,8 @@ async function main() {
   const skillRowEdit = selfCertifyingSkillEdit({ beforeImages: skillImages, changedFiles, slugById });
 
   const elig = autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy, skillRowEdit });
-  const autoDoneReason = elig.reason + lookupNote + primeNote + ladderNote + skillNote;
+  const autoDoneReason = elig.reason + lookupNote + primeNote + ladderNote + skillNote +
+    ` (changed-file source: ${changedFileSource})`;
 
   const detailLine = GATES.map(g => `${g.label}=${gateResults[g.key]} [${gateDetail[g.key]}]`).join("\n  ");
   const prose =
