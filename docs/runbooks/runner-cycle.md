@@ -2035,7 +2035,33 @@ normally**; the hygiene pass is bookkeeping, never this cycle's build. The decis
 standing brief's `Open decisions` and `Ticket hygiene, last night` groups for the reversal window; one
 `reverse_decision()` restores every cell.
 
-**5. Pick ONE item.** Selection layers, in order (register B30):
+**5. Pick ONE item.** Selection layers, in order (register B30): **THE MANAGER TAKES THE PICK (`SES-378`) — run the two passes below, then read the selection layers the manager was shown (register B30):**
+
+<!-- FEATURE: SES-378 — step 5 asks the Development Manager for the pick; the layers below are what it was shown, not a second place to decide. -->
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/run-project.js \
+  --project=<the executing project's slug> --cycle-id=<your cycle id> --dry-run
+# exit 3 → run the printed prompt as a devmanager sub-agent, save its JSON, re-run with
+# --answer=<path>. Then READ L2038: log the call, and the rule for a mismatch or a refusal.
+```
+
+**(a)** The assignment is *ticket, capability, engine* and **you execute it** — never re-derive the
+pick. **(b)** `--project` is the slug of the one `public.projects` row with `status = 'executing'`
+(`moat-support` today). **(c)** **Exit 2 naming a ticket other than the pick** → write
+`MANAGER MISMATCH: assignment <X> vs queue head <Y>` in the cycle row notes and **build
+`prime_directive_queue()`'s first row** — the `SES-45` boundary: a mismatch is a finding on the
+Skill text, never a re-ordering of the board. **(d)** Exit **1** (`stop`), any other exit **2**, or
+no Agent tool → note it and carry on with the queue's first row; a manager that cannot answer never
+stops the cycle. **(e)** Log the call with the command below and write
+`MANAGER: ai_activity_log <id>` into the cycle row.
+
+```
+node scripts/agent-log.js --agent=devmanager --capability=run-project --model=<the model the driver printed> \
+  --ai-type=agent-turn --feature=run-project:dm-run-intent:depth0 \
+  --input-tokens=N --output-tokens=N --cycle=<your cycle id>
+```
+
 **(1a) One-off directives** — `runner_directives` `WHERE type='directive' AND status='queued'`,
 oldest first: a directive is the mission, mark it `in_progress`.
 

@@ -171,12 +171,28 @@ export default async function run() {
     "the two homes must match EACH OTHER, not merely the constant -- otherwise editing the constant " +
     "to match one home would make a drifted other home green");
 
+  // SES-378 (v7.0.488) raised this from 2 to 3 and made it a SET rather than a count. Step 5 now
+  // asks the Development Manager for the pick and logs that call, so the runbook carries a third
+  // agent-log.js line. A bare count of 3 would stay green if the manager's line were added and the
+  // Designer's deleted in one edit -- so each of the three agents is named and asserted, and the
+  // total is asserted too, which is what still catches a FOURTH line nobody accounted for.
   const runbook = fs.readFileSync(path.join(ROOT, "docs/runbooks/runner-cycle.md"), "utf8");
-  const logLines = runbook.split("\n").filter(l => l.includes("agent-log.js")).length;
-  assert.equal(logLines, 2,
-    `docs/runbooks/runner-cycle.md must carry exactly 2 agent-log.js lines -- one for the design ` +
-    `run at step 6 and one for the build run at step 7. It carried ZERO before this ticket, which ` +
-    `is why the log holds 2 Designer and 1 Builder rows across 12 kickoffs. got ${logLines}`);
+  const logLines = runbook.split("\n").filter(l => l.includes("agent-log.js"));
+  for (const [agent, where] of [
+    ["--agent=devmanager", "the manager's pick at step 5 (SES-378)"],
+    ["--agent=designer", "the design run at step 6"],
+    ["--agent=builder", "the build run at step 7"],
+  ]) {
+    assert.equal(logLines.filter(l => l.includes(agent)).length, 1,
+      `docs/runbooks/runner-cycle.md must carry exactly one agent-log.js line for ${agent} -- ` +
+      `${where}. An unlogged governance run is throughput nobody can read off the audit, which is ` +
+      `what SES-359 measured: the log held 2 Designer and 1 Builder rows across 12 kickoffs, and ` +
+      `exactly 1 devmanager row (39604) across every cycle ever run. got ${logLines.filter(l => l.includes(agent)).length}`);
+  }
+  assert.equal(logLines.length, 3,
+    `docs/runbooks/runner-cycle.md must carry exactly 3 agent-log.js lines -- devmanager at step 5, ` +
+    `designer at step 6, builder at step 7. It carried ZERO before SES-359. got ${logLines.length}: ` +
+    `${logLines.map(l => l.trim().slice(0, 60)).join(" | ")}`);
 
   const ledger = fs.readFileSync(path.join(ROOT, "docs/SELFBUILD-RETIREMENT-LEDGER.md"), "utf8");
   assert.ok(/^### 54\./m.test(ledger),
@@ -189,7 +205,7 @@ export default async function run() {
     `("executor — live QA" refused, "$2" and "none" accepted); "lanes = []" refused by the ` +
     `case-sensitive match; --check-kickoff exits 1 (kind kickoff-no-lanes) / 0 with no credentials; ` +
     `one wording byte-identical across ${WORDING_HOMES.join(" and ")}; runner-cycle.md carries ` +
-    `${logLines} agent-log.js lines; ledger entry 54 present`);
+    `${logLines.length} agent-log.js lines, one each for devmanager/designer/builder; ledger entry 54 present`);
 }
 
 selfRun(import.meta.url, run);
