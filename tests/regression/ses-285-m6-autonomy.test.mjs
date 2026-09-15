@@ -1,3 +1,22 @@
+// DeepBench v7.0.487 | tests/regression/ses-285-m6-autonomy.test.mjs | SES-386 -- ASSERTION 6 KEEPS
+// ITS ID AND CHANGES ITS SUBJECT. It asserted TODAY'S BOARD -- zero open `needs-john` tickets, zero
+// undecided `gated_before_build` cards -- and neither column is written by any code under `api/`,
+// `src/`, `shared/`, `lib/` or `scripts/` (grep, 2026-09-15). They are moved by a human. So the
+// clause graded whether John had answered his cards this week, which is not a property of the change
+// under test and not something any session could fix; a red here told a builder to go and edit board
+// rows to turn a suite green, which is the worst instruction a guard can give.
+//
+// WHAT IT GRADES NOW: that `docs/runbooks/standing-brief.md` carries a `**Human gates**` block naming
+// BOTH counts. The counts are still measured, still live, still visible -- they are rendered by
+// `scripts/render-standing-brief.js` from the same two queries this file used to run, character for
+// character on the filter. The MEANING survived ("nothing silently blocks on a human") and only the
+// SUBJECT moved, which is `SES-197`'s retarget-never-delete boundary; the deleted alternative would
+// have been to drop the clause, and that is the one thing Section 4 clause 1 forbids.
+//
+// ASSERTION 7 IS UNTOUCHED and still reads live rows, because what it grades IS a property of a
+// migration this repo ran: every card SES-285 closed still resolves to a real ticket. That clause
+// cannot go red because John was busy.
+//
 // DeepBench v7.0.359 | tests/regression/ses-285-m6-autonomy.test.mjs | SES-285
 //
 // FEATURE: SES-285 -- guards the retirement of the card/tap judgment surface: the eight M6 rules
@@ -64,6 +83,26 @@ import { parseSnapshot } from "./ses-280-m5-governance-rules.test.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SNAPSHOT = path.join(ROOT, "docs/governance/RULES-SNAPSHOT.md");
+// FEATURE: SES-386 -- the one repo-side home for the two human-gate counts.
+export const BRIEF_REL = "docs/runbooks/standing-brief.md";
+const BRIEF = path.join(ROOT, BRIEF_REL);
+export const HUMAN_GATES_HEADING = "**Human gates**";
+
+/**
+ * FEATURE: SES-386. The `Human gates` block, or null. Pure and exported so ses-373 and the SES-386
+ * guard read the SAME extractor rather than each writing a regex that can drift (SES-45's "a second
+ * implementation agreeing with itself").
+ *
+ * CRLF IS NORMALISED FIRST -- the same trap parseCanonicalDoc() documents below, one commit away:
+ * this repo's working tree is CRLF and a freshly rendered file is LF.
+ */
+export function humanGatesBlock(text) {
+  const t = String(text).replace(/\r\n/g, "\n");
+  const at = t.indexOf(HUMAN_GATES_HEADING);
+  if (at < 0) return null;
+  const end = t.indexOf("\n*Provenance:", at);
+  return end < 0 ? t.slice(at) : t.slice(at, end);
+}
 const CANONICAL_REL = "docs/RUNNER-GOV-M6-REQUIREMENTS.md";
 const CANONICAL = path.join(ROOT, CANONICAL_REL);
 
@@ -207,21 +246,36 @@ export const RULE_ASSERTIONS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Assertions 6-7: live board and card state. Graded over a plain shape so they carry the same
-// negative controls the rule assertions do.
-//   state = { needsJohnOpen: [...ids], undecidedCards: [...ids], closedByMigration: [{id, backlog_id, resolves}] }
+// Assertions 6-7: the human-gate REPORT (6) and live card state (7). Graded over a plain shape so
+// they carry the same negative controls the rule assertions do.
+//   state = { brief: <the standing brief's text>, closedByMigration: [{id, backlog_id, resolves}] }
 // ---------------------------------------------------------------------------
 
 export const STATE_ASSERTIONS = [
   {
     id: "6-nothing-blocks-on-a-human",
     detail:
-      "ZERO open backlog_items rows carry design_status='needs-john', and ZERO gated_before_build " +
-      "runner_items rows are left with decision IS NULL. This is the discrimination assertion: it " +
-      "grades the migration's OUTCOME on live rows, not the rule text that mandated it. Measured " +
-      "before the work: 33 and 44",
-    test: s => s.needsJohnOpen.length === 0 && s.undecidedCards.length === 0,
-    breaks: s => ({ ...s, undecidedCards: [...s.undecidedCards, "a-card-nobody-decided"] }),
+      `${BRIEF_REL} carries a "${HUMAN_GATES_HEADING}" block naming BOTH counts -- the open ` +
+      "`needs-john` tickets and the undecided `gated_before_build` cards. RETARGETED BY SES-386, " +
+      "not thinned: the clause used to read those two columns live and fail when either was " +
+      "non-zero, but no code in this repo writes either one, so it graded whether a human had " +
+      "worked through his cards rather than anything the change did. The counts are still " +
+      "measured live -- scripts/render-standing-brief.js runs the same two queries, character " +
+      "for character on the filter -- and what is asserted is that they are REPORTED, so a " +
+      "gate can never again block silently. Measured before SES-285: 33 and 44; today: 0 and 0",
+    test: s => {
+      const block = humanGatesBlock(s.brief);
+      return !!block
+        && /\*\*\d+ open `needs-john` ticket\(s\)\*\*/.test(block)
+        && /\*\*\d+ undecided `gated_before_build` card\(s\)\*\*/.test(block);
+    },
+    // The control REMOVES the block rather than editing a number in it: a block that reports the
+    // wrong count is a renderer bug the SES-386 guard's fixtures catch; a block that is GONE is
+    // this clause's own failure, because then nothing says whether a human is being waited on.
+    breaks: s => {
+      const block = humanGatesBlock(s.brief);
+      return { ...s, brief: block ? String(s.brief).replace(block, "") : `${s.brief}\n(no block)` };
+    },
   },
   {
     id: "7-nothing-evaporated",
@@ -335,15 +389,10 @@ async function rest(url, key, pathAndQuery) {
   return body;
 }
 
+// SES-386: the two board reads are GONE from here. They now live in exactly one place --
+// scripts/render-standing-brief.js's fetchFacts() -- and assertion 6 grades what it rendered. Two
+// copies of a query is how the brief and the guard come to disagree about what "undecided" means.
 async function fetchLiveState(url, key) {
-  const needsJohnOpen = await rest(
-    url, key,
-    "backlog_items?select=backlog_id&design_status=eq.needs-john&status=not.in.(done,delivered,removed)&limit=1000",
-  );
-  const undecidedCards = await rest(
-    url, key,
-    "runner_items?select=id&kind=eq.gated_before_build&decision=is.null&limit=1000",
-  );
   const closed = await rest(
     url, key,
     `runner_items?select=id,backlog_id&decision_reason=like.${encodeURIComponent(CLOSE_MARKER)}*&limit=1000`,
@@ -356,8 +405,7 @@ async function fetchLiveState(url, key) {
     : [];
   const known = new Set(found.map(r => r.backlog_id));
   return {
-    needsJohnOpen: needsJohnOpen.map(r => r.backlog_id),
-    undecidedCards: undecidedCards.map(r => r.id),
+    brief: fs.readFileSync(BRIEF, "utf8"),
     closedByMigration: closed.map(r => ({ id: r.id, backlog_id: r.backlog_id, resolves: known.has(r.backlog_id) })),
   };
 }
@@ -368,8 +416,10 @@ async function theLiveRegistryAndBoardAgree(doc, snapshotRules) {
   if (!url || !key) {
     notRun(
       "the live arm: all five rule assertions against public.governance_rules, the " +
-        "snapshot-vs-registry equality, and assertions 6 and 7 (the migrated backlog_items and " +
-        "runner_items state), which have NO repo-side render and cannot be graded offline at all",
+        "snapshot-vs-registry equality, assertion 7 (the migrated runner_items state, which has NO " +
+        "repo-side render and cannot be graded offline at all), and assertion 6 -- which since " +
+        "SES-386 reads the committed standing brief and so is gated here only because it is graded " +
+        "alongside 7, never because it needs a key",
       "SUPABASE_URL and/or SUPABASE_SERVICE_KEY are absent. governance_rules is service_role-only " +
         "(SES-174 locked anon/authenticated to ZERO privileges), so the anon key cannot substitute. " +
         "The snapshot arm above still ran and graded all five rule assertions against the committed " +
@@ -397,6 +447,20 @@ async function theLiveRegistryAndBoardAgree(doc, snapshotRules) {
   );
 
   const state = await fetchLiveState(url, key);
+  // SES-386: SAID, never implied. The coverage that was here is genuinely gone and something had to
+  // say so -- a retarget that quietly leaves a hole is the same green-that-proves-nothing this suite
+  // exists to catch. What replaced it is a REPORT, not a gate, and the difference is the declaration.
+  notRun(
+    "assertion 6 as a GATE on live rows",
+    "SES-386 retargeted assertion 6: nothing now FAILS this suite when an open ticket carries " +
+      "design_status='needs-john' or a gated_before_build card is left undecided. Neither column is " +
+      "written by any code under api/, src/, shared/, lib/ or scripts/ (grep, 2026-09-15), so a red " +
+      "there graded a human's inbox rather than the change under test and no session could act on " +
+      "it. The counts are still read live, by scripts/render-standing-brief.js with the same two " +
+      "filters, and the clause above asserts the standing brief REPORTS both -- so a gate cannot " +
+      "block silently, but an open gate is no longer a regression. If you need the numbers, read " +
+      `the "${HUMAN_GATES_HEADING}" block in ${BRIEF_REL}.`,
+  );
   grade(STATE_ASSERTIONS, state, null, "live board");
   everyAssertionHasTeeth(STATE_ASSERTIONS, state, null, "live board");
 }

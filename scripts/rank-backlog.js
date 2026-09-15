@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.487 | scripts/rank-backlog.js | SES-386 -- THE RUN'S COST IS REPORTED BY THE RUNNER,
+// because the sub-agent cannot report it. `tokensFrom()` reads `input_tokens`/`output_tokens` off the
+// answer JSON, `pz-rank-intent`'s stored schema declares no such properties and step 4c ended at
+// `--answer=<file>`, so the pair was ALWAYS absent and every scheduled re-rank since v7.0.446 stored
+// `est_tokens_dev = NULL`. Not a leak, a blind spot: the runbook's own step now passes the Agent
+// tool's reported pair as `--input-tokens=` / `--output-tokens=`, `usageFromArgs()` validates it, and
+// the CLI wins over the answer file. An unreported pair still stores NULL, never 0.
+//
 // DeepBench v7.0.446 | scripts/rank-backlog.js | SES-346 -- the Prioritizer's board re-rank, moved off
 // a Vercel cron and onto the session path. This file IS `api/cron/rank-backlog.js`'s job; it is not a
 // new capability, a new schedule, or a second ranking. `docs/SELFBUILD-RETIREMENT-LEDGER.md` entry 53
@@ -62,7 +70,11 @@
 // USAGE
 //   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/rank-backlog.js --cycle=<uuid> \
 //     [--scratch=<dir>] [--state-file=<path>] [--dry-run] [--json]
-//   ... --answer=<path to the Prioritizer's JSON>   (pass two)
+//   ... --answer=<path to the Prioritizer's JSON> \
+//       [--input-tokens=<n>] [--output-tokens=<n>]   (pass two; SES-386 -- the Agent tool's own
+//       reported usage for the sub-agent turn. Omit both and est_tokens_dev stays NULL, which says
+//       "unmeasured", never "free". Either flag given as anything but a non-negative integer is a
+//       driver error: exit 2, nothing written.)
 //
 // EXIT CODES -- three states, and collapsing any two throws away a distinction:
 //   0  the run completed. Either the ranking was written, or there was honestly nothing to order
@@ -120,6 +132,18 @@ function fail(message) {
 // seam-proof convention scripts/verifier.js and scripts/run-project.js keep.
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * SES-386. A non-negative integer or nothing. `-1` and `x` are BOTH refused here rather than
+ * silently coerced: `Number('-1')` is a number and `parseInt('x')` is NaN, and a token count that
+ * arrives as either is a measurement nobody made. `^\d+$` admits no sign, no decimal point and no
+ * whitespace, so the refusal is on the TEXT, before any arithmetic can launder it.
+ */
+function usageInt(value) {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
+  const n = Number(value);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
 export function parseArgs(argv) {
   const out = { json: false, dryRun: false };
   for (const raw of argv) {
@@ -133,8 +157,50 @@ export function parseArgs(argv) {
       case 'state-file': out.stateFile = value; break;
       case 'dry-run': out.dryRun = true; break;
       case 'json': out.json = true; break;
+      // FEATURE: SES-386 -- the RUNNER reports what the sub-agent cost, because the sub-agent
+      // cannot. `tokensFrom()` reads the pair off the answer JSON, but `pz-rank-intent`'s schema
+      // has no such properties, so every scheduled re-rank since v7.0.446 has stored
+      // est_tokens_dev = NULL and ses-334 part (d) went red with no code change once the last
+      // measured row aged out of its window. The Agent tool DOES report the pair to the session
+      // driving step 4c; these two flags are how it reaches the cycle row.
+      case 'input-tokens':
+      case 'output-tokens': {
+        const n = usageInt(value);
+        if (n === null) {
+          return { error: `--${name} must be a non-negative integer, got "${value}" -- a token count `
+            + 'that is not one is not a measurement and must never be stored as though it were' };
+        }
+        out[name === 'input-tokens' ? 'inputTokens' : 'outputTokens'] = n;
+        break;
+      }
       default: return { error: `unrecognized argument "--${name}"` };
     }
+  }
+  return out;
+}
+
+/**
+ * FEATURE: SES-386. The parsed CLI pair as `tokensFrom()`'s OWN key names, so the two sources
+ * compose by a plain spread and the CLI wins: `tokensFrom({ ...answer, ...usageFromArgs(args) })`.
+ *
+ * THE ABSENT PAIR RETURNS `{}` AND NOT `{input_tokens: null}`, which is the whole point of the
+ * shape. A null would OVERWRITE a pair the answer file did carry; an absent key leaves it alone,
+ * and with neither source reporting, `tokensFrom()` still yields `null` rather than 0 (SES-147's
+ * "NULL is not zero": a stored 0 says the run was free).
+ *
+ * Pure and exported so tests/regression/ses-334-served-class-block.test.mjs drives both directions
+ * with no network.
+ */
+export function usageFromArgs(args) {
+  const out = {};
+  for (const [flag, key] of [['inputTokens', 'input_tokens'], ['outputTokens', 'output_tokens']]) {
+    const v = args?.[flag];
+    if (v === undefined || v === null) continue;
+    if (!Number.isInteger(v) || v < 0) {
+      return { error: `--${flag === 'inputTokens' ? 'input' : 'output'}-tokens must be a `
+        + `non-negative integer, got "${v}"` };
+    }
+    out[key] = v;
   }
   return out;
 }
@@ -332,6 +398,12 @@ async function passOne(args) {
 // ---------------------------------------------------------------------------------------------
 
 async function passTwo(args) {
+  // SES-386: BEFORE the state file, before the answer file, before the handler. A malformed pair is
+  // a driver error, not a refused ranking, so it exits 2 having touched nothing at all -- there is
+  // no cycle row to write about it because no run happened.
+  const usage = usageFromArgs(args);
+  if (usage.error) fail(usage.error);
+
   const scratch = args.scratch || os.tmpdir();
   const stateFile = args.stateFile || statePathFor(scratch, args.cycle);
   if (!fs.existsSync(stateFile)) {
@@ -356,7 +428,11 @@ async function passTwo(args) {
     return EXIT_CANNOT_RUN;
   }
 
-  const tokens = tokensFrom(answer);
+  // SES-386: the CLI pair WINS over the answer file. The sub-agent cannot report its own usage
+  // through `pz-rank-intent` (the schema has no such properties), so in practice the answer half is
+  // always absent and the flags are the only measurement there is; where both are present the
+  // caller who watched the turn is the better witness than the file the turn wrote.
+  const tokens = tokensFrom({ ...answer, ...usage });
   const content = {
     ranked: answer.ranked.map(e => ({
       backlog_id: e.backlog_id,

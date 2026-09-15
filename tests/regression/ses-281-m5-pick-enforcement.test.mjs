@@ -1,3 +1,11 @@
+// DeepBench v7.0.487 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-386 -- the live
+// arm's first clause (`lane.length > 0`) becomes a B42 PROPERTY rather than a flat requirement. An
+// empty selfbuild lane has two causes: nothing buildable (the finding it always was, still a FAIL
+// with the same words) or every admitted candidate held by a LIVE parallel cycle's atomic claim,
+// which under register B42 is the design working. The second is declared, never skipped, and the
+// liveness of the holding cycle is what tells them apart -- a claim held by an ENDED cycle is stale
+// and still fails.
+//
 // DeepBench v7.0.448 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-368 -- the register
 // grew to sixteen anchored sections (M5-16, the weekly pace gate); EXPECTED_M5_SECTIONS is the one
 // place this file holds the count, in step with ses-280's M5_IDS.
@@ -328,15 +336,52 @@ async function theLivePickPathObeysTheFourRules() {
 
   const epicName = new Map(epics.map(e => [e.id, e.name ?? ""]));
   const byRef = new Map(items.map(i => [i.backlog_id, i]));
+  // SES-340: `prime_standing` is now `EXISTS (projects WHERE status='executing')` and lane (c)'s
+  // fence is `epic_project_executing()`. The LANE VALUE stays `selfbuild` -- a named deviation
+  // recorded in docs/SELFBUILD-RETIREMENT-LEDGER.md -- so this filter is unchanged on purpose.
   const lane = rows.filter(r => r.lane === "selfbuild");
-  assert.ok(
-    lane.length > 0,
-    // SES-340: `prime_standing` is now `EXISTS (projects WHERE status='executing')` and lane (c)'s
-    // fence is `epic_project_executing()`. The LANE VALUE stays `selfbuild` -- a named deviation
-    // recorded in docs/SELFBUILD-RETIREMENT-LEDGER.md -- so this filter is unchanged on purpose.
-    "the selfbuild lane came back empty -- either no project is executing or every " +
-      "in-scope ticket is unbuildable; both are findings, not a pass",
-  );
+
+  // FEATURE: SES-386 -- AN EMPTY LANE HAS TWO CAUSES AND ONLY ONE OF THEM IS A DEFECT.
+  //
+  // The old clause failed outright on an empty lane. But register B42 (`docs/RUNNER-GOV-0820-
+  // REQUIREMENTS.md#B42`, John verbatim 2026-08-21: "what if i want to run 100 automated routines at
+  // once? should not be an issue") makes PARALLEL cycles the design, and parallel cycles coordinate
+  // by ATOMIC CLAIMS: a ticket another live cycle holds is correctly withheld from this lane. So a
+  // suite run from inside a cycle -- which is every scheduled run -- could fail here for the single
+  // reason that the platform was working. A contested claim is not a skip, and a lane emptied by
+  // claims is not an empty board.
+  //
+  // THE DISCRIMINATION IS THE LIVENESS OF THE HOLDER, and that is the whole clause: a claim held by
+  // a cycle that has ENDED is a stale claim, which IS a defect and still fails below. Only a claim
+  // held by a cycle with `ended_at IS NULL` explains the absence.
+  if (lane.length === 0) {
+    const claimed = await pg(
+      url, key,
+      "backlog_items?select=backlog_id,claimed_by&status=in.(open,partial)&queue=not.is.null&claimed_by=not.is.null&limit=2000",
+    );
+    const liveCycles = await pg(url, key, "runner_cycles?select=id&ended_at=is.null&limit=1000");
+    const live = new Set(liveCycles.map(c => String(c.id)));
+    const heldByLive = claimed.filter(i => live.has(String(i.claimed_by)));
+    assert.ok(
+      heldByLive.length >= 1,
+      // The OLD WORDS, kept verbatim: with nothing held by a live cycle, an empty lane means exactly
+      // what it always meant and this is still the finding it always was.
+      "the selfbuild lane came back empty -- either no project is executing or every " +
+        "in-scope ticket is unbuildable; both are findings, not a pass",
+    );
+    notRun(
+      "the live lane arms (M5-02/M5-07/M5-09)",
+      `the lane is empty and ${heldByLive.length} admitted ticket(s) are held by live cycles ` +
+        `(${heldByLive.slice(0, 5).map(i => i.backlog_id).join(", ")}${heldByLive.length > 5 ? ", …" : ""}` +
+        `; ${live.size} cycle(s) with ended_at IS NULL) -- under B42 that is not a skip. Parallel ` +
+        "cycles coordinate by atomic claims, so a contested claim withholding every candidate is the " +
+        "design working, not a board with nothing on it. SAID IN FULL: this returns, so the three " +
+        "clauses that follow the lane arms -- M6-01's zero open 'john-paced', the 'needs-desktop " +
+        "survived' control, and SES-299's stored-queue ordering -- did not run either. Re-run when " +
+        "no cycle holds the queue, or read the order off prime_directive_queue() by hand.",
+    );
+    return;
+  }
 
   // --- M5-02 + M5-07: the order the DATABASE returned is monotonic in (lane, queue, cycles).
   // Deliberately NOT a re-sort of the rows in JS: this asserts a property OF the returned order,

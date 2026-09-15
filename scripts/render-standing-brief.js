@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.487 | scripts/render-standing-brief.js | SES-386 — IS ANYTHING WAITING ON A HUMAN?
+// A new group, `Human gates`, lands AFTER `Ticket hygiene, last night` and BEFORE the provenance
+// footer: the open `needs-john` tickets and the undecided `gated_before_build` cards, counted, with
+// ids up to five. Neither column is written by any code in this repo — they are board state — so
+// this is where they are REPORTED. `ses-285` assertion 6 and `ses-373` assertion 1 used to read
+// them live and go red on a board mid-flight; they now assert THIS block, which is a fact about the
+// change rather than a fact about the day.
+//
 // DeepBench v7.0.477 | scripts/render-standing-brief.js | AGT-79 slice 3 — WHAT DID THE TICKET
 // OWNER LEAVE ON THE BOARD LAST NIGHT? A new group, `Ticket hygiene, last night`, lands AFTER
 // `Auditor's ledger` and BEFORE the provenance footer: the open `public.ticket_owner_findings`
@@ -354,6 +362,16 @@ export function factsSha(facts) {
             : null,
           decision: facts.hygiene.decision ? [facts.hygiene.decision.id, facts.hygiene.decision.status] : null,
           run: facts.hygiene.run ? [facts.hygiene.run.id, facts.hygiene.run.ended_at] : null,
+        }
+      : null,
+    // FEATURE: SES-386 — the two human-gate ID SETS, sorted, so a ticket being flagged `needs-john`,
+    // a card being decided, or either set emptying moves the sha and --check reports the drift. The
+    // IDS and not the counts: two tickets swapping which one waits on John is a real change to what
+    // this block says, and a pair of counts would hash identically through it.
+    humanGates: facts.humanGates
+      ? {
+          needsJohn: Array.isArray(facts.humanGates.needsJohn) ? [...facts.humanGates.needsJohn].map(String).sort() : null,
+          undecidedCards: Array.isArray(facts.humanGates.undecidedCards) ? [...facts.humanGates.undecidedCards].map(String).sort() : null,
         }
       : null,
   });
@@ -918,6 +936,71 @@ export function renderTicketHygiene(hygiene, stamp, nowIso) {
   return L.join("\n");
 }
 
+/** How many gate ids the Human gates block names before it stops listing and says how many are left. */
+export const HUMAN_GATE_IDS_SHOWN = 5;
+
+/**
+ * FEATURE: SES-386 — `Human gates`: the ONE repo-side home for "is anything waiting on John?".
+ *
+ * WHY IT EXISTS AT ALL, and it is a test-design fact rather than a reporting one. `M6-01`'s outcome
+ * lives in two live columns — `backlog_items.design_status = 'needs-john'` and a
+ * `gated_before_build` `runner_items` row with `decision IS NULL` — and NOTHING under `api/`,
+ * `src/`, `shared/`, `lib/` or `scripts/` writes either of them (grep, 2026-09-15). They are board
+ * state a human moves. Two regression guards (`ses-285` assertion 6, `ses-373` assertion 1) were
+ * reading them live and FAILING the suite whenever the board was mid-flight: a red that grades
+ * today's board, never the change under test, and that no session could act on. The counts are
+ * worth SEEING, so they are rendered here and the guards assert THIS block instead.
+ *
+ * THREE BRANCHES, the same three every group above it uses, for the same reason:
+ *   - `gates` absent — SAID, never rendered as zeros. "The reads did not happen" and "nothing is
+ *     waiting on John" are opposite facts and the brief must not blur them;
+ *   - both counts zero — a MEASURED zero, said as one;
+ *   - either count non-zero — the count AND the ids, up to `HUMAN_GATE_IDS_SHOWN`, because a
+ *     number with no handle is something a reader cannot act on.
+ *
+ * Pure: (gates, stamp) in, markdown out, driven from fixtures by
+ * tests/regression/ses-386-board-not-gate.test.mjs.
+ */
+export function renderHumanGates(gates, stamp) {
+  const L = [];
+  const lead = `**Human gates** — *${stamp}.* The two reads that say whether anything is waiting on ` +
+    "a human: open `backlog_items` carrying `design_status = 'needs-john'`, and `gated_before_build` " +
+    "`runner_items` left with `decision IS NULL` (`M6-01`). Board state, written by no code in this " +
+    "repo — which is why it is REPORTED here and not asserted as a gate by the regression suite.";
+
+  if (!gates || !Array.isArray(gates.needsJohn) || !Array.isArray(gates.undecidedCards)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The human-gate state was not read for this render* — which is **not** the same as " +
+      "*nothing is waiting on a human*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const tickets = gates.needsJohn;
+  const cards = gates.undecidedCards;
+  const list = (ids) => {
+    const shown = ids.slice(0, HUMAN_GATE_IDS_SHOWN).map(id => `\`${String(id)}\``).join(", ");
+    const rest = ids.length - Math.min(ids.length, HUMAN_GATE_IDS_SHOWN);
+    return rest > 0 ? `${shown} …and ${rest} more` : shown;
+  };
+
+  L.push(`${lead} **${tickets.length} open \`needs-john\` ticket(s)**, ` +
+    `**${cards.length} undecided \`gated_before_build\` card(s)**.`);
+  L.push("");
+  if (tickets.length === 0 && cards.length === 0) {
+    L.push("- **Nothing blocks on a human** — a measured zero: both reads ran and both came back " +
+      "empty, so `M6-01` holds on the board it governs.");
+  } else {
+    if (tickets.length > 0) L.push(`- **\`needs-john\` (${tickets.length}):** ${list(tickets)}`);
+    if (cards.length > 0) L.push(`- **Undecided gated cards (${cards.length}):** ${list(cards)}`);
+    L.push("- *Open is not wrong.* A card nobody has answered yet is a real board state; what it is " +
+      "NOT is a regression, so nothing in the suite goes red for it.");
+  }
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -945,7 +1028,9 @@ export function renderBlock(facts, nowIso) {
   // means "not read", never "the ledger holds no findings".
   // FEATURE: AGT-79 slice 3 — hygiene joins the destructure on the same terms as audit: absent
   // means "not read", never "the Ticket Owner found nothing".
-  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene } = facts;
+  // FEATURE: SES-386 — humanGates joins the destructure on the same terms as hygiene: absent means
+  // "not read", never "nothing is waiting on a human".
+  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1164,6 +1249,13 @@ export function renderBlock(facts, nowIso) {
   // it: a pure helper the guard can assert from a fixture, rendering what the tables returned and
   // printing the night's own notes rather than recounting the board behind them.
   L.push(renderTicketHygiene(hygiene, stamp, nowIso));
+
+  // ---- Human gates (FEATURE: SES-386) -------------------------------------------------------
+  // After Ticket hygiene, before the provenance line. The LAST group deliberately: it is the one
+  // that says whether anything above it is waiting on a person rather than on a cycle. Same
+  // contract as the seven groups above it — a pure helper a fixture can drive, rendering the two
+  // reads fetchFacts() made and counting nothing they could have counted themselves.
+  L.push(renderHumanGates(humanGates, stamp));
 
   const sha = factsSha(facts);
   L.push(`*Provenance: ${items.length} board rows, payload \`sha256:${sha.slice(0, 16)}\`, ${stamp}. ` +
@@ -1440,7 +1532,27 @@ export async function fetchFacts(url, key) {
   if (!Array.isArray(hygRun)) die("the nightly cycle read came back non-array — refusing to render the hygiene group from nothing");
   const hygiene = { open: hygOpen, decision: hygDec[0] ?? null, run: hygRun[0] ?? null };
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene };
+  // FEATURE: SES-386 — the two human-gate reads, moved here from two regression guards.
+  //
+  // THE FILTERS ARE THE ONES ses-285 ASSERTION 6 AND ses-373 ASSERTION 1 RAN, character for
+  // character, and that is deliberate: this block REPLACES those reads as the one home, so a
+  // divergence in the predicate would mean the brief and the guards were talking about different
+  // boards. Columns are NAMED, never `select=*` (.claude/rules/supabase-column-grants.md).
+  //
+  // A NON-ARRAY REFUSES rather than rendering an unmeasured zero, same posture as every read above:
+  // an empty set here is the good state, which is exactly why a failed read must never look like one.
+  const gateTickets = await rest(url, key,
+    "backlog_items?select=backlog_id&design_status=eq.needs-john&status=not.in.(done,delivered,removed)&limit=1000");
+  if (!Array.isArray(gateTickets)) die("the needs-john read came back non-array — refusing to render the human-gate group from nothing");
+  const gateCards = await rest(url, key,
+    "runner_items?select=id&kind=eq.gated_before_build&decision=is.null&limit=1000");
+  if (!Array.isArray(gateCards)) die("the undecided-card read came back non-array — refusing to render the human-gate group from nothing");
+  const humanGates = {
+    needsJohn: gateTickets.map(r => r.backlog_id),
+    undecidedCards: gateCards.map(r => r.id),
+  };
+
+  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates };
 }
 
 async function main() {

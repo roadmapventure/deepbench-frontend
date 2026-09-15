@@ -1952,10 +1952,19 @@ rather than API dollars. Precondition: no `runner_cycles` row whose `notes` star
 per day, on the first scheduled cycle that passes the walls. Two passes, the step-4b shape:
 `node scripts/rank-backlog.js --cycle=<this cycle's id>` prints the Prioritizer's assembled prompt
 and exits **3**; run that prompt as a `prioritizer` sub-agent on the **judgment** lane (step 6's
-lanes table, never a literal), save its JSON, then re-run with `--answer=<that file>`. The
+lanes table, never a literal), save its JSON, then re-run with
+`node scripts/rank-backlog.js --cycle=<id> --answer=<file> --input-tokens=<the Agent tool's reported
+input> --output-tokens=<its output>`. The
 Prioritizer ranks, `prioritizer-write` writes, the cycle row records — exit 0. Exit **2** is a
 refusal and NOTHING was written to the board; write the reason in `notes` and **continue to step 5
 normally** — the re-rank is bookkeeping, never this cycle's build.
+
+**The two token flags are the ONLY measurement of what this run cost (`SES-386`, `v7.0.487`).** The
+sub-agent cannot report its own usage — `pz-rank-intent`'s schema carries no `input_tokens` /
+`output_tokens` — so an unreported pair stores `est_tokens_dev = NULL`, which says *unmeasured* and
+never *free*, and `tests/regression/ses-334-served-class-block.test.mjs` part (d) then DECLARES that
+gap rather than failing on it. A value that is not a non-negative integer is a driver error: exit
+**2**, nothing written anywhere.
 
 **RELOCATED HERE FROM THE RETIRING `v7.0.446` STAMP (`SES-346`) BY `SES-164` STEP 2, because it was the
 one fact that stamp carried with ZERO hits anywhere in this body or in `docs/SELFBUILD-RETIREMENT-LEDGER.md`

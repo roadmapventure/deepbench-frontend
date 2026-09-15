@@ -1,3 +1,23 @@
+// DeepBench v7.0.487 | tests/regression/ses-373-card-only-self-decides.test.mjs | SES-386 -- ARM (C)
+// ASSERTION 1 KEEPS ITS ID AND CHANGES ITS SUBJECT, for the same reason ses-285's assertion 6 did.
+// It ran the identical "zero undecided gated_before_build cards" query -- deliberately, so the two
+// guards could not disagree -- and inherited the identical defect: nothing in this repo writes
+// `runner_items.decision`, so the clause graded whether a human had answered his cards. Two guards
+// going red together over a board state neither could fix is not twice the coverage, it is the same
+// false red twice.
+//
+// WHAT IT GRADES NOW: that ses-285 still carries the clause, by id. The rule keeps ONE home
+// (ses-285's `6-nothing-blocks-on-a-human`, which since SES-386 asserts the standing brief's
+// `**Human gates**` block), and this file asserts that home has not been deleted out from under it.
+// That is the honest shape of a cross-file dependency: this test's own header already imports
+// CLOSE_MARKER from ses-285 precisely so the two cannot drift, and this is the same discipline
+// applied to a clause instead of a constant.
+//
+// ARMS (A) AND (B) ARE UNTOUCHED, and they are the ones that grade THIS ticket's engine. Assertions
+// 2, 3 and 4 are untouched too: they read HISTORICAL rows -- the five cards SES-373 backfilled and
+// their before-images -- which are a fact about a migration this repo ran and cannot go red because
+// a human was busy.
+//
 // DeepBench v7.0.458 | tests/regression/ses-373-card-only-self-decides.test.mjs | SES-373
 //
 // FEATURE: SES-373 -- a card-only rollback decision records itself. Before this ship
@@ -311,14 +331,23 @@ export const BACKFILLED_IDS = [
 ];
 export const BACKFILL_REASON_PREFIX = "Backfilled by SES-373";
 
+// FEATURE: SES-386 -- the ONE home for the undecided-card clause, named by file and by assertion id.
+export const PEER_GUARD_REL = "tests/regression/ses-285-m6-autonomy.test.mjs";
+export const PEER_ASSERTION_ID = "6-nothing-blocks-on-a-human";
+
 export const LIVE_ASSERTIONS = [
   {
     id: "1-no-gated-card-is-left-undecided",
     detail:
-      "ZERO gated_before_build runner_items rows carry decision IS NULL. This is the same query " +
-      "ses-285 assertion 6 runs, so a pass here and a fail there is impossible by construction",
-    test: (s) => s.undecidedCards.length === 0,
-    breaks: (s) => ({ ...s, undecidedCards: [...s.undecidedCards, "a-card-nobody-decided"] }),
+      `${PEER_GUARD_REL} still carries the "${PEER_ASSERTION_ID}" clause. RETARGETED BY SES-386: ` +
+      "this used to run the same 'zero undecided gated_before_build rows' query ses-285 assertion " +
+      "6 ran, so that the two could not disagree -- and it inherited the same defect, because no " +
+      "code in this repo writes runner_items.decision and the clause therefore graded a human's " +
+      "inbox rather than the change under test. The rule now has ONE home (ses-285's clause, which " +
+      "asserts the standing brief's Human gates block reports both counts) and this asserts that " +
+      "home still exists. A clause with one home and no guard on the home is one delete from gone",
+    test: (s) => typeof s.peerGuard === "string" && s.peerGuard.includes(PEER_ASSERTION_ID),
+    breaks: (s) => ({ ...s, peerGuard: String(s.peerGuard).split(PEER_ASSERTION_ID).join("6-renamed-away") }),
   },
   {
     id: "2-every-held-card-is-retired-with-a-reason",
@@ -376,17 +405,16 @@ async function rest(url, key, pathAndQuery) {
 }
 
 async function fetchLiveState(url, key) {
-  // The SAME query ses-285 assertion 6 runs, character for character on the filter, so the two
-  // tests cannot disagree about what "undecided" means.
-  const undecidedCards = await rest(url, key,
-    "runner_items?select=id&kind=eq.gated_before_build&decision=is.null&limit=1000");
+  // SES-386: the undecided-card read is GONE from here. It lives in exactly one place now --
+  // scripts/render-standing-brief.js's fetchFacts() -- and what assertion 1 grades is that ses-285
+  // still carries the clause that grades what it rendered.
   const heldCards = await rest(url, key,
     `runner_items?select=id,decision,decision_reason&title=like.${encodeURIComponent("Auto-rollback held")}*&limit=1000`);
   const images = await rest(url, key,
     "runner_before_images?select=pk_value,decision_id,row_data&table_name=eq.runner_items" +
     `&pk_value=in.(${BACKFILLED_IDS.join(",")})&limit=1000`);
   return {
-    undecidedCards: undecidedCards.map((r) => r.id),
+    peerGuard: fs.readFileSync(path.join(REPO, PEER_GUARD_REL), "utf8"),
     heldCards,
     images,
     byId: new Map(heldCards.map((r) => [r.id, r])),
@@ -426,7 +454,8 @@ async function theLiveBoardCarriesNoUndecidedHold() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "arm (C), the live board: zero undecided gated_before_build cards, every 'Auto-rollback held' " +
+      "arm (C), the live board: ses-285 still carrying the one-home clause (SES-386 retargeted " +
+        "assertion 1 off the live undecided-card query), every 'Auto-rollback held' " +
         "card retired with a reason, the five SES-373 rows naming their backfill decision, and a " +
         "full before-image under a decision id for each. There is NO repo-side render of " +
         "runner_items -- docs/backlog/BACKLOG-SNAPSHOT.md carries no card rows at all -- so this " +
