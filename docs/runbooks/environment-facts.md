@@ -27,3 +27,4 @@ on the board, or a cycle (`cycle:601227fb`). No pipes inside the fact.
 - 2026-09-15 | cycle:601227fb | feature_id_counter can drift behind the board (seen this cycle: it offered SES-389 while the board already held 398); claim with GREATEST(counter, max)+1, never the counter alone.
 - 2026-09-15 | cycle:601227fb | Since SES-336 the Builder owns the push, so at step 7a origin/dev IS HEAD and a git-derived changed-file list is empty (SES-379).
 - 2026-09-15 | cycle:601227fb | Several scripts still emit "cannot change to 'C:/Projects/deepbench-frontend'", a laptop path dead in the cloud clone.
+- 2026-09-15 | SES-400 | check 9's retirement window is the enclosing BLOCK, and a bold lead-in on the citation's own line starts it, so a note on the line above sits outside the window and does not clear the flag.

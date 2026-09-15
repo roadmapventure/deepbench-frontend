@@ -160,7 +160,7 @@ for repeatedly.**
    against the newest SAME-WEEK reading carrying a Fable number, `SES-398`, since a self-read's
    `fable_pct` is NULL whenever its call carried no Fable window) — is at or above
    <!-- FEATURE: SES-395 --> `runner_budget.weekly_rest_pct` for the current
-   **`America/Chicago`** month (register `B35`; the month boundary is John's clock, never UTC).
+   **`America/Chicago`** month (`B35` (2), rest superseded by `M6-07`; John's clock, never UTC).
 4. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
    that stopped the runner and then sat unread in a card, and it now has a name instead of a silent
    pass.** (3) preceding (4) is deliberate and NULL-safe: with the row absent, (3)'s comparison is
