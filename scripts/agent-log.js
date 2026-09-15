@@ -22,6 +22,15 @@
 // distinction has to survive into the data. Added to lib/request-context.js's allowlist -- the only
 // gate the value passes, since ai_activity_log has no CHECK constraint on the column.
 //
+// cost_usd IS NULL, NOT 0 (SES-383). The two are different assertions and the difference is the
+// whole ticket: NULL means "not billable -- do not price this row, and do not count it", while 0
+// would mean "billable and it happened to be free". A session turn runs on John's subscription, so
+// no API dollar exists to record. NULL is also what makes the §19v dollar wall ONE number: the wall
+// sums cost_usd over the whole table with no call_source filter, and NULL adds nothing -- so a
+// non-billable row is excluded by its own value rather than by a filter someone has to remember to
+// keep in step. Passing `costUsd: null` explicitly is required: lib/activity-log.js defaults it to
+// `undefined`, which means "price it from my tokens" and is exactly the behaviour being fixed.
+//
 // --cycle GOES TO visitor_id, ON PURPOSE, and an editor must not "promote" it into call_facts.
 // call_facts is the base of the §19k runtime signature; a per-cycle uuid there would make every row's
 // signature distinct -- the measured LOG-91 failure, 720 -> 24,826 distinct signatures. visitor_id is
@@ -149,6 +158,9 @@ async function main() {
     inputTokens: args.inputTokens,
     outputTokens: args.outputTokens,
     latencyMs: args.latencyMs ?? null,
+    // FEATURE: SES-383 -- see the header note. NULL = "not billable", and it must be passed
+    // explicitly: the default is `undefined`, which prices the row from its tokens.
+    costUsd: null,
     traceId,
   }), args.cycle ? { visitorId: args.cycle } : {});
 

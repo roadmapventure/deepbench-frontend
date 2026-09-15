@@ -259,7 +259,13 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
     // paired Set computed above is the equivalent per-row source.
     d.operations++;
     if (isCountableCall({ model: row.model, isPairedDup: paired.has(row.id) })) d.calls++;
-    const rowCost = paired.has(row.id) ? 0 : (row.cost_usd != null
+    // FEATURE: SES-383 -- a `call_source='session'` row is a governance turn run on subscription
+    // tokens: real tokens, zero API dollars. Writing NULL to its cost_usd (scripts/agent-log.js,
+    // plus the backfill) is NOT enough on its own, because the `cost_usd != null` fallback below
+    // would then re-derive a price from those tokens and put it straight back on the screen. The
+    // guard has to sit at the READ too. It precedes the fallback deliberately; every other row
+    // keeps the fallback intact, including the pre-LOG-149 rows that depend on it.
+    const rowCost = (paired.has(row.id) || row.call_source === 'session') ? 0 : (row.cost_usd != null
       ? parseFloat(row.cost_usd)
       // FEATURE: HAR-02a -- cache-token fields priced when present; null on historical rows = +0.
       : computeCallCost(row.model, row.input_tokens, row.output_tokens, row.cache_creation_input_tokens, row.cache_read_input_tokens));
@@ -1161,7 +1167,12 @@ export async function hydrateFromSupabase(tenantId = null) {
       tier:      row.knowledge_tier || null,
       location:  row.feature || '—',
       agentId:   row.agent_id || null,
-      cost:      paired.has(row.id) ? 0 : (row.cost_usd != null
+      // FEATURE: SES-383 -- the same guard as buildActivitySummary()'s rowCost, and it has to be in
+      // BOTH places: this one feeds byService/totalCost (the By-Service dollar column and the header
+      // Total Cost), that one feeds byAgent. A session turn is subscription usage -- real tokens, no
+      // API dollars -- so it folds in at 0 rather than being re-priced from its tokens when cost_usd
+      // is NULL. Every other row keeps the computeCallCost fallback.
+      cost:      (paired.has(row.id) || row.call_source === 'session') ? 0 : (row.cost_usd != null
         ? parseFloat(row.cost_usd)
         // FEATURE: HAR-02a -- cache-token fields priced when present; null on historical rows = +0.
         : computeCallCost(row.model, row.input_tokens, row.output_tokens, row.cache_creation_input_tokens, row.cache_read_input_tokens)),
