@@ -3,6 +3,14 @@
 // Fable number (its own PostgREST read: fable_pct=not.is.null, taken_at=gte.<chicagoWeek start>),
 // not against the gate's newest row -- migration ses398_judgment_reads_week_fable, because the
 // routine's meter self-read writes fable_pct NULL whenever its call carried no Fable window.
+// DeepBench | tests/regression/ses-297-pre-boot-pickability.test.mjs | Live fix, 2026-09-15 -- John
+// in chat: "just make it so it degrades with weekly daily averages." `weekly_pace` no longer refuses
+// a boot -- it degrades the ORCHESTRATOR lane (public.orchestrator_model(), mirrors judgment_model())
+// from claude-opus-5 to the mechanical lane's model instead, so the cycle keeps shipping cheaper
+// rather than going idle. REASONS drops to six; the oracle drops the weekly_pace branch; the live arm
+// gains the same closed-set/lane/detail assertions for orchestrator_model() that judgment_model()
+// already had. The wall (weekly_rest_pct, protecting John's own reserved headroom) is untouched and
+// still refuses outright -- only the softer day-of-week pace signal changed what it costs.
 // DeepBench v7.0.486 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-395 -- the wall and
 // the pace grade `all_models_pct` again, and Fable past its own share DEGRADES the judgment lane
 // instead of refusing the cycle. The doc clause flips to `judgment_model` / `fable_rest` /
@@ -87,7 +95,7 @@ const SESSIONS = path.join(ROOT, SESSIONS_REL);
 const BLOCK_START = "**PRE-BOOT GATE — ONE QUERY";
 const BLOCK_END = "**0. Bootstrap.**";
 
-// The seven refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
+// The six refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
 // what each one MEANS is read out of the runbook by the clauses below, never restated.
 export const REASONS = [
   "scheduler_off",
@@ -96,13 +104,13 @@ export const REASONS = [
   // that the CAP has one home: this gate carries no token_cap and does not second-guess
   // resolve_day_token_cap() RUNG 2's 48h ceiling brake. The 2026-09-01 defect was two homes for one
   // consequence at two thresholds; this is two DIFFERENT consequences with one home each. Sits
-  // second: John's switch outranks it, and the wall and the pace both grade a number this branch
-  // has just called out of date. 'pickable_degraded' is still not here.
+  // second: John's switch outranks it, and the wall grades a number this branch has just called out
+  // of date. 'pickable_degraded' is still not here.
   "meter_stale",
   "weekly_wall",
-  // SES-368 / M5-16: John's pace. Sits between the wall and the budget-row check, and like the wall
-  // it compares NULL-safely -- no reading, no pace verdict.
-  "weekly_pace",
+  // Live fix, 2026-09-15: weekly_pace RETIRED as a refusal here -- it degrades the orchestrator lane
+  // (public.orchestrator_model()) instead, same treatment SES-395 already gave Fable's pace/rest
+  // against the judgment lane. See the orchestrator_model() assertions in the live arm below.
   "no_budget_row",
   "nothing_pickable",
   "unaffordable",
@@ -536,12 +544,8 @@ export function expectedReason(f) {
   // exactly as before: no reading, no wall verdict.
   if (f.weeklyRestPct !== null && f.gatedPct !== null && f.gatedPct >= f.weeklyRestPct)
     return "weekly_wall";
-  // SES-368 / M5-16, SES-395: the pace, in the ladder's real position -- after the wall, before the
-  // budget row, grading the SAME number the wall did. At-or-above refuses (14.29 on day 1 refuses;
-  // 14.28 boots), and NULL on either side falls through, exactly as the wall does.
-  if (f.paceLimitPct !== null && f.paceLimitPct !== undefined && f.gatedPct !== null &&
-      f.gatedPct >= f.paceLimitPct)
-    return "weekly_pace";
+  // Live fix, 2026-09-15: the pace no longer has a branch here -- it degrades the orchestrator lane
+  // (asserted separately below, mirroring judgment_model()) rather than refusing the boot.
   if (!f.budgetRowExists) return "no_budget_row";
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
@@ -754,6 +758,38 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.judgment_reason=${JSON.stringify(d.judgment_reason)} but judgment_model() says ${j.reason}`);
   assert.strictEqual(Number(d.fable_share), Number(j.fable_share),
     `detail.fable_share=${d.fable_share} but judgment_model() says ${j.fable_share}`);
+
+  // Live fix, 2026-09-15: orchestrator_model() gets the same treatment judgment_model() already has
+  // above -- closed reason set, model graded against a LANE not a literal, and the gate's own detail
+  // must agree with the function rather than making a reader call twice.
+  const orchestrator = asArray(
+    await pg(url, key, "rpc/orchestrator_model", { method: "POST", body: "{}" }), "rpc/orchestrator_model");
+  assert.strictEqual(orchestrator.length, 1,
+    `orchestrator_model() returned ${orchestrator.length} rows, expected exactly 1`);
+  const o = orchestrator[0];
+  assert.ok(laneModels.has(o.model_id),
+    `orchestrator_model() answered model_id=${JSON.stringify(o.model_id)}, which is not a ` +
+      `runner_model_lanes model id (${[...laneModels].join(", ")}). The fallback must name a LANE's ` +
+      "model, never a literal -- a literal survives John moving a lane and silently spawns the wrong model");
+  assert.ok(["orchestrator_pace", "lane"].includes(o.reason),
+    `orchestrator_model() answered reason=${JSON.stringify(o.reason)}; the closed set is orchestrator_pace | lane`);
+  const wantOrchestratorModel = o.reason === "lane" ? laneOf("orchestrator") : laneOf("mechanical");
+  assert.strictEqual(o.model_id, wantOrchestratorModel,
+    `orchestrator_model() answered ${o.model_id} on reason '${o.reason}', but the ` +
+      `${o.reason === "lane" ? "orchestrator" : "mechanical"} lane's model is ${wantOrchestratorModel} -- ` +
+      "'orchestrator_pace' takes the mechanical lane's model, 'lane' the orchestrator's own");
+  assert.strictEqual(
+    o.all_models_pct === null || o.all_models_pct === undefined ? null : Number(o.all_models_pct),
+    facts.allModelsPct,
+    `orchestrator_model().all_models_pct=${o.all_models_pct} but the freshest reading says ${facts.allModelsPct}`);
+  assert.strictEqual(Number(o.pace_limit_pct), facts.paceLimitPct,
+    `orchestrator_model().pace_limit_pct=${o.pace_limit_pct} but day ${facts.weekDayIndex} x 100/7 is ` +
+      `${facts.paceLimitPct} -- a second calendar here is free to disagree with the gate's`);
+  assert.strictEqual(d.orchestrator_model, o.model_id,
+    `detail.orchestrator_model=${JSON.stringify(d.orchestrator_model)} but orchestrator_model() says ${o.model_id}`);
+  assert.strictEqual(d.orchestrator_reason, o.reason,
+    `detail.orchestrator_reason=${JSON.stringify(d.orchestrator_reason)} but orchestrator_model() says ${o.reason}`);
+
   assert.strictEqual(d.pickable_count, lanes.length,
     `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
     "drain/selfbuild rows -- the gate and the picker are reading different boards");

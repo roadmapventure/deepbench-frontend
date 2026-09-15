@@ -136,7 +136,7 @@ exactly one home — `public.resolve_day_token_cap()`, read at step 3** — and 
 ceiling there, never here. A reading inside the threshold still grades the weekly wall in (3): a
 63% taken an hour ago is better evidence than none.
 
-**The seven refusal reasons, in the precedence the function applies them.**
+**The six refusal reasons, in the precedence the function applies them.**
 Each names itself, always: **a bare `false` is the "NULL is not zero" defect this codebase has paid
 for repeatedly.**
 
@@ -158,40 +158,44 @@ for repeatedly.**
    **Fable past its own share DEGRADES the judgment lane to `detail.judgment_model` instead of
    refusing the cycle**, so the boot decision is back on the all-models meter and a refusal on the
    Fable meter alone no longer exists; `detail.fable_pct` is still reported, and
-   `detail.judgment_reason` says what it cost) — is at or above <!-- FEATURE: SES-395 -->
-   `runner_budget.weekly_rest_pct` for the current **`America/Chicago`** month (register `B35`, superseded
-   2026-09-01 by `M6-07` (`SES-285`; annotated `SES-289`) — **scope matters here: only B35's
-   Reverse-on-gated answer lost its subject. The America/Chicago boundary is its answer (2),
-   explicitly unaffected and still binding** — the month boundary is John's clock, never UTC).
-4. `weekly_pace` — **`M5-16`** (`SES-368`, John's rule of 2026-09-11 in his words: *"only fire if
-   usage is below the daily limit … divided by 7 days, each week restarts at 1am central on
-   Fridays"*, *"daily at 100%"*): the freshest reading's `all_models_pct` — the same
-   `detail.gated_pct` the wall graded (`SES-395`) — is at or above
-   `detail.pace_limit_pct` = `week_day_index` × 100/7, where the week starts at the most recent
-   Friday 01:00 **`America/Chicago`** (`detail.week_started_at`) and the day index is whole days
-   elapsed + 1, clamped 1..7. Day 1 allows 14.29, day 2 28.57, day 7 100. The wall (2) still wins
-   when both are true. This is a pace, not a cap: it says nothing about tokens per cycle, and it
-   carries no staleness threshold of its own (`M5-15`). **Fable has its own day-of-week share and it
-   is not graded here.** `public.judgment_model()` grades the newest same-week reading that carries a
-   Fable number <!-- FEATURE: SES-398 --> (`fable_pct IS NOT NULL` and `taken_at` at or after
-   `detail.week_started_at`, `SES-398` — so a meter self-read with no Fable window never lifts a
-   same-week degrade, and a Fable number from before the reset never degrades the new week) against
-   `detail.fable_share` (the same day index × 100/7) and against the same `weekly_rest_pct`, and reports
-   `detail.judgment_reason` = `fable_rest` \| `fable_pace` \| `lane` with `detail.judgment_model`
-   naming the model a judgment-lane call runs on right now — the orchestrator's for either Fable
-   reason, the judgment lane's otherwise (`SES-395`). Guarded by
-   `tests/regression/ses-297-pre-boot-pickability.test.mjs`, which carries this reason in `REASONS`,
-   the oracle branch, a fixed-instant calendar check and the three `detail` keys.
-5. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
+   `detail.judgment_reason` (`fable_rest` \| `fable_pace` \| `lane`) says what it cost — graded
+   against the newest reading SINCE THE WEEK START that carries a Fable number, `SES-398`, since the
+   routine's own meter self-read writes `fable_pct` NULL whenever its call carried no Fable window)
+   — is at or above <!-- FEATURE: SES-395 --> `runner_budget.weekly_rest_pct` for the current
+   **`America/Chicago`** month (register `B35`; the month boundary is John's clock, never UTC).
+4. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
    that stopped the runner and then sat unread in a card, and it now has a name instead of a silent
-   pass.** (3) and (4) preceding (5) is deliberate and NULL-safe: with the row absent, (3)'s comparison
-   is NULL rather than true, and with no reading at all (4)'s is too, so the ladder falls through to
-   (5) instead of blaming the wall or the pace for a missing row.
-6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
+   pass.** (3) preceding (4) is deliberate and NULL-safe: with the row absent, (3)'s comparison is
+   NULL rather than true, so the ladder falls through to (4) instead of blaming the wall for a
+   missing row.
+5. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row.
-7. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
+6. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
+
+**The pace signal — `M5-16` (`SES-368`), retired as a refusal `2026-09-15` (live fix, John in chat:
+*"just make it so it degrades with weekly daily averages"*).** The freshest reading's
+`all_models_pct` — the same `detail.gated_pct` the wall grades — being at or above
+`detail.pace_limit_pct` = `week_day_index` × 100/7 (week starts the most recent Friday 01:00
+**`America/Chicago`**, day index whole days elapsed + 1, clamped 1..7; day 1 allows 14.29, day 2
+28.57, day 7 100) **no longer refuses the cycle.** It degrades the **orchestrator lane** instead,
+exactly as Fable's own pace/rest already degrades the judgment lane (`SES-395`):
+`public.orchestrator_model()` grades `all_models_pct` against this same `pace_limit_pct` and
+returns `detail.orchestrator_model` = the mechanical lane's model (`claude-sonnet-5`) with
+`detail.orchestrator_reason` = `orchestrator_pace`, or the orchestrator lane's own model
+(`claude-opus-5`) with reason `lane` otherwise. The wall (3, `weekly_rest_pct`) is untouched and
+still refuses outright — it is the harder ceiling protecting John's own reserved weekly headroom,
+never a pace, and continuing on a cheaper model would still spend it. **Fable has its own
+day-of-week share, graded the same way, and is not touched by this change:**
+`public.judgment_model()` grades `fable_pct` against `detail.fable_share` (the same day index ×
+100/7) and against the same `weekly_rest_pct`, and reports `detail.judgment_reason` = `fable_rest`
+\| `fable_pace` \| `lane` with `detail.judgment_model` naming the model a judgment-lane call runs
+on right now — the orchestrator's for either Fable reason, the judgment lane's otherwise
+(`SES-395`). Guarded by `tests/regression/ses-297-pre-boot-pickability.test.mjs`, which carries the
+closed `REASONS` set (six, not seven), the oracle branch, a fixed-instant calendar check, and the
+`orchestrator_model()`/`detail.orchestrator_*` assertions alongside the existing `judgment_model()`
+ones.
 
 Everything else is `pickable` — one pass reason, no degraded variant (`SES-302`). A stale reading
 now has **two** consequences with one home each (`M5-15`, `SES-389`): **past
