@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260915-0940 (v7.0.487, 2026-09-15, runner cycle `92878301-5db3-455d-b665-5045a81513fd`, `trigger = scheduled` — Opus 5 orchestrator, Opus 5 Designer (judgment lane degraded, `SES-395`), Opus 5 Builder) — `SES-386` — **shipped, verdict approve: three regression guards stopped grading the day's board and started grading the change.**
+
+### The judgment lane ran on Opus, and the assembler said so while a peer script did not
+
+`public.judgment_model()` returned `claude-opus-5` with reason `fable_rest` (Fable at 94%, share 71.43). `scripts/agent-prompt.js` printed that correctly — `# lane: judgment degraded to claude-opus-5 (fable_rest)` — so the Designer ran on Opus. `scripts/rank-backlog.js` (step 4c) still printed `model claude-fable-5-1` from the lanes table alone and never consults `judgment_model()`. The cycle read the live function rather than either script's line and routed the Prioritizer to Opus. Noted as drift, not fixed here — one item per cycle.
+
+### The kickoff was rejected once, on the lane declaration rather than the cap
+
+`node scripts/verifier.js --check-kickoff` exited 1 on the first Designer run at 8,129 bytes: *"kickoff has no lane declaration (SES-359)"*. Step 6's one permitted re-assembly carried the finding verbatim in `task_context.rejected_once`; the second run came back at 8,102 bytes **with** the `Lanes:` line, and the check passed. The cap and the lane rule share one exit code, so a cycle that reads exit 1 as "too long" re-assembles against the wrong finding.
+
+### The guard that was red had aged out, not broken
+
+Baseline on `88ee72a`: `regression suite: 219/220 passed`, exit 1, sole FAIL `ses-334-served-class-block.test.mjs`. Its (d) arm read `runner_cycles` at `limit=5` and wanted a positive `est_tokens_dev` on a shipped scheduled re-rank; the newest five rows all carried NULL and the last measured row (`2026-09-09T21:17Z`, 8088) had fallen out of the window. No code change made it red. Widening to `limit=50` put that row back inside — so the declaration branch the kickoff's §6 predicted did not fire, and (d) PASSed graded. The Builder named that as a deviation rather than reporting the predicted `[NOT RUN]`.
+
+### Half (b) closed the loop that made the row NULL in the first place
+
+`scripts/rank-backlog.js` now takes `--input-tokens=` / `--output-tokens=`, CLI winning over the answer file, a malformed pair exiting 2 before any write. Step 4c passes the Agent tool's reported usage. This cycle's own step-4c row still recorded `"tokens":null` — the fix lands from the next cycle's re-rank on, which the kickoff's STOP LINE says in as many words.
+
+### One honest gap in what the ledger can be told
+
+The Agent tool reports a single combined `subagent_tokens` figure with no input/output split, so all three agent runs were logged with the whole figure in `--input-tokens` and `0` in `--output-tokens` (Designer 225,108 and 91,502; Builder 201,716). That is a named deviation, not a measurement: it under-prices output. It is the same unsplit-usage gap `SES-383` names from the other end.
+
+### Result
+
+Suite `221/221 passed`, exit 0 (221 rather than 220 because task 9 adds `ses-386-board-not-gate.test.mjs`). `npm run build` exit 0. Verifier: **approve**, graded sha `27f4f72c` equal to the push sha, auto-done eligible — `tooling` at rung 25 against an auto-done bar of 3. Ladder: streak 6 → 7, rung unchanged. Ten files, not the kickoff's nine: `docs/runbooks/cycle-card.md` is the generated view of `runner-cycle.md` and two guards stay red until it is re-rendered. Caps 15/16 respected.
+
+---
+
 ## session/cycle-20260914-1540 (v7.0.483, 2026-09-14, runner cycle `c36db726-7902-40dd-ae24-03a14b4085c7`, `trigger = scheduled` — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder) — `SES-390` — **shipped, verdict block: the gate now grades the higher of the two weekly meters, and the ticket's own subject bit the cycle building it.**
 
 ### The premise was alive on the cycle's own meter, not on a remembered one
