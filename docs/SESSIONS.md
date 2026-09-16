@@ -5,6 +5,32 @@
 
 ---
 
+## session/cycle-20260916-1328 (v7.0.508, 2026-09-16, unattended cycle `620161e0-ef2d-46ca-b400-8e89db0ac0bd`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `SES-378` — **partial (slice 3 shipped), verdict approve: the staff watch gets a table, and the fix from the previous slice proved itself on the very next pick.**
+
+The chain continued straight out of `22a5e6d6`'s tail, and the first thing it produced was evidence for the slice that had just shipped. `run-project.js` printed `claim: held as 620161e0-ef2d-46ca-b400-8e89db0ac0bd` — a cycle id, not the `run-project:moat-support:N` label it would have written an hour earlier. Slice 2 working live on the next pick it touched.
+
+### The premise was a table's absence, and the Designer measured it rather than assuming it
+
+All 70 `public` base tables enumerated: `audit_findings` and `ticket_owner_findings` exist, neither is per-agent, and `scripts/staff-watch.js` did not exist. The finding slice 2 carried forward — `CLAIM LABEL COLLISION: run-project:moat-support:1 on SES-378 + SES-399` — survived only as prose in this file, so it could never reach the ticket's own three-cycle promotion bar. `SES-408`, `SES-402` and `SES-397` all name the staff watch as their blocker. Two other carried-forward items were found **already done** this cycle and scoped out rather than rebuilt: the manager loop run (`ai_activity_log` 46453) and `claimed_by` carrying a cycle id.
+
+### `public.runner_staff_findings`, and the grant asserted rather than assumed
+
+The Builder captured the down **before** applying (`capture_migration_down` → `drop table if exists public.runner_staff_findings;`, 1 object, 0 refusals), then asserted the grant state from `information_schema.role_table_grants` **and** `pg_class.relacl` rather than from the migration's success flag: zero `anon`/`authenticated` privileges of any type, not even PG17 `MAINTAIN`. That is `.claude/rules/supabase-column-grants.md`'s addendum being followed rather than cited.
+
+`scripts/staff-watch.js` records a finding per agent per cycle, dedupes by fingerprint, and promotes at three **distinct cycles** — and the test's SES-158 control is the sharp one: swapping `count(distinct cycle_id)` for `count(*)` turns the three-rows-one-cycle fixture from 0 promotions into 1, so the arithmetic is pinned by a case that would fail if the rule were loosened.
+
+### The red at the end was the previous cycle's own residual, not the Builder's
+
+The suite came back 235/237 on two CLAUDE-STATE arms. The Builder proved them inherited (both files moved off the tree, same two failures) and — correctly — refused to fix them: `CLAUDE-STATE.md` is not a file its kickoff names. The cause, measured to the second: `CLAUDE-STATE.md` was rendered and committed at `273bf1d9` at 13:24:39Z, and cycle `22a5e6d6`'s ship card was written 2m18s later at 13:26:57Z. `renderBody()` takes the newest ship card per ticket, so the committed file drifted from the ledger inside three minutes. This is the `SES-278` residual arriving one step earlier than usual, because the card and the render landed in the same minute instead of in different cycles. One `render-claude-state.js` run cleared it (`78b9e4e4`), the Builder re-ran its gates and pushed: **237/237**.
+
+### Carried forward
+
+The Skill rows (slice 4). Deviation D1: `runner_card_asks.target_kind` admits only `item`/`question`, so `--promote --apply` is refused at the constraint until it is widened — written as the kickoff specifies with the DB's refusal surfaced at exit 2, never silently substituted, and nothing this cycle rests on it. D2: the promotion query runs in JS because PostgREST exposes no raw-SQL RPC here. D3: the grant-denial half of the live test is declared not-run and was measured over the MCP instead.
+
+Ship `78b9e4e4`, verdict `d245f36a` approve, auto-done eligible YES, `invention` streak 1 → 2.
+
+---
+
 ## session/cycle-20260916-1241 (v7.0.503, 2026-09-16, unattended cycle `22a5e6d6-ddef-4f18-8b73-09ed269b3a66`, `trigger = scheduled` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Builder) — `SES-378` — **partial (slice 2 landed), verdict approve: the four-cycle jam broke, and the work that had been sitting on a session branch since 04:34Z is on `dev`.**
 
 `SES-378` was picked twice today and shipped nothing both times (`aa7173c6` at 03:42Z, `0a9d8bf2` at 09:42Z), and the same red gated four further cycles that never got as far as a pick. The reason was not the ticket. `tests/regression/agt-70-auditor.test.mjs` was red on the clean tree, so every Builder correctly refused to push, and the ticket's own finished slice sat on `origin/session/cycle-20260916-0341` at `aeb7728` — built, tested, committed, never landed. Cycle `0a9d8bf2` cleared two of the three reds at 10:03Z; this cycle root-caused the third.
