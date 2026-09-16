@@ -8,12 +8,21 @@
 // WHAT IS PINNED, and where a lazier guard would go vacuously green.
 //
 // (1) THE FIVE SKILL TYPES AS A SET, NOT A COUNT. `length === 5` passes against five copies of one
-// type. `run-project` carries FIVE types over FIVE links -- there is no Format Skill since the
+// type. `run-project` carries FIVE types -- there is no Format Skill since the
 // 2026-09-09 amendment (the executor's Format branch overwrites the Intent's output contract, so
 // the contract lives on the Intent traits). THE KICKOFF DOC SAYS "six `dm-*` profiles" (Task 1) AND
-// THE SEED CARRIES FIVE; the seed is the authority and the wording drift is recorded here rather
+// THE SEED CARRIED FIVE; the seed is the authority and the wording drift is recorded here rather
 // than fixed silently -- the same drift AGT-64's, AGT-65's, AGT-66's and AGT-67's tests each
 // recorded.
+//
+// SIX LINKS OVER FIVE TYPES SINCE `SES-378` slice 4 (`v7.0.509`), and the types/links distinction
+// above is exactly why this file needed one number moved and not a rewrite. That slice added
+// `dm-knowledge-cycle-card` -- the runner cycle as the manager's own Knowledge, pinned to
+// docs/runbooks/cycle-card.md by sha -- as a SECOND `knowledge` profile at display_order 5. So the
+// type SET is unchanged at five and is still asserted as a set; what moved is the number of link
+// rows. SKILL_SLUGS below is therefore the LINKED set, and a future reader must not "restore" it to
+// five: doing so would fail against a correctly seeded board, and the set assertion beneath it --
+// which names every slug -- is what keeps the count from being satisfiable by six copies of one row.
 //
 // (2) THE MODEL IS ASSERTED AGAINST runner_model_lanes, NOT AGAINST THE STRING "claude-opus-5". A
 // literal here would be a second copy of the lane table -- the drift `SES-313` created that table
@@ -108,8 +117,14 @@ const DRIVER_REL = "scripts/run-project.js";
 const INTENT_SLUG = "dm-run-intent";
 const KNOWLEDGE_SLUG = "dm-knowledge-platform";
 const GUARDRAILS_SLUG = "dm-guardrails";
-const SKILL_SLUGS = ["dm-identity", KNOWLEDGE_SLUG, "dm-behavior", INTENT_SLUG, GUARDRAILS_SLUG];
-// Named as a SET rather than counted -- `length === 5` passes against five copies of one type.
+// SES-378 slice 4: the second `knowledge` profile. It carries the runner cycle itself (the bytes of
+// docs/runbooks/cycle-card.md, pinned by sha in its traits), where KNOWLEDGE_SLUG above carries the
+// instruments list. tests/regression/ses-378d-manager-skill-rows.test.mjs owns its contents; this
+// file owns only the fact that run-project links it.
+const CYCLE_CARD_SLUG = "dm-knowledge-cycle-card";
+const SKILL_SLUGS = ["dm-identity", KNOWLEDGE_SLUG, "dm-behavior", INTENT_SLUG, GUARDRAILS_SLUG, CYCLE_CARD_SLUG];
+// Named as a SET rather than counted -- `length === 5` passes against five copies of one type, and
+// since SES-378 slice 4 there are six links over these same five types.
 const SKILL_TYPES = ["identity", "knowledge", "behavior", "intent", "guardrails"];
 
 // The lane this agent belongs to. The MODEL is not written here on purpose -- see header note (2).
@@ -347,8 +362,9 @@ export default async function run() {
 
   const links = await rest(`capability_skill_profiles?capability_slug=eq.${RUN_PROJECT_CAPABILITY}&select=skill_profile_slug`);
   assert.equal(links.length, SKILL_SLUGS.length,
-    `${RUN_PROJECT_CAPABILITY} must link ${SKILL_SLUGS.length} Skill profiles (five types, no Format ` +
-    `Skill; the kickoff's "six dm-*" wording is stale and the seed is the authority), got ${links.length}`);
+    `${RUN_PROJECT_CAPABILITY} must link ${SKILL_SLUGS.length} Skill profiles over ${SKILL_TYPES.length} ` +
+    `types (no Format Skill; two of them are knowledge -- the instruments list and, since SES-378 ` +
+    `slice 4, the runner cycle itself), got ${links.length}`);
   assert.deepEqual(links.map(l => l.skill_profile_slug).sort(), [...SKILL_SLUGS].sort());
 
   const assigns = await rest(`agent_capability_assignments?agent_id=eq.${DEVMANAGER_AGENT_ID}&select=capability_slug`);

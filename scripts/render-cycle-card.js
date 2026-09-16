@@ -192,11 +192,281 @@ export function render(md) {
   return out.join("\n");
 }
 
+// ---- SES-378 slice 4: the card becomes the manager's own Knowledge Skill row --------------------
+//
+// WHY THE CARD NEEDS A ROW AT ALL, measured live this cycle rather than recalled. `skill_profiles`
+// holds 113 rows and NOT ONE carries the runner cycle; `capability_skill_profiles` for `run-project`
+// is five rows whose only Knowledge member is `dm-knowledge-platform`, and that profile's `method`
+// is the instruments list -- which tables to read -- not the procedure. So the Development Manager
+// is assembled with no idea what a cycle DOES, and every cycle re-reads the runbook to find out.
+// The card is already the executable digest of that procedure (see this file's header); this block
+// is what puts its bytes where the assembled prompt can see them, as data, through the trait
+// `dm-knowledge-platform` already declares (`traits.source = "inline"`, api/prompt/db-assembly.js).
+// NOTHING IN CODE LEARNS THE SLUG: db-assembly renders any profile that declares the trait
+// (.claude/rules/capabilities-are-data.md), and the slug below is this script's own subject, not a
+// branch anywhere else.
+//
+// THE PIN IS THE POINT. `traits.source_sha256` stores runbookSha() OF THE CARD -- so a row whose
+// text no longer matches the committed card is DETECTABLE (`drifted`) instead of quietly stale,
+// which is the failure mode a copied-into-a-row document always has. `--sync-knowledge` reports
+// absent / current / drifted and exits 1 on drift, so a cycle that re-renders the card and forgets
+// the row fails a check rather than running on an old procedure. It is deliberately NOT self-
+// healing: repairing drift is an UPDATE over an agent's live Knowledge, which is an agent-row write
+// John's rule (AGENT-ROW-AGREED-TICKET) wants imaged under a ticket that names it -- not a silent
+// side effect of a render.
+//
+// WHY --apply WRITES OVER PostgREST AND NOT AS ONE `DO` BLOCK, stated plainly because the runbook
+// asks for the DO block. Node here has no SQL channel: there is no `pg`/`postgres` dependency in
+// package.json and no raw-SQL RPC on this project (`public.exec_readonly_sql` does not exist --
+// probed at SES-378 slice 3's ship and again here against pg_proc). So the sequence below is
+// record_decision() -> both before-images -> both INSERTs, the same REST shape scripts/ticket-owner.js
+// and scripts/apply-title-regeneration.js already use. EVERY PROPERTY THE UNDO DEPENDS ON SURVIVES
+// that split, and the one that does not is unreachable here: runbook 7b's one-block rule exists
+// because a row's `updated_at` would otherwise postdate `decided_at` and reverse_decision() would
+// refuse it -- and NEITHER `skill_profiles` NOR `capability_skill_profiles` HAS an `updated_at`
+// column (read from information_schema this cycle; reverse_decision()'s own SES-364 comment says
+// the same of all seven agent-row tables, which is why they restore as `restored_unverified`).
+// What is preserved and is not optional: one decision handle, the image written BEFORE its row,
+// `row_data` NULL for an INSERT, and `pk_value` the row's uuid `id` -- so the ids are generated
+// HERE and inserted explicitly, because an image cannot name a pk the database has not issued yet.
+// `--decision=<uuid>` exists so a sibling write in the same slice (the guardrails edit) shares the
+// one handle rather than splitting the slice's undo across two.
+
+export const KNOWLEDGE_SLUG = "dm-knowledge-cycle-card";
+export const KNOWLEDGE_NAME = "Development Manager Knowledge — the runner cycle, one line per step";
+export const KNOWLEDGE_OBJECTIVE = "The runner cycle, step by step";
+export const KNOWLEDGE_TYPE_SLUG = "knowledge";
+export const KNOWLEDGE_CAPABILITY = "run-project";
+export const KNOWLEDGE_LEVEL = 2;
+export const KNOWLEDGE_DISPLAY_ORDER = 5;
+
+// Pure. The row §4 of the kickoff specifies, derived from the card's CURRENT bytes every time --
+// never a literal, so the pin cannot disagree with the text it pins.
+export function knowledgeRow(cardText) {
+  const text = lf(cardText);
+  return {
+    slug: KNOWLEDGE_SLUG,
+    name: KNOWLEDGE_NAME,
+    skill_type_slug: KNOWLEDGE_TYPE_SLUG,
+    objective: KNOWLEDGE_OBJECTIVE,
+    method: text,
+    traits: { source: "inline", source_file: CARD_REL, source_sha256: runbookSha(text) },
+  };
+}
+
+// THE MODEL CONFIG IS INHERITED FROM THE CAPABILITY'S OTHER SKILLS, NEVER WRITTEN HERE. A literal
+// model id in this file would be a second copy of `runner_model_lanes` -- the drift SES-313 created
+// that table to end, and the one tests/regression/agt-68-devmanager.test.mjs asserts against for
+// every `dm-*` profile: it reads the orchestrator lane live and refuses any profile that disagrees.
+// FOUND LIVE at this ship rather than reasoned about: the first seed omitted these columns, took the
+// table defaults (`claude-haiku-4-5-20251001`, 4000 tokens, NULL temperature) and went RED on that
+// assertion while its five siblings all carried the lane's model at 8000/0. Inheriting from the
+// siblings is strictly better than reading the lane here, because it copies nothing at all -- a lane
+// change that moves the other five moves this row's next seed with them, with no third place to
+// update. FAIL CLOSED ON DISAGREEMENT: if the siblings do not already agree, this cannot know which
+// of them is right, and guessing would write a model nobody chose.
+export const INHERITED_MODEL_COLUMNS = Object.freeze([
+  "llm_provider", "llm_model", "max_tokens", "api_key_source", "temperature",
+]);
+
+// Pure -- given the sibling rows, returns the config they agree on, or throws naming the column.
+export function inheritedModelConfig(siblings) {
+  if (!Array.isArray(siblings) || siblings.length === 0) {
+    throw new Error(`no sibling ${KNOWLEDGE_CAPABILITY} Skill rows to inherit the model config from — refusing to seed ${KNOWLEDGE_SLUG} on the table defaults, which is how it lands on a model nobody chose`);
+  }
+  const out = {};
+  for (const col of INHERITED_MODEL_COLUMNS) {
+    const seen = [...new Set(siblings.map(s => JSON.stringify(s[col] ?? null)))];
+    if (seen.length !== 1) {
+      throw new Error(`${KNOWLEDGE_CAPABILITY}'s existing Skill rows disagree on ${col} (${seen.join(" vs ")}) — this cannot know which is right, so it writes none of them. Settle the siblings first.`);
+    }
+    out[col] = JSON.parse(seen[0]);
+  }
+  return out;
+}
+
+// Pure, and the whole classifier. `live` is the fetched row or null.
+//   absent   -> no row: --apply may INSERT it
+//   current  -> the pinned sha equals the card's: nothing to do, and a second --apply is a no-op
+//   drifted  -> a row exists whose pin is something else: exit 1, write nothing
+export function knowledgeSyncState(live, cardSha) {
+  if (!live) return { state: "absent", pinned: null, expected: cardSha };
+  const pinned = (live.traits && live.traits.source_sha256) || null;
+  return { state: pinned === cardSha ? "current" : "drifted", pinned, expected: cardSha };
+}
+
+async function supaRest(base, key, pathAndQuery, init = {}) {
+  const res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
+    ...init,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${init.method || "GET"} ${pathAndQuery} -> ${res.status} ${text.slice(0, 400)}`);
+  return text ? JSON.parse(text) : null;
+}
+
+function flagValue(name) {
+  const hit = process.argv.find(a => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : null;
+}
+
+async function syncKnowledge() {
+  const apply = process.argv.includes("--apply");
+  const cardPath = path.join(WORKTREE, CARD_REL);
+
+  let cardText;
+  try {
+    cardText = lf(fs.readFileSync(cardPath, "utf8"));
+  } catch {
+    console.error(`render-cycle-card --sync-knowledge: ${CARD_REL} is missing — there is nothing to seed the row from. Generate it first:  node scripts/render-cycle-card.js --write`);
+    process.exit(2);
+  }
+
+  const row = knowledgeRow(cardText);
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+
+  console.log(`render-cycle-card --sync-knowledge: the row (${CARD_REL}, ${Buffer.byteLength(cardText, "utf8")} bytes)`);
+  console.log(`  slug       ${row.slug}`);
+  console.log(`  name       ${row.name}`);
+  console.log(`  objective  ${row.objective}`);
+  console.log(`  method     <the ${Buffer.byteLength(row.method, "utf8")} bytes of ${CARD_REL}>`);
+  console.log(`  traits     ${JSON.stringify(row.traits)}`);
+  console.log(`  link       ${KNOWLEDGE_CAPABILITY} · level ${KNOWLEDGE_LEVEL} · is_required true · display_order ${KNOWLEDGE_DISPLAY_ORDER}`);
+
+  if (!base || !key) {
+    const missing = [!base && "SUPABASE_URL", !key && "SUPABASE_SERVICE_KEY"].filter(Boolean).join(", ");
+    console.error(`render-cycle-card --sync-knowledge: cannot read the live row — missing env var(s): ${missing}. Exiting 2 (cannot run), which is NOT "absent": nothing was read.`);
+    process.exit(2);
+  }
+
+  let live;
+  try {
+    const rows = await supaRest(base, key, `skill_profiles?select=id,slug,method,traits&slug=eq.${KNOWLEDGE_SLUG}&limit=1`);
+    live = Array.isArray(rows) && rows.length ? rows[0] : null;
+  } catch (e) {
+    console.error(`render-cycle-card --sync-knowledge: cannot read the live row — ${e.message}. Exiting 2 (cannot run).`);
+    process.exit(2);
+  }
+
+  const st = knowledgeSyncState(live, row.traits.source_sha256);
+  console.log(`  live       ${st.state}` +
+    (st.state === "drifted" ? ` — pinned ${JSON.stringify(st.pinned)}, the card renders ${JSON.stringify(st.expected)}` : ""));
+
+  if (st.state === "drifted") {
+    console.error(`render-cycle-card --sync-knowledge: DRIFTED — public.skill_profiles.${KNOWLEDGE_SLUG} pins ${JSON.stringify(st.pinned)} but ${CARD_REL} renders ${JSON.stringify(st.expected)}. The manager is being assembled with a procedure that is no longer the committed one. Repairing it is an UPDATE over an active agent's Knowledge: image it under a ticket that names the write (AGENT-ROW-AGREED-TICKET), never as a side effect of a render.`);
+    process.exit(1);
+  }
+
+  if (!apply) {
+    console.log(`render-cycle-card --sync-knowledge: ${st.state} — no write attempted (add --apply to seed it).`);
+    process.exit(0);
+  }
+
+  if (st.state === "current") {
+    console.log(`render-cycle-card --sync-knowledge --apply: already current — no row written, no link written. A second --apply is a no-op by construction.`);
+    process.exit(0);
+  }
+
+  const cycleId = flagValue("cycle-id");
+  if (!cycleId) {
+    console.error("render-cycle-card --sync-knowledge --apply: --cycle-id=<uuid> is required — every agent-row write owes a runner_before_images row, and an image needs an owner (§19v).");
+    process.exit(2);
+  }
+
+  let decision = flagValue("decision");
+  try {
+    if (!decision) {
+      decision = await supaRest(base, key, "rpc/record_decision", {
+        method: "POST",
+        body: JSON.stringify({
+          p_cycle_id: cycleId,
+          p_session_name: null,
+          p_kind: "agent-row",
+          p_backlog_id: "SES-378",
+          p_summary: `SES-378 slice 4: the Development Manager gains ${KNOWLEDGE_SLUG}, linked to ${KNOWLEDGE_CAPABILITY} at display_order ${KNOWLEDGE_DISPLAY_ORDER}`,
+          p_reasoning: `The manager's assembled prompt carried the instruments list and no procedure, so every cycle re-read the runbook to learn what a cycle does. ${CARD_REL} is already the generated digest of it, pinned here at ${row.traits.source_sha256} so a re-render that orphans the row is detectable. SES-378.scope_origin is john-named and AGENT-ROW-AGREED-TICKET makes an agreed ticket's Knowledge write build work, imaged, not a card (pattern:0).`,
+          p_ladder_work_class: null,
+        }),
+      });
+      if (typeof decision !== "string" || decision.length !== 36) {
+        throw new Error(`record_decision returned ${JSON.stringify(decision)}, which is not a decision id`);
+      }
+    }
+
+    // Read the siblings BEFORE the images are written, so a disagreement refuses the whole apply
+    // while the ledger is still untouched rather than half-way through it.
+    const sibLinks = await supaRest(base, key, `capability_skill_profiles?select=skill_profile_slug&capability_slug=eq.${KNOWLEDGE_CAPABILITY}`);
+    const sibSlugs = sibLinks.map(l => l.skill_profile_slug).filter(s => s !== KNOWLEDGE_SLUG);
+    const sibRows = sibSlugs.length
+      ? await supaRest(base, key, `skill_profiles?select=${INHERITED_MODEL_COLUMNS.join(",")}&slug=in.(${sibSlugs.join(",")})`)
+      : [];
+    const modelConfig = inheritedModelConfig(sibRows);
+
+    // The ids are issued HERE so the before-images can name the primary keys the INSERTs will use.
+    const profileId = crypto.randomUUID();
+    const linkId = crypto.randomUUID();
+
+    // Both images first, and their success is what authorises the writes. row_data NULL is the
+    // SES-89 convention for "this row does not exist yet" -- the undo of an INSERT is a DELETE.
+    await supaRest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([
+        { cycle_id: cycleId, session_name: null, table_name: "skill_profiles", pk_value: profileId, row_data: null, decision_id: decision },
+        { cycle_id: cycleId, session_name: null, table_name: "capability_skill_profiles", pk_value: linkId, row_data: null, decision_id: decision },
+      ]),
+    });
+
+    await supaRest(base, key, "skill_profiles", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ id: profileId, ...row, ...modelConfig }),
+    });
+
+    await supaRest(base, key, "capability_skill_profiles", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        id: linkId,
+        capability_slug: KNOWLEDGE_CAPABILITY,
+        skill_profile_slug: KNOWLEDGE_SLUG,
+        level: KNOWLEDGE_LEVEL,
+        is_required: true,
+        display_order: KNOWLEDGE_DISPLAY_ORDER,
+      }),
+    });
+
+    // READ BACK, both halves. A PostgREST write the role could not make answers 2xx and changes
+    // nothing on some paths, so the row is re-read and re-classified rather than assumed.
+    const back = await supaRest(base, key, `skill_profiles?select=id,slug,method,traits&slug=eq.${KNOWLEDGE_SLUG}&limit=1`);
+    const after = knowledgeSyncState(Array.isArray(back) && back.length ? back[0] : null, row.traits.source_sha256);
+    const links = await supaRest(base, key, `capability_skill_profiles?select=skill_profile_slug,display_order&capability_slug=eq.${KNOWLEDGE_CAPABILITY}`);
+    if (after.state !== "current") {
+      throw new Error(`the row read back as "${after.state}" after the INSERT — decision ${decision} is standing and holds the images; reverse it before retrying`);
+    }
+    console.log(`render-cycle-card --sync-knowledge --apply: wrote ${KNOWLEDGE_SLUG} (${profileId}) and its ${KNOWLEDGE_CAPABILITY} link (${linkId}) under decision ${decision} — ${KNOWLEDGE_CAPABILITY} now has ${links.length} link rows; model config inherited from its ${sibSlugs.length} siblings (${modelConfig.llm_model}, ${modelConfig.max_tokens} tokens); both images carry row_data NULL.`);
+    process.exit(0);
+  } catch (e) {
+    console.error(`render-cycle-card --sync-knowledge --apply: FAILED — ${e.message}` +
+      (decision ? ` Decision ${decision} was recorded; reverse it (select public.reverse_decision('${decision}','<who>','<why>');) before retrying so the slice keeps one handle.` : ""));
+    process.exit(2);
+  }
+}
+
 // ---- CLI ----------------------------------------------------------------------------------
 // no flag  -> check: 0 the committed card equals render(runbook); 1 it differs or is over cap
 //             (prints the first differing line and the --write command); 2 the runbook or the card
 //             could not be read, a step has no NOTES entry, or NOTES names a step the runbook lacks.
 // --write  -> write the card. Refuses over CARD_BYTE_CAP.
+// --sync-knowledge [--apply --cycle-id=<uuid> [--decision=<uuid>]]
+//          -> 0 the live Knowledge row is absent or current, 1 it is DRIFTED, 2 it cannot be read
+//             (missing card, missing env, REST failure) or --apply could not complete.
 
 function firstDiff(a, b) {
   const x = a.split("\n");
@@ -208,6 +478,10 @@ function firstDiff(a, b) {
 }
 
 function main() {
+  // The sync branch is its own subcommand: it reads the CARD, never the runbook, so a stale card is
+  // reported by the check above rather than silently re-rendered into an agent's Knowledge here.
+  if (process.argv.includes("--sync-knowledge")) return syncKnowledge();
+
   const write = process.argv.slice(2).includes("--write");
   const runbookPath = path.join(WORKTREE, RUNBOOK_REL);
   const cardPath = path.join(WORKTREE, CARD_REL);
