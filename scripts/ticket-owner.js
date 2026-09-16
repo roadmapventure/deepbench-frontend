@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.506 | scripts/ticket-owner.js | SES-385 slice 1 -- CHECK 12, `remainder-stranded`:
+// a CLOSED row whose own record still names work that was never built. Two structural halves, both
+// chosen by measurement over a notes regex (39 of 159 closed rows, mostly the word "remainder" in
+// sweep prose about OTHER tickets): `ticket_matrix.actual_cycles` below the row's own
+// `predicted_cycles`, or an UNDECIDED `runner_items` card of kind `gated_before_build`. The second
+// half is why readBoard's runner_items read dropped its `decided_at` filter and gained `kind` --
+// ONE read now answers check 10's Accepts (rows WITH a decided_at) and check 12's open cards.
+// Verdict `judgment` with no `fix`: the census writes neither `status` nor `design_status`, ever.
+//
 // DeepBench v7.0.480 | scripts/ticket-owner.js | AGT-79 slice 4 -- THE JUDGMENT PASS (--judge), the
 // two-pass `exit 3` shape scripts/rank-backlog.js already carries. The census is mechanical; the
 // JUDGMENT is not. A derivable fix is arithmetic the census can compute, but whether that
@@ -32,7 +41,7 @@
 // otherwise records itself as one scheduled cycle row whose notes ARE the night's report.
 //
 // WHAT THIS FILE IS. The Ticket Owner owns a ticket's ROW after it is filed -- its quote, its
-// actual, its status and its close-out. Eleven date-fenced checks read the board once and sort
+// actual, its status and its close-out. Twelve date-fenced checks read the board once and sort
 // every gap into two kinds: DERIVABLE (another column already holds the value, so the fix is
 // computed here and carried on the finding) and JUDGMENT (a capability has to decide it, so the
 // finding carries a sentence and no fix). The census half computes both and writes NOTHING.
@@ -131,6 +140,9 @@ export const CHECKS = Object.freeze([
   "type-off-taxonomy",
   "delivered-unaccepted",
   "cycles-over-quote",
+  // SES-385: the twelfth and last. A shipped slice that stops advertising a design it already built
+  // is the fix; this is the check that finds the rows where it did not happen.
+  "remainder-stranded",
 ]);
 
 // The nightly run's signature in runner_cycles.notes. It is a PREFIX and not a column because the
@@ -181,7 +193,16 @@ export function classifyBoard(board, { now, rate }) {
   const cycles = new Map();
   for (const r of board.matrix ?? []) cycles.set(r.backlog_id, r.actual_cycles ?? 0);
   const verdicts = new Set((board.verdicts ?? []).map(r => r.backlog_id));
-  const accepts = new Set((board.accepts ?? []).map(r => r.backlog_id));
+  // ONE READ, TWO SETS (SES-385). runner_items is now read WITHOUT the `decided_at` filter, so the
+  // same rows answer both questions: a card carrying a decided_at IS the Accept check 10 reads, and
+  // an UNDECIDED card of kind `gated_before_build` is work still waiting to be built, which check 12
+  // reads. The decided_at test is what keeps the widened read from turning an open card into an
+  // Accept -- dropping the filter without it would silently answer check 10 "accepted" on every
+  // undecided card on the board.
+  const accepts = new Set((board.accepts ?? []).filter(r => r.decided_at != null).map(r => r.backlog_id));
+  const gatedOpen = new Set((board.accepts ?? [])
+    .filter(r => r.decided_at == null && r.kind === "gated_before_build")
+    .map(r => r.backlog_id));
   const liveCycles = new Set((board.openCycles ?? []).map(r => r.id));
   // A later decision stands in for an Accept: John ruling on the ticket after it was delivered is
   // the acceptance, whatever row carried it.
@@ -301,6 +322,27 @@ export function classifyBoard(board, { now, rate }) {
     if (closed && row.predicted_cycles != null && c > row.predicted_cycles) {
       file(row, "cycles-over-quote", "judgment",
         `ticket_matrix.actual_cycles reads ${c} against predicted_cycles ${row.predicted_cycles}.`);
+    }
+
+    // 12 remainder-stranded (SES-385) -- a CLOSED row whose OWN record still names work that was
+    // never built: it closed under its own quote (actual_cycles below predicted_cycles), or an
+    // undecided `gated_before_build` card is still open against it. Both halves are structural
+    // columns, chosen over a notes regex by measurement: the regex flagged 39 of 159 closed rows,
+    // mostly on the word "remainder" in sweep prose about OTHER tickets, while the undecided gated
+    // set is 4 rows platform-wide. JUDGMENT and never derivable, with NO `fix`: whether a row that
+    // closed under its quote is finished early or stranded half-built is a reading of the ticket's
+    // story, and the census writes neither `status` nor `design_status` on any row.
+    if (closed) {
+      const under = row.predicted_cycles != null && c < row.predicted_cycles;
+      const gated = gatedOpen.has(row.backlog_id);
+      if (under || gated) {
+        const why = [];
+        if (under) why.push(`ticket_matrix.actual_cycles reads ${c} against predicted_cycles ${row.predicted_cycles}`);
+        if (gated) why.push("an undecided runner_items card of kind gated_before_build still names it");
+        file(row, "remainder-stranded", "judgment",
+          `a ${status} ticket whose own record still names unbuilt work: ${why.join("; ")}` +
+          ` (design_status ${row.design_status ?? "null"}).`);
+      }
     }
 
     // Counts only, never findings: both are reported once as a number, not flagged per row.
@@ -644,8 +686,11 @@ async function readBoard(base, key) {
     "ticket_matrix?select=backlog_id,actual_cycles,predicted_cycles&limit=5000", 5000);
   const verdicts = await readAll(base, key, "runner_verdicts",
     "runner_verdicts?select=backlog_id&limit=10000", 10000);
+  // SES-385: the `decided_at=not.is.null` filter came OFF and `kind` went on, so this ONE read
+  // serves check 10's Accepts (the rows with a decided_at) and check 12's undecided
+  // `gated_before_build` cards. classifyBoard splits them; a second read would be a second board.
   const accepts = await readAll(base, key, "runner_items",
-    "runner_items?select=backlog_id,decided_at&decided_at=not.is.null&backlog_id=not.is.null&limit=10000", 10000);
+    "runner_items?select=backlog_id,kind,decided_at&backlog_id=not.is.null&limit=10000", 10000);
   const decisions = await readAll(base, key, "runner_decisions",
     "runner_decisions?select=backlog_id,decided_at&backlog_id=not.is.null&limit=10000", 10000);
   const openCycles = await readAll(base, key, "runner_cycles",

@@ -3232,13 +3232,15 @@ SELECT * FROM public.verdict_ladder_signal('<verdict id>');
   completion, and the bit that makes it more than a rename: **you do not wait.** The card goes on
   his page, the ticket sits `delivered`, and the cycle moves on to other work — a delivered ticket
   is stepped past at step 5 (the blocked-prefix table) and is excluded from drain picks in SQL, so
-  it can never be re-picked while it waits. Use `partial` exactly as before for work that genuinely
+  it can never be re-picked while it waits. **AND WHEN THE CYCLE'S OWN RECORD NAMES UNBUILT WORK, THE STATUS IS `partial` (`SES-385`,
+  `v7.0.506`):** a declared remainder, an undecided `gated_before_build` card, or a kickoff saying
+  *slice N of M* with N below M — write `partial`, never `delivered`, whatever the verdict; **clear
+  `design_status`**, so a spent kickoff stops advertising a design that is already built; and
+  **keep `kickoff_link`** — `ship_handoff_census` reads the link, and `ck_design_status_kickoff`
+  allows the cleared flag beside it. A block verdict still resets the class streak and still
+  records no ship decision. Use `partial` exactly as before for work that genuinely
   stopped half-done; `delivered` means *finished and awaiting his verdict* — **and LEAVE THE CLAIM ALONE here: it is released after the
-  push, in its own statement below (`SES-106`, `v7.0.150`).** This bullet used to read *"and
-  clear the claim in the same UPDATE (`claimed_by = NULL, claimed_at = NULL`)"*, which
-  contradicted the re-assertion gate two bullets down — a cycle cannot treat the claim as a hard
-  gate on the push after its own close-out has already dropped it. John settled the order
-  himself (`q-claim-release-order`, **yes**, 2026-08-21T22:05Z): release after the push. **Then run
+  push, in its own statement below (`SES-106`, `v7.0.150`).** John settled the claim-release order (`q-claim-release-order`, **yes**, 2026-08-21T22:05Z): release after the push. **Then run
   `SELECT public.recompute_backlog_queue();`** — completed/removed is one of B4's recompute
   events (`SES-86` phase 2, `v7.0.130`). It is idempotent and returns 0 when nothing moved, so
   running it is never wrong. **What it will NOT do any more, and that is deliberate: your ship no
@@ -3250,10 +3252,7 @@ SELECT * FROM public.verdict_ladder_signal('<verdict id>');
   renumber. So `recompute_backlog_queue()` is **unchanged** by `SES-154` — measured on a fixture
   rather than assumed: a delivered ticket sitting at queue 2 was still at queue 2 after a recompute
   that moved 0 rows. The number is released when the tail's Accept harvest writes `done` and runs
-  the recompute there. This line used to read "`FEATURES*.md` row (status + P-class)"
-  and was left behind by cycle 2's trim — those files hold no ticket rows to edit, so it
-  contradicted this same runbook's step-5 selection query. A cycle that still edits a
-  `FEATURES*.md` row is writing to a stub.
+  the recompute there.
 - Close-out edits in the same commit set: **`CLAUDE-STATE.md` is GENERATED — do not hand-edit it
   (`SES-177`, `v7.0.228`).** Set your cycle row's `version` (and `push_sha`) and run
   `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js`; the version lines and

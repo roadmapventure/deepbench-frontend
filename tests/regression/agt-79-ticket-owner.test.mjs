@@ -1,3 +1,11 @@
+// DeepBench v7.0.506 | tests/regression/agt-79-ticket-owner.test.mjs | SES-385 slice 1 -- THE
+// CENSUS IS TWELVE CHECKS NOW, and every count below is re-pinned against the same fixture rather
+// than loosened: `remainder-stranded` fires on QA-79-04 (`done`, actual_cycles 0 against
+// predicted_cycles 1), so the fixture classifies to 12 findings / 8 judgment, renderCensus prints
+// thirteen lines, and one more ledger insert is planned. The standing `CHECKS.length === 11` /
+// `CHECKS[10] === "cycles-over-quote"` pair is MOVED to 12 / `CHECKS[11]`, which is what makes this
+// file red against an unchanged scripts/ticket-owner.js. Discrimination of the new check itself
+// lives in tests/regression/ses-385-remainder-stranded.test.mjs.
 // DeepBench v7.0.505 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 5 -- NEW PART
 // L: THE RUNBOOK'S STEP 4e NOW FIRES THE JUDGED NIGHT. Slice 4 shipped the judgment pass and the
 // seed landed, so pass one exits 3 (part K live prints `gate answered 3`) -- and yet no night had
@@ -22,7 +30,7 @@
 // TICKET OWNER'S CENSUS, WRITE PASS, NIGHTLY LANDING AND JUDGMENT PASS, pinned at the level that
 // can actually go red.
 //
-// WHY EVERY ARM CARRIES A CONTROL. Ten of the eleven checks produce a SHORT list on a healthy
+// WHY EVERY ARM CARRIES A CONTROL. Eleven of the twelve checks produce a SHORT list on a healthy
 // board, and the failure mode of a census is not a wrong list -- it is an EMPTY one. A check that
 // silently stopped firing, a fence that swallowed every row, a sort that dropped ties: each of
 // those reads as "nothing to report," which is exactly what a clean night looks like. So every
@@ -38,7 +46,7 @@
 // key in it is a different write.
 //
 // (B) THE RENDER AND THE CONSTANTS. Byte-stability (the nightly report is diffed night over
-// night), the eleven lines that must print even at zero, and the four constants the whole census
+// night), the twelve lines that must print even at zero, and the four constants the whole census
 // hangs off -- a FENCES typo would quietly reclassify hundreds of rows in either direction.
 //
 // (C) THE CLI, SPAWNED WITH THE CREDENTIALS DELETED. The fixture path must run with no creds at
@@ -163,8 +171,8 @@ async function main() {
   // --- A: the census, pure --------------------------------------------------------------------
   const r = run({});
 
-  assert.deepStrictEqual(r.counts, { rows: 14, findings: 11, derivable: 4, judgment: 7 },
-    "the fourteen-row fixture must classify to exactly 11 findings, 4 derivable");
+  assert.deepStrictEqual(r.counts, { rows: 14, findings: 12, derivable: 4, judgment: 8 },
+    "the fourteen-row fixture must classify to exactly 12 findings, 4 derivable");
 
   const expected = {
     "quote-missing": ["QA-79-01"],
@@ -178,6 +186,10 @@ async function main() {
     "type-off-taxonomy": ["QA-79-12", "QA-79-13"],
     "delivered-unaccepted": ["QA-79-10"],
     "cycles-over-quote": ["QA-79-14"],
+    // SES-385's check 12: QA-79-04 is `done` with actual_cycles 0 against predicted_cycles 1 --
+    // a closed row whose own record still names work nobody built. No other fixture row closed
+    // under its quote, and the fixture carries no undecided gated_before_build card at all.
+    "remainder-stranded": ["QA-79-04"],
   };
   for (const check of CHECKS) {
     assert.deepStrictEqual(byCheck(r, check), expected[check], `${check} did not find exactly its fixture rows`);
@@ -253,22 +265,22 @@ async function main() {
   const text = renderCensus(r, F.now);
   assert.strictEqual(text, renderCensus(r, F.now), "renderCensus must be byte-stable: the report is diffed night over night");
   assert.ok(text.startsWith(
-    "ticket-owner census 2026-09-13T02:00:00Z: 14 rows · 11 findings (4 derivable · 7 judgment)" +
+    "ticket-owner census 2026-09-13T02:00:00Z: 14 rows · 12 findings (4 derivable · 8 judgment)" +
     " · behind the fences: quote 1 · size 1 · cost 1 · verdict 1 · unrevalidated>30d 1 · attended-actual null 2"),
     `the census headline is not the agreed line:\n${text.split("\n")[0]}`);
   assert.ok(text.endsWith("\n"), "the census ends with a newline");
-  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 12, "headline plus one line per check, always eleven");
+  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 13, "headline plus one line per check, always twelve");
   const sizeLine = text.split("\n").find(l => l.includes("size-missing"));
   assert.ok(sizeLine.endsWith("—"), "a check that found nothing must still print its line, ending in an em dash");
 
   const emptyText = renderCensus(
     run({ board: { items: [], matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] } }), F.now);
-  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 12, "an empty board still prints all eleven checks");
+  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 13, "an empty board still prints all twelve checks");
   assert.ok(emptyText.includes("0 rows · 0 findings"), "an empty board reports zero rows, not nothing");
 
-  assert.strictEqual(CHECKS.length, 11);
+  assert.strictEqual(CHECKS.length, 12);
   assert.strictEqual(CHECKS[0], "quote-missing");
-  assert.strictEqual(CHECKS[10], "cycles-over-quote");
+  assert.strictEqual(CHECKS[11], "remainder-stranded");
   assert.strictEqual(TYPE_TAXONOMY.length, 10, "the eight FEATURES.md rows plus the two live majorities");
   assert.ok(TYPE_TAXONOMY.includes("Tooling") && TYPE_TAXONOMY.includes("Bug"));
   assert.deepStrictEqual(Object.keys(TYPE_MAP), ["feature", "Bug Fixes"],
@@ -368,6 +380,7 @@ async function main() {
   const ins = plan.ledger.insert;
   assert.deepStrictEqual(ins.map(f => [f.backlog_id, f.check_slug]).sort(), [
     ["QA-79-04", "actual-unknown"],
+    ["QA-79-04", "remainder-stranded"],
     ["QA-79-08", "verdict-missing"],
     ["QA-79-10", "delivered-unaccepted"],
     ["QA-79-13", "type-off-taxonomy"],
@@ -397,7 +410,7 @@ async function main() {
   // (ii) CONTROL -- add a prior row matching tonight: it moves OUT of insert and INTO reseen, so
   // the two lists are proven disjoint rather than merely both populated.
   const p4 = planWrites(r, [...P, { id: "p4", backlog_id: "QA-79-04", check_slug: "actual-unknown" }], F.board.items, { rate: F.rate });
-  assert.strictEqual(p4.ledger.insert.length, 5, "a finding already on the ledger must not be inserted a second time");
+  assert.strictEqual(p4.ledger.insert.length, 6, "a finding already on the ledger must not be inserted a second time");
   assert.deepStrictEqual(p4.ledger.reseen, ["p1", "p4"]);
 
   // (iii) A fix with no primary key is not a write -- it throws rather than planning a PATCH it
@@ -553,11 +566,11 @@ async function main() {
 
   assert.strictEqual(renderCensus(r, F.now).split("\n")[0], `ticket-owner census ${F.now}: ${censusLine(r)}`,
     "renderCensus's first line IS censusLine — one string, two readers, byte-identical");
-  assert.ok(censusLine(r).startsWith("14 rows · 11 findings (4 derivable · 7 judgment) · behind the fences: quote "),
+  assert.ok(censusLine(r).startsWith("14 rows · 12 findings (4 derivable · 8 judgment) · behind the fences: quote "),
     `the census line carries the counts and the fences in order; got: ${censusLine(r).slice(0, 90)}`);
 
   const n1 = nightlyNotes(censusLine(r), { fixed: 1, inserted: 4, reseen: 0, cleared: 0, decision: "d1", expires_at: "2026-09-16T00:00:00Z" });
-  assert.ok(n1.startsWith(`${NIGHTLY_PREFIX} — 14 rows · 11 findings`), `the notes lead with the prefix the precondition reads; got: ${n1.slice(0, 60)}`);
+  assert.ok(n1.startsWith(`${NIGHTLY_PREFIX} — 14 rows · 12 findings`), `the notes lead with the prefix the precondition reads; got: ${n1.slice(0, 60)}`);
   assert.ok(n1.endsWith(" · fixed 1 · findings +4 ~0 −0 · decision d1 — reversible until 2026-09-16T00:00:00Z"),
     `a night that fixed something ends in its decision handle and window; got: ${n1.slice(-90)}`);
   const n2 = nightlyNotes(censusLine(r), { fixed: 0, inserted: 0, reseen: 170, cleared: 0, decision: null, expires_at: null });
@@ -634,7 +647,7 @@ async function main() {
     confirmed: 3, refused: 1, unconfirmed: 0, sentences: 2,
     model: "claude-fable-5-1", report: J.answer.report,
   });
-  assert.deepStrictEqual(g.result.counts, { rows: 14, findings: 11, derivable: 3, judgment: 8 },
+  assert.deepStrictEqual(g.result.counts, { rows: 14, findings: 12, derivable: 3, judgment: 9 },
     "a refused fix moves one finding from derivable to judgment and changes no other count");
   assert.deepStrictEqual(
     g.result.findings.map(f => `${f.backlog_id} ${f.check}`),
@@ -656,7 +669,7 @@ async function main() {
   const pj = planWrites(g.result, J.prior, F.board.items, { rate: F.rate });
   assert.deepStrictEqual(pj.fixes.map(f => f.backlog_id), ["QA-79-03", "QA-79-07", "QA-79-12"],
     "only the confirmed fixes become writes");
-  assert.strictEqual(pj.ledger.insert.length, 7, "eight judgment pairs minus the one already on the ledger");
+  assert.strictEqual(pj.ledger.insert.length, 8, "nine judgment pairs minus the one already on the ledger");
   assert.deepStrictEqual(pj.ledger.reseen, ["00000000-0000-4000-8000-0000000000a1"]);
   assert.deepStrictEqual(pj.ledger.clear, ["00000000-0000-4000-8000-0000000000a2"]);
 
@@ -738,7 +751,7 @@ async function main() {
   assert.strictEqual(kDry.status, 0, `--answer --dry-run needs no cycle and no creds; stderr: ${kDry.stderr}`);
   assert.deepStrictEqual(JSON.parse(kDry.stdout), {
     ok: true, dry_run: true, confirmed: 3, refused: 1, unconfirmed: 0,
-    fixes: 3, insert: 7, reseen: 1, clear: 1,
+    fixes: 3, insert: 8, reseen: 1, clear: 1,
   }, "the dry run must report the same plan the pure half computes");
 
   const kNoState = spawnCli(["--judge", `--answer=${answerPath}`, `--state-file=${path.join(D, "missing.json")}`, "--dry-run"]);
