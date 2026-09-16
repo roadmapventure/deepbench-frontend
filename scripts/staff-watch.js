@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.511 | scripts/staff-watch.js | SES-378 slice 5 -- DEVIATION D1 IS RETIRED, and the
+// only thing that changed is the database. `runner_card_asks_target_kind_check` now admits
+// `'skill-edit'` (migration `ses378e_card_ask_skill_edit`), so `--promote --apply` files the ask it
+// has been writing all along instead of being refused 23514. NOT ONE LINE OF BEHAVIOUR MOVED here;
+// the comment at the INSERT records the widening and cites the ticket. Guarded both directions by
+// `tests/regression/ses-378e-staff-watch-brief.test.mjs` (1): `'skill-edit'` inserts, `'item'` still
+// inserts, and `'not-a-kind'` is still refused 23514 -- a constraint that was DROPPED rather than
+// widened would pass the first two and fail the third.
+//
 // DeepBench v7.0.508 | scripts/staff-watch.js | SES-378 slice 3 -- build item (6) THE STAFF WATCH.
 //
 // WHY THIS EXISTS, and it is a table's absence rather than a missing feature. All 70 `public` base
@@ -297,12 +306,14 @@ async function promote(args) {
       // ONE ROW EACH, never one per finding: the ask is about the fingerprint, and `uniq_card_ask
       // (target_id, asked_at, question)` is the only thing between a re-run and a duplicated thread.
       //
-      // DEVIATION D1, REPORTED NOT ROUTED AROUND. The kickoff specifies `target_kind = 'skill-edit'`.
-      // Read off the live database at this ship: `runner_card_asks_target_kind_check` admits only
-      // `'item'` and `'question'`, so this INSERT is refused (23514) until a later slice widens that
-      // constraint. The value is written as the kickoff specifies and the database's own refusal is
-      // surfaced at exit 2 -- a silently substituted `'item'` would file the ask under the wrong
-      // vocabulary and nobody would ever learn the constraint was in the way.
+      // DEVIATION D1 IS RETIRED as of `SES-378` slice 5 (`v7.0.511`, migration
+      // `ses378e_card_ask_skill_edit`): `runner_card_asks_target_kind_check` now reads
+      // `CHECK ((target_kind = ANY (ARRAY['item'::text, 'question'::text, 'skill-edit'::text])))`,
+      // so this INSERT is accepted rather than refused 23514. NOTHING HERE CHANGED to make that
+      // true, and that is the point D1 was making: the value was written as the kickoff specified
+      // and the database's own refusal was surfaced at exit 2, so the constraint could be widened
+      // deliberately. A silently substituted `'item'` would have filed every ask under the wrong
+      // vocabulary and nobody would ever have learned the constraint was in the way.
       const written = await db.post("runner_card_asks?on_conflict=target_id,asked_at,question", [{
         target_kind: "skill-edit",
         target_id: p.fingerprint,

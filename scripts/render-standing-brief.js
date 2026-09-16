@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// DeepBench v7.0.511 | scripts/render-standing-brief.js | SES-378 slice 5 — THE STAFF WATCH REACHES
+// THE BRIEF. A new group, `Staff watch`, lands AFTER `Ticket hygiene, last night` and BEFORE
+// `Human gates`: `public.runner_staff_findings` rows per `agent_id`, with distinct fingerprints,
+// distinct cycles and the newest. Slice 3 shipped the table and slice 4 shipped the counter, and
+// `grep -n runner_staff_findings scripts/render-standing-brief.js` returned ZERO hits at this ship —
+// every finding the Development Manager recorded about the runner's own agents was displayed
+// nowhere. The promotion bar is 3 distinct CYCLES, which is why this group prints the cycle count
+// beside the row count rather than the row count alone: they are the two different numbers and only
+// one of them moves a finding toward a Skill edit.
+//
 // DeepBench v7.0.487 | scripts/render-standing-brief.js | SES-386 — IS ANYTHING WAITING ON A HUMAN?
 // A new group, `Human gates`, lands AFTER `Ticket hygiene, last night` and BEFORE the provenance
 // footer: the open `needs-john` tickets and the undecided `gated_before_build` cards, counted, with
@@ -373,6 +383,14 @@ export function factsSha(facts) {
           needsJohn: Array.isArray(facts.humanGates.needsJohn) ? [...facts.humanGates.needsJohn].map(String).sort() : null,
           undecidedCards: Array.isArray(facts.humanGates.undecidedCards) ? [...facts.humanGates.undecidedCards].map(String).sort() : null,
         }
+      : null,
+    // FEATURE: SES-378 slice 5 — the staff ledger's IDENTITY TRIPLES, sorted, so a new finding, a
+    // defect recurring in a second cycle, or a row leaving each move the sha and --check reports the
+    // drift. (agent, fingerprint, cycle) and NOT `created_at`: the triple IS the row's identity —
+    // `unique (cycle_id, fingerprint)` makes a repeat within one cycle unwritable — while including
+    // the timestamp would report drift on a re-record that changed nothing a reader sees.
+    staff: Array.isArray(facts.staff)
+      ? facts.staff.map(r => [String(r.agent_id), String(r.fingerprint), String(r.cycle_id)]).sort()
       : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
@@ -936,6 +954,69 @@ export function renderTicketHygiene(hygiene, stamp, nowIso) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: SES-378 slice 5 — `Staff watch`: what the Development Manager recorded about the
+ * runner's own agents. Pure, like every group above it — `staff` is the array fetchFacts() read and
+ * nothing here goes near the network or the clock.
+ *
+ * ONE ROW PER AGENT, and the grouping key is the agent because a Skill edit lands on ONE agent's
+ * Skill (`tests/regression/ses-378c-staff-watch.test.mjs` (a) pins the same key on the fingerprint
+ * side). Four numbers per agent: findings, distinct fingerprints, distinct cycles, newest.
+ *
+ * DISTINCT CYCLES IS NOT THE ROW COUNT, and printing only one of them would be the slice-4 defect
+ * wearing a table. `PROMOTION_BAR` is 3 distinct CYCLES: three rows written by one chatty cycle is
+ * one observation recorded three times and must never read as a defect three cycles saw. The two
+ * columns sitting side by side are what let a reader see which of the two a number is.
+ *
+ * ABSENT IS NOT ZERO. A missing or non-array `staff` renders "the staff ledger was not read", never
+ * a count — and deliberately never the words a measured zero uses, because "the read failed" and
+ * "the ledger is empty" are opposite facts and only one of them is a measurement.
+ */
+export function renderStaffWatch(staff, stamp) {
+  const L = [];
+  const lead = `**Staff watch** — *${stamp}.* What the Development Manager (\`SES-378\`) recorded ` +
+    "about the runner's own agents: `public.runner_staff_findings` rows per `agent_id`, with the " +
+    "distinct fingerprints and the distinct CYCLES behind them. Counts only, never a rate.";
+
+  if (!Array.isArray(staff)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The staff ledger was not read for this render* — which is **not** the same as *an " +
+      "empty ledger*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const by = new Map();
+  for (const r of staff) {
+    const id = String(r.agent_id);
+    let cur = by.get(id);
+    if (!cur) by.set(id, (cur = { id, n: 0, fps: new Set(), cycles: new Set(), newest: null }));
+    cur.n++;
+    if (r.fingerprint != null) cur.fps.add(String(r.fingerprint));
+    if (r.cycle_id != null) cur.cycles.add(String(r.cycle_id));
+    if (!cur.newest || Date.parse(r.created_at) > Date.parse(cur.newest)) cur.newest = r.created_at;
+  }
+  const agents = [...by.values()].sort((a, b) => b.n - a.n || a.id.localeCompare(b.id));
+
+  L.push(`${lead} **${staff.length} finding(s)** across ${agents.length} agent(s).`);
+  L.push("");
+
+  if (staff.length === 0) {
+    L.push("- **No findings — a measured zero:** the ledger was read and holds no row.");
+    L.push("");
+  } else {
+    L.push("| agent | findings | distinct fingerprints | distinct cycles | newest |");
+    L.push("|---|---:|---:|---:|---|");
+    for (const a of agents) {
+      L.push(`| \`${a.id}\` | ${a.n} | ${a.fps.size} | ${a.cycles.size} | ${a.newest ? cst(a.newest) : "—"} |`);
+    }
+    L.push("");
+  }
+
+  return L.join("\n");
+}
+
 /** How many gate ids the Human gates block names before it stops listing and says how many are left. */
 export const HUMAN_GATE_IDS_SHOWN = 5;
 
@@ -1030,7 +1111,9 @@ export function renderBlock(facts, nowIso) {
   // means "not read", never "the Ticket Owner found nothing".
   // FEATURE: SES-386 — humanGates joins the destructure on the same terms as hygiene: absent means
   // "not read", never "nothing is waiting on a human".
-  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates } = facts;
+  // FEATURE: SES-378 slice 5 — staff joins the destructure on the same terms as humanGates: absent
+  // means "not read", never "the Development Manager found nothing".
+  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1250,10 +1333,19 @@ export function renderBlock(facts, nowIso) {
   // printing the night's own notes rather than recounting the board behind them.
   L.push(renderTicketHygiene(hygiene, stamp, nowIso));
 
+  // ---- Staff watch (FEATURE: SES-378 slice 5) -----------------------------------------------
+  // AFTER Ticket hygiene and BEFORE Human gates, which keeps Human gates the last group: this one
+  // reports what a cycle found about the runner's own agents, and the group below it is the one
+  // that says whether anything above it is waiting on a person. Same contract as the seven groups
+  // above it — a pure helper a fixture can drive, rendering what fetchFacts() read and counting
+  // nothing the table could have counted itself.
+  L.push(renderStaffWatch(staff, stamp));
+
   // ---- Human gates (FEATURE: SES-386) -------------------------------------------------------
-  // After Ticket hygiene, before the provenance line. The LAST group deliberately: it is the one
-  // that says whether anything above it is waiting on a person rather than on a cycle. Same
-  // contract as the seven groups above it — a pure helper a fixture can drive, rendering the two
+  // After Staff watch (SES-378 slice 5 landed between it and Ticket hygiene), before the provenance
+  // line. The LAST group deliberately: it is the one that says whether anything above it is waiting
+  // on a person rather than on a cycle. Same
+  // contract as the eight groups above it — a pure helper a fixture can drive, rendering the two
   // reads fetchFacts() made and counting nothing they could have counted themselves.
   L.push(renderHumanGates(humanGates, stamp));
 
@@ -1532,6 +1624,19 @@ export async function fetchFacts(url, key) {
   if (!Array.isArray(hygRun)) die("the nightly cycle read came back non-array — refusing to render the hygiene group from nothing");
   const hygiene = { open: hygOpen, decision: hygDec[0] ?? null, run: hygRun[0] ?? null };
 
+  // FEATURE: SES-378 slice 5 — the Development Manager's staff findings, one read, no view.
+  //
+  // THE ROWS, NOT A GROUPING: the per-agent counting happens in renderStaffWatch() where a fixture
+  // can drive it, the same division every group above it keeps. Columns are NAMED, never `select=*`
+  // (.claude/rules/supabase-column-grants.md) — and `detail` is deliberately absent, because the
+  // group prints counts and a finding's prose belongs to `scripts/staff-watch.js`, not to a brief.
+  //
+  // AN EMPTY LEDGER IS A REAL STATE (it renders as a measured zero) but a read that did not happen
+  // is not: a non-array refuses here rather than publishing a clean-looking staff nobody measured.
+  const staff = await rest(url, key,
+    "runner_staff_findings?select=agent_id,kind,fingerprint,cycle_id,created_at&order=created_at.desc&limit=10000");
+  if (!Array.isArray(staff)) die("the runner_staff_findings read came back non-array — refusing to render the staff-watch group from nothing");
+
   // FEATURE: SES-386 — the two human-gate reads, moved here from two regression guards.
   //
   // THE FILTERS ARE THE ONES ses-285 ASSERTION 6 AND ses-373 ASSERTION 1 RAN, character for
@@ -1552,7 +1657,7 @@ export async function fetchFacts(url, key) {
     undecidedCards: gateCards.map(r => r.id),
   };
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates };
+  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff };
 }
 
 async function main() {
