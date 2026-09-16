@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.512 | scripts/ticket-owner.js | AGT-79 slice 6 -- AN UNJUDGED NIGHT NOW SAYS SO.
+// One branch: nightlyNotes() ends ` · unjudged` where it used to end with nothing. Five
+// `audit-board` nights ran arithmetic-only and the board could not tell, because a night that
+// skipped pass two wrote a string byte-identical to slice 3's. The prefix the precondition and the
+// standing brief match on is untouched; only the tail grew.
+//
 // DeepBench v7.0.506 | scripts/ticket-owner.js | SES-385 slice 1 -- CHECK 12, `remainder-stranded`:
 // a CLOSED row whose own record still names work that was never built. Two structural halves, both
 // chosen by measurement over a notes regex (39 of 159 closed rows, mostly the word "remainder" in
@@ -455,9 +461,12 @@ export function sameChicagoDay(aIso, bIso) {
 // census line verbatim, the four write counts, and the decision handle with its reversal window.
 // This string is the night's whole report -- the standing brief prints it rather than recomputing
 // it, so what John reads is what the run actually said about itself.
-// `judged` is optional and appended LAST, so an unjudged night's notes are byte-identical to what
-// slice 3 wrote -- the standing brief and the precondition read the same string they always did,
-// and a judged night simply says one more thing at the end.
+// `judged` is optional and the LAST thing the string says, but its absence is now SPOKEN rather
+// than silent (slice 6): an unjudged night ends ` · unjudged` where slice 3-5 ended with nothing.
+// A night that ran arithmetic-only used to be byte-identical to a night from before the judgment
+// pass existed, so five unjudged nights passed unnoticed on the board. The precondition and the
+// standing brief both read this string by its PREFIX (`NIGHTLY_PREFIX`), never by its ending, so
+// lengthening the tail changes what John reads and nothing that matches it.
 export function nightlyNotes(line, applied, judged) {
   const a = applied ?? {};
   const head = `${NIGHTLY_PREFIX} — ${line} · fixed ${a.fixed} · findings +${a.inserted} ~${a.reseen} −${a.cleared}`;
@@ -466,7 +475,7 @@ export function nightlyNotes(line, applied, judged) {
     : " · no decision (nothing to fix)";
   return head + tail + (judged
     ? ` · judged ${judged.confirmed}/${judged.refused}/${judged.unconfirmed} on ${judged.model}`
-    : "");
+    : " · unjudged");
 }
 
 // --- the judgment pass, pure (slice 4) ---------------------------------------------------------

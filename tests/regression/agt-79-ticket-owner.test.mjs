@@ -1,3 +1,13 @@
+// DeepBench v7.0.512 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 6 -- NEW PART
+// M: THE UNJUDGED NIGHT SAYS SO. Part L pinned the runbook line that fires the judged night; it
+// fired five times, judged nothing, and nothing on the board could tell -- an arithmetic-only
+// night's notes were byte-identical to slice 3's. Part M pins the new ` · unjudged` tail with its
+// judged control, and the brief's new bullet with THE DISCRIMINATOR: two night ledgers whose
+// newest row is unjudged in both, differing only in whether nights 2-4 were judged, must render
+// DIFFERENT bytes (streak 1 against streak 4). A renderer reading `run` alone -- every renderer
+// before this slice -- renders them identically, which is what makes this arm a measurement.
+// Absent `nights` renders "not read", never a streak of 0. Source-only, no credentials.
+//
 // DeepBench v7.0.506 | tests/regression/agt-79-ticket-owner.test.mjs | SES-385 slice 1 -- THE
 // CENSUS IS TWELVE CHECKS NOW, and every count below is re-pinned against the same fixture rather
 // than loosened: `remainder-stranded` fires on QA-79-04 (`done`, actual_cycles 0 against
@@ -125,7 +135,7 @@ import {
   chicagoDay, judgeTask, ingestJudgment, statePathFor, EXIT_AWAITING_ANSWER,
 } from "../../scripts/ticket-owner.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
-import { renderTicketHygiene, factsSha, cst, BEGIN, END } from "../../scripts/render-standing-brief.js";
+import { renderTicketHygiene, factsSha, cst, BEGIN, END, HYGIENE_NIGHTS_READ } from "../../scripts/render-standing-brief.js";
 import { parseSteps, render, NOTES, CARD_REL, RUNBOOK_REL } from "../../scripts/render-cycle-card.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -569,12 +579,15 @@ async function main() {
   assert.ok(censusLine(r).startsWith("14 rows · 12 findings (4 derivable · 8 judgment) · behind the fences: quote "),
     `the census line carries the counts and the fences in order; got: ${censusLine(r).slice(0, 90)}`);
 
+  // Slice 6 appended ` · unjudged` to the falsy-`judged` branch, so these two arms carry it: the
+  // decision handle and the no-decision sentence are still the last thing the night says about its
+  // WRITES, and the judgment tail now follows them either way. Part M owns the tail itself.
   const n1 = nightlyNotes(censusLine(r), { fixed: 1, inserted: 4, reseen: 0, cleared: 0, decision: "d1", expires_at: "2026-09-16T00:00:00Z" });
   assert.ok(n1.startsWith(`${NIGHTLY_PREFIX} — 14 rows · 12 findings`), `the notes lead with the prefix the precondition reads; got: ${n1.slice(0, 60)}`);
-  assert.ok(n1.endsWith(" · fixed 1 · findings +4 ~0 −0 · decision d1 — reversible until 2026-09-16T00:00:00Z"),
+  assert.ok(n1.endsWith(" · fixed 1 · findings +4 ~0 −0 · decision d1 — reversible until 2026-09-16T00:00:00Z · unjudged"),
     `a night that fixed something ends in its decision handle and window; got: ${n1.slice(-90)}`);
   const n2 = nightlyNotes(censusLine(r), { fixed: 0, inserted: 0, reseen: 170, cleared: 0, decision: null, expires_at: null });
-  assert.ok(n2.endsWith(" · fixed 0 · findings +0 ~170 −0 · no decision (nothing to fix)"),
+  assert.ok(n2.endsWith(" · fixed 0 · findings +0 ~170 −0 · no decision (nothing to fix) · unjudged"),
     `a night with nothing to fix records no decision and SAYS so; got: ${n2.slice(-70)}`);
   assert.strictEqual(NIGHTLY_PREFIX, "SCHEDULED-AGENT: audit-board", "the prefix is the contract between the script, the runbook and the brief");
 
@@ -802,6 +815,78 @@ async function main() {
   assert.strictEqual(cardCheck.status, 0,
     `the committed card is stale against the edited runbook — run node scripts/render-cycle-card.js --write; stdout: ${cardCheck.stdout} stderr: ${cardCheck.stderr}`);
   console.log(`[AGT-79] part L: step 4e fires --nightly --judge; runbook ${Buffer.byteLength(md4e, "utf8")}B < 381000; card re-rendered (renderer exit 0)`);
+
+  // --- M: the UNJUDGED night says so (slice 6, pure/source-only) ---------------------------------
+  // Part L pinned the runbook line that FIRES the judged night. It fired five times and judged
+  // nothing, and the board could not tell: `nightlyNotes` appended the judged tail when pass two
+  // ran and NOTHING otherwise, so an arithmetic-only night was byte-identical to a night from
+  // before the judgment pass existed. Every arm here is source-only and needs no credentials.
+
+  // (a) and (b): the notes now say which kind of night this was, in both directions. The negative
+  // is the arm that was missing, and the positive is the control that proves the tail still lands.
+  const mUn = nightlyNotes(censusLine(r), { fixed: 0, inserted: 0, reseen: 170, cleared: 0, decision: null, expires_at: null });
+  assert.ok(mUn.endsWith(" · unjudged"),
+    `a night that ran without pass two must SAY it went unjudged; got: ${mUn.slice(-60)}`);
+  assert.ok(mUn.startsWith(`${NIGHTLY_PREFIX} — `),
+    "the tail is longer, the PREFIX is untouched — the precondition and the brief both read it by prefix");
+  const mJudged = nightlyNotes(censusLine(r), { fixed: 0, inserted: 0, reseen: 170, cleared: 0, decision: null, expires_at: null },
+    { confirmed: 4, refused: 1, unconfirmed: 0, model: "claude-fable-5-1" });
+  assert.ok(mJudged.endsWith(" · judged 4/1/0 on claude-fable-5-1"),
+    `a judged night still ends in its counts and the model that produced them; got: ${mJudged.slice(-60)}`);
+  assert.ok(!mJudged.includes(" · unjudged"),
+    "the two tails are exclusive — a judged night must never also carry the unjudged word");
+
+  // The fixtures for the renderer arms. Five nights, newest first, exactly as the REST read orders
+  // them. `mNight(judged)` differs in ONE thing: whether the notes carry the judged tail.
+  const mNight = (n, judged) => ({
+    id: `1111111${n}-2222-4333-8444-55555555555${n}`,
+    outcome: "shipped",
+    ended_at: `2026-09-1${n}T03:40:00+00:00`,
+    notes: `${NIGHTLY_PREFIX} — 855 rows · 170 findings (0 derivable · 170 judgment) · fixed 0 · ` +
+      `findings +0 ~170 −0 · no decision (nothing to fix)` +
+      (judged ? " · judged 4/1/0 on claude-fable-5-1" : " · unjudged"),
+  });
+  const streakOf = out => {
+    const m = out.match(/\*\*(\d+)\*\* consecutive unjudged/);
+    return m ? Number(m[1]) : null;
+  };
+
+  // (c) THE DISCRIMINATOR. Two ledgers whose newest night is unjudged in both and which differ ONLY
+  // in whether nights 2-4 were judged: one broken streak, one four nights deep. A renderer that
+  // reads `run` alone — which is every renderer before this slice — renders these IDENTICALLY, so
+  // this pair is what fails against the old code rather than merely passing against the new.
+  const mBroken = { ...HYG(), nights: [mNight(5, false), mNight(4, true), mNight(3, true), mNight(2, true), mNight(1, true)] };
+  const mDeep = { ...HYG(), nights: [mNight(5, false), mNight(4, false), mNight(3, false), mNight(2, false), mNight(1, true)] };
+  const oBroken = renderTicketHygiene(mBroken, "as of X", NOW);
+  const oDeep = renderTicketHygiene(mDeep, "as of X", NOW);
+  assert.notStrictEqual(oBroken, oDeep,
+    "four unjudged nights and one must not render the same bytes — that identity IS the defect this slice closes");
+  assert.strictEqual(streakOf(oBroken), 1, `one unjudged night on top of a judged run reads a streak of 1; got: ${oBroken}`);
+  assert.strictEqual(streakOf(oDeep), 4, `four consecutive unjudged nights read a streak of 4; got: ${oDeep}`);
+  assert.ok(oDeep.includes("ran UNJUDGED"), "the unjudged form names the state in words, not only in a number");
+  assert.ok(oDeep.indexOf("- Judgment:") > oDeep.indexOf("- Last run:"),
+    "the judgment bullet reads after the run it is about");
+
+  // (d) The other direction, and it must not be the same sentence with a different number: a judged
+  // newest night is the YES form, and its streak is a measured 0.
+  const oYes = renderTicketHygiene({ ...HYG(), nights: [mNight(5, true), mNight(4, false)] }, "as of X", NOW);
+  assert.ok(oYes.includes("the newest night was judged"), `a judged newest night says so; got: ${oYes}`);
+  assert.ok(!oYes.includes("ran UNJUDGED"), "the yes form must not also carry the no form's words");
+  assert.strictEqual(streakOf(oYes), null, "the yes form reports no consecutive-unjudged count to read");
+  assert.ok(oYes.includes("0 unjudged nights on top"), "the yes form still states the streak, as a measured zero");
+
+  // (e) ABSENT IS NOT ZERO — the rule the rest of this group already follows. A ledger that was
+  // never read must never render as "0 unjudged nights", which is the opposite claim.
+  const oUnread = renderTicketHygiene({ ...HYG(), nights: undefined }, "as of X", NOW);
+  assert.ok(oUnread.includes("night ledger was not read"), `an unread night ledger says so; got: ${oUnread}`);
+  assert.ok(!oUnread.includes("0 unjudged nights"), "an unread ledger must never render as a measured zero");
+  assert.ok(!oUnread.includes("ran UNJUDGED"), "an unread ledger is not evidence of an unjudged night either");
+  assert.strictEqual(streakOf(oUnread), null, "no streak can be counted from a ledger that was not read");
+
+  // (f) Purity, the property every group in the brief is held to, re-asserted over the new input.
+  assert.strictEqual(renderTicketHygiene(mDeep, "as of X", NOW), oDeep, "the group is pure — same facts, same bytes");
+  assert.strictEqual(HYGIENE_NIGHTS_READ, 14, "the nightly read's depth is a named constant, and the streak can only count what it read");
+  console.log(`[AGT-79] part M: unjudged notes tail lands; renderer discriminates streak ${streakOf(oDeep)} from ${streakOf(oBroken)} over ${HYGIENE_NIGHTS_READ}-night reads`);
 
   // --- E: live ---------------------------------------------------------------------------------
   const base = process.env.SUPABASE_URL;

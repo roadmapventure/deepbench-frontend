@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.512 | scripts/render-standing-brief.js | AGT-79 slice 6 — WAS LAST NIGHT JUDGED?
+// `Ticket hygiene, last night` printed the newest nightly row's notes verbatim and nothing else,
+// which left the one fact that mattered invisible: five nights ran without the judgment pass and
+// the board said nothing. The nightly read widens from 1 row to HYGIENE_NIGHTS_READ (`nights`;
+// `run` stays `nights[0]`, so factsSha is untouched) and the group gains ONE bullet after
+// `Last run` — judged or not, with the consecutive-unjudged streak counted newest-first. A night
+// is judged IFF its notes carry `· judged`. An unread ledger says so; it never renders a zero.
+//
 // DeepBench v7.0.511 | scripts/render-standing-brief.js | SES-378 slice 5 — THE STAFF WATCH REACHES
 // THE BRIEF. A new group, `Staff watch`, lands AFTER `Ticket hygiene, last night` and BEFORE
 // `Human gates`: `public.runner_staff_findings` rows per `agent_id`, with distinct fingerprints,
@@ -875,6 +883,18 @@ export function renderAuditLedger(audit, stamp) {
   return L.join("\n");
 }
 
+/** How many nightly `audit-board` rows the hygiene group reads to count the unjudged streak. */
+export const HYGIENE_NIGHTS_READ = 14;
+
+/**
+ * Was this nightly row JUDGED — the one predicate, used by the renderer and nothing else. The
+ * positive tail only, for the reason spelled out in renderTicketHygiene's header: rows written
+ * before AGT-79 slice 6 carry neither tail, and they are unjudged nights.
+ */
+function isJudgedNight(n) {
+  return String(n?.notes ?? "").includes(" · judged ");
+}
+
 /**
  * FEATURE: AGT-79 slice 3 — `Ticket hygiene, last night`: what the Ticket Owner's nightly pass left
  * on the board. Pure, like every group above it — `hygiene` is what fetchFacts() read, and nothing
@@ -891,7 +911,19 @@ export function renderAuditLedger(audit, stamp) {
  *
  * ABSENT IS NOT ZERO. A missing or non-array `open` renders "the hygiene ledger was not read",
  * never "no open findings" — the two sentences describe opposite situations and only one of them
- * is a measurement.
+ * is a measurement. The same rule governs `nights` below: absent renders "the night ledger was not
+ * read", never a streak of 0, which would say the opposite of what was measured.
+ *
+ * AGT-79 slice 6 — WAS LAST NIGHT JUDGED, AND HOW LONG HAS IT NOT BEEN. The `Last run` bullet
+ * prints the night's own notes verbatim, which is honest and, for the one fact that matters here,
+ * invisible: five `audit-board` nights ran arithmetic-only and nothing on the board said so. This
+ * group now reads the newest HYGIENE_NIGHTS_READ nights and answers the question directly.
+ *
+ * ONE PREDICATE, BOTH ERAS: a night is judged IFF its notes contain `" · judged "` — the tail
+ * scripts/ticket-owner.js appends only when pass two wrote the audit row first (§19k), so the tail
+ * standing in for the `ai_activity_log` row is a sound proxy and this file needs no second read.
+ * The NEGATIVE tail (`· unjudged`) is deliberately NOT the predicate: every row written before
+ * slice 6 lacks both tails, and reading the positive one classifies those correctly as unjudged.
  */
 export function renderTicketHygiene(hygiene, stamp, nowIso) {
   const L = [];
@@ -943,6 +975,24 @@ export function renderTicketHygiene(hygiene, stamp, nowIso) {
       `${String(run.notes).replace(/^SCHEDULED-AGENT: audit-board — /, "")}`
     : "- *No nightly run on record yet* — runbook step 4e has not fired; the counts above are the " +
       "ledger as it stands.");
+
+  const nights = hygiene.nights;
+  if (!Array.isArray(nights)) {
+    L.push("- *The night ledger was not read for this render* — which is **not** the same as *every " +
+      "night judged*. Re-run `scripts/render-standing-brief.js` with a service key.");
+  } else if (nights.length === 0) {
+    L.push("- *No nightly run on record to judge* — a measured zero: the night ledger was read and " +
+      "holds no `audit-board` row.");
+  } else {
+    let streak = 0;
+    while (streak < nights.length && !isJudgedNight(nights[streak])) streak++;
+    L.push(streak === 0
+      ? `- Judgment: **the newest night was judged** — 0 unjudged nights on top, over the newest ` +
+        `${nights.length} on record.`
+      : `- Judgment: **the newest night ran UNJUDGED** — **${streak}** consecutive unjudged ` +
+        `night(s), over the newest ${nights.length} on record. A night is judged only when its ` +
+        "notes carry `· judged`; runbook step 4e is the line that fires it.");
+  }
 
   const d = hygiene.decision;
   L.push(d
@@ -1618,11 +1668,17 @@ export async function fetchFacts(url, key) {
   const hygDec = await rest(url, key,
     "runner_decisions?select=id,status,summary,expires_at,decided_at&kind=eq.hygiene&order=decided_at.desc&limit=1");
   if (!Array.isArray(hygDec)) die("the hygiene decision read came back non-array — refusing to render the hygiene group from nothing");
+  // AGT-79 slice 6 — the same read, widened from 1 row to HYGIENE_NIGHTS_READ so the group can say
+  // how MANY consecutive nights went unjudged, not just what the newest one said. `run` stays
+  // `hygRun[0]`, the identical value the limit=1 read produced, so factsSha's `hygiene` member is
+  // byte-for-byte what it was and --check reports no drift from this widening. The streak itself is
+  // deliberately NOT in the sha: it moves every night by construction, and drift is for what John
+  // has to look at, not for the clock.
   const hygRun = await rest(url, key,
     "runner_cycles?select=id,ended_at,outcome,notes&notes=like." + encodeURIComponent("SCHEDULED-AGENT: audit-board%") +
-    "&ended_at=not.is.null&order=ended_at.desc&limit=1");
+    `&ended_at=not.is.null&order=ended_at.desc&limit=${HYGIENE_NIGHTS_READ}`);
   if (!Array.isArray(hygRun)) die("the nightly cycle read came back non-array — refusing to render the hygiene group from nothing");
-  const hygiene = { open: hygOpen, decision: hygDec[0] ?? null, run: hygRun[0] ?? null };
+  const hygiene = { open: hygOpen, decision: hygDec[0] ?? null, run: hygRun[0] ?? null, nights: hygRun };
 
   // FEATURE: SES-378 slice 5 — the Development Manager's staff findings, one read, no view.
   //
