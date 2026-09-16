@@ -52,12 +52,24 @@
 //     then re-reads that same function and refuses on any drift (see `stateDrift`), which is what
 //     makes editing the state file between the two passes a refusal rather than an instruction.
 //
-// (4) IT NEVER CLAIMS A TICKET A LIVE PEER HOLDS. The claim is ONE atomic PATCH carrying the
-//     runbook's own guard (`docs/runbooks/session-setup.md` § 2c, rule B40): the 24h-expiry filter
-//     rides in the query string, so the database -- not this file -- decides. 1 row back = ours,
-//     0 rows = somebody else's, and there is no check-then-claim pair anywhere in this file. It sets
-//     `claimed_by` / `claimed_at` and NOTHING else: `SES-316` made bumping `updated_at` on a claim
-//     the reason a decision minutes earlier became un-restorable.
+// (4) IT NEVER CLAIMS A TICKET A LIVE PEER HOLDS, AND THE CLAIM IT WRITES IS THE CYCLE'S OWN ID
+//     (SES-378 slice 2). The claim is ONE atomic PATCH carrying the runbook's own guard
+//     (`docs/runbooks/session-setup.md` § 2c, rule B40): the 24h-expiry filter rides in the query
+//     string, so the database -- not this file -- decides. 1 row back = ours, 0 rows = somebody
+//     else's, and there is no check-then-claim pair anywhere in this file. It sets `claimed_by` /
+//     `claimed_at` and NOTHING else: `SES-316` made bumping `updated_at` on a claim the reason a
+//     decision minutes earlier became un-restorable.
+//
+//     `claimed_by` is `--cycle-id` VERBATIM, never a `run-project:<project>:<step>` label. Register
+//     B42 (`docs/runbooks/runner-cycle.md` L354) re-asserts `claimed_by = '<your cycle id>'` before
+//     EVERY irreversible act and reads 0 rows as "do not push, do not claim a counter" -- so a claim
+//     written under a label nobody can re-assert breaks the pushing cycle's own gate. Measured:
+//     `run-project:moat-support:1` sat on `SES-378` AND on `SES-399` at the same moment, held by two
+//     different cycles that the string could not tell apart. Two further consumers read the column
+//     as a cycle id: `scripts/ticket-owner.js:256` (check 6) clears a 24h-old claim whose holder is
+//     not a live cycle, and `tests/regression/_lib/board-state.js:40-43` measured 3 claimed tickets
+//     against 2 live cycles with ZERO matches. Without a cycle id there is no claim at all
+//     (`claimerFor` returns an error and the driver exits `EXIT_CANNOT_RUN` writing nothing).
 //
 // (5) IT NEVER ACTS PAST A WALL. `--dry-run` writes nothing at all, and even without it pass two
 //     re-reads the walls and refuses the claim while any of them stands, whatever the answer says.
@@ -99,7 +111,11 @@
 //   GET  /rest/v1/agents | agent_capability_assignments | capabilities    the roster, read LIVE
 //   GET  /rest/v1/backlog_items                 the pick's own board row
 //   GET  /rest/v1/skill_profiles                the Intent's stored traits.schema
-//   PATCH /rest/v1/backlog_items                THE ONE WRITE. Skipped entirely under --dry-run.
+//   GET  /rest/v1/runner_model_lanes            the judgment lane, via resolveJudgmentModel
+//   POST /rest/v1/rpc/judgment_model            the model the handed-over call will RUN on (same)
+//   PATCH /rest/v1/backlog_items                THE ONE WRITE -- `claimed_by` = the --cycle-id
+//                                               VERBATIM (never a `run-project:` label), so register
+//                                               B42 can re-assert it. Skipped under --dry-run.
 //
 // Pure helpers (parseArgs, statePathFor, wallReading, stateDrift, answerErrors, claimQueryFor,
 // claimOutcome, handoffContextFor) are exported so the regression suite drives every branch with no
@@ -383,6 +399,22 @@ export function claimQueryFor(backlogId, cutoffIso) {
     + `&select=backlog_id,claimed_by,claimed_at`;
 }
 
+// WHO THE CLAIM NAMES -- SES-378 slice 2, and header note (4). The claimer is the CYCLE ID, so that
+// the one thing every later reader does with `claimed_by` -- compare it to a cycle -- can succeed.
+// A `run-project:<project>:<step>` label cannot: two cycles running the same project's step 1 write
+// the identical string, which is not a hypothetical (`run-project:moat-support:1` was live on both
+// `SES-378` and `SES-399`, under two different cycles, on 2026-09-16).
+//
+// AN ABSENT CYCLE ID IS AN ERROR, NOT A FALLBACK. The tempting shape here is "no --cycle-id, so use
+// the old label" -- which is precisely the state that breaks register B42's re-assertion, and it
+// would break it silently, on the path nobody watches. A claim nobody can re-assert is worse than
+// no claim: the ticket looks taken to every peer while its own holder is gated out of pushing.
+export function claimerFor({ cycleId }) {
+  const id = String(cycleId ?? "").trim();
+  if (!id) return { error: "--cycle-id is required to claim: B42 re-asserts claimed_by = '<your cycle id>' before every irreversible act; a claim nobody can re-assert is worse than none" };
+  return { claimer: id };
+}
+
 // WHAT THE ATOMIC CLAIM'S ROW COUNT MEANS -- rule B40's two-line rule, as a function rather than as
 // an `if` buried in the write path. "1 row → it's yours; 0 rows → someone holds it" is the sentence
 // every session in this repo is supposed to obey, and a sentence nothing can drive is a sentence
@@ -510,9 +542,29 @@ async function governanceRoster(base, key, tenant) {
 }
 
 // One assembly, through the executor's own code, with the intent slug always explicit.
-async function assembleFor({ agentId, capabilitySlug, intentSlug, taskContext, tenant }) {
+//
+// AND THE MODEL IT NAMES IS THE ONE THE CALL WILL RUN ON (SES-378 slice 2). `assembly.llm.model` is
+// the Skill rows' STORED answer -- all six governance agents store `claude-fable-5-1` -- and the
+// session that runs this handoff learns its model from the line this function prints. Measured on
+// one live `run-project` call this cycle: this file printed `claude-fable-5-1` while
+// `scripts/agent-prompt.js`, asked the same minute, printed `claude-opus-5` (`# lane: judgment
+// degraded ... (fable_rest)`). Step 5(e) then copies THIS number into `agent-log --model=`, so the
+// stored answer was reaching the activity log as the model of a call that ran on another one.
+//
+// THE LANE READ IS THE SHIPPED ONE (SES-45). `resolveJudgmentModel` is imported from
+// `./agent-prompt.js`, never re-implemented here: a second copy of the degrade rule is the exact
+// drift the Governance Agents project exists to end, and it would drift in the direction of
+// disagreeing about which model a logged call used. It is fenced to the judgment lane by equality
+// inside that function, so a handoff on any other model is left alone.
+//
+// IT FAILS SOFT, AND THAT IS DELIBERATE. `resolveJudgmentModel` returns the assembly's own model
+// with a `warning` when the meter is unreachable. A failed lane read must never block a handoff:
+// the stored model is still a correct model to run on, just possibly an expensive one, and turning
+// a meter outage into a governance outage is the larger defect. The warning is printed, not
+// swallowed.
+async function assembleFor({ agentId, capabilitySlug, intentSlug, taskContext, tenant, base, key }) {
   const { assemblePrompt } = await import("../api/prompt/db-assembly.js");
-  const { renderAssembly } = await import("./agent-prompt.js");
+  const { renderAssembly, resolveJudgmentModel } = await import("./agent-prompt.js");
   const assembly = await assemblePrompt({
     capability_slug: capabilitySlug,
     agent_id: agentId,
@@ -527,8 +579,14 @@ async function assembleFor({ agentId, capabilitySlug, intentSlug, taskContext, t
   if (rendered.omitted?.length) {
     console.error(`run-project: prompt sections omitted (no stored content -- fetched per call by the executor): ${rendered.omitted.join(", ")}`);
   }
-  const header = `# ${assembly.agent_card?.name ?? agentId} — ${assembly.agent_card?.role ?? ""} · capability ${assembly.capability_slug} · intent ${intentSlug} · model ${assembly.llm?.model}`;
-  return { text: `${header}\n${rendered.system_prompt}`, model: assembly.llm?.model ?? null };
+  const lane = await resolveJudgmentModel(assembly, { supabaseUrl: base, headers: headersFor(key) });
+  if (lane.warning) console.error(`run-project: ${lane.warning}`);
+  const model = lane.model ?? assembly.llm?.model ?? null;
+  const header = `# ${assembly.agent_card?.name ?? agentId} — ${assembly.agent_card?.role ?? ""} · capability ${assembly.capability_slug} · intent ${intentSlug} · model ${model}`;
+  // Only when it actually moved -- the shape scripts/agent-prompt.js L282 prints. A note on every
+  // run is a note nobody reads.
+  const laneLine = lane.from ? `\n# lane: judgment degraded to ${lane.model} (${lane.reason})` : "";
+  return { text: `${header}${laneLine}\n${rendered.system_prompt}`, model };
 }
 
 // The prompt goes to a FILE always and to stdout only when stdout is not carrying the machine
@@ -714,7 +772,15 @@ async function main() {
       console.error(`run-project: --dry-run, so the claim on ${target} was NOT made.`);
     } else {
       const cutoff = new Date(Date.now() - CLAIM_TTL_HOURS * 3600 * 1000).toISOString();
-      const claimer = `run-project:${args.project}:${args.step}`;
+      // Header note (4): the cycle id or nothing. Refused BEFORE the PATCH, so a run without
+      // `--cycle-id` writes no row rather than one no reader can attribute.
+      const named = claimerFor({ cycleId: args.cycleId });
+      if (named.error) {
+        return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+          payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: named.error },
+          prose: `run-project: ${named.error}. Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+      }
+      const claimer = named.claimer;
       const r = await rest(base, key, claimQueryFor(target, cutoff), {
         method: "PATCH",
         headers: { Prefer: "return=representation" },
@@ -749,6 +815,7 @@ async function main() {
         intentSlug: rosterRow.default_intent_slug,
         taskContext: handoffContextFor({ answer, state }),
         tenant: args.tenant,
+        base, key,
       });
     } catch (e) {
       return emit({ code: EXIT_CANNOT_RUN, json: args.json,
@@ -839,6 +906,7 @@ async function main() {
       intentSlug: contract.intentSlug,
       taskContext: state,
       tenant: args.tenant,
+      base, key,
     });
   } catch (e) {
     fail(`could not assemble the ${RUN_PROJECT_CAPABILITY} prompt: ${e.message}`);
