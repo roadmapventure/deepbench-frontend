@@ -695,3 +695,138 @@ DRY-RUN against the tree before this slice (`4743bbf3`): K fails at import (`chi
 - **The landing slice (after the seed, one cycle):** step 4e's command becomes `--nightly --judge --cycle-id=<id>` with the exit-3 sentence step 4c already uses; `NOTES["4e"].outcome` mentions the judgment; `node scripts/render-cycle-card.js --write`; the brief's `Ticket hygiene, last night` group reads the ` · judged c/r/u` suffix from the notes it already prints; part K's live arm becomes a `--nightly --judge` arm; decide whether `report` gets a home (a column on the nightly cycle row, or a `docs/` file per night like `docs/audits/<W>.md`).
 - **Two facts, not tickets:** `scripts/rank-backlog.js:396` passes `--model=claude-fable-5-1` to `agent-log.js` as a literal while `state.model` sits beside it — a stale literal on the SES-331 path, worth one line in a later hygiene pass. `validateAgentVerdict` does not descend into array item properties (verifier.js:868-916), which is why every two-pass driver re-checks its item shapes; a shared `items.properties` walk would retire three copies of that check (rank-backlog's `answerErrors`, audit-cluster's `validateFindings`, this ingest).
 
+<!-- DeepBench v7.0.512 | AGT-79 harvest — APPEND-ONLY INCREMENT for docs/harvests/AGT-79.md. This
+     section is slice 6's reasoning (design cycle 6739fa7f-22ae-444c-95c8-9577633739c1, 2026-09-16).
+     The file already carries slices 1-5 (147,711 B at the time of writing); append this, do not
+     overwrite. Linked once from docs/kickoffs/v7.0.512-AGT-79-unjudged-night-visible.md §1. -->
+
+---
+
+## Slice 6 (v7.0.512, 2026-09-16) — the unjudged night says so
+
+### 1. Premise revalidation
+
+The ticket's `kickoff_link` points at `docs/kickoffs/v7.0.505-AGT-79-ticket-owner-judged-night-landing.md`.
+That slice HAS shipped: `docs/runbooks/runner-cycle.md` step 4e (L2031-2060) now reads
+`node scripts/ticket-owner.js --nightly --judge --cycle-id=<your cycle id>` with the exit-3 ceremony and the
+fallback rule (4). That kickoff is spent history and was not rebuilt.
+
+All five of the ticket's SHIPS items are present in the tree and working:
+
+| SHIPS item | Evidence |
+|---|---|
+| (1) agent + capability + skills | `capabilities.audit-board` = 1, `capability_skill_profiles` = 5, one governance agent row |
+| (2) derivable fixes written | nights of 2026-09-15 and 2026-09-16 each report `fixed 3` under a `hygiene` decision handle |
+| (3) `public.ticket_owner_findings` | 217 rows, 209 open, 8 distinct `check_slug` values |
+| (4) runner-cycle step 4e | present, and now judged |
+| (5) standing-brief block | `renderTicketHygiene` at `scripts/render-standing-brief.js:878` |
+
+So the premise is NOT "build the Ticket Owner." It is what slice 5's own STOP LINE left open:
+
+> Write no status — **`AGT-79` stays `partial`** until a cycle actually runs a judged night and
+> `ai_activity_log` holds a `ticketowner` row.
+
+**Premise alive.**
+
+### 2. The live measurement
+
+Taken 2026-09-16 in cycle `6739fa7f-22ae-444c-95c8-9577633739c1`, against Supabase and this tree.
+
+```sql
+select count(*) from ai_activity_log where agent_id = 'ticketowner';           -- 0
+select count(*) from public.ticket_owner_findings;                             -- 217 (209 open)
+select count(*) filter (where notes like '%· judged %') as judged,
+       count(*) as nights
+  from public.runner_cycles where notes like 'SCHEDULED-AGENT: audit-board%';  -- judged 0, nights 5
+```
+
+The five nights, newest first: `63fb1536` (2026-09-16 06:47:03Z), `7dffdf5f` (09-15), `8b87c407` (09-14),
+`27cef94a` and `3cd2c80e` (09-13). **None carries the `· judged a/b/c on model` tail.** The newest ran AFTER
+slice 5 shipped and still went arithmetic-only.
+
+The code is not the blocker. Run on the unchanged tree (read-only — pass one writes no DB row):
+
+```
+$ node scripts/ticket-owner.js --judge --cycle-id=6739fa7f-… --state-file=<scratch>
+EXIT=3
+ticket-owner judge: pass one complete — 882 rows · 0 derivable · 296 judgment · model claude-fable-5-1
+stdout: 92,910 bytes of assembled prompt
+```
+
+Two things fell out of that run that the census had not seen before:
+
+- `remainder-stranded` (`SES-385`, check 12) yields **85** findings live but holds **0** rows in the ledger.
+  Not a bug: `scripts/ticket-owner.js` is stamped `v7.0.506`, i.e. the check landed AFTER the 06:47Z night.
+  The next night files them. Left alone deliberately.
+- `derivable` is now **0** — this morning's night fixed the three that existed.
+
+### 3. The argument for this slice
+
+Five nights ran unjudged and nobody noticed, because an unjudged night is *silent by construction*:
+
+- `nightlyNotes` (`scripts/ticket-owner.js:461-470`) appends the judged tail when pass two ran and appends
+  the empty string otherwise. The comment above it defends that byte-identity on purpose ("an unjudged
+  night's notes are byte-identical to what slice 3 wrote"). That was right when there was no judgment pass.
+  It is the hole now.
+- `fetchFacts` reads the nightly cycle row at `limit=1` (`scripts/render-standing-brief.js:1529-1531`) and
+  `renderTicketHygiene` prints its `notes` verbatim (`:923-927`). One night, no history, no streak.
+- Step 4e rule (4) tells the CYCLE to "write which happened in `notes`" — a fact carried by a cycle
+  remembering to type it. That is the defect John's central-service-before-hardcoding rule names.
+
+So the condition the whole ticket now hangs on is measurable only by hand query. This slice makes it legible
+on the board. It does NOT judge a night — no build can; a judged night needs a cycle to run the sub-agent.
+
+### 4. Alternatives considered and rejected
+
+1. **Have the build run a judged night.** Rejected twice over: the night is already spent for 2026-09-16
+   (the precondition answers `already run today`), and a design session writing live judgment rows under a
+   `hygiene` decision is a build, not a design. It also would not fix the silence for the next unjudged night.
+2. **Read `ai_activity_log` for the `ticketowner` count in the brief.** Rejected on a measured constraint:
+   the brief's `rest()` neither pages nor forwards a Range header, and `ai_activity_log` exceeds a REST page
+   (its own comment, `:1471-1473`, measured 2026-09-11). Unnecessary anyway — pass two writes the audit row
+   FIRST and aborts the run if it is refused (`:1072-1081`), then calls `recordNightly` (`:1101-1104`), so
+   `· judged ` in the notes implies the log row. The notes are the cheaper, sound proxy. (The kickoff carries
+   this argument in one compressed sentence; the full form is here.)
+3. **Use `governance_agent_usage`.** It is already read by the brief, but its window is 7 days; the streak
+   wanted is "has a night EVER been judged." Rejected.
+4. **Edit step 4e to press the ceremony harder.** Rejected on the byte wall: `runner-cycle.md` is
+   **380,915 B** against the `SES-336` ceiling of **381,000** — 85 bytes free, so any addition must first
+   remove. And the step already says the right thing; the gap is reporting, not instruction.
+5. **Derive judged/unjudged purely from the absence of the tail, changing no writer.** Nearly chosen — it is
+   one file. Rejected because a fact worth reporting should be written, not inferred: the explicit
+   `· unjudged` marker makes every future night self-describing in `runner_cycles` for any reader, not just
+   the brief. Both are shipped together and agree, because the predicate stays "contains `· judged `", which
+   is correct for the five legacy rows that carry neither marker.
+
+### 5. What this slice does not do
+
+- It does not judge a night, does not write `ai_activity_log`, and does not move `AGT-79` off `partial`.
+- It does not make the ceremony fire. A cycle that gets exit 3 with no Agent tool still falls back, by
+  design (rule (4) — a hygiene pass must never wall a cycle). It will now be *visible* that it did.
+- It does not touch `factsSha`, so `render-standing-brief.js --check` behaviour is unchanged — and `--check`
+  already exits 1 (DRIFT) on the unchanged tree, because it hashes facts rather than rendered text.
+- It does not file the 85 `remainder-stranded` findings; the next nightly run does that on its own.
+
+### 6. The re-assembly (SES-359 / SES-376, this cycle)
+
+The first draft of this kickoff was refused by `scripts/verifier.js --check-kickoff`: 8,182 bytes — inside
+the 8,192 cap — but carrying **no `Lanes:` line**, which `kickoffLaneFinding` (`verifier.js:1490-1500`)
+grades on the LINE, not the document. The draft's `runner_model_lanes` mention did not satisfy it: the match
+is case-sensitive `\bLanes\b` followed by a colon on the same line, so `runner_model_lanes` is correctly not
+a declaration. Adding `Lanes: session (Builder) | executor none |` to the Model bullet costs 43 bytes and
+would have carried the draft to 8,225, over the cap — the two checks had to be satisfied at once.
+
+Paid for by moving reasoning out of CONTEXT, never a task's facts (SES-376): the `rest()`-paging argument
+was compressed to one clause (its full form is alternative 2 above); the QA "before" grep line and the
+streak restatement in QA were tightened against §4's definition; three phrases were shortened. Re-measured
+at **8,144 bytes**, and `--check-kickoff` exits 0 with `kickoff 8144 bytes, within 8192 (SES-376)`.
+
+Two line-number corrections were made against the live tree while re-assembling, so the kickoff's read list
+is exact: the nightly read is `:1529-1531` (not 1530-1532), the pass-two log/record pair is `:1072-1081` and
+`:1101-1104`, and the variable the brief holds the nightly rows in is `hygRun`, not `hygRuns`.
+
+### 7. Follow-on worth watching (not filed)
+
+If the streak the brief now prints keeps climbing, the finding is about step 4e's ceremony being skipped by
+cycles, not about the Ticket Owner's code — that would be a separate ticket against the runner's step-4e
+discipline, with the streak as its evidence. Nothing to file until there are nights to point at.
