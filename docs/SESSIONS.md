@@ -5,6 +5,32 @@
 
 ---
 
+## session/cycle-20260916-1531 (v7.0.511, 2026-09-16, unattended cycle `f23b774e-c185-42b1-9a1b-955a34c7543b`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `SES-378` — **partial (slice 5 shipped), verdict approve: the staff watch reaches the page John reads, and the ask vocabulary admits the promotion it was refusing.**
+
+Fourth cycle of one session, and the one that closed slice 3's own loop. Slice 3 shipped a findings table; nothing rendered it, and the promotion it was supposed to file was refused by a constraint. Both halves measured live before designing rather than taken from the ticket: zero `runner_staff_findings` references in `render-standing-brief.js`, and `pg_get_constraintdef` on `runner_card_asks_target_kind_check` still reading `ARRAY['item','question']`.
+
+### The lesson from the previous cycle applied one cycle later
+
+Slice 4's kickoff was refused by `verifier --check-kickoff` for a missing `Lanes:` line and cost a re-assembly. This Designer checked the matcher at `scripts/verifier.js:1491` rather than copying the line on faith, and the kickoff passed first time at 7,082 bytes.
+
+### The QA the Designer refused to write
+
+The obvious discriminating probe would be `staff-watch.js --promote --apply` — and it proves nothing: the promotion bar is three distinct cycles and the table holds one finding from one cycle, so that command exits 0 on the unchanged tree either way. The kickoff specified direct `runner_card_asks` INSERT probes instead, and the Builder ran all three: `skill-edit` accepted 201, `not-a-kind` refused 23514/400, `item` still accepted 201. Each probe imaged before the write, deleted after, both deletions re-read as 0 rows.
+
+### `capture_migration_down` refusing is its documented answer, not a gap
+
+Called before `apply_migration` as the rule requires, it returned class `refused` — 0 captured, 1 refusal, `derived_down_sql` NULL — which is what it does for an existing constraint altered in place. The Builder wrote the hand-derived down to `runner_before_images` (`ffb5c0e7`) with the live prior definition read in the same statement, and recorded the rollback class as card-only rather than pretending a derived down existed.
+
+### One thing it added that the kickoff did not name, and should have
+
+`factsSha()` gained `staff` alongside the new group. Without it the provenance hash would not move when a finding arrives, so `--check` would report no drift on a group that had changed — the render would go stale silently, which is the whole failure the sha exists to catch.
+
+A peer pushed `09b048a8` (SES-410, restoring the weekly_pace boot refusal) between the Builder's gate run and its push; it rebased and re-ran both gates on the rebased tree before pushing. Parallel cycles working as designed.
+
+Ship `58048893`, verdict `31ae9322` approve, regression 239/239, auto-done eligible YES, `invention` streak 3 → 4.
+
+---
+
 ## session/cycle-20260916-1424 (v7.0.509, 2026-09-16, unattended cycle `32218efa-f777-4edf-b611-8e3e6b2a93a2`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `SES-378` — **partial (slice 4 shipped), verdict approve: the Development Manager gets its own Skill rows, so the cycle it runs is Knowledge and the chain rule is a guardrail.**
 
 Third cycle of one session, and the first where a gate refused the platform's own work before a human could.
