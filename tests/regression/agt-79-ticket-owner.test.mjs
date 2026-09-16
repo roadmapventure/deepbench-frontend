@@ -1,3 +1,13 @@
+// DeepBench v7.0.505 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 5 -- NEW PART
+// L: THE RUNBOOK'S STEP 4e NOW FIRES THE JUDGED NIGHT. Slice 4 shipped the judgment pass and the
+// seed landed, so pass one exits 3 (part K live prints `gate answered 3`) -- and yet no night had
+// ever been judged, because step 4e still read `--nightly` alone. Part L reads the SHIPPED runbook
+// and pins the command, the exit-0 precondition, the three facts the ceremony must carry
+// (ticketowner, the judgment lane, --answer=), the never-a-wall fallback, the SES-336 byte ceiling
+// and the card's own line. Its control is the renderer run WITHOUT --write: the card records the
+// runbook's sha256, so exit 0 is the arm that fails if the runbook were edited and the generated
+// card left stale. Part I's slice-4 negative (`!body4e.includes("--judge")`) is RETIRED by this
+// same slice rather than weakened, and its two command substrings follow the new line.
 // DeepBench v7.0.485 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-70 -- THE LIVE
 // DELIVERED-UNACCEPTED ARM ASSUMED BOARD STATE. It asserted at least four delivered-unaccepted
 // rows, which is not a property of the census -- it is a property of how many tickets John has
@@ -509,18 +519,20 @@ async function main() {
   // instead of the words.
   const raw4e = runbookMd.slice(runbookMd.indexOf("**4e. "), runbookMd.indexOf("**5. ", runbookMd.indexOf("**4e. ")));
   const body4e = raw4e.replace(/\s+/g, " ");
-  assert.ok(body4e.includes("ticket-owner.js --nightly --cycle-id="), "the step names the command a cycle actually runs");
+  assert.ok(body4e.includes("ticket-owner.js --nightly --judge --cycle-id="), "the step names the command a cycle actually runs");
   assert.ok(body4e.includes("SCHEDULED-AGENT: audit-board"), "the step names the notes prefix its precondition reads");
   assert.ok(body4e.includes("already run today"), "the step names the exit-0 answer that sends a cycle on to step 5");
   assert.ok(body4e.includes("continue to step 5 normally"), "exit 2 is a refusal, never a stop — the hygiene pass is bookkeeping");
-  assert.ok(!body4e.includes("--judge"), "the judgment run is NOT this slice and must not be documented as available");
+  // Slice 4's negative here was `!body4e.includes("--judge")` — correct while the judgment pass had
+  // shipped but was not yet documented as available. Slice 5 (v7.0.505) lands it in the step, so the
+  // negative is RETIRED rather than weakened, and part L below asserts the whole ceremony positively.
 
   const card = fs.readFileSync(path.join(ROOT, CARD_REL), "utf8");
   assert.strictEqual(card, render(runbookMd), "the card is a GENERATED view — it must be the byte-exact render of the runbook in this same commit");
   const cardLine = card.split("\n").find(l => l.startsWith("**4e.** Ticket hygiene · L"));
   assert.ok(cardLine, "the card must carry a 4e line naming the step");
   const cardBlocks = card.split("```");
-  assert.ok(cardBlocks.some(b => b.includes("--nightly --cycle-id=")), "the card carries 4e's command block in full");
+  assert.ok(cardBlocks.some(b => b.includes("--nightly --judge --cycle-id=")), "the card carries 4e's command block in full");
   assert.ok(runbookMd.split("\n").filter(l => l.startsWith("<!-- DeepBench v")).length <= 5,
     "session-hygiene check 7: at most 5 header stamps on the runbook");
   assert.ok(fs.readFileSync(path.join(ROOT, "docs/SESSIONS.md"), "utf8").includes("<!-- DeepBench v7.0.452 | runbooks/runner-cycle.md | SES-352"),
@@ -736,6 +748,47 @@ async function main() {
   assert.strictEqual(kRefused.status, 2, "a refused answer is exit 2, even on a dry run");
   assert.ok(kRefused.stderr.includes("REFUSED and nothing was written"), `got: ${kRefused.stderr}`);
   assert.ok(kRefused.stderr.includes('"account"'), `the refusal must name the offending key; got: ${kRefused.stderr}`);
+
+  // --- L: step 4e fires the JUDGED night (slice 5, source-only) ---------------------------------
+  // Part I pins that step 4e exists and that the card is its byte-exact render. This part pins the
+  // one line that made the difference between a judgment pass that EXISTS and a judgment pass that
+  // has ever RUN: slice 4 shipped the code and the runbook still said `--nightly` alone, so five
+  // nights went by arithmetic-only and `ai_activity_log` held zero `ticketowner` rows. Every arm
+  // here reads the shipped runbook, not a fixture.
+  const md4e = fs.readFileSync(path.join(ROOT, RUNBOOK_REL), "utf8");
+  const step4e = md4e.slice(md4e.indexOf("**4e. "), md4e.indexOf("**5. ", md4e.indexOf("**4e. ")));
+  const flat4e = step4e.replace(/\s+/g, " ");
+
+  assert.match(step4e, /ticket-owner\.js --nightly --judge --cycle-id=/,
+    "step 4e must run the JUDGED night — `--nightly` alone is the line that kept the judgment pass inert");
+  assert.ok(flat4e.includes("already run today"),
+    "the exit-0 precondition answer survives the judged night: pass one checks the night BEFORE the gate");
+
+  // The ceremony: a cycle that gets exit 3 has to know WHO judges, on WHICH lane, and how the
+  // answer comes back. All three or the step is an instruction a cycle cannot follow.
+  assert.ok(flat4e.includes("ticketowner"), "the ceremony must name the sub-agent that judges");
+  assert.ok(flat4e.includes("judgment"), "the ceremony must name the lane, read live from runner_model_lanes");
+  assert.ok(flat4e.includes("--answer="), "the ceremony must name the flag pass two comes back on");
+
+  // The fallback: exit 3 with no Agent tool, or a pass-two refusal, is never a wall.
+  assert.ok(flat4e.includes("re-run `--nightly` alone"),
+    "the fourth rule must name the unjudged re-run by its exact command — a fallback a cycle has to invent is not a fallback");
+
+  assert.ok(Buffer.byteLength(md4e, "utf8") < 381_000,
+    `the runbook is ${Buffer.byteLength(md4e, "utf8")} bytes; SES-336's ceiling is 381000 and this step's edit had to remove bytes before adding them`);
+
+  const card4eLine = fs.readFileSync(path.join(ROOT, CARD_REL), "utf8")
+    .split("\n").find(l => l.startsWith("**4e.**"));
+  assert.ok(card4eLine && card4eLine.includes("judg"),
+    `the card's 4e line must say the night is judged; got: ${card4eLine}`);
+
+  // THE CONTROL, and it is the arm that fails if the edit were cosmetic: the card records the
+  // runbook's sha256, so a runbook edited without re-rendering the card leaves the renderer's own
+  // check exiting 1. Exit 0 here means the committed card was regenerated against THIS runbook.
+  const cardCheck = spawnSync(process.execPath, ["scripts/render-cycle-card.js"], { cwd: ROOT, encoding: "utf8" });
+  assert.strictEqual(cardCheck.status, 0,
+    `the committed card is stale against the edited runbook — run node scripts/render-cycle-card.js --write; stdout: ${cardCheck.stdout} stderr: ${cardCheck.stderr}`);
+  console.log(`[AGT-79] part L: step 4e fires --nightly --judge; runbook ${Buffer.byteLength(md4e, "utf8")}B < 381000; card re-rendered (renderer exit 0)`);
 
   // --- E: live ---------------------------------------------------------------------------------
   const base = process.env.SUPABASE_URL;
