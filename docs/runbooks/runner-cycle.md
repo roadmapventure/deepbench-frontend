@@ -4597,21 +4597,23 @@ naming (`SES-312`, `v7.0.401`). <!-- FEATURE: SES-312 — the precondition is a 
 **Why the word had to change:** "accepted" named John's tap, `SES-285` retired the tap surface, and
 a precondition that can never be satisfied parks the succession rather than guarding it — which is
 the `B23` failure the whole `M6` register exists to invert. The two-part test is deliberately not
-one: the `runner_items` row is step 8d's idempotence key and **survives a reversal** (it is outside
-`reverse_decision()`'s allowlist by design, so the evidence a review happened cannot be erased),
+one: the `runner_items` row is step 8d's idempotence key and **survives a reversal** (since `SES-364`
+because **GUARD B refuses every `kind = 'gated_before_build'` image by name** — the table IS on the
+allowlist now; guard B reads BOTH the live row's `kind` and the image's, and refuses any card
+belonging to the **acting cycle**),
 while the `runner_decisions` row is what carries the 72-hour window — so reading only the card
 would let a reversed review's drain stand. Any drain outside that exact shape is still John's alone
 to write.
 
-**The allowlist is a closed list, and `skill_profiles` is NOT on it — relocated here from `SES-333`'s
-retired header stamp (`SES-164` step 2: it was the last written home of this warning).** Measured at
-that ship: `reverse_decision()`'s `k_allowed` array is `backlog_items`, `runner_directives`,
-`runner_drain_scope`, `runner_settings`, `governance_rules`, `epics`, `vision_claims`. So a Reverse
-of a decision whose write landed in `public.skill_profiles` — every `*-guardrails` / `*-behavior`
-Skill-row edit — reports the before-image **`refused`** rather than restoring it. The image is still
-written, and the prior value is recoverable from its `row_data` **by hand**; widening the allowlist
-is a separate ticket and has deliberately never been taken. Do not record a Skill-row decision as
-auto-reversible on the strength of the before-image existing: written is not restorable.
+**The allowlist, widened 7 → 14 by `SES-364`** (read live): `backlog_items`,
+`runner_directives`, `runner_drain_scope`, `runner_settings`, `governance_rules`, `epics`,
+`vision_claims`, `skill_profiles`, `agents`, `capabilities`, `capability_skill_profiles`,
+`agent_capability_assignments`, `ai_activity_log`, `runner_items`. A Skill-row edit now **restores**.
+**READ `restored_unverified`, NOT `restored`, FOR ALL SEVEN NEW TABLES:** none has an `updated_at`
+column, so a Reverse that worked reads `restored 0, restored_unverified 1, refused 0` — and the
+outcome word is `applied` either way, so re-read the row. **GUARD A:** a cycle may not move
+`agents.is_active` by restoring a row (still John's hire card, §19v P5); a **named human** actor
+(`p_actor_cycle => null`) may. Neither guard aborts the reversal — ledger entry 46.
 
 **Composition was settled by precedent, not by judgment, and a later cycle should not re-derive it:**
 the M3 drain (`6810599f`) named **the epic's then-open members PLUS the tickets filed straight after

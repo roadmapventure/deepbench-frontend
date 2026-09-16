@@ -930,7 +930,29 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
   `skill_profiles` is **not** on it, so a Reverse reports the before-image `refused` rather than
   restoring it. The before-image is written anyway (`runner_before_images`, `table_name`
   `skill_profiles`, carrying `decision_id`) and the prior `guardrails` value is recoverable from its
-  `row_data` by hand. Widening the allowlist is a separate ticket, deliberately not taken here.
+  `row_data` by hand.
+  **NO LONGER CARD-ONLY — `SES-364` (`v7.0.501`) widened the allowlist to fourteen tables and
+  `skill_profiles` is one of them,** so this entry's Reverse now restores the `guardrails` value
+  itself and nothing has to be copied out of `row_data` by hand. Two things to carry into that
+  reversal: it reports **`restored_unverified 1, restored 0`** (the table has no `updated_at`
+  column, so the written-since guard cannot verify it) and the outcome word is `applied` either way
+  — **assert the row's `guardrails` value, not the outcome**, because the pre-`SES-364` build
+  returned `applied` here while restoring nothing. See `docs/runbooks/runner-cycle.md`'s allowlist
+  clause and `tests/regression/ses-364-reverse-agent-rows.test.mjs`.
+  <!-- FEATURE: SES-364 — the "separate ticket" named here was taken. -->
+  `SES-364` also added two guards that bound the widening, and this entry is their written home —
+  `docs/runbooks/runner-cycle.md` states them in one line each and points here. **Guard A:** an
+  automated cycle may not move `agents.is_active` by restoring a row (still John's hire card, §19v
+  P5 / `.claude/rules/agent-roster-inert.md`, which `AGENT-ROW-AGREED-TICKET` expressly exempts from
+  the write licence it grants) — the row is refused and counted, with the reason naming the card. A
+  **named human** actor (`p_actor_cycle => null`) restores it in full: `p_actor` and `p_reason` are
+  both required and both land on the reversal row, which is the signature. Do not "finish" this by
+  refusing every actor — a hire John wants undone would then have no undo at all. **Guard B:** a
+  `gated_before_build` `runner_items` card is still refused (it is step 8d's idempotence key and
+  `SES-312`'s drain precondition), and so is any card on the acting cycle; both sides of the `kind`
+  are read, because an INSERT image carries `row_data` NULL and knows its kind only from the live
+  row. **Neither guard aborts the reversal: they refuse the row and the decision's other images
+  still restore** — which is also what makes the counts readable.
 
 ### 47. `runner-cycle.md` step 5 — the blocked-prefix table and `NULL` is not `auto` (moved into the Prioritizer)
 - **Said, verbatim (openings):** *"**THE BLOCKED PREFIX IS READ AT A GLANCE, NOT RE-DERIVED EVERY
