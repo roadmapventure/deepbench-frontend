@@ -5,6 +5,32 @@
 
 ---
 
+## session/cycle-20260916-1241 (v7.0.503, 2026-09-16, unattended cycle `22a5e6d6-ddef-4f18-8b73-09ed269b3a66`, `trigger = scheduled` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Builder) — `SES-378` — **partial (slice 2 landed), verdict approve: the four-cycle jam broke, and the work that had been sitting on a session branch since 04:34Z is on `dev`.**
+
+`SES-378` was picked twice today and shipped nothing both times (`aa7173c6` at 03:42Z, `0a9d8bf2` at 09:42Z), and the same red gated four further cycles that never got as far as a pick. The reason was not the ticket. `tests/regression/agt-70-auditor.test.mjs` was red on the clean tree, so every Builder correctly refused to push, and the ticket's own finished slice sat on `origin/session/cycle-20260916-0341` at `aeb7728` — built, tested, committed, never landed. Cycle `0a9d8bf2` cleared two of the three reds at 10:03Z; this cycle root-caused the third.
+
+### The last red was a false positive, and its cause is a shape nobody had rendered before
+
+`detectDuplicates()` in `scripts/audit-corpus.js` exempts a rule rendered out of `public.governance_rules`: `render-rule-blocks.js` emits `> **Rule X** — <statement>`, so the registry's text is a SUFFIX of the rendered block and `endsWith` sees it. That test was written against a ONE-LINE render. `AGENT-ROW-AGREED-TICKET` holds **four** lines, and a blockquote quotes every one of them — so the rendered text carries a `> ` in the MIDDLE of the string, where no `endsWith` can reach. Two homes John himself asked for (card ask `0ca06470` put the rule in `.claude/rules/agent-roster-inert.md` beside `docs/ARCHITECTURE.md`) were being counted as a defect. Measured: `duplicates 1 stale 1` before, `duplicates 0 stale 1` after, suite 232/235 → 235/235.
+
+The fix strips blockquote marks from both sides of the exemption comparison and nothing else — `> ` at a line start is render syntax, never a statement's own content. The grouping key is untouched, so two hand-written copies of one paragraph are still one finding. Three new assertions pin it in both directions, including the one that would have made the cheap fix wrong: the rule's FIRST line alone must not exempt the whole block.
+
+### The landing was a cherry-pick, not a rebuild
+
+Step 0b's own remedy for a preserved session branch is *"cherry-pick it, do not redo the work"*, so `e5f195c` and `aeb7728` were replayed unchanged onto this cycle's branch and handed to a Builder to verify against the kickoff rather than to re-implement. Its first suite run came back RED at 235/236 — on the delivery's own live arm (d), `SES-378.claimed_by is "run-project:moat-support:1" -- a run-project: label, not a cycle id`. That was not a code gap: it was the kickoff's Task 4, the live claim repair, which the earlier Builder never reached. It went green on the repair, not on an edit, which is the strongest evidence the test is discriminating.
+
+### The kickoff's own repair SQL was stale, and following it literally would have re-created the defect
+
+§4 wrote `claimed_by = 'aa7173c6-…'`, the drafting cycle. The label on the board had been rewritten at 12:47:04Z **today**, by this cycle's own `run-project` step running dev's unfixed driver. Writing the dead cycle's id would have left the B42 re-assertion gate at 0 rows for the cycle actually pushing — precisely what `SES-378` exists to close. The Builder wrote this cycle's id instead, before-image first (`runner_before_images c68fbe51`), PATCH scoped by the stale label, `claimed_by` only per `SES-316`, `claimed_at` unmoved. B42: 0 rows before, 1 row after.
+
+### What is carried forward
+
+Task 4's loop-run half — step 5's two `--dry-run` passes against the fixed driver, the printed-model confirmation, the `agent-log` call — was not run, so the ticket stays `partial` and `design_status` is cleared per `SES-385`: a spent kickoff stops advertising a design already built. `CLAIM LABEL COLLISION: run-project:moat-support:1 on SES-378 + SES-399` stands as a staff-watch finding. `SES-404` is fixed in substance by this push and its row is left for its own reviewer to close.
+
+Ship `e18f7ee`, verdict `9ac16a26` approve (build green, regression 236/236, hygiene gate clear), auto-done eligible YES, `invention` streak 0 → 1.
+
+---
+
 ## session/cycle-20260916-0820 (v7.0.507, 2026-09-16, unattended cycle `03c7e9a6-8b02-40af-94bc-7bd8a876cbdc`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Designer, Opus 5 Builder) — `SES-287` — **partial (slice 1 of 2), verdict block on the inherited `agt-70-auditor` red: the auto-rollback engine stops proposing to undo four other cycles work, and its card stops claiming a revert it never performed.**
 
 The ticket named three defects and the Designer re-measured all three rather than taking the filing as fact. Defect 1 (a stale green anchor) was already dead: `SES-352`s `trg_anchor_green_from_ci` keeps `runner_green_states` a trigger-maintained projection of `ci_run_conclusions`, measured 50/50 with `observed_at = concluded_at` and zero ordering inversions — the 107-vs-50 gap is `GREEN_STATE_RETENTION` pruning, not staleness. So the build gates only the two live ones: `decide()` measured nothing about how far back a revert reached, and `buildIncidentCard()` keyed its past tense off `decision.action` for an engine that never runs git.
