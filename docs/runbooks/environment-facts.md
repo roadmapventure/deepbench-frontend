@@ -4,8 +4,11 @@
 
 What this platform has **measured** about the environment it builds itself in — the facts a cycle
 would otherwise re-discover, or worse, guess at. Validated by `scripts/check-environment-facts.js`;
-`--render` prints the exact body of the future `ds-knowledge-environment` Knowledge Skill Profile
-(that row is gated — ARCHITECTURE §19v P5, the Designer is an active agent).
+`--render` prints the exact body of the live `ds-knowledge-environment` Knowledge Skill Profile
+(`SES-396` slice 2, `v7.0.504`). That row was gated under ARCHITECTURE §19v P5 while the sentence
+here read "is gated"; rule `AGENT-ROW-AGREED-TICKET` (John 2026-09-14, amended 2026-09-15) made it
+build work for a `scope_origin = 'john-named'` ticket, and slice 2 wrote it under one decision
+handle with a before-image per row. `--check-row` asserts the row still matches `--render`.
 
 **Append-only, newest last.** A line is added only for a fact **no reading of the ticket or the code
 could show** — something true of the machine, the clock, the clone or the account, learned by

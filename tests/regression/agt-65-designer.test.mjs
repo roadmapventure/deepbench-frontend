@@ -1,3 +1,27 @@
+// DeepBench v7.0.504 | tests/regression/agt-65-designer.test.mjs | SES-396 slice 2 — SKILL_SLUGS
+// gains a SIXTH entry, `ds-knowledge-environment`, and the count it feeds moves 5 -> 6 with it.
+//
+// WHY THERE ARE NOW TWO KNOWLEDGE SKILLS ON ONE CAPABILITY, which is the only thing about this edit
+// a later reader could mistake for a duplicate to be tidied away. They answer different questions.
+// `ds-knowledge-standard` holds the DESIGN STANDARD — how a kickoff is shaped and graded, a text
+// that changes when the standard changes. `ds-knowledge-environment` holds the ENVIRONMENT FACTS
+// this platform has MEASURED (`docs/runbooks/environment-facts.md`, append-only), so the Designer
+// stops re-measuring the same handful of truths every cycle or, worse, guessing them. Its body is
+// `node scripts/check-environment-facts.js --render` byte for byte, and
+// tests/regression/ses-396-environment-facts.test.mjs arm (d) — NOT this file — is what pins those
+// bytes; the register is append-only, so that pin goes red on the first append that does not reach
+// the row, which is the intended pressure.
+//
+// THE SET ASSERTION BELOW IS UNCHANGED AND STILL DOES THE WORK. `SKILL_TYPES` stays five, because
+// six links over five TYPES is exactly the shape now: two of them are `knowledge`. A guard that had
+// grown SKILL_TYPES to six alongside the slugs would be asserting a type that does not exist, and a
+// guard that only counted would pass against six copies of one Skill — header note (1)'s point,
+// which this edit deliberately does not weaken.
+//
+// The row and its `design-kickoff` link (display_order 5, the ordinal the seed left free) were
+// written by SES-396 slice 2 under rule AGENT-ROW-AGREED-TICKET: `scope_origin = 'john-named'`, one
+// `runner_decisions` handle, one `runner_before_images` row each. Nothing flipped `agents.is_active`.
+//
 // DeepBench v7.0.456 | tests/regression/agt-65-designer.test.mjs | AGT-69 — the off-bench clause is retired: OFF_BENCH_AGENT_IDS no longer exists, so the import drops it and the assertion that the Designer was ON that list is deleted outright. The surviving NOT-in-AGENTS clause now reads for the AGT-69 reason: the governance agents render on the Bench's Governance section from live lane=governance rows, never from the static list.
 // DeepBench v7.0.431 | tests/regression/agt-65-designer.test.mjs | AGT-65 -- The Designer:
 // the seed rows are real, the Intent's contract still parses, and the ONE database rule the
@@ -54,8 +78,11 @@ const AGENT_ID = "designer";
 const CAPABILITY = "design-kickoff";
 const INTENT_SLUG = "ds-kickoff-intent";
 const KNOWLEDGE_SLUG = "ds-knowledge-standard";
-const SKILL_SLUGS = ["ds-identity", KNOWLEDGE_SLUG, "ds-behavior", INTENT_SLUG, "ds-guardrails"];
-// Named as a SET rather than counted -- `length === 5` passes against five copies of one type.
+const ENVIRONMENT_SLUG = "ds-knowledge-environment";
+const SKILL_SLUGS = ["ds-identity", KNOWLEDGE_SLUG, "ds-behavior", INTENT_SLUG, "ds-guardrails", ENVIRONMENT_SLUG];
+// Named as a SET rather than counted -- `length === 6` passes against six copies of one type. Still
+// FIVE types over SIX slugs: `knowledge` is carried twice (the design standard and the measured
+// environment facts -- see the header).
 const SKILL_TYPES = ["identity", "knowledge", "behavior", "intent", "guardrails"];
 
 // The Intent keys the handoff and the runner both read back off the Designer's return.
@@ -116,7 +143,8 @@ export default async function run() {
 
   const links = await rest(`capability_skill_profiles?capability_slug=eq.${CAPABILITY}&select=skill_profile_slug`);
   assert.equal(links.length, SKILL_SLUGS.length,
-    `${CAPABILITY} must link ${SKILL_SLUGS.length} Skill profiles (five types, no Format Skill), got ${links.length}`);
+    `${CAPABILITY} must link ${SKILL_SLUGS.length} Skill profiles (five types over six links -- ` +
+    `knowledge twice since SES-396 slice 2 -- and no Format Skill), got ${links.length}`);
   assert.deepEqual(links.map(l => l.skill_profile_slug).sort(), [...SKILL_SLUGS].sort());
 
   const assigns = await rest(`agent_capability_assignments?agent_id=eq.${AGENT_ID}&select=capability_slug`);
