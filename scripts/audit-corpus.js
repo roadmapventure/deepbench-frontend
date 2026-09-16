@@ -240,12 +240,29 @@ export function extractSkillRows(rows) {
 // the right relation and not a fuzzy one: the rule's own text must still be present byte-for-byte
 // after normalization, only the render's lead-in may differ. Empty rule texts are dropped first --
 // `"".endsWith` is true of everything and would exempt the whole corpus.
+//
+// (2b) A MULTI-LINE RULE RENDERS AS A MULTI-LINE BLOCKQUOTE, AND THE SUFFIX TEST COULD NOT SEE ONE
+// (SES-404's live red, measured 2026-09-16). The exemption above was written against a one-line
+// render, where `> **Rule X** — ` is a pure lead-in. `governance_rules.statement` may hold several
+// lines -- AGENT-ROW-AGREED-TICKET holds four -- and render-rule-blocks.js quotes EVERY line, so the
+// rendered text carries a `> ` the registry's own statement does not, in the MIDDLE of the string
+// where no `endsWith` can reach it. The result was a false duplicate for every multi-line rule
+// rendered into the two or more docs it governs by design: AGENT-ROW-AGREED-TICKET, live in
+// docs/ARCHITECTURE.md and .claude/rules/agent-roster-inert.md, reddened the whole suite from
+// v7.0.497 and gated four consecutive runner cycles. So the comparison strips the blockquote marks
+// from BOTH sides first, and that is the only thing it relaxes: `> ` at a line start is render
+// syntax, never a statement's own content, and every other byte must still match as before. The
+// grouping key is untouched -- two hand-written copies of the same paragraph are still one finding.
 export function detectDuplicates(statements, ruleTexts = []) {
+  const unquote = t => String(t ?? "").replace(/^[ \t]*>[ \t]?/gm, "");
   const ruleNorms = (ruleTexts ?? [])
-    .map(t => normalize(typeof t === "string" ? t : t?.statement))
+    .map(t => normalize(unquote(typeof t === "string" ? t : t?.statement)))
     .filter(t => t.length > 0);
   const ruleSet = new Set(ruleNorms);
-  const isSanctionedRestatement = key => ruleSet.has(key) || ruleNorms.some(r => key.endsWith(r));
+  const isSanctionedRestatement = raw => {
+    const key = normalize(unquote(raw));
+    return ruleSet.has(key) || ruleNorms.some(r => key.endsWith(r));
+  };
 
   const groups = new Map();
   for (const s of statements) {
@@ -259,7 +276,10 @@ export function detectDuplicates(statements, ruleTexts = []) {
 
   const findings = [];
   for (const [key, members] of groups) {
-    if (isSanctionedRestatement(key)) continue; // a live rule quoted in its own home is not a defect
+    // A live rule quoted in its own home is not a defect. The RAW text is what is tested, never the
+    // grouping key: `normalize()` has already collapsed the render's newlines, and a `> ` that has
+    // become ` > ` mid-string is no longer at a line start for `unquote()` to strip.
+    if (isSanctionedRestatement(members[0].text)) continue;
     const homes = new Set(members.map(m => locationKey(m.location)));
     if (homes.size < 2) continue;
     findings.push({

@@ -761,6 +761,23 @@ function theDetectorExemptsFencesAndRuleRenders() {
   // And the suffix relation is a real one: an empty rule text must exempt nothing.
   assert.strictEqual(detectDuplicates(statementsFrom([["p.md", rendered], ["q.md", rendered]]), [""]).length, 1,
     "an empty rule statement must not exempt the corpus -- ''.endsWith() is true of every string");
+
+  // SES-404, measured live 2026-09-16: a MULTI-LINE rule is the shape that got through. The registry
+  // statement holds several lines, render-rule-blocks.js quotes every one of them, so the rendered
+  // text carries a `> ` in the MIDDLE that no endsWith can reach -- AGENT-ROW-AGREED-TICKET is four
+  // lines and was a false duplicate across docs/ARCHITECTURE.md and .claude/rules/agent-roster-inert.md
+  // on every commit. Both directions, because an exemption that cannot fail proves nothing.
+  const MULTILINE_RULE = `${RULE_TEXT}\nReserved to John still: any claim no agreed ticket names.\nJohn 2026-09-14 (decision 20a06cf3).`;
+  const multiRendered = `# Three\n\n> **Rule B41** — ${MULTILINE_RULE.split("\n").join("\n> ")}\n`;
+  assert.strictEqual(
+    detectDuplicates(statementsFrom([["p.md", multiRendered], ["q.md", multiRendered]]), [MULTILINE_RULE]).length, 0,
+    "a multi-line live rule rendered as a blockquote is the SAME sanctioned restatement -- the `> ` on its continuation lines is render syntax, not a difference in the statement");
+  assert.strictEqual(
+    detectDuplicates(statementsFrom([["p.md", multiRendered], ["q.md", multiRendered]]), []).length, 1,
+    "with no live rule behind it the same multi-line block IS a duplicate -- the quote-stripping relaxes the render's syntax, never the exemption's subject");
+  assert.strictEqual(
+    detectDuplicates(statementsFrom([["p.md", multiRendered], ["q.md", multiRendered]]), [RULE_TEXT]).length, 1,
+    "the FIRST line alone must not exempt the whole block -- the rule's own text must still be present byte-for-byte after normalization, which is what keeps this from becoming a prefix match");
 }
 
 // --- E+. the file list, and WHOSE Set excludes from it -------------------------------------------
