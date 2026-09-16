@@ -409,6 +409,30 @@ in `public.runner_decision_patterns`, identically for both the attended and unat
 - Before-images you already wrote without a decision id are adopted rather than re-taken:
   `public.attach_before_images('<decision id>', ARRAY['<image id>']::uuid[])` fills `decision_id`
   only where it is still NULL.
+- **`attach_before_images()` REFUSES the whole call if any image names a table
+  `reverse_decision()` cannot replay (`SES-399`, `v7.0.502`).** The restorable tables are the
+  fourteen `public.reversible_tables()` returns — the twin of `reverse_decision()`'s own
+  `k_allowed`, widened 7 → 14 by `SES-364`. Name anything else and the call raises, **nothing is
+  attached, not even the restorable images in the same batch**, and the message lists every
+  offending image id with its table. *Why all-or-nothing:* a partial attach would hand you a
+  decision whose undo set quietly omits rows — §19v's promise (*"no before-image logged → the
+  write does not happen"*) broken one level down, and reported as success. *Why at attach time:*
+  the handle you paste into your close-out note above is a promise that a Reverse will restore
+  the row, and until this shipped the enumerated attach would write that promise over any table
+  at all. If the table genuinely should be restorable, widen `reversible_tables()` **and**
+  `reverse_decision()`'s `k_allowed` in the same migration; the tie is asserted once, by the
+  migration's own trailing `DO` block, so later drift presents as a loud false refusal here
+  rather than as a silent unbacked promise.
+- **`record_ship_decision()`'s bulk sweep is deliberately NOT guarded, and do not "fix" that.**
+  It adopts the cycle's whole image set through its own
+  `UPDATE public.runner_before_images … WHERE cycle_id = … AND decision_id IS NULL`, never
+  through `attach_before_images()`, and adopting the ledger rows is intended — its body says so:
+  *"the honest report, rather than an undo set that quietly omits rows."* Measured at `SES-399`:
+  **43 live decisions carry at least one image outside the fourteen, and 39 of them are
+  `kind='ship'`**, so extending the guard to the sweep would refuse nearly every ship. The four
+  that are not ships (3 `directive`, 1 `gate`, 9 images over `projects`, `runner_card_asks`,
+  `runner_migration_downs`, `runner_model_lanes`) came through the enumerated attach and are
+  exactly what the refusal above now stops.
 
 ### 3e. Run the verifier before you write `done` — the attended session's own verdict (`SES-311`, `v7.0.400`)
 
