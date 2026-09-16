@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// DeepBench v7.0.500 | scripts/run-project.js | SES-403 -- THE MANAGER CAN SEE THE SHIPS THAT ARE
+// STUCK, and it gets ONE new instrument and ONE new refusal, not a new action. `regradable_ships()`
+// is read beside `prime_directive_queue()` and carried into the state as `regradable`; if the
+// answer carries `regrades`, every id in it must be one the LISTER returned. Nothing here decides
+// what is re-gradable -- that rule has one home, in the function, and this file reads it verbatim
+// exactly as it reads the pick.
+//
 // DeepBench v7.0.434 | scripts/run-project.js | AGT-68 -- the session's HANDS for The Development
 // Manager. The manager's Skill rows are its judgment; this file is the part that can touch a row.
 //
@@ -296,6 +303,31 @@ export function answerErrors(answer, state) {
   if (answer.project && state?.project && String(answer.project) !== String(state.project)) {
     errors.push(`the answer is about project "${answer.project}" but this run is managing "${state.project}"`);
   }
+
+  // FEATURE: SES-403 -- `regrades`, OPTIONAL and checked in the same direction as the assignment.
+  //
+  // It is checked HERE, above the action fork, because a re-grade list is not an assignment: it can
+  // ride on a `report` or a `stop` as easily as on an `assign`, and the two early returns below
+  // would skip it on exactly those. Absent is the ordinary case and says nothing.
+  //
+  // THE LIST IS THE LISTER'S, NOT THE MANAGER'S. `state.regradable` is `public.regradable_ships()`
+  // read verbatim; naming anything else is the same class of move as re-ordering the board, and it
+  // is refused here rather than argued with. `public.record_regrade_assignment()` re-reads the
+  // lister and refuses again on its own -- the driver's check is the early, legible half, never the
+  // only one.
+  if (answer.regrades !== undefined && answer.regrades !== null) {
+    if (!Array.isArray(answer.regrades)) {
+      errors.push(`"regrades" is ${typeof answer.regrades}, not an array of backlog ids -- the manager may not re-grade a ship the lister did not return, and a non-list cannot be checked against the lister at all`);
+    } else {
+      const listed = (Array.isArray(state?.regradable) ? state.regradable : [])
+        .map(r => String(r && r.backlog_id));
+      const unknown = answer.regrades.filter(id => !listed.includes(String(id)));
+      if (unknown.length) {
+        errors.push(`"regrades" names ${unknown.map(String).join(", ")}, which regradable_ships() did not return (it returned: ${listed.join(", ") || "nothing"}) -- the manager may not re-grade a ship the lister did not return`);
+      }
+    }
+  }
+
   const action = answer.action;
   // An action outside the closed set never reaches the assign branch by falling through it.
   if (!ACTIONS.includes(action)) {
@@ -532,6 +564,17 @@ async function readInstruments({ base, key, project, cycleId, trigger, tenant })
   const queue = await rpc(base, key, "prime_directive_queue");
   if (queue.error) return { error: queue.error };
 
+  // FEATURE: SES-403 -- the ships blocked for a cause OUTSIDE themselves, read as an instrument
+  // beside the queue rather than derived here. `public.regradable_ships()` is the one home for that
+  // rule (a delivered ticket whose block's red gates all map to CI jobs that are `success` in the
+  // newest ref='dev' conclusion, concluded after the verdict, with no unreversed ship decision);
+  // this driver reads it and never re-derives it, the same way it reads the pick verbatim.
+  // A FAILED READ IS FATAL FOR PASS ONE, exactly like every other instrument above: a manager shown
+  // an empty re-grade list because the read failed would conclude there is nothing stuck, which is
+  // the assumption dm-behavior forbids ("a missing row is a stop, not an assumption").
+  const regradable = await rpc(base, key, "regradable_ships");
+  if (regradable.error) return { error: regradable.error };
+
   // Both of these need a cycle id. Absent one they are recorded as unread -- which `wallReading`
   // treats as a wall standing, so nobody gets a green board by omitting a flag.
   const dayCap = cycleId
@@ -564,6 +607,7 @@ async function readInstruments({ base, key, project, cycleId, trigger, tenant })
     dayTokenCap: dayCap.error ? { error: dayCap.error } : dayCap.row,
     schedulerGate: sched.error ? { error: sched.error } : sched.row,
     queue: queue.rows,
+    regradable: regradable.rows,   // SES-403
     roster: roster.roster,
     pick,
     pickRow,
@@ -769,6 +813,9 @@ async function main() {
     // project this step is managing is a real state the manager has to speak to, not a bug.
     pick_in_project: inst.pickProject ? inst.pickProject === args.project : null,
     queue: inst.queue,
+    // SES-403: the ships the lister says may be graded again, beside the queue. The manager names
+    // ids from THIS list in `regrades` or names none; `answerErrors` refuses anything else.
+    regradable: inst.regradable,
     roster: inst.roster,
     last_handoff: handoff,
     // The Intent's OWN contract, from its row. It reaches the prompt through the executor's TASK

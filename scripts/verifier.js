@@ -1,4 +1,33 @@
 #!/usr/bin/env node
+// DeepBench v7.0.500 | scripts/verifier.js | SES-403 -- `--regrade`: A SHIP BLOCKED FOR A CAUSE
+// OUTSIDE ITSELF CAN BE GRADED AGAIN, and the thing to read twice is that this branch RUNS NO GATE.
+// Measured live 2026-09-15: SES-379/383/388/390/394/395/398 are all `delivered`, each with its
+// latest and only `runner_verdicts` row a `block`, `gate_build` green on all seven, the reds
+// entirely `regression` and/or `hygiene`; `runner_decisions` holds zero `kind='ship'` rows for any
+// of them, and `record_ship_decision()`'s first refusal means none can ever be written. Seven
+// deliveries permanently unshippable for somebody else's red.
+//
+// THE MAPPING IS THE MECHANISM (`GATE_CI_JOBS`, mirrored by `public.ci_jobs_for_gates`): this
+// file's three gate keys collapse onto CI's two blocking jobs -- `build` -> `Build (blocking)`,
+// `regression` AND `hygiene` -> `Tripwire + regression (blocking)`. A ship is re-gradable when
+// every job its verdict's RED gates map to is `success` in the newest `ref='dev'` conclusion, that
+// conclusion concluded AFTER the verdict, and no unreversed ship decision exists. The verdict comes
+// from that conclusion and never from a local run: SES-352 makes CI the authority on dev green, and
+// a re-run here would grade THIS worktree at THIS instant -- a different tree from either.
+//
+// A GREEN JOB IS EVIDENCE; A FAILING ONE IS NOT. Dev head CONTAINS this delivery, so a `success`
+// job there proves the delivery does not break it -- and a `failure` proves nothing, because
+// somebody else's commit can be the one breaking it. That asymmetry is the whole lane, and it is
+// why `regradeGateResults()` re-grades only the gates the block was RED on and carries a gate the
+// delivery already passed on its own tree forward unchanged. Importing dev head's failures onto
+// gates this delivery passed would put back exactly the outside cause the ticket exists to remove.
+//
+// THE NEGATIVE CONTROL IS FREE AND NEEDS NO CODE. A ship blocked on its OWN diff has that diff in
+// `dev`, so the job it broke is still `failure` at dev head; `regradable_ships()` never returns it
+// and the flag refuses it at exit 2. A missing conclusion, a `skipped` gate, or a job absent from
+// the run excludes just as hard -- the absence of evidence about dev head is never evidence that
+// dev head is green.
+//
 // DeepBench v7.0.472 | scripts/verifier.js | SES-345 -- THE VERDICT ROW CARRIES THE SHA IT GRADED,
 // and the thing to read twice is that leg 4 of the handoff was never missing a FACT, it was missing a
 // JOIN KEY. `ship_handoff_census` has asked "does this ship have a sha?" since it was built, but it
@@ -682,6 +711,112 @@ export function verdictFor(gates) {
     reasoning: `block: ${parts.join("; ")}. Green: ${green.length ? green.map(r => r.label).join(", ") : "none"}. ` +
       `A block is the status quo -- the cycle ships delivered and cards John, exactly as before this lane existed.`,
   };
+}
+
+// FEATURE: SES-403 -- THE MAPPING IS THE MECHANISM, and this is its repo-side home.
+//
+// The three gate keys above collapse onto CI's TWO blocking jobs (`.github/workflows/ci.yml`
+// L169, L188): `build` is decided by `Build (blocking)`, and `regression` AND `hygiene` are both
+// decided by `Tripwire + regression (blocking)` -- that job runs the tripwire and the suite in one
+// checkout. `public.ci_jobs_for_gates(text[])` is the database's copy of exactly this table, and
+// `regradable_ships()` lists through it; this one is what the flag re-grades through, so the
+// lister and the re-grade cannot answer the same question two ways.
+//
+// A CONSTANT RATHER THAN A LITERAL AT TWO CALL SITES, for the SES-199 GATES reason one screen up:
+// a later widening or narrowing of the job set shows up in this file's diff and in its guard's,
+// never silently.
+export const GATE_CI_JOBS = Object.freeze({
+  build: "Build (blocking)",
+  regression: "Tripwire + regression (blocking)",
+  hygiene: "Tripwire + regression (blocking)",
+});
+
+// Gate keys -> the DISTINCT CI job names that decide them.
+//
+// AN UNMAPPED KEY THROWS. A fourth entry added to GATES and not to GATE_CI_JOBS must stop a
+// re-grade dead rather than contribute no job and let the remaining ones vouch for the delivery --
+// "every job in the list is green" over a list that quietly lost a member is the whole defect this
+// lane must not have. Same refusal the SQL function raises, for the same reason.
+export function ciJobsForGates(gateKeys) {
+  if (!Array.isArray(gateKeys)) {
+    throw new Error(`ciJobsForGates: expected an array of gate keys, got ${gateKeys === null ? "null" : typeof gateKeys} -- a null gate list is "nobody looked", never "no red gates"`);
+  }
+  const out = [];
+  for (const raw of gateKeys) {
+    const job = GATE_CI_JOBS[String(raw ?? "").trim().toLowerCase()];
+    if (!job) {
+      throw new Error(`ciJobsForGates: gate key "${raw}" maps to no CI job. The mapping is ${Object.entries(GATE_CI_JOBS).map(([k, v]) => `${k} -> "${v}"`).join("; ")}; a new gate key needs a job here before any ship can be re-graded on it.`);
+    }
+    // regression and hygiene share one job, and asking twice about the same job is one question.
+    if (!out.includes(job)) out.push(job);
+  }
+  return out;
+}
+
+// FEATURE: SES-403 -- the verdict a CI conclusion supports, or the named reason there is none.
+//
+//   gates  the PRIOR verdict's stored gate statuses ({ build, regression, hygiene }).
+//   jobs   the newest `ref='dev'` conclusion's `jobs` array ([{ name, conclusion }]).
+//
+// Returns { ok, gateResults, source, reason }.
+//
+// WHICH GATES CI RE-GRADES, AND WHY IT IS NOT ALL OF THEM. The evidence a green CI job gives is
+// ONE-DIRECTIONAL, and the whole lane turns on that asymmetry:
+//
+//   * A job that is `success` at dev head is proof about THIS delivery, because dev head CONTAINS
+//     this delivery. A gate that was red and whose job is now green is genuinely green.
+//   * A job that is `failure` at dev head proves nothing about this delivery -- somebody else's
+//     commit can be the one breaking it. That is the entire premise of this ticket, so importing
+//     that failure onto a gate this delivery already PASSED on its own tree would re-introduce the
+//     outside cause the lane exists to remove.
+//
+// So a gate the prior verdict recorded GREEN stays green (it was proven on the delivery's own
+// tree), and only a RED gate is re-graded from its CI job. `regradable_ships()` applies the same
+// asymmetry when it lists -- every job the RED gates map to must be `success` -- which is what
+// keeps the lister and the flag from answering one question two ways. `source` records which half
+// each gate came from, so the row can say it rather than leaving a reader to assume.
+//
+// TWO REFUSALS, both the fail-closed direction this file takes everywhere else:
+//
+//   * A SKIPPED PRIOR GATE. `skipped` means the check never produced an exit status at all
+//     (gateStatus()'s three-value return). CI's conclusion says nothing about a check that did not
+//     run here, so no job can clear it and the block stands.
+//   * A MISSING CONCLUSION, or a conclusion carrying no job for a gate being re-graded. The absence
+//     of evidence about dev head is never evidence that dev head is green.
+export function regradeGateResults({ gates, jobs } = {}) {
+  const prior = gates || {};
+  const skipped = GATES.filter(g => prior[g.key] === "skipped");
+  if (skipped.length) {
+    return { ok: false, gateResults: null, source: null,
+      reason: `the prior verdict records ${skipped.map(g => g.label).join(", ")} as SKIPPED -- a check that never produced an exit status is not something a CI conclusion can clear. The block stands and nothing is recorded.` };
+  }
+  if (!Array.isArray(jobs) || jobs.length === 0) {
+    return { ok: false, gateResults: null, source: null,
+      reason: `there is no CI conclusion to re-grade against (${Array.isArray(jobs) ? "the conclusion carries an empty job list" : "none could be read"}) -- the absence of evidence about dev head is never evidence that dev head is green.` };
+  }
+  const byName = new Map(jobs.filter(j => j && j.name !== undefined && j.name !== null)
+    .map(j => [String(j.name), j.conclusion ?? null]));
+  const gateResults = {};
+  const source = {};
+  const absent = [];
+  for (const g of GATES) {
+    if (prior[g.key] === "green") {
+      gateResults[g.key] = "green";
+      source[g.key] = "carried from the prior verdict -- this delivery already passed it on its own tree";
+      continue;
+    }
+    const [job] = ciJobsForGates([g.key]);
+    if (!byName.has(job)) { absent.push(`${g.label} -> "${job}"`); continue; }
+    const conclusion = byName.get(job);
+    gateResults[g.key] = conclusion === "success" ? "green" : "red";
+    source[g.key] = `CI job "${job}" = ${conclusion ?? "null"}`;
+  }
+  if (absent.length) {
+    return { ok: false, gateResults: null, source: null,
+      reason: `the CI conclusion carries no job for ${absent.join(", ")} -- an absent job says nothing about that gate, and reading silence as green is exactly what this lane may not do.` };
+  }
+  return { ok: true, gateResults, source,
+    reason: GATES.map(g => `${g.label}=${gateResults[g.key]} (${source[g.key]})`).join("; ") };
 }
 
 // Charter premise 3, as a test rather than as a sentence to remember.
@@ -1627,6 +1762,193 @@ async function judgmentRows(supabaseUrl, supabaseKey) {
   return { intentSlug, schema };
 }
 
+// FEATURE: SES-403 -- `--regrade`: re-grade a ship that was blocked for a cause OUTSIDE ITSELF.
+//
+// THE PREMISE, measured rather than argued (2026-09-15): seven `delivered` tickets each carry a
+// single `runner_verdicts` row whose verdict is `block`, `gate_build` green on all seven, the reds
+// entirely `regression` and/or `hygiene`. `runner_decisions` holds no `kind='ship'` row for any of
+// them, and `record_ship_decision()`'s first refusal (`verdict is distinct from 'approve' -> raise`)
+// means none can ever be written. They are stuck, and not one of them is stuck on its own diff.
+//
+// THIS BRANCH RUNS NO GATE, and that is the design rather than an economy. The verdict comes from
+// CI's own conclusion on `dev` (SES-352: CI is the authority on dev green). A local re-run would
+// grade THIS worktree at THIS instant, which is a different tree from the one the ship's block was
+// about and a different tree from the one CI concluded on.
+//
+// WHY THE NEGATIVE CONTROL IS FREE. A ticket blocked on its OWN diff has that diff in `dev`, so the
+// job it broke is still `failure` at dev head -- `regradable_ships()` never returns it, and (a)
+// below refuses it at exit 2. Nothing has to be remembered for that case; it falls out of the rule.
+//
+// Exit codes follow the file's table exactly: 2 is "the re-grade could not run" (no credentials, a
+// ticket the lister did not return, an unreadable conclusion, a failed insert) and is NOT a verdict;
+// 1 is a verdict or a standing block (the ancestry check failed, or the re-grade still blocks); 0 is
+// an approve, recorded, with its ship decision written.
+async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  // No `--dry-run` relaxation on the READS: every fact this branch grades on is a row. `--dry-run`
+  // means "write nothing", never "invent the board".
+  const missing = [
+    !supabaseUrl && "SUPABASE_URL", !supabaseKey && "SUPABASE_SERVICE_KEY",
+    !ticket && "--ticket", !cycleId && "--cycle-id",
+  ].filter(Boolean);
+  if (missing.length) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", missing },
+      prose: `verifier --regrade: missing ${missing.join(", ")}. Exiting 2 (the re-grade could not run) -- this is NOT a verdict, and the prior block stands untouched.` });
+  }
+
+  // ---- (a) THE LISTER IS THE AUTHORITY. -------------------------------------------------------
+  // Not "does this ticket look stuck to me" -- `public.regradable_ships()` decides, and a ticket it
+  // did not return is refused here rather than argued with. That is what makes the flag unable to
+  // re-grade a ship blocked on its own diff even when a caller names one.
+  const listed = await rest(supabaseUrl, supabaseKey, "rpc/regradable_ships", { method: "POST", body: "{}" });
+  if (listed.error) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: listed.error },
+      prose: `verifier --regrade: public.regradable_ships() could not be read (${listed.error}). Exiting 2 -- no verdict, nothing recorded.` });
+  }
+  const rows = Array.isArray(listed.rows) ? listed.rows : [];
+  const row = rows.find(r => r && String(r.backlog_id) === String(ticket)) || null;
+  if (!row) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", ticket, listed: rows.map(r => r.backlog_id) },
+      prose: `verifier --regrade: public.regradable_ships() did not return ${ticket} (it returned: ${rows.map(r => r.backlog_id).join(", ") || "nothing"}).\n` +
+        `A ship is re-gradable only when every CI job its verdict's RED gates map to is \`success\` in the newest ref='dev' conclusion, that conclusion concluded AFTER the verdict, and no unreversed ship decision exists. A ship blocked on its own diff has that diff in dev, so the job it broke is still failing there and it is never listed.\n` +
+        `Exiting 2 -- this is NOT a verdict on ${ticket}; its prior block stands.` });
+  }
+
+  // ---- (b) THE ANCESTRY CHECK, and it is the whole join between the two trees. -----------------
+  // CI concluded on `ci_sha`. The block was graded on `graded_sha`. If the graded tree is not an
+  // ancestor of the CI tree, then the CI run's green says nothing about the delivery being
+  // re-graded -- the commit may have been rebased away, reverted, or never landed at all.
+  // ANY git error is the same answer as a non-ancestor: unknown is not innocent, and this is the
+  // one place where reading "git could not tell" as "fine" would launder a ship nobody shipped.
+  // NOTHING IS RECORDED on this path. A block that stands needs no second block row saying so.
+  const gradedSha = row.graded_sha ?? null;
+  const ciSha = row.ci_sha ?? null;
+  let ancestryError = null;
+  if (!gradedSha || !ciSha) {
+    ancestryError = `the lister returned graded_sha=${gradedSha ?? "null"} and ci_sha=${ciSha ?? "null"}; an unrecorded sha cannot be placed in dev's history`;
+  } else {
+    const anc = spawnSync("git", ["merge-base", "--is-ancestor", gradedSha, ciSha], { cwd: repoRoot, encoding: "utf8" });
+    if (anc.error) ancestryError = `git merge-base could not run: ${anc.error.message}`;
+    else if (anc.status !== 0) {
+      ancestryError = anc.status === 1
+        ? `${gradedSha} is NOT an ancestor of the CI tree ${ciSha}`
+        : `git merge-base --is-ancestor exited ${anc.status}: ${String(anc.stderr || "").trim() || "no stderr"}`;
+    }
+  }
+  if (ancestryError) {
+    return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "regrade-refused", recorded: false, ticket,
+        prior_verdict_id: row.verdict_id, graded_sha: gradedSha, ci_sha: ciSha, ci_run_id: row.ci_run_id, error: ancestryError },
+      prose: `verifier --regrade: REFUSED on ${ticket} -- ${ancestryError}.\n` +
+        `  The CI conclusion is evidence about the tree it ran on; unless the graded tree is inside that tree's history, its green is not about this delivery.\n` +
+        `  Exiting 1: the prior block (${row.verdict_id}) STANDS and NOTHING was recorded.` });
+  }
+
+  // ---- (c) THE GATE RESULTS, from CI's jobs through the same mapping the lister used. ----------
+  // Two reads rather than one: the prior verdict's own gate statuses (so a `skipped` gate refuses
+  // here as well as in the lister) and the conclusion's job array (which the lister's return shape
+  // does not carry). Both by primary key, so neither can describe a different row than the one the
+  // lister named.
+  const prev = await rest(supabaseUrl, supabaseKey,
+    `runner_verdicts?select=id,gate_build,gate_regression,gate_hygiene,epic_name,priority_class&id=eq.${encodeURIComponent(row.verdict_id)}&limit=1`);
+  if (prev.error || !Array.isArray(prev.rows) || !prev.rows[0]) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: prev.error || `no runner_verdicts row ${row.verdict_id}` },
+      prose: `verifier --regrade: could not read the prior verdict ${row.verdict_id} (${prev.error || "no such row"}). Exiting 2 -- no verdict, nothing recorded.` });
+  }
+  const priorRow = prev.rows[0];
+  const conc = await rest(supabaseUrl, supabaseKey,
+    `ci_run_conclusions?select=commit_sha,run_id,concluded_at,jobs&run_id=eq.${encodeURIComponent(row.ci_run_id)}&limit=1`);
+  if (conc.error) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: conc.error },
+      prose: `verifier --regrade: could not read ci_run_conclusions for run ${row.ci_run_id} (${conc.error}). Exiting 2 -- no verdict, nothing recorded.` });
+  }
+  const conclusion = Array.isArray(conc.rows) ? conc.rows[0] : null;
+  const graded = regradeGateResults({
+    gates: { build: priorRow.gate_build, regression: priorRow.gate_regression, hygiene: priorRow.gate_hygiene },
+    jobs: conclusion ? conclusion.jobs : null,
+  });
+  if (!graded.ok) {
+    return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "regrade-refused", recorded: false, ticket,
+        prior_verdict_id: row.verdict_id, ci_run_id: row.ci_run_id, error: graded.reason },
+      prose: `verifier --regrade: REFUSED on ${ticket} -- ${graded.reason}\n  Exiting 1: the prior block (${row.verdict_id}) STANDS and NOTHING was recorded.` });
+  }
+  const gateResults = graded.gateResults;
+  const { verdict, reasoning: verdictReasoning } = verdictFor(gateResults);
+  const jobNames = ciJobsForGates(row.red_gates || []);
+
+  // ---- (d) ONE row. Same insertVerdict() both other lanes go through, same payload shape. ------
+  //
+  // `graded_sha` IS THE CI TREE, deliberately. SES-345's key names the tree the gates ran on, and
+  // here the gates ran in CI on `ci_sha` -- writing this worktree's HEAD would record a tree nobody
+  // graded. `auto_done_eligible` is FALSE unconditionally: a re-grade is a second look at an
+  // existing delivery, never its own ladder grant, and this branch never reads class_autonomy().
+  const reasoning =
+    `${verdictReasoning}\n` +
+    `SES-403 re-grade of ${ticket}: the prior verdict ${row.verdict_id} (${row.version ?? "no version"}) blocked on ${(row.red_gates || []).join(", ") || "(no red gate recorded)"}, ` +
+    `which CI decides through ${jobNames.map(j => `"${j}"`).join(" and ") || "(no job)"}. Re-graded against the newest ref='dev' conclusion: run ${row.ci_run_id}, sha ${row.ci_sha}, concluded ${row.ci_concluded_at}. ` +
+    `Gates: ${graded.reason} ` +
+    `The graded tree ${gradedSha} is an ancestor of ${ciSha}. NO GATE WAS RUN LOCALLY -- CI is the authority on dev green (SES-352), and a local run would grade a different tree at a different instant.`;
+  const autoDoneReason =
+    `auto-done does not apply to a re-grade: this is a second look at an existing delivery graded from CI's conclusion, not a fresh delivery, and the trust ladder was not asked (SES-403).`;
+
+  const prose =
+    `verifier --regrade verdict: ${verdict.toUpperCase()} on ${ticket}${version ? ` (${version})` : ""} -- from CI run ${row.ci_run_id}\n` +
+    `  ${GATES.map(g => `${g.label}=${gateResults[g.key]} [${graded.source[g.key]}]`).join("\n  ")}\n` +
+    `  prior verdict: ${row.verdict_id} (red: ${(row.red_gates || []).join(", ") || "none recorded"})\n` +
+    `  graded sha: ${ciSha} (CI's tree; ${gradedSha} is an ancestor of it)\n` +
+    `  auto-done eligible: no -- ${autoDoneReason}`;
+
+  const payload = {
+    ok: verdict === "approve", exitCode: verdict === "approve" ? 0 : 1,
+    kind: "regrade", verdict, gates: gateResults, gate_source: graded.source, reasoning,
+    ticket, version: version || null,
+    prior_verdict_id: row.verdict_id, prior_version: row.version ?? null,
+    red_gates: row.red_gates || [], ci_jobs: jobNames,
+    ci_sha: ciSha, ci_run_id: row.ci_run_id, ci_concluded_at: row.ci_concluded_at,
+    graded_sha: ciSha, auto_done_eligible: false, auto_done_reason: autoDoneReason,
+    epic_name: priorRow.epic_name ?? null, priority_class: priorRow.priority_class ?? null,
+  };
+
+  if (dryRun) {
+    return emit({ code: payload.exitCode, payload: { ...payload, recorded: false, ship_decision_id: null },
+      prose: `${prose}\n  --dry-run: nothing recorded.` });
+  }
+
+  const ins = await insertVerdict({
+    supabaseUrl, supabaseKey, cycleId, ticket, version, verdict, gateResults, reasoning,
+    eligible: false, autoDoneReason,
+    epicName: priorRow.epic_name ?? null, priorityClass: priorRow.priority_class ?? null,
+    gradedSha: ciSha,
+  });
+  if (ins.error) {
+    return emit({ code: 2, payload: { ...payload, recorded: false, error: ins.error },
+      prose: `${prose}\n  RECORDING FAILED: ${ins.error}\n  Exiting 2 -- the re-grade above was reached but is not in the ledger, so it is not assertable.` });
+  }
+
+  // ---- (e) ON APPROVE ONLY: the ship decision the block made unwritable. -----------------------
+  // A BLOCK EMITS AND STOPS. Its block row is the record, and SES-402 reads those later; manufacturing
+  // a ship decision for a delivery that still does not pass is the one thing record_ship_decision()'s
+  // first refusal exists to prevent, and routing around it here would be that refusal defeated.
+  if (verdict !== "approve") {
+    return emit({ code: 1, payload: { ...payload, recorded: true, verdict_id: ins.rowId, ship_decision_id: null },
+      prose: `${prose}\n  recorded as runner_verdicts ${ins.rowId}\n  Still a block: no ship decision written, and that row is what SES-402 reads.` });
+  }
+  const ship = await rest(supabaseUrl, supabaseKey, "rpc/record_ship_decision", {
+    method: "POST",
+    body: JSON.stringify({
+      p_cycle_id: cycleId, p_backlog_id: ticket, p_version: version || row.version || null,
+      p_push_sha: ciSha, p_verdict_id: ins.rowId,
+    }),
+  });
+  if (ship.error) {
+    return emit({ code: 2, payload: { ...payload, recorded: true, verdict_id: ins.rowId, ship_decision_id: null, error: ship.error },
+      prose: `${prose}\n  recorded as runner_verdicts ${ins.rowId}\n  record_ship_decision FAILED: ${ship.error}\n  Exiting 2 -- the approve is in the ledger but the ship it authorises is not, which is a half-written handoff rather than a verdict.` });
+  }
+  const shipId = Array.isArray(ship.rows) ? ship.rows[0] : ship.rows;
+  return emit({ code: 0, payload: { ...payload, recorded: true, verdict_id: ins.rowId, ship_decision_id: shipId ?? null },
+    prose: `${prose}\n  recorded as runner_verdicts ${ins.rowId}\n  ship decision: ${shipId ?? "(none returned)"} -- its window closes through the tail's ordinary sweep.` });
+}
+
 async function main() {
   const repoRoot = arg("repo", path.resolve(__dirname, ".."));
 
@@ -1670,6 +1992,17 @@ async function main() {
   const cycleId = arg("cycle-id", "");
   const ticket = arg("ticket", "");
   const version = arg("version", "");
+
+  // ---- SES-403: `--regrade`, and it RETURNS BEFORE THE GATE LOOP on purpose. ------------------
+  //
+  // Placed here, second, for the same reason `--check-kickoff` is first: what this branch grades is
+  // not this worktree. It runs no gate, assembles no prompt and reaches no judge -- so every lane
+  // below it would be doing work whose result it must not use. Its own credential check lives
+  // inside regradeBranch() because it needs `--ticket` and `--cycle-id` too, which the general
+  // check below does not require.
+  if (process.argv.includes("--regrade")) {
+    return regradeBranch({ repoRoot, ticket, cycleId, version, dryRun });
+  }
 
   // FEATURE: AGT-67 -- the judge lane. Validated, never defaulted on a typo (see parseJudgeMode).
   const judgeParsed = parseJudgeMode(arg("judge", undefined));
