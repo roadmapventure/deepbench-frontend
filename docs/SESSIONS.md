@@ -5,6 +5,30 @@
 
 ---
 
+## session/cycle-20260916-1424 (v7.0.509, 2026-09-16, unattended cycle `32218efa-f777-4edf-b611-8e3e6b2a93a2`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `SES-378` — **partial (slice 4 shipped), verdict approve: the Development Manager gets its own Skill rows, so the cycle it runs is Knowledge and the chain rule is a guardrail.**
+
+Third cycle of one session, and the first where a gate refused the platform's own work before a human could.
+
+### The kickoff was rejected by its own checker, and that is the procedure working
+
+Pass 1 came back 8,186 bytes, premise alive, and `verifier --check-kickoff` exit **1**: *"kickoff has no lane declaration (SES-359)"*. Step 6.3 calls that a named deviation and allows exactly one re-assembly, so the file was not written, `design_status` was not set, the harvest was restored from git, and `design-kickoff` was re-assembled once with the verifier's own message in `task_context`. Pass 2 came back 8,183 bytes carrying `- **Lanes:** session (the Builder, subscription); executor none, $0.` and exit 0. A second failure would have closed this cycle `gated_before_build`; it did not come to that.
+
+### The Designer re-measured rather than inheriting
+
+`skill_profiles` 113 rows, **0** carrying the step-9 chain rule and **0** carrying the cycle card; `run-project`'s only Knowledge row was `dm-knowledge-platform` (instruments only); `dm-guardrails` was 5 `must` + 6 `must_not` with no chain rule. It also read the ticket against the live roster rule and found the ticket's own text stale: `SES-378.scope_origin` is `john-named`, and rule `AGENT-ROW-AGREED-TICKET` (John, decision `38a1c566`) makes these Skill-row edits build work with before-images — so "John's word required by the roster rule" no longer describes this slice. The Builder confirmed it mechanically rather than by reading the same prose: `agent-row-gate: SES-378 · action=edit-active · scope_origin="john-named" → BUILD`, exit 0.
+
+### The seed was wrong and the suite caught it — the fix went into the seed, not the guard
+
+The first Skill row took the table's defaults (`claude-haiku-4-5-20251001`, 4000 tokens) while its five siblings all run the orchestrator lane at 8000/0, and `AGT-68` reads that lane live. The Builder repaired the **seeder**: `--apply` now inherits the model config from the capability's other Skills and refuses if they disagree, so a future lane change moves this row with its siblings and there is no third place to remember. The live row was repaired in place under the same decision, imaged; the oldest image for it is still the NULL insert image, so the Reverse is unchanged. Live after: `skill_profiles` 114, `run-project` links 6 (orders 1–6, distinct), `dm-guardrails.must` 6, decision `f43264be` carrying 4 before-images, 2 of them `row_data NULL`. A second `--apply` added nothing.
+
+### Deviations, disclosed
+
+`--apply` writes over PostgREST rather than as §4's single `DO` block — Node here has no SQL channel (no `pg` dependency, no raw-SQL RPC on this project). Everything the undo rests on survives the split, and the specific hazard 7b's one-block rule guards against cannot occur: neither `skill_profiles` nor `capability_skill_profiles` has an `updated_at` column, which is `reverse_decision()`'s own `SES-364` note. Task 2's guardrails write **is** a true single `DO` block over the MCP. A third file the kickoff does not name, `tests/regression/agt-68-devmanager.test.mjs`, was edited inside the 3-file cap: it pinned `run-project` at exactly 5 links, the count this slice moves to 6, and the Designer's own baseline set had listed it.
+
+Ship `ba9f6f9e`, verdict `9106185c` approve, regression 238/238, auto-done eligible YES, `invention` streak 2 → 3.
+
+---
+
 ## session/cycle-20260916-1328 (v7.0.508, 2026-09-16, unattended cycle `620161e0-ef2d-46ca-b400-8e89db0ac0bd`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `SES-378` — **partial (slice 3 shipped), verdict approve: the staff watch gets a table, and the fix from the previous slice proved itself on the very next pick.**
 
 The chain continued straight out of `22a5e6d6`'s tail, and the first thing it produced was evidence for the slice that had just shipped. `run-project.js` printed `claim: held as 620161e0-ef2d-46ca-b400-8e89db0ac0bd` — a cycle id, not the `run-project:moat-support:N` label it would have written an hour earlier. Slice 2 working live on the next pick it touched.
