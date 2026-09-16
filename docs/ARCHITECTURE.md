@@ -2679,7 +2679,7 @@ bucket, and with it the earlier "unspent days roll forward" line):**
   5-hour %) typed into the briefing converts percentages to tokens (`tokens_per_pct`,
   calibrated from runner-only overnight windows). Guardrails, derived from a measured month of
   John's real usage (median working day ~11.6M tokens, p90 ~34M, peak 88M): runner rests at a
-  **weekly all-models reading ≥ 85%**; plans against a **50% share** of today's calculated
+  **weekly all-models reading ≥ 85%** (90% from Thursday 01:00 CT, `SES-414`); plans against a **50% share** of today's calculated
   availability; initial/uncalibrated allowance **10M tokens/day**; a reading staler than 48h
   drops it to a **3M/day fallback** — ignoring the page makes the runner more cautious, never
   less. All token figures are estimates, always labeled estimated; the runner governs only

@@ -161,6 +161,8 @@ for repeatedly.**
    `fable_pct` is NULL whenever its call carried no Fable window) — is at or above
    <!-- FEATURE: SES-395 --> `runner_budget.weekly_rest_pct` for the current
    **`America/Chicago`** month (`B35` (2), rest superseded by `M6-07`; John's clock, never UTC).
+   From Thursday 01:00 to the Friday 01:00 reset the stop is `final_day_rest_pct` (`SES-414`,
+   `OD-28`); `detail.wall_stop` and `detail.wall_pct` report it.
 4. `weekly_pace` — **`M5-16`** (`SES-368`, John 2026-09-11: *"only fire if usage is below the daily
    limit"*): `all_models_pct` at or above `detail.pace_limit_pct` = `week_day_index` × 100/7; the week
    starts Friday 01:00 `America/Chicago` (`detail.week_started_at`), whole days, clamped 1..7. The
@@ -1313,7 +1315,7 @@ Four things about this boundary, each of which has already bitten or would have:
     live 2026-09-15: **$0.00 from `runner_cycles` against $220.40 from the log, same day**).
 - **Subscription tokens (the governor that replaced the phantom-dollar wall):**
   read the latest `runner_usage_readings` row (John's typed-in meter percentages).
-  (a) `all_models_pct ≥ weekly_rest_pct` (85) → rest: `did_not_run`, reason "weekly meter at
+  (a) `all_models_pct ≥ rest_pct` from `resolve_day_token_cap()` (85; 90 from Thursday 01:00 to the reset) → rest: `did_not_run`, reason "weekly meter at
   N% — resting", END. (b) No reading, or latest older than 48h → today's allowance =
   `stale_fallback_tokens` (3M). (c) Otherwise: calibrate `tokens_per_pct` from the estimated
   tokens logged between the two most recent readings vs. the meter delta (store it on the
@@ -1328,7 +1330,7 @@ Four things about this boundary, each of which has already bitten or would have:
   `max_tokens IS NOT NULL`, and `expires_at > now()`. Then `max_tokens` — never `max_usd`, which
   is dollars only — is your allowance for this cycle, and you log the override's directive id in
   the cycle row's `notes`. The rest wall (a) is NOT overridable: an override buys the day's
-  allowance, never John's weekly meter, so `all_models_pct ≥ weekly_rest_pct` still rests.
+  allowance, never John's weekly meter, so `all_models_pct ≥ rest_pct` still rests.
   **The override never widens the API-dollar wall** — that is real money and needs its own
   `max_usd` override. Both new columns are nullable and fail closed: NULL `max_tokens` or a NULL
   / past `expires_at` means no override, and the wall stands.
@@ -1414,7 +1416,7 @@ John's STANDING daily-max box to that ladder and moved the whole ladder into
 
 **A blank box (`NULL`) is rungs 1/2/4/5 exactly as they were before `SES-147`** — that is what makes
 this additive rather than a change to how the runner already budgets, and it is why `NULL` must
-never be coerced to `0`. **The rest wall (`all_models_pct ≥ weekly_rest_pct`, 85) sits above all
+never be coerced to `0`. **The rest wall (`all_models_pct ≥ rest_pct`) sits above all
 five and is overridable by none of them.** `resolve_day_token_cap()` **reports** it as
 `rest_wall_hit` so one call carries the whole token track — **reporting is not enforcing: you still
 check wall (a) yourself, first, and rest the cycle when it is true.**

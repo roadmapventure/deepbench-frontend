@@ -1,3 +1,7 @@
+// DeepBench v7.0.513 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-414 -- from Thursday
+// 01:00 America/Chicago to the Friday 01:00 reset the wall grades `final_day_rest_pct` (OD-28, default
+// 90) instead of `weekly_rest_pct` (85): chicagoWeek() carries finalDay, the oracle walls on wallPct,
+// and the live arm grades detail.wall_stop / wall_pct / final_day_rest_pct and the resolver's rest_pct.
 // DeepBench v7.0.510 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-410 -- `weekly_pace`
 // refuses again (M5-16); the 2026-09-15 live fix removed it without John's word. REASONS back to seven.
 // DeepBench v7.0.489 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-398 -- the live arm
@@ -194,6 +198,16 @@ export const CLAUSES = [
     detail: "SES-410: `weekly_pace` stays numbered refusal 4, between the wall (3) and the budget row (5)",
     test: s => /3\. `weekly_wall`.*4\. `weekly_pace`.*5\. `no_budget_row`/.test(s),
     breaks: s => s.replace("4. `weekly_pace`", "`weekly_pace`"),
+  },
+  {
+    id: "the-final-day-stop-is-in-refusal-3",
+    detail:
+      "SES-414 (OD-28): refusal (3) must name `final_day_rest_pct` as the stop from Thursday 01:00 to " +
+      "the Friday 01:00 reset, and `detail.wall_stop` as the field that says which stop applied -- drop " +
+      "either and the next reader grades the wall at a flat 85 all week, parking the runner through the " +
+      "last 24 hours John moved to 90",
+    test: s => /3\. `weekly_wall`.*`final_day_rest_pct`.*4\. `weekly_pace`/.test(s) && /detail\.wall_stop/.test(s),
+    breaks: s => s.split("final_day_rest_pct").join("a later stop"),
   },
   {
     id: "a-refusal-always-names-itself",
@@ -499,25 +513,34 @@ export function chicagoWeek(nowMs = Date.now()) {
   if (weekStartedAt > nowMs) weekStartedAt = startOf(back + 7);
   const weekDayIndex = Math.min(7, Math.max(1, Math.floor((nowMs - weekStartedAt) / 86400000) + 1));
   const paceLimitPct = Math.round((weekDayIndex * 100 / 7) * 100) / 100;
-  return { weekStartedAt, weekDayIndex, paceLimitPct };
+  // SES-414 (OD-28): the final 24 hours before the Friday 01:00 reset -- Chicago's Thursday an hour
+  // back, the SQL's `extract(dow FROM (now() AT TIME ZONE 'America/Chicago') - interval '1 hour') = 4`.
+  // Not weekDayIndex === 7: whole elapsed days drift by the DST hour, and the clock is John's.
+  return { weekStartedAt, weekDayIndex, paceLimitPct, finalDay: chicagoParts(nowMs - 3600000).dow === 4 };
 }
 
 // Always runs. The same instants the migration was checked against, so the JS calendar and the
 // SQL calendar are pinned to one table of expectations rather than to each other.
 function theOracleCalendarMatchesTheFixedInstants() {
   const cases = [
-    ["Fri 2026-09-11 00:30 CT, before the reset", Date.UTC(2026, 8, 11, 5, 30), Date.UTC(2026, 8, 4, 6), 7, 100],
-    ["Fri 2026-09-11 01:00 CT, the reset", Date.UTC(2026, 8, 11, 6), Date.UTC(2026, 8, 11, 6), 1, 14.29],
-    ["Sat 2026-09-12 00:59 CT, end of day 1", Date.UTC(2026, 8, 12, 5, 59), Date.UTC(2026, 8, 11, 6), 1, 14.29],
-    ["Sat 2026-09-12 01:00 CT, day 2", Date.UTC(2026, 8, 12, 6), Date.UTC(2026, 8, 11, 6), 2, 28.57],
-    ["Thu 2026-09-17 23:00 CT, day 7", Date.UTC(2026, 8, 18, 4), Date.UTC(2026, 8, 11, 6), 7, 100],
-    ["Mon 2026-11-02 12:00 CST, after the DST end", Date.UTC(2026, 10, 2, 18), Date.UTC(2026, 9, 30, 6), 4, 57.14],
+    ["Fri 2026-09-11 00:30 CT, before the reset", Date.UTC(2026, 8, 11, 5, 30), Date.UTC(2026, 8, 4, 6), 7, 100, true],
+    ["Fri 2026-09-11 01:00 CT, the reset", Date.UTC(2026, 8, 11, 6), Date.UTC(2026, 8, 11, 6), 1, 14.29, false],
+    ["Sat 2026-09-12 00:59 CT, end of day 1", Date.UTC(2026, 8, 12, 5, 59), Date.UTC(2026, 8, 11, 6), 1, 14.29, false],
+    ["Sat 2026-09-12 01:00 CT, day 2", Date.UTC(2026, 8, 12, 6), Date.UTC(2026, 8, 11, 6), 2, 28.57, false],
+    ["Thu 2026-09-17 23:00 CT, day 7", Date.UTC(2026, 8, 18, 4), Date.UTC(2026, 8, 11, 6), 7, 100, true],
+    ["Mon 2026-11-02 12:00 CST, after the DST end", Date.UTC(2026, 10, 2, 18), Date.UTC(2026, 9, 30, 6), 4, 57.14, false],
+    // SES-414: both sides of the final-day boundary, and the DST week where elapsed day 7 starts an
+    // hour before Chicago's Thursday 01:00 -- the case weekDayIndex === 7 would get wrong.
+    ["Thu 2026-09-17 00:59 CT, a minute before the final day", Date.UTC(2026, 8, 17, 5, 59), Date.UTC(2026, 8, 11, 6), 6, 85.71, false],
+    ["Thu 2026-09-17 01:00 CT, the final day starts", Date.UTC(2026, 8, 17, 6), Date.UTC(2026, 8, 11, 6), 7, 100, true],
+    ["Thu 2026-11-05 00:30 CST, elapsed day 7 but not yet the final day", Date.UTC(2026, 10, 5, 6, 30), Date.UTC(2026, 9, 30, 6), 7, 100, false],
   ];
-  for (const [label, now, start, idx, limit] of cases) {
+  for (const [label, now, start, idx, limit, finalDay] of cases) {
     const w = chicagoWeek(now);
     assert.strictEqual(w.weekStartedAt, start, `${label}: week start ${new Date(w.weekStartedAt).toISOString()} != ${new Date(start).toISOString()}`);
     assert.strictEqual(w.weekDayIndex, idx, `${label}: day index ${w.weekDayIndex} != ${idx}`);
     assert.strictEqual(w.paceLimitPct, limit, `${label}: pace limit ${w.paceLimitPct} != ${limit}`);
+    assert.strictEqual(w.finalDay, finalDay, `${label}: finalDay ${w.finalDay} != ${finalDay}`);
   }
   // Negative control: a calendar that starts the week on Friday 00:00 instead of 01:00 answers the
   // pre-reset instant as day 1 of the NEW week. If that variant passed the table, the table would
@@ -542,7 +565,9 @@ export function expectedReason(f) {
   // SES-395: the wall grades ALL-MODELS again. Fable past its own share is not a refusal here --
   // it degrades the judgment lane (public.judgment_model(), asserted separately below). NULL-safe
   // exactly as before: no reading, no wall verdict.
-  if (f.weeklyRestPct !== null && f.gatedPct !== null && f.gatedPct >= f.weeklyRestPct)
+  // SES-414 (OD-28): against wallPct -- null with no budget row, else the column finalDay picks
+  // (final_day_rest_pct from Thursday 01:00 to the Friday 01:00 reset, weekly_rest_pct otherwise).
+  if (f.wallPct !== null && f.gatedPct !== null && f.gatedPct >= f.wallPct)
     return "weekly_wall";
   // SES-368 / M5-16, SES-395: the pace, in the ladder's real position -- after the wall, before the
   // budget row, grading the SAME number the wall did. At-or-above refuses (14.29 on day 1 refuses;
@@ -601,7 +626,7 @@ async function theLiveGateObeysItsOwnLadder() {
     "runner_usage_readings");
   const month = chicagoMonth();
   const budget = asArray(
-    await pg(url, key, `runner_budget?select=month,weekly_rest_pct&month=eq.${month}`), "runner_budget");
+    await pg(url, key, `runner_budget?select=month,weekly_rest_pct,final_day_rest_pct&month=eq.${month}`), "runner_budget");
   const queue = asArray(
     await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" }),
     "rpc/prime_directive_queue");
@@ -637,6 +662,9 @@ async function theLiveGateObeysItsOwnLadder() {
   const gatedPct = allModelsPct;
   const gatedMeter = "all_models";
   const week = chicagoWeek();
+  // SES-414: the stop's column is picked by the clock-only finalDay, and its VALUE is read from the
+  // row, never assumed -- a hard-coded 90 here passes after John moves the column.
+  const wallColumn = week.finalDay ? "final_day_rest_pct" : "weekly_rest_pct";
   const facts = {
     schedulerOn: settings[0]?.scheduler_on ?? null,
     // SES-389: read, never assumed. A test that hard-codes 2 here passes after John moves the
@@ -648,6 +676,10 @@ async function theLiveGateObeysItsOwnLadder() {
     gatedPct,
     gatedMeter,
     weeklyRestPct: budget[0]?.weekly_rest_pct ?? null,
+    finalDayRestPct: budget[0]?.final_day_rest_pct ?? null,
+    finalDay: week.finalDay,
+    wallStop: budget.length ? wallColumn : null,
+    wallPct: budget.length ? (budget[0][wallColumn] ?? null) : null,
     budgetRowExists: budget.length > 0,
     // SES-390: headroom stays ALL-MODELS on purpose. runner_pct_per_cycle() is calibrated from
     // all-models deltas, so pricing a ticket against the Fable meter would compare two different
@@ -686,6 +718,28 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.week_day_index=${d.week_day_index} but the clock says day ${facts.weekDayIndex}`);
   assert.strictEqual(Number(d.pace_limit_pct), facts.paceLimitPct,
     `detail.pace_limit_pct=${d.pace_limit_pct} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct}`);
+  // SES-414 (OD-28): the stop the wall graded and the column it came from, against the raw row and
+  // the clock-only finalDay. A gate that walls at a flat weekly_rest_pct on the final day, or picks
+  // the final-day stop on a UTC Thursday, disagrees here.
+  assert.strictEqual(d.wall_pct === null || d.wall_pct === undefined ? null : Number(d.wall_pct), facts.wallPct,
+    `detail.wall_pct=${d.wall_pct} but runner_budget.${facts.wallStop} is ${facts.wallPct} ` +
+      `(finalDay=${facts.finalDay}: final_day_rest_pct from Thursday 01:00 America/Chicago to the Friday 01:00 reset)`);
+  assert.strictEqual(d.wall_stop ?? null, facts.wallStop,
+    `detail.wall_stop=${JSON.stringify(d.wall_stop)} but the clock picks ${JSON.stringify(facts.wallStop)} ` +
+      `(finalDay=${facts.finalDay}) -- it must name the column the wall graded`);
+  assert.strictEqual(
+    d.final_day_rest_pct === null || d.final_day_rest_pct === undefined ? null : Number(d.final_day_rest_pct),
+    facts.finalDayRestPct,
+    `detail.final_day_rest_pct=${d.final_day_rest_pct} but runner_budget.final_day_rest_pct is ${facts.finalDayRestPct}`);
+  // One stop, two readers: resolve_day_token_cap() reports rest_wall_hit from the same number. With
+  // p_cycle_id null its calibration writes nothing, so the purity sample below is untouched.
+  const resolved = asArray(
+    await pg(url, key, "rpc/resolve_day_token_cap", { method: "POST", body: '{"p_cycle_id":null}' }),
+    "rpc/resolve_day_token_cap");
+  assert.strictEqual(resolved.length, 1, `resolve_day_token_cap() returned ${resolved.length} rows, expected exactly 1`);
+  assert.strictEqual(Number(resolved[0].rest_pct), Number(d.wall_pct),
+    `resolve_day_token_cap().rest_pct=${resolved[0].rest_pct} but runner_should_boot() walls at ${d.wall_pct} -- ` +
+      "the spend resolver and the boot gate must grade the same stop, or a cycle boots past a wall its own step 3 reports hit");
   // SES-395: the number the wall and the pace actually graded is all_models_pct, and gated_meter
   // says so. This is the assertion that catches a revert to GREATEST: with the live meters at 60
   // and 94 a GREATEST gate reports 94 here and fails, which is the discrimination -- the pair only
@@ -973,7 +1027,18 @@ async function run() {
       "SES-410 (v7.0.510, ses410_weekly_pace_stop), rolled back: BEFORE " +
       "85.71->pickable/orchestrator_pace; 85.70->pickable/lane; null->pickable/lane; " +
       "101->weekly_wall/orchestrator_pace; AFTER 85.71->weekly_pace/orchestrator_pace; " +
-      "85.70->pickable/lane; null->pickable/lane; 101->weekly_wall/orchestrator_pace; zero residue.",
+      "85.70->pickable/lane; null->pickable/lane; 101->weekly_wall/orchestrator_pace; zero residue. " +
+      "SES-414 (v7.0.513, ses414_final_day_stop), rolled back: BEFORE Thu0059 50->pickable//85/false; " +
+      "Thu0059 85->weekly_wall//85/true; Thu0059 87->weekly_wall//85/true; Thu0059 89.99->weekly_wall//85/true; " +
+      "Thu0059 90->weekly_wall//85/true; Thu0100 50->pickable//85/false; Thu0100 85->weekly_wall//85/true; " +
+      "Thu0100 87->weekly_wall//85/true; Thu0100 89.99->weekly_wall//85/true; Thu0100 90->weekly_wall//85/true; " +
+      "Fri0100 50->weekly_pace//85/false; Fri0100 85->weekly_wall//85/true; Fri0100 87->weekly_wall//85/true; " +
+      "Fri0100 89.99->weekly_wall//85/true; Fri0100 90->weekly_wall//85/true; AFTER Thu0059 50->pickable/85/85/false; " +
+      "Thu0059 85->weekly_wall/85/85/true; Thu0059 87->weekly_wall/85/85/true; Thu0059 89.99->weekly_wall/85/85/true; " +
+      "Thu0059 90->weekly_wall/85/85/true; Thu0100 50->pickable/90/90/false; Thu0100 85->pickable/90/90/false; " +
+      "Thu0100 87->pickable/90/90/false; Thu0100 89.99->pickable/90/90/false; Thu0100 90->weekly_wall/90/90/true; " +
+      "Fri0100 50->weekly_pace/85/85/false; Fri0100 85->weekly_wall/85/85/true; Fri0100 87->weekly_wall/85/85/true; " +
+      "Fri0100 89.99->weekly_wall/85/85/true; Fri0100 90->weekly_wall/85/85/true; zero residue.",
   );
 }
 

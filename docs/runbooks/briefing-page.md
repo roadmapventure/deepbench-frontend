@@ -663,7 +663,7 @@ Four rules for the rebuild:
   `morning` / `night` / `adhoc`). A reading harvested from anywhere that is not one of the two
   slot rows is `adhoc`.
 - **An unslotted reading still counts for the walls.** It feeds the rest wall
-  (`all_models_pct ≥ 85`) and the 48-hour staleness check exactly as before. It simply cannot
+  (`all_models_pct ≥ rest_pct`) and the 48-hour staleness check exactly as before. It simply cannot
   calibrate. Do not treat `adhoc` as "ignored".
 - **The card-level "✓ Your latest reading was recorded" line is derived** from whichever slot
   holds the newest `at`, never from a stored "latest" field — a second copy of the same fact goes

@@ -292,10 +292,10 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-28"></a>OD-28 — The weekly rest wall
 
-> The weekly rest wall fires when the all-models usage meter reaches `runner_budget.weekly_rest_pct` (column default 85), and `runner_budget.runner_share_pct` (default 50) is the share of the week the runner may spend; canonical: those two columns.
+> The weekly rest wall fires when the all-models usage meter reaches `runner_budget.weekly_rest_pct` (column default 85), or `runner_budget.final_day_rest_pct` (column default 90) from Thursday 01:00 America/Chicago until the Friday 01:00 weekly reset, and `runner_budget.runner_share_pct` (default 50) is the share of the week the runner may spend; canonical: those three columns.
 
 - **Enforcement:** `script`
-- **Lives in:** `public.runner_budget.weekly_rest_pct`, `.runner_share_pct`.
+- **Lives in:** `public.runner_budget.weekly_rest_pct`, `.final_day_rest_pct`, `.runner_share_pct`.
 - **Pinned by:** `scripts/check-token-wall-binding.js`.
 - **Judgment:** **keep.** G5: a wall that stops the machine before it eats John's own week is the difference between a helper and a bill.
 
