@@ -136,7 +136,7 @@ exactly one home — `public.resolve_day_token_cap()`, read at step 3** — and 
 ceiling there, never here. A reading inside the threshold still grades the weekly wall in (3): a
 63% taken an hour ago is better evidence than none.
 
-**The six refusal reasons, in the precedence the function applies them.**
+**The seven refusal reasons, in the precedence the function applies them.**
 Each names itself, always: **a bare `false` is the "NULL is not zero" defect this codebase has paid
 for repeatedly.**
 
@@ -147,7 +147,7 @@ for repeatedly.**
    so 2h is four missed readings). `detail` names `reading_taken_at` and `meter_stale_hours`
    alongside `reading_age_hours`, so the refusal can be audited from its own payload. **NULL-safe
    like the wall: with no reading at all the comparison is NULL and the ladder falls through**, so a
-   missing reading is still (4)'s question, never this one's. This is the gate's *own* threshold and
+   missing reading is still (5)'s question, never this one's. This is the gate's *own* threshold and
    it is not the spend brake's — `resolve_day_token_cap()` RUNG 2 keeps 48h and `stale-floor`. Sits
    below `scheduler_off` because John's switch is a decision and this is an observation; above the
    wall because it grades a number the wall has just called out of date.
@@ -161,25 +161,21 @@ for repeatedly.**
    `fable_pct` is NULL whenever its call carried no Fable window) — is at or above
    <!-- FEATURE: SES-395 --> `runner_budget.weekly_rest_pct` for the current
    **`America/Chicago`** month (`B35` (2), rest superseded by `M6-07`; John's clock, never UTC).
-4. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
+4. `weekly_pace` — **`M5-16`** (`SES-368`, John 2026-09-11: *"only fire if usage is below the daily
+   limit"*): `all_models_pct` at or above `detail.pace_limit_pct` = `week_day_index` × 100/7; the week
+   starts Friday 01:00 `America/Chicago` (`detail.week_started_at`), whole days, clamped 1..7. The
+   wall (3) wins when both hold. `detail.orchestrator_model` / `orchestrator_reason`
+   (`public.orchestrator_model()`) are reported, never a substitute for this stop (`SES-410`, John
+   2026-09-16: *"i never said remove the stop"*).
+5. `no_budget_row` — no `runner_budget` row exists for that month. **This is the 2026-09-01 outage
    that stopped the runner and then sat unread in a card, and it now has a name instead of a silent
-   pass.** (3) preceding (4) is deliberate and NULL-safe: with the row absent, (3)'s comparison is
-   NULL rather than true, so the ladder falls through to (4) instead of blaming the wall for a
-   missing row.
-5. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
+   pass.** (3) and (4) preceding (5) is deliberate and NULL-safe: with the row absent (3)'s comparison
+   is NULL, and with no reading (4)'s is too, so the ladder falls through to (5).
+6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row.
-6. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
+7. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
-
-**The pace signal — `M5-16`, retired as a refusal `2026-09-15`** (John: *"degrades with weekly
-daily averages"*). `all_models_pct` at or above `detail.pace_limit_pct` (same calendar as the
-wall) **no longer refuses** — it degrades the **orchestrator lane**, `SES-395`'s own treatment of
-the judgment lane: `public.orchestrator_model()` returns `claude-sonnet-5` /
-`detail.orchestrator_reason` = `orchestrator_pace` past threshold, else `claude-opus-5` / `lane`.
-The wall (3) still refuses outright — John's reserved headroom, which a cheaper model still
-spends. Guarded by `tests/regression/ses-297-pre-boot-pickability.test.mjs` (six `REASONS`; adds
-`orchestrator_model()` assertions beside `judgment_model()`'s).
 
 Everything else is `pickable` — one pass reason, no degraded variant (`SES-302`). A stale reading
 now has **two** consequences with one home each (`M5-15`, `SES-389`): **past

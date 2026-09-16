@@ -1,16 +1,10 @@
+// DeepBench v7.0.510 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-410 -- `weekly_pace`
+// refuses again (M5-16); the 2026-09-15 live fix removed it without John's word. REASONS back to seven.
 // DeepBench v7.0.489 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-398 -- the live arm
 // grades `judgment_model().fable_pct` against the newest reading SINCE THE WEEK START that carries a
 // Fable number (its own PostgREST read: fable_pct=not.is.null, taken_at=gte.<chicagoWeek start>),
 // not against the gate's newest row -- migration ses398_judgment_reads_week_fable, because the
 // routine's meter self-read writes fable_pct NULL whenever its call carried no Fable window.
-// DeepBench | tests/regression/ses-297-pre-boot-pickability.test.mjs | Live fix, 2026-09-15 -- John
-// in chat: "just make it so it degrades with weekly daily averages." `weekly_pace` no longer refuses
-// a boot -- it degrades the ORCHESTRATOR lane (public.orchestrator_model(), mirrors judgment_model())
-// from claude-opus-5 to the mechanical lane's model instead, so the cycle keeps shipping cheaper
-// rather than going idle. REASONS drops to six; the oracle drops the weekly_pace branch; the live arm
-// gains the same closed-set/lane/detail assertions for orchestrator_model() that judgment_model()
-// already had. The wall (weekly_rest_pct, protecting John's own reserved headroom) is untouched and
-// still refuses outright -- only the softer day-of-week pace signal changed what it costs.
 // DeepBench v7.0.486 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-395 -- the wall and
 // the pace grade `all_models_pct` again, and Fable past its own share DEGRADES the judgment lane
 // instead of refusing the cycle. The doc clause flips to `judgment_model` / `fable_rest` /
@@ -95,7 +89,7 @@ const SESSIONS = path.join(ROOT, SESSIONS_REL);
 const BLOCK_START = "**PRE-BOOT GATE — ONE QUERY";
 const BLOCK_END = "**0. Bootstrap.**";
 
-// The six refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
+// The seven refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
 // what each one MEANS is read out of the runbook by the clauses below, never restated.
 export const REASONS = [
   "scheduler_off",
@@ -104,13 +98,13 @@ export const REASONS = [
   // that the CAP has one home: this gate carries no token_cap and does not second-guess
   // resolve_day_token_cap() RUNG 2's 48h ceiling brake. The 2026-09-01 defect was two homes for one
   // consequence at two thresholds; this is two DIFFERENT consequences with one home each. Sits
-  // second: John's switch outranks it, and the wall grades a number this branch has just called out
-  // of date. 'pickable_degraded' is still not here.
+  // second: John's switch outranks it, and the wall and the pace both grade a number this branch
+  // has just called out of date. 'pickable_degraded' is still not here.
   "meter_stale",
   "weekly_wall",
-  // Live fix, 2026-09-15: weekly_pace RETIRED as a refusal here -- it degrades the orchestrator lane
-  // (public.orchestrator_model()) instead, same treatment SES-395 already gave Fable's pace/rest
-  // against the judgment lane. See the orchestrator_model() assertions in the live arm below.
+  // SES-368 / M5-16: John's pace. Sits between the wall and the budget-row check, and like the wall
+  // it compares NULL-safely -- no reading, no pace verdict.
+  "weekly_pace",
   "no_budget_row",
   "nothing_pickable",
   "unaffordable",
@@ -194,6 +188,12 @@ export const CLAUSES = [
       REASONS.every(r => s.includes(`\`${r}\``)) &&
       /M5-16/.test(s) && /M5-15/.test(s) && /M5-06/.test(s) && /M6-09/.test(s),
     breaks: s => s.split("`no_budget_row`").join("`some other refusal`"),
+  },
+  {
+    id: "the-pace-is-numbered-refusal-4",
+    detail: "SES-410: `weekly_pace` stays numbered refusal 4, between the wall (3) and the budget row (5)",
+    test: s => /3\. `weekly_wall`.*4\. `weekly_pace`.*5\. `no_budget_row`/.test(s),
+    breaks: s => s.replace("4. `weekly_pace`", "`weekly_pace`"),
   },
   {
     id: "a-refusal-always-names-itself",
@@ -544,8 +544,12 @@ export function expectedReason(f) {
   // exactly as before: no reading, no wall verdict.
   if (f.weeklyRestPct !== null && f.gatedPct !== null && f.gatedPct >= f.weeklyRestPct)
     return "weekly_wall";
-  // Live fix, 2026-09-15: the pace no longer has a branch here -- it degrades the orchestrator lane
-  // (asserted separately below, mirroring judgment_model()) rather than refusing the boot.
+  // SES-368 / M5-16, SES-395: the pace, in the ladder's real position -- after the wall, before the
+  // budget row, grading the SAME number the wall did. At-or-above refuses (14.29 on day 1 refuses;
+  // 14.28 boots), and NULL on either side falls through, exactly as the wall does.
+  if (f.paceLimitPct !== null && f.paceLimitPct !== undefined && f.gatedPct !== null &&
+      f.gatedPct >= f.paceLimitPct)
+    return "weekly_pace";
   if (!f.budgetRowExists) return "no_budget_row";
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
@@ -965,7 +969,11 @@ async function run() {
       "migration's own trailing DO block rather than afterwards: exactly 1 runner_should_boot " +
       "overload and exactly 1 judgment_model overload, EXECUTE denied to anon AND authenticated " +
       "and granted to service_role (both directions, per .claude/rules/supabase-column-grants.md's " +
-      "SES-315 addendum -- functions default OPEN and a PUBLIC-only revoke leaves them open).",
+      "SES-315 addendum -- functions default OPEN and a PUBLIC-only revoke leaves them open). " +
+      "SES-410 (v7.0.510, ses410_weekly_pace_stop), rolled back: BEFORE " +
+      "85.71->pickable/orchestrator_pace; 85.70->pickable/lane; null->pickable/lane; " +
+      "101->weekly_wall/orchestrator_pace; AFTER 85.71->weekly_pace/orchestrator_pace; " +
+      "85.70->pickable/lane; null->pickable/lane; 101->weekly_wall/orchestrator_pace; zero residue.",
   );
 }
 
