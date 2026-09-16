@@ -201,6 +201,10 @@ function aFullyRedDeploymentNowTriggers() {
     greenAnchor: { commit_sha: "0000green0000", migration_watermark: "20260830000001" },
     currentWatermark: "20260830000001",
     cycles: [{ id: "cyc-1", push_sha: SERVING_SHA, version: "v7.0.334" }],
+    // SES-287 (v7.0.507): decide() now requires the commit range, and an unsupplied one cards
+    // (register B37 -- a successor never adjudicates a predecessor). One commit, pushed by cyc-1 --
+    // the attributed cycle -- so this clause still grades the DEPLOY trigger it was written for.
+    rangeShas: [SERVING_SHA],
   });
   assert.strictEqual(decision.action, ACTIONS.REVERT_AND_CARD,
     "an attributable, code-only, fully-red deployment must now reach a rollback decision -- otherwise this slice shipped nothing");

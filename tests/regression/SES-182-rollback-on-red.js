@@ -72,6 +72,12 @@ function revertableFacts(over = {}) {
     greenAnchor: ANCHOR,
     currentWatermark: ANCHOR.migration_watermark,
     cycles: CYCLES,
+    // SES-287 (v7.0.507): the range is now a FACT decide() requires, and an omitted one cards
+    // rather than reverts (register B37 -- a successor never adjudicates a predecessor). One
+    // commit, pushed by cyc-1, which is the cycle this fixture is attributed to, so every clause
+    // below still grades the branch it was written to grade.
+    // SES-287-one-cycle-revert-guard.test.mjs owns the guard itself.
+    rangeShas: [HEAD],
     ...over,
   };
 }

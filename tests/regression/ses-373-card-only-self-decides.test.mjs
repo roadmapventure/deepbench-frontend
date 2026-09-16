@@ -115,6 +115,11 @@ function revertableFacts(over = {}) {
     greenAnchor: ANCHOR,
     currentWatermark: ANCHOR.migration_watermark,
     cycles: CYCLES,
+    // SES-287 (v7.0.507): one commit, pushed by cyc-1 -- the attributed cycle. Without it decide()
+    // cards every range (an unsupplied range is unknown, and unknown is not innocent), and the (A)
+    // negative control below, which needs a REVERT_AND_CARD card to prove stamping is conditional,
+    // would prove nothing because both branches would be card-only.
+    rangeShas: [HEAD],
     ...over,
   };
 }

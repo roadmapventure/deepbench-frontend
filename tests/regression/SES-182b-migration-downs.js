@@ -78,6 +78,11 @@ function movedFacts(over = {}) {
     cycles: CYCLES,
     migrations: RANGE,
     downs: RANGE.map((m) => DOWN(m.name)),
+    // SES-287 (v7.0.507): the commit range is now a fact decide() requires, and an unsupplied one
+    // cards BEFORE the watermark branch is reached (register B37 -- a successor never adjudicates a
+    // predecessor). One commit, pushed by the attributed cycle, so every clause in this file still
+    // grades the SCHEMA question it was written to grade rather than the new range gate.
+    rangeShas: [HEAD],
     ...over,
   };
 }

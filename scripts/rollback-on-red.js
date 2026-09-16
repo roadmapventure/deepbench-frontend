@@ -1,5 +1,36 @@
 #!/usr/bin/env node
-// DeepBench v7.0.458 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373
+// DeepBench v7.0.507 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373 + SES-287 slice 1
+//
+// -- SES-287 slice 1 (v7.0.507): ONE CYCLE'S COMMITS, OR NO REVERT AT ALL -------------------
+// Two of SES-287's three defects are closed here. The third -- the stale green anchor -- was closed
+// by SES-352 (v7.0.452), which made runner_green_states a trigger-maintained projection of CI's own
+// record; readGreenAnchor() below already reads the newest concluded green and is NOT touched.
+//
+// (2) NOTHING MEASURED HOW MANY CYCLES A REVERT RANGE SPANNED. decide() returned REVERT_AND_CARD
+// with revertPlanFor(anchor, head) over whatever sat between the two, and the live incident
+// (docs/SESSIONS.md:1296) is what that costs: the engine proposed reverting de6e08e8..95cf5fee --
+// SIX COMMITS FROM FOUR CYCLES -- attributing all of it to the last pusher. Register B37 forbids
+// exactly that: A SUCCESSOR NEVER ADJUDICATES A PREDECESSOR. rangeCycleSpan() measures it and the
+// gate sits immediately after the anchor check, BEFORE the watermark branch, so it covers BOTH
+// revert returns rather than one of them.
+//
+// THE RANGE IS PASSED IN, never derived, for the same reason --migrations is: decide() is pure and
+// this file never runs git (see the boundary below). The cycle reads `git rev-list <anchor>..<head>`
+// and hands the shas over as --range-shas. AN ABSENT LIST IS "NOT SUPPLIED", NEVER "AN EMPTY
+// RANGE" -- identical to schemaPlanFor()'s reading of an absent --migrations, and it fails closed
+// to card-only, which is byte-identical to what the engine does on dev today.
+//
+// (3) THE CARD CLAIMED THE PLAN AS THE ACT. buildIncidentCard() titled a REVERT_AND_CARD outcome
+// "was reverted to the last green state" and said "dev is back at green ... by revert-forward",
+// when this engine never runs git and never pushes: the CYCLE executes the plan behind its push
+// gates and MAY DECLINE. That incident's card had to be rewritten by hand. The local `reverted` is
+// now `plannedRevert` and every sentence on that branch names the revert as PENDING. The card-only
+// branch's prose is unchanged, byte for byte -- it was already honest.
+//
+// LEFT FOR SLICE 2, said here rather than left to be discovered: the runbook step-4a edit that
+// actually passes --range-shas (docs/runbooks/runner-cycle.md is at the SES-336 byte ceiling and a
+// step edit must remove bytes first), and the AFFIRMATIVE half of defect 3 -- recording a revert
+// the cycle DID execute. Until then an omitted --range-shas cards instead of reverting.
 //
 // -- SES-373 (v7.0.458): A CARD-ONLY OUTCOME RECORDS ITSELF ---------------------------------
 // Until this ship the CARD_ONLY branch filed its incident card with `decision NULL`, and ses-285
@@ -215,6 +246,60 @@ export function attributionOf(headSha, cycles) {
   return hit ? { cycleId: hit.id ?? null, version: hit.version ?? null, sha: hit.push_sha } : null;
 }
 
+// SES-287. How many CYCLES does the red range span, and does anything in it belong to nobody?
+//
+// Register B37: a successor never adjudicates a predecessor. A revert of anchor..head undoes every
+// commit in between, so a range spanning four cycles undoes three cycles' work and blames the last
+// pusher for it -- which is what the live incident at docs/SESSIONS.md:1296 proposed. This measures
+// the span so decide() can refuse it; it decides nothing itself.
+//
+// THREE PROPERTIES, each of which is how it gets rebuilt wrong:
+//   * AN ABSENT LIST IS NOT AN EMPTY RANGE. `known:false` with a "not supplied" reason, exactly as
+//     schemaPlanFor() reads an absent --migrations and rangeIsCodeOnly() reads an unknown
+//     watermark. Unknown is not innocent. A list that is not an array, or is empty, is unknown --
+//     a red range by definition contains at least the head commit, so an empty one is a caller
+//     that did not measure rather than a range that holds nothing.
+//   * THE MATCH RULE IS attributionOf()'s, CALLED, NOT RESTATED. runner_cycles.push_sha is written
+//     abbreviated by some cycles, so the prefix comparison is load-bearing -- and a second copy of
+//     it would be free to drift from the one the attribution itself is made with, which is the one
+//     comparison this gate's answer is checked against.
+//   * A SHA NO CYCLE CLAIMS IS COLLECTED, NEVER IGNORED. `unclaimed` is how an attended push
+//     sitting inside the range becomes visible; dropping it would let a one-cycle answer be
+//     reported for a range that also carries a human's commit.
+export function rangeCycleSpan(rangeShas, cycles) {
+  if (!Array.isArray(rangeShas) || rangeShas.length === 0) {
+    return {
+      known: false,
+      cycleIds: [],
+      unclaimed: [],
+      reason:
+        "the commit range for this red was not supplied, so how many cycles it spans is unknown -- " +
+        "unknown is not innocent, exactly as it is not for the migration watermark or the migration list.",
+    };
+  }
+
+  const cycleIds = [];
+  const unclaimed = [];
+  for (const sha of rangeShas) {
+    const hit = attributionOf(sha, cycles);
+    if (!hit || !hit.cycleId) {
+      unclaimed.push(String(sha ?? "(empty sha)"));
+      continue;
+    }
+    if (!cycleIds.includes(hit.cycleId)) cycleIds.push(hit.cycleId);
+  }
+
+  const parts = [
+    `the range holds ${rangeShas.length} commit(s) across ${cycleIds.length} runner cycle(s)` +
+      (cycleIds.length > 0 ? ` (${cycleIds.join(", ")})` : ""),
+  ];
+  if (unclaimed.length > 0) {
+    parts.push(`${unclaimed.length} commit(s) in it are claimed by no cycle at all (${unclaimed.join(", ")})`);
+  }
+
+  return { known: true, cycleIds, unclaimed, reason: `${parts.join("; ")}.` };
+}
+
 // Is the SCHEMA half of a red range reversible, and if not, which member stopped it?
 //
 // The answer is all-or-nothing on purpose. `steps` comes back EMPTY whenever anything is missing,
@@ -300,6 +385,7 @@ export function decide(facts = {}) {
     cycles = [],
     migrations = [],
     downs = [],
+    rangeShas = null,
   } = facts;
 
   if (!TRIGGER_SOURCES.includes(trigger)) {
@@ -343,6 +429,32 @@ export function decide(facts = {}) {
     };
   }
 
+  // SES-287, and it sits HERE -- after the anchor check, before the watermark branch -- so it gates
+  // BOTH revert returns below rather than whichever one a later edit remembers. Register B37: a
+  // successor never adjudicates a predecessor, so the one range this machine may undo is the one
+  // that holds the attributed cycle's own commits and nothing else.
+  const rangeSpan = rangeCycleSpan(rangeShas, cycles);
+  const oneCycle =
+    rangeSpan.known === true &&
+    rangeSpan.unclaimed.length === 0 &&
+    rangeSpan.cycleIds.length === 1 &&
+    rangeSpan.cycleIds[0] === attribution.cycleId;
+
+  if (!oneCycle) {
+    return {
+      action: ACTIONS.CARD_ONLY,
+      reason:
+        `${trigger} (${redDetail}) on unattended push ${headSha}. NO revert is planned: ` +
+        `${rangeSpan.reason} A revert of ${greenAnchor.commit_sha}..${headSha} would undo every commit ` +
+        `in that range, so anything beyond cycle ${attribution.cycleId}'s own work would be a successor ` +
+        `adjudicating a predecessor (register B37) and blaming the last pusher for it.`,
+      attribution,
+      greenAnchor,
+      redDetail,
+      rangeSpan,
+    };
+  }
+
   if (!rangeIsCodeOnly(greenAnchor.migration_watermark, currentWatermark)) {
     // Slice 2: the watermark moving no longer ENDS the question, it asks a second one -- does every
     // migration in the range carry a captured, auto-downable down? A miss still cards, and it now
@@ -375,6 +487,7 @@ export function decide(facts = {}) {
       redDetail,
       revertPlan: revertPlanFor(greenAnchor.commit_sha, headSha),
       schemaPlan,
+      rangeSpan,
     };
   }
 
@@ -387,6 +500,7 @@ export function decide(facts = {}) {
     greenAnchor,
     redDetail,
     revertPlan: revertPlanFor(greenAnchor.commit_sha, headSha),
+    rangeSpan,
   };
 }
 
@@ -415,9 +529,20 @@ export function revertPlanFor(greenSha, headSha) {
 //
 // backlog_id stays NULL and the human reference goes in display_ref -- SES-116: backlog_id is a
 // JOIN KEY and composing a reference into it silently broke 63 of 80 card->ticket joins.
+// SES-287 DEFECT 3. The local below was called `reverted` and every sentence keyed on it was written
+// in the past tense -- "was reverted to the last green state", "dev is back at green ... by
+// revert-forward", "I put dev back to the last state that passed". THIS ENGINE NEVER RUNS git AND
+// NEVER PUSHES (the boundary at the top of this file): REVERT_AND_CARD emits a PLAN, and the cycle
+// executes it behind its push gates and may decline. So the card was asserting an execution that had
+// not happened, and on the live incident it had to be rewritten by hand. It is `plannedRevert` now
+// and the prose says PLANNED. The card-only branch is untouched, byte for byte -- it was already
+// honest, and rewording it would be a second edit wearing this one's justification.
+//
+// THE AFFIRMATIVE HALF IS SLICE 2's: recording a revert the cycle DID execute. Until it exists there
+// is no branch here that may speak in the past tense, which is why none does.
 export function buildIncidentCard(decision, ctx = {}) {
   const { cycleId = null, headSha = null, beforeImages = [], trigger = "ci-red", restorePlan = null } = ctx;
-  const reverted = decision.action === ACTIONS.REVERT_AND_CARD;
+  const plannedRevert = decision.action === ACTIONS.REVERT_AND_CARD;
   const shortSha = headSha ? String(headSha).slice(0, 7) : "(unknown sha)";
 
   // SES-182 slice 4. Slice 1's sentence -- "N before-image(s) across M table(s) ... REPORTED, not
@@ -442,28 +567,34 @@ export function buildIncidentCard(decision, ctx = {}) {
     backlog_id: null,
     display_ref: `SES-182 incident - ${trigger} on ${shortSha}`,
     cycle_id: cycleId,
-    title: reverted
-      ? `Auto-rollback: ${trigger} on ${shortSha} was reverted to the last green state`
+    title: plannedRevert
+      ? `Auto-rollback: ${trigger} on ${shortSha} was NOT reverted automatically; a revert to the last green state is PLANNED for the cycle to execute`
       : `Auto-rollback held: ${trigger} on ${shortSha} was NOT reverted, and here is exactly why`,
     value_case: decision.reason,
-    before_after: reverted
-      ? `Before: dev served ${shortSha}, red. After: dev is back at green ${String(decision.greenAnchor?.commit_sha ?? "").slice(0, 7)} by revert-forward (no history rewrite).`
+    before_after: plannedRevert
+      ? `Before and after: dev still serves ${shortSha}. Nothing has been reverted yet -- this plan runs behind the cycle's push gates and may be declined.`
       : `Before and after: dev still serves ${shortSha}. Nothing was reverted -- the reason above names why, and this card is the whole of the action taken.`,
     qa_evidence: [
       `Trigger: ${trigger}. Red detail: ${decision.redDetail ?? "(none recorded)"}.`,
       `Attribution: cycle ${decision.attribution?.cycleId ?? "(none)"}${decision.attribution?.version ? ` (${decision.attribution.version})` : ""}.`,
       `Green anchor: ${decision.greenAnchor?.commit_sha ?? "(none recorded)"}${decision.greenAnchor?.migration_watermark ? ` @ watermark ${decision.greenAnchor.migration_watermark}` : ""}.`,
+      // SES-287: what the B37 gate actually measured, on the card rather than only in the reason.
+      `Range span: ${decision.rangeSpan?.reason ?? "(not measured)"}`,
       dataRecord,
       schemaRecord,
-      reverted ? `Revert plan: ${decision.revertPlan?.command}` : "Revert plan: none -- see the reason.",
+      plannedRevert
+        ? `Revert plan (PROPOSED, NOT RUN -- this engine never runs git): ${decision.revertPlan?.command}`
+        : "Revert plan: none -- see the reason.",
     ].join("\n"),
-    plain_cant: reverted
-      ? "A push of mine went red on dev and stayed red until you noticed it."
+    plain_cant: plannedRevert
+      ? "A push of mine went red on dev, and undoing it is not something I am allowed to do by myself."
       : "A push of mine went red on dev and I could not safely undo it on my own.",
-    plain_after: reverted
-      ? "I put dev back to the last state that passed, and this card is me telling you I did."
+    plain_after: plannedRevert
+      ? "I worked out exactly how to put dev back to the last state that passed and wrote that plan down here. It has not been run yet -- the cycle runs it behind its own checks, and may decide not to."
       : "I left dev exactly as it is and brought you the evidence instead of guessing.",
-    plain_worth: "Accept if the call was right. Reverse puts the change back and undoes my rollback.",
+    plain_worth: plannedRevert
+      ? "Accept if the plan is the right call and should be run. Reverse means leave dev exactly where it is."
+      : "Accept if the call was right. Reverse puts the change back and undoes my rollback.",
   };
 }
 
@@ -787,6 +918,7 @@ async function main() {
   const currentWatermark = argValue("watermark", null);
   const jobsRaw = argValue("jobs", null);
   const migrationsRaw = argValue("migrations", null);
+  const rangeShasRaw = argValue("range-shas", null);
 
   if (!headSha) fail(2, "--sha=<head sha> is required.");
   let jobs;
@@ -802,6 +934,17 @@ async function main() {
     migrations = migrationsRaw ? JSON.parse(migrationsRaw) : [];
   } catch (e) {
     fail(2, `--migrations must be a JSON array of {version, name}: ${e.message}`);
+  }
+  // SES-287. The shas between the green anchor and the head, read by the CYCLE with
+  // `git rev-list <anchor>..<head>` and handed in -- this engine never runs git. Omitted is NOT "a
+  // range of one" and NOT "an empty range": it is "the list was not supplied", which
+  // rangeCycleSpan() fails closed on, exactly as schemaPlanFor() does for --migrations. Null rather
+  // than [] so an omission and a supplied-but-empty list read identically here and are both unknown.
+  let rangeShas = null;
+  try {
+    rangeShas = rangeShasRaw ? JSON.parse(rangeShasRaw) : null;
+  } catch (e) {
+    fail(2, `--range-shas must be a JSON array of commit shas: ${e.message}`);
   }
 
   const anchorRes = await readGreenAnchor(base, key);
@@ -820,6 +963,7 @@ async function main() {
     cycles: cyclesRes.cycles,
     migrations,
     downs: downsRes.downs,
+    rangeShas,
   });
 
   if (!APPLY) {
