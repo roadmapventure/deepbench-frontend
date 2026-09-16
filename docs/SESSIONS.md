@@ -5,6 +5,16 @@
 
 ---
 
+## session/cycle-20260916-0820 (v7.0.507, 2026-09-16, unattended cycle `03c7e9a6-8b02-40af-94bc-7bd8a876cbdc`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Designer, Opus 5 Builder) — `SES-287` — **partial (slice 1 of 2), verdict block on the inherited `agt-70-auditor` red: the auto-rollback engine stops proposing to undo four other cycles work, and its card stops claiming a revert it never performed.**
+
+The ticket named three defects and the Designer re-measured all three rather than taking the filing as fact. Defect 1 (a stale green anchor) was already dead: `SES-352`s `trg_anchor_green_from_ci` keeps `runner_green_states` a trigger-maintained projection of `ci_run_conclusions`, measured 50/50 with `observed_at = concluded_at` and zero ordering inversions — the 107-vs-50 gap is `GREEN_STATE_RETENTION` pruning, not staleness. So the build gates only the two live ones: `decide()` measured nothing about how far back a revert reached, and `buildIncidentCard()` keyed its past tense off `decision.action` for an engine that never runs git.
+
+Measured at ship time on a real red rather than on the filed incident: against `f1024926` the pre-ship engine returned revert-and-card over a **47-commit range spanning 14 runner cycles**, attributed wholly to the last pusher — four times the August incident the ticket was filed for. The new guard proves a difference rather than restating behaviour: it imports the engine as it stood at `f85505d3` and runs the same facts through both.
+
+Two named deviations. The kickoff said two fixtures needed `rangeShas`; four call `decide()` expecting `REVERT_AND_CARD`, so the ship is 6 files against the kickoffs 4 (cap 16) — the alternative was pushing a red suite. And the runbook step 4a edit that would actually pass `--range-shas` is held for slice 2, because `docs/runbooks/runner-cycle.md` sits at 380,902 B against the `SES-336` ceiling of 381,000 and bytes must come out first. Until then every live invocation omits the list and therefore cards — fail-closed, and identical to the engines pre-ship live behaviour.
+
+---
+
 ## session/design-app-shell-0915 (v7.0.496, 2026-09-15, supervised cycle `3a456cd8-2939-4f6b-993a-92f9d6429150`, `trigger = supervised` — attended; Opus 5 session, Opus 5 Designer (judgment lane degraded, `SES-395`), Opus 5 Builder) — `MOB-22` — **delivered, verdict block on pre-existing reds: the app frame is now the visible screen on phones, and production gets it as its own release branch (PR #11), not as `dev → main`.**
 
 ### John's ask was two asks, and the second one shaped the build

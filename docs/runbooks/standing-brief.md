@@ -44,76 +44,43 @@
 > standing filing rules — and is maintained by hand, deliberately.
 
 <!-- BEGIN GENERATED — scripts/render-standing-brief.js — do not hand-edit inside this block -->
-## Live board state — generated, do not hand-edit — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST)*
+## Live board state — generated, do not hand-edit — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST)*
 
 > Rendered from the tables by `scripts/render-standing-brief.js` at every ship. **Every number below is derived; nothing here is maintained by hand.** The judgment prose beneath this block is the opposite — hand-maintained, deliberately, and this script never writes outside these markers. Where the two disagree about a number, this block is right and the sentence below is stale: say so rather than reconciling them by hand.
 
-**Board census** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* **640 open tickets**, 631 numbered, **9 open-but-unnumbered**, 914 rows total.
+**Board census** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* **645 open tickets**, 636 numbered, **9 open-but-unnumbered**, 919 rows total.
 
 | `status` | rows | share of board |
 |---|---:|---:|
-| `open` | 552 | 60.4% |
-| `done` | 262 | 28.7% |
-| `partial` | 48 | 5.3% |
-| `removal proposed` | 27 | 3% |
-| `delivered` | 13 | 1.4% |
+| `open` | 551 | 60% |
+| `done` | 262 | 28.5% |
+| `partial` | 49 | 5.3% |
+| `removal proposed` | 27 | 2.9% |
+| `delivered` | 18 | 2% |
 | `removed` | 12 | 1.3% |
 
-**`design_status` among OPEN tickets** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* Reads for selection (`SES-114`); `NULL` is *not* `auto`, it is not-yet-triaged and no cycle may backfill it.
+**`design_status` among OPEN tickets** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* Reads for selection (`SES-114`); `NULL` is *not* `auto`, it is not-yet-triaged and no cycle may backfill it.
 
 | `design_status` | open rows | selection effect |
 |---|---:|---|
-| `NULL` | 564 | full ceremony — not yet triaged |
+| `NULL` | 563 | full ceremony — not yet triaged |
 | `needs-decision` | 44 | — |
-| `designed` | 24 | **not a skip** — build from `kickoff_link` (step 6 fast path) |
+| `designed` | 30 | **not a skip** — build from `kickoff_link` (step 6 fast path) |
 | `needs-desktop` | 7 | skipped, `record_skip()` — needs a session John attends (B39) |
 | `auto` | 1 | full ceremony |
 
-**Scheduler and automation settings** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* §2b of the briefing, John's own switches, binding via `scheduler_gate()` at step 1b:
+**Scheduler and automation settings** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* §2b of the briefing, John's own switches, binding via `scheduler_gate()` at step 1b:
 
 - Scheduler: **on**, every **1 hour** on John's clock grid (America/Chicago hours divisible by the interval — `SES-151`, DST-proof).
 - Cron minute **40**, manual-fire tolerance **±10 min** (a start outside it is treated as a manual fire and is never paced).
 - Standing daily max: **196M tokens**. This is rung 3 of five, **below** the 48h stale floor: a standing number must not defeat the staleness brake.
 
-**Standing epic drain** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* Created only by John; the runner may read one, never write one (`drain_epic_next()` property 5). The finish line is drawn from the members he **named** (`runner_drain_scope`), never the live `now` tier (`SES-142`) — and within that list it is the members a milestone **gate ruled required** (`milestone_required`, `SES-310`) whenever the list carries such a ruling, every named member otherwise.
+**Standing epic drain** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* Created only by John; the runner may read one, never write one (`drain_epic_next()` property 5). The finish line is drawn from the members he **named** (`runner_drain_scope`), never the live `now` tier (`SES-142`) — and within that list it is the members a milestone **gate ruled required** (`milestone_required`, `SES-310`) whenever the list carries such a ruling, every named member otherwise.
 
 - **No drain standing.** Selection is the class-sorted board exactly as it is with no drain declared.
 
-**Open decisions** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* Decisions made under `M6-02` that are still inside their reversal window (`runner_settings.reversal_window_hours` = 72h). Silence finalises them; to reverse one, run the line beside it (`docs/runbooks/session-setup.md` § Reversing a decision).
+**Open decisions** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* Decisions made under `M6-02` that are still inside their reversal window (`runner_settings.reversal_window_hours` = 72h). Silence finalises them; to reverse one, run the line beside it (`docs/runbooks/session-setup.md` § Reversing a decision).
 
-- `736f6bfc` · ship · `AGT-70` · AGT-70 shipped at v7.0.467 (c236e7829160dedbdfa6963d09f5412a3c8f624c) on verdict 015bf5d7-81b8-4afc-954c-94172d2804ba · finalises Sep 15, 5:55 PM CST · `select public.reverse_decision('736f6bfc-1c5a-4b6c-bd4b-8ec64d680fed','John','<why>');`
-- `f8e2c5db` · rollback · — · Auto-rollback held: ci-red on f330acc was not reverted (card-only) · finalises Sep 15, 6:08 PM CST · `select public.reverse_decision('f8e2c5db-c719-4a90-84f0-e65172743228','John','<why>');`
-- `96804178` · ticket-status · `SES-381` · Filed SES-381: dev CI is red because CLAUDE-STATE.md cannot satisfy both halves of its own guard at once — stale fails… · finalises Sep 15, 6:10 PM CST · `select public.reverse_decision('96804178-a3ca-435b-b2ce-33183011c876','John','<why>');`
-- `87805ede` · ticket-scope · `SES-381` · Picked SES-381 ahead of the queue's first row (SES-344) under step 4's blocker rule: dev CI is red on a clause that mak… · finalises Sep 15, 6:16 PM CST · `select public.reverse_decision('87805ede-6752-4562-a42d-0a53336f9940','John','<why>');`
-- `257714bd` · ship · `SES-381` · SES-381 shipped at v7.0.470 (24d6ae1a89b14e822c655634ee419ff50af76865) on verdict 20d4803f-81ac-4613-b325-9fef23c008ac · finalises Sep 15, 6:53 PM CST · `select public.reverse_decision('257714bd-6ddc-4362-93d5-8dd4d78479a5','John','<why>');`
-- `bb559085` · ticket-status · `SES-382` · Filed SES-382: the regression suite shares one live database across parallel cycles, so a fixture-row control premise f… · finalises Sep 15, 7:02 PM CST · `select public.reverse_decision('bb559085-9ed0-4c9e-9c55-0cd7e9a5ff8b','John','<why>');`
-- `769dcfd5` · ship · `AGT-70` · AGT-70 shipped at v7.0.469 (a66cf335dbbe50f7d0dfc94061119cdab15f8101) on verdict 8862f53f-7d31-4209-83fb-2ec17a73a95c · finalises Sep 15, 7:05 PM CST · `select public.reverse_decision('769dcfd5-e39e-4e2e-b029-17abc98f143a','John','<why>');`
-- `98bf412f` · ticket-status · `AGT-70` · AGT-70 — The Auditor: defer the partial remainder; all four build slices have shipped and every remaining item is John'… · finalises Sep 15, 7:47 PM CST · `select public.reverse_decision('98bf412f-216c-4cee-883e-d12d24ab98be','John','<why>');`
-- `e228c7ee` · rollback · — · Auto-rollback held: ci-red on 8d8a23a was not reverted (card-only) · finalises Sep 15, 7:54 PM CST · `select public.reverse_decision('e228c7ee-9c8b-410d-bf8f-f72a88e5a006','John','<why>');`
-- `4aa5d63f` · ticket-status · `SES-383` · Filed SES-383: agent-log.js prices SUBSCRIPTION tokens as API dollars, so today's audit reads $58.06 where the real bil… · finalises Sep 15, 8:31 PM CST · `select public.reverse_decision('4aa5d63f-94b1-47e1-99e7-af85aaeb3d14','John','<why>');`
-- `27224cba` · rollback · — · Auto-rollback held: ci-red on 05f1655 was not reverted (card-only) · finalises Sep 15, 8:31 PM CST · `select public.reverse_decision('27224cba-e603-433c-a9da-2b7110357d44','John','<why>');`
-- `13466c51` · classification · `AGT-79` · AGT-79 classed P10 - Tooling, serves P1 - Improves John's Skills · finalises Sep 15, 8:40 PM CST · `select public.reverse_decision('13466c51-bec7-4c47-89e9-b0488084195f','John','<why>');`
-- `49da79ad` · ticket-scope · `SES-383` · Corrected SES-383 in place: the $2.27 of script-source spend was this cycle's own proof run, not a peer's, so the "near… · finalises Sep 15, 8:41 PM CST · `select public.reverse_decision('49da79ad-d021-4300-aadf-30fcd39e0ec6','John','<why>');`
-- `1dc648dd` · directive · `SES-384` · File SES-384: every new public table is born readable by anon, which contradicts the rule file that says default privil… · finalises Sep 15, 9:30 PM CST · `select public.reverse_decision('1dc648dd-bf0c-46f3-a6df-4f905716bdc3','John','<why>');`
-- `875a4da0` · rollback · — · Auto-rollback held: ci-red on b70ebad was not reverted (card-only) · finalises Sep 15, 9:37 PM CST · `select public.reverse_decision('875a4da0-a9dc-4c93-97f1-85137fc493e1','John','<why>');`
-- `b8204c1d` · ticket-scope · `AGT-79` · Clear AGT-79 design_status: its kickoff is spent, so the fast path would send a builder at a design that is already bui… · finalises Sep 15, 9:42 PM CST · `select public.reverse_decision('b8204c1d-ae88-428d-ac5f-9b964d39c53f','John','<why>');`
-- `77afdcbc` · hygiene · `AGT-79` · Ticket Owner: 40 derivable cell fix(es) on 40 row(s) — cost 37 · claim 1 · type 2 · finalises Sep 15, 10:31 PM CST · `select public.reverse_decision('77afdcbc-32dc-4505-bfda-724acc1f8b07','John','<why>');`
-- `adfe1b4a` · directive · `SES-386` · File SES-386: three regression guards grade LIVE BOARD state, so every verdict the runner produced tonight was a block… · finalises Sep 15, 10:49 PM CST · `select public.reverse_decision('adfe1b4a-302b-4496-8dd1-bd8c1606c5a0','John','<why>');`
-- `ffac0e54` · rollback · — · Auto-rollback held: ci-red on 80d28c8 was not reverted (card-only) · finalises Sep 15, 10:51 PM CST · `select public.reverse_decision('ffac0e54-fa05-45d9-87f1-dfec1fa6cd0d','John','<why>');`
-- `75935390` · ticket-scope · `AGT-79` · Clear AGT-79 design_status again: the slice-2 kickoff is spent, so the fast path would hand a Builder a contract with n… · finalises Sep 15, 10:54 PM CST · `select public.reverse_decision('75935390-9eeb-45b2-8fbf-75383b722e7f','John','<why>');`
-- `de5ca607` · gate · `SES-344` · SES-344 slice 3 is built and green on its own evidence but was NOT pushed to dev: the regression suite is red on failur… · finalises Sep 15, 11:35 PM CST · `select public.reverse_decision('de5ca607-c0c5-4f36-9e47-27b436e29dcf','John','<why>');`
-- `439e1e1d` · rollback · — · Auto-rollback held: ci-red on b9d5a05 was not reverted (card-only) · finalises Sep 15, 11:43 PM CST · `select public.reverse_decision('439e1e1d-6d38-449e-9fcc-b676cba57084','John','<why>');`
-- `a0029f68` · hygiene · `SES-344` · Clear SES-344 design_status: the v7.0.476 kickoff is spent — every one of its six tasks landed on dev at 948dced4. · finalises Sep 16, 12:02 AM CST · `select public.reverse_decision('a0029f68-0100-4494-8198-50df70944f38','John','<why>');`
-- `26cf84f8` · rollback · — · Auto-rollback held: ci-red on 948dced was not reverted (card-only) · finalises Sep 16, 12:04 AM CST · `select public.reverse_decision('26cf84f8-713d-48bd-bc2b-41ba2c8542a0','John','<why>');`
-- `084e8f52` · learning · `SES-159` · class-loop learning claims for P3 - Investor Value · finalises Sep 16, 12:09 AM CST · `select public.reverse_decision('084e8f52-c1bc-4d34-bd4e-38a7492b19c0','John','<why>');`
-- `bf3b98e7` · classification · — · board ordered: 2 ticket(s) given an automation_rank · finalises Sep 16, 12:11 AM CST · `select public.reverse_decision('bf3b98e7-aa16-41db-bb77-a74ed7b80e86','John','<why>');`
-- `33e81841` · hygiene · `AGT-79` · Clear AGT-79 design_status: the v7.0.477 kickoff is spent — all nine of its files and eight tasks shipped at b9d5a050. · finalises Sep 16, 12:12 AM CST · `select public.reverse_decision('33e81841-084b-419f-8b4d-182085c46d31','John','<why>');`
-- `20d03633` · gate · `AGT-79` · AGT-79 gated before build: the remainder's live run needs a roster row only John may create, and this cycle declines to… · finalises Sep 16, 12:12 AM CST · `select public.reverse_decision('20d03633-f9e4-48e6-a89e-c8baa79e706f','John','<why>');`
-- `aa0eb223` · filing · `SES-387` · File SES-387: class_understanding_due() keys its once-a-day gate on the cycle's START day, so a chain that crosses midn… · finalises Sep 16, 12:17 AM CST · `select public.reverse_decision('aa0eb223-2ad4-46f5-aca5-5e5454f6b3c2','John','<why>');`
-- `fdd25904` · ticket-scope · `AGT-79` · AGT-79 is designed for v7.0.480 as the CODE half of the Ticket Owner judgment pass only; kickoff_link and design_status… · finalises Sep 16, 2:06 AM CST · `select public.reverse_decision('fdd25904-e694-450d-8124-dab05a5bcaed','John','<why>');`
-- `9bcfe35e` · rule · `AGT-79` · ai_activity_log 43696 tokens corrected from my pre-result estimate (195,000) to the harness-measured total for the Desi… · finalises Sep 16, 2:10 AM CST · `select public.reverse_decision('9bcfe35e-2dcf-4a95-8160-891104c99f86','John','<why>');`
-- `e100d5a4` · rollback · — · Auto-rollback held: ci-red on b11ead3 was not reverted (card-only) · finalises Sep 16, 2:53 AM CST · `select public.reverse_decision('e100d5a4-ef6c-4323-af00-d670a9ae3ab5','John','<why>');`
-- `f98ebb28` · ticket-status · `AGT-79` · AGT-79 stays partial and re-pickable; design_status cleared to NULL now that the v7.0.480 kickoff is spent, kickoff_lin… · finalises Sep 16, 2:54 AM CST · `select public.reverse_decision('f98ebb28-79cd-4fbc-bb0b-6e3df39a2fbf','John','<why>');`
 - `8c167ca5` · gate · `AGT-79` · AGT-79 — The Ticket Owner agent is flagged needs-desktop: its whole remainder is the seed only John may apply. · finalises Sep 16, 4:46 AM CST · `select public.reverse_decision('8c167ca5-84be-416a-9759-91219298aad0','John','<why>');`
 - `b69ec7db` · rollback · — · Auto-rollback held: ci-red on a315f84 was not reverted (card-only) · finalises Sep 16, 5:46 AM CST · `select public.reverse_decision('b69ec7db-90b6-46c6-9f2a-2c2f1c83f9ef','John','<why>');`
 - `0e90173d` · directive · `AGT-70` · Two duplicate AGT-70 gated cards (bd54b947, 5c2dc87b) retired as repeats of card 3a0cf412; the ask itself (apply docs/d… · finalises Sep 16, 11:17 AM CST · `select public.reverse_decision('0e90173d-a017-478d-847a-903066df8717','John','<why>');`
@@ -161,15 +128,41 @@
 - `9cab0073` · ticket-scope · `SES-403` · Filed SES-403 (a ship blocked for a cause outside itself is re-graded once that cause is fixed) into Moat Support, pinn… · finalises Sep 18, 5:32 PM CST · `select public.reverse_decision('9cab0073-9419-4323-a610-bffe20d76d04','John','<why>');`
 - `6e01f7b5` · rollback · — · Auto-rollback held: ci-red on 3eb6855 was not reverted (card-only) · finalises Sep 18, 5:34 PM CST · `select public.reverse_decision('6e01f7b5-158c-4397-a6b6-f36600661e91','John','<why>');`
 - `18468b27` · ship · `MOB-22` · MOB-22 ships to dev as delivered (verdict block on pre-existing reds) and goes to production as its own release branch,… · finalises Sep 18, 6:10 PM CST · `select public.reverse_decision('18468b27-6506-470e-9fdf-63896b589ff0','John','<why>');`
+- `81ddac6a` · rollback · — · Auto-rollback held: ci-red on 1540d50 was not reverted (card-only) · finalises Sep 18, 6:28 PM CST · `select public.reverse_decision('81ddac6a-b508-456f-a4f7-0cf74e08cea2','John','<why>');`
+- `a369b3aa` · ticket-scope · `SES-404` · Filed SES-404: agt-70-auditor.test.mjs asserts on the LIVE corpus, so it is red on every commit and is now the only thi… · finalises Sep 18, 6:30 PM CST · `select public.reverse_decision('a369b3aa-cb82-4590-b5b5-2a44112473b8','John','<why>');`
+- `2a3fee6a` · ship · `MOB-22` · On John's word, PR #11 merged to main: the MOB-22 locked app frame is live on deepbench.roadmapventure.com. · finalises Sep 18, 6:49 PM CST · `select public.reverse_decision('2a3fee6a-6820-4d9b-b188-1c8cabc45027','John','<why>');`
+- `3eb61e71` · ticket-status · `SES-403` · SES-403 designed: kickoff v7.0.499 written and pushed, design_status -> designed · finalises Sep 18, 8:13 PM CST · `select public.reverse_decision('3eb61e71-3ace-4118-bbde-c095a5e7a4ad','John','<why>');`
+- `34ebcf23` · filing · — · Filed SES-405 and SES-406 from this cycle's CI-red root-cause (one atomic ID block of 2) · finalises Sep 18, 8:16 PM CST · `select public.reverse_decision('34ebcf23-0e65-495a-b1c6-da0b774fa20c','John','<why>');`
+- `461bb2de` · ticket-status · `SES-403` · SES-403 built and pushed at v7.0.500; verdict block for an outside cause, so the ticket goes delivered · finalises Sep 18, 9:13 PM CST · `select public.reverse_decision('461bb2de-965b-4ef8-b4a4-469c757f982f','John','<why>');`
+- `456bbb40` · ticket-status · `SES-364` · SES-364 designed and built at v7.0.501 (685d36da); verdict block for the same outside cause, ticket delivered · finalises Sep 18, 10:14 PM CST · `select public.reverse_decision('456bbb40-add5-4ee7-8cc0-685f793b1784','John','<why>');`
+- `6c41c311` · rollback · — · Auto-rollback held: ci-red on 685d36d was not reverted (card-only) · finalises Sep 18, 10:44 PM CST · `select public.reverse_decision('6c41c311-92f2-4406-9b41-2805148b3bde','John','<why>');`
+- `74ed56bd` · repair · — · Repair: 5 before-images THIS SESSION wrote keyed by backlog_id text instead of the uuid PK, making its own reversal pro… · finalises Sep 18, 10:51 PM CST · `select public.reverse_decision('74ed56bd-d843-460e-9941-83cd83e96d78','John','<why>');`
+- `91e75dd4` · filing · `SES-407` · Filed SES-407: 418 backlog_items before-images are keyed by backlog_id text, so reverse_decision() cannot address them · finalises Sep 18, 10:51 PM CST · `select public.reverse_decision('91e75dd4-1b42-4f65-96b7-f9fa3d3dadba','John','<why>');`
+- `bafbfa71` · ticket-status · `SES-399` · SES-399 designed and built at v7.0.502 (b743d24c); verdict block for the same outside cause, ticket delivered · finalises Sep 18, 10:57 PM CST · `select public.reverse_decision('bafbfa71-e589-4d2e-897f-355561d88225','John','<why>');`
+- `762c0f29` · agent-row · `SES-396` · SES-396 slice 2: the Designer gains ds-knowledge-environment (linked to design-kickoff at display_order 5) and ds-kicko… · finalises Sep 18, 11:22 PM CST · `select public.reverse_decision('762c0f29-5c76-496e-9da4-a9f15391502e','John','<why>');`
+- `1c155d2c` · filing · `SES-408` · Filed SES-408: the staff watch appends an environment-facts register line for every filing it classifies as an environm… · finalises Sep 18, 11:36 PM CST · `select public.reverse_decision('1c155d2c-20ea-47c6-a554-c46e007b04cd','John','<why>');`
+- `c888ab3b` · ticket-status · `SES-378` · SES-378 slice 2 was designed, built and verified, and is gated before build rather than shipped: the Verifier returned… · finalises Sep 18, 11:39 PM CST · `select public.reverse_decision('c888ab3b-b8ad-418b-a369-09238ced962a','John','<why>');`
+- `c273dc52` · rollback · — · Auto-rollback held: ci-red on b743d24 was not reverted (card-only) · finalises Sep 18, 11:44 PM CST · `select public.reverse_decision('c273dc52-e273-4160-beac-ce6d086d4bad','John','<why>');`
+- `db295b92` · ticket-status · `SES-396` · SES-396 slice 2 built and pushed at v7.0.504 (58accfcd); verdict block for the same outside cause, ticket delivered · finalises Sep 19, 12:08 AM CST · `select public.reverse_decision('db295b92-e89a-4dba-8788-92e87fedc733','John','<why>');`
+- `82cf6bbc` · ticket-scope · `SES-391` · Appended a second live sighting to SES-391: the chain re-picked SES-378 twenty-nine minutes after a peer gated it · finalises Sep 19, 12:12 AM CST · `select public.reverse_decision('82cf6bbc-6f10-4f38-bad8-ef4a8cf2c0d3','John','<why>');`
+- `6471c68f` · rollback · — · Auto-rollback held: ci-red on 58accfc was not reverted (card-only) · finalises Sep 19, 1:44 AM CST · `select public.reverse_decision('6471c68f-7ed7-4de5-a640-2eb08380e098','John','<why>');`
+- `4a04764a` · classification · — · board ordered: 5 ticket(s) given an automation_rank · finalises Sep 19, 1:46 AM CST · `select public.reverse_decision('4a04764a-a5d8-459b-9d05-c02719ba37d7','John','<why>');`
+- `13000992` · hygiene · `AGT-79` · Ticket Owner: 3 derivable cell fix(es) on 3 row(s) — cost 2 · claim 0 · type 1 · finalises Sep 19, 1:47 AM CST · `select public.reverse_decision('13000992-f57c-4564-a100-d25e8b5b70cf','John','<why>');`
+- `195c52b6` · rollback · — · Auto-rollback held: ci-red on 05e9f95 was not reverted (card-only) · finalises Sep 19, 2:31 AM CST · `select public.reverse_decision('195c52b6-2726-4d89-a823-161722b05016','John','<why>');`
+- `c9855388` · learning · `SES-159` · class-loop learning claims for P2 - Inventive · finalises Sep 19, 2:35 AM CST · `select public.reverse_decision('c9855388-725a-4d28-ac00-e9fed50ff426','John','<why>');`
+- `33143012` · ticket-status · `SES-385` · SES-385 stays partial with design_status cleared and kickoff_link kept — the ship applying its own new rule to itself. · finalises Sep 19, 3:11 AM CST · `select public.reverse_decision('33143012-9c26-46f6-951f-566e05404729','John','<why>');`
+- `94853781` · rollback · — · Auto-rollback held: ci-red on f102492 was not reverted (card-only) · finalises Sep 19, 3:12 AM CST · `select public.reverse_decision('94853781-22a0-4e54-b56a-96fce962b749','John','<why>');`
+- `24e008f5` · design-complete · `SES-287` · SES-287 designed as slice 1 of 2 — the one-cycle revert guard; kickoff v7.0.507 written and lane-gated (exit 0, 7713 B). · finalises Sep 19, 3:33 AM CST · `select public.reverse_decision('24e008f5-e31e-4d76-80c7-795e9556803e','John','<why>');`
+- `d2818688` · ticket-status · `SES-287` · SES-287 slice 1 shipped at v7.0.507 / 089c0bbd; verdict BLOCK on the standing agt-70-auditor red, so the ticket is writ… · finalises Sep 19, 4:00 AM CST · `select public.reverse_decision('d2818688-f9c1-494d-9b3e-8cc6155966df','John','<why>');`
 
-**664 final this week, 0 reversed this week** — *this week* is a **rolling 7 days** back from the stamp, not a calendar week and not a Friday-07:00Z reset: no such weekly-reset helper exists in this file or anywhere in `scripts/`, so a rolling window is what is used and is labelled as one. A reversal is the strongest negative signal the ladder takes (`M6-07`), so the second number is the one to read first.
+**697 final this week, 0 reversed this week** — *this week* is a **rolling 7 days** back from the stamp, not a calendar week and not a Friday-07:00Z reset: no such weekly-reset helper exists in this file or anywhere in `scripts/`, so a rolling window is what is used and is labelled as one. A reversal is the strongest negative signal the ladder takes (`M6-07`), so the second number is the one to read first.
 
-**Judgment classes** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* What the corpus currently holds per pull test, live from `public.judgment_class_census` (`SES-84`; the same view `SES-159` reads). Ratification is a standing metric (John, 2026-08-23: a class is never finished being learned), never a finish line.
+**Judgment classes** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* What the corpus currently holds per pull test, live from `public.judgment_class_census` (`SES-84`; the same view `SES-159` reads). Ratification is a standing metric (John, 2026-08-23: a class is never finished being learned), never a finish line.
 
 | class | ratified | proposed | rejected | total |
 |---|---:|---:|---:|---:|
 | `P1 - Improves John's Skills` | 7 | 31 | 6 | 44 |
-| `P2 - Inventive` | 0 | 58 | 6 | 64 |
+| `P2 - Inventive` | 0 | 61 | 6 | 67 |
 | `P3 - Investor Value` | 0 | 58 | 7 | 65 |
 | `P4 - New Customers` | 1 | 37 | 3 | 41 |
 | `neutral` | 0 | 84 | 29 | 113 |
@@ -179,21 +172,21 @@
 - Newest proposed root claim for P3: `VC-SYN-001` — Investor value is the least-defined product goal because nobody has yet said what an investor would check. The drafts agree on one reading: the buyer is a skep…
 - Newest proposed root claim for P4: `VC-ROOT-004` — New features that win new customers. The bar is buy-pull — functionality that makes a customer say "I have to buy this." Administrative capability (accounts, b…
 
-**John-model** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* How often a decision that leaned on a standing pattern of John's stood unreversed through its window, live from `public.john_model_signal` (`SES-004`; the criteria are `public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md`). A rate binds only from 30 finalised-or-reversed decisions (M7 gate, ruling iii).
+**John-model** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* How often a decision that leaned on a standing pattern of John's stood unreversed through its window, live from `public.john_model_signal` (`SES-004`; the criteria are `public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md`). A rate binds only from 30 finalised-or-reversed decisions (M7 gate, ruling iii).
 
-- **99.3% agreement** over 152 finalised-or-reversed decisions (151 finalised unreversed, 1 reversed; 35 still open, 187 citing in total). A reversal is the strongest negative signal the ladder takes, so the second number is the one to read first.
+- **99.4% agreement** over 176 finalised-or-reversed decisions (175 finalised unreversed, 1 reversed; 26 still open, 202 citing in total). A reversal is the strongest negative signal the ladder takes, so the second number is the one to read first.
 
 | criterion | citing | final unreversed | reversed | open | rate |
 |---|---:|---:|---:|---:|---:|
-| `pattern:137` P1–P4 are pull tests, not category labels — administrative expectations never q… | 76 | 73 | 0 | 3 | 100% |
-| `pattern:0` No standing pattern applied -- new judgment. | 51 | 25 | 0 | 26 | — |
-| `pattern:85` Don't gate small, reversible calls on his approval — decide and flag. | 44 | 42 | 1 | 1 | 97.7% |
-| `pattern:96` When a gap surfaces outside the session's scope, log it with its own ID rather… | 11 | 5 | 0 | 6 | — |
+| `pattern:137` P1–P4 are pull tests, not category labels — administrative expectations never q… | 76 | 76 | 0 | 0 | 100% |
+| `pattern:0` No standing pattern applied -- new judgment. | 63 | 43 | 0 | 20 | 100% |
+| `pattern:85` Don't gate small, reversible calls on his approval — decide and flag. | 47 | 42 | 1 | 4 | 97.7% |
+| `pattern:96` When a gap surfaces outside the session's scope, log it with its own ID rather… | 11 | 10 | 0 | 1 | — |
 | `pattern:86` Process, tooling, and hygiene mechanics are fully delegated — decide and execut… | 9 | 8 | 0 | 1 | — |
 
 - A per-pattern `—` is not a zero: that criterion has not reached 30 finalised-or-reversed citations of its own, so it carries counts and no rate.
 
-**Invention in use** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* Criterion 7 (`docs/SELFBUILD-CHARTER.md`): at least one platform-originated feature — the Bench Report Card judge (`LOG-143`) — is measurably used by real visitors, live from `public.report_card_usage`. Counts only, never a rate.
+**Invention in use** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* Criterion 7 (`docs/SELFBUILD-CHARTER.md`): at least one platform-originated feature — the Bench Report Card judge (`LOG-143`) — is measurably used by real visitors, live from `public.report_card_usage`. Counts only, never a rate.
 
 - **7d:** 0 judge runs, 0 by real visitors (0 distinct).
 - **30d:** 3 judge runs, 0 by real visitors (0 distinct).
@@ -201,39 +194,40 @@
 
 - *no real-visitor use yet.*
 
-**Board by served class** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* Which class each open ticket SERVES under the served-class test (`VC-MISSION-033`), ruled by The Prioritizer's `classify-ticket` and stored on `backlog_items.supports_class` — a ticket's own class is a different question and is not restated here.
+**Board by served class** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* Which class each open ticket SERVES under the served-class test (`VC-MISSION-033`), ruled by The Prioritizer's `classify-ticket` and stored on `backlog_items.supports_class` — a ticket's own class is a different question and is not restated here.
 
 | serves | open tickets |
 |---|---:|
 | `P1 - Improves John's Skills` | 83 |
 | `P2 - Inventive` | 22 |
-| `P3 - Investor Value` | 6 |
+| `P3 - Investor Value` | 5 |
 | `P4 - New Customers` | 2 |
 | `P7 - Agent Creation` | 1 |
+| `P10 - Tooling` | 1 |
 | *serves none* | 486 |
 
 - *Negative ranks are John's own automation queue, seeded to sort ahead of anything assigned later (`SES-86`). The nightly re-rank writes 1..N and therefore sits below them — intended precedence, not a re-rank that failed.*
 
 - **Top 5 by `automation_rank`:**
   -35. `SES-288` — A schema-range red can never be auto-reverted: one refused down-migration disables rollba… *(serves none)*
-  -34. `SES-287` — The auto-rollback engine picks a stale green anchor and blames the last pusher for four c… *(serves P2 - Inventive)*
   1. `AGT-79` — The Ticket Owner agent: a nightly pass over the board that checks every ticket's token qu… *(serves P1 - Improves John's Skills)*
-  1. `SES-378` — The Development Manager takes the pick: step 5 asks GV-01 for the assignment (ticket, cap… *(serves P2 - Inventive)*
-  4. `SES-391` — A continuation re-picks the ticket the chain just gated: AGT-70 was classified gated thre… *(serves P2 - Inventive)*
+  2. `SES-378` — The Development Manager takes the pick: step 5 asks GV-01 for the assignment (ticket, cap… *(serves P2 - Inventive)*
+  3. `SES-385` — A shipped slice leaves its ticket advertising a design that is already built: design_stat… *(serves P2 - Inventive)*
+  4. `SES-337` — The Verifier agent must reproduce the last 30 recorded verdicts before it grades a ship,… *(serves P1 - Improves John's Skills)*
 
-- Last scheduled re-rank: Sep 15, 4:44 AM CST.
+- Last scheduled re-rank: Sep 16, 1:45 AM CST.
 
-**Governance agents, last 7 days** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* Whether the platform's own agents (`agents.lane = 'governance'`) are doing the development work, live from `public.governance_agent_usage` and `public.ship_handoff_census` (`SES-360`). A **rolling 7 days** back from render time, like the decision counts above. Counts and token sums only, never a rate.
+**Governance agents, last 7 days** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* Whether the platform's own agents (`agents.lane = 'governance'`) are doing the development work, live from `public.governance_agent_usage` and `public.ship_handoff_census` (`SES-360`). A **rolling 7 days** back from render time, like the decision counts above. Counts and token sums only, never a rate.
 
 | role | source | calls | input tokens | output tokens |
 |---|---|---:|---:|---:|
-| Governance — Development Manager | `session` | 4 | 229473 | 12884 |
+| Governance — Development Manager | `session` | 15 | 3441018 | 48534 |
 | Governance — Researcher | `session` | 9 | 1971842 | 196132 |
 | Governance — Prioritizer | `mcp` | 1 | 1964 | 1240 |
-| Governance — Prioritizer | `session` | 582 | 2208036 | 92173 |
-| Governance — Prioritizer | *unlabelled* | 1018 (1014 untokened) | 20121 | 4652 |
-| Governance — Designer | `session` | 38 | 86790175 | 618636 |
-| Governance — Builder | `session` | 25 | 68919776 | 370258 |
+| Governance — Prioritizer | `session` | 583 | 2274419 | 92174 |
+| Governance — Prioritizer | *unlabelled* | 1074 (1070 untokened) | 20121 | 4652 |
+| Governance — Designer | `session` | 46 | 100019726 | 792945 |
+| Governance — Builder | `session` | 33 | 79616762 | 558840 |
 | Governance — Verifier | `mcp` | 3 | 28992 | 18874 |
 | Governance — Verifier | `script` | 11 | 175325 | 79690 |
 | Governance — Verifier | `session` | 5 | 5352037 | 0 |
@@ -241,10 +235,10 @@
 | Governance — Auditor | `session` | 24 | 2130338 | 195403 |
 | Governance — Ticket Owner | *no calls in the window* | 0 | — | — |
 
-- **Ships with all four handoff rows: 12 of 56** ships in the window (`SES-345`'s four: `automation_rank`, `kickoff_link`, a per-ticket push sha, a verdict row). Missing per leg: kickoff_link 24, per-ticket sha 42, automation_rank 6, verdict 0.
+- **Ships with all four handoff rows: 14 of 62** ships in the window (`SES-345`'s four: `automation_rank`, `kickoff_link`, a per-ticket push sha, a verdict row). Missing per leg: kickoff_link 24, per-ticket sha 42, automation_rank 10, verdict 0.
 - *unlabelled* is a NULL `call_source` — the pre-attribution unknown, never read as automation (`LOG-128`); `untokened` rows carry no token counts at all (deterministic handler rows), so a large call count beside a small token sum is that, not a cheap model.
 
-**Auditor's ledger** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* What `public.audit_findings` (`AGT-70`) holds and what has left it for the board. Counts only, never a rate. Latest week 2026-W37: **6 findings (4 open · 2 resolved · 0 not a defect)** — **0 ruled** open findings (a ruled, open, `high` row is what `tripwire-to-backlog.js --from-ledger` files, at most 3 per ISO week); **0 filed** to the board from the ledger so far (`source_file = 'audit-ledger'`).
+**Auditor's ledger** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* What `public.audit_findings` (`AGT-70`) holds and what has left it for the board. Counts only, never a rate. Latest week 2026-W37: **6 findings (4 open · 2 resolved · 0 not a defect)** — **0 ruled** open findings (a ruled, open, `high` row is what `tripwire-to-backlog.js --from-ledger` files, at most 3 per ISO week); **0 filed** to the board from the ledger so far (`source_file = 'audit-ledger'`).
 
 | fingerprint | kind | confidence | fact | ruled |
 |---|---|---|---|---|
@@ -255,27 +249,28 @@
 
 - *A finding leaves this table only by John's ruling — `resolved`, `not-a-defect`, or ruled and left `open` to file. Candidates a run found but nobody ingested live in `docs/audits/<week>-candidates.json`, not here.*
 
-**Ticket hygiene, last night** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* What the Ticket Owner (`AGT-79`) left on the board: `public.ticket_owner_findings` open rows by check, the newest `hygiene` decision and the newest nightly cycle row. Counts only, never a rate. **179 open findings** across 8 check(s).
+**Ticket hygiene, last night** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* What the Ticket Owner (`AGT-79`) left on the board: `public.ticket_owner_findings` open rows by check, the newest `hygiene` decision and the newest nightly cycle row. Counts only, never a rate. **209 open findings** across 8 check(s).
 
 | check | open | oldest | nights open |
 |---|---:|---|---:|
-| `actual-unknown` | 67 | Sep 12, 10:31 PM CST | 2 |
-| `verdict-missing` | 41 | Sep 12, 10:31 PM CST | 2 |
-| `designed-closed` | 35 | Sep 12, 10:31 PM CST | 2 |
-| `size-missing` | 16 | Sep 12, 10:31 PM CST | 2 |
-| `type-off-taxonomy` | 13 | Sep 12, 10:31 PM CST | 2 |
-| `quote-missing` | 3 | Sep 12, 10:31 PM CST | 2 |
-| `cycles-over-quote` | 2 | Sep 12, 10:31 PM CST | 2 |
-| `delivered-unaccepted` | 2 | Sep 12, 10:31 PM CST | 2 |
+| `actual-unknown` | 78 | Sep 12, 10:31 PM CST | 3 |
+| `designed-closed` | 47 | Sep 12, 10:31 PM CST | 3 |
+| `verdict-missing` | 42 | Sep 12, 10:31 PM CST | 3 |
+| `size-missing` | 21 | Sep 12, 10:31 PM CST | 3 |
+| `type-off-taxonomy` | 13 | Sep 12, 10:31 PM CST | 3 |
+| `quote-missing` | 4 | Sep 12, 10:31 PM CST | 3 |
+| `cycles-over-quote` | 2 | Sep 12, 10:31 PM CST | 3 |
+| `delivered-unaccepted` | 2 | Sep 12, 10:31 PM CST | 3 |
 
-- Last run: `7dffdf5f` · shipped · Sep 15, 4:44 AM CST · 867 rows · 182 findings (3 derivable · 179 judgment) · behind the fences: quote 526 · size 494 · cost 45 · verdict 97 · unrevalidated>30d 427 · attended-actual null 267 · fixed 3 · findings +9 ~170 −6 · decision fd39d118-f6ff-4249-b234-cbf312dfca14 — reversible until 2026-09-18T09:44:04.630689+00:00
-- Decision `fd39d118` · open · Ticket Owner: 3 derivable cell fix(es) on 3 row(s) — cost 3 · claim 0 · type 0 · finalises Sep 18, 4:44 AM CST · `select public.reverse_decision('fd39d118-f6ff-4249-b234-cbf312dfca14','John','<why>');`
+- Last run: `63fb1536` · shipped · Sep 16, 1:47 AM CST · 880 rows · 212 findings (3 derivable · 209 judgment) · behind the fences: quote 525 · size 493 · cost 45 · verdict 97 · unrevalidated>30d 426 · attended-actual null 280 · fixed 3 · findings +32 ~177 −2 · decision 13000992-f57c-4564-a100-d25e8b5b70cf — reversible until 2026-09-19T06:47:02.534441+00:00
+- Decision `13000992` · open · Ticket Owner: 3 derivable cell fix(es) on 3 row(s) — cost 2 · claim 0 · type 1 · finalises Sep 19, 1:47 AM CST · `select public.reverse_decision('13000992-f57c-4564-a100-d25e8b5b70cf','John','<why>');`
 
-**Human gates** — *as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST).* The two reads that say whether anything is waiting on a human: open `backlog_items` carrying `design_status = 'needs-john'`, and `gated_before_build` `runner_items` left with `decision IS NULL` (`M6-01`). Board state, written by no code in this repo — which is why it is REPORTED here and not asserted as a gate by the regression suite. **0 open `needs-john` ticket(s)**, **0 undecided `gated_before_build` card(s)**.
+**Human gates** — *as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST).* The two reads that say whether anything is waiting on a human: open `backlog_items` carrying `design_status = 'needs-john'`, and `gated_before_build` `runner_items` left with `decision IS NULL` (`M6-01`). Board state, written by no code in this repo — which is why it is REPORTED here and not asserted as a gate by the regression suite. **0 open `needs-john` ticket(s)**, **5 undecided `gated_before_build` card(s)**.
 
-- **Nothing blocks on a human** — a measured zero: both reads ran and both came back empty, so `M6-01` holds on the board it governs.
+- **Undecided gated cards (5):** `ba7390e0-f506-4269-be1b-990e792528a1`, `2d5441c7-5133-4b21-9768-7921dce0c409`, `82f5dfba-f775-413a-9a85-f8b3a435b79d`, `52c9e635-dade-4cc0-8c84-490d8a63b99c`, `887cdb4e-0341-469a-a4bb-0038d3aed671`
+- *Open is not wrong.* A card nobody has answered yet is a real board state; what it is NOT is a regression, so nothing in the suite goes red for it.
 
-*Provenance: 914 board rows, payload `sha256:468503548c3f0b9d`, as of 2026-09-15 23:10Z (Sep 15, 6:10 PM CST). The stamp says when this was last read; the sha says whether it still matches the tables. `--check` compares the sha, never the stamp — a refreshed stamp over identical facts is not drift.*
+*Provenance: 919 board rows, payload `sha256:1c48490053b05d6e`, as of 2026-09-16 09:01Z (Sep 16, 4:01 AM CST). The stamp says when this was last read; the sha says whether it still matches the tables. `--check` compares the sha, never the stamp — a refreshed stamp over identical facts is not drift.*
 <!-- END GENERATED — scripts/render-standing-brief.js -->
 
 **Next session:** none required — the runner is live and works **John's automation queue** (canonical: `docs/RUNNER-GOV-0820-REQUIREMENTS.md`): the queue is the board's leading sort key, not a list to read (`automation_rank`, v7.0.133) — `ORDER BY queue` already honours it. Classes are always written named, **`P1 - Improves John's Skills` → `P10 - Tooling`**; outcomes as plain words (“did not run”, “gated before build”); budget is two-track (API dollars + token governor). John judges from the briefing page. Runner pause: disable `deepbench-runner` at claude.ai/code/routines. **Board census measured 2026-08-23T12:5xZ by runner cycle `363b5138`, taken from the board after its own close-out recompute rather than carried forward:** **561 open tickets, 561 numbered, 0 open-but-unnumbered**, 611 rows total, **the standing Automation drain now has a FIXED finish line** — from `v7.0.179` (`SES-142`) it works the **18 members John named** on directive `b74009ea`, stored as `runner_drain_scope` FK rows, and a ticket filed into the epic *after* that naming **never joins it**: it queues normally and waits for him. The live `now` tier had already drifted to 19 against his 18. `drain_epic_next()` retires when those 18 are `done`/`removed`, and returns the new outcome **`unscoped`** — never a live-tier fallback — for any future drain declared without a list. Queue/drain state as of **v7.0.196** (2026-08-23 ~17:00Z, `successional-review` close-out, 561 rows renumbered): `SES-140` — *the successor fire is refused by the platform* and `SES-151` — *the scheduler runs on John's clock grid* are both **`done`**; the drain's nearest open member `SES-84` — *the vision corpus* (`needs-john`) waits on John's briefing decisions, so cycles step past it (`SES-114`) and work the board (`SES-121` — *shrink the `.claude/`-mutable surface* went `done` at v7.0.198; procedure text now lives in `docs/runbooks/`, cycle-writable). **The board's `title` column is trustworthy for display for the first time** (`SES-91`, v7.0.177): 98 rows that held a bare priority-class string now carry a real authored title, and the only `^P[0-9]+ - ` title left is `ADM-1`, whose title is a real sentence behind a stale class prefix and is deliberately left for `SES-117` to **accommodate** rather than repair. `SES-119` is now `done` (v7.0.184 + v7.0.185): the briefing renders `public.backlog_display_title(title, description)` rather than the read-time `gist` workaround, and **`runner-cycle.md`'s Language block now requires a ticket's title wherever John reads its ID**. Step 5's `gist` expression deliberately stays — it is still correct for any future row filed the old way, and 50 of 562 open numbered tickets still fall back to it. **From v7.0.195 the chain runs IN-SESSION (`SES-140` FINAL)** — a cycle that actually ran one (`shipped`/`gated_before_build`/`reverted`) and whose drain still returns `pick` opens its next `runner_cycles` row (trigger `chained (drain continuation)`) **in the same session** and re-enters the runbook at step 1; session-spawning is retired as platform-unsupported (`runner-cycle.md` tail step (8) carries the evidence). A **wall-stopped cycle continues nothing**, which keeps the budget wall a brake rather than a metronome. Proven live 2026-08-23: cycles `1fcd687e` → `a11c94d2`, the first chained row in the runner's life. **The briefing-redesign epic is finished** — `SES-129`, its last member, shipped in cycle `ed1a5eb3`. **A new filing rule binds from this version:** `runner_items.backlog_id` takes a **bare** ticket id or NULL and is enforced by `ck_runner_items_backlog_id_bare`; the display string belongs in `display_ref`, and the briefing's id chip reads `coalesce(backlog_id, display_ref)` (`SES-116`, v7.0.174 — `runner-cycle.md` step 9). **`design_status` reads for selection (`SES-114`, v7.0.165); among OPEN tickets measured at the v7.0.198 close-out:** 16 `designed` (incl. `SES-101`, flipped from `needs-desktop` — its one remaining edit now lives in `docs/runbooks/session-setup.md` step 3c, cycle-writable), **0 `needs-desktop`**, **1 `needs-john`** (`SES-84`), 546 `NULL` = not yet triaged, deliberately not guessed to `auto`. Measured at the v7.0.198 close-out: **11 of John's 18 named members remain open** (`SES-121` retired from the list by going `done` this session); the only `needs-john` member is `SES-84` — the rest are buildable, the drain reaches them and can retire on them. **`CHI-89`** still holds its queue slot with its removal card undecided — visible to John and skipped by cycles, exactly as `SES-113` intended. **`SES-133` is still open at `partial`** — the other half of John's 2026-08-23 emergencies directive; it sits at queue 251 rather than at the top, because the drain reads the Automation epic's `now` tier in queue order and `SES-133` is not in that epic. **From v7.0.182 John's own switches govern the cadence** (`SES-143`): the briefing's **§2b Automation panel** carries a scheduler checkbox + an every-N-hours box (live values: **on, 3 hours** — John's order 2026-08-23: the runner runs at **12/3/6/9 on his clock**, `SES-151`) and a drain checkbox, and `runner-cycle.md`'s **new step 1b** calls `public.scheduler_gate()` before anything else — a scheduled cycle arriving early closes `did_not_run` with *"paced by your scheduler setting"*, and with the scheduler off it closes *"scheduler off"*. **The cron stays hourly permanently by design** — a cycle cannot edit its own routine — and **from v7.0.196 (`SES-151`) the gate paces by John's clock grid**: a scheduled fire runs iff its row's `started_at` falls in an America/Chicago hour divisible by `interval_hours` (3 → **12/3/6/9 AM/PM his clock**, DST-proof; the mixed-clock elapsed test that wrongly paced 3 of 9 hourly fires is dead, `q-hourly-interval-boundary` answered by ship). Two consequences worth knowing before reading a quiet night as a stall: the gate **fails open** on every unknown, and it governs **scheduled** fires only, so a standing drain's chained continuation cycles run regardless — while the Automation drain stands, **the chain and not the interval is what actually sets the pace**. A manual fire (off the cron grid) is never paced; whether that is what John wants is the one thing the spec leaves open, asked as `q-manual-fire-pacing`. **From v7.0.188 that gate actually fires** (`SES-146`): until then `scheduler_gate()` matched the trigger by exact equality against the bare word `scheduled`, so a cycle passing the verbatim line step 1b asks for — `trigger: scheduled` — fell through to *"not a scheduled cycle"* and skipped **both** the pacing branch and the `scheduler_on = false` branch, and the grid test compared `now()`-at-step-1b rather than the fire time against a hardcoded ±2. Both failed open, so the panel looked live and bound nothing. The trigger is now normalised, the grid is anchored to the cycle row's own `started_at`, and the tolerance is the column `runner_settings.grid_tolerance_min` (10). **Silence is not a “no”** on any open question. **From v7.0.183 the board's open status is `open`, never `missing`** (`SES-118`): `backlog_items_status_check` now allows exactly `('open','partial','done','removal proposed','removed')` and the retired value raises `23514` — 510 rows renamed, `updated_at` deliberately untouched so step 8c's 30-day revalidation sweep still sees the sinking tail. **That consequence closed at v7.0.189** (attended session `ses118-gated`, 2026-08-23): step 3c's INSERT now writes `'open'`, zero `'missing'` literals remain under `.claude/`, and `SES-118` is `done` — its gated card `76564dde` awaits John's decision on the briefing page.
