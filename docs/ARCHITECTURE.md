@@ -2534,6 +2534,13 @@ cycle's mission before any list item.
    the platform is his living portfolio (added 2026-08-20, John, `design-runner-gov-0820` —
    inserted above the original list, every other class pushed down one)
 2. **P2 - Inventive** — new inventive features: white space, competitive differentiation.
+   **Full seven-test definition (rewritten 2026-09-14, John test-by-test in chat, supersedes the
+   one-line bar below as the operative check): `docs/vision/market-map.md` §"What P2 - Inventive
+   means concretely," `C-MAP-28` through `C-MAP-35`** — not-yet-built, real demand, the real
+   competitors (Copilot/ChatGPT/Claude) structurally won't build it (named trap: multi-agent/
+   memory/self-training), durability against a fast-follower, compounding asset, beachhead fit
+   (soft), and intelligence-native (not a coded feature dressed as inventive). Not yet wired into
+   The Researcher's (`GV-02`) own scan logic — still applied by hand.
    **The bar is hard-to-replicate uniqueness (John, 2026-08-21):** a feature competitors can
    easily copy — an admin screen, an expected surface, "administrative expectations" — is not
    P2, however new it is to the platform
