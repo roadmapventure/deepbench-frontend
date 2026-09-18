@@ -1,5 +1,36 @@
 #!/usr/bin/env node
-// DeepBench v7.0.507 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373 + SES-287 slice 1
+// DeepBench v7.0.525 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373 + SES-287 slices 1-2
+//
+// -- SES-287 slice 2 (v7.0.525): THE REVERT CARD SETTLES ITS OWN OUTCOME --------------------
+// Slice 1 closed the range gate and made the REVERT_AND_CARD card say PLANNED instead of claiming
+// the act. It left the AFFIRMATIVE half open, and that gap is not cosmetic: buildIncidentCard()
+// returns that card with NO `decision` key at all, and main() stamps one only inside the CARD_ONLY
+// branch -- so the moment a range IS supplied and the cycle declines the plan, the card sits
+// `decision NULL` for ever. Live card 000cb93c (2026-09-15) is that card; a human retired it by hand.
+//
+// WHAT THIS SHIP ADDS, AND WHERE THE LINE STILL IS. The engine still does not perform the revert and
+// still cannot observe whether one ran: THE CYCLE decides that behind its push gates. What it gains
+// is a way to RECORD the answer the cycle brings back -- `--settle --card-id=<uuid>
+// --outcome=declined|executed [--reason=<text>]` with `--cycle-id` -- which records a
+// `kind = 'rollback'` decision under the cycle id passed in, images the card row under that decision
+// id, and PATCHes the card into the past tense. That is the same ledger-writer half the header
+// already claims for CARD_ONLY, held to the same three limits: `p_backlog_id` NULL,
+// `p_ladder_work_class` NULL, and nothing acted on the world.
+//
+// 'retired' FOR BOTH OUTCOMES, and this is the decision most likely to be helpfully "fixed" later.
+// An executed revert is NOT an `accept`: accept is the one value `trg_runner_items_accept_clears_flag`
+// keys on and it reads as John's approval, which no unattended cycle has. `retired` is SES-300's
+// *withdrawn as an ask -- a record, never an open question*, and that is true of both outcomes. WHICH
+// outcome it was lives in the prose (title / before_after / plain_after, rewritten in the past tense)
+// and in the decision row's summary. The enum carries the ask's status, never the verdict.
+//
+// FAIL DIRECTION, inherited from SES-373 rather than re-argued: no decision -> NO STAMP -> exit 2
+// (*could not run*, never a pass), card untouched. A stamped card with no decision row behind it is
+// the SES-373 defect wearing a value rather than closing it. And a card that ALREADY carries a
+// decision is refused rather than overwritten -- settling twice orphans the first decision's
+// before-image, and a row whose restore path points at the wrong prior state is worse than no stamp.
+//
+// Guarded by tests/regression/ses-287b-revert-settled.test.mjs.
 //
 // -- SES-287 slice 1 (v7.0.507): ONE CYCLE'S COMMITS, OR NO REVERT AT ALL -------------------
 // Two of SES-287's three defects are closed here. The third -- the stale green anchor -- was closed
@@ -673,6 +704,142 @@ export function stampCardOnly(card, decisionId, now = new Date()) {
   };
 }
 
+// SES-287 slice 2. The two outcomes a cycle may bring back from its push gates, as DATA so the guard
+// asserts the vocabulary rather than restating it -- exactly as TRIGGER_SOURCES and
+// DOWN_CLASSIFICATIONS are. There is no third: a revert either ran or it did not, and "unknown" is
+// not an outcome to record, it is a settle call that should not have been made yet.
+export const REVERT_OUTCOMES = { DECLINED: "declined", EXECUTED: "executed" };
+export const REVERT_OUTCOME_VALUES = [REVERT_OUTCOMES.DECLINED, REVERT_OUTCOMES.EXECUTED];
+
+// BOTH outcomes file this value -- see the header. It is deliberately the same constant
+// CARD_ONLY_DECISION carries, and it is written separately rather than aliased because the two
+// clauses answer different questions and a later change to one must not silently move the other.
+export const REVERT_OUTCOME_DECISION = "retired";
+
+// Not CARD_ONLY_REASON_PREFIX, and not ses-285's close marker: assertion 7 there selects on its own
+// prefix and then demands a backlog_id that RESOLVES, which an incident card carries none of by
+// design (SES-116 -- backlog_id is a JOIN KEY).
+export const REVERT_OUTCOME_REASON_PREFIX = "Recorded by rollback-on-red (SES-287):";
+
+function assertRevertOutcome(fnName, outcome) {
+  if (!REVERT_OUTCOME_VALUES.includes(outcome)) {
+    throw new Error(
+      `${fnName}: outcome '${outcome}' is not one a cycle can report (admitted: ` +
+        `${REVERT_OUTCOME_VALUES.join(", ")}). A revert ran behind the push gates or it did not; ` +
+        "anything else is a guess about dev being written down as a fact about dev."
+    );
+  }
+}
+
+// The plan's sha range, for the prose. Absent rather than invented: a settle call whose card carries
+// no readable plan says so, which is recoverable, where a made-up range is not.
+function revertRangeOf(decision) {
+  const from = decision?.revertPlan?.from ?? null;
+  const to = decision?.revertPlan?.to ?? null;
+  return from && to ? `${from}..${to}` : "(the plan's sha range was not recorded on the card)";
+}
+
+// The short sha the card was filed under, read back off display_ref -- which buildIncidentCard()
+// composes as `SES-182 incident - <trigger> on <shortSha>`. Used only when the settle call did not
+// pass --sha, and a miss renders "(unknown sha)" rather than a blank.
+function cardShortSha(card) {
+  const hit = /\bon ([0-9a-f]{4,40})\b/i.exec(String(card?.display_ref ?? ""));
+  return hit ? hit[1] : "(unknown sha)";
+}
+
+// SES-287 slice 2. The `rpc/record_decision` body for the outcome of a planned revert. PURE, and it
+// throws on a missing cycle id for exactly rollbackDecisionArgs()'s reason: `record_decision()`
+// RAISES unless exactly one of cycle_id / session_name is set (`ck_decision_attribution`), and
+// refusing here stops the caller BEFORE the first write of the sequence instead of surfacing a
+// constraint name. An unattributed decision is a value with nobody behind it.
+//
+// `p_backlog_id` and `p_ladder_work_class` are both NULL, and that is not tidiness: an incident is
+// not a board ticket (SES-116) and recording what a cycle already did moves no rung. Those two NULLs
+// are half of what keeps this inside the ledger-writer boundary the header claims.
+export function revertOutcomeDecisionArgs(decision, ctx = {}) {
+  const { cycleId = null, trigger = "ci-red", headSha = null, outcome = null, reason = null } = ctx;
+  if (!cycleId) {
+    throw new Error(
+      "revertOutcomeDecisionArgs: cycleId is required -- record_decision() raises unless exactly one " +
+        "of cycle_id / session_name is set (ck_decision_attribution), and an unattended cycle sets the cycle."
+    );
+  }
+  assertRevertOutcome("revertOutcomeDecisionArgs", outcome);
+
+  const ran = outcome === REVERT_OUTCOMES.EXECUTED;
+  const shortSha = headSha
+    ? String(headSha).slice(0, 7)
+    : String(decision?.revertPlan?.to ?? decision?.attribution?.sha ?? "").slice(0, 7) || "(unknown sha)";
+  const range = revertRangeOf(decision);
+
+  return {
+    p_cycle_id: cycleId,
+    p_session_name: null,
+    p_kind: ROLLBACK_DECISION_KIND,
+    p_backlog_id: null,
+    p_summary: ran
+      ? `Auto-rollback executed: ${trigger} on ${shortSha} -- the planned revert of ${range} was run by the cycle`
+      : `Auto-rollback declined: ${trigger} on ${shortSha} -- the planned revert of ${range} was NOT run`,
+    p_reasoning:
+      `${decision?.reason ?? "(no reason recorded)"} The plan covered ${range}; the cycle ` +
+      `${ran ? "EXECUTED it behind its own push gates" : "DECLINED it and left dev exactly as it was"} ` +
+      `and reported the outcome back. This record IS that outcome and carries the 72-hour reversal ` +
+      `handle (M6-02); no rung moves (ladder_work_class NULL).` +
+      `${reason ? ` Cycle's stated reason: ${reason}` : ""} pattern:0`,
+    p_ladder_work_class: null,
+  };
+}
+
+// SES-287 slice 2. A COPY of the card, settled. Pure and non-mutating, for stampCardOnly()'s reason:
+// the caller keeps the undecided card it built, so a guard can hold the two side by side and prove
+// the stamp is what changed.
+//
+// IT REWRITES THE THREE TENSE-BEARING FIELDS AND NOTHING ELSE. title, before_after and plain_after
+// are the three places slice 1 had to write "PLANNED" because no branch was allowed to speak in the
+// past tense yet. Now that the cycle reports back, this is the one place that may -- and it says
+// which outcome happened in words, because the enum below cannot (both outcomes file 'retired').
+// value_case, qa_evidence and the revert plan on the card are LEFT ALONE: they record what was
+// decided and proposed at filing time, which the outcome does not change.
+export function stampRevertOutcome(card, decisionId, outcome, ctx = {}) {
+  if (!decisionId) {
+    throw new Error(
+      "stampRevertOutcome: a decision id is required -- filing 'retired' with no decision row behind " +
+        "it is the SES-373 defect wearing a value rather than closing it."
+    );
+  }
+  assertRevertOutcome("stampRevertOutcome", outcome);
+
+  const { trigger = "ci-red", headSha = null, reason = null, now = new Date() } = ctx;
+  const ran = outcome === REVERT_OUTCOMES.EXECUTED;
+  const shortSha = headSha ? String(headSha).slice(0, 7) : cardShortSha(card);
+
+  return {
+    ...card,
+    decision: REVERT_OUTCOME_DECISION,
+    decision_reason:
+      `${REVERT_OUTCOME_REASON_PREFIX} the cycle ${ran ? "ran" : "did not run"} the revert this card ` +
+      `proposed, and reported it back. Decision ${decisionId} (runner_decisions, kind ` +
+      `${ROLLBACK_DECISION_KIND}) is its record and its 72-hour reversal handle; nothing waits on a ` +
+      `human (M6-01). '${REVERT_OUTCOME_DECISION}' = withdrawn as an ask (SES-300) and it is filed for ` +
+      `BOTH outcomes -- never 'accept', which is the value trg_runner_items_accept_clears_flag keys on ` +
+      `and reads as an approval nobody gave. Which outcome it was is in the title above.` +
+      `${reason ? ` Cycle's stated reason: ${reason}` : ""}`,
+    decided_at: now.toISOString(),
+    title: ran
+      ? `Auto-rollback: ${trigger} on ${shortSha} was reverted to the last green state -- the cycle ran the revert`
+      : `Auto-rollback: ${trigger} on ${shortSha} was NOT reverted -- the cycle declined the revert, and dev still serves ${shortSha}`,
+    before_after: ran
+      ? `Before and after: dev served ${shortSha}; the cycle ran the revert behind its push gates and dev now ` +
+        `serves the revert-forward commit that undoes it. Nothing was rewritten, so every existing checkout stays valid.`
+      : `Before and after: dev still serves ${shortSha}. The revert was never run -- the cycle declined it behind ` +
+        `its push gates -- so nothing about dev changed, and the reason above is the whole of the record.`,
+    plain_after: ran
+      ? "I put dev back to the last state that passed, by adding a change that undoes the bad one rather than erasing anything."
+      : "I worked out exactly how to put dev back to the last state that passed, and then decided not to run it. Dev is " +
+        "exactly where it was, and this card is the record of that call.",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Supabase REST -- the impure half
 // ---------------------------------------------------------------------------
@@ -887,10 +1054,29 @@ export async function fileIncidentCard(base, key, card, decisionId = null) {
 const ARGV = process.argv.slice(2);
 const JSON_OUT = ARGV.includes("--json");
 const APPLY = ARGV.includes("--apply");
+const SETTLE = ARGV.includes("--settle");
 
 function argValue(name, fallback) {
   const hit = ARGV.find((a) => a.startsWith(`--${name}=`));
   return hit ? hit.slice(name.length + 3) : fallback;
+}
+
+// SES-287 slice 2. A settle call names a CARD, not a decision object: the decide() run that produced
+// the card happened in an earlier invocation and the cycle has been away at its push gates since.
+// This reads back the two facts the decision row needs. value_case IS decide()'s own reason (one
+// home, and SES-182's guard asserts that equality), and the sha range is read out of the
+// `--no-commit <from>..<to>` that fileIncidentCard() wrote from revertPlanFor(). That is the engine
+// reading back its OWN structured composition, not prose a cycle wrote about itself -- and a line
+// that does not match degrades to "not recorded" rather than inventing a range.
+const PLAN_RANGE_SHAPE = /--no-commit ([0-9a-f]{4,40})\.\.([0-9a-f]{4,40})/;
+
+function decisionFromCard(row) {
+  const hit = PLAN_RANGE_SHAPE.exec(String(row?.qa_evidence ?? ""));
+  return {
+    reason: row?.value_case ?? "(no reason was recorded on the card)",
+    revertPlan: hit ? { from: hit[1], to: hit[2], strategy: "revert-forward" } : null,
+    attribution: { cycleId: row?.cycle_id ?? null },
+  };
 }
 
 function fail(code, message) {
@@ -919,6 +1105,79 @@ async function main() {
   const jobsRaw = argValue("jobs", null);
   const migrationsRaw = argValue("migrations", null);
   const rangeShasRaw = argValue("range-shas", null);
+
+  // -- SES-287 slice 2: --settle. The cycle is back from its push gates with what it actually did. --
+  //
+  // It sits ABOVE the --sha requirement because a settle call needs no head sha: the card already
+  // carries the sha it was filed under, and demanding one again would invite a caller to pass a
+  // different one and quietly re-label the incident.
+  //
+  // THE ORDER IS SES-373's AND IT IS LOAD-BEARING: record the decision, image the row, then patch it.
+  // A decision that will not record ends the call at exit 2 with the card untouched -- a stamped card
+  // with no decision row behind it is the SES-373 defect wearing a value. The before-image sits
+  // between them for §19v's reason: no before-image logged -> the write does not happen, and
+  // reverse_decision() addresses the row by the pk this image names.
+  if (SETTLE) {
+    const cardId = argValue("card-id", null);
+    const outcome = argValue("outcome", null);
+    const settleReason = argValue("reason", null);
+
+    if (!cardId) fail(2, "--settle requires --card-id=<uuid>: the incident card whose outcome is being recorded.");
+    if (!cycleId) {
+      fail(2, "--settle requires --cycle-id=<uuid> -- record_decision() raises unless exactly one of " +
+        "cycle_id / session_name is set (ck_decision_attribution), and it stamps the before-image too.");
+    }
+    if (!REVERT_OUTCOME_VALUES.includes(outcome)) {
+      fail(2, `--outcome must be one of ${REVERT_OUTCOME_VALUES.join(" | ")}; got ` +
+        `${outcome === null ? "(omitted)" : `'${outcome}'`}. A revert ran behind the push gates or it did not.`);
+    }
+
+    const read = await rest(base, key, `runner_items?id=eq.${encodeURIComponent(cardId)}&select=*`);
+    if (read.error) fail(2, `could not read incident card ${cardId}: ${read.error}`);
+    const row = Array.isArray(read.rows) ? read.rows[0] : null;
+    if (!row) fail(2, `no runner_items row with id ${cardId} -- refusing to settle a card that does not exist.`);
+    if (row.decision) {
+      fail(2, `card ${cardId} already carries decision '${row.decision}' -- refusing to overwrite a settled ` +
+        "outcome, which would orphan the first decision's before-image and leave the restore path pointing " +
+        "at a state that is no longer the prior one.");
+    }
+
+    const settled = decisionFromCard(row);
+    const dec = await recordRollbackDecision(
+      base,
+      key,
+      revertOutcomeDecisionArgs(settled, { cycleId, version, trigger, headSha, outcome, reason: settleReason })
+    );
+    if (dec.error) {
+      fail(2, "the revert outcome could not be recorded, so the card was left exactly as it was (a stamped " +
+        "card with no decision row behind it is the SES-373 defect wearing a value, not a lesser evil): " + dec.error);
+    }
+
+    const img = await insertBeforeImage(base, key, cycleId, "runner_items", cardId, dec.id);
+    if (img.error) fail(2, img.error);
+
+    const stamped = stampRevertOutcome(row, dec.id, outcome, { trigger, headSha, reason: settleReason });
+    const patched = await rest(base, key, `runner_items?id=eq.${encodeURIComponent(cardId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        decision: stamped.decision,
+        decision_reason: stamped.decision_reason,
+        decided_at: stamped.decided_at,
+        title: stamped.title,
+        before_after: stamped.before_after,
+        plain_after: stamped.plain_after,
+      }),
+    });
+    if (patched.error) fail(2, `the card patch failed after decision ${dec.id} was already recorded: ${patched.error}`);
+
+    finish(
+      0,
+      { settled: true, cardId, decisionId: dec.id, outcome, card: stamped },
+      `settled ${outcome}: card ${cardId}\n${stamped.title}\n` +
+        `decision ${dec.id} (runner_decisions, kind ${ROLLBACK_DECISION_KIND}; reversible for 72h)`
+    );
+  }
 
   if (!headSha) fail(2, "--sha=<head sha> is required.");
   let jobs;
