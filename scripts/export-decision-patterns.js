@@ -258,6 +258,24 @@ export function auditNumbering(rows) {
   for (let i = 1; i <= nums.length; i++) {
     if (!seen.has(i)) problems.push(`criterion ${i} is missing — the numbering must be contiguous 1..${nums.length}`);
   }
+  // ROLE COVERAGE, and it is a DIFFERENT question from the per-row validity above: every loop so far
+  // grades one row in isolation, so an md in which a whole role is named by NOBODY passes all of them.
+  // That is not hypothetical — it is what shipped. MEASURED on the live md at `v7.0.515`: `auditor`
+  // was named explicitly by 0 of 171 criteria, because the only rows that could have carried it sat in
+  // sections whose default was the coarse `all`. A per-role assembly built on that filter hands The
+  // Auditor only criteria that name no role at all, so the filter cannot discriminate — the capability
+  // reads as working while selecting nothing. `all` is exempt: it is the tag's ABSENCE spelled out, so
+  // a file in which every row is explicit and none says `all` is correct, not a defect. Reported BY
+  // NAME rather than as a count, because "some role is uncovered" does not tell an editor which
+  // section to go tag.
+  const named = new Set();
+  for (const r of rows) for (const role of (Array.isArray(r.applies_to) ? r.applies_to : [])) named.add(role);
+  for (const role of ROLES) {
+    if (role === "all") continue;
+    if (!named.has(role)) {
+      problems.push(`role "${role}" is named explicitly by no criterion — every role in ROLES except \`all\` must be the explicit tag of at least one row, or a per-role read of this file selects nothing for it`);
+    }
+  }
   return problems;
 }
 

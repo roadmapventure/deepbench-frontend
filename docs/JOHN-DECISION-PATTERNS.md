@@ -1,3 +1,18 @@
+<!-- DeepBench v7.0.522 | docs/JOHN-DECISION-PATTERNS.md | SES-415 (pass 2) — the role tag stops
+     being coarse. 35 criteria gain an explicit `*Applies to:*` marker right after the imperative —
+     the seed set (1-5), Working with John (81-91, 131-134, 136, 152-157) and The record itself
+     (93-100) — so they are no longer tagged `{all}` only because their section default says so.
+     `92` (a decision's own record is the deliverable) and `135` (never ask permission for a
+     read-only query) deliberately KEEP the `all` default, as does `166`; all three
+     `*Applies to (section default):* all` lines stay in place. Auditor went from 0 explicit
+     criteria to 3 (`94`, `98`, `100` — the record-honesty judgments), which is what makes a
+     per-role filter able to discriminate at all. NO IMPERATIVE, BODY OR `*Seen in:*` IS TOUCHED:
+     the marker is stripped from `body` by `parsePatterns()`, and all 171 rows were proven
+     byte-identical on section/imperative/body/seen_in across the edit, so the quote gate's `#137`
+     residue (SES-246) cannot move. `auditNumbering()` now fails any md where a role in `ROLES`
+     other than `all` is named by no row — the check that would have caught auditor's 0. Guarded by
+     tests/regression/ses-415-role-tagged-criteria.test.mjs (ROLE COVERAGE arm). Stamp count held at
+     5 per session-hygiene check 7: `v7.0.126` moved verbatim to docs/SESSIONS.md. -->
 <!-- DeepBench v7.0.515 | docs/JOHN-DECISION-PATTERNS.md | SES-415 — mining pass 2: this week's Moat
      Support tickets become criteria 162-171 under a new section, and EVERY criterion now carries a
      ROLE TAG. The tag has one home, this file: an entry marker `*Applies to:* designer, builder.`
@@ -35,7 +50,6 @@
      tests/regression/SES-004-runner-era-criteria.js, whose negative control removes the harvest and
      requires the gate to FAIL on a runner-era criterion. -->
 <!-- DeepBench v7.0.136 | docs/JOHN-DECISION-PATTERNS.md | p1p3-now-review — criterion 137 (P1–P4 pull tests, John 2026-08-21): P2 needs hard-to-replicate uniqueness, P4 needs "I have to buy this" pull, administrative expectations classify by function; FAANG-showcase promotes to P1. Live reclass: ADM-1 → P10, LOG-126 → P5, AGT-015 → P1. -->
-<!-- DeepBench v7.0.126 | docs/JOHN-DECISION-PATTERNS.md | SES-90 — the local-archive mining pass: criteria 101–136, mined from John's own typed messages across all 186 local Claude Code sessions (2026-07-08 → 2026-08-21; 2,303 messages read in full, no sampling). Local-archive citations are quote+date durable, file-path best-effort (the archive is not in git); scripts/check-decision-pattern-quotes.js skips them by design and verifies everything in-repo. Coverage/privacy record: docs/harvests/SES-90.md. -->
 
 # John's Decision Patterns — Reference
 
@@ -45,7 +59,8 @@
 > `docs/FEATURES-ARCHIVE.md` — every recorded instance where Claude proposed one thing and John
 > decided another, or where he stated a standing rule in his own words. Criteria 101–136 were mined
 > 2026-08-21 (`SES-90`, `v7.0.126`) from the LOCAL Claude Code session archive — every message John
-> personally typed across all 186 sessions (2026-07-08 → 2026-08-21), read in full — appended at the
+> personally typed across all 186 sessions (2026-07-08 → 2026-08-21), 2,303 messages read in
+> full with no sampling; coverage and privacy record `docs/harvests/SES-90.md` — appended at the
 > end of each themed section; their `Seen in:` cites the local archive (quote + date durable). Criterion 137 was added
 > 2026-08-21 (`p1p3-now-review`, `v7.0.136`). Criteria 138–161 were mined 2026-08-29 (`SES-004`,
 > `v7.0.327`) from the **runner-era** corpus — John’s taps, directives, answered questions, card asks
@@ -83,27 +98,36 @@ on them up front.
 
 *Applies to (section default):* all.
 
-**1. Eliminate a problem; don't bound or accept it.** When Claude offers "accept the bounded/rare
+**1. Eliminate a problem; don't bound or accept it.**
+*Applies to:* designer, builder, manager.
+When Claude offers "accept the bounded/rare
 downside," John's default is to remove the downside entirely if there's a way. *Seen in:* Claude proposed
 living with bounded config-drift on history; John chose to backfill+freeze so drift is gone, not managed.
 
 **2. Data-driven over code — hardcoding is the platform's premise to remove, not a convenience to weigh.**
+*Applies to:* designer, builder.
 Prefer a data row + one generic mechanism to N special cases in code. Adding a thing should be a data
 insert, not a code deploy. *Seen in:* Claude defaulted to a per-pattern `CASE` ladder; John: "if the format
 is the same, why per-pattern code?" → one generic `signature @> criteria` match, patterns as data.
 
-**3. Stable / reproducible output beats convenient implementation.** Numbers and displays must not silently
+**3. Stable / reproducible output beats convenient implementation.**
+*Applies to:* builder, verifier.
+Numbers and displays must not silently
 change run-to-run or as internals shift. This outranks Claude's instinct to minimize storage or avoid
 "redundant" work. *Seen in:* the whole reason the AI-Audit counts had to be deterministic, and the push to
 *freeze* the signature rather than re-derive it live where drift could move it.
 
 **4. A best-practice prior is conditioned on the goal — name the contextual exception, don't apply the
-rule dogmatically.** "Don't store derived data / avoid staleness" is real, but had a genuine exception
+rule dogmatically.**
+*Applies to:* designer, builder, manager.
+"Don't store derived data / avoid staleness" is real, but had a genuine exception
 here. *Seen in:* Claude locked "runtime, not stored"; John saw that a *write-time fact snapshot* is
 consistent with facts already captured that way AND kills drift — so the rule's exception was the right
 call. When a locked prior collides with the goal, the collision is the finding, not the rule.
 
-**5. Model how work actually enters the pipeline, not just the design.** A settled piece of work needs the
+**5. Model how work actually enters the pipeline, not just the design.**
+*Applies to:* designer, manager.
+A settled piece of work needs the
 *artifact that makes it invokable* — in DeepBench, a ticket ID — created now, or it's invisible. Design the
 workflow, not only the architecture. *Seen in:* Claude proposed deferring ticket IDs; John: without an ID,
 "how does it get invoked into a session?" → claim the IDs now, kickoffs later.
@@ -812,55 +836,75 @@ according to the screen display and is not interupted."
 *Applies to (section default):* all.
 
 **81. Lead with the user-visible problem in plain language — problem, fix, expected outcome, real example;
-mechanism, file paths and status codes last.** *Seen in:* after repeated failures John said it directly —
+mechanism, file paths and status codes last.**
+*Applies to:* designer, manager.
+*Seen in:* after repeated failures John said it directly —
 "You keep failing, because you write too much technical at first and i can't follow" — and the
 use-case-first template was locked into `WORKING-WITH-JOHN.md`.
 
-**82. Present one concrete use case at a time, never bundled.** *Seen in:* the standing preference on
+**82. Present one concrete use case at a time, never bundled.**
+*Applies to:* designer, manager.
+*Seen in:* the standing preference on
 record is that "John needs proposals broken into one concrete use case at a time, never bundled"; multi-item
 UX passes are "9 items, worked one at a time per his request."
 
 **83. Agreement on a session's goal is not sign-off on the specific artifact — walk him through the
-concrete content before executing.** *Seen in:* Claude spawned `AGT-023`'s coding session immediately after
+concrete content before executing.**
+*Applies to:* designer, manager.
+*Seen in:* Claude spawned `AGT-023`'s coding session immediately after
 committing its kickoff; John interrupted, and the lesson was recorded as "general agreement on the
 session's goal is not the same as sign-off on a specific kickoff's content."
 
 **84. For any visible UI change, get explicit approval on a live mock or annotated screenshot before the
-kickoff or any code, resolving open questions one at a time.** *Seen in:* `MI-43` "Mocked two options and
+kickoff or any code, resolving open questions one at a time.**
+*Applies to:* designer.
+*Seen in:* `MI-43` "Mocked two options and
 got explicit approval before coding," and `MI-27`, `MI-31`, `MI-55` and `SH-19` all resolved live before
 code.
 
-**85. Don't gate small, reversible calls on his approval — decide and flag.** Ask-first is for canonical
+**85. Don't gate small, reversible calls on his approval — decide and flag.**
+*Applies to:* designer, builder, manager.
+Ask-first is for canonical
 terminology, shared state, and reversing his decisions; over-asking recreates the fatigue the rule exists
 to fix. *Seen in:* John raised that "design sessions have been checking in on too many small decisions
 lately" and confirmed the 3-tier default, with the deliberate asymmetry that "defaulting everything to
 Tier 3 recreates the exact fatigue this rule exists to fix."
 
 **86. Process, tooling, and hygiene mechanics are fully delegated — decide and execute on best practices.**
+*Applies to:* builder, manager.
 *Seen in:* facing ~50 standing-rule compliance gaps Claude prepared to involve him; John: "just fix it
 based on best practices, why do I need to be involved."
 
 **87. Canonical terminology is built live with John, in his own words, one term per concept — never
-solo-drafted.** *Seen in:* Claude proposed drafting the cross-reference index alone; John's condition was
+solo-drafted.**
+*Applies to:* designer.
+*Seen in:* Claude proposed drafting the cross-reference index alone; John's condition was
 direct involvement, because sessions "create their own language" and end up talking past him.
 
 **88. Never invent a name for an AI or agent technique — use the real published industry term, verified
-against the literature rather than recalled.** *Seen in:* the catalog carried invented labels
+against the literature rather than recalled.**
+*Applies to:* designer.
+*Seen in:* the catalog carried invented labels
 (`agent-delegation`, `intelligent-synthesis`, a wrong `transfer-learning`); John's standing directive names
 it a repeated frustration — "I have been fighting claude this entire time to quit making up its own
 terminology" — and his web-research ask exposed the Structural/Reasoning grouping as invented before it
 could be adopted.
 
 **89. When his wording conflicts with the verified current state, surface the discrepancy and confirm —
-never silently correct him and never blindly implement the wrong string.** *Seen in:* John's `LAV-14` ask
+never silently correct him and never blindly implement the wrong string.**
+*Applies to:* designer, manager.
+*Seen in:* John's `LAV-14` ask
 named a screen title a fresh grep proved doesn't exist; the session asked rather than guessing, since it is
 "expensive to guess wrong on a string that becomes canonical," and he confirmed he'd conflated two.
 
 **90. Implement his spec literally — an unrequested extra category, rename, or edge case is a defect, and
-his copy ships verbatim.** *Seen in:* shipped code carried a 4th "Internal (QA)" caller bucket "John never
+his copy ships verbatim.**
+*Applies to:* designer, builder.
+*Seen in:* shipped code carried a 4th "Internal (QA)" caller bucket "John never
 asked for (his own spec was exactly three: him/Claude/public)" — removed and collapsed into Public.
 
 **91. A close-out that ends in a credential or infrastructure chore written in jargon is unfinished work.**
+*Applies to:* builder, manager.
 The blocker is the session's to route around, never his to absorb. *Seen in:* `ABT-1b`'s close-out ended
 with "This needs John to add the `workflow` scope to that PAT"; he said plainly he had no idea what it
 meant and asked
@@ -870,24 +914,32 @@ piece of work" — and the next session eliminated the credential need entirely.
 ---
 
 **131. A close-out answers exactly two questions first, directly: is the ticket complete, and what
-newly-opened work is required — before any narrative.** John had to send the same recovery prompt to six
+newly-opened work is required — before any narrative.**
+*Applies to:* manager.
+John had to send the same recovery prompt to six
 sessions in one morning. *Seen in:* verbatim, repeatedly — "I am confused. Can you be straight forward with
 me. Is log-60 complete, and are there new tickets required for beta?" *(local archive
 `1ce79e25-5f52-458a-9889-97dbe45e32f7.jsonl`, 2026-07-29; near-identical prompts in five sibling sessions
 the same day)*
 
 **132. State explicitly whether each item is being fixed now or only filed as a ticket — never blur doing
-and filing.** *Seen in:* mid-close confusion — "hold on, are you fixing something, or just writing it up as
+and filing.**
+*Applies to:* designer, manager.
+*Seen in:* mid-close confusion — "hold on, are you fixing something, or just writing it up as
 a ticket to fix?… I am confused on yoru solution here." *(local archive
 `044f6d4d-c5fb-480a-9938-f0022b258ec7.jsonl`, 2026-07-27)*
 
 **133. Opening a design session on a ticket returns the ticket's full story unprompted — problem, current
-state, history — not a request for more input.** *Seen in:* the session-process review — "when i state an
+state, history — not a request for more input.**
+*Applies to:* designer.
+*Seen in:* the session-process review — "when i state an
 issue i want to design, i expect it to come back with the full story right away." *(local archive
 `567941f2-a34c-49c8-9201-29e8d50d41e1.jsonl`, 2026-07-24)*
 
 **134. Every ticket and kickoff names its model, and any prompt John must launch is handed to him
-paste-ready in chat.** *Seen in:* made standing on 2026-07-28 — "from now on, i need for each ticket, either
+paste-ready in chat.**
+*Applies to:* designer, manager.
+*Seen in:* made standing on 2026-07-28 — "from now on, i need for each ticket, either
 written in the ticket which model to use, and you tell me which model to kick off the session to use. also,
 repost the prompt here so i can copy/paste." *(local archive `0b5f157c-4c1c-41e4-8cc1-d0a6051d51ba.jsonl`,
 2026-07-28)*
@@ -897,7 +949,9 @@ repost the prompt here so i can copy/paste." *(local archive `0b5f157c-4c1c-41e4
 you to run a query to find out this data?" *(local archive `1f29550a-20a7-4792-b0c0-c70cf02cb933.jsonl`,
 2026-08-11)*
 
-**136. Every Skill change names the Skill's type and justifies the type choice.** *Seen in:* on a fix routed
+**136. Every Skill change names the Skill's type and justifies the type choice.**
+*Applies to:* designer, builder.
+*Seen in:* on a fix routed
 through a Skill edit — "each time you update a skill, i need to know the type. It seems you are giving this
 a type 'intent'? Why not 'format'?" *(local archive `027e7f3c-54eb-4ad7-b796-f5aa808332d0.jsonl`,
 2026-07-27)*
@@ -905,36 +959,48 @@ a type 'intent'? Why not 'format'?" *(local archive `027e7f3c-54eb-4ad7-b796-f5a
 ---
 
 **152. Put decisions to John as tappable options — radio yes/no or lettered choices — and reserve
-typed answers for genuinely open questions.** A paragraph that forces him to compose a reply is a
+typed answers for genuinely open questions.**
+*Applies to:* designer.
+A paragraph that forces him to compose a reply is a
 defect in the ask, and each control needs a plain statement of what choosing it does. *Seen in:*
 "create a question list for the briefing with a radio yes/no, instead of listing a full paragraph
 and i have to type out the answer."
 
 **153. Every decision surface carries a More-Info escape hatch — John must be able to question
 the issue and resolve it in place, without leaving the surface or guessing which button is
-right.** Confusion about what a control means is grounds to redesign the ask, and the resulting
+right.**
+*Applies to:* designer.
+Confusion about what a control means is grounds to redesign the ask, and the resulting
 exchange is kept as part of the record. *Seen in:* "I need to be able to ask questions about the
 issue. But would like to be able to solve them in the brief."
 
 **154. Every proposal leads with a three-part business-value statement: what can't the user do
-today, what could they do after, and how it makes the platform more valuable.** Technical
+today, what could they do after, and how it makes the platform more valuable.**
+*Applies to:* designer, manager.
+Technical
 mechanism comes only after those three land; a pitch that opens in jargon gets reworked unread.
 *Seen in:* his Rework on the A2A invention card — "I need a business value statement - what can't
 the user do today? What would they be able to do after? How does this make the platform more
 valuable?"
 
 **155. When a run dies, the notification names why it died and what to do next — a status line
-saying it stopped is not a report.** Cause plus recommended action, pushed to him, every time.
+saying it stopped is not a report.**
+*Applies to:* builder, manager.
+Cause plus recommended action, pushed to him, every time.
 *Seen in:* his answer on failed-run handling — "need to know why it died and what to do next."
 
 **156. When John says he cannot answer a question, ownership transfers — pick a cautious default,
-record it, and stop putting the question to him.** Re-asking what he has declined to decide is
+record it, and stop putting the question to him.**
+*Applies to:* designer, manager.
+Re-asking what he has declined to decide is
 the fatigue bug, not diligence. *Seen in:* his answer to the token-calibration question — "I
 don't know how to answer" — after which the runner kept the conservative figure and owned the
 reconciliation itself.
 
 **157. A remediation John words for named dates stays scoped to those dates — never generalize a
-one-time backfill into a standing rule without his separate assent.** He will answer "no" to the
+one-time backfill into a standing rule without his separate assent.**
+*Applies to:* designer, builder.
+He will answer "no" to the
 standing version and "yes" to the dated one in the same breath; implementing the standing version
 anyway reverses his decision. *Seen in:* declining the automatic morning-reading rule while
 directing the backfill — "only calculate the earliest as morning and the latest as evening cst
@@ -951,46 +1017,61 @@ checkpointed to `dev` mid-session, because he called cross-session context loss 
 for 5 days."
 
 **93. Never store a fact in a doc when a live source of truth already exists — point at the source.**
+*Applies to:* designer, builder.
 *Seen in:* Claude proposed correcting a stale version number in `CLAUDE-DESIGN.md`; John's sharper framing
 questioned why it was stored at all — "if you want to know code numbers, just go to git - not sure why you
 are storing it."
 
 **94. When live evidence contradicts a locked rule, surface the conflict and amend the locked section in
-the same session — never silently patch against it, and never silently obey it either.** *Seen in:* a
+the same session — never silently patch against it, and never silently obey it either.**
+*Applies to:* designer, auditor.
+*Seen in:* a
 locked style-guide value (5.5px subtitle) proved illegible on a real device; John's call was to revise the
 value and "amend Section 24 in the same session, not silently patch against a standing locked rule."
 
 **95. A ticket closes only when every sentence in its own text is satisfied — never discharge residue by
-refiling the ticket's own acceptance criterion under a new number.** *Seen in:* Claude closed `AGT-36`
+refiling the ticket's own acceptance criterion under a new number.**
+*Applies to:* manager, verifier.
+*Seen in:* Claude closed `AGT-36`
 while filing four new tickets, one of which restated `AGT-36`'s own criterion; John — "you think we are
 done with agt-36, but you created 4 more tickets required for beta?" — reopened it, producing the standing
 test: "does closing the parent leave a sentence in *its own* row unsatisfied?"
 
 **96. When a gap surfaces outside the session's scope, log it with its own ID rather than patching inline
-or blocking close-out.** *Seen in:* a Node test failure traced to a harness bug in an out-of-scope file and
+or blocking close-out.**
+*Applies to:* designer, builder, manager.
+*Seen in:* a Node test failure traced to a harness bug in an out-of-scope file and
 the session stopped rather than patching; two attribution regressions found at QA were accepted "as known,
 logged gaps rather than block the session."
 
 **97. Restoring data the approved design already intended needs no permission; removing or altering a
-visual element does.** Calibrate the approval gate to the change class, not to the fact that a mistake was
+visual element does.**
+*Applies to:* builder, manager.
+Calibrate the approval gate to the change class, not to the fact that a mistake was
 made. *Seen in:* a session asked permission to fix its own error; John asked "why wouldn't you make that
 change?" and
 named the boundary — "Restoring data the design already intended is not an approval-gate case; removing or
 altering a visual element is."
 
 **98. Gaps in governed content go through the governed reviewer as evidence-only candidates — never
-declared exempt, hand-authored, or resolved by a bare status write.** *Seen in:* facing 17 unnamed hop
+declared exempt, hand-authored, or resolved by a bare status write.**
+*Applies to:* designer, auditor.
+*Seen in:* facing 17 unnamed hop
 shapes, John's call was to file all of them for Susan's live review; "the unnamed schema-emission hops were
 not accepted as pattern-less."
 
 **99. Assign a displayed name or classification by a structural rule over provable facts — never by an
-agent judging the hop or the model naming its own pattern.** *Seen in:* Claude quietly swapped
+agent judging the hop or the model naming its own pattern.**
+*Applies to:* designer, builder.
+*Seen in:* Claude quietly swapped
 "reasoning-derived" for "evidence-derived" and closed the question without asking; put to John directly, he
 settled that a hop's name comes from a Layer B rule — "never by an agent judging the hop and never by the
 model naming its own pattern."
 
 **100. Curate showcase content from measured run data, and label a deliberately-kept failing case as the
-demo it is.** *Seen in:* John chose the console's questions by measured movement and reliability — the
+demo it is.**
+*Applies to:* designer, auditor.
+*Seen in:* John chose the console's questions by measured movement and reliability — the
 "LAV screen offers only the 3 highest-movement questions" — and in `LAV-11` kept the 0%-pass question on
 purpose as the guardrail showcase with an explicit demo-label prefix.
 
