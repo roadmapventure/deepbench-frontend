@@ -830,3 +830,65 @@ is exact: the nightly read is `:1529-1531` (not 1530-1532), the pass-two log/rec
 If the streak the brief now prints keeps climbing, the finding is about step 4e's ceremony being skipped by
 cycles, not about the Ticket Owner's code — that would be a separate ticket against the runner's step-4e
 discipline, with the streak as its evidence. Nothing to file until there are nights to point at.
+
+---
+
+## Slice 7 (v7.0.518, 2026-09-18) — the twelfth slug is admitted, so a night can land again
+
+### Premise revalidation (measured 2026-09-18 ~10:0xZ, live Supabase: `execute_sql` for catalog reads; files read in the clone at `d3b67eb`)
+
+- `AGT-79` is `partial`, `design_status` NULL, `kickoff_link` = the spent slice-6 kickoff (`v7.0.512`). Slice 5's STOP LINE holds it `partial` until a cycle runs a judged night and `ai_activity_log` carries a `ticketowner` row for a night that LANDED.
+- `pg_get_constraintdef` of `ticket_owner_findings_check_slug_check`: `CHECK ((check_slug = ANY (ARRAY['quote-missing', 'size-missing', 'cost-snapshot-missing', 'actual-unknown', 'claim-on-closed', 'claim-expired', 'verdict-missing', 'designed-closed', 'type-off-taxonomy', 'delivered-unaccepted', 'cycles-over-quote'])))` — eleven, byte-for-byte the `v7.0.474` DDL in this harvest's `## Findings DDL`. The table carries six constraints in total (pkey, cycle_id fkey, verdict check, two timestamp checks, this one).
+- `scripts/ticket-owner.js:145-152` `CHECKS` has twelve entries, `remainder-stranded` last, added by `SES-385` slice 1 (`v7.0.506`). That kickoff's §4 changed `CHECKS`, `classifyBoard`, `readBoard`, two tests and the runbook — and no migration. The gap was born there.
+- Tonight, twice: cycle `23da8dd6` (pass two at 06:48:08Z) and this cycle `779a95c6` (pass two at 09:51:01Z). In both, pass one exited 3, the `ticketowner` sub-agent answered, pass two wrote its `ai_activity_log` row FIRST (§19k, `judgePassTwo` :1072-1081) and then `applyPlan` step 4 died on `POST ticket_owner_findings` with HTTP 400 / SQLSTATE 23514 naming `ticket_owner_findings_check_slug_check`; the failing row carried `remainder-stranded`. `--nightly` alone (the unjudged fallback, runbook rule 4) died identically because the census emits the same finding either way.
+- Why the whole night dies: `applyPlan` posts the ledger inserts as ONE array (`:826-838`). PostgREST wraps a bulk insert in one statement, so one refused row refuses all 200+.
+- Ledger state: `ticket_owner_findings` 217 rows, 209 open, `max(last_seen_at)` = 2026-09-16 06:47:01Z — the last night that landed. `runner_cycles`: 5 `SCHEDULED-AGENT: audit-board` rows, newest `63fb1536` ended 2026-09-16 06:47:03Z; 0 contain ` · judged `, 0 contain ` · unjudged` (slice 6's tail has never been written because no night has reached `recordNightly` since it shipped).
+- Residue of the two failed nights, all attributable and none blocking: `ai_activity_log` holds 2 `agent_id = 'ticketowner'` rows (ids 47135, 47355; model `claude-fable-5-1`; feature `audit-board:to-audit-intent:depth0`; 0 tokens — `tokensFrom(answer)` found none). `runner_before_images` holds 428 null-row images for `table_name = 'ticket_owner_findings'` whose `pk_value` matches no finding: 210 under cycle `23da8dd6`, 218 under `779a95c6` — step 4 images the inserts before posting them, and the post failed. They carry no `decision_id`, so no reversal chain reads them.
+- One derivable-fix decision DID land tonight before the ledger died: `1545e15c` (cycle `23da8dd6`, 06:48:10Z), "2 derivable cell fix(es) on 2 row(s) — cost 2", reasoning `at rate 1`: `SES-410` and `SES-414` now carry `cost_pct_snapshot = 1`, `cost_cycles_snapshot = 1`, `cost_snapshot_rate = 1`. Arithmetic at the rate in force that minute; reversible until 2026-09-21 06:48Z.
+- `SES-418` (open, filed by cycle `23da8dd6` at step 4e) describes this exact defect and asks for a decision: widen or stop emitting, and whether the insert should stop being all-or-nothing, guarded by a test that feeds the script's slug vocabulary to the live constraint.
+
+**Verdict: alive.** The judged night the ticket is waiting on cannot land through an eleven-slug constraint; nothing on `origin/dev` at `d3b67eb` changes that.
+
+### Governing architecture
+
+- `§19b` — the capability executor's own assembly. Untouched: `assemblePrompt`, the intent, the schema, `ingestJudgment` all stay where slice 4 put them.
+- `§19k` — log before any write. It is why both failed nights still left `ticketowner` rows: the row is written first and the abort came after. The two rows are honest: a judgment happened and its writes were refused.
+- `§19v` — the self-building platform. A cycle shipped a code vocabulary past its schema; a cycle filed the defect it hit; this cycle closes it under a migration with its down captured.
+- Rule #1 (`§19d`/`§19e`): no agent name enters any row this slice writes. The fixture rows carry `ZZTO-79N` and a slug.
+
+### The decision SES-418 asked for, and the alternatives it beat
+
+1. **Widen the constraint to the twelve `CHECKS` emits** (chosen). The slug is a John-named check (`SES-385`, John 2026-09-15 "go") with its own regression file; the constraint's job is to refuse a slug the CODE does not know, not to veto a check the code shipped. Same constraint name so nothing that quotes the error message changes; same order as `CHECKS` so the two lists diff cleanly.
+2. Stop emitting `remainder-stranded` — rejected: it deletes a shipped, tested check to fit a stale CHECK list, and `ses-385-remainder-stranded.test.mjs` would go red by design.
+3. Drop the CHECK constraint entirely — rejected: it removes the only schema-side guard that caught this drift at all. A wrong slug would then land silently and the brief would print it as a check nobody wrote.
+4. Make the insert per-row so one bad slug cannot discard the night — rejected. A night is one unit by slice 4's own rule ("there is no partial night"); a ledger written in part produces `notes` counts that disagree with the rows, and `recordNightly` would stamp a night as landed that half-landed. The refusal is the right behaviour; the gap was that nothing tested the vocabulary against the table. Part N does.
+5. A pure guard in `planWrites` asserting every insert's slug is in `CHECKS` — not added: it cannot see the table and would not have caught this (the slug IS in `CHECKS`).
+
+### Where part N goes, and why the file stays red after the ship
+
+`tests/regression/agt-79-ticket-owner.test.mjs` is one `main()`. Its live section opens at the credential gate (`:895-901`), defines `rest()` (`:904-909`), reads two counts (`:911-912`), spawns `--census` (`:914-916`) and at `:920-921` asserts `census.rate > 0.1 && census.rate < 1`. Tonight `runner_pct_per_cycle()` returns exactly `1`: the function is the median of `pct_used::numeric / cycles` over `usage_window_cycles` rows with `runner_only` and `cycles > 0`; since the week reset (Friday 01:00 CT = 06:00Z) every such window holds one cycle and a one-percent tick, so the median is 1. Earlier weeks read 0.444 and 0.714. The value is legitimate — a percent-per-cycle rate at a week's start on an integer meter — and the assertion's `< 1` is the thing that is wrong. That assertion aborts `main()`, so parts G and K-live have not run tonight and would not run a new arm placed after them. Part N therefore sits between `rest()` and `findingsBefore`, before the spawn. The file will still report the rate FAIL after this ship; the kickoff names that as a finding for the cycle to file, not a fix for the Builder, per the standing rule that a pre-existing red turning green is a finding.
+
+Baseline on the unchanged tree, `node scripts/baseline-red-set.js --tests=tests/regression/agt-79-ticket-owner.test.mjs,tests/regression/ses-385-remainder-stranded.test.mjs`: `Red set: 1 of 2` — `agt-79` RED on the rate line, `ses-385` green. Full `run-all.js`: 238/242, FAILs `agt-79-ticket-owner` (the rate), `ses-378d-manager-skill-rows` (cycle-card bytes vs `dm-knowledge-cycle-card.method`), `ses-378f-staff-watch-caller` (same card, `source_sha256`), `ses-84-claims-classed` (`unclassed.total` 4). None touch this slice's files except the first, and the first fails before this slice's arm would run only if the arm were placed after it — hence the placement.
+
+### The migration's down
+
+`capture_migration_down(p_cycle_id uuid, p_up_name text, p_objects jsonb)` returns `captured_class`; an in-place ALTER on an existing table classifies `refused` (`SES-345` harvest: refused by design, card-only rollback). The hand-written down is the same two statements with the eleven-slug list, and it is only valid after `delete from public.ticket_owner_findings where check_slug = 'remainder-stranded'` — a real cost (those findings are the census's own record) that the card must say aloud.
+
+### What this slice does not do
+
+- It does not judge a night, run `--nightly`, or write a cycle row. Running `--nightly` alone from the build would spend tonight's `already run today` slot on an UNJUDGED night and block the judged re-run the cycle can make.
+- It does not touch `scripts/ticket-owner.js`, the runbook (380,036 bytes; 964 under the `SES-336` ceiling; nothing procedural changes), the seed, the brief, or the cycle card.
+- It does not loosen `:920-921`, delete the 428 orphan images, or reverse decision `1545e15c`. All three are the cycle's to file or decide.
+- It does not write any status. `SES-418`'s disposition (same defect, resolved here) is the cycle's decision.
+
+### Model lane
+
+Declared in SESSION per `SES-359` (`kickoffLaneFinding`): `session` (the Builder, subscription); `executor none`, $0 -- the first draft carried no `Lanes:` line and `--check-kickoff` refused it. `runner_model_lanes` read live: orchestrator `claude-opus-5`, mechanical `claude-sonnet-5`, judgment `claude-fable-5-1`. The work is an exact ALTER and an exact fixture arm with every string given, so the mechanical lane builds it; the judged night's one call stays on the judgment lane inside the cycle's `ticketowner` sub-agent.
+
+### Residue for the orchestrator (not the build's)
+
+1. File: `agt-79-ticket-owner.test.mjs:920` asserts `census.rate < 1`; `runner_pct_per_cycle()` reads exactly 1 since the 2026-09-18 06:00Z week reset (one-cycle `runner_only` windows on an integer-percent meter). The bound encodes an assumption the meter does not keep. Evidence above.
+2. File or sweep: 428 null-row `runner_before_images` rows (`table_name = 'ticket_owner_findings'`, no `decision_id`) under cycles `23da8dd6` and `779a95c6` image findings that were never inserted. Harmless to reversal; noise in any image census.
+3. Decide: decision `1545e15c` stamped `SES-410` and `SES-414` at rate 1. Arithmetic at the rate in force; whether a week-start rate should stamp closed rows is a `runner_pct_per_cycle()` question, not the Ticket Owner's.
+4. After this ship, re-run step 4e in this cycle with the Agent tool; if it lands judged, `AGT-79` is `delivered` and slice 5's condition is finally met by measurement, not by assertion.
+
