@@ -129,7 +129,7 @@ export const NOTES = {
   "5":        { outcome: "the queue's first admitted row is the pick; ONE item; rename at the pick", block: 1 },
   "5a":       { outcome: "write files N (+k) / tasks M (+k) into notes; step 7 grades the ship on them", block: 1 },
   "6":        { outcome: "premise holds → revalidated_at = now() and build; dead → removal proposed", block: 1 },
-  "7":        { outcome: "assemble build-ticket, never hand-build the prompt; ONE ship point", block: 1 },
+  "7":        { outcome: "assemble build-ticket, never hand-build; ONE ship point; settle-ship.js writes the status", block: 1 },
   "7b":       { outcome: "every judgment write is a decision row with a handle and a reversal window", block: 2 },
   "8":        { outcome: "your own ship broke dev → revert-forward, restore before-images, 'reverted'", block: 0 },
   "8a":       { outcome: "re-run 4a with the post-push sha; the engine classifies, never you by hand", block: 0 },
