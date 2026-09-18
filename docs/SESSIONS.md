@@ -14387,3 +14387,24 @@ invisible to John, who does not read the ledger. §10 of the briefing is what it
   standing daily max of **40M** against John's **196M**, and a standing drain of
   **M2, 3 of 10 open** when the live drain is **M5, 11 of 11**. Every session reads that block at
   start. This is `SES-177` (b)'s own defect class reproduced inside the file that shipped to kill it.
+
+
+## Appendix — retired `docs/JOHN-DECISION-PATTERNS.md` header stamps (opened by `SES-415`, v7.0.515, 2026-09-18)
+
+`docs/JOHN-DECISION-PATTERNS.md` reached the session-hygiene check-7 cap of five header stamps at this
+ship, so this appendix opens here. The stamp below is preserved **verbatim**; it is in git history too,
+but git history is not where anyone looks.
+
+<!-- DeepBench v7.0.110 | docs/JOHN-DECISION-PATTERNS.md | SES-79 — the full mining pass: the seed set of 5 criteria (one session, `design-log-38-0724`) grows to 100, mined from ~3 months of docs/SESSIONS.md + docs/FEATURES-ARCHIVE.md. Every "Seen in" is a real recorded exchange; every one was grepped back against its source before landing. -->
+
+**Retired by `SES-415` (`v7.0.515`, 2026-09-18) to hold the stamp count at 5 — session-hygiene check 7.**
+`SES-164` step 2 was run FIRST by grep rather than from recollection, and found **nothing to relocate**:
+every fact this stamp carries is already restated in the live file's own header blockquote — the
+`SES-79` mining pass, its `v7.0.110` version, the seed set of 5 growing to 100, and the
+`docs/SESSIONS.md` + `docs/FEATURES-ARCHIVE.md` corpus it was mined from. Its one editor-facing clause
+(*"every one was grepped back against its source before landing"*) is the contract
+`scripts/check-decision-pattern-quotes.js` now enforces executably and the file's own footer states in
+prose, so it survives in two places that are read. Body otherwise untouched by the rotation: this ship's
+only other edits to that file are the new `v7.0.515` stamp, the ten `*Applies to (section default):*`
+lines under the existing `## ` headings, the new section carrying criteria 162-171, and the footer's
+role-tag paragraph — no criterion 1-161's text is changed.

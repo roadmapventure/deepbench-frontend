@@ -53,6 +53,15 @@ const GATE = path.join(REPO, "scripts", "check-decision-pattern-quotes.js");
 // The first runner-era criterion. 1..137 predate this pass (SES-79 v7.0.110, SES-90 v7.0.126,
 // criterion 137 from p1p3-now-review v7.0.136); this pass appends from 138.
 const FIRST_RUNNER_ERA = 138;
+// The LAST one. Criteria 162+ are a DIFFERENT pass with a DIFFERENT corpus (SES-415, v7.0.515,
+// grounded in docs/harvests/SES-415.md and guarded by tests/regression/ses-415-role-tagged-criteria.test.mjs).
+// Clauses 3 and 4 below are scoped to 138..161 for that reason and not out of caution: clause 3
+// would demand SES-004.md cover a criterion mined from another week's tickets, and clause 4 would
+// make this file the owner of a later pass's grounding -- two tests answering for one criterion, so
+// a real miss on 162+ would be reported twice and a fix would have to land in both.
+const LAST_RUNNER_ERA = 161;
+/** The 138..161 window this file, and only this file, answers for. */
+const isRunnerEra = n => n >= FIRST_RUNNER_ERA && n <= LAST_RUNNER_ERA;
 // Mirrors scripts/check-decision-pattern-quotes.js's own MIN_QUOTE_LEN. Asserted equal to the
 // gate's literal below, so the two cannot drift apart silently.
 const MIN_QUOTE_LEN = 8;
@@ -173,7 +182,9 @@ function harvestCoversEveryRunnerEraEntry() {
   assert.ok(fs.existsSync(HARVEST), "docs/harvests/SES-004.md is missing -- the quotes have no in-repo corpus");
   const harvest = fs.readFileSync(HARVEST, "utf8");
   const map = entries(readDoc());
-  for (const n of [...map.keys()].filter((k) => k >= FIRST_RUNNER_ERA)) {
+  const covered = [...map.keys()].filter(isRunnerEra);
+  assert.ok(covered.length > 0, `no criterion in ${FIRST_RUNNER_ERA}..${LAST_RUNNER_ERA} found -- the window this clause grades is empty`);
+  for (const n of covered) {
     assert.ok(
       new RegExp(`(^|[^0-9])${n}([^0-9]|$)`, "m").test(harvest),
       `criterion ${n} has no provenance entry in docs/harvests/SES-004.md`,
@@ -208,11 +219,11 @@ function missedCriteria(res) {
 
 function noRunnerEraQuoteIsUngrounded() {
   const res = runGate(REPO);
-  const runnerEraMisses = [...new Set(missedCriteria(res).filter((n) => n >= FIRST_RUNNER_ERA))];
+  const runnerEraMisses = [...new Set(missedCriteria(res).filter(isRunnerEra))];
   assert.deepStrictEqual(
     runnerEraMisses,
     [],
-    `the ship gate cannot ground these runner-era quotes: ${runnerEraMisses.join(", ")}\n${res.stdout}\n${res.stderr}`,
+    `the ship gate cannot ground these runner-era (${FIRST_RUNNER_ERA}..${LAST_RUNNER_ERA}) quotes: ${runnerEraMisses.join(", ")}\n${res.stdout}\n${res.stderr}`,
   );
 }
 

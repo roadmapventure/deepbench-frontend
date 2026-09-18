@@ -12,7 +12,7 @@
 //
 // APPEND-ONLY, AND THE TABLE ENFORCES IT. Numbers are cited across the repo, so `pattern_no`,
 // `section` and `imperative` are immutable on an existing row (the ses004_decision_patterns trigger
-// raises). Only `body`, `seen_in` and `source_version` are upserted — which is exactly what
+// raises). Only `body`, `seen_in`, `source_version` and `applies_to` are upserted — which is exactly what
 // --check treats as REPAIRABLE drift; a section or imperative that moved is drift this script
 // reports and REFUSES to paper over, because papering over it would mean renumbering by stealth.
 //
@@ -21,6 +21,15 @@
 // the two trees and across a re-wrap. Collapsing every whitespace run to one space makes the stored
 // text — and therefore --check — immune to both. (Same class of bug as the CRLF false-green in
 // scripts/render-rule-blocks.js, SES-313.)
+//
+// THE ROLE TAG (SES-415, v7.0.515). Each criterion also carries `applies_to` — the agent roles that
+// must apply it — and the tag's ONE HOME is the md, exactly like every other field: an entry marker
+// `*Applies to:* designer, builder.` right after the imperative, or a `*Applies to (section
+// default):* manager.` line under a `## ` heading for every entry of that section that carries no
+// marker of its own. Precedence is marker, then section default, then `{all}`. A SECTION_ROLES
+// constant in this file would have been a second home for a fact the md can state on one line.
+// `applies_to` is MUTABLE (the append-only trigger guards pattern_no/section/imperative only), so a
+// later pass can retag a criterion without renumbering anything.
 //
 // Usage:
 //   node scripts/export-decision-patterns.js            # upsert every criterion (needs creds)
@@ -41,12 +50,38 @@ export const DOC_REL = "docs/JOHN-DECISION-PATTERNS.md";
 // nothing. It is deliberately absent from the md, so --check must not read it as an extra row.
 export const RESERVED_PATTERN_NO = 0;
 
-/** The three columns an existing row may legally change. Everything else is the citable identity. */
-export const MUTABLE_COLUMNS = ["body", "seen_in", "source_version"];
+/** The role slugs `applies_to` may contain. Mirrors the table's own CHECK constraint
+ * (decision_patterns_applies_to_roles); a role outside this list is a defect auditNumbering()
+ * reports BEFORE the write, so the md never reaches a constraint violation. */
+export const ROLES = ["designer", "builder", "manager", "verifier", "auditor", "all"];
+
+/** The columns an existing row may legally change. Everything else is the citable identity. */
+export const MUTABLE_COLUMNS = ["body", "seen_in", "source_version", "applies_to"];
 
 /** CRLF-proof, wrap-proof normalisation. Applied to every stored field. */
 export function norm(s) {
   return String(s == null ? "" : s).replace(/\r\n?/g, "\n").replace(/\s+/g, " ").trim();
+}
+
+/** A role list as the md writes it ("designer, builder.") -> a sorted, deduped, lowercased array. */
+export function parseRoles(list) {
+  return [...new Set(
+    String(list == null ? "" : list)
+      .split(/[,;]/)
+      .map(s => norm(s).toLowerCase().replace(/^[\s.*`]+|[\s.*`]+$/g, ""))
+      .filter(Boolean),
+  )].sort();
+}
+
+/**
+ * Field-aware normalisation for the comparison. `applies_to` is an ARRAY, and the order PostgREST
+ * returns it in is the order it was written, not a sort — so comparing it as a string would report
+ * permanent drift on a row whose roles are the same set in a different order. Sorted, deduped and
+ * joined on both sides; every other field is the plain whitespace collapse.
+ */
+export function fieldValue(field, v) {
+  if (field === "applies_to") return norm(parseRoles(Array.isArray(v) ? v.join(",") : v).join(","));
+  return norm(v);
 }
 
 /**
@@ -84,6 +119,17 @@ export function parsePatterns(md) {
     return name;
   };
 
+  // The SECTION DEFAULT, one line under a `## ` heading: `*Applies to (section default):* manager.`
+  // It is attributed to the nearest heading above it exactly as an entry is, so the map has one key
+  // per section name and the md stays the only home of the tag.
+  const sectionDefaults = new Map();
+  const defaultRe = /\*Applies\s+to\s*\(section\s+default\):\*([^\n]*)/g;
+  let d;
+  while ((d = defaultRe.exec(doc)) !== null) {
+    const name = sectionAt(d.index);
+    if (name) sectionDefaults.set(name, parseRoles(d[1]));
+  }
+
   const rows = [];
   const parts = doc.split(/^(?=\*\*\d+\.\s)/m);
   let cursor = 0;
@@ -101,7 +147,18 @@ export function parsePatterns(md) {
     if (!bold) continue;
     const pattern_no = Number(bold[1]);
     const imperative = norm(bold[2]);
-    const rest = text.slice(bold[0].length);
+    const section = sectionAt(pos);
+    let rest = text.slice(bold[0].length);
+
+    // THE ENTRY MARKER, and it is STRIPPED from `rest` before the body is taken: the tag is a column,
+    // so leaving it in the prose would store the same fact twice and make every existing row's body
+    // drift the day its section gained a default. `\*Applies\s+to:\*` cannot match the section-default
+    // line — that one reads `Applies to (section default):`, so the colon does not follow `to`.
+    const marker = /\*Applies\s+to:\*([^\n]*)/.exec(rest);
+    const applies_to = marker
+      ? parseRoles(marker[1])
+      : (sectionDefaults.get(section) || ["all"]).slice();
+    if (marker) rest = rest.slice(0, marker.index) + rest.slice(marker.index + marker[0].length);
 
     // `*Seen in:*` hard-wraps in this file (found live on entry #112 by the quote gate), so the
     // marker is matched across the break rather than as a literal.
@@ -113,11 +170,12 @@ export function parsePatterns(md) {
 
     rows.push({
       pattern_no,
-      section: sectionAt(pos),
+      section,
       imperative,
       body,
       seen_in,
       source_version: version,
+      applies_to,
     });
   }
   rows.sort((a, b) => a.pattern_no - b.pattern_no);
@@ -144,13 +202,13 @@ export function compareRows(mdRows, liveRows) {
     const l = live.get(m.pattern_no);
     if (!l) { drift.push({ kind: "missing", pattern_no: m.pattern_no, field: null }); continue; }
     for (const f of ["section", "imperative"]) {
-      if (norm(m[f]) !== norm(l[f])) {
-        drift.push({ kind: "immutable", pattern_no: m.pattern_no, field: f, md: norm(m[f]), live: norm(l[f]) });
+      if (fieldValue(f, m[f]) !== fieldValue(f, l[f])) {
+        drift.push({ kind: "immutable", pattern_no: m.pattern_no, field: f, md: fieldValue(f, m[f]), live: fieldValue(f, l[f]) });
       }
     }
     for (const f of MUTABLE_COLUMNS) {
-      if (norm(m[f]) !== norm(l[f])) {
-        drift.push({ kind: "mutable", pattern_no: m.pattern_no, field: f, md: norm(m[f]), live: norm(l[f]) });
+      if (fieldValue(f, m[f]) !== fieldValue(f, l[f])) {
+        drift.push({ kind: "mutable", pattern_no: m.pattern_no, field: f, md: fieldValue(f, m[f]), live: fieldValue(f, l[f]) });
       }
     }
   }
@@ -177,6 +235,19 @@ export function auditNumbering(rows) {
     seen.add(r.pattern_no);
     if (!r.section) problems.push(`criterion ${r.pattern_no} sits under no "## " section heading`);
     if (!r.imperative) problems.push(`criterion ${r.pattern_no} has an empty imperative`);
+    // THE ROLE TAG IS CHECKED HERE RATHER THAN AT THE CONSTRAINT, and the difference matters: the
+    // table's CHECK would reject the whole upsert with a 400 naming no criterion, while this reports
+    // the number and the role before a byte is written. An empty list is a defect too — the tag's
+    // absence is spelled `all`, never an empty array.
+    const roles = Array.isArray(r.applies_to) ? r.applies_to : [];
+    if (roles.length === 0) {
+      problems.push(`criterion ${r.pattern_no} has an empty \`applies_to\` list — write \`all\` rather than nothing`);
+    }
+    for (const role of roles) {
+      if (!ROLES.includes(role)) {
+        problems.push(`criterion ${r.pattern_no} names an unknown role "${role}" — allowed: ${ROLES.join(", ")}`);
+      }
+    }
     // AN EMPTY BODY IS NOT A DEFECT, and asserting otherwise was this parser's first bug: MEASURED on
     // the live md rather than assumed, 98 of the 161 criteria are an imperative followed straight by
     // `*Seen in:*` with no elaboration at all (#8 is the shape). The body column is the ELABORATION,
@@ -221,7 +292,7 @@ async function rest(url, key, pathAndQuery, init = {}) {
 
 export async function fetchLive(url, key) {
   const rows = await rest(url, key,
-    "decision_patterns?select=pattern_no,section,imperative,body,seen_in,source_version&order=pattern_no&limit=5000");
+    "decision_patterns?select=pattern_no,section,imperative,body,seen_in,source_version,applies_to&order=pattern_no&limit=5000");
   if (!Array.isArray(rows)) die("decision_patterns did not return an array");
   return rows;
 }

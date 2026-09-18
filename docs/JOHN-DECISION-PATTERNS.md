@@ -1,3 +1,16 @@
+<!-- DeepBench v7.0.515 | docs/JOHN-DECISION-PATTERNS.md | SES-415 — mining pass 2: this week's Moat
+     Support tickets become criteria 162-171 under a new section, and EVERY criterion now carries a
+     ROLE TAG. The tag has one home, this file: an entry marker `*Applies to:* designer, builder.`
+     right after the imperative, or a `*Applies to (section default):*` line under a `## ` heading
+     for the entries of that section that carry no marker. `scripts/export-decision-patterns.js`
+     parses both and writes `decision_patterns.applies_to` (migration `ses415_applies_to`, a text[]
+     with a CHECK over designer/builder/manager/verifier/auditor/all, default `{all}`); the column is
+     MUTABLE, so a later pass retags without renumbering. NO CRITERION 1-161's TEXT IS TOUCHED — the
+     161 older rows are tagged by their section's default line alone, so the quote gate's residue
+     (3 ungrounded phrases on #137, SES-246) cannot move. Corpus for 162-171:
+     docs/harvests/SES-415.md, whose `## Criterion N` blocks name the Supabase row and column every
+     passage was copied from. Guarded by tests/regression/ses-415-role-tagged-criteria.test.mjs.
+     Stamp count held at 5 per session-hygiene check 7: `v7.0.110` moved verbatim to docs/SESSIONS.md. -->
 <!-- DeepBench v7.0.411 | docs/JOHN-DECISION-PATTERNS.md | SES-004 (b) — header blockquote gains one
      paragraph: the criteria are rows in `public.decision_patterns`, exported by
      `scripts/export-decision-patterns.js` (`--check` is now part of this file's ship gate alongside
@@ -23,7 +36,6 @@
      requires the gate to FAIL on a runner-era criterion. -->
 <!-- DeepBench v7.0.136 | docs/JOHN-DECISION-PATTERNS.md | p1p3-now-review — criterion 137 (P1–P4 pull tests, John 2026-08-21): P2 needs hard-to-replicate uniqueness, P4 needs "I have to buy this" pull, administrative expectations classify by function; FAANG-showcase promotes to P1. Live reclass: ADM-1 → P10, LOG-126 → P5, AGT-015 → P1. -->
 <!-- DeepBench v7.0.126 | docs/JOHN-DECISION-PATTERNS.md | SES-90 — the local-archive mining pass: criteria 101–136, mined from John's own typed messages across all 186 local Claude Code sessions (2026-07-08 → 2026-08-21; 2,303 messages read in full, no sampling). Local-archive citations are quote+date durable, file-path best-effort (the archive is not in git); scripts/check-decision-pattern-quotes.js skips them by design and verifies everything in-repo. Coverage/privacy record: docs/harvests/SES-90.md. -->
-<!-- DeepBench v7.0.110 | docs/JOHN-DECISION-PATTERNS.md | SES-79 — the full mining pass: the seed set of 5 criteria (one session, `design-log-38-0724`) grows to 100, mined from ~3 months of docs/SESSIONS.md + docs/FEATURES-ARCHIVE.md. Every "Seen in" is a real recorded exchange; every one was grepped back against its source before landing. -->
 
 # John's Decision Patterns — Reference
 
@@ -69,6 +81,8 @@ on them up front.
 
 ## The seed set (`design-log-38-0724`)
 
+*Applies to (section default):* all.
+
 **1. Eliminate a problem; don't bound or accept it.** When Claude offers "accept the bounded/rare
 downside," John's default is to remove the downside entirely if there's a way. *Seen in:* Claude proposed
 living with bounded config-drift on history; John chose to backfill+freeze so drift is gone, not managed.
@@ -97,6 +111,8 @@ workflow, not only the architecture. *Seen in:* Claude proposed deferring ticket
 ---
 
 ## Mechanism and architecture
+
+*Applies to (section default):* designer, builder.
 
 **6. No pre-wired destination anywhere — a delegation or backup decision is live, traceable, logged model
 judgment.** A fixed relationship fails the sniff test *even when stored as pure data*, and a "generic"
@@ -235,6 +251,8 @@ instead.
 
 ## Diagnosing and fixing
 
+*Applies to (section default):* builder, verifier.
+
 **22. No blind fixes — root-cause measurement comes before any fix ships.** A plausible theory is not
 enough. *Seen in:* a `max_tokens` bump shipped on theory with no A/B and measurably changed nothing; John
 made it standing — "no fix ships without root-cause measurement first, going forward" — and the real cause
@@ -307,6 +325,8 @@ original design intent?" — and the session adopted the fidelity-check rule alo
 ---
 
 ## What the platform is allowed to display
+
+*Applies to (section default):* designer.
 
 **32. Attribute a fact from what the call actually did, never from declared configuration.** A declared
 field is a propensity, not evidence that the thing fired. *Seen in:* `sendRequest()` spread a declared
@@ -405,6 +425,8 @@ check and state how i can defend if asked" — which produced an end-to-end trac
 ---
 
 ## The user's experience
+
+*Applies to (section default):* designer.
 
 **45. User-facing surfaces show real activity only — no back-office mechanics, no roadmap placeholders, no
 capture-boundary caveats.** The user screen is a product surface, not an engineering console. *Seen in:*
@@ -557,6 +579,8 @@ thread and any tickets must stay within their cards along with ticket id's it cr
 
 ## Scope, sequencing, and the backlog
 
+*Applies to (section default):* manager, designer.
+
 **64. One session works exactly one issue; everything else surfaced becomes its own backlog row.** *Seen
 in:* on the AI Audit triage John directed that "this session is `LOG-15` only, all other issues will be
 worked in a separate session"; he split `CHI-09`'s two bundled fixes and worked only the first.
@@ -702,6 +726,8 @@ researching FAANG AI job openings for the skillsets to turn into functionality.
 
 ## Testing, QA, and ship gates
 
+*Applies to (section default):* builder, verifier.
+
 **73. A regression run passes only when every case delivers its final business outcome end-to-end.**
 Harness survival, or correctly-classified failures, is not success. *Seen in:* Claude's 23-question run
 reported a clean in-range result; John rejected the definition outright — "that is not what I am expecting
@@ -782,6 +808,8 @@ seen drain run according to the rules that are displayed" and "drain must work n
 according to the screen display and is not interupted."
 
 ## Working with John
+
+*Applies to (section default):* all.
 
 **81. Lead with the user-visible problem in plain language — problem, fix, expected outcome, real example;
 mechanism, file paths and status codes last.** *Seen in:* after repeated failures John said it directly —
@@ -914,6 +942,8 @@ for 8/19-8/21."
 
 ## The record itself
 
+*Applies to (section default):* all.
+
 **92. Persist every finding and decision where a cold future session will find it — real backlog IDs and
 pushed docs, never only the current conversation.** *Seen in:* mid-session John asked "would another
 session see this?" and the honest answer was no; `LOG-23`–`27` got real IDs immediately and the work was
@@ -978,6 +1008,8 @@ heavily test in a POC of concept first" (`196574a9-e824-4618-8c65-96d0d18650b6.j
 
 ## Supervising autonomous work
 
+*Applies to (section default):* manager.
+
 *Added by the `SES-004` runner-era pass (`v7.0.327`). The runner era created a decision class the
 existing headings do not hold: John supervising an autonomous system's authority, budget and trust
 mechanics, rather than reviewing a session's work product. The four criteria below are all rulings on
@@ -1011,6 +1043,91 @@ doing this manually" — filed and ordered next in the same atomic call.
 
 ---
 
+## What this week's tickets taught the staff
+
+Mined 2026-09-18 (`SES-415`, `v7.0.515`) from the 49 tickets added to project `moat-support` after
+2026-09-11 — why each was created, why 7 were deferred and why 2 were removed. Every passage below is
+copied verbatim into `docs/harvests/SES-415.md` under a `## Criterion N` heading that names the
+Supabase row and column it came from, so the ship gate can check it and a later reader can re-fetch it.
+
+**162. A check grades the change, never the live world.**
+*Applies to:* designer, builder, verifier, manager.
+A test that reads live state declares NOT RUN when that state is absent, and a red is called the
+ship's only after it has been re-run on the unchanged tree. *Seen in:* `SES-371`, where "the 7d
+window emptied on 2026-09-10 and the assertion began failing with no code change", and `SES-404`'s
+independence method — "stash every changed path and re-run on the clean tree".
+
+**163. One change, every home, one ship.**
+*Applies to:* designer, builder.
+The kickoff lists every home of what it changes — registry and snapshot, runbook and card, function
+and test oracle, twin allowlists — and the build changes them together. *Seen in:* `SES-410`, where
+"neither says remove the stop, yet the migration header, runner-cycle.md and the ses-297 test header
+all cite him for the removal", and `SES-411`, which "deleted the weekly_pace refusal that live rule
+M5-16 names and rewrote the one test that encoded it in the same commit".
+
+**164. Know the environment (`environment-facts.md`) before designing.**
+*Applies to:* designer, builder.
+Design against `docs/runbooks/environment-facts.md`, and a build that discovers a fact appends it
+there. *Seen in:* `SES-396`, where of the nine tickets the runner filed on 2026-09-12 "six were
+environment facts no reading of the ticket or the code could show", and `SES-379`, where "the BUILDER
+owns the push, so by the time step 7a runs origin/dev IS HEAD and the changed-file list is EMPTY".
+
+**165. A budget rule is only as good as its sensor: age, source, fail closed, spend read not
+estimated.**
+*Applies to:* designer, manager.
+A gate on a number checks that number's age and source and fails closed; usage is taken from recorded
+figures, never estimated. *Seen in:* `SES-389`, where `runner_should_boot()` "kept reading 25% with
+reading_age_hours climbing to 22.4 and answered pickable 20+ times", and John on `SES-388` — "the
+meter relies on my computer being on. we need to be able to update the meter when my computer is off."
+
+**166. A John rule is never removed or weakened without his words; a degrade does not remove a stop.**
+*Applies to:* all.
+John is quoted only for what he said, and a change that weakens a live rule cites the rule and his
+words or it does not ship. *Seen in:* `SES-410`, John 2026-09-16 — "i never said remove the stop." —
+against the 09-15 words the live fix had actually cited, "just make it so it degrades with weekly
+daily averages".
+
+**167. The staff decide (fix now / later with a home / drop with evidence); John keeps money,
+production, hiring.**
+*Applies to:* manager.
+A build's finding is decided before the next pick — fixed now as that ticket's own residue, deferred
+with a scope reason and a home, or dropped with the evidence. *Seen in:* `SES-413`, where "John keeps
+only spending money, releasing to production (dev -> main), and hiring or switching on agents", and
+his own words the same day — "of course! it should have been designed by you 3 months ago, when i
+first said make this autonomous".
+
+**168. A fresh agent's reading has a byte budget (kickoff ≤ 8,192; card, not runbook).**
+*Applies to:* designer, manager.
+Reasoning goes to the harvest, and a cycle reads the card rather than the runbook. *Seen in:*
+`SES-376`, where the Builder starts fresh "so 20-45 KB of Designer reasoning is re-read per ticket
+before a line of code", and `SES-377`'s 365 KB runbook — "4-8 minutes and roughly 30-50K tokens of
+orientation per fire, paid five times today".
+
+**169. Every recorded promise is keepable (`pk_value` is the uuid; no undo promise outside
+`reversible_tables()`).**
+*Applies to:* builder, verifier.
+A before-image's `pk_value` is the row's uuid, and a table outside `reversible_tables()` gets no undo
+promise at all. *Seen in:* `SES-399`, where "a Reverse would refuse all 79 and restore nothing while
+reporting a reversal", and `SES-407`'s 418 before-images that "carry pk_value = the backlog_id TEXT
+(e.g. 'SES-403') rather than the uuid".
+
+**170. A deferral records its revisit trigger; the manager re-checks weekly and un-defers without
+asking.**
+*Applies to:* manager.
+When a trigger fires the manager un-defers the ticket itself; `LOG-150` and `SES-380` carry no trigger
+at all, which is the case this forbids. *Seen in:* `SES-369`'s defer reason — "the lane is shut on
+purpose until then. Revisit after 2026-09-18." — and `SES-382`'s, "fixture collisions under parallel
+cycles revisited after the Moat build starts".
+
+**171. A ticket is removed only with evidence or the superseding ticket named.**
+*Applies to:* manager.
+Removal is a recorded decision carrying one of the two, never a status change on its own. *Seen in:*
+`SES-358`'s removal, where "the runner re-enable pre-flight was proven live by the first unattended
+day instead of by a function", and `SES-372`'s, where "SES-373 shipped the second shape with a
+reversal handle per card".
+
+---
+
 *Format for new entries: a one-line **criterion** (imperative), then a concrete **Seen in:** instance so it
 stays grounded, not abstract. Only add a criterion that would change a *future* decision — not a one-off.
 Every `Seen in:` must be checkable against `docs/SESSIONS.md`, `docs/FEATURES-ARCHIVE.md`, or
@@ -1018,3 +1135,9 @@ Every `Seen in:` must be checkable against `docs/SESSIONS.md`, `docs/FEATURES-AR
 after any edit here). Local-archive citations (`~/.claude/projects`, the `SES-90` pass) are the one
 exception: not in git, skipped by the checker with a count, quote+date is the durable part. If you cannot
 find the text, the criterion does not go in.*
+
+*Every entry also carries a role tag: `*Applies to:* designer, builder.` on the line under the
+imperative, or — for an entry that states none — the `*Applies to (section default):*` line under its
+`## ` heading. The roles are `designer`, `builder`, `manager`, `verifier`, `auditor` and `all`;
+`scripts/export-decision-patterns.js` parses the tag into `decision_patterns.applies_to` and refuses
+to export an unknown role or an empty list.*

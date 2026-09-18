@@ -122,15 +122,18 @@ const FIXTURE_ROWS = [
     pattern_no: 1, section: "First section", imperative: "Do the narrow thing.",
     body: "Prefer the smallest change that works.",
     seen_in: "John chose one row over a new service.", source_version: "v9.9.9",
+    applies_to: ["all"],
   },
   {
     pattern_no: 2, section: "First section", imperative: "Never renumber a criterion.",
     body: "", seen_in: "the numbers are cited across the repo.", source_version: "v9.9.9",
+    applies_to: ["all"],
   },
   {
     pattern_no: 3, section: "Second section", imperative: "Collapse the wrap.",
     body: "A body that hard-wraps across two lines is still one body.",
     seen_in: "a quote that wrapped too.", source_version: "v9.9.9",
+    applies_to: ["all"],
   },
 ];
 
@@ -228,12 +231,17 @@ function theParserIsIndifferentToLineEndings() {
   assert.strictEqual(norm("a \r\n b\t\tc "), "a b c", "norm() collapses every whitespace run, including CRLF");
 }
 
+// THE FLOOR IS 161, NOT THE EXACT COUNT, and the name keeps 161 because that is the floor: the file
+// is APPEND-ONLY, so a later mining pass that adds criteria must not turn this green test red
+// (SES-415, v7.0.515, appended 162-171). What still cannot move is the floor — a count BELOW 161
+// means a criterion the repo cites by number was lost — and contiguity, which is what makes the
+// numbers addressable at all.
 function theRealFileYields161ContiguousCriteria() {
   const rows = parsePatterns(read(DOC_REL));
-  assert.strictEqual(rows.length, 161,
-    `${DOC_REL} must parse to 161 criteria (the SES-004 runner-era pass took it to 161), got ${rows.length}`);
-  assert.deepStrictEqual(rows.map(r => r.pattern_no), Array.from({ length: 161 }, (_, i) => i + 1),
-    "the numbering must be contiguous 1..161 — numbers are cited across the repo and a gap means a criterion was lost in parsing");
+  assert.ok(rows.length >= 161,
+    `${DOC_REL} must parse to AT LEAST 161 criteria (the SES-004 runner-era pass took it to 161, and the file is append-only), got ${rows.length}`);
+  assert.deepStrictEqual(rows.map(r => r.pattern_no), Array.from({ length: rows.length }, (_, i) => i + 1),
+    `the numbering must be contiguous 1..${rows.length} — numbers are cited across the repo and a gap means a criterion was lost in parsing`);
   assert.deepStrictEqual(auditNumbering(rows), [],
     "the real file must be exportable as it stands — auditNumbering() found a structural problem");
   assert.ok(rows.every(r => r.section && r.imperative),
@@ -560,8 +568,11 @@ async function rest(url, key, q) {
 }
 
 async function theLiveTableMatchesTheMdAndCarriesTheReservedRow(url, key) {
+  // `applies_to` is NAMED here for the same reason as every other column: compareRows() grades it as
+  // a mutable column (SES-415), and a select that omitted it would compare the md's roles against
+  // `undefined` and report drift on every single row.
   const live = await rest(url, key,
-    "decision_patterns?select=pattern_no,section,imperative,body,seen_in,source_version&order=pattern_no&limit=5000");
+    "decision_patterns?select=pattern_no,section,imperative,body,seen_in,source_version,applies_to&order=pattern_no&limit=5000");
   const md = parsePatterns(read(DOC_REL));
 
   assert.strictEqual(live.length, md.length + 1,
@@ -651,7 +662,7 @@ async function run(ctx = {}) {
   const key = ctx.key ?? process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "the live arm (decision_patterns holds the 161 md criteria plus the reserved row and matches the " +
+      "the live arm (decision_patterns holds every md criterion plus the reserved row and matches the " +
       "md with no drift, every join row resolves to a criterion, and john_model_signal's 30-decision " +
       "floor holds on the data)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent; run with --env-file-if-exists=.env.local or export " +
