@@ -1,3 +1,18 @@
+// DeepBench v7.0.518 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 7 -- NEW PART
+// N: THE LIVE CONSTRAINT IS IN LOCKSTEP WITH CHECKS. Slice 1 of SES-385 appended the twelfth slug
+// `remainder-stranded` to CHECKS in scripts/ticket-owner.js and never to
+// ticket_owner_findings_check_slug_check, which still admitted eleven. Closed rows on the real
+// board trip the new check, so the night's single whole-array ledger POST answered 400 / 23514 and
+// BOTH arms of step 4e died at `insert findings` -- twice in one night -- with nothing landing.
+// The migration widens the constraint; part N is what stops the drift coming back. It feeds the
+// TABLE the CODE's own vocabulary -- one array of CHECKS.length rows, `return=representation` --
+// and asserts the returned slugs sorted equal `[...CHECKS].sort()` and the count equals
+// CHECKS.length. That is the discriminator: a constraint narrower than CHECKS refuses the array
+// outright (23514, the exact live failure), and a row quietly dropped fails the count, so neither
+// half can pass on a table that has drifted. It sits after the credential gate and before
+// `findingsBefore` deliberately -- the pre-existing `rate < 1` failure at the live census aborts
+// main() further down, and an arm placed after it would never run. Cleanup is a `finally` DELETE
+// plus an asserted zero-count, never an assumed one. `countWhere` is hoisted out of part G for it.
 // DeepBench v7.0.512 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 6 -- NEW PART
 // M: THE UNJUDGED NIGHT SAYS SO. Part L pinned the runbook line that fires the judged night; it
 // fired five times, judged nothing, and nothing on the board could tell -- an arithmetic-only
@@ -908,6 +923,51 @@ async function main() {
     return body.trim() === "" ? null : JSON.parse(body);
   }
 
+  // Hoisted out of part G (it was defined at the top of the write pass): part N below needs the
+  // same exact-count read, and part G still calls it unchanged from further down the same scope.
+  async function countWhere(table, query) {
+    const res = await fetch(`${url}/rest/v1/${table}?${query}&select=id`, {
+      headers: { ...H, Prefer: "count=exact", Range: "0-0" },
+    });
+    await res.text();
+    const total = Number((res.headers.get("content-range") || "").split("/")[1]);
+    assert.ok(Number.isFinite(total), `could not count ${table}?${query}`);
+    return total;
+  }
+
+  // --- N: the lockstep arm — the LIVE constraint must admit every slug CHECKS holds -------------
+  // SES-385 appended `remainder-stranded` to CHECKS and never to the table, so the night's one
+  // whole-array ledger POST answered 400 / 23514 and no night could land. Feeding the table the
+  // code's own vocabulary is the only read that goes red the moment the two drift again: a
+  // constraint narrower than CHECKS refuses the array outright, and a row silently dropped fails
+  // the count. The cleanup is unconditional, and it is asserted rather than assumed.
+  try {
+    const nRows = [...CHECKS].map(slug => ({
+      backlog_id: "ZZTO-79N",
+      check_slug: slug,
+      verdict: "judgment",
+      detail: "AGT-79 part N lockstep fixture",
+      cycle_id: null,
+    }));
+    const nBack = await rest("ticket_owner_findings", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(nRows),
+    });
+    assert.strictEqual(nBack.length, CHECKS.length,
+      `the ledger must return all ${CHECKS.length} rows, got ${nBack.length}`);
+    assert.deepStrictEqual(nBack.map(r => r.check_slug).sort(), [...CHECKS].sort(),
+      "the live constraint must admit exactly the slugs CHECKS holds");
+    console.log(`[AGT-79] part N: the live constraint admits all ${CHECKS.length} slugs`);
+  } finally {
+    await rest("ticket_owner_findings?backlog_id=eq.ZZTO-79N", {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+    assert.strictEqual(await countWhere("ticket_owner_findings", "backlog_id=eq.ZZTO-79N"), 0,
+      "part N left fixture findings on the live ledger");
+  }
+
   const findingsBefore = await restCount(base, key, "ticket_owner_findings");
   const itemsBefore = await restCount(base, key, "backlog_items");
 
@@ -1026,16 +1086,6 @@ async function main() {
     "design_status,kickoff_link,cost_pct_snapshot,cost_cycles_snapshot,revalidated_at,filed_at,created_at," +
     "updated_at,actual_tokens_attended";
   const readFixture = () => rest(`backlog_items?backlog_id=like.ZZTO-79*&order=backlog_id&select=${PROJECTION}`);
-
-  async function countWhere(table, query) {
-    const res = await fetch(`${url}/rest/v1/${table}?${query}&select=id`, {
-      headers: { ...H, Prefer: "count=exact", Range: "0-0" },
-    });
-    await res.text();
-    const total = Number((res.headers.get("content-range") || "").split("/")[1]);
-    assert.ok(Number.isFinite(total), `could not count ${table}?${query}`);
-    return total;
-  }
 
   let passed = false;
   try {
