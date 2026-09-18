@@ -104,6 +104,10 @@ import { assemblePrompt } from "../api/prompt/db-assembly.js";
 import { renderAssembly } from "./agent-prompt.js";
 import { validateAgentVerdict } from "./verifier.js";
 import { tokensFrom } from "./rank-backlog.js";
+// SES-385 slice 3: check 12 reads the close-out's OWN decision function rather than a second copy
+// of its rules. settle-ship.js guards its CLI at :293, so importing it runs nothing and needs no
+// credentials -- the same import-safety contract as the four above.
+import { decideStatus } from "./settle-ship.js";
 
 // --- constants (exported; the regression test asserts each one) --------------------------------
 
@@ -210,6 +214,13 @@ export function classifyBoard(board, { now, rate }) {
     .filter(r => r.decided_at == null && r.kind === "gated_before_build")
     .map(r => r.backlog_id));
   const liveCycles = new Set((board.openCycles ?? []).map(r => r.id));
+  // SES-385 slice 3: each closed row's own kickoff text, read for us by readBoard() (classifyBoard
+  // is pure and never opens a file). A row with no entry, or whose link would not open, is simply
+  // absent from the map and reads as "" -- which decideStatus() answers `delivered`, so a dead link
+  // costs a finding rather than the census.
+  const kickoffText = new Map((board.kickoffs ?? [])
+    .filter(k => typeof k.text === "string")
+    .map(k => [k.backlog_id, k.text]));
   // A later decision stands in for an Accept: John ruling on the ticket after it was delivered is
   // the acceptance, whatever row carried it.
   const decisions = board.decisions ?? [];
@@ -330,23 +341,30 @@ export function classifyBoard(board, { now, rate }) {
         `ticket_matrix.actual_cycles reads ${c} against predicted_cycles ${row.predicted_cycles}.`);
     }
 
-    // 12 remainder-stranded (SES-385) -- a CLOSED row whose OWN record still names work that was
-    // never built: it closed under its own quote (actual_cycles below predicted_cycles), or an
-    // undecided `gated_before_build` card is still open against it. Both halves are structural
-    // columns, chosen over a notes regex by measurement: the regex flagged 39 of 159 closed rows,
-    // mostly on the word "remainder" in sweep prose about OTHER tickets, while the undecided gated
-    // set is 4 rows platform-wide. JUDGMENT and never derivable, with NO `fix`: whether a row that
-    // closed under its quote is finished early or stranded half-built is a reading of the ticket's
-    // story, and the census writes neither `status` nor `design_status` on any row.
+    // 12 remainder-stranded (SES-385 slice 3) -- a CLOSED row whose OWN record still names work
+    // that was never built, decided by the SAME function the close-out settles with:
+    // decideStatus() over the row's own kickoff text plus its undecided `gated_before_build` card.
+    //
+    // THE CYCLES PROXY IS GONE, deleted on a measurement rather than an argument. Slice 1's
+    // `actual_cycles < predicted_cycles` trigger filed 88 findings on the live board; running
+    // slice 2's decideStatus() over each flagged row's own kickoff answered only 5 of them real
+    // (`AGT-79`, `LOG-149`, `SES-364`, `SES-383`, `SES-396`). Of the other 83: 55 carry no
+    // `kickoff_link` at all, 27 link a kickoff that declares itself finished, and 1 (`SES-184`)
+    // links a file that is not in the tree. 86 of the 88 fired on the cycles proxy ALONE, 2 on both
+    // halves, and NONE on the card alone -- so the proxy was 94% of the noise and none of the
+    // signal. Coming in under a quote is estimate variance, not unbuilt work, and check 11
+    // (`cycles-over-quote`) already owns the other direction of that same comparison.
+    //
+    // JUDGMENT and never derivable, with NO `fix`: re-opening a stranded row is a write under one
+    // reversible decision (slice 4's), and the census writes neither `status` nor `design_status`.
     if (closed) {
-      const under = row.predicted_cycles != null && c < row.predicted_cycles;
-      const gated = gatedOpen.has(row.backlog_id);
-      if (under || gated) {
-        const why = [];
-        if (under) why.push(`ticket_matrix.actual_cycles reads ${c} against predicted_cycles ${row.predicted_cycles}`);
-        if (gated) why.push("an undecided runner_items card of kind gated_before_build still names it");
+      const d = decideStatus({
+        kickoffText: kickoffText.get(row.backlog_id) ?? "",
+        gatedOpen: gatedOpen.has(row.backlog_id),
+      });
+      if (d.status === "partial") {
         file(row, "remainder-stranded", "judgment",
-          `a ${status} ticket whose own record still names unbuilt work: ${why.join("; ")}` +
+          `a ${status} ticket whose own record still names unbuilt work: ${d.reasons.join("; ")}` +
           ` (design_status ${row.design_status ?? "null"}).`);
       }
     }
@@ -704,7 +722,20 @@ async function readBoard(base, key) {
     "runner_decisions?select=backlog_id,decided_at&backlog_id=not.is.null&limit=10000", 10000);
   const openCycles = await readAll(base, key, "runner_cycles",
     "runner_cycles?select=id&ended_at=is.null&limit=1000", 1000);
-  return { items, matrix, verdicts, accepts, decisions, openCycles };
+  // SES-385 slice 3: check 12 asks the closed ticket's OWN kickoff whether it names a remainder,
+  // and classifyBoard() is pure by construction -- it may not open a file. So the text is read
+  // HERE, beside the six REST reads, and arrives on the board like every other input. Only closed
+  // rows with a link are read (73 files today); an unreadable or absent path lands `text: null`
+  // rather than throwing, because SES-184 and SES-185 link kickoffs that are not in the tree and a
+  // census that crashes on one dead link censuses nothing.
+  const kickoffs = [];
+  for (const row of items) {
+    if (!CLOSED.has(row.status) || row.kickoff_link == null) continue;
+    let text = null;
+    try { text = fs.readFileSync(path.resolve(ROOT, row.kickoff_link), "utf8"); } catch { text = null; }
+    kickoffs.push({ backlog_id: row.backlog_id, kickoff_link: row.kickoff_link, text });
+  }
+  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs };
 }
 
 async function readRate(base, key) {

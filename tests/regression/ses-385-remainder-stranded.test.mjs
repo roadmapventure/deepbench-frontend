@@ -11,18 +11,32 @@
 //
 // WHAT IS PINNED HERE, and why each arm can actually go red:
 //
-// (A) THE CHECK, over a four-row board built one variable at a time, asserted by ID and never by
+// RE-PINNED v7.0.524 (SLICE 3): CHECK 12 READS THE RECORD, NOT THE CYCLE COUNT. Slice 1's trigger
+// was `actual_cycles < predicted_cycles`; measured on the live board it filed 88 findings, and
+// running slice 2's decideStatus() over each flagged row's own kickoff answered only 5 of them
+// real (55 of the rest carry no `kickoff_link` at all, 27 link a kickoff that declares itself
+// finished, 1 links a file that is not in the tree). Under-quote is estimate variance, not unbuilt
+// work, and check 11 `cycles-over-quote` already owns the other direction. So the proxy is DELETED
+// and check 12 asks decideStatus() over the closed row's own kickoff text -- gathered by
+// readBoard() and handed in on `board.kickoffs`, because classifyBoard() is pure and may not open
+// a file. Part (2)'s words are "names unbuilt work"; this is the thing that reads that.
+//
+// (A) THE CHECK, over a five-row board built one variable at a time, asserted by ID and never by
 // count. A count is exactly what a check that stopped firing still satisfies once another arm
-// moves. The two positives are the two structural halves of the discriminator -- a closed row that
-// came in UNDER its own quote, and a closed row with an UNDECIDED `gated_before_build` card -- and
-// the two negatives are the pair the check is most likely to swallow: a closed row that spent its
-// whole quote with no open card, and an OPEN row under its quote (the check is closed-only, or
-// every in-flight ticket on the board reads as stranded every night).
+// moves. The two positives are the two halves of the NEW discriminator -- a closed row whose own
+// kickoff's STOP LINE says `partial`, and a closed row with an UNDECIDED `gated_before_build`
+// card -- and the three negatives are the ones the check is most likely to swallow: a closed row
+// whose kickoff declares itself FINISHED (the text half must actually read the words), an OPEN row
+// (the check is closed-only, or every in-flight ticket reads as stranded every night), and
+// SES-385-E, a closed row UNDER ITS QUOTE with no kickoff text at all. E is the arm that goes red
+// against an unchanged tree: slice 1's deleted proxy flags it, the record-reading trigger does not.
 //
 // (B) THE CONTROLS, one per half, each a single mutation of the same fixture that must flip its
-// own row and no other: raise the actual to the quote and the first positive must LEAVE the list;
-// decide the card and the second must. Without those, a check hard-coded to flag every closed row
-// passes (A) completely.
+// own row and no other: drop A's kickoff entry and the first positive must LEAVE the list; decide
+// the card and the second must. Without those, a check hard-coded to flag every closed row passes
+// (A) completely. Plus PURITY: a board with no `kickoffs` key at all must not throw -- readBoard()
+// is the only half that touches disk, and classifyBoard() has to survive being handed a board
+// without it (which is every other test in this suite).
 //
 // (C) THE WIDENED READ, which is the one change here that could silently invert a check that was
 // already green. `readBoard`'s `runner_items` read dropped `decided_at=not.is.null` so one read
@@ -67,10 +81,19 @@ const row = (backlog_id, over) => ({
   ...over,
 });
 
-// (A) done, actual 1 of a quote of 2 -- closed under its own quote.
-// (B) delivered, quote spent, but an UNDECIDED gated_before_build card still names it.
-// (C) done, actual 2 of 2, no open card -- the row the check must NOT flag.
-// (D) open, actual 1 of a quote of 3 -- in flight, and the check is closed-only.
+// The kickoff text each closed row's own `kickoff_link` resolves to, exactly as readBoard() hands
+// it over. A row absent from this list has no text and reads "" -- which decideStatus() answers
+// `delivered`, so an absent entry is a NEGATIVE, never a free pass.
+const STOP_PARTIAL = "## 7. STOP LINE\n\nClose the ticket `partial`.";
+const STOP_DONE = "## 7. STOP LINE\n\nClose the ticket.";
+
+// (A) done, quote SPENT (2 of 2), and its own kickoff's STOP LINE says `partial` -- the record half.
+// (B) delivered, quote spent, no kickoff text, but an UNDECIDED gated_before_build card names it.
+// (C) done, quote spent, and its kickoff declares itself FINISHED -- the row the text half must NOT
+//     flag, and the reason the STOP LINE words are read rather than the link's mere presence.
+// (D) open, actual 1 of a quote of 3, undecided card -- in flight, and the check is closed-only.
+// (E) done, actual 1 of a quote of 2, NO kickoff entry -- under its quote and nothing else. Slice
+//     1's deleted proxy flagged exactly this row; the record-reading trigger must not.
 function fixture() {
   return {
     now: NOW,
@@ -81,16 +104,23 @@ function fixture() {
         row("SES-385-B", { status: "delivered" }),
         row("SES-385-C"),
         row("SES-385-D", { status: "open", predicted_cycles: 3, design_status: null, kickoff_link: null }),
+        row("SES-385-E"),
       ],
       matrix: [
-        { backlog_id: "SES-385-A", actual_cycles: 1, predicted_cycles: 2 },
+        { backlog_id: "SES-385-A", actual_cycles: 2, predicted_cycles: 2 },
         { backlog_id: "SES-385-B", actual_cycles: 2, predicted_cycles: 2 },
         { backlog_id: "SES-385-C", actual_cycles: 2, predicted_cycles: 2 },
         { backlog_id: "SES-385-D", actual_cycles: 1, predicted_cycles: 3 },
+        { backlog_id: "SES-385-E", actual_cycles: 1, predicted_cycles: 2 },
+      ],
+      kickoffs: [
+        { backlog_id: "SES-385-A", kickoff_link: "docs/kickoffs/v0.0.0-fixture.md", text: STOP_PARTIAL },
+        { backlog_id: "SES-385-C", kickoff_link: "docs/kickoffs/v0.0.0-fixture.md", text: STOP_DONE },
       ],
       verdicts: [
         { backlog_id: "SES-385-A" }, { backlog_id: "SES-385-B" },
         { backlog_id: "SES-385-C" }, { backlog_id: "SES-385-D" },
+        { backlog_id: "SES-385-E" },
       ],
       // The widened read's own shape: runner_items rows now arrive undecided as well as decided,
       // carrying `kind`. C's card is DECIDED, so it is an Accept and never an open gate.
@@ -124,7 +154,7 @@ async function run() {
   const r = classify(F.board);
 
   assert.deepStrictEqual(ids(r, "remainder-stranded"), ["SES-385-A", "SES-385-B"],
-    "exactly the closed row under its quote and the closed row with an undecided gated_before_build card are stranded");
+    "exactly the closed row whose own kickoff STOP LINE names `partial` and the closed row with an undecided gated_before_build card are stranded — C's kickoff declares itself finished and E is merely under its quote");
 
   for (const id of ["SES-385-A", "SES-385-B"]) {
     const f = r.findings.find(x => x.backlog_id === id && x.check === "remainder-stranded");
@@ -138,18 +168,33 @@ async function run() {
   // The detail is what a human reads in the ledger, so each half must say which half fired.
   const dA = r.findings.find(f => f.backlog_id === "SES-385-A" && f.check === "remainder-stranded").detail;
   const dB = r.findings.find(f => f.backlog_id === "SES-385-B" && f.check === "remainder-stranded").detail;
-  assert.ok(dA.includes("actual_cycles reads 1") && dA.includes("predicted_cycles 2"),
-    `the under-quote half must quote both numbers; got: ${dA}`);
+  assert.ok(dA.includes("STOP LINE"), `the record half must name the section it read; got: ${dA}`);
   assert.ok(dB.includes("gated_before_build"), `the open-card half must name the card kind; got: ${dB}`);
   assert.ok(dA.includes("design_status designed"), `the detail must carry the flag the rule clears; got: ${dA}`);
+  // The reason each row was filed is its OWN reason, not a shared sentence: swapping the two
+  // details would pass every arm above.
+  assert.ok(!dA.includes("gated_before_build"), `A has no open card — its detail must not claim one; got: ${dA}`);
+  assert.ok(!dB.includes("STOP LINE"), `B has no kickoff text at all — its detail must not cite one; got: ${dB}`);
+  // The deleted proxy must not be back in the sentence either: no detail may quote the cycle counts.
+  for (const d of [dA, dB]) {
+    assert.ok(!/actual_cycles/.test(d),
+      `check 12 no longer reads ticket_matrix.actual_cycles — a detail quoting it means the proxy survived; got: ${d}`);
+  }
 
   // --- (B) one control per half ------------------------------------------------------------------
-  // (i) A spends its whole quote: it must LEAVE the list, and B must stay. A check hard-coded to
+  // (i) A's kickoff entry is dropped: it must LEAVE the list, and B must stay. A check hard-coded to
   // flag every closed row passes (A) above and fails here.
-  const bumped = fixture().board;
-  bumped.matrix.find(m => m.backlog_id === "SES-385-A").actual_cycles = 2;
-  assert.deepStrictEqual(ids(classify(bumped), "remainder-stranded"), ["SES-385-B"],
-    "a closed row that spent its whole quote is not stranded — the arithmetic half must actually read actual_cycles");
+  const noText = fixture().board;
+  noText.kickoffs = noText.kickoffs.filter(k => k.backlog_id !== "SES-385-A");
+  assert.deepStrictEqual(ids(classify(noText), "remainder-stranded"), ["SES-385-B"],
+    "a closed row whose kickoff text is absent is not stranded — the record half must actually read the text, not the row");
+
+  // (i-b) The same row, same board, with its STOP LINE rewritten to the FINISHED wording: A must
+  // still leave. That separates "read the text" from "saw an entry at all".
+  const settled = fixture().board;
+  settled.kickoffs.find(k => k.backlog_id === "SES-385-A").text = STOP_DONE;
+  assert.deepStrictEqual(ids(classify(settled), "remainder-stranded"), ["SES-385-B"],
+    "a kickoff that declares itself finished is not a remainder — the words in the STOP LINE are the trigger");
 
   // (ii) B's card is decided: it must LEAVE the list, and A must stay.
   const decided = fixture().board;
@@ -170,12 +215,24 @@ async function run() {
   assert.deepStrictEqual(ids(classify(closedD), "remainder-stranded"), ["SES-385-A", "SES-385-B", "SES-385-D"],
     "D is excluded because it is OPEN, not because of anything else about it — closing it must flag it");
 
-  // (v) A quote-less closed row cannot be under its quote: a null predicted_cycles is an absent
-  // comparison, never a zero. (`quote-missing` is check 1's business, and only on a live row.)
-  const noQuote = fixture().board;
-  noQuote.items.find(i => i.backlog_id === "SES-385-A").predicted_cycles = null;
-  assert.deepStrictEqual(ids(classify(noQuote), "remainder-stranded"), ["SES-385-B"],
-    "a closed row with no quote at all must not be compared against one");
+  // (v) THE DELETED PROXY, proven gone by moving it rather than by reading the source. E is already
+  // 1 of 2; drive A and C under their quotes too and the list must not move an inch. Against slice
+  // 1's trigger this arm reads ["SES-385-A","SES-385-B","SES-385-C","SES-385-E"].
+  const underAll = fixture().board;
+  for (const m of underAll.matrix) if (m.backlog_id !== "SES-385-D") m.actual_cycles = 0;
+  assert.deepStrictEqual(ids(classify(underAll), "remainder-stranded"), ["SES-385-A", "SES-385-B"],
+    "actual_cycles below predicted_cycles is estimate variance, not unbuilt work — check 12 must not read it at all any more");
+
+  // (vi) PURITY / shape: classifyBoard is handed boards with no `kickoffs` key by every other test
+  // in this suite, and readBoard() is the only half allowed to touch disk. An absent key must read
+  // as "no text anywhere", leaving only the gated row.
+  const noKickoffs = fixture().board;
+  delete noKickoffs.kickoffs;
+  let shapeResult;
+  assert.doesNotThrow(() => { shapeResult = classify(noKickoffs); },
+    "classifyBoard must not throw on a board with no `kickoffs` key — it is pure by construction and cannot read the file itself");
+  assert.deepStrictEqual(ids(shapeResult, "remainder-stranded"), ["SES-385-B"],
+    "with no kickoff text on the board only the undecided gated_before_build card can strand a row");
 
   // --- (C) the widened read must not invert the Accept check --------------------------------------
   // B is `delivered`, 48 h+ old, and its only runner_items row is UNDECIDED. Before SES-385 the
@@ -236,7 +293,7 @@ async function run() {
   assert.ok(bytes <= CEILING,
     `${RUNBOOK_REL} is ${bytes} bytes against SES-336's ceiling of ${CEILING} — this edit had to free bytes before adding any`);
 
-  console.log(`[SES-385] stranded: ${ids(r, "remainder-stranded").join(", ")} · not stranded: SES-385-C (quote spent), SES-385-D (open) · runbook ${bytes}B <= ${CEILING}`);
+  console.log(`[SES-385] stranded: ${ids(r, "remainder-stranded").join(", ")} · not stranded: SES-385-C (kickoff finished), SES-385-D (open), SES-385-E (under quote only) · runbook ${bytes}B <= ${CEILING}`);
   return ["check-12", "controls", "widened-read", "runbook-rule"];
 }
 

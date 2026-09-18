@@ -23,14 +23,19 @@
 // before this slice -- renders them identically, which is what makes this arm a measurement.
 // Absent `nights` renders "not read", never a streak of 0. Source-only, no credentials.
 //
-// DeepBench v7.0.506 | tests/regression/agt-79-ticket-owner.test.mjs | SES-385 slice 1 -- THE
-// CENSUS IS TWELVE CHECKS NOW, and every count below is re-pinned against the same fixture rather
-// than loosened: `remainder-stranded` fires on QA-79-04 (`done`, actual_cycles 0 against
-// predicted_cycles 1), so the fixture classifies to 12 findings / 8 judgment, renderCensus prints
-// thirteen lines, and one more ledger insert is planned. The standing `CHECKS.length === 11` /
-// `CHECKS[10] === "cycles-over-quote"` pair is MOVED to 12 / `CHECKS[11]`, which is what makes this
-// file red against an unchanged scripts/ticket-owner.js. Discrimination of the new check itself
-// lives in tests/regression/ses-385-remainder-stranded.test.mjs.
+// DeepBench v7.0.524 | tests/regression/agt-79-ticket-owner.test.mjs | SES-385 slice 3 -- CHECK 12
+// NOW READS THE RECORD, NOT THE CYCLE COUNT, and this fixture moved with it rather than around it.
+// Slice 1 fired the check on `actual_cycles < predicted_cycles`; measured live that proxy filed 88
+// findings of which only 5 were real, so it is deleted and check 12 asks slice 2's decideStatus()
+// over the closed row's OWN kickoff text plus its undecided `gated_before_build` card. The fixture
+// therefore gains a `kickoffs` sibling of `items` -- the board shape readBoard() now returns -- and
+// QA-79-04 gains a `kickoff_link` and one entry whose STOP LINE says `partial`. QA-79-04 stays the
+// single stranded row under the NEW trigger, so every count below is UNCHANGED at 12 findings /
+// 8 judgment, thirteen rendered lines and the same ledger inserts: this file pins that the
+// re-triggering did not move the rest of the census. Its `design_status` is null, so check 8 is
+// untouched by the new link. `CHECKS.length === 12` / `CHECKS[11] === "remainder-stranded"` stand.
+// Discrimination of the new trigger itself lives in
+// tests/regression/ses-385-remainder-stranded.test.mjs.
 // DeepBench v7.0.505 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 5 -- NEW PART
 // L: THE RUNBOOK'S STEP 4e NOW FIRES THE JUDGED NIGHT. Slice 4 shipped the judgment pass and the
 // seed landed, so pass one exits 3 (part K live prints `gate answered 3`) -- and yet no night had
@@ -211,9 +216,12 @@ async function main() {
     "type-off-taxonomy": ["QA-79-12", "QA-79-13"],
     "delivered-unaccepted": ["QA-79-10"],
     "cycles-over-quote": ["QA-79-14"],
-    // SES-385's check 12: QA-79-04 is `done` with actual_cycles 0 against predicted_cycles 1 --
-    // a closed row whose own record still names work nobody built. No other fixture row closed
-    // under its quote, and the fixture carries no undecided gated_before_build card at all.
+    // SES-385 slice 3's check 12: QA-79-04 is `done` and the `kickoffs` entry for its own
+    // kickoff_link carries a STOP LINE naming `partial` -- the record itself says work is left.
+    // No other fixture row has kickoff text that decideStatus() calls `partial` (QA-79-14 has a
+    // link but no entry, so it reads ""), and the fixture carries no undecided
+    // gated_before_build card at all, so this list is the same one row it was under slice 1's
+    // deleted cycles proxy -- by a different, non-overlapping trigger.
     "remainder-stranded": ["QA-79-04"],
   };
   for (const check of CHECKS) {
