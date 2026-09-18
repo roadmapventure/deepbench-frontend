@@ -1,4 +1,18 @@
 #!/usr/bin/env node
+// DeepBench v7.0.521 | scripts/render-standing-brief.js | SES-413 slice 3 — THE DAILY DECISIONS
+// LIST. `governance_rules.MANAGER-DECIDES-BY-DEFAULT` line 3 promises John "a daily list of what
+// was decided, not questions; a question that still reaches him is counted weekly, target zero",
+// and NOTHING RENDERED IT. The brief's only decision group was `Open decisions` — an UNDO list,
+// `status=eq.open`, every bullet ending in `reverse_decision(...)`, which drops a decision the
+// moment it finalises and holds no day boundary at all; and `grep -n runner_questions` over this
+// file returned ZERO hits, so the counted half of the rule reached no reader. A new group,
+// `Decided for you`, lands AFTER `Open decisions` and BEFORE `Judgment classes`: a seven-row CST-day
+// table (decided / reversed / questions to you), the newest day's decisions one bullet each capped
+// at DAILY_DECISION_LINES, and the weekly question count beside its target of zero. Days are CST
+// days via cstDay(), never UTC ones — a decision recorded at 04:30Z belongs to the previous day in
+// Chicago, and five hours out of every twenty-four a UTC-dated list files work under a day John had
+// already stopped reading. No `reverse_decision(` in here: undo stays `Open decisions`' job.
+//
 // DeepBench v7.0.512 | scripts/render-standing-brief.js | AGT-79 slice 6 — WAS LAST NIGHT JUDGED?
 // `Ticket hygiene, last night` printed the newest nightly row's notes verbatim and nothing else,
 // which left the one fact that mattered invisible: five nights ran without the judgment pass and
@@ -400,6 +414,24 @@ export function factsSha(facts) {
     staff: Array.isArray(facts.staff)
       ? facts.staff.map(r => [String(r.agent_id), String(r.fingerprint), String(r.cycle_id)]).sort()
       : null,
+    // FEATURE: SES-413 slice 3 — the week's decision IDS WITH THEIR STATUS, the week's question ids
+    // with theirs, and the open-question count, so a decision arriving, one finalising, one being
+    // reversed, a question being asked or one being answered each move the sha and --check reports
+    // the drift. ID **AND** STATUS, not the id alone: the normal life of a row here is to arrive
+    // `open` and become `final` WITHOUT ever leaving this window, so an id-only payload would hash
+    // identically across the single most common change this group exists to show. `decided_at` is
+    // deliberately ABSENT for the reason the 7-day cutoff is absent from `decisions` above — it is a
+    // fixed property of a row that never moves, and the window itself advances with the clock, so
+    // hashing the cutoff would report drift on every run and the check would be ignored within a day.
+    daily: facts.daily
+      ? {
+          rows: Array.isArray(facts.daily.rows)
+            ? facts.daily.rows.map(r => [String(r.id), String(r.status)]).sort() : null,
+          questions: Array.isArray(facts.daily.questions)
+            ? facts.daily.questions.map(q => [String(q.qid), String(q.status)]).sort() : null,
+          openQuestions: Number(facts.daily.openQuestions || 0),
+        }
+      : null,
   });
   return crypto.createHash("sha256").update(payload).digest("hex");
 }
@@ -440,6 +472,170 @@ export function summarise(s, max = 120) {
   const flat = String(s == null ? "" : s).replace(/`/g, "'").replace(/\s+/g, " ").trim();
   if (!flat) return "—";
   return flat.length > max ? flat.slice(0, max - 1).trimEnd() + "…" : flat;
+}
+
+/**
+ * FEATURE: SES-413 slice 3 — ONE CST *DAY*, for the one group that is organised by day.
+ *
+ * cst() above formats an INSTANT a person reads ("Sep 18, 1:20 PM CST"). This formats the DAY that
+ * instant fell on in Chicago, as `en-CA` writes it — `YYYY-MM-DD`, which sorts lexically, keys a
+ * bucket, heads a table row and drops straight into a SQL `::date` literal. It is a separate
+ * function rather than something parsed back out of cst() because "Sep 18" carries no year and so
+ * cannot be a bucket key at all.
+ *
+ * THE UTC DAY IS THE WRONG ANSWER, AND IT IS WRONG FOR FIVE HOURS OUT OF EVERY TWENTY-FOUR. A
+ * decision recorded at `2026-09-18T04:30:00Z` happened at 11:30 PM on Sep 17 in Chicago, and a
+ * daily list that files it under Sep 18 tells John something was decided on a day he had already
+ * stopped reading — and hides it from the day he was working. Every boundary in the group below
+ * goes through here (the bucket, the table row, the headline, the overflow query), so there is
+ * exactly one place the day is decided and no second copy to drift from it.
+ *
+ * Throws on a bad date, exactly like cst(): a silent `Invalid Date` would become its own bucket and
+ * a whole day of decisions would render under a heading John never reads.
+ */
+export function cstDay(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) throw new Error(`cstDay: not a date: ${iso}`);
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+}
+
+/**
+ * How many decision bullets the daily list prints for its newest day before it stops listing and
+ * says how many are left.
+ *
+ * A DISPLAY CONSTANT, NOT A CADENCE. SES-146's "every cadence number is a column" does not reach
+ * it, for the same reason `OPEN_DECISION_BATCH` inside renderBlock() is not a column either:
+ * changing it changes how much of one day fits on a page, and changes nothing the runner does.
+ */
+export const DAILY_DECISION_LINES = 25;
+
+/**
+ * FEATURE: SES-413 slice 3 — THE DAILY LIST THE RULE ALREADY PROMISED. Pure, like every group in
+ * this file: `daily` is exactly what fetchFacts() read, `nowIso` is the clock passed in rather than
+ * read here, and nothing below goes near the network.
+ *
+ * IT IS NOT A COPY OF `Open decisions`, AND THE DIFFERENCE IS THE WHOLE TICKET. That group answers
+ * "what can I still undo?" — `status=eq.open`, ordered by expiry, every bullet ending in a
+ * `reverse_decision()` handle — so a decision DROPS OFF IT at the moment it finalises, which is the
+ * moment it became a thing that was decided for John. This group answers "what was decided for me,
+ * and when?" It reads by `decided_at`, keeps finalised rows, is bucketed by CST day, and carries NO
+ * `reverse_decision(` at all: undo has a home one group up and putting a second copy of it here
+ * would make the daily record read like a list of mistakes to correct.
+ *
+ * THE SEVEN ROWS ARE ALWAYS SEVEN, ZEROS INCLUDED. A day with no decisions is a fact about the
+ * runner — it means a day passed in which it decided nothing for John — and a table that renders
+ * only the days that happen to have rows cannot express it: six rows would read as "seven busy
+ * days" to anyone not counting. Live at this ship, `2026-09-17` is exactly such a day.
+ *
+ * ABSENT IS NOT ZERO, and the two sentences are deliberately disjoint — neither one's words appear
+ * in the other's branch. "The ledger was not read" and "nothing was decided" are opposite facts and
+ * only one of them is a measurement; a group that printed the second when it meant the first would
+ * publish a quiet week nobody measured, on the one page John reads to find out what happened.
+ *
+ * FREE TEXT GOES THROUGH summarise(). `runner_decisions.summary` is written by cycles under no
+ * format constraint (SES-286a: NOT NULL and non-blank, nothing more), so a single backtick in one
+ * would open a code span that swallows the rest of the line.
+ */
+export function renderDailyDecisions(daily, stamp, nowIso) {
+  const L = [];
+  const lead = `**Decided for you** — *${stamp}.* What the runner DECIDED on your behalf, by CST ` +
+    "day (`governance_rules.MANAGER-DECIDES-BY-DEFAULT`: *a daily list of what was decided, not " +
+    "questions*), with the questions that reached you anyway counted beside it — target zero. Not " +
+    "the `Open decisions` group above: that one is the undo list and drops a decision the moment it " +
+    "finalises; this one is the record of the day and keeps it.";
+
+  if (!daily || !Array.isArray(daily.rows)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The decision ledger was not read for this render* — which is **not** the same as *a " +
+      "quiet week*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const rows = daily.rows;
+  const questions = Array.isArray(daily.questions) ? daily.questions : [];
+  const openQuestions = Number(daily.openQuestions || 0);
+  const askedLine = `**${questions.length} question(s) reached you in the last 7 days — target ` +
+    `zero**; ${openQuestions} still open.`;
+
+  if (rows.length === 0) {
+    L.push(`${lead} ${askedLine}`);
+    L.push("");
+    L.push("- **Nothing was decided in the last 7 days — a measured zero.** The ledger was read and " +
+      "holds no decision inside the window.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  // The seven days the table names, newest first, anchored on the CST day THIS RENDER happened on.
+  // Stepped from a NOON anchor rather than from `nowIso` itself: a DST boundary moves a midnight by
+  // an hour, and stepping 24h from an evening instant across one would put two entries on the same
+  // date and skip another. Noon ± an hour is still the same calendar day in every US zone.
+  const today = cstDay(nowIso);
+  const anchor = Date.parse(`${today}T12:00:00Z`);
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(new Date(anchor - i * 86400000).toISOString().slice(0, 10));
+
+  // Bucket by CST day. `reversed` counts rows DECIDED on that day that now carry `reversed` — which
+  // is the honest reading of a table keyed by `decided_at` and is what the lead says it is, not "a
+  // reversal happened that day" (the reversal lands later, and `reversed_at` is not in this read).
+  const decidedBy = new Map();
+  const reversedBy = new Map();
+  for (const r of rows) {
+    const day = cstDay(r.decided_at);
+    decidedBy.set(day, (decidedBy.get(day) || 0) + 1);
+    if (String(r.status) === "reversed") reversedBy.set(day, (reversedBy.get(day) || 0) + 1);
+  }
+  const askedBy = new Map();
+  for (const q of questions) {
+    const day = cstDay(q.asked_at);
+    askedBy.set(day, (askedBy.get(day) || 0) + 1);
+  }
+
+  // The newest day the ledger actually HAS rows for, which is not necessarily today: a render at
+  // 6 AM CST on a quiet morning must lead with the work of the day before, not with an empty
+  // "0 decided today" over a table that plainly shows otherwise.
+  const newest = [...decidedBy.keys()].sort().pop();
+  const newestRows = rows
+    .filter(r => cstDay(r.decided_at) === newest)
+    .sort((a, b) => Date.parse(b.decided_at) - Date.parse(a.decided_at));
+
+  // READ BUT OUTSIDE THE TABLE — stated, never dropped. The read window is a rolling 7×24h back from
+  // the clock; the table's window is seven CST CALENDAR days. The two disagree by however far into
+  // the day the render happens, so on any render after CST midnight some rows sit before the first
+  // table row. Saying how many is the difference between a table that is a stated projection and one
+  // that silently loses a day's work.
+  const inTable = new Set(days);
+  const outside = rows.filter(r => !inTable.has(cstDay(r.decided_at))).length;
+
+  L.push(`${lead} **${newestRows.length} decided on ${newest}**; ${askedLine}`);
+  L.push("");
+  L.push("| CST day | decided | reversed | questions to you |");
+  L.push("|---|---:|---:|---:|");
+  for (const day of days) {
+    L.push(`| \`${day}\` | ${decidedBy.get(day) || 0} | ${reversedBy.get(day) || 0} | ${askedBy.get(day) || 0} |`);
+  }
+  L.push("");
+  if (outside > 0) {
+    L.push(`- *${outside} decision(s) were read but fall outside the table:* the read window is a ` +
+      "rolling 7×24h back from the stamp, the table is the seven CST days ending `" + today + "`, " +
+      "and any render after CST midnight sees the gap between them. They are in no column above.");
+    L.push("");
+  }
+  L.push(`**The ${newestRows.length} decided on ${newest}** — newest first.`);
+  L.push("");
+  for (const d of newestRows.slice(0, DAILY_DECISION_LINES)) {
+    L.push(`- \`${String(d.id).slice(0, 8)}\` · ${d.kind || "—"} · ` +
+      `${d.backlog_id ? `\`${d.backlog_id}\`` : "—"} · ${summarise(d.summary)} · ${d.status || "—"}`);
+  }
+  if (newestRows.length > DAILY_DECISION_LINES) {
+    L.push(`- …and ${newestRows.length - DAILY_DECISION_LINES} more decided that day · ` +
+      "`select id, kind, backlog_id, summary, status from public.runner_decisions where " +
+      "(decided_at at time zone 'America/Chicago')::date = '" + newest + "' order by decided_at desc;`");
+  }
+  L.push("");
+  return L.join("\n");
 }
 
 /**
@@ -1163,7 +1359,9 @@ export function renderBlock(facts, nowIso) {
   // "not read", never "nothing is waiting on a human".
   // FEATURE: SES-378 slice 5 — staff joins the destructure on the same terms as humanGates: absent
   // means "not read", never "the Development Manager found nothing".
-  const { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff } = facts;
+  // FEATURE: SES-413 slice 3 — daily joins the destructure on the same terms as staff: absent means
+  // "not read", never "a quiet week in which nothing was decided for you".
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1342,6 +1540,13 @@ export function renderBlock(facts, nowIso) {
   }
   L.push("");
 
+  // ---- Decided for you (FEATURE: SES-413 slice 3 — MANAGER-DECIDES-BY-DEFAULT line 3) --------
+  // AFTER `Open decisions` and BEFORE `Judgment classes`, which puts the two decision groups next
+  // to each other on the page: the undo list, then the record of what was decided. `Human gates`
+  // stays last (SES-386). Same contract as every group around it — a pure helper a fixture can
+  // drive, rendering what fetchFacts() read and counting nothing the tables could have counted.
+  L.push(renderDailyDecisions(daily, stamp, nowIso));
+
   // ---- Judgment classes (FEATURE: SES-84 — M7 gate ruling ii) ------------------------------
   // After Open decisions, before the provenance line. The group is a pure helper so the guard can
   // assert it from a fixture; it renders what the view returned and counts nothing itself.
@@ -1513,6 +1718,38 @@ export async function fetchFacts(url, key) {
     finalWeek: Array.isArray(finalWeek) ? finalWeek.length : 0,
     reversedWeek: Array.isArray(reversedWeek) ? reversedWeek.length : 0,
   };
+
+  // FEATURE: SES-413 slice 3 — the DAILY list, and the questions the rule counts against it.
+  //
+  // HERE, RIGHT AFTER `decisions`, BECAUSE `since` IS THE SAME WINDOW. These three reads share the
+  // rolling 7-day cutoff computed above rather than recomputing one, so the weekly question count
+  // and the weekly final/reversed counts one group up can never be measured over two different
+  // weeks — which is the failure a second `new Date(Date.now() - …)` in this function would create
+  // silently, and only at the seam of a day.
+  //
+  // BY `decided_at`, NOT BY `status`, and that is the whole difference from the read above it: the
+  // open read answers "what can still be undone", this one answers "what was decided", and a
+  // finalised decision — the normal end state — is invisible to the first and central to the second.
+  //
+  // THE SECOND AND THIRD READS ARE THE COUNTED HALF OF THE RULE. `runner_questions` appeared NOWHERE
+  // in this file before this slice, so "a question that still reaches him is counted weekly, target
+  // zero" was a promise with no instrument. Two reads and not one: `asked_at=gte.${since}` is the
+  // WEEKLY count the target is about, and `status=eq.open` is the standing backlog of questions
+  // still sitting on John regardless of when they were asked. Live at this ship those are 0 and 17,
+  // which is exactly why both are needed — one number alone reads as "no questions" and is wrong.
+  //
+  // Columns are NAMED, never `select=*` (.claude/rules/supabase-column-grants.md). A read that did
+  // not happen comes back non-array and REFUSES here, rather than rendering a measured-looking quiet
+  // week nobody measured — the same posture as every read above.
+  const dailyRows = await rest(url, key,
+    `runner_decisions?select=id,kind,backlog_id,summary,status,decided_at&decided_at=gte.${since}&order=decided_at.desc&limit=2000`);
+  if (!Array.isArray(dailyRows)) die("the daily decisions read came back non-array — refusing to render the daily list from nothing");
+  const dailyQuestions = await rest(url, key,
+    `runner_questions?select=qid,question,status,asked_at&asked_at=gte.${since}&order=asked_at.desc&limit=1000`);
+  if (!Array.isArray(dailyQuestions)) die("the weekly questions read came back non-array — refusing to render the daily list from nothing");
+  const openQuestionRows = await rest(url, key, "runner_questions?select=qid&status=eq.open&limit=1000");
+  if (!Array.isArray(openQuestionRows)) die("the open questions read came back non-array — refusing to render the daily list from nothing");
+  const daily = { rows: dailyRows, questions: dailyQuestions, openQuestions: openQuestionRows.length };
 
   // FEATURE: SES-84 — the per-class census, read from the VIEW and never re-derived here.
   // judgment_class_census is service_role only (its migration revokes anon/authenticated by name,
@@ -1713,7 +1950,7 @@ export async function fetchFacts(url, key) {
     undecidedCards: gateCards.map(r => r.id),
   };
 
-  return { items, settings, drain, decisions, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff };
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff };
 }
 
 async function main() {

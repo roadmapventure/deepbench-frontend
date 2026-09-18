@@ -53,6 +53,9 @@ first impression”*
 Every place that asks John today is inventoried in `docs/governance/ASKS-TO-JOHN.md`, each row
 marked `moved-to-manager` or `kept`.
 
+The daily list itself: `docs/runbooks/standing-brief.md` § **Decided for you** (`SES-413` slice 3);
+its weekly question count becomes a scoreboard column in slice 4.
+
 ---
 
 ## Before Writing a Kickoff Doc: Walk Through It Live
