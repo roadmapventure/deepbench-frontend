@@ -3383,7 +3383,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/settle-ship.js \
   **across the whole table**, not one matched to the ticket — so a fixture whose after-row is not the
   newest row on the board grades against **somebody else's ship** and reads `did_not_hold` for
   reasons that have nothing to do with the claim. (2) The metric name is not free text: CHECK
-  constraint `ck_backlog_outcome_claim` calls `public.outcome_claim_is_valid(text)`, whose seven
+  constraint `ck_backlog_outcome_claim` calls `public.outcome_claim_is_valid(text)`, whose eight
   metric names are that function's sole home, so an invented or mistyped metric is **rejected at
   filing** rather than surfacing as a silent `unmeasurable` three days later.
 - **Standing brief (`SES-265`, `v7.0.356`) — in the same commit set, every ship, immediately after

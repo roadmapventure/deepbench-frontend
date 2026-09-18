@@ -54,7 +54,12 @@ Every place that asks John today is inventoried in `docs/governance/ASKS-TO-JOHN
 marked `moved-to-manager` or `kept`.
 
 The daily list itself: `docs/runbooks/standing-brief.md` § **Decided for you** (`SES-413` slice 3);
-its weekly question count becomes a scoreboard column in slice 4.
+its weekly question count is graded on the board as `platform_scoreboard.questions_to_john_week`
+(`SES-413` slice 4, `v7.0.523`) — the count of `runner_questions` asked in the **trailing 7 days**,
+whatever their status, written by `snapshot_platform_scoreboard()` on every ship. It is a claimable
+metric: `enhancement_claim = 'questions_to_john_week: down'` passes `outcome_claim_is_valid()` and
+grades on `public.ticket_outcome` like any other. Rows taken before `v7.0.523` read NULL — never
+measured, not zero.
 
 ---
 

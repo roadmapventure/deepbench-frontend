@@ -292,10 +292,12 @@ RETURNING backlog_id, priority_class;
 
 - **A Selfbuild ticket declares its outcome claim at filing (`SES-309`, 2026-09-02, `v7.0.390`).**
   `enhancement_claim` is the number the ticket says it will move — one `platform_scoreboard`
-  column and a direction, `'<metric>: up|down'` — and the seven metric names are exactly
+  column and a direction, `'<metric>: up|down'` — and the eight metric names are exactly
   `noship_cycles_week`, `noship_tokens_week`, `shipped_cycles_week`, `tokens_per_shipped_cycle`,
-  `cycles_per_shipped_ticket`, `cron_silence_hours`, `hygiene_flags`. **`'none: <why no scoreboard
-  number applies>'` is a valid and honest answer, and most chartered work is that kind** — a
+  `cycles_per_shipped_ticket`, `cron_silence_hours`, `hygiene_flags`, `questions_to_john_week`
+  (`SES-413` slice 4, `v7.0.523` — questions that reached John in the trailing 7 days, target
+  zero). **`'none: <why no scoreboard number applies>'` is a valid and honest answer, and most
+  chartered work is that kind** — a
   tooling ticket that records state in its own table moves nothing on the board, and saying so on
   the row is the point. `public.outcome_claim_is_valid()` is the check constraint
   (`ck_backlog_outcome_claim`), so a typo or an invented metric name is rejected at filing rather
@@ -724,7 +726,7 @@ re-rebase, retry once.
 **`done` requires 3e's verdict (`SES-311`).**
 
 **Then stamp the scoreboard (`SES-303`, 2026-09-02, v7.0.382)** — every ship, attended or not,
-records the platform's five standing numbers at that moment, so the ticket's effect can be read
+records the platform's six standing numbers at that moment, so the ticket's effect can be read
 off the series later (`public.ticket_outcome`, M5-12's 72-hour window). One call over the Supabase
 MCP, right after the push lands:
 
@@ -733,8 +735,8 @@ SELECT * FROM public.snapshot_platform_scoreboard('ship', '<TICKET-ID>', '<push 
 ```
 
 The flag count is `session-hygiene`'s "N flagged" line if you ran it this session; `NULL` means
-unmeasurable, never zero. Nothing else to fill in — the other four numbers are computed from
-`runner_cycles` by the function itself.
+unmeasurable, never zero. Nothing else to fill in — the other five numbers are computed from
+`runner_cycles` (and, since `SES-413` slice 4, `runner_questions`) by the function itself.
 
 The verdict vocabulary `public.ticket_outcome` grades that series with is
 **`held` / `did_not_hold` / `unmeasurable` / `unclaimed` / `pending`** (`unclaimed` added by
