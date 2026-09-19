@@ -619,9 +619,13 @@ async function mainFromLedger(base, key) {
   for (let i = 0; i < toFile.length; i += 1) {
     const row = toFile[i];
     const backlogId = parsed.ids[i];
-    const img = await insertBeforeImage(base, key, cycleId, backlogId);
+    // SES-407: the before-image is keyed by the backlog_items ROW UUID, never the backlog_id text --
+    // reverse_decision() refuses a pk_value it cannot cast to uuid, so a text key restores nothing.
+    // Mint the id here and hand the SAME one to the ticket insert, so the image points at the row.
+    const rowId = crypto.randomUUID();
+    const img = await insertBeforeImage(base, key, cycleId, rowId);
     if (img.error) fail(2, `${backlogId}: ${img.error}`);
-    const ins = await insertTicket(base, key, buildLedgerTicketDraft(row, backlogId, { now }));
+    const ins = await insertTicket(base, key, { id: rowId, ...buildLedgerTicketDraft(row, backlogId, { now }) });
     if (ins.error) fail(2, `${backlogId}: ${ins.error}`);
     filed.push({ backlogId, fingerprint: row.fingerprint, kind: row.kind });
   }
@@ -696,9 +700,12 @@ async function main() {
   for (let i = 0; i < toFile.length; i += 1) {
     const group = toFile[i];
     const backlogId = parsed.ids[i];
-    const img = await insertBeforeImage(base, key, cycleId, backlogId);
+    // SES-407: see the ledger loop above -- the image is keyed by the row uuid, minted here and
+    // reused as the ticket's id so the two agree.
+    const rowId = crypto.randomUUID();
+    const img = await insertBeforeImage(base, key, cycleId, rowId);
     if (img.error) fail(2, `${backlogId}: ${img.error}`);
-    const ins = await insertTicket(base, key, buildTicketDraft(group, backlogId));
+    const ins = await insertTicket(base, key, { id: rowId, ...buildTicketDraft(group, backlogId) });
     if (ins.error) fail(2, `${backlogId}: ${ins.error}`);
     filed.push({ backlogId, check: group.check, sigHash: group.sigHash, members: group.members.length });
   }
