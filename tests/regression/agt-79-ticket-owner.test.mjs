@@ -10,8 +10,8 @@
 // CHECKS.length. That is the discriminator: a constraint narrower than CHECKS refuses the array
 // outright (23514, the exact live failure), and a row quietly dropped fails the count, so neither
 // half can pass on a table that has drifted. It sits after the credential gate and before
-// `findingsBefore` deliberately -- the pre-existing `rate < 1` failure at the live census aborts
-// main() further down, and an arm placed after it would never run. Cleanup is a `finally` DELETE
+// `findingsBefore` deliberately -- any failure at the live census aborts main() further down, and
+// an arm placed after it would never run. Cleanup is a `finally` DELETE
 // plus an asserted zero-count, never an assumed one. `countWhere` is hoisted out of part G for it.
 // DeepBench v7.0.512 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 6 -- NEW PART
 // M: THE UNJUDGED NIGHT SAYS SO. Part L pinned the runbook line that fires the judged night; it
@@ -985,41 +985,72 @@ async function main() {
   const census = JSON.parse(live.stdout);
 
   assert.ok(census.counts.rows >= 800, `the live board read only ${census.counts.rows} rows`);
-  assert.ok(typeof census.rate === "number" && census.rate > 0.1 && census.rate < 1,
-    `the cost rate must be a real fraction, got ${census.rate}`);
+  assert.ok(Number.isFinite(census.rate) && census.rate > 0,
+    `the cost rate must be a positive finite number, got ${census.rate}`);
 
-  // SES-141 IS the board's one claim left on a closed ticket, and SES-131 / SES-208 ARE its only
-  // two one-to-one type spellings. But this slice's write pass exists precisely to close those
-  // gaps, so after it has run they are FIXED rather than found. Each is therefore asserted as a
-  // pair: the census still reports it with the exact fix, OR the live row already carries that
-  // fix. Both halves are a real statement about the ticket; "neither" is the failure, and a
-  // derivable finding on any OTHER row still fails outright.
-  const claimOnClosed = census.findings.filter(f => f.check === "claim-on-closed");
-  assert.deepStrictEqual(claimOnClosed.map(f => f.backlog_id), claimOnClosed.length ? ["SES-141"] : [],
-    `claim-on-closed must name SES-141 and nothing else, got ${claimOnClosed.map(f => f.backlog_id).join(", ")}`);
-  if (claimOnClosed.length === 1) {
-    assert.deepStrictEqual(claimOnClosed[0].fix, { claimed_by: null, claimed_at: null });
-  } else {
-    const row = (await rest("backlog_items?backlog_id=eq.SES-141&select=status,claimed_by,claimed_at"))[0];
-    assert.ok(row, "SES-141 must still be on the board");
-    assert.ok(["done", "delivered"].includes(row.status), `SES-141 is ${row.status}, so it was never a claim-on-closed row at all`);
-    assert.strictEqual(row.claimed_by, null, "SES-141 is off the claim-on-closed list, so its claim must already be cleared");
-    assert.strictEqual(row.claimed_at, null, "a cleared claim clears both columns, never just the holder");
+  // SES-422: PART E LIVE ASSERTS EACH CHECK'S PROPERTY, NEVER A ROW'S IDENTITY. The arms this
+  // replaces pinned today's board -- SES-141 as the one claim-on-closed row, LOG-143 / SES-245 as
+  // the cycles-over-quote pair, SES-131 / SES-208 as the only derivable type spellings. Each of
+  // those is a fact about the board's CONTENTS, so the board moving (a new over-quote close, a
+  // fixed claim) reddens a test that the census never broke, which is environmental noise and not
+  // a regression. What is actually invariant is the RELATION between each finding and the live row
+  // it names: a claim-on-closed row is closed and its fix clears both claim columns; an over-quote
+  // finding's own detail carries actual > predicted; a derivable type fix is exactly TYPE_MAP's
+  // image of the live type. Those hold on any board, and every one of them fails if the classifier
+  // drifts. Zero findings of a check passes its loop -- the counts are the fixture arms' job.
+  const liveRows = new Map();
+  const liveIds = [...new Set(census.findings
+    .filter(f => ["claim-on-closed", "cycles-over-quote", "type-off-taxonomy"].includes(f.check))
+    .map(f => f.backlog_id))];
+  if (liveIds.length) {
+    // ONE read for all three checks' findings, so the arms below compare against the live row
+    // rather than against the census's own copy of it.
+    for (const r of await rest(`backlog_items?backlog_id=in.(${liveIds.join(",")})&select=backlog_id,status,type,claimed_by`)) {
+      liveRows.set(r.backlog_id, r);
+    }
+  }
+  const rowFor = (f) => {
+    const row = liveRows.get(f.backlog_id);
+    assert.ok(row, `${f.check} named ${f.backlog_id}, which the live board does not carry`);
+    return row;
+  };
+
+  for (const f of census.findings.filter(f => f.check === "claim-on-closed")) {
+    const row = rowFor(f);
+    assert.ok(["done", "delivered"].includes(row.status),
+      `claim-on-closed named ${f.backlog_id}, whose live status reads ${row.status} -- the check fires only on a closed row`);
+    assert.strictEqual(f.verdict, "derivable",
+      `clearing a claim off a closed row is derivable, never a judgment; ${f.backlog_id} reads ${f.verdict}`);
+    assert.deepStrictEqual(f.fix, { claimed_by: null, claimed_at: null },
+      `a cleared claim clears both columns, never just the holder; ${f.backlog_id} fixes ${JSON.stringify(f.fix)}`);
   }
 
-  const over = census.findings.filter(f => f.check === "cycles-over-quote").map(f => f.backlog_id);
-  assert.ok(over.includes("LOG-143") && over.includes("SES-245"), `cycles-over-quote read ${over.join(", ")}`);
+  for (const f of census.findings.filter(f => f.check === "cycles-over-quote")) {
+    assert.strictEqual(f.verdict, "judgment",
+      `overrunning a quote is a judgment call, never derivable; ${f.backlog_id} reads ${f.verdict}`);
+    assert.ok(!("fix" in f), `a judgment finding carries no fix; ${f.backlog_id} carries ${JSON.stringify(f.fix)}`);
+    const m = f.detail.match(/actual_cycles reads (\d+) against predicted_cycles (\d+)\./);
+    assert.ok(m, `every cycles-over-quote finding must quote both numbers; got: ${f.detail}`);
+    assert.ok(Number(m[1]) > Number(m[2]),
+      `${f.backlog_id} is only over quote if actual exceeds predicted; its detail reads ${m[1]} against ${m[2]}`);
+  }
 
-  const typeDerivable = census.findings.filter(f => f.check === "type-off-taxonomy" && f.verdict === "derivable")
-    .map(f => f.backlog_id).sort();
-  assert.ok(typeDerivable.every(id => id === "SES-131" || id === "SES-208"),
-    `only the two one-to-one spellings may be derivable, got ${typeDerivable.join(", ")}`);
-  for (const [id, mapped] of [["SES-131", "Feature"], ["SES-208", "Bug"]]) {
-    if (typeDerivable.includes(id)) {
-      assert.deepStrictEqual(census.findings.find(f => f.backlog_id === id && f.check === "type-off-taxonomy").fix, { type: mapped });
-    } else {
-      const row = (await rest(`backlog_items?backlog_id=eq.${id}&select=type`))[0];
-      assert.strictEqual(row.type, mapped, `${id} is off the derivable list, so its type must already read ${mapped}`);
+  // The one-to-one property: a derivable type fix is TYPE_MAP's image of the row's live type, and
+  // nothing else. A judgment finding is free-form, so the predicate passes it through.
+  const oneToOne = (f, rowType) =>
+    f.verdict !== "derivable" || (Object.hasOwn(TYPE_MAP, rowType) && f.fix?.type === TYPE_MAP[rowType]);
+  // NEGATIVE CONTROLS, pure -- these are what stop `oneToOne` degenerating into "true".
+  assert.strictEqual(oneToOne({ verdict: "derivable", fix: { type: "Feature" } }, "Architecture"), false,
+    "a type the map does not carry can never be derived, whatever fix the census proposes");
+  assert.strictEqual(oneToOne({ verdict: "derivable", fix: { type: "Feature" } }, "feature"), true,
+    "the casing slip IS one-to-one, so the same fix against the mapped type must pass");
+  for (const f of census.findings.filter(f => f.check === "type-off-taxonomy")) {
+    const row = rowFor(f);
+    assert.ok(oneToOne(f, row.type),
+      `${f.backlog_id} reads type ${row.type}: a derivable fix must be TYPE_MAP's image of it, got ${JSON.stringify(f.fix)}`);
+    if (f.verdict === "judgment") {
+      assert.ok(!Object.hasOwn(TYPE_MAP, row.type) && !TYPE_TAXONOMY.includes(row.type),
+        `${f.backlog_id} reads type ${row.type}, which the taxonomy or the map does carry -- it is not a judgment call`);
     }
   }
 

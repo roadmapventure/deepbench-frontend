@@ -39,6 +39,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { randomUUID } from "node:crypto";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
@@ -47,7 +48,13 @@ const PM_REL = "lib/project-manager.js";
 const WO_REL = "src/screens/CreateWorkOrderScreen.jsx";
 const EXEC_REL = "api/capabilities/execute.js";
 
-const FIXTURE_ID = "ses330-fixture-governance-agent";
+// SES-422: the fixture ids are per RUN, not per FILE. Fixed ids on the shared `public.agents`
+// table collide whenever a peer cycle is holding the row at the same moment -- the before-image
+// control below then fails `already exists` (HTTP 409) on a tree with no defect in it. A run-
+// unique suffix makes both controls fire only on a genuine one: a row under THIS run's id can
+// only be left by this run.
+const RUN = randomUUID().slice(0, 8);
+const FIXTURE_ID = `ses330-fixture-governance-agent-${RUN}`;
 const REQUESTING_AGENT_ID = "chloe"; // measured live 2026-09-09: lane='product', is_active=true
 
 // ---------------------------------------------------------------------------------------------
@@ -127,7 +134,7 @@ async function partB_liveLaneColumnAndCheck(ctx = {}) {
   // (b2) The CHECK constraint rejects an invalid lane value, rollback-safe: a single failed
   // INSERT statement persists nothing by construction (Postgres aborts the statement, not a
   // multi-statement transaction we'd need to roll back ourselves) -- verified below anyway.
-  const probeId = "ses330-check-constraint-probe";
+  const probeId = `ses330-check-constraint-probe-${RUN}`;
   // Safety: confirm the probe id doesn't already exist before asserting "nothing persisted" after.
   const before = await fetch(`${base}/rest/v1/agents?id=eq.${probeId}&select=id`, { headers: hdr });
   const beforeRows = before.ok ? await before.json() : [];

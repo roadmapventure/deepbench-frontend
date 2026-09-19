@@ -1357,9 +1357,21 @@ async function weekTwoRunsAgainstTheRealLedger() {
     // count, because the count is whatever the live Skill rows currently store -- an assertion on
     // 22 would go red the day John fixes them, which is the wrong direction for a regression.
     const corpus = spawn("audit-corpus.js", [`--out=${path.join(tmp, "s.json")}`, `--detect=${path.join(tmp, "d.json")}`]);
-    assert.match(corpus, /duplicates 0 stale [01]\b/,
-      `the live corpus must report both detector bands; got: ${corpus.trim()}`);
+    const BAND = /statements \d+ \(governance \d+, agent-data \d+, retired \d+\) duplicates (\d+) stale (\d+)\b/;
+    const band = corpus.match(BAND);
+    assert.ok(band, `the live corpus must print both detector bands; got: ${corpus.trim()}`);
+    // NEGATIVE CONTROL: a line carrying only one of the two bands must NOT satisfy this arm --
+    // otherwise the assertion above would pass on a run whose stale detector never reported.
+    assert.strictEqual(BAND.test("statements 7 (governance 7, agent-data 0, retired 4) duplicates 0"), false,
+      "a one-band line must not satisfy the live arm");
     const detected = JSON.parse(fs.readFileSync(path.join(tmp, "d.json"), "utf8"));
+    // The printed bands are tied to the detector FILE: whatever the live corpus currently holds,
+    // the two counts must equal the findings written to d.json. That reddens on a real detector
+    // regression and stays green as the corpus grows.
+    assert.strictEqual(detected.findings.filter(x => x.kind === "duplicate").length, Number(band[1]),
+      `the printed duplicates band must equal the duplicate findings written to d.json; printed ${band[1]}`);
+    assert.strictEqual(detected.findings.filter(x => x.kind === "stale-or-irrelevant").length, Number(band[2]),
+      `the printed stale band must equal the stale-or-irrelevant findings written to d.json; printed ${band[2]}`);
     for (const f of detected.findings.filter(x => x.kind === "stale-or-irrelevant")) {
       assert.strictEqual(f.governing_fact, "temperature stored for a model whose API rejects temperature",
         "every stale finding is the detector's one sentence -- a second wording would be a second fingerprint for one fact");
