@@ -1,0 +1,1 @@
+design-ses422-0918 — SES-422 design: verification pipeline can't distinguish a real regression from noise (agt-70-auditor live-corpus assertion, agt-79 hardcoded allowlist, before-image restore keying, auto-rollback stale anchor).
