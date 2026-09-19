@@ -44,6 +44,8 @@ import { fileURLToPath } from 'url';
 import { assemblePrompt } from '../api/prompt/db-assembly.js';
 import { renderAssembly } from './agent-prompt.js';
 import { handle as prioritizerWrite } from '../api/_lib/handlers/prioritizer-write.js';
+// FEATURE: SES-423 -- the in-process seam. See the prioritizerWrite() call below.
+import { runWithCallSource } from '../lib/request-context.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TENANT = 'global';
@@ -299,14 +301,18 @@ async function apply(args) {
       confidence: ruling.confidence,
     };
 
-    const result = await prioritizerWrite({
+    // FEATURE: SES-423 -- the same in-process seam scripts/rank-backlog.js's call now uses, and
+    // the same reason: called bare, the handler writes with no AsyncLocalStorage context and the
+    // row lands with call_source NULL. The handler itself is context-neutral by design and its
+    // HTTP route already wraps it, so the fix belongs at each in-process caller, not in api/.
+    const result = await runWithCallSource('session', () => prioritizerWrite({
       agent_id: AGENT,
       tenant_id: TENANT,
       content,
       supabaseUrl,
       supabaseHeaders,
       handler_context: { trace_id: `ses-332-${ruling.backlog_id}` },
-    });
+    }));
     const hr = result.handler_result;
     if (hr.written) {
       counts.written++;

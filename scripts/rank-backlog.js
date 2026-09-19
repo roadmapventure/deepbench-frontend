@@ -95,6 +95,9 @@ import { fileURLToPath } from 'url';
 import { assemblePrompt } from '../api/prompt/db-assembly.js';
 import { renderAssembly } from './agent-prompt.js';
 import { handle as prioritizerWrite } from '../api/_lib/handlers/prioritizer-write.js';
+// FEATURE: SES-423 -- the in-process seam. See the prioritizerWrite() call below for what was
+// landing in the table without it.
+import { runWithCallSource } from '../lib/request-context.js';
 // IMPORTED, NOT RESTATED. `validateAgentVerdict` reads whatever schema it is handed and names the
 // offending key -- generic despite the noun in its name, and already driven by AGT-67's own mutant
 // guard. A second copy here would be a second contract to keep in step.
@@ -450,14 +453,25 @@ async function passTwo(args) {
   // THE SAME HANDLER THE EXECUTOR CALLS, in-process. It performs its own per-entry refusals
   // (backlog-id form, integer rank >= 1, duplicates), writes the decision row, and recomputes the
   // queue -- none of which is restated here.
-  const result = await prioritizerWrite({
+  //
+  // FEATURE: SES-423 -- UNDER runWithCallSource('session'), and that wrapper is the whole fix.
+  // The handler is context-neutral BY DESIGN and its HTTP route already supplies the context
+  // (api/prompt/request-receivable.js, withRequestContext) -- so there is nothing to fix in api/.
+  // The hole is here: calling the handler in-process makes the write with NO AsyncLocalStorage
+  // context at all, so lib/request-context.js has nothing to read and every row this path wrote
+  // landed with call_source NULL. Measured live over 14 days: 1,216 of 1,216 rows matching
+  // `feature like 'prioritizer:%'` carry NULL, latest 2026-09-19 08:58Z and still growing -- the
+  // Prioritizer's own writes were the one governance path invisible to the call_source split.
+  // 'session' is already allowlisted (SES-331) and is the truthful value: a session ran this.
+  // Forward-only; nothing is back-filled (LOG-121).
+  const result = await runWithCallSource('session', () => prioritizerWrite({
     agent_id: AGENT,
     tenant_id: TENANT,
     content,
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseHeaders: headers(),
     handler_context: { cycle_id: state.cycle_id || args.cycle || null, trace_id: `ses-346-${state.cycle_id || 'session'}` },
-  });
+  }));
   const hr = result.handler_result || {};
   const written = hr.ranked?.length ?? 0;
 

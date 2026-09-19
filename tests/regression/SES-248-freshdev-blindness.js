@@ -36,6 +36,8 @@ import {
   freshDevDirEntries,
   checkFreshDevReader,
   SHARED_CHECKOUT,
+  gitWorktreeList,
+  checkWorktrees,
 } from "../../scripts/check-session-docs.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -167,6 +169,79 @@ function theFindingCallsTheEntryWhatItIs() {
   );
 }
 
+// ---- Clause 6 (SES-423): THE WORKTREE-LIST ARM, which this ticket shipped and left behind ----
+//
+// SES-248 routed freshDevText() and freshDevDirEntries() through the resolver and stopped there.
+// gitWorktreeList() and check 5b's wtRoot kept the hard-coded SHARED_CHECKOUT, and that leftover
+// was WORSE than the original bug rather than a remnant of it: clause 2's WARN fires only when
+// freshDevRoot() resolves to NOTHING, and off Windows it resolves FINE (to the running worktree),
+// so checks 5/5b/5d shelled a dead C:/ path, swallowed the throw, returned "no worktrees" and were
+// covered by no announcement at all. Measured on this tree before the fix: one `fatal: cannot
+// change to 'C:/Projects/deepbench-frontend'` on stderr, zero findings about it.
+//
+// The arms below pin the SHAPE of the answer, which is the part that erased the distinction: a
+// "could not look" must not be spelled the same as "there are no worktrees".
+function theWorktreeListerSaysWhenItCouldNotLook() {
+  const unresolvable = gitWorktreeList(nullResolver);
+  assert.strictEqual(unresolvable.ok, false, "an unresolvable root must not report a successful listing");
+  assert.deepStrictEqual(unresolvable.worktrees, [], "and it must carry no worktrees");
+  assert.ok(unresolvable.reason, "it must SAY why -- a bare [] is the defect, not the fix");
+
+  // NEGATIVE CONTROL / the distinction itself: "could not look" and "looked, found none" must be
+  // told apart by the caller. The retired function returned null for one and [] for the other,
+  // which is exactly the pair SES-248 spent its ticket separating elsewhere in this file.
+  assert.notStrictEqual(unresolvable.ok, true,
+    "could-not-look must be distinguishable from a real empty listing by the ok flag alone");
+}
+
+function theRegistryIsReadFromTheCheckoutThatOwnsIt() {
+  // A resolved root that is NOT the shared checkout cannot answer "which worktrees did the other
+  // 5-7 sessions register?" -- it can only answer it about itself. Reporting its answer as if it
+  // were the registry's produces false check-5d FLAGs naming worktrees that exist on John's
+  // machine; measured here, that turned findingsTotal 118 -> 133 and tripwire-to-backlog.js
+  // promoted the 16 fabricated findings to a detection class it would have FILED as a ticket.
+  const elsewhere = gitWorktreeList(() => "/some/other/checkout");
+  assert.strictEqual(elsewhere.ok, false,
+    "a resolved root that is not the shared checkout must report could-not-look, never its own worktrees");
+  assert.match(elsewhere.reason, /not the shared checkout/,
+    "and it must say that is why, so the report names the limit instead of hiding it");
+
+  // THE VACUITY GUARD, and the half that proves this is a gate rather than a blanket refusal:
+  // handed the shared checkout, the function must genuinely try to list it.
+  const atShared = gitWorktreeList(() => SHARED_CHECKOUT);
+  assert.ok(
+    atShared.ok || /git worktree list failed/.test(atShared.reason),
+    "given the shared checkout the lister must actually attempt the listing -- on John's machine " +
+      "that succeeds, and where the path does not exist it must fail as a LISTING failure, not be " +
+      "refused by the registry gate above",
+  );
+}
+
+function theBlindChecksAnnounceInsteadOfPassingClean() {
+  // The whole function, driven for real against a root that cannot serve it. Before SES-423 this
+  // produced NOTHING -- checks 5/5b/5d simply did not run and said nothing about it.
+  const findings = [];
+  checkWorktrees(findings, "## In flight now\n- `some-worktree-0101` doing a thing\n", nullResolver);
+  assert.strictEqual(findings.length, 1,
+    "an unusable registry must produce exactly one aggregated finding, not one per check and not none");
+  const [f] = findings;
+  assert.strictEqual(f.severity, "WARN",
+    "a checkout this script cannot reach is an environment fact, never a defect in the tree under test");
+  assert.strictEqual(f.check, "5");
+  for (const named of ["5", "5b", "5d"]) {
+    assert.ok(new RegExp(`\\b${named}\\b`).test(f.detail), `the WARN must name check ${named} as one that could not run`);
+  }
+  assert.ok(/COULD NOT LOOK/i.test(f.detail) && /never "nothing to find"/.test(f.detail),
+    "it must state the distinction the defect erased, in the same words clause 2's WARN uses");
+
+  // NEGATIVE CONTROL: the state text above names a worktree that is registered nowhere. Had the
+  // checks actually run against an unusable registry, check 5d would have FLAGged it -- so the
+  // absence of a 5d flag here is what proves the run announced its blindness instead of inventing
+  // a finding out of it.
+  assert.ok(!findings.some(x => x.check === "5d"),
+    "a blind run must not emit check-5d flags -- those would be fabricated from a registry it could not read");
+}
+
 function run() {
   sharedCheckoutWinsWhenItExists();
   theFallbackIsReachedOnlyWhenTheFirstFails();
@@ -175,6 +250,9 @@ function run() {
   aWorkingReaderSaysNothing();
   theReaderReturnsRealEntriesOnThisTree();
   theFindingCallsTheEntryWhatItIs();
+  theWorktreeListerSaysWhenItCouldNotLook();
+  theRegistryIsReadFromTheCheckoutThatOwnsIt();
+  theBlindChecksAnnounceInsteadOfPassingClean();
 }
 
 selfRun(import.meta.url, run);

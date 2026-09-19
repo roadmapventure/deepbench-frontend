@@ -683,19 +683,81 @@ function checkFreshDevReader(findings, rootResolver = freshDevRoot) {
 }
 
 // ---- Checks 5, 5b, 5d: worktree <-> "In flight now" cross-reference ----
-function gitWorktreeList() {
+//
+// FEATURE: SES-423 -- THE HALF SES-248 LEFT BEHIND. That ticket gave freshDevRoot() a candidate
+// list and routed freshDevText()/freshDevDirEntries() through it, but this function and check 5b's
+// wtRoot kept the hard-coded SHARED_CHECKOUT. The result was WORSE than the original bug rather
+// than a leftover of it, because SES-248's announcement could not cover it: checkFreshDevReader()
+// only warns when freshDevRoot() resolves to NOTHING, and here it resolves FINE (to the running
+// worktree) -- so checks 5/5b/5d went on shelling a dead C:/ path, caught their own throw, and
+// returned "no worktrees" while the WARN designed to announce exactly that stayed silent. Measured
+// 2026-09-19 on this clone: `node scripts/tripwire-to-backlog.js --json` exited 0 with
+// findingsTotal 118 and one stderr line, `fatal: cannot change to 'C:/Projects/deepbench-frontend'`
+// -- loud in the terminal, absent from the findings, and reading as a clean pass on three checks
+// that never ran.
+//
+// THREE CHANGES, and each closes a different half:
+//   (1) THE ROOT IS RESOLVED, never hard-coded -- the same freshDevRoot() every other reader here
+//       already uses. The candidate ORDER is untouched: SHARED_CHECKOUT is still tried first, which
+//       SES-248's header names as the edit it forbids, so John's machine observes no change.
+//   (2) stdio's stderr is "ignore", so a failed probe cannot print `fatal:` to a terminal where it
+//       reads as a crash of the tripwire itself. The finding is the report, not stderr.
+//   (3) "COULD NOT LOOK" IS A DISTINCT RETURN, not null-as-empty. The old `null` and a genuine
+//       empty list were two different facts sharing one spelling -- the identical defect SES-248
+//       fixed in freshDevDirEntries(), reproduced here. Callers now get { ok, worktrees, reason }.
+//
+// The root is a parameter with the real resolver as its default so the guard drives BOTH arms --
+// a root that resolves and one that does not -- without a second copy of this logic
+// (docs/STANDARDS.md Section 4, the same shape checkFreshDevReader() already takes).
+// A FOURTH CHANGE THE NAIVE FIX MAKES NECESSARY, and it is the difference between this check
+// reporting and this check LYING. freshDevRoot() answers "which local checkout can serve
+// origin/dev's CONTENT?" -- and its fallback, the running worktree, is a perfectly correct answer
+// to that question, which is why SES-248 added it. Checks 5/5b/5d ask something else entirely:
+// "which worktrees are REGISTERED, and what sits on disk under .claude/worktrees/?" That is a
+// MACHINE-LOCAL fact about the shared checkout 5-7 concurrent sessions coordinate through, and a
+// cloud clone cannot answer it -- it can only answer it about ITSELF.
+//
+// Measured here 2026-09-19, with this function pointed at the resolved fallback: findingsTotal went
+// 118 -> 133 and every one of the 15 new FLAGs was a check-5d false positive naming a worktree that
+// genuinely exists on John's machine ("automation-review", "design-ses422-0918", ...) and cannot
+// exist in this clone, which has ONE worktree and no .claude/worktrees directory at all. Worse,
+// tripwire-to-backlog.js promoted them to a 16-member detection class and would have FILED it as a
+// backlog ticket. Silence was the bug; fiction that reaches the board is a worse one, and it is the
+// same "answer from whichever checkout happened to run the check" failure SES-248's header names as
+// the edit it forbids.
+//
+// So the registry is read from the checkout that OWNS it, and any other resolved root is reported
+// as "could not look" -- SES-248's own vocabulary, for SES-248's own reason. On John's machine
+// SHARED_CHECKOUT is the first candidate and resolves, so these checks behave exactly as they
+// always have; off it they now say what they could not do instead of inventing findings or
+// printing `fatal:` and shrugging.
+function gitWorktreeList(rootResolver = freshDevRoot) {
+  const root = rootResolver();
+  if (root === null) {
+    return { ok: false, root: null, worktrees: [], reason: "no usable git checkout to list worktrees from" };
+  }
+  if (root !== SHARED_CHECKOUT) {
+    return {
+      ok: false, root: null, worktrees: [],
+      reason: `the resolved checkout (${root}) is not the shared checkout the worktree registry lives in, `
+        + `so this run can see only its own worktree and not the ones other sessions registered`,
+    };
+  }
   let out;
   try {
-    out = execFileSync("git", ["-C", SHARED_CHECKOUT, "worktree", "list", "--porcelain"], { encoding: "utf8" });
-  } catch (e) {
-    return null; // not fatal -- git may be unavailable in some sandboxes
+    out = execFileSync("git", ["-C", root, "worktree", "list", "--porcelain"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  } catch {
+    // Still not fatal -- git may be unavailable in some sandboxes. But it is no longer SILENT, and
+    // it no longer looks like "this checkout has no worktrees".
+    return { ok: false, root: null, worktrees: [], reason: `git worktree list failed in ${root}` };
   }
   const worktrees = [];
   for (const block of out.split("\n\n")) {
     const m = block.match(/^worktree (.+)$/m);
     if (m) worktrees.push(m[1].replace(/\\/g, "/"));
   }
-  return worktrees;
+  return { ok: true, root, worktrees, reason: null };
 }
 
 function isAncestorOfDev(worktreePath) {
@@ -917,12 +979,22 @@ function checkEntryLengths(findings, stateText) {
   }
 }
 
-function checkWorktrees(findings, stateText) {
-  const registered = gitWorktreeList();
-  if (registered === null) {
-    findings.push({ check: "5", severity: "WARN", detail: "git worktree list failed -- skipping worktree cross-reference checks" });
+// The resolver is threaded through rather than reached for, so the guard can run this whole
+// function against a root that does not resolve and assert it SAYS SO (SES-423).
+function checkWorktrees(findings, stateText, rootResolver = freshDevRoot) {
+  const listing = gitWorktreeList(rootResolver);
+  if (!listing.ok) {
+    // SES-423: an aggregated "could not look", naming every check it invalidates. Previously this
+    // said only "skipping worktree cross-reference checks" for the git-unavailable case and said
+    // NOTHING AT ALL for the unresolvable-root case, because the root was never consulted.
+    findings.push({
+      check: "5", severity: "WARN",
+      detail: `${listing.reason} -- checks 5, 5b and 5d COULD NOT LOOK and did not run. `
+        + `An empty result from them is "could not look", never "nothing to find" -- do not read this run as a clean pass on those checks.`,
+    });
     return;
   }
+  const registered = listing.worktrees;
   const bullets = extractInFlightBullets(stateText);
   const bulletNames = new Set(bullets.map(b => b.name));
 
@@ -965,7 +1037,12 @@ function checkWorktrees(findings, stateText) {
   }
 
   // Check 5b: directory on disk under .claude/worktrees/ that git never registered.
-  const wtRoot = path.join(SHARED_CHECKOUT, ".claude", "worktrees");
+  // SES-423: the root the listing ITSELF used, carried on the listing rather than re-resolved.
+  // Joining SHARED_CHECKOUT here independently was the other half of the same defect -- readdirSync
+  // threw on the dead C:/ path and the catch read it as "no worktrees dir yet, nothing to check".
+  // Taking the root from the listing makes it structurally impossible for 5b to compare one
+  // checkout's disk against another checkout's git, which a second resolver call would allow.
+  const wtRoot = path.join(listing.root, ".claude", "worktrees");
   let onDisk = [];
   try {
     onDisk = fs.readdirSync(wtRoot, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name);
@@ -1826,6 +1903,11 @@ export {
   freshDevDirEntries,
   checkFreshDevReader,
   SHARED_CHECKOUT,
+  // SES-423 -- the worktree-list arm SES-248 left on the hard-coded path. Both take the resolver as
+  // a parameter, so the guard drives the REAL functions through a resolving and a non-resolving
+  // root rather than asserting against a re-typed copy of their behaviour.
+  gitWorktreeList,
+  checkWorktrees,
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
