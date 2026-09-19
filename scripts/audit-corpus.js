@@ -1,5 +1,35 @@
 #!/usr/bin/env node
-// DeepBench v7.0.469 | scripts/audit-corpus.js | AGT-70
+// DeepBench v7.0.528 | scripts/audit-corpus.js | AGT-70 / SES-411
+// FEATURE: SES-422 slice 3 (SES-411) -- the THIRD deterministic detector: a rule read against the
+// function that actually enforces it.
+//
+// detectRuleFunctionDrift() is the first detector whose corpus is a FUNCTION BODY. The platform
+// keeps one fact -- "which refusals does the pre-boot gate apply" -- in four homes: the body's
+// `THEN '<reason>'` literals, the function's own COMMENT enumeration, the `governance_rules` rows
+// that name the function, and the closed REASONS set tests/regression/ses-297-pre-boot-pickability
+// .test.mjs ranges over. Nothing compared them until now, and SES-410 is the proof it matters: a
+// live edit on 2026-09-15 removed `weekly_pace` from the body while M5-16 went on saying the gate
+// applies it. The captured pre-SES-410 body is still in runner_migration_downs, so the detector has
+// a real drifted control to be tested against rather than a synthetic one.
+//
+// THE CLOSED SET IS IMPORTED, NEVER RESTATED -- same rule as NO_TEMPERATURE_PREFIXES above. REASONS
+// is the ses-297 test's own list of the seven refusals; a copy of it here would be a second home
+// for exactly the kind of claim this tool exists to find. The import is inert: that module's work
+// is behind selfRun(), so importing it runs nothing.
+//
+// BODY-SUBSET IS NEVER ASSERTED, and that asymmetry is deliberate. A `THEN` literal with no rule
+// and no comment entry may be a column pick rather than a refusal -- `final_day_rest_pct` is one
+// live today -- and a detector that filed it would file a false contradiction into an append-only
+// ledger. Every line runs the other way: something a rule, the comment or REASONS NAMES that the
+// body does not do.
+//
+// ONE FINDING PER FUNCTION, never one per mismatched token -- the AGT-70 rule, for the AGT-70
+// reason: the ledger is append-only and N rows to rule individually is board flooding. The
+// mismatch lines are joined into the pg_proc location's text, so nothing is lost.
+//
+// pg_proc IS NOT REACHABLE FROM PostgREST, so the rows come from public.rule_enforcing_functions()
+// (migration ses411_rule_enforcing_functions, service_role only -- anon and authenticated hold no
+// EXECUTE). `drift not-run` is printed, never `drift 0`, on every path that did not read it.
 // FEATURE: AGT-70 slice 4 -- the SECOND deterministic detector, and the Auditor auditing itself.
 //
 // detectStaleParameters() finds a stored parameter the model's own API rejects: a `temperature` on
@@ -93,6 +123,7 @@ import { fileURLToPath } from "url";
 import { RETIREMENT_VOCAB, enclosingParagraph, PROCEDURE_GENERATED_DOCS } from "./check-session-docs.js";
 import { normalize, locationKey } from "./audit-ledger.js";
 import { supportsTemperature, NO_TEMPERATURE_PREFIXES } from "../shared/models.js";
+import { REASONS } from "../tests/regression/ses-297-pre-boot-pickability.test.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -347,6 +378,128 @@ export function detectStaleParameters(statements) {
   }];
 }
 
+// SES-411. The closed sets, keyed by proname. IMPORTED, never restated -- see the header.
+export const CLOSED_SETS = { runner_should_boot: REASONS };
+
+export const RULE_ID = /\bM\d-\d\d\b/g;
+const SNAKE = /^[a-z]+(?:_[a-z]+)+$/;
+const THEN = /THEN\s+'([a-z_-]+)'/g;
+
+// SES-411 -- the third deterministic detector. Pure: `rules` are governance_rules rows
+// ({id, statement, status}), `fns` are public.rule_enforcing_functions() rows, `closedSets` maps a
+// proname to its closed reason list.
+//
+// THREE READERS, ONE BODY.
+//   (A) A LIVE RULE THAT NAMES THE FUNCTION AND A REFUSAL. The statement is split into clauses on
+//       `. ` / `; ` -- and the trailing space is load-bearing, because `runner_settings.meter_stale_hours`
+//       and `detail.judgment_model` would otherwise each split a clause in half and the function
+//       name would land in a different piece from the refusal it governs. A clause binds only if it
+//       carries the function by its backticked name; M5-16's other two clauses mention
+//       `public.judgment_model()` and a refusal that is explicitly NOT this gate's, and binding
+//       them would file `judgment_model` as a missing branch of runner_should_boot.
+//   (B) THE COMMENT'S OWN ENUMERATION. Items split on a comma that is not inside parentheses --
+//       `meter_stale (SES-389 / M5-15, runner_settings.meter_stale_hours)` is ONE item live today,
+//       and a plain `,` split makes it two, one of which parses as nothing.
+//   (C) EVERY RULE ID THE COMMENT CITES, which is the anchor for a rule that governs the gate
+//       without naming a refusal -- M5-06 and M6-09 both do exactly that, so (A) alone would never
+//       notice either of them going retired.
+//
+// A CITED RULE THAT IS NOT LIVE IS A MISMATCH LINE, and a cited id with no row at all reads
+// `missing` rather than being skipped: a comment pointing at a rule the register does not have is
+// the same defect as one pointing at a retired rule, and silently dropping it is the vacuous green.
+export function detectRuleFunctionDrift(rules, fns, closedSets = {}) {
+  const ruleRows = (rules ?? []).filter(r => r && r.id != null);
+  const byId = new Map(ruleRows.map(r => [String(r.id), r]));
+  const findings = [];
+
+  for (const fn of fns ?? []) {
+    const proname = String(fn?.proname ?? "");
+    const identity = String(fn?.identity ?? proname);
+    const definition = String(fn?.definition ?? "");
+    const comment = String(fn?.comment ?? "");
+    const overloads = Number(fn?.overloads);
+
+    const thenLiterals = new Set([...definition.matchAll(THEN)].map(m => m[1]));
+    const closedRaw = closedSets?.[proname];
+    const closedSet = Array.isArray(closedRaw) ? closedRaw.map(String) : null;
+
+    // (A)
+    const bound = new Set();
+    const involved = new Set();
+    for (const r of ruleRows) {
+      if (String(r.status) !== "live") continue;
+      for (const clause of String(r.statement ?? "").split(/[.;]\s+/)) {
+        if (!clause.includes("`public." + proname + "()`")) continue;
+        for (const m of clause.matchAll(/refus[a-z]*[^`]*?`([^`]+)`/gi)) {
+          if (!SNAKE.test(m[1])) continue;
+          bound.add(m[1]);
+          involved.add(String(r.id));
+        }
+      }
+    }
+
+    // (B)
+    const enumerated = [];
+    const block = /refusals[^:]*:\s*([^;]*);/i.exec(comment);
+    if (block) {
+      for (const raw of block[1].split(/,(?![^()]*\))/)) {
+        const m = /^([a-z_]+)(?:\s*\(([^)]*)\))?$/.exec(raw.trim());
+        if (!m) continue;
+        enumerated.push({ token: m[1], rules: (m[2] ?? "").match(RULE_ID) ?? [] });
+      }
+    }
+
+    // (C)
+    for (const id of comment.match(RULE_ID) ?? []) involved.add(id);
+    for (const e of enumerated) for (const id of e.rules) involved.add(id);
+
+    const lines = [];
+    const add = line => { if (!lines.includes(line)) lines.push(line); };
+
+    for (const id of [...involved].sort()) {
+      const row = byId.get(id);
+      const status = row ? String(row.status) : "missing";
+      if (status !== "live") add(`${id} is ${status}, not live`);
+    }
+
+    // The overload check is .claude/rules/supabase-function-signature.md as a detector: two
+    // signatures live at once is an ambiguity PostgREST reports to its caller as an empty result.
+    if (!Number.isFinite(overloads) || overloads !== 1) add(`overloads ${fn?.overloads}`);
+
+    for (const token of new Set([...bound, ...enumerated.map(e => e.token)])) {
+      if (!thenLiterals.has(token)) add(`body lacks ${token}`);
+      if (closedSet && !closedSet.includes(token)) add(`REASONS lacks ${token}`);
+    }
+    if (closedSet) {
+      for (const reason of closedSet) if (!thenLiterals.has(reason)) add(`body lacks ${reason}`);
+    }
+
+    if (!lines.length) continue;
+
+    const ruleIds = [...involved].sort();
+    findings.push({
+      kind: "contradiction",
+      confidence: "high",
+      governing_fact: `the refusals ${identity} enforces vs the rules, comment and REASONS that name them`,
+      locations: [
+        { location: `pg_proc/${identity}`, text: lines.join("; ") },
+        ...ruleIds.map(id => ({
+          location: `governance_rules/${id}`,
+          text: byId.has(id) ? String(byId.get(id).statement ?? "") : "(no such governance_rules row)",
+        })),
+        {
+          location: "tests/regression/ses-297-pre-boot-pickability.test.mjs:REASONS",
+          text: closedSet ? `REASONS=${JSON.stringify(closedSet)}` : "no closed set is declared for this function",
+        },
+      ],
+      proposed_resolution: "restore the refusal or amend the register row — the rule is John's (SES-410)",
+    });
+  }
+
+  findings.sort((a, b) => a.locations[0].location.localeCompare(b.locations[0].location));
+  return findings;
+}
+
 // --- sources -----------------------------------------------------------------------------------
 
 function readIfPresent(rel) {
@@ -447,6 +600,8 @@ async function restGet(base, key, q) {
 
 async function databaseStatements(base, key) {
   const out = [];
+  // SES-411: the same whole-table read serves the corpus AND the drift gate -- id/statement/status
+  // is already everything detectRuleFunctionDrift() needs, so the gate costs no extra request.
   const rules = await restGet(base, key, "governance_rules?select=id,statement,status");
   for (const r of rules) {
     if (r.statement == null || String(r.statement).trim() === "") continue;
@@ -478,7 +633,15 @@ async function databaseStatements(base, key) {
     if (a.bio == null || String(a.bio).trim() === "") continue;
     out.push(mkStatement("agent-data", "agents", `agents/${a.id}/bio`, String(a.bio)));
   }
-  return { statements: out, liveRuleTexts: rules.filter(r => r.status === "live").map(r => r.statement) };
+  // pg_proc is not reachable through PostgREST; ses411_rule_enforcing_functions is the read, and it
+  // is service_role-only. GET works because the function is STABLE.
+  const fns = await restGet(base, key, "rpc/rule_enforcing_functions");
+  return {
+    statements: out,
+    liveRuleTexts: rules.filter(r => r.status === "live").map(r => r.statement),
+    rules,
+    fns,
+  };
 }
 
 // AGT-70 slice 4 -- ONE agent's own material, reached through the link tables. §19b/Rule #1: these
@@ -570,7 +733,9 @@ async function main() {
       process.exit(2);
     }
     statements.push(...walked.statements);
-    report(argv, statements, []);
+    // --agent reads one agent's own rows; it never reads the rule register or pg_proc, so the drift
+    // gate is NOT RUN here and must say so rather than print a 0 it did not measure.
+    report(argv, statements, [], null);
     return;
   }
 
@@ -596,6 +761,7 @@ async function main() {
   }
 
   let liveRuleTexts = [];
+  let gate = null;
   if (!noDb) {
     const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
     const key = process.env.SUPABASE_SERVICE_KEY ?? "";
@@ -607,23 +773,31 @@ async function main() {
       const db = await databaseStatements(base, key);
       statements.push(...db.statements);
       liveRuleTexts = db.liveRuleTexts;
+      // --corpus replaces the file half with a FIXTURE, so the live rules and the live function
+      // bodies are not that run's corpus. Reporting drift there would attribute a live platform
+      // fact to a fixture run; `not-run` is the honest answer.
+      if (typeof corpusDir !== "string") gate = { rules: db.rules, fns: db.fns };
     } catch (e) {
       console.error(`audit-corpus: ${e.message}`);
       process.exit(2);
     }
   }
 
-  report(argv, statements, liveRuleTexts);
+  report(argv, statements, liveRuleTexts, gate);
 }
 
 // Both detectors run on every path -- the bare `--detect` and the `--detect=<json>` file and the
 // summary line all read the SAME two arrays, so the printed `duplicates d stale s` is always the
 // real pair. The stale finding prints as a count rather than as its locations because it carries
 // twenty-three of them live and a summary that scrolls is not a summary.
-function report(argv, statements, liveRuleTexts) {
+function report(argv, statements, liveRuleTexts, gate = null) {
   const duplicates = detectDuplicates(statements, liveRuleTexts);
   const stale = detectStaleParameters(statements);
-  const findings = [...duplicates, ...stale];
+  // SES-411: `gate` is null on every path that did not read the rule register AND pg_proc
+  // (--no-db, --corpus, --agent). `drift not-run` then prints instead of `drift 0` -- a 0 that
+  // nobody measured is the false all-clear this file's header refuses.
+  const drift = gate ? detectRuleFunctionDrift(gate.rules, gate.fns, CLOSED_SETS) : null;
+  const findings = [...duplicates, ...stale, ...(drift ?? [])];
 
   const outPath = arg(argv, "out");
   if (typeof outPath === "string") {
@@ -641,12 +815,15 @@ function report(argv, statements, liveRuleTexts) {
     for (const f of stale) {
       console.log(`  stale-or-irrelevant · ${f.locations.length} locations`);
     }
+    for (const f of drift ?? []) {
+      console.log(`  contradiction · ${f.locations[0].location} · ${f.locations[0].text}`);
+    }
   }
 
   const gov = statements.filter(s => s.corpus === "governance").length;
   const agentData = statements.filter(s => s.corpus === "agent-data").length;
   const retired = statements.filter(s => s.retired).length;
-  console.log(`statements ${statements.length} (governance ${gov}, agent-data ${agentData}, retired ${retired}) duplicates ${duplicates.length} stale ${stale.length}`);
+  console.log(`statements ${statements.length} (governance ${gov}, agent-data ${agentData}, retired ${retired}) duplicates ${duplicates.length} stale ${stale.length} drift ${drift ? drift.length : "not-run"}`);
   process.exit(0);
 }
 
