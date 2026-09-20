@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.538 | scripts/agent-log.js | SES-424 slice 6 -- the parser and the citation writer MOVED
+// OUT to lib/pattern-citations.js, unchanged, so the EXECUTOR's writer (lib/activity-log.js) calls the same
+// two functions instead of a second copy of them. Nothing this script does changed: same flags, same printed
+// lines, same exit codes, same refusal text. parsePatternsApplied is RE-EXPORTED from this path because
+// tests/regression/ses-424e-patterns-cited.test.mjs imports it from here and grades the real parser.
 // DeepBench v7.0.537 | scripts/agent-log.js | SES-331, SES-424 slice 5 -- the other half of the one path: a session
 // that ran a governance agent itself writes the ai_activity_log row the executor would have written.
 //
@@ -124,6 +129,11 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { logActivity } from '../lib/activity-log.js';
+// FEATURE: SES-424 slice 6 -- the one writer both homes call. coercePatternNumbers is imported and
+// re-exported alongside the other two so a reader of this file sees the whole citation surface in one
+// place, even though the CLI itself only ever uses the strict parser (a typed flag is refused loudly;
+// only a MODEL's answer is coerced -- see that module's header).
+import { parsePatternsApplied, writeCitations, coercePatternNumbers } from '../lib/pattern-citations.js';
 import { runWithCallSource } from '../lib/request-context.js';
 import { SERVICE_CATALOG } from '../shared/ai-patterns.js';
 
@@ -177,35 +187,11 @@ export function tokenPairFrom(inputRaw, outputRaw) {
   return { inputTokens: inTok.value, outputTokens: outTok.value };
 }
 
-/**
- * FEATURE: SES-424 slice 5 -- the citation list, parsed once and exported so the regression drives
- * the real parser rather than a copy of its rules (docs/STANDARDS.md Section 4).
- *
- *   absent or ""      -> []   an answer that cited nothing is a legitimate answer, not an error
- *   "163,1,163"       -> [1, 163]   deduped and sorted, because the row set is a SET: the unique
- *                                   (activity_log_id, pattern_no) constraint would refuse the
- *                                   repeat, and a run should not fail over its own duplicate
- *   "0" / "x" / "1.5" -> { error }  0 is not a pattern number (the library starts at 1) and a
- *                                   non-integer is a driver bug, refused before anything is written
- *
- * Returns an array of integers, or { error }.
- */
-export function parsePatternsApplied(raw) {
-  if (raw === undefined || raw === null || String(raw).trim() === '') return [];
-  const seen = new Set();
-  for (const part of String(raw).split(',')) {
-    const tok = part.trim();
-    if (!/^\d+$/.test(tok)) {
-      return { error: `--patterns-applied: "${tok}" is not a pattern number. Pass a comma-separated list of positive integers that exist in public.decision_patterns (e.g. --patterns-applied=1,163), or omit the flag.` };
-    }
-    const n = Number(tok);
-    if (n < 1) {
-      return { error: `--patterns-applied: ${n} is not a pattern number -- the library is numbered from 1. Omit the flag when the turn cited nothing.` };
-    }
-    seen.add(n);
-  }
-  return [...seen].sort((a, b) => a - b);
-}
+// FEATURE: SES-424 slice 6 -- MOVED to lib/pattern-citations.js verbatim (same dedup+sort, same
+// {error} shapes). Re-exported from this path, not re-implemented: ses-424e-patterns-cited.test.mjs:50
+// imports parsePatternsApplied from here, and a test that drives a copy of the rules grades a copy
+// (docs/STANDARDS.md Section 4). coercePatternNumbers is the lenient sibling the EXECUTOR uses.
+export { parsePatternsApplied, coercePatternNumbers };
 
 export function parseArgs(argv, catalogSlugs = SERVICE_CATALOG.map(s => s.slug)) {
   const out = { json: false };
@@ -265,36 +251,6 @@ async function readBackRowId(traceId) {
   return rows[0] ? { row: rows[0] } : { error: 'read-back found no row for this trace id' };
 }
 
-/**
- * The citation rows for one turn. Written AFTER the log row exists, because activity_log_id is a
- * foreign key -- there is no row to cite until the audit row is back. Returns { citations } (the
- * count the database actually accepted, re-read from the insert's own representation, never the
- * length of what was asked for) or { error }.
- */
-async function writeCitations(logId, patterns, agentId, capabilitySlug) {
-  if (!patterns.length) return { citations: 0 };
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  const url = `${process.env.SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/decision_pattern_citations`;
-  const body = patterns.map(pattern_no => ({
-    activity_log_id: logId, pattern_no, agent_id: agentId, capability_slug: capabilitySlug ?? null,
-  }));
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {
-      apikey: key, Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json', Prefer: 'return=representation',
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await r.text();
-  if (!r.ok) {
-    return { error: `citation write refused for pattern(s) ${patterns.join(', ')}: HTTP ${r.status} ${text.slice(0, 300)}. `
-      + `ai_activity_log id=${logId} IS WRITTEN AND STANDS -- the audit row is mandatory and is not rolled back to punish a bad citation. `
-      + `Re-run the citations alone once the pattern number exists in public.decision_patterns.` };
-  }
-  const rows = text ? JSON.parse(text) : [];
-  return { citations: Array.isArray(rows) ? rows.length : 0 };
-}
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));

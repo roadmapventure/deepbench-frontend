@@ -587,7 +587,7 @@ Then log the run — mandatory per the bullet above, not a courtesy:
 ```
 node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<the assembly's llm.model> \
   --ai-type=agent-turn --feature=design-kickoff:ds-kickoff-intent:depth0 \
-  --input-tokens=N --output-tokens=N --cycle=<the supervised cycle id>
+  --input-tokens=N --output-tokens=N --cycle=<the supervised cycle id> --patterns-applied=<answer.patterns_applied>
 ```
 
 Exit 2 is a finding: the row did not land, so the run is unattributable and the count above stays
@@ -613,7 +613,7 @@ Then log this run too:
 ```
 node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the assembly's llm.model> \
   --ai-type=agent-turn --feature=build-ticket:bd-build-intent:depth0 \
-  --input-tokens=N --output-tokens=N --cycle=<the supervised cycle id>
+  --input-tokens=N --output-tokens=N --cycle=<the supervised cycle id> --patterns-applied=<answer.patterns_applied>
 ```
 
 **(c) The one exception, and it is narrow:** a session whose ticket edits the governance agents' own

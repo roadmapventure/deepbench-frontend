@@ -1,3 +1,23 @@
+// DeepBench v7.0.538 | api/capabilities/execute.js | SES-424 slice 6 -- THE TURN'S OWN CITATIONS REACH
+// THE TABLE. The three governance Intent contracts require `patterns_applied` (slice 5), so every
+// executor turn already ANSWERS with the decision criteria it applied -- and this file dropped them:
+// the loop reads turn.tool_input for self-reported claims and delegation provenance, never for that
+// key, so lib/activity-log.js (which gained a citation path this slice) was handed nothing to write.
+// Measured 2026-09-20 over 30 days by call_source, executor-side citations: design-kickoff 0,
+// build-ticket 0, run-project 0.
+//
+// ONE LINE OF CAPTURE, ONE PARAM OF FORWARDING, AND NO NEW DECISION. heldTurnLog carries
+// `patternsApplied` beside `selfReportedClaims` -- read off the same turn.tool_input, by the same
+// generic extractor posture (§19b/§19d: no capability slug, agent id or intent branch is consulted,
+// here or anywhere below). coercePatternNumbers() keeps the positive integers a model wrote and
+// drops the rest WITHOUT erroring, because attribution is best-effort and must never cost a turn its
+// mandatory audit row (pattern:105, and SES-423's lesson about a validator that refused to write).
+//
+// THE FAILURE-PATH WRITE PASSES NONE, deliberately: a refused, aborted or rejected call produced no
+// answer, so it has no criteria to cite, and a citation invented for it would be a claim about a
+// turn that never spoke. NOT a call_facts key and NOT a patterns_used slug -- the citations are
+// their own rows in public.decision_pattern_citations, so the §19k signature is untouched.
+//
 // DeepBench v7.0.466 | api/capabilities/execute.js | SES-348 -- THE EXECUTOR DECLARES ITS REAL
 // CEILING AND DERIVES ITS DEADLINES FROM IT. `config.maxDuration` was 60 on a project whose Fluid-
 // compute default timeout is 300 s, and both deadline computations (the fresh top-level call and the
@@ -144,6 +164,9 @@ import { sendRequest, callModel, extractSelfReportedClaims, extractDelegationPro
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow, patchDurableHopRowChecked } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
+// FEATURE: SES-424 slice 6 -- the lenient reader for a MODEL-authored citation list, shared with
+// scripts/agent-log.js's strict CLI parser in one module (lib/pattern-citations.js).
+import { coercePatternNumbers } from '../../lib/pattern-citations.js';
 import { withRequestContext } from '../../lib/request-context.js';
 // FEATURE: SES-346 -- TRANSPORT DELEGATION ONLY. api/_lib/mcp.js used to be api/mcp.js, a 13th
 // serverless function on a 12-function Hobby plan, and its presence REFUSED every dev deploy from
@@ -439,7 +462,7 @@ export function __resetCapabilityPhraseCache() {
 // stopReason/refusalCategory/fault/tokensEstimated are §19k DIAGNOSTIC facts under the LOG-109
 // posture (.claude/rules/ai-pattern-signature.md) -- bounded enums and a boolean, never a count, and
 // deliberately not added to SIGNATURE_FIELDS.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, cache_creation_input_tokens = null, cache_read_input_tokens = null, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null, stopReason = null, refusalCategory = null, fault = null, tokensEstimated = false, costUsd = undefined }) {
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, cache_creation_input_tokens = null, cache_read_input_tokens = null, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null, stopReason = null, refusalCategory = null, fault = null, tokensEstimated = false, costUsd = undefined, patternsApplied = [] }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -524,6 +547,10 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     // logActivity() prices the row from its own tokens; an explicit 0 is the failure seam asserting
     // an unbilled call. Never computed here -- one pricing site, and it is logActivity().
     costUsd,
+    // FEATURE: SES-424 slice 6 -- the decision criteria this turn cited, forwarded verbatim. [] for
+    // every pre-existing caller and for the failure seam, and [] writes nothing and changes nothing
+    // about the row (lib/activity-log.js keeps its `return=minimal` single request when empty).
+    patternsApplied,
   });
 }
 
@@ -1327,6 +1354,13 @@ async function runLoop({
       spanId: span_id, parentSpanId: parent_span_id,
       inputReferencesOtherDeliverable: integratedDelegateResult,
       selfReportedClaims: extractSelfReportedClaims(turn.tool_input),
+      // FEATURE: SES-424 slice 6 -- the criteria the model itself named in its structured answer,
+      // read off the SAME turn.tool_input the line above reads, and coerced rather than validated:
+      // junk is dropped, the turn still logs, and the FK to public.decision_patterns is the only
+      // authority on which numbers exist. These become ROWS in public.decision_pattern_citations,
+      // never a call_facts key -- a per-turn list there would fragment the §19k signature, the
+      // measured LOG-91 failure (720 -> 24,826 distinct signatures).
+      patternsApplied: coercePatternNumbers(turn.tool_input?.patterns_applied),
       // FEATURE: LOG-67 -- the config-half snapshot, threaded from runCapability() (off promptRequest),
       // merged into this row's call_facts alongside the fact-half tool_calls below.
       signatureConfig,

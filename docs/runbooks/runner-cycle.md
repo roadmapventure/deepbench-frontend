@@ -2100,7 +2100,7 @@ stops the cycle. **(e)** Log the call with the command below and write
 ```
 node scripts/agent-log.js --agent=devmanager --capability=run-project --model=<the model the driver printed> \
   --ai-type=agent-turn --feature=run-project:dm-run-intent:depth0 \
-  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id>
+  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id> --patterns-applied=<answer.patterns_applied>
 ```
 
 **(1a) One-off directives** — `runner_directives` `WHERE type='directive' AND status='queued'`,
@@ -2886,13 +2886,11 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
 ```
 node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<the assembly's llm.model> \
   --ai-type=agent-turn --feature=design-kickoff:ds-kickoff-intent:depth0 \
-  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id>
+  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id> --patterns-applied=<answer.patterns_applied>
 ```
 
    Exit 2 is a finding, not a nuisance: the row did not land, so this run is unattributable and the
-   Designer's own throughput cannot be read off the log at all. Measured 2026-09-12 — 2 Designer and
-   1 Builder rows, all 2026-09-09 fixtures, across the 12 kickoffs written since — which is what an
-   unlogged mandatory run looks like after three days. **The bracketed pair is optional AS A
+   Designer's own throughput cannot be read off the log at all. **The bracketed pair is optional AS A
    PAIR (`v7.0.530`):** omit both when the harness reported no usage and let the row land with
    NULL tokens — unmeasured, never free — but a lone flag, or a negative or non-numeric value,
    still exits 2.
@@ -3032,11 +3030,10 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
 ```
 node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the assembly's llm.model> \
   --ai-type=agent-turn --feature=build-ticket:bd-build-intent:depth0 \
-  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id>
+  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id> --patterns-applied=<answer.patterns_applied>
 ```
 
-   Exit 2 is a finding here for the same reason step 6 gives, and the Builder's half is the thinner
-   of the two: **1** row on the whole log at the measurement.
+   Exit 2 is a finding here for the same reason step 6 gives.
 2. **`outcome = 'pushed'` → read `push_sha`, and that sha IS the ship point; there is no second
    one.** Write it to your cycle row (`runner_cycles.push_sha`, beside `version`) and put the
    returned `build` and `regression_summary` into `notes` **verbatim**. A `regression_summary` that

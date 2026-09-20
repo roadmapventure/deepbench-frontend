@@ -68,12 +68,15 @@ const CYCLE = "docs/runbooks/runner-cycle.md";
 const JOHN = "docs/WORKING-WITH-JOHN.md";
 
 // SES-336's ceiling and the LAST MEASURED size of the runbook, re-measured by every ship that
-// edits it. v7.0.535 (SES-424 slice 3) rotated the v7.0.517 stamp out to docs/SESSIONS.md (its four
-// zero-hit facts -- f3688e3e, verifier.js:2115/:2131, the four staff-watch KINDS and NOTES["7"]
-// -- RELOCATED into step 7a, SES-164 step 2 by grep first) before adding the gate-card bucket to
-// step 5's blocked census, and landed at 380879 B, 121 B under the ceiling.
+// edits it. v7.0.538 (SES-424 slice 6) appended ` --patterns-applied=<answer.patterns_applied>` to
+// the three `scripts/agent-log.js` blocks (+135 B, 45 each) -- which did not fit under the ceiling,
+// so 296 B came OUT first, in the same commit and before the additions: two dated measurements the
+// cycle's own §2 counts had superseded (step 6's "Measured 2026-09-12 -- 2 Designer and 1 Builder
+// rows" sentence, 196 B, and step 6b's "the Builder's half is the thinner of the two: 1 row" clause,
+// 100 B), both kept verbatim in docs/harvests/SES-424-slice6.md. 380879 - 296 + 135 = 380718 B, 282 B
+// under the ceiling. The ceiling itself is NEVER raised to make an edit fit.
 export const RUNBOOK_CEILING = 381000;
-export const BYTES_AT_SHIP = 380879;
+export const BYTES_AT_SHIP = 380718;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
