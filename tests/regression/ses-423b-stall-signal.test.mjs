@@ -184,10 +184,15 @@ function everyClauseHasTeeth(md) {
 function theStampWasMovedNotDeleted(md) {
   const stamps = md.split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
   assert.strictEqual(stamps.length, 5, `session-hygiene check 7 caps the runbook at 5 header stamps; got ${stamps.length}`);
-  assert.ok(stamps[0].startsWith("<!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3"),
+  assert.ok(stamps[0].startsWith("<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3"),
     "this ship's own stamp must be the first line of the runbook");
+  assert.ok(!md.includes("<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md"),
+    "v7.0.517 is the stamp SES-424 slice 3 rotated out; it must no longer be in the runbook");
+  assert.ok(read("docs/SESSIONS.md").includes("<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7"),
+    "the rotated v7.0.517 stamp must land in docs/SESSIONS.md VERBATIM -- a stamp dropped instead of " +
+    "moved loses the only written record of that ship");
   assert.ok(!md.includes("<!-- DeepBench v7.0.516 | runbooks/runner-cycle.md"),
-    "v7.0.516 was the stamp this ship rotated out; it must no longer be in the runbook");
+    "v7.0.516 was the v7.0.532 ship's rotation; it must still be out of the runbook");
   assert.ok(read("docs/SESSIONS.md").includes("<!-- DeepBench v7.0.516 | runbooks/runner-cycle.md | SES-378 slice 6"),
     "the rotated v7.0.516 stamp must land in docs/SESSIONS.md VERBATIM -- a stamp dropped instead of " +
     "moved loses the only written record of that ship");

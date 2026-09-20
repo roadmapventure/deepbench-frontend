@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3 — AN ALL-GATED DRAIN IS NOT A FINISHED ONE: a member carrying an undecided gate card is out of both pick paths since slice 1, so `drain_epic_next`'s `blocked_detail` census now counts *"carrying an undecided gate card"*. `v7.0.517` VERBATIM to `docs/SESSIONS.md`, four ZERO-hit facts RELOCATED into 7a; count 5. Guard `ses-424c`. -->
 <!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3 — A READING IS A DELTA, NEVER THE SESSION TOTAL: `get_session` counts the whole SESSION and a drain chain runs many cycles in one (`fd4e11f4` closed at 32,249,570; its continuation opened on that counter), so step 1 takes reading 0 at the INSERT (`tokens_at_open` in `notes`) and step 9 charges deltas. `v7.0.516` moved VERBATIM to `docs/SESSIONS.md`, two ZERO-hit facts RELOCATED; count 5. Guard `ses-423b`. -->
 <!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2 — A STALL IS JUDGED BY THE BUILD'S OWN SIGNAL, THE CLOSE-OUT MEASURES: step 7 hands the Builder a `heartbeat` key (`scripts/cycle-heartbeat.js`, new) so probe (d) reads a build that STOPPED, not a long one — 13 `stall_notified_at` rows, **9 ended `shipped`**. Step 9's `est_tokens_*` are MEASURED from two `get_session` reads (`SES-409`: 15.27M here vs ≤900,000 shipped), not estimated; the three agent-log fences bracket the pair as optional. `SES-164` step 2 by grep FIRST: `v7.0.505` moved VERBATIM to `docs/SESSIONS.md`, its five ZERO-hit facts RELOCATED into 4e; count 5. Guard `ses-423b-stall-signal.test.mjs`. -->
 <!-- DeepBench v7.0.520 | runbooks/runner-cycle.md | SES-378 slice 8 — THE LANE REFUSAL GETS ITS OWN NAME: step 6 exit 1's TWO causes now branch on the `--json` `kind`, each under its own FIXED detail. Guard `ses-378h-lane-refusal-kind.test.mjs`. `v7.0.500` DROPPED, count 5. -->
 <!-- DeepBench v7.0.519 | runbooks/runner-cycle.md | SES-385 slice 2 — THE CLOSE-OUT SETTLES ITSELF via `scripts/settle-ship.js`; read twice: THE VERDICT IS NOT AN INPUT — the kickoff, the undecided gate cards and `--remainder=` decide, so an `approve` cannot settle a record naming unbuilt work. Slice 1's prose rule failed twice: `SES-413`, `SES-415` read `delivered`, links NULL; `missing_kickoff` 4→2. Part (4) cleared `designed` on **50** closed rows (kickoff said 49; a peer shipped `AGT-79`), links KEPT, 50 imaged. ROTATION: `v7.0.493` DROPPED, count held at **5** (kickoff said 4; `agt-70` asserts 5), `SES-164` step 2 by grep FIRST — its seven ZERO-hit names (`resolveDeliveryFiles`, `selfCertificationBlock`, `changedFilesFor`, `changed-<cycle id>.json`, `ses-379-changed-files-fail-closed`, `377,375`, `premise-3`) RELOCATED into 7a. Card re-rendered and re-pinned. -->
-<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7 — THE TWO JUDGMENT KINDS GET A CALLER, and the thing to read twice is that THE VERIFIER NAMED THE DESIGNER ALL ALONG: a failed `--kickoff=` check forces `block` and PREPENDS its reason (`verifier.js:2115`/`:2131`), and live verdict `f3688e3e` opened with the lane phrase, unrecorded. Step 7 records `kickoff lacked a fact` off `deviations`; 7a records `verdict block attributable to the kickoff` when `reasoning` OPENS with `kickoff over cap` (`SES-376`) or `kickoff has no lane declaration` (`SES-359`). All four `KINDS` now have a caller; a red gate alone is not it. Commands are PROSE: `NOTES["7"].block` = 1 copies the `agent-prompt.js` fence. Stamps held at 5: `v7.0.477` DROPPED, `SES-164` grep FIRST — `toLocaleDateString`, `writeCycle()`, `77afdcbc` ZERO hits, RELOCATED to step 4e. Card re-rendered, re-pinned. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -2167,9 +2167,10 @@ reader.** `prime_directive_queue()` already is layers (1a)/(1b)/(3) in one order
 `directive` first (oldest queued), then lane `drain` (the standing drain's next claimable named
 members), then lane `selfbuild` (the executing project's buildable tickets), with the three
 ticket-ordering keys `SES-281` pinned. Its `buildable` CTE already excludes deferred rows, unclaimed-
-ness, `needs-desktop`, an unresolved milestone design gate and a blocking dependency. A cycle that
-re-derives any of that from the prose below has built a second copy of a predicate that has one home
-— `SES-45`'s defect, which is why this layer is two statements now and was twenty before.
+ness, `needs-desktop`, an unresolved milestone design gate, a blocking dependency and (`SES-424`) an
+undecided gate card. A cycle that re-derives any of that from the prose below has built a second
+copy of a predicate that has one home — `SES-45`'s defect, which is why this layer is two statements
+now and was twenty before.
 
 <!-- FEATURE: SES-333 — the class-sorted board read below is RETIRED IN PLACE and kept verbatim. -->
 **RETIRED IN PLACE (`SES-333`, `v7.0.436`) — `docs/SELFBUILD-RETIREMENT-LEDGER.md` entry 45.** The
@@ -2379,10 +2380,12 @@ waits for John.
   **And since `SES-218` (`v7.0.295`) it is also a member whose remainder is not blocked on another
   ticket** — see the `blocked_by` property below.
 - **`blocked`** — the drain is live and named members are still open, but none you can claim right
-  now: a peer holds them, they are `delivered` awaiting John's Accept, (since `SES-196`) every
-  one that remains is flagged and waiting on him, or (since `SES-218`) every one that remains is
-  blocked on another open ticket. **`blocked_detail` names which** — it is never a
-  silent empty. **Fall through to the class-sorted board and build normally.** A drain must never
+  now: a peer holds them, they are `delivered` awaiting John's Accept, (since `SES-196`) every one
+  that remains is flagged and waiting on him, or (since `SES-218`) every one that remains is
+  blocked on another open ticket. **`blocked_detail` names which** — it is never a silent empty.
+  Since `SES-424` a member carrying an undecided `gated_before_build` card is not work either, and
+  `blocked_detail` counts it (*"carrying an undecided gate card"*): an all-gated list is not a
+  finished drain. **Fall through to the class-sorted board and build normally.** A drain must never
   end a cycle build-less — register B24's rule (B24 superseded 2026-09-01 by `M6-06`; `SES-285`,
   annotated `SES-289` — the one-build-per-cycle half survives that supersession and is what binds
   here), binding here for the same reason.
@@ -3145,7 +3148,9 @@ SELECT * FROM public.verdict_ladder_signal('<verdict id>');
   `node scripts/staff-watch.js --record --cycle-id=<your cycle id> --agent=designer --kind='verdict block attributable to the kickoff' --backlog=<TICKET-ID> --detail='verifier blocked on the kickoff: no lane declaration'`
 
   A `block` on a red gate alone is **NOT** this finding — that one is the build's, and filing it
-  against the Designer buries the only signal this kind exists to raise.
+  against the Designer buries the only signal this kind exists to raise. Verdict `f3688e3e`
+  (`v7.0.517`) opened with the lane phrase, unrecorded: `verifier.js:2115`/`:2131` force the `block`
+  and prepend the reason; all four staff-watch `KINDS` have a caller; `NOTES["7"].block` = 1.
 
   **WHY THE RENDER MOVED UP, and it is the whole of `SES-213`: without it the verdict grades a tree
   that is stale BY CONSTRUCTION.** The regression gate spawns `run-all.js` with no `env` of its own
