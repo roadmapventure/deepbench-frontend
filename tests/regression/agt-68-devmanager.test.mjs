@@ -154,6 +154,11 @@ export const GOOD_ANSWER = Object.freeze({
   },
   report: "1 assigned, 11 open.",
   needs_john: [],
+  // SES-424 slice 5: the live contract now REQUIRES patterns_applied, so an answer without it is
+  // no longer well-formed and the validator arm below would refuse it. Empty is a legitimate value
+  // -- "this turn leaned on none" -- and it is deliberately empty here rather than populated: this
+  // fixture exists to be a VALID answer, and a citation list would be a fact nobody measured.
+  patterns_applied: [],
 });
 // `auto-assign` is truthy, reads like an assignment, and is not in the enum. See header notes 4/5.
 export const BAD_ACTION_MUTANT = Object.freeze({ ...GOOD_ANSWER, action: "auto-assign" });

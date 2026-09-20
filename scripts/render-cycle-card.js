@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v7.0.463 | scripts/render-cycle-card.js | SES-377 -- the cycle card: a 5-10 KB
+// DeepBench v7.0.537 | scripts/render-cycle-card.js | SES-377, SES-424 slice 5 -- the cycle card: a 5-10 KB
 // executable digest of docs/runbooks/runner-cycle.md, GENERATED from it and never hand-written.
 //
 // WHY THIS EXISTS. Measured 2026-09-12 in this clone: runner-cycle.md is 363,840 bytes over 4,409
@@ -215,6 +215,18 @@ export function render(md) {
 // John's rule (AGENT-ROW-AGREED-TICKET) wants imaged under a ticket that names it -- not a silent
 // side effect of a render.
 //
+// ...AND SINCE SES-424 SLICE 5 THERE IS A REPAIR PATH, WHICH IS NOT THE SAME AS SELF-HEALING.
+// `--sync-knowledge` alone still exits 1 on drift and writes nothing; what changed is that the
+// message now NAMES the command that fixes it, and that command (`--repin --cycle-id=<uuid>
+// --ticket=<ID>`) makes the repair the same shape as every other agent-row write: one decision
+// handle, an image carrying the FULL prior row (an UPDATE's undo is a restore, never a delete),
+// then the PATCH, then a read-back that must classify `current`. Before this, a drifted row had
+// NO path at all -- the render exited 1 and the only way forward was a hand-written UPDATE with no
+// image, which is precisely what §19v exists to stop. Requiring --ticket is the rule itself in the
+// flag list: a re-pin is build work only under a ticket that names the write, so the command
+// cannot be run without naming one (pattern:19 -- gate the dangerous operation through an atomic
+// correct path rather than hard-blocking it).
+//
 // WHY --apply WRITES OVER PostgREST AND NOT AS ONE `DO` BLOCK, stated plainly because the runbook
 // asks for the DO block. Node here has no SQL channel: there is no `pg`/`postgres` dependency in
 // package.json and no raw-SQL RPC on this project (`public.exec_readonly_sql` does not exist --
@@ -295,6 +307,22 @@ export function knowledgeSyncState(live, cardSha) {
   return { state: pinned === cardSha ? "current" : "drifted", pinned, expected: cardSha };
 }
 
+// Pure, and the whole of the repair's decision. `live` is the fetched row, `row` what
+// knowledgeRow() renders from the committed card right now. Returns the plan, or null when there
+// is nothing to re-pin -- so a caller cannot write on a row that is already current, and the test
+// can drive both answers without touching Supabase.
+export function repinPlan(live, row) {
+  const st = knowledgeSyncState(live, row.traits.source_sha256);
+  if (st.state !== "drifted") return null;
+  return {
+    from: st.pinned,
+    to: st.expected,
+    // BOTH COLUMNS MOVE TOGETHER. The pin is a sha OF THE METHOD, so patching traits alone would
+    // write a row whose pin describes bytes it does not hold -- a drift that now reads as current.
+    patch: { method: row.method, traits: row.traits },
+  };
+}
+
 async function supaRest(base, key, pathAndQuery, init = {}) {
   const res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
     ...init,
@@ -315,8 +343,80 @@ function flagValue(name) {
   return hit ? hit.slice(name.length + 3) : null;
 }
 
+// THE REPAIR. Reached only from a DRIFTED classification, and it refuses before it writes rather
+// than half-way through: both flags are checked first, so "exit 2 naming the missing flag" leaves
+// the ledger and the row exactly as they were.
+async function repinKnowledge(base, key, live, row) {
+  const cycleId = flagValue("cycle-id");
+  if (!cycleId) {
+    console.error("render-cycle-card --sync-knowledge --repin: --cycle-id=<uuid> is required — every agent-row write owes a runner_before_images row, and an image needs an owner (§19v). Nothing was written.");
+    process.exit(2);
+  }
+  const ticket = flagValue("ticket");
+  if (!ticket) {
+    console.error("render-cycle-card --sync-knowledge --repin: --ticket=<ID> is required — AGENT-ROW-AGREED-TICKET makes an UPDATE over an active agent's Knowledge build work only under a ticket that NAMES the write. Nothing was written.");
+    process.exit(2);
+  }
+
+  const plan = repinPlan(live, row);
+  if (!plan) {
+    console.error(`render-cycle-card --sync-knowledge --repin: nothing to re-pin — the row is already current. Nothing was written.`);
+    process.exit(2);
+  }
+
+  let decision = flagValue("decision");
+  try {
+    if (!decision) {
+      decision = await supaRest(base, key, "rpc/record_decision", {
+        method: "POST",
+        body: JSON.stringify({
+          p_cycle_id: cycleId,
+          p_session_name: null,
+          p_kind: "agent-row",
+          p_backlog_id: ticket,
+          p_summary: `${ticket}: re-pin ${KNOWLEDGE_SLUG} ${plan.from} → ${plan.to}`,
+          p_reasoning: `${CARD_REL} was re-rendered and the live Knowledge row still carried the previous procedure, so the Development Manager was being assembled with a cycle that is no longer the committed one. The row's method and its traits.source_sha256 move together; the image carries the FULL prior row, so the undo is a restore. Matrix row 1 (b84e133d, unreversed) makes this re-pin the Builder's to run.`,
+          p_ladder_work_class: null,
+        }),
+      });
+      if (typeof decision !== "string" || decision.length !== 36) {
+        throw new Error(`record_decision returned ${JSON.stringify(decision)}, which is not a decision id`);
+      }
+    }
+
+    // IMAGE FIRST, carrying the FULL live row -- this is an UPDATE, so its undo is a restore.
+    await supaRest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        cycle_id: cycleId, session_name: null, table_name: "skill_profiles",
+        pk_value: live.id, row_data: live, decision_id: decision,
+      }),
+    });
+
+    await supaRest(base, key, `skill_profiles?slug=eq.${KNOWLEDGE_SLUG}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(plan.patch),
+    });
+
+    const back = await supaRest(base, key, `skill_profiles?select=*&slug=eq.${KNOWLEDGE_SLUG}&limit=1`);
+    const after = knowledgeSyncState(Array.isArray(back) && back.length ? back[0] : null, row.traits.source_sha256);
+    if (after.state !== "current") {
+      throw new Error(`the row read back as "${after.state}" after the PATCH — decision ${decision} is standing and holds the image; reverse it (select public.reverse_decision('${decision}','<who>','<why>');) before retrying`);
+    }
+    console.log(`render-cycle-card --sync-knowledge --repin: re-pinned ${KNOWLEDGE_SLUG} (${live.id}) ${plan.from} → ${plan.to} under ${ticket}, decision ${decision}; one before-image carrying the full prior row; the row reads back current.`);
+    process.exit(0);
+  } catch (e) {
+    console.error(`render-cycle-card --sync-knowledge --repin: FAILED — ${e.message}` +
+      (decision ? ` Decision ${decision} was recorded; reverse it (select public.reverse_decision('${decision}','<who>','<why>');) before retrying so the slice keeps one handle.` : ""));
+    process.exit(2);
+  }
+}
+
 async function syncKnowledge() {
   const apply = process.argv.includes("--apply");
+  const repin = process.argv.includes("--repin");
   const cardPath = path.join(WORKTREE, CARD_REL);
 
   let cardText;
@@ -347,7 +447,9 @@ async function syncKnowledge() {
 
   let live;
   try {
-    const rows = await supaRest(base, key, `skill_profiles?select=id,slug,method,traits&slug=eq.${KNOWLEDGE_SLUG}&limit=1`);
+    // select=* rather than four columns: a re-pin's before-image must carry the FULL prior row,
+    // and an image assembled from a projection restores a row with holes in it.
+    const rows = await supaRest(base, key, `skill_profiles?select=*&slug=eq.${KNOWLEDGE_SLUG}&limit=1`);
     live = Array.isArray(rows) && rows.length ? rows[0] : null;
   } catch (e) {
     console.error(`render-cycle-card --sync-knowledge: cannot read the live row — ${e.message}. Exiting 2 (cannot run).`);
@@ -359,8 +461,23 @@ async function syncKnowledge() {
     (st.state === "drifted" ? ` — pinned ${JSON.stringify(st.pinned)}, the card renders ${JSON.stringify(st.expected)}` : ""));
 
   if (st.state === "drifted") {
-    console.error(`render-cycle-card --sync-knowledge: DRIFTED — public.skill_profiles.${KNOWLEDGE_SLUG} pins ${JSON.stringify(st.pinned)} but ${CARD_REL} renders ${JSON.stringify(st.expected)}. The manager is being assembled with a procedure that is no longer the committed one. Repairing it is an UPDATE over an active agent's Knowledge: image it under a ticket that names the write (AGENT-ROW-AGREED-TICKET), never as a side effect of a render.`);
-    process.exit(1);
+    if (!repin) {
+      console.error(`render-cycle-card --sync-knowledge: DRIFTED — public.skill_profiles.${KNOWLEDGE_SLUG} pins ${JSON.stringify(st.pinned)} but ${CARD_REL} renders ${JSON.stringify(st.expected)}. The manager is being assembled with a procedure that is no longer the committed one. Repairing it is an UPDATE over an active agent's Knowledge: image it under a ticket that names the write (AGENT-ROW-AGREED-TICKET), never as a side effect of a render. Repair it with:  node scripts/render-cycle-card.js --sync-knowledge --repin --cycle-id=<uuid> --ticket=<ID> [--decision=<uuid>]`);
+      process.exit(1);
+    }
+    return repinKnowledge(base, key, live, row);
+  }
+
+  // --repin on a row that is not drifted. `current` is the success case and writes NOTHING; `absent`
+  // cannot be re-pinned at all -- there is no prior row to image, and seeding is --apply's job, a
+  // different write with a different undo (a DELETE, not a restore).
+  if (repin) {
+    if (st.state === "absent") {
+      console.error(`render-cycle-card --sync-knowledge --repin: the row is ABSENT — there is nothing to re-pin. A re-pin is an UPDATE; seeding is --apply, whose image carries row_data NULL because its undo is a DELETE. Seed it with:  node scripts/render-cycle-card.js --sync-knowledge --apply --cycle-id=<uuid>`);
+      process.exit(2);
+    }
+    console.log(`render-cycle-card --sync-knowledge --repin: already current — the row pins ${JSON.stringify(st.expected)}, no write attempted.`);
+    process.exit(0);
   }
 
   if (!apply) {
@@ -467,6 +584,9 @@ async function syncKnowledge() {
 // --sync-knowledge [--apply --cycle-id=<uuid> [--decision=<uuid>]]
 //          -> 0 the live Knowledge row is absent or current, 1 it is DRIFTED, 2 it cannot be read
 //             (missing card, missing env, REST failure) or --apply could not complete.
+// --sync-knowledge --repin --cycle-id=<uuid> --ticket=<ID> [--decision=<uuid>]
+//          -> repairs a DRIFTED row: 0 re-pinned (or already current, nothing written), 2 the row is
+//             absent, a required flag is missing, or the write could not complete. SES-424 slice 5.
 
 function firstDiff(a, b) {
   const x = a.split("\n");

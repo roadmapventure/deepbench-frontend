@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v7.0.426 | scripts/agent-log.js | SES-331 -- the other half of the one path: a session
+// DeepBench v7.0.537 | scripts/agent-log.js | SES-331, SES-424 slice 5 -- the other half of the one path: a session
 // that ran a governance agent itself writes the ai_activity_log row the executor would have written.
 //
 // WHY THIS EXISTS. scripts/agent-prompt.js makes a session's prompt the executor's prompt. This
@@ -66,6 +66,23 @@
 // LOG-130's slot for exactly this: the self-declared identity a non-browser caller has no other way
 // to fill, a plumbing column, never a criteria key.
 //
+// THE PATTERNS A TURN APPLIED ARE A ROW, NOT A SENTENCE (SES-424 slice 5). The three governance
+// agents now answer with `patterns_applied` -- the decision criteria they leaned on this turn, by
+// number -- and a number that lives only inside an answer's JSON is unqueryable the moment the
+// answer scrolls past. `--patterns-applied=<csv>` writes one `public.decision_pattern_citations`
+// row per (this run's ai_activity_log id, pattern_no), so "which criteria does the staff actually
+// decide by, and which has nobody cited in a month" is a query over measured rows.
+//
+// FK, NOT VALIDATION-BY-LIST. `pattern_no` references `public.decision_patterns(pattern_no)`, the
+// same table scripts/render-role-patterns.js renders the agents' Knowledge rows from, so an invented
+// number is refused by the database rather than by a copy of the library kept here (pattern:2 --
+// the hardcoded list is the thing to remove, not to maintain). The refusal exits 2 AND NAMES THE
+// STANDING LOG ROW: the audit row is already written and stays written, because a mandatory row
+// dropped to punish a bad citation is the SES-423 defect wearing new clothes.
+//
+// THE CITATIONS ARE CASCADE-DELETED with their log row (`on delete cascade`), so the pair can never
+// read as a citation with no turn behind it.
+//
 // USAGE
 //   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/agent-log.js \
 //     --agent=owen --capability=bench-report-card --model=claude-opus-5 \
@@ -96,6 +113,9 @@
 //   --latency-ms=<int>         optional
 //   --trace=<id>               optional; one is minted when absent, and is what the row is read back by
 //   --cycle=<uuid>             optional runner_cycles.id -> visitor_id
+//   --patterns-applied=<csv>   optional pattern numbers the turn applied ("1,163"). Empty or absent
+//                              writes no citation rows; duplicates collapse; 0 or a non-integer is
+//                              refused BEFORE the log row is written.
 //   --json                     optional machine-readable single-line result
 //
 // EXIT CODES: 0 the row is in the table and its id is printed; 2 anything else.
@@ -157,6 +177,36 @@ export function tokenPairFrom(inputRaw, outputRaw) {
   return { inputTokens: inTok.value, outputTokens: outTok.value };
 }
 
+/**
+ * FEATURE: SES-424 slice 5 -- the citation list, parsed once and exported so the regression drives
+ * the real parser rather than a copy of its rules (docs/STANDARDS.md Section 4).
+ *
+ *   absent or ""      -> []   an answer that cited nothing is a legitimate answer, not an error
+ *   "163,1,163"       -> [1, 163]   deduped and sorted, because the row set is a SET: the unique
+ *                                   (activity_log_id, pattern_no) constraint would refuse the
+ *                                   repeat, and a run should not fail over its own duplicate
+ *   "0" / "x" / "1.5" -> { error }  0 is not a pattern number (the library starts at 1) and a
+ *                                   non-integer is a driver bug, refused before anything is written
+ *
+ * Returns an array of integers, or { error }.
+ */
+export function parsePatternsApplied(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return [];
+  const seen = new Set();
+  for (const part of String(raw).split(',')) {
+    const tok = part.trim();
+    if (!/^\d+$/.test(tok)) {
+      return { error: `--patterns-applied: "${tok}" is not a pattern number. Pass a comma-separated list of positive integers that exist in public.decision_patterns (e.g. --patterns-applied=1,163), or omit the flag.` };
+    }
+    const n = Number(tok);
+    if (n < 1) {
+      return { error: `--patterns-applied: ${n} is not a pattern number -- the library is numbered from 1. Omit the flag when the turn cited nothing.` };
+    }
+    seen.add(n);
+  }
+  return [...seen].sort((a, b) => a - b);
+}
+
 export function parseArgs(argv, catalogSlugs = SERVICE_CATALOG.map(s => s.slug)) {
   const out = { json: false };
   for (const raw of argv) {
@@ -174,6 +224,7 @@ export function parseArgs(argv, catalogSlugs = SERVICE_CATALOG.map(s => s.slug))
       case 'latency-ms': out.latencyRaw = value; break;
       case 'trace': out.trace = value; break;
       case 'cycle': out.cycle = value; break;
+      case 'patterns-applied': out.patternsAppliedRaw = value; break;
       case 'tenant': out.tenant = value; break;
       case 'json': out.json = true; break;
       default: return { error: `unrecognized flag "--${key}"` };
@@ -198,6 +249,9 @@ export function parseArgs(argv, catalogSlugs = SERVICE_CATALOG.map(s => s.slug))
     if (r.error) return r;
     out.latencyMs = r.value;
   }
+  const patterns = parsePatternsApplied(out.patternsAppliedRaw);
+  if (patterns.error) return patterns;
+  out.patternsApplied = patterns;
   return out;
 }
 
@@ -209,6 +263,37 @@ async function readBackRowId(traceId) {
   if (!r.ok) return { error: `read-back failed: HTTP ${r.status} ${await r.text().catch(() => '')}` };
   const rows = await r.json();
   return rows[0] ? { row: rows[0] } : { error: 'read-back found no row for this trace id' };
+}
+
+/**
+ * The citation rows for one turn. Written AFTER the log row exists, because activity_log_id is a
+ * foreign key -- there is no row to cite until the audit row is back. Returns { citations } (the
+ * count the database actually accepted, re-read from the insert's own representation, never the
+ * length of what was asked for) or { error }.
+ */
+async function writeCitations(logId, patterns, agentId, capabilitySlug) {
+  if (!patterns.length) return { citations: 0 };
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  const url = `${process.env.SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/decision_pattern_citations`;
+  const body = patterns.map(pattern_no => ({
+    activity_log_id: logId, pattern_no, agent_id: agentId, capability_slug: capabilitySlug ?? null,
+  }));
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: key, Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json', Prefer: 'return=representation',
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    return { error: `citation write refused for pattern(s) ${patterns.join(', ')}: HTTP ${r.status} ${text.slice(0, 300)}. `
+      + `ai_activity_log id=${logId} IS WRITTEN AND STANDS -- the audit row is mandatory and is not rolled back to punish a bad citation. `
+      + `Re-run the citations alone once the pattern number exists in public.decision_patterns.` };
+  }
+  const rows = text ? JSON.parse(text) : [];
+  return { citations: Array.isArray(rows) ? rows.length : 0 };
 }
 
 async function main() {
@@ -245,10 +330,15 @@ async function main() {
   const back = await readBackRowId(traceId);
   if (back.error) fail(back.error);
 
+  // FEATURE: SES-424 slice 5. Order is load-bearing: the log row first (it is the mandatory one and
+  // the FK's target), the citations second, and a refusal here exits 2 WITHOUT unwriting the turn.
+  const cited = await writeCitations(back.row.id, args.patternsApplied, args.agent, args.capability);
+  if (cited.error) fail(cited.error);
+
   if (args.json) {
-    process.stdout.write(JSON.stringify({ id: back.row.id, trace_id: traceId, call_source: back.row.call_source, visitor_id: back.row.visitor_id }) + '\n');
+    process.stdout.write(JSON.stringify({ id: back.row.id, trace_id: traceId, call_source: back.row.call_source, visitor_id: back.row.visitor_id, citations: cited.citations }) + '\n');
   } else {
-    process.stdout.write(`ai_activity_log id=${back.row.id} trace_id=${traceId} call_source=${back.row.call_source}\n`);
+    process.stdout.write(`ai_activity_log id=${back.row.id} trace_id=${traceId} call_source=${back.row.call_source} citations=${cited.citations}\n`);
   }
 }
 
