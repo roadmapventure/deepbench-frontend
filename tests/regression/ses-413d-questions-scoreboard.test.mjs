@@ -68,10 +68,11 @@ const CYCLE = "docs/runbooks/runner-cycle.md";
 const JOHN = "docs/WORKING-WITH-JOHN.md";
 
 // SES-336's ceiling and the LAST MEASURED size of the runbook, re-measured by every ship that
-// edits it. v7.0.531 (SES-423 slice 2) rotated the v7.0.505 stamp out to docs/SESSIONS.md before
-// adding the heartbeat/measured-tokens text and landed at 380399 B, 577 B below the previous pin.
+// edits it. v7.0.532 (SES-423 slice 3) rotated the v7.0.516 stamp out to docs/SESSIONS.md (its two
+// zero-hit facts RELOCATED into step 7d, SES-164 step 2 by grep first) before adding step 1's
+// reading 0 and step 9's delta rule, and landed at 380911 B, 89 B under the ceiling.
 export const RUNBOOK_CEILING = 381000;
-export const BYTES_AT_SHIP = 380399;
+export const BYTES_AT_SHIP = 380911;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

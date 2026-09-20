@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3 — A READING IS A DELTA, NEVER THE SESSION TOTAL: `get_session` counts the whole SESSION and a drain chain runs many cycles in one (`fd4e11f4` closed at 32,249,570; its continuation opened on that counter), so step 1 takes reading 0 at the INSERT (`tokens_at_open` in `notes`) and step 9 charges deltas. `v7.0.516` moved VERBATIM to `docs/SESSIONS.md`, two ZERO-hit facts RELOCATED; count 5. Guard `ses-423b`. -->
 <!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2 — A STALL IS JUDGED BY THE BUILD'S OWN SIGNAL, THE CLOSE-OUT MEASURES: step 7 hands the Builder a `heartbeat` key (`scripts/cycle-heartbeat.js`, new) so probe (d) reads a build that STOPPED, not a long one — 13 `stall_notified_at` rows, **9 ended `shipped`**. Step 9's `est_tokens_*` are MEASURED from two `get_session` reads (`SES-409`: 15.27M here vs ≤900,000 shipped), not estimated; the three agent-log fences bracket the pair as optional. `SES-164` step 2 by grep FIRST: `v7.0.505` moved VERBATIM to `docs/SESSIONS.md`, its five ZERO-hit facts RELOCATED into 4e; count 5. Guard `ses-423b-stall-signal.test.mjs`. -->
 <!-- DeepBench v7.0.520 | runbooks/runner-cycle.md | SES-378 slice 8 — THE LANE REFUSAL GETS ITS OWN NAME: step 6 exit 1's TWO causes now branch on the `--json` `kind`, each under its own FIXED detail. Guard `ses-378h-lane-refusal-kind.test.mjs`. `v7.0.500` DROPPED, count 5. -->
 <!-- DeepBench v7.0.519 | runbooks/runner-cycle.md | SES-385 slice 2 — THE CLOSE-OUT SETTLES ITSELF via `scripts/settle-ship.js`; read twice: THE VERDICT IS NOT AN INPUT — the kickoff, the undecided gate cards and `--remainder=` decide, so an `approve` cannot settle a record naming unbuilt work. Slice 1's prose rule failed twice: `SES-413`, `SES-415` read `delivered`, links NULL; `missing_kickoff` 4→2. Part (4) cleared `designed` on **50** closed rows (kickoff said 49; a peer shipped `AGT-79`), links KEPT, 50 imaged. ROTATION: `v7.0.493` DROPPED, count held at **5** (kickoff said 4; `agt-70` asserts 5), `SES-164` step 2 by grep FIRST — its seven ZERO-hit names (`resolveDeliveryFiles`, `selfCertificationBlock`, `changedFilesFor`, `changed-<cycle id>.json`, `ses-379-changed-files-fail-closed`, `377,375`, `premise-3`) RELOCATED into 7a. Card re-rendered and re-pinned. -->
 <!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7 — THE TWO JUDGMENT KINDS GET A CALLER, and the thing to read twice is that THE VERIFIER NAMED THE DESIGNER ALL ALONG: a failed `--kickoff=` check forces `block` and PREPENDS its reason (`verifier.js:2115`/`:2131`), and live verdict `f3688e3e` opened with the lane phrase, unrecorded. Step 7 records `kickoff lacked a fact` off `deviations`; 7a records `verdict block attributable to the kickoff` when `reasoning` OPENS with `kickoff over cap` (`SES-376`) or `kickoff has no lane declaration` (`SES-359`). All four `KINDS` now have a caller; a red gate alone is not it. Commands are PROSE: `NOTES["7"].block` = 1 copies the `agent-prompt.js` fence. Stamps held at 5: `v7.0.477` DROPPED, `SES-164` grep FIRST — `toLocaleDateString`, `writeCycle()`, `77afdcbc` ZERO hits, RELOCATED to step 4e. Card re-rendered, re-pinned. -->
-<!-- DeepBench v7.0.516 | runbooks/runner-cycle.md | SES-378 slice 6 — THE STAFF WATCH GETS A CALLER, and the thing to read twice is that IT SHIPPED INERT: `grep -c staff-watch` read **0** and `runner_staff_findings` held ONE hand-written row. Two triggerable kinds ship now: step 5 rule (c) records `assignment mismatch` on `devmanager`, step 6's `--check-kickoff` exit 1 records `over-cap refusal` on `designer`, new **(7d)** runs `--promote --apply`; a promotion is a `runner_card_asks` `skill-edit` row FOR JOHN, never a Skill edit. Stamp count held at 5: `v7.0.472` DROPPED (`v7.0.462` precedent), `SES-164` step 2 run FIRST by grep — `graded_sha`, `7a-bis`, `ship_handoff_census` homed; `gradedShaFor`, `ses345_verdict_graded_sha` and both guard-test filenames had ZERO hits, RELOCATED into step 7 and reason 3. `cycle-card.md` re-rendered, its Knowledge row re-pinned under an image. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -616,7 +616,13 @@ senders. If no push mechanism is available in the environment, note that in the 
 continue. INSERT `runner_cycles` **with the id the claim returned** —
 `INSERT INTO runner_cycles (id, stamp, trigger, model) VALUES ('<claimed cycle_id>', …)` — via
 the connector, leaving `outcome` NULL until close (the check constraint has no in-progress
-value; found live, SES-78c). Every later step's evidence hangs off this row's id; "who is
+value; found live, SES-78c).
+**Reading 0 (`SES-423`, `v7.0.532`): at this INSERT call `mcp__Claude_Code_Remote__get_session`
+(`session_id` omitted), sum the four `external_metadata.usage` fields and write
+`tokens_at_open: <sum>` into this row's `notes` — the counter is SESSION-cumulative and a chain
+runs several cycles in one session, so step 9 charges only the growth from here. Tool
+unavailable → `tokens_at_open: unmeasured`.**
+Every later step's evidence hangs off this row's id; "who is
 running right now" is `SELECT … FROM runner_cycles WHERE ended_at IS NULL` — and under
 parallel cycles (register B42) **multiple open rows are normal**, not a signal.
 
@@ -1337,7 +1343,8 @@ Four things about this boundary, each of which has already bitten or would have:
   **The override never widens the API-dollar wall** — that is real money and needs its own
   `max_usd` override. Both new columns are nullable and fail closed: NULL `max_tokens` or a NULL
   / past `expires_at` means no override, and the wall stands.
-  All token figures are estimates and are always labeled estimated.
+  Meter-derived token figures are estimates, labeled so; a cycle row's `est_tokens_*` is
+  measured (step 9).
 
 **THE CALIBRATION IS DERIVED BY ONE CALL, NOT BY EACH CYCLE'S ARITHMETIC (`SES-128`,
 `v7.0.163`, migration `ses128_reading_slots`).** Step (c) above describes calibrating
@@ -4139,10 +4146,14 @@ silently forgotten. Close `runner_cycles` with the two cost tracks (John, 2026-0
 `api_cost_dev_usd` / `api_cost_qa_usd` (true billable API calls only — trace to
 `ai_activity_log` where possible; $0 is the normal value) and `est_tokens_dev` /
 `est_tokens_qa` (**measured, never guessed** — `SES-409`: call
-`mcp__Claude_Code_Remote__get_session` with `session_id` OMITTED, twice — when the Builder returns
-(before 7a) and again here. One reading = `input_tokens + output_tokens + cache_read_tokens +
-cache_write_tokens` of `external_metadata.usage`; `est_tokens_dev` = reading 1, `est_tokens_qa` =
-reading 2 − reading 1; write `tokens_basis: get_session` in `notes`. Tool unavailable → both NULL,
+`mcp__Claude_Code_Remote__get_session` with `session_id` OMITTED, three times — reading 0 at
+step 1's INSERT (`tokens_at_open`, read back from this row's `notes`, never from memory),
+reading 1 when the Builder returns (before 7a), reading 2 here. One reading = `input_tokens +
+output_tokens + cache_read_tokens + cache_write_tokens` of `external_metadata.usage`;
+`est_tokens_dev` = reading 1 − reading 0, `est_tokens_qa` = reading 2 − reading 1 —
+DELTAS, never a session total, because the counter is SESSION-cumulative and a chain runs many
+cycles in one session (`v7.0.532`). Write `tokens_basis: get_session` in `notes`. A missing
+reading NULLs each column it feeds; tool unavailable → both NULL,
 never a number), plus outcome and push SHA. The briefing's budget cards
 show the dev/QA split on both tracks, the runner's token use broken down by model, and John's
 latest reading + calibration; the reading-entry card (three percentages + save) must be on
@@ -4415,7 +4426,10 @@ refused), never that the cycle is in trouble. Findings group by `fingerprintFor(
 uuids and nothing else, so one defect seen by three cycles is ONE fingerprint at three cycles while
 three rows written by ONE cycle stay at one — the ticket rides in `--backlog=`, never in the
 detail. **A promotion is a `runner_card_asks` row of kind `skill-edit` asking John to rule, NEVER a
-Skill edit this cycle performs:** the manager may count a defect in a governance agent's text and
+Skill edit this cycle performs:**
+(`runner_staff_findings` held ONE hand-written row when this caller shipped at `v7.0.516`, the
+ship that DROPPED the `v7.0.472` stamp on the `v7.0.462` precedent)
+the manager may count a defect in a governance agent's text and
 it is John who changes that text (the `SES-45` boundary, Rule #1).
 
 ```

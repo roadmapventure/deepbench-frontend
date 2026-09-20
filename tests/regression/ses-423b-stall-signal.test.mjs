@@ -1,4 +1,10 @@
-// DeepBench v7.0.531 | tests/regression/ses-423b-stall-signal.test.mjs | SES-423 slice 2
+// DeepBench v7.0.532 | tests/regression/ses-423b-stall-signal.test.mjs | SES-423 slices 2-3
+//
+// SLICE 3 (v7.0.532) AMENDED THIS FILE: the reading is a DELTA. get_session counts the whole
+// SESSION, a drain chain runs many cycles in one, so charging reading 1 whole re-charges every
+// cycle before it -- fd4e11f4 closed at 32,249,570 and its continuation's first reading was
+// 48,608,438. chargeFor() below is the arithmetic arm: it asserts a two-cycle chain's charges
+// SUM to the last reading and never more, which is exactly what the session-total rule broke.
 //
 // GUARDS THE TWO THINGS v7.0.531 CHANGED, and the reason both needed a guard is the same: each is
 // a RULE CARRIED IN PROSE that a later editor can delete without anything going red.
@@ -81,15 +87,30 @@ export const CLAUSES = [
     id: "the-reading-names-its-tool-and-its-arithmetic",
     detail:
       "a 'measure it' rule with no named tool and no named sum is re-derived differently every " +
-      "cycle: get_session with session_id OMITTED, read twice, four usage fields summed, dev = " +
-      "reading 1 and qa = reading 2 minus reading 1",
+      "cycle: get_session with session_id OMITTED, read THREE times (v7.0.532), four usage " +
+      "fields summed, dev = reading 1 minus reading 0 and qa = reading 2 minus reading 1",
     test: s => {
       const n = norm(s);
-      return n.includes("`mcp__Claude_Code_Remote__get_session` with `session_id` OMITTED, twice")
+      return n.includes("`mcp__Claude_Code_Remote__get_session` with `session_id` OMITTED, three times")
         && n.includes("`input_tokens + output_tokens + cache_read_tokens + cache_write_tokens` of `external_metadata.usage`")
-        && n.includes("`est_tokens_dev` = reading 1, `est_tokens_qa` = reading 2 − reading 1");
+        && n.includes("`est_tokens_dev` = reading 1 − reading 0, `est_tokens_qa` = reading 2 − reading 1");
     },
     breaks: s => s.replace("reading 2 − reading 1", "the QA half"),
+  },
+  {
+    id: "a-reading-is-a-delta-never-the-session-total",
+    detail:
+      "get_session counts the whole SESSION and a drain chain runs many cycles in one, so a " +
+      "close-out that charges reading 1 whole re-charges everything its predecessors already " +
+      "closed with (fd4e11f4 closed at 32,249,570 and its continuation's first reading was " +
+      "48,608,438). Step 1 must take reading 0 at the INSERT and step 9 must charge DELTAS",
+    test: s => {
+      const n = norm(s);
+      return (s.split("tokens_at_open").length - 1) >= 2
+        && /DELTAS, never a session total/.test(n)
+        && n.includes("`est_tokens_dev` = reading 1 − reading 0");
+    },
+    breaks: s => s.replace("= reading 1 − reading 0", "= reading 1"),
   },
   {
     id: "an-unmeasurable-reading-is-null-never-a-number",
@@ -99,7 +120,7 @@ export const CLAUSES = [
     test: s => {
       const n = norm(s);
       return n.includes("`tokens_basis: get_session` in `notes`")
-        && /Tool unavailable → both NULL,\s*never a number/.test(n);
+        && /[Tt]ool unavailable → both NULL,\s*never a number/.test(n);
     },
     breaks: s => s.replace("both NULL,\nnever a number", "your best estimate"),
   },
@@ -163,13 +184,17 @@ function everyClauseHasTeeth(md) {
 function theStampWasMovedNotDeleted(md) {
   const stamps = md.split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
   assert.strictEqual(stamps.length, 5, `session-hygiene check 7 caps the runbook at 5 header stamps; got ${stamps.length}`);
-  assert.ok(stamps[0].startsWith("<!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2"),
+  assert.ok(stamps[0].startsWith("<!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3"),
     "this ship's own stamp must be the first line of the runbook");
-  assert.ok(!md.includes("<!-- DeepBench v7.0.505 | runbooks/runner-cycle.md"),
-    "v7.0.505 was the stamp this ship rotated out; it must no longer be in the runbook");
-  assert.ok(read("docs/SESSIONS.md").includes("<!-- DeepBench v7.0.505 | runbooks/runner-cycle.md | AGT-79 slice 5"),
-    "the rotated v7.0.505 stamp must land in docs/SESSIONS.md VERBATIM -- a stamp dropped instead of " +
+  assert.ok(!md.includes("<!-- DeepBench v7.0.516 | runbooks/runner-cycle.md"),
+    "v7.0.516 was the stamp this ship rotated out; it must no longer be in the runbook");
+  assert.ok(read("docs/SESSIONS.md").includes("<!-- DeepBench v7.0.516 | runbooks/runner-cycle.md | SES-378 slice 6"),
+    "the rotated v7.0.516 stamp must land in docs/SESSIONS.md VERBATIM -- a stamp dropped instead of " +
     "moved loses the only written record of that ship");
+  assert.ok(!md.includes("<!-- DeepBench v7.0.505 | runbooks/runner-cycle.md"),
+    "v7.0.505 was slice 2's rotation; it must still be out of the runbook");
+  assert.ok(read("docs/SESSIONS.md").includes("<!-- DeepBench v7.0.505 | runbooks/runner-cycle.md | AGT-79 slice 5"),
+    "the v7.0.505 stamp slice 2 moved must still be in docs/SESSIONS.md VERBATIM");
 }
 
 // --- the timeline arm: probe (d)'s own basis, replayed over 0e57cedd -----------------------------
@@ -212,6 +237,51 @@ function theHeartbeatsTurnTheFalseStallOff() {
   assert.strictEqual(died.push, true,
     "24 minutes past the last heartbeat is over the 20-minute bar and MUST still push -- a heartbeat " +
     "that suppressed a real stall would be worse than no heartbeat");
+}
+
+// --- the charge arm: a reading is a delta, never the session total (SES-423 slice 3) ------------
+//
+// Measured, not invented: fd4e11f4 closed `shipped` at 07:50:48Z carrying est_tokens_dev
+// 32,249,570, and a6af8e56 -- the SAME session, opened 07:51:34Z -- read 48,608,438 when its
+// Builder returned. The shipped v7.0.531 rule charged reading 1 whole, so this row would have
+// re-charged its predecessor's whole close.
+export function chargeFor({ open, returned, close }) {
+  const delta = (a, b) => (a === null || a === undefined || b === null || b === undefined ? null : b - a);
+  return { dev: delta(open, returned), qa: delta(returned, close) };
+}
+
+function theChargeIsADeltaNotTheSessionTotal() {
+  const FD_CLOSE = 32249570;          // fd4e11f4's own est_tokens_dev, read 07:48Z
+  const RETURNED = 48608438;          // this session's get_session sum at ~08:00Z
+
+  const charged = chargeFor({ open: FD_CLOSE, returned: RETURNED });
+  assert.strictEqual(charged.dev, 16358868,
+    `this cycle's est_tokens_dev is the GROWTH since its own INSERT (48,608,438 - 32,249,570 = ` +
+    `16,358,868); got ${charged.dev}. A number at or above 32,249,570 is the session total.`);
+  assert.ok(charged.dev < FD_CLOSE,
+    "the delta must land BELOW the predecessor's close -- that inequality is the live QA check on " +
+    "the shipped row, and only the session-total rule can fail it");
+
+  // THE CHAIN, which is the whole defect: two cycles in one session must together charge the last
+  // reading and not one token more.
+  const first = chargeFor({ open: 0, returned: FD_CLOSE });
+  assert.strictEqual(first.dev + charged.dev, RETURNED,
+    `a two-cycle chain's charges must sum to the last reading (${RETURNED}); got ` +
+    `${first.dev + charged.dev}`);
+
+  // THE CONTROL IS THE PRE-CHANGE WORLD: charging reading 1 whole, on the same two readings.
+  const sessionTotalRule = FD_CLOSE + RETURNED;
+  assert.strictEqual(sessionTotalRule, 80858008,
+    "the retired rule charges 32,249,570 + 48,608,438 = 80,858,008 for a session that spent " +
+    "48,608,438 -- if this arithmetic does not reproduce, the fixture is not the defect");
+  assert.ok(sessionTotalRule > RETURNED,
+    "the retired rule must over-charge, or the delta rule fixes nothing");
+
+  // A missing reading NULLs the column it feeds; it never falls back to the raw reading.
+  assert.strictEqual(chargeFor({ returned: RETURNED }).dev, null,
+    "no reading 0 means est_tokens_dev is NULL -- charging the raw reading is the defect itself");
+  assert.strictEqual(chargeFor({ open: FD_CLOSE, returned: RETURNED }).qa, null,
+    "no reading 2 means est_tokens_qa is NULL, never a number");
 }
 
 // --- the script's own contract, driven through the CLI ------------------------------------------
@@ -273,11 +343,14 @@ async function run() {
   everyClauseHasTeeth(md);
   theStampWasMovedNotDeleted(md);
   theHeartbeatsTurnTheFalseStallOff();
+  theChargeIsADeltaNotTheSessionTotal();
   theExitCodesAreTheContract();
   await theScriptIsImportableAndReferenced(md);
   console.log(`[SES-423b] ${n} runbook clauses hold, each red under its own breaks(); 0e57cedd replays ` +
     `2 min / no push with the Builder's four beats and 36 min / push with none (24 / push after a lone ` +
-    `03:29 beat); ${HEARTBEAT_REL} exits 2/2/2 on bad args and 1 (never 0) with no credentials`);
+    `03:29 beat); the charge arm reads 48,608,438 - 32,249,570 = 16,358,868 dev, chain sum = the last ` +
+    `reading (the session-total rule charges 80,858,008), a missing reading NULLs its column; ` +
+    `${HEARTBEAT_REL} exits 2/2/2 on bad args and 1 (never 0) with no credentials`);
 }
 
 selfRun(import.meta.url, run);
