@@ -122,7 +122,8 @@ const GUARDRAILS_SLUG = "dm-guardrails";
 // instruments list. tests/regression/ses-378d-manager-skill-rows.test.mjs owns its contents; this
 // file owns only the fact that run-project links it.
 const CYCLE_CARD_SLUG = "dm-knowledge-cycle-card";
-const SKILL_SLUGS = ["dm-identity", KNOWLEDGE_SLUG, "dm-behavior", INTENT_SLUG, GUARDRAILS_SLUG, CYCLE_CARD_SLUG];
+const PATTERNS_SLUG = "dm-knowledge-patterns";
+const SKILL_SLUGS = ["dm-identity", KNOWLEDGE_SLUG, "dm-behavior", INTENT_SLUG, GUARDRAILS_SLUG, CYCLE_CARD_SLUG, PATTERNS_SLUG];
 // Named as a SET rather than counted -- `length === 5` passes against five copies of one type, and
 // since SES-378 slice 4 there are six links over these same five types.
 const SKILL_TYPES = ["identity", "knowledge", "behavior", "intent", "guardrails"];

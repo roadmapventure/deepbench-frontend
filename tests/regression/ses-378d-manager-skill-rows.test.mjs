@@ -77,7 +77,7 @@ const CHAIN_RULE_BYTES = 1087;
 const GUARDRAILS_SLUG = "dm-guardrails";
 const MUST_AFTER = 6;
 const MUST_NOT_UNCHANGED = 6;
-const LINKS_AFTER = 6;
+const LINKS_AFTER = 7;
 const DECISION_KIND = "agent-row";
 const TICKET = "SES-378";
 

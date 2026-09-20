@@ -62,7 +62,8 @@ const CAPABILITY = "build-ticket";
 const INTENT_SLUG = "bd-build-intent";
 const KNOWLEDGE_SLUG = "bd-knowledge-standards";
 const GUARDRAILS_SLUG = "bd-guardrails";
-const SKILL_SLUGS = ["bd-identity", KNOWLEDGE_SLUG, "bd-behavior", INTENT_SLUG, GUARDRAILS_SLUG];
+const PATTERNS_SLUG = "bd-knowledge-patterns";
+const SKILL_SLUGS = ["bd-identity", KNOWLEDGE_SLUG, "bd-behavior", INTENT_SLUG, GUARDRAILS_SLUG, PATTERNS_SLUG];
 // Named as a SET rather than counted -- `length === 5` passes against five copies of one type.
 const SKILL_TYPES = ["identity", "knowledge", "behavior", "intent", "guardrails"];
 

@@ -79,7 +79,8 @@ const CAPABILITY = "design-kickoff";
 const INTENT_SLUG = "ds-kickoff-intent";
 const KNOWLEDGE_SLUG = "ds-knowledge-standard";
 const ENVIRONMENT_SLUG = "ds-knowledge-environment";
-const SKILL_SLUGS = ["ds-identity", KNOWLEDGE_SLUG, "ds-behavior", INTENT_SLUG, "ds-guardrails", ENVIRONMENT_SLUG];
+const PATTERNS_SLUG = "ds-knowledge-patterns";
+const SKILL_SLUGS = ["ds-identity", KNOWLEDGE_SLUG, "ds-behavior", INTENT_SLUG, "ds-guardrails", ENVIRONMENT_SLUG, PATTERNS_SLUG];
 // Named as a SET rather than counted -- `length === 6` passes against six copies of one type. Still
 // FIVE types over SIX slugs: `knowledge` is carried twice (the design standard and the measured
 // environment facts -- see the header).
