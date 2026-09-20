@@ -67,10 +67,11 @@ const SETUP = "docs/runbooks/session-setup.md";
 const CYCLE = "docs/runbooks/runner-cycle.md";
 const JOHN = "docs/WORKING-WITH-JOHN.md";
 
-// SES-336's ceiling and the measurement this ship made against it. The edit is byte-neutral, so
-// BYTES_AT_SHIP is both the before and the after.
+// SES-336's ceiling and the LAST MEASURED size of the runbook, re-measured by every ship that
+// edits it. v7.0.531 (SES-423 slice 2) rotated the v7.0.505 stamp out to docs/SESSIONS.md before
+// adding the heartbeat/measured-tokens text and landed at 380399 B, 577 B below the previous pin.
 export const RUNBOOK_CEILING = 381000;
-export const BYTES_AT_SHIP = 380976;
+export const BYTES_AT_SHIP = 380399;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
@@ -161,15 +162,15 @@ function theRunbookCeilingHeld() {
     + "raised to fit an edit: drop an old header stamp (SES-164 grep FIRST, zero-hit facts RELOCATED, "
     + "not lost) or say it in fewer bytes.");
   assert.strictEqual(bytes, BYTES_AT_SHIP,
-    `slice 4's edit is byte-neutral by construction -- "seven" and "eight" are both five letters -- `
-    + `so ${CYCLE} must still read exactly ${BYTES_AT_SHIP} B. It reads ${bytes} B, which means `
-    + `something OTHER than that swap landed in the same file, with ${RUNBOOK_CEILING - bytes} B of `
-    + "headroom left to account for.");
+    `${CYCLE} must read exactly the ${BYTES_AT_SHIP} B its last editing ship measured. It reads `
+    + `${bytes} B, which means something landed in the file without re-measuring the pin, with `
+    + `${RUNBOOK_CEILING - bytes} B of headroom left to account for. Re-measure with wc -c and move `
+    + "the constant in the same commit -- never raise the CEILING to fit an edit.");
 
   const stamps = read(CYCLE).split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
   assert.strictEqual(stamps.length, HEADER_STAMPS,
     `agt-70-auditor.test.mjs pins ${CYCLE} at exactly ${HEADER_STAMPS} header stamps; got `
-    + `${stamps.length}. Slice 4 adds none and drops none -- a byte-neutral swap earns no stamp.`);
+    + `${stamps.length}. A ship that adds one rotates one out (SES-164 step 2 by grep FIRST).`);
   return { bytes, stamps: stamps.length };
 }
 

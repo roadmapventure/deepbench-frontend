@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2 — A STALL IS JUDGED BY THE BUILD'S OWN SIGNAL, THE CLOSE-OUT MEASURES: step 7 hands the Builder a `heartbeat` key (`scripts/cycle-heartbeat.js`, new) so probe (d) reads a build that STOPPED, not a long one — 13 `stall_notified_at` rows, **9 ended `shipped`**. Step 9's `est_tokens_*` are MEASURED from two `get_session` reads (`SES-409`: 15.27M here vs ≤900,000 shipped), not estimated; the three agent-log fences bracket the pair as optional. `SES-164` step 2 by grep FIRST: `v7.0.505` moved VERBATIM to `docs/SESSIONS.md`, its five ZERO-hit facts RELOCATED into 4e; count 5. Guard `ses-423b-stall-signal.test.mjs`. -->
 <!-- DeepBench v7.0.520 | runbooks/runner-cycle.md | SES-378 slice 8 — THE LANE REFUSAL GETS ITS OWN NAME: step 6 exit 1's TWO causes now branch on the `--json` `kind`, each under its own FIXED detail. Guard `ses-378h-lane-refusal-kind.test.mjs`. `v7.0.500` DROPPED, count 5. -->
 <!-- DeepBench v7.0.519 | runbooks/runner-cycle.md | SES-385 slice 2 — THE CLOSE-OUT SETTLES ITSELF via `scripts/settle-ship.js`; read twice: THE VERDICT IS NOT AN INPUT — the kickoff, the undecided gate cards and `--remainder=` decide, so an `approve` cannot settle a record naming unbuilt work. Slice 1's prose rule failed twice: `SES-413`, `SES-415` read `delivered`, links NULL; `missing_kickoff` 4→2. Part (4) cleared `designed` on **50** closed rows (kickoff said 49; a peer shipped `AGT-79`), links KEPT, 50 imaged. ROTATION: `v7.0.493` DROPPED, count held at **5** (kickoff said 4; `agt-70` asserts 5), `SES-164` step 2 by grep FIRST — its seven ZERO-hit names (`resolveDeliveryFiles`, `selfCertificationBlock`, `changedFilesFor`, `changed-<cycle id>.json`, `ses-379-changed-files-fail-closed`, `377,375`, `premise-3`) RELOCATED into 7a. Card re-rendered and re-pinned. -->
 <!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7 — THE TWO JUDGMENT KINDS GET A CALLER, and the thing to read twice is that THE VERIFIER NAMED THE DESIGNER ALL ALONG: a failed `--kickoff=` check forces `block` and PREPENDS its reason (`verifier.js:2115`/`:2131`), and live verdict `f3688e3e` opened with the lane phrase, unrecorded. Step 7 records `kickoff lacked a fact` off `deviations`; 7a records `verdict block attributable to the kickoff` when `reasoning` OPENS with `kickoff over cap` (`SES-376`) or `kickoff has no lane declaration` (`SES-359`). All four `KINDS` now have a caller; a red gate alone is not it. Commands are PROSE: `NOTES["7"].block` = 1 copies the `agent-prompt.js` fence. Stamps held at 5: `v7.0.477` DROPPED, `SES-164` grep FIRST — `toLocaleDateString`, `writeCycle()`, `77afdcbc` ZERO hits, RELOCATED to step 4e. Card re-rendered, re-pinned. -->
 <!-- DeepBench v7.0.516 | runbooks/runner-cycle.md | SES-378 slice 6 — THE STAFF WATCH GETS A CALLER, and the thing to read twice is that IT SHIPPED INERT: `grep -c staff-watch` read **0** and `runner_staff_findings` held ONE hand-written row. Two triggerable kinds ship now: step 5 rule (c) records `assignment mismatch` on `devmanager`, step 6's `--check-kickoff` exit 1 records `over-cap refusal` on `designer`, new **(7d)** runs `--promote --apply`; a promotion is a `runner_card_asks` `skill-edit` row FOR JOHN, never a Skill edit. Stamp count held at 5: `v7.0.472` DROPPED (`v7.0.462` precedent), `SES-164` step 2 run FIRST by grep — `graded_sha`, `7a-bis`, `ship_handoff_census` homed; `gradedShaFor`, `ses345_verdict_graded_sha` and both guard-test filenames had ZERO hits, RELOCATED into step 7 and reason 3. `cycle-card.md` re-rendered, its Knowledge row re-pinned under an image. -->
-<!-- DeepBench v7.0.505 | runbooks/runner-cycle.md | AGT-79 slice 5 — STEP 4e FIRES THE JUDGED NIGHT: the command is now `ticket-owner.js --nightly --judge`, and the thing to read twice is THAT THE CODE FOR THIS SHIPPED IN SLICE 4 AND HAS BEEN INERT EVER SINCE. The seed John held is applied (`capabilities` `audit-board` = 1, `agents` `ticketowner` = GV-08 active, 5 `capability_skill_profiles`, the catalog entry at `shared/ai-patterns.js:272`), so pass one assembles and exits **3** rather than exiting 2, and `agt-79-ticket-owner.test.mjs` part K live prints `gate answered 3`. YET `ai_activity_log` HELD 0 `agent_id = 'ticketowner'` ROWS AT THIS SHIP — no night had ever been judged, and the whole cause was ONE LINE of this file still reading `--nightly` alone. Measured 2026-09-16 before the edit: 5 `SCHEDULED-AGENT: audit-board` cycle rows, 217 `ticket_owner_findings`, all arithmetic. THE CEREMONY IS TWO COMMENT LINES INSIDE THE BLOCK, NOT PROSE A CYCLE HAS TO REMEMBER: exit 3 → run the printed prompt as a `ticketowner` sub-agent on the `judgment` lane read live from `runner_model_lanes` (§19b — the prompt is `assemblePrompt`'s, never hand-built; the lane is never a literal), save its JSON, re-run with `--answer=<path>` and the SAME `--cycle-id`; `ingestJudgment` validates the answer whole and either refuses it naming every problem or writes it under ONE decision — there is no partial night. RULE (4) EXISTS BECAUSE A JUDGED NIGHT MUST NOT BE ABLE TO STOP A CYCLE: exit 3 with no Agent tool, or a pass-two refusal, is never a wall — re-run `--nightly` alone for an unjudged night, write which happened in `notes`, continue to step 5. Rule (2) was AMENDED, never deleted: the arithmetic half still calls nothing, the judgment half calls once, on the lane. Stamp count held at 5 per session-hygiene check 7: `v7.0.467` (`AGT-70` slice 3) moved VERBATIM to `docs/SESSIONS.md` directly after the `v7.0.452` (`SES-352`) line, so `SES-164` step 2 has nothing to re-home — nothing was dropped. THE COUPLING STANDS: `docs/runbooks/cycle-card.md` (`SES-377`) re-rendered with `node scripts/render-cycle-card.js --write` in this same commit. DEVIATION, RECORDED: the kickoff's literal `NOTES["4e"].outcome` was 169 chars and `render()` throws over `OUTCOME_MAX` 90, so it was cut to 90 carrying the four outcomes; the lane and `--answer=` are carried by the fenced block the card copies whole. Doc + script + card + test; no step or phase heading added, no `src/`/`api/`/`lib/` change, no schema change, no migration, no roster write, no model call. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -512,7 +512,9 @@ hypothesis — *"likely waiting on a permission prompt only you can see, in that
 window"* when the last step touched a known gated path class, plainer "went quiet at step X"
 otherwise. Tell John where the prompt would be; whether to open it is his call — never phrase
 approval as a task he owes (the 34865f07 rule). If the cycle later resumes, its own next
-heartbeat is the all-clear; note the resolution in your tail if you observe it.
+heartbeat is the all-clear; note the resolution in your tail if you observe it. **Since `v7.0.531`
+step 7 heartbeats every task, a (d) row whose `last_step` reads `7 — builder: …` is a build that
+STOPPED, not a long one** — say that, not "still running".
 
 **THE WATCHDOG — one call, run it right after the sweep, every cycle (`SES-194`, `v7.0.230`,
 migration `ses194_stall_watchdog`).** Probe (d) *detects* a frozen peer and pushes John once.
@@ -2043,8 +2045,10 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/ticket-owner.js --nightly
 own — `toLocaleDateString("en-CA", { timeZone: "America/Chicago" })`, never an offset (CDT midnight
 is 05:00Z and CST midnight 06:00Z) — and the `trigger = 'scheduled'` row it writes takes
 `rank-backlog.js`'s `writeCycle()` shape; measured 2026-09-13 before this step existed: 0 such rows,
-170 open `ticket_owner_findings` and one `hygiene` decision (`77afdcbc`) carrying 40 images.
-Otherwise one run reads the
+170 open `ticket_owner_findings` and one `hygiene` decision (`77afdcbc`) carrying 40 images. (Homed
+here from the dropped `v7.0.505` stamp, `SES-164` step 2: the seed reads `ticketowner` = `GV-08`
+active with its catalog entry at `shared/ai-patterns.js:272` and `217` findings; pass two's answer
+is validated whole by `ingestJudgment`; an `outcome` over `OUTCOME_MAX` 90 throws.) Otherwise one run reads the
 whole board once, writes every DERIVABLE fix (a cost stamp from `ticket_matrix`, a stale claim cleared, a
 one-to-one type spelling) under ONE `kind = 'hygiene'` decision with full-row before-images, files the
 JUDGMENT gaps in `ticket_owner_findings` (new rows inserted, re-seen rows touched, closed gaps cleared),
@@ -2089,7 +2093,7 @@ stops the cycle. **(e)** Log the call with the command below and write
 ```
 node scripts/agent-log.js --agent=devmanager --capability=run-project --model=<the model the driver printed> \
   --ai-type=agent-turn --feature=run-project:dm-run-intent:depth0 \
-  --input-tokens=N --output-tokens=N --cycle=<your cycle id>
+  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id>
 ```
 
 **(1a) One-off directives** — `runner_directives` `WHERE type='directive' AND status='queued'`,
@@ -2872,13 +2876,16 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
 ```
 node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<the assembly's llm.model> \
   --ai-type=agent-turn --feature=design-kickoff:ds-kickoff-intent:depth0 \
-  --input-tokens=N --output-tokens=N --cycle=<your cycle id>
+  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id>
 ```
 
    Exit 2 is a finding, not a nuisance: the row did not land, so this run is unattributable and the
    Designer's own throughput cannot be read off the log at all. Measured 2026-09-12 — 2 Designer and
    1 Builder rows, all 2026-09-09 fixtures, across the 12 kickoffs written since — which is what an
-   unlogged mandatory run looks like after three days.
+   unlogged mandatory run looks like after three days. **The bracketed pair is optional AS A
+   PAIR (`v7.0.530`):** omit both when the harness reported no usage and let the row land with
+   NULL tokens — unmeasured, never free — but a lone flag, or a negative or non-numeric value,
+   still exits 2.
 2. **`premise = 'dead'` is the Designer's answer to this step's own first question, and you act on
    it rather than re-checking it.** Take its `premise_evidence` into the removal proposal: set
    `status = 'removal proposed'`, file the briefing card carrying the ticket (ID — title) plus that
@@ -3000,20 +3007,22 @@ the agent is `AGT-66`, `v7.0.432`).** Three statements, and there is no fourth:
 ```
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
   --agent=builder --capability=build-ticket --intent=bd-build-intent \
-  --task='{"kickoff_path":"docs/kickoffs/…","worktree":"<absolute path>","branch":"<your session branch>","version":"v<your version>","cycle_id":"<your cycle id>","caps":{"files":N,"tasks":M}}'
+  --task='{"kickoff_path":"docs/kickoffs/…","worktree":"<clone>","branch":"<branch>","version":"v<ver>","cycle_id":"<cid>","caps":{"files":N,"tasks":M},"heartbeat":"node scripts/cycle-heartbeat.js --cycle=<cid> --step='7 — builder: <task>'"}'
 ```
 
    Run the rendered prompt as a sub-agent on the **`orchestrator`** lane (`claude-opus-5` — the
    lanes table at step 6, read from `runner_model_lanes`; the Builder's own Skill rows carry the
    same model). `--intent` is omittable since `SES-332` (`default_intent_slug` is
-   `bd-build-intent`) — name it anyway.
+   `bd-build-intent`) — name it anyway. **Open that turn with one line before the rendered
+   prompt:** *Run the task's `heartbeat` command after the baseline, after every kickoff task,
+   before run-all and before the push.*
 
    Then log the run (`SES-359`):
 
 ```
 node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the assembly's llm.model> \
   --ai-type=agent-turn --feature=build-ticket:bd-build-intent:depth0 \
-  --input-tokens=N --output-tokens=N --cycle=<your cycle id>
+  [--input-tokens=N --output-tokens=N] --cycle=<your cycle id>
 ```
 
    Exit 2 is a finding here for the same reason step 6 gives, and the Builder's half is the thinner
@@ -4129,8 +4138,12 @@ for the same measured reason — a rule each cycle must remember to apply is a r
 silently forgotten. Close `runner_cycles` with the two cost tracks (John, 2026-08-20):
 `api_cost_dev_usd` / `api_cost_qa_usd` (true billable API calls only — trace to
 `ai_activity_log` where possible; $0 is the normal value) and `est_tokens_dev` /
-`est_tokens_qa` (your own session's thinking, split build-vs-QA steps — **estimated is fine,
-labeled estimated; never invented**), plus outcome and push SHA. The briefing's budget cards
+`est_tokens_qa` (**measured, never guessed** — `SES-409`: call
+`mcp__Claude_Code_Remote__get_session` with `session_id` OMITTED, twice — when the Builder returns
+(before 7a) and again here. One reading = `input_tokens + output_tokens + cache_read_tokens +
+cache_write_tokens` of `external_metadata.usage`; `est_tokens_dev` = reading 1, `est_tokens_qa` =
+reading 2 − reading 1; write `tokens_basis: get_session` in `notes`. Tool unavailable → both NULL,
+never a number), plus outcome and push SHA. The briefing's budget cards
 show the dev/QA split on both tracks, the runner's token use broken down by model, and John's
 latest reading + calibration; the reading-entry card (three percentages + save) must be on
 every rebuild. **The page's shape is now the LOCKED SECTION ORDER in `briefing-page.md`
