@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.534 | docs/WORKING-WITH-JOHN.md | SES-424 slice 2 — the Decision Authority Matrix: MANAGER-DECIDES-BY-DEFAULT extended by decision kind, rendered from the registry -->
 <!-- DeepBench v7.0.514 | docs/WORKING-WITH-JOHN.md | SES-413 — one default, three John-only calls -->
 <!-- DeepBench v7.0.114 | docs/WORKING-WITH-JOHN.md | SES-83 (d) cycle 3 — three instructions retargeted off the trimmed FEATURES*.md files onto public.backlog_items: the Tier-1 autonomy item (file choice → `tier` column), the measured-detail rule, and the log-session-findings rule. The FEATURES-ARCHIVE.md pointers and the Priority Class legend citation are unchanged — both still resolve. -->
 # Working With John — Design Session Reference
@@ -60,6 +61,26 @@ whatever their status, written by `snapshot_platform_scoreboard()` on every ship
 metric: `enhancement_claim = 'questions_to_john_week: down'` passes `outcome_claim_is_valid()` and
 grades on `public.ticket_outcome` like any other. Rows taken before `v7.0.523` read NULL — never
 measured, not zero.
+
+---
+
+## Decision Authority Matrix
+
+*(added 2026-09-20, `SES-424` slice 2)*
+
+The section above sets the default and names the three calls that stay John's. This one extends
+it by *decision kind*: who owns each kind of call a cycle actually makes. Every row records
+authority that is already live and cites where, because writing authority down is not the same
+act as granting it; where a row would have moved one of John's calls, there is a card instead.
+
+<!-- {{rule:MANAGER-AUTHORITY-MATRIX}} · rendered from public.governance_rules — do not hand-edit the quoted lines below. Edit the registry row, then run `node scripts/render-rule-blocks.js --write`. -->
+> **Rule MANAGER-AUTHORITY-MATRIX** — By decision kind: what The Development Manager (GV-01) decides and what stays John's. Row 1, the dm-knowledge-cycle-card re-pin: when a runbook edit re-renders docs/runbooks/cycle-card.md, the Builder re-pins skill_profiles.dm-knowledge-cycle-card (traits.source_sha256, method) under the ticket whose edit moved the card, in that commit, as an agent-row decision with a full-row before-image (AGENT-ROW-AGREED-TICKET, second limb): the manager's, never a card, never John's. A rebase that re-renders the card owns its re-pin the same way. Already live, measured 2026-09-20: 16 unreversed runner_decisions agent-row re-pins of that row (2026-09-16 to 2026-09-20, 13 of them since 09-18), each under the ticket whose edit moved the card, none reversed.
+> The pick (ticket, capability, engine): the manager's, as the first row of prime_directive_queue(), recorded as the claim and the assignment. Already live: runner-cycle.md step 2 -- the assignment is ticket, capability, engine and the cycle executes it rather than re-deriving it, and a mismatch with the queue head is a finding on the manager's Skill text, never a re-ordering of the board (SES-45).
+> What a build finds (file, defer, re-scope, remove, reopen) and gate cards (runner_items.kind = gated_before_build): the manager's, within John's standing rules and the class caps; a card whose subject is one of John's calls or rulings becomes a runner_questions row and is counted. Already live: runner-cycle.md 7b, "what counts as a decision" -- deferring a ticket, removing one under M6-03, re-tiering or re-homing it, ruling a gate -- and step 2's skip table, where on any new row the cycle decides and records the handle instead of flagging needs-john; the runner_questions half is MANAGER-DECIDES-BY-DEFAULT lines 1 and 3.
+> Agent rows: the manager's under an agreed ticket (AGENT-ROW-AGREED-TICKET); John's when no agreed ticket names the write, for an agent he has not seen, and for agents.is_active on. Already live: that rule verbatim, John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566).
+> The ship verdict and the ladder effect it carries: the Verifier's, never bypassed or overruled by the manager. Already live: runner-cycle.md 7a -- the verifier is verdict-only and verdict_ladder_signal() is its output -- and bd-guardrails, which forbids the Builder writing done or a verdict. Governance rules: the manager may file one that restates John's rulings by kind, as this one does, under an imaged rule decision; it never rewrites, retires or supersedes a ruling of John's. Already live: MANAGER-DECIDES-BY-DEFAULT line 1, "decides within John's standing rules, never rewrites one of them", and decision b383cb00, which filed that rule this same way. NOT SETTLED HERE, and left with John: who may call reverse_decision() inside a decision's window. Every call site in the runbook writes John as the actor and the one reversal on record (48d2fd0e) was his, so this rule does not move it; it is on John's desk as an undecided gated_before_build card.
+> Money, production (dev -> main), hiring or switching on agents (agents.is_active, the routine switch) and ratifying a bar he set (the 20-assignment promotion bar): John's. Anything not named here: the manager's, by MANAGER-DECIDES-BY-DEFAULT. Already live: that rule's line 2 for the first three; SES-378 slices 6 to 8 and SES-424's own board row carry the 20-assignment bar as John's to ratify.
+> Filed by SES-424 slice 2 under MANAGER-DECIDES-BY-DEFAULT (John 2026-09-16, decision d496fb07). Every row above writes down authority that is already live and cites where it is already live; no row moves a decision from John to the manager.
 
 ---
 
