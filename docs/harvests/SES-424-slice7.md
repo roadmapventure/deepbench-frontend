@@ -100,3 +100,71 @@ every insert is deleted in `finally`. The dependent sits at `queue 999990` and `
 blocker is created `queue NULL` so it is never itself a pick. `.claude/rules/supabase-function-signature.md`
 applies to both `CREATE OR REPLACE`s: identity argument lists are unchanged, and the migration's
 `DO` block asserts `pg_proc` count = 1 for all three names before it commits.
+
+---
+
+## Build record (2026-09-21, cycle `d75cc389`, `v7.0.539`)
+
+Appended by the Builder. The design half above is unchanged; this section is what the build
+actually measured, so a cold session reads the outcome next to the reasoning.
+
+**Down, captured before anything was applied.** `capture_migration_down(d75cc389…,
+'ses424_blocker_cleared', [prime_directive_queue(), drain_epic_next(uuid)])` →
+`runner_migration_downs` **`e7b8c829-71d4-4ba2-a0b0-459cc9c68aae`**, classification
+`auto-downable`, 2 objects captured, 0 refusals, 36,642 B of derived down SQL.
+
+**Migration 1 `ses424_blocker_cleared`.** `public.backlog_unblocking_statuses()` created
+(`sql`, `IMMUTABLE`, `REVOKE ALL … FROM PUBLIC` + `GRANT EXECUTE … TO service_role`, mirroring
+`prime_directive_queue`'s own ACL). **Neither caller's body was retyped.** Both were re-executed
+from `pg_get_functiondef` with exactly one `replace()` each, guarded by an occurrence count that
+refuses anything other than 1 — so "every other byte as read" is enforced by the migration rather
+than promised by the author. Measured after: `prime_directive_queue()` 152 → 150 lines (the
+three-line clause became one), `drain_epic_next(uuid)` 441 lines unchanged, line 77 now
+`c_unblocking constant text[] := public.backlog_unblocking_statuses();`. `pg_proc` = 1/1/1.
+The self-QA fixture ran the triple listed → listed → absent and left 0 residue.
+
+**Migration 2 `ses424_blocked_by_pass`.** Decision **`99e15850-ea15-412f-8f2b-c31e35930079`**
+(`re-scope`, `SES-424`, `ladder_work_class` `tooling`, window to 2026-09-24T00:10:39Z). Five
+full-row before-images written **first**, one per ticket:
+`4747238c…` SES-397, `bad6a049…` SES-402, `6b175b5b…` SES-408, `0354774d…` SES-416,
+`d8077637…` SES-417. Edges on a `removal proposed` blocker: **5 → 0**. Verified afterwards that
+`(image.row_data - 'blocked_by') = (to_jsonb(live) - 'blocked_by')` for all five — no other column
+moved — and that `updated_at` is untouched on every one, which is what keeps the undo open:
+`reverse_decision()` refuses a row whose `updated_at` is later than `decided_at`.
+
+### The one real finding: `removal proposed` is not the same set as "outside the unblocking set"
+
+The new test's board-wide census was first written as *no ticket may wait on a blocker whose status
+the definition does not hold*. It failed, and the failure was the test's, not the platform's: it
+named ten healthy waits — `AGT-71/72/74/75/76/78/83/84`, `AGT-56`, `SES-317` — each behind an
+**`open`** blocker. A wait on an `open` blocker is the mechanism working: the blocker is live work
+and finishing it ends the wait. `removal proposed` is the shape that cannot end, because the
+blocker is one of the nine rows `SES-424` consolidated and no later event moves it either way.
+The kickoff's clause B said `removal proposed` precisely; the generalization was the build's, and
+the census now counts that one status. Worth keeping because the two readings look identical in
+prose and differ by ten rows on the live board.
+
+### Two fixture departures from §4, both forced by a constraint §4 did not name
+
+- **`row_ordinal`.** §4 gives both rows `row_ordinal 0` under `source_file 'ses-424g'`, but
+  `backlog_items_source_file_row_ordinal_key` is `UNIQUE (source_file, row_ordinal)` — the second
+  insert of a single run would collide with the first. The blocker takes the run's 5-digit nonce
+  and the dependent takes `nonce + 100000`, which also keeps two concurrent suite runs apart
+  (`SES-382`, and `ses-424a`'s own header records the same lesson).
+- **The test blocker carries `epic_id NULL`** (the migration's fixture kept §4's epic). This is
+  what lets clause C walk the blocker through *every* status the RPC names:
+  `backlog_done_requires_verdict` refuses `status = 'done'` on a ticket whose epic belongs to a
+  project, so a blocker on the executing epic could only ever have been checked for two of the
+  three. A blocker is read only through `bb.status`, so it needs no epic; the dependent keeps it,
+  because it is the row that has to be buildable.
+
+### What the test asserts that the migration could not
+
+The migration's `DO` block proves the new bodies; it cannot prove them *through PostgREST*, which
+is the seam every real caller uses. `ses-424g-blocker-cleared.test.mjs` re-runs the triple over
+`rpc/prime_directive_queue`, adds the reverse edit (blocker back to `delivered` → the ticket
+returns, so the exclusion in A iii was the status and nothing else), and drives clause C's sweep
+from `rpc/backlog_unblocking_statuses`'s own output rather than from a literal — a second
+hand-copy of the three words, in the test file, is the defect this ticket removes.
+`drain_epic_next(uuid)` is never called (`ses-281`); its half is the migration's `pg_get_functiondef`
+assertions, declared here rather than silently omitted.
