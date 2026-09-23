@@ -1,3 +1,20 @@
+// DeepBench v7.0.556 | tests/regression/agt-86h-auditor-routine.test.mjs | AGT-86 slice 8c -- arms A, B, H:
+// the runbook docs/runbooks/auditor-routine.md exists with its prompt block, every flag it passes a
+// script is in that script's usage header, and runner-cycle.md step 4d points at it.
+// Kickoff: docs/kickoffs/v7.0.556-AGT-86-s8c-auditor-runbook.md.
+//
+//   A  PROMPT BLOCK -- the marker LINES appear exactly once each (the §15.1 table names both markers
+//      inside a code span, so a bare substring count is 2 -- the block is found by whole line);
+//      the block names the runbook, the weekly wall, --session-name, claim_john_alerts, summary,
+//      never main and the DEEPBENCH-AUDITOR- stamp; no trig_017TZ3JZcLBK6AYH6DKURqMH and no
+//      prime_directive_queue; every claude-<family>-<n> id in the file is a MODEL-LANES-SNAPSHOT id.
+//      Pre-change: the file is absent -> fails at read.
+//   B  EVERY FLAG EXISTS -- for each `node scripts/<x>.js` on a runbook line, every --flag after it
+//      (name before any =) is in the first 130 lines of scripts/<x>.js; the seven audit/agent
+//      scripts are all named. Teeth: a copy with `node scripts/audit-board.js --nope` is red.
+//   H  POINTER -- runner-cycle.md's 4d body (to **4e.) names docs/runbooks/auditor-routine.md and
+//      not "only John's hand"; the file is <= 381,000 bytes. Pre-8b: red on both.
+//
 // DeepBench v7.0.552 | tests/regression/agt-86h-auditor-routine.test.mjs | AGT-86 slice 8a
 //
 // FEATURE: AGT-86 slice 8a -- the code the Auditor routine's playbook calls. The routine has no
@@ -32,6 +49,52 @@ import { selfRun } from "./_lib/self-run.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CLUSTER = path.join(ROOT, "scripts", "audit-cluster.js");
 const ATTRIBUTION_RE = /exactly one of --cycle-id \/ --session-name/;
+const RUNBOOK = path.join(ROOT, "docs", "runbooks", "auditor-routine.md");
+const RUNNER_CYCLE = path.join(ROOT, "docs", "runbooks", "runner-cycle.md");
+const LANES = path.join(ROOT, "docs", "governance", "MODEL-LANES-SNAPSHOT.md");
+const BEGIN = "<!-- AUDITOR-ROUTINE-PROMPT-BEGIN -->";
+const END = "<!-- AUDITOR-ROUTINE-PROMPT-END -->";
+const SEVEN = ["audit-corpus", "audit-cluster", "audit-board", "audit-ledger", "audit-review", "agent-prompt", "agent-log"];
+const RUNNER_CYCLE_MAX_BYTES = 381000;
+const lf = t => String(t).replace(/\r\n/g, "\n");
+
+// The text between the two marker LINES, each asserted present exactly once as a whole line.
+export function promptBlock(md) {
+  const lines = lf(md).split("\n");
+  const at = m => lines.flatMap((l, i) => (l === m ? [i] : []));
+  const a = at(BEGIN), b = at(END);
+  assert.equal(a.length, 1, `${BEGIN} must be a line exactly once (got ${a.length})`);
+  assert.equal(b.length, 1, `${END} must be a line exactly once (got ${b.length})`);
+  assert.ok(b[0] > a[0], "END marker after BEGIN");
+  return lines.slice(a[0] + 1, b[0]).join("\n");
+}
+
+// Every --flag passed to a `node scripts/<x>.js` on a runbook line, checked against the first 130
+// lines of that script (its usage header). Returns the misses and the scripts named.
+export function flagMisses(md, headOf) {
+  const misses = [], scripts = new Set();
+  for (const line of lf(md).split("\n")) {
+    const hits = [...line.matchAll(/node scripts\/([a-z0-9-]+)\.js/g)];
+    hits.forEach((m, k) => {
+      const name = m[1];
+      scripts.add(name);
+      const seg = line.slice(m.index + m[0].length, k + 1 < hits.length ? hits[k + 1].index : line.length);
+      const head = headOf(name);
+      if (head == null) { misses.push(`scripts/${name}.js does not exist`); return; }
+      for (const t of new Set(seg.match(/--[a-z][a-z-]*/g) ?? [])) {
+        if (!new RegExp(t + "(?![a-z-])").test(head)) misses.push(`scripts/${name}.js lacks ${t}`);
+      }
+    });
+  }
+  return { misses, scripts };
+}
+
+function headOf(name) {
+  const p = path.join(ROOT, "scripts", `${name}.js`);
+  if (!fs.existsSync(p)) return null;
+  return lf(fs.readFileSync(p, "utf8")).split("\n").slice(0, 130).join("\n");
+}
+
 const NEW_SLUGS = ["audit-board-health", "audit-work-quality", "audit-config-review", "audit-advisor", "review-audit-worklist"];
 
 // Credentials stripped so arm C proves the refusal happens before any database read.
@@ -49,6 +112,53 @@ export default async function run() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "agt86h-"));
 
   try {
+    // --- A. prompt block --------------------------------------------------------------------------
+    await arm("A prompt block", async () => {
+      const md = fs.readFileSync(RUNBOOK, "utf8");
+      const block = promptBlock(md);
+      for (const need of ["docs/runbooks/auditor-routine.md", "weekly wall", "--session-name", "claim_john_alerts",
+        "summary", "never main", "DEEPBENCH-AUDITOR-"]) {
+        assert.ok(block.includes(need), `the prompt block names ${need}`);
+      }
+      assert.ok(md.includes("AS weekly_wall"), "the runbook's step-0 query computes weekly_wall");
+      for (const never of ["trig_017TZ3JZcLBK6AYH6DKURqMH", "prime_directive_queue"]) {
+        assert.ok(!block.includes(never), `the prompt block must not name ${never}`);
+      }
+      const lanes = new Set([...lf(fs.readFileSync(LANES, "utf8")).matchAll(/^\|\s*(?:orchestrator|judgment|mechanical)\s*\|\s*([^|]+?)\s*\|/gm)].map(m => m[1]));
+      assert.ok(lanes.size >= 3, `the lanes snapshot parses (${lanes.size} ids)`);
+      const ids = [...new Set(md.match(/claude-[a-z]+-[0-9][0-9a-z-]*/g) ?? [])];
+      assert.ok(ids.length >= 1, "the runbook names the orchestrator model");
+      for (const id of ids) assert.ok(lanes.has(id), `${id} is not a MODEL-LANES-SNAPSHOT id`);
+      // Control: the block is found by whole line, not by the first substring (the §15.1 table row
+      // names both markers in a code span BEFORE the block).
+      assert.ok(lf(md).indexOf(BEGIN) < lf(md).indexOf(`\n${BEGIN}\n`), "control: the table's code-span mention precedes the marker line");
+      assert.throws(() => promptBlock(lf(md).replace(`\n${END}\n`, "\n")), "control: a missing END line is refused");
+      assert.ok(Buffer.byteLength(md) <= 40 * 1024, `runbook <= 40 KB (got ${Buffer.byteLength(md)})`);
+    });
+
+    // --- B. every flag exists ---------------------------------------------------------------------
+    await arm("B every flag exists", async () => {
+      const md = fs.readFileSync(RUNBOOK, "utf8");
+      const { misses, scripts } = flagMisses(md, headOf);
+      assert.deepEqual(misses, [], `flags no usage header carries: ${misses.join("; ")}`);
+      for (const s of SEVEN) assert.ok(scripts.has(s), `the runbook runs scripts/${s}.js`);
+      // Teeth: a flag no header carries goes red.
+      const bad = flagMisses(md + "\nnode scripts/audit-board.js --nope\n", headOf);
+      assert.deepEqual(bad.misses, ["scripts/audit-board.js lacks --nope"], "control: an unknown flag is caught");
+    });
+
+    // --- H. runner-cycle.md step 4d points here ---------------------------------------------------
+    await arm("H pointer", async () => {
+      const md = fs.readFileSync(RUNNER_CYCLE, "utf8");
+      const from = md.indexOf("**4d. ");
+      const to = md.indexOf("**4e. ", from);
+      assert.ok(from > 0 && to > from, "could not isolate the 4d body");
+      const body = md.slice(from, to);
+      assert.ok(body.includes("docs/runbooks/auditor-routine.md"), "4d names docs/runbooks/auditor-routine.md");
+      assert.ok(!body.includes("only John's hand"), "4d no longer says only John's hand");
+      assert.ok(Buffer.byteLength(md) <= RUNNER_CYCLE_MAX_BYTES, `runner-cycle.md <= ${RUNNER_CYCLE_MAX_BYTES} bytes (got ${Buffer.byteLength(md)})`);
+    });
+
     // --- C. attribution ---------------------------------------------------------------------------
     await arm("C attribution", async () => {
       const runDir = path.join(tmp, "run");

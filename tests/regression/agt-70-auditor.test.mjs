@@ -36,7 +36,8 @@
 //
 // FEATURE: AGT-70 slice 3 -- the landing: ruled findings become board rows under a weekly cap, the
 // standing brief grows an `Auditor's ledger` group, and runbook step 4d is where the weekly audit
-// fires. Parts A-I below are slices 1 and 2's and are unchanged.
+// fired -- since AGT-86 slice 8b 4d is a pointer to the Auditor's own routine
+// (docs/runbooks/auditor-routine.md). Parts A-I below are slices 1 and 2's and are unchanged.
 //
 // FOUR MORE PARTS, each with its own control:
 //   J   LEDGER FILING (pure) -- ledgerEligible's three gates and its earliest-ruling collapse,
@@ -47,10 +48,10 @@
 //       on a second call, and the branch that matters: `undefined` says "not read" and must NOT say
 //       "0 findings". factsSha moves when a row is ruled and when a row leaves for the board.
 //   L   STEP 4d AND THE CARD (source, always runs) -- 4d sits between 4c and 5, its NOTES entry
-//       exists and is under the outcome cap, and the step body carries the three things that make
-//       it safe: the --from-ledger sweep, a DRY --ingest (no line carries both --ingest= and
-//       --apply, which is the "a cycle never ingests" rule as a grep), and the ISO-week
-//       precondition. Control: rename the step and the renderer must REFUSE, not silently omit it.
+//       exists and is under the outcome cap, and 4d is a pointer (AGT-86 slice 8c re-pin): the body
+//       names docs/runbooks/auditor-routine.md, no longer says "only John's hand", and no line
+//       carries both --ingest= and --apply ("a cycle never ingests" as a grep). Control: rename
+//       the step and the renderer must REFUSE, not silently omit it.
 //   M   LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY; notRun otherwise) -- the CLI's --from-ledger dry
 //       run against the real ledger, and the two counts this slice promised not to move.
 //
@@ -998,18 +999,17 @@ function stepFourDIsInTheRunbookAndOnTheCard() {
   assert.ok(from > 0 && to > from, "could not isolate the 4d body");
   const body = md.slice(from, to);
 
-  assert.ok(body.includes("tripwire-to-backlog.js --from-ledger"),
-    "step 4d must run the ledger sweep -- without it the weekly audit files nothing and the ledger is a dead end");
-  assert.ok(body.includes("audit-ledger.js --ingest="),
-    "step 4d must run the ingest, which is what turns candidates into a record John can rule");
+  // AGT-86 slice 8c: 4d is a pointer. The three greps that pinned the in-cycle audit (--from-ledger,
+  // --ingest=, date_trunc('week') are retired -- 8b's pointer names them as what a cycle no longer
+  // runs, so they no longer discriminate. What 4d must carry now is the pointer itself.
+  assert.ok(body.includes("docs/runbooks/auditor-routine.md"), "step 4d points at the Auditor's own runbook (AGT-86 slice 8b)");
+  assert.ok(!body.includes("only John's hand"), "the manager rules; the cycle no longer ingests (ASKS-TO-JOHN A-27)");
   // THE RULE AS A GREP: a cycle never ingests. --apply on the ingest line would make the Auditor
   // file its own findings, which is the one thing the ledger exists to prevent.
   for (const line of body.split("\n")) {
     assert.ok(!(line.includes("--ingest=") && line.includes("--apply")),
       `step 4d must never pair --ingest= with --apply -- only John's hand ingests. Offending line: ${line}`);
   }
-  assert.ok(body.includes("date_trunc('week'"),
-    "the precondition is an ISO-WEEK window over the run's own log rows, not a day and not a notes prefix");
 
   const stamps = md.split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
   assert.strictEqual(stamps.length, 5, `session-hygiene check 7 caps the runbook at 5 header stamps; got ${stamps.length}`);
@@ -1459,7 +1459,7 @@ export async function run() {
   console.log("         exemptions: fenced 0 / unfenced 1 · rule render 0 with the rule, 1 without · cycle-card.md out by PROCEDURE_GENERATED_DOCS");
   console.log("         ledger filing: 2 of 6 eligible, cap 3 → 0 at filedThisWeek 3, 1 at 2 · draft S/M by locations · isoWeek 2027-01-01 = 2026-W53");
   console.log("         brief group: 6 findings (4 open · 2 resolved) 0 ruled 0 filed · absent says 'not read', never 0 · factsSha moves on a ruling and on a filing");
-  console.log("         step 4d: between 4c and 5, 27 steps, NOTES 85 chars, no --ingest= line carries --apply, 5 header stamps, v7.0.446 in SESSIONS.md");
+  console.log("         step 4d: between 4c and 5, 27 steps, 4d is a pointer to auditor-routine.md (no only-John's-hand), no --ingest= line carries --apply, 5 header stamps, v7.0.446 in SESSIONS.md");
   console.log("         negative control: resolved corpus → 0 clusters, 4 unrunnable (0/3, 1/3, 0/8, 1/2); retired forced false → the 2 come back · CLI duplicates 0 stale 0");
   console.log("         week two: 4 carried over live homes / 0 carried + 4 gone over the resolved corpus · same week 0 · resolved latest row never carries");
   console.log("         verdicts: W37 6 seen, W38 6 recurring, a not-a-defect row → 1 ruled-out + 5 recurring · 2 homes rule out, 1 home does not · carry keeps its own found_by");
