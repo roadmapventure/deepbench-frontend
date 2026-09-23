@@ -246,3 +246,72 @@ pattern:9 (deterministic where a mechanism serves), pattern:14, pattern:17 (exte
 **What 2b does not do.** No model call; no finding ruled; no ticket filed; `john_alerts` untouched. Slice 3 runs `--prepare`, the manager on the session lane (`scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task=<context>`), and the first real `--apply`.
 
 **Patterns applied (2b).** pattern:8, pattern:9 (deterministic validation, no model), pattern:14 (one validator, imported by the test), pattern:17 (existing script shape), pattern:64/66, pattern:67 (no test-only flag), pattern:90 (John's five calls verbatim), pattern:92, pattern:162 (every arm red before, named), pattern:164 (`.env.local` and exit-code conventions designed in), pattern:168.
+
+## 12. Slice 3 — the Auditor files its own findings; the weekly report counts what was found (kickoff `docs/kickoffs/v7.0.549-AGT-86-s3-ledger-self-ingest.md`, 2026-09-23)
+
+### 12.1 Premise: alive
+
+Measured 2026-09-23 on tree `586718f3` and the live database:
+
+| Fact | Measurement |
+|---|---|
+| `audit_findings` | 6 rows, all `2026-W37` (4 open, 2 resolved); every `cycle_id` set; every `check_slug` NULL |
+| `scripts/audit-ledger.js` | `:349` refuses `--apply` without `--cycle-id`; `:388` posts every before-image with `cycle_id` only; `toRow` `:204-223` carries no `check_slug`; `renderReport(week, rows)` `:167-195` renders ledger rows only; `doReport` `:404-422` never reads `docs/audits/<W>-candidates.json` |
+| `runner_before_images` | `ck_before_image_attribution` = exactly one of `cycle_id` / `session_name`; `decision_id` nullable |
+| `docs/audits/2026-W38.md`, `2026-W39.md` | 198 bytes each: `# Audit … — 0 findings (0 open · 0 resolved · 0 not a defect)` |
+| `docs/audits/2026-W38-candidates.json` | 21 `findings` + 4 `carried` (the carried carry `found_by 'carry:2026-W37'`, `status 'open'`); no `check_slug` on any entry |
+| `docs/audits/2026-W39-candidates.json` | 30 `findings` + 4 `carried` (the same four W37 fingerprints) |
+| Fingerprints (pure `fingerprint()` over both files against the six live fingerprints) | W38: 25 distinct, 21 `new` + 4 `recurring`, 0 `seen`; W39 (after W38): 34 distinct, 30 `new` + 4 `recurring`, 0 `seen` — none of the 30 W39 findings share a fingerprint with a W38 finding. Both ingests append 59 rows → 65 |
+| `agt-70-auditor.test.mjs` | part D pins `renderReport(WEEK, rows)` byte-for-byte for open/resolved rows; `:1244-1251` asserts `toRow` properties only (never a whole-row deepEqual) — so an added `check_slug` key and an optional third `renderReport` argument leave it exactly as red or green as it is today (it is one of the 12 inherited reds) |
+| "for John to read" | not in `audit-ledger.js` at all; it lives in runner-cycle.md step 4d (slice 8) and `audit-cluster.js:749`'s `note` field (slice 7). The ledger's own dry-run prints only the summary line and exits 1 with no sentence naming the next step |
+| `runner_model_lanes` | orchestrator `claude-opus-5`, judgment `claude-fable-5-1`, mechanical `claude-sonnet-5` |
+| `apply_audit_review` | still absent from `pg_proc` at design time (2a building as v7.0.546); `scripts/audit-review.js` absent (2b, v7.0.548) — the first run (§12.4) waits on both |
+
+The premise is alive: an attended session cannot ingest at all, and the weekly report counts ledger rows only.
+
+### 12.2 Decisions
+
+1. **Attribution is a pure function the CLI calls first.** `attribution({cycleId, sessionName, apply})` throws on both flags in any mode and on `--apply` with neither, so the refusal fires before the file is read and before `creds()` — which is what lets the test grade it with no credentials (arm D) and is why the pre-change stderr differs (`SUPABASE_URL…` / `requires --cycle-id`). `beforeImage()` is exported for the same reason: the row shape the CHECK constrains is graded without a network.
+2. **No `record_decision` on the ingest.** Slice 1b measured that the ledger guard refuses the DELETE an INSERT image would need, so `reverse_decision()` reports an ingest `refused`, never restored. A decision handle here would promise an undo the platform cannot perform (pattern:33 — do not show what cannot be verified). The image carries only the attribution `ck_before_image_attribution` demands; a session ingest leaves `audit_findings.cycle_id` NULL, exactly as `this_slice` states. The `CLAUDE-DESIGN.md` Backlog Capture rule is satisfied at the image level (the ticket's own §3(1) example is about images, not decisions).
+3. **`renderReport` gains an optional third argument, and the legacy shape is byte-stable.** `found = null` with every row in `open/resolved/not-a-defect` renders today's text unchanged — agt-70 part D's pin is the control. Any other input (a `found` count, or a row in `ticketed/carried/escalated`) switches to the counted header `<F> found, <L> filed[ yet]`, the `Found this run` line, the six-status `Ledger:` line and the `Root-cause tickets:` line. F comes from the candidates file (`findings.length + carried.length`), L from the ledger; the two are named separately because they are different meanings (pattern:40) and a week with F > 0 and L = 0 reads `25 found, 0 filed yet` — never `0 findings` (pattern:34, pattern:38).
+4. **`docs/audits/2026-W37.md` is not re-rendered.** Its candidates file holds 24 judgment-run findings that were never ingested while the ledger holds 6 hand-seeded rows; a re-render would honestly read `24 found, 6 filed` and would make W37 look like an unfinished week when its review is what the 4 carried fingerprints already carry into W38/W39. The coordinator renders W38 and W39 only, per `this_slice`.
+5. **Model.** `claude-opus-5`, orchestrator lane — the same lane every AGT-86 build slice has used in this attended session; the work is one script edit with a byte-stable rendering contract and a credentialed test, not a doc sweep (pattern:125).
+
+### 12.3 Alternatives not taken
+
+- **Count "found" from the ledger's `new + recurring` verdicts at report time.** Rejected: the report must read the file, because the whole defect is that the ledger holds nothing until someone ingests; a report that counts only what the ledger knows is the `0 findings` report by another route.
+- **Drop the two-arg legacy shape and re-pin agt-70 part D.** Rejected: agt-70 is an inherited red the Builder does not own; touching it is a third file for no user-visible gain (pattern:65, pattern:124 applies only to breakage this slice causes).
+- **Have the ingest itself write `docs/audits/<W>.md`.** Rejected: `--report --write` already exists and runner-cycle.md 4d calls it after the ingest; one writer per file.
+- **Change runner-cycle.md 4d's "only John's hand ingests" sentence now.** Not this slice: 282 bytes of headroom under the SES-336 ceiling and the step moves to the Auditor routine's own runbook in slice 8.
+
+### 12.4 The first run — the coordinator's checklist (item 4; after this ship, 2a and 2b are live)
+
+```
+export SUPABASE_URL=… SUPABASE_SERVICE_KEY=…   # from runner_secrets, inline
+node scripts/audit-ledger.js --ingest=docs/audits/2026-W38-candidates.json --week=2026-W38 --session-name=agt-86-auditor-0923 --apply
+   → ingest 2026-W38: 25 findings, 21 new, 0 seen, 4 recurring, 0 ruled-out
+node scripts/audit-ledger.js --ingest=docs/audits/2026-W39-candidates.json --week=2026-W39 --session-name=agt-86-auditor-0923 --apply
+   → ingest 2026-W39: 34 findings, 30 new, 0 seen, 4 recurring, 0 ruled-out
+select iso_week, count(*) from audit_findings group by 1;            → W37 6, W38 25, W39 34
+select count(*) from runner_before_images where session_name='agt-86-auditor-0923' and table_name='audit_findings' and cycle_id is null and row_data is null;  → 59
+node scripts/audit-ledger.js --report=2026-W38 --write   → report 2026-W38: 25 found, 25 filed -> docs/audits/2026-W38.md
+node scripts/audit-ledger.js --report=2026-W39 --write   → report 2026-W39: 34 found, 34 filed -> docs/audits/2026-W39.md
+grep -c "0 findings" docs/audits/2026-W38.md docs/audits/2026-W39.md   → 0 and 0
+node scripts/audit-review.js --prepare --week=2026-W39 --out=$S/ctx.json
+   → worklist 63 ids (4 open W37 + 25 W38 + 34 W39); the 4 W37 fingerprints carry weeks_seen 3 (12 rows) and may not be carried
+node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task=$S/ctx.json  → run as a session sub-agent → $S/answer.json
+node scripts/audit-review.js --dry-run=$S/answer.json --week=2026-W39   → ok
+node scripts/audit-review.js --apply=$S/answer.json --week=2026-W39 --session-name=agt-86-auditor-0923
+   → Decision <id> — reversible until …; tickets AGT-<n>…; counts
+select status, count(*) from audit_findings group by 1;   → open 0; ticketed/not-a-defect/carried/escalated sum to 63; resolved 2
+node scripts/audit-ledger.js --report=2026-W38 --write && node scripts/audit-ledger.js --report=2026-W39 --write   → both carry `Root-cause tickets:` when any group was root-cause/cleanup
+```
+Counts to report: rows per week (6/25/34), images (59), tickets filed, alerts (`john_alerts` rows, one per escalated finding), and the decision handle. Commit the two reports and the two candidates files in the coordinating session's commit, not the Builder's.
+
+### 12.5 What slice 3 does not do
+
+No board check (slice 4), no new Auditor skill row or capability (slice 7), no routine and no runner-cycle.md edit (slice 8), no learning loop (slice 9). `audit-cluster.js:749`'s "John reads" note and `FINDING_KINDS` without `other` stay until slice 7. `docs/audits/2026-W37.md` is untouched.
+
+### 12.6 Patterns applied
+
+pattern:9 (deterministic ingest and report; no model call), pattern:17 (extend `toRow`/`renderReport`/`doReport`, no parallel report), pattern:33 (no decision handle that cannot restore), pattern:34 and pattern:38 (the report renders found findings, never a convenient `0`), pattern:40 (`found` and `filed` named as different meanings), pattern:64/66 (items 1-3 only; the first run is the coordinator's), pattern:65 (legacy render shape kept rather than re-pinning agt-70), pattern:90 (`this_slice`'s wording — `--session-name`, `cycle_id` NULL, "new findings to file", "N found, 0 filed yet" — carried literally), pattern:92 (§12.4 written for a cold coordinator), pattern:125 (orchestrator lane), pattern:162 (every arm has a pre-change red), pattern:164 (`.env.local` has no service key; attribution CHECK designed in), pattern:168 (kickoff ≤ 8,192 bytes).
