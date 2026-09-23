@@ -535,3 +535,139 @@ pattern:2 (the checklist is rows, not code), pattern:7 (behavior in the agent's 
 **Baseline.** `node scripts/baseline-red-set.js --tests=tests/regression/agt-70-auditor.test.mjs --worktree=<worktree>` → agt-70-auditor green, red set 0 of 1; the new test file is absent (the script refuses a non-existent path rather than measuring it). The 12 inherited suite reds from the coordinator's note stand.
 
 **Patterns applied.** pattern:9 (deterministic, no model call), pattern:15 (one module owns the seam), pattern:17 (extend `--corpus`'s script rather than a parallel scanner), pattern:38 (the scan counts everything committed, no convenient scope filter), pattern:68 (local constant over a dependency not yet built), pattern:98 (the Austin personal-domain hit goes to the reviewer, not a hand allowlist), pattern:162 (the test grades fixtures; the live arm asserts existence, not the world's count), pattern:164 (cloud clone layout read from environment facts).
+
+## 16. Slice 9 — the learning loop: 9a the scorecard view and the tighten/promote flags (kickoff `docs/kickoffs/v7.0.553-AGT-86-s9a-check-scorecard.md`, 2026-09-23); 9b the checklist edits (specified in §16.5, next kickoff)
+
+### 16.1 Premise revalidated
+
+Measured live on `rallojeqnkgtxgsdsnqm` 2026-09-23 against tree `9495d45a` (origin/dev with 2a `v7.0.546`, 2b `v7.0.548`, 3 `v7.0.549` and 4 `v7.0.547` shipped):
+
+| Fact | Measurement |
+|---|---|
+| `audit_findings` | 65 rows: W37 4 `open` + 2 `resolved`, W38 25 `open`, W39 34 `open`; `ruled_by` set on 2 (the resolved pair); `check_slug` NULL on all 65 (slice 3's ingest carries no slug; the candidates files have none); 0 rows `kind 'other'`; max distinct `iso_week` per fingerprint 3 (the four W37 fingerprints) |
+| `audit_check_scorecard` | absent from `pg_views`; no file in the tree names it |
+| Default ACL | `pg_default_acl` for relations (`r`) grants `anon` and `authenticated` `arwdDxtm` from both `postgres` and `supabase_admin` — SES-384's fact holds for views too; `ticket_outcome` (the newest view) carries grants for `postgres` and `service_role` only, the revoked shape to copy |
+| `apply_audit_review(uuid, text, text, jsonb)` | 1 `pg_proc` row; body = §9.3 as shipped: p_week, attribution, groups non-empty, per-group rules (kind, finding_ids, carry/reason/weeks_seen, not-a-defect/reason, escalate/john_call+summary, root-cause fields or reuse row, ≤ 1 cleanup with fix), then coverage; `record_decision(… 'filing' …)`; images `to_jsonb(f)` per finding under `v_dec`; `john_alerts` per escalation; `recompute_backlog_queue()`; returns `{decision_id, tickets, counts}`. `p_review -> 'checklist_edits'` is never read |
+| `reversible_tables()` | 15 names incl `skill_profiles`; `reverse_decision()` (`p_decision, p_actor, p_reason, p_actor_cycle DEFAULT NULL`) restores an image whole-row via `jsonb_populate_record` (`update … set (cols) = (select … )` at its `:348`), deletes on a NULL image (`:336`) |
+| `runner_before_images` on `skill_profiles` | 41 rows with `row_data` non-null; the newest under decision `decbb801-5f99-4b85-a406-f29d1be0fcab` (session `agt-86-auditor-0923`, slice 7) images `13d78538-02d1-4f97-b875-ff71bd7dfe50` = `au-knowledge-homes` — the UPDATE-image shape 9b copies |
+| `skill_profiles` `au-*` rows | `au-identity c9e7a0f2-3a87-48e7-9e04-f7c56b53280f`, `au-guardrails 1e1adf86-2700-4c44-bd67-30546fb3da01`, `au-behavior 47e8bc5a-8b0b-49aa-b4bf-2a386d94ea0b`, `au-knowledge-homes 13d78538-02d1-4f97-b875-ff71bd7dfe50`, intents `au-corpus-intent`, `au-agent-data-intent`, `au-board-intent`, `au-quality-intent`, `au-config-intent`, `au-advisor-intent` (all `skill_type_slug intent`) |
+| `dm-audit-review-intent` | id `a6d3568f-3a39-44ff-a2b9-0aa62035281e`, `llm_model claude-opus-5`, `tenant_id NULL`; `method` 1,562 chars (§9.2 verbatim, no tighten/promote rule); `traits.schema.required` = `[groups, summary_for_john, patterns_applied]`, no `checklist_edits` property; linked to `review-audit-worklist` at `display_order` 4 of 6 |
+| `scripts/audit-review.js` (2b, `v7.0.548`) | pure half exports `JOHN_CALLS, KINDS, WEEK_RE, NOTHING_TO_REVIEW, buildTaskContext, validateReview`; `--prepare` GETs `audit_findings?status=in.(open,carried)…`, `audit_findings?select=fingerprint,iso_week,status,ruling,ruled_by` and `backlog_items?source_file=eq.audit-review…`; context keys `week, worklist, open_audit_tickets, john_calls` |
+| `runner_model_lanes` | orchestrator `claude-opus-5`, judgment `claude-fable-5-1`, mechanical `claude-sonnet-5` |
+| Baseline | `node scripts/baseline-red-set.js --tests=tests/regression/agt-86i-learning-loop.test.mjs` → "these paths do not exist, so no baseline was measured" |
+
+Premise alive: nothing scores a check, nothing flags a false-alarm-prone check or a recurring `other`, and the manager's answer contract has no place for a checklist edit. To date the loop has learned nothing (AGT-86 §11) and still cannot.
+
+**Why 9a / 9b.** The ticket's scope is one migration (view + function), the intent row, the script and the test. As one kickoff the seven sections measured 9,645 bytes after two compressions — over the 8,192 cap with task facts still in it (pattern:168), and the cap on files/tasks is at its limit. The ticket itself names the seam: 9a = the scorecard view, the two pure flag functions and the prepare context (the manager SEES); 9b = `checklist_edits` in `apply_audit_review()`, the allowlist, the before-image, the intent row's two rules (the manager ACTS). 9b's kickoff is short because §16.5 holds the function spec and §16.2/§16.3 hold the row text. Not a waiver of the cap (pattern:72) — a split the ticket offered.
+
+### 16.2 `dm-audit-review-intent.method` — the addition, verbatim (9b task 1 appends this after the existing method, separated by one space)
+
+```
+THE LEARNING LOOP (AGT-86 section 11). Your task_context also carries scorecard (checks: per check_slug and week — found, real, false_alarm, carried, rulings, rulings_3w, false_alarm_rate_3w — only checks with three or more rulings; tighten: the check_slugs whose false-alarm rate is 50% or more over their last three weeks), promotions (fingerprints of kind other ruled real — ticketed or escalated — in three distinct weeks, each with its finding_ids: a check waiting to be named), and checklist (the audit checklist rows you may edit: au-behavior, au-knowledge-homes and the au-*-intent rows, each with its objective and method as they read today). Two rules. TIGHTEN: a check in tighten gets its line in au-behavior's method rewritten so the false alarms it raised would no longer pass it — narrow the test, name the exception, or add the evidence it must quote; never delete a check. PROMOTE: a promotion becomes a new named check — add a line to au-behavior's method under the job it belongs to, with a slug, the test and the example taken from the findings themselves, and add that slug to the au-*-intent row whose task_context would carry it. An advisor finding ruled real may add a check the same way. Return every edit in checklist_edits: skill_slug, field (method or objective), new_text (the WHOLE field as it should read after the edit, never a fragment), reason (the finding ids and the rule — tighten or promote — behind it). Edits to au-identity and au-guardrails are refused: who the audit is and its hard limits are John's; put such a change in summary_for_john instead. A checklist edit is recorded under the same reversible decision as your rulings, so make one only when the scorecard or a promotion supports it — an empty checklist_edits is the normal answer.
+```
+
+### 16.3 `dm-audit-review-intent.traits.schema.properties.checklist_edits` — verbatim (9b task 1; `required` stays `[groups, summary_for_john, patterns_applied]`)
+
+```json
+{"type":"array","items":{"type":"object","required":["skill_slug","field","new_text","reason"],"properties":{"skill_slug":{"type":"string","pattern":"^au-(behavior|knowledge-homes|[a-z-]+-intent)$"},"field":{"type":"string","enum":["method","objective"]},"new_text":{"type":"string","minLength":1,"maxLength":12000},"reason":{"type":"string","maxLength":600}}},"description":"Edits to the audit checklist rows the manager owns; au-identity and au-guardrails are John's and are refused. Each edit is imaged and reversible under this review's decision."}
+```
+
+### 16.4 Migration `agt86_s9a_check_scorecard` — verbatim (9a task 1)
+
+```sql
+CREATE VIEW public.audit_check_scorecard AS
+WITH w AS (
+  SELECT check_slug, iso_week,
+         count(*)::int                                                                   AS found,
+         count(*) FILTER (WHERE status IN ('ticketed','escalated','resolved'))::int      AS "real",
+         count(*) FILTER (WHERE status = 'not-a-defect')::int                            AS false_alarm,
+         count(*) FILTER (WHERE status = 'carried')::int                                 AS carried
+    FROM public.audit_findings
+   WHERE check_slug IS NOT NULL
+   GROUP BY check_slug, iso_week
+)
+SELECT check_slug, iso_week, found, "real", false_alarm, carried,
+       ("real" + false_alarm)::int                                                       AS rulings,
+       (sum("real" + false_alarm) OVER w3)::int                                          AS rulings_3w,
+       round((sum(false_alarm) OVER w3)::numeric / nullif(sum("real" + false_alarm) OVER w3, 0), 2) AS false_alarm_rate_3w
+  FROM w
+WINDOW w3 AS (PARTITION BY check_slug ORDER BY iso_week ROWS BETWEEN 2 PRECEDING AND CURRENT ROW);
+
+COMMENT ON VIEW public.audit_check_scorecard IS 'AGT-86 section 11: per-check scorecard of the audit ledger. One row per check_slug and ISO week. real = ticketed + escalated + resolved, false_alarm = not-a-defect, a carry is not a ruling; rulings_3w and false_alarm_rate_3w run over the check''s last three rows by iso_week. Read by scripts/audit-review.js --prepare; service_role only.';
+
+REVOKE ALL ON public.audit_check_scorecard FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audit_check_scorecard TO service_role;
+
+DO $$
+DECLARE
+  n int; a numeric; b numeric; ra int; rb int; pre int;
+BEGIN
+  IF to_regclass('public.audit_check_scorecard') IS NULL THEN RAISE EXCEPTION 'AGT86I: view missing'; END IF;
+  SELECT count(*) INTO n FROM information_schema.role_table_grants
+   WHERE table_schema = 'public' AND table_name = 'audit_check_scorecard' AND grantee IN ('anon','authenticated');
+  IF n <> 0 THEN RAISE EXCEPTION 'AGT86I: % grants to anon/authenticated on the view', n; END IF;
+  IF NOT has_table_privilege('service_role', 'public.audit_check_scorecard', 'SELECT') THEN RAISE EXCEPTION 'AGT86I: service_role cannot read the view'; END IF;
+  SELECT count(*) INTO pre FROM public.audit_findings;
+  BEGIN
+    INSERT INTO public.audit_findings (fingerprint, iso_week, kind, check_slug, locations, governing_fact, confidence, proposed_resolution, status, found_by) VALUES
+      ('agt86qa-a', '2026-W01', 'other', 'agt86qa-a', '[{"location":"qa"}]', 'qa', 'low', 'qa', 'not-a-defect', 'agt-86-qa'),
+      ('agt86qa-a', '2026-W02', 'other', 'agt86qa-a', '[{"location":"qa"}]', 'qa', 'low', 'qa', 'not-a-defect', 'agt-86-qa'),
+      ('agt86qa-a', '2026-W03', 'other', 'agt86qa-a', '[{"location":"qa"}]', 'qa', 'low', 'qa', 'ticketed',     'agt-86-qa'),
+      ('agt86qa-b', '2026-W01', 'other', 'agt86qa-b', '[{"location":"qa"}]', 'qa', 'low', 'qa', 'not-a-defect', 'agt-86-qa'),
+      ('agt86qa-b', '2026-W02', 'other', 'agt86qa-b', '[{"location":"qa"}]', 'qa', 'low', 'qa', 'ticketed',     'agt-86-qa'),
+      ('agt86qa-b', '2026-W03', 'other', 'agt86qa-b', '[{"location":"qa"}]', 'qa', 'low', 'qa', 'ticketed',     'agt-86-qa');
+    SELECT count(*) INTO n FROM public.audit_check_scorecard WHERE check_slug IN ('agt86qa-a','agt86qa-b');
+    SELECT rulings_3w, false_alarm_rate_3w INTO ra, a FROM public.audit_check_scorecard WHERE check_slug = 'agt86qa-a' AND iso_week = '2026-W03';
+    SELECT rulings_3w, false_alarm_rate_3w INTO rb, b FROM public.audit_check_scorecard WHERE check_slug = 'agt86qa-b' AND iso_week = '2026-W03';
+    IF n <> 6 OR ra <> 3 OR rb <> 3 OR a <> 0.67 OR b <> 0.33 THEN
+      RAISE EXCEPTION 'AGT86I_BAD: rows % a(% %) b(% %)', n, ra, a, rb, b;
+    END IF;
+    RAISE EXCEPTION 'AGT86I_OK';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'AGT86I_OK' THEN RAISE; END IF;
+  END;
+  SELECT count(*) INTO n FROM public.audit_findings;
+  IF n <> pre THEN RAISE EXCEPTION 'AGT86I: fixtures leaked (% -> %)', pre, n; END IF;
+  SELECT count(*) INTO n FROM public.audit_check_scorecard WHERE check_slug LIKE 'agt86qa-%';
+  IF n <> 0 THEN RAISE EXCEPTION 'AGT86I: view still shows fixtures'; END IF;
+END $$;
+```
+
+`rulings 1` on each W03 row (one finding per week per check); `found` and `carried` are asserted by the test's F arm on view-shaped rows, not here. The `RAISE 'AGT86I_OK'` is the roll-back: a sub-block's exception discards its own writes, the outer handler swallows that one message and re-raises anything else (the 2a `weeks_seen` shape).
+
+### 16.5 Slice 9b — checklist edits as reversible decisions (next kickoff; 3 files: migration `agt86_s9b_checklist_edits`, `scripts/audit-review.js`, `tests/regression/agt-86i-learning-loop.test.mjs`; the intent row is data; 4 tasks: intent row, down + migration, script + test arms, close-out; model `claude-opus-5`, orchestrator lane; lanes session only, $0)
+
+1. **Intent row, one `DO` block (3d):** `record_decision(NULL, 'agt-86-auditor-0923', 'agent-row', 'AGT-86', 'AGT-86 slice 9b: dm-audit-review-intent learns tighten, promote and checklist_edits', '<reasoning> pattern:2 pattern:7 pattern:16 pattern:136', ladder_work_class('P10 - Tooling'))`; one image `(NULL, 'agt-86-auditor-0923', 'skill_profiles', 'a6d3568f-3a39-44ff-a2b9-0aa62035281e', to_jsonb(row), decision)` taken BEFORE; then `UPDATE skill_profiles SET method = method || ' ' || <§16.2>, traits = jsonb_set(traits, '{schema,properties,checklist_edits}', <§16.3>) WHERE slug = 'dm-audit-review-intent'`. Skill type (pattern:136): still the Intent row — the loop is procedure and output contract for the same capability, not new identity or knowledge.
+2. **Down:** `capture_migration_down('386e52e6-08ae-4bf6-ad3d-5944882fb8ff', 'agt86_s9b_checklist_edits', '[{"kind":"function","identity":"public.apply_audit_review(uuid, text, text, jsonb)"}]'::jsonb)` → `auto-downable` with the prior definition captured (1 overload).
+3. **Function:** `CREATE OR REPLACE FUNCTION public.apply_audit_review(...)` — same identity, the §9.3 body kept verbatim, plus: `v_edits jsonb := p_review -> 'checklist_edits'` (NULL or absent = no edits; if present and not an array → `RAISE 'apply_audit_review: checklist_edits must be an array'`). Validation placed AFTER the per-group loop (1a) and BEFORE coverage (1b), per edit `e`: (i) `e ->> 'skill_slug' !~ '^au-(behavior|knowledge-homes|[a-z-]+-intent)$'` → `RAISE 'apply_audit_review: checklist edit to % refused: only au-behavior, au-knowledge-homes and au-*-intent rows are the manager''s; au-identity and au-guardrails are John''s (AGT-86 section 11(5))', e ->> 'skill_slug'`; (ii) no `skill_profiles` row with that slug → `'apply_audit_review: checklist edit names no skill_profiles row %'`; (iii) `field` not in (`method`, `objective`) → `'apply_audit_review: checklist edit field % must be method or objective'`; (iv) blank `new_text` or `reason` → `'apply_audit_review: checklist edit to % needs new_text and reason'`. Decision reasoning: one line per edit `checklist-edit <slug>.<field>: <reason>` appended to `v_group_lines`. Write, after step 5 (alerts) and before step 6: per edit `INSERT INTO runner_before_images (cycle_id, session_name, table_name, pk_value, row_data, decision_id) SELECT p_cycle_id, p_session_name, 'skill_profiles', sp.id::text, to_jsonb(sp), v_dec FROM skill_profiles sp WHERE sp.slug = <slug>`; then `UPDATE public.skill_profiles SET method = <new_text> WHERE slug = <slug>` (or `objective`); `counts` gains `'checklist_edits', <n>`. Grants re-stated exactly as §9.3. Trailing `DO`: `pg_proc` count 1; `prosrc ~ 'checklist_edits'`; EXECUTE false for anon/authenticated, true for service_role; sub-block (rolled back with `RAISE 'AGT86I_OK'`): INSERT one finding (`agt86i-fix`, `2026-W01`, `kind 'other'`, `found_by 'agt-86-qa'`), build `ids` = every `audit_findings.id` with status in (`open`,`carried`) (now including the fixture), call `apply_audit_review(NULL, 'agt-86-qa', '2026-W03', jsonb_build_object('groups', jsonb_build_array(jsonb_build_object('kind','not-a-defect','reason','qa','finding_ids', ids)), 'summary_for_john','qa', 'patterns_applied','[]'::jsonb, 'checklist_edits', jsonb_build_array(jsonb_build_object('skill_slug','au-knowledge-homes','field','objective','new_text','agt86i qa','reason','qa'))))` into `r`; assert `(select count(*) from runner_before_images where decision_id = (r->>'decision_id')::uuid and table_name = 'skill_profiles' and row_data->>'slug' = 'au-knowledge-homes') = 1`, `(select objective from skill_profiles where slug = 'au-knowledge-homes') = 'agt86i qa'`, `r->'counts'->>'checklist_edits' = '1'`; then `RAISE 'AGT86I_OK'`. After the block: `audit_findings` at its pre-count, `au-knowledge-homes.objective` byte-identical to before, `runner_decisions` count unchanged. A second sub-block proves the refusal: the same call with `skill_slug 'au-identity'` passes only on `SQLERRM ~ 'John'` and leaves `au-identity` untouched.
+4. **`scripts/audit-review.js`:** export `EDITABLE_SLUG = /^au-(behavior|knowledge-homes|[a-z-]+-intent)$/`; `validateReview` gains the four edit refusals with the same texts (minus the `apply_audit_review: ` prefix) in the same place — after the group loop, before coverage; `buildTaskContext({…, profiles})` adds `checklist: profiles.filter(p => EDITABLE_SLUG.test(p.slug)).map(p => ({skill_slug: p.slug, objective: p.objective, method: p.method}))`; `--prepare` GETs `skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug`; `--apply` sends `checklist_edits: answer.checklist_edits ?? []` in `review`.
+5. **Test arms appended to `agt-86i`:** **R** (live; needs ≥ 1 open finding else NOT RUN) — rpc with `groups=[{kind:'not-a-defect', reason:'qa', finding_ids:[first open id]}]` and `checklist_edits=[{skill_slug:'au-identity', field:'method', new_text:'x', reason:'qa'}]` → 400 `P0001` matching `/au-identity/` and `/John/`; `au-guardrails` → same; `dm-behavior` → the refusal (`/refused/`); `{au-knowledge-homes, field:'traits'}` → `/must be method or objective/`; `{au-knowledge-homes, field:'objective', new_text:'x', reason:'qa'}` → `/not covered/` and NOT `/John/` — the allowlist admits it, coverage stops the write. Pre-change every probe reads `not covered` only (the function ignores the key). Controls: `md5(coalesce(objective,'')||coalesce(method,''))` of the four `au-*` rows (via REST `select=slug,objective,method`), the `skill_profiles` image count and the `runner_decisions` count are re-read equal. **D** — `validateReview` on the same five shapes gives the identical texts. **I** — `skill_profiles?slug=eq.dm-audit-review-intent`: `traits.schema.properties.checklist_edits.items.required` deepEqual `[skill_slug, field, new_text, reason]`, `traits.schema.required` still the three, `method` contains `TIGHTEN:` and `PROMOTE:`; pre-change the property is absent. **P2** — `--prepare` context `checklist` slugs all match `EDITABLE_SLUG`, include `au-behavior` and `au-knowledge-homes`, exclude `au-identity`/`au-guardrails`; pre-change the key is absent. The permitted edit's before-image cannot be proven over REST without a real write — the migration's sub-block proves it rolled back, the same stated limit as 2a's `weeks_seen`. Control: `grep -l skill_profiles scripts/audit-ledger.js scripts/audit-cluster.js scripts/audit-board.js scripts/audit-corpus.js` → none, before and after: nothing in the Auditor's path gains a `skill_profiles` write (AGT-86 §11(5)).
+6. **STOP LINE for 9b:** never write AGT-86 done (slices 5 and 8 remain); no checklist edit is made in the build — the first real one is the manager's, in a weekly review after three ruled weeks; report both sub-block outcomes, the intent-row decision id and each arm's pre/post state.
+
+### 16.6 Decisions
+
+1. **The scorecard is a view, not a script's arithmetic.** Two readers already exist for the numbers (the manager's context and, later, the weekly report and John's summary); one SQL definition is the shared core (pattern:14, pattern:93). A rolling window `ROWS BETWEEN 2 PRECEDING AND CURRENT ROW` over the check's rows by `iso_week` is "its last 3 weeks" as the ticket words it — weeks in which the check found something; a calendar window would count silent weeks as clean and dilute the rate. Stated as the chosen meaning (pattern:39).
+2. **A ruling is `real` or `false_alarm`; a carry is neither.** `rulings = real + false_alarm`, so a check that is only ever carried never reaches three rulings and never flags — a carry is the manager declining to rule (pattern:40: `carried` is shown, named, and kept out of the rate).
+3. **"≥ 3 rulings" is the check's lifetime total for inclusion; the tighten flag needs `rulings_3w ≥ 3` as well.** Otherwise one false alarm in a quiet three-week window (rate 1.00 on one ruling) would flag a check the ticket's own rule ("keeps raising false alarms") does not mean. The F arm pins that case (`rulings_3w 2` at rate `1.00` → null).
+4. **Promotion reads finding rows, not the view.** A promotion is per fingerprint (one `other` finding recurring), which the per-check view collapses. `promotableOthers` counts distinct `iso_week` with status `ticketed` or `escalated` — the ticket's "ruled real (ticketed/escalated)" literally (pattern:90); `resolved` is the hand-seeded W37 status and is not a manager's ruling.
+5. **The two flags are pure functions the test grades without a database** (pattern:162): the view's math is proven in the migration's rolled-back sub-block, the JS on view-shaped rows, the live arm only proves the path — the same three-layer split as slice 4.
+6. **`check_slug IS NULL` rows are excluded from the view.** All 65 live rows have no slug (they predate slice 7's checklist), so the scorecard is empty until the first slice-7 run files slugged findings and the manager rules on them; the P arm asserts the count against a direct read rather than hardcoding `0` so it discriminates the day a slug lands.
+7. **Edits ride `p_review`, not a fifth parameter.** The function's identity stays `(uuid, text, text, jsonb)` (`.claude/rules/supabase-function-signature.md`; 2b's POST body unchanged; `agt-86b`'s six refusal probes untouched). Validation of edits sits after the group rules and before coverage for the same reason 2a ordered `weeks_seen` before coverage: a probe can prove the allowlist without covering 63 live findings and without writing.
+8. **The allowlist is a regex over the slug, not a table.** `^au-(behavior|knowledge-homes|[a-z-]+-intent)$` admits the six `au-*-intent` rows that exist and any future intent row the Auditor gains, and excludes `au-identity` and `au-guardrails` by construction. Adding a table for two forbidden names is a knob without a bound to justify it (pattern:67).
+9. **Model.** Orchestrator lane `claude-opus-5` for both halves: a view with grant assertions and a function-body edit with a rolled-back proof are the 2a shape, where a grant mistake is live exposure (SES-315) and a cheaper model grinds (pattern:125).
+
+### 16.7 Alternatives not taken
+
+- **Skip the view; compute the scorecard in `--prepare` only.** Rejected: the report (slice 3's `renderReport`) and John's Monday summary (slice 8) will read the same numbers; two arithmetic copies are the SES-45 defect.
+- **Let the Auditor tighten its own rows when a check's rate crosses 50%.** Rejected by John's words (§11(5): it cannot grade its own homework); the flag is context, the manager edits, the function images.
+- **Hard-block edits to `au-identity`/`au-guardrails` in the JS only.** Rejected: the function is the write path and any service-role holder can call it; the refusal lives in SQL and the JS mirrors it (one validator, two doors).
+- **A calendar-week rolling window (`RANGE`).** Rejected (decision 1); noted so a later reader does not "fix" the `ROWS` frame.
+- **Prove the permitted edit's before-image over REST.** Impossible without a real review write; the sub-block proves it rolled back, stated in the kickoff.
+
+### 16.8 What 9a does not do
+
+No function change, no intent-row change, no checklist edit, no finding ruled; `validateReview`, `--dry-run` and `--apply` are byte-identical; `agt-86b` stays as it is. The scorecard is empty until slugged findings are ruled. Slices 5 and 8 are untouched.
+
+### 16.9 Patterns applied (9a)
+
+pattern:9 (deterministic flags, no model), pattern:14 and pattern:93 (one SQL definition both readers use), pattern:16 (the loop tracks itself from the ledger it already keeps), pattern:17 (extend `buildTaskContext` and `--prepare`, no parallel context), pattern:34/pattern:38 (the view counts every ruled row; `carried` shown, not hidden), pattern:39/pattern:40 (one named meaning for "rulings" and for "last 3 weeks"), pattern:64/pattern:66 (one slice, minimum useful), pattern:67 (no allowlist table), pattern:72 (cap not waived — the ticket's own split), pattern:90 (ticket's "ticketed/escalated" and "≥ 3 rulings", "≥ 50%", "3 distinct weeks" carried literally), pattern:92 (9b specified here for a cold session), pattern:125 (orchestrator lane), pattern:162 (every arm has a pre-change red), pattern:164 (default ACL on views, guard permits INSERT, no service key in `.env.local`), pattern:168 (kickoff 8,164 bytes).
