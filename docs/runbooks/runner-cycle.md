@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b — STEP 4d IS A POINTER: the Auditor runs in its own routine (docs/runbooks/auditor-routine.md); :4720 names the fifteenth restorable table. ROTATION: v7.0.519 DROPPED, count held at 5, SES-164 step 2 by grep FIRST — all six named facts keep ≥1 body hit (`settle-ship.js` 2, `--remainder=` 2, `resolveDeliveryFiles` 1, `selfCertificationBlock` 1, `changedFilesFor` 1, `ses-379-changed-files-fail-closed` 1); none relocated into 7a. -->
 <!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3 — AN ALL-GATED DRAIN IS NOT A FINISHED ONE: a member carrying an undecided gate card is out of both pick paths since slice 1, so `drain_epic_next`'s `blocked_detail` census now counts *"carrying an undecided gate card"*. `v7.0.517` VERBATIM to `docs/SESSIONS.md`, four ZERO-hit facts RELOCATED into 7a; count 5. Guard `ses-424c`. -->
 <!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3 — A READING IS A DELTA, NEVER THE SESSION TOTAL: `get_session` counts the whole SESSION and a drain chain runs many cycles in one (`fd4e11f4` closed at 32,249,570; its continuation opened on that counter), so step 1 takes reading 0 at the INSERT (`tokens_at_open` in `notes`) and step 9 charges deltas. `v7.0.516` moved VERBATIM to `docs/SESSIONS.md`, two ZERO-hit facts RELOCATED; count 5. Guard `ses-423b`. -->
 <!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2 — A STALL IS JUDGED BY THE BUILD'S OWN SIGNAL, THE CLOSE-OUT MEASURES: step 7 hands the Builder a `heartbeat` key (`scripts/cycle-heartbeat.js`, new) so probe (d) reads a build that STOPPED, not a long one — 13 `stall_notified_at` rows, **9 ended `shipped`**. Step 9's `est_tokens_*` are MEASURED from two `get_session` reads (`SES-409`: 15.27M here vs ≤900,000 shipped), not estimated; the three agent-log fences bracket the pair as optional. `SES-164` step 2 by grep FIRST: `v7.0.505` moved VERBATIM to `docs/SESSIONS.md`, its five ZERO-hit facts RELOCATED into 4e; count 5. Guard `ses-423b-stall-signal.test.mjs`. -->
 <!-- DeepBench v7.0.520 | runbooks/runner-cycle.md | SES-378 slice 8 — THE LANE REFUSAL GETS ITS OWN NAME: step 6 exit 1's TWO causes now branch on the `--json` `kind`, each under its own FIXED detail. Guard `ses-378h-lane-refusal-kind.test.mjs`. `v7.0.500` DROPPED, count 5. -->
-<!-- DeepBench v7.0.519 | runbooks/runner-cycle.md | SES-385 slice 2 — THE CLOSE-OUT SETTLES ITSELF via `scripts/settle-ship.js`; read twice: THE VERDICT IS NOT AN INPUT — the kickoff, the undecided gate cards and `--remainder=` decide, so an `approve` cannot settle a record naming unbuilt work. Slice 1's prose rule failed twice: `SES-413`, `SES-415` read `delivered`, links NULL; `missing_kickoff` 4→2. Part (4) cleared `designed` on **50** closed rows (kickoff said 49; a peer shipped `AGT-79`), links KEPT, 50 imaged. ROTATION: `v7.0.493` DROPPED, count held at **5** (kickoff said 4; `agt-70` asserts 5), `SES-164` step 2 by grep FIRST — its seven ZERO-hit names (`resolveDeliveryFiles`, `selfCertificationBlock`, `changedFilesFor`, `changed-<cycle id>.json`, `ses-379-changed-files-fail-closed`, `377,375`, `premise-3`) RELOCATED into 7a. Card re-rendered and re-pinned. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -2002,38 +2002,7 @@ two-pass `exit 3` shape and the `SCHEDULED-AGENT: rank-backlog` notes prefix are
 entry 53.)
 
 <!-- FEATURE: AGT-70 slice 3 — the weekly audit fires here; the ledger is the record and the board receives ruled rows only. -->
-**4d. Weekly audit — once per ISO week, before selection (`AGT-70` slice 3, `v7.0.467`).** The Auditor's
-judgment run (`scripts/audit-cluster.js`, `v7.0.465`) fires on the first cycle of the ISO week that passes
-the walls — the step-4c shape, a week instead of a day. Precondition: `select count(*) from ai_activity_log
-where agent_id = 'auditor' and call_source = 'session' and created_at >= date_trunc('week', now() at time
-zone 'utc')` is **0**. Every live cluster call logs one such row, so a non-zero count is this week's run
-already done: write `AUDIT: already run <week>` in `notes` and go to step 5. Otherwise, with
-`W=$(date -u +%G-W%V)` and `S` a scratch directory:
-
-```
-SUPABASE_URL=… SUPABASE_SERVICE_KEY=… sh -c '
-node scripts/audit-corpus.js --out=$S/s.json &&
-node scripts/audit-cluster.js --build --statements=$S/s.json --week=$W --out-dir=$S/c &&
-node scripts/audit-cluster.js --run --dir=$S/c --cycle-id=<your cycle id> &&
-node scripts/audit-cluster.js --collect --dir=$S/c --statements=$S/s.json --week=$W --out=docs/audits/$W-candidates.json;
-node scripts/audit-ledger.js --ingest=docs/audits/$W-candidates.json --week=$W;
-node scripts/tripwire-to-backlog.js --from-ledger --json;
-node scripts/audit-ledger.js --report=$W --write'
-```
-
-Four rules, none tunable here: (1) **A cycle never ingests candidates.** The `--ingest` line is a dry run;
-its exit **1** means "new findings for John to read" and is never a signal to `--apply` — only John's hand
-ingests, and only he rules (`status`, `ruling`, `ruled_by`, `ruled_at` are the ledger's one mutable band).
-(2) **The board receives ruled rows only.** `--from-ledger` files a `backlog_items` row for a finding that
-is `open`, `high` and carries a `ruled_by` — John read it and left it open — deduped by fingerprint against
-`source_file = 'audit-ledger'` rows and capped at **3 per ISO week**. Its exit **1** IS the 8b-bis signal:
-claim that many `SES` ids in ONE `feature_id_counter` call (`session-setup.md` §3b) and re-run with
-`--apply --cycle-id=<your cycle id> --backlog-ids=SES-<n>,…`. (3) The `--run` model is the `judgment` lane
-read live from `runner_model_lanes`, never a literal; the log rows it writes are this step's precondition.
-(4) `docs/audits/<W>-candidates.json` and `docs/audits/<W>.md` ship in this cycle's ONE commit (step 7) —
-the report is the week's record even when it holds 0 findings. Exit **2** anywhere is a refusal and
-nothing was filed: write it in `notes` and **continue to step 5 normally** — the audit is bookkeeping,
-never this cycle's build.
+**4d. Weekly audit — retired from the cycle (`AGT-86` slice 8b, `v7.0.555`).** The Auditor runs in its own routine — `docs/runbooks/auditor-routine.md` — and a builder cycle no longer audits: it does not run `audit-ledger.js --ingest=`, `tripwire-to-backlog.js --from-ledger` or the `date_trunc('week'` precondition; the routine ingests under its own session name and the Development Manager rules (`ASKS-TO-JOHN` A-27). Go to step 4e.
 
 <!-- FEATURE: AGT-79 slice 3 — the Ticket Owner's nightly pass fires here; the census classifies, the write pass fixes cells under one decision, the cycle row is the record. -->
 **4e. Ticket hygiene — once per CST night, before selection (`AGT-79` slice 3, `v7.0.477`).** The Ticket
@@ -4717,10 +4686,10 @@ while the `runner_decisions` row is what carries the 72-hour window — so readi
 would let a reversed review's drain stand. Any drain outside that exact shape is still John's alone
 to write.
 
-**The allowlist, widened 7 → 14 by `SES-364`** (read live): `backlog_items`,
+**The allowlist, widened 7 → 14 by `SES-364`** and to 15 by `AGT-86` slice 1b (`v7.0.543`) (read live): `backlog_items`,
 `runner_directives`, `runner_drain_scope`, `runner_settings`, `governance_rules`, `epics`,
 `vision_claims`, `skill_profiles`, `agents`, `capabilities`, `capability_skill_profiles`,
-`agent_capability_assignments`, `ai_activity_log`, `runner_items`. A Skill-row edit now **restores**.
+`agent_capability_assignments`, `ai_activity_log`, `runner_items`, `audit_findings`. A Skill-row edit now **restores**.
 **READ `restored_unverified`, NOT `restored`, FOR ALL SEVEN NEW TABLES:** none has an `updated_at`
 column, so a Reverse that worked reads `restored 0, restored_unverified 1, refused 0` — and the
 outcome word is `applied` either way, so re-read the row. **GUARD A:** a cycle may not move
