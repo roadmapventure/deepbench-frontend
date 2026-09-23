@@ -227,8 +227,9 @@ export const RUNBOOK_CLAUSES = [
     detail:
       "without this a session hitting the refusal widens reversible_tables() alone, gets its attach " +
       "through, and has restored the exact unbacked promise the guard was put there to stop -- with " +
-      "the guard still nominally in place, which is worse than not having it",
-    test: s => /The restorable tables are the fourteen `public\.reversible_tables\(\)` returns/.test(norm(s)) &&
+      "the guard still nominally in place, which is worse than not having it. " +
+      "AGT-86 slice 1b widened it to fifteen (audit_findings) and 1d re-pins this sentence.",
+    test: s => /The restorable tables are the fifteen `public\.reversible_tables\(\)` returns/.test(norm(s)) &&
                /widen `reversible_tables\(\)` \*\*and\*\* `reverse_decision\(\)`'s `k_allowed` in the same migration/.test(norm(s)),
     breaks: s => s.replace("widen `reversible_tables()` **and**\n  `reverse_decision()`'s `k_allowed` in the same migration",
                            "widen `reversible_tables()`"),
