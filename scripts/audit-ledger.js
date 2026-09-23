@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+// DeepBench v7.0.549 | scripts/audit-ledger.js | AGT-86 slice 3
+// FEATURE: AGT-86 slice 3 -- THE AUDITOR FILES ITS OWN FINDINGS, AND THE REPORT COUNTS WHAT IT FOUND.
+// A filing is attributed to EXACTLY ONE of a runner cycle (--cycle-id) or a session
+// (--session-name), which is the rule runner_before_images.ck_before_image_attribution enforces --
+// attribution() refuses both and refuses --apply with neither, before the input file is read, so an
+// attended session can file without inventing an open cycle. beforeImage() carries only that one
+// attribution (a session ingest leaves cycle_id NULL on the image and on the row); toRow() passes a
+// finding's check_slug through. The report used to render ledger rows only, so a week whose
+// candidates were never ingested read `0 findings`; renderReport(week, rows, found) now reads
+// `<F> found, <L> filed` from docs/audits/<week>-candidates.json and adds the six-status ledger line
+// and the root-cause tickets line. The two-arg call over the three legacy statuses is byte-identical
+// to AGT-70's format (agt-70 part D pins it). The two clean exits set process.exitCode rather than
+// calling process.exit(): on Node 24/Windows, process.exit() right after a fetch aborts with the
+// libuv `UV_HANDLE_CLOSING` assertion, so the dry run's exit 1 never reached its caller.
+//
 // DeepBench v7.0.469 | scripts/audit-ledger.js | AGT-70
 // FEATURE: AGT-70 slice 4 -- WEEK TWO HAS FOUR ANSWERS, NOT TWO. Slices 1-3 knew `new` and `seen`,
 // which is all a first week needs and is wrong from the second week on: a finding filed in W37 and
@@ -59,22 +74,24 @@
 //
 // Usage:
 //   node scripts/audit-ledger.js --ingest=<json> --week=<YYYY-Www> [--found-by=<s>]
-//                                [--cycle-id=<uuid> --apply]
+//                                [--cycle-id=<uuid> | --session-name=<name>] --apply
 //   node scripts/audit-ledger.js --report=<YYYY-Www> [--write]
 //
 //   --ingest=<json>   A file in the fixture's shape: {week, found_by, findings:[...], carried:[...]}.
 //                     Its top-level `week` and `found_by` are DEFAULTS; the flags win when given.
 //                     `carried` (audit-cluster.js --collect) is ingested with `findings`.
 //   --apply           Actually append. Default is a DRY RUN that writes nothing at all.
-//   --cycle-id=<uuid> Required with --apply: the open runner_cycles row every before-image binds to.
-//   --report=<week>   Render that week's rows. --write puts them in docs/audits/<week>.md.
+//   --cycle-id=<uuid>     With --apply, exactly one of these two: the open runner_cycles row every
+//   --session-name=<name> before-image binds to, or the session that filed. Never both.
+//   --report=<week>   Render that week's rows, with the found counts from docs/audits/<week>-candidates.json
+//                     when that file exists. --write puts them in docs/audits/<week>.md.
 //
 // Exit codes (the same contract tripwire-to-backlog.js and heal-engine.js keep):
 //   0  ran cleanly -- nothing new to file, or --apply appended everything it detected
-//   1  a DRY RUN found findings that are not in the ledger yet (the runner's signal to re-run
-//      with --apply). An --apply run that filed them all is a clean run, not a signal.
-//   2  could not run -- missing credentials, unreadable/invalid input, REST failure, or --apply
-//      without a cycle id. NEVER a pass.
+//   1  a DRY RUN found new findings to file (not in the ledger yet) -- the runner's signal to re-run
+//      with --apply. An --apply run that filed them all is a clean run, not a signal.
+//   2  could not run -- missing credentials, unreadable/invalid input, REST failure, both of
+//      --cycle-id / --session-name, or --apply with neither. NEVER a pass.
 //
 // §19v: every INSERT is preceded by its own runner_before_images row with row_data null, which
 // encodes "this row did not exist before" -- so a Reverse of a filing is a DELETE of that pk. The
@@ -148,7 +165,8 @@ export function fingerprint(f) {
   return createHash("sha256").update(material, "utf8").digest("hex").slice(0, 16);
 }
 
-const STATUS_ORDER = { open: 0, resolved: 1, "not-a-defect": 2 };
+const STATUS_ORDER = { open: 0, resolved: 1, "not-a-defect": 2, ticketed: 3, carried: 4, escalated: 5 };
+const LEGACY_STATUSES = new Set(["open", "resolved", "not-a-defect"]);
 const CONFIDENCE_ORDER = { high: 0, medium: 1, low: 2 };
 
 export function sortRows(rows) {
@@ -164,13 +182,37 @@ export function sortRows(rows) {
 // Pure: rows in, string out, so the test can hold it byte-stable. `first_seen` is attached by the
 // caller (min iso_week for that fingerprint across the whole ledger); a row without one reads as
 // first seen in its own week, which is true for every row of a first-ever ingest.
-export function renderReport(week, rows) {
+//
+// AGT-86 slice 3 -- `found` is {new, carried} from docs/audits/<week>-candidates.json (doReport reads
+// it). LEGACY (found null AND every row in open/resolved/not-a-defect) keeps AGT-70's header byte for
+// byte; anything else gets `<F> found, <L> filed`, the found line, the six-status ledger line and the
+// root-cause tickets line -- so a week whose candidates were never ingested can no longer read
+// `0 findings`.
+export function renderReport(week, rows, found = null) {
   const ordered = sortRows(rows);
   const count = s => ordered.filter(r => r.status === s).length;
+  const legacy = found == null && ordered.every(r => LEGACY_STATUSES.has(r.status));
   const out = [];
   out.push(`<!-- GENERATED by scripts/audit-ledger.js --report=${week} --write (AGT-70) from public.audit_findings — do not edit -->`);
   out.push("");
-  out.push(`# Audit ${week} — ${ordered.length} findings (${count("open")} open · ${count("resolved")} resolved · ${count("not-a-defect")} not a defect)`);
+  if (legacy) {
+    out.push(`# Audit ${week} — ${ordered.length} findings (${count("open")} open · ${count("resolved")} resolved · ${count("not-a-defect")} not a defect)`);
+  } else {
+    const filed = ordered.length;
+    const foundN = found ? found.new + found.carried : filed;
+    out.push(`# Audit ${week} — ${foundN} found, ${filed} filed${filed === 0 ? " yet" : ""}`);
+    if (found) {
+      out.push("");
+      out.push(`Found this run: ${found.new} new + ${found.carried} carried (docs/audits/${week}-candidates.json)`);
+    }
+    out.push("");
+    out.push(`Ledger: ${count("open")} open · ${count("ticketed")} ticketed · ${count("carried")} carried · ${count("escalated")} escalated · ${count("not-a-defect")} not-a-defect · ${count("resolved")} resolved`);
+    if (count("ticketed") > 0) {
+      const tickets = [...new Set(ordered.map(r => r.filed_backlog_id).filter(Boolean))].sort();
+      out.push("");
+      out.push(`Root-cause tickets: ${tickets.join(", ")}`);
+    }
+  }
 
   for (const r of ordered) {
     out.push("");
@@ -188,6 +230,10 @@ export function renderReport(week, rows) {
       out.push("");
       out.push(`**Ruling:** ${r.ruling} (${r.ruled_by ?? "unknown"}, ${String(r.ruled_at ?? "").slice(0, 10)})`);
     }
+    if (r.filed_backlog_id) {
+      out.push("");
+      out.push(`**Ticket:** ${r.filed_backlog_id}`);
+    }
     out.push("");
     out.push(`First seen: ${r.first_seen ?? r.iso_week} · found by ${r.found_by}`);
   }
@@ -201,7 +247,10 @@ export function renderReport(week, rows) {
 // produced by carryForward() already knows it came from `carry:2026-W37`, and stamping this run's
 // `--found-by` over it would erase the only fact the carry added. The fallback is unchanged for
 // every hand-written or model-produced finding, which carries none of the three.
-export function toRow(finding, { week, foundBy, cycleId, id }) {
+//
+// AGT-86 slice 3 -- `check_slug` passes through (null when the finding names no check); a session
+// ingest (sessionName, no cycleId) leaves `cycle_id` NULL.
+export function toRow(finding, { week, foundBy, cycleId, sessionName, id }) {
   const status = finding.status ?? "open";
   const ruled = status !== "open";
   return {
@@ -218,7 +267,31 @@ export function toRow(finding, { week, foundBy, cycleId, id }) {
     ruled_by: finding.ruled_by ?? (ruled ? foundBy : null),
     ruled_at: finding.ruled_at ?? (ruled ? new Date().toISOString() : null),
     found_by: finding.found_by ?? foundBy,
+    check_slug: finding.check_slug ?? null,
     cycle_id: cycleId ?? null,
+  };
+}
+
+// AGT-86 slice 3 -- who a filing is attributed to: EXACTLY ONE of a cycle or a session, the rule
+// runner_before_images.ck_before_image_attribution enforces. Both is refused in any mode; --apply
+// with neither is refused; a dry run with neither is fine (it writes nothing) and returns two nulls.
+export function attribution({ cycleId, sessionName, apply } = {}) {
+  const c = cycleId ? String(cycleId) : null;
+  const s = sessionName ? String(sessionName) : null;
+  if (c && s) throw new Error("exactly one of --cycle-id / --session-name");
+  if (apply && !c && !s) throw new Error("--apply needs exactly one of --cycle-id / --session-name");
+  return { cycle_id: c, session_name: s };
+}
+
+// AGT-86 slice 3 -- the before-image an INSERT is preceded by (§19v). row_data null = "this row did
+// not exist before"; it carries only the one attribution the CHECK demands, no decision_id.
+export function beforeImage({ cycleId, sessionName, id }) {
+  return {
+    cycle_id: cycleId ?? null,
+    session_name: sessionName ?? null,
+    table_name: "audit_findings",
+    pk_value: id,
+    row_data: null,
   };
 }
 
@@ -345,8 +418,16 @@ async function firstSeenByFingerprint(base, key, fps) {
 async function doIngest(argv) {
   const file = arg(argv, "ingest");
   const apply = arg(argv, "apply") === true;
-  const cycleId = arg(argv, "cycle-id");
-  if (apply && !cycleId) fail(2, "--apply requires --cycle-id=<uuid>: every append carries a before-image bound to an open cycle (§19v).");
+  // AGT-86 slice 3 -- attribution is settled BEFORE the file is read: a filing bound to both a
+  // cycle and a session, or to neither, must never get as far as asking for credentials.
+  let attr;
+  try {
+    attr = attribution({ cycleId: arg(argv, "cycle-id"), sessionName: arg(argv, "session-name"), apply });
+  } catch (e) {
+    fail(2, e.message);
+  }
+  const cycleId = attr.cycle_id;
+  const sessionName = attr.session_name;
 
   let doc;
   try {
@@ -381,15 +462,13 @@ async function doIngest(argv) {
 
   if (apply) {
     // `new` and `recurring` append; `seen` cannot (UNIQUE (fingerprint, iso_week) refuses it) and
-    // `ruled-out` must not (re-filing John's ruling turns one closed question into a weekly one).
+    // `ruled-out` must not (re-filing the manager's ruling turns one closed question into a weekly one).
     for (const v of verdicts) {
       if (v.verdict !== "new" && v.verdict !== "recurring") continue;
       const id = randomUUID();
-      const before = await restPost(base, key, "runner_before_images", {
-        cycle_id: cycleId, table_name: "audit_findings", pk_value: id, row_data: null,
-      });
+      const before = await restPost(base, key, "runner_before_images", beforeImage({ cycleId, sessionName, id }));
       if (before.error) fail(2, `${before.error} -- no before-image, so the append does not happen (§19v).`);
-      const row = await restPost(base, key, "audit_findings", toRow(v.finding, { week, foundBy, cycleId, id }));
+      const row = await restPost(base, key, "audit_findings", toRow(v.finding, { week, foundBy, cycleId, sessionName, id }));
       if (row.error) fail(2, row.error);
     }
   }
@@ -398,7 +477,12 @@ async function doIngest(argv) {
   // A dry run that found unfiled work is the signal to re-run with --apply; an --apply run that
   // filed that work is a clean run. `recurring` counts as unfiled work -- the row for THIS week
   // does not exist yet -- while `ruled-out` never does.
-  process.exit(!apply && (summary.new + summary.recurring) > 0 ? 1 : 0);
+  const unfiled = summary.new + summary.recurring;
+  if (!apply && unfiled > 0) {
+    console.error(`audit-ledger: ${unfiled} new findings to file for ${week} -- re-run with --apply and exactly one of --cycle-id=<uuid> / --session-name=<name>`);
+  }
+  // exitCode, not process.exit(): see the AGT-86 slice 3 header note (libuv assertion after fetch).
+  process.exitCode = !apply && unfiled > 0 ? 1 : 0;
 }
 
 async function doReport(argv) {
@@ -409,16 +493,34 @@ async function doReport(argv) {
   const firstSeen = await firstSeenByFingerprint(base, key, rows.map(r => r.fingerprint));
   for (const r of rows) r.first_seen = firstSeen.get(r.fingerprint) ?? r.iso_week;
 
-  const text = renderReport(week, rows);
+  // AGT-86 slice 3 -- what the Auditor FOUND this week, from its candidates file, so a week whose
+  // candidates are not yet filed reads `<F> found, 0 filed yet` rather than `0 findings`.
+  let found = null;
+  const candidatesPath = path.join(ROOT, "docs", "audits", `${week}-candidates.json`);
+  if (fs.existsSync(candidatesPath)) {
+    let cand;
+    try {
+      cand = JSON.parse(fs.readFileSync(candidatesPath, "utf8"));
+    } catch (e) {
+      fail(2, `could not read ${path.relative(ROOT, candidatesPath)}: ${e.message}`);
+    }
+    found = {
+      new: Array.isArray(cand.findings) ? cand.findings.length : 0,
+      carried: (Array.isArray(cand.carried) ? cand.carried : []).length,
+    };
+  }
+
+  const text = renderReport(week, rows, found);
   if (arg(argv, "write") === true) {
     const rel = path.join("docs", "audits", `${week}.md`);
     fs.mkdirSync(path.join(ROOT, "docs", "audits"), { recursive: true });
     fs.writeFileSync(path.join(ROOT, rel), text, "utf8");
-    console.log(`report ${week}: ${rows.length} findings -> ${rel}`);
+    const foundN = found ? found.new + found.carried : rows.length;
+    console.log(`report ${week}: ${foundN} found, ${rows.length} filed -> ${rel}`);
   } else {
     process.stdout.write(text);
   }
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 async function main() {
