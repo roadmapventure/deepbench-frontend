@@ -813,3 +813,11 @@ Edits: (1) the 4d body (`**4d. ` up to the `<!-- FEATURE: AGT-79 slice 3` commen
 ### 15.7 Patterns applied (8a)
 
 pattern:9 (no model call where code serves — the merge and the stop are code), pattern:14 (one `attribution()` for ledger and cluster), pattern:17 (config-review rides the cluster mechanism), pattern:32 (attribute from what the call did — no fake cycle id), pattern:42 (plumbing is never shown as an agent acting), pattern:64/72 (one item; the cap split, never waived by me), pattern:126 (one push per run at the ship point), pattern:165 (the wall's sensor fails closed), pattern:166 (no John stop removed — the builder's gate is untouched), pattern:168 (kickoff ≤ 8,192 B; reasoning here).
+
+### 15.8 Slice 8b addendum (kickoff `docs/kickoffs/v7.0.555-AGT-86-s8b-step-4d-pointer.md`)
+
+The stamp rotation DROPS `v7.0.519` (SES-385 slice 2) after the SES-164 grep rather than relocating it to `docs/SESSIONS.md` — a fourth file the cap does not allow; its six named facts all have body homes (9 hits measured 2026-09-23). The Knowledge re-pin runs WITHOUT `--decision` so `render-cycle-card.js --repin` records its own `record_decision` (p_cycle_id = the AGT-86 cycle) and the full-row before-image — the omission AGT-96 found in earlier re-pins.
+
+### 15.9 Slice 8c addendum (kickoff `docs/kickoffs/v7.0.556-AGT-86-s8c-auditor-runbook.md`)
+
+The runbook is §15.1-§15.3 verbatim — nothing paraphrased, so the prompt block the coordinator pushes into the routine and the steps the routine reads are the text designed and tested here. After this ship the coordinator creates `deepbench-auditor` from the runbook's config table with `enabled=false` (A-21) and John flips it on at claude.ai/code/routines when he wants the first Monday 5:00 AM Central run.
