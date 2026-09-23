@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.552 | scripts/audit-cluster.js | AGT-86 slice 8a -- the Auditor routine runs this script under a SESSION NAME (it has no runner_cycles row): --run takes exactly one of --cycle-id / --session-name via audit-ledger.js attribution(), and agent-log.js gets --cycle only when a cycle exists. Config clusters (statements carrying slice 6's `project` label) route to audit-config-review / au-config-intent, and --build writes --repo-visibility=<label>=<public|private> as task_context.repo_visibility. The --collect note names the routine's ingest, not a hand step.
 // DeepBench v7.0.469 | scripts/audit-cluster.js | AGT-70
 // FEATURE: AGT-70 slice 4 -- two additions, one of them a bug fix the negative-control corpus found.
 //
@@ -58,8 +59,14 @@
 //
 // Usage:
 //   node scripts/audit-cluster.js --build --statements=<json> --week=<YYYY-Www> --out-dir=<dir>
-//                                 [--max-clusters=12] [--no-db]
-//   node scripts/audit-cluster.js --run --dir=<dir> --cycle-id=<uuid> [--limit=N] [--dry-run]
+//                                 [--max-clusters=12] [--no-db] [--repo-visibility=<label>=<public|private> ...]
+//   node scripts/audit-cluster.js --run --dir=<dir> (--cycle-id=<uuid> | --session-name=<name>) [--limit=N] [--dry-run]
+//
+// AGT-86 slice 8a: --run takes EXACTLY ONE of --cycle-id / --session-name (a dry run may take
+// neither); the Auditor routine has no runner_cycles row and runs under `auditor-<W>`. A statement
+// carrying a `project` label (audit-corpus.js --extra-root) routes its cluster to
+// audit-config-review / au-config-intent; --repo-visibility is repeatable and lands in
+// task_context.repo_visibility ({} when none).
 //   node scripts/audit-cluster.js --collect --dir=<dir> --statements=<json> --week=<YYYY-Www>
 //                                 --out=<json> [--no-db]
 //
@@ -74,7 +81,7 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
-import { normalize, locationKey, fingerprint } from "./audit-ledger.js";
+import { normalize, locationKey, fingerprint, attribution } from "./audit-ledger.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -144,12 +151,15 @@ function emitStatement(st, textCap) {
     text: full.slice(0, textCap),
     retired: !!st.retired,
     truncated: full.length > textCap,
+    ...(st.project !== undefined ? { project: st.project } : {}),
   };
 }
 
+// AGT-86 slice 8a: `project` (slice 6's extra-root label) rides into the task file -- the config
+// intent reads it -- and the key is omitted when the statement has none.
 export function taskStatement(s) {
-  const { id, source, location, text, retired, truncated } = s;
-  return { id, source, location, text, retired, truncated };
+  const { id, source, location, text, retired, truncated, project } = s;
+  return { id, source, location, text, retired, truncated, ...(project !== undefined ? { project } : {}) };
 }
 
 function jaccard(a, b) {
@@ -328,8 +338,13 @@ export function carryForward(rows, statements, week) {
 // `audit-agent-data` capability, anything else is `audit-governance-corpus`. A mixed cluster goes to
 // the corpus capability on purpose -- its knowledge section covers both homes, the agent-data one
 // does not, and the wrong Skill text is worse than the broader one.
+//
+// AGT-86 slice 8a: a cluster holding ANY statement with a `project` label (an extra root -- Claude
+// config, another repo) is the config review, checked FIRST: its questions (private data in a
+// public repo, a rule stated only in memory) are the config intent's, not the corpus one's.
 export function capabilityFor(cluster) {
   const sts = cluster?.statements ?? [];
+  if (sts.some(s => s?.project)) return { capability: "audit-config-review", intent: "au-config-intent" };
   const allAgentData = sts.length > 0 && sts.every(s => s.corpus === "agent-data");
   return allAgentData
     ? { capability: "audit-agent-data", intent: "au-agent-data-intent" }
@@ -485,6 +500,12 @@ async function doBuild(argv) {
   const noDb = arg(argv, "no-db") === true;
   const maxClusters = Number(arg(argv, "max-clusters") ?? DEFAULT_MAX_CLUSTERS);
   if (!Number.isInteger(maxClusters) || maxClusters < 1) fail(2, `--max-clusters must be a positive integer (got ${arg(argv, "max-clusters")}).`);
+  const repoVisibility = {};
+  for (const a of argv.filter(x => x.startsWith("--repo-visibility="))) {
+    const m = /^--repo-visibility=([^=]+)=(public|private)$/.exec(a);
+    if (!m) fail(2, `--repo-visibility must be <label>=<public|private> (got ${a.slice("--repo-visibility=".length)}).`);
+    repoVisibility[m[1]] = m[2];
+  }
 
   let rows = [];
   if (!noDb) {
@@ -508,6 +529,7 @@ async function doBuild(argv) {
         cluster: c.name,
         statements: c.statements.map(taskStatement),
         prior: priorFingerprints,
+        repo_visibility: repoVisibility,
       },
     };
     const file = path.join(path.resolve(outDir), `${taskFileName(i + 1, c.name)}.task.json`);
@@ -519,7 +541,7 @@ async function doBuild(argv) {
   for (const u of prior.unrunnable) {
     console.log(`  unrunnable ${u.fingerprint}: ${u.located}/${u.total} located`);
   }
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 function taskFiles(dir) {
@@ -563,10 +585,16 @@ function parseModelResult(stdout) {
 async function doRun(argv) {
   const dir = arg(argv, "dir");
   if (typeof dir !== "string") fail(2, "--dir=<dir> is required.");
-  const cycleId = arg(argv, "cycle-id");
   const dryRun = arg(argv, "dry-run") === true;
   const noDb = arg(argv, "no-db") === true;
-  if (!dryRun && typeof cycleId !== "string") fail(2, "--cycle-id=<uuid> is required: every logged call names the cycle it ran in.");
+  // AGT-86 slice 8a: every logged call names the cycle OR the session it ran in -- exactly one.
+  const flag = n => { const v = arg(argv, n); return typeof v === "string" ? v : undefined; };
+  let cycleId;
+  try {
+    ({ cycle_id: cycleId } = attribution({ cycleId: flag("cycle-id"), sessionName: flag("session-name"), apply: !dryRun }));
+  } catch (e) {
+    fail(2, e.message);
+  }
   const limitRaw = arg(argv, "limit");
   const limit = limitRaw === undefined ? Infinity : Number(limitRaw);
   if (!(limit > 0)) fail(2, `--limit must be a positive integer (got ${limitRaw}).`);
@@ -658,7 +686,7 @@ async function doRun(argv) {
       `--capability=${cap}`, `--model=${callModel}`, `--ai-type=${cap}`,
       `--feature=${cap}:${intent}:depth1`,
       `--input-tokens=${inTok}`, `--output-tokens=${outTok}`, `--latency-ms=${latency}`,
-      `--cycle=${cycleId}`, "--json",
+      ...(cycleId ? [`--cycle=${cycleId}`] : []), "--json",
     ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
     if (log.status !== 0) {
       fail(2, `agent-log.js refused the row for ${stem} (exit ${log.status}): ${(log.stderr ?? "").trim().slice(0, 400)}`);
@@ -680,7 +708,7 @@ async function doRun(argv) {
     const k = Array.isArray(body.findings) ? body.findings.length : "error";
     console.log(`run ${stem.slice(0, 2)} ${task.task_context.cluster}: ${k} findings · ${source} · ${callModel} · in ${inTok} out ${outTok} · log ${loggedId}`);
   }
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 async function doCollect(argv) {
@@ -746,7 +774,7 @@ async function doCollect(argv) {
   const doc = {
     week,
     found_by: `auditor:judgment:${firstModel || "none"}`,
-    note: `candidates from the judgment run — NOT ingested; John reads, then node scripts/audit-ledger.js --ingest=${out} --week=${week} --cycle-id=<cycle> --apply`,
+    note: `candidates from the judgment run — NOT ingested; the Auditor routine's step 3 merges every source and runs node scripts/audit-ledger.js --ingest=<merged> --week=${week} --session-name=<name> --apply`,
     findings: newFindings,
     carried,
     gone,

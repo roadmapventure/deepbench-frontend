@@ -1,3 +1,4 @@
+// DeepBench v7.0.552 | shared/ai-patterns.js | AGT-86 slice 8a -- five audit slugs enter the catalog (audit-board-health, audit-work-quality, audit-config-review, audit-advisor, review-audit-worklist): their capability rows are live and scripts/agent-log.js refuses any --ai-type outside this array, so the Auditor routine's sub-agent log rows would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.480 | shared/ai-patterns.js | AGT-79 -- the Ticket Owner's `audit-board` enters the catalog BEFORE its Skill rows exist, on the AGT-70 precedent immediately below: scripts/ticket-owner.js --judge writes the mandatory agent-log.js row before it applies anything, and agent-log.js refuses an --ai-type this array does not carry. The seed (docs/design/agt-79-ticket-owner-seed.sql) is John's to apply; the entry is inert until then. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug, resolved by the existing `|| e.type` fallback.
 // DeepBench v7.0.465 | shared/ai-patterns.js | AGT-70 -- the Auditor's `audit-agent-data` and `audit-governance-corpus` enter the catalog BEFORE their Skill rows exist, so the judgment lane's mandatory agent-log.js row can be written on its first run rather than refused. See the comment above the two entries.
 // DeepBench v7.0.441 | shared/ai-patterns.js | SES-338 -- the last two governance capabilities enter the catalog: `verify-ship` and `run-project`. Found by a REFUSAL, not by inspection -- SES-337's reproduction ran 43 verify-ship turns this sitting and scripts/agent-log.js refused every one ("not a SERVICE_CATALOG slug"), so the mandatory Layer-3 log could not be written at all. Same shape and same cause as classify-ticket (SES-332) and rank-backlog (SES-334): the capability shipped with its Skill rows and no catalog entry. NAMED DEVIATION: the SES-337/338 kickoff's section 3 says "No new catalog entry"; that sentence was measurably wrong about the live catalog, and .claude/rules/capability-logging.md (every Layer-3 execution logs, no exceptions) outranks it. No AI_TYPE_TO_SERVICE entry for either -- ai_type equals capability_slug, resolved by the existing `|| e.type` fallback.
@@ -270,6 +271,17 @@ export const SERVICE_CATALOG = [
   // contract is the pattern's definition. NOT 'Guardrails / Output Filtering': the refusals are
   // enforced by CODE after the turn, never by the model declining to answer.
   { slug: 'audit-board',             name: 'Audit Board (The Ticket Owner)',    serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+
+  // AGT-86 slice 8a -- the Auditor routine's five sub-agent runs, on the audit-board precedent above.
+  // Their capability rows are live (review-audit-worklist since slice 2a, the four Auditor slugs since
+  // slice 7); scripts/agent-log.js refuses any --ai-type this array does not carry, so without these
+  // entries the routine's mandatory log row for each run would be refused (§19k). Judge patterns for
+  // the same reason as the entries above; audit-advisor adds 'Tool Use' because it searches the web.
+  { slug: 'audit-board-health',      name: 'Audit Board Health (The Auditor)',  serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  { slug: 'audit-work-quality',      name: 'Audit Work Quality (The Auditor)',  serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  { slug: 'audit-config-review',     name: 'Audit Config Review (The Auditor)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  { slug: 'audit-advisor',           name: 'Audit Advisor (The Auditor)',       serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier', 'Tool Use'], roadmap: 'now' },
+  { slug: 'review-audit-worklist',   name: 'Review Audit Worklist (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // run-project: 'Structured Output' because the manager's answer is validated against
   // dm-run-intent's schema before scripts/run-project.js will act on it, and 'Orchestrator-Workers'
