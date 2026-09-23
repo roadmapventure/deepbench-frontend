@@ -26,11 +26,26 @@
 // The weeks_seen carry refusal cannot be driven over REST without a permanent fixture
 // (audit_findings refuses DELETE); the migration's own trailing DO block proves it on three
 // rolled-back fixture rows. Never inserts a finding.
+//
+// DeepBench v7.0.548 | AGT-86 slice 2b -- scripts/audit-review.js arms (kickoff
+// docs/kickoffs/v7.0.548-AGT-86-s2b-audit-review-script.md §6). Pre-change: importing the script
+// throws, so D/E/F are red while the 2a arms above are untouched.
+//   D  DRY-RUN MIRRORS THE FUNCTION (no DB) -- validateReview() refuses with the function's own texts;
+//      a valid review passes; SES-158 control: one id removed -> exactly one refusal naming it.
+//      buildTaskContext() counts weeks_seen over distinct weeks, keeps only ruled prior rows, and
+//      returns null on no findings.
+//   E  LIVE PREPARE (service key, else NOT RUN) -- --prepare exits 0 and its worklist is the live
+//      open/carried set; plus the exit-3 source arm (null -> process.exit(3) with the §6 sentence).
+//   F  APPLY REFUSES BEFORE IT SENDS (no credentials, no network) -- --apply with a bad answer
+//      exits 1 naming `not covered` and prints no Decision; --dry-run on the same input gives the
+//      identical refusal text (one validator, two doors); --apply with neither id exits 2.
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -60,21 +75,110 @@ async function call(url, key, method, q, body, extra = {}) {
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 240)}`;
 const review = (groups, extra = {}) => ({ groups, summary_for_john: "qa", patterns_applied: [], ...extra });
 
+// --- 2b helpers ------------------------------------------------------------------------------------
+const SCRIPT = path.join(ROOT, "scripts/audit-review.js");
+const loadScript = () => import(pathToFileURL(SCRIPT).href);
+const W4 = [
+  { id: "w1", fingerprint: "fp1", iso_week: "2026-W39", weeks_seen: 1 },
+  { id: "w2", fingerprint: "fp2", iso_week: "2026-W39", weeks_seen: 1 },
+  { id: "w3", fingerprint: "fp3", iso_week: "2026-W39", weeks_seen: 2 },
+  { id: "w4", fingerprint: "fp4", iso_week: "2026-W39", weeks_seen: 3 },
+];
+const RC = { kind: "root-cause", title: "t", root_cause: "rc", fix: "f" };
+const GOOD = () => review([
+  { ...RC, finding_ids: ["w1", "w2"] },
+  { kind: "cleanup", fix: "one-liners", finding_ids: ["w3"] },
+  { kind: "escalate", john_call: "money", summary: "needs a paid plan", finding_ids: ["w4"] },
+]);
+const runScript = (args, env = {}) => spawnSync(process.execPath, [SCRIPT, ...args],
+  { cwd: ROOT, env: { ...process.env, ...env }, encoding: "utf8", timeout: 60000 });
+
 async function run() {
   const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   const anon = process.env.VITE_SUPABASE_ANON_KEY ?? "";
-  if (!url || !key) {
-    notRun("AGT-86b live arms (R, P, F, A)",
-      "SUPABASE_URL + SUPABASE_SERVICE_KEY absent -- the review capability rows, prompt, apply_audit_review refusals and anon arms are unverified here. Credentialed run: STANDARDS.md Section 2 rule 5");
-    return;
-  }
 
   const failures = [];
   const arm = async (name, fn) => {
     try { await fn(); console.log(`    [arm ${name}] ok`); }
     catch (e) { failures.push(`${name}: ${e.message}`); console.log(`    [arm ${name}] FAIL -- ${e.message}`); }
   };
+
+  // --- D. dry-run mirrors the function (no DB) ---------------------------------------------------
+  await arm("D dry-run", async () => {
+    const { validateReview, buildTaskContext, JOHN_CALLS } = await loadScript();
+    const refusalsOf = groups => validateReview(review(groups), W4).refusals;
+    const cases = [
+      ["w1..w3 only", [{ ...RC, finding_ids: ["w1", "w2", "w3"] }], "finding w4 not covered"],
+      ["w1 twice", [{ ...RC, finding_ids: ["w1", "w2", "w3", "w4"] }, { kind: "not-a-defect", reason: "x", finding_ids: ["w1"] }],
+        "finding w1 in two groups"],
+      ["unknown w9", [{ ...RC, finding_ids: ["w1", "w2", "w3", "w4", "w9"] }], "unknown or not open/carried finding w9"],
+      ["carry w4", [{ ...RC, finding_ids: ["w1", "w2", "w3"] }, { kind: "carry", reason: "later", finding_ids: ["w4"] }],
+        "finding w4 has weeks_seen = 3 and may not be carried again"],
+      ["escalate sans john_call", [{ ...RC, finding_ids: ["w1", "w2", "w3"] }, { kind: "escalate", summary: "s", finding_ids: ["w4"] }],
+        "escalate needs john_call (rules, money, production, hiring, switch) and summary"],
+      ["two cleanups", [{ kind: "cleanup", fix: "a", finding_ids: ["w1", "w2"] }, { kind: "cleanup", fix: "b", finding_ids: ["w3", "w4"] }],
+        "at most one cleanup group"],
+    ];
+    for (const [name, groups, want] of cases) {
+      const r = refusalsOf(groups);
+      assert.deepEqual(r, [want], `${name}: exactly the function's refusal '${want}'; got ${JSON.stringify(r)}`);
+    }
+    assert.deepEqual(validateReview(GOOD(), W4), { ok: true, refusals: [] }, "the valid review must pass");
+    // SES-158 control: the same valid review with w2 removed -> exactly one refusal, naming w2.
+    const minus = GOOD();
+    minus.groups[0].finding_ids = ["w1"];
+    assert.deepEqual(validateReview(minus, W4), { ok: false, refusals: ["finding w2 not covered"] });
+    assert.deepEqual(validateReview(GOOD(), W4, "bad").refusals, ["p_week bad is not an ISO week (YYYY-Www)"]);
+
+    const allRows = [
+      { fingerprint: "fpX", iso_week: "2026-W37", status: "carried", ruling: "later", ruled_by: "devmanager" },
+      { fingerprint: "fpX", iso_week: "2026-W38", status: "carried", ruling: "later again", ruled_by: "devmanager" },
+      { fingerprint: "fpX", iso_week: "2026-W39", status: "open", ruling: null, ruled_by: null },
+      { fingerprint: "fpY", iso_week: "2026-W39", status: "open", ruling: null, ruled_by: null },
+    ];
+    const ctx = buildTaskContext({ week: "2026-W39",
+      findings: [{ id: "x1", fingerprint: "fpX", iso_week: "2026-W39", kind: "other" }], allRows,
+      tickets: [{ backlog_id: "AGT-999", title: "t", status: "open", description: "d", extra: 1 }] });
+    assert.equal(ctx.worklist[0].weeks_seen, 3, "one fingerprint over three weeks -> weeks_seen 3");
+    assert.equal(ctx.worklist[0].prior_rulings.length, 2, "only the two ruled rows are prior rulings");
+    assert.deepEqual(Object.keys(ctx.john_calls).sort(), Object.keys(JOHN_CALLS).sort());
+    assert.deepEqual(Object.keys(ctx.open_audit_tickets[0]), ["backlog_id", "title", "status", "description"]);
+    assert.equal(buildTaskContext({ week: "2026-W39", findings: [], allRows, tickets: [] }), null, "no findings -> null");
+  });
+
+  // --- F. apply refuses before it sends (no credentials, no network) -----------------------------
+  await arm("F apply-refuses", async () => {
+    await loadScript(); // pre-change red: the script does not exist
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agt86b-"));
+    const ctxPath = path.join(dir, "context.json");
+    const badPath = path.join(dir, "bad.json");
+    fs.writeFileSync(ctxPath, JSON.stringify({ week: "2026-W39", worklist: W4, open_audit_tickets: [], john_calls: {} }));
+    const bad = GOOD();
+    bad.groups[0].finding_ids = ["w1"];
+    fs.writeFileSync(badPath, JSON.stringify(bad));
+    const dead = { SUPABASE_URL: "http://127.0.0.1:9", SUPABASE_SERVICE_KEY: "dummy-not-a-key" };
+    try {
+      const a = runScript([`--apply=${badPath}`, `--context=${ctxPath}`, "--week=2026-W39", "--session-name=agt-86b-qa"], dead);
+      assert.equal(a.status, 1, `--apply on a bad answer must exit 1; got ${a.status}: ${a.stderr}`);
+      assert.match(a.stderr, /not covered/, "the refusal must name the uncovered finding");
+      assert.doesNotMatch(a.stdout, /Decision/, "a refused apply must never reach the function");
+      const d = runScript([`--dry-run=${badPath}`, `--context=${ctxPath}`], dead);
+      assert.equal(d.status, 1, `--dry-run on the same answer must exit 1; got ${d.status}`);
+      assert.equal(d.stderr, a.stderr, "one validator, two doors: identical refusal text");
+      const n = runScript([`--apply=${badPath}`, `--context=${ctxPath}`, "--week=2026-W39"], dead);
+      assert.equal(n.status, 2, `--apply with neither --cycle-id nor --session-name must exit 2; got ${n.status}`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  if (!url || !key) {
+    notRun("AGT-86b live arms (R, P, F, A, E)",
+      "SUPABASE_URL + SUPABASE_SERVICE_KEY absent -- the review capability rows, prompt, apply_audit_review refusals, anon and live --prepare arms are unverified here. Credentialed run: STANDARDS.md Section 2 rule 5");
+    if (failures.length) throw new Error(`${failures.length} arm(s) failed:\n      ${failures.join("\n      ")}`);
+    return;
+  }
   const get = async q => {
     const r = await call(url, key, "GET", q);
     if (!r.ok) throw new Error(`GET ${q} -> ${describe(r)}`);
@@ -196,6 +300,34 @@ async function run() {
     assert.notEqual(r.code, "PGRST202", `PGRST202 means the function does not exist -- the pre-change red, never a pass; got ${describe(r)}`);
     assert.ok(!r.ok, `anon must not be able to apply a review; got ${describe(r)}`);
     assert.match(r.text, /42501|permission denied/, `the refusal must be a privilege denial; got ${describe(r)}`);
+  });
+
+  // --- E. live prepare (read-only) + the exit-3 source arm ---------------------------------------
+  await arm("E prepare", async () => {
+    const { buildTaskContext, NOTHING_TO_REVIEW } = await loadScript();
+    const live = (await get("audit_findings?status=in.(open,carried)&select=id&order=id")).map(f => f.id);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agt86b-"));
+    const out = path.join(dir, "prepare.json");
+    try {
+      const r = runScript(["--prepare", "--week=2026-W39", `--out=${out}`]);
+      if (live.length === 0) {
+        assert.equal(r.status, 3, `no open/carried findings -> exit 3; got ${r.status}: ${r.stderr}`);
+      } else {
+        assert.equal(r.status, 0, `--prepare must exit 0; got ${r.status}: ${r.stderr}`);
+        const ctx = JSON.parse(fs.readFileSync(out, "utf8"));
+        assert.deepEqual(ctx.worklist.map(w => w.id).sort(), [...live].sort(), "the worklist is exactly the live open/carried set");
+        assert.ok(ctx.worklist.every(w => w.weeks_seen >= 1), "every weeks_seen >= 1");
+        assert.deepEqual(Object.keys(ctx.john_calls).sort(), ["hiring", "money", "production", "rules", "switch"]);
+        assert.ok(Array.isArray(ctx.open_audit_tickets), "open_audit_tickets is an array");
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    assert.equal(buildTaskContext({ week: "2026-W39", findings: [], allRows: [], tickets: [] }), null);
+    assert.equal(NOTHING_TO_REVIEW, "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)");
+    const src = fs.readFileSync(SCRIPT, "utf8");
+    assert.match(src, /if \(ctx === null\) die\(3, NOTHING_TO_REVIEW\);/, "the prepare branch must map null to exit 3 with the §6 sentence");
+    assert.match(src, /function die\(code, msg\)[\s\S]{0,200}process\.exit\(code\)/, "die() must exit with its code");
   });
 
   if (failures.length) throw new Error(`${failures.length} arm(s) failed:\n      ${failures.join("\n      ")}`);
