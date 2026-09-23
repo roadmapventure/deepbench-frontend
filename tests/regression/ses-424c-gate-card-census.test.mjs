@@ -52,6 +52,7 @@ export const PHRASE = "carrying an undecided gate card";
 export const ROTATED = "<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md";
 export const ROTATED_FULL = "<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7";
 export const THIS_STAMP = "<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3";
+export const LATER_STAMP = "<!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b";
 
 // Each clause: {id, detail, test, breaks}. `test` reads the runbook; `breaks` is that clause's OWN
 // smallest mutation of the runbook text. Green-after-mutation is a failure of THIS file.
@@ -97,10 +98,12 @@ export const CLAUSES = [
     detail:
       "session-hygiene check 7 caps the runbook at 5 header stamps, and this ship's own stamp must " +
       "be the first line -- a rotation that adds a sixth, or that files this slice below an older " +
-      "ship, is the unbounded growth the check exists to stop",
+      "ship, is the unbounded growth the check exists to stop; since v7.0.555 (AGT-86 slice 8b moved " +
+      "step 4d to a pointer) a later ship's stamp is line 1 and this ship's stamp must still be " +
+      "among the five",
     test: s => {
       const stamps = s.split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
-      return stamps.length === 5 && stamps[0].startsWith(THIS_STAMP);
+      return stamps.length === 5 && stamps[0].startsWith(LATER_STAMP) && stamps.some(l => l.startsWith(THIS_STAMP));
     },
     breaks: s => s.replace(THIS_STAMP, "<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-999 slice 0"),
   },
@@ -172,7 +175,7 @@ async function run() {
 
   console.log(`[SES-424c] ${n} runbook clauses hold, each red under its own breaks(); the body ` +
     `(tail -n +6) carries the PHRASE "${PHRASE}", E1's gate-card exclusion and all three relocated ` +
-    `v7.0.517 facts; 5 header stamps with v7.0.535 first, v7.0.517 out of the runbook and present ` +
+    `v7.0.517 facts; 5 header stamps with v7.0.555 first and v7.0.535 present, v7.0.517 out of the runbook and present ` +
     `exactly once in ${SESSIONS_REL}`);
 }
 

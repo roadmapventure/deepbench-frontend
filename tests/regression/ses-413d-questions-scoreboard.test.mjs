@@ -75,8 +75,13 @@ const JOHN = "docs/WORKING-WITH-JOHN.md";
 // rows" sentence, 196 B, and step 6b's "the Builder's half is the thinner of the two: 1 row" clause,
 // 100 B), both kept verbatim in docs/harvests/SES-424-slice6.md. 380879 - 296 + 135 = 380718 B, 282 B
 // under the ceiling. The ceiling itself is NEVER raised to make an edit fit.
+//
+// v7.0.555 (AGT-86 slice 8b) moved step 4d to a pointer at docs/runbooks/auditor-routine.md (-2,701 B
+// for the step, +~250 B for the pointer, +~70 B at :4720 for the fifteenth restorable table, the
+// v7.0.519 stamp dropped and a v7.0.555 stamp added): 380718 -> 378273 B, 2,727 B under the ceiling.
+// Re-pinned by v7.0.557 in the same push.
 export const RUNBOOK_CEILING = 381000;
-export const BYTES_AT_SHIP = 380718;
+export const BYTES_AT_SHIP = 378273;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
