@@ -120,6 +120,10 @@ export const FENCES = Object.freeze({
   runner_verdicts: "2026-08-25T03:50:04Z",
 });
 
+// AGT-86 slice 4: the unrevalidated-row fence, exported so scripts/audit-board.js's stale check reads
+// the SAME 30 days classifyBoard counts with -- one number, two readers.
+export const UNREVALIDATED_DAYS = 30;
+
 // docs/FEATURES.md section Type Taxonomy (eight rows) plus the two live majorities the legend has
 // never been updated to carry -- Tooling (235 rows) and Bug (43). Filed as a gap for the capability
 // that owns the legend; until then the census must not call 235 correctly-typed rows off-taxonomy.
@@ -197,7 +201,7 @@ export function classifyBoard(board, { now, rate }) {
 
   const H24 = nowMs - 24 * HOUR;
   const H48 = nowMs - 48 * HOUR;
-  const D30 = nowMs - 30 * DAY;
+  const D30 = nowMs - UNREVALIDATED_DAYS * DAY;
   const nowStamp = new Date(nowMs).toISOString();
 
   const cycles = new Map();
