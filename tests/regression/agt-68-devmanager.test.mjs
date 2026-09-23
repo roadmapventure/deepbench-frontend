@@ -1,3 +1,4 @@
+// DeepBench v7.0.546 | tests/regression/agt-68-devmanager.test.mjs | AGT-86 slice 2a -- the assignment pin at the capability_skill_profiles block names review-audit-worklist beside run-project (sorted); nothing else moves.
 // DeepBench v7.0.456 | tests/regression/agt-68-devmanager.test.mjs | AGT-69 — the off-bench clause is retired: OFF_BENCH_AGENT_IDS no longer exists, so the import drops it and the assertion that the Development Manager was ON that list is deleted outright. The surviving NOT-in-AGENTS clause now reads for the AGT-69 reason: the governance agents render on the Bench's Governance section from live lane=governance rows, never from the static list.
 // DeepBench v7.0.434 | tests/regression/agt-68-devmanager.test.mjs | AGT-68 -- The Development
 // Manager: the seed rows are real, the manager's judgment is bound to the pick path rather than to
@@ -374,7 +375,10 @@ export default async function run() {
   assert.deepEqual(links.map(l => l.skill_profile_slug).sort(), [...SKILL_SLUGS].sort());
 
   const assigns = await rest(`agent_capability_assignments?agent_id=eq.${DEVMANAGER_AGENT_ID}&select=capability_slug`);
-  assert.deepEqual(assigns.map(a => a.capability_slug), [RUN_PROJECT_CAPABILITY]);
+  // AGT-86 slice 2a (v7.0.546): the manager's SECOND capability, review-audit-worklist (the weekly
+  // audit review), is pinned by name next to run-project. Sorted, so row order cannot redden it; its
+  // own rows and links are asserted in tests/regression/agt-86b-audit-review.test.mjs.
+  assert.deepEqual(assigns.map(a => a.capability_slug).sort(), ["review-audit-worklist", RUN_PROJECT_CAPABILITY].sort());
   const cap = (await rest(`capabilities?slug=eq.${RUN_PROJECT_CAPABILITY}&select=slug,execution_type,default_intent_slug`))[0];
   assert.equal(cap.execution_type, "ai");
   assert.equal(cap.default_intent_slug, INTENT_SLUG,
