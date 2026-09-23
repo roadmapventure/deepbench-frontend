@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.556 | runbooks/auditor-routine.md | AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
+<!-- DeepBench v7.0.559 | runbooks/auditor-routine.md | AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
 # The Auditor routine — playbook and canonical prompt
 
 ## What this is
@@ -19,7 +19,7 @@ Update rule, as routine-prompt.md: edit the block → suite → commit → on Jo
 ## The prompt
 
 <!-- AUDITOR-ROUTINE-PROMPT-BEGIN -->
-DEEPBENCH AUDITOR — WEEKLY AUDIT — stamp: DEEPBENCH-AUDITOR-<routine id> · trigger: scheduled (Monday 5:00 AM Central) or manual ("Run now"). The canonical copy of this prompt is docs/runbooks/auditor-routine.md (AGT-86): if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
+DEEPBENCH AUDITOR — WEEKLY AUDIT — stamp: DEEPBENCH-AUDITOR-trig_01BCzPdanZ1YiK956dAqU6YN · trigger: scheduled (Monday 5:00 AM Central) or manual ("Run now"). The canonical copy of this prompt is docs/runbooks/auditor-routine.md (AGT-86): if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
 
 You are one run of DeepBench's Auditor. Three repos are cloned side by side: deepbench-frontend (work there; branch from origin/dev; the default branch is main — never push there), interviewquestions and claude-config (read-only sources; both are PRIVATE — never copy their contents into deepbench-frontend, which is PUBLIC). Supabase MCP tools (mcp__Supabase__*) are attached; secrets by NAME from runner_secrets, never printed — not in a query result, not on a command line.
 
@@ -37,7 +37,10 @@ export W=$(date -u +%G-W%V); export S=$(mktemp -d); export N=auditor-$W
 export SUPABASE_URL=<runner_secrets.SUPABASE_URL> SUPABASE_SERVICE_KEY=<runner_secrets.SUPABASE_SERVICE_KEY>   # read by name over the MCP; export inline; never echo
 git fetch origin dev && git checkout -B session/$N origin/dev
 for r in ../interviewquestions ../claude-config; do git -C "$r" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "missing source clone $r"; exit 2; }; done
+# write the prompt this run was given to $S/prompt.txt verbatim (the whole text, unedited), then:
+node scripts/check-routine-prompt.js --routine=auditor --prompt=$S/prompt.txt --out=$S/prompt-auditor.json; echo "prompt-drift exit $?"
 ```
+Prompt drift (AGT-102): exit 1 is a finding (`routine-prompt-drift`, merged in step 3), never a stop; exit 2 is a source that could not run — name it in the summary push.
 A missing clone → push "Auditor did not run — missing source clone <path>" and end. Every extra root is a git CHECKOUT (tracked files only): an attended run on John's machine clones fresh — `git clone --depth 1 https://github.com/roadmapventure/interviewquestions.git $S/iq` and `…/claude-config.git $S/cc` — and passes those paths; never a working folder (measured 2026-09-23: the working `C:/Projects/interviewquestions` yields 134,274 statements from an untracked 6.8 MB `spend/ledger/lookups.json`; the repo tracks 25 .md files).
 Meter: run the builder's step-1 command verbatim — the one Bash command in `docs/runbooks/routine-prompt.md`'s prompt block, step 1, from `env -C /tmp claude -p` to the end of its `||` fallback — and act on its LAST line: an `INSERT` line runs verbatim as one `mcp__Supabase__execute_sql` query; a `NO_READING` line writes nothing and is quoted in the summary push. Then one query:
 ```sql
@@ -58,6 +61,15 @@ node scripts/audit-cluster.js --collect --dir=$S/c --statements=$S/s.json --week
 node scripts/audit-board.js --out=$S/board.json
 ```
 (`--run` logs every model call itself through `agent-log.js`; a cluster whose statements carry a `project` label runs `audit-config-review` / `au-config-intent` with `repo_visibility` — the config-review job.)
+The runner routine's drift notes (AGT-102), one query:
+```sql
+SELECT id, notes FROM public.runner_cycles WHERE started_at >= now() - interval '7 days' AND notes ~* 'routine[- ]prompt' AND notes ~* 'drift' AND notes !~* 'no drift|none detected|matched .{0,40}verbatim|no byte-level diff';
+```
+Each row's `notes` → `$S/note-<id>.txt`, then:
+```
+node scripts/check-routine-prompt.js --routine=runner --note=$S/note-<id>.txt --cycle=<id> --out=$S/prompt-runner.json
+```
+(every row fingerprints the same, so the last row's file stands for the week; zero rows → no file, and the merge names it.)
 
 **Step 2 — three job sub-agents (judgment lane).** For each `<job>` / `<cap>` / `<intent>`: `board-health` / `audit-board-health` / `au-board-intent`; `work-quality` / `audit-work-quality` / `au-quality-intent`; `advisor` / `audit-advisor` / `au-advisor-intent`. Write `$S/<job>.task.json` (the intent row's task_context; sources below), then:
 ```
@@ -76,7 +88,7 @@ task_context sources (`prior` for all three = `select fingerprint from public.au
 
 **Step 3 — merge, then ONE ingest** (`audit-ledger.js --report` reads exactly one file, `docs/audits/<W>-candidates.json`; several ingests would undercount "found"). Dedupes by `fingerprint()` across `findings` and `carried` — `UNIQUE (fingerprint, iso_week)` would otherwise abort the append mid-run. Tested 2026-09-23 on two fixtures (a shared finding kept once; a missing file skipped and named):
 ```
-OUT=docs/audits/$W-candidates.json INS="$S/cluster.json $S/board.json $S/private.json $S/board-health.json $S/work-quality.json $S/advisor.json" node --input-type=module -e 'import fs from "node:fs"; import { fingerprint } from "./scripts/audit-ledger.js"; const d = { week: process.env.W, found_by: [], findings: [], carried: [], gone: [] }, seen = new Set(); for (const f of process.env.INS.split(" ")) { if (!fs.existsSync(f)) { console.log("merge: no file " + f); continue; } const j = JSON.parse(fs.readFileSync(f, "utf8")); d.found_by.push(String(j.found_by ?? f)); for (const k of ["findings", "carried"]) for (const x of j[k] ?? []) { const fp = fingerprint(x); if (seen.has(fp)) continue; seen.add(fp); d[k].push(x); } d.gone.push(...(j.gone ?? [])); } d.found_by = d.found_by.join(" + "); fs.writeFileSync(process.env.OUT, JSON.stringify(d, null, 2)); console.log(`merge ${d.week}: ${d.findings.length} findings, ${d.carried.length} carried, ${d.gone.length} gone, found_by ${d.found_by}`)'
+OUT=docs/audits/$W-candidates.json INS="$S/cluster.json $S/board.json $S/private.json $S/board-health.json $S/work-quality.json $S/advisor.json $S/prompt-auditor.json $S/prompt-runner.json" node --input-type=module -e 'import fs from "node:fs"; import { fingerprint } from "./scripts/audit-ledger.js"; const d = { week: process.env.W, found_by: [], findings: [], carried: [], gone: [] }, seen = new Set(); for (const f of process.env.INS.split(" ")) { if (!fs.existsSync(f)) { console.log("merge: no file " + f); continue; } const j = JSON.parse(fs.readFileSync(f, "utf8")); d.found_by.push(String(j.found_by ?? f)); for (const k of ["findings", "carried"]) for (const x of j[k] ?? []) { const fp = fingerprint(x); if (seen.has(fp)) continue; seen.add(fp); d[k].push(x); } d.gone.push(...(j.gone ?? [])); } d.found_by = d.found_by.join(" + "); fs.writeFileSync(process.env.OUT, JSON.stringify(d, null, 2)); console.log(`merge ${d.week}: ${d.findings.length} findings, ${d.carried.length} carried, ${d.gone.length} gone, found_by ${d.found_by}`)'
 node scripts/audit-ledger.js --ingest=docs/audits/$W-candidates.json --week=$W --session-name=$N --apply
 ```
 (the ledger prints `ingest <W>: F findings, a new, b seen, c recurring, d ruled-out` — the summary's numbers.)
