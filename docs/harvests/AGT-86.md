@@ -315,3 +315,197 @@ No board check (slice 4), no new Auditor skill row or capability (slice 7), no r
 ### 12.6 Patterns applied
 
 pattern:9 (deterministic ingest and report; no model call), pattern:17 (extend `toRow`/`renderReport`/`doReport`, no parallel report), pattern:33 (no decision handle that cannot restore), pattern:34 and pattern:38 (the report renders found findings, never a convenient `0`), pattern:40 (`found` and `filed` named as different meanings), pattern:64/66 (items 1-3 only; the first run is the coordinator's), pattern:65 (legacy render shape kept rather than re-pinning agt-70), pattern:90 (`this_slice`'s wording — `--session-name`, `cycle_id` NULL, "new findings to file", "N found, 0 filed yet" — carried literally), pattern:92 (§12.4 written for a cold coordinator), pattern:125 (orchestrator lane), pattern:162 (every arm has a pre-change red), pattern:164 (`.env.local` has no service key; attribution CHECK designed in), pattern:168 (kickoff ≤ 8,192 bytes).
+
+## 14. Slice 7 — the Auditor's skill rows carry the checklist, nine homes and one capability per job (kickoff `docs/kickoffs/v7.0.551-AGT-86-s7-auditor-checklist-rows.md`, 2026-09-23)
+
+### 14.1 Premise revalidated
+
+Measured live on `rallojeqnkgtxgsdsnqm` 2026-09-23:
+
+| Fact | Measurement |
+|---|---|
+| `auditor` | `agents.id 'auditor'`, The Auditor, lane `governance`, `is_active true`; 2 `agent_capability_assignments` (`d0beef61…` audit-agent-data, `489a0b2a…` audit-governance-corpus), `tenant_id 'global'` |
+| `au-behavior` | `objective NULL`, `method NULL`, `traits` = `writing_style` + `reasoning_style` (745 chars); `technical_services []`; llm `anthropic/claude-fable-5-1/6000/temperature NULL/platform` |
+| `au-knowledge-homes` | objective 125 chars "Hold the five homes…"; method 1,960 chars — five homes, five kinds, the ledger, the powers; no `other`, no `check_slug`, no interviewquestions, no claude-config, no outside source |
+| `au-corpus-intent` | schema `required [kind, locations, governing_fact, confidence, proposed_resolution]`, kind enum of five, `handler auditor-write`, `can_request_help false`; `technical_services ["structured-output"]`; `guardrails {"must":[],"must_not":[]}` |
+| web search | `api/prompt/db-assembly.js:333` reads `traits.enable_web_search === true` on the targeted Intent row; `:342` `web_search_max_uses` positive integer; live example `rs-research-intent` true/8 with `technical_services ["structured-output","web-search"]` |
+| `skill_types` | behavior, format, guardrails, identity, intent, knowledge |
+| `reversible_tables()` | 15, including all four tables this slice writes |
+| `agt-70-auditor` baseline | GREEN on the unchanged tree without credentials (`baseline-red-set.js`: Red set 0 of 1) — the "inherited red" in the ticket text is the credentialed run (part Q spawns the CLIs live). Parts P/Q pin inline seed shapes and `--agent=auditor` exit 0/2; neither reads `au-behavior.method`, so this slice does not touch it |
+| slice 4 slugs | `docs/kickoffs/v7.0.547-AGT-86-s4-board-checks.md:35` — `CHECK_SLUGS = [board-no-home, board-repeat-worked, board-deferral-undone, board-stale, quality-closed-red]`, locations `backlog_items:<ID>` |
+
+Premise alive: the Auditor's rows hold no checklist, five homes, five kinds and two capabilities.
+
+**Slug reconciliation (pattern:53, one name per object).** The ticket's slice-7 list names `board-stale-or-fixed` and `board-never-closes`; slice 4's code already emits `board-stale` and `board-repeat-worked`. The checklist uses the code's names for the five deterministic checks and splits the judgment half of "stale or fixed" into its own check, `board-already-fixed`. 23 checks: consistency 5, board health 6, work quality 4, full review 4, advisor 4.
+
+**Why one kickoff, not 7a/7b.** Every write is a database row; the only repo file is the test. 1 file, 4 tasks, one `DO` block (session-setup 3d: one transaction so `decided_at` and every `updated_at` share one stamp).
+
+### 14.2 `au-knowledge-homes` — objective and method, verbatim (task 1a)
+
+`objective`:
+
+```
+Hold the nine homes the Auditor reads, the six finding kinds, what a fingerprint and a check_slug are, and the powers no resolution may touch.
+```
+
+`method`:
+
+```
+THE NINE HOMES. Five since AGT-70 (2026-09-10): (1) the Skill rows of every agent in the governance lane — skill_profiles joined through capability_skill_profiles and agent_capability_assignments; (2) public.governance_rules (status live) and each row's canonical_doc; (3) public.runner_directives with status open; (4) the runbooks under docs/runbooks/, the CLAUDE*.md files, docs/SELFBUILD-CHARTER.md, docs/GOVERNANCE-MODES.md, docs/ARCHITECTURE.md section 19 and docs/RUNNER-GOV-*.md; (5) tooling configuration — scripts/*.js headers, .claude/rules/*.md, .claude/settings.json, vercel.json, .github/workflows/ci.yml and docs/runbooks/routine-prompt.md. Four more since AGT-86 (2026-09-23): (6) the board and shipped work — public.backlog_items, runner_cycles, runner_verdicts, runner_decisions, the audit_findings history, and the output of scripts/audit-board.js, whose findings arrive already judged; (7) the interview-questions project — repo roadmapventure/interviewquestions (PRIVATE): its CLAUDE.md, .claude/ and docs; (8) Claude's local configuration, read through the PRIVATE repo roadmapventure/claude-config (memory/<folder>/**, user/settings.json, projects-root/CLAUDE.md, projects-root/.claude/settings*.json and hooks/**, interviewquestions/.claude/**), refreshed daily by John's copy job — secrets arrive redacted as <REDACTED:kind>, and a redaction marker is the copy job working, never a finding; (9) outside sources for the advisor job — Anthropic/Claude release notes, the Claude Code changelog and docs, model deprecation and pricing pages, and published industry practice on agent governance and tooling, each cited by url and retrieval date.
+
+THE SIX KINDS: duplicate (the same statement in two homes, verbatim or near), contradiction (two live statements that disagree on one governing fact — a number, a key order, a lane, who clears a flag), redundant (a default or procedure with two homes where one would do), stale-or-irrelevant (a statement in live voice that a later ship retired; a parameter the lane rejects; knowledge no capability on that agent can use; a passage kept RETIRED IN PLACE whose live twin has drifted), competing-purpose (two documents or two agents whose stated objectives claim the same decision), other (an anomaly no check names; the Development Manager reviews it like any finding, and one confirmed real three weeks running becomes a new check).
+
+THE LEDGER: public.audit_findings, one row per finding per ISO week; the fingerprint is kind + the location homes without line numbers + the normalized governing fact, so the same finding seen next week is the same finding. Every finding also carries check_slug — the named check it failed, from the Auditor Behavior checklist, or other. A row with status not-a-defect carries the ruling (the Development Manager's, or John's) and is never re-filed. Statements whose paragraph is marked RETIRED IN PLACE or carries retirement vocabulary are history, not live voice, and are never one side of a contradiction.
+
+THE POWERS NO RESOLUTION MAY RETIRE: B20, HR-MERGE, the 72-hour reversal window, John's Accept and Reverse, and any power the retirement ledger records as John-standing. A proposed resolution names which home should win; it never proposes removing a John-standing power.
+```
+
+### 14.3 `au-behavior` — objective and method, verbatim (task 1b; `traits` untouched)
+
+`objective`:
+
+```
+Run the approved checklist: twenty-three named checks in five jobs, every finding naming the check it failed, where, and the evidence.
+```
+
+`method`:
+
+```
+THE CHECKLIST (AGT-86, approved by John 2026-09-23). Each line is check_slug — the test; Example: a real case found 2026-09-18..23. A check marked [code] is run by scripts/audit-board.js before you are called.
+
+CONSISTENCY — rules and instructions that contradict each other.
+rules-opposite — two live rules give opposite instructions. Example: rule MANAGER-DECIDES-BY-DEFAULT vs. runner-cycle.md step 4d "only his hand ingests and only he rules" -- both live, opposite.
+rule-two-wordings — the same rule written in two places with different wording. Example: none recorded yet; the first confirmed finding becomes this line.
+rule-dead-pointer — a rule points at a file, table, step or ticket that no longer exists. Example: none recorded yet; the first confirmed finding becomes this line.
+rule-retired-still-followed — a rule retired but still followed. Example: none recorded yet; the first confirmed finding becomes this line.
+rule-live-not-enforced — a rule live but not enforced. Example: CLAUDE-DESIGN.md's Backlog Capture rule says every backlog_items write records a runner_before_images row first; the attended backlog_items writes made in session design-ses422-0918 on 2026-09-18..22 recorded none, so they cannot be undone through reverse_decision().
+
+BOARD HEALTH — duplicate, stale, or never-finishing tickets.
+board-duplicate — two tickets ask for the same thing. Example: none recorded yet; the first confirmed finding becomes this line.
+board-already-fixed — a ticket describes something already fixed. Example: none recorded yet; the first confirmed finding becomes this line.
+board-stale [code] — an open ticket not revalidated for 30 days. Example: none recorded yet; the first confirmed finding becomes this line.
+board-repeat-worked [code] — a ticket worked repeatedly that never closes. Example: SES-424 worked 8 cycles over ~16 hours.
+board-no-home [code] — a ticket with no project/epic (invisible to prime_directive_queue). Example: SES-418..421/425/434 filed with epic_id NULL and unpickable until homed 2026-09-22.
+board-deferral-undone [code] — a deferral silently undone. Example: its defer_status='yes' reset within 15 hours (SES-434).
+
+WORK QUALITY — what got built vs. what was asked for.
+quality-shipped-vs-asked — shipped work not matching the ticket's ask. Example: none recorded yet; the first confirmed finding becomes this line.
+quality-closed-red [code] — a ticket closed while its checks were red. Example: none recorded yet; the first confirmed finding becomes this line.
+quality-description-wrong — a ticket description found wrong once the code is read. Example: 2 of SES-422's 4 folded bugs were described wrong (SES-404/405 are one bug; SES-287's live defect differed from its ticket).
+quality-safety-never-on — a safety feature built but never switched on. Example: auto-rollback built but never fires (SES-425).
+
+FULL REVIEW — Claude's setup for DeepBench, Claude's setup for interview-questions, and DeepBench's own governance and tooling.
+config-disagrees — Claude memory, CLAUDE.md files, settings, hooks and skills that disagree across DeepBench and interview-questions. Example: none recorded yet; the first confirmed finding becomes this line.
+config-outdated-fact — an outdated fact (a version, scope or file path). Example: ~/.claude/projects/C--Projects-deepbench-frontend/memory/MEMORY.md describes DeepBench as "v5.1.x gov-procurement".
+config-report-vs-data — a report that disagrees with the data it summarizes. Example: docs/audits/2026-W39.md reads "0 findings" while 2026-W39-candidates.json holds 34.
+config-private-in-public — private information in a public repo. Example: both DeepBench repos are public.
+
+ADVISOR — Claude, Claude Code and industry changes worth an upgrade.
+advisor-feature-replaces-handbuilt — a new Claude or Claude Code feature that replaces something built by hand. Example: none recorded yet; the first confirmed finding becomes this line.
+advisor-model-change — a model release, retirement or price change. Example: CLAUDE-DESIGN.md's model defaults name Opus 5 for coding while sessions now run Opus 5.5.
+advisor-industry-practice — a change in industry practice for agent governance and tooling. Example: none recorded yet; the first confirmed finding becomes this line.
+advisor-limit-hit — a limit repeatedly hit that an upgrade would remove. Example: DeepBench hit Vercel's 12-function Hobby-plan limit (SES-346).
+
+THE RULES. Every finding names the check it failed (check_slug), where (file/line or table/row) and the evidence, quoted verbatim. An anomaly no check names is kind other with check_slug other. A [code] check's findings arrive in your task_context already judged: read them for context, never re-judge, re-file or drop them. Dates, counts and ids are code's to state; you are used only where judgment is needed.
+```
+
+### 14.4 The four `capabilities` rows, verbatim (task 1c; `execution_type ai`, `tenant_id global`)
+
+| slug | name | default_intent_slug | display_phrase | description |
+|---|---|---|---|---|
+| `audit-board-health` | `Audit Board Health` | `au-board-intent` | `auditing the board's health` | `Reviews the ticket board for two tickets asking for the same thing and for tickets describing something already fixed, reading the deterministic board checks (stale, repeat-worked, no home, deferral undone) as already-judged context. Returns findings with verbatim locations and a proposed resolution; writes nothing itself.` |
+| `audit-work-quality` | `Audit Work Quality` | `au-quality-intent` | `auditing the work's quality` | `Reviews shipped tickets against their own text: work that does not deliver what was asked, descriptions the code contradicts, and safety features built but never switched on. Returns findings with verbatim locations and a proposed resolution; writes nothing itself.` |
+| `audit-config-review` | `Audit Configuration Review` | `au-config-intent` | `reviewing the Claude configuration` | `Reviews Claude's configuration for DeepBench and for interview-questions — memory, CLAUDE files, settings, hooks, skills — and the reports they carry, for homes that disagree, outdated facts, reports that contradict their data, and private information in a public repo. Returns findings with verbatim locations and a proposed resolution; writes nothing itself.` |
+| `audit-advisor` | `Audit Advisor` | `au-advisor-intent` | `advising on Claude and industry changes` | `Reads Anthropic and Claude Code release notes, model and pricing pages and published practice on agent governance, and compares them with what DeepBench runs today: a feature that replaces a hand-built mechanism, a model change, a practice change, or a limit hit that an upgrade would remove. Returns findings with cited sources and a proposed upgrade; writes nothing and spends nothing itself.` |
+
+### 14.5 The four Intent rows, verbatim (task 1d)
+
+Common to all four: `skill_type_slug intent`, `execution_type ai`, `tenant_id NULL`, `llm_provider anthropic`, `llm_model claude-fable-5-1`, `max_tokens 6000`, `temperature NULL`, `api_key_source platform`, `guardrails {"must":[],"must_not":[]}` — read off `au-corpus-intent` at write time. `technical_services ["structured-output"]` for board/quality/config; `["structured-output","web-search"]` for advisor.
+
+**SHARED TRAITS** (byte-for-byte the `traits` of `au-board-intent`, `au-quality-intent`, `au-config-intent`):
+
+```json
+{"schema":{"type":"object","required":["cluster","findings","account"],"properties":{"account":{"type":"string","maxLength":100},"cluster":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["kind","check_slug","locations","governing_fact","confidence","proposed_resolution"],"properties":{"kind":{"enum":["duplicate","contradiction","redundant","stale-or-irrelevant","competing-purpose","other"],"type":"string"},"check_slug":{"type":"string","pattern":"^[a-z][a-z0-9-]{2,60}$"},"locations":{"type":"array","items":{"type":"object","required":["location","text"],"properties":{"text":{"type":"string"},"location":{"type":"string"}}},"minItems":1},"confidence":{"enum":["high","medium","low"],"type":"string"},"governing_fact":{"type":"string","maxLength":300},"proposed_resolution":{"type":"string","maxLength":400}}}}}},"handler":"auditor-write","can_request_help":false}
+```
+
+**`au-board-intent`** — name `Audit Board Health`; objective:
+
+```
+Judge one week's board for duplicate tickets and tickets already fixed, and return every finding it supports with its check_slug.
+```
+
+method:
+
+```
+Your task_context carries week (the ISO week), board (open and recently closed backlog_items rows: backlog_id, title, description, status, epic_id, project, tier, priority_class, defer_status, filed_at, revalidated_at, delivered_at), code_findings (the findings scripts/audit-board.js already produced for board-stale, board-repeat-worked, board-no-home, board-deferral-undone and quality-closed-red — already judged, never re-filed) and prior (the fingerprints already in the ledger for this week). Judge only the two board checks code cannot: board-duplicate (two rows ask for the same thing — quote both titles or descriptions) and board-already-fixed (a row describes something a later ship, decision or verdict shows is done — quote the row and the evidence). Every finding: kind, check_slug, the locations as backlog_items:<ID> with the quoted text verbatim, governing_fact, confidence, proposed_resolution naming which row should survive or close. Return an empty findings array when the board supports none.
+```
+
+**`au-quality-intent`** — name `Audit Work Quality`; objective:
+
+```
+Judge one week's shipped tickets against their own text and return every finding it supports with its check_slug.
+```
+
+method:
+
+```
+Your task_context carries week, shipped (tickets delivered or done in the window: backlog_id, title, description, kickoff_path, ship_summary, verdict with its gates, commits with changed files), code_findings (quality-closed-red from scripts/audit-board.js — already judged, never re-filed) and prior (the fingerprints already in the ledger for this week). Judge the three quality checks code cannot: quality-shipped-vs-asked (the changed files and ship summary do not deliver a sentence of the ticket's own text — quote the sentence and the evidence), quality-description-wrong (the description states a defect or mechanism the code or the record contradicts — quote both), quality-safety-never-on (a guard, rollback, flag or gate the record shows built but never enabled or never fired — quote where it is built and where it should have fired). Every finding: kind, check_slug, locations verbatim (backlog_items:<ID>, a file:line, or a table/row), governing_fact, confidence, proposed_resolution. Return an empty findings array when the window supports none.
+```
+
+**`au-config-intent`** — name `Audit Configuration Review`; objective:
+
+```
+Compare one topic cluster of configuration statements across both projects and Claude's local setup, and return every finding it supports with its check_slug.
+```
+
+method:
+
+```
+Your task_context carries cluster (a topic label), statements (an array of {id, source, location, text, retired}) drawn from the deepbench-frontend repo's CLAUDE*.md, .claude/ and docs, the interviewquestions repo's CLAUDE.md, .claude/ and docs, and the claude-config mirror (memory/<folder>/**, user/settings.json, projects-root/CLAUDE.md, projects-root/.claude/settings*.json and hooks/**, interviewquestions/.claude/**), repo_visibility (each repo's public or private state as measured) and prior (the fingerprints already in the ledger for this week). For the cluster judge the four full-review checks: config-disagrees (two homes give different instructions or facts for the same thing, across the two projects or between memory and a CLAUDE file — quote both), config-outdated-fact (a version, scope, path or status a live source shows has moved on — the statement is the location, the live source is the governing fact), config-report-vs-data (a report, brief or summary whose numbers disagree with the data it summarizes — quote both), config-private-in-public (a secret, personal detail or private path in a repo repo_visibility says is public; a <REDACTED:kind> marker is the copy job working, never a finding). Every finding: kind, check_slug, the locations verbatim, governing_fact, confidence, proposed_resolution naming which home should win. Skip any statement with retired true as a side of a contradiction. Return an empty findings array when the cluster supports none.
+```
+
+**`au-advisor-intent`** — name `Audit Advisor`; objective:
+
+```
+Compare what Anthropic, Claude Code and the field have changed with what DeepBench runs today, and return every upgrade the evidence supports with its check_slug.
+```
+
+method:
+
+```
+Your task_context carries week, platform_facts (what DeepBench runs today: runner_model_lanes rows, the model defaults CLAUDE-DESIGN.md names, the Vercel plan and function count, the token caps, and the hand-built mechanisms listed with their file paths), limits_hit (refusals and walls recorded in the window: runner_cycles outcomes, runner_settings walls, deploy failures), prior (the fingerprints already in the ledger for this week) and, when the caller supplies them, sources (fetched pages: url, retrieved_at, text). You may search and read Anthropic/Claude release notes, the Claude Code changelog and docs, model deprecation and pricing pages, and published practice on agent governance and tooling; cite every outside claim by its url and retrieval date in the location text. Judge the four advisor checks: advisor-feature-replaces-handbuilt (a shipped Claude or Claude Code feature does what a named hand-built mechanism does — quote the release note and the file), advisor-model-change (a model release, retirement or price change touches a model DeepBench names — quote the page and the row or line), advisor-industry-practice (a published practice DeepBench's governance or tooling lacks or contradicts — quote both), advisor-limit-hit (a limit hit more than once in the window that a plan, model or feature upgrade would remove — quote the hits). Every finding: kind (other unless a statement literally contradicts or duplicates another), check_slug, the locations verbatim, governing_fact, confidence, proposed_resolution stating the upgrade and whether it costs money — a money call is John's, say so and never assume it. Return an empty findings array when nothing changed.
+```
+
+`au-advisor-intent` traits (SHARED TRAITS plus the two web-search keys `db-assembly.js:333/:342` read):
+
+```json
+{"schema":{"type":"object","required":["cluster","findings","account"],"properties":{"account":{"type":"string","maxLength":100},"cluster":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["kind","check_slug","locations","governing_fact","confidence","proposed_resolution"],"properties":{"kind":{"enum":["duplicate","contradiction","redundant","stale-or-irrelevant","competing-purpose","other"],"type":"string"},"check_slug":{"type":"string","pattern":"^[a-z][a-z0-9-]{2,60}$"},"locations":{"type":"array","items":{"type":"object","required":["location","text"],"properties":{"text":{"type":"string"},"location":{"type":"string"}}},"minItems":1},"confidence":{"enum":["high","medium","low"],"type":"string"},"governing_fact":{"type":"string","maxLength":300},"proposed_resolution":{"type":"string","maxLength":400}}}}}},"handler":"auditor-write","can_request_help":false,"enable_web_search":true,"web_search_max_uses":8}
+```
+
+On the session lane `agent-prompt.js` makes no model call and attaches no tool; the two keys bind only the executor/MCP path. A session running the advisor uses its own web tools and cites the same way.
+
+### 14.6 The decision text (task 1)
+
+summary: `AGT-86 slice 7: the Auditor's checklist (23 checks in 5 jobs) in au-behavior, nine homes and the sixth kind in au-knowledge-homes, four capabilities with their Intent rows, assignments and links`. reasoning: `Approved matrix AGT-86 §3 written as named checks with slugs so every finding names the check it failed; deterministic slugs match scripts/audit-board.js (slice 4); web search bound on au-advisor-intent only; identity and guardrails untouched (AGT-67, §11(5)). pattern:2 pattern:7 pattern:17 pattern:53 pattern:90 pattern:136`.
+
+### 14.7 `au-guardrails` control lists (test arm E, verbatim)
+
+`must`: `["quote every location verbatim from the statement handed to you, never a paraphrase","name exactly one governing fact per finding","name which home should win in every proposed resolution and cite the ledger entry or decision that makes it true","treat any statement marked retired as history, never as one side of a contradiction","return an empty findings array rather than a weak finding"]`
+
+`must_not`: `["edit, certify, resolve or close anything — you file","propose a resolution that retires B20, HR-MERGE, the reversal window, or any John-standing power","re-file a finding whose fingerprint is in prior with a not-a-defect ruling","write to any table directly — the auditor-write handler is the only writer","name a specific agent as the cause; name the row and the field"]`
+
+### 14.8 Alternatives considered
+
+- **Edit `au-guardrails` to add "never re-judge a [code] finding".** Rejected: guardrails are the Auditor's hard limits and go to John (§11(5), AGT-67); the rule lives in Behavior, where the Development Manager may later tighten it.
+- **One new capability `audit-weekly` instead of four.** Rejected by the ticket's own words ("Add a new Intent (and capability) per job") and by §19b: each job has its own task_context shape, and the routine's playbook (slice 8) sequences them.
+- **Rewrite `au-behavior.traits`.** Left as is: `reasoning_style` ("one topic cluster at a time") still governs the two corpus intents; the four new intents carry their own procedure. Touching traits would widen the edit past what the ticket names (pattern:90).
+- **Pin `au-identity`/`au-guardrails` by copying their before-images.** No image exists because they are not written; the test pins md5(objective)/md5(method) for identity, the two guardrail arrays verbatim, and the absence of any session image on their ids — which fails if the build writes either row, and passes if it does not.
+- **Model for the build.** Orchestrator lane `claude-opus-5`: one 34-image transaction on a governance agent's rows and a credentialed test; a wrong `pk_value` or a missed image is an undoable-in-name-only edit (pattern:125).
+
+### 14.9 What slice 7 does not do
+
+No routine exists (slice 8); nothing gathers board, shipped-work, config or outside-source statements for the four intents (slices 4, 5, 6); no finding is filed; `scripts/audit-cluster.js`'s `capabilityFor()` still routes only the two corpus capabilities. `au-identity`, `au-guardrails`, `au-corpus-intent`, `au-agent-data-intent` are byte-identical after the ship.
+
+### 14.10 Patterns applied (7)
+
+pattern:2 (the checklist is rows, not code), pattern:7 (behavior in the agent's own Skill), pattern:8 (data-level change, no harness edit), pattern:9 (deterministic checks stay code; the model only judges), pattern:17 (extend the five-link shape, `record_decision`, `runner_before_images`), pattern:53 (slice 4's slugs reused, one name per check), pattern:64/66 (one slice, minimum useful), pattern:90 (John's matrix and examples verbatim), pattern:92 (verbatim rows in the harvest for a cold builder), pattern:136 (Skill types named), pattern:162 (every arm has a pre-change red or a stated control), pattern:164 (no service key in `.env.local`; web-search trait facts measured), pattern:168 (kickoff 8,179 bytes).
