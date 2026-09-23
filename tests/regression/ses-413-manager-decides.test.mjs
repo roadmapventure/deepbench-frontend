@@ -2,7 +2,7 @@
 //
 // Pins governance rule MANAGER-DECIDES-BY-DEFAULT (public.governance_rules, canonical home
 // docs/WORKING-WITH-JOHN.md#decision-autonomy-tiers) and the two documents that carry it: the
-// rewritten Decision Autonomy Tiers section, and docs/governance/ASKS-TO-JOHN.md, the 26-row
+// rewritten Decision Autonomy Tiers section, and docs/governance/ASKS-TO-JOHN.md, the 27-row
 // census of every place that asks John today.
 //
 // WHAT THIS FILE IS FOR, stated narrowly so a later editor does not widen it into a doc linter:
@@ -182,9 +182,9 @@ export function assertCanonicalHome(wwjText, statement) {
 
 export function assertInventory(inventoryText) {
   const rows = inventoryText.split(/\r?\n/).filter(l => /^\| A-\d{2} \|/.test(l));
-  eq(rows.length, 26, `${INVENTORY_REL} row count`);
+  eq(rows.length, 27, `${INVENTORY_REL} row count`);
 
-  // Numbered A-01..A-26, in order and without a gap: a census with a hole in it is a census that
+  // Numbered A-01..A-27, in order and without a gap: a census with a hole in it is a census that
   // quietly stopped covering something.
   rows.forEach((line, i) => {
     const want = `A-${String(i + 1).padStart(2, "0")}`;
@@ -208,7 +208,7 @@ export function assertInventory(inventoryText) {
     throw new Error(`${INVENTORY_REL} ${id} carries Mark ${JSON.stringify(mark)}; the only two values are "moved-to-manager" and "kept".`);
   }
 
-  eq(moved, 19, `${INVENTORY_REL} moved-to-manager count`);
+  eq(moved, 20, `${INVENTORY_REL} moved-to-manager count`);
   eq(kept, 7, `${INVENTORY_REL} kept count`);
 }
 
@@ -257,7 +257,7 @@ function partB(row) {
   if (drifted === wwj) throw new Error("control (iii) changed nothing -- the rendered block's first line is not as expected");
   mustThrow("one character changed inside the rendered block", () => assertCanonicalHome(drifted, row.statement));
 
-  // (iv) 25 rows instead of 26 -- an ask dropping out of the census unnoticed.
+  // (iv) 26 rows instead of 27 -- an ask dropping out of the census unnoticed.
   const inventory = read(INVENTORY_REL);
   const short = inventory.split(/\r?\n/).filter(l => !/^\| A-26 \|/.test(l)).join("\n");
   if (short === inventory) throw new Error("control (iv) removed nothing -- row A-26 is not shaped as expected");

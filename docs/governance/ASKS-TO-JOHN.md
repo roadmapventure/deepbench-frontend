@@ -1,20 +1,20 @@
-<!-- DeepBench v7.0.514 | docs/governance/ASKS-TO-JOHN.md | SES-413 — every place that asks John today, each one marked moved or kept -->
+<!-- DeepBench v7.0.544 | docs/governance/ASKS-TO-JOHN.md | AGT-86 slice 1c — A-27: the Auditor's ruling moves to the manager (SES-413 census, 27 rows) -->
 # Asks to John — the inventory `MANAGER-DECIDES-BY-DEFAULT` is measured against
 
 Rule `MANAGER-DECIDES-BY-DEFAULT` (`public.governance_rules`, canonical home
 `docs/WORKING-WITH-JOHN.md#decision-autonomy-tiers`) says anything that would come to John goes to
 The Development Manager (GV-01) first. This file is the census that claim is checkable against: one
 row for every place in the platform — doc, rule, runbook, table comment or column — that puts a
-question to John as things stand on 2026-09-18.
+question to John as things stand on 2026-09-18, plus A-27 added 2026-09-23 (AGT-86).
 
 **Mark** carries one of exactly two literals, spelled in the rows themselves rather than restated
-here so the counts below stay greppable. **19 rows** are the manager's to decide under the rule
+here so the counts below stay greppable. **20 rows** are the manager's to decide under the rule
 above, recorded with `record_decision()` and its before-images so each one can be reversed.
 **7 rows** stay John's, and every one of those names its reserved call in **Why** — *money*,
 *production*, *hire*, *switch*, *ruling* or *undo*.
 
 Slice 1 (this ship) only *marks* the rows. **Slice 2 routes the moved ones**: the mechanics of the
-19 — which surface replaces each ask, and on whose decision row — are `SES-413` slice 2's work and
+20 — which surface replaces each ask, and on whose decision row — are `SES-413` slice 2's work and
 wait on `SES-378` / `SES-402`. Nothing in this file changes behaviour by itself.
 
 | Row | Where | The ask today | Mark | Why |
@@ -45,7 +45,8 @@ wait on `SES-378` / `SES-402`. Nothing in this file changes behaviour by itself.
 | A-24 | `docs/runbooks/runner-cycle.md:2345` | A late drain member "waits for John" | moved-to-manager | Waiting is the failure this rule exists to end; the manager drains and lists what it drained. |
 | A-25 | `budget_override` / `max_usd` — `governance_rules` `B32`, `OD-24` | Raising the day's token or dollar cap; the override is John's word alone | kept | Spending money is one of the three: the system surfaces the approaching wall, John grants the raise. |
 | A-26 | The Reverse handle — `governance_rules` `M6-02` | John's Reverse on a decision inside the 72-hour window | kept | The undo is what makes the manager's authority safe to grant; only John reverses. |
+| A-27 | docs/runbooks/runner-cycle.md:2025, step 4d (AGT-70) | "only John's hand ingests, and only he rules" — the Auditor's ledger: the --ingest line is a dry run, and status, ruling, ruled_by, ruled_at are John's alone to write | moved-to-manager | The Development Manager reviews the Auditor's work list and rules on every finding within John's standing rules (AGT-86 section 5, John 2026-09-23); a ruling is a recorded row, reversible once AGT-86 slice 1b (v7.0.543) ships, and the five calls he keeps (rules, money, production, hiring, switch) route to john_alerts. The heal engine's identical rule is A-16. |
 
 **How to read a `kept` row.** It is not a residue slice 2 will clear. Each one is either one of the
-three calls the rule reserves, or the ruling/undo machinery that keeps the other 19 reversible —
+three calls the rule reserves, or the ruling/undo machinery that keeps the other 20 reversible —
 which is why a `kept` row's **Why** always names which of those it is.
