@@ -671,3 +671,145 @@ No function change, no intent-row change, no checklist edit, no finding ruled; `
 ### 16.9 Patterns applied (9a)
 
 pattern:9 (deterministic flags, no model), pattern:14 and pattern:93 (one SQL definition both readers use), pattern:16 (the loop tracks itself from the ledger it already keeps), pattern:17 (extend `buildTaskContext` and `--prepare`, no parallel context), pattern:34/pattern:38 (the view counts every ruled row; `carried` shown, not hidden), pattern:39/pattern:40 (one named meaning for "rulings" and for "last 3 weeks"), pattern:64/pattern:66 (one slice, minimum useful), pattern:67 (no allowlist table), pattern:72 (cap not waived — the ticket's own split), pattern:90 (ticket's "ticketed/escalated" and "≥ 3 rulings", "≥ 50%", "3 distinct weeks" carried literally), pattern:92 (9b specified here for a cold session), pattern:125 (orchestrator lane), pattern:162 (every arm has a pre-change red), pattern:164 (default ACL on views, guard permits INSERT, no service key in `.env.local`), pattern:168 (kickoff 8,164 bytes).
+
+## 15. Slice 8 — the Auditor's own routine and playbook, split 8a / 8b / 8c (kickoff `docs/kickoffs/v7.0.552-AGT-86-s8a-routine-prereqs.md`, 2026-09-23)
+
+### 15.0 Premise: alive, and why the slice is three ships
+
+Measured 2026-09-23 at `6730f662` (= origin/dev after slice 6's `76e5c55a` and the first-run ingest): `docs/runbooks/auditor-routine.md` does not exist; `runner-cycle.md:2003-2036` (2,701 B) still runs the corpus audit inside a builder cycle with "only John's hand ingests" (:2025), and every builder cycle since the 2026-09-22 pause is `did_not_run`, so the Auditor has not fired since. Three code facts stop a runbook from being written first:
+
+1. `scripts/audit-cluster.js --run` (:569) refuses without `--cycle-id` and hands it to `agent-log.js --cycle` (`visitor_id`, unvalidated). The routine has no `runner_cycles` row by design (AGT-86 §7); passing a made-up id would attribute the log rows to a cycle that never existed (pattern:32). The honest fix is the same `attribution()` the ledger already uses (slice 3): exactly one of `--cycle-id` / `--session-name`, and `--cycle` omitted from the log row when it is a session (the ordinary `call_source = 'session'` shape).
+2. `capabilityFor()` (:331) routes every cluster to the two corpus capabilities; `emitStatement`/`taskStatement` drop slice 6's `project` label, so `au-config-intent` (slice 7) could never be called with the `repo_visibility` it is written for. The config-review job is therefore run INSIDE the cluster run (one mechanism, pattern:17), not as a fourth stand-alone sub-agent — the three stand-alone jobs are board-health, work-quality and advisor.
+3. `shared/ai-patterns.js` `SERVICE_CATALOG` lacks `audit-board-health`, `audit-work-quality`, `audit-config-review`, `audit-advisor` and `review-audit-worklist`; `agent-log.js:226` refuses an `--ai-type` outside it, so the routine could not log any of its five judgment runs (§19k, AI-audit-mandatory). Slices 2a and 7 wrote the rows without the catalog entry — the `audit-board` precedent (AGT-79) says the entry enters with the capability.
+
+Runbook + these two scripts + a test = 4 files, over the cap; and a runbook that names flags no script carries fails its own "every flag exists" arm. So: **8a** (this kickoff) = the code the playbook calls; **8b** = the runner-cycle.md pointer, the card NOTES and the regenerated card; **8c** = the runbook, its prompt block, the test arms A/B and the agt-70 re-pin. The coordinator creates the routine OFF after 8c ships.
+
+Alternatives rejected: (i) the routine opens a `runner_cycles` row — the ticket's §7 says no row, and the row's outcome vocabulary (shipped/gated/reverted/did_not_run/failed) has no honest word for a weekly audit; (ii) `--cycle-id=auditor-<W>` as a string — dishonest attribution, see 1; (iii) a fourth stand-alone config sub-agent fed hand-picked statements — a second copy of the cluster mechanism (SES-45); (iv) folding the catalog entries into 8c — the Builder would ship a runbook whose log calls are refused live, which a test without credentials cannot see.
+
+### 15.1 Routine configuration (8c writes it into the runbook; the coordinator creates the routine from it, `enabled=false`)
+
+| Field | Value | Why |
+|---|---|---|
+| name | `deepbench-auditor` | separate from `deepbench-runner` (`trig_017TZ3JZcLBK6AYH6DKURqMH`), its own switch (A-21) |
+| cron | `0 10 * * 1` (UTC) | Monday 5:00 AM CDT; after DST ends 2026-11-01 John sets `0 11 * * 1` in the routine (the runbook records `0 10 * * 1` and says so) |
+| model | the `orchestrator` row of `public.runner_model_lanes` at creation (`claude-opus-5` on 2026-09-23) | judgment work runs on the model `scripts/agent-prompt.js` prints |
+| sources | `roadmapventure/deepbench-frontend` (branch `dev`), `roadmapventure/interviewquestions`, `roadmapventure/claude-config` | three clones side by side; the two private ones are read-only inputs |
+| connectors | Supabase MCP (`mcp__Supabase__*`, the governance credential) | ledger, alerts, secrets by name |
+| allowed_tools | the builder routine's ten (copy from a fresh `RemoteTrigger get` of `trig_017…`) plus `WebSearch` | `au-advisor-intent` has `enable_web_search true` |
+| enabled | `false` at creation | John's switch alone |
+| prompt | the block between `<!-- AUDITOR-ROUTINE-PROMPT-BEGIN -->` / `<!-- AUDITOR-ROUTINE-PROMPT-END -->` in `docs/runbooks/auditor-routine.md`, byte-identical | the routine-prompt.md convention: the file is the source, the routine the copy |
+
+Update rule, as routine-prompt.md: edit the block → suite → commit → on John's word `RemoteTrigger update` with the WHOLE `ccr` (`environment_id`, `events`, `session_context`) read from a fresh `get`, then read back `derived_state.model` and `allowed_tools`.
+
+### 15.2 The routine prompt, verbatim (8c task 1 copies this block into the runbook)
+
+```
+DEEPBENCH AUDITOR — WEEKLY AUDIT — stamp: DEEPBENCH-AUDITOR-<routine id> · trigger: scheduled (Monday 5:00 AM Central) or manual ("Run now"). The canonical copy of this prompt is docs/runbooks/auditor-routine.md (AGT-86): if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
+
+You are one run of DeepBench's Auditor. Three repos are cloned side by side: deepbench-frontend (work there; branch from origin/dev; the default branch is main — never push there), interviewquestions and claude-config (read-only sources; both are PRIVATE — never copy their contents into deepbench-frontend, which is PUBLIC). Supabase MCP tools (mcp__Supabase__*) are attached; secrets by NAME from runner_secrets, never printed — not in a query result, not on a command line.
+
+1. Read docs/runbooks/auditor-routine.md from the deepbench-frontend clone and execute its steps 0-7 in order, exactly. Step 0 sets W (the ISO week), S (a scratch directory) and N=auditor-<W> — the session name every ledger write carries; there is no runner_cycles row — checks the three clones, reads the usage meter with the builder's step-1 command, and asks public.runner_should_boot() for its DETAIL only. The one stop is the weekly wall: gated_pct >= wall_pct, or a meter that could not be read and is older than meter_stale_hours. On that stop: one push to John "Auditor did not run — <reason>", then end. scheduler_off, nothing_pickable, weekly_pace and the gate's other reasons are the builder's refusals and never stop the Auditor.
+2. Steps 1-2 gather and judge: the corpus with both extra roots and the private scan, the board checks as code, the cluster run under --session-name=$N (config-review clusters route themselves to audit-config-review), then three job sub-agents — board-health, work-quality and advisor (the advisor may use WebSearch) — each on the model scripts/agent-prompt.js prints and each logged with scripts/agent-log.js. Step 3 merges every source into docs/audits/$W-candidates.json and ingests it ONCE with --session-name=$N --apply. Step 4: if scripts/audit-review.js --prepare exits 0, run the Development Manager (review-audit-worklist) as a sub-agent on the model the assembly prints, then --dry-run and --apply; exit 3 means no findings — no manager run, no cost. Step 5 writes the week's report and commits docs/audits/* to dev (git fetch origin dev, rebase, git push origin HEAD:dev — never main). Step 6: SELECT * FROM public.claim_john_alerts() and send one push per row, in plain words, naming which of John's five calls it is. Step 7: always one summary push — found N (new / recurring / gone), tickets filed with ids and titles, not-a-defect, carried, escalated, and the decision handle that reverses the review.
+3. The hand-off to the Development Manager is table rows sequenced by the runbook — never agent to agent. You write the work list and stop; the manager rules. Nothing in this run edits a skill row, flips a routine, merges to main or spends money — those are John's calls and reach him as john_alerts.
+4. Model discipline: you are the orchestrator lane (public.runner_model_lanes, read live, never assumed); a failed sub-agent re-runs once one tier up, never twice at the same tier. Every claim in a push traces to a row, a SHA or a script's stdout. Priority classes are written named (P10 - Tooling); outcomes as plain words. This run ends when your turn ends — send the summary before you stop.
+```
+
+### 15.3 Steps 0-7 (8c task 1 copies these into the runbook, one numbered step each, commands verbatim; cwd = the deepbench-frontend clone root)
+
+**Step 0 — stamp, clones, meter, the one stop.**
+```
+export W=$(date -u +%G-W%V); export S=$(mktemp -d); export N=auditor-$W
+export SUPABASE_URL=<runner_secrets.SUPABASE_URL> SUPABASE_SERVICE_KEY=<runner_secrets.SUPABASE_SERVICE_KEY>   # read by name over the MCP; export inline; never echo
+git fetch origin dev && git checkout -B session/$N origin/dev
+for r in ../interviewquestions ../claude-config; do git -C "$r" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "missing source clone $r"; exit 2; }; done
+```
+A missing clone → push "Auditor did not run — missing source clone <path>" and end. Every extra root is a git CHECKOUT (tracked files only): an attended run on John's machine clones fresh — `git clone --depth 1 https://github.com/roadmapventure/interviewquestions.git $S/iq` and `…/claude-config.git $S/cc` — and passes those paths; never a working folder (measured 2026-09-23: the working `C:/Projects/interviewquestions` yields 134,274 statements from an untracked 6.8 MB `spend/ledger/lookups.json`; the repo tracks 25 .md files).
+Meter: run the builder's step-1 command verbatim — the one Bash command in `docs/runbooks/routine-prompt.md`'s prompt block, step 1, from `env -C /tmp claude -p` to the end of its `||` fallback — and act on its LAST line: an `INSERT` line runs verbatim as one `mcp__Supabase__execute_sql` query; a `NO_READING` line writes nothing and is quoted in the summary push. Then one query:
+```sql
+SELECT (detail->>'gated_pct')::numeric >= (detail->>'wall_pct')::numeric               AS weekly_wall,
+       (detail->>'reading_age_hours')::numeric > (detail->>'meter_stale_hours')::numeric AS meter_stale,
+       detail->>'gated_pct' AS gated_pct, detail->>'wall_pct' AS wall_pct, detail->>'wall_stop' AS wall_stop,
+       detail->>'reading_age_hours' AS age_hours
+FROM public.runner_should_boot();
+```
+Stop iff `weekly_wall` is true, or `meter_stale` is true AND the self-read printed `NO_READING` (pattern:165 — a wall nobody can read fails closed). Push "Auditor did not run — weekly wall: <gated_pct>% ≥ <wall_pct>% (<wall_stop>)" or "— meter unreadable: <age_hours> h old, NO_READING <reason>", and end. The `reason` column is never consulted: `scheduler_off`, `nothing_pickable`, `weekly_pace`, `unaffordable` are the builder's. (`wall_pct` is `final_day_rest_pct` on Thursdays — an on-demand Thursday run meets the stricter wall; the Monday fire always meets `weekly_rest_pct`.)
+
+**Step 1 — gather (code; exit 2 from any line = that source could not run: keep going, name it in the summary push, the merge tolerates a missing file).**
+```
+node scripts/audit-corpus.js --out=$S/s.json --extra-root=interviewquestions=../interviewquestions --extra-root=claude-config=../claude-config --private-scan=$S/private.json
+node scripts/audit-cluster.js --build --statements=$S/s.json --week=$W --out-dir=$S/c --repo-visibility=deepbench-frontend=public --repo-visibility=interviewquestions=private --repo-visibility=claude-config=private
+node scripts/audit-cluster.js --run --dir=$S/c --session-name=$N
+node scripts/audit-cluster.js --collect --dir=$S/c --statements=$S/s.json --week=$W --out=$S/cluster.json
+node scripts/audit-board.js --out=$S/board.json
+```
+(`--run` logs every model call itself through `agent-log.js`; a cluster whose statements carry a `project` label runs `audit-config-review` / `au-config-intent` with `repo_visibility` — the config-review job.)
+
+**Step 2 — three job sub-agents (judgment lane).** For each `<job>` / `<cap>` / `<intent>`: `board-health` / `audit-board-health` / `au-board-intent`; `work-quality` / `audit-work-quality` / `au-quality-intent`; `advisor` / `audit-advisor` / `au-advisor-intent`. Write `$S/<job>.task.json` (the intent row's task_context; sources below), then:
+```
+node scripts/agent-prompt.js --agent=auditor --capability=<cap> --task="$(cat $S/<job>.task.json)" > $S/<job>.prompt.md
+node scripts/agent-prompt.js --agent=auditor --capability=<cap> --task="$(cat $S/<job>.task.json)" --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+```
+Run `$S/<job>.prompt.md` as an Agent-tool sub-agent on the printed model (the advisor's with WebSearch), stating the clone's absolute path; the answer is one JSON object `{cluster, findings, account}`. Save `{"week":"$W","found_by":"auditor:routine:<job>","findings":<answer.findings>}` as `$S/<job>.json`, then log:
+```
+node scripts/agent-log.js --agent=auditor --capability=<cap> --model=<printed model> --ai-type=<cap> --feature=<cap>:<intent>:depth1 [--input-tokens=<n> --output-tokens=<n>] [--patterns-applied=<csv>]
+```
+(token flags only when the sub-agent's usage is known — both or neither.) A sub-agent that returns no parseable object is re-run ONCE one tier up; still nothing → `$S/<job>.json` is written with `findings: []` and the summary names it.
+task_context sources (`prior` for all three = `select fingerprint from public.audit_findings where iso_week = '$W'`):
+- board-health: `week`; `board` = every `backlog_items` row with status in (open, partial) as `{backlog_id, title, status, epic_id, project (epics.project_id), tier, priority_class, defer_status, filed_at, revalidated_at, delivered_at}`, plus `description` (first 300 chars) only for rows filed or delivered in the last 14 days; `code_findings` = `$S/board.json`'s `findings`.
+- work-quality: `week`; `shipped` = rows with `delivered_at` or status `done` in the last 7 days: `{backlog_id, title, description (first 1500), kickoff_path (ls docs/kickoffs/*-<ID>-*.md), ship_summary (latest runner_cycles.notes for that item, first 1500), verdict (latest runner_verdicts row), commits (git log origin/dev --since='8 days ago' --grep=<ID> --name-only --format='%h %s')}`; `code_findings` = `$S/board.json` findings with `check_slug quality-closed-red`.
+- advisor: `week`; `platform_facts` = `{lanes: runner_model_lanes rows, claude_design_models: grep -n "claude-" CLAUDE-DESIGN.md, api_functions: node scripts/check-api-function-count.js output, budget: the current-month runner_budget row, hand_built: [scripts/audit-corpus.js, audit-cluster.js, audit-ledger.js, audit-board.js, audit-review.js, agent-prompt.js, agent-log.js, render-cycle-card.js, heal-engine.js, ticket-owner.js, tripwire-to-backlog.js — each with its header's first sentence]}`; `limits_hit` = `select outcome, last_step, count(*) from runner_cycles where started_at >= now() - interval '7 days' and outcome in ('did_not_run','failed') group by 1,2` plus the api/ function count against 12.
+
+**Step 3 — merge, then ONE ingest** (`audit-ledger.js --report` reads exactly one file, `docs/audits/<W>-candidates.json`; several ingests would undercount "found"). Dedupes by `fingerprint()` across `findings` and `carried` — `UNIQUE (fingerprint, iso_week)` would otherwise abort the append mid-run. Tested 2026-09-23 on two fixtures (a shared finding kept once; a missing file skipped and named):
+```
+OUT=docs/audits/$W-candidates.json INS="$S/cluster.json $S/board.json $S/private.json $S/board-health.json $S/work-quality.json $S/advisor.json" node --input-type=module -e 'import fs from "node:fs"; import { fingerprint } from "./scripts/audit-ledger.js"; const d = { week: process.env.W, found_by: [], findings: [], carried: [], gone: [] }, seen = new Set(); for (const f of process.env.INS.split(" ")) { if (!fs.existsSync(f)) { console.log("merge: no file " + f); continue; } const j = JSON.parse(fs.readFileSync(f, "utf8")); d.found_by.push(String(j.found_by ?? f)); for (const k of ["findings", "carried"]) for (const x of j[k] ?? []) { const fp = fingerprint(x); if (seen.has(fp)) continue; seen.add(fp); d[k].push(x); } d.gone.push(...(j.gone ?? [])); } d.found_by = d.found_by.join(" + "); fs.writeFileSync(process.env.OUT, JSON.stringify(d, null, 2)); console.log(`merge ${d.week}: ${d.findings.length} findings, ${d.carried.length} carried, ${d.gone.length} gone, found_by ${d.found_by}`)'
+node scripts/audit-ledger.js --ingest=docs/audits/$W-candidates.json --week=$W --session-name=$N --apply
+```
+(the ledger prints `ingest <W>: F findings, a new, b seen, c recurring, d ruled-out` — the summary's numbers.)
+
+**Step 4 — the Development Manager's review, only when there is something to review.**
+```
+node scripts/audit-review.js --prepare --week=$W --out=$S/ctx.json; echo "prepare exit $?"
+```
+Exit 3 → "nothing to review — no manager run" goes in the summary; skip to step 5. Exit 0 →
+```
+node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task="$(cat $S/ctx.json)" > $S/review.prompt.md
+node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task="$(cat $S/ctx.json)" --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+```
+Sub-agent on the printed model → `$S/answer.json` (`{groups, summary_for_john, patterns_applied}`); log it: `node scripts/agent-log.js --agent=devmanager --capability=review-audit-worklist --model=<printed> --ai-type=review-audit-worklist --feature=review-audit-worklist:dm-audit-review-intent:depth1 […]`. Then:
+```
+node scripts/audit-review.js --dry-run=$S/answer.json --context=$S/ctx.json
+node scripts/audit-review.js --apply=$S/answer.json --context=$S/ctx.json --week=$W --session-name=$N
+```
+A `--dry-run` refusal → re-run the sub-agent ONCE with the refusal lines appended to the prompt; a second refusal → no `--apply`, the summary quotes the refusals, the findings stay `open` for next week. Keep `--apply`'s `Decision <id> — reversible until …` line and its ticket ids for step 7.
+
+**Step 5 — report and record.**
+```
+node scripts/audit-ledger.js --report=$W --write
+git add docs/audits/$W-candidates.json docs/audits/$W.md && git commit -m "auditor $W — <F> found, <T> tickets filed" && git fetch origin dev && git rebase origin/dev && git push origin HEAD:dev
+```
+Never main. An attended run commits in its own session's commit.
+
+**Step 6 — John's calls.** `SELECT id, john_call, summary, detail, ref_table, ref_id FROM public.claim_john_alerts();` — one push per row: "John's call (<john_call>): <summary>", where `rules` = your own rules or past decisions, `money` = spending beyond what you approved, `production` = a dev → main release, `hiring` = creating or activating an agent, `switch` = turning an agent or routine on or off. Zero rows → no push.
+
+**Step 7 — the summary, always.** One push: "Auditor <W>: found <F> (<a> new, <c> recurring, <g> gone); tickets filed: <ID — title, …> or none; not-a-defect <n>; carried <n>; escalated <n>; review decision <id>, reversible until <expires_at in America/Chicago>: select public.reverse_decision('<id>','John','<why>'); report docs/audits/<W>.md on dev; sources that could not run: <list or none>." When step 0 stopped, the did-not-run push IS the summary.
+
+**On demand.** "Run now" on the routine, or any Claude session told "run the Auditor", follows steps 0-7 attended with `N=<its own session name>` and fresh clones under `$S` (step 0). No idempotence guard: a second run in one ISO week re-classifies its findings as `seen` and files nothing twice; the cost is the run's tokens, John's to spend. Local caveat, not a blocker: on Windows/Node 24 a script that calls `process.exit()` right after a fetch can abort with a libuv assertion (slice 3 measured it in `audit-ledger.js` and `audit-cluster.js`); the cloud routine is Linux.
+
+### 15.4 Slice 8c — the runbook and the test arms (after 8b; 3 files)
+
+Files: `docs/runbooks/auditor-routine.md` (new; §15.1 table, §15.2 block between the markers, §15.3 steps, the on-demand paragraph; one `<!-- DeepBench v7.0.5xx | runbooks/auditor-routine.md | AGT-86 slice 8c -->` stamp), `tests/regression/agt-86h-auditor-routine.test.mjs` (gains arms A, B, H), `tests/regression/agt-70-auditor.test.mjs` (part L re-pinned, §15.5). Arms: **A** both markers once; the block names `docs/runbooks/auditor-routine.md`, `weekly_wall`, `--session-name`, `claim_john_alerts`, `summary`, `never main`, stamp `DEEPBENCH-AUDITOR-`; contains neither `trig_017TZ3JZcLBK6AYH6DKURqMH` nor `prime_directive_queue`. **B** for every `node scripts/<x>.js …` line in the runbook, every `--name` token appears in that script's first 130 lines (red on the unchanged tree because the file is absent; and a runbook naming a flag no header carries fails). **H** runner-cycle.md's 4d body has no `only John's hand` and names `docs/runbooks/auditor-routine.md`; bytes ≤ 381,000 (green only after 8b). Model: `claude-fable-5-1` (judgment — the runbook is what a fresh cloud session executes). After 8c ships the coordinator creates the routine from §15.1 with `enabled=false` and pastes John a one-line "flip it on at claude.ai/code/routines when you want the first Monday run".
+
+### 15.5 Slice 8b — runner-cycle.md step 4d becomes a pointer; the card follows (3 files)
+
+Files: `docs/runbooks/runner-cycle.md`, `scripts/render-cycle-card.js`, `docs/runbooks/cycle-card.md`. Measured: step 4d is `:2003-2036`, 2,701 B; file 380,718 B of 381,000; `ses-377-cycle-card.test.mjs` holds the committed card byte-equal to `node scripts/render-cycle-card.js` (so the card is regenerated with `--write` in the SAME commit — no later ship point does it; the SES-424 slice-5 `--sync-knowledge` row is checked by `ses-424e`, an inherited red, and repinned with `--sync-knowledge --repin --cycle-id=386e52e6-08ae-4bf6-ad3d-5944882fb8ff --ticket=AGT-86` after the write); `agt-70-auditor.test.mjs:994-1012` (part L) greps the 4d body for `tripwire-to-backlog.js --from-ledger`, `audit-ledger.js --ingest=`, `date_trunc('week'`, and no line pairing `--ingest=` with `--apply`; `render-cycle-card.js:127` holds 4d's NOTES outcome (≤ 90 chars); `ses-364-reverse-agent-rows.test.mjs:309` pins the bold lead-in `**The allowlist, widened 7 → 14 by \`SES-364\`**` at `:4720` (keep it byte-identical).
+Edits: (1) the 4d body (`**4d. ` up to the `<!-- FEATURE: AGT-79 slice 3` comment) becomes: `**4d. Weekly audit — retired from the cycle (\`AGT-86\` slice 8b).** The Auditor runs in its own routine — \`docs/runbooks/auditor-routine.md\` — and a builder cycle no longer audits: it does not run \`audit-ledger.js --ingest=\`, \`tripwire-to-backlog.js --from-ledger\` or the \`date_trunc('week'\` precondition; the routine ingests under its own session name and the Development Manager rules (\`ASKS-TO-JOHN\` A-27). Go to step 4e.` — the three retired strings are named so part L stays green until 8c re-pins it to the pointer (`points at auditor-routine.md`, no `only John's hand`); (2) `:4720`: after `` by `SES-364` `` insert ` and to 15 by \`AGT-86\` slice 1b (\`v7.0.543\`: \`audit_findings\`)` and append `audit_findings` to the list; (3) `render-cycle-card.js:127` outcome → `retired: the Auditor runs in its own routine (auditor-routine.md); go to 4e`; (4) `node scripts/render-cycle-card.js --write`, then the repin above. Header stamp: one new `v7.0.5xx` line, the oldest of the five rotated to `docs/SESSIONS.md` verbatim (agt-70 part L asserts 5 stamps and the `v7.0.446` line in SESSIONS.md). Frees ≈ 2,000 B. QA: `node scripts/render-cycle-card.js` exit 0; `wc -c` ≤ 381,000; `grep -c "only John's hand" docs/runbooks/runner-cycle.md` = 0; ses-364, ses-377, agt-70 source arms green. Model: `claude-opus-5` (mechanical doc edit).
+
+### 15.6 Residue for the Development Manager (filed as evidence, not built here)
+
+- `scripts/audit-corpus.js walkRoot()` walks the directory; for a root that is a git repository it should walk `git -C <root> ls-files` instead (tracked files only), so an attended run cannot drown the 12-cluster step on an untracked data file (measured: 134,274 vs 25 tracked .md in interviewquestions). One function, one test arm; slice 6's file.
+- The `--session-name` attribution leaves `ai_activity_log.visitor_id` NULL for routine runs; if a per-run correlation is ever wanted, `agent-log.js` would need a session column, not `visitor_id` (LOG-91: never in `call_facts`).
+- `capabilityFor()` sends a MIXED cluster (this repo + an extra root) to config-review; the corpus intent's knowledge is the broader one — if mixed clusters prove common, route on the majority label.
+
+### 15.7 Patterns applied (8a)
+
+pattern:9 (no model call where code serves — the merge and the stop are code), pattern:14 (one `attribution()` for ledger and cluster), pattern:17 (config-review rides the cluster mechanism), pattern:32 (attribute from what the call did — no fake cycle id), pattern:42 (plumbing is never shown as an agent acting), pattern:64/72 (one item; the cap split, never waived by me), pattern:126 (one push per run at the ship point), pattern:165 (the wall's sensor fails closed), pattern:166 (no John stop removed — the builder's gate is untouched), pattern:168 (kickoff ≤ 8,192 B; reasoning here).
