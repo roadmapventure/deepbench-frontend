@@ -1,3 +1,9 @@
+// DeepBench v7.0.553 | scripts/audit-review.js | AGT-86 slice 9a -- --prepare adds the per-check scorecard
+// (public.audit_check_scorecard) and two deterministic flags: flagChecks() marks a check 'tighten' when its
+// last three weeks hold >= 3 rulings at a false-alarm rate >= 0.5; promotableOthers() names an `other`
+// fingerprint ruled real (ticketed/escalated) in >= 3 distinct weeks. Flags only -- the manager acts in 9b.
+// Spec: docs/harvests/AGT-86.md section 16; kickoff docs/kickoffs/v7.0.553-AGT-86-s9a-check-scorecard.md.
+//
 // DeepBench v7.0.548 | scripts/audit-review.js | AGT-86 slice 2 (2b) -- the Development Manager's weekly
 // audit review, as a client of public.apply_audit_review(). Spec: docs/harvests/AGT-86.md section 9.4;
 // kickoff docs/kickoffs/v7.0.548-AGT-86-s2b-audit-review-script.md.
@@ -43,7 +49,44 @@ export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager
 
 const blank = v => String(v ?? "").trim() === "";
 
-export function buildTaskContext({ week, findings, allRows, tickets }) {
+// AGT-86 §11: view rows (one per check_slug and iso_week) -> one entry per check with >= 3 summed rulings.
+export function flagChecks(viewRows) {
+  const groups = new Map();
+  for (const r of Array.isArray(viewRows) ? viewRows : []) {
+    if (!groups.has(r.check_slug)) groups.set(r.check_slug, []);
+    groups.get(r.check_slug).push(r);
+  }
+  const out = [];
+  for (const [check_slug, rows] of groups) {
+    const total = rows.reduce((n, r) => n + (Number(r.rulings) || 0), 0);
+    if (total < 3) continue;
+    const weeks = [...rows].sort((x, y) => String(x.iso_week).localeCompare(String(y.iso_week)));
+    const latest = weeks[weeks.length - 1];
+    const flag = Number(latest.rulings_3w) >= 3 && Number(latest.false_alarm_rate_3w) >= 0.5 ? "tighten" : null;
+    out.push({ check_slug, weeks, flag });
+  }
+  return out.sort((x, y) => String(x.check_slug).localeCompare(String(y.check_slug)));
+}
+
+// AGT-86 §11: an `other` fingerprint ruled real in three distinct weeks is a candidate for a new check.
+export function promotableOthers(allRows) {
+  const byFp = new Map();
+  for (const r of Array.isArray(allRows) ? allRows : []) {
+    if (r.check_slug !== "other" || (r.status !== "ticketed" && r.status !== "escalated")) continue;
+    if (!byFp.has(r.fingerprint)) byFp.set(r.fingerprint, { weeks: new Set(), finding_ids: [] });
+    const e = byFp.get(r.fingerprint);
+    e.weeks.add(r.iso_week);
+    e.finding_ids.push(r.id);
+  }
+  const out = [];
+  for (const [fingerprint, e] of byFp) {
+    const weeks = [...e.weeks].sort();
+    if (weeks.length >= 3) out.push({ fingerprint, weeks, finding_ids: e.finding_ids, note: "promote to a new check" });
+  }
+  return out.sort((x, y) => String(x.fingerprint).localeCompare(String(y.fingerprint)));
+}
+
+export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows }) {
   if (!Array.isArray(findings) || findings.length === 0) return null;
   const rows = Array.isArray(allRows) ? allRows : [];
   const worklist = findings.map(f => {
@@ -71,6 +114,11 @@ export function buildTaskContext({ week, findings, allRows, tickets }) {
       backlog_id: t.backlog_id, title: t.title, status: t.status, description: t.description,
     })),
     john_calls: { ...JOHN_CALLS },
+    scorecard: (() => {
+      const checks = flagChecks(scorecardRows ?? []);
+      return { checks, tighten: checks.filter(c => c.flag === "tighten").map(c => c.check_slug) };
+    })(),
+    promotions: promotableOthers(rows),
   };
 }
 
@@ -189,9 +237,10 @@ async function prepare(args) {
     return r.json;
   };
   const findings = await get("audit_findings?status=in.(open,carried)&select=id,fingerprint,iso_week,kind,check_slug,locations,governing_fact,confidence,proposed_resolution&order=created_at,id");
-  const allRows = await get("audit_findings?select=fingerprint,iso_week,status,ruling,ruled_by");
+  const allRows = await get("audit_findings?select=id,fingerprint,iso_week,status,ruling,ruled_by,check_slug");
   const tickets = await get("backlog_items?source_file=eq.audit-review&status=not.in.(done,removed)&select=backlog_id,title,status,description&order=backlog_id");
-  const ctx = buildTaskContext({ week, findings, allRows, tickets });
+  const scorecardRows = await get("audit_check_scorecard?select=*&order=check_slug,iso_week");
+  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows });
   if (ctx === null) die(3, NOTHING_TO_REVIEW);
   const out = JSON.stringify(ctx, null, 2) + "\n";
   if (typeof args.out === "string" && args.out) {
