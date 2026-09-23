@@ -69,7 +69,12 @@ export const K_ALLOWED = [
   // pg_attribute), so every restore of one lands in `restored_unverified`, never `restored`.
   "skill_profiles", "agents", "capabilities", "capability_skill_profiles",
   "agent_capability_assignments", "ai_activity_log", "runner_items",
+  // AGT-86 slice 1b (v7.0.543): the ruling band of an audit finding. No updated_at either.
+  "audit_findings",
 ];
+
+// AGT-86 slice 1b's one addition, kept apart from SES364_ADDED so that list still names SES-364's seven.
+export const AGT86_ADDED = ["audit_findings"];
 
 // The PRE-CHANGE allowlist. Kept here ONLY as the negative control -- never used for anything else.
 export const K_ALLOWED_BEFORE = [
@@ -157,17 +162,20 @@ export function guardsDifferOn() {
 }
 
 function theAllowlistIsFourteenAndTheLedgerTablesStayOut() {
-  assert.strictEqual(K_ALLOWED.length, 14,
-    `the allowlist is fourteen tables after SES-364, not ${K_ALLOWED.length}. If a fifteenth ` +
+  assert.strictEqual(K_ALLOWED.length, 15,
+    `the allowlist is fifteen tables after AGT-86 slice 1b, not ${K_ALLOWED.length}. If a sixteenth ` +
     "arrived, re-derive the §19v P5 argument before widening this list -- a whole-row restore " +
     "moves every column of the table it names");
-  assert.strictEqual(new Set(K_ALLOWED).size, 14, "the allowlist carries a duplicate name");
+  assert.strictEqual(new Set(K_ALLOWED).size, 15, "the allowlist carries a duplicate name");
   for (const t of K_ALLOWED_BEFORE) {
     assert.ok(K_ALLOWED.includes(t),
       `SES-364 must not have DROPPED ${t} from the allowlist -- it widens, it does not trade`);
   }
   for (const t of SES364_ADDED) {
     assert.ok(K_ALLOWED.includes(t), `${t} is missing from the allowlist`);
+  }
+  for (const t of AGT86_ADDED) {
+    assert.ok(K_ALLOWED.includes(t), `${t} is missing from the allowlist (AGT-86 slice 1b)`);
   }
   assert.ok(K_ALLOWED.includes("agent_capability_assignments"),
     "agent_capability_assignments is the table a reader drops when they go by the ticket TITLE " +

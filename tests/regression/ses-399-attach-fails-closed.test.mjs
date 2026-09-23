@@ -69,6 +69,8 @@ export const REVERSIBLE_TABLES = [
   "backlog_items", "runner_directives", "runner_drain_scope", "runner_settings",
   "governance_rules", "epics", "vision_claims", "skill_profiles", "agents", "capabilities",
   "capability_skill_profiles", "agent_capability_assignments", "ai_activity_log", "runner_items",
+  // AGT-86 slice 1b (v7.0.543): a ruling on an audit finding is reversible.
+  "audit_findings",
 ];
 
 // The four tables the 4 non-ship decisions had actually promised over, measured at this ship. None
@@ -122,9 +124,9 @@ export const GUARDED = ["attach_before_images"];
 export const UNGUARDED_BY_DESIGN = ["record_ship_decision"];
 
 function theVocabularyIsTheTwinOfKAllowed() {
-  assert.strictEqual(REVERSIBLE_TABLES.length, 14,
-    `reversible_tables() returns fourteen names, not ${REVERSIBLE_TABLES.length}`);
-  assert.strictEqual(new Set(REVERSIBLE_TABLES).size, 14, "the vocabulary carries a duplicate name");
+  assert.strictEqual(REVERSIBLE_TABLES.length, 15,
+    `reversible_tables() returns fifteen names, not ${REVERSIBLE_TABLES.length}`);
+  assert.strictEqual(new Set(REVERSIBLE_TABLES).size, 15, "the vocabulary carries a duplicate name");
   assert.deepStrictEqual([...REVERSIBLE_TABLES].sort(), [...K_ALLOWED].sort(),
     "reversible_tables() and reverse_decision()'s k_allowed have DRIFTED APART. The whole point of " +
     "the guard is that the list it refuses by is the list the restore actually replays -- two lists " +
@@ -315,7 +317,7 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "the live arms: public.reversible_tables() resolvable and returning the fourteen names this " +
+      "the live arms: public.reversible_tables() resolvable and returning the fifteen names this " +
         "file asserts, attach_before_images() resolvable at its UNCHANGED (uuid, uuid[]) identity " +
         "list with a misspelled-argument control (the second-overload detector), its two " +
         "pre-existing guards each pinned by the message it returns, and the write-free-ness of all " +
@@ -344,7 +346,7 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
   assert.deepStrictEqual([...live].sort(), [...REVERSIBLE_TABLES].sort(),
     "the DEPLOYED reversible_tables() and this file's list disagree. Whichever is right, the guard " +
     "is refusing by a vocabulary nobody here has checked");
-  assert.strictEqual(live.length, 14, `the deployed vocabulary has ${live.length} names, not 14`);
+  assert.strictEqual(live.length, 15, `the deployed vocabulary has ${live.length} names, not 15`);
 
   // 2. THE IDENTITY ARGUMENT LIST IS UNCHANGED. SES-399 did CREATE OR REPLACE on the exact
   //    (uuid, uuid[]) list, so a two-argument call by name must still resolve. A retyped or
@@ -410,32 +412,35 @@ export default async function run() {
     "attach_before_images() is a WRITER: it sets decision_id on live runner_before_images rows. A " +
       "permanent regression test must never do that on the live ledger (the SES-196 / SES-218 / " +
       "SES-275 refusal), and this suite reaches Supabase only over PostgREST, which cannot read " +
-      "pg_proc and cannot open a transaction to roll a fixture back. MEASURED AT THIS SHIP INSTEAD, " +
-      "live over the MCP, inside DO blocks with every fixture rolled back and every count re-read " +
-      "afterwards. pg_proc at this ship, asserted by the migration's own trailing DO block rather " +
-      "than by its success flag AND re-read independently afterwards: EXACTLY 1 overload each of " +
-      "public.attach_before_images (identity argument list still 'p_decision uuid, p_image_ids " +
-      "uuid[]', UNCHANGED, so no DROP was owed), public.reverse_decision ('p_decision uuid, " +
-      "p_actor text, p_reason text, p_actor_cycle uuid') and public.reversible_tables (no " +
-      "arguments); cardinality 14; all fourteen names present as quoted literals in " +
-      "reverse_decision's prosrc. " +
-      "THE REFUSAL ARM, one fixture decision plus two unattached images (one backlog_items, one " +
-      "runner_ladder), run against BOTH builds. PRE-CHANGE, before the migration: the identical " +
-      "call RETURNED 2, attached both, and left 0 images unattached -- the red. POST-CHANGE: it " +
-      "RAISED 'attach_before_images: refusing the whole batch -- reverse_decision() cannot restore " +
-      "<image id> (runner_ladder). Nothing was attached, not even the restorable images.', and the " +
-      "re-read showed 2 images STILL decision_id IS NULL and 0 rows written -- which is what proves " +
-      "it refuses the whole call rather than skipping the bad row. " +
-      "THE NEGATIVE CONTROL, the same shape with the backlog_items image alone: attach returned 1, " +
-      "and reverse_decision(<dec>, 'SES-399 QA', 'control') returned outcome 'applied' with " +
-      "restored 1, restored_unverified 0, refused 0, refused_written_since 0, and the fixture " +
-      "ticket's title back at its imaged value 'ORIGINAL TITLE'. Identical to the pre-change " +
-      "behaviour, which is the point of the arm. " +
-      "THE VOCABULARY ARM: for each of the 14 names reversible_tables() returns, a fixture image " +
-      "over that table attached -- 14 attached, 14 expected, 0 refusals. " +
-      "ZERO RESIDUE on re-read after rollback, every count identical to the pre-test read: " +
-      "runner_before_images 7085, runner_decisions 784, backlog_items 917, and no row matching any " +
-      "ses-399-qa / ZZZ-399 / ses399-fx fixture name.",
+      "pg_proc and cannot open a transaction to roll a fixture back. MEASURED AT AGT-86 SLICE 1b " +
+      "(v7.0.543) INSTEAD, live over the MCP, inside DO blocks ending in RAISE so every fixture " +
+      "rolled back, and every count re-read afterwards. pg_proc at this ship, asserted by migration " +
+      "agt86_s1b_reversible_audit_findings's own trailing DO block rather than by its success flag " +
+      "AND re-read independently afterwards: EXACTLY 1 overload each of public.reverse_decision " +
+      "('p_decision uuid, p_actor text, p_reason text, p_actor_cycle uuid', CREATE OR REPLACE on the " +
+      "identical list from its live pg_get_functiondef, so no DROP was owed) and " +
+      "public.reversible_tables (no arguments); cardinality 15 with audit_findings last; all fifteen " +
+      "names present as quoted literals in reverse_decision's prosrc; EXECUTE anon false, " +
+      "authenticated false, service_role true on both. " +
+      "THE ATTACH ARM, one audit_findings fixture (fingerprint agt-86b-qa), a record_decision() " +
+      "directive and one before-image of the fixture, run against BOTH builds. PRE-CHANGE, before " +
+      "the migration: attach_before_images(dec, [img]) RAISED 'attach_before_images: refusing the " +
+      "whole batch -- reverse_decision() cannot restore <image id> (audit_findings). Nothing was " +
+      "attached, not even the restorable images.' -- the red. POST-CHANGE: it RETURNED 1. " +
+      "RULE, THEN REVERSE: the fixture ruled status 'ticketed', ruling/ruled_by/ruled_at/" +
+      "filed_backlog_id 'SES-0'/john_call 'money' (the guard allowed it); reverse_decision(dec, " +
+      "'agt-86b-qa', 'control') returned outcome 'applied', restored 0, restored_unverified 1, " +
+      "refused 0, refused_written_since 0, and the re-read showed status 'open' with ruling, " +
+      "ruled_by, ruled_at, filed_backlog_id and john_call all NULL and every immutable column " +
+      "unchanged. " +
+      "THE INSERT-IMAGE CONTROL, a second decision with a row_data NULL image of the same finding: " +
+      "attach returned 1; reverse returned refused 1, restored_unverified 0, restored 0, first " +
+      "refusal 'audit_findings is append-only (AGT-70): delete refused' -- the ledger guard, not the " +
+      "allowlist -- and the finding row still existed. " +
+      "ZERO RESIDUE on re-read after rollback: audit_findings 6, runner_decisions 898, " +
+      "runner_before_images unchanged by the QA (8847 -- the one row over the 8846 pre-read is " +
+      "capture_migration_down()'s own image of this ship's down, written before the QA ran), and no " +
+      "agt-86b-qa row in audit_findings, runner_decisions or runner_before_images.",
   );
 }
 
