@@ -1,3 +1,7 @@
+// DeepBench v7.0.554 | tests/regression/agt-86b-audit-review.test.mjs | AGT-86 slice 9b -- arm R re-pinned:
+// the nine INSERT before-images are counted under 2a's seed decision (aefd0627), since 9b's reversible edit
+// of dm-audit-review-intent adds a tenth, UPDATE image on the same row under its own decision.
+//
 // DeepBench v7.0.546 | tests/regression/agt-86b-audit-review.test.mjs | AGT-86 slice 2a
 //
 // FEATURE: AGT-86 slice 2a -- The Development Manager gains the review-audit-worklist capability (its
@@ -52,6 +56,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const CAPABILITY = "review-audit-worklist";
 const INTENT = "dm-audit-review-intent";
 const AGENT = "devmanager";
+const SEED_DECISION = "aefd0627-f371-469d-a0a1-0fbac32db4bf"; // 2a's seed decision: the nine INSERT images
 const LINKS = ["dm-identity", "dm-knowledge-platform", "dm-behavior", INTENT, "dm-guardrails", "dm-knowledge-patterns"];
 const WEEK = "2026-W37";
 const SESSION_TAG = "agt-86b-qa";
@@ -222,7 +227,9 @@ async function run() {
     assert.equal(intent.llm_model, lane.model_id, "the Intent's llm_model must be the orchestrator lane's (the manager's lane)");
 
     const pks = [caps[0].id, assigns[0].id, intent.id, ...links.map(l => l.id)];
-    const imgs = await get(`runner_before_images?pk_value=in.(${pks.join(",")})&select=pk_value,table_name,row_data,decision_id,session_name`);
+    // Re-pinned v7.0.554 (AGT-86 slice 9b): later reversible edits of these rows add their own UPDATE images
+    // (9b's intent-row edit, decision cd942b73), so the nine INSERT images are counted under 2a's decision.
+    const imgs = await get(`runner_before_images?pk_value=in.(${pks.join(",")})&decision_id=eq.${SEED_DECISION}&select=pk_value,table_name,row_data,decision_id,session_name`);
     assert.equal(imgs.length, 9, `nine INSERT before-images, one per new row; got ${imgs.length}`);
     assert.deepEqual([...new Set(imgs.map(i => i.pk_value))].sort(), [...pks].sort(), "every image's pk_value is a live new row");
     assert.ok(imgs.every(i => i.row_data === null), "an INSERT's image is row_data NULL (its undo is a DELETE)");

@@ -1,3 +1,11 @@
+// DeepBench v7.0.554 | scripts/audit-review.js | AGT-86 slice 9b -- the manager ACTS on 9a's flags:
+// --prepare adds `checklist` (the au-* rows the manager may edit: EDITABLE_SLUG, each with objective and
+// method as they read today); validateReview() gains the four checklist-edit refusals of
+// apply_audit_review() in the function's place -- after the groups-non-empty check, before the per-group
+// loop -- with the same texts; --apply sends checklist_edits in p_review. The function owns the edit's
+// write and before-image under the review's one reversible decision; this file still writes no table.
+// Spec: docs/harvests/AGT-86.md sections 16.5 and 16.10; kickoff docs/kickoffs/v7.0.554-AGT-86-s9b-checklist-edits.md.
+//
 // DeepBench v7.0.553 | scripts/audit-review.js | AGT-86 slice 9a -- --prepare adds the per-check scorecard
 // (public.audit_check_scorecard) and two deterministic flags: flagChecks() marks a check 'tighten' when its
 // last three weeks hold >= 3 rulings at a false-alarm rate >= 0.5; promotableOthers() names an `other`
@@ -46,6 +54,8 @@ export const JOHN_CALLS = Object.freeze({
 export const KINDS = Object.freeze(["root-cause", "cleanup", "not-a-defect", "carry", "escalate"]);
 export const WEEK_RE = /^\d{4}-W\d{2}$/;
 export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)";
+// AGT-86 §11(5): the checklist rows the manager may edit. au-identity and au-guardrails are John's.
+export const EDITABLE_SLUG = /^au-(behavior|knowledge-homes|[a-z-]+-intent)$/;
 
 const blank = v => String(v ?? "").trim() === "";
 
@@ -86,7 +96,7 @@ export function promotableOthers(allRows) {
   return out.sort((x, y) => String(x.fingerprint).localeCompare(String(y.fingerprint)));
 }
 
-export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows }) {
+export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles }) {
   if (!Array.isArray(findings) || findings.length === 0) return null;
   const rows = Array.isArray(allRows) ? allRows : [];
   const worklist = findings.map(f => {
@@ -119,12 +129,17 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
       return { checks, tighten: checks.filter(c => c.flag === "tighten").map(c => c.check_slug) };
     })(),
     promotions: promotableOthers(rows),
+    checklist: (Array.isArray(profiles) ? profiles : [])
+      .filter(p => EDITABLE_SLUG.test(String(p.slug ?? "")))
+      .map(p => ({ skill_slug: p.slug, objective: p.objective, method: p.method })),
   };
 }
 
-// review = the manager's { groups, summary_for_john, patterns_applied }; worklist = the context's worklist.
-// week is optional: when given it is checked first, as the function checks p_week first.
-export function validateReview(review, worklist, week) {
+// review = the manager's { groups, summary_for_john, patterns_applied, checklist_edits? }; worklist = the
+// context's worklist. week is optional: when given it is checked first, as the function checks p_week first.
+// checklist is optional (the context's checklist): when given, an edit naming no row in it is refused, as
+// the function refuses an edit naming no skill_profiles row; offline without it that rule stays the function's.
+export function validateReview(review, worklist, week, checklist) {
   const refusals = [];
   if (week !== undefined && (week === null || !WEEK_RE.test(String(week)))) {
     refusals.push(`p_week ${week} is not an ISO week (YYYY-Www)`);
@@ -134,6 +149,30 @@ export function validateReview(review, worklist, week) {
     refusals.push("p_review.groups must be a non-empty array");
     return { ok: false, refusals };
   }
+  // 1e. checklist edits (slice 9b), in the function's place: after the groups check, before the group loop.
+  const edits = review.checklist_edits;
+  if (edits !== undefined && edits !== null) {
+    if (!Array.isArray(edits)) {
+      refusals.push("checklist_edits must be an array");
+    } else {
+      const known = Array.isArray(checklist) ? new Set(checklist.map(c => String(c.skill_slug))) : null;
+      for (const e of edits) {
+        const slug = e && typeof e === "object" ? e.skill_slug : undefined;
+        const field = e && typeof e === "object" ? e.field : undefined;
+        const shown = slug === undefined || slug === null ? "<NULL>" : String(slug);
+        if (!EDITABLE_SLUG.test(String(slug ?? ""))) {
+          refusals.push(`checklist edit to ${shown} refused: only au-behavior, au-knowledge-homes and au-*-intent rows are the manager's; au-identity and au-guardrails are John's (AGT-86 section 11(5))`);
+        } else if (known && !known.has(String(slug))) {
+          refusals.push(`checklist edit names no skill_profiles row ${shown}`);
+        } else if (field !== "method" && field !== "objective") {
+          refusals.push(`checklist edit field ${field === undefined || field === null ? "<NULL>" : field} must be method or objective`);
+        } else if (blank(e.new_text) || blank(e.reason)) {
+          refusals.push(`checklist edit to ${shown} needs new_text and reason`);
+        }
+      }
+    }
+  }
+
   const list = Array.isArray(worklist) ? worklist : [];
   const seenWeeks = new Map(list.map(w => [String(w.id), Number(w.weeks_seen) || 0]));
   const idsOf = g => (Array.isArray(g && g.finding_ids) ? g.finding_ids.map(String) : []);
@@ -197,9 +236,16 @@ function parseArgs(argv) {
   return a;
 }
 
+// Windows / Node 24: process.exit() right after a fetch can abort in libuv. Before any fetch die() exits
+// at once; after one it sets process.exitCode and unwinds with a sentinel main()'s catch swallows, so the
+// process ends on its own with the same code.
+class Exit extends Error {}
+let fetched = false;
 function die(code, msg) {
   (code === 0 ? process.stdout : process.stderr).write(msg.endsWith("\n") ? msg : msg + "\n");
-  process.exit(code);
+  if (!fetched) process.exit(code);
+  process.exitCode = code;
+  throw new Exit(String(code));
 }
 
 function readJson(p, what) {
@@ -216,6 +262,7 @@ function creds() {
 }
 
 async function rest(base, key, method, q, body) {
+  fetched = true;
   const res = await fetch(`${base}/rest/v1/${q}`, {
     method,
     headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -240,7 +287,8 @@ async function prepare(args) {
   const allRows = await get("audit_findings?select=id,fingerprint,iso_week,status,ruling,ruled_by,check_slug");
   const tickets = await get("backlog_items?source_file=eq.audit-review&status=not.in.(done,removed)&select=backlog_id,title,status,description&order=backlog_id");
   const scorecardRows = await get("audit_check_scorecard?select=*&order=check_slug,iso_week");
-  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows });
+  const profiles = await get("skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug");
+  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles });
   if (ctx === null) die(3, NOTHING_TO_REVIEW);
   const out = JSON.stringify(ctx, null, 2) + "\n";
   if (typeof args.out === "string" && args.out) {
@@ -249,7 +297,7 @@ async function prepare(args) {
   } else {
     process.stdout.write(out);
   }
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 function refuse(refusals) {
@@ -259,7 +307,7 @@ function refuse(refusals) {
 function dryRun(args) {
   const answer = readJson(args["dry-run"], "answer");
   const ctx = readJson(args.context, "context");
-  const v = validateReview(answer, ctx.worklist, ctx.week);
+  const v = validateReview(answer, ctx.worklist, ctx.week, ctx.checklist);
   if (!v.ok) refuse(v.refusals);
   die(0, "ok");
 }
@@ -279,11 +327,14 @@ async function apply(args) {
   const week = args.week;
   const answer = readJson(args.apply, "answer");
   const ctx = readJson(args.context, "context");
-  const v = validateReview(answer, ctx.worklist, week);
+  const v = validateReview(answer, ctx.worklist, week, ctx.checklist);
   if (!v.ok) refuse(v.refusals); // nothing is sent
 
   const { base, key } = creds();
-  const review = { groups: answer.groups, summary_for_john: answer.summary_for_john, patterns_applied: answer.patterns_applied };
+  const review = {
+    groups: answer.groups, summary_for_john: answer.summary_for_john, patterns_applied: answer.patterns_applied,
+    checklist_edits: answer.checklist_edits ?? [],
+  };
   const r = await rest(base, key, "POST", "rpc/apply_audit_review", {
     p_cycle_id: hasCycle ? args["cycle-id"] : null,
     p_session_name: hasSession ? args["session-name"] : null,
@@ -297,7 +348,7 @@ async function apply(args) {
   console.log(`Decision ${id} — reversible until ${chicago(expires)}: select public.reverse_decision('${id}', 'John', '<why>');`);
   console.log(`Tickets: ${Array.isArray(tickets) && tickets.length ? tickets.join(", ") : "(none)"}`);
   console.log(`Counts: ${JSON.stringify(counts ?? {})}`);
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 async function main() {
@@ -310,5 +361,9 @@ async function main() {
 
 // Importing this module for its exports must never run the CLI (SES-45).
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch(e => die(1, `audit-review: ${e.stack || e.message}`));
+  main().catch(e => {
+    if (e instanceof Exit) return;
+    process.stderr.write(`audit-review: ${e.stack || e.message}\n`);
+    process.exitCode = 1;
+  });
 }
