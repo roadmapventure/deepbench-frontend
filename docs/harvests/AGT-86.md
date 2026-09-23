@@ -90,3 +90,15 @@ pattern:8 (narrowest layer: schema + grants, no harness), pattern:17 (extend `au
 **QA shape.** The discriminating pair is the test against the doc in both mismatched directions: re-pinned test vs unchanged doc fails "expected 27, got 26"; unchanged test vs edited doc fails "expected 26, got 27". Only the pair is green. Control (iv) stays on A-26 — dropping any one row must still throw — so the Builder does not reshape the control.
 
 **Patterns applied (1c).** pattern:8, pattern:17 (the census row is the existing structure), pattern:72, pattern:90 (John's section-5 wording carried into the Why, not paraphrased into new categories), pattern:92, pattern:124, pattern:162, pattern:168.
+
+## 8. Slice 1d — session-setup.md names fifteen restorable tables (kickoff `docs/kickoffs/v7.0.545-AGT-86-s1d-session-setup-fifteen.md`, 2026-09-23)
+
+**Premise revalidated at `c021e1d9` (= origin/dev), after 1b shipped (`88dc5406`).** Live `reversible_tables()` is 15 names with `audit_findings` last; `ses-399` already pins 15 at :127-129 and :349 (1b's re-pin). `docs/runbooks/session-setup.md:415-417` still says "the fourteen `public.reversible_tables()` returns … widened 7 → 14 by `SES-364`", and `ses-399:231` grades exactly that sentence, so the doc understates the live list by one name and the test is what keeps it that way. Baseline: ses-399 green on the unchanged tree. Premise alive; the slice is the two-file re-pin §6 predicted.
+
+**What stays as "fourteen" on purpose.** session-setup.md:433 ("43 live decisions carry at least one image outside the fourteen") is SES-399's dated measurement, graded by ses-399:244 — history, not a claim about today. ses-364:366 grades a third sentence ("widened the allowlist to fourteen tables", SES-364's own act) — also history. runner-cycle.md:4720 lists the fourteen names and is slice 8's (282 bytes of headroom, and that file has its own stamp ceiling).
+
+**The stamp trap, stated so the Builder does not trip it.** session-setup.md carries exactly five header stamps and session-hygiene check 7 caps a runbook at about five, so a new stamp retires the oldest (`v7.0.426`, SES-331). The two recent precedents differ — SES-331 moved its predecessor verbatim to `docs/SESSIONS.md`, SES-388 dropped its predecessor after proving by grep that every fact it carried was already in the body. 1d follows SES-388 (two files, not three): the kickoff names the four greps (`agent-prompt.js`, `agent-log.js`, `call_source`, `{{rule:B40}}`) whose hits prove the SES-331 stamp is fully homed in §3f and §2c, and requires the counts in the new stamp. If any grep is zero, the stamp is relocated, not dropped.
+
+**QA shape.** The mismatched pair again: re-pinned test vs unchanged doc, and unchanged test vs edited doc, both fail the same clause; `everyClauseHasTeeth()` proves the re-pinned clause still has a mutation that breaks it.
+
+**Patterns applied (1d).** pattern:8, pattern:72, pattern:92, pattern:124 (the doc regex moves in the same ship as the sentence), pattern:162, pattern:163 (the last doc home of the fifteen that this session can reach within the cap), pattern:168.
