@@ -105,6 +105,15 @@
 //   --no-db         Skip every database source. Without it, credentials are required.
 //   --out=<json>    Write the statement table to that path.
 //   --detect[=json] Write the findings to that path (bare --detect prints them instead).
+//   --extra-root=<label>=<dir>  (AGT-86 slice 6, repeatable) ALSO read every *.md and *.json under
+//                   <dir>, recursively (.git and node_modules skipped), as `<label>:<rel>` statements
+//                   carrying `project: <label>`. APPENDED after the normal or --corpus half, never a
+//                   replacement; refused with --agent. Roots are flags, never hard-coded: locally
+//                   C:/Projects/claude-config and C:/Projects/interviewquestions, sibling clones in
+//                   the cloud routine. Prints `extra-root <label>: <n> statements` per root.
+//   --private-scan=<json>  (AGT-86 slice 6) run scripts/audit-private-scan.js over THIS repo's
+//                   tracked files and write {week, found_by, findings}; prints `private-scan <n>
+//                   findings`. The summary line below stays byte-identical (agt-70 test parses it).
 //
 // DETECTION ALWAYS RUNS and the printed `duplicates d` is always the real count -- the flag decides
 // where the findings GO, not whether they are computed. That is a deliberate reading: the detector
@@ -559,6 +568,34 @@ function flattenJson(rel, value, prefix, depth, out) {
   }
 }
 
+// AGT-86 slice 6 -- an EXTRA ROOT outside this repo (Claude memory, hooks, interview questions).
+// readIfPresent/globMd are ROOT-relative and non-recursive, so this walks its own absolute dir.
+// Locations are `<label>:<rel>` with forward slashes, so audit-ledger.js's locationKey() still
+// strips only the trailing `:<line>` and a finding keys to the file.
+export function walkRoot(label, dirAbs) {
+  const out = [];
+  const walk = relDir => {
+    let entries;
+    try { entries = fs.readdirSync(path.join(dirAbs, relDir), { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (e.name === ".git" || e.name === "node_modules") continue;
+      const rel = relDir ? `${relDir}/${e.name}` : e.name;
+      if (e.isDirectory()) { walk(rel); continue; }
+      if (!e.isFile()) continue;
+      let raw;
+      try { raw = fs.readFileSync(path.join(dirAbs, rel), "utf8"); } catch { continue; }
+      if (e.name.endsWith(".md")) {
+        out.push(...extractMarkdown(`${label}:${rel}`, raw));
+      } else if (e.name.endsWith(".json")) {
+        try { flattenJson(`${label}:${rel}`, JSON.parse(raw), "", 0, out); } catch { /* malformed: skipped */ }
+      }
+    }
+  };
+  walk("");
+  for (const s of out) s.project = label;
+  return out;
+}
+
 // A minimal indentation walker -- no new dependency, and the corpus only needs `key.path=value`
 // statements, never a faithful YAML object graph.
 export function extractYaml(rel, raw) {
@@ -698,6 +735,13 @@ function arg(argv, name) {
   return eq < 0 ? true : hit.slice(eq + 1);
 }
 
+// AGT-86 slice 6 -- EVERY hit of a repeatable flag, where arg() returns the first only.
+export function args(argv, name) {
+  return argv
+    .filter(a => a === `--${name}` || a.startsWith(`--${name}=`))
+    .map(a => { const eq = a.indexOf("="); return eq < 0 ? "" : a.slice(eq + 1); });
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const corpusDir = arg(argv, "corpus");
@@ -705,6 +749,26 @@ async function main() {
   const agentId = arg(argv, "agent");
 
   const statements = [];
+
+  // AGT-86 slice 6: parse and check every --extra-root BEFORE any work, so a bad root is exit 2
+  // rather than a run that silently read less than it was asked to.
+  const extraRoots = [];
+  for (const spec of args(argv, "extra-root")) {
+    const eq = spec.indexOf("=");
+    const label = eq > 0 ? spec.slice(0, eq) : "";
+    const dir = eq > 0 ? spec.slice(eq + 1) : "";
+    let isDir = false;
+    try { isDir = !!dir && fs.statSync(dir).isDirectory(); } catch { isDir = false; }
+    if (!label || !isDir) {
+      console.error(`audit-corpus: --extra-root=${spec} is not a directory (exit 2 = could not run, never a pass).`);
+      process.exit(2);
+    }
+    extraRoots.push({ label, dir: path.resolve(dir) });
+  }
+  if (extraRoots.length && typeof agentId === "string") {
+    console.error("audit-corpus: --extra-root cannot be combined with --agent=<id>, which reads one agent's database rows only (exit 2 = could not run, never a pass).");
+    process.exit(2);
+  }
 
   // --agent is a DIFFERENT corpus, not a filter over the normal one: no files, no config, no
   // script headers, and no live rule texts (a rule is not an agent's own statement, and passing
@@ -760,6 +824,23 @@ async function main() {
     }
   }
 
+  // AGT-86 slice 6: extra roots are APPENDED after either file half, never replace it.
+  const extraLines = [];
+  for (const r of extraRoots) {
+    const got = walkRoot(r.label, r.dir);
+    for (const s of got) statements.push(s);   // a large root overflows the spread-argument limit
+    extraLines.push(`extra-root ${r.label}: ${got.length} statements`);
+  }
+  const privateOut = arg(argv, "private-scan");
+  if (typeof privateOut === "string") {
+    const { scanTree } = await import("./audit-private-scan.js");
+    const { isoWeek } = await import("./audit-ledger.js");
+    const findings = scanTree(ROOT);
+    fs.mkdirSync(path.dirname(path.resolve(privateOut)), { recursive: true });
+    fs.writeFileSync(path.resolve(privateOut), JSON.stringify({ week: isoWeek(new Date()), found_by: "auditor:private-scan", findings }, null, 2), "utf8");
+    extraLines.push(`private-scan ${findings.length} findings`);
+  }
+
   let liveRuleTexts = [];
   let gate = null;
   if (!noDb) {
@@ -783,14 +864,14 @@ async function main() {
     }
   }
 
-  report(argv, statements, liveRuleTexts, gate);
+  report(argv, statements, liveRuleTexts, gate, extraLines);
 }
 
 // Both detectors run on every path -- the bare `--detect` and the `--detect=<json>` file and the
 // summary line all read the SAME two arrays, so the printed `duplicates d stale s` is always the
 // real pair. The stale finding prints as a count rather than as its locations because it carries
 // twenty-three of them live and a summary that scrolls is not a summary.
-function report(argv, statements, liveRuleTexts, gate = null) {
+function report(argv, statements, liveRuleTexts, gate = null, preLines = []) {
   const duplicates = detectDuplicates(statements, liveRuleTexts);
   const stale = detectStaleParameters(statements);
   // SES-411: `gate` is null on every path that did not read the rule register AND pg_proc
@@ -820,6 +901,7 @@ function report(argv, statements, liveRuleTexts, gate = null) {
     }
   }
 
+  for (const l of preLines) console.log(l);
   const gov = statements.filter(s => s.corpus === "governance").length;
   const agentData = statements.filter(s => s.corpus === "agent-data").length;
   const retired = statements.filter(s => s.retired).length;
