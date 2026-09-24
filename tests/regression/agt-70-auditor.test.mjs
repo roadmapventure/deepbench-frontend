@@ -1,4 +1,36 @@
+// DeepBench v7.0.576 | tests/regression/agt-70-auditor.test.mjs | AGT-107
 // DeepBench v7.0.563 | tests/regression/agt-70-auditor.test.mjs | AGT-101
+//
+// AGT-107 -- parts M and Q asserted the WHOLE audit_findings table was 6 rows. That was never the
+// claim: each part's own comment promises INVARIANCE across its own dry-run commands ("must leave
+// both exactly where it found them", "Nothing above passed --apply"). The literal 6 was a frozen
+// proxy that held only while the ledger had one week in it. Live this cycle: 65 rows (W37 6,
+// W38 25, W39 34). Both sites now snapshot before the part's first spawn and assert the delta.
+// A check grades the change, never the live world (pattern:162).
+//
+// PRE-FIX FAILURES, captured verbatim on the unchanged tree with credentials (not a notRun):
+//
+//   part M, `node tests/regression/agt-70-auditor.test.mjs` (exit 1):
+//     [FAIL] agt-70-auditor.test.mjs -- the ledger still holds exactly 6 rows; this slice ingests nothing
+//
+//     65 !== 6
+//
+//   part Q is masked by M (the file is assert-and-stop), so it was graded on its own by
+//   temporarily neutralising M's two lines. Q then failed FIRST at its own step (1), NOT at its
+//   count -- a third live-world-grading site this ticket does not cover (exit 1):
+//     [FAIL] agt-70-auditor.test.mjs -- every one of the six must be recognised as the SAME finding in a new week; got: ingest 2026-W38: 6 findings, 0 new, 4 seen, 2 recurring, 0 ruled-out
+//
+//   With step (1) also neutralised, Q's own count assertion -- the site this ticket fixes -- fails
+//   exactly as M did (exit 1):
+//     [FAIL] agt-70-auditor.test.mjs -- the ledger still holds exactly 6 rows -- every command in this part is a dry run
+//
+//     65 !== 6
+//
+// OPEN, NOT FIXED HERE: line ~1401's `/6 findings, 0 new, 0 seen, 6 recurring, 0 ruled-out/` pins
+// the W38 ingest's seen/recurring split, which is a function of what the live ledger now holds at
+// W38 (25 rows) -- the same defect class as the two counts, but a different assertion needing its
+// own design call, and outside this kickoff's §4. This file stays RED on that line until it is
+// ticketed. Q's raw `fetch` at line ~1466 is likewise left alone -- not this ticket.
 // DeepBench v7.0.469 | tests/regression/agt-70-auditor.test.mjs | AGT-70
 //
 // FEATURE: AGT-70 slice 4 -- the negative control, week two, and the Auditor audited. Parts A-M
@@ -1101,6 +1133,16 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
     return;
   }
 
+  const get = async q => {
+    const res = await fetch(`${url}/rest/v1/${q}`, { headers: restHeaders(key) });
+    if (!res.ok) throw new Error(`GET ${q} -> HTTP ${res.status}: ${await res.text().catch(() => "")}`);
+    return res.json();
+  };
+  // AGT-107 -- snapshot BEFORE this part's first spawn, so the assertions below grade this part's
+  // own commands rather than the size the live ledger happens to have reached.
+  const ledgerBefore = (await get("audit_findings?select=id")).length;
+  const filedBefore  = (await get("backlog_items?select=id&source_file=eq.audit-ledger")).length;
+
   let out = "";
   try {
     out = execFileSync(process.execPath,
@@ -1120,17 +1162,14 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
     `capLeft must be the cap minus what has filed this week; got ${json.capLeft} for ${json.filedThisWeek} of ${json.weeklyCap}`);
   assert.ok(Array.isArray(json.detections), "detections is always an array, even when empty");
 
-  const get = async q => {
-    const res = await fetch(`${url}/rest/v1/${q}`, { headers: restHeaders(key) });
-    if (!res.ok) throw new Error(`GET ${q} -> HTTP ${res.status}: ${await res.text().catch(() => "")}`);
-    return res.json();
-  };
   // THE TWO COUNTS THIS SLICE PROMISED NOT TO MOVE. The sweep is a DRY RUN by default, so running
   // it -- here, and in the QA above -- must leave both exactly where it found them.
-  assert.strictEqual((await get("audit_findings?select=id")).length, 6,
-    "the ledger still holds exactly 6 rows; this slice ingests nothing");
-  assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, 0,
-    "no board row has been filed from the ledger; --from-ledger defaults to a dry run and there is nothing ruled to file anyway");
+  // AGT-107 -- the claim is INVARIANCE, not a size. The ledger grows week on week (65 rows this
+  // cycle across W37/W38/W39); pinning it to 6 graded the live world, not this part (pattern:162).
+  assert.strictEqual((await get("audit_findings?select=id")).length, ledgerBefore,
+    `every command in this part is a dry run: the ledger must end where it started (${ledgerBefore} rows)`);
+  assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, filedBefore,
+    `no board row may be filed from the ledger by a dry run; started at ${filedBefore}`);
 }
 
 // --- N. the negative control ----------------------------------------------------------------------
@@ -1384,6 +1423,16 @@ async function weekTwoRunsAgainstTheRealLedger() {
     return;
   }
 
+  const get = async q => {
+    const r = await fetch(`${url}/rest/v1/${q}`, { headers: restHeaders(key) });
+    if (!r.ok) throw new Error(`GET ${q} -> HTTP ${r.status}`);
+    return r.json();
+  };
+  // AGT-107 -- snapshot BEFORE this part's first spawn, so (6) below grades this part's own
+  // commands rather than the size the live ledger happens to have reached.
+  const ledgerBefore = (await get("audit_findings?select=id")).length;
+  const filedBefore  = (await get("backlog_items?select=id&source_file=eq.audit-ledger")).length;
+
   const spawn = (script, args) => execFileSync(process.execPath, [path.join(ROOT, "scripts", script), ...args],
     { encoding: "utf8", cwd: ROOT });
 
@@ -1492,15 +1541,12 @@ async function weekTwoRunsAgainstTheRealLedger() {
   }
 
   // (6) THE TWO COUNTS. Nothing above passed --apply, so the ledger and the board are untouched.
-  const get = async q => {
-    const r = await fetch(`${url}/rest/v1/${q}`, { headers: restHeaders(key) });
-    if (!r.ok) throw new Error(`GET ${q} -> HTTP ${r.status}`);
-    return r.json();
-  };
-  assert.strictEqual((await get("audit_findings?select=id")).length, 6,
-    "the ledger still holds exactly 6 rows -- every command in this part is a dry run");
-  assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, 0,
-    "and no board row has been filed from the ledger");
+  // AGT-107 -- the claim is INVARIANCE, not a size. The ledger grows week on week (65 rows this
+  // cycle across W37/W38/W39); pinning it to 6 graded the live world, not this part (pattern:162).
+  assert.strictEqual((await get("audit_findings?select=id")).length, ledgerBefore,
+    `every command in this part is a dry run: the ledger must end where it started (${ledgerBefore} rows)`);
+  assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, filedBefore,
+    `no board row may be filed from the ledger by a dry run; started at ${filedBefore}`);
 }
 
 export async function run() {
