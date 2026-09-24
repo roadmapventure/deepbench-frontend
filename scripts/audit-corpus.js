@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.562 | scripts/audit-corpus.js | AGT-100 -- --extra-root reads GIT-TRACKED files only.
+// walkRoot() below lists its root with trackedFiles() (scripts/audit-private-scan.js, the one shared
+// core) and reads only what git tracks there; the working interviewquestions folder had been handing
+// the review 134,274 statements out of one untracked 6.8 MB ledger against 25 tracked .md files. A
+// root that is NOT a git checkout keeps the old disk walk unchanged.
+//
 // DeepBench v7.0.528 | scripts/audit-corpus.js | AGT-70 / SES-411
 // FEATURE: SES-422 slice 3 (SES-411) -- the THIRD deterministic detector: a rule read against the
 // function that actually enforces it.
@@ -105,10 +111,13 @@
 //   --no-db         Skip every database source. Without it, credentials are required.
 //   --out=<json>    Write the statement table to that path.
 //   --detect[=json] Write the findings to that path (bare --detect prints them instead).
-//   --extra-root=<label>=<dir>  (AGT-86 slice 6, repeatable) ALSO read every *.md and *.json under
-//                   <dir>, recursively (.git and node_modules skipped), as `<label>:<rel>` statements
-//                   carrying `project: <label>`. APPENDED after the normal or --corpus half, never a
-//                   replacement; refused with --agent. Roots are flags, never hard-coded: locally
+//   --extra-root=<label>=<dir>  (AGT-86 slice 6, repeatable) ALSO read <dir>'s *.md and *.json as
+//                   `<label>:<rel>` statements. AGT-100: a root that IS a git checkout contributes its
+//                   GIT-TRACKED *.md/*.json only (`git ls-files`) -- an untracked or ignored file is
+//                   never read; a root that is not a checkout is walked on disk as before, recursively,
+//                   .git and node_modules skipped. Every statement carries `project: <label>`, and the
+//                   root is APPENDED after the normal or --corpus half, never a replacement; refused
+//                   with --agent. Roots are flags, never hard-coded: locally
 //                   C:/Projects/claude-config and C:/Projects/interviewquestions, sibling clones in
 //                   the cloud routine. Prints `extra-root <label>: <n> statements` per root.
 //   --private-scan=<json>  (AGT-86 slice 6) run scripts/audit-private-scan.js over THIS repo's
@@ -131,6 +140,7 @@ import { createHash } from "crypto";
 import { fileURLToPath } from "url";
 import { RETIREMENT_VOCAB, enclosingParagraph, PROCEDURE_GENERATED_DOCS } from "./check-session-docs.js";
 import { normalize, locationKey } from "./audit-ledger.js";
+import { trackedFiles } from "./audit-private-scan.js";
 import { supportsTemperature, NO_TEMPERATURE_PREFIXES } from "../shared/models.js";
 import { REASONS } from "../tests/regression/ses-297-pre-boot-pickability.test.mjs";
 
@@ -574,24 +584,40 @@ function flattenJson(rel, value, prefix, depth, out) {
 // strips only the trailing `:<line>` and a finding keys to the file.
 export function walkRoot(label, dirAbs) {
   const out = [];
-  const walk = relDir => {
-    let entries;
-    try { entries = fs.readdirSync(path.join(dirAbs, relDir), { withFileTypes: true }); } catch { return; }
-    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (e.name === ".git" || e.name === "node_modules") continue;
-      const rel = relDir ? `${relDir}/${e.name}` : e.name;
-      if (e.isDirectory()) { walk(rel); continue; }
-      if (!e.isFile()) continue;
-      let raw;
-      try { raw = fs.readFileSync(path.join(dirAbs, rel), "utf8"); } catch { continue; }
-      if (e.name.endsWith(".md")) {
-        out.push(...extractMarkdown(`${label}:${rel}`, raw));
-      } else if (e.name.endsWith(".json")) {
-        try { flattenJson(`${label}:${rel}`, JSON.parse(raw), "", 0, out); } catch { /* malformed: skipped */ }
-      }
+  const take = rel => {
+    let raw;
+    // A directory (a submodule entry in `git ls-files`) or an unreadable file throws here and skips.
+    try { raw = fs.readFileSync(path.join(dirAbs, rel), "utf8"); } catch { return; }
+    if (rel.endsWith(".md")) {
+      out.push(...extractMarkdown(`${label}:${rel}`, raw));
+    } else if (rel.endsWith(".json")) {
+      try { flattenJson(`${label}:${rel}`, JSON.parse(raw), "", 0, out); } catch { /* malformed: skipped */ }
     }
   };
-  walk("");
+  // AGT-100: a root that is a git checkout contributes its TRACKED files only. An extra root is a
+  // working folder, not a clean export -- the interviewquestions root's untracked local ledger alone
+  // outweighed its 25 tracked .md files by three orders of magnitude, and a statement git never
+  // tracked is not the project's governance. trackedFiles() throws rather than guess (fail closed);
+  // null means "not a checkout", the only case that keeps the disk walk below.
+  const tracked = trackedFiles(dirAbs);
+  if (tracked !== null) {
+    for (const rel of tracked) {             // already sorted, forward-slash, relative to dirAbs
+      if (rel.endsWith(".md") || rel.endsWith(".json")) take(rel);
+    }
+  } else {
+    const walk = relDir => {
+      let entries;
+      try { entries = fs.readdirSync(path.join(dirAbs, relDir), { withFileTypes: true }); } catch { return; }
+      for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+        if (e.name === ".git" || e.name === "node_modules") continue;
+        const rel = relDir ? `${relDir}/${e.name}` : e.name;
+        if (e.isDirectory()) { walk(rel); continue; }
+        if (!e.isFile()) continue;
+        take(rel);
+      }
+    };
+    walk("");
+  }
   for (const s of out) s.project = label;
   return out;
 }
@@ -827,7 +853,14 @@ async function main() {
   // AGT-86 slice 6: extra roots are APPENDED after either file half, never replace it.
   const extraLines = [];
   for (const r of extraRoots) {
-    const got = walkRoot(r.label, r.dir);
+    let got;
+    try {
+      got = walkRoot(r.label, r.dir);
+    } catch (e) {
+      // AGT-100: git itself failed on this root. Never a silent disk walk, never a short count.
+      console.error(`audit-corpus: --extra-root=${r.label}: could not list tracked files (${e.message.split("\n")[0]}) (exit 2 = could not run, never a pass).`);
+      process.exit(2);
+    }
     for (const s of got) statements.push(s);   // a large root overflows the spread-argument limit
     extraLines.push(`extra-root ${r.label}: ${got.length} statements`);
   }

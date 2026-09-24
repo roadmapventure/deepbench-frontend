@@ -11,6 +11,11 @@
 //      carrying project "claude-config", every statement of a plain run is still present, and the
 //      per-root line and the unchanged summary line print. Pre-change: no `claude-config:` location.
 //   B  MISSING ROOT -- exit 2 naming the flag. Pre-change: the unknown flag is ignored and exits 0.
+//   G  TRACKED ONLY (AGT-100) -- an extra root that IS a git checkout contributes its git-tracked
+//      *.md/*.json only: the walker and the CLI both report the 2 tracked files, and the untracked
+//      notes.md, the ignored ignored.md and the untracked spend/lookups.json never appear. Arm A's
+//      non-checkout root still reads 2 statements off the disk. Pre-change (measured, unchanged tree):
+//      walkRoot returned all 5 files and the CLI printed `extra-root iq: 5 statements`.
 //   C  DETECTORS + ALLOWLIST -- planted fakes flagged, known-safe shapes not, no planted value in any
 //      finding. Pre-change: the import fails; without the allowlist the sb_publishable_ line is flagged.
 //   D  AGGREGATE -- 26 hits of one detector -> 1 finding at audit-private/<detector>; 25 -> 25; two
@@ -29,6 +34,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { walkRoot } from "../../scripts/audit-corpus.js";   // main() is argv-guarded; importing runs nothing
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CORPUS = path.join(ROOT, "scripts", "audit-corpus.js");
@@ -94,6 +100,53 @@ export default async function run() {
       assert.match(r.stderr, /--extra-root=claude-config=.* is not a directory/, `stderr names the flag; got ${r.stderr}`);
       const withAgent = node([`--agent=auditor`, `--extra-root=claude-config=${tmp}`]);
       assert.equal(withAgent.status, 2, "--extra-root with --agent refused (exit 2)");
+    });
+
+    // --- G. tracked only --------------------------------------------------------------------------
+    await arm("G tracked-only", async () => {
+      if (spawnSync("git", ["--version"], { encoding: "utf8" }).error) {
+        notRun("AGT-86f arm G (tracked-only root)", "git not on PATH -- the tracked-only listing cannot be exercised here");
+        return;
+      }
+      const dir = path.join(tmp, "iq");   // a SIBLING of arm A's cfg, never nested inside it
+      fs.mkdirSync(path.join(dir, "spend"), { recursive: true });
+      const git = (...args) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+      assert.equal(git("init", "-q").status, 0, "fixture: git init");
+      const para = "The Auditor reads memory files as well as this repository, so a rule stated only in memory is still inside the weekly full review scope.";
+      fs.writeFileSync(path.join(dir, "rules.md"), `${para}\n`);
+      fs.writeFileSync(path.join(dir, "data.json"), JSON.stringify({ bank: "tracked" }));
+      fs.writeFileSync(path.join(dir, ".gitignore"), "ignored.md\n");
+      fs.writeFileSync(path.join(dir, "ignored.md"), `${para}\n`);
+      fs.writeFileSync(path.join(dir, "notes.md"), `${para}\n`);
+      fs.writeFileSync(path.join(dir, "spend", "lookups.json"), JSON.stringify({ lookups: { acme: "Acme Corp" } }));
+      assert.equal(git("add", "rules.md", "data.json", ".gitignore").status, 0, "fixture: git add");
+      assert.equal(git("-c", "user.name=agt86f", "-c", "user.email=agt86f@example.invalid", "commit", "-qm", "fixture").status, 0,
+        "fixture: git commit");
+
+      // (a) the walker itself reads the tracked two and nothing else. Pre-change it read all five.
+      const got = walkRoot("iq", dir);
+      const files = [...new Set(got.map(s => s.location.split(":")[1]))].sort();
+      assert.deepEqual(files, ["data.json", "rules.md"], `tracked files only; got ${files.join(", ") || "(none)"}`);
+      assert.ok(got.length >= 2, `at least one statement per tracked file; got ${got.length}`);
+      assert.ok(got.every(s => s.project === "iq"), "every tracked-only statement carries project iq");
+
+      // (b) the real CLI path agrees, and no untracked or ignored location reaches the out rows.
+      const outG = path.join(tmp, "tracked.json");
+      const r = node(["--no-db", `--extra-root=iq=${dir}`, `--out=${outG}`]);
+      assert.equal(r.status, 0, `tracked-only run exits 0; stderr ${r.stderr}`);
+      const m = r.stdout.match(/^extra-root iq: (\d+) statements$/m);
+      assert.ok(m, `per-root line printed; stdout ${r.stdout}`);
+      assert.equal(Number(m[1]), got.length, `the printed count is the tracked-only count (${got.length})`);
+      const rowsG = JSON.parse(fs.readFileSync(outG, "utf8"));
+      for (const bad of ["iq:notes.md", "iq:ignored.md", "iq:spend/"]) {
+        assert.ok(!rowsG.some(s => s.location.startsWith(bad)), `${bad} is never read (untracked or ignored)`);
+      }
+
+      // (c) a root that is NOT a checkout keeps the disk walk -- the fix narrows git roots only.
+      const scanG = await import("../../scripts/audit-private-scan.js");
+      assert.equal(scanG.trackedFiles(path.join(tmp, "cfg")), null, "a non-checkout root has no tracked listing");
+      assert.equal(walkRoot("claude-config", path.join(tmp, "cfg")).length, 2,
+        "arm A's non-git root still yields its 2 statements");
     });
 
     // --- C. detectors + allowlist -----------------------------------------------------------------

@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.562 | scripts/audit-private-scan.js | AGT-100 -- trackedFiles() is THE tracked-file
+// listing, and now the SHARED CORE: scanTree() below and walkRoot() in scripts/audit-corpus.js both
+// mean "the files git tracks under this root", and two walkers answering that question separately
+// drift. One core, two callers. Kickoff: docs/kickoffs/v7.0.562-AGT-100-extra-root-tracked-only.md.
+//
 // DeepBench v7.0.550 | scripts/audit-private-scan.js | AGT-86 slice 6
 // FEATURE: AGT-86 slice 6 -- the private-info scan. The Auditor's full review reads THIS repo, and
 // this repo is public: a credential, a personal address or a home-directory path in a tracked file
@@ -33,7 +38,7 @@
 
 import fs from "fs";
 import path from "path";
-import { execFileSync } from "child_process";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -176,10 +181,28 @@ export function aggregate(hits) {
   return findings;
 }
 
-// Tracked files only (`git ls-files -z`), binary skipped by a NUL byte in the first 8 KB.
+// AGT-100 -- the paths `git ls-files -z` reports under rootAbs: relative to it, forward-slash, already
+// sorted, ignored and untracked files absent, a tracked .gitignore present. Returns null for the ONE
+// condition a caller may read as "there is no tracked listing here" -- rootAbs is not a git checkout.
+// EVERY OTHER git failure THROWS, and that is the load-bearing half: a caller that fell back to a disk
+// walk because git errored would read exactly the untracked files this function exists to exclude, so
+// it fails closed (git missing, a permissions error, a broken index are all raised, never swallowed).
+export function trackedFiles(rootAbs) {
+  const r = spawnSync("git", ["-C", rootAbs, "ls-files", "-z"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (r.error) throw r.error;
+  if (r.status !== 0) {
+    if (/not a git repository/i.test(r.stderr ?? "")) return null;
+    throw new Error(String(r.stderr ?? "").split("\n")[0] || `git ls-files exited ${r.status}`);
+  }
+  return r.stdout.split("\0").filter(Boolean);
+}
+
+// Tracked files only (trackedFiles(), `git ls-files -z`), binary skipped by a NUL byte in the first 8 KB.
 export function scanTree(rootAbs = ROOT) {
-  const listed = execFileSync("git", ["-C", rootAbs, "ls-files", "-z"], { maxBuffer: 64 * 1024 * 1024 });
-  const rels = listed.toString("utf8").split("\0").filter(Boolean);
+  const rels = trackedFiles(rootAbs);
+  // THIS repo is always a checkout, so null is a broken invocation, never a reason to scan the disk:
+  // main()'s catch turns it into the exit-2 "could not run" line, never a clean "0 findings".
+  if (rels === null) throw new Error("not a git checkout");
   const hits = [];
   for (const rel of rels) {
     let buf;
