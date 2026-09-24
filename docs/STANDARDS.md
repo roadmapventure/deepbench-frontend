@@ -629,6 +629,8 @@ Every agent added to `src/data/agents.js` MUST include ALL of the following fiel
 
 **Mechanized 2026-07-21 (`SES-010`).** `node scripts/check-model-ids.js` sweeps `api/`, `lib/`, and `src/` for this exact pattern — flags any short-form id used as a value (not a `MODEL_ID_NORMALIZE`-style lookup key), CRITICAL for server-side (a possible real API-call bug, not just a logging one), WARNING for client-side. Run before commit on any session touching a `model:` field. First run (2026-07-21) found live, pre-existing violations: `api/brief.js` and `lib/agent-run.js` both pass `"claude-sonnet-4-5"` as a real server-side call value, and `src/contexts/FetchContext.jsx`'s `logAICall()` call site uses `"claude-haiku-4-5"`. Not fixed by this session — flagged for whoever picks up the fix.
 
+**The companion check, mechanized 2026-09-24 (`AGT-90`).** `node scripts/check-skill-model-params.js` reads the live `skill_profiles` rows and fails when one stores a call parameter the model family it names rejects — today, a non-NULL `temperature` on a family listed in `shared/models.js` `NO_TEMPERATURE_PREFIXES`, which it reads from that constant rather than restating the prefix (a literal would keep printing PASS the day a second family is added). Pinned by `tests/regression/agt-90-fable-temperature.test.mjs`; exit 1 covers both a real violation and a missing env var, never a silent pass.
+
 **Why:** The AI Audit panel groups by model string. Short-form and full-version IDs produce two separate rows for the same model, splitting cost and call counts. An AI Transparency screen with fragmented model data or "Unknown provider" labels fails its purpose.
 
 ### SERVICE_CATALOG roadmap field rule
