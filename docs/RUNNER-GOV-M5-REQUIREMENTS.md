@@ -480,7 +480,9 @@ gates and no ordinary member.
 
 **What `c_flagged` now holds: `ARRAY['needs-desktop']`, and nothing else.** It is declared identically
 in `drain_epic_next` and `drain_chain_gate`, and spelled inline in `prime_directive_queue`'s
-`buildable` CTE. Two entries left:
+`buildable` CTE. **Since `AGT-88` (v7.0.580) the value has one home, `public.pick_blocking_flags()`:
+`drain_chain_gate`'s `c_flagged` and `prime_directive_queue`'s `buildable` CTE read it; `drain_epic_next`
+keeps its own identical copy until `AGT-109` (registry `OD-09`).** Two entries left:
 
 - `'needs-john'` was retired outright by `M6-01` (`SES-285`, `v7.0.359`); no ticket can be in it.
 - `'john-paced'` was **the human gate that migration missed** — it matched on the string

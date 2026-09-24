@@ -91,28 +91,28 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-07"></a>OD-07 — The filing-lane cut date
 
-> The filing-lane boundary is the literal date 2026-08-21, and it is written three separate times — `public.recompute_backlog_queue()`, `public.prime_directive_queue()`'s `buildable` CTE, and `public.drain_epic_next()`'s `c_lane_cut` constant — with no column, setting or single constant behind any of them; canonical: those three function bodies, jointly.
+> The filing-lane boundary is one stored date, `runner_settings.filing_lane_cutoff` (default and live value 2026-08-21), read by `public.recompute_backlog_queue()` and by `public.prime_directive_queue()`'s `buildable` CTE and lane sort since AGT-88; `public.drain_epic_next()` still spells the date itself — its `c_lane_cut` constant plus two inline copies — until AGT-109 re-points it; canonical: `runner_settings.filing_lane_cutoff`.
 
 - **Enforcement:** `script`
-- **Lives in:** `public.recompute_backlog_queue()`, `public.prime_directive_queue()`, `public.drain_epic_next()`.
+- **Lives in:** `public.runner_settings.filing_lane_cutoff` (AGT-88), read by `public.recompute_backlog_queue()` and `public.prime_directive_queue()`; `public.drain_epic_next()` keeps three copies until AGT-109.
 - **Pinned by:** `tests/regression/ses-295-scope-rationale-promotion.test.mjs` reads the date; nothing asserts the three copies agree.
-- **Judgment:** **amend.** Three hand-copied literals of one governing fact is exactly what G2 forbids. Proposal 8 in the batch.
+- **Judgment:** **amend.** Three hand-copied literals of one governing fact is exactly what G2 forbids. Proposal 8 in the batch. **AGT-88 (v7.0.580) gave it one home; two of three consumers read it, `drain_epic_next` follows in AGT-109.**
 
 ### <a id="OD-08"></a>OD-08 — The claim expiry
 
-> A ticket claim goes stale after 24 hours, written as the interval literal `INTERVAL '24 hours'` in both `public.prime_directive_queue()` and `public.drain_epic_next()`, so a dead session can never strand a ticket permanently; canonical: those two function bodies.
+> A ticket claim goes stale after `runner_settings.claim_stale_hours` hours (default and live value 24), read by `public.prime_directive_queue()` since AGT-88, so a dead session can never strand a ticket permanently; `public.drain_epic_next()` (twice) and `public.backlog_mode()` still carry the literal `INTERVAL '24 hours'` until AGT-109 re-points them; canonical: `runner_settings.claim_stale_hours`.
 
 - **Enforcement:** `script`
-- **Lives in:** `public.prime_directive_queue()` and `public.drain_epic_next()`, `b.claimed_at < now() - INTERVAL '24 hours'`.
+- **Lives in:** `public.runner_settings.claim_stale_hours` (AGT-88), read by `public.prime_directive_queue()`; `public.drain_epic_next()` and `public.backlog_mode()` keep `INTERVAL '24 hours'` until AGT-109.
 - **Pinned by:** `tests/regression/ses-84-claims-classed.test.mjs`.
 - **Judgment:** **keep.** G1: without an expiry a crashed cycle stops the loop, and the loop is the deliverable. Two copies, but they are the same two functions OD-05/OD-06 already require to agree.
 
 ### <a id="OD-09"></a>OD-09 — The one design_status that still blocks
 
-> Exactly one `design_status` value blocks a pick — `needs-desktop`, a physical constraint about a machine John has — and the array holding it is deliberately kept identical in `public.drain_epic_next()` and `public.drain_chain_gate()`; `needs-john` was retired by M6-01 and `john-paced` was converted, because blocking on a human judgment is what M6-01 forbids; canonical: the `c_flagged` constant in those two functions.
+> Exactly one `design_status` value blocks a pick — `needs-desktop`, a physical constraint about a machine John has — and since AGT-88 it has one home, `public.pick_blocking_flags()`, which `public.drain_chain_gate()`'s `c_flagged` and `public.prime_directive_queue()`'s `buildable` CTE both read; `public.drain_epic_next()` still declares its own identical `c_flagged` array until AGT-109; `needs-john` was retired by M6-01 and `john-paced` was converted, because blocking on a human judgment is what M6-01 forbids; canonical: `public.pick_blocking_flags()`.
 
 - **Enforcement:** `script`
-- **Lives in:** `public.drain_epic_next()` and `public.drain_chain_gate()`, `c_flagged constant text[] := ARRAY['needs-desktop']`.
+- **Lives in:** `public.pick_blocking_flags()` (AGT-88), read by `public.drain_chain_gate()` and `public.prime_directive_queue()`; `public.drain_epic_next()` keeps `c_flagged constant text[] := ARRAY['needs-desktop']` until AGT-109.
 - **Pinned by:** `tests/regression/ses-285-m6-autonomy.test.mjs`.
 - **Judgment:** **keep.** G5 in one line: the only thing allowed to pace the runner is physics, not a pending opinion.
 
@@ -167,12 +167,12 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-15"></a>OD-15 — The scheduler gate's fail-open constants
 
-> `public.scheduler_gate()` re-states each pacing default as its own COALESCE literal — `scheduler_on` true, `interval_hours` 3, `cron_minute` 40, `grid_tolerance_min` 10 — and additionally clamps a sub-1 interval up to 1 to guard its own modulo; the literals are a second copy of the column defaults they shadow; canonical: `public.scheduler_gate()`.
+> `public.scheduler_gate()` reads each pacing value straight from its OD-14 home — `runner_settings.scheduler_on`, `runner_settings.interval_hours`, `runner_settings.cron_minute`, `runner_settings.grid_tolerance_min` — with no COALESCE literal of its own (AGT-88 retired the four shadows true, 3, 40, 10, which the NOT NULL column defaults made unreachable), raises instead of guessing when the settings row is missing, and still clamps a sub-1 interval up to 1 to guard its own modulo; canonical: `public.scheduler_gate()`, as a reader of OD-14.
 
 - **Enforcement:** `script`
 - **Lives in:** `public.scheduler_gate()`.
 - **Pinned by:** none.
-- **Judgment:** **retire.** Failing open is right and stays; the duplicated numbers are the thing to retire, because the columns already carry live, green defaults. Proposal 7.
+- **Judgment:** **retire.** Failing open is right and stays; the duplicated numbers are the thing to retire, because the columns already carry live, green defaults. Proposal 7. **Done by AGT-88 (v7.0.580):** the four literals are gone and a missing settings row now fails closed; the sub-1 clamp stays.
 
 ### <a id="OD-16"></a>OD-16 — What counts as a manual fire
 
