@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v7.0.583 | scripts/market-agent.js | AGT-121 -- the call path for a market-lane agent run
+// DeepBench v7.0.583 | scripts/market-agent.js | AGT-121 -- the call path for a product-lane marketing agent run
 // inside a Claude session: read its market records and the platform rows its capability needs,
 // assemble its prompt, and write its checked answer back. First caller: nathan (Nathan Laan, the
 // product-marketing agent).
@@ -179,7 +179,9 @@ export function validateMarketAnswer(answer, capability) {
     if (item.kind === 'correction' && data.capability !== capability) {
       return { error: `${at} is a correction for "${data.capability}", not "${capability}"` };
     }
-    if (COPY_TESTED.includes(capability) && (!Array.isArray(data.copy_tests) || data.copy_tests.length < 1)) {
+    // A correction is John's cut, not a differentiator: exempt from the copy test (decision 247bcab1).
+    if (COPY_TESTED.includes(capability) && item.kind !== 'correction'
+        && (!Array.isArray(data.copy_tests) || data.copy_tests.length < 1)) {
       return { error: `${at} carries no data.copy_tests -- ${capability} records need at least one` };
     }
     if (item.kind === 'ip_asset') {

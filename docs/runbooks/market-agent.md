@@ -3,7 +3,7 @@
 
 ## What this is
 
-The method a Claude session follows to run the market-lane agent (`nathan`, Nathan Laan — product marketing) over its own DeepBench rows. The user-level `/nathan` skill is a thin loader that points here. Every step is a script except three the session does itself: web research, the Napkin read and note write-back, and the single sub-agent turn, which runs on the session's subscription.
+The method a Claude session follows to run the product-lane marketing agent (`nathan`, Nathan Laan — product marketing) over its own DeepBench rows. The user-level `/nathan` skill is a thin loader that points here. Every step is a script except three the session does itself: web research, the Napkin read and note write-back, and the single sub-agent turn, which runs on the session's subscription.
 
 - `scripts/market-agent.js --render` reads the capability's `market_records`, its corrections and the platform rows it needs, and assembles the prompt through `assemblePrompt()` — the executor's own path (§19b). Never hand-build or edit the prompt.
 - `scripts/market-agent.js --write` checks the answer (copy tests, IP typing, statuses, Napkin notes) and stores it in `public.market_records` in one insert.

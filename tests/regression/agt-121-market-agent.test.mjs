@@ -1,6 +1,6 @@
 // DeepBench v7.0.583 | tests/regression/agt-121-market-agent.test.mjs | AGT-121
 //
-// FEATURE: AGT-121 -- the call path for a market-lane agent (first one: Nathan Laan, product
+// FEATURE: AGT-121 -- the call path for a product-lane marketing agent (first one: Nathan Laan, product
 // marketing): scripts/market-agent.js reads the capability's market_records and platform rows,
 // assembles the prompt through assemblePrompt() in-process (§19b), and writes a checked answer back.
 //
@@ -189,6 +189,21 @@ async function partC() {
   // Discrimination: a kind/title-only validator lets at least the five content refusals through.
   assert.ok(naiveAccepted >= 5, `control: a kind/title-only validator refused ${7 - naiveAccepted} of 7 -- the fixtures do not discriminate`);
   results.push("control-kind-title-only-validator-fails");
+
+  // The correction exemption (decision 247bcab1), as a pair so it cannot widen silently.
+  const slug = "pmm-why-deepbench";
+  const correction = validateMarketAnswer({
+    records_to_write: [{ kind: "correction", title: "Synthetic cut", status: "draft", data: { capability: slug } }],
+    napkin_notes: [], napkin_left: [],
+  }, slug);
+  assert.ok(correction.ok && !correction.error, `a correction without copy_tests was refused for ${slug}: ${JSON.stringify(correction)}`);
+  results.push("validate-accepts-correction-without-copy-tests");
+  const competitor = validateMarketAnswer({
+    records_to_write: [{ kind: "competitor", title: "Synthetic competitor", status: "draft", data: {} }],
+    napkin_notes: [], napkin_left: [],
+  }, slug);
+  assert.ok(competitor.error && !competitor.ok, `a competitor without copy_tests was accepted for ${slug}: ${JSON.stringify(competitor)}`);
+  results.push("validate-refuses-competitor-without-copy-tests");
   return results;
 }
 
