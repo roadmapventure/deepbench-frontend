@@ -150,11 +150,12 @@ row is not a mechanism; this section is what makes the next one arrive by itself
 <!-- FEATURE: SES-312 — the review decides, files its named successors and declares the next
      drain inside one recorded decision, and the handle is what makes over-filing safe. -->
 **Everything below happens in ONE `DO` block, and that is load-bearing rather than tidy.**
-`runner-cycle.md` 7b carries the reason in full: `now()` is frozen for the length of a transaction,
-and `reverse_decision()` refuses any row whose live `updated_at` is **later** than the image it
-would restore from. Record the decision in one statement and file in the next, and the reversal
-counts every row `refused`, restores nothing, and **still returns `outcome = 'applied'`** — the
-decision is silently un-undoable, which is the one failure this whole mechanism exists to prevent.
+**`runner-cycle.md` step 7b is the home for why — read it there, not here.** In one line: `now()`
+is frozen for the length of a transaction, and `reverse_decision()` refuses any row whose live
+`updated_at` postdates the decision's own `decided_at` (`SES-316` — **not** the image's
+`created_at`). Record the decision in one statement and file in the next, and the reversal
+counts every row `refused_written_since`, restores nothing, and returns **`outcome = 'refused'`** —
+the undo did not happen, which is the one failure this whole mechanism exists to prevent.
 
 **Write order is fixed: decision → record → successors → drain → recompute.** The decision comes
 first because it is the only thing that hands out an id, and **every before-image below carries

@@ -587,9 +587,21 @@ edit the kickoff by hand. On exit 0, write the returned `kickoff_markdown` to th
 Then ONE write, before-image first, because `SES-112`'s check refuses `designed` without a link:
 
 ```sql
-INSERT INTO runner_before_images (session_name, table_name, pk_value, row_data)
-SELECT '<session>', 'backlog_items', id::text, to_jsonb(b) FROM backlog_items b WHERE backlog_id = '<ID>';
-UPDATE backlog_items SET kickoff_link = '<kickoff_path>', design_status = 'designed' WHERE backlog_id = '<ID>';
+DO $$
+DECLARE v_dec uuid; v_img jsonb;
+BEGIN
+  v_dec := public.record_decision(
+    NULL, '<session>', 'design-kickoff', '<ID>',
+    'Kickoff designed for <ID>', '<what you read and what you ruled>',
+    public.ladder_work_class('<the ticket''s priority_class>'));
+  SELECT to_jsonb(b) INTO v_img FROM public.backlog_items b WHERE b.backlog_id = '<ID>';
+  INSERT INTO public.runner_before_images
+    (cycle_id, session_name, table_name, pk_value, row_data, decision_id)
+  VALUES (NULL, '<session>', 'backlog_items', (v_img->>'id'), v_img, v_dec);
+  UPDATE public.backlog_items
+     SET kickoff_link = '<kickoff_path>', design_status = 'designed', updated_at = now()
+   WHERE backlog_id = '<ID>';
+END $$;
 ```
 
 Then log the run — mandatory per the bullet above, not a courtesy:

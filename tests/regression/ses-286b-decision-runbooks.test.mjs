@@ -1,3 +1,5 @@
+// DeepBench v7.0.573 | tests/regression/ses-286b-decision-runbooks.test.mjs | AGT-95 -- three
+// clauses added for the two descriptions of reverse_decision() that live OUTSIDE step 7b.
 // DeepBench v7.0.395 | tests/regression/ses-286b-decision-runbooks.test.mjs | SES-286 (b)
 //
 // FEATURE: SES-286 (b) -- guards the four CALL SITES that turn the decision ledger from a schema
@@ -33,6 +35,31 @@
 // unless it would have failed before it: all eight content clauses FAIL on origin/dev's copies of
 // both runbooks -- none of the strings existed there.
 //
+// DRY-RUN FOR AGT-95's THREE CLAUSES, same discipline, REAL OUTPUT PASTED rather than described.
+// Run on the UNCHANGED tree (a75e2626, both runbooks untouched) before either doc edit landed,
+// grading each clause independently because an assert-and-stop run only ever proves the first one
+// failed. `node <scratchpad>/grade-agt95.mjs`, importing CLAUSES from this file:
+//
+//   [FAIL] gate-review-points-at-7b-for-the-guard (docs/runbooks/gate-review.md)
+//   [FAIL] gate-review-names-the-refused-outcome (docs/runbooks/gate-review.md)
+//   [FAIL] session-setup-design-status-write-carries-decision_id (docs/runbooks/session-setup.md)
+//
+// (each FAIL printed a second line -- that clause's own `detail` string, verbatim from the table
+// below, elided here only to keep the header readable.) The suite invocation on the same unchanged
+// tree stops at the first of the three, and that line is pasted verbatim too:
+//
+//   [FAIL] ses-286b-decision-runbooks.test.mjs -- docs/runbooks/gate-review.md lost clause
+//   "gate-review-points-at-7b-for-the-guard": SES-316 moved the reference point: ...
+//   EXIT=1
+//
+// WHY THESE THREE FAILED, in the strings rather than in the abstract, because that is what makes
+// them a test and not a restatement: gate-review.md:153-157 said reverse_decision() compares
+// against "the image it would restore from" and "still returns `outcome = 'applied'`" -- the
+// pre-SES-316 reference point AND the pre-SES-316 outcome, in one paragraph -- and the
+// session-setup.md block that writes design_status = 'designed' inserted a before-image with no
+// decision_id and called nothing that hands one out. A no-op tree cannot produce this red; those
+// live strings are what produced it.
+//
 // Invocation: node tests/regression/ses-286b-decision-runbooks.test.mjs
 
 import assert from "assert";
@@ -44,6 +71,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CYCLE = "docs/runbooks/runner-cycle.md";
 const SETUP = "docs/runbooks/session-setup.md";
+const GATE = "docs/runbooks/gate-review.md";
 
 // CRLF is normalised on read for one reason, stated so nobody "simplifies" it away: this repo
 // checks out CRLF on Windows and LF in CI, and an index or substring test that disagrees between
@@ -78,6 +106,26 @@ const remainderBullet = s => {
   if (a < 0) return null;
   const b = s.indexOf("\n", a);
   return s.slice(a, b < 0 ? s.length : b);
+};
+
+// AGT-95 adds two slicers, anchored the same way the four above are -- on text the edit itself
+// owns -- so a clause can never pass on a string that happens to appear somewhere else in the file.
+const ONE_TXN_START = "**Everything below happens in ONE `DO` block";
+const ONE_TXN_END = "**Write order is fixed:";
+const DESIGNED_WRITE = "design_status = 'designed'";
+
+const oneTxnBlock = s => slice(s, ONE_TXN_START, ONE_TXN_END);
+
+// The fenced block that performs the `designed` write, found by walking back from the write itself
+// to the fence that opens it -- so the clause grades THAT block and not 3d's template, which
+// already carries the shape and would otherwise satisfy a file-wide search on its own.
+const designedWriteBlock = s => {
+  const hit = s.indexOf(DESIGNED_WRITE);
+  if (hit < 0) return null;
+  const open = s.lastIndexOf("```sql", hit);
+  if (open < 0) return null;
+  const close = s.indexOf("\n```", open);
+  return s.slice(open, close < 0 ? s.length : close);
 };
 
 // The sweep call, exactly as the runbook writes it -- held here so clause 2's mutation MOVES the
@@ -219,6 +267,70 @@ export const CLAUSES = [
       "`needs-john` is retired as a blocking state (M6-01), and 7b is what a cycle reads at the " +
       "exact moment it is deciding whether to escalate. One occurrence there, in any voice, " +
       "reintroduces the state this ticket family removed.",
+  },
+
+  // --- AGT-95: the two descriptions of reverse_decision() that live OUTSIDE step 7b -------------
+  // 7b is the one home for the guard (clauses 1-2 above hold that down). These three hold down the
+  // two places that RESTATE it and had drifted from it: gate-review.md's one-transaction paragraph,
+  // which still taught the pre-SES-316 comparison and the pre-SES-316 outcome, and session-setup.md's
+  // designed-write, which made a judgment write with no decision_id and therefore no handle at all.
+  {
+    id: "gate-review-points-at-7b-for-the-guard",
+    file: GATE,
+    test: s => {
+      const b = oneTxnBlock(s);
+      return !!b && b.includes("step 7b") && b.includes("decided_at") &&
+        !b.includes("outcome = 'applied'");
+    },
+    breaks: [
+      s => s.split("the decision's own `decided_at`").join("the image's own `created_at`"),
+      s => s.split("returns **`outcome = 'refused'`**").join("still returns **`outcome = 'applied'`**"),
+      s => s.split("step 7b is the home for why").join("this section is the home for why"),
+    ],
+    detail:
+      "SES-316 moved the reference point: reverse_decision() compares a row's live updated_at " +
+      "against the DECISION's decided_at, not against the image's created_at. This paragraph is a " +
+      "restatement of 7b's guard, so it either cites 7b and names the real reference point or it " +
+      "teaches a reader the rule 7b no longer holds -- and a reader who trusts it splits the " +
+      "transaction for the wrong reason and gets the wrong outcome back.",
+  },
+  {
+    id: "gate-review-names-the-refused-outcome",
+    file: GATE,
+    test: s => {
+      const b = oneTxnBlock(s);
+      return !!b && b.includes("outcome = 'refused'") && b.includes("refused_written_since");
+    },
+    breaks: [
+      s => s.split("`outcome = 'refused'`").join("`outcome = 'applied'`"),
+      s => s.split("counts every row `refused_written_since`").join("counts every row `refused`"),
+    ],
+    detail:
+      "the three outcomes are exact and session-setup.md's reversal section states them: applied " +
+      "(nothing written since), partial (something was and something was still restored), refused " +
+      "(something was and NOTHING was restored). A split transaction restores nothing, so it " +
+      "returns refused -- loudly. Teaching 'still returns applied' here describes a silently " +
+      "un-undoable decision that SES-316 removed, which is the one outcome a reader must not be " +
+      "told to expect. refused_written_since is the counter that tells the two refusals apart.",
+  },
+  {
+    id: "session-setup-design-status-write-carries-decision_id",
+    file: SETUP,
+    test: s => {
+      const b = designedWriteBlock(s);
+      return !!b && b.includes("record_decision(") && b.includes("decision_id") &&
+        b.includes("runner_before_images");
+    },
+    breaks: [
+      s => s.split("row_data, decision_id)").join("row_data)"),
+      s => s.split("v_dec := public.record_decision(").join("v_dec := public.recordTheReasoning("),
+    ],
+    detail:
+      "step 7b is the shape of EVERY judgment write, and design_status = 'designed' is a judgment " +
+      "write -- it is the one the attended designer makes on its own kickoff. An image with no " +
+      "decision_id is not a handle: nothing hands out an id, so reverse_decision() cannot reach " +
+      "the row and the write is un-undoable by construction. This is the same defect part (a) " +
+      "shipped into, surviving at one call site the part-(b) sweep did not reach.",
   },
 ];
 
