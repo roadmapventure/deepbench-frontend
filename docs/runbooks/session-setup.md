@@ -281,7 +281,7 @@ SELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>'
        'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',
        coalesce(max(row_ordinal),0)+1,
        now(),                                   -- filed_at: the created date (never created_at, M5-04)
-       '<original|gate-review|john-named|discovered|pre-existing>',   -- scope_origin (FILE-MATRIX)
+       '<original|gate-review|john-named|discovered|pre-existing|enhancement>',   -- scope_origin (FILE-MATRIX)
        '<S|M|L>', <predicted cycles, >= 1>, '<no|maybe|yes>',           -- size_stamp, predicted_cycles, defer_status
        '<scope_rationale: WHY it belongs — "Goal N, <name>: …" — REQUIRED on a Selfbuild ticket, M5-03>',
        '<M0..M7 the ticket serves, or NULL>',                           -- milestone (SES-304)
@@ -312,7 +312,15 @@ RETURNING backlog_id, priority_class;
   drain, not by the pre-boot gate — until one is written. Name the charter goal it advances
   (`docs/SELFBUILD-CHARTER.md` "Goals"), one or two sentences. The other matrix fields
   (`scope_origin`, `size_stamp`, `predicted_cycles`, `defer_status`) are fail-LOUD (`FILE-MATRIX`):
-  a missing one is flagged, not refused.
+  a missing one is flagged, not refused. **`scope_origin='enhancement'` is the one exception, and it
+  refuses rather than flags (`EL-01`):** an enhancement row missing `scope_rationale`,
+  `enhancement_claim` or `predicted_cycles` is **unbuildable** — not picked and not flagged-but-picked
+  — enforced in `public.drain_epic_next()` and `public.prime_directive_queue()`
+  (`ses283_enhancement_lane`). Note that the lane is shut today and this rule is how to file into it
+  correctly when it opens, not an invitation to try: `runner_settings.invention_requires_epic` is
+  `true`, so `public.file_invention_proposal()` raises, and `backlog_items` holds exactly **one** row
+  with `scope_origin='enhancement'` in its entire history (filed 2026-08-23). `SES-369` and `SES-430`
+  own that gate; `AGT-93` only made the filing rule findable and correct.
 - **`row_ordinal` is NOT NULL** — omit it and the INSERT fails (found live filing `SES-96`,
   2026-08-21); the `SELECT … max+1` form above handles it.
 - **`title` is the human sentence.** Phases (a)/(b) imported the class string into `title` for
