@@ -11,9 +11,11 @@
 // A detector hosted INSIDE the runner cannot fire DURING a silence: nothing is running to fire it.
 // So this reports a hole at the FIRST FIRE AFTER IT, which is the only moment a runner-hosted
 // detector can speak at all -- and is precisely the moment nothing spoke on 2026-08-28. The
-// live-during-the-hole half needs an independent channel (John's own 6-hourly watchdog routine), and
-// an unattended cycle may not edit his routines; that half is declared on SES-269's ship card, not
-// silently attempted here.
+// live-during-the-hole half needed an independent channel (John's own 6-hourly watchdog routine), and
+// an unattended cycle may not edit his routines; that half was declared on SES-269's ship card, not
+// silently attempted here. HISTORY, AND NO LONGER THE STATE OF THE PLATFORM (SES-319): that half now
+// exists database-side as public.runner_silence(), which measures the hole from the rows themselves
+// and so can answer DURING a silence, when nothing in this script is running to be asked.
 //
 // -- THE HALF A REBUILD DROPS: "no fire in N hours" IS NOT THE AGE OF THE NEWEST ROW -------
 // The obvious reading of the ticket's own Fix line is `now() - max(started_at)`. That form CAN NEVER

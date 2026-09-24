@@ -175,7 +175,8 @@ for repeatedly.**
    pass.** (3) and (4) preceding (5) is deliberate and NULL-safe: with the row absent (3)'s comparison
    is NULL, and with no reading (4)'s is too, so the ladder falls through to (5).
 6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
-   lane row.
+   lane row — `runner_should_boot()`'s `pickable` CTE is `WHERE q.lane IN ('drain','selfbuild')`,
+   so a queued **directive** row alone is not pickable.
 7. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
@@ -1577,8 +1578,9 @@ decided card leaves briefing §6 (`briefing_open_cards()` filters `decision is n
 the standing brief's open-decisions ledger instead. **Fail direction: no decision → no card → exit
 2** (*could not run*, noted exactly as above). **The `revert-and-card` branch is unchanged and its
 card is still filed undecided on purpose** — that branch's action is executed by *you*, behind the
-push gates, so its record belongs to the cycle at the moment it pushes; that record is not built
-(open, `SES-373` §7). Guarded by `tests/regression/ses-373-card-only-self-decides.test.mjs`.
+push gates, so its record belongs to the cycle at the moment it pushes. **That record IS built**:
+`rollback-on-red.js --settle --card-id=<uuid> --outcome=declined|executed --cycle-id=<uuid>` writes
+it (`SES-287` slice 2, `v7.0.525`), closing what `SES-373` §7 left open. Guarded by `tests/regression/ses-373-card-only-self-decides.test.mjs`.
 
 **`--migrations` is `SES-182` slice 2 (`v7.0.333`) and it matters only on a RED**, so a green sweep
 may omit it. It is the migrations that landed in the range, read with **one call** —
@@ -3854,11 +3856,12 @@ Four things this step deliberately does:
   arithmetic, which PostgREST cannot express and this project has no RPC for. The cycle claims the
   block through the connector and passes it in — that is what keeps CLAUDE.md's atomic-counter rule
   intact instead of quietly hand-counting.
-- **The INSERT before-image convention starts here.** Every prior `runner_before_images` row records
-  an UPDATE and carries the old row in `row_data`. A heal filing is an INSERT, so there is no prior
-  state: it writes `row_data = NULL`, meaning **"this row did not exist — Reverse is a DELETE of
-  this pk."** The before-image is written first and its success is what authorises the ticket
-  insert (§19v: no before-image, no write).
+- **The INSERT before-image convention is `SES-142`'s (`v7.0.179`), not this step's.** Every prior
+  `runner_before_images` row records an UPDATE and carries the old row in `row_data`. A heal filing
+  is an INSERT, so there is no prior state: it writes `row_data = NULL`, meaning **"this row did not
+  exist — Reverse is a DELETE of this pk."** `SES-142` set that form for its `runner_drain_scope`
+  inserts; this step follows it. The before-image is written first and its success is what
+  authorises the ticket insert (§19v: no before-image, no write).
 - **Feature-owns-its-bugs still binds (§19v).** A failure caused by *this* cycle's own ship is
   sweep-#2 and revert territory, never a ticket — filing a bug in the thing you just built is a QA
   failure wearing a ticket's clothes. Only pre-existing signatures are legitimate here.

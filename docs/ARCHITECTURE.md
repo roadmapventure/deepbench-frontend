@@ -417,8 +417,6 @@ Two many-to-many joins, three real layers. No separate "Skill Profile" layer abo
 
 Skills are the atomic unit of the platform. Six types are defined today. New Skill types can always be added without changing existing ones.
 
-**Known drift (2026-07-15):** the `skill_types` lookup table itself only has 5 seeded rows — `guardrails` is real and already dispatched on in the harness (`api/prompt/db-assembly.js`'s `SKILL_ORDER`), but was never added to the `skill_types` catalog. Needs a one-row seed to close the gap between code and catalog.
-
 | Skill Type | What it captures | Example Skills |
 |-----------|-----------------|----------------------|
 | **Identity** | Who the agent is — mindset, philosophy, personality, ethics | Philosophy, Autonomy, Skeptic Level, Temporal Stance, Epistemology |
@@ -540,7 +538,7 @@ A Deliverable is an output object produced when any level of the hierarchy execu
 ---
 
 ### DB Architecture — Current State
-**[CORRECTED 2026-07-01, S-APPLE-02a-design; prose corrected again 2026-07-15 — see rewrite note at the top of this section]** `skill_types` (5 rows, missing `guardrails` — see "Known drift" above), `skill_profiles` (the Skill rows — the atomic unit, not a separate "instance" layer), `capabilities` (8 rows), `capability_skill_profiles` (the Skill↔Capability join), and `agent_capability_assignments` (the Capability↔Agent join) are all live in Supabase today and already wired into `api/prompt/db-assembly.js`'s `assemblePrompt()`. What remains gated behind S-INFRA-01 is only the items explicitly listed in Section 4 (per-Skill LLM/BYOK superadmin config) and the `skill_profile_slug` scoping columns on `agent_configs`/`knowledge_entries` (Section 9) that turn the Library into per-division Data Rooms. The two tables below are live now — new Capabilities and Skills can be created against them without waiting for S-INFRA-01.
+**[CORRECTED 2026-07-01, S-APPLE-02a-design; prose corrected again 2026-07-15 — see rewrite note at the top of this section]** `skill_types` (6 rows, `guardrails` included), `skill_profiles` (the Skill rows — the atomic unit, not a separate "instance" layer), `capabilities` (read the live table for the roster; no count is copied here), `capability_skill_profiles` (the Skill↔Capability join), and `agent_capability_assignments` (the Capability↔Agent join) are all live in Supabase today and already wired into `api/prompt/db-assembly.js`'s `assemblePrompt()`. What remains gated behind S-INFRA-01 is only the items explicitly listed in Section 4 (per-Skill LLM/BYOK superadmin config) and the `skill_profile_slug` scoping columns on `agent_configs`/`knowledge_entries` (Section 9) that turn the Library into per-division Data Rooms. The two tables below are live now — new Capabilities and Skills can be created against them without waiting for S-INFRA-01.
 
 **Known gap (2026-07-01):** `assemblePrompt()` loads every `skill_profiles` row attached to a `capability_slug` unconditionally — there is no per-call filter when a Capability has more than one Intent-type Skill (e.g. a capability with both a "routing" intent and an "answer" intent would load both into every call). No existing capability has hit this yet; S-APPLE-02b is the first to need it and must add the filter as part of its own scope.
 
@@ -1069,7 +1067,7 @@ Full agents.js migration (salary, stats, avatar, flags) is a separate future ses
 
 ## 19b. The Generic Capability Executor [LOCKED S-APPLE-03-design 2026-07-01]
 
-**This is the platform's founding intent, restated precisely: capabilities are data, not code.** A capability is a set of Skill Profiles (Identity, Behavior, Knowledge, Intent, Format) plus rows in `capability_skill_profiles` and `agent_capability_assignments`. Building a new capability should never require writing or deploying a new route — only inserting new Supabase rows. The platform is the container; agents are configurations that live inside it.
+**This is the platform's founding intent, restated precisely: capabilities are data, not code.** A capability is a set of Skill Profiles (Identity, Behavior, Knowledge, Intent, Format, Guardrails) plus rows in `capability_skill_profiles` and `agent_capability_assignments`. Building a new capability should never require writing or deploying a new route — only inserting new Supabase rows. The platform is the container; agents are configurations that live inside it.
 
 **The mechanism:** `api/capabilities/execute.js` — one generic route, called with `{ capability_slug, intent_slug, agent_id, task_context, tenant_id, format_skill_profile_slug, display_agent_id }`. The last two are optional, generalized from `AA-69`'s Work Order format-last pattern (`api/plan.js`) so any capability can have its output shaped by a display agent's Format Skill in the same single call (`AA-77`, `S-APPLE-03a-2`). It runs the same three already-generic pipeline steps every capability needs, in sequence:
 1. `assemblePrompt()` (`db-assembly.js`) — loads the Skill Profiles for `capability_slug`, filtered to `intent_slug`
@@ -2480,8 +2478,8 @@ Scaffold (`db-assembly.js` `assemblePrompt()`, `ai-enrichment.js` `enrichPrompt(
 the way §2/§19b say they do — a type the pipeline drops or mis-orders means the Recruiter would
 author Skills that silently do nothing. Known starting points: `SKILL_ORDER`
 (`db-assembly.js:58`) covers all six but falls back to a silent `?? 99` for unrecognized type
-slugs, and §2's known drift (the `skill_types` catalog is missing its `guardrails` row while the
-code dispatches on it). The audit must assert on the path taken, not the output — a prompt that
+slugs — the `skill_types` catalog now carries its `guardrails` row, so code and catalog agree and
+§2's drift note is retired. The audit must assert on the path taken, not the output — a prompt that
 "looks right" doesn't prove the type was consumed by the intended branch.
 
 ### Ruled out / deferred

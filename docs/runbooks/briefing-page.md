@@ -550,7 +550,7 @@ Four rules a rebuild must not re-derive differently:
   the effective cap, is wrong on **precisely the days a higher rung fires** — which are the days
   John is looking at this panel. Live proof of the discrimination, on fixtures inside a rolled-back
   transaction: box `4` + a live override → `25,000,000 / override`; box `4` + every reading aged
-  past 48h → `3,000,000 / stale-floor`, **not** `4,000,000`; blank box → `10,000,000 / calibrated`,
+  past 48h → `3,000,000 / stale-floor`, **not** `4,000,000`; blank box → `10,000,000 / uncalibrated-default`,
   the pre-`SES-147` number exactly.
 
 ### The four board tables' data contracts (`SES-126`)

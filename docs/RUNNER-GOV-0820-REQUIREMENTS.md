@@ -352,9 +352,11 @@
   than restating them, and `docs/runbooks/runner-cycle.md` step 6 renders the table's rows
   directly. Makes §19v's escalation rule executable: a failed attempt re-runs that piece one
   tier up, never grinds. Fable spend is metered by the token governor and visible in the
-  briefing's by-model breakdown. **Unverified precondition:** the cloud environment supporting
-  Agent + per-agent model — first cycle after rollout reports; if unavailable, it notes it in
-  the cycle row and continues on Opus 5.
+  briefing's by-model breakdown. **Precondition — HISTORY, settled by the AMENDMENT above
+  (2026-08-31), not an open question:** the cloud environment supporting Agent + per-agent model was
+  the unverified item here. An unattended session barred from the subagent tool runs the
+  judgment-dense step on its own session model and records that on its cycle row; which model that
+  is, per lane, is `public.runner_model_lanes`' answer, never a model id frozen into this line.
 
 - **B30. John's automation queue is a SELECTION LAYER, not just a plan (found at close-out,
   2026-08-20):** runbook step 5 picks in three layers — directives → the next incomplete step

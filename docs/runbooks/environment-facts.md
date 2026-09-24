@@ -26,7 +26,7 @@ on the board, or a cycle (`cycle:601227fb`). No pipes inside the fact.
 - 2026-09-15 | SES-399 | reverse_decision()'s allowed-table list excludes ai_activity_log, so a Reverse restores nothing there.
 - 2026-09-15 | cycle:601227fb | The default branch is main and stale; all work is on dev. Push HEAD:dev, never bare dev, never main.
 - 2026-09-15 | cycle:601227fb | runner-cycle.md is 380,902 bytes against the SES-336 ceiling of 381,000; a step edit must first remove bytes.
-- 2026-09-15 | cycle:601227fb | runner_before_images has a CHECK refusing cycle_id and session_name together; pass exactly one.
+- 2026-09-15 | cycle:601227fb | runner_before_images has a CHECK refusing cycle_id and session_name together; pass exactly one — first home SES-150, CLAUDE-DESIGN.md:136, where an automated cycle sets cycle_id and an attended session sets session_name.
 - 2026-09-15 | cycle:601227fb | feature_id_counter can drift behind the board (seen this cycle: it offered SES-389 while the board already held 398); claim with GREATEST(counter, max)+1, never the counter alone.
 - 2026-09-15 | cycle:601227fb | Since SES-336 the Builder owns the push, so at step 7a origin/dev IS HEAD and a git-derived changed-file list is empty (SES-379).
 - 2026-09-15 | cycle:601227fb | Several scripts still emit "cannot change to 'C:/Projects/deepbench-frontend'", a laptop path dead in the cloud clone.

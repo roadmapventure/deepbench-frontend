@@ -65,8 +65,9 @@ rather than the current state. What shipped, in order:
 
 - **(a) `v7.0.394`** — `public.runner_decisions`: a decision is a row with an `expires_at` and a
   handle, its handle being its own `id`, and the before-images written under it carry
-  `decision_id`. With it, four functions: `record_decision()`, `sweep_decision_windows()`,
-  `reverse_decision()` and `ladder_apply_signal()` (plus the `ladder_work_class()` helper).
+  `decision_id`. With it, six functions: `record_decision()`, `sweep_decision_windows()`,
+  `reverse_decision()`, `ladder_apply_signal()` and `attach_before_images()` (plus the
+  `ladder_work_class()` helper) — the count `docs/runbooks/runner-cycle.md` already carries.
 - **(b) `v7.0.395`** — the runbooks call them: `docs/runbooks/runner-cycle.md` **7b** (what a
   decision is, and the one transaction that records it with its rows), its serial-tail
   **`(7b) SWEEP THE DECISION WINDOWS`** step ahead of the chain gate, and step 8c's automatic

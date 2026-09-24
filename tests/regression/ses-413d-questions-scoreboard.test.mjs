@@ -93,7 +93,7 @@ export const RUNBOOK_CEILING = 381000;
 // v7.0.565's 380144 rather than the 379678 it was written against, so the pin is the RE-MEASURED
 // post-rebase byte count, never either side of the conflict: 380144 -> 380253 B, 747 B under the
 // ceiling. Re-measured with wc -c after the rebase and re-pinned in the same commit.
-export const BYTES_AT_SHIP = 380253;
+export const BYTES_AT_SHIP = 380667;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
