@@ -229,3 +229,182 @@ John's, with the before-image the rule requires.
   `ai_activity_log` row with `call_source` and the judged run's `visitor_id`, so the measure needs no
   new telemetry. Today the denominator is 3 cards, 0 from real visitors; that number is the Heal
   item, not this feature's failure.
+
+---
+
+<!-- SECOND PASS, SAME DAY, SAME LENS. The Researcher, capability research-class-lens, model
+     claude-opus-5, run 2026-09-24 under session/cycle-20260924-1541. Allowed: 2. Survivors
+     returned: 0. Appended rather than overwritten: the section above is the 00:41 cycle's record
+     of this same lens and destroying it would lose the payloads it carries. Leg 1 ran on live
+     WebSearch (egress ok, two queries, real results); WebFetch was refused by the egress proxy
+     (www.papermark.com, EGRESS_BLOCKED), so every market finding below is a search digest and is
+     marked *Digest*. Leg 2 ran read-only against Supabase the same day. Nothing was written to any
+     table. -->
+
+## Second pass, `cycle-20260924-1541`: zero survivors, and the measurement that says why
+
+**Root claim:** `VC-ROOT-003`. **Class reading:** `VC-SYN-001`. **Allowed:** 2.
+**Survivors returned: 0.** Not for want of candidates — for a reason I measured rather than assumed.
+
+### The pitch
+
+I ran both legs and then asked the question this lane has stopped asking: what happens to a P3
+proposal after the Researcher returns it. Measured fresh today, against the rows:
+
+- `public.backlog_items` holds **exactly one** row with `scope_origin = 'enhancement'` in its entire
+  history — `LOG-143`, filed 2026-08-23, class P1, status done. **Zero** enhancement rows have been
+  filed in the last 21 days, and **zero ever** in `P3 - Investor Value`.
+- `docs/research/` holds **seven** P3 invention passes since 2026-09-09 (09-09, 09-11, 09-11-pass2,
+  09-19, 09-20, 09-21, 09-24), returning roughly a dozen survivors between them. None became a row.
+- `public.invention_due()` returns `(t, 2, "rung 2: 0 of 2 used today (America/Chicago)")` — the pass
+  is due and may file two.
+- `public.runner_settings.invention_requires_epic` is **true**, and
+  `select count(*) from public.runner_directives where type='drain-epic' and status='queued'` is
+  **0**. Read against `pg_get_functiondef('file_invention_proposal')`, that combination reaches
+  `raise exception 'file_invention_proposal: invention_requires_epic is true and no drain-epic
+  directive is queued'` before any payload is examined. **Anything I return today is refused at
+  filing, by construction, whatever it says.**
+- `SES-369` (open, filed 2026-09-11) is that fact as a ticket: "The invention lane is shut:
+  invention_requires_epic is true…". `SES-430` (open, filed 2026-09-20) is the companion:
+  `invention_due()` says due before checking the flag, so a full Researcher pass runs and is refused.
+- `public.vision_claims` for this class: **61 proposed, 7 rejected, 0 ratified.** Not one P3 claim has
+  ever been ratified. The class's own learning rows say why, and they say it ten times
+  (`VC-LRN-001`, `-002`, `-005`, `-007`, `-013`, `-014`, `-015`, `-019`, `-020`, `-021`): the
+  admission rule is unresolved pending a ruling from you that has not happened.
+
+So the P3 lane's bottleneck is not proposal supply. Supply is running at roughly two proposals a day
+into a closed valve, against a claim store where nothing has ever been ratified. A thirteenth and
+fourteenth proposal today does not move the class; it adds two more records that cannot be filed and
+cannot be ruled on.
+
+That alone would not justify a zero — my job is evidence, not process. What makes the zero honest is
+that **every candidate the evidence supports today is already an open, unfiled proposal of this same
+lane, and the two strongest were returned seven hours ago in the section above, on this same lens,
+from the same measurements.** I re-measured them (137 Skills, 20 written in three days, newest
+2026-09-23; 9,903 deliverables, 0 ever out of `draft`, 78 in 30 days; `agent_training_sessions` 0
+rows; 3 judge runs all-time, 0 from a real visitor, 0 in 7 days; 936 traces in 30 days) and the
+numbers are identical to the 00:41 pass. Returning them again is a re-run wearing an invention
+costume, which is the thing this lane is supposed to kill, not produce.
+
+And on one of them the market moved *against* the proposal since this morning — see finding 4 below.
+
+### What the market says (live, dated)
+
+Egress: WebSearch live and returning results (two queries this run). WebFetch refused by the proxy,
+so each item is a search digest carrying the date the digest or URL states.
+
+1. **Training-data provenance is the first thing a 2026 buyer checks, and a manifest is not enough.**
+   *Digest, read 2026-09-24:* a standard AI review runs nine domains (model provenance and IP,
+   training data, contract data rights, architecture, inference economics, compute commitments,
+   evaluation evidence, governance, key-person risk); post-LOI adds a training-data provenance audit;
+   and "the reconciliation that matters is between the manifest and the training run logs showing what
+   was actually loaded."
+   ([papermark.com/blog/ai-due-diligence](https://www.papermark.com/blog/ai-due-diligence);
+   [valutico.com 2026 buyer's framework](https://valutico.com/ai-vulnerability-in-ma-due-diligence-a-2026-buyers-framework/))
+   This is the strongest market fact of the pass and it grounds runners-up 1 and 2 — both already open.
+2. **Provenance of generated training material is a named deal-asset question.** Mayer Brown,
+   "Synthetic Data as a Deal Asset: Ownership, Provenance, and Diligence Considerations in AI
+   Acquisitions," 2026-07.
+   ([mayerbrown.com](https://www.mayerbrown.com/en/insights/publications/2026/07/synthetic-data-as-a-deal-asset-ownership-provenance-and-diligence-considerations-in-ai-acquisitions))
+   A Skill corpus whose rows carry no author and no origin is the shape this paper says gets
+   discounted.
+3. **Unprovenanced training data is priced as transferred liability.** *Digest, 2026:* an acquirer
+   that cannot trace where the target's training data came from assumes a liability that travels with
+   the model; the diligence step now has the highest generative-AI usage of any M&A workflow (58%),
+   so inconsistencies surface in week one.
+   ([developmentcorporate.com](https://developmentcorporate.com/corporate-development/ai-training-data-due-diligence-the-identity-liability-hiding-in-your-next-acquisition/);
+   [blog.pebblous.ai](https://blog.pebblous.ai/blog/ai-acquisition-hidden-data-debt/en/))
+4. **The governed self-improvement loop became a published checklist this month — it is no longer
+   white space.** *Digest, read 2026-09-24:* Salesforce's Agent Optimizer ships an "autonomy dial"
+   that can "require sign-off at every step," investigating, suggesting fixes, building, testing and
+   staging changes, stopping at review points you choose; Arize's prompt optimization generates an
+   improved prompt from eval feedback, versions it in a Prompt Hub and promotes it in a few clicks;
+   and a 2026 pre-deployment checklist now enumerates the governance shape itself — "frozen baseline,
+   bounded drift, hidden-objective check, human sign-off where it counts, instant rollback, live-action
+   guardrails."
+   ([salesforce.com/blog/agent-optimizer](https://www.salesforce.com/blog/agent-optimizer/);
+   [salesforce.com/news/stories/toward-self-improving-agents](https://www.salesforce.com/news/stories/toward-self-improving-agents/);
+   [pydantic.dev, 2026](https://pydantic.dev/articles/best-ai-agent-optimization-platforms-2026);
+   [futureagi.com, 2026](https://futureagi.com/blog/self-improving-ai-agents-pre-deployment-checklist-2026/))
+   This is the finding that changed between 00:41 and now. The 00:41 pass admitted "the platform
+   drafts the Skill fix" by arguing its governance wrapper — judge evidence as provenance,
+   before-image, reversal window, human Accept — is what the neighbours lack. As of this morning's
+   reading that wrapper is a *published checklist item* with two shipped implementations of the
+   versioned-proposal-then-promote flow. Under pattern 149 that is a standard skill, and under
+   `VC-EXIT-026` the remaining delta (a Skill row shared across agents rather than one agent's prompt)
+   is a schema detail, not a mechanism a reviewer would call new. It does not clear the bar today.
+
+### What the job postings name
+
+Not run. The postings leg is the P1 instrument (`VC-ROOT-001`, pattern 149); P3 is tested against
+buyers, acquirers and diligence, which the market leg covers. Recorded as an omission, not padded.
+
+### Vision-corpus grounding cited on the row
+
+- `VC-ROOT-003` (root); `VC-SYN-001` (a skeptical technical reviewer confirms a claim from the product
+  itself) — the reading every candidate below was scored against.
+- `VC-LRN-014`: P3's only operative classifier is a negative one, and every survivor so far was
+  admitted by arguing it was *not disqualified*. Both of today's re-run candidates are admitted that
+  way again, which is the pattern this claim flags, not a new argument.
+- `VC-LRN-007`, `VC-LRN-001`, `VC-LRN-013`, `VC-LRN-021`: the class cannot be classified confidently
+  until you rule once — on what "investor-ready" means, on the exit shape, and on which of the three
+  named assets P3 ranks against. 61 proposed, 0 ratified, measured today.
+- `VC-LRN-020`: P3 still has no boundary rule against P4.
+- `VC-EXIT-026` (a dashboard without new mechanism does not pass) and patterns 137 / 149
+  (`docs/JOHN-DECISION-PATTERNS.md`) — applied to every shortlist row below, and finding 4 is what
+  moved candidate 2 across the 149 line.
+- `VC-EXIT-009` / `VC-EXIT-010` (the DEEP is the asset), `VC-EXIT-027` (value travels with the asset),
+  `VC-INVAR-014` / `VC-INVAR-018` (attribution and stateable provenance) — the grounds the two
+  re-run candidates rest on, unchanged and still sound; they are open proposals, not new ones.
+- Rejected paths checked, none re-proposed: `VC-REJECTED-016` (declared config is not evidence),
+  `VC-REJECTED-017` (no fabricated zeros), `VC-REJECTED-008` (after two instruction-level attempts, go
+  structural).
+
+### The shortlist, and why each ranked below the bar
+
+1. **Skill authorship on the record** (`skill_profiles.origin` + actor stamp). Evidence is the
+   strongest in the pass (findings 1–3; `VC-EXIT-009`, `VC-INVAR-018`; 137 rows, 20 written in three
+   days, no author column). Ranked out as a **fourth return**: proposed 2026-09-21, returned again at
+   00:41 today, payload complete and unchanged in the section above. Nothing about it has changed in
+   seven hours except that it still cannot be filed.
+2. **Personnel File / DEEP measured from the ledger** (`agent_skill_exercise`, `deep_exercise` over
+   `assembled_skill_slugs`). Finding 1's "manifest versus what was actually loaded" is a better
+   market argument for it than either prior pass had. Ranked out as a **third return** (2026-09-20,
+   2026-09-21), same unfiled state; and `SES-363` (open, P10) already owns the versioning half.
+3. **The platform drafts the Skill fix** (revision-proposal rows from judge evidence). Ranked out on
+   two independent grounds. Market: finding 4 — the governed draft-review-promote loop is now a
+   published checklist with shipped neighbours, so it reads as pattern 149. Platform: `AGT-74` (open,
+   **already classed P3**, filed 2026-09-11) is "Skill edit with a before-and-after across every agent
+   that shares it," which is this candidate's core; and the usage leg cannot feed it — 3 judge cards
+   all-time, 0 from a real visitor, 0 in 7 days, against 936 traces in 30 days. Proposing a consumer
+   for a producer that has never run for a real visitor is building on a Heal-lane defect.
+4. **Deliverable verdict on the record** (approval routes back to the producing agent and writes the
+   training row). Carries the pass's single most damning number: **0 of 9,903 deliverables has ever
+   left `draft`** — the locked pitch's feedback-loop clause (`VC-EXIT-008`) has never fired once.
+   Ranked out because four existing backlog rows already cover the surface (`DL-03`, `DL-06`, `AI-24`,
+   `MC-07`). Re-classing open rows is a Prioritizer act, not invention. The zero is recorded here so
+   whoever builds them cites it.
+5. **Ledger reconciled to the provider's bill.** Still grounded (1,033 model rows in 30 days carry no
+   `cost_usd`). Ranked out: returned 2026-09-19, refused at filing twice, and gated on an Admin API
+   key whose availability is unresolved.
+
+### How it reaches the build queue
+
+It does not, and that is the finding. Verified this run, not recalled: `invention_requires_epic = true`
+with zero queued `drain-epic` directives makes `file_invention_proposal()` raise before it reads a
+payload; `invention_due()` reports `due` anyway (`SES-430`); `SES-369` has tracked the shut lane since
+2026-09-11 and is still open. **The two rows that would unblock this class are `SES-369` and
+`SES-430`, and neither is a P3 invention — they are open P10 tooling rows that only the Execute lane
+can clear.** The second unblock is a ruling, not a ticket: one tap from you on any P3 claim would give
+the class its first ratified row and turn `VC-LRN-014`'s negative classifier into a positive one.
+Until one of those two things happens, this lane should be measured by ratifications, not by
+proposals filed.
+
+### The usage signal that proves it
+
+For a zero, the signal is the lane's own throughput, and it is already instrumented:
+`select count(*) from backlog_items where scope_origin = 'enhancement'` (1 all-time, 0 in 21 days,
+0 ever in P3) against the seven pass documents in `docs/research/`; and
+`select status, count(*) from vision_claims where judgment_class = 'P3 - Investor Value' group by 1`
+(61 proposed, 7 rejected, 0 ratified). Both are one query, need no new telemetry, and both should
+move off zero before this lens is run again.
