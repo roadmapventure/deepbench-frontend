@@ -19,7 +19,7 @@ John's judgment is exercised** — during the work, the morning after on evidenc
 | Mode | Judgment point | Selection | Status |
 |---|---|---|---|
 | **Manual Design & Build** | During the work — design conversation, walkthrough gates, kickoff docs, John's approvals live | **Default.** A human in the chat *is* the selection; no session is ever asked "which mode?" | Active (today's process) |
-| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner (routine `trig_017TZ3JZcLBK6AYH6DKURqMH`, "deepbench-runner"), whose prompt carries the stamp `DEEPBENCH-RUNNER-AUTOMATED-…`, echoed into the session's `runner_cycles` row — including every in-session `chained (drain continuation)` cycle that session opens. No stamp → Manual Design & Build. | **LIVE — approved by John 2026-08-20** (`S-SES-78d` go-live). Cadence (John, 2026-08-23, `SES-151` `v7.0.196`): the cron fires **hourly at :40** and cannot be edited by a cycle; `scheduler_gate()` admits scheduled fires only on John's clock grid — an **America/Chicago hour divisible by `interval_hours`** (3 → **12, 3, 6, 9 AM/PM on his clock**, DST-proof, no cron realign ever). Chained drain continuations are exempt — while a drain stands, the chain sets the pace. Pause = the §2b scheduler checkbox, or disable the routine at claude.ai/code/routines |
+| **Automated** | The morning after, on evidence — the daily briefing's Accept / Reverse / Rework | **Cannot be chosen — must be proven.** Only a session launched by the approved runner (routine `trig_017TZ3JZcLBK6AYH6DKURqMH`, "deepbench-runner"), whose prompt carries the stamp `DEEPBENCH-RUNNER-AUTOMATED-…`, echoed into the session's `runner_cycles` row — including every in-session `chained (drain continuation)` cycle that session opens. No stamp → Manual Design & Build. | **LIVE — approved by John 2026-08-20** (`S-SES-78d` go-live). Cadence (John, 2026-08-23, `SES-151` `v7.0.196`): a scheduled fire is admitted when its cycle row's `started_at` falls in an **America/Chicago hour divisible by `runner_settings.interval_hours`** (row 1, read live) **and** the routine's cron fires in that hour — DST-proof, no cron realign ever, and no cycle may edit the routine. Live homes: `runner_settings` row 1 and routine `trig_017TZ3JZcLBK6AYH6DKURqMH` at claude.ai/code/routines; full rule: runner-cycle.md step 1b. Chained drain continuations are exempt — while a drain stands, the chain sets the pace. Pause = the §2b scheduler checkbox, or disable the routine at claude.ai/code/routines |
 | **"Open Workspace"** *(placeholder name — John's to set, Tier 3)* | None — non-DeepBench work (research, documents, anything John runs as Claude Desktop projects today) | John says so at session start | Defined, available |
 
 ## Shared invariants — identical in every DeepBench mode
@@ -99,17 +99,20 @@ John is present and directing; it is the default absent any explicit selection, 
 
 ## Automated
 
-The three-engine 24×7 pipeline (Execute / Heal / Invent) governed by §19v: lane routing
-(auto vs. gated), the P1–P10 priority order, feature-flag exposure rules, the budget governor,
-the trust ladder, and the daily briefing. Appropriate for unattended work only. **LIVE since
-2026-08-20** (`S-SES-78d` go-live, approved by John) — the mode remains structurally enforced:
-the runner's stamp, echoed into each cycle's `runner_cycles` row, is the only thing that proves
-it; no stamp, no Automated. Cadence (`SES-151`, `v7.0.196`): the cron fires **hourly at :40**
-and `scheduler_gate()` admits scheduled fires only on John's America/Chicago clock grid — an
-hour divisible by `interval_hours` (3 → 12/3/6/9 AM/PM on his clock, DST-proof). A draining
-cycle continues **in-session** via a `chained (drain continuation)` `runner_cycles` row
-(`SES-140` FINAL — the session-spawning form is retired and platform-refused). John's manual
-sessions always take deploy-quota precedence over Automated cycles.
+The three-engine 24×7 pipeline (Execute / Heal / Invent) governed by §19v: lane routing (auto vs.
+gated), the P1–P10 priority order, feature-flag exposure rules, the budget governor, the trust
+ladder, and the daily briefing. Appropriate for unattended work only. **LIVE since 2026-08-20**
+(`S-SES-78d` go-live, approved by John) — the mode remains structurally enforced: the runner's
+stamp, echoed into each cycle's `runner_cycles` row, is the only thing that proves it; no stamp,
+no Automated. Cadence (`SES-151`, `v7.0.196`): `scheduler_gate()` admits a scheduled fire when its
+cycle row's `started_at` falls in an **America/Chicago hour divisible by
+`runner_settings.interval_hours`** (row 1, read live) **and** the routine's cron fires in that
+hour — DST-proof. The live homes are `runner_settings` row 1 and routine
+`trig_017TZ3JZcLBK6AYH6DKURqMH` at claude.ai/code/routines, which is also the pause switch; full
+rule: runner-cycle.md step 1b. A draining cycle continues **in-session** via a `chained (drain
+continuation)` `runner_cycles` row (`SES-140` FINAL — the session-spawning form is retired and
+platform-refused). John's manual sessions always take deploy-quota precedence over Automated
+cycles.
 
 **Chained cycles are in-session continuations (`SES-140` FINAL, `v7.0.195`, John 2026-08-23 —
 supersedes the `SES-141`/`v7.0.180` session-spawning form).** A draining cycle does not spawn a

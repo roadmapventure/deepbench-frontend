@@ -80,8 +80,12 @@ const JOHN = "docs/WORKING-WITH-JOHN.md";
 // for the step, +~250 B for the pointer, +~70 B at :4720 for the fifteenth restorable table, the
 // v7.0.519 stamp dropped and a v7.0.555 stamp added): 380718 -> 378273 B, 2,727 B under the ceiling.
 // Re-pinned by v7.0.557 in the same push.
+//
+// v7.0.565 (AGT-87) replaced the stale cadence literals in step 1b and two outliers with the rule
+// that points at `runner_settings.interval_hours` and the routine (prose only, no value changed):
+// 379678 -> 380144 B, 856 B under the ceiling. Re-pinned in the same commit that edits the runbook.
 export const RUNBOOK_CEILING = 381000;
-export const BYTES_AT_SHIP = 379678;
+export const BYTES_AT_SHIP = 380144;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

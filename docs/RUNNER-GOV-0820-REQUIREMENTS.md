@@ -24,10 +24,12 @@
 - **A1. Language (John):** outcomes `did_not_run` / `gated_before_build` (constraints + data +
   docs + routine prompt); displayed as plain words. Classes always written NAMED, never bare
   digits. Everything is a **"backlog ticket," never "row."**
-- ~~A2. Schedule~~ — **SUPERSEDED 2026-08-23 by `SES-151` (`v7.0.196`): the cron fires hourly
-  at :40 permanently, and `scheduler_gate()` paces by John's America/Chicago clock grid (an
-  hour divisible by `interval_hours`; 3 → 12/3/6/9 AM/PM on his clock) — DST-proof, no cron
-  realign ever.** As originally shipped: fires 12/3/6/9 AM/PM CST (UTC cron
+- ~~A2. Schedule~~ — **SUPERSEDED 2026-08-23 by `SES-151` (`v7.0.196`): `scheduler_gate()` admits
+  a scheduled fire when its cycle row's `started_at` falls in an America/Chicago hour divisible
+  by `runner_settings.interval_hours` (row 1, read live) AND the routine's cron fires in that
+  hour — DST-proof, no cron realign ever. Live homes: `runner_settings` row 1 and routine
+  `trig_017TZ3JZcLBK6AYH6DKURqMH` at claude.ai/code/routines; full rule: runner-cycle.md
+  step 1b.** As originally shipped: fires 12/3/6/9 AM/PM CST (UTC cron
   `0 2,5,8,11,14,17,20,23 * * *`; re-align one hour when DST ends in November).
 - **A3. Two-track budget (John):** API dollars only (dev/QA split) against $5 day / $100 month
   hard walls; subscription tokens estimated (dev/QA split), governed by John's typed-in meter

@@ -680,8 +680,10 @@ SELECT * FROM public.scheduler_gate('<your cycle id>', '<your prompt''s trigger:
 the platform refused exactly that on 2026-08-23 (`SES-140`, verbatim: *"fire_trigger: this routine
 was created via http_api, not by an agent"*). It does not need to. The stored prompt already says
 *"execute runner-cycle.md EXACTLY"*, so this step binds every future cycle with no trigger edit at
-all: **the cron stays hourly permanently and each cycle paces itself down to John's `N`.** That is
-also what **retires `SES-140`'s restore obligation** — there is no interval left to restore.
+all: **the cron is John's own routine switch (`trig_017TZ3JZcLBK6AYH6DKURqMH`, his to edit at
+claude.ai/code/routines) and each cycle paces itself down to `runner_settings.interval_hours`, row
+1, read live.** That is also what **retires `SES-140`'s restore obligation** — there is no
+interval left to restore.
 
 Five properties of `scheduler_gate()` that are load-bearing. **Do not re-derive any of them by
 hand** — that is the eighth time this platform would have made the same mistake (`SES-86` phase 3,
@@ -689,12 +691,12 @@ hand** — that is the eighth time this platform would have made the same mistak
 
 - **PACING IS JOHN'S CLOCK GRID, not elapsed time since a predecessor (`SES-151`, `v7.0.196`).**
   A scheduled fire runs iff its cycle row's `started_at` falls in an **America/Chicago hour
-  divisible by `interval_hours`** — at the standing 3 that is **12, 3, 6, 9 AM/PM on John's
-  clock**, exactly, every day, DST-proof by construction (wall clock, not UTC — the retired
-  UTC-cron realign chore is gone for good). Why the elapsed-hours form had to die, measured not
-  reasoned: its `v_hours` mixed clocks (call-time `now()` against the predecessor's
-  `started_at`), so sub-minute step-0 jitter decided verdicts — **3 of 9 hourly fires were
-  wrongly paced in the `interval=1h` era** (cycle `6177c7aa`, question
+  divisible by `interval_hours`** — the admitted hours are **whatever `runner_settings` row 1's
+  value divides, read live**, never a number written here — exactly, every day, DST-proof by
+  construction (wall clock, not UTC — the retired UTC-cron realign chore is gone for good). Why
+  the elapsed-hours form had to die, measured not reasoned: its `v_hours` mixed clocks (call-time
+  `now()` against the predecessor's `started_at`), so sub-minute step-0 jitter decided verdicts —
+  **3 of 9 hourly fires were wrongly paced in the `interval=1h` era** (cycle `6177c7aa`, question
   `q-hourly-interval-boundary`) — and at any interval it drifts off whatever clock grid John
   actually means. The grid form has no boundary to jitter across: the minute never matters, only
   the hour.
@@ -728,7 +730,7 @@ hand** — that is the eighth time this platform would have made the same mistak
   step 1 already uses to label a fire `(manual fire)`. This is the one case the spec does not
   settle, and it had to be settled somehow, because §2b puts John's own *"▶ Run a cycle now"* link
   on that very panel and a paced-out tap is a dead button. The grid minute is the column
-  `runner_settings.cron_minute` (40, read live from the routine), so correcting it is one `UPDATE`.
+  `runner_settings.cron_minute` (read live from the routine), so correcting it is one `UPDATE`.
   Filed as question `q-manual-fire-pacing` rather than left as an inference.
   **The grid is measured against your cycle row's `started_at`, NOT against the `p_started` you pass
   (`SES-146`, `v7.0.188`) — and the tolerance is the column `runner_settings.grid_tolerance_min`
@@ -3434,11 +3436,14 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/settle-ship.js \
   **What it will NOT do, so a later cycle does not go looking:** it never writes outside its two
   markers — it splices, then compares head and tail byte-for-byte and exits **2** having written
   nothing on one byte of difference. So the hand-maintained judgment prose beneath the block is
-  untouched by this step, **including where that prose contradicts the block** (it still says the
-  scheduler runs *"3 hours — 12/3/6/9"* against a live `interval_hours` of 1). That disagreement is
-  not this step's to reconcile: the block's own line 49 already rules that where the two differ,
-  **the block is right and the sentence below is stale — say so rather than reconciling them by
-  hand.** Repairing that prose is a hand edit and a separate ticket.
+  untouched by this step, **including where that prose ever contradicts the block**. That hand edit
+  was `AGT-87` (`v7.0.565`): the judgment paragraph carries no cadence numbers of its own any more
+  — it states the rule (a scheduled fire is admitted when its cycle row's `started_at` falls in an
+  America/Chicago hour divisible by `runner_settings.interval_hours`, row 1 read live, **and** the
+  routine's cron fires in that hour) and points at the block above as the only home for the live
+  values. Block-wins is unchanged and is still this step's whole answer to any disagreement: the
+  block's own line 49 rules that where the two differ, **the block is right and the sentence below
+  is stale — say so rather than reconciling them by hand.**
 - **PROVE THE VERSION YOU ARE SHIPPING WAS ISSUED TO YOU — a second hard gate on the push
   (`SES-153`, `v7.0.233`, migration `ses153_issued_versions`).** Run it immediately before the
   re-assertion below:
@@ -4555,8 +4560,8 @@ accumulating one.
    17:0x–17:4xZ chained cycles used successfully — and **NEVER by `fire_trigger` on the
    `deepbench-runner` routine**, which the platform refuses to agents for `http_api`-created
    routines (`SES-140`, re-measured 2026-08-30 by the cycle John saw). **If the spawn itself
-   fails, close normally and note it:** the hourly cron is the designed fallback and the cost is
-   minutes, never a wall.
+   fails, close normally and note it:** the routine's own cron is the designed fallback and the
+   cost is minutes, never a wall.
 2. Note `CONTINUED IN-SESSION AS CYCLE <new id>` in the row you just closed at (6).
 3. **Re-enter at step 1** with the new cycle id and run every step exactly as a fresh cycle
    would — step 1b (`chained (drain continuation)` is exempt from pacing, by spec), **step 3's
