@@ -1,3 +1,4 @@
+// DeepBench v7.0.563 | tests/regression/agt-70-auditor.test.mjs | AGT-101
 // DeepBench v7.0.469 | tests/regression/agt-70-auditor.test.mjs | AGT-70
 //
 // FEATURE: AGT-70 slice 4 -- the negative control, week two, and the Auditor audited. Parts A-M
@@ -129,6 +130,7 @@ import { execFileSync } from "node:child_process";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   fingerprint, locationKey, normalize, renderReport, isoWeek, isoWeekStart, classifyIngest, toRow,
+  LEDGER_STATUSES,
 } from "../../scripts/audit-ledger.js";
 import {
   ledgerEligible, ledgerDetect, buildLedgerTicketDraft, LEDGER_SOURCE_FILE, LEDGER_WEEKLY_CAP,
@@ -395,6 +397,38 @@ function theCorpusCliRuns() {
 
 // --- F. live -------------------------------------------------------------------------------------
 
+// AGT-101 -- what a week's FILING is, graded against the fixture rather than the board. PURE: rows
+// in, assertions out, and it never counts a status. A finding's `status` is the OUTPUT of the
+// Auditor -> Development Manager -> John loop (docs/ARCHITECTURE.md §19v) and is designed to move:
+// the four 2026-W37 rows that read `open` when this test was written are now `ticketed`, ruled onto
+// AGT-87/AGT-89/AGT-90/SES-264. Grading that census grades the live world instead of the change
+// (pattern:162). What the Auditor filed is the stable thing: the count, the fingerprints computed
+// from the fixture, each row's kind, its week, and its finder -- plus that whatever status a ruling
+// has since written is one of the six names `audit_findings_status_check` allows, never a count of
+// them.
+function assertWeekFiling(rows, findings) {
+  assert.strictEqual(rows.length, findings.length,
+    `${WEEK} must hold exactly the fixture's ${findings.length} filed findings; got ${rows.length}`);
+
+  const expected = new Map(findings.map(f => [fingerprint(f), f]));
+  const filed = new Map(rows.map(r => [r.fingerprint, r]));
+  assert.deepStrictEqual([...filed.keys()].sort(), [...expected.keys()].sort(),
+    `${WEEK}'s filed fingerprints must be exactly the fixture's; ` +
+    `missing ${JSON.stringify([...expected.keys()].filter(fp => !filed.has(fp)))}, ` +
+    `unexpected ${JSON.stringify([...filed.keys()].filter(fp => !expected.has(fp)))}`);
+
+  for (const [fp, f] of expected) {
+    const r = filed.get(fp);
+    assert.strictEqual(r.kind, f.kind, `${fp} is filed as ${r.kind}; the fixture calls it ${f.kind}`);
+    assert.strictEqual(r.iso_week, WEEK, `${fp} must be filed in ${WEEK}; got ${r.iso_week}`);
+    assert.strictEqual(r.found_by, "hand:review-govtooling-0910",
+      `${fp} must name its finder; got ${JSON.stringify(r.found_by)}`);
+    assert.ok(LEDGER_STATUSES.includes(r.status),
+      `${fp} carries status ${JSON.stringify(r.status)}, which audit_findings_status_check does not ` +
+      `allow (${LEDGER_STATUSES.join(", ")})`);
+  }
+}
+
 function restHeaders(key, extra = {}) {
   return { apikey: key, Authorization: `Bearer ${key}`, ...extra };
 }
@@ -426,10 +460,11 @@ async function theLedgerIsAppendOnly() {
   };
 
   const rows = await get(`audit_findings?select=*&iso_week=eq.${WEEK}`);
-  const byStatus = rows.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] ?? 0) + 1 }), {});
-  assert.strictEqual(byStatus.open, 4, `${WEEK} must hold 4 open findings; got ${JSON.stringify(byStatus)}`);
-  assert.strictEqual(byStatus.resolved, 2, `${WEEK} must hold 2 resolved findings; got ${JSON.stringify(byStatus)}`);
-  assert.ok(rows.every(r => r.found_by === "hand:review-govtooling-0910"), "every first-week row names its finder");
+  // AGT-101 -- the week is graded on what the Auditor FILED (the fixture's six findings, their
+  // fingerprints, kinds and finder), never on how many of them are open today. A status count here
+  // would redden this test for correct work the moment the Development Manager rules a row; see
+  // assertWeekFiling above.
+  assertWeekFiling(rows, FIXTURE.findings);
 
   // Deterministic target, so a failure names the same row every time.
   const target = [...rows].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint))[0];
@@ -861,6 +896,38 @@ function theLedgerFilesOnlyRuledOpenHighRowsUnderTheCap() {
 
   assert.strictEqual(LEDGER_WEEKLY_CAP, 3, "the standing weekly cap is 3 (runbook step 4d states the same number)");
 
+  // AGT-101 -- the status VOCABULARY, pinned to the schema, and assertWeekFiling()'s two inverted
+  // controls. Both are pure: no row is read, written or restored anywhere here.
+  assert.deepStrictEqual(LEDGER_STATUSES, ["open", "resolved", "not-a-defect", "ticketed", "carried", "escalated"],
+    "the exported set must be exactly audit_findings_status_check's six names, in the report's sort order -- " +
+    "part F grades membership in THIS list, so a name added here without the constraint (or lost from it) " +
+    "would silently widen or narrow what the live ledger is allowed to say");
+
+  // The live shape the helper is handed, built from the fixture: the four unruled findings carry
+  // `ticketed` on purpose, because the point of AGT-101 is that WHICH status a row carries is not
+  // graded. The positive arm runs first -- without it a helper that threw unconditionally would
+  // pass both controls below.
+  const filedRows = FIXTURE.findings.map(f => ({
+    fingerprint: fingerprint(f), kind: f.kind, iso_week: WEEK,
+    found_by: "hand:review-govtooling-0910", status: f.status ?? "ticketed",
+  }));
+  assertWeekFiling(filedRows, FIXTURE.findings);
+
+  // CONTROL (a): a status outside the six. An assertion that accepted any non-empty string -- the
+  // obvious wrong fix for AGT-101 -- passes the arm above and fails here.
+  assert.throws(
+    () => assertWeekFiling(filedRows.map((r, i) => (i === 0 ? { ...r, status: "wontfix" } : r)), FIXTURE.findings),
+    /carries status "wontfix", which audit_findings_status_check does not allow/,
+    "a status the constraint does not allow must be rejected, and by the status branch");
+
+  // CONTROL (b): one fixture fingerprint absent from the filing. The COUNT is held (the first row
+  // stands in twice) so the rejection can only have come from the fingerprint-set branch -- a
+  // status-only or count-only assertion passes this and the helper would be grading nothing.
+  assert.throws(
+    () => assertWeekFiling([filedRows[0], ...filedRows.slice(0, 1), ...filedRows.slice(2)], FIXTURE.findings),
+    /filed fingerprints must be exactly the fixture's/,
+    "a week missing one of the fixture's findings must be rejected, and by the fingerprint branch");
+
   // The draft. The fingerprint in the description is what makes the dedup above work at all.
   const now = new Date("2026-09-14T10:00:00.000Z");
   const draft = buildLedgerTicketDraft(R1, "SES-999", { now });
@@ -895,9 +962,10 @@ function theLedgerFilesOnlyRuledOpenHighRowsUnderTheCap() {
 
 // --- K. the brief group (pure + doc) -------------------------------------------------------------
 
-// The six live fingerprints' SHAPE: four open with nobody's ruling on them, two resolved, nothing
-// filed. This is the state the ledger is actually in at this ship, so a drift in the renderer shows
-// up here as the wrong sentence about the real board.
+// The six fingerprints' SHAPE as the FIXTURE files them: four unruled, two resolved, nothing filed.
+// AGT-101 -- this is a hand-built INPUT to the renderer, not a photograph of the live board: those
+// four rows now read `ticketed`, ruled by the Development Manager. A drift in the renderer shows up
+// here as the wrong sentence about this input, which is the stable thing to grade (pattern:162).
 const AUDIT = (over = {}) => ({
   rows: [
     { fingerprint: "4637961d21e1076a", iso_week: "2026-W37", kind: "contradiction", confidence: "high", status: "open", governing_fact: "the order of the board's ranking keys", ruled_by: null },
@@ -1044,7 +1112,12 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
   const json = JSON.parse(out.trim());
   assert.strictEqual(json.source, "ledger", "the JSON must name its SOURCE -- the tripwire path and this one share every other key");
   assert.strictEqual(json.weeklyCap, 3, "the live cap is the constant, not a flag");
-  assert.strictEqual(json.filedThisWeek, 0, "nothing has been filed from the ledger this ISO week");
+  // AGT-101 -- what is graded is the CAP ARITHMETIC, not the tally. `filedThisWeek` is 0 only until
+  // the first ledger ticket files; pinning it to 0 reddens this part for the ledger working.
+  assert.ok(Number.isInteger(json.filedThisWeek) && json.filedThisWeek >= 0 && json.filedThisWeek <= json.weeklyCap,
+    `filedThisWeek must be a whole count inside the weekly cap; got ${json.filedThisWeek} against a cap of ${json.weeklyCap}`);
+  assert.strictEqual(json.capLeft, json.weeklyCap - json.filedThisWeek,
+    `capLeft must be the cap minus what has filed this week; got ${json.capLeft} for ${json.filedThisWeek} of ${json.weeklyCap}`);
   assert.ok(Array.isArray(json.detections), "detections is always an array, even when empty");
 
   const get = async q => {
@@ -1092,7 +1165,7 @@ const OPEN_FOUR = ["4637961d21e1076a", "4ef228c361f9a904", "b057c6f102845074", "
 
 function aResolvedCorpusFindsNothingAndTheFlagIsWhy() {
   assert.deepStrictEqual(ROWS.filter(r => r.status === "open").map(r => r.fingerprint).sort(), OPEN_FOUR,
-    "the fixture must fingerprint to the four open findings the LIVE ledger holds -- if these drift apart this whole part is measuring a different week than the one it names");
+    "the fixture must fingerprint to the four findings it files unruled -- AGT-101: these four ids are the FIXTURE's, not the live board's (where the Development Manager's ruling has since moved every one of them); if the file and this list drift apart this whole part is measuring a different week than the one it names");
 
   const sts = resolved();
   assert.strictEqual(sts.length, 25, `the resolved corpus is 18 database statements plus 7 from the three files; got ${sts.length}`);

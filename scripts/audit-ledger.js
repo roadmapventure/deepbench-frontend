@@ -166,6 +166,9 @@ export function fingerprint(f) {
 }
 
 const STATUS_ORDER = { open: 0, resolved: 1, "not-a-defect": 2, ticketed: 3, carried: 4, escalated: 5 };
+// The six names public.audit_findings' `audit_findings_status_check` constraint allows, in the
+// order the report sorts them; exported so a caller names the set once instead of restating it.
+export const LEDGER_STATUSES = Object.freeze(Object.keys(STATUS_ORDER));
 const LEGACY_STATUSES = new Set(["open", "resolved", "not-a-defect"]);
 const CONFIDENCE_ORDER = { high: 0, medium: 1, low: 2 };
 
