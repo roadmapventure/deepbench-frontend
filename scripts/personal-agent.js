@@ -78,16 +78,16 @@ export const READ_MAP = {
 // A kind-level read filter: match-finder reads only postings not yet reviewed (data.status = new).
 const KIND_FILTERS = { posting: rec => rec?.data?.status === 'new' };
 
-// Local repositories evidence-mining may read (read-only: git log, files). Paths only -- no remote,
-// no credential. The shared checkout is read here, never written (its history is the full one; the
-// runner's own checkout is a depth-1 clone).
+// The evidence sources the design named, read-only (git log, files). Paths only -- no remote, no
+// credential. deepbench-personal is the personal-lane clone of dev -- never the shared checkout
+// C:/Projects/deepbench-frontend, which is deliberately stale. The last entry is a single file.
 export const REPOS = [
-  'C:/Projects/deepbench-frontend',
+  'C:/Projects/deepbench-personal',
   'C:/Projects/deepbench-backend',
+  'C:/Projects/nigp-analyzer',
   'C:/Projects/interviewquestions',
   'C:/Projects/interviewquestions-evidence',
-  'C:/Projects/maricopa-dashboard',
-  'C:/Projects/roadmapventure-site',
+  'C:/Projects/john-leonard-profile.md',
 ];
 
 const BOARDS = ['greenhouse', 'lever', 'ashby'];
