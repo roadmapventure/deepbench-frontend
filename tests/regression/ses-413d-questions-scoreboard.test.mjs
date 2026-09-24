@@ -85,7 +85,15 @@ const JOHN = "docs/WORKING-WITH-JOHN.md";
 // that points at `runner_settings.interval_hours` and the routine (prose only, no value changed):
 // 379678 -> 380144 B, 856 B under the ceiling. Re-pinned in the same commit that edits the runbook.
 export const RUNBOOK_CEILING = 381000;
-export const BYTES_AT_SHIP = 380144;
+//
+// v7.0.567 (AGT-89) corrected two sentences about the automation lane at the M5-02 block:
+// "SITS ABOVE ALL SIX ORDER CLAUSES" -> "IS THE LEADING OF OD-01'S SIX ORDER CLAUSES", and the
+// rank domain "(1-6; NULL = not in the lane)" -> the open-ended integer it actually is (measured
+// live this ship: min -45, max 23 over 177 ranked rows). The edit adds +109 B. It landed on top of
+// v7.0.565's 380144 rather than the 379678 it was written against, so the pin is the RE-MEASURED
+// post-rebase byte count, never either side of the conflict: 380144 -> 380253 B, 747 B under the
+// ceiling. Re-measured with wc -c after the rebase and re-pinned in the same commit.
+export const BYTES_AT_SHIP = 380253;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

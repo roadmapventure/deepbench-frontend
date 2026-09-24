@@ -37,7 +37,7 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-01"></a>OD-01 — The queue sort keys
 
-> The pickable board's stored order is produced by exactly six ranking keys applied in this sequence: `automation_rank` nulls last, then tier (`now` before `next` before everything else), then the numeric part of `priority_class` ascending, then the M5-02 filing lane (`coalesce(filed_at, created_at)` before 2026-08-21 first), then `predicted_cycles` ascending nulls last, then `coalesce(filed_at, created_at)` ascending, with `backlog_id` and `id` as final tiebreaks; canonical: `public.recompute_backlog_queue()`.
+> The pickable board's stored order is produced by exactly six ranking keys applied in this sequence: `automation_rank` nulls last, then tier (`now` before `next` before everything else), then the numeric part of `priority_class` ascending, then the M5-02 filing lane (`filed_at` before 2026-08-21 first, NULL last), then `predicted_cycles` ascending nulls last, then `filed_at` ascending nulls last, with `backlog_id` and `id` as final tiebreaks; canonical: `public.recompute_backlog_queue()`.
 
 - **Enforcement:** `script`
 - **Lives in:** `public.recompute_backlog_queue()`, the `unpinned` CTE's `row_number() OVER (ORDER BY …)`.
@@ -439,12 +439,12 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-43"></a>OD-43 — The Prioritizer's own sort order
 
-> `pz-rank-intent` instructs the Prioritizer to order tickets by project milestone order, then `supports_class` (P1 first, none last), then `priority_class`, then the filing lane, then `predicted_cycles`, then queue — an order that does NOT agree with the one the picker actually uses, which puts the filing lane ABOVE the class and knows nothing of `supports_class` at all; canonical: `public.skill_profiles.method` for `pz-rank-intent`.
+> `pz-rank-intent` instructs the Prioritizer to order tickets by project milestone order, then `supports_class` (P1 first, none last), then `priority_class`, then the filing lane, then `predicted_cycles`, then queue; that ruling is written to `backlog_items.automation_rank`, which is OD-01's LEADING key, so the two are layers and not rivals: the Intent decides the ranked head of the board and OD-01's remaining keys order everything below it; canonical: `public.skill_profiles.method` for `pz-rank-intent`.
 
 - **Enforcement:** `script`
 - **Lives in:** `public.skill_profiles` row `pz-rank-intent`, column `method`.
 - **Pinned by:** `tests/regression/ses-334-served-class-block.test.mjs` pins the block that REPORTS the ranking, not the key order itself.
-- **Judgment:** **amend — NAMED CONTRADICTION.** OD-01 and M5-02 say filing lane before class; this says class before filing lane, and adds a key (`supports_class`) the picker cannot see. The Prioritizer writes `automation_rank`, which is OD-01's LEADING key, so its ordering does reach the board — through a key that overrides every key it was told to sort under. G2 forbids exactly this: one governing fact, two authoritative statements. Proposal 1.
+- **Judgment:** **keep — two layers, stated.** There is no contradiction to amend. The Prioritizer writes `automation_rank`, which is OD-01's LEADING key, so the Intent orders the ranked head of the board and OD-01's remaining keys order everything below it — two layers, not two rivals, and both statements now say so (`AGT-89`, `v7.0.567`). What genuinely remains is narrower and is NOT settled here: `pz-rank-intent` orders `predicted_cycles` before queue where the pickers order queue first, and it sorts on `supports_class`, which the picker cannot see. Editing `pz-rank-intent.method` is John's decision; filed as its own row.
 
 ### <a id="OD-44"></a>OD-44 — The cost-per-cycle fallback
 
@@ -464,7 +464,7 @@ Accept, reverse or rework them as a batch; they are ordered by how much they cos
 
 | # | Default | What is wrong | Proposed change |
 |---|---|---|---|
-| 1 | **OD-43** vs **OD-01** | The Prioritizer is told to sort class-before-lane and to use `supports_class`; the picker sorts lane-before-class and cannot see `supports_class`. Its ruling still reaches the board through `automation_rank`, OD-01's leading key — so the written order and the real order disagree, and the disagreement is invisible. | Pick one. Either rewrite `pz-rank-intent.method` to the M5-02/M5-07 key order, or amend M5-02 to put `supports_class` above the filing lane and teach `recompute_backlog_queue()` the key. One ticket, either way. |
+| 1 | **OD-43** vs **OD-01** | REGISTERED AND CLOSED by `AGT-89` (`v7.0.567`): there was no contradiction. The Prioritizer's ruling reaches the board through `automation_rank`, OD-01's LEADING key, so the Intent decides the ranked head and OD-01's remaining keys order everything below it. Both statements now say so. | Done — OD-43 and OD-01 rewritten as layers. The narrower residue (`pz-rank-intent` orders `predicted_cycles` before queue, and sorts on `supports_class` the picker cannot see) needs a `pz-rank-intent.method` edit and is John's call; filed as its own P10 row, `design_status='needs-john'`. |
 | 2 | **OD-35** | `ladder_work_class()` returns NULL for P1, P3, P4 and P6, so those four classes can never auto-done and never earn scope extras — including P1, the class a FAANG-showcase ticket is promoted INTO. | Add the four mappings (or rule explicitly, in the registry, that those classes are attended-only). Today the rule exists only as an absent CASE arm. |
 | 3 | **OD-32** | `cap_relax_rung` is 13 and `tooling` is at rung 20, so `class_autonomy('P10 - Tooling')` grants +7 files and +7 tasks — a live cap of 10 files / 11 tasks against CLAUDE.md's hard 3 / 4. | Cap the extras (a `cap_relax_max_extra` column, or `least(rung - cap_relax_rung, k)`), and state the ceiling in the registry rather than leaving it implied by whatever rung a class happens to reach. |
 | 4 | **OD-14** | `interval_hours` is LIVE 1 while the written record describes a 3-hour grid at 12/3/6/9 CST. The gate therefore passes every hour, and no test notices. | Confirm 1 is intended and correct the prose, or restore 3. Either way the value and the description have to agree. |

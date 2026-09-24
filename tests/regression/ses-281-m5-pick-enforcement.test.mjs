@@ -1,3 +1,10 @@
+// DeepBench v7.0.567 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-89 -- the
+// stored-queue oracle below reads `filed_at` ALONE, mirroring recompute_backlog_queue() after the
+// agt89_filing_lane_filed_at_only migration dropped its `coalesce(filed_at, created_at)`; a NULL
+// filed_at sorts to the tail, as laneOf() has always had it. A TRIPWIRE in the live arm goes red
+// the first time an open row carries a NULL filed_at, so the tail is never where one lands
+// unremarked. Both carry their own negative controls.
+//
 // DeepBench v7.0.497 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-401 -- the
 // empty-lane clause is now one shared discrimination (`_lib/board-state.js`) over four states, and
 // it joins live cycles on `runner_cycles.item_id`. SES-386's block below joined `claimed_by` (text,
@@ -529,7 +536,32 @@ async function theLivePickPathObeysTheFourRules() {
   );
   const LANE_CUT = Date.parse("2026-08-21T00:00:00Z");
   const bucket = r => `${r.tier}|${r.priority_class}`;
-  const isPre = r => Date.parse(r.filed_at ?? r.created_at) < LANE_CUT;
+  // AGT-89 (v7.0.567): `filed_at` ALONE, never `?? created_at`. This oracle used to mirror the
+  // `coalesce(filed_at, created_at)` that recompute_backlog_queue() carried; the migration dropped
+  // it, because coalesce(NULL, created_at) resolves to a real date and therefore PROMOTED an
+  // unfiled ticket into the priority lane -- the exact opposite of what the comment beside it
+  // claimed. A NULL filed_at now sorts to the TAIL, which is what laneOf() at the top of this file
+  // has always said and what M5-02 says. The two are now the same rule, written once each.
+  const isPre = r => !!r.filed_at && Date.parse(r.filed_at) < LANE_CUT;
+
+  // NEGATIVE CONTROL for that oracle, before it grades anything: it must answer for the NULL the
+  // same way the function does. Under the old `?? created_at` form the first of these three was
+  // TRUE -- a pre-cut created_at bought an unfiled ticket the priority lane -- so this block fails
+  // on the pre-change oracle and is not satisfiable by an oracle that does nothing.
+  assert.strictEqual(
+    isPre({ filed_at: null, created_at: "2026-06-01T00:00:00Z" }), false,
+    "the lane oracle still falls back to created_at: an unfiled ticket with a pre-cut created_at " +
+      "is being read into the PRIORITY lane, which is the promotion AGT-89 removed",
+  );
+  assert.strictEqual(
+    isPre({ filed_at: "2026-06-01T00:00:00Z", created_at: "2026-09-01T00:00:00Z" }), true,
+    "the lane oracle no longer reads a real pre-cut filed_at as the priority lane",
+  );
+  assert.strictEqual(
+    isPre({ filed_at: null, created_at: "2026-06-01T00:00:00Z" }), laneOf(null) === 0,
+    "the stored-queue oracle and laneOf() disagree about a NULL filed_at -- the two homes of " +
+      "M5-02 inside this one file have drifted apart",
+  );
   const inversions = [];
   for (const a of ordered) {
     for (const b of ordered) {
@@ -548,6 +580,45 @@ async function theLivePickPathObeysTheFourRules() {
       `pairs in the same tier+class bucket put a pre-2026-08-21 ticket AFTER a post-cut one. ` +
       `First few: ${inversions.slice(0, 5).join("; ")}. That is B3's retired newest-first ordering ` +
       "still running in the stored queue",
+  );
+
+  // --- AGT-89 TRIPWIRE: zero open rows may carry a NULL filed_at.
+  // Dropping the coalesce made the board HONEST about an unfiled ticket (it falls to the tail)
+  // rather than silently flattering it into the priority lane -- but the tail is still not a
+  // decision anyone made. Measured 2026-09-24, immediately before this shipped: 572 open rows, 0
+  // of them unfiled, so the change is latent today and this assertion is what keeps it latent.
+  // The first row filed without a filed_at turns the queue's oldest-first key into a NULL, and
+  // this goes red naming it instead of letting it sit in the tail unremarked.
+  const unfiled = rows => rows.filter(r => r.filed_at === null || r.filed_at === undefined);
+  const openRows = await pg(
+    url, key,
+    "backlog_items?select=backlog_id,status,filed_at,created_at,queue" +
+      "&status=not.in.(done,removed)&limit=2000",
+  );
+  assert.ok(
+    openRows.length > 0,
+    "the open board came back empty, so the NULL-filed_at tripwire graded nothing -- that is a " +
+      "finding about the read, not a pass",
+  );
+  assert.deepStrictEqual(
+    unfiled(openRows).map(r => `${r.backlog_id}(${r.status})`), [],
+    `${unfiled(openRows).length} of ${openRows.length} open backlog rows carry a NULL filed_at. ` +
+      "Since AGT-89 recompute_backlog_queue() orders on bare filed_at, so each of these sorts to " +
+      "the TAIL of its tier+class bucket by default rather than by anyone's ruling. Give the row " +
+      "a filed_at, or decide in the open that the tail is where an unfiled ticket belongs",
+  );
+
+  // NEGATIVE CONTROL for the tripwire: the same detector over the same shape of row with the one
+  // thing that should matter present. A filter that answered [] for every input would pass the
+  // assertion above on any board, today's included, and prove nothing (the SES-158 lesson).
+  assert.deepStrictEqual(
+    unfiled([
+      { backlog_id: "SYNTH-FILED", status: "open", filed_at: "2026-06-01T00:00:00Z" },
+      { backlog_id: "SYNTH-UNFILED", status: "open", filed_at: null, created_at: "2026-06-01T00:00:00Z" },
+    ]).map(r => r.backlog_id),
+    ["SYNTH-UNFILED"],
+    "the NULL-filed_at detector does not catch a seeded unfiled row, so its green above graded " +
+      "nothing -- a control that changes nothing proves nothing",
   );
 
   // --- The conversion is reversible from the ledger, not from memory.

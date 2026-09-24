@@ -2585,10 +2585,12 @@ reason the drain could not terminate was never `SES-110`: it was the **live-tier
 ticket replaced**, which the runner's own filings extended faster than it drained. Termination now
 depends only on John's 18 named members closing — a set no cycle can add to.
 
-**THE AUTOMATION LANE SITS ABOVE ALL SIX ORDER CLAUSES (`SES-86` phase 3, `v7.0.133`, directive
+**THE AUTOMATION LANE IS THE LEADING OF OD-01'S SIX ORDER CLAUSES (`SES-86` phase 3, `v7.0.133`, directive
 `f47e5a95` — John, 2026-08-21T16:21Z).** His line, verbatim: *"keep closing automation tooling
 tickets first before getting to the classified backlog."* `backlog_items.automation_rank` holds his
-C4 step number (1–6; NULL = not in the lane) and is the function's **leading** key, `NULLS LAST`.
+C4 step number, an open-ended integer, lower first, NULL = not ranked — SES-101's slot is
+min(open lane) − 1, so live values go negative, and it is the function's **leading** key,
+`NULLS LAST`.
 Three things about it:
 
 - **Why it stopped being prose.** As a doc section, layer 2 was something each cycle had to

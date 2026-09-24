@@ -462,8 +462,8 @@ What each one is, in the pick path:
   board by up to 68 days (`SES-295`). A NULL `filed_at` falls to the review bucket; zero rows carry
   one today. This is the clause that retires **B3**, whose ordering ended *"newest-to-oldest within
   class"* — the exact inverse of the lane John set.
-- **`M5-07` — cheapest-first tiebreak.** `predicted_cycles` ascending, **nulls last**, as the last
-  ordering term. It changes only ties: never a lane, never a class.
+- **`M5-07` — cheapest-first tiebreak.** `predicted_cycles` ascending, **nulls last**, as the last ranking key before the
+  filed_at date and the backlog_id/id tiebreaks. It changes only ties: never a lane, never a class.
 - **`M5-09` — the rolling wave, enforced.** A member is unpickable while its milestone's own design
   gate is unresolved (`status <> 'done'`). **A gate ticket never blocks itself** (`g.id <> b.id`) —
   without that exclusion the milestone deadlocks permanently behind the one ticket that could open
