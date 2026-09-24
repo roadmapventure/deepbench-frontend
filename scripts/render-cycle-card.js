@@ -414,9 +414,11 @@ async function repinKnowledge(base, key, live, row) {
   }
 }
 
-async function syncKnowledge() {
+async function syncKnowledge(opts = {}) {
   const apply = process.argv.includes("--apply");
-  const repin = process.argv.includes("--repin");
+  // AGT-112: `opts.repin` is how the --write branch falls into the SAME repair below rather than
+  // growing a second one. The flags it re-pins under are the flags already on the command line.
+  const repin = opts.repin === true || process.argv.includes("--repin");
   const cardPath = path.join(WORKTREE, CARD_REL);
 
   let cardText;
@@ -580,13 +582,53 @@ async function syncKnowledge() {
 // no flag  -> check: 0 the committed card equals render(runbook); 1 it differs or is over cap
 //             (prints the first differing line and the --write command); 2 the runbook or the card
 //             could not be read, a step has no NOTES entry, or NOTES names a step the runbook lacks.
-// --write  -> write the card. Refuses over CARD_BYTE_CAP.
+// --write [--cycle-id=<uuid> --ticket=<ID>]
+//          -> write the card. Refuses over CARD_BYTE_CAP. A write that CHANGES the card refuses
+//             with exit 2 unless it carries --cycle-id, --ticket and live credentials (AGT-112,
+//             writeGate below), and on success re-pins the Knowledge row in the same run under the
+//             same decision handle. A write that changes nothing is ungated and exits 0.
 // --sync-knowledge [--apply --cycle-id=<uuid> [--decision=<uuid>]]
 //          -> 0 the live Knowledge row is absent or current, 1 it is DRIFTED, 2 it cannot be read
 //             (missing card, missing env, REST failure) or --apply could not complete.
 // --sync-knowledge --repin --cycle-id=<uuid> --ticket=<ID> [--decision=<uuid>]
 //          -> repairs a DRIFTED row: 0 re-pinned (or already current, nothing written), 2 the row is
 //             absent, a required flag is missing, or the write could not complete. SES-424 slice 5.
+
+// AGT-112 -- WHY A RENDER MAY NOT SHIP ALONE. Measured this cycle: the committed card was
+// re-rendered twice in one night (187df12b -> 385a4688 -> a3c4ac6d) and the live Knowledge row was
+// re-pinned neither time, so the Development Manager spent ~4 hours being assembled from a cycle
+// two renders old. Nothing coupled the two: `grep "sync-knowledge\|repin" runner-cycle.md` returned
+// 0 hits, and the re-pin was a separate command a human had to remember. That is the wrong shape --
+// the fix is not a third wording of the instruction but a structural one (pattern:10), and the
+// structure is to gate the dangerous operation through the atomic correct path instead of blocking
+// it (pattern:19): a render that CHANGES the card cannot be written at all unless it arrives with
+// what the re-pin needs, and then it re-pins in the same run under the same handle.
+//
+// A NO-OP RE-RENDER IS NOT GATED. `changed === false` writes bytes identical to the ones already
+// committed, so it cannot put the pin out of date and owes nothing -- gating it would only train
+// everyone to pass flags that mean nothing, and would break `--write` as an idempotent check.
+//
+// Pure, and the whole of the gate's decision: null when the write may proceed, else the refusal
+// string. It names every missing thing at once, so a caller fixes one command line instead of
+// discovering the requirements one exit at a time.
+export function writeGate({ changed, ticket, cycleId, hasCreds }) {
+  if (changed !== true) return null;
+  const missing = [];
+  if (!ticket) missing.push("--ticket=<ID>");
+  if (!cycleId) missing.push("--cycle-id=<uuid>");
+  if (!hasCreds) missing.push("SUPABASE_URL and SUPABASE_SERVICE_KEY in the environment");
+  if (!missing.length) return null;
+  return `render-cycle-card --write: this render CHANGES ${CARD_REL}, and the live ` +
+    `${KNOWLEDGE_SLUG} Knowledge row pins the card's bytes — so writing it here would leave the ` +
+    `Development Manager assembled from a procedure that is no longer the committed one, which is ` +
+    `exactly what happened twice on 2026-09-24 (AGT-112). The write and the re-pin are ONE ` +
+    `operation under one decision handle.\n` +
+    // ONE LINE, NOTHING ELSE ON IT. The hint below names every flag, so a test that only grepped
+    // the whole message for "--ticket" would pass on the --cycle-id refusal too (STANDARDS §4,
+    // LOO-013: assert WHICH branch fired). This line is the machine-readable answer to that.
+    `  missing: ${missing.join(", ")}\n` +
+    `Nothing was written. Re-run as:  node scripts/render-cycle-card.js --write --cycle-id=<uuid> --ticket=<ID>`;
+}
 
 function firstDiff(a, b) {
   const x = a.split("\n");
@@ -630,9 +672,38 @@ function main() {
         "Lower FULL_BLOCK_MAX in this script so fewer blocks are carried in full. Never raise CARD_BYTE_CAP: the cap IS the feature.");
       process.exit(1);
     }
+
+    // AGT-112. `changed` is measured against the bytes on disk, not assumed from the flags: a card
+    // that is missing entirely is a change, and a re-render that produces what is already committed
+    // is not. The gate runs BEFORE the write, so a refusal leaves the card byte-for-byte as it was.
+    let onDisk = null;
+    try {
+      onDisk = lf(fs.readFileSync(cardPath, "utf8"));
+    } catch {
+      onDisk = null;
+    }
+    const changed = onDisk !== card;
+    const refusal = writeGate({
+      changed,
+      ticket: flagValue("ticket"),
+      cycleId: flagValue("cycle-id"),
+      hasCreds: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY),
+    });
+    if (refusal) {
+      console.error(refusal);
+      process.exit(2);
+    }
+
     fs.writeFileSync(cardPath, card);
     console.log(`render-cycle-card: wrote ${CARD_REL} — ${bytes} bytes, ${parseSteps(md).length} steps, from ${RUNBOOK_REL} sha256 ${runbookSha(md)}`);
-    process.exit(0);
+
+    // An unchanged write cannot have moved the pin, so it ends here and touches no database.
+    if (!changed) process.exit(0);
+
+    // THE COUPLING. Same process, same flags, one handle: the repair below is the existing
+    // repinKnowledge(), reached through the existing classifier, never a second copy of it.
+    console.log("render-cycle-card --write: the card changed — re-pinning the Knowledge row in the same run.");
+    return syncKnowledge({ repin: true });
   }
 
   let committed;
