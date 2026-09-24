@@ -8,6 +8,14 @@ lost, only moved out of the live rulebase. This file exists so removals are *fin
 reasons*: if you are looking for a rule you remember and can't find it, check here before
 concluding it never existed. Entries are append-only; newest at the bottom of each section.
 
+**And every retirement also re-points the registry, in the same ship that retires the thing:** grep
+`public.governance_rules` — both the `statement` column and the `canonical_doc` column — for the
+retired path, predicate or rule id, and amend or supersede *every* hit before the push, never in a
+follow-up ticket. Writing the entry below is not the whole duty: a live rule still naming something
+that no longer exists is worse than no rule, because the next cycle believes it and goes looking for
+a file that is not there. `AGT-91` (entry 55) is what that omission costs — four live rows, three
+retirements, found by a grep nobody had been required to run.
+
 Restore path for any entry, unless stated otherwise: `git log --follow -- <path>` in
 `deepbench-frontend`, then `git show <commit>:<path>` to recover the exact prior text.
 
@@ -1230,3 +1238,44 @@ Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery re
 - **Restore:** git history of `CLAUDE-DESIGN.md` — but the block is still present in the live file, so
   there is nothing to recover; what a restore would undo is the retirement notice above it and the
   §3f pointers at Step 4.13 and Step 5a.
+
+### 55. Four live `governance_rules` rows that named retired homes — re-pointed, not removed
+- **Said:** four rows, all `status = 'live'`, each naming something three earlier retirements had
+  already taken away. Prior text, verbatim from this ship's before-images:
+  - `OD-42` — "The nightly re-rank hands the Prioritizer at most 60 candidates … canonical:
+    `api/cron/rank-backlog.js`'s `MAX_CANDIDATES` and `public.skill_profiles.max_tokens` for
+    `pz-rank-intent`."
+  - `OD-19` — "The Prioritizer's nightly board re-rank is a VERCEL cron at `10 9 * * *` … canonical:
+    `vercel.json` `crons[0]`, with the reasoning in `api/cron/rank-backlog.js`."
+  - `OD-04` — "… the `board` row … is emitted whether the Prime Directive stands or not; canonical:
+    `public.prime_directive_queue()`."
+  - `B10` — "Mine each ticket's filed_at timestamp from git history to support newest/oldest
+    tie-breaking."
+- **Lived:** `public.governance_rules`; the census blockquotes and **Lives in:** lines at
+  `docs/design/2026-09-09-operational-defaults-census.md#OD-04`, `#OD-19`, `#OD-42`; and B10's own
+  home, the bullet at `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B10`. Rendered from the registry into
+  `docs/governance/RULES-SNAPSHOT.md`.
+- **Why retired:** the *referents* were, not the rules. `SES-346` (entry 53) deleted
+  `api/cron/rank-backlog.js` and the `10 9 * * *` Vercel cron and moved the board re-rank onto the
+  runner's own cycle at `runner-cycle.md` step 4c, which orphaned `OD-42`'s and `OD-19`'s canonical
+  homes — `api/cron/` no longer exists and `vercel.json` declares no `crons` key, both measured on
+  this tree. `SES-340` (entries 43/44) replaced the "Prime Directive stands" predicate with
+  `EXISTS (projects WHERE status = 'executing')` and closed directive `a0ef9525` superseded, which
+  left `OD-04` restating a predicate nobody evaluates. `M5-02` superseded B3's newest/oldest
+  tie-break on 2026-09-01 (entry 20), which left `B10` justifying `filed_at` by a sort key that is
+  no longer the reason it is mined. Three retirements, none of which was required to grep the
+  registry — the duty the Contract above now carries.
+- **Survives:** all four rules, in full. Nothing was removed or superseded: each statement was
+  re-pointed at the home that does exist (`scripts/rank-backlog.js`, `runner-cycle.md` step 4c,
+  `public.prime_directive_queue()`, `M5-02`'s filing lane) and each now cites the ledger entry that
+  says what happened to the home it used to name — 53, 53, 43/44 and 20 respectively. The live
+  count of rows naming a retired referent went **4 → 0**, which is the discriminator
+  `tests/regression/agt-91-retired-homes.test.mjs` pins on both arms.
+- **Restore:** `public.reverse_decision('7f25bb78-ff4a-4377-94ca-e174ef23f4dc', '<actor>', '<reason>')`.
+  All four rows were imaged into `public.runner_before_images` under that one decision before any
+  write: `B10` `d425de24-2071-4fa5-a3a9-df59e88ca72e`, `OD-04` `1c0c4ade-7cf9-416c-bdfe-bc172b9e77d3`,
+  `OD-19` `b52c4f5a-b780-4531-9b75-6e748c8a8087`, `OD-42` `bfb4ea71-b58b-4394-bef9-8e955ffb9da4`.
+  `governance_rules` is on `reverse_decision()`'s `k_allowed` list and carries an `updated_at`
+  column, so a reversal restores all four **verified** (`restored`, not `restored_unverified`) —
+  read from `pg_get_functiondef` this session, not recalled. The doc halves are git only:
+  `git log --follow --` the three files above.

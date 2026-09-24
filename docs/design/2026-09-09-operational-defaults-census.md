@@ -64,7 +64,7 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-04"></a>OD-04 — The pick lane order
 
-> Work is offered to a cycle in three lanes in a fixed order — `directive` (every queued one-off directive, oldest first), then `drain` (the standing drain's next claimable named members), then `selfbuild` (every buildable ticket in an executing project) — and the `board` row that reports how many queued tickets are outside an executing project is emitted whether the Prime Directive stands or not; canonical: `public.prime_directive_queue()`.
+> Work is offered to a cycle in three lanes in a fixed order — `directive` (every queued one-off directive, oldest first), then `drain` (the standing drain's next claimable named members), then `selfbuild` (every buildable ticket in an executing project) — and the `board` row that reports how many queued tickets are outside an executing project is emitted whether or not an executing project exists; canonical: `public.prime_directive_queue()` (`SES-340` made "standing" `EXISTS (projects WHERE status = 'executing')`; directive `a0ef9525`, which used to be that predicate, is closed superseded — ledger 43/44).
 
 - **Enforcement:** `script`
 - **Lives in:** `public.prime_directive_queue()`, the `picks` CTE's three `UNION ALL` arms and the trailing board row.
@@ -203,10 +203,10 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-19"></a>OD-19 — The nightly re-rank's cron
 
-> The Prioritizer's nightly board re-rank is a VERCEL cron at `10 9 * * *`, which is 03:10 America/Chicago in summer and 02:10 in winter because Vercel crons carry no timezone; the requirement it satisfies is "overnight, off the runner's own grid", and :10 was chosen to collide with neither the runner's :40 nor the finaliser's :17; canonical: `vercel.json` `crons[0]`, with the reasoning in `api/cron/rank-backlog.js`.
+> The board re-rank runs on the runner's own cycle at `docs/runbooks/runner-cycle.md` step 4c — once per CST day, on the first scheduled cycle that passes the walls, gated on no `runner_cycles` row whose `notes` start `SCHEDULED-AGENT: rank-backlog` having an `ended_at` in the current America/Chicago day; the Vercel cron `10 9 * * *` was retired with its route and `vercel.json` declares no crons; canonical: `scripts/rank-backlog.js` (`SES-346`, ledger 53).
 
 - **Enforcement:** `script`
-- **Lives in:** `vercel.json`; `api/cron/rank-backlog.js`.
+- **Lives in:** `scripts/rank-backlog.js`, run by `docs/runbooks/runner-cycle.md` step 4c.
 - **Pinned by:** `tests/regression/ses-334-served-class-block.test.mjs`.
 - **Judgment:** **keep.** The DST drift is named in the file rather than papered over, and both readings satisfy the requirement. G2 is satisfied by the naming, not by the shape.
 
@@ -430,10 +430,10 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-42"></a>OD-42 — The re-rank's candidate cap
 
-> The nightly re-rank hands the Prioritizer at most 60 candidates, taken from `public.prime_directive_queue()` itself rather than from a re-derived board filter, because `pz-rank-intent`'s `max_tokens` is 4000 and each ranked entry costs roughly 30 output tokens — a TRUNCATED ranking is worse than a refused one, since the handler would apply the half it received as if it were the whole order; canonical: `api/cron/rank-backlog.js`'s `MAX_CANDIDATES` and `public.skill_profiles.max_tokens` for `pz-rank-intent`.
+> The board re-rank hands the Prioritizer at most 60 candidates, taken from `public.prime_directive_queue()` itself rather than from a re-derived board filter, because `pz-rank-intent`'s `max_tokens` is 4000 and each ranked entry costs roughly 30 output tokens — a TRUNCATED ranking is worse than a refused one, since the handler would apply the half it received as if it were the whole order; canonical: `scripts/rank-backlog.js`'s `MAX_CANDIDATES` and `public.skill_profiles.max_tokens` for `pz-rank-intent` (`SES-346` moved it off the cron; ledger 53).
 
 - **Enforcement:** `script`
-- **Lives in:** `api/cron/rank-backlog.js`; `public.skill_profiles` row `pz-rank-intent`.
+- **Lives in:** `scripts/rank-backlog.js`; `public.skill_profiles` row `pz-rank-intent`.
 - **Pinned by:** `tests/regression/ses-334-served-class-block.test.mjs`.
 - **Judgment:** **keep.** G2: reading the candidates from the picker's own function is the alternative to a second copy of its `buildable` CTE, and the cap is an output-budget fact rather than a round number.
 

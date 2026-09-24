@@ -153,9 +153,9 @@
   surface on the briefing for after-the-fact taps. Sample of 6 demonstrated live this session.
 - **B9. Filing rule:** every NEW backlog ticket is classed (named form) at filing; never
   enters the board undecided.
-- **B10. `filed_at` mined from git history** (no file records ticket birth; needed for B3's
-  newest/oldest — and still needed after `M5-02` **superseded** B3 on 2026-09-01, because the
-  filing lane selects on `filed_at` too).
+- **B10. `filed_at` mined from git history** (no file records ticket birth, and `M5-02`'s filing
+  lane selects on it — that is what `filed_at` is for now. It was filed for B3's newest/oldest
+  tie-break, which `M5-02` **superseded** on 2026-09-01; ledger 20).
 - **B11. Classification/meta work rides the directive queue** (bootstrap exception so
   P9 - Bug Fixes volume can't starve the passes that order the board).
 - **B12. Invention engine wiring — SUPERSEDED 2026-09-01 by `M6-04` (`SES-285`, `v7.0.359`);
