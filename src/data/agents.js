@@ -1,8 +1,8 @@
-// DeepBench v7.0.485 | agents.js | AGT-70 — AVATAR_CFG + AGENT_PRONOUNS entries for `auditor` (The Auditor, GV-07) and `ticketowner` (The Ticket Owner, GV-08, AGT-79), both lane `governance` and is_active true in `public.agents`. Same terms as AGT-63..AGT-69: NOT in the AGENTS array — the Bench's Governance section renders them from the live `lane = 'governance'` rows, and these entries exist only so the portrait and pronouns resolve wherever an audit, cycle or decision surface already draws those two ids. The header is trimmed to the newest five stamps in this same edit (the session-hygiene check 7 shape): every retired line was either a historical label rename or is restated by a stamp still standing above it.
+// DeepBench v7.0.581 | agents.js | AGT-120 — AGENTS entry `nathan` (Nathan Laan, MK-06, Product Marketing Manager, lane `product`, is_active=false in `public.agents` — tryout; the hire is John's) with benchGroups ["platform"] (not "mi", so the Channel Intelligence screen does not list him), plus AVATAR_CFG and AGENT_PRONOUNS he/him/his. The broker roster never sees him while inactive (lib/project-manager.js fences is_active=eq.true&lane=eq.product).
+// DeepBench v7.0.485 | agents.js | AGT-70 —AVATAR_CFG + AGENT_PRONOUNS entries for `auditor` (The Auditor, GV-07) and `ticketowner` (The Ticket Owner, GV-08, AGT-79), both lane `governance` and is_active true in `public.agents`. Same terms as AGT-63..AGT-69: NOT in the AGENTS array — the Bench's Governance section renders them from the live `lane = 'governance'` rows, and these entries exist only so the portrait and pronouns resolve wherever an audit, cycle or decision surface already draws those two ids. The header is trimmed to the newest five stamps in this same edit (the session-hygiene check 7 shape): every retired line was either a historical label rename or is restated by a stamp still standing above it.
 // DeepBench v7.0.456 | agents.js | AGT-69 — OFF_BENCH_AGENT_IDS deleted with its comment (John's ruling 2026-09-11, decision 146256c1): the governance agents render on the Bench's Governance section from live lane=governance rows (src/components/GovernanceSection.jsx, view governance_agent_activity_7d), never from a list here. Their AVATAR_CFG / AGENT_PRONOUNS entries stay — the portraits render from them.
 // DeepBench v7.0.434 | agents.js | AGT-68 — AVATAR_CFG + AGENT_PRONOUNS entries for `devmanager` (The Development Manager, GV-01, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66/67.
 // DeepBench v7.0.433 | agents.js | AGT-67 — AVATAR_CFG + AGENT_PRONOUNS entries for `verifier` (The Verifier, GV-06, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66.
-// DeepBench v7.0.432 | agents.js | AGT-66 — AVATAR_CFG + AGENT_PRONOUNS entries for `builder` (The Builder, GV-05, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65.
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -268,6 +268,17 @@ export const AGENTS = [
     color: T.moss,
     benchGroups: ["mi"],
   },
+  // FEATURE: AGT-120 — Nathan Laan (MK-06) Product Marketing Manager; is_active=false (tryout)
+  {
+    id: "nathan", name: "Nathan Laan", role: "Product Marketing Manager",
+    code: "MK-06", hiredOn: "Sep 2026", trainer: "RMV", arch: "Deep Prompt + Web Search",
+    specialty: "Positioning · Competitive Analysis · Messaging",
+    salary: 130000, value: 150000, hourly: 68, reportHrs: 2, reportCost: 136,
+    docs: 0, classes: 0, chunks: 0, skill: 0, situational: 0,
+    trainable: true, trainableBy: "RMV", revenueModel: "Platform",
+    quip: `"If a buyer can't repeat why, we haven't said it yet."`, color: T.navy,
+    benchGroups: ["platform"],
+  },
 ];
 
 // FEATURE: RO-10 — Bench screen category filter definitions. "all" is not
@@ -311,6 +322,7 @@ export const AVATAR_CFG = {
   elena:  { skin:"#e8d4b8", hair:"#1a1a1a", collar:"#1a1a3a", extra:"bun",     border:T.navy  },
   // FEATURE: AGT-026 — Jordan Ellsworth avatar
   jordan: { skin:"#d0a888", hair:"#3a2e24", collar:"#1e3a44", extra:"headset", border:T.moss },
+  nathan: { skin:"#d2ae88", hair:"#2e2620", collar:"#22324a", extra:"glasses", border:T.navy },
   // FEATURE: AGT-63 — The Prioritizer (GV-03), the governance lane's classifier. Deliberately NOT
   // in the AGENTS list below: governance agents stay off the Bench until the exit review decides
   // how they render (agents.lane, SES-330). The avatar/pronoun entries exist anyway because every
@@ -378,6 +390,7 @@ export const AGENT_PRONOUNS = {
   elena:  { subject:"she",  object:"her",  possessive:"her"   },
   // FEATURE: AGT-026 — Jordan Ellsworth pronouns
   jordan: { subject:"he", object:"him", possessive:"his" },
+  nathan: { subject:"he", object:"him", possessive:"his" },
   // FEATURE: AGT-63 — The Prioritizer pronouns (they/them/their).
   prioritizer: { subject:"they", object:"them", possessive:"their" },
   // FEATURE: AGT-64 — The Researcher pronouns (they/them/their).
