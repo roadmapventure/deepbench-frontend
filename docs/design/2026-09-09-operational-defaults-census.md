@@ -341,10 +341,10 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-33"></a>OD-33 — The scope-cap baseline and its fail-closed arithmetic
 
-> The scope-cap baseline is 3 FILES and 4 TASKS, stated in `docs/runbooks/runner-cycle.md` step 5a and in CLAUDE.md's hard rules but held in NO column; `public.class_autonomy()` returns only the EXTRAS on top of it, and fails closed by null arithmetic rather than by a special case — an unclassed ticket, a class with no ladder row, or a missing `runner_settings` singleton all yield zero extras and `auto_done` false; canonical: `docs/runbooks/runner-cycle.md` step 5a for the baseline, `public.class_autonomy()` for the extras.
+> The scope-cap baseline is 3 FILES and 4 TASKS, stated in `docs/STANDARDS.md` Section 2 and restated in `docs/runbooks/runner-cycle.md` step 5a and CLAUDE.md's hard rules but held in NO column; `public.class_autonomy()` returns only the EXTRAS on top of it, and fails closed by null arithmetic rather than by a special case — an unclassed ticket, a class with no ladder row, or a missing `runner_settings` singleton all yield zero extras and `auto_done` false; canonical: `docs/STANDARDS.md` Section 2 for the baseline, `public.class_autonomy()` for the extras.
 
 - **Enforcement:** `script`
-- **Lives in:** `docs/runbooks/runner-cycle.md` step 5a; `public.class_autonomy()`.
+- **Lives in:** `docs/STANDARDS.md` Section 2; `public.class_autonomy()`.
 - **Pinned by:** `tests/regression/ses-285-m6-autonomy.test.mjs`.
 - **Judgment:** **keep.** Failing closed on a lookup that goes wrong can only NARROW a cap, never widen one, which is the correct direction for every autonomy grant. G5.
 
