@@ -114,9 +114,16 @@ export const REASONS = [
   "unaffordable",
 ];
 export const PASS_REASON = "pickable";
+// FEATURE: AGT-127 -- THE EIGHTH VERDICT, AND THE SECOND ONE THAT BOOTS. It is NOT a refusal, so it
+// is deliberately not in REASONS above: refusal 6 SPLIT. With nothing pickable and at least one
+// undecided `gated_before_build` card that no open `gate-card-…` question names, the fire boots to
+// rule those cards and nothing else (`detail.mode='rule-cards-only'`). It sits in refusal 6's slot,
+// AFTER every wall, so it can never boot a fire past one -- the oracle below places it there too,
+// and a gate that hoisted it above the wall disagrees with this file rather than with nobody.
+export const GATE_CARDS_REASON = "gate_cards_to_rule";
 // SES-302: exactly ONE reason boots. The set is kept rather than collapsed back to a string so a
 // future pass reason is a one-line change here instead of a rewrite of the consistency check.
-export const BOOTING_REASONS = new Set([PASS_REASON]);
+export const BOOTING_REASONS = new Set([PASS_REASON, GATE_CARDS_REASON]);
 
 // ---------------------------------------------------------------------------
 // Pure readers
@@ -576,6 +583,10 @@ export function expectedReason(f) {
       f.gatedPct >= f.paceLimitPct)
     return "weekly_pace";
   if (!f.budgetRowExists) return "no_budget_row";
+  // AGT-127: refusal 6 splits, and the oracle splits with it. Both halves are graded, so a gate
+  // that counted EVERY undecided card (re-firing forever on one whose decision is John's, since a
+  // `john` ruling writes no card) and a gate that counted none both disagree here.
+  if (f.pickableCount === 0 && f.gateCardsToRule > 0) return GATE_CARDS_REASON;
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
   // SES-302 still holds for the CAP: no token_cap branch, no pickable_degraded. The age is graded
@@ -605,9 +616,14 @@ async function theLiveGateObeysItsOwnLadder() {
   assert.strictEqual(rows.length, 1, `runner_should_boot() returned ${rows.length} rows, expected exactly 1`);
   const v = rows[0];
 
-  assert.ok(REASONS.includes(v.reason) || v.reason === PASS_REASON,
+  assert.ok(REASONS.includes(v.reason) || v.reason === PASS_REASON || v.reason === GATE_CARDS_REASON,
     `runner_should_boot() returned an unknown reason ${JSON.stringify(v.reason)}; the closed set is ` +
-    `${[...REASONS, PASS_REASON].join(", ")}`);
+    `${[...REASONS, PASS_REASON, GATE_CARDS_REASON].join(", ")}`);
+  // AGT-127: the mode is what a booting fire READS to know it may only rule cards. A fire that took
+  // the reason and not the mode would try to build on a board with pickable_count = 0.
+  assert.strictEqual(v.detail.mode, v.reason === GATE_CARDS_REASON ? "rule-cards-only" : null,
+    `detail.mode is ${JSON.stringify(v.detail.mode)} on reason ${v.reason}; it reads rule-cards-only ` +
+    "on gate_cards_to_rule and null on every other verdict");
   assert.strictEqual(
     v.should_boot, BOOTING_REASONS.has(v.reason),
     `should_boot=${v.should_boot} disagrees with reason=${v.reason}. The two must never be able to ` +
@@ -638,6 +654,15 @@ async function theLiveGateObeysItsOwnLadder() {
   assert.ok(items.length > 100, `backlog_items returned ${items.length} rows -- refusing to grade a truncated read`);
   assert.ok(Number.isFinite(pctPerCycle) && pctPerCycle > 0,
     `runner_pct_per_cycle() returned ${pctPerCycle}; the oracle cannot price a ticket without it`);
+
+  // AGT-127, from the RAW TABLES like every other fact here: an undecided gated_before_build card
+  // counts only while no OPEN `gate-card-<first 8 of its id>` question names it.
+  const gateCards = asArray(
+    await pg(url, key, "runner_items?kind=eq.gated_before_build&decision=is.null&select=id"), "runner_items");
+  const gateQ = asArray(
+    await pg(url, key, "runner_questions?qid=like.gate-card-*&status=eq.open&select=qid"), "runner_questions");
+  const openQ = new Set(gateQ.map(q => q.qid));
+  const gateCardsToRule = gateCards.filter(c => !openQ.has(`gate-card-${String(c.id).slice(0, 8)}`)).length;
 
   const cyclesOf = new Map(items.map(i => [i.backlog_id, i.predicted_cycles]));
   const lanes = queue.filter(r => r.lane === "drain" || r.lane === "selfbuild");
@@ -690,6 +715,7 @@ async function theLiveGateObeysItsOwnLadder() {
     paceLimitPct: week.paceLimitPct,
     pickableCount: lanes.length,
     cheapestPctOfWeek: priced.length ? Math.min(...priced) : null,
+    gateCardsToRule,
   };
 
   const want = expectedReason(facts);

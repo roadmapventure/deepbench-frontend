@@ -93,7 +93,12 @@ export const RUNBOOK_CEILING = 381000;
 // v7.0.565's 380144 rather than the 379678 it was written against, so the pin is the RE-MEASURED
 // post-rebase byte count, never either side of the conflict: 380144 -> 380253 B, 747 B under the
 // ceiling. Re-measured with wc -c after the rebase and re-pinned in the same commit.
-export const BYTES_AT_SHIP = 380667;
+// v7.0.585 (AGT-127) adds the `gate_cards_to_rule` boot branch to refusal 6 and the gate-card
+// ruling call to 7b, and REMOVES bytes first, as the pin requires: the archived-pointer
+// paragraph, refusal 2's restated staleness rationale and its restated one-home sentence, the
+// self-read tail, and 7b's verbatim quotation of the sentence SES-315 retired. Net 380667 ->
+// 380976 B, 24 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
+export const BYTES_AT_SHIP = 380976;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

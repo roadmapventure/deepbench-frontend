@@ -2721,6 +2721,36 @@ blast radius. **No rung ever unlocks the gated lane** — that boundary moves on
 like this one. Inventions start at the most conservative rung. Silence is never an Accept: an
 unjudged item stays live on dev but its streak does not advance.
 
+**THE DEVELOPMENT MANAGER RULES EVERY UNDECIDED GATE CARD (`AGT-127`, `v7.0.585`).** The authority
+was already his — `MANAGER-AUTHORITY-MATRIX` row 3, *"what a build finds … and gate cards
+(`runner_items.kind = 'gated_before_build'`): the manager's, within John's standing rules and the
+class caps"* — and until this ship he held no capability that could exercise it, so the cards simply
+accumulated: **16 undecided, 2026-09-16 to 2026-09-24**, each one taking its ticket out of both pick
+paths (`SES-424` slice 1). The capability is `decide-gated-card` (Intent `dm-gate-intent`, reusing
+the manager's own identity, behavior, guardrails and knowledge rows), the client is
+`scripts/decide-gated-card.js`, and `public.apply_gate_rulings(p_rulings, p_cycle_id,
+p_session_name)` owns every write, its `runner_before_images` rows and ONE `record_decision` handle,
+exactly as `apply_audit_review()` does. Five rulings: `accept` (card only), `rework` (card + the
+ticket's `scope_rationale` appended, `design_status` cleared), `retired` (card + `status = 'removal
+proposed'`), `needs-desktop` (card + `design_status = 'needs-desktop'`), and `john` — **which writes
+no card at all** and opens a `runner_questions` row `gate-card-<first 8 of the card id>` instead,
+because a card whose subject is one of John's four calls is not the manager's to decide. That open
+question is also the exit `runner_should_boot()` reads: without it, its new `gate_cards_to_rule`
+branch would fire on the same card every hour, forever. **This moves no decision from John to the
+manager; it gives authority he already held a way to act.**
+
+**THE GUARD B ASYMMETRY, SAID OUT LOUD BECAUSE A READER WILL OTHERWISE ASSUME SYMMETRY.** A gate
+ruling is reversible on its **ticket** side and is **not** reversible on its **card** side, and both
+halves are deliberate. `reverse_decision()` restores the ticket's band from the images the function
+wrote; it **refuses the card stamp by name**, because a `kind = 'gated_before_build'` card *"survives
+every reversal"* — it is step 8d's idempotence key and the evidence a gate review happened, and
+`SES-312` makes an unreversed review the precondition for a drain declaration, so erasing it would
+un-name a succession nobody re-decided (`SES-364` Guard B). Measured on a rolled-back probe at this
+ship: `outcome = applied`, `restored = 1`, `refused = 1`, the ticket back at `open` and the card
+still stamped. The consequence a caller must act on rather than discover: **re-gating a ticket is a
+fresh `insert into public.runner_items`, never an undo** — `scripts/decide-gated-card.js --apply`
+prints both lines together for that reason.
+
 ### The Invention engine
 
 **What it studies:** market/competitor scan (web research); white space against

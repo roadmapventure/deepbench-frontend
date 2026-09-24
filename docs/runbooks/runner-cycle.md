@@ -99,8 +99,8 @@ query** (`docs/runbooks/routine-prompt.md` step 1, `SES-398`). One pinned Bash c
 account's `unifiedWindows` off a one-line `claude -p` call's `rate_limit_event` and prints either one
 `INSERT` into `runner_usage_readings` (`source = 'routine-self-read'`, `fable_pct` NULL when the call
 carried no Fable window), which the cycle runs so the reading this gate grades is minutes old, or one
-`NO_READING <reason>` line, written into the cycle row's notes as `METER SELF-READ:`. It reads no
-repo file and needs no secret.
+`NO_READING <reason>` line, written into the cycle row's notes as `METER SELF-READ:`. No repo file,
+no secret.
 
 - **`should_boot = true`** (`reason = 'pickable'`) → continue to step 0. `detail` already names the
   ticket the pick path would return, with its title (`backlog_display_title`, per the ID + title
@@ -123,9 +123,8 @@ RETURNING id;
 
   Then **end**. No push notification, no session rename, no serial tail, no successor fire.
 
-**Two earlier wording corrections (`SES-298`, `SES-302`) are archived VERBATIM in `docs/SESSIONS.md`**
-(appendix *runner-cycle.md rationale retired by `SES-336`*, entry A, ledger 51) — the live rule is
-the paragraph below, in full.
+**`SES-298` / `SES-302` wording corrections: archived VERBATIM in `docs/SESSIONS.md`**
+(appendix *runner-cycle.md rationale retired by `SES-336`*, entry A, ledger 51). Live rule below.
 
 **So: the gate reports `reading_age_hours` and a `cap_authority` pointer, and grades that age
 against one setting and nothing else.** <!-- FEATURE: SES-389 --> It carries no `token_cap` and
@@ -143,12 +142,10 @@ for repeatedly.**
 1. `scheduler_off` — `runner_settings.scheduler_on` is false. John's own switch, the same one step
    1b's `scheduler_gate()` honours.
 2. `meter_stale` — **`M5-15`** (`SES-389`): the freshest reading's age exceeds
-   `runner_settings.meter_stale_hours` (default 2, John's number — the reader writes every 30 min,
-   so 2h is four missed readings). `detail` names `reading_taken_at` and `meter_stale_hours`
+   `runner_settings.meter_stale_hours` (default 2, John's number). `detail` names `reading_taken_at` and `meter_stale_hours`
    alongside `reading_age_hours`, so the refusal can be audited from its own payload. **NULL-safe
    like the wall: with no reading at all the comparison is NULL and the ladder falls through**, so a
-   missing reading is still (5)'s question, never this one's. This is the gate's *own* threshold and
-   it is not the spend brake's — `resolve_day_token_cap()` RUNG 2 keeps 48h and `stale-floor`. Sits
+   missing reading is still (5)'s question, never this one's. Sits
    below `scheduler_off` because John's switch is a decision and this is an observation; above the
    wall because it grades a number the wall has just called out of date.
 3. `weekly_wall` — **`M5-06`**: the freshest reading's `all_models_pct` — carried as
@@ -176,7 +173,10 @@ for repeatedly.**
    is NULL, and with no reading (4)'s is too, so the ladder falls through to (5).
 6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row — `runner_should_boot()`'s `pickable` CTE is `WHERE q.lane IN ('drain','selfbuild')`,
-   so a queued **directive** row alone is not pickable.
+   so a queued **directive** row alone is not pickable. **`AGT-127` splits this slot:** an undecided
+   `gated_before_build` card no open `gate-card-…` question names answers `gate_cards_to_rule`:
+   `should_boot=true`, `detail.mode='rule-cards-only'`, `detail.gate_cards_to_rule=<n>`, placed
+   HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged.
 7. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
@@ -221,8 +221,8 @@ Four properties that are load-bearing. **Do not re-derive any of them by hand:**
   the seven reasons clear themselves (a reading gets taken — which clears `meter_stale` and may
   clear the wall and the pace with it, a month rolls over, a budget row is inserted) and
   `scheduler_off` is John's own deliberate choice; **`nothing_pickable`
-  is the unbounded one** — an empty drain means no fire boots and therefore no fire harvests until
-  an attended session runs. That remainder is named on `SES-297`'s card. It is **not** a gap to close
+  is the unbounded one** — no fire boots, so no fire harvests, until an attended session runs
+  (`SES-297`'s card; `AGT-127` bounds its commonest cause, 6 above). It is **not** a gap to close
   by quietly restoring the tail here: doing so restores the full page read on exactly the path this
   ticket exists to make cheap.
 
@@ -3588,16 +3588,18 @@ resolving a `needs-decision` ticket, deferring one (`defer_status = 'yes'`/`'stu
 under `M6-03`, re-tiering or re-homing it, amending a required set, ruling a gate, amending a
 directive. **Not a decision:** a queue recompute, a claim, a
 before-image, a scoreboard stamp. A decision that files a ticket files it in the same transaction
-(`M6-05`).
+(`M6-05`). **Gate cards are ruled by ONE call (`AGT-127`):** `scripts/decide-gated-card.js
+--prepare` → `devmanager`/`decide-gated-card` → `--dry-run` → `--apply`;
+`public.apply_gate_rulings()` owns every write, its images and the one handle. A card on one of
+John's four calls is ruled `john`: no card write, an open `gate-card-…` question — also the
+boot branch's exit. A Reverse restores the ticket band and refuses the card stamp by name
+(Guard B); re-gating is a fresh insert.
 
 <!-- FEATURE: SES-315 (b) — 7b stops calling a ship "not a decision", because since part (a) it is one. -->
 **A SHIP *IS* A DECISION, AND THE SENTENCE THAT SAID OTHERWISE IS RETIRED (`SES-315`, `M6-01`).**
-That list used to open *"step 7's own close-out status write on a green verdict (that is the
-verifier's output, and its Reverse lives on the ship card)"*, and it survives above only as this
-quotation of what the file **used to** say. Both halves stopped being true together: the status
-write is indeed the verifier's mechanical output — that much is unchanged and is why it is still
-absent from the decision list — but the *delivery* it recorded had no handle at all once `SES-285`
-retired the ship card's tap. Step 7's close-out now records the ship with
+The retired sentence called step 7's close-out status write not a decision. Half of that still
+holds — it is the verifier's mechanical output, which is why it is absent from the list above — but
+the *delivery* it recorded had no handle at all once `SES-285` retired the ship card's tap. Step 7's close-out now records the ship with
 `public.record_ship_decision()`: a `kind = 'ship'` row carrying the verdict's own reasoning, adopting
 the cycle's own before-images as its undo set. So a shipped change's Reverse is
 `public.reverse_decision('<that id>', …)` exactly like every other decision's — with one addition

@@ -378,7 +378,13 @@ export default async function run() {
   // AGT-86 slice 2a (v7.0.546): the manager's SECOND capability, review-audit-worklist (the weekly
   // audit review), is pinned by name next to run-project. Sorted, so row order cannot redden it; its
   // own rows and links are asserted in tests/regression/agt-86b-audit-review.test.mjs.
-  assert.deepEqual(assigns.map(a => a.capability_slug).sort(), ["review-audit-worklist", RUN_PROJECT_CAPABILITY].sort());
+  // AGT-127 (v7.0.585): the THIRD, decide-gated-card -- ruling every undecided gated_before_build
+  // card. Same one-line extension AGT-86 made here, for the same reason: this is a CLOSED set, so a
+  // capability appearing on the manager without a ticket naming it reddens this line, which is the
+  // property (AGENT-ROW-AGREED-TICKET). Its own rows and links are asserted in
+  // tests/regression/agt-127-decide-gated-card.test.mjs.
+  assert.deepEqual(assigns.map(a => a.capability_slug).sort(),
+    ["decide-gated-card", "review-audit-worklist", RUN_PROJECT_CAPABILITY].sort());
   const cap = (await rest(`capabilities?slug=eq.${RUN_PROJECT_CAPABILITY}&select=slug,execution_type,default_intent_slug`))[0];
   assert.equal(cap.execution_type, "ai");
   assert.equal(cap.default_intent_slug, INTENT_SLUG,

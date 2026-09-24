@@ -1,3 +1,4 @@
+// DeepBench v7.0.585 | shared/ai-patterns.js | AGT-127 -- `decide-gated-card` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array, so the Layer-3 row for the manager's gate-card ruling run would be refused without it (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.552 | shared/ai-patterns.js | AGT-86 slice 8a -- five audit slugs enter the catalog (audit-board-health, audit-work-quality, audit-config-review, audit-advisor, review-audit-worklist): their capability rows are live and scripts/agent-log.js refuses any --ai-type outside this array, so the Auditor routine's sub-agent log rows would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.480 | shared/ai-patterns.js | AGT-79 -- the Ticket Owner's `audit-board` enters the catalog BEFORE its Skill rows exist, on the AGT-70 precedent immediately below: scripts/ticket-owner.js --judge writes the mandatory agent-log.js row before it applies anything, and agent-log.js refuses an --ai-type this array does not carry. The seed (docs/design/agt-79-ticket-owner-seed.sql) is John's to apply; the entry is inert until then. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug, resolved by the existing `|| e.type` fallback.
 // DeepBench v7.0.465 | shared/ai-patterns.js | AGT-70 -- the Auditor's `audit-agent-data` and `audit-governance-corpus` enter the catalog BEFORE their Skill rows exist, so the judgment lane's mandatory agent-log.js row can be written on its first run rather than refused. See the comment above the two entries.
@@ -288,6 +289,19 @@ export const SERVICE_CATALOG = [
   // because the turn's whole product is WHO DOES WHAT NEXT -- it assigns a capability to a ticket
   // and fires no work itself.
   { slug: 'run-project',             name: 'Run Project (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'Orchestrator-Workers'], roadmap: 'now' },
+
+  // AGT-127 -- decide-gated-card, the manager's third governance capability. MANDATORY, not
+  // decorative: scripts/agent-log.js refuses any --ai-type this array does not carry, so without
+  // this line the Layer-3 row for every ruling run would be refused and the call would go unlogged
+  // (SES-338, found by a REFUSAL rather than by inspection; .claude/rules/capability-logging.md).
+  // 'Structured Output' because the answer is validated against dm-gate-intent's stored schema --
+  // offline by validateRulings() and again inside public.apply_gate_rulings() -- before one card is
+  // stamped; 'LLM-as-Judge / Verifier' because the turn IS the judgment: each undecided gate card is
+  // ruled accept, rework, retired, needs-desktop, or pushed to John. NOT 'Guardrails / Output
+  // Filtering': the refusals are enforced by SQL after the turn, never by the model declining to
+  // answer. No AI_TYPE_TO_SERVICE entry -- ai_type equals the slug via the `|| e.type` fallback,
+  // the same path run-project and review-audit-worklist take.
+  { slug: 'decide-gated-card',       name: 'Decide Gated Card (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge
