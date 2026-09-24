@@ -1,3 +1,4 @@
+// DeepBench v7.0.578 | tests/regression/agt-70-auditor.test.mjs | AGT-108
 // DeepBench v7.0.576 | tests/regression/agt-70-auditor.test.mjs | AGT-107
 // DeepBench v7.0.563 | tests/regression/agt-70-auditor.test.mjs | AGT-101
 //
@@ -26,11 +27,24 @@
 //
 //     65 !== 6
 //
-// OPEN, NOT FIXED HERE: line ~1401's `/6 findings, 0 new, 0 seen, 6 recurring, 0 ruled-out/` pins
-// the W38 ingest's seen/recurring split, which is a function of what the live ledger now holds at
-// W38 (25 rows) -- the same defect class as the two counts, but a different assertion needing its
-// own design call, and outside this kickoff's §4. This file stays RED on that line until it is
-// ticketed. Q's raw `fetch` at line ~1466 is likewise left alone -- not this ticket.
+// AGT-108 -- FIXED, and the note above named the wrong line: that third site was line 1450, not
+// ~1401 -- `/6 findings, 0 new, 0 seen, 6 recurring, 0 ruled-out/`, which graded the live ledger's
+// W38 contents (0 seen / 6 recurring when it was written; 4 seen / 2 recurring by this cycle) and
+// so drifted exactly as the two counts did. Part Q now DERIVES the split before its first spawn:
+// it fingerprints the fixture with the imported fingerprint() and reads audit_findings, so `seen`
+// is every fixture fp that holds a 2026-W38 row (classifyIngest tests inWeek FIRST and
+// unconditionally, so that is sound), and `new` is every fp the ledger holds in NO week -- the
+// pre-slice-4 bug that printed `6 new`, still pinned exactly and still gradeable.
+// `recurring` and `ruled-out` are graded as a SUM, never apart: which of the two a leftover reads
+// turns on the live `not-a-defect` rows' location homes (6 today), so splitting them would import
+// the drift this fix removes.
+//
+// STILL LIVE-DEPENDENT BY DESIGN, and correctly so: if the ledger ever gains W38 rows for the two
+// fixture fingerprints that sit at W37 only (22925b8015372812, b62c4ab018d78468), the split reads
+// 6 seen and `unfiled` drops to 0, the dry ingest exits 0, and step (1)'s own must-exit-1 pair --
+// the throw and the `e.status === 1` assert, immediately below the derivation -- calls that a
+// failure. That is the ingest's re-run contract, not this split's, and is where it belongs.
+// Q's raw `fetch` is likewise still left alone -- not this ticket.
 // DeepBench v7.0.469 | tests/regression/agt-70-auditor.test.mjs | AGT-70
 //
 // FEATURE: AGT-70 slice 4 -- the negative control, week two, and the Auditor audited. Parts A-M
@@ -1439,6 +1453,15 @@ async function weekTwoRunsAgainstTheRealLedger() {
   // (1) THE WEEK THAT DOES NOT EXIST YET. The first week's own file, ingested dry at W38, must come
   // back as six RECURRING and exit 1 -- work the ledger does not hold for that week. Before slice 4
   // this printed `6 new`, which would have doubled the ledger on the first Monday of week two.
+  // AGT-108 -- the split is a function of what the ledger holds at W38 TODAY, so DERIVE it;
+  // never write it down (pattern:162 -- `6 recurring` held only while W38 was empty).
+  const W38 = "2026-W38";
+  const fixtureFps = JSON.parse(read(FINDINGS_REL)).findings.map(fingerprint);
+  const ledgerFps  = await get("audit_findings?select=fingerprint,iso_week");
+  const atW38   = new Set(ledgerFps.filter(r => r.iso_week === W38).map(r => r.fingerprint));
+  const anyWeek = new Set(ledgerFps.map(r => r.fingerprint));
+  const expectSeen = fixtureFps.filter(fp => atW38.has(fp)).length;
+  const expectNew  = fixtureFps.filter(fp => !anyWeek.has(fp)).length;
   let w38 = "";
   try {
     spawn("audit-ledger.js", [`--ingest=${FINDINGS_REL}`, "--week=2026-W38", "--found-by=hand:review-govtooling-0910"]);
@@ -1447,8 +1470,15 @@ async function weekTwoRunsAgainstTheRealLedger() {
     assert.strictEqual(e.status, 1, `the dry W38 ingest must exit 1 (the runner's re-run signal); got ${e.status}: ${e.stdout ?? ""}${e.stderr ?? ""}`);
     w38 = String(e.stdout ?? "");
   }
-  assert.match(w38, /6 findings, 0 new, 0 seen, 6 recurring, 0 ruled-out/,
-    `every one of the six must be recognised as the SAME finding in a new week; got: ${w38.trim()}`);
+  const SPLIT = /(\d+) findings, (\d+) new, (\d+) seen, (\d+) recurring, (\d+) ruled-out/;
+  const s = w38.match(SPLIT);
+  assert.ok(s, `the W38 ingest must print all five bands; got: ${w38.trim()}`);
+  const [found, sNew, sSeen, sRec, sRuled] = s.slice(1).map(Number);
+  const G = `ledger says ${expectNew} new / ${expectSeen} seen / ${fixtureFps.length - expectSeen} rec+ruled; got: ${w38.trim()}`;
+  assert.strictEqual(found, fixtureFps.length, `the fixture's size. ${G}`);
+  assert.strictEqual(sNew, expectNew, `a fingerprint the ledger holds in SOME week must be RECOGNISED, never re-filed as new. ${G}`);
+  assert.strictEqual(sSeen, expectSeen, `the in-week hit is taken FIRST: every fixture fp with a ${W38} row reads seen. ${G}`);
+  assert.strictEqual(sRec + sRuled, fixtureFps.length - expectSeen, `every leftover lands in recurring or ruled-out. ${G}`);
 
   // (2) CONTROL, same file same command, at the week it really was filed in: six seen, exit 0.
   const w37 = spawn("audit-ledger.js", [`--ingest=${FINDINGS_REL}`, `--week=${WEEK}`, "--found-by=hand:review-govtooling-0910"]);
