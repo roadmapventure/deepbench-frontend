@@ -121,7 +121,12 @@ async function run() {
       assert.ok(!md.includes("<routine id>"), "the runbook no longer carries the <routine id> placeholder");
       assert.ok(lines.join("\n").includes(`DEEPBENCH-AUDITOR-${AUDITOR_ID}`), "the prompt stamp names the auditor routine id");
       assert.ok(md.includes("--routine=auditor --prompt=$S/prompt.txt"), "step 0 checks the prompt this run was given");
-      assert.ok(md.includes("$S/prompt-auditor.json $S/prompt-runner.json"), "step 3 merges both drift files");
+      // AGT-102 s2: the two were adjacent until slice 2 inserted docs/audits/runner-prompt-drift.json
+      // between them. Adjacency was never the invariant -- that both are merged, auditor before
+      // runner, is (the merge keeps the FIRST copy of a fingerprint). Presence + order, as arm C.
+      const iA = md.indexOf("$S/prompt-auditor.json"), iR = md.indexOf("$S/prompt-runner.json");
+      assert.ok(iA !== -1 && iR !== -1, "step 3 merges both drift files");
+      assert.ok(iA < iR, "the auditor's drift file is merged before the runner's");
       assert.ok(md.includes("--routine=runner --note=$S/note-<id>.txt --cycle=<id>"), "step 1 checks the runner's drift notes");
     });
 

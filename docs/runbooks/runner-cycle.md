@@ -638,6 +638,27 @@ UPDATE public.runner_lease
 RETURNING released_at;   -- 0 rows = the tail lease was stolen; leave the new holder alone
 ```
 
+**The routine's own prompt, checked as code (`AGT-102` slice 2, `v7.0.564`).**
+`docs/runbooks/routine-prompt.md` is the source and the live routine
+`trig_017TZ3JZcLBK6AYH6DKURqMH` is the copy (`ARCHITECTURE.md` §19v); this is the step that
+proves the two still agree, as code — no model call. Write the prompt THIS run was given —
+verbatim and whole, no trimming and no summary — to a scratch file OUTSIDE the clone
+(`T=$(mktemp)`, so the clone never carries the prompt), then run:
+
+```bash
+node scripts/check-routine-prompt.js --routine=runner --prompt="$T" --out=docs/audits/runner-prompt-drift.json
+```
+
+- **Exit 1 — drift. A finding, never a stop.** `git add docs/audits/runner-prompt-drift.json`
+  and carry on with the cycle; step 6's one batched push carries it to `dev`, and the Auditor's
+  step-3 merge reads it as the `high` finding ahead of the prose note. Never edit the live
+  routine to close it — pushing the block is John's word alone (`SES-355`).
+- **Exit 0 — equal.** Commit the file only if it is **already tracked** (that clears last week's
+  finding); if it is untracked, delete it, so a green week leaves no file behind.
+- **Exit 2 — the check could not run** (bad flags, an unreadable prompt file, a marker count
+  other than 1). Write no file; name the reason in this cycle's row. The prose drift note in
+  `runner_cycles.notes` is the fallback for this case only.
+
 **1b. THE SETTINGS GATE — John's Automation panel, honoured (`SES-143`, `v7.0.182`, migration
 `ses143_runner_settings`).** §2b of the briefing gives John a scheduler switch with an interval and
 a drain switch. This is the step that makes them binding. Run it immediately after your cycle row

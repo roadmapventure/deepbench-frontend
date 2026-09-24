@@ -81,7 +81,7 @@ const JOHN = "docs/WORKING-WITH-JOHN.md";
 // v7.0.519 stamp dropped and a v7.0.555 stamp added): 380718 -> 378273 B, 2,727 B under the ceiling.
 // Re-pinned by v7.0.557 in the same push.
 export const RUNBOOK_CEILING = 381000;
-export const BYTES_AT_SHIP = 378273;
+export const BYTES_AT_SHIP = 379678;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
