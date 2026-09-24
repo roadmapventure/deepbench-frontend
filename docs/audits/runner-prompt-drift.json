@@ -1,0 +1,24 @@
+{
+  "found_by": "check-routine-prompt:runner",
+  "findings": [
+    {
+      "kind": "contradiction",
+      "check_slug": "routine-prompt-drift",
+      "locations": [
+        {
+          "location": "routine/trig_017TZ3JZcLBK6AYH6DKURqMH/prompt",
+          "text": "3. Read docs/runbooks/cycle-card.md from that branch FIRST — one line per step in execution order, with the command to run — and work its steps in that order. Open docs/runbooks/runner-cycle.md only at the L-anchor the card names for the step you are on, and only when that step's line is a pointer or names an exception. Record in your cycle row the docs/runbooks bytes you read before the pick. The runbook is the complete procedure and outranks the card and every summary in this prompt — the card is generated from it (SES-377), never edited by hand; ARCHITECTURE.md §19v governs. Gated or uncertain classification → a gated_before_build row, never an unattended ship."
+        },
+        {
+          "location": "docs/runbooks/routine-prompt.md:41",
+          "text": "3. Read docs/runbooks/cycle-card.md from that branch FIRST — one line per step in execution order, with the command to run — and work its steps in that order. Open docs/runbooks/runner-cycle.md only at the L-anchor the card names for the step you are on, and only when that step's line is a pointer or names an exception. Record in your cycle row the docs/runbooks bytes you read before the pick. The runbook is the complete procedure and outranks the card and every summary in this prompt — the card is generated from it (SES-377), never edited by hand; ARCHITECTURE.md §19v governs. Gated or uncertain classification → a gated_before_build row, never an unattended ship. Then check THIS PROMPT against its repo block: write the prompt you were given — verbatim and whole — to a scratch file OUTSIDE the clone (`mktemp`), then run `node scripts/check-routine-prompt.js --routine=runner --prompt=<that file> --out=docs/audits/runner-prompt-drift.json`. Exit 1 is a FINDING, never a stop: `git add docs/audits/runner-prompt-drift.json` so step 6's one batched push carries it, and carry on with the cycle. Exit 0: commit that file only if it is already tracked (that clears last week's finding), otherwise delete it — never commit it on exit 0 when it is untracked. Exit 2: no file, and name the reason in your cycle row."
+        }
+      ],
+      "governing_fact": "the live routine prompt must equal its repo block (the repo is the source)",
+      "confidence": "high",
+      "proposed_resolution": "update the live routine from the repo block on John's word (routine-prompt.md update rule), or fix the block"
+    }
+  ],
+  "carried": [],
+  "gone": []
+}
