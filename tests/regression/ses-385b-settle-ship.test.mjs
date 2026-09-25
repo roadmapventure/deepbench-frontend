@@ -27,10 +27,13 @@
 // base fixture must STILL read `delivered`, and a `verdict: "approve"` on a partial one must STILL
 // read `partial`. Both directions, because either alone permits a one-way override.
 //
-// (D) THE FOUR REAL KICKOFFS on disk, by the answer each one is known to need. These are the
+// (D) THE FIVE REAL KICKOFFS on disk, by the answer each one is known to need. These are the
 // regression proper: `SES-413` and `SES-415` are the two documents the prose rule was read against
 // and got wrong, and `SES-414` is the negative control that must stay `delivered` -- without it an
-// implementation that returns `partial` unconditionally passes every other arm in this file.
+// implementation that returns `partial` unconditionally passes every other arm in this file. The
+// fifth is `AGT-128`'s own regression: `AGT-109`'s kickoff, which the unscoped reader settled
+// `partial` off `AGT-88`'s word, and which must now read `delivered` WITH its id and `partial`
+// without the scoping -- so every real row is read as the ticket it belongs to, never as a file.
 //
 // (E) THE MUTATION CONTROL. `grep -c settle-ship` on `docs/runbooks/runner-cycle.md` and on
 // `scripts/render-cycle-card.js` both read ZERO on the unchanged tree, so the two prose halves of
@@ -74,6 +77,35 @@ function run() {
     readRemainder("`partial` up here.\n\n## 7. STOP LINE\n\nclose it delivered.\n").stopPartial, false,
     "`partial` ABOVE the STOP LINE must not count — the scope starts at the heading, not at the top of the file");
 
+  // ---- (A2) THE STOP LINE MUST NAME THIS TICKET (`AGT-128`) ---------------------------------
+  // Measured on the live board 2026-09-25, not argued: `K109` (`AGT-109`'s own kickoff) closes with
+  // "Mark `AGT-88` done -- slice 1 was left `partial` pending this", and the section-scoped reader
+  // settled `AGT-109` `partial` off ANOTHER ticket's word. A wrongly-`partial` row stays in the
+  // pick path (`ARCHITECTURE.md` §19v) and can be re-picked and rebuilt, so this is the arm.
+  // The section is now read sentence by sentence: a sentence that names ticket ids counts only for
+  // the ids it names; a sentence that names NONE is this ship's own instruction and still counts --
+  // 35 of the 36 partial STOP LINEs on disk are written that way, so a blanket id requirement would
+  // silently stop settling almost every real `partial`.
+  const S = "## 7. STOP LINE\n\n";
+  const REGRESSION = "Mark `AGT-88` done -- slice 1 was left `partial` pending this.";
+  assert.strictEqual(readRemainder(S + REGRESSION, "AGT-109").stopPartial, false,
+    "THE REGRESSION: a STOP LINE sentence naming only `AGT-88` must not settle `AGT-109` `partial`");
+  assert.strictEqual(readRemainder(S + REGRESSION, "AGT-88").stopPartial, true,
+    "the SAME sentence read for `AGT-88` — the ticket it actually names — must read true, or the scoping is a blanket false");
+  assert.strictEqual(
+    readRemainder(S + "Leave `SES-391` open. Close `AGT-109` `partial`.", "AGT-109").stopPartial, true,
+    "a later sentence naming THIS ticket must fire even though an earlier one named another");
+  assert.strictEqual(
+    readRemainder(S + "Close as: partial\n`AGT-88` stays `partial`.", "AGT-109").stopPartial, true,
+    "`Close as: partial` is the ship's own explicit instruction — it fires whatever ids the rest of the section names");
+  assert.strictEqual(readRemainder(S + "the ticket stays `partial`.", null).stopPartial, true,
+    "a sentence naming NO id is this ship's own word — the no-id form every other partial kickoff uses must still fire");
+  assert.strictEqual(readRemainder(S + "`AGT-88` stays `partial`.", null).stopPartial, false,
+    "with no ticket id supplied, a sentence naming ANOTHER ticket must not fire — an unknown id never inherits a named one");
+  assert.strictEqual(
+    readRemainder(S + "ship it.\n\n## 8. NOTES\n\nAGT-1 stays `partial`.", "AGT-1").stopPartial, false,
+    "the section still ends at the next `## ` heading — a `partial` under NOTES is outside the STOP LINE, id or no id");
+
   // ---- (B) the decision, one variable at a time off ONE base --------------------------------
   assert.strictEqual(decideStatus({ kickoffText: "slice 1 of 4" }).status, "partial",
     "N below M is a declared remainder");
@@ -93,6 +125,14 @@ function run() {
   assert.strictEqual(
     decideStatus({ kickoffText: SETTLED.replace("ship it and close the row.", "close it `partial`.") }).status,
     "partial", "a STOP LINE naming `partial` alone must flip the base fixture");
+
+  // The same flip, but by TICKET ID and nothing else: one text, two ids, two statuses. This is the
+  // arm that proves `ticketId` reaches `decideStatus` rather than stopping at `readRemainder`.
+  const ANOTHERS_PARTIAL = SETTLED.replace("ship it and close the row.", "`AGT-88` stays `partial`.");
+  assert.strictEqual(decideStatus({ kickoffText: ANOTHERS_PARTIAL, ticketId: "SES-999" }).status, "delivered",
+    "another ticket's `partial` in the STOP LINE must leave THIS ship `delivered` — the AGT-109 defect, by value");
+  assert.strictEqual(decideStatus({ kickoffText: ANOTHERS_PARTIAL, ticketId: "AGT-88" }).status, "partial",
+    "the SAME text read for `AGT-88` must settle `partial` — the id is the only thing that moved");
 
   // A remainder that is only whitespace is NOT a declared remainder; otherwise `--remainder=`
   // passed empty by a shell would settle every ship `partial`.
@@ -124,21 +164,23 @@ function run() {
   assert.throws(() => planSettle({ id: "d", status: "open" }, "docs/k.md", "blocked"),
     /not a status a close-out writes/, "only `partial` and `delivered` are close-out statuses");
 
-  // ---- (D) the four real kickoffs on disk -----------------------------------------------------
+  // ---- (D) the five real kickoffs on disk, each read as the ticket it belongs to ---------------
   const REAL = [
-    ["docs/kickoffs/v7.0.514-SES-413-manager-decides-by-default.md", "partial",
+    ["docs/kickoffs/v7.0.514-SES-413-manager-decides-by-default.md", "SES-413", "partial",
       "its own section 1 says `slice 1 of 4`; this is one of the two rows the prose rule got wrong"],
-    ["docs/kickoffs/v7.0.515-SES-415-role-tagged-criteria.md", "partial",
+    ["docs/kickoffs/v7.0.515-SES-415-role-tagged-criteria.md", "SES-415", "partial",
       "its STOP LINE says to close `partial`; the other row the prose rule got wrong"],
-    ["docs/kickoffs/v7.0.513-SES-414-final-day-stop.md", "delivered",
+    ["docs/kickoffs/v7.0.513-SES-414-final-day-stop.md", "SES-414", "delivered",
       "THE NEGATIVE CONTROL — a sound close-out, and an implementation that always returns `partial` must fail here"],
-    ["docs/kickoffs/v7.0.506-SES-385-shipped-slice-stops-advertising.md", "partial",
+    ["docs/kickoffs/v7.0.506-SES-385-shipped-slice-stops-advertising.md", "SES-385", "partial",
       "slice 1's own kickoff declares `slice 1 of 2`"],
+    ["docs/kickoffs/v7.0.584-AGT-109-constant-homes-slice-2.md", "AGT-109", "delivered",
+      "THE REGRESSION — its STOP LINE names AGT-88, never AGT-109"],
   ];
-  for (const [rel, want, why] of REAL) {
+  for (const [rel, ticketId, want, why] of REAL) {
     const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
-    const got = decideStatus({ kickoffText: text });
-    assert.strictEqual(got.status, want, `${rel} must settle \`${want}\` — ${why} (got \`${got.status}\`: ${got.reasons.join("; ")})`);
+    const got = decideStatus({ kickoffText: text, ticketId });
+    assert.strictEqual(got.status, want, `${rel} read as ${ticketId} must settle \`${want}\` — ${why} (got \`${got.status}\`: ${got.reasons.join("; ")})`);
   }
 
   // ---- (E) the mutation control, plus the byte ceiling ----------------------------------------
@@ -161,8 +203,8 @@ function run() {
   assert.ok(bytes <= CEILING,
     `${RUNBOOK_REL} is ${bytes} bytes against SES-336's ceiling of ${CEILING} — this edit had to free bytes before adding any`);
 
-  console.log(`[SES-385b] settle-ship: 4 real kickoffs (SES-413 partial, SES-415 partial, SES-414 delivered, SES-385 partial) · settle-ship named ${nRunbook}× in the runbook, ${nRenderer}× in the renderer · runbook ${bytes}B <= ${CEILING}`);
-  return ["reader", "decision", "verdict-not-an-input", "planSettle", "real-kickoffs", "mutation-control"];
+  console.log(`[SES-385b] settle-ship: 5 real kickoffs (SES-413 partial, SES-415 partial, SES-414 delivered, SES-385 partial, AGT-109 delivered — its STOP LINE names AGT-88) · settle-ship named ${nRunbook}× in the runbook, ${nRenderer}× in the renderer · runbook ${bytes}B <= ${CEILING}`);
+  return ["reader", "stop-line-names-this-ticket", "decision", "verdict-not-an-input", "planSettle", "real-kickoffs", "mutation-control"];
 }
 
 selfRun(import.meta.url, run);

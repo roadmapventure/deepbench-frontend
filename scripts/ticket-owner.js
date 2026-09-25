@@ -364,6 +364,7 @@ export function classifyBoard(board, { now, rate }) {
     if (closed) {
       const d = decideStatus({
         kickoffText: kickoffText.get(row.backlog_id) ?? "",
+        ticketId: row.backlog_id,
         gatedOpen: gatedOpen.has(row.backlog_id),
       });
       if (d.status === "partial") {

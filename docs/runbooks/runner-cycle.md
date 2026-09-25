@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.586 | runbooks/runner-cycle.md | AGT-128 — THE STOP LINE TRIGGER READS THIS TICKET'S VERDICT: another ticket's `partial` no longer settles this ship. v7.0.520 DROPPED, count 5. -->
 <!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b — STEP 4d IS A POINTER: the Auditor runs in its own routine (docs/runbooks/auditor-routine.md); :4720 names the fifteenth restorable table. ROTATION: v7.0.519 DROPPED, count held at 5, SES-164 step 2 by grep FIRST — all six named facts keep ≥1 body hit (`settle-ship.js` 2, `--remainder=` 2, `resolveDeliveryFiles` 1, `selfCertificationBlock` 1, `changedFilesFor` 1, `ses-379-changed-files-fail-closed` 1); none relocated into 7a. -->
 <!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3 — AN ALL-GATED DRAIN IS NOT A FINISHED ONE: a member carrying an undecided gate card is out of both pick paths since slice 1, so `drain_epic_next`'s `blocked_detail` census now counts *"carrying an undecided gate card"*. `v7.0.517` VERBATIM to `docs/SESSIONS.md`, four ZERO-hit facts RELOCATED into 7a; count 5. Guard `ses-424c`. -->
 <!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3 — A READING IS A DELTA, NEVER THE SESSION TOTAL: `get_session` counts the whole SESSION and a drain chain runs many cycles in one (`fd4e11f4` closed at 32,249,570; its continuation opened on that counter), so step 1 takes reading 0 at the INSERT (`tokens_at_open` in `notes`) and step 9 charges deltas. `v7.0.516` moved VERBATIM to `docs/SESSIONS.md`, two ZERO-hit facts RELOCATED; count 5. Guard `ses-423b`. -->
 <!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2 — A STALL IS JUDGED BY THE BUILD'S OWN SIGNAL, THE CLOSE-OUT MEASURES: step 7 hands the Builder a `heartbeat` key (`scripts/cycle-heartbeat.js`, new) so probe (d) reads a build that STOPPED, not a long one — 13 `stall_notified_at` rows, **9 ended `shipped`**. Step 9's `est_tokens_*` are MEASURED from two `get_session` reads (`SES-409`: 15.27M here vs ≤900,000 shipped), not estimated; the three agent-log fences bracket the pair as optional. `SES-164` step 2 by grep FIRST: `v7.0.505` moved VERBATIM to `docs/SESSIONS.md`, its five ZERO-hit facts RELOCATED into 4e; count 5. Guard `ses-423b-stall-signal.test.mjs`. -->
-<!-- DeepBench v7.0.520 | runbooks/runner-cycle.md | SES-378 slice 8 — THE LANE REFUSAL GETS ITS OWN NAME: step 6 exit 1's TWO causes now branch on the `--json` `kind`, each under its own FIXED detail. Guard `ses-378h-lane-refusal-kind.test.mjs`. `v7.0.500` DROPPED, count 5. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -2906,7 +2906,7 @@ node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<
    8,192 bytes — the constant is `KICKOFF_BYTE_CAP` in `scripts/verifier.js`, and the Designer's and
    Builder's Intent rows carry the same bytes in `docs/design/ga-agents-seed.sql` — and, since
    `SES-359`, a missing lane declaration). Exit 1 is a NAMED DEVIATION, never a quiet trim: do not write it as the kickoff, do
-   not set `designed`. TWO CAUSES (`SES-378`), branched on the `--json` `kind`, never the prose.
+   not set `designed`. TWO CAUSES (`SES-378`), branched on the `--json` `kind`, never the prose. Guard: `ses-378h-lane-refusal-kind.test.mjs`.
    `kickoff-over-cap`: re-assemble `design-kickoff` ONCE with `"over_cap":{"bytes":N,"cap":8192}` in `task_context`, then
    `node scripts/staff-watch.js --record --cycle-id=<your cycle id> --agent=designer --kind='over-cap refusal' --backlog=<ID> --detail='kickoff over KICKOFF_BYTE_CAP on first assembly'`.
    `kickoff-no-lanes`: re-assemble ONCE with `"no_lanes":true`, then this FIXED detail of its own:
@@ -3318,7 +3318,7 @@ SELECT * FROM public.verdict_ladder_signal('<verdict id>');
   the recompute there.
 
   **THE WRITE IS `scripts/settle-ship.js`'S (`SES-385` slice 2, `v7.0.519`):** the kickoff (*slice N
-  of M* with N below M, a STOP LINE naming `partial`), the undecided gate cards named in the
+  of M* with N below M, a STOP LINE closing THIS ticket `partial`), the undecided gate cards named in the
   trigger list above and `--remainder=` decide; ONE `ticket-status` decision with a full-row image writes the status,
   `design_status` NULL and `kickoff_link` = this kickoff. **A `delivered` on a kickoff naming a
   remainder is a bug, never an override** — the verdict is not an input to this script at all, so no
