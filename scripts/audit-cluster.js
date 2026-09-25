@@ -436,6 +436,23 @@ export function EXCEPTION_PROMPT(cap, intent, seedAbs, taskAbs) {
 // A cluster name is an anchor and may carry `/`, `:` or `.` (`scripts/audit-ledger.js` is a real
 // one). The file name is sanitized; the real name lives inside the file, and --collect reads it
 // from there rather than parsing it back out of the path.
+// AGT-129: ONE description of how this script calls agent-prompt.js, shared by both spawns below.
+// The task_context goes over STDIN, never in an argv entry: Linux caps one entry at 131,072 B and
+// this script's own board-health task measured 245 KB on 2026-09-25 -- the old argv form died
+// E2BIG before node started, which is a spawn failure with no prompt, not a truncated one.
+export function promptCall(task, { json = false } = {}) {
+  return {
+    args: [
+      "--agent=auditor",
+      `--capability=${task.capability}`,
+      `--intent=${task.intent}`,
+      "--task-file=-",
+      ...(json ? ["--json"] : []),
+    ],
+    input: JSON.stringify(task.task_context),
+  };
+}
+
 export function taskFileName(index, name) {
   const safe = String(name).replace(/[^A-Za-z0-9_.-]/g, "-");
   return `${String(index).padStart(2, "0")}-${safe}`;
@@ -632,16 +649,16 @@ async function doRun(argv) {
     let callModel = model;
     if (assembled) {
       source = "assembled";
+      const ca = promptCall(task);
       const a = spawnSync(process.execPath, [
-        path.join(ROOT, "scripts", "agent-prompt.js"), "--agent=auditor",
-        `--capability=${cap}`, `--intent=${intent}`, `--task=${JSON.stringify(task.task_context)}`,
-      ], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+        path.join(ROOT, "scripts", "agent-prompt.js"), ...ca.args,
+      ], { input: ca.input, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
       if (a.status !== 0) fail(2, `agent-prompt.js exited ${a.status} for ${stem}: ${(a.stderr ?? "").slice(0, 400)}`);
       prompt = a.stdout;
+      const cj = promptCall(task, { json: true });
       const j = spawnSync(process.execPath, [
-        path.join(ROOT, "scripts", "agent-prompt.js"), "--agent=auditor",
-        `--capability=${cap}`, `--intent=${intent}`, `--task=${JSON.stringify(task.task_context)}`, "--json",
-      ], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+        path.join(ROOT, "scripts", "agent-prompt.js"), ...cj.args,
+      ], { input: cj.input, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
       if (j.status === 0) {
         try {
           const stored = JSON.parse(j.stdout)?.llm?.model;
