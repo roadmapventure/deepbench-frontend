@@ -49,7 +49,11 @@ const board = (extra = {}) => ({
 const ids = fs_ => fs_.map(f => f.locations[0].location);
 const roundTrip = f => {
   assert.ok(DB_KINDS.includes(f.kind), `kind ${f.kind} must be in the audit_findings CHECK enum`);
-  const r = toRow(f, { week: "2026-W39", foundBy: "auditor:board-checks", cycleId: null, id: "x" });
+  // AGT-131 (v7.0.596): toRow() needs a type. A board-check finding carries none of its own BY
+  // DESIGN -- docs/runbooks/auditor-routine.md's step 3 merge stamps `defect` on every Auditor
+  // finding that did not declare one -- so the round trip supplies the run's type, exactly as the
+  // CLI's --type does. The shape this arm is about is unchanged.
+  const r = toRow(f, { week: "2026-W39", foundBy: "auditor:board-checks", cycleId: null, id: "x", findingType: "defect" });
   assert.equal(r.fingerprint, fingerprint(f));
   assert.match(r.fingerprint, /^[0-9a-f]{16}$/);
   assert.ok(f.governing_fact.length <= 300 && f.proposed_resolution.length <= 400);

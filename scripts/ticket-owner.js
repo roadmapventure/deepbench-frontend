@@ -108,6 +108,10 @@ import { tokensFrom } from "./rank-backlog.js";
 // of its rules. settle-ship.js guards its CLI at :293, so importing it runs nothing and needs no
 // credentials -- the same import-safety contract as the four above.
 import { decideStatus } from "./settle-ship.js";
+// AGT-131: the one findings intake. Import-safe by the same contract (SES-176) -- audit-ledger.js
+// runs its CLI only as a process entry point, and ingestFindings() takes its transports as
+// arguments, so nothing here reads process.env on import.
+import { ingestFindings, isoWeek } from "./audit-ledger.js";
 
 // --- constants (exported; the regression test asserts each one) --------------------------------
 
@@ -749,8 +753,53 @@ async function readRate(base, key) {
   return rate;
 }
 
-// applyPlan(base, key, plan, {cycleId, sessionName, now}) -> {decision, expires_at, fixed,
-// inserted, reseen, cleared}
+// openJudgmentBySlug(prior, ledger, now) -> [{slug, count, oldest}], in CHECKS order (AGT-131)
+//
+// WHAT IS STILL OPEN AFTER TONIGHT, which is `prior ∪ insert − clear` and not any one of the three.
+// `prior` alone is last night's answer; `insert` alone is tonight's discoveries and misses every
+// gap that has been open for a month without changing; and a set that forgot `clear` would keep
+// raising a finding for a check the board just satisfied. The three lists are exhaustive over the
+// ledger by planWrites()'s own construction, so this is the whole open set and not a sample.
+//
+// PURE, AND ONE FINDING PER CHECK -- never one per row. 222 open judgment rows over 10 checks are
+// 10 questions for a capability to answer, and 222 ledger rows would be a queue nobody reads. The
+// COUNT lives in the location `text` and nowhere else, because `fingerprint()` is built from
+// `kind | locationKeys | normalize(governing_fact)`: a count in the governing fact would mint a new
+// finding every night the number moved, which is precisely a ledger that cannot carry.
+export function openJudgmentBySlug(prior, ledger, now) {
+  const cleared = new Set((ledger?.clear ?? []).map(String));
+  const open = [];
+  for (const r of prior ?? []) {
+    if (cleared.has(String(r.id))) continue;
+    open.push({ slug: r.check_slug ?? r.check, first_seen: r.first_seen_at ?? now });
+  }
+  // A row inserted tonight is first seen tonight -- it has no first_seen_at until the write lands.
+  for (const r of ledger?.insert ?? []) open.push({ slug: r.check_slug, first_seen: now });
+
+  const out = [];
+  for (const slug of CHECKS) {
+    const members = open.filter(o => o.slug === slug);
+    if (!members.length) continue;
+    const oldest = members.map(m => m.first_seen).filter(Boolean).sort()[0] ?? now;
+    out.push({ slug, count: members.length, oldest });
+  }
+  return out;
+}
+
+// The finding a still-open check raises, pure so the regression file can pin its exact shape.
+export function censusFindingFor({ slug, count, oldest }) {
+  return {
+    kind: "other",
+    check_slug: `owner:${slug}`,
+    locations: [{ location: `ticket_owner_findings:${slug}`, text: `${count} open rows, oldest first_seen ${oldest}` }],
+    governing_fact: `Ticket Owner check ${slug} holds open judgment rows a capability must decide`,
+    confidence: "high",
+    proposed_resolution: "rule the rows or retire the check",
+  };
+}
+
+// applyPlan(base, key, plan, {cycleId, sessionName, now, prior}) -> {decision, expires_at, fixed,
+// inserted, reseen, cleared, raised}
 //
 // The five steps, in this order and no other. The ORDER is the safety property: the decision row
 // exists before any image, every image exists before the cell it images is touched, and the ledger
@@ -761,7 +810,7 @@ async function readRate(base, key) {
 // ck_decision_attribution takes exactly one of cycle_id / session_name: the nightly run is a
 // cycle, the regression fixture is a session. Passing both (or neither) is a programming error and
 // throws before a single request leaves the process.
-export async function applyPlan(base, key, plan, { cycleId, sessionName, now, judged } = {}) {
+export async function applyPlan(base, key, plan, { cycleId, sessionName, now, judged, prior } = {}) {
   if ((cycleId == null) === (sessionName == null)) {
     throw new Error("applyPlan: pass exactly one of cycleId / sessionName — every write is attributed to one or the other");
   }
@@ -891,6 +940,39 @@ export async function applyPlan(base, key, plan, { cycleId, sessionName, now, ju
     }, where("clear"));
   }
 
+  // 6 -- AGT-131: THE CENSUS RAISES ITS OWN GAPS INTO THE ONE FINDINGS LIST. `ticket_owner_findings`
+  // held 222 open judgment rows over 10 checks and had no reviewer; the Development Manager reviews
+  // `audit_findings`. One `gap` per still-open check reaches him there. It runs LAST, after the
+  // clears, for the same reason the clears run last: the raise must describe the ledger as tonight
+  // left it, not as it was halfway through.
+  //
+  // NO `prior`, NO RAISE, and never a guess: the open set is `prior ∪ insert − clear`, and a caller
+  // that did not hand over the ledger it planned against cannot have that set computed for it. An
+  // `insert`-only fallback would silently under-count every check that has been open since before
+  // tonight -- a wrong number in a permanent, un-deletable row.
+  let raised = 0;
+  if (prior !== undefined) {
+    const findings = openJudgmentBySlug(prior, plan.ledger, now).map(censusFindingFor);
+    if (findings.length) {
+      const ingest = await ingestFindings({
+        findings,
+        week: isoWeek(now ?? new Date()),
+        foundBy: "ticket-owner:census",
+        findingType: "gap",
+        cycleId: cycleId ?? null,
+        sessionName: sessionName ?? null,
+        apply: true,
+        get: q => rest(base, key, q, {}, where("raise findings")),
+        post: (table, body) => rest(base, key, table, {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify(body),
+        }, where("raise findings")),
+      });
+      raised = ingest.written;
+    }
+  }
+
   return {
     decision,
     expires_at,
@@ -898,6 +980,7 @@ export async function applyPlan(base, key, plan, { cycleId, sessionName, now, ju
     inserted: insert.length,
     reseen: reseen.length,
     cleared: clear.length,
+    raised,
   };
 }
 
@@ -1130,7 +1213,7 @@ async function judgePassTwo({ argv, nightly, cycleId, answerArg, stateFile, dryR
     loggedId = null;
   }
 
-  const applied = await applyPlan(base, key, plan, { cycleId, now: state.now, judged });
+  const applied = await applyPlan(base, key, plan, { cycleId, now: state.now, judged, prior: state.prior });
 
   const out = {
     measured_at: state.now,
@@ -1331,14 +1414,16 @@ async function main() {
   let applied = null;
   if (applyArg !== undefined) {
     const prior = await readAll(base, key, "ticket_owner_findings",
-      "ticket_owner_findings?select=id,backlog_id,check_slug&cleared_at=is.null&limit=10000", 10000);
+      // AGT-131 -- first_seen_at joins the projection: step 6's raise reports the age of the
+      // oldest open row per check, and a read that omitted it would report tonight for all of them.
+      "ticket_owner_findings?select=id,backlog_id,check_slug,first_seen_at&cleared_at=is.null&limit=10000", 10000);
     let plan;
     try {
       plan = planWrites(result, prior, board.items, { rate });
     } catch (e) {
       fail(e.message);
     }
-    applied = await applyPlan(base, key, plan, { cycleId, now });
+    applied = await applyPlan(base, key, plan, { cycleId, now, prior });
     out.apply = applied;
 
     // Last, and only after the plan landed: the run records ITSELF. Writing the cycle row before

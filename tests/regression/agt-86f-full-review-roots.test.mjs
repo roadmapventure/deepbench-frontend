@@ -261,7 +261,9 @@ export default async function run() {
       for (const f of allFindings) {
         assert.ok(KIND_CHECK.includes(f.kind), `kind ${f.kind} in the CHECK set`);
         assert.equal(f.check_slug, "config-private-in-public");
-        const row = toRow(f, { week: "2026-W39", foundBy: "auditor:private-scan", cycleId: null, id: "x" });
+        // AGT-131 (v7.0.596): the run's type, the same one the routine's step 3 merge stamps on an
+        // Auditor finding that declares none. toRow() refuses a row whose type nobody supplied.
+        const row = toRow(f, { week: "2026-W39", foundBy: "auditor:private-scan", cycleId: null, id: "x", findingType: "defect" });
         assert.equal(row.fingerprint, fingerprint(f));
         assert.equal(row.kind, "other");
         assert.equal(row.confidence, "high");

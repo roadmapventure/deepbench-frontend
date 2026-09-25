@@ -1260,7 +1260,12 @@ async function main() {
     assert.deepStrictEqual(plan2.ledger.clear, []);
 
     const res2 = await applyPlan(url, key, plan2, { sessionName: S, now: now2 });
-    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 4, cleared: 0 },
+    // AGT-131 (v7.0.596): the return gained `raised` -- step 6 raises one audit_findings `gap` per
+    // check still holding open judgment rows. It is 0 here BY CONSTRUCTION and that is the
+    // assertion: this call passes no `prior`, and with no ledger to compute `prior ∪ insert − clear`
+    // from, applyPlan raises nothing rather than guessing from `insert` alone. That is also what
+    // keeps this fixture out of a table whose guard refuses every DELETE.
+    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 4, cleared: 0, raised: 0 },
       "a night with nothing to fix records NO decision -- an empty decision row is noise John has to read");
     assert.strictEqual((await rest(`runner_decisions?session_name=eq.${encodeURIComponent(S)}&select=id`)).length, 1,
       "two nights, one decision: the second wrote no board cell, so it decided nothing");

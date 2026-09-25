@@ -1,3 +1,18 @@
+// DeepBench v7.0.596 | api/_lib/handlers/auditor-write.js | AGT-131 -- THE LOOP IS GONE AND THE
+// INTAKE IS SHARED. This file used to carry its own copy of the read/classify/append sequence,
+// commented "the CLI's read verbatim" -- two implementations of one seam, agreeing with themselves
+// until the week they stopped. It now calls scripts/audit-ledger.js's ingestFindings() with `get`
+// and `post` built from the executor's supabaseUrl/supabaseHeaders, which is the ONE thing this
+// file ever added over the CLI (pattern:14, pattern:15). The Auditor's intents report governance
+// defects, so the run's finding_type is `defect` unless handler_context names another; a finding
+// that declares its own type keeps it.
+//
+// WHAT STAYS A LOOP HERE, and only this: the ruling PATCH over the verdicts ingestFindings()
+// returns. Filing is the ledger's job and is now shared; RULING is this handler's, because the CLI
+// has no such path -- a `seen` finding that arrives already carrying a status other than `open`
+// patches the four columns the table's trigger allows. Deleting that pass with the append loop
+// would have silently dropped a ruling the Auditor had already made.
+//
 // DeepBench v7.0.485 | api/_lib/handlers/auditor-write.js | AGT-70 -- The Auditor's write handler:
 // a cluster of findings from an Intent turn becomes rows on `public.audit_findings`.
 // FEATURE: AGT-70 -- dispatched generically via format_contract.handler === 'auditor-write', the
@@ -41,8 +56,7 @@
 // SES-176's contract makes the import safe: scripts/audit-ledger.js runs its CLI only when it is
 // the process entry point, so importing it here executes no argv parsing and no process.exit.
 
-import { randomUUID } from 'crypto';
-import { classifyIngest, toRow, fingerprint, isoWeek } from '../../../scripts/audit-ledger.js';
+import { ingestFindings, isoWeek } from '../../../scripts/audit-ledger.js';
 import { logActivity } from '../../../lib/activity-log.js';
 
 const WEEK_FORM = /^\d{4}-W\d{2}$/;
@@ -99,55 +113,54 @@ export async function handle({ agent_id, tenant_id, content, supabaseUrl, supaba
   let reseen = 0;
 
   if (findings.length) {
-    const fps = findings.map(fingerprint);
-    const filter = `or=(fingerprint.in.(${fps.join(',')}),status.eq.not-a-defect)`;
-    const rows = await rest(
-      supabaseUrl, supabaseHeaders,
-      `audit_findings?select=fingerprint,iso_week,status,locations&${filter}`,
-    );
-
-    const { verdicts } = classifyIngest(findings, rows ?? [], week);
     const attrib = attribution(cycleId, handler_context);
 
-    for (const v of verdicts) {
-      if (v.verdict === 'new' || v.verdict === 'recurring') {
-        // ARCHITECTURE.md 19v: the before-image is written FIRST and only its success authorises
-        // the append. row_data null encodes "this row did not exist before", so a Reverse of a
-        // filing is a DELETE of that pk -- the same shape scripts/audit-ledger.js --apply writes.
-        const id = randomUUID();
-        await rest(supabaseUrl, supabaseHeaders, 'runner_before_images', {
-          method: 'POST',
+    // The read, the four-way verdict and the before-image-then-append are the ledger's. The
+    // transports are ours: a capability turn holds the executor's headers, never process.env.
+    // §19v lives inside ingestFindings() -- the before-image is written FIRST and only its success
+    // authorises the append, and row_data null is how a Reverse of a filing becomes a DELETE.
+    const ingest = await ingestFindings({
+      findings,
+      week,
+      foundBy,
+      findingType: handler_context?.finding_type ?? 'defect',
+      cycleId: attrib.cycle_id,
+      sessionName: attrib.session_name,
+      apply: true,
+      get: q => rest(supabaseUrl, supabaseHeaders, q),
+      post: (table, body) => rest(supabaseUrl, supabaseHeaders, table, {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify(body),
+      }),
+    });
+
+    written = ingest.written;
+    reseen = ingest.reseen;
+    skipped += ingest.skipped;
+
+    // FILING IS NOT RULING. A `seen` finding is patched ONLY when it arrives already carrying a
+    // status other than `open`, and only in {status, ruling, ruled_by, ruled_at} -- the four
+    // columns the ledger's own trigger allows an UPDATE to touch. An unconditional patch would
+    // write `open` and a null ruling straight over a ruling John had already made.
+    for (const v of ingest.verdicts) {
+      if (v.verdict !== 'seen') continue;
+      const status = v.finding.status ?? 'open';
+      if (status === 'open') continue;
+      await rest(
+        supabaseUrl, supabaseHeaders,
+        `audit_findings?fingerprint=eq.${v.fingerprint}&iso_week=eq.${week}`,
+        {
+          method: 'PATCH',
           headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ ...attrib, table_name: 'audit_findings', pk_value: id, row_data: null }),
-        });
-        await rest(supabaseUrl, supabaseHeaders, 'audit_findings', {
-          method: 'POST',
-          headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify(toRow(v.finding, { week, foundBy, cycleId, id })),
-        });
-        written++;
-      } else if (v.verdict === 'seen') {
-        const status = v.finding.status ?? 'open';
-        if (status !== 'open') {
-          await rest(
-            supabaseUrl, supabaseHeaders,
-            `audit_findings?fingerprint=eq.${v.fingerprint}&iso_week=eq.${week}`,
-            {
-              method: 'PATCH',
-              headers: { Prefer: 'return=minimal' },
-              body: JSON.stringify({
-                status,
-                ruling: v.finding.ruling ?? null,
-                ruled_by: v.finding.ruled_by ?? foundBy,
-                ruled_at: v.finding.ruled_at ?? new Date().toISOString(),
-              }),
-            },
-          );
-        }
-        reseen++;
-      } else {
-        skipped++;
-      }
+          body: JSON.stringify({
+            status,
+            ruling: v.finding.ruling ?? null,
+            ruled_by: v.finding.ruled_by ?? foundBy,
+            ruled_at: v.finding.ruled_at ?? new Date().toISOString(),
+          }),
+        },
+      );
     }
   }
 

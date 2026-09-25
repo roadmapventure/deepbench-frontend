@@ -97,11 +97,14 @@ async function run() {
     assert.equal(typeof beforeImage, "function", "beforeImage must be exported");
     const f = { kind: "contradiction", locations: [{ location: "docs/a.md:1", text: "a" }], governing_fact: "g",
       confidence: "high", proposed_resolution: "p", check_slug: "x" };
-    const withSlug = toRow(f, { week: "2026-W38", foundBy: "hand:qa", sessionName: "s", id: ID });
+    // AGT-131 (v7.0.596): toRow() now REFUSES a row whose type neither the finding nor the run
+    // declared, so these two calls name one. What arm B is about -- check_slug and cycle_id -- is
+    // unchanged; tests/regression/agt-131-findings-intake.test.mjs arm A owns the type contract.
+    const withSlug = toRow(f, { week: "2026-W38", foundBy: "hand:qa", sessionName: "s", id: ID, findingType: "defect" });
     assert.equal(withSlug.check_slug, "x", "check_slug passes through");
     assert.equal(withSlug.cycle_id, null, "a session ingest leaves cycle_id null");
     const { check_slug: _drop, ...noSlug } = f;
-    assert.equal(toRow(noSlug, { week: "2026-W38", foundBy: "hand:qa", cycleId: CYCLE, id: ID }).check_slug, null,
+    assert.equal(toRow(noSlug, { week: "2026-W38", foundBy: "hand:qa", cycleId: CYCLE, id: ID, findingType: "defect" }).check_slug, null,
       "a finding without check_slug files null");
     const bs = beforeImage({ sessionName: "s", id: ID });
     assert.deepEqual(bs, { cycle_id: null, session_name: "s", table_name: "audit_findings", pk_value: ID, row_data: null });

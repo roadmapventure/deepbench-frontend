@@ -1,4 +1,24 @@
 #!/usr/bin/env node
+// DeepBench v7.0.596 | scripts/staff-watch.js | AGT-131 -- A STAFF FINDING NOW REACHES THE ONE
+// FINDINGS LIST. `runner_staff_findings` was written by this script and read by nobody: 20 rows
+// over 9 fingerprints sat in a table with no reviewer while the Development Manager reviewed
+// `audit_findings` alone. `--record` still writes that row -- and it must, because the promotion
+// bar counts PER-CYCLE rows and `audit_findings`' `UNIQUE (fingerprint, iso_week)` physically
+// cannot hold three of them in one week -- but it now also RAISES the finding into
+// `audit_findings` through scripts/audit-ledger.js's ingestFindings(), `finding_type: 'defect'`,
+// `found_by: staff-watch:<agent>`, one source and no join.
+//
+// THE TWO TABLES ANSWER DIFFERENT QUESTIONS, which is why this is a raise and not a move. The raw
+// table answers "how many distinct cycles have seen this?" -- the arithmetic the 3-cycle bar runs
+// on. The ledger answers "what is open right now, and who is going to decide it?" The ledger's own
+// week-unique key folds the second, third and fourth sighting into one row, which is correct for a
+// review queue and fatal for a counter (pattern:17: extend the structure that fits, per question).
+//
+// THE GOVERNING FACT IS THE NORMALISED DETAIL, not the raw one, and that is deliberate: the ledger
+// fingerprints on `normalize(governing_fact)`, and a cycle uuid inside the prose would mint a fresh
+// finding every cycle -- the exact failure `fingerprintFor()` was written to prevent here.
+// `normalizeDetail()` is now the one spelling of that masking, shared by both.
+//
 // DeepBench v7.0.511 | scripts/staff-watch.js | SES-378 slice 5 -- DEVIATION D1 IS RETIRED, and the
 // only thing that changed is the database. `runner_card_asks_target_kind_check` now admits
 // `'skill-edit'` (migration `ses378e_card_ask_skill_edit`), so `--promote --apply` files the ask it
@@ -62,6 +82,7 @@
 import path from "path";
 import { createHash } from "crypto";
 import { fileURLToPath } from "url";
+import { ingestFindings, isoWeek } from "./audit-ledger.js";
 
 // The ticket's own four values, verbatim, and the same list the table's CHECK constraint carries.
 // Kept here so a bad `--kind` is refused BEFORE a row is attempted rather than surfacing as a 23514
@@ -97,12 +118,36 @@ function fail(message) {
 // string. sha256("agent|kind|") is a perfectly good-looking 16 hex characters that every empty
 // detail would share, so a caller that only checks truthiness would silently group unrelated
 // findings under one hash and promote them together.
-export function fingerprintFor({ agentId, kind, detail } = {}) {
-  const norm = String(detail ?? "").toLowerCase()
+// AGT-131 -- the masking, as its own export, because TWO things now depend on it agreeing with
+// itself: this file's fingerprint and the `governing_fact` the raised `audit_findings` row carries.
+// A second copy written inline at the raise would drift on the first day someone widened UUID_RE.
+export function normalizeDetail(detail) {
+  return String(detail ?? "").toLowerCase()
     .replace(UUID_RE, "<uuid>")
     .replace(/\s+/g, " ").trim().replace(/\.$/, "");
+}
+
+export function fingerprintFor({ agentId, kind, detail } = {}) {
+  const norm = normalizeDetail(detail);
   if (!agentId || !kind || !norm) return { error: "agent, kind and detail are all required" };
   return { fingerprint: sha256(`${agentId}|${kind}|${norm}`).slice(0, 16) };
+}
+
+// AGT-131 -- the finding this script raises into the one findings list, as a pure function so the
+// regression file can read its exact shape without a network. `kind:'other'` and a
+// `<source>:<slug>` check_slug are the non-Auditor form the ticket settled; the locations are the
+// agent, and the ticket too when the observation named one.
+export function ledgerFindingFor({ agent, kind, detail, backlog } = {}) {
+  const locations = [{ location: `agents:${agent}`, text: detail }];
+  if (backlog) locations.push({ location: `backlog_items:${backlog}`, text: detail });
+  return {
+    kind: "other",
+    check_slug: `staff:${String(kind).replace(/\s+/g, "-")}`,
+    locations,
+    governing_fact: normalizeDetail(detail),
+    confidence: "high",
+    proposed_resolution: "Skill edit via --promote at the bar",
+  };
 }
 
 // --- the promotion arithmetic ------------------------------------------------------------------
@@ -255,14 +300,36 @@ async function record(args) {
   if (rows.length !== 1) fail(`expected exactly 1 row for (${args.cycleId}, ${fp.fingerprint}) after --record, found ${rows.length}`);
   const row = rows[0];
 
+  // AGT-131 -- AND THE SAME OBSERVATION IS RAISED INTO THE ONE FINDINGS LIST. The raw row above is
+  // the counter's evidence; this is the review queue's. It runs AFTER the raw write, so a ledger
+  // that refused the append never costs the cycle its count. ingestFindings() writes the §19v
+  // before-image itself, folds the second sighting of a week to `seen`, and never re-files a
+  // finding the manager has already ruled not-a-defect.
+  const finding = ledgerFindingFor({ agent: args.agent, kind: args.kind, detail: args.detail, backlog: args.backlog });
+  const ingest = await ingestFindings({
+    findings: [finding],
+    week: isoWeek(new Date()),
+    foundBy: `staff-watch:${args.agent}`,
+    findingType: "defect",
+    cycleId: args.cycleId,
+    apply: true,
+    get: q => db.get(q),
+    post: (table, body) => db.post(table, body, "return=minimal"),
+  });
+  const raised = ingest.verdicts[0] ?? null;
+  const audit_finding = raised ? { verdict: raised.verdict, fingerprint: raised.fingerprint } : null;
+
   if (args.json) {
-    process.stdout.write(JSON.stringify({ recorded: isNew, rows_for_fingerprint_in_cycle: rows.length, row }) + "\n");
+    process.stdout.write(JSON.stringify({ recorded: isNew, rows_for_fingerprint_in_cycle: rows.length, row, audit_finding }) + "\n");
   } else {
     process.stdout.write(
       `${isNew ? "recorded" : "no-op (already recorded in this cycle)"} `
       + `fingerprint=${row.fingerprint} agent=${row.agent_id} kind="${row.kind}" `
       + `backlog=${row.backlog_id ?? "-"} cycle=${row.cycle_id} id=${row.id}\n`
-      + `rows for this (cycle, fingerprint): ${rows.length}\n`);
+      + `rows for this (cycle, fingerprint): ${rows.length}\n`
+      // A permanent, un-deletable ledger row was just appended (or deliberately not): the default
+      // mode says so rather than leaving it to whoever remembers to pass --json.
+      + `audit_findings: ${audit_finding ? `${audit_finding.verdict} (${audit_finding.fingerprint})` : "nothing raised"}\n`);
   }
 }
 

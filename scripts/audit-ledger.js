@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+// DeepBench v7.0.596 | scripts/audit-ledger.js | AGT-131
+// FEATURE: AGT-131 -- ONE FINDINGS LIST, AND THIS FILE IS ITS ONE INTAKE. Four writers reach
+// public.audit_findings: this CLI, api/_lib/handlers/auditor-write.js, scripts/staff-watch.js and
+// scripts/ticket-owner.js. Until this ship the first two carried the SAME read/classify/append loop
+// written twice -- and the copy had already started to drift -- while the last two wrote their
+// findings to tables (`runner_staff_findings`, `ticket_owner_findings`) nobody reviews.
+// ingestFindings() below is that loop, once, with its transports injected: `get`/`post` are the
+// caller's, so a capability turn's supabaseUrl/supabaseHeaders and a script's process.env both
+// drive the same code rather than two implementations that agree until the week they stop
+// (pattern:14, pattern:15).
+//
+// EVERY ROW NOW SAYS WHAT IT IS AND WHO FOUND IT, SINGULAR. `finding_type` is NOT NULL over
+// {defect, gap, proposal, security} with no default -- a writer that will not say what it found has
+// not said enough, and a default would answer for it silently (pattern:10). toRow() takes the
+// finding's own value first and the run's `--type` second, and THROWS when neither exists, so the
+// refusal lands in this process with a legible message instead of as a 23502 from PostgREST.
+// `audit_findings_found_by_single` (NOT VALID) refuses a joined `found_by` from here on; the 27
+// rows that already carry one are history the append-only guard will not let anyone repair.
+//
 // DeepBench v7.0.549 | scripts/audit-ledger.js | AGT-86 slice 3
 // FEATURE: AGT-86 slice 3 -- THE AUDITOR FILES ITS OWN FINDINGS, AND THE REPORT COUNTS WHAT IT FOUND.
 // A filing is attributed to EXACTLY ONE of a runner cycle (--cycle-id) or a session
@@ -73,13 +92,16 @@
 // record who filed that closure, never a judgment this script made.
 //
 // Usage:
-//   node scripts/audit-ledger.js --ingest=<json> --week=<YYYY-Www> [--found-by=<s>]
+//   node scripts/audit-ledger.js --ingest=<json> --week=<YYYY-Www> [--found-by=<s>] [--type=<t>]
 //                                [--cycle-id=<uuid> | --session-name=<name>] --apply
 //   node scripts/audit-ledger.js --report=<YYYY-Www> [--write]
 //
 //   --ingest=<json>   A file in the fixture's shape: {week, found_by, findings:[...], carried:[...]}.
 //                     Its top-level `week` and `found_by` are DEFAULTS; the flags win when given.
 //                     `carried` (audit-cluster.js --collect) is ingested with `findings`.
+//   --type=<t>        The run's finding_type for every finding that does not carry its own: one of
+//                     defect, gap, proposal, security (AGT-131). Defaults to the input file's
+//                     top-level `finding_type`. A finding with neither is exit 2, not a guess.
 //   --apply           Actually append. Default is a DRY RUN that writes nothing at all.
 //   --cycle-id=<uuid>     With --apply, exactly one of these two: the open runner_cycles row every
 //   --session-name=<name> before-image binds to, or the session that filed. Never both.
@@ -253,7 +275,27 @@ export function renderReport(week, rows, found = null) {
 //
 // AGT-86 slice 3 -- `check_slug` passes through (null when the finding names no check); a session
 // ingest (sessionName, no cycleId) leaves `cycle_id` NULL.
-export function toRow(finding, { week, foundBy, cycleId, sessionName, id }) {
+// AGT-131 -- the four values public.audit_findings' `audit_findings_finding_type_check` allows.
+// Exported so the CLI can refuse a bad --type with a message naming the set, rather than letting
+// PostgREST answer 23514 for it (the same reasoning scripts/staff-watch.js applies to --kind).
+export const FINDING_TYPES = Object.freeze(["defect", "gap", "proposal", "security"]);
+
+// A finding's own `finding_type` wins over the run's, because a batch may legitimately mix them:
+// the Ticket Owner's census raises `gap` while the Auditor's routine raises `defect`, and a caller
+// that stamped one value over the whole batch would erase the distinction the column exists for.
+// THROWS when neither exists -- see the header: a writer that will not say what it found has not
+// said enough, and there is no default to fall back on.
+export function findingTypeOf(finding, findingType) {
+  const t = finding?.finding_type ?? findingType ?? null;
+  if (!t) {
+    throw new Error(
+      `finding_type is required and has no default: neither the finding nor the run supplied one ` +
+      `(one of ${FINDING_TYPES.join(", ")}) -- pass --type=<t>, or put finding_type on the finding.`);
+  }
+  return String(t);
+}
+
+export function toRow(finding, { week, foundBy, cycleId, sessionName, id, findingType }) {
   const status = finding.status ?? "open";
   const ruled = status !== "open";
   return {
@@ -272,6 +314,7 @@ export function toRow(finding, { week, foundBy, cycleId, sessionName, id }) {
     found_by: finding.found_by ?? foundBy,
     check_slug: finding.check_slug ?? null,
     cycle_id: cycleId ?? null,
+    finding_type: findingTypeOf(finding, findingType),
   };
 }
 
@@ -350,6 +393,79 @@ export function classifyIngest(findings, rows, week) {
     verdicts.push({ finding, fingerprint: fp, verdict, match });
   }
   return { verdicts, summary };
+}
+
+// --- the one intake (AGT-131) -------------------------------------------------------------------
+//
+// ingestFindings({findings, week, foundBy, findingType, cycleId, sessionName, get, post, apply})
+//   -> {verdicts, summary, written, reseen, skipped}
+//
+// THE READ, THE CLASSIFICATION AND THE APPEND, ONCE, FOR ALL FOUR WRITERS. What used to live here
+// as doIngest()'s middle and AGT-70's copy of it inside api/_lib/handlers/auditor-write.js is this
+// function; both now call it, and scripts/staff-watch.js and scripts/ticket-owner.js reach the
+// ledger through it rather than through a third and fourth spelling of the same loop.
+//
+// `get` AND `post` ARE THE CALLER'S, and that is the whole reason this can be shared. A capability
+// turn holds the executor's supabaseUrl/supabaseHeaders; a script holds process.env credentials;
+// a test holds neither and hands in two stubs. The contract is deliberately tiny:
+//   get(pathAndQuery) -> the rows, as an array. Throws or fails the process on a transport error.
+//   post(table, body) -> resolves on success. Throws on a transport error.
+// Nothing here catches a transport failure and carries on: a read that did not happen would
+// classify every carry as new work, and an append whose before-image did not land is a row §19v
+// cannot reverse.
+//
+// THE TYPE OF EVERY FINDING IS RESOLVED BEFORE THE FIRST WRITE, not at each row's turn. A batch of
+// ten whose seventh carries no type must file NONE of them: half a cluster in the ledger and an
+// exit 2 is the worst of both answers, and the next run would read the filed half as `seen`.
+//
+// AND ONLY UNDER `apply`, which is not a loophole. A DRY RUN WRITES NOTHING, so it has no row to
+// type; its whole product is the four-way verdict and the exit code that says how much of this
+// batch the ledger does not hold yet. Refusing a dry run for a missing type would make the
+// cheapest, safest form of this command the one that stops working first -- and the runbook's
+// step 3 leans on exactly that signal to decide whether to re-run with --apply.
+export async function ingestFindings({
+  findings, week, foundBy, findingType, cycleId, sessionName, get, post, apply,
+} = {}) {
+  const all = Array.isArray(findings) ? findings : [];
+  // Resolve-and-discard: this throws for the batch before anything is read or written.
+  if (apply) for (const f of all) findingTypeOf(f, findingType);
+
+  const fps = all.map(fingerprint);
+  // ONE read, and it deliberately over-reads: every row sharing a fingerprint with this batch, in
+  // ANY week (that is what tells `recurring` from `new`), plus every `not-a-defect` row whatever
+  // its fingerprint (the ruled-out test matches on location homes, which no fingerprint filter
+  // would fetch). A second round-trip per finding would be the same answer at N times the cost.
+  const filter = fps.length
+    ? `or=(fingerprint.in.(${fps.join(",")}),status.eq.not-a-defect)`
+    : `status=eq.not-a-defect`;
+  const rows = await get(`audit_findings?select=fingerprint,iso_week,status,locations&${filter}`);
+
+  const { verdicts, summary } = classifyIngest(all, rows ?? [], week);
+
+  let written = 0;
+  // `new` and `recurring` append; `seen` cannot (UNIQUE (fingerprint, iso_week) refuses it) and
+  // `ruled-out` must not (re-filing the manager's ruling turns one closed question into a weekly one).
+  if (apply) {
+    for (const v of verdicts) {
+      if (v.verdict !== "new" && v.verdict !== "recurring") continue;
+      const id = randomUUID();
+      try {
+        await post("runner_before_images", beforeImage({ cycleId, sessionName, id }));
+      } catch (e) {
+        throw new Error(`${e.message} -- no before-image, so the append does not happen (§19v).`);
+      }
+      await post("audit_findings", toRow(v.finding, { week, foundBy, cycleId, sessionName, id, findingType }));
+      written++;
+    }
+  }
+
+  return {
+    verdicts,
+    summary,
+    written,
+    reseen: summary.seen,
+    skipped: summary.ruledOut,
+  };
 }
 
 // --- CLI --------------------------------------------------------------------------------------
@@ -442,6 +558,15 @@ async function doIngest(argv) {
   const foundBy = arg(argv, "found-by") ?? doc.found_by;
   if (!week || !/^\d{4}-W\d{2}$/.test(String(week))) fail(2, `--week must be YYYY-Www (got ${week ?? "nothing"}).`);
   if (!foundBy) fail(2, "--found-by=<s> is required when the input file carries no top-level found_by.");
+  // AGT-131 -- the run's type, for every finding that does not carry its own. A bad value is
+  // refused HERE, naming the four, rather than reaching PostgREST as a 23514 the caller decodes.
+  // A finding with no type at all is refused by findingTypeOf() inside ingestFindings(), before
+  // the batch's first write.
+  const findingType = arg(argv, "type") ?? doc.finding_type ?? null;
+  if (findingType === true) fail(2, `--type needs a value: one of ${FINDING_TYPES.join(", ")}.`);
+  if (findingType !== null && !FINDING_TYPES.includes(String(findingType))) {
+    fail(2, `--type "${findingType}" is not one of the four finding types: ${FINDING_TYPES.join(", ")}.`);
+  }
   // AGT-70 slice 4 -- `carried` is ingested alongside `findings`, from the same file and in the
   // same pass. A separate --carry flag would let a cycle file this week's discoveries and silently
   // drop last week's still-open ones, which is the exact failure week two exists to prevent. A doc
@@ -451,30 +576,23 @@ async function doIngest(argv) {
   const findings = [...own, ...(Array.isArray(doc.carried) ? doc.carried : [])];
 
   const { base, key } = creds();
-  const fps = findings.map(fingerprint);
-  // ONE read, and it deliberately over-reads: every row sharing a fingerprint with this batch, in
-  // ANY week (that is what tells `recurring` from `new`), plus every `not-a-defect` row whatever
-  // its fingerprint (the ruled-out test matches on location homes, which no fingerprint filter
-  // would fetch). A second round-trip per finding would be the same answer at N times the cost.
-  const filter = fps.length
-    ? `or=(fingerprint.in.(${fps.join(",")}),status.eq.not-a-defect)`
-    : `status=eq.not-a-defect`;
-  const rows = await restGet(base, key, `audit_findings?select=fingerprint,iso_week,status,locations&${filter}`);
-
-  const { verdicts, summary } = classifyIngest(findings, rows, week);
-
-  if (apply) {
-    // `new` and `recurring` append; `seen` cannot (UNIQUE (fingerprint, iso_week) refuses it) and
-    // `ruled-out` must not (re-filing the manager's ruling turns one closed question into a weekly one).
-    for (const v of verdicts) {
-      if (v.verdict !== "new" && v.verdict !== "recurring") continue;
-      const id = randomUUID();
-      const before = await restPost(base, key, "runner_before_images", beforeImage({ cycleId, sessionName, id }));
-      if (before.error) fail(2, `${before.error} -- no before-image, so the append does not happen (§19v).`);
-      const row = await restPost(base, key, "audit_findings", toRow(v.finding, { week, foundBy, cycleId, sessionName, id }));
-      if (row.error) fail(2, row.error);
-    }
+  // AGT-131 -- the read, the classification and the append are ingestFindings()'s, not this
+  // function's. What stays here is the CLI's: credentials from the environment, restGet/restPost
+  // as the transports, and a thrown message turned into this script's exit 2.
+  let result;
+  try {
+    result = await ingestFindings({
+      findings, week, foundBy, findingType, cycleId, sessionName, apply,
+      get: q => restGet(base, key, q),
+      post: async (table, body) => {
+        const r = await restPost(base, key, table, body);
+        if (r.error) throw new Error(r.error);
+      },
+    });
+  } catch (e) {
+    fail(2, e.message);
   }
+  const { summary } = result;
 
   console.log(`ingest ${week}: ${findings.length} findings, ${summary.new} new, ${summary.seen} seen, ${summary.recurring} recurring, ${summary.ruledOut} ruled-out`);
   // A dry run that found unfiled work is the signal to re-run with --apply; an --apply run that

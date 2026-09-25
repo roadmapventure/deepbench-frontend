@@ -1367,14 +1367,17 @@ function theFourVerdictsFireInTheRightOrder() {
     "the same finding twice in ONE file appends once: the second is `seen` because an earlier finding of this call already claimed the fingerprint");
 
   // toRow's pass-through, which is what keeps a carry's own provenance instead of stamping the run's.
+  // AGT-131 (v7.0.596): toRow() REFUSES a row whose type neither the finding nor the run declared,
+  // so both calls below name one. The pass-through this arm is about is unchanged; the type
+  // contract itself is owned by tests/regression/agt-131-findings-intake.test.mjs arm A.
   const carried = toRow(
     { ...FIXTURE.findings[0], found_by: `carry:${WEEK}`, ruled_by: "john", ruled_at: "2026-09-15T00:00:00.000Z" },
-    { week: "2026-W38", foundBy: "x", id: "i" });
+    { week: "2026-W38", foundBy: "x", id: "i", findingType: "defect" });
   assert.strictEqual(carried.found_by, `carry:${WEEK}`, "a carried finding keeps the week it was carried from");
   assert.strictEqual(carried.ruled_by, "john", "and keeps whoever ruled it");
   assert.strictEqual(carried.ruled_at, "2026-09-15T00:00:00.000Z", "and when");
   assert.strictEqual(carried.status, "open", "an open finding carried forward is still open");
-  const plain = toRow(FIXTURE.findings[0], { week: "2026-W38", foundBy: "x", id: "i" });
+  const plain = toRow(FIXTURE.findings[0], { week: "2026-W38", foundBy: "x", id: "i", findingType: "defect" });
   assert.strictEqual(plain.found_by, "x", "CONTROL: a finding carrying none of the three still takes the run's own --found-by");
   assert.strictEqual(plain.ruled_by, null, "and an open row is unruled, exactly as before slice 4");
 }
