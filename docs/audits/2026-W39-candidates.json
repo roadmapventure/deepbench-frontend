@@ -1,662 +1,431 @@
 {
   "week": "2026-W39",
-  "found_by": "auditor:judgment:claude-fable-5-1",
-  "note": "candidates from the judgment run — NOT ingested; John reads, then node scripts/audit-ledger.js --ingest=docs/audits/2026-W39-candidates.json --week=2026-W39 --cycle-id=<cycle> --apply",
+  "found_by": "auditor:judgment:none + auditor:board-checks + auditor:private-scan + auditor:routine:board-health (assembly failed: E2BIG) + auditor:routine:work-quality + auditor:routine:advisor + check-routine-prompt:auditor + check-routine-prompt:runner + check-routine-prompt:runner",
   "findings": [
     {
-      "kind": "contradiction",
+      "check_slug": "board-no-home",
+      "kind": "other",
       "locations": [
         {
-          "location": "skill_profiles/pz-rank-intent/method",
-          "text": "Your task_context carries tickets: an array of {backlog_id, priority_class, supports_class, filed_at, predicted_cycles, queue, epic, milestone_order}. Order them: (1) project milestone order when the set spans milestones of one project; (2) supports_class, P1 first, none last; (3) priority_class, P1 first; (4) filing lane (filed before 2026-08-21 first); (5) predicted_cycles, cheapest first, unknown last; (6) queue. Return every ticket exactly once with its rank and a one-line reason naming which key decided its place. Never re-judge a class here — rank-backlog orders what classify-ticket ruled."
-        },
-        {
-          "location": "governance_rules/OD-06",
-          "text": "The standing drain picks its next member by filing lane first, then queue number, then `predicted_cycles` nulls last, and by nothing else; canonical: `public.drain_epic_next()`, the pick predicate's `ORDER BY`."
-        },
-        {
-          "location": "governance_rules/OD-05",
-          "text": "Within the offered lanes, rows are numbered by `lane_ord`, then the directive lane's `created_at`, then the filing lane, then the queue number, then `predicted_cycles` nulls last — the same three ticket keys `drain_epic_next()` uses, and that agreement is the property the pair of functions exists to hold; canonical: `public.prime_directive_queue()`, the `ranked` CTE."
+          "location": "audit-board/board-no-home",
+          "text": "551 rows: AA-01, AA-02, AA-04, AA-05, AA-06, AA-07, AA-08, AA-09, AA-10, AA-102, AA-105, AA-109, AA-11, AA-111, AA-119, AA-12, AA-121, AA-123, AA-13, AA-133, AA-14, AA-140, AA-146, AA-15, AA-153, AA-156, AA-159, AA-16, AA-169, AA-17, AA-175, AA-178, AA-18, AA-180, AA-181, AA-19, AA-191, AA-194, AA-20, AA-21, AA-22, AA-23, AA-24, AA-25, AA-26, AA-27, AA-28, AA-29, AA-30, AA-31, AA-32, AA-33, AA-34, AA-35, AA-36, AA-37, AA-38, AA-39, AA-40, AA-41, AA-42, AA-43, AA-45, AA-46, AA-47, AA-48, AA-49, AA-50, AA-51, AA-52, AA-54, AA-55, AA-56, AA-59, AA-63, AA-65, AA-66, AA-69, AA-70, AA-71, AA-74, AA-78, AA-79, AA-85, AA-88, AA-89, AA-90, AA-91, AA-92, AA-93, AA-94, AA-96, AA-99, ABT-2, ADM-3, ADM-4, ADM-5, AG-01, AG-04, AG-05, AG-06, AG-10, AG-11, AG-12, AG-25, AG-26, AG-30, AG-31, AGR-001, AGR-002, AGR-01, AGR-4, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-007, AGT-008, AGT-009, AGT-010, AGT-011, AGT-012, AGT-013, AGT-014, AGT-015, AGT-016, AGT-017, AGT-018, AGT-019, AGT-020, AGT-021, AGT-022, AGT-024, AGT-025, AGT-028, AGT-029, AGT-105, AGT-106, AGT-110, AGT-111, AGT-114, AGT-115, AGT-116, AGT-117, AGT-118, AGT-122, AGT-123, AGT-124, AGT-125, AGT-126, AGT-30, AGT-31, AGT-33, AGT-34, AGT-37, AGT-39, AGT-40, AGT-41, AGT-42, AGT-43, AGT-46, AGT-48, AGT-49, AGT-50, AGT-51, AGT-52, AGT-55, AGT-57, AGT-58, AGT-59, AGT-60, AGT-61, AGT-62, AGT-81, AGT-85, AI-03, AI-06, AI-07, AI-11, AI-12, AI-17, AI-19, AI-20, AI-21, AI-22, AI-24, AI-25, AI-26, AI-27, AI-31, AI-34, AI-35, AI-38, AI-42, AI-45, AI-46, AI-52, AW-07, AW-11, AW-12, AW-13, AW-15, AW-17, AW-28, AZ-03, AZ-04, AZ-05, AZ-15, AZ-18, AZ-20, CHI-101, CHI-102, CHI-103, CHI-104, CHI-11, CHI-16, CHI-17, CHI-19, CHI-20, CHI-22, CHI-24, CHI-27, CHI-47, CHI-48, CHI-52, CHI-54, CHI-62, CHI-63, CHI-67, CHI-68, CHI-69, CHI-70, CHI-72, CHI-78, CHI-83, CHI-85, CHI-86, CHI-87, CHI-91, CHI-93, CHI-94, CHI-95, CHI-97, CHI-98, DAT-001, DAT-002, DAT-004, DAT-10, DAT-13, DAT-14, DAT-15, DAT-16, DAT-17, DAT-19, DAT-20, DAT-23, DAT-24, DAT-26, DAT-8, DAT-9, DB-01, DB-04, DB-14, DB-18, DB-19, DB-20, DL-01, DL-02, DL-03, DL-04, DL-05, DL-06, DL-07, DL-08, DL-09, DL-10, DL-11, DL-12, FM-01, FM-02, FM-03, FM-04, FM-05, FM-06, FM-07, FT-04, FT-05, FT-06, HAR-03, HAR-10, HAR-12, HAR-13, HAR-14, HAR-19, HAR-22, HAR-23, HAR-24, HAR-25, HAR-26, HAR-27, HAR-28, HAR-29, HAR-31, HAR-32, HAR-35, HAR-36, HAR-37, HAR-38, HAR-39, HAR-40, IN-01, IN-02, IN-03, IN-04, IN-05, IN-06, IN-07, IN-08, LA-01, LAV-18, LAV-2, LAV-24, LAV-27, LAV-3, LAV-30, LAV-31, LAV-35, LAV-4, LAV-6, LOG-01, LOG-05, LOG-06, LOG-07, LOG-09, LOG-10, LOG-100, LOG-102, LOG-106, LOG-108, LOG-11, LOG-110, LOG-111, LOG-113, LOG-114, LOG-115, LOG-116, LOG-117, LOG-118, LOG-119, LOG-120, LOG-122, LOG-123, LOG-126, LOG-134, LOG-140, LOG-142, LOG-144, LOG-146, LOG-22, LOG-23, LOG-40, LOG-42, LOG-43, LOG-44, LOG-45, LOG-46, LOG-47, LOG-48, LOG-50, LOG-53, LOG-55, LOG-56, LOG-57, LOG-58, LOG-59, LOG-62, LOG-63, LOG-68, LOG-70, LOG-74, LOG-77, LOG-78, LOG-82, LOG-84, LOG-89, LOG-94, LOG-96, LOO-003, LOO-005, LOO-008, LOO-18, LOO-21, LOO-24, LOO-25, LOO-27, LOO-29, LOO-30, LOO-31, LOO-32, LOO-34, LOO-35, LOO-36, LOO-42, MC-01, MC-02, MC-03, MC-04, MC-05, MC-06, MC-07, MI-01, MI-03, MI-07, MI-08, MI-09, MI-16, MI-41, MI-53, MI-69, MI-70, MI-71, MOB-10, MOB-12, MOB-13, MOB-3, MOB-6, MOB-9, PE-04, PE-06, PE-12, PE-14, PE-15, PE-16, PE-18, PRO-1, PRO-3, PRO-4, RO-16, SCA-2, SCA-3, SCA-4, SCA-5, SES-007, SES-014, SES-017, SES-195, SES-198, SES-204, SES-206, SES-212, SES-214, SES-217, SES-224, SES-225, SES-226, SES-227, SES-228, SES-229, SES-232, SES-233, SES-239, SES-249, SES-250, SES-251, SES-252, SES-253, SES-259, SES-26, SES-262, SES-264, SES-266, SES-267, SES-268, SES-270, SES-271, SES-272, SES-274, SES-278, SES-29, SES-306, SES-307, SES-314, SES-318, SES-328, SES-36, SES-375, SES-38, SES-384, SES-387, SES-39, SES-41, SES-426, SES-427, SES-428, SES-429, SES-430, SES-431, SES-432, SES-433, SES-44, SES-55, SES-56, SES-59, SES-60, SES-63, SES-70, SES-72, SES-73, SES-74, SES-75, SH-06, SH-07, SH-08, SH-09, SH-17, SK-07, SK-08, SK-09, SK-10, SK-11, SK-13, SK-14, SK-15, SK-16, SK-17, SK-18, SK-19, SK-20, SK-21, SV-01, SV-02, SV-03, SV-04, TC-02, TI-02, TI-03, TI-07, TI-14, TI-15, TI-16, TI-17, TI-18, TT-03, TT-04, WO-02, WO-03, WO-04, WO-05, WO-06"
         }
       ],
-      "governing_fact": "Whether predicted_cycles is applied before the queue number (pz-rank-intent, key 5 before key 6) or after it (drain_epic_next and prime_directive_queue: lane, queue, then predicted_cycles nulls last) when ordering pickable tickets.",
+      "governing_fact": "An open or partial backlog row with no epic, or whose epic has no project, can never be picked: prime_directive_queue() admits a row only through epic_project_executing(epic_id).",
       "confidence": "high",
-      "proposed_resolution": "OD-06 and OD-05 win: public.drain_epic_next() and public.prime_directive_queue() are the canonical pickers, and registry row OD-43 already records the pz-rank-intent method as the side that does not agree with the picker. Re-sequence skill_profiles.method for pz-rank-intent so predicted_cycles nulls last follows the queue number."
+      "proposed_resolution": "551 rows. Give the row an epic under an executing project, or remove it."
     },
     {
-      "kind": "contradiction",
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
       "locations": [
         {
-          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:465",
-          "text": "- **`M5-07` — cheapest-first tiebreak.** `predicted_cycles` ascending, **nulls last**, as the last\n  ordering term. It changes only ties: never a lane, never a class."
-        },
-        {
-          "location": "governance_rules/OD-01",
-          "text": "The pickable board's stored order is produced by exactly six ranking keys applied in this sequence: `automation_rank` nulls last, then tier (`now` before `next` before everything else), then the numeric part of `priority_class` ascending, then the M5-02 filing lane (`coalesce(filed_at, created_at)` before 2026-08-21 first), then `predicted_cycles` ascending nulls last, then `coalesce(filed_at, created_at)` ascending, with `backlog_id` and `id` as final tiebreaks; canonical: `public.recompute_backlog_queue()`."
+          "location": "backlog_items:SES-378",
+          "text": "10 cycles (streak cap 4); status removal proposed"
         }
       ],
-      "governing_fact": "Whether predicted_cycles ascending nulls last is the last ordering term of the stored queue, or is followed by coalesce(filed_at, created_at) ascending and the backlog_id and id tiebreaks.",
-      "confidence": "medium",
-      "proposed_resolution": "OD-01 wins: its canonical is public.recompute_backlog_queue(), which orders filed_at, backlog_id and id after predicted_cycles. Amend the M5-07 register line at docs/RUNNER-GOV-M5-REQUIREMENTS.md:465 to read 'the last ranking key before the filed_at date and id tiebreaks'."
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "docs/runbooks/session-setup.md:310",
-          "text": "- **`scope_rationale` is the review bucket's promotion criterion (`M5-03`, `SES-295`, 2026-09-02):**\n  a Selfbuild ticket filed on or after 2026-08-21 with no rationale is **never picked** — not by the\n  drain, not by the pre-boot gate — until one is written. Name the charter goal it advances\n  (`docs/SELFBUILD-CHARTER.md` \"Goals\"), one or two sentences. The other matrix fields\n  (`scope_origin`, `size_stamp`, `predicted_cycles`, `defer_status`) are fail-LOUD (`FILE-MATRIX`):\n  a missing one is flagged, not refused."
-        },
-        {
-          "location": "governance_rules/EL-01",
-          "text": "A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04)."
-        },
-        {
-          "location": "docs/RUNNER-GOV-ENHANCEMENT-LANE.md:39",
-          "text": "Four parts of the proposed five-part test were already columns or structural facts:\n`scope_rationale` (`SES-295`), `predicted_cycles` (`FILE-MATRIX`), before-images plus the `M6-02`\nwindow. The one new column is **`enhancement_claim`** — the metric and direction — which is also\nexactly what `SES-303`'s outcome telemetry reads back. Enforced in `drain_epic_next()` and\n`prime_directive_queue()` (migration `ses283_enhancement_lane`, the `SES-305`/`SES-295`\nanchored-replace pattern); `runner_should_boot()` and `drain_chain_gate()` inherit."
-        }
-      ],
-      "governing_fact": "Whether a ticket missing predicted_cycles is only flagged and stays pickable (session-setup: 'flagged, not refused', no exception stated) or is refused at pick time (EL-01: an enhancement row is not buildable without it, enforced in the drain).",
-      "confidence": "medium",
-      "proposed_resolution": "EL-01 wins for scope_origin = 'enhancement' rows: migration ses283_enhancement_lane enforces the admission test in drain_epic_next() and prime_directive_queue(). Add that exception to docs/runbooks/session-setup.md:310; FILE-MATRIX's fail-LOUD rule stays true for every other scope_origin."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "governance_rules/M5-07",
-          "text": "Within the same lane and priority class, break queue ties by lowest `predicted_cycles` first."
-        },
-        {
-          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:163",
-          "text": "> Within the same lane and priority class, break queue ties by lowest `predicted_cycles` first."
-        }
-      ],
-      "governing_fact": "The M5-07 cheapest-first tiebreak rule is stated word for word in two live homes, the governance_rules row and the requirements document.",
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
       "confidence": "high",
-      "proposed_resolution": "governance_rules/M5-07 wins as the home: the register ID is the row the OD-01 order and the M5 requirements cite. Keep docs/RUNNER-GOV-M5-REQUIREMENTS.md:163 as a pointer to the row rather than a second copy of its text, so the two cannot drift; no ledger entry retires either passage today."
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged."
     },
     {
-      "kind": "duplicate",
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
       "locations": [
         {
-          "location": "governance_rules/M5-04",
-          "text": "Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `milestone`, `milestone_required`, `priority_class`, `filed_at` as the created date, `status`, `scope_rationale`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags. A milestone's required set is the stored `milestone_required` flag, set at its gate decision and never re-judged per question."
-        },
-        {
-          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:110",
-          "text": "> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `milestone`, `milestone_required`, `priority_class`, `filed_at` as the created date, `status`, `scope_rationale`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags. A milestone's required set is the stored `milestone_required` flag, set at its gate decision and never re-judged per question."
+          "location": "backlog_items:SES-422",
+          "text": "4 cycles (streak cap 4); status delivered"
         }
       ],
-      "governing_fact": "The M5-04 minimum answer set for incomplete tickets, including predicted_cycles, is stated word for word in two live homes, the governance_rules row and the requirements document.",
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
       "confidence": "high",
-      "proposed_resolution": "governance_rules/M5-04 wins as the home: the register ID is what the runbooks cite (session-setup.md:269 cites M5-04 for filed_at). Keep docs/RUNNER-GOV-M5-REQUIREMENTS.md:110 as a pointer to the row rather than a second copy; no ledger entry retires either passage today."
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged."
     },
     {
-      "kind": "duplicate",
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
       "locations": [
         {
-          "location": "governance_rules/EL-01",
-          "text": "A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04)."
-        },
-        {
-          "location": "docs/RUNNER-GOV-ENHANCEMENT-LANE.md:37",
-          "text": "> A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04)."
+          "location": "backlog_items:SES-424",
+          "text": "8 cycles (streak cap 4); status delivered"
         }
       ],
-      "governing_fact": "The EL-01 enhancement admission test, with predicted_cycles as the displacement-cost term, is stated word for word in two live homes, the governance_rules row and the enhancement-lane document.",
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
       "confidence": "high",
-      "proposed_resolution": "governance_rules/EL-01 wins as the home: docs/RUNNER-GOV-ENHANCEMENT-LANE.md:39 itself says the row is what migration ses283_enhancement_lane enforces in drain_epic_next() and prime_directive_queue(). Keep line 37 as a pointer to the row rather than a second copy; no ledger entry retires either passage today."
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged."
     },
     {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "docs/runbooks/runner-cycle.md:3860",
-          "text": "- **The INSERT before-image convention starts here.** Every prior `runner_before_images` row records\n  an UPDATE and carries the old row in `row_data`. A heal filing is an INSERT, so there is no prior\n  state: it writes `row_data = NULL`, meaning **\"this row did not exist — Reverse is a DELETE of\n  this pk.\"** The before-image is written first and its success is what authorises the ticket\n  insert (§19v: no before-image, no write)."
-        },
-        {
-          "location": "docs/runbooks/briefing-page.md:1001",
-          "text": "Every write is `runner_before_images`-first like any other Supabase write (§19v); an INSERT writes\n`row_data = NULL`, the `SES-142` precedent. Decisions ride the same `briefing-state` harvest as every\nother card. On-demand bursts (\"I have X minutes\") serve claims rapid-fire in chat, same bookkeeping."
-        }
-      ],
-      "governing_fact": "Which ship established the INSERT before-image convention (row_data = NULL): runner-cycle.md:3860 says it starts at the heal engine and every prior row recorded an UPDATE; briefing-page.md:1001 says the precedent is SES-142, an earlier ship.",
-      "confidence": "medium",
-      "proposed_resolution": "briefing-page.md:1001 should win: SES-142 predates the heal engine (SES-276, v7.0.389 header of scripts/heal-engine.js), so runner-cycle.md:3860 should drop the claim that every prior row was an UPDATE and cite SES-142 as the precedent instead of 'starts here'."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": ".claude/rules/agent-roster-inert.md:28",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\n> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\n> Flipping agents.is_active on is unchanged and remains John's hire card.\n> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        },
-        {
-          "location": "docs/ARCHITECTURE.md:2632",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\n> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\n> Flipping agents.is_active on is unchanged and remains John's hire card.\n> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        },
-        {
-          "location": "governance_rules/AGENT-ROW-AGREED-TICKET",
-          "text": "Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\nReserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\nFlipping agents.is_active on is unchanged and remains John's hire card.\nJohn 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        }
-      ],
-      "governing_fact": "The full text of rule AGENT-ROW-AGREED-TICKET, including its before-image-per-row clause, lives verbatim in three homes: the rules file, ARCHITECTURE.md §19v, and the governance_rules row.",
-      "confidence": "high",
-      "proposed_resolution": ".claude/rules/agent-roster-inert.md:28 should win as the canonical home, which scripts/agent-row-gate.js:1 states outright (decisions 20a06cf3 and 38a1c566); ARCHITECTURE.md:2632 and the governance_rules row should be marked as renders of it, never edited independently."
-    },
-    {
-      "kind": "redundant",
-      "locations": [
-        {
-          "location": "CLAUDE-DESIGN.md:136",
-          "text": "**Which column attributes it depends on the session, and exactly one of the two is set** — `ck_before_image_attribution`: an **Automated** cycle sets `cycle_id` (its `runner_cycles` row); an **attended** session — which has no cycle row — sets **`session_name`**, its own short session name, the same string it gave `dev_version_counter.updated_by_session`. Until `v7.0.234` `cycle_id` was `NOT NULL` with an FK to `runner_cycles`, so an attended session **structurally could not comply** with the instruction this guide gives it, and three sessions disclosed that and wrote their before-values into `docs/SESSIONS.md` prose instead (`:1514`, `:1526`, `:1819` — a fact with a second home, and not restorable by a Reverse). A row attributed by **neither** column, or by **both**, is refused: an unattributed before-image satisfies §19v's letter while naming nobody, which is worse than the gap it replaced."
-        },
-        {
-          "location": "docs/runbooks/environment-facts.md:29",
-          "text": "- 2026-09-15 | cycle:601227fb | runner_before_images has a CHECK refusing cycle_id and session_name together; pass exactly one."
-        },
-        {
-          "location": "skill_profiles/ds-knowledge-environment/method",
-          "text": "- 2026-09-15 | cycle:601227fb | runner_before_images has a CHECK refusing cycle_id and session_name together; pas"
-        }
-      ],
-      "governing_fact": "The attribution constraint on runner_before_images (exactly one of cycle_id or session_name set) is stated in three homes, one dated 2026-08-24 under SES-150 and two dated 2026-09-15 under cycle 601227fb with no reference to the first.",
-      "confidence": "medium",
-      "proposed_resolution": "CLAUDE-DESIGN.md:136 should win as the constraint's home (SES-150, v7.0.234); environment-facts.md:29 should cite SES-150 rather than stand as an independently discovered fact, and the skill row follows environment-facts.md as its render (scripts/check-environment-facts.js --check-row)."
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "docs/runbooks/runner-cycle.md:3577",
-          "text": "This block is not a step you reach once per cycle: it is the shape of\n**every** judgment write, wherever in the cycle you make one."
-        },
-        {
-          "location": "docs/runbooks/session-setup.md:365",
-          "text": "  INSERT INTO public.runner_before_images\n    (cycle_id, session_name, table_name, pk_value, row_data, decision_id)\n  VALUES (NULL, '<short-session-name>', 'backlog_items', (v_img->>'id'), v_img, v_dec);"
-        },
-        {
-          "location": "docs/runbooks/session-setup.md:579",
-          "text": "```sql\nINSERT INTO runner_before_images (session_name, table_name, pk_value, row_data)\nSELECT '<session>', 'backlog_items', id::text, to_jsonb(b) FROM backlog_items b WHERE backlog_id = '<ID>';\nUPDATE backlog_items SET kickoff_link = '<kickoff_path>', design_status = 'designed' WHERE backlog_id = '<ID>';\n```"
-        }
-      ],
-      "governing_fact": "Whether an attended session's backlog_items write must hang its before-image off a runner_decisions handle: 7b says every judgment write does, and session-setup.md:365 shows that shape, but session-setup.md:579 writes design_status with no decision_id.",
-      "confidence": "low",
-      "proposed_resolution": "session-setup.md:365 should win as the one attended-write shape under 7b (SES-286, v7.0.395, M6-05); session-setup.md:579 should either adopt record_decision() and decision_id or state in one line why a design_status write is bookkeeping rather than a judgment."
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "governance_rules/FILE-MATRIX",
-          "text": "Every ticket filed from 2026-09-01 carries its governance matrix on the row: scope_origin (original / gate-review / john-named / discovered / pre-existing), size_stamp (S/M/L), predicted_cycles (>=1 — THE cost driver; the token figure is derived by predicted_ticket_tokens(), never stored, because measurement on 2026-09-01 showed size_stamp does not predict token cost while cycle count does), and defer_status (no / maybe / yes, with defer_reason mandatory on yes). design_status keeps its existing meaning and is part of the same matrix. Recall the whole matrix from public.ticket_matrix, never by re-deriving it per question. John, attended architect session 2026-09-01, verbatim: \"each ticket from now on carries the above matrix information in the db, so we can instantly recall it, and also prioritize accordingly\". Enforcement is fail-LOUD not fail-closed by deliberate choice: a tripwire flags any open ticket in a named drain scope missing a field, rather than a NOT NULL that would break the runner's own filing path mid-drain and park the platform (SES-279 ships the tripwire, the runbook filing rule, and the briefing render). Extended 2026-09-02 (SES-295, John 2026-09-01: \"on tickets c"
-        },
-        {
-          "location": "docs/runbooks/session-setup.md:269",
-          "text": "```sql\nINSERT INTO backlog_items\n  (backlog_id, tier, type, priority_class, title, description, status, epic_id,\n   source_file, session_ref, row_ordinal,\n   filed_at, scope_origin, size_stamp, predicted_cycles, defer_status, scope_rationale, milestone,\n   enhancement_claim)\nSELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>',\n       '<named P-class — REQUIRED at filing, register B9>',\n       '<one-line human title — never the class string>',\n       '<description; convention opens with the bolded named class>',\n       'open',\n       (SELECT id FROM epics WHERE name = '<epic name>')::uuid,  -- or NULL for no epic\n       'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',\n       coalesce(max(row_ordinal),0)+1,\n       now(),                                   -- filed_at: the created date (never created_at, M5-04)\n       '<original|gate-review|john-named|discovered|pre-existing>',   -- scope_origin (FILE-MATRIX)\n       '<S|M|L>', <predicted cycles, >= 1>, '<no|maybe|yes>',           -- size_stamp, predicted_cycles, defer_status\n       '<scope_rationale: WHY it belongs — \"Goal N, <name>: …\" — REQUIRED on a Selfbuild ticket, M5-03>',\n       '"
-        },
-        {
-          "location": "governance_rules/EL-01",
-          "text": "A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04)."
-        },
-        {
-          "location": "docs/RUNNER-GOV-ENHANCEMENT-LANE.md:37",
-          "text": "> A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04)."
-        }
-      ],
-      "governing_fact": "The permitted value set of backlog_items.scope_origin: FILE-MATRIX and the session-setup filing template enumerate five values (original, gate-review, john-named, discovered, pre-existing); EL-01 makes 'enhancement' a sixth live value that the template cannot file.",
-      "confidence": "medium",
-      "proposed_resolution": "EL-01 wins: decision M6-04 (enhancement lane) made 'enhancement' a live value, and the retired runner-cycle.md:1924 shows file_invention_proposal already writes it. Extend the FILE-MATRIX enumeration and the session-setup.md:269 template to include enhancement. Confidence is medium because the FILE-MATRIX text is truncated and its SES-295 extension may already say so."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": ".claude/rules/agent-roster-inert.md:28",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\n> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\n> Flipping agents.is_active on is unchanged and remains John's hire card.\n> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        },
-        {
-          "location": "docs/ARCHITECTURE.md:2632",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\n> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\n> Flipping agents.is_active on is unchanged and remains John's hire card.\n> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        },
-        {
-          "location": "governance_rules/AGENT-ROW-AGREED-TICKET",
-          "text": "Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\nReserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\nFlipping agents.is_active on is unchanged and remains John's hire card.\nJohn 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        }
-      ],
-      "governing_fact": "When an agent-row write is build work rather than a card: a ticket with scope_origin = 'john-named' or an unreversed runner_decisions row naming ticket and change, with a before-image per row under one decision handle.",
-      "confidence": "high",
-      "proposed_resolution": ".claude/rules/agent-roster-inert.md:28 wins as canonical: the scripts/agent-row-gate.js header (SES-394, decisions 20a06cf3 and 38a1c566) names it the canonical home, rendered into ARCHITECTURE §19v with governance_rules as the live row. Currently identical; record the three homes so the two renders are regenerated from the rule file, never hand-edited."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:249",
-          "text": "> Auto-close never applies to a ticket whose `scope_origin` is not `original` or `gate-review`; `discovered` and `john-named` work closes on verifier pass once its reversal window elapses."
-        },
-        {
-          "location": "governance_rules/M5-14",
-          "text": "Auto-close never applies to a ticket whose `scope_origin` is not `original` or `gate-review`; `discovered` and `john-named` work closes on verifier pass once its reversal window elapses."
-        }
-      ],
-      "governing_fact": "Which scope_origin values are eligible for auto-close: only original and gate-review; discovered and john-named close on verifier pass after the reversal window.",
-      "confidence": "high",
-      "proposed_resolution": "Two verbatim homes, currently identical. No decision in this cluster names the canonical one; following the SES-394 pattern (rule file canonical, DB row and ARCHITECTURE as renders), propose docs/RUNNER-GOV-M5-REQUIREMENTS.md:249 as canonical and governance_rules/M5-14 as its rendered row. John to confirm."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "docs/RUNNER-GOV-ENHANCEMENT-LANE.md:37",
-          "text": "> A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04)."
-        },
-        {
-          "location": "governance_rules/EL-01",
-          "text": "A ticket is an enhancement when `scope_origin = 'enhancement'`, and it is admitted — buildable at all — only when its own row passes the admission test: `scope_rationale` names the charter goal it advances, `enhancement_claim` names the platform scoreboard metric it will move and in which direction, and `predicted_cycles` states its displacement cost; reversibility is by construction (before-images, M6-02). The row is the verdict — no card, no Accept (M6-04)."
-        }
-      ],
-      "governing_fact": "The admission test for an enhancement ticket (scope_origin = 'enhancement'): scope_rationale, enhancement_claim and predicted_cycles on the row, with no card and no Accept.",
-      "confidence": "high",
-      "proposed_resolution": "Two verbatim homes, currently identical. No decision in this cluster names the canonical one; following the SES-394 pattern (rule file canonical, DB row as render), propose docs/RUNNER-GOV-ENHANCEMENT-LANE.md:37 as canonical and governance_rules/EL-01 as its rendered row, per decision M6-04. John to confirm."
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "docs/RUNNER-GOV-M6-REQUIREMENTS.md:66",
-          "text": "- **(a) `v7.0.394`** — `public.runner_decisions`: a decision is a row with an `expires_at` and a\n  handle, its handle being its own `id`, and the before-images written under it carry\n  `decision_id`. With it, four functions: `record_decision()`, `sweep_decision_windows()`,\n  `reverse_decision()` and `ladder_apply_signal()` (plus the `ladder_work_class()` helper)."
-        },
-        {
-          "location": "docs/runbooks/runner-cycle.md:3577",
-          "text": "Part (a) (`v7.0.394`) shipped `public.runner_decisions`, `runner_settings.reversal_window_hours`,\n`runner_before_images.decision_id` and six functions; **this block is where a cycle calls them**,\nand until it existed every `M6-*` rule marked `script` was prose."
-        }
-      ],
-      "governing_fact": "How many functions the v7.0.394 part (a) ship added: the M6 register names four plus one helper (five), the runbook says six.",
-      "confidence": "high",
-      "proposed_resolution": "docs/RUNNER-GOV-M6-REQUIREMENTS.md:66 should win as the M6 register that names each function; correct runner-cycle.md:3577's count to match, unless the v7.0.394 migration itself defines a sixth function, in which case the register's named list is the row to extend. Decision: the v7.0.394 ship under M6-02/M6-05/M6-06 (SES-286)."
-    },
-    {
+      "check_slug": "board-stale",
       "kind": "stale-or-irrelevant",
       "locations": [
         {
-          "location": "docs/runbooks/runner-cycle.md:1546",
-          "text": "**The `revert-and-card` branch is unchanged and its\ncard is still filed undecided on purpose** — that branch's action is executed by *you*, behind the\npush gates, so its record belongs to the cycle at the moment it pushes; that record is not built\n(open, `SES-3"
-        },
-        {
-          "location": "scripts/rollback-on-red.js:1",
-          "text": "// -- SES-287 slice 2 (v7.0.525): THE REVERT CARD SETTLES ITS OWN OUTCOME --------------------\n// Slice 1 closed the range gate and made the REVERT_AND_CARD card say PLANNED instead of claiming\n// the act. It left the AFFIRMATIVE half open, and that gap is not cosmetic: buildIncidentCard()\n// returns that card with NO `decision` key at all, and main() stamps one only inside the CARD_ONLY\n// branch -- so the moment a range IS supplied and the cycle declines the plan, the card sits\n// `decision NULL` for ever. Live card 000cb93c (2026-09-15) is that card; a human retired it by hand.\n//\n// WHAT THIS SHIP ADDS, AND WHERE THE LINE STILL IS. The engine still does not perform the revert and\n// still cannot observe whether one ran: THE CYCLE decides that behind its push gates. What it gains\n// is a way to RECORD the answer the cycle brings back -- `--settle --card-id=<uuid>\n// --outcome=declined|executed [--reason=<text>]` with `--cycle-id` -- which records a\n// `kind = 'rollback'` decision under the cycle id passed in, images the card row under that decision\n// id, and PATCHes the car"
+          "location": "audit-board/board-stale",
+          "text": "440 rows: AA-01, AA-02, AA-04, AA-05, AA-06, AA-07, AA-08, AA-09, AA-10, AA-102, AA-105, AA-109, AA-11, AA-111, AA-119, AA-12, AA-121, AA-123, AA-13, AA-133, AA-14, AA-140, AA-146, AA-15, AA-153, AA-156, AA-159, AA-16, AA-169, AA-17, AA-175, AA-178, AA-18, AA-180, AA-181, AA-19, AA-191, AA-20, AA-21, AA-22, AA-23, AA-24, AA-25, AA-26, AA-27, AA-28, AA-29, AA-30, AA-31, AA-32, AA-33, AA-34, AA-35, AA-36, AA-37, AA-38, AA-39, AA-40, AA-41, AA-42, AA-43, AA-45, AA-46, AA-47, AA-48, AA-49, AA-50, AA-51, AA-52, AA-54, AA-55, AA-56, AA-63, AA-69, AA-71, AA-74, AA-78, AA-79, AA-88, AA-89, AA-90, AA-91, AA-92, AA-93, AA-94, AA-96, AA-99, ABT-2, ADM-2, ADM-3, AG-01, AG-05, AG-06, AG-10, AG-11, AG-12, AG-25, AG-26, AG-30, AG-31, AGR-001, AGR-002, AGR-01, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, AGT-012, AGT-013, AGT-014, AGT-016, AGT-017, AGT-018, AGT-019, AGT-020, AGT-022, AGT-024, AGT-025, AGT-028, AGT-029, AGT-30, AGT-31, AGT-33, AGT-34, AGT-39, AGT-40, AGT-41, AGT-42, AGT-43, AGT-46, AGT-48, AGT-49, AGT-50, AGT-51, AGT-52, AGT-55, AGT-56, AGT-57, AGT-58, AGT-60, AGT-61, AI-11, AI-12, AI-17, AI-19, AI-20, AI-21, AI-22, AI-24, AI-25, AI-26, AI-27, AI-34, AI-38, AI-42, AI-45, AI-52, AW-13, AW-17, AZ-03, AZ-04, AZ-05, AZ-20, CHI-101, CHI-102, CHI-103, CHI-104, CHI-11, CHI-16, CHI-17, CHI-19, CHI-20, CHI-22, CHI-24, CHI-47, CHI-48, CHI-52, CHI-54, CHI-62, CHI-63, CHI-67, CHI-68, CHI-69, CHI-72, CHI-78, CHI-83, CHI-85, CHI-86, CHI-87, CHI-93, CHI-94, CHI-95, CHI-97, CHI-98, DAT-001, DAT-002, DAT-004, DAT-10, DAT-13, DAT-14, DAT-16, DAT-17, DAT-19, DAT-20, DAT-23, DAT-24, DAT-8, DAT-9, DB-18, DB-19, DB-20, DL-01, DL-02, DL-03, DL-04, DL-05, DL-06, DL-07, DL-08, DL-09, DL-10, DL-11, DL-12, FM-01, FM-02, FM-03, FM-04, FM-05, FM-06, FM-07, FT-05, HAR-03, HAR-10, HAR-12, HAR-13, HAR-14, HAR-19, HAR-22, HAR-23, HAR-24, HAR-25, HAR-26, HAR-27, HAR-28, HAR-29, HAR-31, HAR-32, HAR-35, HAR-36, HAR-37, HAR-39, HAR-40, IN-01, IN-02, IN-03, IN-04, IN-05, IN-06, IN-07, IN-08, LA-01, LAV-18, LAV-2, LAV-24, LAV-27, LAV-3, LAV-35, LAV-4, LAV-6, LOG-01, LOG-05, LOG-06, LOG-07, LOG-100, LOG-102, LOG-106, LOG-108, LOG-11, LOG-110, LOG-111, LOG-113, LOG-114, LOG-115, LOG-116, LOG-117, LOG-118, LOG-119, LOG-120, LOG-122, LOG-125, LOG-140, LOG-142, LOG-144, LOG-22, LOG-40, LOG-42, LOG-43, LOG-44, LOG-45, LOG-46, LOG-47, LOG-48, LOG-50, LOG-53, LOG-55, LOG-57, LOG-58, LOG-59, LOG-62, LOG-63, LOG-68, LOG-74, LOG-78, LOG-82, LOG-84, LOG-88, LOG-89, LOG-94, LOG-96, LOO-003, LOO-005, LOO-18, LOO-25, LOO-27, LOO-29, LOO-30, LOO-31, LOO-32, LOO-34, LOO-35, LOO-36, MC-01, MC-02, MC-03, MC-04, MC-05, MC-06, MC-07, MI-07, MI-09, MI-16, MI-41, MI-53, MI-69, MI-70, MI-71, MOB-10, MOB-12, MOB-13, MOB-3, MOB-6, MOB-9, PE-12, PE-14, PE-15, PE-16, PE-18, PRO-1, PRO-3, PRO-4, RO-16, SCA-2, SCA-3, SCA-4, SCA-5, SES-002, SES-007, SES-014, SES-017, SES-105, SES-108, SES-123, SES-152, SES-156, SES-195, SES-198, SES-204, SES-206, SES-26, SES-29, SES-36, SES-38, SES-39, SES-41, SES-43, SES-44, SES-52, SES-55, SES-56, SES-59, SES-60, SES-63, SES-70, SES-72, SES-73, SES-74, SES-75, SH-06, SH-07, SH-08, SH-09, SK-07, SK-08, SK-09, SK-10, SK-11, SK-13, SK-14, SK-15, SK-16, SK-17, SK-18, SK-19, SK-20, SK-21, SV-01, SV-02, SV-03, SV-04, TC-02, TI-03, TI-07, TI-14, TI-15, TI-16, TI-17, TI-18, TT-03, TT-04, WO-02, WO-03, WO-04, WO-05, WO-06"
         }
       ],
-      "governing_fact": "Whether the revert-and-card branch's decision record exists: the runbook (v7.0.458) says it is not built and the card stays undecided; the engine (v7.0.525) records it via --settle.",
-      "confidence": "medium",
-      "proposed_resolution": "scripts/rollback-on-red.js v7.0.525 should win, as the SES-287 slice 2 ship that built the record the runbook calls open; amend runner-cycle.md:1546 to describe the --settle path and stop calling the record unbuilt. Medium because the runbook passage is truncated at the ticket it names and a later runbook passage may already carry this."
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "governance_rules/AGENT-ROW-AGREED-TICKET",
-          "text": "Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\nReserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen."
-        },
-        {
-          "location": "governance_rules/MANAGER-AUTHORITY-MATRIX",
-          "text": "Row 1, the dm-knowledge-cycle-card re-pin: when a runbook edit re-renders docs/runbooks/cycle-card.md, the Builder re-pins skill_profiles.dm-knowledge-cycle-card (traits.source_sha256, method) under the ticket whose edit moved the card, in that commit, as an agent-row decision with a full-row before-image (AGENT-ROW-AGREED-TICKET, second limb): the manager's, never a card, never John's. A rebase that re-renders the card owns its re-pin the same way. Already live, measured 2026-09-20: 16 unreversed runner_decisions agent-row re-pins of that row (2026-09-16 to 2026-09-20, 13 of them since 09-18), each under the ticket whose edit moved the card, none reversed."
-        }
-      ],
-      "governing_fact": "What makes an active agent's knowledge-row edit build work: the rule requires the ticket be john-named or named by a prior decision row; the matrix lets any ticket whose edit moved the card carry the re-pin.",
-      "confidence": "medium",
-      "proposed_resolution": "MANAGER-AUTHORITY-MATRIX row 1 should win for this one row, as the later standing ruling under MANAGER-DECIDES-BY-DEFAULT (John 2026-09-16, decision d496fb07) with 16 unreversed re-pins behind it; add the re-pin carve-out to AGENT-ROW-AGREED-TICKET's text (or have the matrix cite the decision row that names it) so the two rules state one condition. John's is_active hire card is untouched."
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "docs/runbooks/runner-cycle.md:177",
-          "text": "6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`\n   lane row."
-        },
-        {
-          "location": "docs/runbooks/runner-cycle.md:2110",
-          "text": "`prime_directive_queue()`'s directive lane admits `status = 'queued'` only, which is why its first\nrow is a ticket unless John has queued a mission, and why this layer and `runner_should_boot()`'s\n`nothing_pickable` now read one board."
-        },
-        {
-          "location": "docs/runbooks/routine-prompt.md:43",
-          "text": "Work selection is the runbook's step 5 read from public.prime_directive_queue(): the directive lane first (John's word outranks everything), then the standing drain, then the executing project's selfbuild lane — the queue's first admitted row is the pick"
-        }
-      ],
-      "governing_fact": "Whether a queued directive-lane row alone counts as pickable work: M6-09 fires nothing_pickable whenever no drain or selfbuild row exists, while the pick layer says the directive lane is offered first and the boot gate reads the same board.",
-      "confidence": "medium",
-      "proposed_resolution": "runner-cycle.md:2110 should win: nothing_pickable and the pick layer read one board, so M6-09 at runner-cycle.md:177 should name the queue's first admitted row in any lane, not only drain or selfbuild. Decision SES-353 (v7.0.453, migration ses353_standing_decisions_leave_pick_lane) made the directive lane a queued-only lane the boot gate reads."
-    },
-    {
-      "kind": "stale-or-irrelevant",
-      "locations": [
-        {
-          "location": "governance_rules/OD-42",
-          "text": "The nightly re-rank hands the Prioritizer at most 60 candidates, taken from `public.prime_directive_queue()` itself rather than from a re-derived board filter, because `pz-rank-intent`'s `max_tokens` is 4000 and each ranked entry costs roughly 30 output tokens — a TRUNCATED ranking is worse than a refused one, since the handler would apply the half it received as if it were the whole order; canonical: `api/cron/rank-backlog.js`'s `MAX_CANDIDATES` and `public.skill_profiles.max_tokens` for `pz-rank-intent`."
-        },
-        {
-          "location": "scripts/rank-backlog.js:1",
-          "text": "// DeepBench v7.0.446 | scripts/rank-backlog.js | SES-346 -- the Prioritizer's board re-rank, moved off\n// a Vercel cron and onto the session path. This file IS `api/cron/rank-backlog.js`'s job; it is not a\n// new capability, a new schedule, or a second ranking. `docs/SELFBUILD-RETIREMENT-LEDGER.md` entry 53\n// carries what the route said and how to restore it."
-        }
-      ],
-      "governing_fact": "The canonical home of the re-rank's 60-candidate cap: OD-42 names api/cron/rank-backlog.js's MAX_CANDIDATES, a Vercel cron route that SES-346 retired and replaced with scripts/rank-backlog.js on the session path.",
+      "governing_fact": "An open backlog row older than the unrevalidated-days fence that has never been revalidated is a suspect, not a plan.",
       "confidence": "high",
-      "proposed_resolution": "scripts/rank-backlog.js should win as the canonical home; governance_rules/OD-42's canonical clause and its 'nightly' cron framing should be re-pointed to that file's MAX_CANDIDATES, per SES-346 (v7.0.446) and docs/SELFBUILD-RETIREMENT-LEDGER.md entry 53, which carries what the retired route said."
+      "proposed_resolution": "440 rows. Revalidate the row (set revalidated_at) or remove it."
     },
     {
-      "kind": "stale-or-irrelevant",
-      "locations": [
-        {
-          "location": "governance_rules/OD-04",
-          "text": "Work is offered to a cycle in three lanes in a fixed order — `directive` (every queued one-off directive, oldest first), then `drain` (the standing drain's next claimable named members), then `selfbuild` (every buildable ticket in an executing project) — and the `board` row that reports how many queued tickets are outside an executing project is emitted whether the Prime Directive stands or not; canonical: `public.prime_directive_queue()`."
-        },
-        {
-          "location": "docs/runbooks/runner-cycle.md:2123",
-          "text": "standing is now\n`EXISTS (projects WHERE status = 'executing')`, and lane (c)'s admission fence is\n`public.epic_project_executing(<epic>)` — both READ FROM `prime_directive_queue()`, never\nre-derived here or anywhere else.** That single home is why the page, this step and\n`drain_chain_gate()`'s §2e branch cannot disagree about whether the runner is admitted to work; a\nsecond copy of either predicate is the `SES-45` defect wearing a convenience's clothes. The Selfbuild\nPrime Directive `a0ef9525`, which used to be that predicate, is closed `superseded` — see\n`docs/SELFBUILD-RETIREMENT-LEDGER.md` entries 43 and 44."
-        }
-      ],
-      "governing_fact": "What 'standing' means for the board row's emission: OD-04 conditions on the Selfbuild Prime Directive standing, while since SES-340 standing is EXISTS (projects WHERE status = 'executing') and directive a0ef9525 is closed superseded.",
-      "confidence": "medium",
-      "proposed_resolution": "runner-cycle.md:2123 should win: OD-04's clause should read 'whether or not a project is executing', with public.prime_directive_queue() still canonical, per SES-340 (v7.0.425) and docs/SELFBUILD-RETIREMENT-LEDGER.md entries 43 and 44, which closed the Prime Directive a0ef9525 as superseded."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "governance_rules/OD-07",
-          "text": "The filing-lane boundary is the literal date 2026-08-21, and it is written three separate times — `public.recompute_backlog_queue()`, `public.prime_directive_queue()`'s `buildable` CTE, and `public.drain_epic_next()`'s `c_lane_cut` constant — with no column, setting or single constant behind any of them; canonical: those three function bodies, jointly."
-        },
-        {
-          "location": "docs/runbooks/runner-cycle.md:2165",
-          "text": "A cycle that re-derives any of that from the prose below has built a second\ncopy of a predicate that has one home — `SES-45`'s defect"
-        }
-      ],
-      "governing_fact": "The filing-lane cut date 2026-08-21 is one fact written as three separate literals in three function bodies, with no column, setting or single constant behind them.",
-      "confidence": "medium",
-      "proposed_resolution": "One home should win: a single constant (a runner_settings row or one SQL constant) that recompute_backlog_queue(), prime_directive_queue() and drain_epic_next() all read, with OD-07's canonical clause re-pointed to it. SES-45 is the decision that a second copy of a predicate is a defect (runner-cycle.md:2165), and OD-07 itself records that no single constant exists."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "governance_rules/OD-08",
-          "text": "A ticket claim goes stale after 24 hours, written as the interval literal `INTERVAL '24 hours'` in both `public.prime_directive_queue()` and `public.drain_epic_next()`, so a dead session can never strand a ticket permanently; canonical: those two function bodies."
-        },
-        {
-          "location": "docs/runbooks/runner-cycle.md:2165",
-          "text": "A cycle that re-derives any of that from the prose below has built a second\ncopy of a predicate that has one home — `SES-45`'s defect"
-        }
-      ],
-      "governing_fact": "The 24-hour claim-staleness interval is one fact written as the same interval literal in two function bodies, with no single constant behind either.",
-      "confidence": "medium",
-      "proposed_resolution": "One home should win: a single constant (a runner_settings row or one SQL constant) that both prime_directive_queue() and drain_epic_next() read, with OD-08's canonical clause re-pointed to it. SES-45 is the decision that a second copy of a predicate is a defect (runner-cycle.md:2165)."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:481",
-          "text": "**What `c_flagged` now holds: `ARRAY['needs-desktop']`, and nothing else.** It is declared identically\nin `drain_epic_next` and `drain_chain_gate`, and spelled inline in `prime_directive_queue`'s\n`buildable` CTE."
-        },
-        {
-          "location": "docs/runbooks/runner-cycle.md:2165",
-          "text": "A cycle that re-derives any of that from the prose below has built a second\ncopy of a predicate that has one home — `SES-45`'s defect"
-        }
-      ],
-      "governing_fact": "The list of flags that block a pick (currently only needs-desktop) is one fact declared in three function bodies: drain_epic_next, drain_chain_gate and prime_directive_queue's buildable CTE.",
-      "confidence": "medium",
-      "proposed_resolution": "prime_directive_queue()'s buildable CTE should win as the one SQL home, with drain_epic_next and drain_chain_gate reading it rather than redeclaring c_flagged, or all three reading the pz-guardrails blocked_prefix row that decision 21402e94 made the flag table's home (ledger entry 47). SES-45 is the decision that a second copy of a predicate is a defect."
-    },
-    {
+      "check_slug": "quality-closed-red",
       "kind": "contradiction",
       "locations": [
         {
-          "location": "docs/ARCHITECTURE.md:361",
-          "text": "Every Skill carries a `type` tag from a fixed lookup (6 today — see below)."
-        },
-        {
-          "location": "docs/ARCHITECTURE.md:542",
-          "text": "`skill_types` (5 rows, missing `guardrails` — see \"Known drift\" above)"
+          "location": "audit-board/quality-closed-red",
+          "text": "34 rows: AGT-69, AGT-70, AGT-79, AGT-80, LOG-104, LOG-145, LOG-149, MOB-22, SES-180, SES-205, SES-207, SES-213, SES-216, SES-218, SES-219, SES-223, SES-301, SES-311, SES-343, SES-344, SES-345, SES-352, SES-353, SES-354, SES-355, SES-360, SES-367, SES-368, SES-373, SES-374, SES-376, SES-389, SES-51, SES-53"
         }
       ],
-      "governing_fact": "How many rows the skill_types lookup holds today: 6 or 5.",
-      "confidence": "medium",
-      "proposed_resolution": "docs/ARCHITECTURE.md:542 wins on the live count: it was verified against the live schema (S-APPLE-02a-design, 2026-07-01; re-verified in the 2026-07-15 rewrite). §2's \"6 today\" should read 6 defined, 5 seeded, until the guardrails row is seeded under its own ticket."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "governance_rules/AGENT-ROW-AGREED-TICKET",
-          "text": "Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle."
-        },
-        {
-          "location": "docs/ARCHITECTURE.md:2632",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card"
-        },
-        {
-          "location": ".claude/rules/agent-roster-inert.md:28",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card"
-        }
-      ],
-      "governing_fact": "The full text of rule AGENT-ROW-AGREED-TICKET is held verbatim in three homes: the governance_rules row, docs/ARCHITECTURE.md:2632 and .claude/rules/agent-roster-inert.md:28.",
-      "confidence": "medium",
-      "proposed_resolution": "The governance_rules row wins as the one home (John 2026-09-14, decision 20a06cf3; amended 2026-09-15, decision 38a1c566). One of the two doc copies should be the row's canonical_doc; the other should cite the rule by name rather than restate it. Not a defect if both copies are rendered from the row."
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "location": "docs/RUNNER-GOV-0820-REQUIREMENTS.md:343",
-          "text": "AMENDMENT (2026-08-31, John verbatim \"a\"): when the platform bars\n  the subagent tool in an unattended session, the cycle performs the judgment-dense step on its\n  own session model and records that fact on the cycle row — compliant, not a violation."
-        },
-        {
-          "location": "docs/RUNNER-GOV-0820-REQUIREMENTS.md:343",
-          "text": "The lane→model ids named above have exactly\n  one home, `public.runner_model_lanes` (`SES-313`, `v7.0.402`) — this paragraph cites it rather\n  than restating them, and `docs/runbooks/runner-cycle.md` step 6 renders the table's rows\n  directly."
-        },
-        {
-          "location": "docs/RUNNER-GOV-0820-REQUIREMENTS.md:343",
-          "text": "**Unverified precondition:** the cloud environment supporting\n  Agent + per-agent model — first cycle after rollout reports; if unavailable, it notes it in\n  the cycle row and continues on Opus 5."
-        }
-      ],
-      "governing_fact": "Which model an unattended cycle uses for a judgment-dense step when the subagent tool is unavailable: the amendment says the cycle's own session model, the trailing precondition clause says the literal Opus 5.",
-      "confidence": "medium",
-      "proposed_resolution": "The 2026-08-31 amendment (John verbatim \"a\") wins: the fallback is the cycle's own session model, recorded on the cycle row. The pre-rollout precondition sentence in B21 should be marked history or re-pointed at the amendment and `public.runner_model_lanes` (SES-313, v7.0.402), since the same row says model ids have exactly one home and it should not carry a literal."
-    },
-    {
-      "kind": "redundant",
-      "locations": [
-        {
-          "location": "governance_rules/OD-33",
-          "text": "The scope-cap baseline is 3 FILES and 4 TASKS, stated in `docs/runbooks/runner-cycle.md` step 5a and in CLAUDE.md's hard rules but held in NO column; `public.class_autonomy()` returns only the EXTRAS on top of it"
-        },
-        {
-          "location": "docs/runbooks/routine-prompt.md:29",
-          "text": "A rule stated here a second time is the\n`SES-45` defect wearing a convenience's clothes."
-        }
-      ],
-      "governing_fact": "The scope-cap baseline of 3 files and 4 tasks has two written homes, runner-cycle.md step 5a and CLAUDE.md's hard rules, and no column, so a change to the number must be made in two places.",
-      "confidence": "medium",
-      "proposed_resolution": "runner-cycle.md step 5a wins, as OD-33's own canonical clause already names it; CLAUDE.md's hard-rules passage should point at step 5a rather than restate the numbers, per the SES-45 one-home principle. The CLAUDE.md passage itself was not in this cluster, so its verbatim text should be pulled before the row is acted on."
-    },
-    {
-      "kind": "duplicate",
-      "locations": [
-        {
-          "location": "governance_rules/AGENT-ROW-AGREED-TICKET",
-          "text": "Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\nReserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\nFlipping agents.is_active on is unchanged and remains John's hire card.\nJohn 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        },
-        {
-          "location": "docs/ARCHITECTURE.md:2632",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\n> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\n> Flipping agents.is_active on is unchanged and remains John's hire card.\n> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        },
-        {
-          "location": ".claude/rules/agent-roster-inert.md:28",
-          "text": "> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.\n> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.\n> Flipping agents.is_active on is unchanged and remains John's hire card.\n> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out."
-        }
-      ],
-      "governing_fact": "Which conditions let a session write an agent's taxonomy rows without an approval card (the full text of Rule AGENT-ROW-AGREED-TICKET) — one rule, three verbatim homes.",
+      "governing_fact": "A backlog row marked done whose latest runner verdict is block was closed over a red verdict.",
       "confidence": "high",
-      "proposed_resolution": "governance_rules/AGENT-ROW-AGREED-TICKET wins as the home of record, with the one file its canonical_doc names kept as the mirror; the other file copy should become a one-line pointer to the row. Decisions 20a06cf3 (2026-09-14) and 38a1c566 (2026-09-15) wrote the rule into governance_rules."
+      "proposed_resolution": "34 rows. Re-open the row, or record an approve verdict that supersedes the block."
     },
     {
-      "kind": "stale-or-irrelevant",
+      "check_slug": "config-private-in-public",
+      "kind": "other",
       "locations": [
         {
-          "location": "docs/ARCHITECTURE.md:542",
-          "text": "`skill_types` (5 rows, missing `guardrails` — see \"Known drift\" above)"
-        },
-        {
-          "location": "docs/ARCHITECTURE.md:1072",
-          "text": "A capability is a set of Skill Profiles (Identity, Behavior, Knowledge, Intent, Format) plus rows in `capability_skill_profiles` and `agent_capability_assignments`."
-        },
-        {
-          "location": "docs/ARCHITECTURE.md:384",
-          "text": "Skills              — the atomic unit; each tagged with one of 6 types (see below);"
-        },
-        {
-          "location": "governance_rules/AGENT-ROW-AGREED-TICKET",
-          "text": "editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it"
+          "location": "docs/kickoffs/v7.0.550-AGT-86-s6-full-review-roots.md:39",
+          "text": "personal_email: 3. Write tests/regression/agt-86f-full-review-roots.test.mjs (`selfRun`/`notRun` from `_lib/self-run.js`). A: temp root with `memory/a.md` (one 140-char paragraph) + `settings.json`; subprocess `--no-…"
         }
       ],
-      "governing_fact": "Whether guardrails is a live sixth Skill type: line 542 says skill_types has 5 rows with guardrails missing and line 1072 lists five types, while line 384 says 6 and the 2026-09-14 rule treats an agent's guardrails rows as existing rows.",
-      "confidence": "medium",
-      "proposed_resolution": "docs/ARCHITECTURE.md:384's six-type list wins; lines 542 and 1072 should be restamped to name guardrails as live. Decision 20a06cf3 (2026-09-14, amended 38a1c566) governs writes to an active agent's guardrails rows, which is only meaningful if that Skill type exists."
+      "governing_fact": "personal_email must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_email value from docs/kickoffs/v7.0.550-AGT-86-s6-full-review-roots.md (rotate it if it is a credential) and keep it only in server-held config"
     },
     {
-      "kind": "stale-or-irrelevant",
+      "check_slug": "config-private-in-public",
+      "kind": "other",
       "locations": [
         {
-          "location": "docs/ARCHITECTURE.md:542",
-          "text": "`capabilities` (8 rows), `capability_skill_profiles` (the Skill↔Capability join), and `agent_capability_assignments` (the Capability↔Agent join) are all live in Supabase today"
-        },
-        {
-          "location": "docs/runbooks/mcp-server.md:44",
-          "text": "One MCP tool per row in `capabilities` that has an **active** holder in\n`agent_capability_assignments` — 18 product-lane tools without the key, 25 with it (measured\n2026-09-09)."
+          "location": "public/Austin_2025Data_.csv:5529",
+          "text": "personal_email: 15505,\"Barriers and Enclosures, Construction\",Shade Structure Design by Rudy Herrera 210-896-9304 rudy****,0.,,,0.,\"4,600.00\",,Shade Structure Design,PO600025070701537,07/07/2025,V00000993007,Rudy M H…"
         }
       ],
-      "governing_fact": "How many rows the capabilities table holds: the Current State section says 8, while the MCP runbook counts 25 capabilities with an active holder in agent_capability_assignments.",
+      "governing_fact": "personal_email must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_email value from public/Austin_2025Data_.csv (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "DeepBench-Session-Init.md:196",
+          "text": "personal_path: `C:\\Projects\\deepbench-backend`. Config: `C:\\U****\\AppData\\Roaming\\Claude\\claude_desktop_config.json`."
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from DeepBench-Session-Init.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/harvests/AGT-121.md:18",
+          "text": "personal_path: | files | `scripts/market-agent.js`, `docs/runbooks/market-agent.md`, `tests/regression/agt-121-market-agent.test.mjs` absent; loader dir `C:/U****/.claude/skills/nathan` absent | premise **alive** |"
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/harvests/AGT-121.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/harvests/AGT-84.md:33",
+          "text": "personal_path: The user-level loader `C:/U****/.claude/skills/jerry/SKILL.md` (read today) already says: checkout `C:/Projects/deepbench-jerry` (shallow clone of dev), read `docs/runbooks/personal-agent.md`, creds b…"
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/harvests/AGT-84.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/harvests/SES-90.md:102",
+          "text": "personal_path: **Archive:** `C:\\U****\\.claude\\projects\\` — two project directories:"
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/harvests/SES-90.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v7.0.550-AGT-86-s6-full-review-roots.md:39",
+          "text": "personal_path: 3. Write tests/regression/agt-86f-full-review-roots.test.mjs (`selfRun`/`notRun` from `_lib/self-run.js`). A: temp root with `memory/a.md` (one 140-char paragraph) + `settings.json`; subprocess `--no-…"
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/kickoffs/v7.0.550-AGT-86-s6-full-review-roots.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v7.0.561-AGT-84-personal-agent-call-path.md:11",
+          "text": "personal_path: - **Governing:** §19b (one assembly path: `assemblePrompt()` in-process, never hand-built), §19d/§19e Rule #1, §19k logging. Loader `C:/U****/.claude/skills/jerry/SKILL.md` exists (outside the repo)."
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/kickoffs/v7.0.561-AGT-84-personal-agent-call-path.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v7.0.583-AGT-121-nathan-call-path.md:10",
+          "text": "personal_path: - **Caps:** 3 repo files, 4 tasks, plus the loader `C:/U****/.claude/skills/nathan/SKILL.md` (outside the repo, never committed)."
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/kickoffs/v7.0.583-AGT-121-nathan-call-path.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v7.0.63-S-LAV-28c-receipt-display-and-content-qa.md:12",
+          "text": "personal_path: **S-LAV-28b's verdict (shipped `ceec571b`, live-verified — this settles your Task 2b): World 3c, the fold is yours.** On both captured repro runs, every deep-leg lifecycle frame WAS in the stream with…"
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/kickoffs/v7.0.63-S-LAV-28c-receipt-display-and-content-qa.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/vision/evidence-sources.md:40",
+          "text": "personal_path: - [C-src-20] (HIGH) The local Claude Code session archive (`C:\\U****\\.claude\\projects\\C--Projects\\*.jsonl`, 186 sessions, 2026-07-08 → 2026-08-21) is the highest-authority source for John's typed word…"
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/vision/evidence-sources.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v5.2.27-S-PROMPT-ARCH-01-prompt-architecture.md:505",
+          "text": "secret_assignment: const BYPASS = 'deep****';"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from docs/kickoffs/v5.2.27-S-PROMPT-ARCH-01-prompt-architecture.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v5.2.35-S-DAN-PIPELINE-01-dan-enrichment-pipeline.md:481",
+          "text": "secret_assignment: const BYPASS_HEADER = 'deep****';"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from docs/kickoffs/v5.2.35-S-DAN-PIPELINE-01-dan-enrichment-pipeline.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v6.1.31-S-ARCH-AGENT-SELECT-BUDGET-01-aa151-agent-selection-max-tokens.md:70",
+          "text": "secret_assignment: const BYPASS = 'deep****';"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from docs/kickoffs/v6.1.31-S-ARCH-AGENT-SELECT-BUDGET-01-aa151-agent-selection-max-tokens.md (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "tests/regression/ses-424f-executor-citations.test.mjs:76",
+          "text": "secret_assignment: const FAKE_KEY = \"ses4****\";"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from tests/regression/ses-424f-executor-citations.test.mjs (rotate it if it is a credential) and keep it only in server-held config"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "audit-private/vercel_bypass",
+          "text": "48 lines in 46 files: docs/kickoffs/v5.2.29-CONTENT-01a-format-routing-enrichment-logging.md, docs/kickoffs/v5.2.30-CONTENT-01b-ai-audit-alex-ui.md, docs/kickoffs/v5.2.30-VICTORIA-01-product-strategist-solution-catalog.md, docs/kickoffs/v5.2.34-BUG12p-enrichment-tenant-id.md, docs/kickoffs/v5.2.35-S-DAN-PIPELINE-01-dan-enrichment-pipeline.md, docs/kickoffs/v5.2.37-AI-AUDIT-FIX-01-ai-audit-panel-data-integrity.md, docs/kickoffs/v6.1.24-S-ARCH-RETRY-TOOLRESULT-01-aa150-aa151-tool-result-retry-fix.md, docs/kickoffs/v6.1.25-S-ARCH-RETRY-CATCH-01-aa151-second-parse-failure-guard.md, docs/kickoffs/v6.1.26-S-ARCH-TEMPERATURE-01-aa154-llm-sampling-determinism.md, docs/kickoffs/v6.1.27-S-ARCH-RETRY-DIAGNOSTICS-01-aa157-retry-rejection-detail.md, docs/kickoffs/v6.1.28-S-ARCH-SPEED-CI-ANSWER-01-aa149-haiku-swap-model-drawer.md, docs/kickoffs/v6.1.29-S-ARCH-EXECUTE-DETAIL-01-aa158-execute-catch-detail-passthrough.md, docs/kickoffs/v6.1.31-S-ARCH-AGENT-SELECT-BUDGET-01-aa151-agent-selection-max-tokens.md, docs/kickoffs/v6.1.37-S-ARCH-RAW-INPUT-DIAGNOSTIC-01-aa151-raw-input-visibility.md, docs/kickoffs/v6.2.3-S-ARCH-CATALOG-ROUTING-01-aa176-catalog-delegation-consolidation.md, docs/kickoffs/v6.3.10-S-ARCH-RETRY-SPECIFICITY-01-aa182-retry-correction-specificity.md, docs/kickoffs/v6.3.13-S-ARCH-FAILURE-DETAIL-01-aa195-durable-hops-error-detail.md, docs/kickoffs/v6.3.131-HAR-9-truncation-aware-parse-retry.md, docs/kickoffs/v6.3.132-LOG-37a-layer-a-call-facts.md, docs/kickoffs/v6.3.133-LOG-37b-agent-turn-call-facts.md, docs/kickoffs/v6.3.135-CHI-65-empty-section-crash.md, docs/kickoffs/v6.3.136-LOG-37a-patch-retrieval-method.md, docs/kickoffs/v6.3.137-CHI-66-react-error-boundary.md, docs/kickoffs/v6.3.16-AA-195-nested-checkpoint-resume-fix.md, docs/kickoffs/v6.3.184-LOG-95-hop-event-span-identity.md, docs/kickoffs/v6.3.19-AA-196-per-intent-hop-budget-estimate.md, docs/kickoffs/v6.3.204-LOG-91-single-write-per-model-call.md, docs/kickoffs/v6.3.21-AA-196-patch-hop-budget-pagination.md, docs/kickoffs/v6.3.215-LOG-37c-embedding-call-facts.md, docs/kickoffs/v6.3.216-LOG-109-article-extraction-visibility.md, docs/kickoffs/v6.3.222-HAR-21-claim-resolver.md, docs/kickoffs/v6.3.224-AGT-37-citation-envelope.md, docs/kickoffs/v6.3.227-CHI-92-news-search-display-split.md, docs/kickoffs/v6.3.25-AI-46a-trace-id-foundation.md, docs/kickoffs/v6.3.26-AI-46b-trace-id-threading.md, docs/kickoffs/v6.3.27-LOG-09c-embedding-logging-fetchcontext-fix.md, docs/kickoffs/v6.3.28-S-ARCH-LOOP-CONTINUITY-01-loo001-loo002-loo004-agent-selection-fixes.md, docs/kickoffs/v6.3.31-LOG-18-activity-log-delivery-fix.md, docs/kickoffs/v7.0.10-AA-179c-assembly-emit.md, docs/kickoffs/v7.0.3-LAV-1d-prompt-exposure.md, docs/kickoffs/v7.0.34-LOG-121a-caller-attribution-capture.md, docs/kickoffs/v7.0.58-LAV-23-agent-decided-opening-retrieval.md, docs/kickoffs/v7.0.6-LAV-1f-hitl.md, docs/kickoffs/v7.0.85-LOG-133-broker-pattern-coverage.md, docs/runbooks/mcp-server.md, scripts/chi-true-regression.mjs"
+        }
+      ],
+      "governing_fact": "vercel_bypass must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "48 lines in 46 files carry a vercel_bypass value -- rotate it once, remove every copy from the tracked files, and keep it only in server-held config"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-shipped-vs-asked",
+      "locations": [
+        {
+          "location": "backlog_items:SES-418 (status done, updated 2026-09-22 16:04Z)",
+          "text": "WHAT REMAINS: the findings insert is still all-or-nothing, so the next slug the script learns to emit before the constraint learns it will again discard a whole night — 300+ valid findings lost to one row. Make the insert per-row tolerant (or validate the batch against the live constraint before sending it) and guard it with a test that feeds the script's own slug vocabulary against the live CHECK, so the two can never drift apart silently again."
+        },
+        {
+          "location": "scripts/ticket-owner.js:861-873 (origin/dev c51a6ab0; last touched by v7.0.547 AGT-86 slice 4, no SES-418 commit)",
+          "text": "await rest(base, key, \"ticket_owner_findings\", {\n      method: \"POST\",\n      headers: { Prefer: \"return=minimal\" },\n      body: JSON.stringify(insert.map(f => ({\n        id: f.id,\n        backlog_id: f.backlog_id,\n        check_slug: f.check_slug,\n        verdict: \"judgment\","
+        },
+        {
+          "location": "commits for SES-418 in task_context (the only commit naming the ticket) — b169632d v7.0.514",
+          "text": "b169632d v7.0.514 SES-413 — re-export the backlog snapshot after the ship (SES-418 filed, SES-413 delivered)\n\ndocs/backlog/BACKLOG-SNAPSHOT.md"
+        },
+        {
+          "location": "docs/harvests/AGT-79.md § The decision SES-418 asked for, and the alternatives it beat, item 4 (v7.0.518, cycle 779a95c6, 2026-09-18 09:51Z — before the 10:30Z narrowing)",
+          "text": "Make the insert per-row so one bad slug cannot discard the night — rejected. A night is one unit by slice 4's own rule (\"there is no partial night\"); a ledger written in part produces `notes` counts that disagree with the rows, and `recordNightly` would stamp a night as landed that half-landed. The refusal is the right behaviour; the gap was that nothing tested the vocabulary against the table. Part N does."
+        },
+        {
+          "location": "backlog_items:SES-418 ship_summary",
+          "text": "Seventh continuation, of cycle 0f571e00-19d4-410b-8741-1c6e6e1818f6. drain_chain_gate answered continue, and runner_should_boot() answered FALSE — weekly_pace."
+        }
+      ],
+      "governing_fact": "Whether SES-418's remaining ask — a per-row-tolerant insert or a batch validated against the live constraint before sending — was built before the row closed done; the ledger POST is still one whole-array statement and no commit or ship summary names the ticket's work.",
+      "confidence": "high",
+      "proposed_resolution": "The AGT-79 v7.0.518 decision (docs/harvests/AGT-79.md: per-row insert rejected, part N test is the guard; 90 remainder-stranded rows and 6 landed nights since prove the constraint half) should win: record that disposition on backlog_items:SES-418 and replace its unrelated ship_summary, or re-open the row for the batch-validation half it still asks for."
+    },
+    {
+      "kind": "other",
+      "check_slug": "advisor-model-change",
+      "locations": [
+        {
+          "location": "https://platform.claude.com/docs/en/release-notes/overview — entry dated September 22, 2026, retrieved 2026-09-25",
+          "text": "We've launched **Claude Opus 5.5** (`claude-opus-5-5`), a model for long-running agentic coding and knowledge work. It has a 1M token context window by default, 128k max output tokens, and always-on adaptive thinking, at $4 / $20 USD per MTok (Claude Opus 5 is $5 / $25)."
+        },
+        {
+          "location": "https://www.anthropic.com/claude-opus-5-5 — retrieved 2026-09-25",
+          "text": "It costs 40% less to run than Opus 5 ... performs at the level of Claude Fable 5.1 on most work"
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/model-deprecations — Model status table, retrieved 2026-09-25",
+          "text": "| claude-opus-5-5 | Active | N/A | Not sooner than September 22, 2027 | ... | claude-opus-5 | Active | N/A | Not sooner than July 24, 2027 |"
+        },
+        {
+          "location": "runner_model_lanes row lane=orchestrator (task_context platform_facts.lanes[0])",
+          "text": "{\"lane\":\"orchestrator\",\"model_id\":\"claude-opus-5\",\"purpose\":\"Parent cycle: orchestrates, codes, QAs, ships (register B21).\",\"updated_at\":\"2026-09-02T23:17:49.529179+00:00\",\"updated_by\":\"ses-313-coding\"}"
+        },
+        {
+          "location": "shared/models.js lines 12-13 and 85-89",
+          "text": "// RATES READ 2026-09-11 against the published first-party Anthropic rates (per MTok): Fable 5.1\n// $10/$50 with its own published $0.25 cache-read rate, Opus 5 $5/$25, Sonnet 5 $2/$10, Sonnet 4.6\n...\nexport const MODEL_PRICING = Object.freeze({\n  \"claude-fable-5-1\":          { input_per_1k: 0.010,   output_per_1k: 0.050, cache_read_per_1k: 0.00025 },\n  \"claude-opus-5\":             { input_per_1k: 0.005,   output_per_1k: 0.025 },\n  \"claude-sonnet-5\":           { input_per_1k: 0.002,   output_per_1k: 0.010 },\n  \"claude-sonnet-4-6\":         { input_per_1k: 0.003,   output_per_1k: 0.015 },"
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/release-notes/overview — entry dated September 22, 2026 'Tool Choice Restrictions', retrieved 2026-09-25",
+          "text": "`tool_choice` types `any` and `tool` also return a 400 error, as on Claude Fable 5.1; use `auto` with strict tool use."
+        },
+        {
+          "location": "api/prompt/request-receivable.js lines 281-284 and 291",
+          "text": "// do; this one is about what the model will ACCEPT. `claude-fable-*` rejects tool_choice `tool` and\n// `any` outright -- measured against the live API, see shared/models.js -- so the forced branch below\n// returned a hard 400 for every schema-only intent on the governance lane, which is every governance\n// agent, since their Skill rows all carry claude-fable-5-1. Found by SES-334's first scheduled call.\n...\n  const forcedChoiceRejected = !supportsForcedToolChoice(model);"
+        }
+      ],
+      "governing_fact": "Which model the orchestrator lane runs and what it costs: the lane row names claude-opus-5 at $5/$25, and since 2026-09-22 Anthropic ships claude-opus-5-5 at $4/$20 with Opus 5 still active until at least 2027-07-24.",
+      "confidence": "high",
+      "proposed_resolution": "Home: runner_model_lanes.orchestrator + shared/models.js. Two parts: (a) add a claude-opus-5-5 row to MODEL_PRICING and extend supportsForcedToolChoice() to the `claude-opus-5-5` id (no money, the release note says it 400s on forced tool_choice like Fable); (b) moving the lane's model_id to claude-opus-5-5 is a spend/model decision — a money call that is John's, not assumed here."
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "advisor-model-change",
+      "locations": [
+        {
+          "location": "https://platform.claude.com/docs/en/release-notes/overview — entry dated September 24, 2026 'Billing Changes for Refusals', retrieved 2026-09-25",
+          "text": "We're resuming billing for refusals that arrive before any output when `stop_details.category` is `\"bio\"`, `\"frontier_llm\"`, or `\"reasoning_extraction\"`, the categories where we measure low volumes of false positives. Refusals billed under this change are charged like any other request, at the rates of the model that ran it."
+        },
+        {
+          "location": "api/prompt/request-receivable.js lines 695-697 and 700-706",
+          "text": "// NOT BILLED, AND THE ROW MUST SAY SO WITH A 0. Anthropic's published semantics: a refusal that\n// fires BEFORE any output is charged no input and no output tokens (only a mid-stream refusal bills\n// the streamed partial). A priced figure on this row would be the phantom-dollar defect §19v\n...\n  if (llmData.stop_reason === 'refusal') {\n    throw Object.assign(new Error(`Anthropic refused the request (${llmData.stop_details?.category ?? 'uncategorized'})`), {\n      status: 502, upstreamStatus: 200, failureClass: 'permanent', faultCode: 'anthropic-refusal',\n      detail: JSON.stringify(llmData.stop_details ?? null),\n      modelCall: {\n        sent: true, billed: false, model, stop_reason: 'refusal',\n        refusal_category: llmData.stop_details?.category ?? null,"
+        },
+        {
+          "location": "api/capabilities/execute.js lines 1295-1297",
+          "text": "          // A refusal and a rejection are unbilled: 0, asserted. An abort IS billed, so it is left to\n          // price from the estimated floor rather than claiming it was free.\n          costUsd: mc.billed === false ? 0 : undefined,"
+        },
+        {
+          "location": "runner_model_lanes row lane=judgment (task_context platform_facts.lanes[2])",
+          "text": "{\"lane\":\"judgment\",\"model_id\":\"claude-fable-5-1\",\"purpose\":\"Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21).\"}"
+        }
+      ],
+      "governing_fact": "Whether a pre-output refusal is billed: the executor writes billed:false and cost_usd 0 for every stop_reason 'refusal', but since 2026-09-24 Anthropic charges refusals in the bio, frontier_llm and reasoning_extraction categories at the model's full rate.",
+      "confidence": "high",
+      "proposed_resolution": "Home: api/prompt/request-receivable.js (the throw site owns `billed`). Set billed to true when stop_details.category is one of bio, frontier_llm, reasoning_extraction so lib/activity-log.js prices the row from `usage` instead of writing 0; keep 0 for cyber and uncategorized. Ledger-accuracy fix only — no money to spend, but it will make the dollar meter rise on the Fable 5.1 judgment lane where refusals occur."
+    },
+    {
+      "kind": "other",
+      "check_slug": "advisor-limit-hit",
+      "locations": [
+        {
+          "location": "task_context limits_hit.cycles (2026-W39 window)",
+          "text": "{\"outcome\":\"did_not_run\",\"last_step\":\"step 0 — pre-boot refusal (weekly_pace)\",\"count\":11} ... {\"outcome\":\"did_not_run\",\"last_step\":\"step 0 - pre-boot refusal (weekly_pace)\",\"count\":2} ... {\"outcome\":\"did_not_run\",\"last_step\":\"step 3 — wall stop (unaffordable: day token cap)\",\"count\":1},{\"outcome\":\"did_not_run\",\"last_step\":\"step 3 — wall stop (day token cap), taken after the step 4 sweeps\",\"count\":1},{\"outcome\":\"did_not_run\",\"last_step\":\"step 3 — wall stop (day token cap), taken after the step 4 sweeps and the step 9 tail\",\"count\":1},{\"outcome\":\"did_not_run\",\"last_step\":\"step 5 — no pick (day token cap headroom below the only admitted item; judgment lane unloadable)\",\"count\":1}"
+        },
+        {
+          "location": "runner_budget row (task_context platform_facts.budget)",
+          "text": "{\"month\":\"2026-09\",\"month_cap_usd\":100,\"day_default_usd\":5,\"updated_at\":\"2026-09-25T06:00:00.232361+00:00\",\"runner_day_token_allowance\":10000000,\"stale_fallback_tokens\":3000000,\"weekly_rest_pct\":85,\"runner_share_pct\":50,\"final_day_rest_pct\":90}"
+        },
+        {
+          "location": "runner_model_lanes row lane=orchestrator (task_context platform_facts.lanes[0])",
+          "text": "{\"lane\":\"orchestrator\",\"model_id\":\"claude-opus-5\",\"purpose\":\"Parent cycle: orchestrates, codes, QAs, ships (register B21).\"}"
+        },
+        {
+          "location": "https://www.anthropic.com/claude-opus-5-5 — retrieved 2026-09-25",
+          "text": "It costs 40% less to run than Opus 5"
+        },
+        {
+          "location": "https://code.claude.com/docs/en/changelog — version 2.1.280, retrieved 2026-09-25",
+          "text": "Added Claude Opus 5.5 (`claude-opus-5-5`), now the default Opus model — 1M context, $4/$20 per Mtok with $0.20/Mtok cache reads"
+        }
+      ],
+      "governing_fact": "The runner was refused 13 times this week by weekly_pace and stopped 4 times by the day token cap while its orchestrator lane still runs claude-opus-5, the model Anthropic now says costs 40% more per task than claude-opus-5-5.",
       "confidence": "medium",
-      "proposed_resolution": "docs/runbooks/mcp-server.md:44 wins on the strength of its dated measurement (2026-09-09); docs/ARCHITECTURE.md:542's count of 8, last corrected 2026-07-15, should drop the figure or be restamped from a live read."
+      "proposed_resolution": "Home: runner_model_lanes.orchestrator. The no-spend lever is the lane switch to claude-opus-5-5 (same cap, fewer tokens and dollars per cycle); whether subscription pace meters weight Opus 5.5 lower is not stated in Anthropic's usage-limits article, so the day-token-cap relief is certain and the weekly_pace relief is plausible. Raising the cap or the subscription tier is a money call that is John's."
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "routine-prompt-drift",
+      "locations": [
+        {
+          "location": "routine/trig_017TZ3JZcLBK6AYH6DKURqMH/prompt",
+          "text": "3. Read docs/runbooks/cycle-card.md from that branch FIRST — one line per step in execution order, with the command to run — and work its steps in that order. Open docs/runbooks/runner-cycle.md only at the L-anchor the card names for the step you are on, and only when that step's line is a pointer or names an exception. Record in your cycle row the docs/runbooks bytes you read before the pick. The runbook is the complete procedure and outranks the card and every summary in this prompt — the card is generated from it (SES-377), never edited by hand; ARCHITECTURE.md §19v governs. Gated or uncertain classification → a gated_before_build row, never an unattended ship."
+        },
+        {
+          "location": "docs/runbooks/routine-prompt.md:41",
+          "text": "3. Read docs/runbooks/cycle-card.md from that branch FIRST — one line per step in execution order, with the command to run — and work its steps in that order. Open docs/runbooks/runner-cycle.md only at the L-anchor the card names for the step you are on, and only when that step's line is a pointer or names an exception. Record in your cycle row the docs/runbooks bytes you read before the pick. The runbook is the complete procedure and outranks the card and every summary in this prompt — the card is generated from it (SES-377), never edited by hand; ARCHITECTURE.md §19v governs. Gated or uncertain classification → a gated_before_build row, never an unattended ship. Then check THIS PROMPT against its repo block: write the prompt you were given — verbatim and whole — to a scratch file OUTSIDE the clone (`mktemp`), then run `node scripts/check-routine-prompt.js --routine=runner --prompt=<that file> --out=docs/audits/runner-prompt-drift.json`. Exit 1 is a FINDING, never a stop: `git add docs/audits/runner-prompt-drift.json` so step 6's one batched push carries it, and carry on with the cycle. Exit 0: commit that file only if it is already tracked (that clears last week's finding), otherwise delete it — never commit it on exit 0 when it is untracked. Exit 2: no file, and name the reason in your cycle row."
+        }
+      ],
+      "governing_fact": "the live routine prompt must equal its repo block (the repo is the source)",
+      "confidence": "high",
+      "proposed_resolution": "update the live routine from the repo block on John's word (routine-prompt.md update rule), or fix the block"
     }
   ],
-  "carried": [
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "text": "interval_hours=1",
-          "location": "runner_settings/1/interval_hours"
-        },
-        {
-          "text": "divisible by `interval_hours`** — at the standing 3 that is **12, 3, 6, 9 AM/PM on John's",
-          "location": "docs/runbooks/runner-cycle.md:626"
-        },
-        {
-          "text": "40 */3 * * *",
-          "location": "routine/trig_017TZ3JZcLBK6AYH6DKURqMH/cron_expression"
-        }
-      ],
-      "governing_fact": "the runner's scheduling interval in hours",
-      "confidence": "high",
-      "proposed_resolution": "runner_settings is the one home (SES-177b: the block is right and the sentence is stale); either set interval_hours to 3 to match the cron John runs, or reword runner-cycle.md:626 to read the value from the row — John decides which number is true.",
-      "status": "open",
-      "ruling": null,
-      "ruled_by": null,
-      "ruled_at": null,
-      "found_by": "carry:2026-W37"
-    },
-    {
-      "kind": "contradiction",
-      "locations": [
-        {
-          "text": "The pickable board's stored order is produced by exactly six ranking keys applied in this sequence: `automation_rank` nulls last, then tier (`now` before `next` before everything else), then the numeric part of `priority_class` ascending, then the M5-02 filing lane",
-          "location": "governance_rules/OD-01"
-        },
-        {
-          "text": "`pz-rank-intent` instructs the Prioritizer to order tickets by project milestone order, then `supports_class` (P1 first, none last), then `priority_class`, then the filing lane, then `predicted_cycles`, then queue — an order that does NOT agree with the one the picker actually uses",
-          "location": "governance_rules/OD-43"
-        },
-        {
-          "text": "Order them: (1) project milestone order when the set spans milestones of one project; (2) supports_class, P1 first, none last; (3) priority_class, P1 first; (4) filing lane (filed before 2026-08-21 first); (5) predicted_cycles, cheapest first, unknown last; (6) queue.",
-          "location": "skill_profiles/pz-rank-intent/method"
-        }
-      ],
-      "governing_fact": "the order of the board's ranking keys",
-      "confidence": "high",
-      "proposed_resolution": "OD-01 (public.recompute_backlog_queue()) is the executing home; the census already marked OD-43 'amend — NAMED CONTRADICTION'. Either the rank Intent adopts the picker's key order or OD-01 gains supports_class as a key — a John decision, then one Skill-row edit under a directive (gated).",
-      "status": "open",
-      "ruling": null,
-      "ruled_by": null,
-      "ruled_at": null,
-      "found_by": "carry:2026-W37"
-    },
-    {
-      "kind": "stale-or-irrelevant",
-      "locations": [
-        {
-          "text": "temperature=0",
-          "location": "skill_profiles/pz-identity/temperature"
-        },
-        {
-          "text": "temperature=0",
-          "location": "skill_profiles/pz-knowledge-classes/temperature"
-        },
-        {
-          "text": "temperature=0",
-          "location": "skill_profiles/pz-knowledge-john/temperature"
-        },
-        {
-          "text": "temperature=0",
-          "location": "skill_profiles/pz-behavior/temperature"
-        },
-        {
-          "text": "temperature=0",
-          "location": "skill_profiles/pz-classify-intent/temperature"
-        },
-        {
-          "text": "temperature=0",
-          "location": "skill_profiles/pz-rank-intent/temperature"
-        },
-        {
-          "text": "temperature=0",
-          "location": "skill_profiles/pz-guardrails/temperature"
-        },
-        {
-          "text": "FEATURE: SES-334 -- the same family also REJECTS `temperature` outright (\"`temperature` is deprecated for this model\"), so the field is dropped for it rather than sent and refused.",
-          "location": "api/prompt/request-receivable.js:274-279"
-        }
-      ],
-      "governing_fact": "temperature stored for a model whose API rejects temperature",
-      "confidence": "high",
-      "proposed_resolution": "Set temperature NULL on every claude-fable-5-1 Skill row (the executor never sends it); a stored parameter the lane rejects is a statement that is false in live voice. One Skill-row edit under a directive (gated).",
-      "status": "open",
-      "ruling": null,
-      "ruled_by": null,
-      "ruled_at": null,
-      "found_by": "carry:2026-W37"
-    },
-    {
-      "kind": "stale-or-irrelevant",
-      "locations": [
-        {
-          "text": "## Execution status — **Awaiting John's mark.** On go: SES-169 (Step 0 backup) runs first and must verify restorable;",
-          "location": "docs/SELFBUILD-CHARTER.md:262-264"
-        },
-        {
-          "text": "**Next session:** none required — the runner is live and works **John's automation queue**",
-          "location": "docs/runbooks/standing-brief.md:233"
-        }
-      ],
-      "governing_fact": "whether the Selfbuild has started executing",
-      "confidence": "high",
-      "proposed_resolution": "Replace the charter's Execution status with a dated pointer to the standing brief's generated block (the one home for run state), or mark the paragraph RETIRED IN PLACE with the date M0 ran.",
-      "status": "open",
-      "ruling": null,
-      "ruled_by": null,
-      "ruled_at": null,
-      "found_by": "carry:2026-W37"
-    }
-  ],
+  "carried": [],
   "gone": []
 }
