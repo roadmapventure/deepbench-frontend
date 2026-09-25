@@ -71,6 +71,8 @@ export const REVERSIBLE_TABLES = [
   "capability_skill_profiles", "agent_capability_assignments", "ai_activity_log", "runner_items",
   // AGT-86 slice 1b (v7.0.543): a ruling on an audit finding is reversible.
   "audit_findings",
+  // AGT-152 (v7.0.597): a model switch reverses in one step (model_assignments, pk id since this ship).
+  "model_assignments",
 ];
 
 // The four tables the 4 non-ship decisions had actually promised over, measured at this ship. None
@@ -124,9 +126,9 @@ export const GUARDED = ["attach_before_images"];
 export const UNGUARDED_BY_DESIGN = ["record_ship_decision"];
 
 function theVocabularyIsTheTwinOfKAllowed() {
-  assert.strictEqual(REVERSIBLE_TABLES.length, 15,
-    `reversible_tables() returns fifteen names, not ${REVERSIBLE_TABLES.length}`);
-  assert.strictEqual(new Set(REVERSIBLE_TABLES).size, 15, "the vocabulary carries a duplicate name");
+  assert.strictEqual(REVERSIBLE_TABLES.length, 16,
+    `reversible_tables() returns sixteen names, not ${REVERSIBLE_TABLES.length}`);
+  assert.strictEqual(new Set(REVERSIBLE_TABLES).size, 16, "the vocabulary carries a duplicate name");
   assert.deepStrictEqual([...REVERSIBLE_TABLES].sort(), [...K_ALLOWED].sort(),
     "reversible_tables() and reverse_decision()'s k_allowed have DRIFTED APART. The whole point of " +
     "the guard is that the list it refuses by is the list the restore actually replays -- two lists " +
@@ -318,7 +320,7 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "the live arms: public.reversible_tables() resolvable and returning the fifteen names this " +
+      "the live arms: public.reversible_tables() resolvable and returning the sixteen names this " +
         "file asserts, attach_before_images() resolvable at its UNCHANGED (uuid, uuid[]) identity " +
         "list with a misspelled-argument control (the second-overload detector), its two " +
         "pre-existing guards each pinned by the message it returns, and the write-free-ness of all " +
@@ -347,7 +349,7 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
   assert.deepStrictEqual([...live].sort(), [...REVERSIBLE_TABLES].sort(),
     "the DEPLOYED reversible_tables() and this file's list disagree. Whichever is right, the guard " +
     "is refusing by a vocabulary nobody here has checked");
-  assert.strictEqual(live.length, 15, `the deployed vocabulary has ${live.length} names, not 15`);
+  assert.strictEqual(live.length, 16, `the deployed vocabulary has ${live.length} names, not 16`);
 
   // 2. THE IDENTITY ARGUMENT LIST IS UNCHANGED. SES-399 did CREATE OR REPLACE on the exact
   //    (uuid, uuid[]) list, so a two-argument call by name must still resolve. A retyped or
@@ -413,35 +415,36 @@ export default async function run() {
     "attach_before_images() is a WRITER: it sets decision_id on live runner_before_images rows. A " +
       "permanent regression test must never do that on the live ledger (the SES-196 / SES-218 / " +
       "SES-275 refusal), and this suite reaches Supabase only over PostgREST, which cannot read " +
-      "pg_proc and cannot open a transaction to roll a fixture back. MEASURED AT AGT-86 SLICE 1b " +
-      "(v7.0.543) INSTEAD, live over the MCP, inside DO blocks ending in RAISE so every fixture " +
-      "rolled back, and every count re-read afterwards. pg_proc at this ship, asserted by migration " +
-      "agt86_s1b_reversible_audit_findings's own trailing DO block rather than by its success flag " +
-      "AND re-read independently afterwards: EXACTLY 1 overload each of public.reverse_decision " +
-      "('p_decision uuid, p_actor text, p_reason text, p_actor_cycle uuid', CREATE OR REPLACE on the " +
-      "identical list from its live pg_get_functiondef, so no DROP was owed) and " +
-      "public.reversible_tables (no arguments); cardinality 15 with audit_findings last; all fifteen " +
-      "names present as quoted literals in reverse_decision's prosrc; EXECUTE anon false, " +
-      "authenticated false, service_role true on both. " +
-      "THE ATTACH ARM, one audit_findings fixture (fingerprint agt-86b-qa), a record_decision() " +
-      "directive and one before-image of the fixture, run against BOTH builds. PRE-CHANGE, before " +
-      "the migration: attach_before_images(dec, [img]) RAISED 'attach_before_images: refusing the " +
-      "whole batch -- reverse_decision() cannot restore <image id> (audit_findings). Nothing was " +
-      "attached, not even the restorable images.' -- the red. POST-CHANGE: it RETURNED 1. " +
-      "RULE, THEN REVERSE: the fixture ruled status 'ticketed', ruling/ruled_by/ruled_at/" +
-      "filed_backlog_id 'SES-0'/john_call 'money' (the guard allowed it); reverse_decision(dec, " +
-      "'agt-86b-qa', 'control') returned outcome 'applied', restored 0, restored_unverified 1, " +
-      "refused 0, refused_written_since 0, and the re-read showed status 'open' with ruling, " +
-      "ruled_by, ruled_at, filed_backlog_id and john_call all NULL and every immutable column " +
-      "unchanged. " +
-      "THE INSERT-IMAGE CONTROL, a second decision with a row_data NULL image of the same finding: " +
-      "attach returned 1; reverse returned refused 1, restored_unverified 0, restored 0, first " +
-      "refusal 'audit_findings is append-only (AGT-70): delete refused' -- the ledger guard, not the " +
-      "allowlist -- and the finding row still existed. " +
-      "ZERO RESIDUE on re-read after rollback: audit_findings 6, runner_decisions 898, " +
-      "runner_before_images unchanged by the QA (8847 -- the one row over the 8846 pre-read is " +
-      "capture_migration_down()'s own image of this ship's down, written before the QA ran), and no " +
-      "agt-86b-qa row in audit_findings, runner_decisions or runner_before_images.",
+      "pg_proc and cannot open a transaction to roll a fixture back. MEASURED AT AGT-152 (v7.0.597) " +
+      "INSTEAD, live over the MCP, inside DO blocks ending in RAISE so every fixture rolled back, and " +
+      "every count re-read afterwards. pg_proc at this ship, asserted by migration " +
+      "agt152b_reversible_model_assignments's own trailing DO block rather than by its success flag: " +
+      "EXACTLY 1 overload each of public.reverse_decision ('p_decision uuid, p_actor text, p_reason " +
+      "text, p_actor_cycle uuid', CREATE OR REPLACE from its live pg_get_functiondef with one k_allowed " +
+      "element added, so no DROP was owed), public.reversible_tables (no arguments), " +
+      "apply_model_assignment, review_model_watch, model_assignments_sync_skills and the new " +
+      "lane_member_skills; cardinality 16 with model_assignments last; all sixteen names present as " +
+      "quoted literals in reverse_decision's prosrc; EXECUTE anon false and authenticated false on all " +
+      "six, service_role true; model_assignments' primary key exactly id, unique (job_kind, job_key) " +
+      "kept (agt152a_model_assignments_pk). " +
+      "THE SWITCH, run against BOTH builds: capability data-room-custody moved to claude-fable-5-1 " +
+      "(library-evidence-intent onto fable; fable 55), then apply_model_assignment switched " +
+      "lane/judgment to claude-opus-5-5 on three passing trials at 1.05x. PRE-CHANGE: 55 Skill rows " +
+      "moved (library-evidence-intent with them), 55 imaged, the model_assignments image at pk_value " +
+      "'lane/judgment'; reverse_decision returned outcome 'applied', restored 0, restored_unverified " +
+      "55, refused 1, refused_written_since 0, and judgment stayed on claude-opus-5-5 -- the red. " +
+      "POST-CHANGE: 54 moved, library-evidence-intent still claude-fable-5-1, 54 imaged, 1 " +
+      "model_assignments image at pk_value = the row's id; reverse_decision returned outcome " +
+      "'applied', restored 1, restored_unverified 54, refused 0, refused_written_since 0, and the " +
+      "re-read showed judgment on claude-fable-5-1 with decision_id and watch_baseline NULL, " +
+      "claude-opus-5-5 rows 0, fable 55. " +
+      "THE ATTACH ARM: a fresh UNATTACHED model_assignments image (attach only touches decision_id " +
+      "IS NULL rows; the switch's own image is written attached). PRE-CHANGE attach_before_images(dec, " +
+      "[img]) RAISED 'attach_before_images: refusing the whole batch -- reverse_decision() cannot " +
+      "restore <image id> (model_assignments).' POST-CHANGE it RETURNED 1. " +
+      "ZERO RESIDUE on re-read after rollback: 5 model_assignments rows, all decision_id NULL; fable " +
+      "54, claude-opus-5-5 0; data-room-custody on claude-haiku-4-5-20251001; runner_before_images " +
+      "where table_name = 'model_assignments' 0.",
   );
 }
 
