@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.559 | runbooks/auditor-routine.md | AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
+<!-- DeepBench v7.0.587 | runbooks/auditor-routine.md | AGT-129 --task-file, delivered_at fix; AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
 # The Auditor routine — playbook and canonical prompt
 
 ## What this is
@@ -73,17 +73,18 @@ node scripts/check-routine-prompt.js --routine=runner --note=$S/note-<id>.txt --
 
 **Step 2 — three job sub-agents (judgment lane).** For each `<job>` / `<cap>` / `<intent>`: `board-health` / `audit-board-health` / `au-board-intent`; `work-quality` / `audit-work-quality` / `au-quality-intent`; `advisor` / `audit-advisor` / `au-advisor-intent`. Write `$S/<job>.task.json` (the intent row's task_context; sources below), then:
 ```
-node scripts/agent-prompt.js --agent=auditor --capability=<cap> --task="$(cat $S/<job>.task.json)" > $S/<job>.prompt.md
-node scripts/agent-prompt.js --agent=auditor --capability=<cap> --task="$(cat $S/<job>.task.json)" --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+node scripts/agent-prompt.js --agent=auditor --capability=<cap> --task-file=$S/<job>.task.json > $S/<job>.prompt.md
+node scripts/agent-prompt.js --agent=auditor --capability=<cap> --task-file=$S/<job>.task.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
 ```
+(`--task-file`, never `--task=` fed from a `$(cat …)` subshell: Linux caps one argv entry at 128 KB — the 155 KB step-4 list and the 245 KB board-health task died "Argument list too long", AGT-129; step 1's audit-cluster.js --run feeds stdin the same way.)
 Run `$S/<job>.prompt.md` as an Agent-tool sub-agent on the printed model (the advisor's with WebSearch), stating the clone's absolute path; the answer is one JSON object `{cluster, findings, account}`. Save `{"week":"$W","found_by":"auditor:routine:<job>","findings":<answer.findings>}` as `$S/<job>.json`, then log:
 ```
 node scripts/agent-log.js --agent=auditor --capability=<cap> --model=<printed model> --ai-type=<cap> --feature=<cap>:<intent>:depth1 [--input-tokens=<n> --output-tokens=<n>] [--patterns-applied=<csv>]
 ```
 (token flags only when the sub-agent's usage is known — both or neither.) A sub-agent that returns no parseable object is re-run ONCE one tier up; still nothing → `$S/<job>.json` is written with `findings: []` and the summary names it.
 task_context sources (`prior` for all three = `select fingerprint from public.audit_findings where iso_week = '$W'`):
-- board-health: `week`; `board` = every `backlog_items` row with status in (open, partial) as `{backlog_id, title, status, epic_id, project (epics.project_id), tier, priority_class, defer_status, filed_at, revalidated_at, delivered_at}`, plus `description` (first 300 chars) only for rows filed or delivered in the last 14 days; `code_findings` = `$S/board.json`'s `findings`.
-- work-quality: `week`; `shipped` = rows with `delivered_at` or status `done` in the last 7 days: `{backlog_id, title, description (first 1500), kickoff_path (ls docs/kickoffs/*-<ID>-*.md), ship_summary (latest runner_cycles.notes for that item, first 1500), verdict (latest runner_verdicts row), commits (git log origin/dev --since='8 days ago' --grep=<ID> --name-only --format='%h %s')}`; `code_findings` = `$S/board.json` findings with `check_slug quality-closed-red`.
+- board-health: `week`; `board` = every `backlog_items` row with status in (open, partial) as `{backlog_id, title, status, epic_id, project (epics.project_id), tier, priority_class, defer_status, filed_at, revalidated_at}`, plus `description` (first 300 chars) only for rows whose filed_at or revalidated_at is in the last 14 days; `code_findings` = `$S/board.json`'s `findings`.
+- work-quality: `week`; `shipped` = rows with status in (delivered, done) whose `updated_at` is in the last 7 days (backlog_items has no `delivered_at`; 28 rows on 2026-09-25): `{backlog_id, title, description (first 1500), kickoff_path (ls docs/kickoffs/*-<ID>-*.md), ship_summary (latest runner_cycles.notes for that item, first 1500), verdict (latest runner_verdicts row), commits (git log origin/dev --since='8 days ago' --grep=<ID> --name-only --format='%h %s')}`; `code_findings` = `$S/board.json` findings with `check_slug quality-closed-red`.
 - advisor: `week`; `platform_facts` = `{lanes: runner_model_lanes rows, claude_design_models: grep -n "claude-" CLAUDE-DESIGN.md, api_functions: node scripts/check-api-function-count.js output, budget: the current-month runner_budget row, hand_built: [scripts/audit-corpus.js, audit-cluster.js, audit-ledger.js, audit-board.js, audit-review.js, agent-prompt.js, agent-log.js, render-cycle-card.js, heal-engine.js, ticket-owner.js, tripwire-to-backlog.js — each with its header's first sentence]}`; `limits_hit` = `select outcome, last_step, count(*) from runner_cycles where started_at >= now() - interval '7 days' and outcome in ('did_not_run','failed') group by 1,2` plus the api/ function count against 12.
 
 **Step 3 — merge, then ONE ingest** (`audit-ledger.js --report` reads exactly one file, `docs/audits/<W>-candidates.json`; several ingests would undercount "found"). Dedupes by `fingerprint()` across `findings` and `carried` — `UNIQUE (fingerprint, iso_week)` would otherwise abort the append mid-run. Tested 2026-09-23 on two fixtures (a shared finding kept once; a missing file skipped and named):
@@ -99,8 +100,8 @@ node scripts/audit-review.js --prepare --week=$W --out=$S/ctx.json; echo "prepar
 ```
 Exit 3 → "nothing to review — no manager run" goes in the summary; skip to step 5. Exit 0 →
 ```
-node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task="$(cat $S/ctx.json)" > $S/review.prompt.md
-node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task="$(cat $S/ctx.json)" --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json > $S/review.prompt.md
+node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
 ```
 Sub-agent on the printed model → `$S/answer.json` (`{groups, summary_for_john, patterns_applied}`); log it: `node scripts/agent-log.js --agent=devmanager --capability=review-audit-worklist --model=<printed> --ai-type=review-audit-worklist --feature=review-audit-worklist:dm-audit-review-intent:depth1 […]`. Then:
 ```

@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// DeepBench v7.0.587 | scripts/agent-prompt.js | AGT-129 -- the task may come from a FILE or STDIN,
+// not only from one argv entry. Linux caps a single argv entry at MAX_ARG_STRLEN = 131,072 B, so
+// `--task=$(cat big.json)` dies E2BIG before node starts -- measured 2026-09-25: 127 KB spawns,
+// 129 KB does not, and the auditor routine's own 155 KB worklist and 245 KB board-health task are
+// both past the wall. `--task-file=<path>` reads the file, `--task-file=-` reads stdin, and both
+// take the SAME JSON-object check as `--task=`, which is unchanged so runner-cycle.md steps 4b/6/7
+// keep working.
 // DeepBench v7.0.486 | scripts/agent-prompt.js | SES-395 -- the judgment lane falls back to the
 // orchestrator model when Fable is past its daily share. resolveJudgmentModel() asks
 // public.judgment_model() and the printed model is the one the call actually runs on; the header
@@ -43,11 +50,14 @@
 //                              resolveIntentSlug below). Pass --intent=none for the deliberate
 //                              no-intent assembly.
 //   --task=<json>              optional JSON object, the task_context (default {})
+//   --task-file=<path>         optional; task_context from a file, or stdin when <path> is -
+//                              (argv caps at 128 KB on Linux -- use this for a big task_context)
 //   --tenant=<id>              optional, default 'global'
 //   --json                     print the raw assembly object instead of the rendered prompt
 //
 // EXIT CODES: 0 ok; 2 any missing/invalid input or missing credential.
 
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { assemblePrompt } from '../api/prompt/db-assembly.js';
@@ -165,26 +175,53 @@ export function parseArgs(argv) {
       case 'intent': out.intent = value; break;
       case 'tenant': out.tenant = value; break;
       case 'task': out.task = value; break;
+      // `?? ''` so a BARE `--task-file` (no `=`) is refused for want of a path rather than
+      // silently meaning `{}` -- the regex above yields undefined for a valueless flag.
+      case 'task-file': out.taskFile = value ?? ''; break;
       case 'json': out.json = true; break;
       default: return { error: `unrecognized flag "--${key}"` };
     }
   }
   if (!out.agent) return { error: '--agent=<agents.id> is required' };
   if (!out.capability) return { error: '--capability=<slug> is required' };
-  if (out.task !== undefined) {
-    let parsed;
-    try {
-      parsed = JSON.parse(out.task);
-    } catch (e) {
-      return { error: `--task must be valid JSON: ${e.message}` };
-    }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { error: '--task must be a JSON object' };
-    }
-    out.taskContext = parsed;
-  } else {
-    out.taskContext = {};
+  // AGT-129. Two flags, ONE source of task text and ONE validity check below -- a second copy of
+  // the JSON check is how the two paths would drift into disagreeing about what a task is.
+  if (out.task !== undefined && out.taskFile !== undefined) {
+    return { error: 'pass one of --task / --task-file, not both' };
   }
+
+  let taskText;
+  let taskFlag;
+  if (out.taskFile !== undefined) {
+    if (!out.taskFile) return { error: '--task-file=<path> needs a path (- for stdin)' };
+    taskFlag = '--task-file';
+    try {
+      // fd 0 rather than '/dev/stdin': readFileSync(0) reads a PIPE to EOF, which is what a
+      // spawning caller hands us, and it needs no such path to exist.
+      taskText = out.taskFile === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(out.taskFile, 'utf8');
+    } catch (e) {
+      return { error: `--task-file: ${e.message}` };
+    }
+  } else if (out.task !== undefined) {
+    taskFlag = '--task';
+    taskText = out.task;
+  }
+
+  if (taskText === undefined) {
+    out.taskContext = {};
+    return out;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(taskText);
+  } catch (e) {
+    // The flag NAMES ITSELF in the message: a caller piping stdin must not be sent to read --task.
+    return { error: `${taskFlag} must be valid JSON: ${e.message}` };
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { error: `${taskFlag} must be a JSON object` };
+  }
+  out.taskContext = parsed;
   return out;
 }
 
