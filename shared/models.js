@@ -52,7 +52,12 @@ export const MODELS = {
 // A PREFIX MATCH, DELIBERATELY. The restriction travels with the model FAMILY, and pinning exact
 // dated ids would mean this list silently stops matching the day a new snapshot ships -- which
 // presents as the same hard 400 this exists to prevent, with nothing pointing here.
-export const NO_FORCED_TOOL_CHOICE_PREFIXES = ["claude-fable-"];
+//
+// FEATURE: AGT-148 (v7.0.592) -- `claude-opus-5-` joins the list: Opus 5.5 returns the same 400 on a
+// forced tool_choice (finding 961caae922b0381a). THE TRAILING DASH IS LOAD-BEARING: `claude-opus-5`
+// (the orchestrator lane's model) has no dash after the 5 and stays forced-capable; only the dotted
+// snapshots (`claude-opus-5-5`, ...) match. NO_TEMPERATURE_PREFIXES below is unchanged -- not measured.
+export const NO_FORCED_TOOL_CHOICE_PREFIXES = ["claude-fable-", "claude-opus-5-"];
 
 export function supportsForcedToolChoice(model) {
   if (typeof model !== "string" || !model) return true; // unknown model: keep today's behaviour
