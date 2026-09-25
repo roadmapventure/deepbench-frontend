@@ -12,7 +12,9 @@
 // RATES READ 2026-09-11 against the published first-party Anthropic rates (per MTok): Fable 5.1
 // $10/$50 with its own published $0.25 cache-read rate, Opus 5 $5/$25, Sonnet 5 $2/$10, Sonnet 4.6
 // $3/$15, Haiku 4.5 $1/$5; text-embedding-3-small $0.02/MTok (OpenAI, carried over unchanged from
-// the hook's AA-181 table). Partner rates (Bedrock/Vertex) are NOT these and are not modelled --
+// the hook's AA-181 table). AGT-142 (v7.0.588): Opus 5.5 $4/$20, $0.20 cache read, per audit W39
+// finding 961caae922b0381a (release notes 2026-09-22, retrieved 2026-09-25). Partner rates
+// (Bedrock/Vertex) are NOT these and are not modelled --
 // this platform calls the first-party API only.
 //
 // FROZEN AT THE MOMENT OF THE CALL. lib/activity-log.js prices each row as it writes it, so a later
@@ -84,6 +86,7 @@ export function supportsTemperature(model) {
 // fallback rather than eight copied numbers so that adding a model cannot silently get it wrong.
 export const MODEL_PRICING = Object.freeze({
   "claude-fable-5-1":          { input_per_1k: 0.010,   output_per_1k: 0.050, cache_read_per_1k: 0.00025 },
+  "claude-opus-5-5":           { input_per_1k: 0.004,   output_per_1k: 0.020, cache_read_per_1k: 0.0002 },
   "claude-opus-5":             { input_per_1k: 0.005,   output_per_1k: 0.025 },
   "claude-sonnet-5":           { input_per_1k: 0.002,   output_per_1k: 0.010 },
   "claude-sonnet-4-6":         { input_per_1k: 0.003,   output_per_1k: 0.015 },
