@@ -1,3 +1,4 @@
+// DeepBench v7.0.590 | shared/ai-patterns.js | AGT-144 -- `model-assignment` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.585 | shared/ai-patterns.js | AGT-127 -- `decide-gated-card` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array, so the Layer-3 row for the manager's gate-card ruling run would be refused without it (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.552 | shared/ai-patterns.js | AGT-86 slice 8a -- five audit slugs enter the catalog (audit-board-health, audit-work-quality, audit-config-review, audit-advisor, review-audit-worklist): their capability rows are live and scripts/agent-log.js refuses any --ai-type outside this array, so the Auditor routine's sub-agent log rows would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.480 | shared/ai-patterns.js | AGT-79 -- the Ticket Owner's `audit-board` enters the catalog BEFORE its Skill rows exist, on the AGT-70 precedent immediately below: scripts/ticket-owner.js --judge writes the mandatory agent-log.js row before it applies anything, and agent-log.js refuses an --ai-type this array does not carry. The seed (docs/design/agt-79-ticket-owner-seed.sql) is John's to apply; the entry is inert until then. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug, resolved by the existing `|| e.type` fallback.
@@ -302,6 +303,13 @@ export const SERVICE_CATALOG = [
   // answer. No AI_TYPE_TO_SERVICE entry -- ai_type equals the slug via the `|| e.type` fallback,
   // the same path run-project and review-audit-worklist take.
   { slug: 'decide-gated-card',       name: 'Decide Gated Card (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  // AGT-144 -- model-assignment, the manager's fourth capability: watch Claude releases into
+  // model_catalog, trial a candidate, and switch / keep / money / file-ticket per job type. Same
+  // MANDATORY reason as decide-gated-card above: scripts/agent-log.js refuses an --ai-type this
+  // array does not carry. 'Tool Use' because release watching reads Anthropic's pages through
+  // WebFetch/WebSearch; 'Structured Output' because both Intents answer a stored schema that
+  // public.apply_model_assignment() enforces before any write. No AI_TYPE_TO_SERVICE entry.
+  { slug: 'model-assignment',        name: 'Model Assignment (The Development Manager)', serviceType: 'ai', patterns: ['Tool Use', 'Structured Output'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge
