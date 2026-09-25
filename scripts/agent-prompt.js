@@ -130,18 +130,41 @@ export async function resolveIntentSlug({ intent, capability, tenant, fetchImpl 
 // An assembly whose model is the orchestrator's (the Builder's own, say) is left exactly alone --
 // degrading it would "drop" it to the model it is already on, and a fence keyed on a slug would
 // need editing every time an agent moves lane.
+//
+// FEATURE: AGT-143 -- a capability's own row in public.model_assignments answers first. The
+// trigger trg_model_assignments_sync_skills keeps the Skill rows in step with it, so this read is
+// the belt to that brace: the candidate is the table's answer, and the lane/degrade step below runs
+// on the candidate, never on a slug. No capability_slug -> no read (ses-331's stub never sees it).
 export async function resolveJudgmentModel(assembly, { supabaseUrl, headers, fetchImpl = fetch } = {}) {
   const assemblyModel = assembly?.llm?.model;
   const base = { model: assemblyModel, reason: 'lane' };
   const root = String(supabaseUrl || '').replace(/\/+$/, '');
   try {
+    const slug = assembly?.capability_slug;
+    let candidate = assemblyModel;
+    let fromCapability = false;
+    if (slug) {
+      const aRes = await fetchImpl(`${root}/rest/v1/model_assignments?select=job_kind,job_key,model_id`
+        + `&job_kind=eq.capability&job_key=eq.${encodeURIComponent(slug)}&limit=1`, { headers });
+      if (!aRes.ok) throw new Error(`model_assignments returned HTTP ${aRes.status}`);
+      const aRows = await aRes.json();
+      const row = Array.isArray(aRows) ? aRows[0] : null;
+      if (row && row.job_kind === 'capability' && row.job_key === slug && row.model_id) {
+        candidate = row.model_id;
+        fromCapability = true;
+      }
+    }
+    const capAnswer = () => (candidate !== assemblyModel
+      ? { model: candidate, reason: 'capability', from: assemblyModel }
+      : { model: candidate, reason: 'capability' });
+
     const lanesRes = await fetchImpl(`${root}/rest/v1/runner_model_lanes?select=lane,model_id`, { headers });
     if (!lanesRes.ok) throw new Error(`runner_model_lanes returned HTTP ${lanesRes.status}`);
     const lanes = await lanesRes.json();
     const judgment = Array.isArray(lanes) ? lanes.find(l => l.lane === 'judgment') : null;
     if (!judgment?.model_id) throw new Error('runner_model_lanes carries no `judgment` row');
     // Not a judgment-lane call -- nothing to degrade, and no reason to spend the RPC.
-    if (assemblyModel !== judgment.model_id) return base;
+    if (candidate !== judgment.model_id) return fromCapability ? capAnswer() : base;
 
     const rpcRes = await fetchImpl(`${root}/rest/v1/rpc/judgment_model`, {
       method: 'POST',
@@ -153,8 +176,10 @@ export async function resolveJudgmentModel(assembly, { supabaseUrl, headers, fet
     const answer = Array.isArray(rows) ? rows[0] : rows;
     if (!answer?.model_id) throw new Error('rpc/judgment_model returned no model_id');
     // The function agreeing with the lane is the ordinary case, not a degrade.
-    if (answer.model_id === assemblyModel) return { model: assemblyModel, reason: answer.reason || 'lane' };
-    return { model: answer.model_id, reason: answer.reason || 'degraded', from: assemblyModel };
+    if (answer.model_id === candidate) {
+      return fromCapability ? capAnswer() : { model: assemblyModel, reason: answer.reason || 'lane' };
+    }
+    return { model: answer.model_id, reason: answer.reason || 'degraded', from: candidate };
   } catch (e) {
     // FAIL TO THE STORED ANSWER, LOUDLY. An unreachable REST surface must not stop a session running
     // an agent -- the lane's own model is still a correct model to run on, just possibly an expensive
@@ -316,7 +341,11 @@ async function main() {
 
   const header = `# ${assembly.agent_card.name} — ${assembly.agent_card.role} · capability ${assembly.capability_slug} · model ${assembly.llm?.model}`;
   // Only when it actually moved. A note on every run is a note nobody reads.
-  const laneLine = degraded ? `\n# lane: judgment degraded to ${lane.model} (${lane.reason})` : '';
+  // AGT-143: a capability assignment that moved the model gets its own line; the degrade line is
+  // byte-identical to SES-395's.
+  const laneLine = lane.reason === 'capability' && lane.from
+    ? `\n# lane: capability assignment ${assembly.capability_slug} -> ${lane.model}`
+    : degraded ? `\n# lane: judgment degraded to ${lane.model} (${lane.reason})` : '';
   process.stdout.write(header + laneLine + '\n' + system_prompt + '\n');
   if (omitted.length) {
     console.error(`agent-prompt: sections omitted (no stored content -- fetched per call by the executor): ${omitted.join(', ')}`);
