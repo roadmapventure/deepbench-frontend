@@ -1,3 +1,12 @@
+// DeepBench v7.0.609 | scripts/audit-review.js | AGT-134 -- validateReview() mirrors the one new
+// refusal apply_audit_review() gained: `needs_desktop` is the manager's "an unattended cycle must
+// not pick this straight back up" flag, and it only means something on a group that FILES a ticket
+// (a root-cause without reuse_backlog_id, or the cleanup), because that ticket is where it lands as
+// design_status 'needs-desktop'. On any other group it is refused, not dropped -- a dropped flag
+// reads as a ruling made and then ignored. A non-boolean is refused too. Both texts are the
+// function's, minus its "apply_audit_review: " prefix (the agt-86i arm R convention). No table is
+// written here. Spec: docs/kickoffs/v7.0.609-AGT-134-manager-rules-upkeep.md section 5 task 5.
+//
 // DeepBench v7.0.605 | scripts/audit-review.js | AGT-132 slice 1 -- the worklist gains a SOURCE and a
 // TYPE, and the manager is told where each ticket goes: --prepare selects found_by and finding_type,
 // every worklist row carries `source` (found_by's first segment) and `finding_type`, and the context
@@ -286,6 +295,20 @@ export function validateReview(review, worklist, week, checklist, routes, projec
     // 1a (AGT-132), the function's own condition: the two kinds that file a ticket need a route.
     const files = (kind === "root-cause" && (g.reuse_backlog_id === undefined || g.reuse_backlog_id === null)) ||
                   kind === "cleanup";
+
+    // 1a (AGT-134), in the function's place and with the function's texts minus the
+    // `apply_audit_review: ` prefix (the agt-86i arm R convention). needs_desktop asks for
+    // design_status 'needs-desktop' on the ticket this group files; on a group that files none
+    // there is nothing to write it to, so it is REFUSED rather than dropped. Only a boolean is a
+    // ruling -- `"yes"` is a typo the manager should see, not a truthy value to act on.
+    if (g && typeof g === "object" && Object.prototype.hasOwnProperty.call(g, "needs_desktop") &&
+        g.needs_desktop !== null) {
+      if (typeof g.needs_desktop !== "boolean") {
+        refusals.push("needs_desktop must be a boolean");
+      } else if (g.needs_desktop && !files) {
+        refusals.push("needs_desktop applies only to a group that files a ticket");
+      }
+    }
     if (Array.isArray(routes) && files) {
       let route = null;
       try {

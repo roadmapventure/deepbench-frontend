@@ -12,9 +12,9 @@ cycle. **This file is the source; the routine holds a copy.** A cycle that finds
 notes the drift in its cycle row and follows the runbook, which outranks both.
 
 **How it changes.** Edit the block below, run the regression suite (the drift test is red on any
-retired mechanism or unknown model id), commit, then — on John's word — push the block verbatim
-to the routine with `RemoteTrigger {action: "update"}` and read it back with `get`. Enabling the
-routine is never part of that step.
+retired mechanism or unknown model id), commit, then push the block verbatim to the routine with
+`RemoteTrigger {action: "update"}` and read it back with `get`. That push is an ATTENDED act, not a
+John approval — see "How a drift finding is closed" below (`AGT-134`, `JOHN-0925-DESIGNER-DECIDES`).
 
 **The update call replaces `job_config.ccr` whole — found live 2026-09-11, the first push of this
 file.** An update carrying only `environment_id` + `events` succeeded (HTTP 200, prompt correct)
@@ -66,3 +66,33 @@ You are one cycle of DeepBench's development runner. The repo is cloned; default
 not `WebSearch`, so step 4b's egress probe answers `blocked` on every cycle until he adds it at
 claude.ai/code/routines. This file does not change tools, connectors, cron, model or the enabled
 flag — only the prompt text.
+
+## How a drift finding is closed (2026-09-26, `AGT-134`, `v7.0.609`)
+
+A `routine-prompt-drift` finding — `scripts/check-routine-prompt.js` writing
+`found_by = check-routine-prompt:<routine>` — had been re-detected on every runner run since
+2026-09-23 and ruled by nobody, because no unattended cycle can edit the routine that fired it.
+A ruling now has an execution path, and these are its five steps.
+
+1. **The Development Manager rules it, not John.** It is `root-cause` with `needs_desktop: true`
+   and a project of the manager's pick (`dm-audit-review-intent.method`). `escalate` carries only
+   the five `john_call` values — rules, money, production, hiring, switch — and a prompt push is
+   none of them.
+2. **The ticket carries `needs-desktop`.** `apply_audit_review()` writes
+   `design_status = 'needs-desktop'` for a group that filed under the flag. `pick_blocking_flags()`
+   names that flag and `prime_directive_queue()` excludes it, so an unattended cycle cannot pick
+   straight back up the finding it has no way to fix.
+3. **An attended session pushes the block**, under this file's "How it changes" rule: the WHOLE
+   `ccr` object (`environment_id`, `events`, `session_context`) copied from a fresh
+   `RemoteTrigger get`, then `RemoteTrigger {action: "update"}`, then a `get` read back —
+   `derived_state.model` and `session_request.config.allowed_tools` compared to what was sent.
+4. **It records one `runner_decisions` row** naming the trigger id and the sha256 of the block it
+   pushed, so the next drift finding can be read against a decision rather than a memory.
+5. **It re-runs the check to exit 0** —
+   `node scripts/check-routine-prompt.js --routine=runner --prompt=<the new live prompt>` — and
+   commits the cleared `docs/audits/runner-prompt-drift.json`. Only then is the finding resolved.
+
+**What no session may touch here, attended or not.** The execution path moves WHERE a prompt push
+happens, never WHO may make it. The routine's **enabled flag, its `allowed_tools`, its cron and its
+model are John's alone** (`JOHN-0925-DESIGNER-DECIDES`; decision `48d2fd0e`, reversed 2026-09-03:
+never flip the switch). `AGT-134` wrote none of them and called no `RemoteTrigger update` itself.

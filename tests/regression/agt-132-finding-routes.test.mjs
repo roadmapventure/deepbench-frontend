@@ -93,10 +93,30 @@ const EPIC_AUD = "6c8a8325-205c-4e08-b0b2-64c939582cc6";
 const PARA_HEAD = "THE FINDINGS STANDARD AND ROUTING";
 const PREFIX = "apply_audit_review: ";
 
-// The four rows the migration seeds, in the order --prepare reads them (precedence, source).
+// ARM A's FIXTURE TABLE -- the four rows slice 1's migration seeded. It is a fixture, not a copy of
+// the live table, and it deliberately stays four: arm A's whole point is that a source with no row
+// STOPS the review, so it needs a source (`runner`) that this table does not map. Later tickets add
+// live rows for real sources (AGT-138 `researcher`; AGT-134 `check-routine-prompt` and `runner`) and
+// none of them changes what arm A is reasoning about.
 const ROUTES = [
   { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
   { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
+  { precedence: 30, source: "staff-watch", finding_type: "*", project_slug: null },
+  { precedence: 30, source: "ticket-owner", finding_type: "*", project_slug: null },
+];
+
+// ARM B's LIVE TABLE -- every row public.finding_routes holds, in the order --prepare reads them
+// (precedence, source). Re-pointed 4 -> 7 by AGT-134 (v7.0.609): AGT-138 added `researcher`, and
+// AGT-134 added `check-routine-prompt` (the drift check's own writer, previously unmapped, which
+// made finding_group_epic() RAISE on every clean drift finding and stopped the whole review) and
+// `runner`. All three are precedence 30 / project_slug NULL -- the Development Manager picks the
+// project; creating one is still John's.
+const LIVE_ROUTES = [
+  { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
+  { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
+  { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
+  { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
+  { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
   { precedence: 30, source: "staff-watch", finding_type: "*", project_slug: null },
   { precedence: 30, source: "ticket-owner", finding_type: "*", project_slug: null },
 ];
@@ -223,7 +243,7 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, ROUTES, "the four routing rows, exactly");
+    assert.deepEqual(r.json, LIVE_ROUTES, "the seven routing rows, exactly");
     assert.ok(!r.json.some(x => x.source === "*" && x.finding_type === "*"),
       "there is deliberately no catch-all row: an unmapped source must stop the review");
 
@@ -272,7 +292,7 @@ async function run() {
     const p = spawnSync(process.execPath, [SCRIPT, "--prepare", "--week=2026-W39", `--out=${ctxPath}`], { encoding: "utf8" });
     assert.equal(p.status, 0, `--prepare must exit 0; got ${p.status} ${p.stderr}`);
     const ctx = JSON.parse(fs.readFileSync(ctxPath, "utf8"));
-    assert.deepEqual(ctx.routes, ROUTES, "the prepared context carries the routing table");
+    assert.deepEqual(ctx.routes, LIVE_ROUTES, "the prepared context carries the routing table");
     assert.ok(Array.isArray(ctx.projects) && ctx.projects.length > 0 && ctx.projects.every(x => typeof x.slug === "string"),
       "and the projects he may pick from, by slug");
     assert.ok(ctx.worklist.length > 0, "there is a live worklist to check");
