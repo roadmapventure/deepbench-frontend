@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
 <!-- DeepBench v7.0.602 | runbooks/runner-cycle.md | AGT-137 — (7e): the Auditor reviews THIS run (`audit-run-review.js`). `v7.0.520` DROPPED, count 5. -->
 <!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b — STEP 4d IS A POINTER: the Auditor runs in its own routine (docs/runbooks/auditor-routine.md); :4720 names the fifteenth restorable table. ROTATION: v7.0.519 DROPPED, count held at 5, SES-164 step 2 by grep FIRST — all six named facts keep ≥1 body hit (`settle-ship.js` 2, `--remainder=` 2, `resolveDeliveryFiles` 1, `selfCertificationBlock` 1, `changedFilesFor` 1, `ses-379-changed-files-fail-closed` 1); none relocated into 7a. -->
 <!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3 — AN ALL-GATED DRAIN IS NOT A FINISHED ONE: a member carrying an undecided gate card is out of both pick paths since slice 1, so `drain_epic_next`'s `blocked_detail` census now counts *"carrying an undecided gate card"*. `v7.0.517` VERBATIM to `docs/SESSIONS.md`, four ZERO-hit facts RELOCATED into 7a; count 5. Guard `ses-424c`. -->
 <!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3 — A READING IS A DELTA, NEVER THE SESSION TOTAL: `get_session` counts the whole SESSION and a drain chain runs many cycles in one (`fd4e11f4` closed at 32,249,570; its continuation opened on that counter), so step 1 takes reading 0 at the INSERT (`tokens_at_open` in `notes`) and step 9 charges deltas. `v7.0.516` moved VERBATIM to `docs/SESSIONS.md`, two ZERO-hit facts RELOCATED; count 5. Guard `ses-423b`. -->
-<!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2 — A STALL IS JUDGED BY THE BUILD'S OWN SIGNAL, THE CLOSE-OUT MEASURES: step 7 hands the Builder a `heartbeat` key (`scripts/cycle-heartbeat.js`, new) so probe (d) reads a build that STOPPED, not a long one — 13 `stall_notified_at` rows, **9 ended `shipped`**. Step 9's `est_tokens_*` are MEASURED from two `get_session` reads (`SES-409`: 15.27M here vs ≤900,000 shipped), not estimated; the three agent-log fences bracket the pair as optional. `SES-164` step 2 by grep FIRST: `v7.0.505` moved VERBATIM to `docs/SESSIONS.md`, its five ZERO-hit facts RELOCATED into 4e; count 5. Guard `ses-423b-stall-signal.test.mjs`. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -27,7 +27,7 @@ Priority Class legend). John should never have to memorize the digits.
 always **ID + title**, because he does not memorize IDs. That is the same sentence as the clause
 above it, applied one level out: he should not have to memorize the digits of a priority class, and
 he should not have to memorize what `SES-140` **is**. So a ticket reference on a surface he reads —
-a briefing card's id chip, a §10 row, a push notification, the session name, a `close_directive`
+a briefing card's id chip, a §10 row, the session name, a `close_directive`
 note, a `record_skip` reason — reads `SES-140 — the successor fire is refused by the platform`,
 never a bare `SES-140`. The session rename at step 5 (`"<TICKET-ID> — <short name>"`) already has
 this shape and is the pattern, not an exception to it.
@@ -121,7 +121,8 @@ VALUES
 RETURNING id;
 ```
 
-  Then **end**. No push notification, no session rename, no serial tail, no successor fire.
+  Then **end**. No session rename, no serial tail, no successor fire. (Nothing notifies John from
+  anywhere in this runbook any more — `JOHN-0925-NOTIFICATIONS-OFF`, `AGT-133`.)
 
 **`SES-298` / `SES-302` wording corrections: archived VERBATIM in `docs/SESSIONS.md`**
 (appendix *runner-cycle.md rationale retired by `SES-336`*, entry A, ledger 51). Live rule below.
@@ -380,7 +381,7 @@ catches work that already landed on `dev` regardless of claims; this catches the
 claim expired and moved. Two different failures, both real, and `633fe486` was saved by the
 first one only by accident.
 
-**0b. A SILENT predecessor is PUSHED to John — and is never declared dead by a successor (John,
+**0b. A SILENT predecessor is REPORTED IN A ROW John reads — and is never declared dead by a successor (John,
 2026-08-21, directive `1d01ea85`, register B35; corrected the same cycle by measurement, B37).**
 Asked what he wanted when a run dies, John answered: **"need to know why it died and what to do
 next."** Detection already existed — the TTL steal and the `ended_at IS NULL` sweep — and it was
@@ -397,7 +398,7 @@ out from a briefing card the next morning. The signal was dying in the ledger. I
   gap is **~9h20m**. A row may be closed `failed` by someone else only after **24h** of no writes
   attributable to it (that bar is derived from the measurement, not chosen), and the closing note
   must say what evidence was used.
-- **Say "went silent", never "died", in the push, the card and the ledger** — until something
+- **Say "went silent", never "died", in the row, the card and the ledger** — until something
   actually proves death. This is the `v7.0.115` failure (a hung probe's silence read as a finding)
   in its third costume; the rule "a subagent that has not returned is not a result" applies to an
   absent *cycle* exactly as it does to an absent *subagent*.
@@ -475,7 +476,7 @@ needs its own half of the fix:
 
 - **A NULL heartbeat was INVISIBLE to the tripwire, while the watchdog could still close the row.**
   `heartbeat_at < now() - INTERVAL '20 minutes'` evaluates to NULL — not true — for a NULL
-  heartbeat, so the row silently dropped out of (d) and John got no push; `stall_watchdog()` has
+  heartbeat, so the row silently dropped out of (d) and nothing reported it; `stall_watchdog()` has
   coalesced since `SES-194`, so the *same* row was still eligible to be closed `failed` at the 24h
   bar. A cycle could therefore be closed for going silent having never produced the 20-minute alert
   the tripwire exists to send. Two detectors over one column disagreeing about what a missing value
@@ -492,8 +493,8 @@ needs its own half of the fix:
 Two boundaries, so this is not re-derived differently later:
 
 - **`never_reported` is projected, never filtered on.** A never-reporting open peer is exactly as
-  worth pushing as a frozen one — more so, since it has not even reached its first step boundary —
-  and it changes only the *wording* of the push: "has not reported since it started" rather than
+  worth reporting as a frozen one — more so, since it has not even reached its first step boundary —
+  and it changes only the *wording* of the report: "has not reported since it started" rather than
   "frozen since its last step". Turning the column into a `WHERE` clause rebuilds the invisibility
   this fixed.
 - **The column's `DEFAULT now()` is deliberately NOT dropped.** It is what makes a fresh row's
@@ -503,22 +504,28 @@ Two boundaries, so this is not re-derived differently later:
   today's schema a *live* row cannot carry NULL, so the NULL arm of (d) guards the 43 historical
   rows and any future explicit NULL — it is a removed divergence, not a hot path.
 
-**A row from (d) gets its own IMMEDIATE push — this is the "a session is asking for
-permission" alert (`SES-103`).** First claim the report atomically so John gets exactly one
-push per stall, however many peers are sweeping:
+**A row from (d) gets its own IMMEDIATE report — this is the "a session is asking for
+permission" alert (`SES-103`), and it is a ROW, never a push (`JOHN-0925-NOTIFICATIONS-OFF`,
+`AGT-133`).** First claim the report atomically so the stall is reported exactly once, however
+many peers are sweeping:
 `UPDATE runner_cycles SET stall_notified_at = now() WHERE id = '<stalled id>' AND
-stall_notified_at IS NULL RETURNING id` — 0 rows means another peer already pushed; stand down.
-On 1 row, push: which cycle, frozen since when, its `last_step`, and the hypothesis stated as a
+stall_notified_at IS NULL RETURNING id` — 0 rows means another peer already reported it; stand
+down. **The claim still stamps, because the report still happens** — one peer writes it into its
+own `runner_decisions` row, so the column means "reported", not "his phone rang".
+On 1 row, report: which cycle, frozen since when, its `last_step`, and the hypothesis stated as a
 hypothesis — *"likely waiting on a permission prompt only you can see, in that session's
 window"* when the last step touched a known gated path class, plainer "went quiet at step X"
 otherwise. Tell John where the prompt would be; whether to open it is his call — never phrase
 approval as a task he owes (the 34865f07 rule). If the cycle later resumes, its own next
 heartbeat is the all-clear; note the resolution in your tail if you observe it. **Since `v7.0.531`
 step 7 heartbeats every task, a (d) row whose `last_step` reads `7 — builder: …` is a build that
-STOPPED, not a long one** — say that, not "still running".
+STOPPED, not a long one** — say that, not "still running". That reading is measured, not assumed:
+of **13 `stall_notified_at` rows** at `SES-423` slice 2, **9 ended `shipped`** — elapsed time alone
+called nine working builds stalled, which is why the signal is the build's own heartbeat and not the
+clock. Guarded by `tests/regression/ses-423b-stall-signal.test.mjs`.
 
 **THE WATCHDOG — one call, run it right after the sweep, every cycle (`SES-194`, `v7.0.230`,
-migration `ses194_stall_watchdog`).** Probe (d) *detects* a frozen peer and pushes John once.
+migration `ses194_stall_watchdog`).** Probe (d) *detects* a frozen peer and reports it once.
 Until this shipped **nothing ever closed one**, so a silent cycle's row stayed open forever and
 its ticket claim stranded until the 24h expiry — measured live 2026-08-24T17:45Z: `e4074c97`
 (frozen 124 min at *"step 5 — pick"*) and `039d1477` (108 min at *"step 3/4"*) both still open
@@ -565,12 +572,14 @@ outcome you reasoned your way to — is still forbidden, and is still the failur
 two working cycles in the ledger John reads.
 
 Any row from these — or a `steals` jump on your own tail-lease claim — means a session has
-gone silent. **Send a push notification** carrying both halves of what John asked for — and
-leave the row alone:
+gone silent. **Write this cycle's own `runner_decisions` row** carrying both halves of what John
+asked for — notifications are off and nothing here reaches his phone
+(`JOHN-0925-NOTIFICATIONS-OFF`, `AGT-133`), so the report is a row he reads — and
+leave the silent row alone:
 
 - **Why it went silent — only what is observable.** Which cycle, when it started, how long it
   has been quiet, what it had picked (`item_id` / `notes`), whether the lease was taken by TTL
-  steal or found free, and whether anything was pushed. **State the limit in the message
+  steal or found free, and whether anything was pushed to `dev`. **State the limit in the row
   itself:** a cloud cycle's transcript is not readable from here, so the runner reports last
   observable *state* plus a named hypothesis — never a cause it did not observe. "It went silent
   after step N and the last thing it wrote was X" is a real answer; an invented root cause is
@@ -585,7 +594,7 @@ leave the row alone:
   something better than a shrug to put next to the state.
 - **A silence during John's own waking hours is a DIFFERENT finding.** The evidenced cause
   requires his absence. A cycle that goes quiet while he is demonstrably in the app is not
-  explained by B39, and the push should say so rather than reach for the nearest known cause —
+  explained by B39, and the row should say so rather than reach for the nearest known cause —
   that reflex is how this platform got three wrong rulings in a row.
 - **What to do next — concretely, including "nothing".** Most silences need no action at all:
   the claim's 24h expiry re-opens the ticket, the next cycle re-picks it, and the silent
@@ -598,23 +607,23 @@ leave the row alone:
   **One thing that is NOT an action to give him.** Opening the session and approving the prompt
   does clear a `.claude/` park — that is how the 2026-08-21 pair came back. **Never write that
   to John as the remedy.** He has ruled on it (`34865f07`: *"That should not be happening"*), and
-  a push that hands him a tap to perform has converted his instruction into a chore. Report the
+  a report that hands him a tap to perform has converted his instruction into a chore. Report the
   park, name what it cost, and say the work is recoverable; the fix belongs in the procedure —
   the cycle should not have entered the gate — not in his inbox.
 
-Two consecutive silences on the same item is itself the finding, and the push says so — that is
+Two consecutive silences on the same item is itself the finding, and the row says so — that is
 what `ba8f2ce3` and `633fe486` were, and nothing told him at the time. Both, note, later came
 back and pushed their work to their own session branches; the correct action for that pair was
 "cherry-pick `69bc903`", never "the work is gone".
 
-**1. Open the cycle — and tell John's phone it started (`SES-102` — runner transparency on the
-phone, John's ask 2026-08-21, `v7.0.142`).** Immediately after inserting your cycle row, send
-**exactly one push notification**: fire kind + time + where the result lands — e.g.
-`"Runner cycle started (scheduled 3:00 PM CST fire). Pick and outcome will be on the briefing."`
-(or `"(manual fire)"` when the start time sits off the 3-hour grid). One push per cycle open,
-never more — the step-0b silence pushes and the close-out remain the only other notification
-senders. If no push mechanism is available in the environment, note that in the cycle row and
-continue. INSERT `runner_cycles` **with the id the claim returned** —
+**1. Open the cycle — and THIS STEP NOTIFIES NOTHING (`SES-102` asked for transparency on the
+phone, John's ask 2026-08-21, `v7.0.142`; that channel is CLOSED —
+`JOHN-0925-NOTIFICATIONS-OFF`, `AGT-133`).** The open is a row, not a message: the fire kind, the
+time and where the result lands are already in the `runner_cycles` row you are about to insert,
+and the briefing card reads them from it. **Send nothing, to any phone, from this step or any
+other in this runbook.** `SES-102`'s ask is not withdrawn — the transparency it wanted is served
+by the row and the card until John designs a notification path, and switching notifications back
+on is his word alone. INSERT `runner_cycles` **with the id the claim returned** —
 `INSERT INTO runner_cycles (id, stamp, trigger, model) VALUES ('<claimed cycle_id>', …)` — via
 the connector, leaving `outcome` NULL until close (the check constraint has no in-progress
 value; found live, SES-78c).
@@ -1269,8 +1278,26 @@ Four boundaries, each of which is how this gets built wrong:
   inside, `L` = multi-cycle / design-heavy / discovery risk; `gate_count` is the number of **known**
   external gate-crossings on the path to done (a John action, a secret, another repo, a blocking
   ticket, an un-drilled surface) and is the multi-day predictor — `SES-191` hid three. This applies
-  to every filing site in this runbook: step 2b's routed tickets, step 4b's invention card when John accepts it (RETIRED WORDING — `SES-160` files the proposal's `backlog_items` row directly via `file_invention_proposal()`, one transaction, no card and no Accept), step 6's
-  removal-proposal successors, and `heal-engine.js`'s `LOO-` rows.
+  to every filing site that REMAINS in this runbook, and there are exactly four: step 2b's routed
+  tickets, step 6's removal-proposal successors, `heal-engine.js`'s `LOO-` rows at step 8b, and
+  `tripwire-to-backlog`'s rows at step 8b-bis.
+- **THE CYCLE NO LONGER FILES WHAT IT JUDGED (`AGT-133`; `JOHN-0925-FINDINGS-STANDARD`).** Anyone
+  reports findings; **only The Development Manager files tickets**, for every source. Measured at
+  this ship: `source_file='runner-cycle'` stood at **84 `backlog_items` rows over 45 days** — a cycle
+  judging that something needed doing and filing its own ticket for it. That path is closed. Residue
+  a cycle judges — a defect it noticed, a gap it hit, a proposal it formed — becomes a **finding**:
+
+```
+ingestFindings({ findings:[…], week:W, foundBy:'runner:cycle:<your cycle id>',
+                 findingType:'defect' | 'gap' | 'proposal' | 'security',
+                 cycleId:'<your cycle id>', apply:true })
+```
+
+  `(7f)` rules it the same run, and files the ticket if there is one to file. **The boundary is
+  JUDGMENT, not mechanism** (Designer's call, `JOHN-0925-DESIGNER-DECIDES`): the four sites above
+  are **deterministic** — a healer's `LOO-` row and a tripwire row are produced by a rule with no
+  opinion in it, and they keep filing exactly as they do today. Converting those to findings is
+  itself a **finding**, never a ticket a cycle files to propose it.
 - **A rejection is a KEPT ROW, never a deletion** — decision 5, and `SES-157`'s ruling that
   `vision/rejected-paths.md` is a retired stub. A rejected claim is `status = 'rejected'` with its
   `provenance` set (`ck_vision_claim_decided` enforces that), because rejections teach what not to
@@ -2856,8 +2883,8 @@ the verification.
 **A subagent that has not returned is not a result (`SES-83` (d) cycle 4, corrected `v7.0.117`).**
 A delegated probe that is still `running` at close-out has told you **nothing** — not "blocked",
 not "slow", not "failed". Cycle 4 read ~21 minutes of silence from a background probe as evidence
-of a block, wrote that reading into the ledger, `CLAUDE-STATE.md`, `docs/SESSIONS.md`, the briefing
-and a push notification, and closed. The agent then returned **success**: three tool calls, no
+of a block, wrote that reading into the ledger, `CLAUDE-STATE.md`, `docs/SESSIONS.md` and the
+briefing, and closed. The agent then returned **success**: three tool calls, no
 denial, no prompt — 2,090,008 ms of latency, not a block. Delegating the probe was right and is
 what made the error recoverable; converting its silence into a finding was not. So: **either wait
 for the agent, or report the question as still open** — never a third thing. Two mechanics make
@@ -2931,6 +2958,30 @@ have handed it (`SES-376`: the reasoning lives in the harvest, the FACTS live in
 
 The detail names no ticket on purpose: `--backlog=` carries that, or the finding fingerprints a new
 way every cycle and never reaches the 3-cycle promotion bar.
+
+**A `deviations` ENTRY NAMING A DEFECT THE KICKOFF DID NOT OWN IS DECIDED BY A RULE, NOT BY A MODEL
+(`AGT-133`; `JOHN-0925-FINDINGS-STANDARD`).** The Builder reports such a defect and never silently
+fixes or silently drops it. Apply the test in this order and record the answer:
+
+1. **Fix it now only if BOTH hold** — it fits inside the **remaining** `files` and `tasks` caps for
+   this kickoff, **and** it lives in a file the kickoff **already names**. Either one failing means
+   capture. A new file or a cap breach is never a fix-now, however small the diff looks: that is the
+   caps breach arriving through the door nothing watches.
+2. **Otherwise capture it as a finding** — never a ticket you file, because only The Development
+   Manager files (`(7f)`):
+
+```
+ingestFindings({ findings:[…], week:W, foundBy:'runner:cycle:<your cycle id>',
+                 findingType:'defect', cycleId:'<your cycle id>', apply:true })
+```
+
+3. **Either way, ONE `runner_decisions` row records the call** — which way it went and which limb of
+   the test decided it. One row per call, never one per defect and never none: a fix-now with no row
+   is an unrecorded scope change, and a capture with no row is a defect nobody chose to defer.
+
+**`(7f)` rules the captured finding THAT SAME RUN** — the capture is not a deferral to next week.
+That is the whole point of running the manager in the tail: a defect this cycle found is a defect
+this cycle's review either files or rules out, with its source, its type and its location on it.
 
 **THE VERDICT, THE CLOSE-OUT AND THE RECORD BELOW STAY THIS STEP'S.** The Builder writes no status,
 no verdict and no decision — `bd-guardrails` forbids it in its own words (*"write done or a verdict
@@ -4026,7 +4077,9 @@ output_tokens + cache_read_tokens + cache_write_tokens` of `external_metadata.us
 DELTAS, never a session total, because the counter is SESSION-cumulative and a chain runs many
 cycles in one session (`v7.0.532`). Write `tokens_basis: get_session` in `notes`. A missing
 reading NULLs each column it feeds; tool unavailable → both NULL,
-never a number), plus outcome and push SHA. The briefing's budget cards
+never a number. Why measured and not estimated: `SES-409` read **15.27M** tokens on the session that
+had been estimating **≤900,000** — the estimate was off by better than an order of magnitude, and
+every budget card downstream inherited it), plus outcome and push SHA. The briefing's budget cards
 show the dev/QA split on both tracks, the runner's token use broken down by model, and John's
 latest reading + calibration; the reading-entry card (three percentages + save) must be on
 every rebuild. **The page's shape is now the LOCKED SECTION ORDER in `briefing-page.md`
@@ -4307,6 +4360,50 @@ node scripts/staff-watch.js --promote --apply --cycle-id=<your cycle id>
 ```
 
 **(7e) THE AUDITOR REVIEWS THIS RUN (`AGT-137`).** Only shipped, gated_before_build, reverted, failed; else exit 3 — nothing to review, no cost. `node scripts/audit-run-review.js --prepare --cycle-id=<your cycle id> --out=$S/run.json`; `auditor-routine.md` § Per-run review.
+
+**(7f) THE DEVELOPMENT MANAGER REVIEWS THE FINDINGS (`AGT-133`; `JOHN-0925-REVIEW-CADENCE`).**
+`(7e)` writes findings and nothing read them: 28 rows sat `open` with `ruling` NULL on the day this
+step shipped. Same gate as `(7e)` — **shipped, gated_before_build, reverted, failed and nothing
+else**; on any other outcome this step does not run. `W` is this ISO week (`isoWeek()`, exported by
+`scripts/audit-ledger.js`), `$S` your scratchpad.
+
+```
+node scripts/audit-review.js --prepare --week=$W --out=$S/ctx.json; echo "prepare exit $?"
+```
+
+**Exit 3 → no findings: no manager run, no sub-agent, no cost.** Write `MANAGER REVIEW: nothing to
+review` into the cycle `notes` and go on to `(8)`. Exit 0 → run the manager exactly as
+`auditor-routine.md` step 4 does, on the model `scripts/agent-prompt.js` PRINTS (never a hardcoded
+id — `AGT-147`), stating the clone's absolute path:
+
+```
+node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json > $S/review.prompt.md
+node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+```
+
+The `devmanager` sub-agent's answer is one JSON object (`{groups, summary_for_john,
+patterns_applied}`) saved as `$S/answer.json`. **Log the call exactly as `auditor-routine.md` step 4
+logs it** — that command has ONE home and this step does not restate it — with
+`--ai-type=review-audit-worklist` and
+`--feature=review-audit-worklist:dm-audit-review-intent:depth1` (§19k). Then:
+
+```
+node scripts/audit-review.js --dry-run=$S/answer.json --context=$S/ctx.json
+node scripts/audit-review.js --apply=$S/answer.json --context=$S/ctx.json --week=$W --cycle-id=<your cycle id>
+```
+
+A `--dry-run` refusal → re-run the sub-agent ONCE with the refusal lines appended; a second refusal
+→ **no `--apply`**, the refusals go in `notes` verbatim, and the findings stay `open` for the weekly
+review. Keep `--apply`'s `Decision <id> — reversible until …` line and its ticket ids for the record.
+
+**THIS STEP NEVER GATES THE CHAIN.** A refusal, an exit 3, a missing credential or an unmapped
+source is a line in `notes` — **never `gate_failed`**, never a `did_not_run`, never a reason `(8)`
+does not run. The review reads a week's findings; the chain ships tickets. A cycle that let an
+unread finding stop its own drain would have inverted both.
+
+**AND THIS STEP FILES THE TICKETS — the cycle does not (`JOHN-0925-FINDINGS-STANDARD`).** Only The
+Development Manager files, for every source. `--apply` is the one filing path for a finding, and it
+claims its ids the same atomic way every other filing site does.
 
 
 **(8) A DRAINING CYCLE CONTINUES THE DRAIN IN-SESSION — FIVE GATES, ONE CALL (`SES-139`,

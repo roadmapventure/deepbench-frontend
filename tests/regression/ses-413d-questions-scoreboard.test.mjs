@@ -119,7 +119,13 @@ export const RUNBOOK_CEILING = 381000;
 // "step 4b" cross-references still resolve. 10,561 B out, 199 B in (the pointer line): 380980 ->
 // 370419 B, 10,581 B under the ceiling -- the only re-pin here that LOWERS the number. Re-measured
 // with wc -c and re-pinned in the same commit as the removal, which is what ses-424f:291 asserts.
-export const BYTES_AT_SHIP = 370419;
+// v7.0.610 (AGT-133) adds step 9's (7f) (The Development Manager rules (7e)'s findings, ~2,750 B),
+// step 7's mid-build fix-now-or-capture rule (~1,530 B) and the filing-sites rewrite (~1,080 B);
+// deletes the five `push notification` sites and converts step 0b's and step 1's notifications into
+// rows; and rotates v7.0.531 out (~1,050 B) after RELOCATING its three zero-hit facts into 0b and
+// step 9 (SES-164 step 2, by grep first). Net 370419 -> 377625 B, 3,375 B under the ceiling.
+// Re-measured with wc -c and re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 377625;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

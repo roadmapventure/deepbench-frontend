@@ -108,10 +108,16 @@ async function run() {
   // only the RULE-BODY sentence (the list item itself, "to every filing site"), never this file's
   // own version-stamp header, which quotes the phrase purely as commentary and carries no
   // "RETIRED WORDING" marker of its own.
+  // AGT-133 (v7.0.610): this was `assert.ok(filingListLines.length > 0)`, which made the PRESENCE of
+  // the retired "step 4b's invention card when John accepts it" clause mandatory. That inverted the
+  // check's own purpose: what it guards is that the retired idiom, IF PRESENT, is annotated -- and
+  // deleting the idiom outright is the strongest form of that, not a violation. AGT-133 deleted it
+  // (step 4b became a pointer at AGT-138 when the Researcher left the cycle, so it is no longer a
+  // filing site at all), and the rule-body sentence it lived in now names the four sites that remain.
+  // So: the annotation requirement below still bites on every line that carries the idiom; its
+  // absence is compliance. The sentence itself is asserted by agt-133-run-tail-review.test.mjs.
   const filingListLines = lines.filter(l =>
     l.includes("step 4b's invention card when John") && l.includes("to every filing site"));
-  assert.ok(filingListLines.length > 0,
-    `${RUNBOOK_REL}: step 6's filing-site list sentence ("to every filing site in this runbook...") is missing`);
   for (const line of filingListLines) {
     assert.ok(/RETIRED WORDING/.test(line) && line.includes("file_invention_proposal"),
       `${RUNBOOK_REL}: the filing-site list's "step 4b's invention card when John accepts it" clause ` +

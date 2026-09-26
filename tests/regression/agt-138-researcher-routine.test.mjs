@@ -285,9 +285,14 @@ export default async function run() {
         "control: without the row, the SAME call throws -- which is what every researcher finding " +
         "did at audit-review.js:100 before this ship");
       // And an unrelated unmapped source still stops: the row is one route, not a catch-all.
+      // AGT-133 (v7.0.610): this probe used `runner:cycle`, which AGT-134 then MAPPED at precedence 30
+      // -- and AGT-133's own acceptance criterion is that a runner finding routes rather than throwing,
+      // so probing `runner` here would assert the opposite of the shipped platform. Repointed at
+      // `carry`, which AGT-138's own kickoff named as still-unmapped and which live finding_routes
+      // still holds no row for. The clause under test is unchanged: ONE route is not a catch-all.
       assert.throws(() => routeGroup({ kind: "root-cause", finding_ids: ["rn"] },
-        [{ id: "rn", found_by: "runner:cycle" }], routes),
-        /unmapped source runner/,
+        [{ id: "rn", found_by: "carry:something" }], routes),
+        /unmapped source carry/,
         "the researcher row must not have become a catch-all for every other source");
 
       const dn = await get(url, key, "runner_migration_downs?select=up_name,classification,captured_by_cycle&up_name=eq.agt138_researcher_route");

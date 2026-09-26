@@ -246,6 +246,10 @@ async function run() {
     assert.deepEqual(r.json, LIVE_ROUTES, "the seven routing rows, exactly");
     assert.ok(!r.json.some(x => x.source === "*" && x.finding_type === "*"),
       "there is deliberately no catch-all row: an unmapped source must stop the review");
+    // The precedence ORDER is the invariant a new row must not disturb: security outranks everything.
+    const sec = r.json.find(x => x.source === "*" && x.finding_type === "security");
+    assert.ok(sec && r.json.every(x => x === sec || x.precedence >= sec.precedence),
+      "the security route still holds the lowest precedence of every row in the table");
 
     const m = await req(url, key, "rpc/migrations_in_range", { method: "POST", body: { p_from: PREV, p_to: "99999999999999" } });
     assert.equal(m.status, 200, describe(m));
