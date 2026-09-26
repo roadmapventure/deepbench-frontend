@@ -680,6 +680,156 @@ export function summarizeGateOutput({ stdout, stderr }) {
   return chosen.join(" | ");
 }
 
+// ---------------------------------------------------------------------------
+// FEATURE: AGT-170 -- THE REGRESSION GATE GRADES THE DELTA, NEVER THE SUITE'S ABSOLUTE EXIT CODE.
+// ---------------------------------------------------------------------------
+//
+// READ THE DIRECTION OUT LOUD, because it is the OPPOSITE of every other rule in this file. The
+// kickoff checks above (`kickoffCapFinding`, `kickoffLaneFinding`) and the SES-403 re-grade all move
+// one way only, approve -> block; each of their headers says so, and says so because a rule that can
+// turn a red into a green is the rule that can launder a ship. This one IS that rule: it is the
+// file's one RED -> GREEN move. So it is fenced by three things rather than trusted:
+//
+//   1. IT REQUIRES A BASELINE THAT WAS HANDED TO IT. No baseline -> the absolute exit code stands,
+//      untouched. It never measures its own baseline, because a baseline measured on the tree being
+//      graded is the tree vouching for itself.
+//   2. IT REQUIRES A PROVEN NAME-WISE SUBSET. Every `[FAIL]` name in this run must also be a `[FAIL]`
+//      name in the baseline. One name that is not -> red, and the reason names it.
+//   3. IT RECORDS BOTH LISTS. `standing` and `newlyRed` go to the payload and into `gateDetail`, so a
+//      subset claim is quoted from the grader that made the call, never re-derived from a second run
+//      by whoever reads it later (the three-parties-measuring-one-baseline defect
+//      `scripts/baseline-red-set.js`'s header records).
+//
+// WHY IT EXISTS, measured on this clone at `e6676adc` rather than argued: `gateStatus`'s whole rule is
+// `exitCode === 0 ? "green" : "red"`, and the suite was standing red -- 18-19 of 298 files, none of
+// them anybody's current diff -- so every delivery was graded on somebody else's red and no ship
+// could pass. `grep -ci baseline scripts/verifier.js` was `0`: there was no baseline anywhere.
+//
+// THE FAILING SET IS RECOVERABLE BY NAME, which is what makes this a mechanism rather than a waiver:
+// `tests/regression/run-all.js:150` prints `  [FAIL] <file> -- <message>` on stdout, and the gate
+// already captures that output for `summarizeGateOutput`. Nothing new is run and nothing is trusted.
+//
+// DELIBERATELY INERT AS SHIPPED, and named here so nobody reads the silence as a bug -- the same
+// disposition `kickoffCapFinding` and `kickoffLaneFinding` shipped on, for the same reason. No
+// runbook step passes `--regression-baseline=` yet, so `baseline` is null on every production run and
+// the gate grades the absolute exit code exactly as it did before this ship. ARMING IT IS AN EDIT TO
+// THREE FILES AT ONCE, which is why it is not in this delivery and is not one line in a doc: any byte
+// change to `docs/runbooks/runner-cycle.md` also requires (1) `docs/runbooks/cycle-card.md`
+// re-rendered in the same commit, because the card's header carries a sha256 of the runbook
+// (`SES-377`, `scripts/render-cycle-card.js --write`), and (2) `BYTES_AT_SHIP` in
+// `tests/regression/ses-413d-questions-scoreboard.test.mjs` re-measured and re-pinned in the same
+// commit (`ses-424f` asserts the pair agrees). Measured on this tree: arming it inside AGT-170's
+// 3-file cap left 8 tests newly red, so the doc half is a separate attended edit. The code lands
+// first so that arming it is a doc change and a re-render rather than a code change nobody wants to
+// make under time pressure at the ship point.
+
+// Pure. The `[FAIL]` names in a gate's output, sorted and unique. NAMES ONLY -- "newly red BY NAME"
+// is the comparison, so the message body is deliberately dropped: a test that fails with a different
+// assertion message this run is the same standing red, not a new one, and reading the message would
+// make every re-worded failure look newly red.
+//
+// ANCHORED AT THE START OF THE LINE, and that is the mutant the guard is written around. A failure
+// MESSAGE can itself contain `[FAIL]` -- a test that asserts about this very suite's output prints
+// exactly that -- and a scan for `[FAIL]` anywhere in the line would harvest a name out of a message
+// body and put a file in the failing set that never ran. So the line is trimmed (same trim
+// `summarizeGateOutput` does, for the same reason: `run-all.js` indents these two spaces), it must
+// START with the marker, and the name is the FIRST token after it.
+export function failingTestsFrom(output) {
+  const names = [];
+  for (const raw of String(output ?? "").split("\n")) {
+    const line = raw.trim();
+    if (!line.startsWith("[FAIL]")) continue;
+    const name = line.slice("[FAIL]".length).trim().split(/\s+/)[0];
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names.sort();
+}
+
+// Pure. The regression gate's status once the delta is taken into account.
+//
+//   absolute  what `gateStatus` said about the run: 'green' | 'red' | 'skipped'.
+//   baseline  the `[FAIL]` names from a run on the UNCHANGED tree, or null for "none handed over".
+//   post      the `[FAIL]` names from this run.
+//
+// Returns { status, standing, newlyRed, reason }. `standing` and `newlyRed` are the two recorded
+// lists of fence 3 above; `reason` is built here rather than at the call site for the reason
+// `verdictFor`'s header gives -- a claim composed by its reader has no fixed home.
+//
+// EVERY EXIT THAT IS NOT A PROVEN SUBSET LEAVES THE ABSOLUTE ANSWER ALONE. There are four of them
+// and they are listed together on purpose, because the fail-closed direction is the whole safety
+// argument for a red -> green rule:
+//
+//   - `baseline == null` (no flag, unreadable file, empty file) -> the absolute exit code stands.
+//   - `absolute !== 'red'` -> unchanged, which is what keeps SES-181's THIRD value alive: a
+//     'skipped' gate (the suite never produced an exit status) must never become green here, and a
+//     rule written as `red ? ... : 'green'` would have done exactly that.
+//   - a `post` that is not an array -> nobody parsed this run's failures, and "nobody looked" is not
+//     "no failures" (the `ciJobsForGates` refusal, same sentence).
+//   - a red run that named NO failing test -> there is nothing to prove a subset OVER. A suite that
+//     exits 1 after crashing before its first `[FAIL]` line has an empty failing set, and an empty
+//     set is trivially a subset of any baseline -- so the naive rule would read the most total
+//     failure the suite can have as the cleanest possible green. It stays red.
+export const REGRESSION_NO_BASELINE_REASON =
+  "no baseline handed to the gate; the absolute exit code stands — fail closed (AGT-170)";
+
+export function regressionDelta({ absolute, baseline, post }) {
+  const none = (status, reason) => ({ status, standing: null, newlyRed: null, reason });
+
+  if (baseline === null || baseline === undefined) return none(absolute, REGRESSION_NO_BASELINE_REASON);
+  if (!Array.isArray(baseline)) {
+    return none(absolute, `baseline is ${typeof baseline}, not a list of names; the absolute exit code stands -- fail closed (AGT-170)`);
+  }
+  if (absolute !== "red") {
+    return none(absolute, `absolute gate is ${absolute}, not red -- the delta only ever moves a red, so this is untouched (AGT-170)`);
+  }
+  if (!Array.isArray(post)) {
+    return none("red", "this run's failing set was never parsed, so no red can be shown to be in the baseline -- fail closed (AGT-170)");
+  }
+
+  const baselineNames = baseline.map(n => String(n));
+  const postNames = post.map(n => String(n));
+  const newlyRed = postNames.filter(n => !baselineNames.includes(n));
+  const standing = postNames.filter(n => baselineNames.includes(n));
+
+  if (!postNames.length) {
+    return { status: "red", standing, newlyRed,
+      reason: `regression exited non-zero and named NO failing test, so there is no failing set to ` +
+        `prove against the ${baselineNames.length}-name baseline -- fail closed (AGT-170)` };
+  }
+  if (newlyRed.length) {
+    return { status: "red", standing, newlyRed,
+      reason: `regression RED on ${newlyRed.length} newly red ${newlyRed.length === 1 ? "test" : "tests"} ` +
+        `this delivery must answer for: ${newlyRed.join(", ")} (absent from the ${baselineNames.length}-name ` +
+        `baseline). ${standing.length} other red ${standing.length === 1 ? "test is" : "tests are"} standing (AGT-170)` };
+  }
+  return { status: "green", standing, newlyRed,
+    reason: `regression GREEN on the delta: all ${standing.length} red ${standing.length === 1 ? "test" : "tests"} ` +
+      `in this run are in the ${baselineNames.length}-name baseline BY NAME (${standing.join(", ")}), and 0 are ` +
+      `newly red. The suite's absolute exit code is red and stays reported as such (AGT-170)` };
+}
+
+// AGT-170's file half, kept beside the pure core rather than inline at the call site so the
+// fail-closed cases are one readable list. Returns { names, source }: `names` is null for every case
+// that is not a real baseline, and `source` SAYS WHICH -- "no --regression-baseline passed" and "the
+// file was there and unreadable" are different facts about a ship that stayed blocked, and a single
+// null would make them the same fact. Same rule as the ladder and project lookups above.
+//
+// AN EMPTY FILE IS NOT AN EMPTY BASELINE. A zero-byte or whitespace-only file is the shape a
+// redirect that never ran leaves behind (`... > $S/baseline.txt` where the command died), and reading
+// it as "no test was red on the unchanged tree" would turn every standing red into a newly red one --
+// the fail-closed direction, but for the wrong reason and with a misleading report. It is null, and
+// the source says the file was empty. A file with real content and no `[FAIL]` line IS an empty
+// baseline, legitimately: the unchanged tree was green, so anything red here is this delivery's.
+export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFileSync(f, "utf8")) {
+  if (!baselinePath) return { names: null, source: "no --regression-baseline passed; the gate grades the absolute exit code (AGT-170)" };
+  let text;
+  try { text = readFile(baselinePath); }
+  catch (e) { return { names: null, source: `--regression-baseline=${baselinePath} could not be read (${e.message}); the gate grades the absolute exit code (AGT-170)` }; }
+  if (!String(text).trim()) return { names: null, source: `--regression-baseline=${baselinePath} is empty; the gate grades the absolute exit code (AGT-170)` };
+  const names = failingTestsFrom(text);
+  return { names, source: `${baselinePath} (${names.length} red on the unchanged tree)` };
+}
+
 // The whole verdict rule, in one pure function.
 //
 //   gates  { build: 'green'|'red'|'skipped', regression: ..., hygiene: ... }
@@ -1360,14 +1510,24 @@ function runGate(gate, repoRoot) {
       timeout: 20 * 60 * 1000,
     });
   } catch (e) {
-    return { status: "skipped", detail: `spawn threw: ${e.message}` };
+    return { status: "skipped", fails: null, detail: `spawn threw: ${e.message}` };
   }
-  if (res.error) return { status: "skipped", detail: `could not run: ${res.error.message}` };
+  if (res.error) return { status: "skipped", fails: null, detail: `could not run: ${res.error.message}` };
   // A signal kill leaves status null -- gateStatus() reads that as skipped, which is why the raw
   // status is passed through rather than defaulted to a number here.
   const status = gateStatus({ ran: true, exitCode: res.status });
   const tail = summarizeGateOutput({ stdout: res.stdout, stderr: res.stderr });
-  return { status, detail: `exit ${res.status === null ? "signal " + res.signal : res.status}${tail ? " -- " + tail.slice(0, DETAIL_CAP) : ""}` };
+  // AGT-170: the FAILING SET BY NAME, for the regression gate only. `[FAIL] <file>` is
+  // `tests/regression/run-all.js`'s vocabulary and nothing else prints it -- `npm run build` and the
+  // hygiene tripwire fail with their own prose -- so a name list off either of those would be an
+  // empty array masquerading as a measurement, and `regressionDelta()` reads an empty failing set
+  // under a red as the fail-closed case precisely because it cannot be told apart from that.
+  // Returned rather than re-parsed at the call site: the delta must grade the OUTPUT THIS GATE RAN,
+  // and a second parse of a string that has since been capped to DETAIL_CAP is a different string.
+  const fails = gate.key === "regression"
+    ? failingTestsFrom(`${res.stdout || ""}\n${res.stderr || ""}`)
+    : null;
+  return { status, fails, detail: `exit ${res.status === null ? "signal " + res.signal : res.status}${tail ? " -- " + tail.slice(0, DETAIL_CAP) : ""}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -2000,6 +2160,13 @@ async function main() {
   // below it would be doing work whose result it must not use. Its own credential check lives
   // inside regradeBranch() because it needs `--ticket` and `--cycle-id` too, which the general
   // check below does not require.
+  //
+  // AGT-170 DOES NOT REACH THIS BRANCH, and that is a decision rather than an oversight. A re-grade
+  // reads CI job CONCLUSIONS, and a conclusion is ABSOLUTE: `Tripwire + regression (blocking)` at dev
+  // head says success or failure about a tree this process never ran and holds no `[FAIL]` names for,
+  // so there is no failing set to prove a subset over and nothing here to hand a baseline to. The
+  // asymmetry that lane already rests on covers the standing-red case on its own -- a `success` job
+  // proves the delivery does not break it, and a `failure` proves nothing and lists nothing.
   if (process.argv.includes("--regrade")) {
     return regradeBranch({ repoRoot, ticket, cycleId, version, dryRun });
   }
@@ -2015,6 +2182,14 @@ async function main() {
   const scratchDir = arg("scratch", os.tmpdir());
   const contextPath = arg("context-file", "") || judgeContextPathFor(scratchDir, ticket);
   const kickoffPath = arg("kickoff", "");
+  // FEATURE: AGT-170 -- the baseline the regression gate grades its delta against: the saved
+  // stdout+stderr of a `run-all.js` run on the UNCHANGED tree, captured by runbook step 7 before the
+  // build's first edit. A PATH RATHER THAN A RUN, and that is the whole safety property: this process
+  // cannot measure the baseline itself without measuring the tree it is grading, which is the tree
+  // vouching for itself. Absent, unreadable, or empty -> null -> `regressionDelta()` leaves the
+  // absolute exit code alone. No flag is the ordinary case for an attended cycle and it costs nothing
+  // but the grading the platform already had.
+  const regressionBaselinePath = arg("regression-baseline", "");
   // Pass two is "session mode AND a verdict file". It re-runs NOTHING: the gates that graded this
   // delivery ran in pass one and their results are in the context file. Re-running them here would
   // grade a different instant with the same version number on it -- and would cost 20 minutes.
@@ -2079,11 +2254,40 @@ async function main() {
 
   const gateResults = {};
   const gateDetail = {};
+  const gateFails = {};
   for (const gate of GATES) {
     const r = runGate(gate, repoRoot);
     gateResults[gate.key] = r.status;
     gateDetail[gate.key] = r.detail;
+    if (r.fails) gateFails[gate.key] = r.fails;
   }
+
+  // ---- FEATURE: AGT-170 -- THE REGRESSION GATE'S STATUS BECOMES THE DELTA'S. -------------------
+  //
+  // ONLY WHAT "REGRESSION GREEN" MEANS CHANGES, and everything downstream is deliberately untouched:
+  // `verdictFor` still approves iff all three gates are green, `verdictRowFor` still writes the three
+  // statuses into their own columns, and `ck_runner_verdicts_fail_closed` still refuses an approve
+  // that is not all-green. The delta decides ONE of the three inputs; it does not soften the rule
+  // that reads them. A ship with a newly red test, a red build or a red tripwire blocks exactly as
+  // before.
+  //
+  // THE ABSOLUTE ANSWER IS NEVER OVERWRITTEN, only re-graded beside itself: `regression_absolute`
+  // carries what the suite's exit code actually said, `gateDetail.regression` keeps its `exit 1 --
+  // [FAIL] ...` tail and gains the delta line, and both lists reach `--json`. A reader who wants to
+  // know whether the suite passed can still find out; what they can no longer do is read a red the
+  // delivery did not cause as this delivery's red.
+  const baselineRead = readRegressionBaseline(regressionBaselinePath);
+  const regressionAbsolute = gateResults.regression;
+  const delta = regressionDelta({
+    absolute: regressionAbsolute,
+    baseline: baselineRead.names,
+    post: gateFails.regression ?? null,
+  });
+  gateResults.regression = delta.status;
+  gateDetail.regression = `${gateDetail.regression} | delta: ${delta.standing === null ? "not graded" : delta.standing.length} standing, ` +
+    `${delta.newlyRed === null ? "not graded" : delta.newlyRed.length} newly red` +
+    `${delta.newlyRed && delta.newlyRed.length ? ` [${delta.newlyRed.join(", ")}]` : ""}` +
+    ` -- ${delta.reason}`;
 
   let { verdict, reasoning } = verdictFor(gateResults);
 
@@ -2320,6 +2524,21 @@ async function main() {
     // SES-359: same shape, same reasons -- null when the kickoff declares its lanes or none was
     // passed, the finding object when it does not. Reported, never stored in its own column.
     kickoff_no_lanes: kickoffNoLanes,
+    // AGT-170: the delta's five facts, reported and never stored in their own columns -- the
+    // Designer's recorded call (JOHN-0925-DESIGNER-DECIDES): no new `runner_verdicts` column and no
+    // migration, the lists ride `--json` and `gateDetail`. `gates.regression` above is the GRADED
+    // status; `regression_absolute` is what the suite's own exit code said, so the two can be
+    // compared by whoever reads the row instead of being one value that lost its history.
+    //
+    // THE FAILING LIST IS QUOTED FROM THE GRADER, WHICH IS THE POINT OF PUBLISHING IT. The subset
+    // claim was decided against `regression_fails` and `regression_baseline_source`; a reader who
+    // re-ran the suite to check it would be grading a different instant -- the same reasoning
+    // SES-403's header gives for never re-running the gates during a re-grade.
+    regression_absolute: regressionAbsolute,
+    regression_standing: delta.standing,
+    regression_newly_red: delta.newlyRed,
+    regression_fails: gateFails.regression ?? null,
+    regression_baseline_source: baselineRead.source,
   };
 
   // ---- AGT-67 pass one: hand the judgment everything, print the prompt, record NOTHING. -------
