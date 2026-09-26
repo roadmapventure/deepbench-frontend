@@ -98,7 +98,14 @@ export const RUNBOOK_CEILING = 381000;
 // paragraph, refusal 2's restated staleness rationale and its restated one-home sentence, the
 // self-read tail, and 7b's verbatim quotation of the sentence SES-315 retired. Net 380667 ->
 // 380976 B, 24 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
-export const BYTES_AT_SHIP = 380976;
+// v7.0.602 (AGT-137) adds step 9's (7e) -- the Auditor's per-run review -- and, as the pin
+// requires, takes the bytes OUT first: (7d)'s dead-history parenthetical about the ONE
+// hand-written `runner_staff_findings` row (163 B, kept in the (7d) block's own history) and the
+// OLDEST header stamp, `v7.0.520` (282 B; SES-164 grep FIRST -- its subject, step 6 exit 1's two
+// `kind` branches, lives in step 6's own span and is pinned by ses-378h-lane-refusal-kind.test.mjs).
+// 445 B out, 438 B in (this ship's stamp 158 B, so the count stays 5; (7e) 280 B): 380976 ->
+// 380969 B, 31 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
+export const BYTES_AT_SHIP = 380969;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

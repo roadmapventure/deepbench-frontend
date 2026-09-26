@@ -52,7 +52,10 @@ export const PHRASE = "carrying an undecided gate card";
 export const ROTATED = "<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md";
 export const ROTATED_FULL = "<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7";
 export const THIS_STAMP = "<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3";
-export const LATER_STAMP = "<!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b";
+// LATER_STAMP is whichever ship stamped the runbook LAST, so it is line 1; this slice's own
+// stamp only has to still be among the five. v7.0.602 (AGT-137, step 9's (7e)) rotated
+// v7.0.520 out and took line 1 from v7.0.555 (AGT-86 slice 8b).
+export const LATER_STAMP = "<!-- DeepBench v7.0.602 | runbooks/runner-cycle.md | AGT-137";
 
 // Each clause: {id, detail, test, breaks}. `test` reads the runbook; `breaks` is that clause's OWN
 // smallest mutation of the runbook text. Green-after-mutation is a failure of THIS file.
@@ -175,7 +178,7 @@ async function run() {
 
   console.log(`[SES-424c] ${n} runbook clauses hold, each red under its own breaks(); the body ` +
     `(tail -n +6) carries the PHRASE "${PHRASE}", E1's gate-card exclusion and all three relocated ` +
-    `v7.0.517 facts; 5 header stamps with v7.0.555 first and v7.0.535 present, v7.0.517 out of the runbook and present ` +
+    `v7.0.517 facts; 5 header stamps with v7.0.602 first and v7.0.535 present, v7.0.517 out of the runbook and present ` +
     `exactly once in ${SESSIONS_REL}`);
 }
 

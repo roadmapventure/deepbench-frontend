@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.602 | runbooks/runner-cycle.md | AGT-137 — (7e): the Auditor reviews THIS run (`audit-run-review.js`). `v7.0.520` DROPPED, count 5. -->
 <!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b — STEP 4d IS A POINTER: the Auditor runs in its own routine (docs/runbooks/auditor-routine.md); :4720 names the fifteenth restorable table. ROTATION: v7.0.519 DROPPED, count held at 5, SES-164 step 2 by grep FIRST — all six named facts keep ≥1 body hit (`settle-ship.js` 2, `--remainder=` 2, `resolveDeliveryFiles` 1, `selfCertificationBlock` 1, `changedFilesFor` 1, `ses-379-changed-files-fail-closed` 1); none relocated into 7a. -->
 <!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3 — AN ALL-GATED DRAIN IS NOT A FINISHED ONE: a member carrying an undecided gate card is out of both pick paths since slice 1, so `drain_epic_next`'s `blocked_detail` census now counts *"carrying an undecided gate card"*. `v7.0.517` VERBATIM to `docs/SESSIONS.md`, four ZERO-hit facts RELOCATED into 7a; count 5. Guard `ses-424c`. -->
 <!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3 — A READING IS A DELTA, NEVER THE SESSION TOTAL: `get_session` counts the whole SESSION and a drain chain runs many cycles in one (`fd4e11f4` closed at 32,249,570; its continuation opened on that counter), so step 1 takes reading 0 at the INSERT (`tokens_at_open` in `notes`) and step 9 charges deltas. `v7.0.516` moved VERBATIM to `docs/SESSIONS.md`, two ZERO-hit facts RELOCATED; count 5. Guard `ses-423b`. -->
 <!-- DeepBench v7.0.531 | runbooks/runner-cycle.md | SES-423 slice 2 — A STALL IS JUDGED BY THE BUILD'S OWN SIGNAL, THE CLOSE-OUT MEASURES: step 7 hands the Builder a `heartbeat` key (`scripts/cycle-heartbeat.js`, new) so probe (d) reads a build that STOPPED, not a long one — 13 `stall_notified_at` rows, **9 ended `shipped`**. Step 9's `est_tokens_*` are MEASURED from two `get_session` reads (`SES-409`: 15.27M here vs ≤900,000 shipped), not estimated; the three agent-log fences bracket the pair as optional. `SES-164` step 2 by grep FIRST: `v7.0.505` moved VERBATIM to `docs/SESSIONS.md`, its five ZERO-hit facts RELOCATED into 4e; count 5. Guard `ses-423b-stall-signal.test.mjs`. -->
-<!-- DeepBench v7.0.520 | runbooks/runner-cycle.md | SES-378 slice 8 — THE LANE REFUSAL GETS ITS OWN NAME: step 6 exit 1's TWO causes now branch on the `--json` `kind`, each under its own FIXED detail. Guard `ses-378h-lane-refusal-kind.test.mjs`. `v7.0.500` DROPPED, count 5. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -4431,14 +4431,15 @@ uuids and nothing else, so one defect seen by three cycles is ONE fingerprint at
 three rows written by ONE cycle stay at one — the ticket rides in `--backlog=`, never in the
 detail. **A promotion is a `runner_card_asks` row of kind `skill-edit` asking John to rule, NEVER a
 Skill edit this cycle performs:**
-(`runner_staff_findings` held ONE hand-written row when this caller shipped at `v7.0.516`, the
-ship that DROPPED the `v7.0.472` stamp on the `v7.0.462` precedent)
 the manager may count a defect in a governance agent's text and
 it is John who changes that text (the `SES-45` boundary, Rule #1).
 
 ```
 node scripts/staff-watch.js --promote --apply --cycle-id=<your cycle id>
 ```
+
+**(7e) THE AUDITOR REVIEWS THIS RUN (`AGT-137`).** Only shipped, gated_before_build, reverted, failed; else exit 3 — nothing to review, no cost. `node scripts/audit-run-review.js --prepare --cycle-id=<your cycle id> --out=$S/run.json`; `auditor-routine.md` § Per-run review.
+
 
 **(8) A DRAINING CYCLE CONTINUES THE DRAIN IN-SESSION — FIVE GATES, ONE CALL (`SES-139`,
 `v7.0.176`; actuator replaced by `SES-141` `v7.0.180`, replaced again and FINAL by `SES-140`

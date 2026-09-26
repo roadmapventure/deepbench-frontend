@@ -5,7 +5,7 @@
 //
 //   A  PROMPT BLOCK -- the marker LINES appear exactly once each (the §15.1 table names both markers
 //      inside a code span, so a bare substring count is 2 -- the block is found by whole line);
-//      the block names the runbook, the weekly wall, --session-name, claim_john_alerts, summary,
+//      the block names the runbook, the weekly wall, --session-name, record_decision (AGT-137), summary,
 //      never main and the DEEPBENCH-AUDITOR- stamp; no trig_017TZ3JZcLBK6AYH6DKURqMH and no
 //      prime_directive_queue; every claude-<family>-<n> id in the file is a MODEL-LANES-SNAPSHOT id.
 //      Pre-change: the file is absent -> fails at read.
@@ -116,7 +116,10 @@ export default async function run() {
     await arm("A prompt block", async () => {
       const md = fs.readFileSync(RUNBOOK, "utf8");
       const block = promptBlock(md);
-      for (const need of ["docs/runbooks/auditor-routine.md", "weekly wall", "--session-name", "claim_john_alerts",
+      // AGT-137: the block RECORDS the week instead of pushing it, so `record_decision` replaces
+      // `claim_john_alerts` as the needle -- while notifications are off, claiming the alerts would
+      // stamp notified_at over rows nobody was told about.
+      for (const need of ["docs/runbooks/auditor-routine.md", "weekly wall", "--session-name", "record_decision",
         "summary", "never main", "DEEPBENCH-AUDITOR-"]) {
         assert.ok(block.includes(need), `the prompt block names ${need}`);
       }
