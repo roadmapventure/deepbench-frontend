@@ -99,7 +99,7 @@ All work read-only outside this scratchpad. No repo, worktree, or Supabase write
 
 ## What was mined
 
-**Archive:** `C:\Users\jleon\.claude\projects\` — two project directories:
+**Archive:** `%USERPROFILE%\.claude\projects\` — two project directories:
 
 | Directory | .jsonl sessions | Size | Date range |
 |---|---|---|---|

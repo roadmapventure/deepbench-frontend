@@ -30,7 +30,7 @@ Public JSON boards only (Greenhouse, Lever, Ashby), token from `watch_company.da
 
 ## 6. The runbook and the skill
 
-The user-level loader `C:/Users/jleon/.claude/skills/jerry/SKILL.md` (read today) already says: checkout `C:/Projects/deepbench-jerry` (shallow clone of dev), read `docs/runbooks/personal-agent.md`, creds by NAME from `runner_secrets`, `--render` → one sub-agent on the printed model → `--write` → `agent-log.js`, personal data only in `career_records`, `is_active` is the hire card. The runbook the kickoff specifies matches that loader line for line; the ask table, the sequence, the tryout rule and the two schedule prompts are the runbook's whole content. Method only: no personal fact may appear in it (the repo is public).
+The user-level loader `%USERPROFILE%/.claude/skills/jerry/SKILL.md` (read today) already says: checkout `C:/Projects/deepbench-jerry` (shallow clone of dev), read `docs/runbooks/personal-agent.md`, creds by NAME from `runner_secrets`, `--render` → one sub-agent on the printed model → `--write` → `agent-log.js`, personal data only in `career_records`, `is_active` is the hire card. The runbook the kickoff specifies matches that loader line for line; the ask table, the sequence, the tryout rule and the two schedule prompts are the runbook's whole content. Method only: no personal fact may appear in it (the repo is public).
 
 Schedules: created with the local scheduled-tasks tool ONLY on John's hire word — `agents.is_active` true is that word in data. This build creates none (pattern:166: a John rule is never weakened without his words).
 
