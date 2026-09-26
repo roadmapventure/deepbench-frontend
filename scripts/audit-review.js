@@ -1,3 +1,14 @@
+// DeepBench v7.0.605 | scripts/audit-review.js | AGT-132 slice 1 -- the worklist gains a SOURCE and a
+// TYPE, and the manager is told where each ticket goes: --prepare selects found_by and finding_type,
+// every worklist row carries `source` (found_by's first segment) and `finding_type`, and the context
+// carries `routes` (public.finding_routes, precedence order) and `projects` (the slugs he may pick
+// from). routeGroup() mirrors public.finding_group_epic() exactly -- lowest precedence over the
+// group's findings, security before auditor before "you pick" -- and validateReview() refuses the
+// three routing refusals offline, in the function's words minus its "apply_audit_review: " prefix.
+// The epic-count refusal stays the function's, like the reuse_backlog_id rule: it needs the epics
+// table. Skipped entirely when a caller passes no routes, so a pre-AGT-132 context still validates.
+// Spec: docs/kickoffs/v7.0.605-AGT-132-finding-routes.md sections 4 and 5 task 3.
+//
 // DeepBench v7.0.554 | scripts/audit-review.js | AGT-86 slice 9b -- the manager ACTS on 9a's flags:
 // --prepare adds `checklist` (the au-* rows the manager may edit: EDITABLE_SLUG, each with objective and
 // method as they read today); validateReview() gains the four checklist-edit refusals of
@@ -59,6 +70,58 @@ export const EDITABLE_SLUG = /^au-(behavior|knowledge-homes|[a-z-]+-intent)$/;
 
 const blank = v => String(v ?? "").trim() === "";
 
+// AGT-131 made found_by a single writer id; AGT-132 reads its first segment as the SOURCE, exactly as
+// public.finding_group_epic() does with split_part(found_by, ':', 1).
+export function sourceOf(foundBy) {
+  const s = String(foundBy ?? "");
+  return s === "" ? null : s.split(":")[0];
+}
+
+// AGT-132: the mirror of public.finding_group_epic()'s route pick, and nothing more -- it answers WHICH
+// ROUTE a group takes, never which epic (that needs the epics table and stays the function's). The
+// group's route is the LOWEST precedence over its findings, tie-broken by source, so a group holding
+// one security finding is a Security ticket however it was grouped. A finding whose source no row maps
+// THROWS in the function's words: an unmapped source stops the review instead of falling through.
+// A finding the worklist does not carry is skipped here, as the SQL's join skips it -- the coverage
+// rule below is what refuses an unknown id, in both places.
+export function routeGroup(group, worklist, routes) {
+  const list = Array.isArray(worklist) ? worklist : [];
+  const rows = Array.isArray(routes) ? routes : [];
+  const ids = Array.isArray(group && group.finding_ids) ? group.finding_ids.map(String) : [];
+  const kind = (group && group.kind) ?? "(no kind)";
+  const candidates = [];
+  for (const id of ids) {
+    const w = list.find(x => String(x.id) === id);
+    if (w === undefined) continue;
+    const src = w.source ?? sourceOf(w.found_by);
+    const type = w.finding_type ?? null;
+    const matches = rows.filter(r => (r.source === src || r.source === "*") &&
+                                     (r.finding_type === type || r.finding_type === "*"));
+    if (matches.length === 0) {
+      throw new Error(`finding ${id} has unmapped source ${src} — add a finding_routes row; project creation is John's`);
+    }
+    candidates.push(...matches);
+  }
+  if (candidates.length === 0) throw new Error(`a ${kind} group has no known findings to route`);
+  candidates.sort((a, b) => (Number(a.precedence) - Number(b.precedence)) ||
+                            String(a.source).localeCompare(String(b.source)));
+  return candidates[0];
+}
+
+// The distinct sources of a group's findings, in the order the function's string_agg reports them.
+function sourcesOf(group, worklist) {
+  const list = Array.isArray(worklist) ? worklist : [];
+  const ids = Array.isArray(group && group.finding_ids) ? group.finding_ids.map(String) : [];
+  const srcs = new Set();
+  for (const id of ids) {
+    const w = list.find(x => String(x.id) === id);
+    if (w === undefined) continue;
+    const src = w.source ?? sourceOf(w.found_by);
+    if (src !== null && src !== undefined) srcs.add(String(src));
+  }
+  return [...srcs].sort();
+}
+
 // AGT-86 §11: view rows (one per check_slug and iso_week) -> one entry per check with >= 3 summed rulings.
 export function flagChecks(viewRows) {
   const groups = new Map();
@@ -96,7 +159,7 @@ export function promotableOthers(allRows) {
   return out.sort((x, y) => String(x.fingerprint).localeCompare(String(y.fingerprint)));
 }
 
-export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles }) {
+export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects }) {
   if (!Array.isArray(findings) || findings.length === 0) return null;
   const rows = Array.isArray(allRows) ? allRows : [];
   const worklist = findings.map(f => {
@@ -106,6 +169,9 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
       fingerprint: f.fingerprint,
       iso_week: f.iso_week,
       kind: f.kind,
+      // AGT-132: WHO reported it and WHAT it is -- the two facts the routing reads.
+      source: sourceOf(f.found_by),
+      finding_type: f.finding_type ?? null,
       check_slug: f.check_slug ?? null,
       locations: f.locations ?? null,
       governing_fact: f.governing_fact ?? null,
@@ -120,6 +186,10 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
   return {
     week,
     worklist,
+    // AGT-132: the routing table as data and the projects he may pick from -- the manager is never
+    // asked to remember either, and never invents a project (creating one is John's).
+    routes: Array.isArray(routes) ? routes : [],
+    projects: Array.isArray(projects) ? projects : [],
     open_audit_tickets: (Array.isArray(tickets) ? tickets : []).map(t => ({
       backlog_id: t.backlog_id, title: t.title, status: t.status, description: t.description,
     })),
@@ -139,7 +209,11 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
 // context's worklist. week is optional: when given it is checked first, as the function checks p_week first.
 // checklist is optional (the context's checklist): when given, an edit naming no row in it is refused, as
 // the function refuses an edit naming no skill_profiles row; offline without it that rule stays the function's.
-export function validateReview(review, worklist, week, checklist) {
+// routes / projects are optional (the context's): with them, the three AGT-132 routing refusals a
+// client CAN see offline are checked in the function's place -- inside the per-group loop, after that
+// kind's field checks, for exactly the two kinds that file a ticket. Without routes the whole block is
+// skipped, so a context written before AGT-132 validates as it always did.
+export function validateReview(review, worklist, week, checklist, routes, projects) {
   const refusals = [];
   if (week !== undefined && (week === null || !WEEK_RE.test(String(week)))) {
     refusals.push(`p_week ${week} is not an ISO week (YYYY-Www)`);
@@ -207,6 +281,30 @@ export function validateReview(review, worklist, week, checklist) {
       cleanups += 1;
       if (cleanups > 1) refusals.push("at most one cleanup group");
       if (blank(g.fix)) refusals.push("cleanup needs fix (the bundled list)");
+    }
+
+    // 1a (AGT-132), the function's own condition: the two kinds that file a ticket need a route.
+    const files = (kind === "root-cause" && (g.reuse_backlog_id === undefined || g.reuse_backlog_id === null)) ||
+                  kind === "cleanup";
+    if (Array.isArray(routes) && files) {
+      let route = null;
+      try {
+        route = routeGroup(g, list, routes);
+      } catch (e) {
+        refusals.push(e.message);
+      }
+      if (route !== null && (route.project_slug === null || route.project_slug === undefined)) {
+        // The route says the manager picks, so his pick must be explicit and must be a project that
+        // exists. An omission is never read as "the general backlog".
+        const pick = String(g.project ?? "").trim();
+        if (pick === "") {
+          const srcs = sourcesOf(g, list);
+          refusals.push(`a ${kind} group from source(s) ${srcs.length ? srcs.join(", ") : "(none)"} needs project (a projects.slug or general)`);
+        } else if (pick !== "general" && Array.isArray(projects) &&
+                   !projects.some(p => String(p.slug) === pick)) {
+          refusals.push(`project ${pick} is not a projects row; project creation is John's`);
+        }
+      }
     }
   }
 
@@ -283,12 +381,14 @@ async function prepare(args) {
     if (!r.ok) die(1, `audit-review: GET ${q} -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
     return r.json;
   };
-  const findings = await get("audit_findings?status=in.(open,carried)&select=id,fingerprint,iso_week,kind,check_slug,locations,governing_fact,confidence,proposed_resolution&order=created_at,id");
+  const findings = await get("audit_findings?status=in.(open,carried)&select=id,fingerprint,iso_week,kind,check_slug,locations,governing_fact,confidence,proposed_resolution,found_by,finding_type&order=created_at,id");
   const allRows = await get("audit_findings?select=id,fingerprint,iso_week,status,ruling,ruled_by,check_slug");
   const tickets = await get("backlog_items?source_file=eq.audit-review&status=not.in.(done,removed)&select=backlog_id,title,status,description&order=backlog_id");
   const scorecardRows = await get("audit_check_scorecard?select=*&order=check_slug,iso_week");
   const profiles = await get("skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug");
-  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles });
+  const routes = await get("finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
+  const projects = await get("projects?select=slug,name,status&order=slug");
+  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects });
   if (ctx === null) die(3, NOTHING_TO_REVIEW);
   const out = JSON.stringify(ctx, null, 2) + "\n";
   if (typeof args.out === "string" && args.out) {
@@ -307,7 +407,7 @@ function refuse(refusals) {
 function dryRun(args) {
   const answer = readJson(args["dry-run"], "answer");
   const ctx = readJson(args.context, "context");
-  const v = validateReview(answer, ctx.worklist, ctx.week, ctx.checklist);
+  const v = validateReview(answer, ctx.worklist, ctx.week, ctx.checklist, ctx.routes, ctx.projects);
   if (!v.ok) refuse(v.refusals);
   die(0, "ok");
 }
@@ -327,7 +427,7 @@ async function apply(args) {
   const week = args.week;
   const answer = readJson(args.apply, "answer");
   const ctx = readJson(args.context, "context");
-  const v = validateReview(answer, ctx.worklist, week, ctx.checklist);
+  const v = validateReview(answer, ctx.worklist, week, ctx.checklist, ctx.routes, ctx.projects);
   if (!v.ok) refuse(v.refusals); // nothing is sent
 
   const { base, key } = creds();
