@@ -1,3 +1,27 @@
+# DeepBench v7.0.613 | .github/workflows/ci.yml | AGT-168 slice 1 — THE PRIVATE-INFO SCAN NOW
+# GATES, and the one line to read twice is `--base`. scripts/audit-private-scan.js has detected
+# credentials, personal addresses and home-directory paths in tracked files since v7.0.550, but its
+# only entry point was the whole tree and nothing here ran it. Measured on dev at this ship: 48
+# lines across 46 tracked files already carry a Vercel protection-bypass value — all historical
+# residue under docs/kickoffs/, newest v7.0.85. A step calling the bare form would report those 48
+# on EVERY run and be red forever, and a check that is always red is a check nobody reads. So the
+# step grades THE CHANGE: the added lines of `git diff <base> HEAD`, nothing else.
+#
+# IT IS A STEP IN `checks`, NOT A NEW JOB, and that is deliberate rather than lazy. `checks` is
+# already blocking and already named in `report-conclusion`'s `needs`, so a red gate reaches the
+# anchor with no `needs` edit and no jq-payload edit — and adding a fourth job would have required
+# both (see the `needs` note above that job).
+#
+# `git fetch --depth=1 origin "$BASE_SHA"` IS LOAD-BEARING, not belt-and-braces. actions/checkout@v4
+# carries no `fetch-depth` here, so the runner clones at depth 1 (SES-393) and the base commit is
+# simply absent; without the fetch the script cannot resolve it and exits 2 on every single run.
+#
+# THE EDIT THIS SHIP FORBIDS: dropping `--base` to "also catch the existing ones". That does not
+# catch them, it paints the branch permanently red and the 48 lines stay exactly where they are.
+# Removing them is a ~46-file purge that needs John's own waiver of the 3-file cap, and rotating
+# the live bypass value is his alone; neither is this step's job. This gate is PROPHYLACTIC — it
+# stops the 49th line. Guarded by tests/regression/AGT-168-private-scan-change-scoped.js.
+#
 # DeepBench v7.0.452 | .github/workflows/ci.yml | SES-352 — THIS JOB NOW WRITES THE GREEN ANCHOR,
 # not just the grade. `trg_anchor_green_from_ci` on public.ci_run_conclusions inserts the
 # runner_green_states row the moment the curl below lands an all-success run, stamping
@@ -197,6 +221,18 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      # AGT-168 — change-scoped, never the whole tree: see the header. `--base` is what keeps this
+      # green over the 48 standing lines while still failing the 49th. Exit 2 (an unresolvable base)
+      # is a failure here BY DESIGN — `on: push` fires only for dev and main, so `github.event.before`
+      # is always a real sha, and a base we cannot resolve means we scanned nothing.
+      - name: Private-info scan (change-scoped gate)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          node scripts/audit-private-scan.js --base="$BASE_SHA"
 
       # `--gate` (SES-199), never the bare form — see the header. Gates on FLAG findings in checks
       # 9/10/11 only, the truth-registry classes; the size and shape ratchets stay advisory and are

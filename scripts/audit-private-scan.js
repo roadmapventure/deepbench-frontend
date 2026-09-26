@@ -1,4 +1,36 @@
 #!/usr/bin/env node
+// DeepBench v7.0.613 | scripts/audit-private-scan.js | AGT-168 slice 1 -- THE SCAN CAN NOW GRADE A
+// CHANGE INSTEAD OF THE TREE, which is what lets CI run it at all. THIS IS PURELY ADDITIVE: every
+// line before the `--- AGT-168` divider further down is unchanged, so scanTree(), scanText(),
+// trackedFiles(), DETECTORS, ALLOWLIST and aggregate() behave exactly as they did, and a run with
+// no `--base` still prints `private-scan N findings` and exits 0 (measured at the ship: 17
+// findings, exit 0, before and after).
+//
+// WHY A SECOND ENTRY POINT RATHER THAN WIRING scanTree() INTO CI. Measured on this tree at the
+// ship, not recalled: 48 lines across 46 tracked files already carry a `vercel_bypass` value --
+// every one of them historical residue under docs/kickoffs/, newest v7.0.85, so the literal
+// stopped propagating on its own. A CI step calling scanTree() would report those 48 standing
+// lines on every single run and be red forever, and a check that is always red is a check nobody
+// reads. THE GATE GRADES THE CHANGE, NEVER THE LIVE WORLD. The unit is the ADDED LINE, not the
+// changed file: editing line 10 of a kickoff that carries the literal on line 155 stays green,
+// and only a line this change adds can go red.
+//
+// THIS IS PROPHYLACTIC AND SAYS SO OUT LOUD: it stops the 49th line and removes none of the 48.
+// Purging the existing ones is a ~46-file edit that needs John's own waiver of the 3-file cap,
+// and rotating the live bypass value is his alone. Neither is done here.
+//
+// FAIL CLOSED ON AN UNRESOLVABLE BASE -- exit 2, the same "could not run, never a pass" the
+// tracked-listing failure already uses. An empty or absent `--base` VALUE is that case too: in CI
+// it is the shape a missing default variable takes, and degrading it into the whole-tree run's
+// exit 0 would be a gate reporting green on a scan it never performed.
+//
+// THE VALUE STILL NEVER LEAVES THE PROCESS. scanChange() hands every added line through the same
+// scanText(), so a hit arrives already masked to its first four characters; the change-scoped
+// printer emits that masked text and nothing else. Guarded by
+// tests/regression/AGT-168-private-scan-change-scoped.js.
+//
+// Usage: node scripts/audit-private-scan.js [--out=<json>] [--base=<rev>]
+// Exit codes: 0 ran clean; 1 the change added private info (--base only); 2 could not run.
 // DeepBench v7.0.562 | scripts/audit-private-scan.js | AGT-100 -- trackedFiles() is THE tracked-file
 // listing, and now the SHARED CORE: scanTree() below and walkRoot() in scripts/audit-corpus.js both
 // mean "the files git tracks under this root", and two walkers answering that question separately
@@ -33,7 +65,7 @@
 // one leaked value is board flooding. The stable location is what makes fingerprint() hold week to
 // week while the line numbers move underneath it.
 //
-// Usage: node scripts/audit-private-scan.js [--out=<json>]
+// Usage (as of AGT-168, superseded by the header above): node scripts/audit-private-scan.js [--out=<json>]
 // Exit codes: 0 ran; 2 could not run (not a git checkout).
 
 import fs from "fs";
@@ -213,6 +245,90 @@ export function scanTree(rootAbs = ROOT) {
   return aggregate(hits);
 }
 
+// --- AGT-168: the change-scoped half ----------------------------------------------------------
+
+// The `+` lines of `git diff --unified=0 <baseRev> HEAD`, as [{rel, line, text}] with `line` the
+// REAL new-file line number read off each hunk header (`@@ -a,b +c,d @@` -> the next added line is
+// c, then c+1, ...). `--unified=0` is what makes that arithmetic exact: with no context lines in
+// the hunk, every line after the header is an addition or a deletion and nothing else.
+//
+// THROWS RATHER THAN RETURNING EMPTY when baseRev will not resolve, and that is the load-bearing
+// half -- the same reasoning trackedFiles() already carries. An unresolvable base returning `[]`
+// would read as "this change added nothing private", which is a gate passing a scan it never ran.
+// CI clones at depth 1 (actions/checkout@v4 with no fetch-depth, SES-393), so the base object is
+// genuinely absent there until the workflow fetches it, and that is exactly the case that must be
+// loud.
+export function addedLines(baseRev, rootAbs = ROOT) {
+  const rev = String(baseRev ?? "");
+  // A rev starting with `-` would be read by git as an option, never a commit.
+  if (!rev || rev.startsWith("-")) throw new Error(`not a usable base revision: "${rev}"`);
+
+  const resolved = spawnSync("git", ["-C", rootAbs, "rev-parse", "--verify", "--quiet", `${rev}^{commit}`],
+    { encoding: "utf8" });
+  if (resolved.error) throw resolved.error;
+  if (resolved.status !== 0 || !resolved.stdout.trim()) {
+    throw new Error(`base revision does not resolve to a commit in this checkout: ${rev}`);
+  }
+
+  const r = spawnSync("git",
+    ["-C", rootAbs, "-c", "core.quotePath=false", "diff", "--unified=0", "--no-color", "--no-ext-diff",
+      resolved.stdout.trim(), "HEAD"],
+    { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error(String(r.stderr ?? "").split("\n")[0] || `git diff exited ${r.status}`);
+
+  const added = [];
+  let rel = null;
+  let next = 0;
+  let prev = "";
+  for (const raw of r.stdout.split("\n")) {
+    // `+++ b/<path>` is a file header only where the previous line was its `--- ` twin. An ADDED
+    // line whose own text begins with `++ ` arrives here as `+++ ...` and would otherwise be read
+    // as a header, silently retargeting every hit after it.
+    if (raw.startsWith("+++ ") && prev.startsWith("--- ")) {
+      const target = raw.slice(4).trim();
+      // /dev/null is a deletion: it adds no lines, and its hunks must not be attributed to
+      // whatever file was named before it.
+      rel = target === "/dev/null" ? null : target.replace(/^b\//, "").replace(/^"|"$/g, "");
+      next = 0;
+      prev = raw;
+      continue;
+    }
+    prev = raw;
+    if (raw.startsWith("--- ") || raw.startsWith("diff --git ")) continue;
+    if (raw.startsWith("@@")) {
+      const m = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+      next = m ? Number(m[1]) : 0;
+      continue;
+    }
+    if (!rel || !next) continue;
+    if (raw.startsWith("+")) {
+      added.push({ rel, line: next, text: raw.slice(1) });
+      next += 1;
+    }
+    // `-` lines and `\ No newline at end of file` consume no new-file line number.
+  }
+  return added;
+}
+
+// Hits (NOT findings -- no aggregate(), because a change-scoped run reports every added line it
+// caught and one is already too many) for the lines this change added since baseRev. Each added
+// line goes through the SAME scanText() the whole-tree path uses, so the detector table, the
+// allowlist, the one-hit-per-detector-per-line rule and the masking are shared rather than
+// reimplemented; scanText() numbers a lone line as 1, so the real new-file number is remapped back
+// on to `line` and `location` here.
+export function scanChange(baseRev, rootAbs = ROOT) {
+  const hits = [];
+  for (const a of addedLines(baseRev, rootAbs)) {
+    for (const h of scanText(a.rel, a.text)) {
+      h.line = a.line;
+      h.location = `${a.rel}:${a.line}`;
+      hits.push(h);
+    }
+  }
+  return hits;
+}
+
 function arg(argv, name) {
   const hit = argv.find(a => a === `--${name}` || a.startsWith(`--${name}=`));
   if (!hit) return undefined;
@@ -221,6 +337,34 @@ function arg(argv, name) {
 }
 
 async function main() {
+  // AGT-168: the change-scoped gate, handled FIRST and returning before the ledger import -- CI
+  // runs this path on a bare checkout, and a gate that needs a second module to load is a gate
+  // with one more way to die than it has jobs.
+  const base = arg(process.argv.slice(2), "base");
+  if (base !== undefined) {
+    if (typeof base !== "string" || base.trim() === "") {
+      console.error("audit-private-scan: --base needs a revision (exit 2 = could not run, never a pass).");
+      process.exit(2);
+    }
+    let hits;
+    try {
+      hits = scanChange(base.trim(), ROOT);
+    } catch (e) {
+      console.error(`audit-private-scan: could not scan the change (${e.message.split("\n")[0]}) (exit 2 = could not run, never a pass).`);
+      process.exit(2);
+    }
+    // Already masked by scanText() -- the raw value never reaches this printer.
+    for (const h of hits) console.log(`  ${h.location}  ${h.text}`);
+    console.log(`private-scan (change-scoped) ${hits.length} hits vs ${base.trim()}`);
+    if (hits.length > 0) {
+      console.error(
+        "This change ADDS private info to a public repo. Remove the value from the added line and keep " +
+        "it only in server-held config; rotate it if it is a live credential. The standing lines this " +
+        "scan deliberately ignores are AGT-168's later slice, not yours.");
+    }
+    process.exit(hits.length > 0 ? 1 : 0);
+  }
+
   const { isoWeek } = await import("./audit-ledger.js");
   let findings;
   try {
