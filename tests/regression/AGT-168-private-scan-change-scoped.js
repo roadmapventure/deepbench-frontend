@@ -1,4 +1,4 @@
-// DeepBench v7.0.613 | tests/regression/AGT-168-private-scan-change-scoped.js | AGT-168 slice 1
+// DeepBench v7.0.616 | tests/regression/AGT-168-private-scan-change-scoped.js | AGT-168 slices 1-3
 //
 // FEATURE: the change-scoped half of scripts/audit-private-scan.js -- addedLines(), scanChange()
 // and the `--base=<rev>` CLI mode that CI's `checks` job now runs on every push and PR.
@@ -31,6 +31,26 @@
 // the clause would fail in exactly the environment the gate ships into. It was run by hand at the
 // ship instead and reported with the QA results.
 //
+// WHY THE STEP WINDOW IS LINE-BOUNDED, AND COMMENT-STRIPPED IN BOTH DIRECTIONS. Slices 1-2 cut the
+// CI step out of the YAML by character offset -- `body.slice(body.lastIndexOf("- name:", idx),
+// idx + 200)` -- and `idx` is the offset of the script's NAME, not the end of its step. Measured on
+// the shipped file this slice: that window is 483 chars and runs 152 chars past the scan step's last
+// character (171 past the needle itself: `idx+200` against `idx+29`). It reached over the comment
+// block at ci.yml:246-255 and into `- name: Regression suite (credentialed)`, whose own
+// `if: always()` could then satisfy the assertion written to grade the SCAN step. Reproduced three
+// ways before the fix: unchanged tree, all six conditions pass; delete the scan step's
+// `if: always()` alone, red (correct); delete it TOGETHER WITH that 787-char comment block, and all
+// six pass again -- a false green, the LOO-013 shape ARCHITECTURE.md §19v names, in the assertion
+// slice 2 shipped to hold `if: always()`. The window below is the step's own lines and nothing
+// after them: back to its `- name:`, forward to the next one (exclusive), comments dropped. The
+// comment-stripping is what makes the bound survive an edit -- a future comment carrying `- name:`
+// can no longer move the boundary, and one carrying `if: always()` can no longer feed a condition.
+// clause 5 is the negative control that keeps this honest, and it is red under the old window.
+//
+// The scan step's own text is what this grades; ci.yml is NOT edited by this slice, and no clause
+// here asserts that it was. Every mutation clause 5 grades is derived in memory from the shipped
+// string and written nowhere (pattern:76).
+//
 // No network, no credentials, no model call.
 
 import assert from "assert";
@@ -45,6 +65,7 @@ import { scanTree } from "../../scripts/audit-private-scan.js";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
 const SCRIPT = path.join(REPO, "scripts", "audit-private-scan.js");
+const CI_YML = path.join(REPO, ".github", "workflows", "ci.yml");
 
 // 32 mixed-case letters, no digit -- the shape of the real Vercel protection-bypass value, which is
 // why the secret_assignment detector keeps its wide rule for BYPASS names. Never a real credential:
@@ -203,20 +224,38 @@ function failsClosed() {
   assert.ok(!/change-scoped/.test(whole.stdout), "the unflagged run must not take the change-scoped path");
 }
 
-// The CI step is part of the ship: a gate nothing runs is not a gate. Read off the shipped YAML
-// rather than restated, and scoped to the `checks` job so a step added to `build` cannot pass it.
-function ciRunsTheGate() {
-  const yml = fs.readFileSync(path.join(REPO, ".github", "workflows", "ci.yml"), "utf8");
+// TASK 1 -- the window, alone and pure: `yml` string in, the scan step's OWN text out. Scoped to
+// the `checks` job exactly as slices 1-2 scoped it, so a step added to `build` still cannot pass.
+// See WHY THE STEP WINDOW IS LINE-BOUNDED in the header for the 152/171-char overshoot this fixes.
+function stepWindow(yml) {
   const start = yml.indexOf("\n  checks:");
   assert.notStrictEqual(start, -1, "ci.yml must still define a `checks:` job");
   const rest = yml.slice(start + 1);
   const next = rest.search(/\n {2}[A-Za-z0-9_-]+:\n/);
   const body = next === -1 ? rest : rest.slice(0, next);
 
-  const idx = body.indexOf("scripts/audit-private-scan.js");
-  assert.notStrictEqual(idx, -1,
+  const lines = body.split("\n");
+  const hit = lines.findIndex(l => l.includes("scripts/audit-private-scan.js"));
+  assert.notStrictEqual(hit, -1,
     "the `checks` job must run scripts/audit-private-scan.js -- without the step the gate ships dead");
-  const step = body.slice(body.lastIndexOf("- name:", idx), idx + 200);
+
+  // Back to the step's own `- name:`, forward to the next one (exclusive, or the end of the job).
+  let first = hit;
+  while (first > 0 && !/^\s*- name:/.test(lines[first])) first--;
+  assert.ok(/^\s*- name:/.test(lines[first]),
+    "the scan invocation must sit inside a named step -- a bare run line has no step to bound the window to");
+  let last = hit + 1;
+  while (last < lines.length && !/^\s*- name:/.test(lines[last])) last++;
+
+  // Comments dropped in BOTH directions: that is what makes the bound hold under a future edit.
+  // The `- name:` line survives as line 0, so the joined string still carries the newline before
+  // `if:` that the `if: always()` condition below matches on.
+  return lines.slice(first, last).filter(l => !/^\s*#/.test(l)).join("\n");
+}
+
+// TASK 1 -- the six conditions, moved verbatim from slices 1-2, regexes unchanged. They now read a
+// string that cannot contain a single character of any other step.
+function assertGateStep(step) {
   assert.ok(/--base=/.test(step),
     "the CI invocation must pass --base -- the bare form scans the whole tree, finds the 48 standing lines and is red forever");
   assert.ok(/git fetch[^\n]*\$\{?BASE_SHA/.test(step) || /git fetch[^\n]*"\$BASE_SHA"/.test(step),
@@ -227,12 +266,75 @@ function ciRunsTheGate() {
     "the gate step must not carry continue-on-error -- a step that cannot fail is not a gate");
   assert.ok(/\n\s*if:\s*always\(\)/.test(step),
     "the scan step must carry if: always() -- without it a red tripwire step above it skips the scan entirely, concealing exactly the class of leak this gate exists to catch");
+}
+
+// The CI step is part of the ship: a gate nothing runs is not a gate. Read off the shipped YAML
+// rather than restated.
+function ciRunsTheGate() {
+  const yml = fs.readFileSync(CI_YML, "utf8");
+  assertGateStep(stepWindow(yml));
 
   // The gate must sit in a job the conclusion reporter already depends on, or a red gate never
   // reaches the anchor (SES-255).
   const reporter = yml.slice(yml.indexOf("\n  report-conclusion:"));
   assert.ok(/needs:\s*\[[^\]]*\bchecks\b[^\]]*\]/.test(reporter),
     "`report-conclusion` must still name `checks` in needs, or this gate's failure is forgotten by the anchor");
+}
+
+// Clause 5 -- THE WINDOW CANNOT REACH THE NEXT STEP, and the clause that makes the five conditions
+// above worth asserting at all. Built in clause 1's form: a mutation the OLD window graded green
+// must be graded red now. Derived in memory from the shipped string -- nothing is written to disk,
+// and ci.yml is not touched (pattern:76). Without this, a window that had quietly gone back to
+// borrowing the next step's text would look exactly as green as a correct one.
+function theWindowCannotReachTheNextStep() {
+  const yml = fs.readFileSync(CI_YML, "utf8");
+  const lines = yml.split("\n");
+
+  // The `checks` job's own run line. ci.yml's file header names the script too (ci.yml:2), so a
+  // whole-file search for the name finds that prose, not the step -- hence the job floor and the
+  // `node ` anchor rather than a bare includes().
+  const jobStart = lines.findIndex(l => /^ {2}checks:/.test(l));
+  assert.ok(jobStart > 0, "ci.yml must still define a `checks:` job");
+  const hit = lines.findIndex((l, i) => i > jobStart && /^\s+node scripts\/audit-private-scan\.js/.test(l));
+  assert.ok(hit > jobStart, "the `checks` job must still run the scan script on its own line");
+
+  let first = hit;
+  while (first > 0 && !/^\s*- name:/.test(lines[first])) first--;
+  const ifAt = lines.findIndex((l, i) => i >= first && i < hit && /^\s*if:\s*always\(\)\s*$/.test(l));
+  assert.notStrictEqual(ifAt, -1,
+    "the scan step must carry an `if: always()` line of its own for this control to remove -- if it does not, slice 2 has been reverted and the five conditions above are the ones to read");
+  const nextStep = lines.findIndex((l, i) => i > hit && /^\s*- name: Regression suite \(credentialed\)/.test(l));
+  assert.ok(nextStep > hit,
+    "`- name: Regression suite (credentialed)` must still follow the scan step -- it is the step whose text the old window borrowed");
+
+  // The two edits: drop the scan step's own `if: always()`, then delete everything between its last
+  // line and the next step -- the 787-char comment block at ci.yml:246-255.
+  const mutated = lines.filter((l, i) => i !== ifAt && !(i > hit && i < nextStep)).join("\n");
+
+  // THE MUTATION BIT, asserted before the verdict, so a clause that passed because the mutation
+  // silently did nothing is distinguishable from one that passed because the window is bounded.
+  assert.notStrictEqual(mutated, yml, "the mutation must actually change the text it grades");
+  const ifCount = text => (text.match(/\n\s*if:\s*always\(\)/g) || []).length;
+  assert.strictEqual(ifCount(mutated), ifCount(yml) - 1,
+    `exactly one if: always() must be gone from the mutation, got ${ifCount(yml)} -> ${ifCount(mutated)}`);
+  assert.ok(!/red tripwire cannot conceal/.test(mutated),
+    "the comment block between the two steps must be gone -- shrinking it is what let the old window reach the next step");
+  assert.ok(/^\s+node scripts\/audit-private-scan\.js/m.test(mutated),
+    "the mutation must leave the scan step's run line in place -- it removes the step's `if:`, not the step");
+  assert.ok(/- name: Regression suite \(credentialed\)/.test(mutated),
+    "the mutation must leave the next step in place and now adjacent -- that adjacency is the whole mechanism");
+
+  // THE VERDICT, and it names which condition fired rather than only that something threw (the
+  // LOO-013 lesson): the bounded window must go red on `if: always()` here. The old `idx + 200`
+  // window was GREEN on this exact string, borrowing the next step's own `if: always()` once the
+  // comment block between them was out of the way.
+  assert.throws(() => assertGateStep(stepWindow(mutated)), /if: always\(\)/,
+    "with the scan step's own if: always() deleted and the comment block after it removed, the step window must still be red -- if this passes, the window is reaching into the next step and the assertion above is vacuous");
+
+  // And the bound in the other direction, on the shipped text as it stands: the next step is
+  // outside the window, so none of its characters can satisfy any condition.
+  assert.ok(!stepWindow(yml).includes("Regression suite (credentialed)"),
+    "the scan step's window must not contain the next step's name -- if it does, it is grading two steps as one");
 }
 
 export default async function run() {
@@ -242,6 +344,7 @@ export default async function run() {
     theValueNeverLeaves(theChangeIsGraded());
     failsClosed();
     ciRunsTheGate();
+    theWindowCannotReachTheNextStep();
   } finally {
     // `finally`, so a failing clause still cleans up after itself -- the fixture is worthless for
     // debugging anyway, since every assertion above already quotes the output it judged.
