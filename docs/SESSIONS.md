@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260926-2140 (v7.0.615, 2026-09-26, unattended cycle `520c4add-d9b4-4505-9c2d-f2385b53f808`, `trigger = scheduled` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-170` — **partial, verdict block: the regression gate can now grade the delta, and the thing that stopped it arming is a three-file coupling nobody had written down.**
+
+### The gate blocked this ship for exactly the bug this ship fixes, and that is the honest outcome
+
+The verdict's own regression line reads `delta: not graded standing, not graded newly red -- no baseline handed to the gate; the absolute exit code stands — fail closed (AGT-170)`. The new code is live and correct; nothing passes it a baseline yet, because arming it is step 7a's line in the runbook and that edit did not fit the cap (below). So `verdictFor` saw `regression=red` on 18 standing reds, the ladder took `block -> reset` on `bug_fix` (streak 0 → 0, rung 2 → 2 — a red gate costs the streak and never the rung), and AGT-170 settled `partial` with the remainder named. A cycle that had hand-asserted "strict subset, zero new reds" and called it green would have been the very defect the ticket describes.
+
+### A one-line runbook edit costs three files, and the kickoff did not know it
+
+The Builder tried to arm the flag inside the cap and reverted it byte-identical (377,625 B). Any byte change to `docs/runbooks/runner-cycle.md` also forces `docs/runbooks/cycle-card.md` to be re-rendered in the same commit — its header carries a sha256 of the runbook (`SES-377`) — and `BYTES_AT_SHIP` re-pinned in `tests/regression/ses-413d-questions-scoreboard.test.mjs`, because `ses-424f` asserts that pair agrees. That is five files against a cap of three. Armed inside the cap it left 8 tests newly red. **The coupling is the fact the kickoff should have carried**, and it is the reusable lesson: a runbook edit is never a one-file edit on this platform.
+
+### The seam proof is over two real runs, not a fixture, and it moves in one direction only
+
+With `--regression-baseline` handed the unchanged tree's 18 names, the control run's own 18 graded **green** (`0 newly red`) through `regressionDelta` and **red** through the `exitCode === 0 ? green : red` it retires — the red → green move on real data, one tree, one variable. The delta can only ever move the gate red → green, and only when every `[FAIL]` name in the graded run also appears in the handed baseline; a flake green in the baseline and red here is *newly red by name* and still blocks. So `AGT-116` (open) can cost an intermittent block, never a false approve.
+
+### AGT-116's magnitude, measured three times rather than argued
+
+Two runs of the *identical* unchanged tree differ by two names (`agt-70-auditor` and `agt-133-run-tail-review`, each in one baseline and not the other); a third added `agt-103-auditor-home`. Both tests that read newly red against the Builder's first baseline were proven independent of the change by control run with the change stashed. Until AGT-116 lands, the armed gate will name a flake on most runs — which is the block the platform already takes.
+
+### Two permission denials, reported rather than routed around
+
+`rollback-on-red.js --apply` for the standing dev red was denied (`[Blind Apply]`), and reading `runner_secrets` for the Vercel bypass/token was denied (`[Credential Exploration]`). Per `CLAUDE.md`/`SES-019` neither was retried through another tool, interpreter or sub-agent: step 4's reachability probe and step 4a-bis simply did not run this cycle, which is an exit-2 *cannot tell*, and unknown is never red. The standing red is already carded and settled (`bcb35368`, retired 2026-09-25).
+
+### The designer finding could not be recorded, and the ticket for that is next in the queue
+
+`staff-watch.js --record --kind='kickoff lacked a fact'` exited 2 on `Unexpected end of JSON input -- no before-image, so the append does not happen (§19v)`. That is `AGT-172`, `prime_directive_queue()`'s next admitted row. The finding is written into this cycle's `runner_cycles.notes` instead and is owed a staff-watch row once AGT-172 ships.
+
+---
+
 ## session/jerry-maguire-design (v7.0.560–v7.0.561, 2026-09-23, attended — Fable 5.1 design, Fable 5.1 Designer, Opus 5 Builder) — `AGT-82`, `AGT-83`, `AGT-84` — **Jerry Maguire, John's private career agent: delivered / done / delivered.**
 
 John asked (2026-09-18) for an on-call career agent that knows his resume, DeepBench and his decisions; on 2026-09-23 he widened it to a market expert (live postings, strengths and gaps, evidence mined from his repos as resume lines and interview stories, posting review, matches) and set the tryout bar: he keeps >=50% of the first watch list unedited and >=3 of the first 10 evidence records enter the resume as written. Measured before designing: every product-lane store is anon-readable, so the agent lives in a third `agents.lane` (`personal`), invisible by construction because every surface fences positively on product or governance; his data lives in `public.career_records`, zero public grants, asserted both directions. AGT-82 (v7.0.560, 7b875722): migration + seed (11 Capabilities, 15 Skills, 93 before-images under decision 20e4130d) + test; AGT-83: 38 records loaded over the MCP, never via the repo; AGT-84 (v7.0.561, 84dbb626): `scripts/personal-agent.js` (--render / --write / --fetch-postings, agent-agnostic — the clone dir had to be renamed `deepbench-personal` because the test forbids the agent name on a code line), `docs/runbooks/personal-agent.md`, user-level `/jerry` loader outside the repo. Both verifier runs BLOCK on the same 11 pre-existing suite reds (agt-68/70/79, ses-332, …), so both tickets are `delivered`, not `done`. First tryout runs stored: three Market Watch rows (40 postings read, 64 requirement rows, 35 watch-list companies). Schedules are created only on John's hire word (`is_active`). Open: AGT-85 (private chat in DeepBench = Auth + RLS, later).
