@@ -28,12 +28,20 @@
 //     1,2,3,4,6) and a seed that reused an occupied slot would still make the count six while
 //     leaving two Knowledge sections racing for one position in the assembled prompt.
 //
-// (c) THE GUARDRAIL IS THE RULE, BYTE-FOR-BYTE. One `must` entry must equal the body of
+// (c) THE RULE IS THE RULE, BYTE-FOR-BYTE -- AND IT IS NOW IN dm-run-intent, NOT dm-guardrails.
+//     AGT-132 slice 2 moved it: `dm-guardrails` is linked to FOUR capabilities (decide-gated-card,
+//     model-assignment, review-audit-worklist, run-project), so a rule that governs only the runner
+//     chain was being carried into three prompts it does not govern; `dm-run-intent` is linked to
+//     `run-project` alone. So this arm now asserts BOTH directions of one move: the body of
 //     docs/runbooks/routine-prompt.md line 47 with its `9. ` numbering removed -- read from the
-//     file, never pasted here. Two copies of a rule that differ by a reflow are two rules, and the
-//     agent would be running the older one; comparing against the file is what makes that
-//     impossible. `must_not` is asserted UNCHANGED at 6, so a "fix" that appends to the wrong array
-//     fails instead of passing on a total.
+//     file, never pasted here -- is ABSENT from `dm-guardrails.guardrails.must` and is the LAST
+//     paragraph of `dm-run-intent.method`, byte-for-byte. Two copies of a rule that differ by a
+//     reflow are two rules, and the agent would be running the older one; comparing against the
+//     file is what makes that impossible. `must` is 5 again (the pre-SES-378d count) and `must_not`
+//     is asserted UNCHANGED at 11 -- AGT-144's five appends, measured live, not the 6 this file was
+//     seeded against: the pin was never re-pointed, which is stale PIN, never stale data. Both
+//     counts are asserted so a "fix" that lands in the wrong array fails instead of passing on a
+//     total.
 //
 // (d) REVERSIBILITY IS ASSERTED, NOT ASSUMED. AGENT-ROW-AGREED-TICKET licenses this write on the
 //     promise that a Reverse puts the rows back, and `reverse_decision()` addresses a row BY ITS
@@ -45,7 +53,9 @@
 //
 // (e) THE SES-158 NEGATIVE CONTROL. (c)'s comparison is driven a second time with ONE character of
 //     the expected text changed, and it must then find nothing. Without it, (c) would keep passing
-//     against a matcher that had quietly become "some string is present".
+//     against a matcher that had quietly become "some string is present" -- which matters more
+//     after AGT-132 slice 2 than before, because (c)'s dm-guardrails half is now an ABSENCE, and an
+//     absence passes vacuously against a matcher that finds nothing anywhere.
 //
 // NOTHING HERE WRITES. Every live arm reads. The `--sync-knowledge --apply` run and the guardrails
 // DO block that produced these rows are the session's own, reported in its ship notes.
@@ -75,8 +85,11 @@ const CHAIN_RULE_LINE = 47;
 const CHAIN_RULE_PREFIX = "9. ";
 const CHAIN_RULE_BYTES = 1087;
 const GUARDRAILS_SLUG = "dm-guardrails";
-const MUST_AFTER = 6;
-const MUST_NOT_UNCHANGED = 6;
+const RUN_INTENT_SLUG = "dm-run-intent";
+// AGT-132 slice 2: the chain rule left `must` (back to its pre-SES-378d 5) for dm-run-intent.method.
+const MUST_AFTER = 5;
+// Live at 11 since AGT-144 appended five: this pin was stale, the data was not. Re-pointed, not relaxed.
+const MUST_NOT_UNCHANGED = 11;
 const LINKS_AFTER = 7;
 const DECISION_KIND = "agent-row";
 const TICKET = "SES-378";
@@ -202,9 +215,24 @@ async function run() {
     `${GUARDRAILS_SLUG}.guardrails.must must hold ${MUST_AFTER} entries (it held 5 before this slice). got ${JSON.stringify(guard.must && guard.must.length)}`);
   assert.strictEqual(Array.isArray(guard.must_not) ? guard.must_not.length : -1, MUST_NOT_UNCHANGED,
     `${GUARDRAILS_SLUG}.guardrails.must_not must be UNCHANGED at ${MUST_NOT_UNCHANGED} -- an append that landed in the wrong array would still make the pair total 12`);
-  const at = indexOfExact(guard.must, rule);
+  assert.strictEqual(indexOfExact(guard.must, rule), -1,
+    `${GUARDRAILS_SLUG}.guardrails.must still holds the chain rule. AGT-132 slice 2 MOVED it to ${RUN_INTENT_SLUG}.method because ${GUARDRAILS_SLUG} is linked to four capabilities and the rule governs only the runner chain. Two homes is worse than the wrong one: the manager would read it twice, and a later edit to either copy would leave the two disagreeing.`);
+
+  // ...and it is the LAST paragraph of dm-run-intent.method, through the SAME matcher, so (e)'s
+  // control covers this half too. The presence half is what keeps the absence above from passing
+  // vacuously on a rule that was deleted rather than moved.
+  const ri = await get(`skill_profiles?select=id,slug,method,skill_type_slug&slug=eq.${RUN_INTENT_SLUG}`);
+  assert.strictEqual(ri.length, 1, `public.skill_profiles must hold exactly one ${RUN_INTENT_SLUG} row`);
+  assert.strictEqual(ri[0].skill_type_slug, "intent",
+    `${RUN_INTENT_SLUG} must stay an Intent row. A second Guardrails row would collide with ${GUARDRAILS_SLUG} on section slug and SKILL_ORDER 4 (api/prompt/db-assembly.js), so the type is the reason this move is safe, not a detail.`);
+  const paras = lf(ri[0].method ?? "").split("\n\n");
+  const at = indexOfExact(paras, rule);
   assert.notStrictEqual(at, -1,
-    `no entry of ${GUARDRAILS_SLUG}.guardrails.must equals the chain rule byte-for-byte. The rule is ${PROMPT_REL} line ${CHAIN_RULE_LINE} minus its ${JSON.stringify(CHAIN_RULE_PREFIX)} prefix (${CHAIN_RULE_BYTES} bytes, opening ${JSON.stringify(rule.slice(0, 42))}). A reworded, re-wrapped or re-punctuated copy is a SECOND rule, not this one.`);
+    `no paragraph of ${RUN_INTENT_SLUG}.method equals the chain rule byte-for-byte. The rule is ${PROMPT_REL} line ${CHAIN_RULE_LINE} minus its ${JSON.stringify(CHAIN_RULE_PREFIX)} prefix (${CHAIN_RULE_BYTES} bytes, opening ${JSON.stringify(rule.slice(0, 42))}). A reworded, re-wrapped or re-punctuated copy is a SECOND rule, not this one.`);
+  assert.strictEqual(at, paras.length - 1,
+    `the chain rule must be the LAST paragraph of ${RUN_INTENT_SLUG}.method (it was appended, and an append that landed mid-row means the row was rewritten rather than extended). got index ${at} of ${paras.length}`);
+  assert.strictEqual(indexOfExact(paras, mutated), -1,
+    "(e) over the LIVE list: the matcher must reject a one-character mutation against dm-run-intent.method itself, not only against the fixture");
 
   // == (d) THE UNDO IS REAL ======================================================================
   const decisions = await get(`runner_decisions?select=id,kind,backlog_id,status&kind=eq.${DECISION_KIND}&backlog_id=eq.${TICKET}`);
@@ -238,7 +266,7 @@ async function run() {
   assert.ok(updates.some(i => i.table_name === "skill_profiles" && i.pk_value === gr[0].id),
     `the guardrails edit must carry a NON-null image of ${GUARDRAILS_SLUG} (${gr[0].id}) -- a NULL image there would tell a Reverse to DELETE the manager's guardrails rather than restore its 5 musts. got ${JSON.stringify(updates.map(i => ({ t: i.table_name, pk: i.pk_value })))}`);
 
-  console.log(`  [SES-378d] ${pure}; live: ${KNOWLEDGE_SLUG} pinned ${cardSha}, ${KNOWLEDGE_CAPABILITY} ${LINKS_AFTER} links (orders ${JSON.stringify(orders.slice().sort((a, b) => a - b))}), must ${guard.must.length} / must_not ${guard.must_not.length} with the chain rule at index ${at}, ${imgs.length} images under decision ${decisionId} (${inserts.length} NULL)`);
+  console.log(`  [SES-378d] ${pure}; live: ${KNOWLEDGE_SLUG} pinned ${cardSha}, ${KNOWLEDGE_CAPABILITY} ${LINKS_AFTER} links (orders ${JSON.stringify(orders.slice().sort((a, b) => a - b))}), must ${guard.must.length} / must_not ${guard.must_not.length} with the chain rule ABSENT, ${RUN_INTENT_SLUG}.method paragraph ${at + 1}/${paras.length} carries it, ${imgs.length} images under decision ${decisionId} (${inserts.length} NULL)`);
 }
 
 export default run;

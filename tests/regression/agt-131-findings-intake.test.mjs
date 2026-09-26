@@ -16,8 +16,15 @@
 //      CONTROLS: ten open owner slugs raise ten findings and zero raise none -- a raise wired to
 //      "tonight had inserts" rather than to the open set passes the first and fails the second.
 //   D  LIVE (credential-gated) -- the database itself refuses what the code now refuses: a joined
-//      `found_by` is 23514 and a missing `finding_type` is 23502, while a dry-run ingest of a
-//      typeless fixture STILL exits 1. That last one is not padding: a type check that fired on
+//      `found_by` is refused by name and a missing `finding_type` is 23502, while a dry-run ingest
+//      of a typeless fixture STILL exits 1. RE-POINTED 2026-09-26 (AGT-132 slice 2, v7.0.607): the
+//      one-source rule moved OUT of the table CHECK `audit_findings_found_by_single` and INTO
+//      `audit_findings_guard()`'s INSERT limb, because the CHECK -- NOT VALID but still enforced on
+//      UPDATE -- refused every status-only UPDATE of the 27 legacy joined rows and so stopped the
+//      Development Manager's review path from running on real rows at all. Same rule, same table,
+//      new home: the refusal is now P0001 `found_by names ONE source (AGT-131)` from a BEFORE
+//      INSERT trigger instead of 23514 from a CHECK. This arm asserts the RULE, and asserts the
+//      CHECK is gone, so neither a silent loss of the rule nor a silent return of the CHECK passes. That last one is not padding: a type check that fired on
 //      the dry run would break the runbook's step 3 signal, and only a run proves it does not.
 //
 // NOTHING HERE MUTATES THE LEDGER. Arm D's two live POSTs are REFUSALS -- the rows they describe
@@ -132,7 +139,7 @@ async function run() {
     for (const r of rows) {
       assert.equal(r.body.finding_type, "defect", "the Auditor's intents report governance defects");
       assert.equal(r.body.found_by, "auditor", "found_by is the agent id ALONE -- one source per row, never a join");
-      assert.ok(!/ \+ /.test(r.body.found_by), "a joined found_by is what audit_findings_found_by_single refuses");
+      assert.ok(!/ \+ /.test(r.body.found_by), "a joined found_by is what audit_findings_guard()'s INSERT limb refuses (AGT-132 slice 2; it was audit_findings_found_by_single until then)");
       assert.equal(r.body.iso_week, "2026-W38");
     }
     for (const i of images) {
@@ -290,15 +297,19 @@ async function run() {
       };
 
       const joined = await post({ ...base, found_by: "a + b", finding_type: "defect" });
-      assert.ok(joined.text.includes("23514"), `a joined found_by must be refused 23514; got ${joined.status} ${joined.text.slice(0, 200)}`);
-      assert.ok(joined.text.includes("audit_findings_found_by_single"), `and by THAT constraint; got ${joined.text.slice(0, 200)}`);
+      assert.ok(!joined.status || joined.status >= 400, `a joined found_by must be refused; got ${joined.status} ${joined.text.slice(0, 200)}`);
+      assert.ok(joined.text.includes("found_by names ONE source (AGT-131)"),
+        `a joined found_by must be refused by audit_findings_guard()'s INSERT limb, which is where AGT-132 slice 2 moved this rule; got ${joined.status} ${joined.text.slice(0, 200)}`);
+      assert.ok(joined.text.includes("a + b"), `and the refusal echoes the offending value; got ${joined.text.slice(0, 200)}`);
+      assert.ok(!joined.text.includes("audit_findings_found_by_single"),
+        `the table CHECK must be GONE, not shadowing the guard: it was NOT VALID yet still enforced on UPDATE, so it froze the 27 legacy joined rows and stopped every real apply_audit_review() call. got ${joined.text.slice(0, 200)}`);
 
       const typeless = await post({ ...base, found_by: "agt-131:test" });
       assert.ok(typeless.text.includes("23502"), `a row with no finding_type must be refused 23502; got ${typeless.status} ${typeless.text.slice(0, 200)}`);
       assert.ok(typeless.text.includes("finding_type"), `and name the column; got ${typeless.text.slice(0, 200)}`);
 
       // CONTROL: the backfill did not leave a hole, and the 27 historical joined rows are history,
-      // not casualties -- the NOT VALID constraint was never applied to them.
+      // not casualties -- they were never rewritten, only unfrozen (AGT-132 slice 2).
       const read = async q => {
         const r = await fetch(`${url}/rest/v1/audit_findings?${q}`, { headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact", Range: "0-0" } });
         return Number((r.headers.get("content-range") ?? "/0").split("/")[1]);
