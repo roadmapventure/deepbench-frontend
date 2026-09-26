@@ -82,6 +82,8 @@ act as granting it; where a row would have moved one of John's calls, there is a
 > Money, production (dev -> main), hiring or switching on agents (agents.is_active, the routine switch) and ratifying a bar he set (the 20-assignment promotion bar): John's. Anything not named here: the manager's, by MANAGER-DECIDES-BY-DEFAULT. Already live: that rule's line 2 for the first three; SES-378 slices 6 to 8 and SES-424's own board row carry the 20-assignment bar as John's to ratify.
 > Filed by SES-424 slice 2 under MANAGER-DECIDES-BY-DEFAULT (John 2026-09-16, decision d496fb07). Every row above writes down authority that is already live and cites where it is already live; no row moves a decision from John to the manager.
 
+John's rulings of 2026-09-25 are registry rows `JOHN-0925-*` (`docs/governance/RULES-SNAPSHOT.md`) and the Designer, Auditor and Researcher Skill rows they name — the database is their only home, never an md file (John 2026-09-25, AGT-135).
+
 ---
 
 ## Before Writing a Kickoff Doc: Walk Through It Live

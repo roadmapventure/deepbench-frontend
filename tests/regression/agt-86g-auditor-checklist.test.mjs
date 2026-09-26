@@ -54,7 +54,7 @@ const JOBS = {
   "audit-config-review": ["au-config-intent", "config-disagrees"],
   "audit-advisor": ["au-advisor-intent", "advisor-feature-replaces-handbuilt"],
 };
-const ALL_ASSIGNMENTS = ["audit-advisor", "audit-agent-data", "audit-board-health", "audit-config-review", "audit-governance-corpus", "audit-work-quality"];
+const ALL_ASSIGNMENTS = ["audit-advisor", "audit-agent-data", "audit-board-health", "audit-config-review", "audit-governance-corpus", "audit-run-review", "audit-work-quality"];
 
 const GUARDRAILS = {
   must: [
