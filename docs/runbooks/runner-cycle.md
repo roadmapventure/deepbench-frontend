@@ -69,8 +69,8 @@ reduced version of a step; 78d replaces them with the full mechanism.
 gate below is still the first executable action of a cycle and nothing here precedes it.**
 `public.projects` is what the runner is building right now, and John's whole ask was that starting
 one be a single statement: *"I should be able to simply state 'build the Governance Agents project'
-and away you go."* A project's `status` is `planned` / `executing` / `paused` / `done`; **exactly one
-row is `executing` at a time, and that row IS the execution authority** — "complete `<project>`" and
+and away you go."* A project's `status` is `planned` / `executing` / `paused` / `done`; **every
+`executing` row is an execution authority, ranked by `priority`** — "complete `<project>`" and
 "pause `<project>`" are `status` writes recorded as decisions (`record_decision`, reversible), never
 prose a cycle has to interpret. Every epic carries `project_id`, so a ticket's admission is a
 property of its epic's project, resolved by `public.epic_project_executing(uuid)` — never by the
@@ -2078,8 +2078,8 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/run-project.js \
 ```
 
 **(a)** The assignment is *ticket, capability, engine* and **you execute it** — never re-derive the
-pick. **(b)** `--project` is the slug of the one `public.projects` row with `status = 'executing'`
-(`moat-support` today). **(c)** **Exit 2 naming a ticket other than the pick** → write
+pick. **(b)** `--project` is the slug of the executing `public.projects` row that owns the queue's first
+row (three today, ranked by `priority`). **(c)** **Exit 2 naming a ticket other than the pick** → write
 `MANAGER MISMATCH: assignment <X> vs queue head <Y>` in the cycle row notes, run the first
 `--record` of `SES-378`'s §4 with `--backlog=<X>` — `node scripts/staff-watch.js --record
 --cycle-id=<your cycle id> --agent=devmanager --kind='assignment mismatch' --backlog=<X>

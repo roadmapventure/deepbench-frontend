@@ -343,13 +343,21 @@ async function theLivePickPathObeysTheFourRules() {
     url, key,
     "backlog_items?select=backlog_id,title,status,design_status,queue,filed_at,predicted_cycles,epic_id&limit=2000",
   );
-  const epics = await pg(url, key, "epics?select=id,name&limit=500");
+  // AGT-140 (v7.0.604): `project_id` joins the epics projection, and `projects` joins the read,
+  // because the lane's FIRST ordering key is now the owning project's `priority`. Without them the
+  // oracle below grades a four-key order with three keys and reports the AGT-140 inversion as
+  // correct.
+  const epics = await pg(url, key, "epics?select=id,name,project_id&limit=500");
+  const projects = await pg(url, key, "projects?select=id,priority,status&limit=200");
   const rows = await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" });
 
   assert.ok(items.length > 100, `backlog_items returned ${items.length} rows -- refusing to grade a truncated read`);
   assert.ok(rows.length > 0, "prime_directive_queue() returned nothing at all -- not even the board row");
 
   const epicName = new Map(epics.map(e => [e.id, e.name ?? ""]));
+  // AGT-140: the epic -> project -> priority chain the pick path now orders on.
+  const projectOfEpic = new Map(epics.map(e => [e.id, e.project_id]));
+  const projectById = new Map(projects.map(p => [p.id, p]));
   const byRef = new Map(items.map(i => [i.backlog_id, i]));
   // SES-340: `prime_standing` is now `EXISTS (projects WHERE status='executing')` and lane (c)'s
   // fence is `epic_project_executing()`. The LANE VALUE stays `selfbuild` -- a named deviation
@@ -399,27 +407,49 @@ async function theLivePickPathObeysTheFourRules() {
     return;
   }
 
-  // --- M5-02 + M5-07: the order the DATABASE returned is monotonic in (lane, queue, cycles).
+  // --- AGT-140 + M5-02 + M5-07: the order the DATABASE returned is monotonic in
+  // (project priority, filing lane, queue, cycles).
   // Deliberately NOT a re-sort of the rows in JS: this asserts a property OF the returned order,
   // so a second implementation of the ordering cannot quietly agree with itself (SES-45).
-  const key3 = ref => {
+  //
+  // AGT-140 (v7.0.604) RETARGETS THIS CLAUSE, and the retarget was forced by live evidence rather
+  // than chosen. With three projects `executing` at once (John, 2026-09-25) the three-key oracle
+  // below GRADED THE INVERSION AS CORRECT: on 2026-09-26 the lane served AGT-141 (agent-training,
+  // project priority 3, queue 25) ahead of AGT-132 (dev-manager-capabilities, priority 2, queue 30)
+  // and this clause passed, because queue 25 < 30 and nothing here had ever heard of a project.
+  // M5-02 and M5-07 are UNCHANGED -- the filing lane, the queue and the cheapest-cycles tiebreak
+  // still decide, in that order, WITHIN a project. Project priority simply goes ahead of them.
+  //
+  // D2, read off the same row the function reads: a ticket whose owning project is not `executing`
+  // carries NO priority key and sorts LAST. MAX, never 0 -- with 0 an admitted enhancement from a
+  // paused project would outrank every chartered ticket on the board.
+  const key4 = ref => {
     const it = byRef.get(ref);
     assert.ok(it, `prime_directive_queue returned ${ref}, which is not in backlog_items`);
-    return [laneOf(it.filed_at), it.queue, it.predicted_cycles ?? Number.MAX_SAFE_INTEGER];
+    const proj = projectById.get(projectOfEpic.get(it.epic_id));
+    const prio = proj && proj.status === "executing" ? proj.priority : Number.MAX_SAFE_INTEGER;
+    return [prio, laneOf(it.filed_at), it.queue, it.predicted_cycles ?? Number.MAX_SAFE_INTEGER];
+  };
+  const lexLte = (a, b) => {
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] < b[i]) return true;
+      if (a[i] > b[i]) return false;
+    }
+    return true;
   };
   let inversionsAgainstBareQueue = 0;
   for (let i = 1; i < lane.length; i++) {
-    const a = key3(lane[i - 1].ref);
-    const b = key3(lane[i].ref);
-    const ordered = a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && a[2] <= b[2])));
+    const a = key4(lane[i - 1].ref);
+    const b = key4(lane[i].ref);
+    const ordered = lexLte(a, b);
     assert.ok(
       ordered,
       `the selfbuild lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
-        `[lane ${a[0]}, queue ${a[1]}, cycles ${a[2]}] precedes ${lane[i].ref} ` +
-        `[lane ${b[0]}, queue ${b[1]}, cycles ${b[2]}]. M5-02 orders by filing lane FIRST, then ` +
-        "queue, then M5-07's predicted_cycles nulls last",
+        `[priority ${a[0]}, lane ${a[1]}, queue ${a[2]}, cycles ${a[3]}] precedes ${lane[i].ref} ` +
+        `[priority ${b[0]}, lane ${b[1]}, queue ${b[2]}, cycles ${b[3]}]. The pick path orders by ` +
+        "project priority FIRST (AGT-140), then filing lane, queue, cycles",
     );
-    if (a[1] > b[1]) inversionsAgainstBareQueue++;
+    if (a[2] > b[2]) inversionsAgainstBareQueue++;
   }
 
   // NON-VACUITY for the lane rule: monotonicity is satisfied trivially by bare queue order when

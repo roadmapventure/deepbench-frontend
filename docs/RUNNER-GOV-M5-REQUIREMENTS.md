@@ -517,6 +517,75 @@ lane, `SES-43` (queue 251, filed pre-cut) now sorts **ahead of** `SES-288` (queu
 
 ---
 
+## Amendment note — `AGT-140`, 2026-09-26 (`v7.0.604`)
+
+<!-- FEATURE: AGT-140 — `projects.priority` becomes the FIRST ordering key in both pick homes. No
+     rule STATEMENT in this register changes, so the byte-for-byte registry↔doc equality that
+     tests/regression/ses-280-m5-governance-rules.test.mjs pins is untouched; only this note is
+     added. M5-02 and M5-07 are amended in EFFECT — they keep their ids, their `status = 'live'`
+     and every word of their text, and they now decide WITHIN a project rather than across the
+     board. -->
+
+**The inversion, measured live 2026-09-26 and not recalled.** John set three projects `executing`
+at once on 2026-09-25 — `auditor-enhancements` (priority 1), `dev-manager-capabilities` (2),
+`agent-training` (3). Neither of the platform's two pick homes read `projects.priority` at all, so
+the first key that could tell two executing projects apart was `M5-02`'s filing lane, and after it
+the queue number. The `selfbuild` lane therefore served
+
+| pos | ref | project | priority | queue | cycles |
+|---|---|---|---|---|---|
+| 1 | `AGT-141` | `agent-training` | 3 | 25 | 1 |
+| 2 | `AGT-132` | `dev-manager-capabilities` | 2 | 30 | 2 |
+| 3 | `AGT-138` | `agent-training` | 3 | 33 | 2 |
+
+and `runner_should_boot()` handed `AGT-141` to the next cycle: a one-cycle ticket in the THIRD
+project ahead of an open buildable ticket in the SECOND. Nothing errored and nothing emptied — the
+runner would simply have kept building the lower-priority project, indefinitely and silently.
+
+**D1 — project priority is the first key.** The pick order is now **four** keys, in this order:
+
+1. the owning project's `projects.priority` (this amendment);
+2. `M5-02`'s filing lane — pre-cut first, post-cut into the review bucket;
+3. the queue number;
+4. `M5-07`'s cheapest-first tiebreak on `predicted_cycles`, nulls last.
+
+Keys 2–4 are **unchanged in text and unchanged in effect within a project**. What changed is their
+scope: they decide the order among a project's own tickets, and no longer decide it across
+projects. `AGT-141` still precedes `AGT-138` inside `agent-training` on exactly the old grounds.
+
+**D2 — an admitted enhancement from a non-executing project sorts last.** A row that clears
+`prime_directive_queue()`'s fence through the `EL-01` admission half rather than through an
+executing epic carries **NULL** for key 1 and sorts `NULLS LAST`. Last, never first: keyed to `0` it
+would outrank every chartered ticket on the board.
+
+**Both pick homes, one migration.** `agt140_project_priority_pick` (`v7.0.604`) changed
+`public.prime_directive_queue()` — a `LEFT JOIN public.projects` in its `buildable` CTE, a
+`sort_project` key in `picks`, and `ORDER BY lane_ord, sort_key, sort_project NULLS LAST, sort_lane,
+sort_queue, sort_cycles NULLS LAST` in `ranked` — and `public.drain_epic_next(uuid)`, whose pick
+gained `JOIN public.projects pj` and now reads `ORDER BY pj.priority, CASE WHEN b.filed_at <
+c_lane_cut THEN 0 ELSE 1 END, b.queue, b.predicted_cycles NULLS LAST`. Neither signature changed,
+and the migration's own trailing `DO` block asserts exactly one `pg_proc` row per name before it
+will commit (`.claude/rules/supabase-function-signature.md`). The prior definitions are captured in
+`public.runner_migration_downs` under `up_name = 'agt140_project_priority_pick'`
+(`auto-downable`, 2 objects, 0 refusals).
+
+**Before and after, same claims held, read from the live functions:**
+
+| | pos 1 | pos 2 | pos 3 | `runner_should_boot()` |
+|---|---|---|---|---|
+| before | `AGT-141` (p3) | `AGT-132` (p2) | `AGT-138` (p3) | `AGT-141` |
+| after | `AGT-132` (p2) | `AGT-141` (p3) | `AGT-138` (p3) | `AGT-132` |
+
+**One consequence for the runbook, recorded here because it is a governance fact and not a typo.**
+`docs/runbooks/runner-cycle.md` said *"exactly one row is `executing` at a time, and that row IS the
+execution authority"*. Three execute by John's word of 2026-09-25, so it now says every `executing`
+row is an execution authority, **ranked by `priority`**. `tests/regression/ses-340-projects-govern.test.mjs`
+clause (a) was retargeted with it — from *exactly one executing project* to *at least one*, with the
+zero case still a finding — and its clause (b) now asserts that every served project is in the
+executing set rather than that it is the single one.
+
+---
+
 ## The M5 gate decision — `SES-184`, decided 2026-09-02 (`v7.0.370`)
 
 <!-- FEATURE: SES-184 — the M5 design gate, decided rather than asked. M6-01: no cycle blocks on a

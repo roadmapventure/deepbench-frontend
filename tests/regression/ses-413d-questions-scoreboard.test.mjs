@@ -105,7 +105,13 @@ export const RUNBOOK_CEILING = 381000;
 // `kind` branches, lives in step 6's own span and is pinned by ses-378h-lane-refusal-kind.test.mjs).
 // 445 B out, 438 B in (this ship's stamp 158 B, so the count stays 5; (7e) 280 B): 380976 ->
 // 380969 B, 31 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
-export const BYTES_AT_SHIP = 380969;
+// v7.0.604 (AGT-140) retargets the E1 clause at step 0's project paragraph -- "exactly one row is
+// `executing` at a time, and that row IS the execution authority" (81 B) -> "every `executing` row
+// is an execution authority, ranked by `priority`" (69 B) -- and step 7's (b), which named the one
+// executing row and `moat-support` as today's (108 B) -> the executing row that owns the queue's
+// first row, three today, ranked by `priority` (131 B). 189 B out, 200 B in: 380969 -> 380980 B,
+// 20 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
+export const BYTES_AT_SHIP = 380980;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

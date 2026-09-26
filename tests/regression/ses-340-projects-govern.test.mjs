@@ -86,18 +86,25 @@ async function theProjectsTableGovernsTheLiveBoard() {
   const progress = await pg(url, key, "project_progress?select=slug,project,status,epics,tickets,done,open_&limit=200");
   const epics = await pg(url, key, "epics?select=id,name,project_id&limit=500");
 
-  // ---- (a) EXACTLY ONE project is executing, and the table can actually show the difference.
+  // ---- (a) AT LEAST ONE project is executing, and the table can actually show the difference.
+  //
+  // AGT-140 (v7.0.604) RETARGETS THIS CLAUSE from `=== 1` to `>= 1`, and the retarget is John's
+  // word, not a convenience: on 2026-09-25 he set THREE projects executing at once
+  // (`auditor-enhancements` 1, `dev-manager-capabilities` 2, `agent-training` 3). The original
+  // clause was written when "exactly one executing row" WAS the execution authority, so a second
+  // row meant two drains competing with nothing to rank them. AGT-140 supplies the ranking:
+  // `projects.priority` is now the FIRST key in both pick homes, so several executing projects are
+  // an ordered queue rather than a collision. What has NOT changed is the zero case -- with no
+  // executing row the runner has nothing admitted at all, and that is still a finding.
   assert.ok(projects.length > 0, "public.projects came back empty -- migration ses340_projects is not live");
   const executing = projects.filter(p => p.status === "executing");
-  assert.strictEqual(
-    executing.length,
-    1,
-    `public.projects holds ${executing.length} rows with status='executing' ` +
-      `(${executing.map(p => p.slug).join(", ") || "none"}). John's rule is one statement -- ` +
-      `"build the <project> project" -- and the pick path's fence is "the epic's project is " +
-      "executing", so two executing projects means two drains competing and zero means the runner ` +
-      `has nothing admitted at all. Every project: ` +
-      projects.map(p => `${p.slug}=${p.status}`).join(", "),
+  const executingIds = new Set(executing.map(p => p.id));
+  assert.ok(
+    executing.length >= 1,
+    "no project is executing -- `public.projects` holds zero rows with status='executing', so the " +
+      "pick path's fence (\"the epic's project is executing\") admits nothing and the runner has no " +
+      "work at all. Since AGT-140 SEVERAL may execute at once, ranked by `priority`; none may not. " +
+      `Every project: ${projects.map(p => `${p.slug}=${p.status}`).join(", ")}`,
   );
 
   // NON-VACUITY, and it is the whole reason clause (a) is not "count > 0": a table where EVERY row
@@ -125,7 +132,7 @@ async function theProjectsTableGovernsTheLiveBoard() {
   }
 
   // ---- (b) EVERY ref the pick lane serves belongs to an epic whose project is executing.
-  await theLaneServesOnlyTheExecutingProject(url, key, { projects, epics, executing });
+  await theLaneServesOnlyTheExecutingProject(url, key, { projects, epics, executing, executingIds });
 
   // ---- (c) the retired Prime Directive is really retired -- no queued row keys the old widening.
   // SES-353 (v7.0.453) widened this read from status=eq.queued to status=in.(queued,standing): the
@@ -181,7 +188,7 @@ async function theProjectsTableGovernsTheLiveBoard() {
 //
 // This is the assertion the whole ticket reduces to: before SES-340 the same lane was
 // `e.name ILIKE 'Selfbuild%'`, so a Governance Agents ticket could not appear here at all.
-async function theLaneServesOnlyTheExecutingProject(url, key, { projects, epics, executing }) {
+async function theLaneServesOnlyTheExecutingProject(url, key, { projects, epics, executing, executingIds }) {
   const board = await readBoardState(pg, url, key);
   if (isDeclarable(board.state)) {
     notRun(
@@ -232,12 +239,29 @@ async function theLaneServesOnlyTheExecutingProject(url, key, { projects, epics,
 
   // ASSERT ON WHICH BRANCH FIRED, not merely that nothing violated the rule. A lane whose every ref
   // sat in a Selfbuild-named epic would pass the loop above under BOTH implementations; a lane
-  // serving the executing project while Selfbuild is paused can only pass under this one.
+  // serving only executing projects while Selfbuild is paused can only pass under this one.
+  //
+  // AGT-140 (v7.0.604): the old form was `deepStrictEqual([...servedProjects], [executing[0].id])`
+  // -- the lane must serve THE one executing project. With three executing at once (John,
+  // 2026-09-25) that is simply false, and it was false in a way that says nothing about the fence:
+  // a lane drawing from two of the three executing projects is the fence working. What the fence
+  // actually claims is MEMBERSHIP -- every served project is executing -- so that is what is
+  // asserted, and the `notExecuting.length > 0` non-vacuity clause above is what keeps it from
+  // being satisfied by a table where everything executes. Which of them comes FIRST is AGT-140's
+  // own question and is graded by priority in ses-281 and agt-140-project-priority-pick.
+  const servedOutside = [...servedProjects].filter(id => !executingIds.has(id));
   assert.deepStrictEqual(
-    [...servedProjects],
-    [executing[0].id],
-    `the lane served ${servedProjects.size} distinct project(s); it must serve exactly the one ` +
-      `executing project (${executing[0].slug})`,
+    servedOutside,
+    [],
+    `the lane served ${servedProjects.size} distinct project(s), of which ${servedOutside.length} ` +
+      "is/are NOT executing. Every served project must be one of the executing projects, ranked by " +
+      `priority (AGT-140). Executing: ` +
+      executing.map(p => `${p.slug}(priority ${p.priority})`).join(", "),
+  );
+  assert.ok(
+    servedProjects.size > 0,
+    "the lane served rows but none resolved to a project -- an empty served set cannot demonstrate " +
+      "a fence",
   );
   const selfbuildProject = projects.find(p => p.slug === "selfbuild" || p.name === "Selfbuild");
   if (!selfbuildProject) {
