@@ -26,6 +26,14 @@ and `session_request.config.allowed_tools` before calling the update done. Resto
 sitting (model `claude-opus-5`, the ten tools as before); nothing fired in between (routine
 disabled).
 
+**The pin follows the table (`AGT-145`).** A routine's `session_context.model` is a copy; the source
+is `public.model_assignments`' `lane/orchestrator` row. To sync, from an attended sitting: `get` each
+routine verbatim into `<dir>/<id>.json`, run `node scripts/sync-routine-models.js --plan --live=<dir>`,
+send each `<id>.update.json` with `update`, `get` again into `<id>.after.json`, then `--verify` and
+`--record` (decision + before-image, printing an undo handle). A cloud run cannot update these
+routines, so with no tool in the sitting `--pending` records the ask instead. `enabled` and
+`cron_expression` are never sent.
+
 **What the prompt deliberately does NOT restate.** Selection order, walls, ceremony, ship point
 and record are `docs/runbooks/runner-cycle.md`'s; the prompt points at them and summarises only
 what a cycle needs before it has read the runbook. A rule stated here a second time is the

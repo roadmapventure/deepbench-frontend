@@ -1,3 +1,7 @@
+// DeepBench v7.0.612 | tests/regression/ses-378d-manager-skill-rows.test.mjs | AGT-145 -- the
+// chain rule's line pin re-pointed 47 -> 55. AGT-145 added a paragraph above the prompt block;
+// the rule's bytes are unchanged (see CHAIN_RULE_LINE below).
+//
 // DeepBench v7.0.509 | tests/regression/ses-378d-manager-skill-rows.test.mjs | SES-378 slice 4 --
 // the Development Manager's own Skill rows: the runner cycle as Knowledge, and the step-9 chain
 // rule as a guardrail.
@@ -33,7 +37,7 @@
 //     model-assignment, review-audit-worklist, run-project), so a rule that governs only the runner
 //     chain was being carried into three prompts it does not govern; `dm-run-intent` is linked to
 //     `run-project` alone. So this arm now asserts BOTH directions of one move: the body of
-//     docs/runbooks/routine-prompt.md line 47 with its `9. ` numbering removed -- read from the
+//     docs/runbooks/routine-prompt.md line 55 with its `9. ` numbering removed -- read from the
 //     file, never pasted here -- is ABSENT from `dm-guardrails.guardrails.must` and is the LAST
 //     paragraph of `dm-run-intent.method`, byte-for-byte. Two copies of a rule that differ by a
 //     reflow are two rules, and the agent would be running the older one; comparing against the
@@ -78,10 +82,16 @@ const WORKTREE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const CARD_REL = "docs/runbooks/cycle-card.md";
 const PROMPT_REL = "docs/runbooks/routine-prompt.md";
 
-// The chain rule lives at routine-prompt.md line 47 as a numbered list item. Both facts are
+// The chain rule lives at routine-prompt.md line 55 as a numbered list item. Both facts are
 // asserted before the body is used: a file whose step 9 moved must fail loudly here rather than
-// silently compare the guardrail against whatever sentence now occupies line 47.
-const CHAIN_RULE_LINE = 47;
+// silently compare the guardrail against whatever sentence now occupies that line.
+//
+// RE-POINTED 47 -> 55 BY AGT-145 (v7.0.612), and the pin is doing its job rather than being in the
+// way: AGT-145 added an eight-line paragraph to routine-prompt.md ABOVE the prompt block, this
+// guard went red naming the move, and the rule's BYTES were then re-read and found unchanged
+// (CHAIN_RULE_BYTES still 1087, prompt block sha256 unchanged -- see
+// tests/regression/agt-145-sync-routine-models.test.mjs part (e)). Only the line moved.
+const CHAIN_RULE_LINE = 55;
 const CHAIN_RULE_PREFIX = "9. ";
 const CHAIN_RULE_BYTES = 1087;
 const GUARDRAILS_SLUG = "dm-guardrails";
