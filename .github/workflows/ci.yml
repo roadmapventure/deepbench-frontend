@@ -222,6 +222,13 @@ jobs:
       - name: Install
         run: npm ci
 
+      # `--gate` (SES-199), never the bare form — see the header. Gates on FLAG findings in checks
+      # 9/10/11 only, the truth-registry classes; the size and shape ratchets stay advisory and are
+      # still printed above the gate line. Reads docs/governance/RULES-SNAPSHOT.md and
+      # docs/backlog/BACKLOG-SNAPSHOT.md, both committed, so it needs no credentials here.
+      - name: Session-docs tripwire (gate)
+        run: node scripts/check-session-docs.js --gate
+
       # AGT-168 — change-scoped, never the whole tree: see the header. `--base` is what keeps this
       # green over the 48 standing lines while still failing the 49th. Exit 2 (an unresolvable base)
       # is a failure here BY DESIGN — `on: push` fires only for dev and main, so `github.event.before`
@@ -233,13 +240,6 @@ jobs:
           set -euo pipefail
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           node scripts/audit-private-scan.js --base="$BASE_SHA"
-
-      # `--gate` (SES-199), never the bare form — see the header. Gates on FLAG findings in checks
-      # 9/10/11 only, the truth-registry classes; the size and shape ratchets stay advisory and are
-      # still printed above the gate line. Reads docs/governance/RULES-SNAPSHOT.md and
-      # docs/backlog/BACKLOG-SNAPSHOT.md, both committed, so it needs no credentials here.
-      - name: Session-docs tripwire (gate)
-        run: node scripts/check-session-docs.js --gate
 
       # `if: always()` so a red tripwire cannot conceal the suite's result — see the header.
       #
