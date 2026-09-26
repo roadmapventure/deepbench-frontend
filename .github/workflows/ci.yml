@@ -147,10 +147,11 @@
 #      way — no flag, always exit 0"). A gating step running the non-gating invocation is a step
 #      that can never fail, which is precisely the defect SES-199 was filed to close.
 #
-# `if: always()` ON THE REGRESSION STEP IS LOAD-BEARING, not tidiness. Steps stop at the first
-# failure, so without it a red tripwire would hide the suite's result entirely and every push after
-# a drift finding would report one problem while concealing however many others. Both checks run,
-# both report, and either one failing fails the job.
+# `if: always()` ON THE PRIVATE-INFO SCAN AND THE REGRESSION STEP IS LOAD-BEARING, not tidiness.
+# Steps stop at the first failure, so without it a red tripwire would hide the scan's and the
+# suite's results entirely and every push after a drift finding would report one problem while
+# concealing however many others. All three checks run, all three report, and any one failing
+# fails the job.
 #
 # ONE RISK NAMED RATHER THAN HIDDEN: this job's `name:` changes from "(reporting only)" to
 # "(blocking)", and GitHub matches required status checks by job NAME. `dev` — where every runner
@@ -234,6 +235,7 @@ jobs:
       # is a failure here BY DESIGN — `on: push` fires only for dev and main, so `github.event.before`
       # is always a real sha, and a base we cannot resolve means we scanned nothing.
       - name: Private-info scan (change-scoped gate)
+        if: always()
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |

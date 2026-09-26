@@ -225,6 +225,8 @@ function ciRunsTheGate() {
     "BASE_SHA must cover both triggers this workflow declares -- push and pull_request");
   assert.ok(!/continue-on-error/.test(step),
     "the gate step must not carry continue-on-error -- a step that cannot fail is not a gate");
+  assert.ok(/\n\s*if:\s*always\(\)/.test(step),
+    "the scan step must carry if: always() -- without it a red tripwire step above it skips the scan entirely, concealing exactly the class of leak this gate exists to catch");
 
   // The gate must sit in a job the conclusion reporter already depends on, or a red gate never
   // reaches the anchor (SES-255).
