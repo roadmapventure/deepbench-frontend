@@ -1,5 +1,13 @@
-// DeepBench v7.0.438 | tests/regression/ses-335-step4b-handoff.test.mjs | SES-335 -- runbook
+// DeepBench v7.0.608 | tests/regression/ses-335-step4b-handoff.test.mjs | SES-335 -- runbook
 // step 4b hands the invention pass to The Researcher, and the method retires into the rs-* Skills.
+//
+// RETARGETED BY AGT-138 (v7.0.608), AND THE RETARGET IS THE POINT RATHER THAN A PATH EDIT. The
+// Researcher left the builder cycle for its own weekly routine, so step 4b is now one 4d-shaped
+// pointer line and the method it used to carry lives in docs/runbooks/researcher-routine.md --
+// moved verbatim, not summarised. Part (a) therefore reads the PLAYBOOK for every sentence of the
+// method and reads the RUNBOOK for exactly two facts: that the pointer line is there, and that the
+// method is NOT (a retarget that only followed the text would pass just as well on a tree with two
+// live copies, which is the drift the move exists to end).
 //
 // WHAT IS BEING PINNED, AND THE SHAPE A LAZIER GUARD WOULD PASS VACUOUSLY.
 //
@@ -35,6 +43,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
+// AGT-138: the method's one home. The runbook keeps the step and points here.
+const PLAYBOOK_REL = "docs/runbooks/researcher-routine.md";
+const RETIREMENT_LINE =
+  "**4b. Invention pass — retired from the cycle (`AGT-138`, `v7.0.608`).** The Researcher runs in " +
+  "its own routine, `docs/runbooks/researcher-routine.md`; a cycle no longer runs the pass. Go to step 4c.";
 const LEDGER_REL = "docs/SELFBUILD-RETIREMENT-LEDGER.md";
 const SESSIONS_REL = "docs/SESSIONS.md";
 
@@ -50,48 +63,61 @@ const CRED_HINT =
 
 export default async function run() {
   const runbook = read(RUNBOOK_REL);
+  const playbook = read(PLAYBOOK_REL);
   const ledger = read(LEDGER_REL);
   const sessions = read(SESSIONS_REL);
 
-  // ---- (a) step 4b orchestrates, and the method is retired in place ---------------------------
-  assert.ok(/\*\*THE PASS IS THE RESEARCHER'S WORK NOW, AND THIS STEP ONLY ORCHESTRATES IT/.test(runbook),
-    "step 4b must name The Researcher as the owner of the pass");
-  assert.ok(/--agent=researcher --capability=research-class-lens --intent=rs-research-intent/.test(runbook),
-    "step 4b must assemble the prompt over scripts/agent-prompt.js with the agent, the capability " +
+  // ---- (a0) AGT-138: the runbook keeps the step as a POINTER and keeps none of the method -----
+  assert.ok(runbook.includes(RETIREMENT_LINE),
+    `${RUNBOOK_REL} must carry step 4b's retirement line verbatim -- the step stays in place so ` +
+    "ses-336's ordered step list and the runbook's nine `step 4b` cross-references still resolve");
+  assert.ok(!/SELECT \* FROM public\.invention_due\(\);/.test(runbook),
+    `${RUNBOOK_REL} still carries the invention_due() precondition -- the pass is not the cycle's ` +
+    "any more, and a runbook that still gates on it is the second live copy AGT-138 removed");
+  assert.ok(!/\(1-legacy\)/.test(runbook),
+    `${RUNBOOK_REL} still carries the legacy method items -- they moved to ${PLAYBOOK_REL} verbatim; ` +
+    "two homes for one procedure is exactly what check 13 forbids");
+  console.log(`  (a0) ${RUNBOOK_REL} holds the pointer line and none of the method -- PASS`);
+
+  // ---- (a) the method, in its one home: the playbook orchestrates and retires in place --------
+  assert.ok(/\*\*THE PASS IS THE RESEARCHER'S WORK NOW, AND THIS STEP ONLY ORCHESTRATES IT/.test(playbook),
+    "the playbook must name The Researcher as the owner of the pass");
+  assert.ok(/--agent=researcher --capability=research-class-lens --intent=rs-research-intent/.test(playbook),
+    "the playbook must assemble the prompt over scripts/agent-prompt.js with the agent, the capability " +
     "and the intent named -- a hand-built prompt is a second copy of the executor's assembly");
   // Line-break tolerant: this phrase wraps, and an assertion that depends on where it wraps is one
   // reflow away from a false red.
-  assert.ok(/run on the[\s\S]{0,40}`judgment`[\s\S]{0,60}lane|\*\*`judgment`\*\*[\s\S]{0,80}lane/.test(runbook),
-    "step 4b must send the run to the judgment lane, read from runner_model_lanes");
-  assert.ok(/`egress = 'blocked'`[\s\S]{0,120}INVENTION PASS: egress blocked/.test(runbook),
-    "step 4b must say what a blocked egress writes and that the cycle continues");
-  assert.ok(/continue to step 5 normally/.test(runbook),
+  assert.ok(/run on the[\s\S]{0,40}`judgment`[\s\S]{0,60}lane|\*\*`judgment`\*\*[\s\S]{0,80}lane/.test(playbook),
+    "the playbook must send the run to the judgment lane, read from runner_model_lanes");
+  assert.ok(/`egress = 'blocked'`[\s\S]{0,120}INVENTION PASS: egress blocked/.test(playbook),
+    "the playbook must say what a blocked egress writes and that the run continues");
+  assert.ok(/continue to step 5 normally/.test(playbook),
     "a blocked egress must not end the cycle -- the pass is bookkeeping plus research, not the build");
 
   // What it REMOVED, which is the half a mention-only assertion misses.
   for (const n of [1, 2, 3, 4]) {
-    assert.ok(runbook.includes(`(${n}-legacy)`),
-      `step 4b's old method item ${n} must be relabelled (${n}-legacy) -- it is no longer the pass`);
+    assert.ok(playbook.includes(`(${n}-legacy)`),
+      `the playbook's legacy method item ${n} must be relabelled (${n}-legacy) -- it is no longer the pass`);
   }
-  assert.ok(/RETIRED IN PLACE \(`SES-335`, `v7\.0\.438`\) — `docs\/SELFBUILD-RETIREMENT-LEDGER\.md` entry 48/.test(runbook),
+  assert.ok(/RETIRED IN PLACE \(`SES-335`, `v7\.0\.438`\) — `docs\/SELFBUILD-RETIREMENT-LEDGER\.md` entry 48/.test(playbook),
     "the legacy block must carry its RETIRED IN PLACE note pointing at ledger entry 48");
   for (const slug of RS_HOMES) {
-    assert.ok(runbook.includes(`\`${slug}\``),
+    assert.ok(playbook.includes(`\`${slug}\``),
       `the retirement note must name ${slug} as a surviving home -- "it moved" with no address is ` +
       "not a retirement, it is a deletion");
   }
   // The method text itself is KEPT: "it is in the Skill now" is not permission to delete it here.
-  assert.ok(/Egress probe \(precondition C3, measured not assumed\)/.test(runbook),
-    "the retired method must still be readable in the runbook -- deleting it leaves the pass " +
+  assert.ok(/Egress probe \(precondition C3, measured not assumed\)/.test(playbook),
+    "the retired method must still be readable in the playbook -- deleting it leaves the pass " +
     "readable by an agent and unreadable by the person debugging it");
-  assert.ok(/an editor must not treat/i.test(runbook),
+  assert.ok(/an editor must not treat/i.test(playbook),
     "the retirement note must forbid the delete-because-it-moved edit outright");
-  console.log("  (a) step 4b orchestrates; items 1-4 are (1-legacy)-(4-legacy) under entry 48 -- PASS");
+  console.log(`  (a) ${PLAYBOOK_REL} orchestrates; items 1-4 are (1-legacy)-(4-legacy) under entry 48 -- PASS`);
 
   // ---- (b) the one renamed key, checked against agt-64's own predicate -------------------------
-  assert.ok(/the Intent returns\s*\n?\s*`priority_class`, `public\.file_invention_proposal\(\)` reads `p\.class`/.test(runbook)
-    || /Intent returns[\s\S]{0,40}`priority_class`[\s\S]{0,80}reads `p\.class`/.test(runbook),
-    "step 4b must state the one key that is renamed at the handoff");
+  assert.ok(/the Intent returns\s*\n?\s*`priority_class`, `public\.file_invention_proposal\(\)` reads `p\.class`/.test(playbook)
+    || /Intent returns[\s\S]{0,40}`priority_class`[\s\S]{0,80}reads `p\.class`/.test(playbook),
+    "the playbook must state the one key that is renamed at the handoff");
   // The predicate itself, not a restatement of it. covers() is agt-64's export; if the rename ever
   // changes there, this assertion moves with it instead of drifting away from it.
   const P_KEYS = ["class", "title", "description", "scope_rationale", "enhancement_claim", "predicted_cycles"];

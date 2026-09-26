@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// DeepBench v7.0.559 | scripts/check-routine-prompt.js | AGT-102 slice 1
+// DeepBench v7.0.608 | scripts/check-routine-prompt.js | AGT-102 slice 1; AGT-138 -- the Researcher's
+// own routine is the third the check knows, and the first whose drift is expected by design
 // FEATURE: AGT-102 -- THE PROMPT A LIVE ROUTINE RUNS MUST EQUAL ITS REPO BLOCK. The runbook is the
 // source and the routine a copy (ARCHITECTURE.md §19v); nothing compared the two, so the Auditor
 // routine ran with the placeholder "DEEPBENCH-AUDITOR-<routine id>" for its first week. This script
@@ -8,16 +9,22 @@
 // routine's runbook.
 //
 // USAGE
-//   node scripts/check-routine-prompt.js --routine=runner|auditor --prompt=<file> [--out=<json>]
-//   node scripts/check-routine-prompt.js --routine=runner|auditor --note=<file> --cycle=<uuid> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher --prompt=<file> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher --note=<file> --cycle=<uuid> [--out=<json>]
 //
 // FLAGS
-//   --routine=runner|auditor   required. runner  -> docs/runbooks/routine-prompt.md,
+//   --routine=runner|auditor|researcher
+//                              required. runner  -> docs/runbooks/routine-prompt.md,
 //                              <!-- ROUTINE-PROMPT-BEGIN --> / <!-- ROUTINE-PROMPT-END -->,
 //                              trig_017TZ3JZcLBK6AYH6DKURqMH.
 //                              auditor -> docs/runbooks/auditor-routine.md,
 //                              <!-- AUDITOR-ROUTINE-PROMPT-BEGIN --> / <!-- AUDITOR-ROUTINE-PROMPT-END -->,
 //                              trig_01BCzPdanZ1YiK956dAqU6YN.
+//                              researcher -> docs/runbooks/researcher-routine.md,
+//                              <!-- RESEARCHER-ROUTINE-PROMPT-BEGIN --> / <!-- RESEARCHER-ROUTINE-PROMPT-END -->,
+//                              trig_01862LsK4ZQF8PTgQoK2cgCV (AGT-138). Drift is EXPECTED against
+//                              this one until John runs RemoteTrigger update -- the playbook is the
+//                              source and the live prompt is still its INTERIM text.
 //   --prompt=<file>            PROMPT MODE: the prompt text the run was given, verbatim.
 //   --note=<file>              NOTE MODE: a runner_cycles.notes text that reports routine-prompt drift.
 //   --cycle=<uuid>             the runner_cycles id the --note came from (required with --note).
@@ -60,6 +67,14 @@ export const ROUTINES = {
     begin: "<!-- AUDITOR-ROUTINE-PROMPT-BEGIN -->",
     end: "<!-- AUDITOR-ROUTINE-PROMPT-END -->",
     id: "trig_01BCzPdanZ1YiK956dAqU6YN",
+  },
+  // AGT-138. The Researcher left the builder cycle for its own weekly routine, so its prompt gets
+  // the same source-and-copy treatment the other two have: the block in the playbook is the source.
+  researcher: {
+    file: "researcher-routine.md",
+    begin: "<!-- RESEARCHER-ROUTINE-PROMPT-BEGIN -->",
+    end: "<!-- RESEARCHER-ROUTINE-PROMPT-END -->",
+    id: "trig_01862LsK4ZQF8PTgQoK2cgCV",
   },
 };
 
@@ -127,7 +142,7 @@ export function parseArgs(argv) {
     a[m[1]] = m[2] ?? "";
   }
   if (!a.routine) throw new UsageError("--routine=runner|auditor is required");
-  if (!Object.hasOwn(ROUTINES, a.routine)) throw new UsageError(`--routine must be runner or auditor (got ${a.routine})`);
+  if (!Object.hasOwn(ROUTINES, a.routine)) throw new UsageError(`--routine must be one of ${Object.keys(ROUTINES).join(", ")} (got ${a.routine})`);
   const hasPrompt = a.prompt !== undefined, hasNote = a.note !== undefined;
   if (hasPrompt === hasNote) throw new UsageError("exactly one of --prompt=<file> / --note=<file>");
   if (hasPrompt && !a.prompt) throw new UsageError("--prompt needs a file");

@@ -122,9 +122,19 @@ async function run() {
     "v7.0.414 is still in the runbook header -- it was copied, not rotated");
   // SES-164 step 2's one relocation. A rotation that archived this warning instead of relocating it
   // would leave the body with no home for it at all, which is content loss with a clean diff.
-  assert.ok(/Its `ladder_work_class` is the LITERAL `'invention'`, never derived from the proposal's own/.test(runbook),
+  // AGT-138 (v7.0.608) moved step 4b's body -- item 5 included -- verbatim into the Researcher's own
+  // playbook when the pass left the builder cycle, so the warning is read at its new home. The
+  // clause is unchanged in what it protects: this sentence must be BODY text somewhere, never only
+  // an archived header stamp. Both directions are asserted, because a relocation that left a copy
+  // behind in the runbook would be the two-live-homes defect the move exists to remove.
+  const relocated = /Its `ladder_work_class` is the LITERAL `'invention'`, never derived from the proposal's own/;
+  assert.ok(relocated.test(norm(fs.readFileSync(path.join(ROOT, "docs/runbooks/researcher-routine.md"), "utf8"))),
     "the one v7.0.414 warning with no body home (the literal 'invention' work class) must have been "
-    + "RELOCATED into the body beside step 4b item 5, not archived with the stamp");
+    + "RELOCATED into the body beside the pass's item 5 -- which AGT-138 moved to "
+    + "docs/runbooks/researcher-routine.md -- not archived with the stamp");
+  assert.ok(!relocated.test(runbook),
+    "the warning is still in docs/runbooks/runner-cycle.md as well; AGT-138 moved the pass to one "
+    + "home and a second live copy is what that move removes");
   console.log(`  (d) stamp count ${stamps}/5, v7.0.414 archived verbatim, its one unhomed warning relocated -- PASS`);
 
   if (!hasCreds()) {

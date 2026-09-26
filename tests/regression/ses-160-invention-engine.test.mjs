@@ -15,6 +15,16 @@
 // SES-275 refusal, the same boundary SES-159 and SES-320 draw for this table family). The
 // writers' evidence is the rolled-back `DO` block run at this ship, recorded in run() below.
 //
+// RETARGETED BY AGT-138 (v7.0.608). The Researcher left the builder cycle for its own weekly
+// routine, so runner-cycle.md step 4b is one 4d-shaped pointer line and the method it carried --
+// the egress probe, the legacy items, the filing call and the Reverse ceremony -- moved VERBATIM
+// into docs/runbooks/researcher-routine.md. The DOC arm follows the text to its one home: three
+// clauses now read the playbook, and the runbook clause asserts the opposite of what it used to --
+// that the pointer line is there and that `invention_due()` is NOT, because two live copies of the
+// pass is the thing the move removes. Nothing about the DATABASE changed: file_invention_proposal()
+// and invention_due() are live functions, the live arm below still calls rpc/invention_due, and a
+// proposal now reaches the board through the audit intake and the manager's ruling instead.
+//
 // Invocation: node tests/regression/ses-160-invention-engine.test.mjs
 // (Section 2 rule 5 for the credentialed form.)
 
@@ -31,6 +41,11 @@ const PRE_CHANGE_SHA = "66acd810b84d12df748f491e355191469c147d90";
 
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
 const LANE_REL = "docs/RUNNER-GOV-ENHANCEMENT-LANE.md";
+// AGT-138 -- the method's one home from v7.0.608 on.
+const PLAYBOOK_REL = "docs/runbooks/researcher-routine.md";
+const RETIREMENT_LINE =
+  "**4b. Invention pass — retired from the cycle (`AGT-138`, `v7.0.608`).** The Researcher runs in " +
+  "its own routine, `docs/runbooks/researcher-routine.md`; a cycle no longer runs the pass. Go to step 4c.";
 
 // The runbook is hard-wrapped, so a load-bearing phrase can straddle a line break (SES-194).
 export const norm = s => s.replace(/\s+/g, " ");
@@ -45,25 +60,32 @@ function readRel(rel) {
 
 export const CLAUSES = [
   {
-    id: "4b-precondition-is-invention-due-not-notes-grep",
+    // AGT-138 turned this clause around: the pass is not the cycle's work any more, so the fact
+    // worth pinning is no longer "the precondition is invention_due()" but "the cycle no longer has
+    // a precondition at all, and the step says where the pass went". The old assertion would now
+    // pass on a tree that had quietly kept the whole pass beside the pointer, which is the one
+    // failure mode the move exists to prevent -- so the absence is asserted with the presence.
+    id: "4b-retired-to-the-researchers-own-routine",
     file: RUNBOOK_REL,
     detail:
-      "the old designation ('run this pass iff no runner_cycles row today carries INVENTION " +
-      "PASS in notes') let a cycle run the pass with no pacing at all -- invention_due() is the " +
-      "one function that reads the rung, the settings and EL-02's cap, and a reader who cannot " +
-      "see this call would resurrect the free-running form the first time they 'simplified' the " +
-      "precondition",
-    test: s => /SELECT \* FROM public\.invention_due\(\);/.test(s) &&
-               !/Deterministic designation, no coordination needed: run this pass/.test(norm(s)),
+      "a reader who found the invention_due() gate still in step 4b would run the pass from a " +
+      "builder cycle -- on a daily rung, with a cycle's notes as its record -- while the weekly " +
+      "routine runs it too, and the two would file against each other. The pointer line is what " +
+      "tells that reader the pass has one home and where it is; its absence is what tells them " +
+      "the cycle's copy is gone rather than merely un-referenced",
+    test: s => s.includes(RETIREMENT_LINE) &&
+               !/SELECT \* FROM public\.invention_due\(\);/.test(s) &&
+               !/\(1-legacy\)/.test(s),
     breaks: s => s.replace(
-      "Precondition: `SELECT * FROM public.invention_due();` (the old notes-grep designation retires).",
-      "Deterministic designation, no coordination needed: run this pass iff no `runner_cycles` " +
-        "row in the current America/Chicago day carries `INVENTION PASS` in `notes`.",
+      RETIREMENT_LINE,
+      "**4b. Invention pass — once per CST day, before selection.**\nPrecondition: " +
+        "`SELECT * FROM public.invention_due();` (the old notes-grep designation retires).",
     ),
   },
   {
     id: "egress-probe-names-the-missing-websearch-tool",
-    file: RUNBOOK_REL,
+    // AGT-138: moved verbatim to the playbook; this is the same text, read at its one home.
+    file: PLAYBOOK_REL,
     detail:
       "the routine's allowed_tools carry WebFetch only, not WebSearch, so a cycle that tries a " +
       "bare WebSearch call every day either burns a cycle re-discovering the same missing tool " +
@@ -83,7 +105,8 @@ export const CLAUSES = [
   },
   {
     id: "step-5-files-with-the-function-and-the-card-sentence-is-quoted-retired",
-    file: RUNBOOK_REL,
+    // AGT-138: moved verbatim to the playbook; this is the same text, read at its one home.
+    file: PLAYBOOK_REL,
     detail:
       "step 5 used to file a gated_before_build card that John's Accept turned into a ticket -- " +
       "SES-283/M6-04 killed that surface, and this ship is the rewrite SES-289's annotation " +
@@ -104,7 +127,8 @@ export const CLAUSES = [
   },
   {
     id: "reverse-ceremony-calls-record-rejected-invention-before-anything-else",
-    file: RUNBOOK_REL,
+    // AGT-138: moved verbatim to the playbook; this is the same text, read at its one home.
+    file: PLAYBOOK_REL,
     detail:
       "a reversed invention decision without this call leaves the rejection unrecorded -- the " +
       "corpus never learns what John turned down, and the SAME idea can be re-proposed on a " +
@@ -170,20 +194,41 @@ function everyClauseHasTeeth() {
 // FILE-LEVEL NEGATIVE CONTROL against the commit this ship was written on (the SES-160 kickoff,
 // doc-only). Every clause must FAIL there -- that tree is the one where step 4b still ran the
 // withdrawn card route and the enhancement-lane doc named no producer.
+// AGT-138 -- A PATH THAT DID NOT EXIST YET IS NOT A READ FAILURE, and the difference decides
+// whether this control has teeth. docs/runbooks/researcher-routine.md is NEW at v7.0.608, so
+// `git show <pre-change sha>:<it>` fails for the same reason a shallow clone fails, and the old
+// catch-all turned that into one notRun() that silently dropped the control for the OTHER two files
+// as well. So the commit's reachability is asked once, and per path the question is whether the
+// path is IN that commit: absent -> "" (and every clause on it fails there, which is exactly what
+// the control asserts), present but unreadable -> still a declared notRun, never a quiet "".
 function theClausesFailOnThePreChangeTree() {
+  const git = args => execFileSync("git", args, {
+    cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"],
+  });
+  try {
+    git(["cat-file", "-e", `${PRE_CHANGE_SHA}^{commit}`]);
+  } catch {
+    notRun(
+      "the file-level negative control",
+      `commit ${PRE_CHANGE_SHA} is unreachable in this checkout (a shallow clone), so the ` +
+        "pre-change docs could not be read. The clauses above still ran against the shipped " +
+        "tree; what is unproven is that they FAIL on the tree where SES-160 did not exist.",
+    );
+    return;
+  }
   const before = {};
-  for (const rel of [RUNBOOK_REL, LANE_REL]) {
+  for (const rel of [...new Set(CLAUSES.map(c => c.file))]) {
+    let inTree = false;
+    try { inTree = git(["ls-tree", "--name-only", PRE_CHANGE_SHA, "--", rel]).trim() !== ""; }
+    catch { inTree = false; }
+    if (!inTree) { before[rel] = ""; continue; }
     try {
-      before[rel] = execFileSync("git", ["show", `${PRE_CHANGE_SHA}:${rel}`], {
-        cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
-        stdio: ["ignore", "pipe", "ignore"],
-      });
+      before[rel] = git(["show", `${PRE_CHANGE_SHA}:${rel}`]);
     } catch {
       notRun(
         "the file-level negative control",
-        `commit ${PRE_CHANGE_SHA} is unreachable in this checkout (a shallow clone), so the ` +
-          "pre-change docs could not be read. The clauses above still ran against the shipped " +
-          "tree; what is unproven is that they FAIL on the tree where SES-160 did not exist.",
+        `${rel} is in commit ${PRE_CHANGE_SHA} but could not be read, so the pre-change docs are ` +
+          "incomplete. The clauses above still ran against the shipped tree.",
       );
       return;
     }

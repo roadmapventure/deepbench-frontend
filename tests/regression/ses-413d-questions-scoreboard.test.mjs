@@ -111,7 +111,15 @@ export const RUNBOOK_CEILING = 381000;
 // executing row and `moat-support` as today's (108 B) -> the executing row that owns the queue's
 // first row, three today, ranked by `priority` (131 B). 189 B out, 200 B in: 380969 -> 380980 B,
 // 20 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
-export const BYTES_AT_SHIP = 380980;
+// v7.0.608 (AGT-138) RETIRES step 4b to a pointer at docs/runbooks/researcher-routine.md -- the
+// Researcher now runs in its own routine, so a cycle no longer runs the invention pass. The whole
+// method (the orchestration statements, (1-legacy)-(4-legacy) under ledger entry 48, the filing
+// items and the Reverse ceremony) MOVED verbatim into that playbook rather than being deleted, and
+// the step stays in place as one 4d-shaped line so ses-336's step list and the runbook's nine
+// "step 4b" cross-references still resolve. 10,561 B out, 199 B in (the pointer line): 380980 ->
+// 370419 B, 10,581 B under the ceiling -- the only re-pin here that LOWERS the number. Re-measured
+// with wc -c and re-pinned in the same commit as the removal, which is what ses-424f:291 asserts.
+export const BYTES_AT_SHIP = 370419;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

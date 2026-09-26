@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v7.0.537 | scripts/render-cycle-card.js | SES-377, SES-424 slice 5 -- the cycle card: a 5-10 KB
+// DeepBench v7.0.608 | scripts/render-cycle-card.js | SES-377, SES-424 slice 5, AGT-138 (4b retired) -- the cycle card: a 5-10 KB
 // executable digest of docs/runbooks/runner-cycle.md, GENERATED from it and never hand-written.
 //
 // WHY THIS EXISTS. Measured 2026-09-12 in this clone: runner-cycle.md is 363,840 bytes over 4,409
@@ -122,7 +122,7 @@ export const NOTES = {
   "4":        { outcome: "dev must serve; a user-blocking failure preempts everything, root-cause first", block: 0 },
   "4a":       { outcome: "read CI's conclusion for that sha and hand it to the actuator", block: 1 },
   "4a-bis":   { outcome: "exit 0 serving-green → carry on; exit 1 → 4a with its engine object; 2 = cannot tell", block: 1 },
-  "4b":       { outcome: "due false → write INVENTION PASS: <reason> in notes and skip the rest", block: 1 },
+  "4b":       { outcome: "retired: the Researcher runs in its own routine (researcher-routine.md); go to 4c", block: 1 },
   "4c":       { outcome: "exit 2 is a refusal and nothing was written — continue to step 5 normally", block: 0 },
   "4d":       { outcome: "retired: the Auditor runs in its own routine (auditor-routine.md); go to 4e", block: 1 },
   "4e":       { outcome: "already run today → step 5; exit 3 → ticketowner judges; no Agent/exit 2 → re-run unjudged", block: 1 },

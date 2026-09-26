@@ -216,6 +216,13 @@ const SITES = [
     site: "B12 -- step 4b, the invention pass",
     retired: "Volume widens only by ladder (B12).",
     preserved: "the corpus is the scoring\n   frame, not your generic priors.",
+    // AGT-138 (v7.0.608): the invention pass left the builder cycle for the Researcher's own weekly
+    // routine, and step 4b's whole method -- this WHY-prose with it -- moved VERBATIM into the
+    // playbook while step 4b became a pointer line. John's card scoped batch 1 to the rule
+    // SENTENCE, so the prose is still owed byte-for-byte; only its address moved. The `retired`
+    // half is asserted against BOTH files below, because a hand-copied statement that travelled
+    // with the prose would be the same exemption-by-marker defect at a new address.
+    file: "docs/runbooks/researcher-routine.md",
   },
   {
     site: "B18 (a) -- step 9, the plain-language summary columns",
@@ -230,17 +237,21 @@ const SITES = [
 ];
 
 function theHandCopiedStatementsAreGone() {
-  const text = read(RUNBOOK_REL);
-  for (const { site, retired } of SITES) {
-    assert.ok(!text.includes(retired),
-      `${site}: the hand-copied rule statement is still in the file. A marker beside a surviving ` +
-      `copy exempts the copy -- check 12 goes quiet and the drift it exists to catch is untouched.`);
+  // Every file a site's prose can live in, so a statement cannot escape the check by moving.
+  const homes = [...new Set([RUNBOOK_REL, ...SITES.map(s => s.file).filter(Boolean)])];
+  for (const rel of homes) {
+    const text = read(rel);
+    for (const { site, retired } of SITES) {
+      assert.ok(!text.includes(retired),
+        `${site}: the hand-copied rule statement is still in ${rel}. A marker beside a surviving ` +
+        `copy exempts the copy -- check 12 goes quiet and the drift it exists to catch is untouched.`);
+    }
   }
 }
 
 function johnsReasoningSurvivedByteForByte() {
-  const text = read(RUNBOOK_REL);
-  for (const { site, preserved } of SITES) {
+  for (const { site, preserved, file } of SITES) {
+    const text = read(file ?? RUNBOOK_REL);
     assert.ok(text.includes(preserved),
       `${site}: John's adjacent reasoning was lost or reflowed. His card scoped this migration to ` +
       `the rule SENTENCE; the WHY-prose around it is preserved byte-for-byte (card 064604e5).`);
