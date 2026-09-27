@@ -1,3 +1,13 @@
+// DeepBench v7.0.646 | tests/regression/agt-86h-auditor-routine.test.mjs | AGT-177 -- arm G grows the
+// sixth slug and the sweep that stops the next one. `audit-run-review`'s capability row shipped in
+// AGT-137 (v7.0.602) with no SERVICE_CATALOG entry, so agent-log.js refused every
+// --ai-type=audit-run-review and docs/runbooks/auditor-routine.md:143 -- prescribed verbatim -- exited
+// 2. Arm G now puts that slug through the same NEW_SLUGS checks and the same parseArgs pair, and
+// SWEEPS docs/runbooks/*.md: every --ai-type=<literal> a runbook prescribes must be a real catalog
+// slug, so the next capability that ships without its entry is caught by the runbook line that would
+// have failed rather than by a refusal in production.
+// Kickoff: docs/kickoffs/v7.0.646-AGT-177-run-review-catalog-and-intent.md §5 task 3.
+//
 // DeepBench v7.0.556 | tests/regression/agt-86h-auditor-routine.test.mjs | AGT-86 slice 8c -- arms A, B, H:
 // the runbook docs/runbooks/auditor-routine.md exists with its prompt block, every flag it passes a
 // script is in that script's usage header, and runner-cycle.md step 4d points at it.
@@ -35,8 +45,11 @@
 //      carries the flag's label; a bad visibility value exits 2 naming the flag. Pre: no such file;
 //      the unknown flag is ignored and exits 0.
 //   F  NOTE -- --collect's note no longer says "John reads" and names --session-name=<name> --apply.
-//   G  CATALOG -- the five slugs exist with the judge patterns (advisor adds Tool Use), and
-//      agent-log.js parseArgs accepts them. Pre: error "not a SERVICE_CATALOG slug".
+//   G  CATALOG -- the six slugs exist with the judge patterns (advisor adds Tool Use), and
+//      agent-log.js parseArgs accepts them. Pre: error "not a SERVICE_CATALOG slug". AGT-177
+//      adds the SWEEP: every --ai-type=<literal> in docs/runbooks/*.md is a catalog slug
+//      (today 10 occurrences, 3 distinct; the `<cap>` and `…` placeholders do not match the
+//      literal class, so they are not asserted against the catalog).
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -95,7 +108,25 @@ function headOf(name) {
   return lf(fs.readFileSync(p, "utf8")).split("\n").slice(0, 130).join("\n");
 }
 
-const NEW_SLUGS = ["audit-board-health", "audit-work-quality", "audit-config-review", "audit-advisor", "review-audit-worklist"];
+const NEW_SLUGS = ["audit-board-health", "audit-work-quality", "audit-config-review", "audit-advisor",
+  "review-audit-worklist", "audit-run-review"];
+
+// AGT-177: the sweep. A runbook line is PRESCRIBED verbatim, so an --ai-type literal it carries that
+// the catalog does not is a guaranteed exit 2 the moment somebody runs the step. Placeholders
+// (`--ai-type=<cap>`, `--ai-type=…`) carry no literal and are not in the class this reads.
+const RUNBOOK_DIR = path.join(ROOT, "docs", "runbooks");
+export function runbookAiTypes(readDir, readFile) {
+  const out = [];
+  for (const name of readDir().filter(n => n.endsWith(".md")).sort()) {
+    const text = lf(readFile(name));
+    text.split("\n").forEach((line, i) => {
+      for (const m of line.matchAll(/--ai-type=([a-z0-9-]+)/g)) {
+        out.push({ file: `docs/runbooks/${name}`, line: i + 1, slug: m[1] });
+      }
+    });
+  }
+  return out;
+}
 
 // Credentials stripped so arm C proves the refusal happens before any database read.
 function cluster(args) {
@@ -246,12 +277,32 @@ export default async function run() {
         assert.ok(e.patterns.includes("Structured Output") && e.patterns.includes("LLM-as-Judge / Verifier"), `${slug} judge patterns`);
       }
       assert.ok(SERVICE_CATALOG.find(s => s.slug === "audit-advisor").patterns.includes("Tool Use"), "advisor carries Tool Use");
-      for (const [cap, intent] of [["audit-advisor", "au-advisor-intent"], ["review-audit-worklist", "dm-audit-review-intent"]]) {
+      for (const [cap, intent] of [["audit-advisor", "au-advisor-intent"], ["review-audit-worklist", "dm-audit-review-intent"],
+        ["audit-run-review", "au-run-intent"]]) {
         const p = parseArgs(["--agent=auditor", `--capability=${cap}`, "--model=m", `--ai-type=${cap}`, `--feature=${cap}:${intent}:depth1`]);
         assert.equal(p.error, undefined, `parseArgs accepts ${cap}: ${p.error}`);
       }
       const slugs = SERVICE_CATALOG.map(s => s.slug);
       assert.equal(new Set(slugs).size, slugs.length, "slug set still unique");
+
+      // AGT-177 SWEEP -- every --ai-type literal a runbook prescribes is a real catalog slug.
+      const readDir = () => fs.readdirSync(RUNBOOK_DIR);
+      const readFile = n => fs.readFileSync(path.join(RUNBOOK_DIR, n), "utf8");
+      const found = runbookAiTypes(readDir, readFile);
+      assert.ok(found.length >= 10, `the sweep reads the runbooks (${found.length} --ai-type literals)`);
+      assert.ok(new Set(found.map(f => f.slug)).size >= 3, `at least three distinct literals (${[...new Set(found.map(f => f.slug))].join(", ")})`);
+      assert.ok(found.some(f => f.slug === "audit-run-review"),
+        "the sweep finds auditor-routine.md's --ai-type=audit-run-review -- the literal that exited 2");
+      const strays = found.filter(f => !slugs.includes(f.slug));
+      assert.deepEqual(strays.map(f => `${f.file}:${f.line} --ai-type=${f.slug}`), [],
+        "every runbook --ai-type literal must be a SERVICE_CATALOG slug -- agent-log.js exits 2 on any that is not");
+      // Controls: the sweep has teeth, and it does NOT read the placeholders as literals.
+      const planted = runbookAiTypes(() => ["fake.md"], () => "node scripts/agent-log.js --ai-type=not-a-slug\n");
+      assert.deepEqual(planted, [{ file: "docs/runbooks/fake.md", line: 1, slug: "not-a-slug" }],
+        "control: a planted unknown literal is seen, with its file and line");
+      assert.ok(!slugs.includes(planted[0].slug), "control: and that planted literal is not a catalog slug");
+      assert.deepEqual(runbookAiTypes(() => ["ph.md"], () => "--ai-type=<cap> and --ai-type=\u2026\n"), [],
+        "control: the `<cap>` and `\u2026` placeholders carry no literal, so the sweep skips them");
     });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

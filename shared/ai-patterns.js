@@ -1,3 +1,4 @@
+// DeepBench v7.0.646 | shared/ai-patterns.js | AGT-177 -- `audit-run-review` enters the catalog: the capability row (public.capabilities, default_intent_slug au-run-intent) shipped in AGT-137/v7.0.602 WITHOUT its catalog slug, so scripts/agent-log.js refuses every --ai-type=audit-run-review and docs/runbooks/auditor-routine.md:143 -- prescribed verbatim -- exits 2. Live proof: 7 turns on feature `audit-run-review:au-run-intent:depth1`, every one logged ai_type `agent-turn`, zero with ai_type `audit-run-review`. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.590 | shared/ai-patterns.js | AGT-144 -- `model-assignment` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.585 | shared/ai-patterns.js | AGT-127 -- `decide-gated-card` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array, so the Layer-3 row for the manager's gate-card ruling run would be refused without it (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.552 | shared/ai-patterns.js | AGT-86 slice 8a -- five audit slugs enter the catalog (audit-board-health, audit-work-quality, audit-config-review, audit-advisor, review-audit-worklist): their capability rows are live and scripts/agent-log.js refuses any --ai-type outside this array, so the Auditor routine's sub-agent log rows would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
@@ -284,6 +285,16 @@ export const SERVICE_CATALOG = [
   { slug: 'audit-config-review',     name: 'Audit Config Review (The Auditor)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
   { slug: 'audit-advisor',           name: 'Audit Advisor (The Auditor)',       serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier', 'Tool Use'], roadmap: 'now' },
   { slug: 'review-audit-worklist',   name: 'Review Audit Worklist (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+
+  // AGT-177 -- audit-run-review, the Auditor's per-run review (AGT-137, v7.0.602), on the five audit
+  // rows immediately above: its capabilities row and five Skill links are live, and agent-log.js
+  // refuses any --ai-type this array does not carry, so the mandatory Layer-3 row for every per-run
+  // review was refused and the 7 runs to date all logged as `agent-turn` instead -- the Auditor's
+  // per-run throughput could not be read off its own ai_type (.claude/rules/capability-logging.md).
+  // Judge patterns for the same reason as the five above: 'Structured Output' because the ruling is
+  // validated against au-run-intent's stored schema before any finding is filed, and
+  // 'LLM-as-Judge / Verifier' because the turn IS the judgment on one finished cycle.
+  { slug: 'audit-run-review',        name: 'Audit Run Review (The Auditor)',    serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // run-project: 'Structured Output' because the manager's answer is validated against
   // dm-run-intent's schema before scripts/run-project.js will act on it, and 'Orchestrator-Workers'

@@ -1,3 +1,11 @@
+// DeepBench v7.0.646 | tests/regression/agt-137-run-review.test.mjs | AGT-177 -- arm D grows the row
+// assertion. au-run-intent's `method` told the reviewer to read a `gate_failed` column off
+// runner_cycles; no table in public has that column at all, and scripts/audit-run-review.js:148 never
+// asks for one (arm B's control already proves the read does not name it) -- only the stored row was
+// wrong. Arm D now asserts the row itself, BOTH directions: `gate_failed` gone AND `its three gates`
+// still named, so a replace that took too much is as red as one that took nothing.
+// Kickoff: docs/kickoffs/v7.0.646-AGT-177-run-review-catalog-and-intent.md §5 task 3.
+//
 // DeepBench v7.0.602 | tests/regression/agt-137-run-review.test.mjs | AGT-137
 // FEATURE: AGT-137 -- the Auditor reviews ONE runner cycle the week it ran, and the Auditor's two
 // John pushes become rows while notifications are off. Kickoff:
@@ -16,8 +24,9 @@
 //   C  DOCS -- runner-cycle.md <= 381,000 B with step 9's span naming `audit-run-review.js --prepare`;
 //      auditor-routine.md <= 40 KB with its prompt block holding `record_decision` and NEITHER
 //      `claim_john_alerts` NOR `push`. Each clause carries a mutation control.
-//   D  LIVE (read-only) -- the capability row, its five links, the `auditor` assignment, and a real
-//      `agent-prompt.js` assembly at exit 0. Declared notRun without credentials.
+//   D  LIVE (read-only) -- the capability row, its five links, the `auditor` assignment, a real
+//      `agent-prompt.js` assembly at exit 0, and (AGT-177) the intent row's own `method`: no
+//      `gate_failed`, still `its three gates`. Declared notRun without credentials.
 //
 // Pre-change (origin/dev): scripts/audit-run-review.js does not exist, so A and B fail at import;
 // the prompt block still names claim_john_alerts and two pushes, so C is red; the capability row
@@ -240,6 +249,26 @@ async function run() {
         "--agent=auditor", `--capability=${CAP}`, `--task-file=${taskFile}`], { cwd: ROOT, encoding: "utf8" });
       assert.strictEqual(r.status, 0, `agent-prompt.js assembles the capability (exit ${r.status}): ${(r.stderr || "").slice(0, 300)}`);
       assert.ok(/finding_type/.test(r.stdout), "and the assembled prompt carries the schema's finding_type requirement");
+
+      // AGT-177: the intent row's own method. `gate_failed` is a column no table in public has, so
+      // a reviewer following the method verbatim asks runner_cycles for it and gets a 400. BOTH
+      // directions -- a `replace` that swallowed the surrounding sentence would leave `bad` false
+      // and is caught by `kept`.
+      const intents = await get(`skill_profiles?slug=eq.${INTENT}&select=slug,method`);
+      assert.strictEqual(intents.length, 1, `exactly one ${INTENT} row; got ${intents.length}`);
+      const method = String(intents[0].method ?? "");
+      assert.ok(!method.includes("gate_failed"),
+        "au-run-intent.method must NOT name `gate_failed` -- no table in public has that column, so the "
+        + "read it prescribes is a 400 (AGT-177); the three real gates ride on the verdicts key");
+      assert.ok(method.includes("its three gates"),
+        "and it must STILL name `its three gates` -- runner_verdicts.gate_build/gate_regression/"
+        + "gate_hygiene is what replaced the dropped word, so losing this sentence is the over-replace");
+      // CONTROL: each clause reads the row, not a constant.
+      assert.ok(method.replace("its three gates", "x").includes("gate_failed") === false
+        && `${method} gate_failed`.includes("gate_failed"),
+        "control: the no-gate_failed clause detects the word when it is put back");
+      assert.ok(!method.split("its three gates").join("x").includes("its three gates"),
+        "control: with its own subject mutated away the three-gates clause goes red");
     });
   }
 
