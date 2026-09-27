@@ -304,12 +304,55 @@ export function renderingCycleFinding(fileText, cycleId) {
   };
 }
 
+// EVERY BULLET'S VERSION AND REVERSAL HANDLE MUST BE ITS OWN (AGT-191, v7.0.630) -- pure, no network.
+//
+// The cycle join above makes the right card reach the right row. This asserts the card itself is not
+// carrying ANOTHER cycle's facts in its prose, which the join cannot see: a ship card is written by a
+// model, and `docs/ARCHITECTURE.md` §19v names this ledger the briefing John judges from ("the editor
+// and executive, not the author"). A bullet that prints `v7.0.619` beside a sentence naming 7.0.621, or
+// a reversal handle belonging to a different cycle, corrupts exactly what his judgement runs on -- and
+// it is unreadable as an error, because every token in it is a real version and a real decision id.
+//
+// THE REFUSAL IS TOTAL AND THAT IS THE DESIGNER'S CALL (JOHN-0925-DESIGNER-DECIDES, reversible): the
+// caller `die()`s and writes nothing, on the standing-brief precedent -- this file is not published at
+// all rather than published wrong. NAMED COST: a card naming an unrelated uuid or another version
+// blocks every render until THE CARD is fixed. Zero such cards behind the live top-10 (13 cards,
+// measured 2026-09-27). The remedy is never an edit to CLAUDE-STATE.md, which is generated.
+//
+// `null` means nothing to report -- a null card (a publish-only cycle has none) or a clean one. A
+// finding is `{ cycle_id, offending, reason }`; `offending` lists the tokens, in prose order, versions
+// before uuids. A row that claimed NO version cannot prove any version token is its own, so every one
+// is offending -- the honest direction, and it is why `own` is compared, never merely tested for truth.
+export function bulletProvenanceFinding(cycle, card, decisionIds) {
+  if (!card) return null;
+  const bare = v => String(v == null ? "" : v).trim().replace(/^v/i, "");
+  const ids = new Set([...(decisionIds || [])].map(v => String(v).toLowerCase()));
+  const prose = `${card.title} ${card.plain_after} ${card.plain_worth}`;
+  const own = bare(cycle && cycle.version);
+  const offending = [];
+  for (const m of prose.match(/v?\d+\.\d+\.\d+/g) || []) if (bare(m) !== own) offending.push(m);
+  for (const m of prose.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || []) {
+    if (!ids.has(m.toLowerCase())) offending.push(m);
+  }
+  if (offending.length === 0) return null;
+  const cid = String(cycle && cycle.id ? cycle.id : "");
+  return {
+    cycle_id: cid,
+    offending,
+    reason: `the ship card for cycle ${cid.slice(0, 8)} (${own ? "v" + own : "no version claimed"}) names ` +
+      `${offending.map(t => `\`${t}\``).join(", ")} in its own prose -- a version or a decision id that is ` +
+      "not this cycle's, so the bullet would publish another cycle's facts beside this cycle's version. " +
+      "Remedy: fix the CARD's `title`/`plain_after`/`plain_worth` in `runner_items`, then re-render. " +
+      "Never edit CLAUDE-STATE.md -- it is generated.",
+  };
+}
+
 // The comparator, pure and exported so the guard asserts the REAL predicate rather than a copy of it
 // (the DIR-603f44ea / SES-176 precedent). `rows` is whatever the ledger returned for the pinned ids.
 // Returns { code, reason }: 0 = no drift, 1 = drift. It never returns 2 -- "could not run" belongs to
 // the caller's network/env layer, and conflating a deleted row (real drift) with a REST failure
 // (could not run) is how a check softens.
-export function checkAgainstPin(fileText, rows, cardsByTicket) {
+export function checkAgainstPin(fileText, rows, cardsByCycle) {
   const pin = parsePin(fileText);
   if (pin.length === 0) {
     return { code: 1, reason: "no ledger-pin in the committed file — it was hand-edited or predates SES-261" };
@@ -324,13 +367,13 @@ export function checkAgainstPin(fileText, rows, cardsByTicket) {
     return { code: 1, reason: `pinned cycle(s) no longer record a push_sha: ${noPush.join(", ")}` };
   }
   const ordered = pin.map(id => byId.get(id));
-  const body = renderBody(ordered, cardsByTicket);
+  const body = renderBody(ordered, cardsByCycle);
   return body === fileText
     ? { code: 0, reason: "the committed file is a byte-exact render of the cycles it pins" }
     : { code: 1, reason: "the committed file differs from a re-render of the cycles it pins" };
 }
 
-export function renderBody(cycles, cardsByTicket) {
+export function renderBody(cycles, cardsByCycle) {
   // THE VERSION LINES AND THE SESSION BULLETS READ DIFFERENT SETS, deliberately. "Version in dev" and
   // "Prior" answer *which version is on dev*, so they skip cycles that claimed no version at all -- a
   // publish-only cycle ships real work and is a real session, but it is not a version. Taking
@@ -372,7 +415,7 @@ export function renderBody(cycles, cardsByTicket) {
   );
 
   lines.push("## Last 3 sessions", "");
-  for (const c of cycles.slice(0, 3)) lines.push(renderBullet(c, cardsByTicket.get(c.item_id) || null));
+  for (const c of cycles.slice(0, 3)) lines.push(renderBullet(c, cardsByCycle.get(c.id) || null));
   lines.push("");
   lines.push(`${GENERATED_MARK} — do not hand-edit the sections above. ledger-pin: ${renderPin(cycles)} -->`);
   return lines.join("\n") + "\n";
@@ -411,14 +454,21 @@ async function main() {
     "runner_cycles?select=id,started_at,trigger,model,version,item_id,push_sha,outcome" + LEDGER_FILTER);
   if (!Array.isArray(cycles) || cycles.length === 0) die("no pushed cycles on record — nothing to render");
 
-  const tickets = [...new Set(cycles.map(c => c.item_id).filter(Boolean))];
-  const cardsByTicket = new Map();
-  if (tickets.length) {
-    const inList = tickets.map(t => `"${t}"`).join(",");
+  // A CARD BELONGS TO THE CYCLE THAT WROTE IT, NEVER TO THE TICKET (AGT-191, v7.0.630). The retired
+  // form fetched `backlog_id=in.(...)` and kept the newest card per TICKET, so every row of a
+  // multi-slice ticket printed the newest slice's text: live 2026-09-27, `3c489041` (v7.0.619,
+  // AGT-168 slice 5) rendered slice 6's title and prose, carrying the string `7.0.621` and the
+  // reversal handle `2179723b-...` — a version and a decision captured under `b873597f`. `AGT-168`
+  // alone has 6 ship cards. All 13 cards behind the live top-10 carry a non-null distinct `cycle_id`,
+  // so the cycle join is exact, and it is also the only join that can be right: `renderBullet` prints
+  // a row's own version beside that card's prose.
+  const cycleIds = [...new Set(cycles.map(c => c.id).filter(Boolean))];
+  const cardsByCycle = new Map();
+  if (cycleIds.length) {
     const cards = await rest(url, key,
-      `runner_items?select=backlog_id,title,plain_after,plain_worth,kind,created_at` +
-      `&kind=eq.ship&backlog_id=in.(${inList})&order=created_at.desc`);
-    for (const c of cards) if (!cardsByTicket.has(c.backlog_id)) cardsByTicket.set(c.backlog_id, c);
+      `runner_items?select=backlog_id,cycle_id,title,plain_after,plain_worth,kind,created_at` +
+      `&kind=eq.ship&cycle_id=in.(${cycleIds.join(",")})&order=created_at.desc`);
+    for (const c of cards) if (c.cycle_id && !cardsByCycle.has(c.cycle_id)) cardsByCycle.set(c.cycle_id, c);
   }
 
   // --check is PIN-ANCHORED (SES-261, v7.0.347): it grades the committed file against the cycles that
@@ -445,13 +495,13 @@ async function main() {
       pinnedRows = await rest(url, key,
         "runner_cycles?select=id,started_at,trigger,model,version,item_id,push_sha,outcome" +
         `&id=in.(${pin.join(",")})`);
-      const pinnedTickets = [...new Set(pinnedRows.map(c => c.item_id).filter(Boolean))];
-      if (pinnedTickets.length) {
-        const pinnedCardRows = await rest(url, key,
-          `runner_items?select=backlog_id,title,plain_after,plain_worth,kind,created_at` +
-          `&kind=eq.ship&backlog_id=in.(${pinnedTickets.map(t => `"${t}"`).join(",")})&order=created_at.desc`);
-        for (const c of pinnedCardRows) if (!pinnedCards.has(c.backlog_id)) pinnedCards.set(c.backlog_id, c);
-      }
+      // Keyed on the CYCLE, exactly as the render path is (AGT-191) — a pin-anchored re-render that
+      // joined cards by ticket would re-derive a DIFFERENT bullet for any pinned row whose ticket
+      // later shipped again, and report that as drift in a file nobody touched.
+      const pinnedCardRows = await rest(url, key,
+        `runner_items?select=backlog_id,cycle_id,title,plain_after,plain_worth,kind,created_at` +
+        `&kind=eq.ship&cycle_id=in.(${pin.join(",")})&order=created_at.desc`);
+      for (const c of pinnedCardRows) if (c.cycle_id && !pinnedCards.has(c.cycle_id)) pinnedCards.set(c.cycle_id, c);
     }
     const verdict = checkAgainstPin(current, pinnedRows, pinnedCards);
     if (verdict.code === 0) {
@@ -467,7 +517,31 @@ async function main() {
     process.exit(1);
   }
 
-  const body = renderBody(cycles, cardsByTicket);
+  // THE PRE-WRITE ASSERTION (AGT-191). Render path only -- `--check` above has already exited, and a
+  // second refusal on a committed file would grade the live world rather than this render. One read,
+  // scoped to the three cycles that actually reach disk.
+  const bulletCycles = cycles.slice(0, 3);
+  const bulletIds = bulletCycles.map(c => String(c.id)).filter(Boolean);
+  const decisionsByCycle = new Map();
+  if (bulletIds.length) {
+    const decisionRows = await rest(url, key,
+      `runner_decisions?select=id,cycle_id&cycle_id=in.(${bulletIds.join(",")})`);
+    for (const d of decisionRows) {
+      if (!d.cycle_id) continue;
+      const k = String(d.cycle_id);
+      if (!decisionsByCycle.has(k)) decisionsByCycle.set(k, new Set());
+      decisionsByCycle.get(k).add(String(d.id).toLowerCase());
+    }
+  }
+  const provenance = bulletCycles
+    .map(c => bulletProvenanceFinding(c, cardsByCycle.get(c.id) || null, decisionsByCycle.get(String(c.id)) || new Set()))
+    .filter(Boolean);
+  if (provenance.length) {
+    die(`refusing to render -- ${provenance.length} of the ${bulletCycles.length} session bullets would ` +
+      `publish another cycle's facts. ${provenance.map(f => f.reason).join(" | ")}`);
+  }
+
+  const body = renderBody(cycles, cardsByCycle);
 
   // The same predicate the test asserts. A body that lost the link never reaches disk.
   if (!bodyKeepsStandingLink(body)) {
