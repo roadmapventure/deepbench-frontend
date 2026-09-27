@@ -1,4 +1,4 @@
--- DeepBench v7.0.648 | docs/design/agt-173-card-citation-guard.sql | AGT-173 -- A CYCLE CARD AND A
+-- DeepBench v7.0.652 | docs/design/agt-173-card-citation-guard.sql | AGT-173 -- A CYCLE CARD AND A
 -- CYCLE'S NOTES CANNOT NEWLY CITE A REMOVED TICKET, AND CORRECTING ONE THAT DOES IS STILL ALLOWED.
 --
 -- WHERE THE GUARD HAD TO GO, measured rather than assumed: NOTHING composes a cycle card.
@@ -67,6 +67,38 @@
 -- `pg_get_functiondef` read back live after the migration and byte-identical to it (md5, live -> file:
 -- note_unverifiable_commit_shas de66e9d032ce7dd932adaccbcd281d89 / 2,231 B;
 -- runner_record_citation_guard 1a98a3cc133aef96dcf3d058e02f63d8 / 3,307 B).
+--
+-- R3+R4 (v7.0.652, cycle c6110394, migration `agt173_handle_completion`) ADDS A THIRD BLOCK TO THE
+-- SAME GUARD FUNCTION AND THE SAME TRIGGER PAIR -- no new trigger, no new column, nothing
+-- duplicated: THE RECORD COMPLETES ITS OWN HANDLE LIST AT WRITE TIME RATHER THAN BEING GRADED AFTER.
+-- MEASURED THIS CYCLE, not reasoned: of the reversal handles belonging to ship cards from the last
+-- four days, 77 of 133 are unlisted across 43 of 59 cards; over runner_cycles.notes in the same
+-- window, 67 of 172 across 37 of 81 cycles. `cycle_reversal_handles()` shipped at v7.0.644 with NO
+-- caller anywhere in the repo and nothing in scripts/, api/ or lib/ writes either surface, so the
+-- completion sits in the table (pattern:8, pattern:10) -- appending, never refusing.
+-- BLOCK ORDER IS LOAD-BEARING and is asserted live, not argued: blocks 1-2 grade the writer's own
+-- text, block 3 appends last. 3 of 285 runner_decisions.summary rows in seven days cite a REMOVED
+-- ticket (4df45c61/SES-378, 2ddefc51/AGT-138, 99e15850/SES-424), so appending first would refuse a
+-- card over the renderer's own words; appended text then sits in OLD and is grandfathered by both
+-- earlier clauses on every later update.
+-- INSERT TIME IS THE RIGHT MOMENT: 52 of 54 omitted decision handles already existed when their card
+-- was inserted. The 2 later ones are caught by a later text update and by nothing else -- named here,
+-- not fixed.
+-- RETURN-TYPE CHANGE => DROP FIRST (.claude/rules/supabase-function-signature.md): CREATE OR REPLACE
+-- cannot add an OUT column, so cycle_reversal_handles is dropped by its exact identity argument list
+-- and recreated with the seventh column `handle_token` -- `left(d.id::text, 8)` on the decision branch
+-- and `m.up_name` on the migration-down branch, the token each sentence carries, which is what makes
+-- the append idempotent by construction. Its body, comment and ORDER BY 5 are otherwise byte-identical
+-- to the v7.0.644 text. The recreated function is re-REVOKEd and re-GRANTed BY NAME, because a DROP +
+-- CREATE restores pg_default_acl's EXECUTE for anon and authenticated.
+-- Down captured FIRST: `capture_migration_down('c6110394-ccf9-426d-b874-69ef431c5dd3',
+-- 'agt173_handle_completion', both functions)` -> auto-downable, 2 objects captured, 0 refusals,
+-- 6,312 B. Both bodies below are `pg_get_functiondef` read back live after the migration and
+-- byte-identical to it (md5, live -> file: runner_record_citation_guard
+-- d7d2de456994110bfe00b07601e2596e / 5,882 B; cycle_reversal_handles
+-- bb42f2f094e2dcf91000ab8d7d78475e / 1,555 B). Blocks 1-2 of the guard were proven verbatim in the
+-- new text against the down's own captured prior definition (1,651 B region, found intact), so
+-- nothing above block 3 was retyped.
 CREATE OR REPLACE FUNCTION public.card_removed_citations(p_new text, p_old text)
  RETURNS TABLE(backlog_id text, status text)
  LANGUAGE sql
@@ -149,13 +181,20 @@ AS $function$
 -- decide-gated-card.js:337 only PRINTS one -- so both are hand-composed SQL at step 9 and the only
 -- place a guard can sit is the table.
 -- BEFORE INSERT OR UPDATE, one function for both tables, the column set chosen per table below.
--- TWO BLOCKS, ONE FUNCTION AND ONE TRIGGER PAIR (v7.0.648 R1 extends, never duplicates): block 1 is
--- the removed-ticket citation, block 2 the unresolvable commit sha. Both read the same v_new/v_old.
+-- THREE BLOCKS, ONE FUNCTION AND ONE TRIGGER PAIR (v7.0.648 R1 and v7.0.652 R3+R4 extend, never
+-- duplicate): block 1 is the removed-ticket citation, block 2 the unresolvable commit sha, block 3
+-- the reversal-handle completion. All three read the same v_new/v_old.
+-- BLOCK ORDER IS LOAD-BEARING: blocks 1-2 grade the WRITER'S OWN text and refuse; block 3 appends
+-- afterwards, so the sentences this function adds are never graded by the rules above. Appending
+-- first would refuse a card over the renderer's own words -- 3 of 285 runner_decisions.summary rows
+-- in seven days cite a removed ticket -- and the appended text then sits in OLD on any later update,
+-- grandfathered by both clauses.
 declare
   v_new       text;
   v_old       text;
   v_offenders text;
   v_count     integer;
+  v_append    text;
 begin
   if TG_TABLE_NAME = 'runner_items' then
     v_new := concat_ws(' ', NEW.title, NEW.value_case, NEW.before_after, NEW.qa_evidence,
@@ -203,12 +242,46 @@ begin
       using errcode = 'check_violation';
   end if;
 
+  -- BLOCK 3 (v7.0.652, R3+R4). THE HANDLE LIST COMPLETES ITSELF, IT IS NEVER REFUSED. Measured this
+  -- cycle over four days: 77 of 133 reversal handles belonging to ship cards are unlisted, across 43
+  -- of 59 cards, and 67 of 172 across 37 of 81 runner_cycles.notes -- cycle_reversal_handles()
+  -- shipped at v7.0.644 with NO caller anywhere in the repo and nothing in code writes either
+  -- surface, so the completion has to sit where the write happens (pattern:8, pattern:10: a correct
+  -- value that already exists deterministically is never left to a writer to remember). 52 of 54
+  -- omitted decision handles already existed when their card was inserted, so INSERT time is the
+  -- right moment; the 2 later ones are caught by a later text update and by nothing else.
+  -- IDEMPOTENT BY CONSTRUCTION: each sentence carries its own handle_token, and the token is what is
+  -- searched for in v_new -- so a handle already named is never appended twice, whoever named it.
+  -- NO EXCEPTION PATH ANYWHERE IN THIS BLOCK: a completion that could raise would abort the writer's
+  -- own record, which is the one thing this ticket must not do.
+  if TG_TABLE_NAME = 'runner_items' then
+    if NEW.kind = 'ship' and NEW.cycle_id is not null and NEW.backlog_id is not null then
+      select string_agg(h.handle_sentence, ' ' order by h.decided_at) into v_append
+        from public.cycle_reversal_handles(NEW.cycle_id, NEW.backlog_id) h
+       where position(h.handle_token in v_new) = 0;
+      if v_append is not null then
+        NEW.plain_worth := btrim(concat_ws(' ', NEW.plain_worth, v_append));
+      end if;
+    end if;
+  elsif TG_TABLE_NAME = 'runner_cycles' then
+    if NEW.item_id is not null then
+      select string_agg(h.handle_sentence, ' ' order by h.decided_at) into v_append
+        from public.cycle_reversal_handles(NEW.id, NEW.item_id) h
+       where position(h.handle_token in v_new) = 0;
+      if v_append is not null then
+        NEW.notes := btrim(concat_ws(E'\n\n', NEW.notes, v_append));
+      end if;
+    end if;
+  end if;
+
   return NEW;
 end
 $function$;
 
+DROP FUNCTION IF EXISTS public.cycle_reversal_handles(uuid, text);
+
 CREATE OR REPLACE FUNCTION public.cycle_reversal_handles(p_cycle_id uuid, p_backlog_id text)
- RETURNS TABLE(handle_kind text, id text, kind text, summary text, decided_at timestamp with time zone, handle_sentence text)
+ RETURNS TABLE(handle_kind text, id text, kind text, summary text, decided_at timestamp with time zone, handle_sentence text, handle_token text)
  LANGUAGE sql
  STABLE
  SET search_path TO 'public', 'pg_catalog'
@@ -223,7 +296,8 @@ AS $function$
          d.kind,
          d.summary,
          d.decided_at,
-         format('Reversible through decision handle %s (%s): %s.', d.id::text, d.kind, d.summary)
+         format('Reversible through decision handle %s (%s): %s.', d.id::text, d.kind, d.summary),
+         left(d.id::text, 8)
     from public.runner_decisions d
    where d.cycle_id = p_cycle_id
      and d.backlog_id = p_backlog_id
@@ -234,7 +308,8 @@ AS $function$
          m.up_name,
          m.captured_at,
          format('Migration %s carries a captured down (%s, %s bytes) taken before it ran.',
-                m.up_name, m.classification, length(m.down_sql))
+                m.up_name, m.classification, length(m.down_sql)),
+         m.up_name
     from public.runner_migration_downs m
    where m.captured_by_cycle = p_cycle_id
    order by 5;
@@ -412,6 +487,17 @@ begin
   if v_rows <> 0 then
     raise exception 'agt173 R1 gate: naming the PATH returned % row(s), expected 0 -- the remedy the '
                     'message prescribes must itself be accepted', v_rows;
+  end if;
+
+  -- 6. R3 (v7.0.652): THE NEW COLUMN CARRIES A REAL TOKEN, read-only over closed history (cycle
+  --    7ff68b47 / AGT-140, the finding this renderer exists for): both decision handles and the
+  --    captured down, each with the token the completion searches for. A column that came back NULL
+  --    would pass 1-5 above too, and the completion would then append every handle on every write.
+  select coalesce(array_agg(h.handle_token order by h.handle_token), array[]::text[]) into v_toks
+    from public.cycle_reversal_handles('7ff68b47-0639-4f1c-9cd7-c366feb69e60'::uuid, 'AGT-140') h;
+  if v_toks is distinct from array['59e5e346', 'agt140_project_priority_pick', 'ea1c27fc'] then
+    raise exception 'agt173 R3 gate: AGT-140 handle_token came back %, expected the two decision '
+                    'prefixes and the captured down name', v_toks;
   end if;
 end
 $gate$;
