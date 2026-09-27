@@ -199,7 +199,12 @@ export const RUNBOOK_CEILING = 381000;
 // its facts keeping body hits). The additions were cut to fit under agt-138's PRE_CHANGE_BYTES
 // (380980, which the runbook must stay below): net 380932 -> 380973 B, 27 B under SES-336's ceiling.
 // That headroom is REPORTED, not absorbed: the next byte any cycle adds needs a real trim. Re-measured with wc -c and re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 380973;
+//
+// v7.0.659 (AGT-170) arms the regression delta: step 7 captures the baseline, 7a passes
+// --regression-baseline=, step 9 quotes 7a's delta: line; E1-E3 trim rationale to pay for it.
+// Net -68 B: 380973 -> 380905. No header stamp (ses-424c pins stamps[0]). Re-measured with wc -c
+// on the tree rebased onto AGT-237.
+export const BYTES_AT_SHIP = 380905;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

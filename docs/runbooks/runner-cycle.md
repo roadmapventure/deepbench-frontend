@@ -2909,6 +2909,14 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
   --task='{"kickoff_path":"docs/kickoffs/…","worktree":"<clone>","branch":"<branch>","version":"v<ver>","cycle_id":"<cid>","caps":{"files":N,"tasks":M},"heartbeat":"node scripts/cycle-heartbeat.js --cycle=<cid> --step='7 — builder: <task>'"}'
 ```
 
+   **Then capture the regression baseline on the unchanged clone, credentialed like 7a's run (`AGT-170`):**
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js > $S/regression-baseline-<your cycle id>.txt
+```
+
+   7a reds only a test newly red BY NAME; a flaky green here costs a false block, never a false approve (`AGT-116`).
+
    Run the rendered prompt as a sub-agent on the **`orchestrator`** lane (`claude-opus-5` — the
    lanes table at step 6, read from `runner_model_lanes`; the Builder's own Skill rows carry the
    same model). `--intent` is omittable since `SES-332` (`default_intent_slug` is
@@ -2945,8 +2953,7 @@ node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the
    the Builder's behalf and do not widen the kickoff to get past the blocker: close the cycle
    `gated_before_build`, or `shipped` when part finished and pushed (`partial` settles the TICKET), carry
    the Builder's `deviations` into `notes` and onto the card, and let 7a grade what actually
-   happened. A blocked build a cycle quietly completes itself is the caps breach the kickoff exists
-   to prevent, arriving through the one door nothing watches.
+   happened.
 
 **WHATEVER THE OUTCOME, READ THE BUILDER'S `deviations` — IT IS THE DESIGNER'S SIGNAL (`SES-378`).**
 An entry saying the build needed a fact the kickoff did not carry — the Builder read the harvest,
@@ -2980,8 +2987,6 @@ ingestFindings({ findings:[…], foundBy:'runner:cycle:<your cycle id>',
    is an unrecorded scope change, and a capture with no row is a defect nobody chose to defer.
 
 **`(7f)` rules the captured finding THAT SAME RUN** — the capture is not a deferral to next week.
-That is the whole point of running the manager in the tail: a defect this cycle found is a defect
-this cycle's review either files or rules out, with its source, its type and its location on it.
 
 **THE VERDICT, THE CLOSE-OUT AND THE RECORD BELOW STAY THIS STEP'S.** The Builder writes no status,
 no verdict and no decision — `bd-guardrails` forbids it in its own words (*"write done or a verdict
@@ -3029,7 +3034,7 @@ against, and an attended cycle runs no Builder.
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js --kickoff=<the ticket's kickoff_link> \
   --cycle-id=<your cycle id> --ticket=<TICKET-ID> --version=v<your version> \
-  --changed-files=$S/changed-<your cycle id>.json
+  --changed-files=$S/changed-<your cycle id>.json \n  --regression-baseline=$S/regression-baseline-<your cycle id>.txt
 ```
 
   The row carries `graded_sha` = the HEAD the gates ran on (`SES-345`), written by
@@ -3102,9 +3107,7 @@ SELECT * FROM public.verdict_ladder_signal('<verdict id>');
   could not run* — note that in the cycle row exactly as a failed export is noted, and never treat
   it as either verdict. **THE FAIL-CLOSED RULE HAS TWO HOMES ON PURPOSE — `verdictFor()` in the
   script AND `ck_runner_verdicts_fail_closed` in the database — because this script will not stay
-  the only thing that inserts a verdict row** (`SES-181`, `v7.0.247`; relocated out of that ship's
-  retiring header stamp by `SES-213`, `v7.0.299`, because it was the one warning in that pile with
-  no copy anywhere in this body — the `SES-164` step that makes a trim safe). Writing the status
+  the only thing that inserts a verdict row** (`SES-181`, `v7.0.247`). Writing the status
   test as `exitCode !== 1`, or defaulting an absent gate to pass, approves a change whose build
   never ran. **The three gates, the fail-closed rule (`skipped` is not `green`) and the
   eligibility test live in `scripts/verifier.js`'s header — cited here, not restated**, so these two
@@ -4006,7 +4009,7 @@ Four properties, each of which is how this gets built wrong:
 
 **9. Write the record, then die.** (Times shown to John — briefing, notifications — are CST
 (America/Chicago), labeled CST; ledger timestamps stay UTC. John, 2026-08-20.) `runner_items` row (kind, **`backlog_id` as a BARE ticket id — see the rule immediately below**,
-title, value case, before → after, QA evidence with proof-type label, dev link, flag slug if
+title, value case, before → after, QA evidence with proof-type label (a regression claim quotes 7a's `delta:` line, `AGT-170`), dev link, flag slug if
 any, cost split, model, **plus the three plain-language columns `plain_cant` / `plain_after` /
 `plain_worth`**).
 
