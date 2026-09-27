@@ -193,7 +193,13 @@ export const RUNBOOK_CEILING = 381000;
 // IN and that is the decision, not an oversight: ses-424c pins v7.0.650 as stamps[0], so a stamp for a
 // one-line clause would cost a drop, a docs/SESSIONS.md append and two more test edits. The 68 B of
 // headroom is REPORTED, not absorbed. Re-measured with wc -c and re-pinned in the same commit.
-export const BYTES_AT_SHIP = 380932;
+//
+// v7.0.658 (AGT-237) adds refusal 6 `db_pressure`, Gate F, the heartbeat's db_level and step 7's
+// hold rule, and rotates the header (v7.0.658 in at line 1, v7.0.555 out to docs/SESSIONS.md, both
+// its facts keeping body hits). The additions were cut to fit under agt-138's PRE_CHANGE_BYTES
+// (380980, which the runbook must stay below): net 380932 -> 380973 B, 27 B under SES-336's ceiling.
+// That headroom is REPORTED, not absorbed: the next byte any cycle adds needs a real trim. Re-measured with wc -c and re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 380973;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

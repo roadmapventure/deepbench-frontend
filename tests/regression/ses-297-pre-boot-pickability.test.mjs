@@ -1,3 +1,6 @@
+// DeepBench v7.0.658 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-237 -- `db_pressure`
+// is refusal 6 (M6-14): REASONS grows to eight, the oracle refuses on anything but green read over
+// rpc/db_health_level, and the live arm grades detail.db_level / db_reasons against that same rpc.
 // DeepBench v7.0.513 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-414 -- from Thursday
 // 01:00 America/Chicago to the Friday 01:00 reset the wall grades `final_day_rest_pct` (OD-28, default
 // 90) instead of `weekly_rest_pct` (85): chicagoWeek() carries finalDay, the oracle walls on wallPct,
@@ -93,7 +96,7 @@ const SESSIONS = path.join(ROOT, SESSIONS_REL);
 const BLOCK_START = "**PRE-BOOT GATE — ONE QUERY";
 const BLOCK_END = "**0. Bootstrap.**";
 
-// The seven refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
+// The eight refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
 // what each one MEANS is read out of the runbook by the clauses below, never restated.
 export const REASONS = [
   "scheduler_off",
@@ -110,6 +113,9 @@ export const REASONS = [
   // it compares NULL-safely -- no reading, no pace verdict.
   "weekly_pace",
   "no_budget_row",
+  // AGT-237 / M6-14: the database's own health. After every spend wall, before the pickable split,
+  // and NOT under meter_limiter_off -- anything but green in the window (incl. `unsafe`) refuses.
+  "db_pressure",
   "nothing_pickable",
   "unaffordable",
 ];
@@ -192,12 +198,12 @@ export const CLAUSES = [
   {
     id: "all-six-refusals-are-named",
     detail:
-      "every one of the seven reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 " +
+      "every one of the eight reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 / M6-14 " +
       "attributed -- a cycle that meets a reason this file does not name cannot write a truthful " +
       "last_step, and a reader cannot tell a refusal from a failure",
     test: s =>
       REASONS.every(r => s.includes(`\`${r}\``)) &&
-      /M5-16/.test(s) && /M5-15/.test(s) && /M5-06/.test(s) && /M6-09/.test(s),
+      /M5-16/.test(s) && /M5-15/.test(s) && /M5-06/.test(s) && /M6-09/.test(s) && /M6-14/.test(s),
     breaks: s => s.split("`no_budget_row`").join("`some other refusal`"),
   },
   {
@@ -583,6 +589,9 @@ export function expectedReason(f) {
       f.gatedPct >= f.paceLimitPct)
     return "weekly_pace";
   if (!f.budgetRowExists) return "no_budget_row";
+  // AGT-237: refusal 6. IS DISTINCT FROM green in the SQL, so a missing level refuses too -- the
+  // oracle mirrors that with !==, never with a truthiness check that would let null through.
+  if (f.dbLevel !== "green") return "db_pressure";
   // AGT-127: refusal 6 splits, and the oracle splits with it. Both halves are graded, so a gate
   // that counted EVERY undecided card (re-firing forever on one whose decision is John's, since a
   // `john` ruling writes no card) and a gate that counted none both disagree here.
@@ -664,6 +673,16 @@ async function theLiveGateObeysItsOwnLadder() {
   const openQ = new Set(gateQ.map(q => q.qid));
   const gateCardsToRule = gateCards.filter(c => !openQ.has(`gate-card-${String(c.id).slice(0, 8)}`)).length;
 
+  // AGT-237: the database's level, read from its one home over the same rpc a cycle's step 7 uses
+  // (scripts/db-pressure.js). Never re-derived from db_health_readings here: the window arithmetic is
+  // the function's, and a second copy in this file would be free to disagree with it.
+  const dbRows = asArray(
+    await pg(url, key, "rpc/db_health_level", { method: "POST", body: "{}" }), "rpc/db_health_level");
+  assert.strictEqual(dbRows.length, 1, `db_health_level() returned ${dbRows.length} rows, expected exactly 1`);
+  const db = dbRows[0];
+  assert.ok(["green", "amber", "red", "unsafe"].includes(db.level),
+    `db_health_level() answered level=${JSON.stringify(db.level)}; the closed set is green | amber | red | unsafe`);
+
   const cyclesOf = new Map(items.map(i => [i.backlog_id, i.predicted_cycles]));
   const lanes = queue.filter(r => r.lane === "drain" || r.lane === "selfbuild");
   // Unknown cost is UNKNOWN, never free -- same treatment the shipped function uses, and the
@@ -716,6 +735,7 @@ async function theLiveGateObeysItsOwnLadder() {
     pickableCount: lanes.length,
     cheapestPctOfWeek: priced.length ? Math.min(...priced) : null,
     gateCardsToRule,
+    dbLevel: db.level,
   };
 
   const want = expectedReason(facts);
@@ -873,6 +893,15 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.orchestrator_model=${JSON.stringify(d.orchestrator_model)} but orchestrator_model() says ${o.model_id}`);
   assert.strictEqual(d.orchestrator_reason, o.reason,
     `detail.orchestrator_reason=${JSON.stringify(d.orchestrator_reason)} but orchestrator_model() says ${o.reason}`);
+
+  // AGT-237: the gate carries the level it graded, and it is the rpc's -- one home, two readers.
+  assert.strictEqual(d.db_level, db.level,
+    `detail.db_level=${JSON.stringify(d.db_level)} but db_health_level() says ${db.level}`);
+  assert.deepStrictEqual(d.db_reasons ?? null, db.reasons ?? null,
+    `detail.db_reasons=${JSON.stringify(d.db_reasons)} but db_health_level() says ${JSON.stringify(db.reasons)}`);
+  if (v.reason === "db_pressure") {
+    assert.notStrictEqual(d.db_level, "green", "a db_pressure refusal must be justified by its own payload");
+  }
 
   assert.strictEqual(d.pickable_count, lanes.length,
     `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
@@ -1064,7 +1093,12 @@ async function run() {
       "Thu0059 90->weekly_wall/85/85/true; Thu0100 50->pickable/90/90/false; Thu0100 85->pickable/90/90/false; " +
       "Thu0100 87->pickable/90/90/false; Thu0100 89.99->pickable/90/90/false; Thu0100 90->weekly_wall/90/90/true; " +
       "Fri0100 50->weekly_pace/85/85/false; Fri0100 85->weekly_wall/85/85/true; Fri0100 87->weekly_wall/85/85/true; " +
-      "Fri0100 89.99->weekly_wall/85/85/true; Fri0100 90->weekly_wall/85/85/true; zero residue.",
+      "Fri0100 89.99->weekly_wall/85/85/true; Fri0100 90->weekly_wall/85/85/true; zero residue. " +
+      "AGT-237 (v7.0.658, agt237_db_health), rolled back with live meter_limiter_off=true and " +
+      "scheduler_on set true inside the transaction: a red reading now -> db_pressure/red while the " +
+      "captured pre-AGT-237 body answered pickable on the SAME inputs; newest reading 16 min old -> " +
+      "db_pressure/unsafe; green now + red 10 min ago -> db_pressure/red; three greens -> pickable/green " +
+      "(pre-AGT-237 body: pickable); zero residue.",
   );
 }
 

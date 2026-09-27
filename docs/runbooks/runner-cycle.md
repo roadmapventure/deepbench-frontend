@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.658 | runbooks/runner-cycle.md | AGT-237 — DB gates. v7.0.555 out. -->
 <!-- DeepBench v7.0.650 | runbooks/runner-cycle.md | AGT-185 — THE FLAT PAIR STOPS TRAVELLING: step 6 recited it 125 lines after step 5a computes the real pair from `class_autonomy()`; it now points there (`docs/STANDARDS.md` Section 2, one home). One-feature cap stays; not on the ladder. `scripts/verifier.js` gains `classCapPair(row)` so a verdict PRINTS the pair it graded (§19v); an unread row says not-graded. `CLAUDE.md:57` NOT edited (`STANDARDS.md:60`) — one yes/no `runner_questions` row. ROTATION: `v7.0.535` DROPPED, count 5, `SES-164` step 2 by grep FIRST — its one ZERO-hit fact (guard `ses-424c`) RELOCATED into `blocked_detail`'s census; "carrying an undecided gate card" keeps 1 body hit, `drain_epic_next` 19. Guard `agt-92-scope-cap-one-home.test.mjs`. -->
 <!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171 — THE (6) CLOSE RELEASES THE PUBLISH LEASE IN THE SAME STATEMENT: a CLOSED cycle held it 26 min (steals 17) because the release came after the (7e)/(7f) sub-agents. Nothing after (6) is leased; step 1's release block is gone; 0b probe (c) flags a closed holder. v7.0.532 DROPPED (docs/SESSIONS.md), 2 ZERO-hit facts RELOCATED to Reading 0; count 5. Guard agt-171-lease-released-at-close.test.mjs. -->
 <!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
 <!-- DeepBench v7.0.602 | runbooks/runner-cycle.md | AGT-137 — (7e): the Auditor reviews THIS run (`audit-run-review.js`). `v7.0.520` DROPPED, count 5. -->
-<!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b — STEP 4d IS A POINTER: the Auditor runs in its own routine (docs/runbooks/auditor-routine.md); :4720 names the fifteenth restorable table. ROTATION: v7.0.519 DROPPED, count held at 5, SES-164 step 2 by grep FIRST — all six named facts keep ≥1 body hit (`settle-ship.js` 2, `--remainder=` 2, `resolveDeliveryFiles` 1, `selfCertificationBlock` 1, `changedFilesFor` 1, `ses-379-changed-files-fail-closed` 1); none relocated into 7a. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -136,7 +136,7 @@ exactly one home — `public.resolve_day_token_cap()`, read at step 3** — and 
 ceiling there, never here. A reading inside the threshold still grades the weekly wall in (3): a
 63% taken an hour ago is better evidence than none.
 
-**The seven refusal reasons, in the precedence the function applies them.**
+**The eight refusal reasons, in the precedence the function applies them.**
 Each names itself, always: **a bare `false` is the "NULL is not zero" defect this codebase has paid
 for repeatedly.**
 
@@ -172,13 +172,15 @@ for repeatedly.**
    that stopped the runner and then sat unread in a card, and it now has a name instead of a silent
    pass.** (3) and (4) preceding (5) is deliberate and NULL-safe: with the row absent (3)'s comparison
    is NULL, and with no reading (4)'s is too, so the ladder falls through to (5).
-6. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
+6. `db_pressure` — **`M6-14`**: `db_health_level()` not `green`.
+   Not under `meter_limiter_off`; `detail.db_*`.
+7. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row — `runner_should_boot()`'s `pickable` CTE is `WHERE q.lane IN ('drain','selfbuild')`,
    so a queued **directive** row alone is not pickable. **`AGT-127` splits this slot:** an undecided
    `gated_before_build` card no open `gate-card-…` question names answers `gate_cards_to_rule`:
    `should_boot=true`, `detail.mode='rule-cards-only'`, `detail.gate_cards_to_rule=<n>`, placed
    HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged.
-7. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
+8. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
 
@@ -218,12 +220,12 @@ Four properties that are load-bearing. **Do not re-derive any of them by hand:**
   The tail's own first act is re-fetching and re-parsing the live briefing page — **473.1 KB at
   `v7.0.348`**, the single most expensive read in a cycle, and precisely the orientation cost this
   gate exists not to pay — while a refusal has nothing for it to write: no pick, no card, no ladder
-  move, no ship. What a refusing fire therefore does **not** do is **harvest John's taps**. Five of
-  the seven reasons clear themselves (a reading gets taken — which clears `meter_stale` and may
+  move, no ship. What a refusing fire therefore does **not** do is **harvest John's taps**. Six of
+  the eight reasons clear themselves (a reading gets taken — which clears `meter_stale` and may
   clear the wall and the pace with it, a month rolls over, a budget row is inserted) and
   `scheduler_off` is John's own deliberate choice; **`nothing_pickable`
   is the unbounded one** — no fire boots, so no fire harvests, until an attended session runs
-  (`SES-297`'s card; `AGT-127` bounds its commonest cause, 6 above). It is **not** a gap to close
+  (`SES-297`'s card; `AGT-127` bounds its commonest cause, 7 above). It is **not** a gap to close
   by quietly restoring the tail here: doing so restores the full page read on exactly the path this
   ticket exists to make cheap.
 
@@ -413,8 +415,12 @@ heartbeat trail is its only voice.
 UPDATE public.runner_cycles
    SET heartbeat_at = now(), last_step = '<step name>'
  WHERE id = '<your id>' AND ended_at IS NULL
-RETURNING id;
+RETURNING id, (SELECT level FROM public.db_health_level()) AS db_level;
 ```
+
+**`db_level` red/unsafe, or the heartbeat failed or took > 10 s:** finish the step, run
+`db-pressure.js --hold`; exit 4 → close `failed`, `last_step 'held: db_pressure'`, end. Run
+`run-all.js` only after `--check` exits 0 or 1.
 
 **THE `AND ended_at IS NULL` IS THE RESUME GUARD, AND IT IS HALF OF `SES-194` (`v7.0.230`) — do
 not drop it back to a bare `WHERE id`.** Since `SES-194` a peer may close your row if it has seen
@@ -4412,7 +4418,7 @@ Development Manager files, for every source. `--apply` is the one filing path fo
 claims its ids the same atomic way every other filing site does.
 
 
-**(8) A DRAINING CYCLE CONTINUES THE DRAIN IN-SESSION — FIVE GATES, ONE CALL (`SES-139`,
+**(8) A DRAINING CYCLE CONTINUES THE DRAIN IN-SESSION — SIX GATES, ONE CALL (`SES-139`,
 `v7.0.176`; actuator replaced by `SES-141` `v7.0.180`, replaced again and FINAL by `SES-140`
 `v7.0.195` — the platform refuses session-spawning, so the chain runs inside the session;
 terminator added by `SES-197`, `v7.0.238`, migration `ses197_drain_chain_gate`).**
@@ -4429,7 +4435,7 @@ SELECT * FROM public.drain_chain_gate('<your cycle id>');
 ```
 
 `verdict = 'continue'` → open the continuation cycle. **Anything else → fire nothing and end the
-session cleanly**, putting `gate_failed` and `reason` in the row you just closed at (6). The five
+session cleanly**, putting `gate_failed` and `reason` in the row you just closed at (6). The six
 gates, in the order the call applies them — the first failure stops and names itself in
 `gate_failed`:
 
@@ -4440,6 +4446,7 @@ gates, in the order the call applies them — the first failure stops and names 
 | C | `pick-actionable` | the pick's `design_status` ∈ `c_flagged` — **`ARRAY['needs-desktop']` ALONE since `SES-281`**; `needs-john` was **retired** outright by `M6-01` and `john-paced` was **converted** by migration `ses281_m5_pick_enforcement`, so both left that set (read out of `pg_get_functiondef` at `SES-315`, not recalled) |
 | D | `noship-streak` | consecutive non-shipping cycles ≥ `runner_settings.chain_max_noship_streak` (2) |
 | E | `undecided-ceiling` | undecided cards ≥ `runner_settings.chain_max_undecided_cards` (**off** unless John sets it) |
+| F | `db-pressure` | `db_health_level()` not `green` |
 
 **GATE C IS `SES-197`, AND IT WAS THE ONE THAT MADE GATE B ABLE TO FAIL AT ALL — until `SES-196`
 moved the clause into the picker itself.** Read from `pg_get_functiondef` at the time rather than

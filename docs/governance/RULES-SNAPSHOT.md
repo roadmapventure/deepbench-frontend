@@ -5,7 +5,7 @@
      The registry in Supabase is the authority; this file is its only in-repo copy and the
      input the truth tripwire (checks 9/10/11, scripts/check-session-docs.js) reads. -->
 
-**Rules:** 173 · **By status:** 156 live · 7 retired · 10 superseded · **Payload sha256:** `8ad31e6903fb1a852e05c45ea4101f73d542645961ad43b412c717761fbed4c2`
+**Rules:** 174 · **By status:** 157 live · 7 retired · 10 superseded · **Payload sha256:** `8719c0d86480620d5ef702122529b602b6b978dbb5c925a431befdcff46a124e`
 
 Cell escaping matches `docs/backlog/BACKLOG-SNAPSHOT.md`: `\` → `\\`, `|` → `\|`, newline → `\n`.
 An empty cell is SQL NULL; the marker `\e` is a stored empty string. Every cell is padded with
@@ -156,6 +156,7 @@ exactly one space per side, and a reader removes one character per side rather t
 | M6-11 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-11 |  | A ticket skipped because a rule filtered it — blocked, out-of-lane, or gate-held — is not a no-ship, and never counts toward a chain's no-ship streak or a ticket's stuck count. |
 | M6-12 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-12 |  | A chain re-anchors from the durable record — the board and the charter — every sixth ticket, paying one boot deliberately rather than trusting carried context for correctness. |
 | M6-13 | live | prose | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-13 |  | The one-feature, three-file, four-task scope caps bind an individual cycle, never the chained session that contains several. |
+| M6-14 | live | script | selfbuild-m6-register | docs/RUNNER-GOV-M6-REQUIREMENTS.md#M6-14 |  | The runner never starts work into a database outage: `public.db_health_tick()` grades the database every five minutes from its own metrics and a REST probe (red at iowait ≥ 60% or a probe that fails or takes ≥ 10 s, amber at iowait ≥ 35%, a probe ≥ 3 s or no metrics; the numbers live in `runner_settings.db_health_thresholds`), and anything but green across the last 15 minutes makes `public.runner_should_boot()` refuse the boot as `db_pressure` and `public.drain_chain_gate()` stop the chain at Gate F, `db-pressure`. |
 | CAP-BROWSER-CONSOLE-GATE | live | reviewer | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | Confirm zero red errors in the browser console after every deploy. |
 | CAP-BUILD-GATE | live | hook | standards-caps | docs/STANDARDS.md#section-2-session-scope-rules |  | `npm run build` must pass with zero errors before any commit. |
 | CAP-DEPLOY-GATE-STEP0 | live | script | standards-caps | docs/STANDARDS.md#section-6-browser-test-checklist |  | Run `node scripts/check-deploy-current.js` as step 0 of every browser test and stop the entire run (report no PASS/FAIL) on any non-zero exit; exit 2 does not count as a pass. |

@@ -63,8 +63,9 @@ export const RELOCATED_GUARD = "ses-424c-gate-card-census.test.mjs";
 // 9's (7e)) rotated v7.0.520 out and took line 1 from v7.0.555 (AGT-86 slice 8b); v7.0.610 (AGT-133,
 // step 9's (7f)) rotated v7.0.531 out and took line 1 from v7.0.602; v7.0.641 (AGT-171, the fused
 // (6) close+release) rotated v7.0.532 out and took line 1 from v7.0.610; v7.0.650 (AGT-185, the flat
-// pair stops travelling) rotated v7.0.535 -- THIS_STAMP -- out and took line 1 from v7.0.641.
-export const LATER_STAMP = "<!-- DeepBench v7.0.650 | runbooks/runner-cycle.md | AGT-185";
+// pair stops travelling) rotated v7.0.535 -- THIS_STAMP -- out and took line 1 from v7.0.641; v7.0.658
+// (AGT-237, the database health gates) rotated v7.0.555 out and took line 1 from v7.0.650.
+export const LATER_STAMP = "<!-- DeepBench v7.0.658 | runbooks/runner-cycle.md | AGT-237";
 
 // Each clause: {id, detail, test, breaks}. `test` reads the runbook; `breaks` is that clause's OWN
 // smallest mutation of the runbook text. Green-after-mutation is a failure of THIS file.

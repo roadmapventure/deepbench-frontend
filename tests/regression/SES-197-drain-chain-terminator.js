@@ -88,14 +88,17 @@ export const extractTail8 = md => extractBlock(md, TAIL8_START, TAIL8_END);
 // "WENT SILENT").
 export const norm = s => s.replace(/\s+/g, " ");
 
-// The five gate slugs are the function's own `gate_failed` vocabulary. A cycle puts this value in
-// its notes, so the doc and the migration must agree on the spelling.
+// The six gate slugs are the function's own `gate_failed` vocabulary. A cycle puts this value in
+// its notes, so the doc and the migration must agree on the spelling. AGT-237 (v7.0.658, migration
+// agt237_db_health) added Gate F `db-pressure` after E: the chain does not start more work while
+// public.db_health_level() reads anything but green -- the same test runner_should_boot() refusal 6 applies.
 export const GATE_SLUGS = [
   "ran-a-cycle",
   "drain-has-work",
   "pick-actionable",
   "noship-streak",
   "undecided-ceiling",
+  "db-pressure",
 ];
 
 // Pure: the load-bearing clauses, kept as data so a negative control can name exactly which one it
@@ -110,9 +113,9 @@ export const CLAUSES = [
     breaks: s => s.replace("public.drain_chain_gate('<your cycle id>')", "-- (call removed)"),
   },
   {
-    id: "five-gates-named",
+    id: "six-gates-named",
     detail:
-      "all five gate_failed slugs must appear -- a cycle reports which gate stopped it, and an " +
+      "all six gate_failed slugs must appear -- a cycle reports which gate stopped it, and an " +
       "unnamed gate cannot be reported",
     test: s => GATE_SLUGS.every(g => s.includes(g)),
     breaks: s => s.replace("pick-actionable", "(gate removed)"),
@@ -302,7 +305,9 @@ function run() {
       "could reach the function only by INVOKING it -- which calls drain_epic_next and can RETIRE a " +
       "live drain directive. Behavioural evidence is the live QA on the ship card: the same fixture " +
       "drain flipping continue->stop on design_status alone, Gate D at 1 vs 2, Gate A leaving the " +
-      "directive untouched, and Gate E off under a NULL ceiling with 23 cards undecided.",
+      "directive untouched, and Gate E off under a NULL ceiling with 23 cards undecided. AGT-237 " +
+      "(v7.0.658) Gate F, rolled back: a red reading -> stop / db-pressure on a cycle that, with three " +
+      "green readings instead, answered continue (the §2e path) -- so the stop is Gate F and nothing earlier.",
   );
 }
 

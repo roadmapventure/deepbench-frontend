@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.658 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | AGT-237 — M6-14 gains its canonical home: the runner never starts work into a database outage (refusal 6 `db_pressure` in runner_should_boot(), Gate F `db-pressure` in drain_chain_gate()). The blockquote is byte-for-byte the governance_rules row the migration agt237_db_health wrote; RULES-SNAPSHOT.md re-exported in the same commit. -->
 <!-- DeepBench v7.0.406 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | M6 COMPLETE — close-out of attended session design-m6-build-0902 (2026-09-02): the required set closed at 8 (the gate's six plus SES-315 and SES-316 from the milestone review), every ship verdict-backed, the first live ship decision recorded (b5214a0a), the M7 drain standing behind SES-186. Doc-only plus the generated CLAUDE-STATE.md, standing brief and backlog snapshot. -->
 <!-- DeepBench v7.0.403 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | M6 milestone gate review (attended session design-m6-build-0902, two Fable 5 lenses, decided under SES-312 as decision c3e86310, reversible until 2026-09-05 18:33 CST): PASS WITH NAMED GAPS — SES-315 and SES-316 filed required into M6, SES-317 non-required behind SES-314, cap_relax_rung 5→13, M7 pick order corrected, the Selfbuild M7 drain declared under 0970abad. Both lenses recorded in their own words. No rule STATEMENT changed. -->
 <!-- DeepBench v7.0.396 | docs/RUNNER-GOV-M6-REQUIREMENTS.md | SES-286 (c) — THE PHASE SPLIT IS OVER, said in an amendment note rather than by editing the paragraph that recorded it. SES-286 (a) (v7.0.394), (b) (v7.0.395) and (c) (v7.0.396) built the reversal-window machinery this file deferred: public.runner_decisions plus record_decision() / sweep_decision_windows() / reverse_decision() / ladder_apply_signal(); runner-cycle.md 7b and its serial-tail sweep; session-setup.md 3d and its Reversing-a-decision section; and the standing brief's Open decisions block, which lists every open decision beside the one line that undoes it. NO RULE STATEMENT CHANGED — not one `>` quoted line was touched, so the ses-285 registry↔doc equality guard is untouched, and no governance_rules row moved. THE SUPERSEDED SENTENCE IS LEFT STANDING DELIBERATELY: "a rule marked `script` below is not yet enforced by any script" was true on 2026-09-01 and false from v7.0.396, and this file is a GATE RECORD — the phase it records really happened, so the note supersedes the sentence rather than deleting the history. An editor tempted to tidy the paragraph instead should read the amendment first. Doc only; the renderer and the new guard tests/regression/ses-286c-open-decisions-brief.test.mjs ship in the same commit. -->
@@ -239,6 +240,17 @@ is cheap *because* it reuses context, so the bound is the price of the saving, n
 ### <a id="M6-13"></a>M6-13 — scope caps bind the cycle, not the chain (`prose`)
 
 > The one-feature, three-file, four-task scope caps bind an individual cycle, never the chained session that contains several.
+
+### <a id="M6-14"></a>M6-14 — the runner never starts work into a database outage (`script`)
+
+> The runner never starts work into a database outage: `public.db_health_tick()` grades the database every five minutes from its own metrics and a REST probe (red at iowait ≥ 60% or a probe that fails or takes ≥ 10 s, amber at iowait ≥ 35%, a probe ≥ 3 s or no metrics; the numbers live in `runner_settings.db_health_thresholds`), and anything but green across the last 15 minutes makes `public.runner_should_boot()` refuse the boot as `db_pressure` and `public.drain_chain_gate()` stop the chain at Gate F, `db-pressure`.
+
+Added by `AGT-237` (`v7.0.658`, migration `agt237_db_health`). Measured 2026-09-27: the 0.5 GB
+NANO instance ran ~500 MB into swap, iowait went from a healthy 5–25% to 80–95%, a 1-row UPDATE
+took 17–19 s, and nothing in a cycle looked before starting work. The readings live in
+`public.db_health_readings`; `public.db_health_level()` is the one home both gates read, and
+`scripts/db-pressure.js` is how a cycle reads it mid-build. The automatic restart is `AGT-237` (d),
+not built: it needs a Supabase personal access token only John can create.
 
 ### Conflicting governance withdrawn in the same change
 

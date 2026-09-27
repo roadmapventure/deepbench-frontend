@@ -1,3 +1,7 @@
+// DeepBench v7.0.658 | tests/regression/ses-411-rule-vs-function.test.mjs | AGT-237 -- the gate gains
+// refusal 6 `db_pressure` (M6-14): COMMENT_TODAY, BODY_TODAY, RULES and the REASONS count move to eight.
+// The captured pre-SES-410 body PREDATES that branch, so the live arm puts `db_pressure` back into it
+// as text first -- the one variable that control grades stays `weekly_pace`, exactly as it shipped.
 // DeepBench v7.0.528 | tests/regression/ses-411-rule-vs-function.test.mjs | SES-422 slice 3
 //
 // FEATURE: SES-411 -- the rule-vs-function check. The platform keeps ONE fact ("which refusals does
@@ -53,12 +57,13 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import { detectRuleFunctionDrift, CLOSED_SETS } from "../../scripts/audit-corpus.js";
 import { REASONS } from "./ses-297-pre-boot-pickability.test.mjs";
 
-// Pinned from the live COMMENT on public.runner_should_boot(), 2026-09-19. The live arm reads the
+// Pinned from the live COMMENT on public.runner_should_boot(), 2026-09-19; AGT-237 re-pinned it 2026-09-27. The live arm reads the
 // real one; this copy exists so the pure arms can mutate a fixed starting point.
 const COMMENT_TODAY =
-  "Pre-boot pickability gate (SES-297 / M6-09). SEVEN refusals in precedence order: scheduler_off, " +
+  "Pre-boot pickability gate (SES-297 / M6-09). EIGHT refusals in precedence order: scheduler_off, " +
   "meter_stale (SES-389 / M5-15, runner_settings.meter_stale_hours), weekly_wall (M5-06), " +
-  "weekly_pace (M5-16), no_budget_row, nothing_pickable, unaffordable (M5-06); otherwise pickable. " +
+  "weekly_pace (M5-16), no_budget_row, db_pressure (AGT-237 / M6-14, runner_settings.db_health_thresholds), " +
+  "nothing_pickable, unaffordable (M5-06); otherwise pickable. " +
   "STABLE and read-only -- it reads prime_directive_queue(), never drain_epic_next(uuid). It carries " +
   "no token_cap: the ceiling has one home, public.resolve_day_token_cap().";
 
@@ -76,6 +81,7 @@ const BODY_TODAY = [
   "      when u.all_models_pct >= 100                          THEN 'weekly_wall'",
   "      when u.all_models_pct >= s.pace_share                 THEN 'weekly_pace'",
   "      when b.id is null                                     THEN 'no_budget_row'",
+  "      when d.level is distinct from 'green'                 THEN 'db_pressure'",
   "      when q.id is null                                     THEN 'nothing_pickable'",
   "      when q.predicted_tokens > b.remaining                 THEN 'unaffordable'",
   "      else 'pickable' end,",
@@ -83,7 +89,7 @@ const BODY_TODAY = [
   "$function$",
 ].join("\n");
 
-// The four governance_rules rows that govern this gate, pinned 2026-09-19. M5-15 and M5-16 are here
+// The governance_rules rows that govern this gate, pinned 2026-09-19 (M6-14 added 2026-09-27, AGT-237). M5-15 and M5-16 are here
 // verbatim because each carries a parsing trap the detector has to survive: M5-15's
 // `runner_settings.meter_stale_hours` and M5-16's `detail.judgment_model` are periods with no space
 // after them, and a clause splitter that ignores that puts the function name in one piece and the
@@ -98,6 +104,10 @@ const RULES = [
     "A cycle fires only while the freshest `runner_usage_readings` row's `all_models_pct` is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` (which grades the same number) and before `no_budget_row`. Fable past its own share is NOT a refusal (`SES-395`): `public.judgment_model()` degrades the judgment lane to the orchestrator model and the gate reports it as `detail.judgment_model` / `detail.judgment_reason`." },
   { id: "M6-09", status: "live", statement:
     "Never boot a session to discover there is nothing to do: every scheduled fire is gated by a pre-boot pickability query, and a fire with nothing pickable closes without spawning a session." },
+  // AGT-237: verbatim, and it BINDS -- its last clause names `public.runner_should_boot()` and the
+  // refusal `db_pressure`, so (A) reads it as well as the comment's own item.
+  { id: "M6-14", status: "live", statement:
+    "The runner never starts work into a database outage: `public.db_health_tick()` grades the database every five minutes from its own metrics and a REST probe (red at iowait ≥ 60% or a probe that fails or takes ≥ 10 s, amber at iowait ≥ 35%, a probe ≥ 3 s or no metrics; the numbers live in `runner_settings.db_health_thresholds`), and anything but green across the last 15 minutes makes `public.runner_should_boot()` refuse the boot as `db_pressure` and `public.drain_chain_gate()` stop the chain at Gate F, `db-pressure`." },
 ];
 
 const mkFn = over => ({
@@ -120,7 +130,7 @@ async function run() {
   assert.strictEqual(CLOSED_SETS.runner_should_boot, REASONS,
     "CLOSED_SETS.runner_should_boot must BE the imported REASONS array -- a copy in audit-corpus.js " +
     "would be a second home for exactly the kind of claim this detector exists to find");
-  assert.strictEqual(REASONS.length, 7, "the closed set is the seven refusals");
+  assert.strictEqual(REASONS.length, 8, "the closed set is the eight refusals");
   assert.deepStrictEqual(detectRuleFunctionDrift(RULES, [mkFn()], CLOSED_SETS), [],
     "today's body, comment, rules and REASONS agree -- anything here is a false positive");
   results.push("today-is-clean");
@@ -228,9 +238,15 @@ async function run() {
 
   const downs = await get("runner_migration_downs?up_name=eq.ses410_weekly_pace_stop&select=prior_ddl");
   assert.strictEqual(downs.length, 1, "the captured pre-SES-410 down row is the control; it is missing");
-  const priorBody = downs[0]?.prior_ddl?.captured?.[0]?.prior_definitions?.[0];
-  assert.ok(typeof priorBody === "string" && priorBody.length > 1000,
+  const capturedBody = downs[0]?.prior_ddl?.captured?.[0]?.prior_definitions?.[0];
+  assert.ok(typeof capturedBody === "string" && capturedBody.length > 1000,
     "prior_ddl.captured[0].prior_definitions[0] is not a function body");
+  // AGT-237: that body was captured before refusal 6 existed. Put `db_pressure` back as TEXT (after
+  // no_budget_row, where the live gate applies it) so the control grades ONE missing branch --
+  // weekly_pace -- and not the later ticket's addition too. The same textual-restore move as below.
+  const priorBody = capturedBody.replace("THEN 'no_budget_row'", "THEN 'no_budget_row'\n      when false THEN 'db_pressure'");
+  assert.notStrictEqual(priorBody, capturedBody,
+    "control: the db_pressure restore changed nothing -- the captured body no longer carries no_budget_row (the SES-158 failure)");
   assert.notStrictEqual(priorBody, String(fns[0].definition),
     "control: the captured body is byte-equal to today's, so it cannot prove anything (the SES-158 failure)");
   const live = detectRuleFunctionDrift(liveRules, [{ ...fns[0], definition: priorBody }], CLOSED_SETS);
