@@ -23,6 +23,22 @@
 // before this slice -- renders them identically, which is what makes this arm a measurement.
 // Absent `nights` renders "not read", never a streak of 0. Source-only, no credentials.
 //
+// DeepBench v7.0.643 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-166 slice 2 -- CHECK 13,
+// `unrevalidated-30d`, AND THE COUNTS THAT MOVED WITH IT. The census stopped merely COUNTING the open
+// rows past the 30-day fence and began draining them, 25 a night, so the fixture's one such row
+// (QA-79-02) now files a finding where it used to file only a number: 12 findings / 8 judgment become
+// 13 / 9, thirteen rendered lines become fourteen, part F's ledger gains one insert and part G's live
+// four-row board gains ZZTO-794's. Those are the SAME rows classified by one more check, not a
+// re-classification -- every other id in every list above is unchanged, which is what the pins prove.
+//
+// NEW PART A2 is where the check is actually discriminated: thirty hand-built rows past the fence,
+// then the four arms that can tell a drain from a stamp -- 25 of 30 ruled and no more; three carried
+// rows costing the batch none of its slots; a batch row whose premise was never read landing JUDGMENT
+// with no `fix`; and the same thirty handed over BACKWARDS yielding the same 25 in the same order.
+// Part B pins `CHECKS.length === 13` and `CHECKS[12]`, which ship in lockstep with the live CHECK
+// constraint part N feeds: a slug appended here without docs/design/agt-166-unrevalidated-slug.sql
+// reddens part N, because applyPlan POSTs the night's findings as ONE array (SES-418).
+//
 // DeepBench v7.0.524 | tests/regression/agt-79-ticket-owner.test.mjs | SES-385 slice 3 -- CHECK 12
 // NOW READS THE RECORD, NOT THE CYCLE COUNT, and this fixture moved with it rather than around it.
 // Slice 1 fired the check on `actual_cycles < predicted_cycles`; measured live that proxy filed 88
@@ -153,6 +169,7 @@ import {
   classifyBoard, renderCensus, planWrites, applyPlan, CHECKS, TYPE_TAXONOMY, TYPE_MAP, FENCES,
   censusLine, sameChicagoDay, nightlyNotes, NIGHTLY_PREFIX,
   chicagoDay, judgeTask, ingestJudgment, statePathFor, EXIT_AWAITING_ANSWER,
+  selectRevalidationBatch, premiseDetail, UNREVALIDATED_BATCH, PREMISE_EXCERPT, REVALIDATION_CHECK,
 } from "../../scripts/ticket-owner.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 import { renderTicketHygiene, factsSha, cst, BEGIN, END, HYGIENE_NIGHTS_READ } from "../../scripts/render-standing-brief.js";
@@ -201,8 +218,8 @@ async function main() {
   // --- A: the census, pure --------------------------------------------------------------------
   const r = run({});
 
-  assert.deepStrictEqual(r.counts, { rows: 14, findings: 12, derivable: 4, judgment: 8 },
-    "the fourteen-row fixture must classify to exactly 12 findings, 4 derivable");
+  assert.deepStrictEqual(r.counts, { rows: 14, findings: 13, derivable: 4, judgment: 9 },
+    "the fourteen-row fixture must classify to exactly 13 findings, 4 derivable");
 
   const expected = {
     "quote-missing": ["QA-79-01"],
@@ -223,6 +240,12 @@ async function main() {
     // gated_before_build card at all, so this list is the same one row it was under slice 1's
     // deleted cycles proxy -- by a different, non-overlapping trigger.
     "remainder-stranded": ["QA-79-04"],
+    // AGT-166 slice 2's thirteenth check: QA-79-02 is the fixture's one open row past the 30-day
+    // fence with `revalidated_at` null, so it is the whole population and rank 1 of tonight's batch.
+    // It is JUDGMENT and not derivable here because the fixture board carries no `premises` entry --
+    // a row whose premise text was never read must never be stamped as re-read. The premises-present
+    // arm is (vii) below.
+    "unrevalidated-30d": ["QA-79-02"],
   };
   for (const check of CHECKS) {
     assert.deepStrictEqual(byCheck(r, check), expected[check], `${check} did not find exactly its fixture rows`);
@@ -246,6 +269,7 @@ async function main() {
   assert.deepStrictEqual(r.backlog, {
     quote_prefence: 1, size_prefence: 1, cost_prefence: 1,
     verdict_prefence: 1, unrevalidated_30d: 1, attended_actual_null: 2,
+    unrevalidated_batch: 1, unrevalidated_carried: 0,
   }, "rows behind a fence are counted, never flagged");
 
   for (const f of r.findings) {
@@ -267,6 +291,10 @@ async function main() {
   assert.strictEqual(i1.backlog.quote_prefence, 0);
   assert.strictEqual(i1.backlog.size_prefence, 0);
   assert.strictEqual(i1.backlog.unrevalidated_30d, 0);
+  // AGT-166: the same move empties the drain, and the thirteenth check must stop firing with it --
+  // a check that kept flagging a row the population no longer holds would stamp a fresh ticket.
+  assert.deepStrictEqual(byCheck(i1, "unrevalidated-30d"), []);
+  assert.strictEqual(i1.backlog.unrevalidated_batch, 0);
 
   // (ii) CONTROL -- the dead cycle is actually open after all: the claim is live, not expired.
   const i2Board = clone(F.board);
@@ -294,26 +322,207 @@ async function main() {
   assert.deepStrictEqual(byCheck(i6, "claim-on-closed"), []);
   assert.deepStrictEqual(byCheck(i6, "claim-expired"), ["QA-79-05", "QA-79-07"]);
 
+  // --- A2: the revalidation drain, pure (AGT-166 slice 2, arm (b)) ------------------------------
+  // THIRTY hand-built rows, all open, all `revalidated_at` null, all born well past the 30-day
+  // fence, and NOTHING else wrong with any of them -- a quote, a size stamp, a taxonomy type and no
+  // claim, so the thirteenth check is the only one that can fire and every count below is its own.
+  // Born dates come in PAIRS so the (born, backlog_id) tiebreak is exercised fifteen times rather
+  // than asserted: a sort on `born` alone leaves same-day rows in the read's order, and two runs of
+  // one night would then judge two different sets.
+  const NOW166 = "2026-09-27T00:00:00.000Z";
+  const pad2 = n => String(n).padStart(2, "0");
+  const drainRow = n => ({
+    id: `00000000-0000-4000-8000-1660000000${pad2(n)}`,
+    backlog_id: `ZQTO-${pad2(n)}`,
+    status: "open", type: "Tooling", tier: "later",
+    claimed_by: null, claimed_at: null, predicted_cycles: 1, size_stamp: "S",
+    design_status: null, kickoff_link: null,
+    cost_pct_snapshot: null, cost_cycles_snapshot: null, revalidated_at: null,
+    filed_at: `2026-07-${pad2(Math.ceil(n / 2))}T00:00:00+00:00`,
+    created_at: `2026-07-${pad2(Math.ceil(n / 2))}T00:00:00+00:00`,
+    updated_at: `2026-07-${pad2(Math.ceil(n / 2))}T00:00:00+00:00`,
+    actual_tokens_attended: 1,
+  });
+  const DRAIN = Array.from({ length: 30 }, (_, i) => drainRow(i + 1));
+  const LONG = `A premise long enough to be cut. ${"filler ".repeat(120)}TAIL-AFTER-THE-CUT`;
+  const drainPremise = n => ({
+    backlog_id: `ZQTO-${pad2(n)}`,
+    title: `ZQTO fixture premise ${pad2(n)}`,
+    // ZQTO-30 is on this board (open); ZZQQ-99 is not; ZQTO-01 is the row's OWN id and must be left
+    // out of the list although the description names it. All three match the id vocabulary
+    // premiseDetail scans for, so a premise naming none of them would prove nothing about the scan.
+    description: n === 1 ? `${LONG} ZQTO-01 is blocked on ZQTO-30 and on ZZQQ-99.` : `Premise ${pad2(n)}.`,
+    priority_class: "P10 - Tooling",
+  });
+  const PREMISES = DRAIN.map(row => drainPremise(Number(row.backlog_id.slice(-2))));
+  const drainBoard = (over = {}) => ({
+    items: DRAIN, matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [],
+    ownerFindings: [], premises: PREMISES, ...over,
+  });
+  const drainRun = (over = {}) => classifyBoard(drainBoard(over), { now: NOW166, rate: 0.5 });
+  const slug166 = res => res.findings.filter(f => f.check === REVALIDATION_CHECK);
+
+  // (vii) THIRTY PAST THE FENCE, NONE CARRIED -> exactly 25 derivable and 0 judgment. The whole
+  // population is reported; only 25 of it is ruled.
+  const d1 = drainRun();
+  assert.strictEqual(slug166(d1).filter(f => f.verdict === "derivable").length, 25,
+    "thirty unrevalidated rows with their premises read must yield exactly one night's 25 rulings");
+  assert.strictEqual(slug166(d1).filter(f => f.verdict === "judgment").length, 0,
+    "a premise that WAS read is the judge's to rule, never filed as a question");
+  assert.deepStrictEqual(d1.counts, { rows: 30, findings: 25, derivable: 25, judgment: 0 },
+    "no other check may fire on these rows — a count here that is not 25 is another check leaking in");
+  assert.strictEqual(d1.backlog.unrevalidated_30d, 30, "the census reports the WHOLE population, never tonight's bite");
+  assert.strictEqual(d1.backlog.unrevalidated_batch, 25);
+  assert.strictEqual(d1.backlog.unrevalidated_carried, 0);
+  assert.ok(censusLine(d1).endsWith(" · revalidation 30 left (batch 25, carried 0)"),
+    `the census line must carry the drain's depth; got: ${censusLine(d1).slice(-70)}`);
+
+  // OLDEST FIRST, and the whole ordered list is asserted rather than its first element.
+  assert.deepStrictEqual(slug166(d1).map(f => f.backlog_id),
+    Array.from({ length: 25 }, (_, i) => `ZQTO-${pad2(i + 1)}`),
+    "the batch is the twenty-five OLDEST rows, in (born, backlog_id) order");
+
+  // The fix is the write and nothing more: `revalidated_at` alone, at the census's own instant.
+  for (const f of slug166(d1)) {
+    assert.deepStrictEqual(f.fix, { revalidated_at: NOW166 },
+      `${f.backlog_id} must fix exactly revalidated_at — never status, never updated_at (SES-316)`);
+  }
+
+  // AGT-169, THE HARD CONSTRAINT: a confirmed premise files NO ledger row. 259 open findings over 10
+  // slugs already sit unruled, so a drain that filed one row per judged premise would add 438 more.
+  const d1plan = planWrites(d1, [], DRAIN, { rate: 0.5 });
+  assert.strictEqual(d1plan.fixes.length, 25, "all 25 rulings are row patches");
+  assert.deepStrictEqual(d1plan.ledger.insert, [],
+    "a confirmed premise writes the row and files NOTHING — the ledger is for refusals only (AGT-169)");
+  assert.deepStrictEqual([...new Set(d1plan.fixes.map(f => f.check))], [REVALIDATION_CHECK]);
+
+  // premiseDetail, on the row built to exercise it: the age, the rank over the population, the cut at
+  // PREMISE_EXCERPT, and the LIVE STATUS of every OTHER ticket the premise names — including one the
+  // board does not carry, which must say so rather than read as open.
+  const det1 = slug166(d1).find(f => f.backlog_id === "ZQTO-01").detail;
+  assert.ok(det1.startsWith("open 88 days, never revalidated (born 2026-07-01T00:00:00+00:00) · batch 1/25 of 30 ·"),
+    `the detail leads with the age, the rank and the population; got: ${det1.slice(0, 110)}`);
+  assert.ok(det1.includes("it names: ZQTO-30 open, ZZQQ-99 not on the board."),
+    `every OTHER ticket the premise names arrives with its live status, the absent one saying so; got: ${det1.slice(-200)}`);
+  assert.ok(!det1.includes("ZQTO-01 open"),
+    "a premise never reports its OWN id's status back to the judge — its description names it, the list must not");
+  assert.ok(!det1.includes("TAIL-AFTER-THE-CUT"), "the description is cut at PREMISE_EXCERPT, not carried whole");
+  assert.ok(det1.includes(`[cut at ${PREMISE_EXCERPT}]`), "a cut premise says it was cut");
+  assert.ok(det1.endsWith("Confirm apply:true only if this premise still names work the board does not show done;" +
+    " else apply:false naming the superseding ticket or the evidence it is dead."),
+    `the line must close with the contract apply:true asserts; got: ${det1.slice(-80)}`);
+  // The CONTROL on the cut: a short premise is carried whole and says nothing about a cut.
+  const det2 = slug166(d1).find(f => f.backlog_id === "ZQTO-02").detail;
+  assert.ok(det2.includes("premise: Premise 02. · it names: none."),
+    `a short premise is carried whole and names nobody; got: ${det2.slice(-120)}`);
+  assert.ok(!det2.includes("[cut at"), "the cut control did not fire — every premise reads as cut, so the arm proves nothing");
+
+  // (viii) THREE CARRIED -> 25 derivable + 3 judgment, and the three are OUT of the batch: 25
+  // DIFFERENT rows are ruled tonight, so an open removal proposal never costs the drain a slot.
+  const CARRIED3 = ["ZQTO-01", "ZQTO-02", "ZQTO-03"].map((backlog_id, i) => ({
+    id: `00000000-0000-4000-8000-16600000c0${pad2(i + 1)}`,
+    backlog_id, check_slug: REVALIDATION_CHECK, first_seen_at: "2026-09-20T03:00:00+00:00",
+  }));
+  const d2 = drainRun({ ownerFindings: CARRIED3 });
+  const d2d = slug166(d2).filter(f => f.verdict === "derivable").map(f => f.backlog_id);
+  const d2j = slug166(d2).filter(f => f.verdict === "judgment").map(f => f.backlog_id);
+  assert.strictEqual(d2d.length, 25, "three carried rows must not cost the batch three of its 25 slots");
+  assert.deepStrictEqual(d2j, ["ZQTO-01", "ZQTO-02", "ZQTO-03"],
+    "a row whose removal proposal is still open is re-filed as judgment, never re-judged");
+  assert.deepStrictEqual(d2d, Array.from({ length: 25 }, (_, i) => `ZQTO-${pad2(i + 4)}`),
+    "the batch slides past the carried rows: 04-28, three of them rows (viii) had no room for");
+  assert.ok(d2d.includes("ZQTO-26") && d2d.includes("ZQTO-27") && d2d.includes("ZQTO-28"),
+    "25 DIFFERENT rows — the drain moves rather than re-reading the same twenty-five");
+  assert.strictEqual(d2.backlog.unrevalidated_carried, 3);
+  assert.strictEqual(d2.backlog.unrevalidated_30d, 30, "a carried row is still in the population it has not left");
+  for (const f of slug166(d2).filter(f => f.verdict === "judgment")) {
+    assert.ok(!("fix" in f), `${f.backlog_id} is carried, so it carries no fix at all`);
+    assert.ok(f.detail.includes("open since 2026-09-20T03:00:00+00:00"),
+      `a carried finding states how long the proposal has waited; got: ${f.detail}`);
+    assert.ok(f.detail.includes("never re-judged"), `got: ${f.detail}`);
+  }
+  // THE WRITE SIDE of the same arm: the three are absent from `fixes`, and they are TOUCHED on the
+  // ledger rather than inserted a second time.
+  const d2plan = planWrites(d2, CARRIED3, DRAIN, { rate: 0.5 });
+  assert.strictEqual(d2plan.fixes.length, 25);
+  for (const id of ["ZQTO-01", "ZQTO-02", "ZQTO-03"]) {
+    assert.ok(!d2plan.fixes.some(f => f.backlog_id === id), `${id} is carried and must never be stamped`);
+  }
+  assert.deepStrictEqual(d2plan.ledger.insert, [], "a carried row is already on the ledger");
+  assert.deepStrictEqual(d2plan.ledger.reseen, CARRIED3.map(c => c.id), "a carried row is touched, keeping its age");
+  assert.deepStrictEqual(d2plan.ledger.clear, []);
+
+  // (ix) A BATCH ROW WITH NO PREMISES ENTRY -> judgment, no fix. The read is what puts a premise in
+  // front of the judge; a row nobody showed him must never be stamped as re-read.
+  const d3 = drainRun({ premises: PREMISES.filter(pr => pr.backlog_id !== "ZQTO-07") });
+  const d3f = slug166(d3).find(f => f.backlog_id === "ZQTO-07");
+  assert.strictEqual(d3f.verdict, "judgment", "an unread premise cannot be confirmed");
+  assert.ok(!("fix" in d3f), "an unread premise carries no fix — a fix that survives is a write");
+  assert.ok(d3f.detail.includes("premise text was not read"), `got: ${d3f.detail}`);
+  assert.strictEqual(slug166(d3).filter(f => f.verdict === "derivable").length, 24,
+    "the other twenty-four are untouched by one missing premise");
+  assert.strictEqual(planWrites(d3, [], DRAIN, { rate: 0.5 }).fixes.length, 24);
+  assert.deepStrictEqual(planWrites(d3, [], DRAIN, { rate: 0.5 }).ledger.insert.map(f => f.backlog_id),
+    ["ZQTO-07"], "the unread premise is the ONE row that reaches the ledger");
+
+  // (x) THE READ ORDER MUST NOT MATTER. Same thirty rows handed over backwards: the same twenty-five
+  // ids, in the same order, with the same ranks. Without this arm a sort that fell back to REST's
+  // order would pass every arm above and judge a different set on every run.
+  const rev = classifyBoard(drainBoard({ items: [...DRAIN].reverse() }), { now: NOW166, rate: 0.5 });
+  assert.deepStrictEqual(slug166(rev).map(f => f.backlog_id), slug166(d1).map(f => f.backlog_id),
+    "the batch is a function of the board, never of the order it was read in");
+  assert.deepStrictEqual(slug166(rev).map(f => f.detail), slug166(d1).map(f => f.detail),
+    "the ranks reverse with the read order unless the sort is total — same details, or the batch is not reproducible");
+  assert.deepStrictEqual(
+    selectRevalidationBatch([...DRAIN].reverse(), { now: NOW166, carried: [] }).batch.map(r => r.backlog_id),
+    selectRevalidationBatch(DRAIN, { now: NOW166, carried: [] }).batch.map(r => r.backlog_id));
+
+  // selectRevalidationBatch's own edges, pure: a population smaller than one night, and a `now` that
+  // cannot be parsed (which must throw rather than select a batch from NaN).
+  const small = selectRevalidationBatch(DRAIN.slice(0, 4), { now: NOW166, carried: ["ZQTO-02"] });
+  assert.strictEqual(small.population.length, 4, "the population is every row past the fence, batch or not");
+  assert.deepStrictEqual(small.carried, ["ZQTO-02"]);
+  assert.deepStrictEqual(small.batch.map(r => r.backlog_id), ["ZQTO-01", "ZQTO-03", "ZQTO-04"]);
+  assert.deepStrictEqual(
+    selectRevalidationBatch(DRAIN, { now: NOW166, carried: ["ZQTO-99"] }).batch.map(r => r.backlog_id),
+    slug166(d1).map(f => f.backlog_id),
+    "a carried id the population does not hold changes nothing — it is not a slot");
+  assert.strictEqual(selectRevalidationBatch(
+    [{ ...drainRow(1), status: "partial" }, { ...drainRow(2), revalidated_at: NOW166 },
+     { ...drainRow(3), filed_at: NOW166, created_at: NOW166 }],
+    { now: NOW166, carried: [] }).population.length, 0,
+    "the predicate is all three clauses: a partial row, a revalidated row and a young row are each out");
+  assert.throws(() => selectRevalidationBatch(DRAIN, { now: "not-a-date", carried: [] }), /parseable/,
+    "a batch selected from an unparseable clock would be a different 25 every run");
+
   // --- B: the render and the constants, pure ---------------------------------------------------
   const text = renderCensus(r, F.now);
   assert.strictEqual(text, renderCensus(r, F.now), "renderCensus must be byte-stable: the report is diffed night over night");
   assert.ok(text.startsWith(
-    "ticket-owner census 2026-09-13T02:00:00Z: 14 rows · 12 findings (4 derivable · 8 judgment)" +
-    " · behind the fences: quote 1 · size 1 · cost 1 · verdict 1 · unrevalidated>30d 1 · attended-actual null 2"),
+    "ticket-owner census 2026-09-13T02:00:00Z: 14 rows · 13 findings (4 derivable · 9 judgment)" +
+    " · behind the fences: quote 1 · size 1 · cost 1 · verdict 1 · unrevalidated>30d 1 · attended-actual null 2" +
+    " · revalidation 1 left (batch 1, carried 0)"),
     `the census headline is not the agreed line:\n${text.split("\n")[0]}`);
   assert.ok(text.endsWith("\n"), "the census ends with a newline");
-  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 13, "headline plus one line per check, always twelve");
+  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 14, "headline plus one line per check, always thirteen");
   const sizeLine = text.split("\n").find(l => l.includes("size-missing"));
   assert.ok(sizeLine.endsWith("—"), "a check that found nothing must still print its line, ending in an em dash");
 
   const emptyText = renderCensus(
     run({ board: { items: [], matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] } }), F.now);
-  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 13, "an empty board still prints all twelve checks");
+  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 14, "an empty board still prints all thirteen checks");
   assert.ok(emptyText.includes("0 rows · 0 findings"), "an empty board reports zero rows, not nothing");
 
-  assert.strictEqual(CHECKS.length, 12);
+  assert.strictEqual(CHECKS.length, 13);
   assert.strictEqual(CHECKS[0], "quote-missing");
   assert.strictEqual(CHECKS[11], "remainder-stranded");
+  // AGT-166 slice 2. This pin and the live CHECK constraint ship together: part N feeds the table
+  // CHECKS's own vocabulary, so a slug appended here without the migration reddens THAT arm, and a
+  // widened constraint without this line reddens nothing at all — which is why both exist.
+  assert.strictEqual(CHECKS[12], "unrevalidated-30d");
+  assert.strictEqual(REVALIDATION_CHECK, "unrevalidated-30d", "one string names the slug, never a literal per site");
+  assert.strictEqual(UNREVALIDATED_BATCH, 25, "the Designer's call (ii): 25 premises a night");
+  assert.strictEqual(PREMISE_EXCERPT, 600, "a premise reaches the judge cut at a fixed, reproducible count");
   assert.strictEqual(TYPE_TAXONOMY.length, 10, "the eight FEATURES.md rows plus the two live majorities");
   assert.ok(TYPE_TAXONOMY.includes("Tooling") && TYPE_TAXONOMY.includes("Bug"));
   assert.deepStrictEqual(Object.keys(TYPE_MAP), ["feature", "Bug Fixes"],
@@ -412,6 +621,7 @@ async function main() {
 
   const ins = plan.ledger.insert;
   assert.deepStrictEqual(ins.map(f => [f.backlog_id, f.check_slug]).sort(), [
+    ["QA-79-02", "unrevalidated-30d"],
     ["QA-79-04", "actual-unknown"],
     ["QA-79-04", "remainder-stranded"],
     ["QA-79-08", "verdict-missing"],
@@ -443,7 +653,7 @@ async function main() {
   // (ii) CONTROL -- add a prior row matching tonight: it moves OUT of insert and INTO reseen, so
   // the two lists are proven disjoint rather than merely both populated.
   const p4 = planWrites(r, [...P, { id: "p4", backlog_id: "QA-79-04", check_slug: "actual-unknown" }], F.board.items, { rate: F.rate });
-  assert.strictEqual(p4.ledger.insert.length, 6, "a finding already on the ledger must not be inserted a second time");
+  assert.strictEqual(p4.ledger.insert.length, 7, "a finding already on the ledger must not be inserted a second time");
   assert.deepStrictEqual(p4.ledger.reseen, ["p1", "p4"]);
 
   // (iii) A fix with no primary key is not a write -- it throws rather than planning a PATCH it
@@ -599,14 +809,14 @@ async function main() {
 
   assert.strictEqual(renderCensus(r, F.now).split("\n")[0], `ticket-owner census ${F.now}: ${censusLine(r)}`,
     "renderCensus's first line IS censusLine — one string, two readers, byte-identical");
-  assert.ok(censusLine(r).startsWith("14 rows · 12 findings (4 derivable · 8 judgment) · behind the fences: quote "),
+  assert.ok(censusLine(r).startsWith("14 rows · 13 findings (4 derivable · 9 judgment) · behind the fences: quote "),
     `the census line carries the counts and the fences in order; got: ${censusLine(r).slice(0, 90)}`);
 
   // Slice 6 appended ` · unjudged` to the falsy-`judged` branch, so these two arms carry it: the
   // decision handle and the no-decision sentence are still the last thing the night says about its
   // WRITES, and the judgment tail now follows them either way. Part M owns the tail itself.
   const n1 = nightlyNotes(censusLine(r), { fixed: 1, inserted: 4, reseen: 0, cleared: 0, decision: "d1", expires_at: "2026-09-16T00:00:00Z" });
-  assert.ok(n1.startsWith(`${NIGHTLY_PREFIX} — 14 rows · 12 findings`), `the notes lead with the prefix the precondition reads; got: ${n1.slice(0, 60)}`);
+  assert.ok(n1.startsWith(`${NIGHTLY_PREFIX} — 14 rows · 13 findings`), `the notes lead with the prefix the precondition reads; got: ${n1.slice(0, 60)}`);
   assert.ok(n1.endsWith(" · fixed 1 · findings +4 ~0 −0 · decision d1 — reversible until 2026-09-16T00:00:00Z · unjudged"),
     `a night that fixed something ends in its decision handle and window; got: ${n1.slice(-90)}`);
   const n2 = nightlyNotes(censusLine(r), { fixed: 0, inserted: 0, reseen: 170, cleared: 0, decision: null, expires_at: null });
@@ -683,7 +893,7 @@ async function main() {
     confirmed: 3, refused: 1, unconfirmed: 0, sentences: 2,
     model: "claude-fable-5-1", report: J.answer.report,
   });
-  assert.deepStrictEqual(g.result.counts, { rows: 14, findings: 12, derivable: 3, judgment: 9 },
+  assert.deepStrictEqual(g.result.counts, { rows: 14, findings: 13, derivable: 3, judgment: 10 },
     "a refused fix moves one finding from derivable to judgment and changes no other count");
   assert.deepStrictEqual(
     g.result.findings.map(f => `${f.backlog_id} ${f.check}`),
@@ -705,7 +915,7 @@ async function main() {
   const pj = planWrites(g.result, J.prior, F.board.items, { rate: F.rate });
   assert.deepStrictEqual(pj.fixes.map(f => f.backlog_id), ["QA-79-03", "QA-79-07", "QA-79-12"],
     "only the confirmed fixes become writes");
-  assert.strictEqual(pj.ledger.insert.length, 8, "nine judgment pairs minus the one already on the ledger");
+  assert.strictEqual(pj.ledger.insert.length, 9, "ten judgment pairs minus the one already on the ledger");
   assert.deepStrictEqual(pj.ledger.reseen, ["00000000-0000-4000-8000-0000000000a1"]);
   assert.deepStrictEqual(pj.ledger.clear, ["00000000-0000-4000-8000-0000000000a2"]);
 
@@ -787,7 +997,7 @@ async function main() {
   assert.strictEqual(kDry.status, 0, `--answer --dry-run needs no cycle and no creds; stderr: ${kDry.stderr}`);
   assert.deepStrictEqual(JSON.parse(kDry.stdout), {
     ok: true, dry_run: true, confirmed: 3, refused: 1, unconfirmed: 0,
-    fixes: 3, insert: 8, reseen: 1, clear: 1,
+    fixes: 3, insert: 9, reseen: 1, clear: 1,
   }, "the dry run must report the same plan the pure half computes");
 
   const kNoState = spawnCli(["--judge", `--answer=${answerPath}`, `--state-file=${path.join(D, "missing.json")}`, "--dry-run"]);
@@ -1175,20 +1385,25 @@ async function main() {
     // reads but this test forgot to select would classify as null and quietly change the answer.
     const board = { items: await readFixture(), matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] };
     const r1 = classifyBoard(board, { now, rate: RATE });
-    assert.deepStrictEqual(r1.counts, { rows: 4, findings: 5, derivable: 1, judgment: 4 },
-      "the four fixture rows must classify to exactly one derivable fix and four judgment findings");
+    // AGT-166 slice 2: ZZTO-794 is open, filed before the fences and never revalidated, so it is the
+    // thirteenth check's whole population and lands as JUDGMENT — the live projection below does not
+    // select title/description, so no `premises` entry reaches the census and an unread premise is
+    // never stamped as re-read. That is the same fail-closed direction the fixture arms pin.
+    assert.deepStrictEqual(r1.counts, { rows: 4, findings: 6, derivable: 1, judgment: 5 },
+      "the four fixture rows must classify to exactly one derivable fix and five judgment findings");
+    assert.deepStrictEqual(byCheck(r1, "unrevalidated-30d"), ["ZZTO-794"]);
     assert.deepStrictEqual(byCheck(r1, "claim-on-closed"), ["ZZTO-791"]);
 
     // (3) Plan against an empty ledger: everything is new tonight.
     const plan1 = planWrites(r1, [], board.items, { rate: RATE });
     assert.strictEqual(plan1.fixes.length, 1);
     assert.strictEqual(plan1.fixes[0].id, id791, "the fix must address ZZTO-791 by the primary key the insert returned");
-    assert.strictEqual(plan1.ledger.insert.length, 4);
+    assert.strictEqual(plan1.ledger.insert.length, 5);
 
     // (4) THE WRITE.
     const res1 = await applyPlan(url, key, plan1, { sessionName: S, now });
     assert.strictEqual(res1.fixed, 1);
-    assert.strictEqual(res1.inserted, 4);
+    assert.strictEqual(res1.inserted, 5);
     assert.strictEqual(res1.reseen, 0);
     assert.strictEqual(res1.cleared, 0);
     assert.strictEqual(typeof res1.decision, "string", "the write pass must return the decision id John reverses");
@@ -1226,7 +1441,7 @@ async function main() {
       "the image must be the FULL row: reverse_decision() rewrites every column from row_data, so a partial image restores a partial row");
 
     const nullImgs = await rest(`runner_before_images?session_name=eq.${encodeURIComponent(S)}&table_name=eq.ticket_owner_findings&select=pk_value,row_data,decision_id`);
-    assert.strictEqual(nullImgs.length, 4, "every ledger row the night invented gets its own null-row image");
+    assert.strictEqual(nullImgs.length, 5, "every ledger row the night invented gets its own null-row image");
     for (const img of nullImgs) {
       assert.strictEqual(img.row_data, null, "a null row_data is how the chain says this row did not exist before");
       assert.strictEqual(img.decision_id, null, "the findings images hang off the session, not off the board's decision");
@@ -1238,7 +1453,12 @@ async function main() {
       ["ZZTO-792", "delivered-unaccepted"],
       ["ZZTO-792", "verdict-missing"],
       ["ZZTO-793", "quote-missing"],
-    ], "exactly the four judgment findings reach the ledger, one row per (ticket, check)");
+      // AGT-166 slice 2, and it lands on the LIVE table: the thirteenth slug is only insertable
+      // because docs/design/agt-166-unrevalidated-slug.sql widened
+      // ticket_owner_findings_check_slug_check first. On the unwidened constraint this POST is one
+      // array of five and answers 400 / 23514, taking the whole night with it (SES-418).
+      ["ZZTO-794", "unrevalidated-30d"],
+    ], "exactly the five judgment findings reach the ledger, one row per (ticket, check)");
     for (const x of led) {
       assert.strictEqual(x.verdict, "judgment");
       assert.strictEqual(x.cleared_at, null, "a finding filed tonight is open, never born cleared");
@@ -1251,12 +1471,12 @@ async function main() {
     const board2 = { ...board, items: await readFixture() };
     const r2 = classifyBoard(board2, { now: now2, rate: RATE });
     assert.strictEqual(r2.counts.derivable, 0, "the cell the first night fixed must not be found again");
-    assert.strictEqual(r2.counts.findings, 4);
+    assert.strictEqual(r2.counts.findings, 5);
     const priorLed = led.map(x => ({ id: x.id, backlog_id: x.backlog_id, check_slug: x.check_slug }));
     const plan2 = planWrites(r2, priorLed, board2.items, { rate: RATE });
     assert.deepStrictEqual(plan2.fixes, []);
     assert.deepStrictEqual(plan2.ledger.insert, [], "a finding already on the ledger is touched, never duplicated");
-    assert.strictEqual(plan2.ledger.reseen.length, 4);
+    assert.strictEqual(plan2.ledger.reseen.length, 5);
     assert.deepStrictEqual(plan2.ledger.clear, []);
 
     const res2 = await applyPlan(url, key, plan2, { sessionName: S, now: now2 });
@@ -1265,7 +1485,7 @@ async function main() {
     // assertion: this call passes no `prior`, and with no ledger to compute `prior ∪ insert − clear`
     // from, applyPlan raises nothing rather than guessing from `insert` alone. That is also what
     // keeps this fixture out of a table whose guard refuses every DELETE.
-    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 4, cleared: 0, raised: 0 },
+    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 5, cleared: 0, raised: 0 },
       "a night with nothing to fix records NO decision -- an empty decision row is noise John has to read");
     assert.strictEqual((await rest(`runner_decisions?session_name=eq.${encodeURIComponent(S)}&select=id`)).length, 1,
       "two nights, one decision: the second wrote no board cell, so it decided nothing");
@@ -1298,7 +1518,7 @@ async function main() {
     assert.strictEqual(Date.parse(restored.claimed_at), Date.parse("2026-09-01T00:00:00+00:00"));
     assert.strictEqual(restored.status, "done", "the reversal restores the whole row, including the columns nobody wrote");
 
-    console.log(`[AGT-79] part G: decision ${res1.decision} (expires ${res1.expires_at}) — 1 fix, 4 findings, reversed: ` +
+    console.log(`[AGT-79] part G: decision ${res1.decision} (expires ${res1.expires_at}) — 1 fix, 5 findings, reversed: ` +
       `restored ${rev.restored} refused ${rev.refused}`);
     passed = true;
   } finally {

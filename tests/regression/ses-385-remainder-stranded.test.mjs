@@ -145,8 +145,15 @@ async function run() {
   // --- the slug itself --------------------------------------------------------------------------
   assert.ok(CHECKS.includes("remainder-stranded"),
     "scripts/ticket-owner.js must carry `remainder-stranded` as a check — without it every id arm below reads as an empty list, which is what a check that never ran looks like");
-  assert.strictEqual(CHECKS[CHECKS.length - 1], "remainder-stranded",
-    "the new check is the twelfth and LAST entry: findings sort by this index and renderCensus prints one line per slug in this order");
+  // AGT-166 slice 2 (v7.0.643) appended a THIRTEENTH check, `unrevalidated-30d`, so this pin moved
+  // from "the last entry" to "the TWELFTH entry" — which is the property SES-385 actually depends on.
+  // The index is what matters and always was: findings sort by `CHECKS.indexOf(check)`, renderCensus
+  // prints one line per slug in this order, and the live CHECK constraint
+  // `ticket_owner_findings_check_slug_check` lists the slugs in the same order. `length - 1` read the
+  // index correctly only while this check happened to be last, so a later append would have reddened
+  // this file for a reason that is not a defect. Pinning index 11 keeps the arm and survives the next one.
+  assert.strictEqual(CHECKS[11], "remainder-stranded",
+    "the check is the TWELFTH entry: findings sort by this index and renderCensus prints one line per slug in this order");
   assert.strictEqual(new Set(CHECKS).size, CHECKS.length, "a duplicated slug would double-print a line and double-sort its findings");
 
   // --- (A) the four fixture rows, by id ----------------------------------------------------------
