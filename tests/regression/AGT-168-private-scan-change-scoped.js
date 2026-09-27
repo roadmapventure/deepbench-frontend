@@ -4,15 +4,16 @@
 // and the `--base=<rev>` CLI mode that CI's `checks` job now runs on every push and PR.
 //
 // WHY THE SCOPE IS THE ADDED LINE AND NOT THE TRACKED TREE, which is the single fact every clause
-// below exists to hold. Measured on this tree at the ship: 48 lines across 46 files already carry
-// a `vercel_bypass` value, all of them historical docs/kickoffs/* residue (newest v7.0.85 -- the
-// literal stopped propagating on its own). A CI step calling scanTree() would report those 48
+// below exists to hold. Measured on this tree at the ship: 42 lines across 42 files (48 hits, 6
+// false positives before AGT-196) already carry a `vercel_bypass` value, all of them historical
+// docs/kickoffs/* residue (newest v7.0.85 -- the literal stopped propagating on its own). A CI step
+// calling scanTree() would report those 42
 // standing lines on EVERY run and be red forever, so the first red would be the last one anybody
 // read. The gate grades the change, never the live world (pattern:162). Clause 1 is the negative
 // control that proves it: a scanner that reached for scanTree() scores >= 1 there and fails.
 //
 // THE GATE IS PROPHYLACTIC. It stops the 49th line; it removes none of the 48. Purging them is
-// the ~46-file edit AGT-168's later slice owns, and it needs John's own waiver of the 3-file cap.
+// the 42-file edit AGT-168's later slice owns, and it needs John's own waiver of the 3-file cap.
 //
 // FIXTURES ARE THROWAWAY GIT REPOS UNDER os.tmpdir(), NEVER THIS CHECKOUT (pattern:76). The whole
 // mechanism under test is `git diff <base> HEAD`, so a fixture has to be a real repository with
@@ -215,7 +216,7 @@ function failsClosed() {
 
   // TODAY'S BEHAVIOUR IS UNTOUCHED, asserted on the real tree rather than a fixture because that is
   // the tree the weekly auditor ledger actually calls: no --base, still exit 0, still the original
-  // summary line, over a repo carrying 48 lines this same script is about to be told to ignore.
+  // summary line, over a repo carrying 42 lines this same script is about to be told to ignore.
   const whole = runRealScript([]);
   assert.strictEqual(whole.code, 0,
     `the unflagged whole-tree run must still exit 0 -- the ledger path is not a gate. Got ${whole.code}: ${whole.stderr}`);
@@ -257,7 +258,7 @@ function stepWindow(yml) {
 // string that cannot contain a single character of any other step.
 function assertGateStep(step) {
   assert.ok(/--base=/.test(step),
-    "the CI invocation must pass --base -- the bare form scans the whole tree, finds the 48 standing lines and is red forever");
+    "the CI invocation must pass --base -- the bare form scans the whole tree, finds the 42 standing lines and is red forever");
   assert.ok(/git fetch[^\n]*\$\{?BASE_SHA/.test(step) || /git fetch[^\n]*"\$BASE_SHA"/.test(step),
     "the step must fetch the base commit explicitly: CI clones at depth 1 (SES-393), so the base object is absent and the gate would exit 2 on every run");
   assert.ok(/github\.event\.before/.test(step) && /pull_request\.base\.sha/.test(step),
