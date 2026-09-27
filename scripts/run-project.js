@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// DeepBench v7.0.653 | scripts/run-project.js | AGT-186 -- THIS FILE'S OWN PROVENANCE IS NOT THE
+// PICKED TICKET. The state key that carries it is now `driver_feature`, not `feature`: named
+// `feature`, next to `driver:` and nowhere near `pick` / `pick_row`, it read to a human and to a
+// sub-agent as the ticket this cycle picked, and one record was written asserting a dropped digit
+// in this file on that misreading alone. The pick travels as `state.pick` / `state.pick_row` and
+// only there. The VALUE `AGT-68` is correct and load-bearing -- it is this driver's own provenance
+// ticket, the same id `intentContract()` names when it cannot find the capabilities row and tells
+// the operator which section of docs/design/ga-agents-seed.sql to apply -- so it must NEVER be
+// "corrected" to whatever ticket a cycle happens to hold. Guard: agt-68-devmanager.test.mjs pins
+// the renamed key, the absence of the bare key, and both strings a value change would break.
+//
 // DeepBench v7.0.625 | scripts/run-project.js | AGT-183 -- TWO REFUSALS THAT FIRED ON THE HAPPY
 // PATH. (1) `stateDrift` takes a third reading -- the stored pick's own board row -- so a pick path that
 // moved on because THIS cycle's own `--cycle-id` holds the pick's claim (rule B40 claims at pick time,
@@ -996,7 +1007,7 @@ async function main() {
 
   const state = {
     driver: "scripts/run-project.js",
-    feature: "AGT-68",
+    driver_feature: "AGT-68",
     project: args.project,
     step: args.step,
     max_steps: args.maxSteps,

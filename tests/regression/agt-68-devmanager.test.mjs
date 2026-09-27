@@ -470,6 +470,28 @@ export default async function run() {
     "the claim must set claimed_by/claimed_at and NOTHING else (SES-316): stamping updated_at on a " +
     `claim is what made a decision recorded minutes earlier un-restorable. got: ${claimBody[0]}`);
 
+  // AGT-186: this driver's OWN provenance ticket must not read as the ticket the cycle picked.
+  // The key was named `feature`, sitting beside `driver:` in the same state object, so a human or
+  // a sub-agent reading `taskContext` took it for the pick -- and a record was written claiming a
+  // digit had been dropped here. The pick travels as `state.pick` / `state.pick_row`, never this.
+  assert.ok(/^\s*driver_feature:\s*"AGT-68",$/m.test(driverSrc),
+    "the state key carrying this driver's own provenance must be `driver_feature`, not `feature`: " +
+    "a key named `feature` next to `driver:` reads as the picked ticket, and the value must stay " +
+    "AGT-68 because that is THIS FILE's provenance ticket, not whatever the cycle happens to hold");
+  assert.ok(!/^\s*feature:/m.test(driverSrc),
+    "no bare `feature:` key may remain in the driver's state: while one exists there is something " +
+    "in `taskContext` that can be compared with the pick and found to disagree, which is the whole " +
+    "misread -- provenance must never be presentable as the pick");
+  assert.ok(driverSrc.includes('apply the AGT-68 section of docs/design/ga-agents-seed.sql'),
+    "intentContract()'s capabilities-row error must still name the AGT-68 section of " +
+    "docs/design/ga-agents-seed.sql: this is why the VALUE is load-bearing -- it tells the " +
+    "operator which seed section to apply, so 'correcting' it to a picked ticket id sends them " +
+    "to a section that does not exist");
+  assert.ok(/\|\s*AGT-68 -- the session's HANDS for The Development/.test(driverSrc),
+    "the v7.0.434 provenance header line must survive the rename: it is the other place this " +
+    "file states that AGT-68 is its own origin ticket, and losing it would leave the value " +
+    "looking like a stale pick with nothing to explain it");
+
   // == Live arm ================================================================================
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
