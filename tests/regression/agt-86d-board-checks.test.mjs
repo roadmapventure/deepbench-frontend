@@ -11,8 +11,25 @@
 // SAME fingerprint (the escalate rule's premise); two per-row findings on different rows must not.
 //
 // LIVE ARM (notRun without SUPABASE_URL + SUPABASE_SERVICE_KEY): runs the CLI to a temp --out and
-// asserts board-repeat-worked names backlog_items:SES-424 and that audit_findings did not grow --
-// the script writes no row.
+// grades board-repeat-worked against an INVARIANT rather than an occupant, plus asserts that
+// audit_findings did not grow -- the script writes no row.
+//
+// WHY THE OCCUPANT PIN WENT (AGT-167). This arm used to require the live run to name
+// backlog_items:SES-424. That was wrong twice over. SES-424 reached `done` in this very cycle, and a
+// terminal row can never fire this check at all -- so the pin would have gone red for a reason with
+// nothing to do with the code under test. And pinning whoever occupies a finding makes the suite a
+// hostage of the board: every ticket that closes, and every new one that starts cycling, turns this
+// file red or green for no change in behaviour. What must hold forever is the SHAPE -- every
+// board-repeat-worked finding names a NON-TERMINAL row whose NON-SHIPPING cycle count has reached N.
+//
+// AND WHY IT IS NOT VACUOUS. On today's board NO non-terminal ticket has 4 non-shipping cycles
+// (measured this cycle: the maximum is 1 among pickable rows), so "every finding has the shape" is
+// satisfied by emitting nothing, and a check that had been broken into total silence would pass. The
+// arm therefore recomputes the expected roster INDEPENDENTLY -- its own paged reads of
+// backlog_items + runner_cycles, its own count, not cycleCounts() -- and asserts SET EQUALITY with
+// what the run emitted. Zero findings passes only when zero is the right answer. The recomputation
+// is deliberately a second copy of the join and nothing else; the join itself is graded by the
+// fixture arms above, which is where a wrong join shows up as a wrong ROW, not a wrong count.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -22,7 +39,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
-  CHECK_SLUGS, AGGREGATE_OVER, runChecks, aggregate,
+  CHECK_SLUGS, AGGREGATE_OVER, TERMINAL, PAGE_ROWS, runChecks, aggregate,
   checkNoHome, checkRepeatWorked, checkDeferralUndone, checkStale, checkClosedRed, ratifiedAt,
 } from "../../scripts/audit-board.js";
 import { UNREVALIDATED_DAYS } from "../../scripts/ticket-owner.js";
@@ -61,6 +78,37 @@ const roundTrip = f => {
   assert.ok(Array.isArray(r.locations) && r.locations.length >= 1);
 };
 
+// The oracle's OWN paged read. audit-board.js's readAll() is the code under test, so this arm must
+// not borrow it; PAGE_ROWS is imported because the page SIZE is PostgREST's limit, not a judgement.
+async function pageAll(url, key, pathAndQuery) {
+  const rows = [];
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const res = await fetch(`${url}/rest/v1/${pathAndQuery}`, {
+      headers: {
+        apikey: key, Authorization: `Bearer ${key}`,
+        "Range-Unit": "items", Range: `${from}-${from + PAGE_ROWS - 1}`,
+      },
+    });
+    assert.ok(res.ok, `oracle read ${pathAndQuery} -> HTTP ${res.status}`);
+    const page = await res.json();
+    assert.ok(Array.isArray(page), `oracle read ${pathAndQuery} came back non-array`);
+    rows.push(...page);
+    if (page.length < PAGE_ROWS) return rows;
+    assert.ok(rows.length < 100000, `oracle read ${pathAndQuery} ran away`);
+  }
+}
+
+async function liveCap(url, key) {
+  const res = await fetch(`${url}/rest/v1/runner_settings?select=chain_max_noship_streak&id=eq.1`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  assert.ok(res.ok, `runner_settings read -> HTTP ${res.status}`);
+  const [row0] = await res.json();
+  const n = row0?.chain_max_noship_streak;
+  assert.ok(Number.isInteger(n) && n >= 1, `chain_max_noship_streak must be a positive integer, got ${JSON.stringify(n)}`);
+  return n;
+}
+
 async function run() {
   // --- the shared fence ---------------------------------------------------------------------------
   assert.equal(UNREVALIDATED_DAYS, 30, "ticket-owner.js must export UNREVALIDATED_DAYS = 30");
@@ -79,9 +127,18 @@ async function run() {
     assert.ok(f.every(x => x.kind === "other" && x.check_slug === "board-no-home"));
   }
 
-  // --- repeat-worked (SES-424 shape: cycles via item_id only) ----------------------------------------
+  // --- repeat-worked: the ceiling is counted in NON-SHIPPING cycles (AGT-167) ------------------------
+  // The rule text has ALWAYS said "without shipping". Before AGT-167 cycleCounts() counted TOTAL
+  // cycles and readBoard() never even selected `outcome`, so the check could not see shipping and
+  // every well-behaved ticket that took several cycles and shipped from each one was a finding. Two
+  // arms hold the corrected measure from both sides, and a lazy fix fails one of them:
+  //   R-SHIPPED  8 cycles, ALL shipped          -> must NOT fire (the false positive itself)
+  //   R-MIX      6 shipped + 4 non-shipping     -> MUST fire on the 4
+  // R-MIX is why "skip any ticket that ever shipped" is not a fix: it would silence the one row here
+  // that genuinely is being re-worked without shipping.
   {
-    const items = [row("SES-424", { status: "delivered" }), row("R-3"), row("R-DONE", { status: "done" }), row("R-UUID")];
+    const items = [row("SES-424", { status: "delivered" }), row("R-3"), row("R-DONE", { status: "done" }), row("R-UUID"),
+      row("R-SHIPPED"), row("R-MIX")];
     const cycles = [
       ...Array.from({ length: 8 }, () => ({ backlog_item_id: null, item_id: "SES-424" })),
       ...Array.from({ length: 3 }, () => ({ backlog_item_id: null, item_id: "R-3" })),
@@ -89,9 +146,18 @@ async function run() {
       // uuid-only join half: 2 via backlog_item_id + 2 via item_id = 4 -> fires
       { backlog_item_id: "u-R-UUID", item_id: null }, { backlog_item_id: "u-R-UUID", item_id: null },
       { backlog_item_id: null, item_id: "R-UUID" }, { backlog_item_id: null, item_id: "R-UUID" },
+      // AGT-167 negative: cycled eight times, shipped every time. Not re-work without shipping.
+      ...Array.from({ length: 8 }, () => ({ backlog_item_id: null, item_id: "R-SHIPPED", outcome: "shipped" })),
+      // AGT-167 positive: the shipped majority is invisible to the measure; the 4 that did not ship fire.
+      ...Array.from({ length: 6 }, () => ({ backlog_item_id: null, item_id: "R-MIX", outcome: "shipped" })),
+      ...Array.from({ length: 4 }, () => ({ backlog_item_id: null, item_id: "R-MIX", outcome: "gated_before_build" })),
     ];
     const f = checkRepeatWorked(board({ items, cycles }), ctx);
-    assert.deepEqual(ids(f), ["backlog_items:R-UUID", "backlog_items:SES-424"], "repeat-worked: >=N non-terminal fires on both join halves; 3 cycles or done does not");
+    assert.deepEqual(ids(f), ["backlog_items:R-MIX", "backlog_items:R-UUID", "backlog_items:SES-424"],
+      "repeat-worked: >=N NON-SHIPPING cycles on a non-terminal row fires (both join halves, and R-MIX's 4 of 10); " +
+      "3 cycles, a done row, and R-SHIPPED's 8 all-shipped cycles do not");
+    assert.match(f.find(x => x.locations[0].location === "backlog_items:R-MIX").locations[0].text, /^4 cycles \(streak cap 4\)/,
+      "the finding must report the NON-SHIPPING count (4), not the 10 cycles the ticket has run");
     assert.ok(f.every(x => x.kind === "other"));
   }
 
@@ -231,9 +297,57 @@ async function run() {
     const doc = JSON.parse(fs.readFileSync(out, "utf8"));
     assert.equal(doc.found_by, "auditor:board-checks");
     assert.match(doc.week, /^\d{4}-W\d{2}$/);
-    const hit = doc.findings.find(f => f.check_slug === "board-repeat-worked" &&
-      f.locations.some(l => l.location === "backlog_items:SES-424"));
-    assert.ok(hit, "live: board-repeat-worked must carry a per-row finding at backlog_items:SES-424");
+    // -- the independent oracle: this file's OWN reads, count and join. Never cycleCounts().
+    const N = await liveCap(url, key);
+    const liveItems = await pageAll(url, key, "backlog_items?select=id,backlog_id,status&order=backlog_id");
+    const liveCycles = await pageAll(url, key, "runner_cycles?select=backlog_item_id,item_id,outcome&order=id");
+    assert.ok(liveItems.length > 0 && liveCycles.length > 0,
+      `live: the oracle read ${liveItems.length} items and ${liveCycles.length} cycles -- an empty read ` +
+      `would make every assertion below vacuously true, so it is refused rather than banked`);
+    const uuidToId = new Map(liveItems.map(r => [r.id, r.backlog_id]));
+    const statusOf = new Map(liveItems.map(r => [r.backlog_id, r.status]));
+    const noship = new Map();
+    for (const c of liveCycles) {
+      if (c.outcome === "shipped") continue;                       // the AGT-167 measure
+      const key2 = (c.backlog_item_id != null ? uuidToId.get(c.backlog_item_id) : null) ?? c.item_id ?? null;
+      if (key2 == null) continue;
+      noship.set(key2, (noship.get(key2) ?? 0) + 1);
+    }
+    const expected = [...noship]
+      .filter(([id, n]) => n >= N && statusOf.has(id) && !TERMINAL.includes(statusOf.get(id)))
+      .map(([id]) => id).sort();
+
+    const emitted = doc.findings.filter(f => f.check_slug === "board-repeat-worked");
+    const aggregated = emitted.length === 1 &&
+      emitted[0].locations[0].location === "audit-board/board-repeat-worked";
+    if (aggregated) {
+      // > AGGREGATE_OVER rows collapse to one finding whose text opens "<n> rows: ".
+      assert.ok(expected.length > AGGREGATE_OVER, `live: the check aggregated but the oracle expected only ${expected.length} rows`);
+      assert.match(emitted[0].locations[0].text, new RegExp(`^${expected.length} rows: `),
+        `live: the aggregate must name ${expected.length} rows, the oracle's count`);
+    } else {
+      const named = emitted.flatMap(f => f.locations.map(l => l.location.replace(/^backlog_items:/, ""))).sort();
+      assert.deepEqual(named, expected,
+        `live: board-repeat-worked must name EXACTLY the non-terminal rows whose non-shipping cycle ` +
+        `count has reached ${N}. Emitted ${JSON.stringify(named)}, oracle ${JSON.stringify(expected)}. ` +
+        `A row only the oracle has is the check going silent; a row only the check has is it firing on ` +
+        `shipped cycles, on a terminal row, or under the cap.`);
+      for (const f of emitted) {
+        const id = f.locations[0].location.replace(/^backlog_items:/, "");
+        const st = statusOf.get(id);
+        assert.ok(st !== undefined && !TERMINAL.includes(st),
+          `live: board-repeat-worked named ${id}, whose status is ${st ?? "(not on the board)"} -- a terminal row must never fire`);
+        const m = /^(\d+) cycles \(streak cap (\d+)\); status (.+)$/.exec(f.locations[0].text);
+        assert.ok(m, `live: unparseable finding text ${JSON.stringify(f.locations[0].text)}`);
+        assert.equal(Number(m[1]), noship.get(id),
+          `live: ${id}'s finding reports ${m[1]} cycles but the oracle counts ${noship.get(id)} non-shipping`);
+        assert.equal(Number(m[2]), N, `live: the finding must quote the live cap ${N}`);
+        assert.equal(m[3], st);
+      }
+    }
+    console.log(`    [live] board-repeat-worked: ${emitted.length} finding(s); oracle expected ${expected.length} ` +
+      `row(s) at cap ${N} over ${liveItems.length} items / ${liveCycles.length} cycles` +
+      (expected.length === 0 ? " -- zero, and independently confirmed correct" : ""));
     for (const f of doc.findings) roundTrip(f);
   } finally {
     try { fs.unlinkSync(out); } catch { /* absent */ }

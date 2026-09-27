@@ -6,10 +6,15 @@
 //   board-no-home         an open/partial row no project can ever pick: epic_id NULL, or its epic
 //                         has no project (prime_directive_queue() admits a row only through
 //                         epic_project_executing(epic_id)).
-//   board-repeat-worked   a ticket the runner has cycled >= runner_settings.chain_max_noship_streak
-//                         times and that is still not done/removed. Cycles join on
-//                         COALESCE(backlog_item_id -> backlog_id, item_id): 375 of 617 cycles carry
-//                         no backlog_item_id, so the text id is half the join, not a fallback.
+//   board-repeat-worked   a ticket whose NON-SHIPPING cycles number >= runner_settings.
+//                         chain_max_noship_streak and that is still not done/removed. A cycle whose
+//                         outcome is 'shipped' is NOT counted (AGT-167): the rule has always read
+//                         "without shipping", but the count was of TOTAL cycles and the read did not
+//                         select `outcome` at all, so a ticket that took several cycles and shipped
+//                         from each one was a finding. Cycles join on
+//                         COALESCE(backlog_item_id -> backlog_id, item_id): 459 of 738 cycles carry
+//                         no backlog_item_id (measured 2026-09-27), so the text id is half the join,
+//                         not a fallback.
 //   board-deferral-undone a before-image recorded defer_status 'yes', the live row no longer says
 //                         'yes', and no runner_decisions row for that ticket is dated at or after
 //                         the image -- a deferral reset nobody decided.
@@ -120,6 +125,8 @@ export function cycleCounts(board) {
   const byUuid = new Map((board.items ?? []).map(r => [r.id, r.backlog_id]));
   const counts = new Map();
   for (const c of board.cycles ?? []) {
+    // AGT-167: the ceiling is a NON-SHIPPING count. A shipped cycle is progress, not re-work.
+    if (c.outcome === "shipped") continue;
     const key = (c.backlog_item_id != null ? byUuid.get(c.backlog_item_id) : null) ?? c.item_id ?? null;
     if (key == null) continue;
     counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -291,7 +298,7 @@ export async function readBoard(base, key) {
   const items = await readAll(base, key, "backlog_items",
     "backlog_items?select=id,backlog_id,status,epic_id,defer_status,filed_at,created_at,revalidated_at&order=backlog_id", 5000);
   const epics = await readAll(base, key, "epics", "epics?select=id,project_id&order=id", 1000);
-  const cycles = await readAll(base, key, "runner_cycles", "runner_cycles?select=backlog_item_id,item_id&order=id", 20000);
+  const cycles = await readAll(base, key, "runner_cycles", "runner_cycles?select=backlog_item_id,item_id,outcome&order=id", 20000);
   const images = await readAll(base, key, "runner_before_images",
     "runner_before_images?select=pk_value,row_data,created_at&table_name=eq.backlog_items&row_data->>defer_status=eq.yes&order=id", 10000);
   const decisions = await readAll(base, key, "runner_decisions",

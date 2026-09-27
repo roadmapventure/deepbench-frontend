@@ -223,14 +223,14 @@ the batch at the end, for John. The only database write is the registry rows the
 - **Pinned by:** `tests/regression/ses-312-succession-without-cards.test.mjs`, `tests/regression/ses-340-projects-govern.test.mjs`.
 - **Judgment:** **keep.** G1 with a brake on it: the chain is how the platform gets a night's work done, and the gates are what stop it grinding.
 
-### <a id="OD-21"></a>OD-21 — The no-ship streak ceiling
+### <a id="OD-21"></a>OD-21 — The no-ship ceiling: one column, two meanings
 
-> A chain stops when `runner_settings.chain_max_noship_streak` consecutive cycles have finished without shipping (column default 2, LIVE VALUE 4); canonical: that column, read by `public.drain_chain_gate()` with a COALESCE fallback of 2.
+> `runner_settings.chain_max_noship_streak` is ONE column with TWO meanings since `AGT-167` (`v7.0.642`), and tuning it moves both: (a) a chain stops when that many consecutive cycles have finished without shipping — `public.drain_chain_gate()`, COALESCE fallback 2; and (b) `public.prime_directive_queue()`'s lane (c) refuses a buildable Selfbuild ticket whose own non-shipping cycle count has reached it — `public.ticket_noship_cycles(text)`, the one home for that measure. Column default 2, LIVE VALUE 4, `CHECK (1..20)`. `drain_epic_next()` and lane (b) are deliberately NOT fenced (`AGT-221`), so a drain pick can still offer what lane (c) refuses.
 
 - **Enforcement:** `script`
-- **Lives in:** `public.runner_settings.chain_max_noship_streak`.
-- **Pinned by:** none.
-- **Judgment:** **keep** the mechanism. G4: a loop that is not shipping is a loop that needs a human eye, and this is the number that fetches one.
+- **Lives in:** `public.runner_settings.chain_max_noship_streak`, read by `public.drain_chain_gate()` (per-chain streak, OD-22 counts it) and by `public.prime_directive_queue()`'s lane (c) through `public.ticket_noship_cycles(text)` (per-ticket count, all of the ticket's non-shipping cycles, no window).
+- **Pinned by:** `tests/regression/agt-167-noship-pick-fence.test.mjs` walks the lane (c) fence at the live cap on a minted fixture (offered at 0, refused at the cap, offered again when one cycle ships); `tests/regression/agt-86d-board-checks.test.mjs` holds the same measure in `scripts/audit-board.js`'s `board-repeat-worked`.
+- **Judgment:** **keep** the mechanism. G4: a loop that is not shipping is a loop that needs a human eye, and this is the number that fetches one. `AGT-167` widened it from naming that condition to acting on it: before, the cap's only reader was Gate D, so a ticket could be picked, fail to ship, and be offered again indefinitely. **One number now moves two gates** — raising it both lengthens the chains a non-shipping run may continue and widens how many failed attempts one ticket may collect before lane (c) stops offering it. The asymmetry with `drain_epic_next()` is deliberate, not an oversight (`AGT-221`).
 
 ### <a id="OD-22"></a>OD-22 — How the streak is counted
 
