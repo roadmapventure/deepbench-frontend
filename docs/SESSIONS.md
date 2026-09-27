@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260927-0342 (v7.0.627, 2026-09-27, unattended cycle `d7790ea0-c34d-4de9-898c-2cac31d8f8f9`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer ×2, Opus 5 Builder) — `AGT-184` — **delivered, verdict block: the auto-rollback engine could call a live schema change "code-only", and one row in seventy-four proved it.**
+
+### One orphan in seventy-four, and it sat on the destructive side of the decision
+
+`scripts/rollback-on-red.js` answers "is there a schema change in this range?" by comparing two watermarks and nothing else. AGT-138's `finding_routes` row was written over PostgREST because that container had no SQL path at all, so `supabase_migrations` gained nothing while the table gained a row — and of **74** `runner_migration_downs` rows, **73** had a matching migration name and exactly one did not. For that range the engine returned `code-only`: revert the commit, and leave a live table change behind. Its own header, lines 161-165, calls that the single direction that must never be wrong.
+
+### Both halves landed, and the migration went back under its original name on purpose
+
+`agt138_researcher_route` was re-applied under the name it originally had — `up_name` is the ledger's join key, so any `agt184_*` name would have moved a watermark and left the orphan orphaned. `capture_migration_down` ran **first**, as step 6 requires, and returned `refused` / 0 objects / `down_sql` NULL: the honest class for a DML insert into an existing table, which also means a red range holding this ship is card-only. Orphans went **1 → 0** and `finding_routes` still holds exactly one `source='researcher'` row, so the `ON CONFLICT DO NOTHING` insert was a true no-op. The point was the watermark, never the data.
+
+### The third fixture arm is the one that makes the guard a guard
+
+`decide()` now returns `card-only` on a ledger orphan, immediately before the code-only return. The QA moves one variable on one fixture: `[]` → `revert-and-card`; the orphan with `migrations: []` → **card-only**, naming it; and `[{up_name:'m1'}]` **with** a matching migration → `revert-and-card` again. That last arm proves the guard keys on the *absence of a ledger row* rather than on a down existing — without it the change would have read as "any down makes a range unrevertable". `origin/dev` answers `revert-and-card` for all three, and against the `origin/dev` engine the new test cannot even load.
+
+### A named test caught a placement that looked free
+
+`SES-287` assertion 7 grades `rangeShas` as the **last** key in the `decide()` call, by regex, to prove the flag is threaded rather than parsed and dropped. Appending `cycleDowns` after it turned that kickoff-named test red. It was diagnosed rather than worked around and moved above `rangeShas`, with the reason commented at the site — a reminder that in this repo an argument's *position* is sometimes asserted.
+
+### The writer-side half was filed, not shipped, because the authority gate said so
+
+The other half — stopping a cycle with no SQL path from writing DML over PostgREST — is a `bd-guardrails` Skill line, and `node scripts/agent-row-gate.js --ticket=AGT-184 --action=edit-active` returns `{"verdict":"gated","clause":"no-authority"}` because AGT-184 is `scope_origin discovered`. It was filed as **AGT-201** with the gate's own JSON quoted on the row. The Builder also flagged that its own ID claim had to use a PostgREST compare-and-swap, since this container's Builder has no SQL path either — atomic, but a second mechanism for something with one documented mechanism, and the same condition AGT-201 exists to close.
+
+### Two assemblies, and the first refusal is on the board
+
+The first kickoff was refused `kickoff-no-lanes` (`SES-359`). That is one of the two causes step 6 allows a single re-assembly for, so the premature commit was reset, the finding recorded, and the re-assembly paid for the `Lanes:` line by trimming prose about the Designer's own lane — 8,163 → 8,148 bytes, no task fact touched.
+
+---
+
 ## session/cycle-20260927-0158 (v7.0.623, 2026-09-27, unattended cycle `c1d1fb0c-d981-4b69-8b19-c26f961b8804`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-176` — **partial, verdict block: a refused API call has been billed since 24 September and this platform was writing it down as free.**
 
 ### The ticket was about a cosmetic zero; revalidation found real money
