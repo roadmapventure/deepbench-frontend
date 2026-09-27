@@ -182,7 +182,18 @@ export const RUNBOOK_CEILING = 381000;
 // Net 380967 -> 380925 B, 75 B under the ceiling -- 42 B of that is headroom this ship did NOT
 // spend, and like the 33 B above it is REPORTED, not absorbed. Re-measured with wc -c and
 // re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 380925;
+//
+// v7.0.654 (AGT-128) edits ONE runbook clause: trigger 2 of the close-out's status rule now reads "a
+// STOP LINE closing THIS ticket `partial`" instead of "naming `partial`", and drops one now-redundant
+// word from the gate-card half of the same sentence. MEASURED ON THE REBASED TREE, not on the tree the
+// build ran against: the peer ships v7.0.653/v7.0.656 trimmed the baseline 380967 -> 380925 B while
+// this ticket sat blocked on a 3.5h Supabase outage, so the 380974 the build first measured was STALE
+// by the time it could land and was re-measured rather than carried -- which is this comment block's
+// own standing warning, obeyed. Net 380925 -> 380932 B, 68 B under the ceiling. NO STAMP WAS ROTATED
+// IN and that is the decision, not an oversight: ses-424c pins v7.0.650 as stamps[0], so a stamp for a
+// one-line clause would cost a drop, a docs/SESSIONS.md append and two more test edits. The 68 B of
+// headroom is REPORTED, not absorbed. Re-measured with wc -c and re-pinned in the same commit.
+export const BYTES_AT_SHIP = 380932;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

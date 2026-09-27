@@ -3231,7 +3231,7 @@ SELECT * FROM public.verdict_ladder_signal('<verdict id>');
   the recompute there.
 
   **THE WRITE IS `scripts/settle-ship.js`'S (`SES-385` slice 2, `v7.0.519`):** the kickoff (*slice N
-  of M* with N below M, a STOP LINE naming `partial`), the undecided gate cards named in the
+  of M* with N below M, a STOP LINE closing THIS ticket `partial`), the undecided gate cards in the
   trigger list above and `--remainder=` decide; ONE `ticket-status` decision with a full-row image writes the status,
   `design_status` NULL and `kickoff_link` = this kickoff. **A `delivered` on a kickoff naming a
   remainder is a bug, never an override** — the verdict is not an input to this script at all, so no
