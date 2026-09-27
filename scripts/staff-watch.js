@@ -1,4 +1,28 @@
 #!/usr/bin/env node
+// DeepBench v7.0.634 | scripts/staff-watch.js | AGT-198 -- A STAFF FINDING REACHES THE MANAGER
+// NAMING ITS SUBJECT, AND NEITHER FINGERPRINT MOVES. `ledgerFindingFor()` set every
+// `locations[].text` to `--detail` verbatim, so a check's own LABEL was the whole body the manager
+// could rule on. Each text now reads `<agent>, "<kind>", on <subject>, cycle <id>: <detail>`, with
+// the subject taken from `--backlog=` first (see `subjectFor()` below), and `record()` refuses
+// exit 2, writing nothing, when neither the flag nor the prose names one.
+//
+// TWO OF THIS TICKET'S OWN ASKS ARE REFUSED HERE, both reversible, both recorded rather than
+// quietly dropped (kickoff §7):
+//
+//   (i) "KEY THE FINGERPRINT ON THAT SUBJECT" -- REFUSED. Measured at this ship, not recalled: all
+//   four `runner_staff_findings` fingerprints at or past the 3-cycle promotion bar are label-only
+//   details (`2fb97122c84a986b` 8 cycles, `e7393ed419f16617` 7, `a05f97ba602f2e21` 6,
+//   `4a759c9ad927b189` 3), and every evidence-rich detail among the 30 rows is a one-cycle
+//   singleton. Keying on the subject splits each of those across its tickets and takes promotions
+//   4 -> 0, and it orphans the FOUR open `skill-edit` rows in `runner_card_asks` whose `target_id`
+//   IS one of those fingerprints -- re-filing all four, the exact defect AGT-172 shipped to remove.
+//   The subject reaches the manager in the BODY instead, which carries no fingerprint material.
+//
+//   (ii) "RE-ASK THE TWO LIVE FINDINGS WITH THEIR FACTS" -- OUT OF SCOPE. `audit_findings` is
+//   append-only (AGT-70) and off `public.reversible_tables()`; `0cf1b9f3c57887e4` and
+//   `9e5ee69379e7e89e` are both already `status=ticketed` onto AGT-198, and their real facts are
+//   not in the record to re-state. Inventing them would be worse than the label they carry.
+//
 // DeepBench v7.0.620 | scripts/staff-watch.js | AGT-172 -- `--record` CAN RECORD, AND `--promote`
 // STOPS RE-ASKING. Two defects in one file, both measured live this cycle rather than recalled.
 //
@@ -181,17 +205,92 @@ export function fingerprintFor({ agentId, kind, detail } = {}) {
   return { fingerprint: sha256(`${agentId}|${kind}|${norm}`).slice(0, 16) };
 }
 
+// --- AGT-198: the subject ------------------------------------------------------------------------
+//
+// WHAT DID THE CHECK SEE IT IN? A `--detail` like `assignment differs from the queue head` is the
+// check's own LABEL, and `ledgerFindingFor()` below used to set it as the whole of every
+// `locations[].text`. `audit-review.js:407` selects `locations` and hands them to the manager at
+// `:185`; `audit-ledger.js:249` renders each as `` - `<location>` -- "<text>" ``. So the label WAS
+// the entire body the manager could rule on -- live at this ship: `audit_findings`
+// `0cf1b9f3c57887e4` and `9e5ee69379e7e89e`, both `status=ticketed` onto AGT-198, each with two
+// locations whose `text` is the bare label and nothing else.
+//
+// THE SUBJECT IS READ FROM THE FLAGS, NEVER DEMANDED OF THE PROSE, and that is the one design
+// choice this function exists to make. The ticket asks to refuse a finding with "no named subject
+// AND no evidence" -- a CONJUNCTION -- and `--backlog=<ID>` is a named subject. Demanding the
+// subject inside `--detail` instead would refuse the procedure's own calls: all SIX
+// `--detail='...'` commands in `docs/runbooks/runner-cycle.md` (`:1981`, `:2806`, `:2808`, `:2957`,
+// `:3058`, `:3060`) are deliberately label-only and every one of them passes `--backlog=`.
+// `:2959` states the reason: "The detail names no ticket on purpose: `--backlog=` carries that, or
+// the finding fingerprints a new way every cycle and never reaches the 3-cycle promotion bar."
+// Measured at this ship, that is not a worry but the record: of `runner_staff_findings`' 30 rows,
+// ALL FOUR fingerprints at or past the bar are label-only (`2fb97122c84a986b` 8 cycles,
+// `e7393ed419f16617` 7, `a05f97ba602f2e21` 6, `4a759c9ad927b189` 3) and every evidence-rich detail
+// is a one-cycle singleton. So a subject demanded of the prose would take promotions 4 -> 0.
+//
+// SOURCES IN ORDER, most authoritative first. The flag is first because it is the only one that is
+// DECLARED rather than guessed out of prose; the three prose sources exist so a caller who names a
+// real subject and passes no flag is not refused for a missing flag.
+export function subjectFor({ detail, backlog } = {}) {
+  if (backlog) return { subject: `backlog_items:${backlog}`, source: "flag" };
+  const d = String(detail ?? "");
+  for (const [source, re] of [
+    ["ticket", /\b(?:SES|AGT|LOG|DAT)-\d+[a-z]?\b/],
+    ["path", /\b[\w./-]+\.(?:js|mjs|md|sql|json)\b/],
+    ["named", /\b(?:public\.[a-z_]+|[a-z_]{4,}\()/],
+  ]) {
+    const m = re.exec(d);
+    if (m) return { subject: m[0], source };
+  }
+  // NAMES THE FIX, NOT JUST THE REFUSAL. This exits a cycle's `--record` with 2 and writes nothing,
+  // so the operator reading it needs to know which of the two ways out to take.
+  return {
+    error: "detail names no subject and no --backlog was given: a check that cannot say WHAT it saw "
+      + "has recorded nothing. Pass --backlog=<ID>, or name the ticket, file, table or function in --detail.",
+  };
+}
+
 // AGT-131 -- the finding this script raises into the one findings list, as a pure function so the
 // regression file can read its exact shape without a network. `kind:'other'` and a
 // `<source>:<slug>` check_slug are the non-Auditor form the ticket settled; the locations are the
 // agent, and the ticket too when the observation named one.
-export function ledgerFindingFor({ agent, kind, detail, backlog } = {}) {
-  const locations = [{ location: `agents:${agent}`, text: detail }];
-  if (backlog) locations.push({ location: `backlog_items:${backlog}`, text: detail });
+//
+// AGT-198 -- EACH `locations[].text` NOW CARRIES THE WHOLE OBSERVATION: who saw it, what check, on
+// what subject, in which cycle, then the detail. That is the body the manager rules on, and it is
+// enriched HERE because this is the one place in the finding that carries NO fingerprint material.
+//
+// `governing_fact` AND `fingerprintFor` ARE DELIBERATELY UNTOUCHED, and this is measured, not
+// reasoned about. `audit-ledger.js:184` is
+// `fingerprint(f) = sha256(kind | sorted locationKeys | normalize(governing_fact))`, and
+// `locationKey()` (`audit-ledger.js:179`) reads `loc.location` ONLY -- never `loc.text`. Proven by
+// running those shipped functions at this ship: enriching the texts below leaves this finding's
+// ledger fingerprint at `0cf1b9f3c57887e4`, byte-identical to the live row, while the control that
+// enriches `governing_fact` instead moves it to `bc45c53ef2773472`. And `fingerprintFor()` above is
+// not called from here at all, so the promotion key `4a759c9ad927b189` still matches: at this ship
+// `runner_card_asks` holds FOUR open `skill-edit` rows whose `target_id` is one of the four
+// promotable fingerprints, all with `answer IS NULL`, and AGT-172's dedupe keys on `target_id`.
+// Moving either fingerprint re-files all four -- the exact defect AGT-172 shipped to remove. So:
+// enrich the text, never the fact. (`docs/kickoffs/v7.0.634-AGT-198-...md` §7 records the refusal
+// of the ticket's own "key the fingerprint on that subject" for this reason.)
+export function ledgerFindingFor({ agent, kind, detail, backlog, cycleId } = {}) {
+  // `record()` runs `subjectFor()` as an exit-2 gate BEFORE it ever reaches here, so the error
+  // branch is unreachable from the shipped path. If some future caller skips that gate, the clause
+  // is OMITTED rather than filled with a guess -- a body that names a subject it did not have is
+  // worse than one that names none.
+  const s = subjectFor({ detail, backlog });
+  const on = s.subject ? `, on ${s.subject}` : "";
+  const inCycle = cycleId ? `, cycle ${cycleId}` : "";
+  const text = `${agent}, "${kind}"${on}${inCycle}: ${detail}`;
+  const locations = [{ location: `agents:${agent}`, text }];
+  if (backlog) locations.push({ location: `backlog_items:${backlog}`, text });
   return {
     kind: "other",
     check_slug: `staff:${String(kind).replace(/\s+/g, "-")}`,
     locations,
+    // FINGERPRINT MATERIAL -- see the block above. `audit-ledger.js:184` hashes
+    // `normalize(governing_fact)`, so any enrichment here re-partitions the ledger and orphans the
+    // four open `runner_card_asks` rows. The enrichment goes in `locations[].text`, which the
+    // fingerprint does not read.
     governing_fact: normalizeDetail(detail),
     confidence: "high",
     proposed_resolution: "Skill edit via --promote at the bar",
@@ -389,6 +488,14 @@ export function restBody(text, { status, what, required } = {}) {
 // --- the three modes ------------------------------------------------------------------------------
 
 async function record(args) {
+  // AGT-198 -- THE SUBJECT GATE, AND IT RUNS BEFORE THE FINGERPRINT AND BEFORE ANY WRITE. A finding
+  // whose body cannot say what it saw reaches the manager as a bare check label and is unrulable;
+  // refusing it here costs the cycle nothing, because `runner_staff_findings` and `audit_findings`
+  // are both append-only and off `reversible_tables()` -- a row written without a subject cannot be
+  // taken back. Exit 2 with nothing written is the only safe direction.
+  const subject = subjectFor({ detail: args.detail, backlog: args.backlog });
+  if (subject.error) fail(subject.error);
+
   const fp = fingerprintFor({ agentId: args.agent, kind: args.kind, detail: args.detail });
   if (fp.error) fail(fp.error);
   const db = rest();
@@ -426,7 +533,13 @@ async function record(args) {
   // that refused the append never costs the cycle its count. ingestFindings() writes the §19v
   // before-image itself, folds the second sighting of a week to `seen`, and never re-files a
   // finding the manager has already ruled not-a-defect.
-  const finding = ledgerFindingFor({ agent: args.agent, kind: args.kind, detail: args.detail, backlog: args.backlog });
+  const finding = ledgerFindingFor({
+    agent: args.agent, kind: args.kind, detail: args.detail, backlog: args.backlog,
+    // AGT-198 -- the cycle rides into the BODY the manager reads. It is not fingerprint material
+    // (`audit-ledger.js:184` hashes kind, locationKeys and governing_fact only), so naming it here
+    // cannot split one defect into one finding per cycle.
+    cycleId: args.cycleId,
+  });
   const ingest = await ingestFindings({
     findings: [finding],
     week: isoWeek(new Date()),

@@ -178,20 +178,32 @@ async function run() {
 
     // (1) THE STAFF FINDING. The detail carries a cycle uuid, exactly as a real one does.
     const detail = "CLAIM LABEL COLLISION: run-project:moat-support:1 on cycle 3680eccd-c909-499a-84ca-bbf488fc2359.";
+    // AGT-198 (v7.0.634) UPDATED THE EXPECTED `text`, AND ONLY THE `text`. Until that ticket every
+    // `locations[].text` was `detail` VERBATIM, so a check's own label was the whole body the
+    // manager could rule on (live: audit_findings 0cf1b9f3c57887e4 / 9e5ee69379e7e89e, both
+    // ticketed onto AGT-198). Each text now names the agent, the kind and the subject before the
+    // detail. `governing_fact` below is DELIBERATELY unchanged and is the half of this arm that
+    // carries the weight: audit-ledger.js:184 hashes it, so AGT-198 enriched the text precisely
+    // because the text is the one part of a finding the fingerprint does not read. If a future
+    // change moves the governing fact, this arm goes red and it should.
+    const body = subject => `devmanager, "assignment mismatch"${subject ? `, on ${subject}` : ""}: ${detail}`;
     const sf = staff.ledgerFindingFor({ agent: "devmanager", kind: "assignment mismatch", detail, backlog: "SES-378" });
     assert.deepEqual(sf, {
       kind: "other",
       check_slug: "staff:assignment-mismatch",
       locations: [
-        { location: "agents:devmanager", text: detail },
-        { location: "backlog_items:SES-378", text: detail },
+        { location: "agents:devmanager", text: body("backlog_items:SES-378") },
+        { location: "backlog_items:SES-378", text: body("backlog_items:SES-378") },
       ],
       governing_fact: "claim label collision: run-project:moat-support:1 on cycle <uuid>",
       confidence: "high",
       proposed_resolution: "Skill edit via --promote at the bar",
     }, "the staff finding's exact shape, uuid-masked governing fact and all");
+    // AGT-198: with no --backlog this detail names no subject in its prose either, so the `on`
+    // clause is OMITTED rather than guessed. `record()` refuses this call exit 2 before it is ever
+    // written; ledgerFindingFor stays pure so the shape is still assertable here.
     assert.deepEqual(staff.ledgerFindingFor({ agent: "devmanager", kind: "assignment mismatch", detail }).locations,
-      [{ location: "agents:devmanager", text: detail }], "no backlog, no second location");
+      [{ location: "agents:devmanager", text: body(null) }], "no backlog, no second location");
     // The masking is the FINGERPRINT's, shared and not re-spelled: same defect, new cycle uuid,
     // same governing fact -- which is the only reason a recurrence can ever be recognised.
     const other = detail.replace("3680eccd-c909-499a-84ca-bbf488fc2359", "baa6df39-bdb4-4c41-b6bd-6a49800993b6");
