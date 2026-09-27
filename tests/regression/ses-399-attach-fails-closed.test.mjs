@@ -1,3 +1,8 @@
+// DeepBench v7.0.662 | tests/regression/ses-399-attach-fails-closed.test.mjs | AGT-240 D8 -- `projects` is
+// restorable now: reversible_tables() and reverse_decision()'s k_allowed were widened together in
+// migration agt240_project_finish_line, so the vocabulary is seventeen names and `projects` leaves the
+// unrestorable-seen-live list; the all-unrestorable batch fixture moves to runner_card_asks.
+//
 // DeepBench v7.0.502 | tests/regression/ses-399-attach-fails-closed.test.mjs | SES-399 --
 // attach_before_images() refuses an image reverse_decision() cannot restore, and refuses the WHOLE
 // batch when it does.
@@ -67,7 +72,7 @@ export const norm = s => s.replace(/\s+/g, " ");
 // shipped function and this file is a failure here rather than a silent divergence.
 export const REVERSIBLE_TABLES = [
   "backlog_items", "runner_directives", "runner_drain_scope", "runner_settings",
-  "governance_rules", "epics", "vision_claims", "skill_profiles", "agents", "capabilities",
+  "governance_rules", "epics", "projects", "vision_claims", "skill_profiles", "agents", "capabilities",
   "capability_skill_profiles", "agent_capability_assignments", "ai_activity_log", "runner_items",
   // AGT-86 slice 1b (v7.0.543): a ruling on an audit finding is reversible.
   "audit_findings",
@@ -79,7 +84,7 @@ export const REVERSIBLE_TABLES = [
 // is restorable, and each is a table the runner writes about itself -- which is exactly why a
 // reversal handle over one of them was never going to be honoured.
 export const UNRESTORABLE_SEEN_LIVE = [
-  "projects", "runner_card_asks", "runner_migration_downs", "runner_model_lanes",
+  "runner_card_asks", "runner_migration_downs", "runner_model_lanes",   // AGT-240 D8: `projects` is restorable now
 ];
 
 // THE SHIPPED GUARD, reimplemented from the deployed body. `batch` is the rows the call would
@@ -109,7 +114,7 @@ export function attachOutcomeSkipBadRows(batch, allowed = REVERSIBLE_TABLES) {
 export const BATCHES = [
   { id: "mixed-one-unrestorable", batch: [{ id: "img-a", table_name: "backlog_items" },
                                           { id: "img-b", table_name: "runner_ladder" }] },
-  { id: "all-unrestorable",       batch: [{ id: "img-c", table_name: "projects" }] },
+  { id: "all-unrestorable",       batch: [{ id: "img-c", table_name: "runner_card_asks" }] },
   { id: "all-restorable",         batch: [{ id: "img-d", table_name: "backlog_items" },
                                           { id: "img-e", table_name: "agents" }] },
   { id: "empty-batch",            batch: [] },
@@ -126,9 +131,9 @@ export const GUARDED = ["attach_before_images"];
 export const UNGUARDED_BY_DESIGN = ["record_ship_decision"];
 
 function theVocabularyIsTheTwinOfKAllowed() {
-  assert.strictEqual(REVERSIBLE_TABLES.length, 16,
-    `reversible_tables() returns sixteen names, not ${REVERSIBLE_TABLES.length}`);
-  assert.strictEqual(new Set(REVERSIBLE_TABLES).size, 16, "the vocabulary carries a duplicate name");
+  assert.strictEqual(REVERSIBLE_TABLES.length, 17,
+    `reversible_tables() returns seventeen names, not ${REVERSIBLE_TABLES.length}`);
+  assert.strictEqual(new Set(REVERSIBLE_TABLES).size, 17, "the vocabulary carries a duplicate name");
   assert.deepStrictEqual([...REVERSIBLE_TABLES].sort(), [...K_ALLOWED].sort(),
     "reversible_tables() and reverse_decision()'s k_allowed have DRIFTED APART. The whole point of " +
     "the guard is that the list it refuses by is the list the restore actually replays -- two lists " +
@@ -320,7 +325,7 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "the live arms: public.reversible_tables() resolvable and returning the sixteen names this " +
+      "the live arms: public.reversible_tables() resolvable and returning the seventeen names this " +
         "file asserts, attach_before_images() resolvable at its UNCHANGED (uuid, uuid[]) identity " +
         "list with a misspelled-argument control (the second-overload detector), its two " +
         "pre-existing guards each pinned by the message it returns, and the write-free-ness of all " +
@@ -349,7 +354,7 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
   assert.deepStrictEqual([...live].sort(), [...REVERSIBLE_TABLES].sort(),
     "the DEPLOYED reversible_tables() and this file's list disagree. Whichever is right, the guard " +
     "is refusing by a vocabulary nobody here has checked");
-  assert.strictEqual(live.length, 16, `the deployed vocabulary has ${live.length} names, not 16`);
+  assert.strictEqual(live.length, 17, `the deployed vocabulary has ${live.length} names, not 17`);
 
   // 2. THE IDENTITY ARGUMENT LIST IS UNCHANGED. SES-399 did CREATE OR REPLACE on the exact
   //    (uuid, uuid[]) list, so a two-argument call by name must still resolve. A retyped or

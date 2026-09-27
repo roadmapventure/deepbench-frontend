@@ -1,3 +1,7 @@
+// DeepBench v7.0.662 | tests/regression/ses-364-reverse-agent-rows.test.mjs | AGT-240 D8 -- `projects` joins
+// K_ALLOWED after `epics` (a project's status and proposal are decided; it HAS updated_at, so the
+// written-since guard applies): seventeen tables.
+//
 // DeepBench v7.0.501 | tests/regression/ses-364-reverse-agent-rows.test.mjs | SES-364 --
 // reverse_decision()'s allowlist widens from 7 tables to 14, and TWO GUARDS keep the two rules the
 // widening would otherwise have quietly repealed.
@@ -65,6 +69,8 @@ export const norm = s => s.replace(/\s+/g, " ");
 export const K_ALLOWED = [
   "backlog_items", "runner_directives", "runner_drain_scope", "runner_settings",
   "governance_rules", "epics", "vision_claims",
+  // AGT-240 D8 (v7.0.662): a project's status and proposal. HAS updated_at.
+  "projects",
   // SES-364's seven. None of these has an `updated_at` column (measured 2026-09-16 from
   // pg_attribute), so every restore of one lands in `restored_unverified`, never `restored`.
   "skill_profiles", "agents", "capabilities", "capability_skill_profiles",
@@ -77,6 +83,9 @@ export const K_ALLOWED = [
 
 // AGT-86 slice 1b's one addition, kept apart from SES364_ADDED so that list still names SES-364's seven.
 export const AGT86_ADDED = ["audit_findings"];
+
+// AGT-240's one addition: a project finish, proposal or start reverses in one step (D8).
+export const AGT240_ADDED = ["projects"];
 
 // AGT-152's one addition: a model switch (apply_model_assignment, review_model_watch) reverses in one step.
 export const AGT152_ADDED = ["model_assignments"];
@@ -167,11 +176,11 @@ export function guardsDifferOn() {
 }
 
 function theAllowlistIsFourteenAndTheLedgerTablesStayOut() {
-  assert.strictEqual(K_ALLOWED.length, 16,
-    `the allowlist is sixteen tables after AGT-152, not ${K_ALLOWED.length}. If a seventeenth ` +
+  assert.strictEqual(K_ALLOWED.length, 17,
+    `the allowlist is seventeen tables after AGT-240, not ${K_ALLOWED.length}. If an eighteenth ` +
     "arrived, re-derive the §19v P5 argument before widening this list -- a whole-row restore " +
     "moves every column of the table it names");
-  assert.strictEqual(new Set(K_ALLOWED).size, 16, "the allowlist carries a duplicate name");
+  assert.strictEqual(new Set(K_ALLOWED).size, 17, "the allowlist carries a duplicate name");
   for (const t of K_ALLOWED_BEFORE) {
     assert.ok(K_ALLOWED.includes(t),
       `SES-364 must not have DROPPED ${t} from the allowlist -- it widens, it does not trade`);
@@ -181,6 +190,9 @@ function theAllowlistIsFourteenAndTheLedgerTablesStayOut() {
   }
   for (const t of AGT86_ADDED) {
     assert.ok(K_ALLOWED.includes(t), `${t} is missing from the allowlist (AGT-86 slice 1b)`);
+  }
+  for (const t of AGT240_ADDED) {
+    assert.ok(K_ALLOWED.includes(t), `${t} is missing from the allowlist (AGT-240 D8)`);
   }
   for (const t of AGT152_ADDED) {
     assert.ok(K_ALLOWED.includes(t), `${t} is missing from the allowlist (AGT-152)`);

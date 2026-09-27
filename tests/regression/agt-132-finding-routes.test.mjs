@@ -1,3 +1,8 @@
+// DeepBench v7.0.662 | tests/regression/agt-132-finding-routes.test.mjs | AGT-240 -- arm C retargeted:
+// the Dev Manager Capabilities pick and the Auditor route now expect finding_group_epic()'s LOCK
+// refusal while their project is executing/proposed/done (a locked list), byte-for-byte the
+// audit-review.js mirror, and still the one epic when the project is unlocked.
+//
 // DeepBench v7.0.605 | tests/regression/agt-132-finding-routes.test.mjs | AGT-132 slice 1 -- a finding's
 // SOURCE and TYPE decide which project its ticket is filed under, and the routing is a TABLE
 // (public.finding_routes) rather than a hardcoded epic. Migration `agt132_finding_routes` (applied over
@@ -157,7 +162,7 @@ async function run() {
   };
 
   const script = await import(pathToFileURL(SCRIPT).href);
-  const { routeGroup, validateReview, buildTaskContext, sourceOf } = script;
+  const { routeGroup, validateReview, buildTaskContext, sourceOf, LOCKED_PROJECT_STATUSES, lockedListRefusal } = script;
 
   // --- A. the route pick and the offline refusals, pure ----------------------------------------------
   await arm("A pure", () => {
@@ -336,15 +341,34 @@ async function run() {
     assert.equal(general.status, 200, describe(general));
     assert.equal(general.json, null, "`general` is the general backlog: no epic, and that is a value, not a failure");
 
-    const picked = await probe(group({ project: "dev-manager-capabilities" }));
-    assert.equal(picked.status, 200, describe(picked));
-    assert.equal(picked.json, EPIC_DMC, "the manager's pick resolves to that project's one epic");
+    // AGT-240 (v7.0.662) RETARGET: a project that is executing, proposed or done has a LOCKED list, so
+    // finding_group_epic() now refuses to file into it -- in its own sentence, which audit-review.js
+    // mirrors (lockedListRefusal). Dev Manager Capabilities and Auditor Enhancements both execute, so
+    // the pick and the Auditor route are refused where they used to return the epic. The expectation is
+    // keyed on each project's status as read, so an unlocked project still resolves to its one epic.
+    const st = await req(url, key, "projects?slug=in.(dev-manager-capabilities,auditor-enhancements)&select=slug,status");
+    assert.equal(st.status, 200, describe(st));
+    const statusOf = s => (st.json ?? []).find(x => x.slug === s)?.status;
+    const expectRoute = (r, slug, epic, what) => {
+      if (LOCKED_PROJECT_STATUSES.includes(statusOf(slug))) {
+        assert.equal(r.status, 400, `${what}: ${slug} is ${statusOf(slug)}, so its list is locked; got ${describe(r)}`);
+        assert.equal(r.code, "P0001", describe(r));
+        assert.equal(r.json.message, `${PREFIX}${lockedListRefusal(slug, statusOf(slug))}`,
+          `${what}: the lock refusal is finding_group_epic()'s own sentence, byte-for-byte the mirror's`);
+      } else {
+        assert.equal(r.status, 200, describe(r));
+        assert.equal(r.json, epic, `${what}: an unlocked project resolves to its one epic`);
+      }
+    };
 
-    // Precedence beats the pick: the SAME `general` on an Auditor finding still homes in Auditor
-    // Enhancements. This is the pair that discriminates a real routing table from "whatever he typed".
+    const picked = await probe(group({ project: "dev-manager-capabilities" }));
+    expectRoute(picked, "dev-manager-capabilities", EPIC_DMC, "the manager's pick");
+
+    // Precedence beats the pick: the SAME `general` on an Auditor finding still routes to Auditor
+    // Enhancements (and, while it executes, is refused THERE -- never quietly sent to general). This is
+    // the pair that discriminates a real routing table from "whatever he typed".
     const auditor = await probe({ kind: "root-cause", project: "general", finding_ids: [au.id] });
-    assert.equal(auditor.status, 200, describe(auditor));
-    assert.equal(auditor.json, EPIC_AUD, "an Auditor finding keeps its own home whatever the group asked for");
+    expectRoute(auditor, "auditor-enhancements", EPIC_AUD, "an Auditor finding keeps its own home whatever the group asked for");
 
     const bad = await probe(group({ project: "nope" }));
     assert.equal(bad.status, 400, describe(bad));

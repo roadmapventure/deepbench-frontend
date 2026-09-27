@@ -1,3 +1,12 @@
+// DeepBench v7.0.662 | scripts/audit-review.js | AGT-240 -- THE LOCKED LIST. KINDS gains `list` (needs a
+// reason): apply_audit_review() rules those findings `listed`, and they wait on the findings list until
+// the project finishes and propose-project.js answers them. The route mirror refuses a filing group
+// whose project is executing, proposed or done -- a project whose list is locked -- in
+// finding_group_epic()'s own sentence minus its "apply_audit_review: " prefix, once the route (or the
+// manager's pick) names the project and before the epic count the function keeps. It reads the status
+// off the context's `projects`, which --prepare already selects; a caller whose projects carry no
+// status is not refused here (the function still is). Spec: docs/kickoffs/v7.0.662-AGT-240-project-finish-line.md.
+//
 // DeepBench v7.0.661 | scripts/audit-review.js | AGT-239 -- OUTCOMES FIRST. --prepare selects each
 // finding's `family`; the default scope `outcomes` (the run tail's (7f)) drops `paperwork`, and
 // --weekly (the Auditor routine's step 4) keeps every family -- paperwork is moved to the weekly
@@ -80,7 +89,12 @@ export const JOHN_CALLS = Object.freeze({
   switch: "switching agents or routines on and off (A-21), including this routine's own switch",
 });
 
-export const KINDS = Object.freeze(["root-cause", "cleanup", "not-a-defect", "carry", "escalate"]);
+export const KINDS = Object.freeze(["root-cause", "cleanup", "not-a-defect", "carry", "escalate", "list"]);
+// AGT-240: a project in one of these has a locked list; finding_group_epic() refuses to file into it.
+export const LOCKED_PROJECT_STATUSES = Object.freeze(["executing", "proposed", "done"]);
+export function lockedListRefusal(slug, status) {
+  return `project ${slug} is ${status} -- its list is locked; use kind list (AGT-240)`;
+}
 export const WEEK_RE = /^\d{4}-W\d{2}$/;
 export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)";
 // AGT-86 §11(5): the checklist rows the manager may edit. au-identity and au-guardrails are John's.
@@ -290,7 +304,7 @@ export function validateReview(review, worklist, week, checklist, routes, projec
   for (const g of groups) {
     const kind = g && g.kind;
     if (!KINDS.includes(kind)) {
-      refusals.push(`group kind ${kind ?? "<NULL>"} is not one of root-cause, cleanup, not-a-defect, carry, escalate`);
+      refusals.push(`group kind ${kind ?? "<NULL>"} is not one of root-cause, cleanup, not-a-defect, carry, escalate, list`);
       continue;
     }
     if (idsOf(g).length === 0) refusals.push(`a ${kind} group has no finding_ids`);
@@ -302,6 +316,9 @@ export function validateReview(review, worklist, week, checklist, routes, projec
       }
     } else if (kind === "not-a-defect") {
       if (blank(g.reason)) refusals.push("not-a-defect needs a reason");
+    } else if (kind === "list") {
+      // AGT-240 D3: the finding waits on the findings list; the reason is its ruling.
+      if (blank(g.reason)) refusals.push("list needs a reason");
     } else if (kind === "escalate") {
       if (!Object.keys(JOHN_CALLS).includes(g.john_call ?? "") || blank(g.summary)) {
         refusals.push("escalate needs john_call (rules, money, production, hiring, switch) and summary");
@@ -341,6 +358,7 @@ export function validateReview(review, worklist, week, checklist, routes, projec
       } catch (e) {
         refusals.push(e.message);
       }
+      let slug = null;   // AGT-240: the project this group would file into, once known
       if (route !== null && (route.project_slug === null || route.project_slug === undefined)) {
         // The route says the manager picks, so his pick must be explicit and must be a project that
         // exists. An omission is never read as "the general backlog".
@@ -351,7 +369,17 @@ export function validateReview(review, worklist, week, checklist, routes, projec
         } else if (pick !== "general" && Array.isArray(projects) &&
                    !projects.some(p => String(p.slug) === pick)) {
           refusals.push(`project ${pick} is not a projects row; project creation is John's`);
+        } else if (pick !== "general") {
+          slug = pick;
         }
+      } else if (route !== null) {
+        slug = String(route.project_slug);
+      }
+      // AGT-240 (b): finding_group_epic()'s lock refusal, in its place -- after the route (or the
+      // pick) names the project, before the epic count the function keeps.
+      const home = slug !== null && Array.isArray(projects) ? projects.find(p => String(p.slug) === slug) : undefined;
+      if (home && LOCKED_PROJECT_STATUSES.includes(home.status)) {
+        refusals.push(lockedListRefusal(slug, home.status));
       }
     }
   }

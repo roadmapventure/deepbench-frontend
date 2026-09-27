@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.661 | runbooks/auditor-routine.md | AGT-239 step 4 passes --weekly (paperwork is ruled here, not per run); the per-run review files the flow checks first; AGT-129 --task-file, delivered_at fix; AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
+<!-- DeepBench v7.0.662 | runbooks/auditor-routine.md | AGT-240 § Per-run review ends with the Finish line block (propose-project.js prepare → Auditor → merge → manager → dry-run → apply); AGT-239 step 4 passes --weekly (paperwork is ruled here, not per run); the per-run review files the flow checks first; AGT-129 --task-file, delivered_at fix; AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
 # The Auditor routine — playbook and canonical prompt
 
 ## What this is
@@ -144,6 +144,28 @@ node scripts/agent-log.js --agent=auditor --capability=audit-run-review --model=
 node scripts/audit-run-review.js --ingest=$S/run-review.json --cycle-id=<the cycle id> --apply
 ```
 (An attended run passes `--session-name=<N>` INSTEAD of `--cycle-id`; never both — `runner_before_images.ck_before_image_attribution` refuses it and the script exits 2 before it reads anything. Every filed row carries `found_by auditor:run-review:<the cycle id>` and the finding's own `finding_type`, defaulting to `defect`; the append is `audit-ledger.js`'s one intake, before-image first.)
+
+*Finish line* (`AGT-240`). A project's list locks when it starts; what is found meanwhile waits on the findings list (`listed`). When every ticket in a locked list is `done` or `removed`, the batch is finished and proposes the next project — asked after every reviewable run, and a weekly run may call the same block:
+```
+node scripts/propose-project.js --prepare --out=$S/finish.json; echo "prepare exit $?"
+```
+Exit 3 → no batch is due: say so and stop — no Auditor turn, no manager turn, no cost. Exit 0 → the file names ONE finished batch (`public.project_batch_state()`'s `proposal_due`) with its members, the findings list (open, carried, listed) and every project. The Auditor grades what the batch built — working, broken or missing, with evidence; it proposes nothing:
+```
+node scripts/agent-prompt.js --agent=auditor --capability=audit-finish-review --task-file=$S/finish.json > $S/finish-review.prompt.md
+node scripts/agent-prompt.js --agent=auditor --capability=audit-finish-review --task-file=$S/finish.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+```
+Sub-agent on the printed model → `$S/finish-review.json` (`{areas, account}`); log it: `node scripts/agent-log.js --agent=auditor --capability=audit-finish-review --model=<printed> --ai-type=audit-finish-review --feature=audit-finish-review:au-finish-intent:depth1 […]`. Merge — the review reaches the manager as a row of the task file, `functionality_review`, never agent to agent (Rule #1):
+```
+node scripts/propose-project.js --review=$S/finish-review.json --context=$S/finish.json --out=$S/propose.json
+node scripts/agent-prompt.js --agent=devmanager --capability=propose-project --task-file=$S/propose.json > $S/propose.prompt.md
+node scripts/agent-prompt.js --agent=devmanager --capability=propose-project --task-file=$S/propose.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+```
+Sub-agent on the printed model → `$S/proposal.json` (`{slug, name, charter, reason, tickets, summary_for_john, patterns_applied}`: ONE project, one ticket per root cause citing its `finding_ids`); log it: `node scripts/agent-log.js --agent=devmanager --capability=propose-project --model=<printed> --ai-type=propose-project --feature=propose-project:dm-propose-intent:depth1 […]`. Then:
+```
+node scripts/propose-project.js --dry-run=$S/proposal.json --context=$S/propose.json
+node scripts/propose-project.js --apply=$S/proposal.json --context=$S/propose.json --cycle-id=<the cycle id>
+```
+A `--dry-run` refusal → re-run the manager ONCE with the refusal lines appended; a second refusal → no `--apply`, the summary quotes the refusals, and the batch stays due for the next run. `--apply` is `public.finish_project_batch()`: ONE `proposal` decision, before-images first — the finished project goes `done` (`paused` when perpetual), the proposed project and its tickets are written `proposed` (not picked), its findings `ticketed`. Nothing here starts it: `start_proposed_project()` takes a session name and John's words, and the standing brief's *Proposed projects* group carries that line to him.
 
 ## On demand
 

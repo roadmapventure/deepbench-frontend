@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.662 | scripts/render-standing-brief.js | AGT-240 (d) — PROPOSED PROJECTS. John (Q3):
+// proposals are "stored in the database as proposed tickets and projects", and his status report lists
+// them. A new group, `Proposed projects`, lands right AFTER `Standing epic drain` (the other "what runs
+// next" fact): renderProposedProjects() prints each row of the `proposed_projects` view — ticket count,
+// count per priority class, predicted cycles, the manager's reason — and the one line that starts it,
+// `start_proposed_project()`, which only a session on his words may run. None is a measured "none",
+// never an unread zero; the view is service_role only, the key this script already needs.
+//
 // DeepBench v7.0.521 | scripts/render-standing-brief.js | SES-413 slice 3 — THE DAILY DECISIONS
 // LIST. `governance_rules.MANAGER-DECIDES-BY-DEFAULT` line 3 promises John "a daily list of what
 // was decided, not questions; a question that still reaches him is counted weekly, target zero",
@@ -423,6 +431,12 @@ export function factsSha(facts) {
     // deliberately ABSENT for the reason the 7-day cutoff is absent from `decisions` above — it is a
     // fixed property of a row that never moves, and the window itself advances with the clock, so
     // hashing the cutoff would report drift on every run and the check would be ignored within a day.
+    // FEATURE: AGT-240 (d) — each proposed project's identity and counts, so a proposal arriving,
+    // being started (it leaves the view) or its tickets moving each move the sha. The reason TEXT is
+    // absent for the reason the claim text is absent above.
+    proposedProjects: Array.isArray(facts.proposedProjects)
+      ? facts.proposedProjects.map(r => [String(r.slug), Number(r.tickets), Number(r.cycles), JSON.stringify(r.by_class ?? {})]).sort()
+      : null,
     daily: facts.daily
       ? {
           rows: Array.isArray(facts.daily.rows)
@@ -1328,6 +1342,43 @@ export function renderHumanGates(gates, stamp) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: AGT-240 (d) — the proposed projects John decides on. Three branches, as every group:
+ * not read (said, never zero), none (a measured none), or one bullet per project with its ticket
+ * count, count per class, predicted cycles and reason, then the start line. Pure: (proposed, stamp)
+ * in, markdown out, driven from fixtures by tests/regression/agt-240-project-finish-line.test.mjs.
+ */
+export function renderProposedProjects(proposed, stamp) {
+  const L = [];
+  const lead = `**Proposed projects** — *${stamp}.* A project whose batch finished proposes the next one ` +
+    "(`AGT-240`): The Auditor grades what it built, The Development Manager proposes ONE project with its " +
+    "tickets and why. Its tickets are normal backlog rows the runner does not pick until you say yes.";
+  if (!Array.isArray(proposed)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The proposed projects were not read for this render* — which is **not** the same as *none*. " +
+      "Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+  L.push(`${lead} **${proposed.length} proposed.**`);
+  L.push("");
+  if (proposed.length === 0) {
+    L.push("- **None** — a measured none: no finished batch has proposed a project.");
+  } else {
+    for (const p of proposed) {
+      const classes = Object.entries(p.by_class ?? {}).map(([k, n]) => `${n} ${k}`).join(", ") || "no open tickets";
+      L.push(`- **\`${p.slug}\`** — ${p.name}: **${p.tickets} ticket(s)** (${classes}), ${p.cycles} predicted ` +
+        `cycle(s), proposed ${p.proposed_at ? cst(p.proposed_at) : "—"}. Why: ${summarise(p.proposal_reason, 400)}`);
+    }
+    L.push("- **Your yes starts it** — in a session, with your words verbatim: " +
+      "`select public.start_proposed_project('<slug>', '<your words>', '<session name>');` " +
+      "It flips the project to `executing` and locks its list; only a session can run it.");
+  }
+  L.push("");
+  return L.join("\n");
+}
+
 /** John's stamp: UTC for the ledger, CST labelled for him (times he reads are CST — 2026-08-20). */
 export function asOf(nowIso) {
   const d = new Date(nowIso);
@@ -1361,7 +1412,8 @@ export function renderBlock(facts, nowIso) {
   // means "not read", never "the Development Manager found nothing".
   // FEATURE: SES-413 slice 3 — daily joins the destructure on the same terms as staff: absent means
   // "not read", never "a quiet week in which nothing was decided for you".
-  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff } = facts;
+  // FEATURE: AGT-240 (d) — proposedProjects joins on the same terms: absent means "not read".
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1466,6 +1518,10 @@ export function renderBlock(facts, nowIso) {
     }
   }
   L.push("");
+
+  // ---- Proposed projects (FEATURE: AGT-240 (d)) — after the drain: what runs next, and what waits
+  // on John's yes. A pure helper a fixture can drive, rendering the view and counting nothing.
+  L.push(renderProposedProjects(proposedProjects, stamp));
 
   // ---- Open decisions (FEATURE: SES-286 (c) — M6-02, M6-06) ---------------------------------
   // The window is READ OFF runner_settings, never written as "72". M6-02's prose says 72 hours, but
@@ -1950,7 +2006,13 @@ export async function fetchFacts(url, key) {
     undecidedCards: gateCards.map(r => r.id),
   };
 
-  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff };
+  // FEATURE: AGT-240 (d) — the proposed projects, read from the VIEW (service_role only). An empty
+  // array is a real state (nothing proposed); a non-array refuses, as every read above.
+  const proposedProjects = await rest(url, key,
+    "proposed_projects?select=slug,name,proposal_reason,proposed_at,tickets,by_class,cycles&order=proposed_at,slug");
+  if (!Array.isArray(proposedProjects)) die("the proposed_projects read came back non-array — refusing to render the proposed-projects group from nothing");
+
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects };
 }
 
 async function main() {

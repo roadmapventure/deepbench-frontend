@@ -1,3 +1,4 @@
+// DeepBench v7.0.662 | shared/ai-patterns.js | AGT-240 -- `audit-finish-review` and `propose-project` enter the catalog with their capability rows: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.646 | shared/ai-patterns.js | AGT-177 -- `audit-run-review` enters the catalog: the capability row (public.capabilities, default_intent_slug au-run-intent) shipped in AGT-137/v7.0.602 WITHOUT its catalog slug, so scripts/agent-log.js refuses every --ai-type=audit-run-review and docs/runbooks/auditor-routine.md:143 -- prescribed verbatim -- exits 2. Live proof: 7 turns on feature `audit-run-review:au-run-intent:depth1`, every one logged ai_type `agent-turn`, zero with ai_type `audit-run-review`. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.590 | shared/ai-patterns.js | AGT-144 -- `model-assignment` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.585 | shared/ai-patterns.js | AGT-127 -- `decide-gated-card` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array, so the Layer-3 row for the manager's gate-card ruling run would be refused without it (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
@@ -295,6 +296,14 @@ export const SERVICE_CATALOG = [
   // validated against au-run-intent's stored schema before any finding is filed, and
   // 'LLM-as-Judge / Verifier' because the turn IS the judgment on one finished cycle.
   { slug: 'audit-run-review',        name: 'Audit Run Review (The Auditor)',    serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+
+  // AGT-240 -- the finish line's two turns enter the catalog with their capability rows (migration
+  // agt240_project_finish_line): scripts/agent-log.js refuses any --ai-type this array does not carry,
+  // so the runbook's mandatory log row for each turn would be refused without them. audit-finish-review
+  // is the Auditor grading a finished batch (Judge, as audit-run-review); propose-project is the
+  // manager's proposal, validated against dm-propose-intent's schema and then by finish_project_batch().
+  { slug: 'audit-finish-review',     name: 'Audit Finish Review (The Auditor)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  { slug: 'propose-project',         name: 'Propose Project (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // run-project: 'Structured Output' because the manager's answer is validated against
   // dm-run-intent's schema before scripts/run-project.js will act on it, and 'Orchestrator-Workers'
