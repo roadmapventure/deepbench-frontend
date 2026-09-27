@@ -125,7 +125,14 @@ export const RUNBOOK_CEILING = 381000;
 // rows; and rotates v7.0.531 out (~1,050 B) after RELOCATING its three zero-hit facts into 0b and
 // step 9 (SES-164 step 2, by grep first). Net 370419 -> 377625 B, 3,375 B under the ceiling.
 // Re-measured with wc -c and re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 377625;
+// v7.0.625 (AGT-183) amends step 5's rule (c) ADDITIVELY -- a recorded pass-over is not a MANAGER
+// MISMATCH, and a pick path that moved because this cycle holds the pick's own claim is not drift
+// (+1,689 B, appended INSIDE the existing lines of (c) so the file's line count is unchanged at 4,706
+// and the step-5 L-anchors `docs/runbooks/cycle-card.md` and `ses-378` pin stay valid). No stamp
+// rotation: HEADER_STAMPS is still 5 and `ses-424c` pins v7.0.610's stamp as line 1, so a sixth or a
+// re-ordered stamp would turn a green guard red. Net 377625 -> 379314 B, 1,686 B under the ceiling.
+// Re-measured with wc -c and re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 379314;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.625 | scripts/run-project.js | AGT-183 -- TWO REFUSALS THAT FIRED ON THE HAPPY
+// PATH. (1) `stateDrift` takes a third reading -- the stored pick's own board row -- so a pick path that
+// moved on because THIS cycle's own `--cycle-id` holds the pick's claim (rule B40 claims at pick time,
+// and the pick lane's filter is holder-blind) is the happy path and not tampering; a peer's claim, a
+// claim past `CLAIM_TTL_HOURS`, an unreadable row, a claim on a third ticket and lane drift all still
+// refuse, and pass two says which pick it acted on (`pick_source`). (2) `answerErrors` admits an
+// off-pick assignment on ONE shape -- a recorded `passed_over` the LISTER's own two lists support --
+// and refuses everything else with today's sentence unchanged. Guard: agt-68-devmanager.test.mjs.
 // DeepBench v7.0.500 | scripts/run-project.js | SES-403 -- THE MANAGER CAN SEE THE SHIPS THAT ARE
 // STUCK, and it gets ONE new instrument and ONE new refusal, not a new action. `regradable_ships()`
 // is read beside `prime_directive_queue()` and carried into the state as `regradable`; if the
@@ -282,7 +290,40 @@ export function wallReading({ shouldBoot, dayTokenCap, schedulerGate }) {
 // database says is the pick RIGHT NOW, and the stored copy is only evidence that the manager was
 // shown the truth. A board that legitimately moved between the passes lands here too, and stopping
 // is the right answer there as well -- the manager reasoned about a pick that no longer exists.
-export function stateDrift(state, livePick) {
+// AGT-183: THE ONE READING THAT TELLS THE CYCLE'S OWN CLAIM APART FROM FOREIGN DRIFT.
+//
+// The pick lane filters on `claimed_by IS NULL OR claimed_at < now() - claim_stale_hours`
+// (`docs/design/agt-140-project-priority-pick.sql:295,561`) -- HOLDER-BLIND. Rule B40 has the cycle
+// claim its ticket AT pick time and step 5 runs this driver twice, so between the passes the cycle's
+// OWN claim removes its OWN ticket from the pick path, and the id comparison in `stateDrift` then
+// reads the happy path as tampering. Measured live 2026-09-27 on AGT-183 itself: `claimed_by =
+// dd911b24-4db2-4f49-ba3e-8b331cd3fd83` at 02:55:26Z, while `runner_should_boot().detail.pick` named
+// another ticket minutes later -- so the shipped function refused that cycle's own `--answer` pass.
+//
+// THE READING IS THE STORED PICK'S OWN BOARD ROW, read live in pass two (never from the state file,
+// which stays evidence) and handed in here. Three conditions and NOT ONE MORE: the row is the ticket
+// the state names, its holder is THIS cycle, and the claim is inside rule B40's window. The row's
+// `status` rides along as evidence only -- a `done` stored pick is already refused one gate later by
+// the claim's own `status=neq.done` filter (see `claimQueryFor`), and restating that rule here would
+// be a second copy of it to keep in step.
+//
+// EVERY OTHER SHAPE IS TODAY'S REFUSAL, UNCHANGED: a peer holder, a claim older than
+// `CLAIM_TTL_HOURS`, a claim on some THIRD ticket, and a row this driver could not read -- which
+// arrives as `null` and refuses, because an unread instrument is never a pass (the direction
+// `wallReading` already fails in). Lane drift is checked separately below and is NOT suppressed: a
+// cycle whose own claim holds but whose lane moved is still stopped.
+function ownClaimHolds(stored, ownClaim) {
+  if (!ownClaim || typeof ownClaim !== "object" || Array.isArray(ownClaim)) return false;
+  const cycleId = String(ownClaim.cycleId ?? "").trim();
+  if (!cycleId) return false;
+  if (String(ownClaim.backlog_id ?? "") !== String(stored.backlog_id)) return false;
+  if (String(ownClaim.claimed_by ?? "").trim() !== cycleId) return false;
+  const at = Date.parse(ownClaim.claimed_at ?? "");
+  if (!Number.isFinite(at)) return false;
+  return Date.now() - at <= CLAIM_TTL_HOURS * 3600 * 1000;
+}
+
+export function stateDrift(state, livePick, ownClaim = null) {
   const drift = [];
   const stored = state && state.pick;
   if (!stored && !livePick) return drift;
@@ -290,11 +331,17 @@ export function stateDrift(state, livePick) {
     drift.push(`the state file carries no pick but the pick path now names "${livePick.backlog_id}" -- the state was written against a different board`);
     return drift;
   }
+  // AGT-183. Computed once, above both comparisons, because the same claim explains both shapes the
+  // pick path can take when a cycle holds its own ticket: another row promoted into the pick, or --
+  // on a board whose only pickable row was that ticket -- no pick at all.
+  const mine = ownClaimHolds(stored, ownClaim);
   if (!livePick) {
-    drift.push(`the state file names pick "${stored.backlog_id}" but the pick path now names none -- nothing is pickable, so there is nothing to assign`);
+    if (!mine) {
+      drift.push(`the state file names pick "${stored.backlog_id}" but the pick path now names none -- nothing is pickable, so there is nothing to assign`);
+    }
     return drift;
   }
-  if (String(stored.backlog_id) !== String(livePick.backlog_id)) {
+  if (String(stored.backlog_id) !== String(livePick.backlog_id) && !mine) {
     drift.push(`the state file names pick "${stored.backlog_id}" but runner_should_boot() now names "${livePick.backlog_id}" -- the pick is read live and never taken from the file`);
   }
   if (stored.lane && livePick.lane && String(stored.lane) !== String(livePick.lane)) {
@@ -311,6 +358,64 @@ export function stateDrift(state, livePick) {
 // check. `stop` and `report` are checked in the mirror direction -- they must NOT carry an
 // assignment, because an assignment nobody acts on in a `stop` is a reader's trap, and a future
 // edit that started acting on it would find the check already passed.
+// AGT-183: THE PASS-OVER, AS THE ONE SHAPE AN OFF-PICK ASSIGNMENT CAN LEGITIMATELY TAKE.
+//
+// `answerErrors`' off-pick refusal is right against re-ranking and must stay: a manager naming any
+// other ticket is a finding on the Skill text. But a legitimate pass-over had NO recordable shape, so
+// cycle `c50ee60d` -- which went past AGT-168, already in `project_blockers` as "needs a session John
+// attends" -- was refused with the same sentence as a re-order, and runbook 5(c) then forced it to
+// build a ticket whose work is unavailable.
+//
+// So the off-pick branch is admitted on ONE shape and nothing else: an optional `passed_over` list of
+// `{backlog_id, reason}` (an extra top-level answer key, which the stored Intent contract already
+// accepts -- `regrades` ships that way, SES-403 -- so no Skill row moves here) that RECORDS the rows
+// the manager went past. Five conditions, every one checked against a LIST THE LISTER RETURNED and
+// never against the manager's own opinion of the board:
+//
+//   1. `passed_over` is a non-empty array -- nothing recorded is not a pass-over.
+//   2. it names the pick itself: going past the pick is the only thing being excused.
+//   3. every id it names is in `state.blockers` (`project_blockers`, read verbatim) -- the board says
+//      what is blocked, and a manager that could nominate its own blocked rows would have the
+//      re-ordering power this whole gate exists to withhold.
+//   4. the assignment's id is on `state.queue` (`prime_directive_queue()`, read verbatim) -- a
+//      pass-over may only reach a row the lister already returned.
+//   5. every queue row ORDERED BEFORE it is blocked too. THE DRIVER NEVER SORTS: it walks a prefix of
+//      the lister's own order, so "next admitted row" stays the lister's sentence and not this file's.
+//
+// Absent `passed_over` returns today's refusal BYTE-IDENTICAL (`ses-378-manager-takes-the-pick`
+// pins that string). Any failed condition returns that same refusal PLUS one line naming which
+// condition failed -- a refusal that does not say which of five gates closed is a refusal nobody can
+// answer.
+function passOverErrors(answer, state, a, pick) {
+  const reorder = `the assignment names "${a.backlog_id}" but the pick path names "${pick.backlog_id}" -- the manager may not re-order the board`;
+  const po = answer.passed_over;
+  if (po === undefined || po === null) return [reorder];
+  if (!Array.isArray(po) || po.length === 0) {
+    const what = Array.isArray(po) ? "an empty array" : `${typeof po}, not an array`;
+    return [reorder, `pass-over refused: "passed_over" is ${what} -- a pass-over is a RECORD of the rows the manager went past, and nothing recorded is nothing to check`];
+  }
+  const overIds = po.map(r => String((r && r.backlog_id) ?? ""));
+  if (!overIds.includes(String(pick.backlog_id))) {
+    return [reorder, `pass-over refused: "passed_over" names ${overIds.join(", ") || "nothing"} and not the pick "${pick.backlog_id}" -- going past the PICK is the only thing a pass-over excuses`];
+  }
+  const blocked = (Array.isArray(state?.blockers) ? state.blockers : []).map(b => String(b && b.backlog_id));
+  const notBlocked = overIds.filter(id => !blocked.includes(id));
+  if (notBlocked.length) {
+    return [reorder, `pass-over refused: "passed_over" names ${notBlocked.join(", ")}, which project_blockers does not (it names: ${blocked.join(", ") || "nothing"}) -- the blocked list is the board's, and a manager that nominated its own blocked rows would be re-ordering by another name`];
+  }
+  const queue = Array.isArray(state?.queue) ? state.queue : [];
+  const refs = queue.map(r => String((r && r.ref) ?? ""));
+  const at = refs.indexOf(String(a.backlog_id));
+  if (at < 0) {
+    return [reorder, `pass-over refused: the assignment names "${a.backlog_id}", which prime_directive_queue() did not return (it returned: ${refs.join(", ") || "nothing"}) -- a pass-over may only reach a row the lister already listed`];
+  }
+  const liveAhead = refs.slice(0, at).filter(id => !blocked.includes(id));
+  if (liveAhead.length) {
+    return [reorder, `pass-over refused: ${liveAhead.join(", ")} sit ahead of "${a.backlog_id}" in prime_directive_queue()'s own order and project_blockers does not name them -- a pass-over skips BLOCKED rows only, and skipping a live one is the re-ordering this refuses`];
+  }
+  return null;
+}
+
 export function answerErrors(answer, state) {
   const errors = [];
   if (!answer || typeof answer !== "object" || Array.isArray(answer)) {
@@ -364,8 +469,11 @@ export function answerErrors(answer, state) {
     errors.push('action is "assign" but the state carries no pick, so there is nothing the pick path authorises assigning');
   } else if (String(a.backlog_id || "") !== String(pick.backlog_id)) {
     // dm-guardrails.must: "use the pick path as computed, never a re-derived order". This is that
-    // clause with teeth. A manager that names any other ticket is a finding on the Skill text.
-    errors.push(`the assignment names "${a.backlog_id}" but the pick path names "${pick.backlog_id}" -- the manager may not re-order the board`);
+    // clause with teeth. A manager that names any other ticket is a finding on the Skill text --
+    // UNLESS it recorded a pass-over the lister's own two lists support (AGT-183; see passOverErrors,
+    // which returns today's refusal unchanged whenever `passed_over` is absent).
+    const over = passOverErrors(answer, state, a, pick);
+    if (over) errors.push(...over);
   }
   // THE ROSTER IS READ LIVE AND THEREFORE CONTAINS THE MANAGER'S OWN CAPABILITY. That is correct --
   // filtering it out in the read would be this driver editing the roster on the agent's behalf --
@@ -719,7 +827,35 @@ async function main() {
         prose: `run-project: could not re-read the pick path (${liveBoot.error}). Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
     }
     const livePick = (liveBoot.row && liveBoot.row.detail && liveBoot.row.detail.pick) || null;
-    const drift = stateDrift(state, livePick);
+    // AGT-183: the stored pick's OWN board row, read LIVE, so `stateDrift` can tell this cycle's own
+    // claim from a board somebody else moved. The id it is read by comes from the state file, which is
+    // exactly what the state file is allowed to be -- a pointer to a row this driver then reads for
+    // itself. The ROW is never taken from the file, and neither is the answer: an unreadable row, a
+    // missing row, or more than one row all arrive at `stateDrift` as `null` and refuse exactly as
+    // today. `cycleId` is this process's own `--cycle-id`, never anything the file carries.
+    let ownClaim = null;
+    const storedPickId = state && state.pick && state.pick.backlog_id;
+    if (storedPickId) {
+      const own = await rest(base, key,
+        `backlog_items?backlog_id=eq.${encodeURIComponent(storedPickId)}`
+        + "&select=backlog_id,status,claimed_by,claimed_at");
+      if (!own.error && Array.isArray(own.rows) && own.rows.length === 1) {
+        ownClaim = { ...own.rows[0], cycleId: args.cycleId };
+      }
+    }
+    const drift = stateDrift(state, livePick, ownClaim);
+    // WHICH PICK THIS PASS IS ACTING ON, derived from the shipped function's own verdict rather than
+    // from a second copy of its rule: the ids disagree and `stateDrift` still returned nothing, which
+    // is only possible when the suppression above fired. Everything downstream already acts on the
+    // STORED pick (`answerErrors` checks the answer against `state.pick`, and the claim targets the
+    // assignment's id) -- what was missing was saying so.
+    const pickSource = (!drift.length && storedPickId && String(storedPickId) !== String(livePick?.backlog_id ?? ""))
+      ? "own-claim"
+      : "live";
+    if (pickSource === "own-claim") {
+      console.error(`run-project: the pick path no longer names ${storedPickId} because THIS cycle (${args.cycleId}) holds its claim`
+        + ` -- claimed_at ${ownClaim.claimed_at}, inside the ${CLAIM_TTL_HOURS}h window. Acting on the stored pick (pick_source=own-claim).`);
+    }
     if (drift.length) {
       return emit({ code: EXIT_CANNOT_RUN, json: args.json,
         payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", drift },
@@ -828,11 +964,18 @@ async function main() {
       payload: {
         ok: true, exitCode: EXIT_OK, kind: "assigned", dry_run: args.dryRun,
         backlog_id: target, capability_slug: rosterRow.capability_slug, engine: answer.assignment.engine,
+        // AGT-183: "live" ordinarily; "own-claim" when the pick path had moved on because THIS cycle
+        // holds the stored pick's claim. A reader who cannot see which of the two happened cannot tell
+        // a suppressed self-claim from a drift check that stopped running.
+        pick_source: pickSource,
         agent_id: rosterRow.agent_id, intent_slug: rosterRow.default_intent_slug, model: next.model,
         claimed: !args.dryRun, claim_rows: claim.rows.length, prompt_file: nextPromptPath,
         reason: answer.assignment.reason ?? null,
       },
       prose: `run-project: ASSIGNED ${target} — ${rosterRow.capability_slug} — engine ${answer.assignment.engine}\n`
+        + (pickSource === "own-claim"
+          ? `  pick:   the STORED pick ${storedPickId}, which the pick path no longer names because this cycle holds its claim (pick_source=own-claim)\n`
+          : "")
         + `  reason: ${answer.assignment.reason ?? "(none given)"}\n`
         + `  claim:  ${args.dryRun ? "NOT MADE (--dry-run)" : `held as ${claim.rows[0]?.claimed_by}`}\n`
         + `  prompt: ${nextPromptPath}\n`

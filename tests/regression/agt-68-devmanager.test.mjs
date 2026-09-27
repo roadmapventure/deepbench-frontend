@@ -1,3 +1,7 @@
+// DeepBench v7.0.625 | tests/regression/agt-68-devmanager.test.mjs | AGT-183 -- header note (8): the
+// own-claim arm and the pass-over arm, each pinning the EXACT refusal sentence it used to return and
+// carrying its own controls (peer holder, stale claim, no claim row, third ticket, lane drift; no
+// passed_over, an unblocked pick, an unblocked earlier queue row skipped, a non-array, an empty array).
 // DeepBench v7.0.546 | tests/regression/agt-68-devmanager.test.mjs | AGT-86 slice 2a -- the assignment pin at the capability_skill_profiles block names review-audit-worklist beside run-project (sorted); nothing else moves.
 // DeepBench v7.0.456 | tests/regression/agt-68-devmanager.test.mjs | AGT-69 — the off-bench clause is retired: OFF_BENCH_AGENT_IDS no longer exists, so the import drops it and the assertion that the Development Manager was ON that list is deleted outright. The surviving NOT-in-AGENTS clause now reads for the AGT-69 reason: the governance agents render on the Bench's Governance section from live lane=governance rows, never from the static list.
 // DeepBench v7.0.434 | tests/regression/agt-68-devmanager.test.mjs | AGT-68 -- The Development
@@ -77,6 +81,15 @@
 // B40 exists to prevent. So the claim is split at a seam instead: `claimQueryFor()` (what is sent)
 // is driven against Postgres in arm (7), and `claimOutcome()` (what the row count means) is driven
 // with both row counts in the pure arm. Together they cover the branch; neither alone would.
+//
+// (8) AGT-183 -- THE TWO REFUSALS THAT FIRED ON THE HAPPY PATH, EACH PINNED BY THE EXACT SENTENCE IT
+// USED TO RETURN. Both arms drive the SHIPPED exported functions on plain objects (no network, no
+// reimplementation), and both assert the old refusal STRING IS GONE rather than merely that some
+// array shrank -- a length check would stay green against a function that had stopped refusing
+// anything at all. So each arm carries its controls beside it: for `stateDrift`, a peer holder, a
+// claim past `CLAIM_TTL_HOURS`, no claim row, a claim on a third ticket and lane drift; for
+// `answerErrors`, no `passed_over`, a pick the board does not call blocked, an unblocked earlier
+// queue row skipped, and a non-array `passed_over`. Every control must still carry its refusal.
 //
 // NO MODEL CALL AND NO SPEND. Whether the Skill text yields an assignment that names the pick path's
 // own ticket is the kickoff's attended QA, run once against this ship's own commit.
@@ -240,6 +253,57 @@ export default async function run() {
     `claim any ticket at all, with the agent honestly agreeing because it was shown the edit. got: ${JSON.stringify(drifted)}`);
   assert.ok(stateDrift(st, null).length >= 1, "a state with a pick against a board with none must be refused");
 
+  // == Pure arm: AGT-183 limb 1 -- the cycle's OWN claim is not foreign drift ===================
+  //
+  // The pick lane is holder-blind, and rule B40 has the cycle claim its ticket AT pick time, so the
+  // cycle's own claim moves its own ticket out of the pick between the two passes. Measured live on
+  // this very ticket (2026-09-27): AGT-183 `claimed_by = dd911b24-…` at 02:55:26Z while
+  // `runner_should_boot().detail.pick` named another ticket -- and the shipped `stateDrift` refused
+  // the cycle's own `--answer` pass with the sentence pinned below.
+  const OWN_CYCLE = "dd911b24-4db2-4f49-ba3e-8b331cd3fd83";
+  const ownState = fixtureState({ pick: { lane: "selfbuild", backlog_id: "AGT-183", title: "own claim" } });
+  const otherPick = { lane: "selfbuild", backlog_id: "AGT-184" };
+  // The board row as pass two reads it: `backlog_id,status,claimed_by,claimed_at` plus this process's
+  // own `--cycle-id`. Never the state file's copy of any of it.
+  const ownClaim = (over = {}) => ({
+    backlog_id: "AGT-183", status: "open", claimed_by: OWN_CYCLE,
+    claimed_at: new Date().toISOString(), cycleId: OWN_CYCLE, ...over,
+  });
+  // RED BEFORE, and the exact sentence it returned -- asserted present on the two-argument call so
+  // the arm below is a real change and not a restatement of current behaviour.
+  const OWN_DRIFT_SENTENCE = 'the state file names pick "AGT-183" but runner_should_boot() now names '
+    + '"AGT-184" -- the pick is read live and never taken from the file';
+  assert.ok(stateDrift(ownState, otherPick).includes(OWN_DRIFT_SENTENCE),
+    `without the claim reading, this pair must still refuse with the pre-AGT-183 sentence verbatim -- ` +
+    `if it does not, the pin below is measuring something else: ${JSON.stringify(stateDrift(ownState, otherPick))}`);
+  // GREEN AFTER: with the stored pick's own row naming THIS cycle inside the window, no drift at all.
+  assert.deepEqual(stateDrift(ownState, otherPick, ownClaim()), [],
+    "a pick that moved because THIS cycle's own --cycle-id claims it is the happy path, not tampering");
+  assert.ok(!stateDrift(ownState, otherPick, ownClaim()).includes(OWN_DRIFT_SENTENCE),
+    "the pre-AGT-183 refusal sentence must be GONE on the own-claim path, not merely joined by others");
+  // A board whose only pickable row WAS that ticket: the pick path names none, same cause, same answer.
+  assert.deepEqual(stateDrift(ownState, null, ownClaim()), [],
+    "a pick path emptied by this cycle's own claim is the same fact as a pick path that moved on");
+  // THE CONTROLS. Each must still carry the refusal -- a manager naming a ticket other than the pick
+  // head is the re-order guardrail working, and exactly one of these five shapes is the happy path.
+  const driftControls = [
+    ["a live PEER holds the stored pick", ownClaim({ claimed_by: "c50ee60d-0000-0000-0000-000000000000" }), otherPick],
+    ["the claim is older than CLAIM_TTL_HOURS", ownClaim({ claimed_at: new Date(Date.now() - (CLAIM_TTL_HOURS + 1) * 3600 * 1000).toISOString() }), otherPick],
+    ["the stored pick's board row could not be read", null, otherPick],
+    ["the claim row names a THIRD ticket", ownClaim({ backlog_id: "AGT-999" }), otherPick],
+    ["the claimed_at is unparseable", ownClaim({ claimed_at: "whenever" }), otherPick],
+    ["the pick path names none and no claim explains it", null, null],
+  ];
+  for (const [what, claim, live] of driftControls) {
+    const d = stateDrift(ownState, live, claim);
+    assert.ok(d.length >= 1, `${what}: this must STILL be refused -- the own-claim suppression may not widen into "any moved pick is fine"`);
+  }
+  // LANE DRIFT IS NOT SUPPRESSED, and it is checked independently of the id: a cycle whose own claim
+  // holds but whose lane moved is still stopped, because the manager reasoned about a different lane.
+  const laned = stateDrift(ownState, { lane: "moat-support", backlog_id: "AGT-184" }, ownClaim());
+  assert.ok(laned.some(d => /pick lane is "selfbuild"/.test(d) && /"moat-support"/.test(d)),
+    `lane drift must survive the own-claim suppression: ${JSON.stringify(laned)}`);
+
   // == Pure arm: the answer against the state it was given =====================================
   assert.deepEqual(answerErrors(GOOD_ANSWER, st), [],
     "a well-formed assignment on the state's own pick must be accepted, or every refusal below is vacuous");
@@ -276,6 +340,80 @@ export default async function run() {
   assert.deepEqual(answerErrors({ ...GOOD_ANSWER, action: "report", assignment: null }, st), [],
     "a report that assigns nothing is a valid answer");
   assert.deepEqual([...ACTIONS], ["assign", "stop", "report"], "the closed action set is the Intent's three");
+
+  // == Pure arm: AGT-183 limb 2 -- a recorded pass-over is not a re-ordering ====================
+  //
+  // Cycle `c50ee60d` went past AGT-168 -- already in `project_blockers` as "needs a session John
+  // attends (needs-desktop)" -- for the next admitted row, and got the re-order refusal pinned below;
+  // runbook 5(c) then forced it to build a ticket whose work is unavailable. The distinction this arm
+  // holds open: a RECORDED pass-over over rows the LISTER's own two lists support is admitted, and a
+  // manager naming any other ticket is still refused.
+  const passState = fixtureState({
+    pick: { lane: "selfbuild", backlog_id: "AGT-168", title: "needs a session John attends" },
+    // prime_directive_queue()'s own order and its own column (`ref`) -- the driver never sorts it.
+    queue: [{ pos: 1, ref: "AGT-168" }, { pos: 2, ref: "AGT-178" }],
+    // project_blockers, read verbatim: the board says what is blocked, never the manager.
+    blockers: [{ backlog_id: "AGT-168", reasons: "needs a session John attends (needs-desktop)" }],
+  });
+  const offPick = (over = {}) => ({
+    ...GOOD_ANSWER,
+    assignment: { ...GOOD_ANSWER.assignment, backlog_id: "AGT-178" },
+    ...over,
+  });
+  const REORDER_SENTENCE = 'the assignment names "AGT-178" but the pick path names "AGT-168" '
+    + '-- the manager may not re-order the board';
+  // RED BEFORE: with no `passed_over`, the refusal is the pre-AGT-183 sentence and nothing else --
+  // BYTE-IDENTICAL, which `ses-378-manager-takes-the-pick.test.mjs` also pins from its own side.
+  assert.deepEqual(answerErrors(offPick(), passState), [REORDER_SENTENCE],
+    "absent passed_over, an off-pick assignment must be refused with today's sentence and no extra line");
+  // GREEN AFTER: the same assignment, carrying the record of what it went past.
+  const passedOver = [{ backlog_id: "AGT-168", reason: "in project_blockers: needs a session John attends" }];
+  assert.deepEqual(answerErrors(offPick({ passed_over: passedOver }), passState), [],
+    "a pass-over that names the pick, is supported by project_blockers, lands on a queue row and " +
+    "skips only blocked rows ahead of it must be admitted");
+  // THE CONTROLS. Each must STILL be refused, and each must name which of the five conditions closed.
+  const passControls = [
+    ["the pass-over names the pick but the board does not call it blocked",
+      offPick({ passed_over: passedOver }), { ...passState, blockers: [] },
+      /project_blockers does not/],
+    // AND THE SAME CONDITION ISOLATED. Above, an unblocked pick is ALSO an unblocked row ahead of the
+    // assignment, so condition 5 can satisfy that control on its own -- a driver that had stopped
+    // checking `project_blockers` for the passed-over ids would slip past it (measured: it did).
+    // Here the pick is not on this project's queue at all -- a real state (`pick_in_project` exists
+    // for exactly it) -- so nothing sits ahead of the assignment and condition 3 is the only gate left.
+    ["the passed-over pick is unblocked and nothing is ahead of the assignment",
+      offPick({ passed_over: passedOver }),
+      { ...passState, queue: [{ pos: 1, ref: "AGT-178" }], blockers: [] },
+      /project_blockers does not \(it names: nothing\)/],
+    ["the pass-over does not name the pick at all",
+      offPick({ passed_over: [{ backlog_id: "AGT-999", reason: "x" }] }), passState,
+      /and not the pick "AGT-168"/],
+    ["an UNBLOCKED earlier queue row is skipped",
+      offPick({ passed_over: passedOver }),
+      { ...passState, queue: [{ pos: 1, ref: "AGT-168" }, { pos: 2, ref: "AGT-171" }, { pos: 3, ref: "AGT-178" }] },
+      /AGT-171 sit ahead of "AGT-178"/],
+    ["the assignment is not on the lister's list at all",
+      offPick({ passed_over: passedOver }), { ...passState, queue: [{ pos: 1, ref: "AGT-168" }] },
+      /prime_directive_queue\(\) did not return/],
+    ["passed_over is not an array",
+      offPick({ passed_over: "AGT-168" }), passState,
+      /"passed_over" is string, not an array/],
+    ["passed_over is an empty array",
+      offPick({ passed_over: [] }), passState,
+      /"passed_over" is an empty array/],
+  ];
+  for (const [what, answer, state, pattern] of passControls) {
+    const errs = answerErrors(answer, state);
+    assert.ok(errs.includes(REORDER_SENTENCE),
+      `${what}: the re-order refusal must STILL be carried -- the pass-over branch may not become a ` +
+      `way to assign any ticket by attaching a list: ${JSON.stringify(errs)}`);
+    assert.ok(errs.some(e => pattern.test(e)),
+      `${what}: the refusal must name WHICH of the five conditions closed, or nobody can answer it: ${JSON.stringify(errs)}`);
+  }
+  // And a pass-over rides on the pick itself without changing anything: the ordinary answer is
+  // untouched by this feature, which is the direction a new optional key most easily breaks.
+  assert.deepEqual(answerErrors({ ...GOOD_ANSWER, passed_over: passedOver }, st), [],
+    "an on-pick assignment that happens to carry a passed_over list is still simply accepted");
 
   // == Pure arm: rule B40, both directions, and the query that carries it ======================
   const cutoff = new Date(Date.now() - CLAIM_TTL_HOURS * 3600 * 1000).toISOString();
