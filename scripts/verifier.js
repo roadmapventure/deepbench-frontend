@@ -450,7 +450,17 @@
 //                       gate, reads no board, needs no credentials -- it is the FIRST branch of
 //                       main(), ahead of the credential check, so step 6 can call it at the moment
 //                       the kickoff is drafted (before the cycle has anything else to check).
-//                       0 = within cap, 1 = over cap, 2 = the file could not be read.
+//                       0 = within cap, 1 = over cap OR no lane declaration (SES-359) OR the
+//                       declaration is unattested (AGT-187), 2 = nothing could be measured.
+//                       A green with no --answer carries `attested:false` and says so in `attests`:
+//                       it grades a line's PRESENCE, never its author.
+//   --answer=<path>     AGT-187, OPTIONAL and only with --check-kickoff. The Designer's own answer
+//                       JSON; its `kickoff_markdown` is compared byte-for-byte with the file on
+//                       disk. Equal -> exit 0, `attested:true`. Different -> exit 1,
+//                       `kickoff-unattested-declaration`, naming the byte delta and the first
+//                       differing line, because a caller that patched the refusal's own remedy into
+//                       the file would otherwise collect a green over its own bytes. Unreadable JSON
+//                       or no `kickoff_markdown` -> exit 2, NEVER a green.
 //
 // The `--judge=session` two-pass shape (AGT-67):
 //   node scripts/verifier.js --judge=session --ticket=AGT-67 --version=v7.0.433 \
@@ -1743,6 +1753,16 @@ export const DIFF_LAST = Object.freeze([
 // doing the work.
 export const KICKOFF_BYTE_CAP = 8192;
 
+// FEATURE: AGT-187 -- WHOSE JOB THE REFUSAL IS, stated on the finding rather than implied by prose.
+//
+// Both refusals used to close with an imperative aimed at nobody in particular ("add one Lanes:
+// line"), and the agent that reads a refusal is the ORCHESTRATOR holding the file, not the Designer
+// who assembled it. Measured on cycle a1e84644: the orchestrator read that sentence literally,
+// appended the 49-byte line itself, and the re-run went green -- so the green certified a lane
+// declaration its own caller had written. `remedy_owner` names the agent the re-assembly belongs to
+// and `remedy` names the ONE command that performs it, so no reader has to infer either.
+export const KICKOFF_REMEDY_OWNER = "designer";
+
 // Null is the answer for "within cap", never `false`: the caller carries this straight into the
 // payload as `kickoff_over_cap`, where a `false` would read as a measurement that was taken and a
 // `null` reads as nothing to report. The reason text names the ticket AND the remedy, because the
@@ -1753,8 +1773,29 @@ export function kickoffCapFinding(text) {
   return {
     bytes,
     cap: KICKOFF_BYTE_CAP,
+    remedy_owner: KICKOFF_REMEDY_OWNER,
+    remedy: `re-assemble design-kickoff ONCE with "over_cap":{"bytes":${bytes},"cap":${KICKOFF_BYTE_CAP}} in task_context; the caller never trims the file`,
     reason: `kickoff over cap: ${bytes} bytes > ${KICKOFF_BYTE_CAP} (SES-376) -- seven sections only; reasoning belongs in docs/harvests/<ID>.md`,
   };
+}
+
+// FEATURE: AGT-187 -- WHICH LINE THE TWO DOCUMENTS FIRST DISAGREE ON.
+//
+// 1-BASED, and the number is the point of the whole payload: "the answer is 49 bytes shorter" says a
+// line went missing, "line 8" says WHICH, and line 8 of a kickoff is the `Lanes:` declaration this
+// ticket exists over. Returns null only when the two strings are identical, so a caller can branch on
+// the return rather than re-comparing. Compared line by line rather than by character offset because
+// the reader is being pointed at a line of a markdown file, not at a byte of a buffer.
+export function firstDifferingLine(a, b) {
+  const left = String(a ?? "").split("\n");
+  const right = String(b ?? "").split("\n");
+  const n = Math.max(left.length, right.length);
+  for (let i = 0; i < n; i++) {
+    if (left[i] !== right[i]) {
+      return { line: i + 1, answer: left[i] ?? null, file: right[i] ?? null };
+    }
+  }
+  return null;
 }
 
 // FEATURE: SES-359 -- THE LANE DECLARATION, graded on the LINE rather than on the document.
@@ -1785,7 +1826,9 @@ export function kickoffLaneFinding(text) {
   if (declared) return null;
   return {
     kind: "kickoff-no-lanes",
-    reason: "kickoff has no lane declaration (SES-359) -- add one Lanes: line in SESSION: session | executor ($ band) | none",
+    remedy_owner: KICKOFF_REMEDY_OWNER,
+    remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never supplies the line',
+    reason: 'kickoff has no lane declaration (SES-359) -- the Designer re-assembles design-kickoff ONCE with "no_lanes":true; a Lanes: line supplied by the caller is not a declaration the Designer made',
   };
 }
 
@@ -2274,8 +2317,58 @@ async function main() {
     if (lanes) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...lanes }, prose: lanes.reason });
     }
-    return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes: Buffer.byteLength(text, "utf8"), cap: KICKOFF_BYTE_CAP },
-      prose: `kickoff ${Buffer.byteLength(text, "utf8")} bytes, within ${KICKOFF_BYTE_CAP} (SES-376)` });
+    // ---- AGT-187: THE THIRD CLAUSE -- the green says WHOSE declaration it graded. -------------
+    //
+    // ORDER IS cap -> lanes -> attestation, and it is not interchangeable: the first two grade the
+    // DOCUMENT and can refuse it outright, so a document that is not a kickoff yet must never be
+    // measured against an answer. Attestation is the last question, asked only of a file that has
+    // already passed both.
+    //
+    // WHAT THE GREEN USED TO MEAN. `kickoffLaneFinding` grades a LINE'S PRESENCE (its own header
+    // says so, deliberately), which is the right check and the wrong claim: the exit 0 was read as
+    // "the Designer declared its lanes" when all it proved was that the bytes on disk carry the
+    // line. On cycle a1e84644 the orchestrator supplied line 8 itself after the refusal and the
+    // re-run went green over 7,781 bytes of which 49 were its own -- a gate whose green is not
+    // evidence (ARCHITECTURE.md 19v).
+    //
+    // 2, NEVER A GREEN, for an answer that cannot be read. Same distinction the branch already
+    // draws twice above: 1 is a judgement about the kickoff, 2 is the absence of one. A caller that
+    // passed `--answer` and got an exit 0 out of an unparseable file would have been handed the
+    // strongest claim this branch can make on the weakest evidence it has.
+    const bytes = Buffer.byteLength(text, "utf8");
+    const answerPath = arg("answer", "");
+    if (answerPath) {
+      const answerAbs = path.resolve(repoRoot, answerPath);
+      let answer;
+      try {
+        answer = JSON.parse(fs.readFileSync(answerAbs, "utf8"));
+      } catch (e) {
+        return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: `answer unreadable JSON: ${e.message}`, path: answerPath },
+          prose: `verifier: --answer=${answerPath} is not readable JSON (${e.message}). Exiting 2 -- this is NOT an attestation verdict, it is the absence of one.` });
+      }
+      const declared = answer && typeof answer.kickoff_markdown === "string" ? answer.kickoff_markdown : null;
+      if (declared === null) {
+        return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "answer carries no kickoff_markdown string", path: answerPath },
+          prose: `verifier: --answer=${answerPath} carries no \`kickoff_markdown\` string, so there is nothing to attest the kickoff against. Exiting 2 -- never a green.` });
+      }
+      const answerBytes = Buffer.byteLength(declared, "utf8");
+      const diff = firstDifferingLine(declared, text);
+      if (diff) {
+        const reason = `kickoff-unattested-declaration: the file on disk is ${bytes} bytes, the Designer's answer declared ${answerBytes} (delta ${bytes - answerBytes >= 0 ? "+" : ""}${bytes - answerBytes}); they first differ at line ${diff.line} (AGT-187). The green would attest to a declaration nobody made -- re-assemble, never patch the file.`;
+        return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "kickoff-unattested-declaration", attested: false,
+          bytes, answer_bytes: answerBytes, byte_delta: bytes - answerBytes, first_differing_line: diff.line,
+          cap: KICKOFF_BYTE_CAP, remedy_owner: KICKOFF_REMEDY_OWNER,
+          remedy: 're-assemble design-kickoff ONCE and commit its own bytes; the caller never edits the kickoff into shape',
+          reason }, prose: reason });
+      }
+      return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: true,
+        answer_bytes: answerBytes, byte_delta: 0,
+        attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
+        prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
+    }
+    return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: false,
+      attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
+      prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
   }
 
   const dryRun = process.argv.includes("--dry-run");
