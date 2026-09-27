@@ -519,6 +519,7 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import { renderingCycleFinding } from "./render-claude-state.js";
+import { shipCardFinding } from "./render-claude-state.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2813,6 +2814,62 @@ async function main() {
     stateRenderCycle = null;
   }
 
+  // FEATURE: AGT-199 -- THE STATE RENDER SAYS WHEN ITS BULLET WAS WRITTEN BEFORE ITS SHIP CARD. NON-GATING.
+  //
+  // THE MEASURED GAP, and it is a DIFFERENT one from AGT-174 above rather than a second reading of it.
+  // Step 7a renders CLAUDE-STATE.md (`runner-cycle.md:3024-3029`); step 9 files the ship card
+  // (`:4007-4010`); nothing re-renders after. `renderBullet` prints the card's `plain_after` and
+  // `plain_worth`, so a render that runs before the card exists commits the bare ticket line and the
+  // briefing John judges from (`docs/ARCHITECTURE.md` §19v) never gains the card's sentence. Live, 2 of
+  // tonight's 5 close-outs: `git show ed368c9d:CLAUDE-STATE.md` line 12 is the bare `` **`AGT-194`**. ``
+  // committed 06:17:12Z while that cycle's card `ab5bcbb4` was created 06:17:49Z; `f8fc2c91` line 12 is the
+  // same for `AGT-195`. The block above is blind to it BY CONSTRUCTION: it reads only the ledger pin, and
+  // on both of those files the pin is right -- `renderingCycleFinding` returns null on exactly the renders
+  // whose bullets are card-less. The predicate that sees it is the render itself, which is why this block
+  // reads the cycle row and its ship card and hands both to `renderBullet`'s own comparison.
+  //
+  // REPORTED, NEVER ENFORCED, on AGT-174's precedent and its reason: this block assigns nothing to the
+  // mechanical lane's two outputs, and no branch below may turn this finding into a block. At 7a the card
+  // is not yet filed, so this line reads *card-missing* on every honest cycle and says so in those words
+  // -- a line that only appeared on a finding would leave its reader unable to tell the ordering from a
+  // build of the verifier that does not look. The guard
+  // (tests/regression/agt-199-ship-card-render.test.mjs) asserts the non-gating property against this
+  // file's source with the `kickoffNoLanes` block above as its positive control.
+  //
+  // NOT MEASURED IS NEVER CLEAN, and the note says which kind: no cycle id, no credentials, a ledger read
+  // that failed or returned no row, or a CLAUDE-STATE.md this process could not read (absent on a fresh
+  // clone before the first render). Each is a reason this could not be checked, not evidence that it is
+  // fine -- the same distinction the block above draws for `!cycleId`.
+  let stateRenderCard = null;
+  let stateRenderCardNote = "";
+  if (!cycleId) {
+    stateRenderCardNote = "not measured (no --cycle-id)";
+  } else if (!supabaseUrl || !supabaseKey) {
+    stateRenderCardNote = "not measured (no credentials)";
+  } else {
+    const cardCycleQ = `runner_cycles?select=id,started_at,trigger,model,version,item_id,push_sha&id=eq.${encodeURIComponent(cycleId)}&limit=1`;
+    const cardShipQ = `runner_items?select=backlog_id,cycle_id,title,plain_after,plain_worth&kind=eq.ship&cycle_id=eq.${encodeURIComponent(cycleId)}&order=created_at.desc&limit=1`;
+    const cr = await rest(supabaseUrl, supabaseKey, cardCycleQ);
+    const kr = await rest(supabaseUrl, supabaseKey, cardShipQ);
+    const cardCycleRow = ((cr && cr.rows) || [])[0] || null;
+    if (cr && cr.error) stateRenderCardNote = `not measured (ledger read failed: ${cr.error})`;
+    else if (kr && kr.error) stateRenderCardNote = `not measured (ledger read failed: ${kr.error})`;
+    else if (!cardCycleRow) stateRenderCardNote = `not measured (ledger read failed: no runner_cycles row for ${String(cycleId).slice(0, 8)})`;
+    else {
+      try {
+        stateRenderCard = shipCardFinding(
+          fs.readFileSync(path.join(repoRoot, "CLAUDE-STATE.md"), "utf8"),
+          cardCycleRow, ((kr && kr.rows) || [])[0] || null);
+      } catch {
+        stateRenderCard = null;
+        stateRenderCardNote = "not measured (CLAUDE-STATE.md unreadable)";
+      }
+      if (!stateRenderCard && !stateRenderCardNote) {
+        stateRenderCardNote = "the committed bullet is a byte-exact render of the ship card that exists";
+      }
+    }
+  }
+
   // Eligibility reads the board, never the argv -- see the header.
   //
   // SES-340: the select EMBEDS THROUGH THE FOREIGN KEY (`epics.project_id -> projects`, constraint
@@ -2987,6 +3044,11 @@ async function main() {
     `  CLAUDE-STATE: ${stateRenderCycle ? stateRenderCycle.reason
       : cycleId ? "pins this cycle as the newest pushed row"
       : "not measured (no --cycle-id)"}\n` +
+    // AGT-199: one line, ALWAYS printed, never part of the verdict -- a sibling fact to the line above
+    // and not a restatement of it: that one says WHOSE ship this file publishes, this one says whether
+    // the bullet it published was written before that cycle's ship card existed. The clean case and each
+    // not-measured kind are stated in words, in `stateRenderCardNote`.
+    `  CLAUDE-STATE CARD: ${stateRenderCard ? stateRenderCard.reason : stateRenderCardNote}\n` +
     // AGT-194: one line, ALWAYS printed, never part of the verdict. The clean case is stated in
     // words too -- a line that appeared only on a finding would leave its reader unable to tell
     // "CI graded this sha green" from "this build of the verifier does not look".
@@ -3024,6 +3086,11 @@ async function main() {
     // this cycle OR when no cycle id was passed (`prose` above keeps those two apart in words).
     // Reported, never stored in its own column and no migration -- AGT-170's convention above.
     state_render_cycle: stateRenderCycle,
+    // AGT-199: the finding object when the committed bullet was rendered before this cycle's ship card
+    // existed (or disagrees with it), null when the bullet is a byte-exact render of a card that does
+    // exist OR when it could not be measured (`prose` above keeps those apart in words). Reported, never
+    // stored in its own column and no migration -- AGT-174's precedent, AGT-170's convention.
+    state_render_card: stateRenderCard,
     // AGT-194: the finding object when this sha has no CI conclusion of its own, null when every
     // blocking job succeeded. Reported, never stored in its own column and NO MIGRATION -- AGT-174's
     // precedent and AGT-170's convention; the fact reaches the ledger through `reasoning` nowhere and
@@ -3105,6 +3172,10 @@ async function main() {
       // `code_eligibility` above records -- the same evidence key carrying less content in one lane
       // than the other is the lane-shaped difference this file's SES-337 note calls out as a defect.
       state_render_cycle: stateRenderCycle,
+      // AGT-199: given to BOTH judge lanes, same key, same content, for the reason
+      // `code_eligibility` above records -- the same evidence key carrying less content in one lane
+      // than the other is the lane-shaped difference this file's SES-337 note calls out as a defect.
+      state_render_card: stateRenderCard,
       // AGT-194: given to BOTH judge lanes, same key, same content, for the reason
       // `code_eligibility` above records -- the same evidence key carrying less content in one lane
       // than the other is the lane-shaped difference this file's SES-337 note calls out as a defect.
@@ -3203,6 +3274,7 @@ async function main() {
       kickoff_over_cap: kickoffOverCap,   // SES-376 -- see the session lane's note above.
       kickoff_no_lanes: kickoffNoLanes,   // SES-359 -- same.
       state_render_cycle: stateRenderCycle,  // AGT-174 -- see the session lane's note above.
+      state_render_card: stateRenderCard,    // AGT-199 -- same: BOTH lanes, same key, same content.
       ci_conclusion: ciConclusion,        // AGT-194 -- same: BOTH lanes, same key, same content.
       diff: diffFor(repoRoot, base),
       ship_report: {                      // SES-344 -- see the session lane's note above.
