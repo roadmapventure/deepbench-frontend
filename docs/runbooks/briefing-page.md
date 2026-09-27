@@ -86,7 +86,8 @@ Store UTC internally as before; the conversion is display-only.
 
    ```
    SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/build-briefing.mjs \
-     --template docs/runbooks/briefing-template.html --data <cycle.json> --out briefing-out.html
+     --template docs/runbooks/briefing-template.html --data <cycle.json> --out briefing-out.html \
+     --cycle=<cid>
    ```
 
    **Until this shipped there was no script at all** — `grep -rln briefing-template scripts/`
@@ -100,7 +101,7 @@ Store UTC internally as before; the conversion is display-only.
 
    | Derived from SQL (no cycle judgment) | Supplied by the cycle in `--data` |
    |---|---|
-   | the `briefing-state` seed (step 1b), the §5/§6 card set (step 1c), `PAGE_BUILT`, §2, §8, §10, §11, §13, §14 | §3 findings, §4's calibration sentence, §4.1 rows, §7/§7.1 directive lines, §9 questions, §12 vision claims |
+   | the `briefing-state` seed (step 1b), the §5/§6 card set (step 1c), `PAGE_BUILT`, §2, §8, §10, §11, §13, §14 | `cycle_id` (whose cycle this narrative is — `AGT-188`), §3 findings, §4's calibration sentence, §4.1 rows, §7/§7.1 directive lines, §9 questions, §12 vision claims |
 
    Three properties that are not style:
 
@@ -115,6 +116,15 @@ Store UTC internally as before; the conversion is display-only.
      top 12, so it is not hypothetical.
    - **`--data` is required.** There is no default for the narrative sections. A builder that
      guessed §3 or John's directive lines would be writing his briefing for him.
+   - **`--cycle=<cid>` is required too, and it is what makes `--data` *yours* (`AGT-188`).** The
+     builder refuses three ways, all exit 2: no `--cycle`; a `--data` whose `cycle_id` names another
+     cycle (`--data was authored for cycle <id>, not <cid>`); or a `--cycle` that matches no
+     `runner_cycles` row, or one whose **non-null** `version` disagrees with `--version` (a
+     `gated_before_build` row carries `version IS NULL`, which is an unclaimed version and not a
+     disagreement). The live cause: cycle `ee5b8998` built a page from `40d8dfe3`'s narrative with
+     every other gate green, while the masthead stamped `ee5b8998`'s own version — nothing tied the
+     `--data` file to a cycle. `--version <vX.Y.Z>` is required as well and always has been; the
+     command block above has never shown it.
 
    Guarded by `tests/regression/SES-149-briefing-builder.js`.
 1b. **SEED THE `briefing-state` BLOCK — it is the verbatim output of one call, never the

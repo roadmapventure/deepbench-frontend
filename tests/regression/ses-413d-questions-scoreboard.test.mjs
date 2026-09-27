@@ -170,7 +170,20 @@ export const RUNBOOK_CEILING = 381000;
 // under SES-336's ceiling. A stamp costs more than the sentence it records, and 33 B of headroom on
 // a 381,000 B ceiling is REPORTED, not absorbed: the next byte any cycle adds needs a real trim.
 // Re-measured with wc -c and re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 380967;
+//
+// v7.0.655 (AGT-188) makes step 9's `last_step` derived (`cycle-heartbeat.js --tail`) and adds the one
+// command line that says so to the tail's (6), plus a header rotation: v7.0.555 (AGT-86 slice 8b) OUT
+// to docs/SESSIONS.md verbatim, v7.0.655 IN -- at line 2, not line 1, because agt-133:132 and
+// ses-424c:67 pin v7.0.650 as the first line by literal string. The rotation is the ONLY byte source
+// (no rule sentence was cut, and (5b)'s "A CYCLE THAT DID NOT PUBLISH MUST NOT STAMP IT AT ALL" block
+// is sha256-identical across this ship): the retiring stamp freed 510 B and the new one plus the
+// command line spent 504, so net 380967 -> 380961 B -- this ship ENDS SMALLER than it started and the
+// STAMP WAS TRIMMED TWICE to get there rather than the ceiling being raised.
+// THE BINDING BOUND IS NOT THE CEILING, and this is the number a later cycle needs: agt-138:59 holds
+// PRE_CHANGE_BYTES = 380980 and asserts `bytes < PRE_CHANGE_BYTES`, so the runbook cannot exceed
+// 380,979 B without agt-138 going red -- 18 B of room here, against 39 B under SES-336's 381,000.
+// Re-measured with wc -c and re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 380961;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

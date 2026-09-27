@@ -1,4 +1,26 @@
 #!/usr/bin/env node
+// DeepBench v7.0.655 | scripts/build-briefing.mjs | AGT-188 — THE BUILD KNOWS WHOSE CYCLE IT IS.
+// MEASURED BEFORE THE EDIT, NOT RECALLED: `grep -nE 'cycle_id|--cycle'` over this file returned ONE
+// hit and it is `resolve_day_token_cap`'s own `p_cycle_id: null` — nothing tied the `--data` file to
+// a cycle. So a PREDECESSOR's narrative cleared every gate below (`--data` present, every AUTHORED
+// field present, `--version` present) while the masthead stamped THIS cycle's version, and the page
+// read as tonight's. It happened: `runner_cycles` row `ee5b8998-3c72-4b91-ad0e-d5d261cf2b1f`
+// self-reports a briefing page "BUILT at 673,915 bytes and NOT published (SES-244 bridge) — built
+// with the predecessor cycle's --data narrative", and names that predecessor,
+// `40d8dfe3-764d-467e-bf2b-7600e522d966`, in the same row.
+// THREE REFUSALS, every one exit 2 ("could not run"), because a page that misattributes its own
+// narrative is unfalsifiable from the page — the same argument the `--version` refusal at the
+// bottom of this file already makes:
+//   1. `--cycle=<uuid>` is required and has NO default.
+//   2. `data.cycle_id` — the SIXTH authored field — must equal it: `--data was authored for cycle
+//      <data.cycle_id>, not <CYCLE>`.
+//   3. That cycle must EXIST in `runner_cycles`, and if its `version` is non-null it must equal
+//      `--version`.
+// THE VERSION ARM IS CONDITIONAL ON PURPOSE and that is not laxity: a `gated_before_build` row
+// legitimately carries `version IS NULL` (four of them tonight), and a null version is an unclaimed
+// version, never a disagreement. `arg()` reads `--name=value` as well as `--name value` in the same
+// edit, so `--cycle=<uuid>` works in the `--cycle=` form every other runner script already uses.
+// Guarded by tests/regression/agt-188-tail-record.test.mjs.
 // DeepBench v7.0.368 | scripts/build-briefing.mjs | SES-300 — A WITHDRAWN CARD STOPS READING AS AN
 // OPEN ASK. The orphan guard below (SES-163) fails a build when an item- ask target is neither
 // rendered nor claimed by a briefing_dom_ids row. SES-285 closed 44 gated_before_build cards with
@@ -221,6 +243,11 @@ import {
 
 const argv = process.argv.slice(2);
 const arg = (name, dflt) => {
+  // AGT-188: both spellings. `--name value` is what this file has always taken; `--name=value` is
+  // what `cycle-heartbeat.js` and every other runner script take, and `--cycle=<uuid>` is documented
+  // in that form in briefing-page.md step 1a. One reader, so the two cannot drift apart.
+  const eq = argv.find(a => a.startsWith(`--${name}=`));
+  if (eq !== undefined) return eq.slice(name.length + 3) || dflt;
   const i = argv.indexOf(`--${name}`);
   return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt;
 };
@@ -255,14 +282,38 @@ const M = n => (Number(n) / 1e6).toFixed(1);
 
 const data = JSON.parse(fs.readFileSync(DATA, 'utf8'));
 
-// SES-163 — the bar the ticket set: "a --data file of at most a few authored sentences". These five
+// SES-163 — the bar the ticket set: "a --data file of at most a few authored sentences". These six
 // are what is left, and a missing one is exit 2 rather than a silently blank section. It is the same
 // rule as a NULL plain_* drawing a red defect line: absent must look absent, never look fine.
-const AUTHORED = ['finding_text', 'finding_time', 'earlier_title', 'earlier_html', 'calib_line'];
+// AGT-188 added the sixth, `cycle_id`: it is not narrative, it is the narrative's OWNER, and it is
+// declared here rather than derived because the whole point is that the file says whose it is.
+const AUTHORED = ['finding_text', 'finding_time', 'earlier_title', 'earlier_html', 'calib_line', 'cycle_id'];
 const missing = AUTHORED.filter(k => data[k] == null || data[k] === '');
 if (missing.length) {
   die(`--data is missing the authored field(s): ${missing.join(', ')}. Everything else is derived; `
-    + `these five are yours because a builder that guessed them would be writing John's briefing.`);
+    + `these six are yours because a builder that guessed them would be writing John's briefing.`);
+}
+
+// AGT-188 — THE IDENTITY GATE, and it runs HERE, before the ~14 derivations below, so a --data file
+// authored for another cycle costs one SELECT rather than a whole build. `ee5b8998` built a page
+// from `40d8dfe3`'s narrative with every gate above green; these three refusals are what that row
+// bought. All exit 2: could not run, never a pass.
+const CYCLE = arg('cycle');
+if (!CYCLE) die('--cycle=<uuid> is required: it is the cycle whose narrative --data carries, and it '
+  + 'cannot be inferred from the file — an unowned narrative is how a predecessor\'s briefing got '
+  + 'stamped with a successor\'s version (runner_cycles ee5b8998).');
+if (data.cycle_id !== CYCLE) {
+  die(`--data was authored for cycle ${data.cycle_id}, not ${CYCLE}`);
+}
+const [cycleRow] = await sel(`runner_cycles?id=eq.${CYCLE}&select=id,version`);
+if (!cycleRow) die(`--cycle=${CYCLE} names no runner_cycles row: a briefing cannot belong to a cycle `
+  + 'that does not exist, and a typo here would otherwise read as a clean build.');
+// CONDITIONAL, deliberately: `version IS NULL` on a gated_before_build row is an unclaimed version,
+// not a disagreement. Only a non-null version that DIFFERS is a refusal.
+const cycleVersionArg = arg('version');
+if (cycleRow.version != null && cycleVersionArg && cycleRow.version !== cycleVersionArg) {
+  die(`cycle ${CYCLE} claimed ${cycleRow.version}, but --version says ${cycleVersionArg}: the `
+    + 'masthead version must be the one THIS cycle claimed.');
 }
 let t = fs.readFileSync(TPL, 'utf8');
 
