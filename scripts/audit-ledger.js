@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.636 | scripts/audit-ledger.js | AGT-202
+// FEATURE: AGT-202 -- THE LEDGER STAMPS ITS OWN WEEK. `week` now defaults to isoWeek(new Date())
+// and is refused when malformed or still in the future: the table's CHECK only tests the SHAPE, so
+// a well-formed wrong week filed 13 rows into `2026-W40` on 2026-09-27 -- invisible to that week's
+// report and to the cap that counts from it. An explicit past week still overrides (pattern:10).
+//
 // DeepBench v7.0.596 | scripts/audit-ledger.js | AGT-131
 // FEATURE: AGT-131 -- ONE FINDINGS LIST, AND THIS FILE IS ITS ONE INTAKE. Four writers reach
 // public.audit_findings: this CLI, api/_lib/handlers/auditor-write.js, scripts/staff-watch.js and
@@ -424,8 +430,23 @@ export function classifyIngest(findings, rows, week) {
 // cheapest, safest form of this command the one that stops working first -- and the runbook's
 // step 3 leans on exactly that signal to decide whether to re-run with --apply.
 export async function ingestFindings({
-  findings, week, foundBy, findingType, cycleId, sessionName, get, post, apply,
+  findings, week = isoWeek(new Date()), foundBy, findingType, cycleId, sessionName, get, post, apply,
 } = {}) {
+  // AGT-202 -- THE WEEK IS THIS WEEK UNLESS A CALLER MEANS OTHERWISE, AND A FORGED ONE IS REFUSED
+  // BEFORE THE READ. `iso_week`'s only database guard is the form -- CHECK (iso_week ~
+  // '^\d{4}-W\d{2}$') -- so a well-formed WRONG week was accepted in full, and on 2026-09-27 that
+  // put 13 findings into `2026-W40`, a week that had not begun. Both throws land here, above the
+  // type resolution and above the fetch: a refusal after the read would still have written a
+  // before-image, and §19v cannot reverse a row nobody can delete. A PAST week still passes -- the
+  // CLI's `--ingest --week=` back-ingest and auditor-write.js's context week are the callers that
+  // legitimately mean an earlier week, and `null` fails the form because a destructuring default
+  // fires on `undefined` alone.
+  const WEEK_FORM = /^\d{4}-W\d{2}$/;
+  if (!WEEK_FORM.test(String(week))) throw new Error(`ingestFindings: week must be YYYY-Www (got ${JSON.stringify(week)}) -- omit it to stamp this ISO week.`);
+  const thisWeek = isoWeek(new Date());
+  // Zero-padded `YYYY-Www` orders lexicographically, so this comparison needs no date arithmetic.
+  if (String(week) > thisWeek) throw new Error(`ingestFindings: week ${week} has not begun -- this ISO week is ${thisWeek}; omit week to stamp it.`);
+
   const all = Array.isArray(findings) ? findings : [];
   // Resolve-and-discard: this throws for the batch before anything is read or written.
   if (apply) for (const f of all) findingTypeOf(f, findingType);
