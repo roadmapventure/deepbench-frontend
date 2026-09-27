@@ -190,13 +190,22 @@ function theRealScriptAgreesAndHasTeeth() {
     }
   };
 
-  assert.strictEqual(spawn(), 0, "the committed CLAUDE-STATE.md must be a byte-exact render of the cycles it pins");
+  // AGT-116 (v7.0.657): exit 2 is "could not run" (the live ledger read failed) -- the live world,
+  // not the change, so it is declared. Exit 1 stays a FAIL: the check is pin-anchored, so drift
+  // there is a real defect in the committed file.
+  const couldNotRun = when => notRun("render-claude-state --check end-to-end",
+    `--check exited 2 ${when} (could not run: the live ledger read failed), so the end-to-end agreement and its teeth are unverified this run`);
+  const first = spawn();
+  if (first === 2) { couldNotRun("on the committed file"); return; }
+  assert.strictEqual(first, 0, "the committed CLAUDE-STATE.md must be a byte-exact render of the cycles it pins");
 
   // Teeth, on the real file, restored in a finally so a failure here cannot leave the tree dirty.
   const good = fs.readFileSync(STATE, "utf8");
   try {
     fs.writeFileSync(STATE, good.replace("**Prior:**", "**Prior:** HAND-EDITED"));
-    assert.strictEqual(spawn(), 1, "a hand-edit of the real file must exit 1 — otherwise this gate is vacuous");
+    const teeth = spawn();
+    if (teeth === 2) { couldNotRun("on the hand-edited file"); return; }
+    assert.strictEqual(teeth, 1, "a hand-edit of the real file must exit 1 — otherwise this gate is vacuous");
   } finally {
     fs.writeFileSync(STATE, good);
   }

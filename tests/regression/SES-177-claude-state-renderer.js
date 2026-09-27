@@ -398,6 +398,14 @@ function checkModeAgreesWithTheCommittedFile() {
   } catch (e) {
     code = e.status;
   }
+  // AGT-116 (v7.0.657): exit 2 is "could not run" (the ledger read failed) -- the live world, not
+  // the change, so it is declared. Exit 1 stays a FAIL: --check is pin-anchored, so drift there is a
+  // real defect in the committed file.
+  if (code === 2) {
+    notRun("render-claude-state --check against the live ledger",
+      "--check exited 2 (could not run: the live ledger read failed), so agreement with the committed file is unverified this run");
+    return;
+  }
   assert.strictEqual(code, 0, "the committed CLAUDE-STATE.md must match what the ledger renders (exit 1 = drift, 2 = could not run)");
 }
 

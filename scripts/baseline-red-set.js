@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.657 | scripts/baseline-red-set.js | AGT-116 — a child that exits 2 with a
+// `[NOT RUN] ... -- transport` line (the database never answered) renders as
+// `— NOT RUN (transport, exit 2): <line>`, does not count toward `Red set:`, and adds `Not run: k`
+// only when k > 0. See renderBlock().
+//
 // DeepBench v7.0.504 | scripts/baseline-red-set.js | SES-396 slice 2 — the red set a ticket starts
 // from, measured once, by a script, so the Designer, the Builder and the Verifier read the SAME one.
 //
@@ -80,12 +85,30 @@ function trim(s) {
 // Pure. `results` is [{ path, code, output }]; returns the CONTEXT-ready block as one string. Kept
 // separate from the running so the FORMAT can be asserted without a child process, and so the red
 // count can never disagree with the lines above it — both are derived from the same array here.
+// AGT-116 (v7.0.657): tests/regression/_lib/self-run.js exits 2 with `[NOT RUN] <name> -- transport
+// ...` when the database never answered. That is an outage, not a red, so it renders on its own line
+// and does NOT count toward `Red set:`.
+const TRANSPORT_NOT_RUN = /\[NOT RUN\][^\r\n]*--\s*transport[^\r\n]*/;
+
+// Pure. The transport [NOT RUN] line when the child exited 2 with one, else null.
+export function transportNotRunLine(r) {
+  if (r.code !== 2) return null;
+  const hit = String(r.output || "").match(TRANSPORT_NOT_RUN);
+  return hit ? trim(hit[0]) : null;
+}
+
 export function renderBlock(results) {
-  const lines = results.map(r => r.code === 0
-    ? `- ${r.path} — green`
-    : `- ${r.path} — RED (exit ${r.code}): ${firstAssertionLine(r.output)}`);
-  const red = results.filter(r => r.code !== 0).length;
+  let red = 0;
+  let notRunCount = 0;
+  const lines = results.map(r => {
+    if (r.code === 0) return `- ${r.path} — green`;
+    const nr = transportNotRunLine(r);
+    if (nr) { notRunCount++; return `- ${r.path} — NOT RUN (transport, exit 2): ${nr}`; }
+    red++;
+    return `- ${r.path} — RED (exit ${r.code}): ${firstAssertionLine(r.output)}`;
+  });
   lines.push(`Red set: ${red} of ${results.length}`);
+  if (notRunCount > 0) lines.push(`Not run: ${notRunCount}`);
   return lines.join("\n");
 }
 

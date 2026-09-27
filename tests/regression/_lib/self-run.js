@@ -1,3 +1,8 @@
+// DeepBench v7.0.657 | tests/regression/_lib/self-run.js | AGT-116 -- a direct run gets the same
+// transport watcher and the same rule as run-all.js: a test that threw while its database calls got
+// no answer prints `[NOT RUN] <name> -- transport ...` and exits 2, never `[FAIL]` / exit 1. The
+// watcher and the rule live in _lib/transport-watch.js.
+//
 // DeepBench v7.0.300 | tests/regression/_lib/self-run.js | SES-207 -- renderNotRun() repairs the
 // bare --env-file= hint the credential-gated tests print at their reader. Rationale, the
 // measurement (8 printed occurrences pre-change), the copy-propagation finding that decided the
@@ -29,6 +34,9 @@
 
 import path from "path";
 import { fileURLToPath } from "url";
+import { ensureTransportWatch, incidentsSince, logSize, removeTransportLog } from "./transport-watch.js";
+// Re-exported for run-all.js, which must keep a single relative import (SES-215's relocation control).
+export { ensureTransportWatch, incidentsSince, logSize, removeTransportLog };
 
 // Pure -- tests/regression/SES-28-self-run-guard.js asserts this directly.
 // Windows: argv[1] and import.meta.url can disagree on drive-letter case, so compare
@@ -163,12 +171,25 @@ export function selfRun(moduleUrl, fn) {
   if (!isEntryPoint(moduleUrl, process.argv[1])) return;
   installHintRepair();   // SES-207: the direct-run path needs the same repair run-all.js gets
   const name = path.basename(fileURLToPath(moduleUrl));
+  // AGT-116: installed before fn runs, so its fetches (and its node children's) are watched.
+  const transport = ensureTransportWatch();
+  const logOffset = logSize(transport.file);
+  const done = code => { if (transport.created) removeTransportLog(transport.file); process.exit(code); };
   const report = () => {
     const parts = takeNotRun();
     if (parts.length) console.log(renderNotRun(parts, "         "));
   };
   Promise.resolve()
     .then(fn)
-    .then(() => { console.log(`  [PASS] ${name}`); report(); process.exit(0); })
-    .catch(e => { console.log(`  [FAIL] ${name} -- ${e.message}`); report(); process.exit(1); });
+    .then(() => { console.log(`  [PASS] ${name}`); report(); done(0); })
+    .catch(e => {
+      const incidents = incidentsSince(logOffset, transport.file);
+      if (incidents.length) {
+        console.log(`  [NOT RUN] ${name} -- transport: ${incidents.length} incident(s); first: ${incidents[0]}`);
+        report();
+        done(2);
+        return;
+      }
+      console.log(`  [FAIL] ${name} -- ${e.message}`); report(); done(1);
+    });
 }

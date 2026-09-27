@@ -223,6 +223,17 @@ tomorrow, would this test notice?* A test that would keep passing is asserting a
 the part not-run (`tests/regression/_lib/self-run.js`'s `notRun(part, reason)`) and say so loudly,
 which `run-all.js` reports. An honest gap is information; a recreation is a false green.
 
+**Transport is not a verdict (`AGT-116`, `v7.0.657`).** A test that throws while its database calls
+got no answer did not run; it did not fail. `tests/regression/_lib/transport-watch.js` wraps `fetch`
+(in-process, and in every node child through `NODE_OPTIONS=--import`) and logs an incident only for
+a call to the `SUPABASE_URL` origin that got a 502/503/504, a ≥500 with body code `PGRST002` or
+`57014`, or a connect/timeout error — never by matching the failure message, and never for a
+foreign origin or a plain 500. `run-all.js` and `selfRun` print such a test `[NOT RUN] <file> --
+transport …`, keep it out of the FAIL list, and exit **2** (1 still wins if anything failed), so an
+outage still blocks a ship without changing the FAIL list between two runs of one commit. A test
+that reads a live value which moves between reads declares that part `notRun` instead of grading
+it: a test grades the change, never the live world (pattern:162).
+
 **Not done here, and named rather than implied:** `SES-45` also floats a `check-session-docs.js`
 lint that would flag a kickoff Section 8 block defining the function it claims to verify. That is a
 *"consider"* in the ticket, not a scoped decision, and it is left open.

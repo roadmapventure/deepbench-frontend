@@ -100,6 +100,7 @@ import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
+import { isDeepStrictEqual } from "util";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   ACTIONS,
@@ -675,6 +676,11 @@ export default async function run() {
     { encoding: "utf8", env: { ...process.env } });
 
   const cycleRow = (await rest("runner_cycles?select=id&order=started_at.desc&limit=1"))[0];
+  // AGT-116 (v7.0.657): the pick is read BEFORE pass one as well as after it. The board is live and
+  // other cycles claim and ship between the two reads; if the pick moved in that window, an
+  // inequality below would be grading the live world, not the driver (pattern:162).
+  const bootBefore = (await rpc("runner_should_boot"))[0];
+  const pickBefore = bootBefore && bootBefore.detail && bootBefore.detail.pick ? bootBefore.detail.pick : null;
   const passOne = runDriver([`--cycle-id=${cycleRow.id}`]);
   assert.equal(passOne.status, EXIT_AWAITING_ANSWER,
     `pass one must exit ${EXIT_AWAITING_ANSWER} (AWAITING THE MANAGER'S ANSWER): the state was ` +
@@ -689,11 +695,14 @@ export default async function run() {
   const stateOnDisk = JSON.parse(fs.readFileSync(emitted.state_file, "utf8"));
   const liveBoot = (await rpc("runner_should_boot"))[0];
   const livePick = liveBoot.detail && liveBoot.detail.pick ? liveBoot.detail.pick : null;
+  const boardMoved = !isDeepStrictEqual(pickBefore, livePick);
   // DEEP, not just the id. "The manager never re-derives the pick" is a claim about the whole
   // object; a reconstruction that agreed on the id alone would satisfy a weaker check.
-  assert.deepEqual(stateOnDisk.pick, livePick,
-    "state.pick must be runner_should_boot().detail.pick VERBATIM -- dm-guardrails.must: 'use the " +
-    "pick path as computed, never a re-derived order', and this driver is where that would break first");
+  if (!boardMoved) {
+    assert.deepEqual(stateOnDisk.pick, livePick,
+      "state.pick must be runner_should_boot().detail.pick VERBATIM -- dm-guardrails.must: 'use the " +
+      "pick path as computed, never a re-derived order', and this driver is where that would break first");
+  }
   assert.ok(Array.isArray(stateOnDisk.roster) && stateOnDisk.roster.length >= 5,
     `the roster must be read LIVE off agent_capability_assignments (Rule #1), not held in any Skill row: ${JSON.stringify(stateOnDisk.roster?.length)}`);
   assert.ok(stateOnDisk.output_contract && stateOnDisk.output_contract.required,
@@ -702,6 +711,18 @@ export default async function run() {
     "appending to an assembled prompt (SES-331)");
   assert.ok(fs.existsSync(emitted.prompt_file) && fs.statSync(emitted.prompt_file).size > 2000,
     "pass one must leave the assembled prompt on disk");
+
+  // AGT-116: the board moved between the two reads, so the equality check and both controls
+  // (which are built on that same pick) are declared, never graded against a moving target.
+  if (boardMoved) {
+    notRun("AGT-68 pick-path equality",
+      `the board moved between reads: runner_should_boot().detail.pick was ` +
+      `${JSON.stringify(pickBefore && pickBefore.backlog_id)} before pass one and ` +
+      `${JSON.stringify(livePick && livePick.backlog_id)} after it, so the equality check and both controls are unverified this run`);
+    fs.rmSync(scratch, { recursive: true, force: true });
+    console.log("[AGT-68] seed rows, lane pin, Intent contract and rule B40 fixtures asserted; the pick-path equality and its controls are declared NOT RUN (board moved between reads)");
+    return;
+  }
 
   // THE NEGATIVE CONTROL. One string mutated in the state file, and the driver must refuse.
   if (livePick) {

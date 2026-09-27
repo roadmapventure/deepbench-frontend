@@ -242,6 +242,14 @@ async function run() {
       const ctxPath = path.join(tmp, "ctx.json");
       const week = isoWeek(new Date());
       const p = spawnSync(process.execPath, [REVIEW_JS, "--prepare", `--week=${week}`, `--out=${ctxPath}`], { encoding: "utf8" });
+      // AGT-116 (v7.0.657): exit 3 is audit-review's NOTHING_TO_REVIEW -- the live week simply has no
+      // open findings right now. That is the live world, not the change, so it is a declared not-run
+      // (pattern:162), never a FAIL. Any OTHER non-zero exit is still a real failure below.
+      if (p.status === 3) {
+        notRun(`AGT-133 arm D --prepare worklist (${week})`,
+          `audit-review --prepare --week=${week} exited 3 (NOTHING_TO_REVIEW): no open findings this week, so the live worklist half is unverified here`);
+        return;
+      }
       assert.equal(p.status, 0,
         `audit-review --prepare --week=${week} must exit 0 with findings open; got ${p.status} ${p.stderr}`);
       const ctx = JSON.parse(fs.readFileSync(ctxPath, "utf8"));

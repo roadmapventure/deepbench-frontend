@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// DeepBench v7.0.657 | tests/regression/run-all.js | AGT-116 -- transport is not a verdict. A test
+// that THREW while its database calls got no answer (502/503/504, a >=500 PGRST002/57014 body, or a
+// connect/timeout error on the SUPABASE_URL origin -- observed by _lib/transport-watch.js, never
+// matched in the message) is printed `[NOT RUN] <file> -- transport ...`, declared through notRun(),
+// and NOT counted in failCount. Exit is 1 if anything failed, else 2 if any test was transport
+// not-run, else 0 -- so an outage still blocks a ship (gateStatus reads 2 as red) while the FAIL
+// list stays the same between two runs of one commit. Measured before: 296/320 then 295/320 on one
+// tree, differing by LOG-132's wall clock. The watcher is installed BEFORE the first env snapshot so
+// SES-215's restore keeps DEEPBENCH_TRANSPORT_LOG and NODE_OPTIONS (which carries it to children).
+//
 // DeepBench v7.0.305 | tests/regression/run-all.js | SES-215 -- process.env is snapshotted before
 // each test and restored after it settles, so one test's mutation can never be another test's
 // answer. John's directive 52c41c2d, verbatim: "stop the cross-test env pollution (isolate or
@@ -77,7 +87,12 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { takeNotRun, renderNotRun, installHintRepair } from "./_lib/self-run.js";
+// AGT-116: the transport helpers come THROUGH self-run.js, so this file keeps exactly one relative
+// import -- SES-215's control relocates a copy of this runner by rewriting that one specifier.
+import {
+  takeNotRun, renderNotRun, installHintRepair, notRun,
+  ensureTransportWatch, incidentsSince, logSize, removeTransportLog,
+} from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -120,6 +135,9 @@ async function main() {
   // process exits at the end of main(), and a restore point would only be a thing to forget.
   installHintRepair();
 
+  // AGT-116: BEFORE any per-test snapshot, so every snapshot carries the log path and NODE_OPTIONS.
+  const transport = ensureTransportWatch();
+
   const files = fs.readdirSync(DIR)
     .filter(f => (f.endsWith(".js") || f.endsWith(".mjs")) && f !== "run-all.js" && !f.startsWith("_"))
     .sort();
@@ -130,6 +148,7 @@ async function main() {
   }
 
   let failCount = 0;
+  let transportNotRun = 0;
   let notRunParts = 0;
   const partialTests = [];
 
@@ -138,6 +157,7 @@ async function main() {
     // SES-215: taken BEFORE the import, because a module's env writes are import-time side effects
     // in several of these tests, not run() bodies. A snapshot taken any later has already lost.
     const envBefore = snapshotEnv();
+    const logOffset = logSize(transport.file);
     try {
       const mod = await import(pathToFileURL(fullPath).href);
       if (typeof mod.default !== "function") {
@@ -146,8 +166,17 @@ async function main() {
       await mod.default();
       console.log(`  [PASS] ${file}`);
     } catch (e) {
-      failCount++;
-      console.log(`  [FAIL] ${file} -- ${e.message}`);
+      const incidents = incidentsSince(logOffset, transport.file);
+      if (incidents.length) {
+        // AGT-116: the database never answered, so this is a run that did not happen, not a verdict.
+        transportNotRun++;
+        const why = `transport: ${incidents.length} incident(s); first: ${incidents[0]}`;
+        notRun(`${file} (whole test)`, why);
+        console.log(`  [NOT RUN] ${file} -- ${why}`);
+      } else {
+        failCount++;
+        console.log(`  [FAIL] ${file} -- ${e.message}`);
+      }
     }
     // SES-215, and OUTSIDE the try/catch on purpose: a test that threw still owns whatever it wrote
     // to process.env before it threw. Same both-arms reasoning as the notRun drain below.
@@ -162,7 +191,7 @@ async function main() {
     }
   }
 
-  console.log(`\nregression suite: ${files.length - failCount}/${files.length} passed`);
+  console.log(`\nregression suite: ${files.length - failCount - transportNotRun}/${files.length} passed`);
   if (notRunParts > 0) {
     // Deliberately loud, and deliberately not an error. The pass count above is true; it is just
     // not the whole story, and "50/50" read alone is what SES-180 could not gate on.
@@ -173,7 +202,8 @@ async function main() {
       `(${partialTests.join(", ")}). Those parts are UNVERIFIED -- a green suite does not cover them.`
     );
   }
-  process.exit(failCount > 0 ? 1 : 0);
+  if (transport.created) removeTransportLog(transport.file);
+  process.exit(failCount > 0 ? 1 : transportNotRun > 0 ? 2 : 0);
 }
 
 main();
