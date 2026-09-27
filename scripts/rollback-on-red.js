@@ -677,6 +677,76 @@ export function rollbackDecisionArgs(decision, ctx = {}) {
   };
 }
 
+// AGT-180. THE HOLD, HANDED BACK AS DATA FOR THE CYCLE TO WRITE. Pure: it composes, it never calls.
+//
+// WHAT WAS ACTUALLY BROKEN, measured this cycle rather than recalled. The card-only assessment above
+// already runs on dev and the harness permits it -- but the `runner_decisions` kind='rollback' write
+// sits past `if (!APPLY)`, and `--apply` has been denied twice in this chain under TWO DIFFERENT
+// reasons ([Blind Apply], then [Modify Shared Resources]). So 34 CI reds on dev since 2026-09-26
+// produced 0 holds: the assessment was never the missing half, the WRITE was.
+//
+// THE FIX IS NOT A RE-SPELLED `--apply`, and this paragraph is here so no later reader "simplifies"
+// it into one. Issuing the same writes under a different flag name, or from another interpreter, is
+// SES-019's forbidden move -- routing around a hook deny with a different tool -- and it stays
+// forbidden however safe this particular instance looks. What moves is not the command but the
+// WRITER: this function emits the statement, and THE CYCLE performs it with the same Supabase tool
+// every other record_decision() on this platform already goes through. That leaves the engine as the
+// read-only assessor its own header claims to be, on every path, rather than one with an exception.
+//
+// `args` IS `rollbackDecisionArgs()` VERBATIM -- one home for the payload, never a second composer.
+// The `sql` below is a RENDERING of that object and nothing else, which is why the three NULL
+// members are asserted rather than assumed: if a later edit gave one of them a value, a hand-rolled
+// `=> null` would silently drop it and the two halves would disagree about what was decided. The
+// emitted statement is one INSERT of a new row, so it needs no before-image (§19v: a new row has no
+// prior state); that is also why it is a bare `select` and not the runbook's DO block, which exists
+// to hold a decision and the UPDATE it images inside one `now()`.
+//
+// DOLLAR QUOTING, AND WHY IT REFUSES RATHER THAN ESCAPES. The reasoning text carries decide()'s own
+// prose, which contains apostrophes on every branch; doubling them by hand is the classic way to
+// emit a statement that runs and means something else. `$hold$` is a tag chosen to be absent from
+// anything this engine composes -- and if it ever is not, this THROWS instead of producing a
+// statement whose quoting silently ends early. A refusal the caller can read beats a write nobody
+// audited.
+export const HOLD_SQL_TAG = "$hold$";
+
+export function holdWriteFor(decision, ctx = {}) {
+  const args = rollbackDecisionArgs(decision, ctx);
+
+  for (const name of ["p_session_name", "p_backlog_id", "p_ladder_work_class"]) {
+    if (args[name] !== null) {
+      throw new Error(
+        `holdWriteFor: ${name} is ${JSON.stringify(args[name])}, but the statement below renders it as ` +
+          `a literal NULL -- emitting it anyway would mean the args and the sql describe different ` +
+          `decisions. Render it properly or stop calling this.`
+      );
+    }
+  }
+
+  const lit = (name) => {
+    const text = String(args[name]);
+    if (text.includes(HOLD_SQL_TAG)) {
+      throw new Error(
+        `holdWriteFor: ${name} contains the literal ${HOLD_SQL_TAG}, which is the dollar-quote tag this ` +
+          `statement is delimited with -- emitting it would end the quoting early and change what the ` +
+          `statement says. Refusing to compose it.`
+      );
+    }
+    return `${HOLD_SQL_TAG}${text}${HOLD_SQL_TAG}`;
+  };
+
+  const sql =
+    `select public.record_decision(` +
+    `p_cycle_id => ${lit("p_cycle_id")}::uuid, ` +
+    `p_session_name => null, ` +
+    `p_kind => ${lit("p_kind")}, ` +
+    `p_backlog_id => null, ` +
+    `p_summary => ${lit("p_summary")}, ` +
+    `p_reasoning => ${lit("p_reasoning")}, ` +
+    `p_ladder_work_class => null);`;
+
+  return { args, sql };
+}
+
 // SES-373. A COPY of the card, decided. Pure and non-mutating: the caller keeps the undecided card
 // it built, which is what lets the guard assert the revert branch is NOT stamped from the same
 // builder output.
@@ -1226,7 +1296,59 @@ async function main() {
   });
 
   if (!APPLY) {
-    finish(0, { decision, applied: false }, `${decision.action}: ${decision.reason}\n(dry run -- pass --apply to write)`);
+    // AGT-180. THE DRY RUN NOW HANDS THE HOLD BACK INSTEAD OF DROPPING IT. Every value below is
+    // ADDITIVE: `applied` is still false, the exit code is still 0, the `decision` object is
+    // byte-identical, and there is NO new flag -- a caller that reads neither key sees exactly the
+    // run it saw before this ship. A permitted `--apply` still writes the row itself further down,
+    // untouched, so after this ship BOTH paths record the hold.
+    //
+    // WHY THE ENGINE STOPS AT THE STATEMENT. `--apply` is denied in this chain, and the one move
+    // that is never available is re-spelling it: the same writes under another flag or from another
+    // interpreter is SES-019's forbidden route around a hook deny. So the write is handed to the
+    // CYCLE, which performs it with the Supabase tool it already uses for every other decision.
+    // Nothing here executes it, and nothing here should ever be edited to.
+    //
+    // ONLY `card-only` IS DUE A HOLD, and the other three actions say so rather than going quiet.
+    // `revert-and-card` deliberately records nothing at this point (its decision belongs to the
+    // cycle at the moment it executes the plan behind its push gates -- SES-373's own carve-out, and
+    // the ses-373 guard asserts that card stays undecided); `record-green` and `none` decided
+    // nothing to hold. A missing --cycle-id is the OTHER absent half, named separately: attribution
+    // is not optional (`ck_decision_attribution`), and an unattributed hold is a value with nobody
+    // behind it.
+    let hold = null;
+    let holdSql = null;
+    let holdReason = null;
+    if (decision.action !== ACTIONS.CARD_ONLY) {
+      holdReason =
+        `no hold is due: the assessment reached '${decision.action}', and only '${ACTIONS.CARD_ONLY}' ` +
+        `records one. '${ACTIONS.REVERT_AND_CARD}' is recorded by the cycle when it executes the plan; ` +
+        `'${ACTIONS.RECORD_GREEN}' and '${ACTIONS.NONE}' hold nothing.`;
+    } else if (!cycleId) {
+      holdReason =
+        `a hold IS due ('${ACTIONS.CARD_ONLY}') but its attribution is absent: pass --cycle-id=<uuid>. ` +
+        `record_decision() raises unless exactly one of cycle_id / session_name is set ` +
+        `(ck_decision_attribution), and an unattended cycle sets the cycle.`;
+    } else {
+      // A statement that cannot be composed is NOT a wall, on the same reading readRestorePlan() gets
+      // above: this path's whole job is to REPORT, and turning a reportable assessment into exit 2
+      // would lose the assessment as well as the hold. The refusal is named in holdReason instead.
+      try {
+        const write = holdWriteFor(decision, { cycleId, version, trigger, headSha });
+        hold = write.args;
+        holdSql = write.sql;
+      } catch (e) {
+        holdReason = `a hold IS due ('${ACTIONS.CARD_ONLY}') but no statement could be composed for it: ${e.message}`;
+      }
+    }
+
+    finish(
+      0,
+      { decision, applied: false, hold, holdSql, holdReason },
+      `${decision.action}: ${decision.reason}\n(dry run -- pass --apply to write)` +
+        (holdSql
+          ? `\nHOLD NOT WRITTEN -- run this through your Supabase tool: ${holdSql}`
+          : `\nno hold statement emitted: ${holdReason}`)
+    );
   }
   if (!cycleId) fail(2, "--cycle-id is required with --apply (it stamps every before-image).");
 
