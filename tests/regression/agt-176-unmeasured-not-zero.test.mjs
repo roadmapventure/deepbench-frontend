@@ -2,7 +2,7 @@
 //
 // FEATURE: AGT-176 -- A BILLED REFUSAL IS NOT FREE, AND AN UNPRICEABLE ROW IS NOT A ZERO.
 // Both refusal gates in api/prompt/request-receivable.js asserted `billed: false`, which the two
-// cost mappers (`:1254` there, `api/capabilities/execute.js:1297`) turn into a hard `costUsd: 0`,
+// cost mappers (the failure-seam mapper in that file, `api/capabilities/execute.js:1297`) turn into a hard `costUsd: 0`,
 // which lands in ai_activity_log as a measured zero. Anthropic began billing pre-output refusals in
 // the `bio`, `frontier_llm` and `reasoning_extraction` categories on 2026-09-24, so on those rows
 // the asserted 0 is not a measurement of a free call -- it is real money missing from the ledger.

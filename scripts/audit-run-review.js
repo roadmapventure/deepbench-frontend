@@ -190,8 +190,8 @@ async function doIngest({ ingest, apply, cycleId, sessionName }, get, post) {
   const findings = Array.isArray(doc.findings) ? doc.findings : null;
   if (!findings) throw new Error(`the --ingest file has no top-level \`findings\` array.`);
   const week = isoWeek(new Date());
-  // One attribution, and a `found_by` that says which run was reviewed -- `audit_findings_found_by_single`
-  // refuses a joined value, so this is one string, never a list.
+  // One attribution, and a `found_by` that says which run was reviewed -- trigger `audit_findings_guard()`
+  // (migration `20260926114350` dropped the CHECK `audit_findings_found_by_single`) refuses a joined value, so this is one string, never a list.
   const foundBy = `auditor:run-review:${cycleId ?? sessionName}`;
   const { summary, written } = await ingestFindings({
     findings, week, foundBy,

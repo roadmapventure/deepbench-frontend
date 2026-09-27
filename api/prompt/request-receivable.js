@@ -727,7 +727,7 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
   // stays unbilled and keeps its measured 0.
   //
   // A BILLED REFUSAL IS PRICED, NEVER ASSERTED. `billed: true` leaves `costUsd` undefined at both
-  // cost mappers (`:1218` here, `api/capabilities/execute.js:1297`), so lib/activity-log.js prices
+  // cost mappers (the failure-seam mapper below, `api/capabilities/execute.js:1297`), so lib/activity-log.js prices
   // the row from its own four token columns and lands NULL -- unknown -- when there are no tokens to
   // price. That is what keeps this from re-opening the phantom-dollar defect §19v records from
   // 2026-08-20: nothing here invents a figure, and an unpriceable row reads absent rather than free.

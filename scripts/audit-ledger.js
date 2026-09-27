@@ -21,7 +21,7 @@
 // not said enough, and a default would answer for it silently (pattern:10). toRow() takes the
 // finding's own value first and the run's `--type` second, and THROWS when neither exists, so the
 // refusal lands in this process with a legible message instead of as a 23502 from PostgREST.
-// `audit_findings_found_by_single` (NOT VALID) refuses a joined `found_by` from here on; the 27
+// Trigger `audit_findings_guard()` (migration `20260926114350` dropped the CHECK `audit_findings_found_by_single`) refuses a joined `found_by` from here on; the 27
 // rows that already carry one are history the append-only guard will not let anyone repair.
 //
 // DeepBench v7.0.549 | scripts/audit-ledger.js | AGT-86 slice 3

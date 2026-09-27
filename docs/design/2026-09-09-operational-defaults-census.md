@@ -203,7 +203,7 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-19"></a>OD-19 — The nightly re-rank's cron
 
-> The board re-rank runs on the runner's own cycle at `docs/runbooks/runner-cycle.md` step 4c — once per CST day, on the first scheduled cycle that passes the walls, gated on no `runner_cycles` row whose `notes` start `SCHEDULED-AGENT: rank-backlog` having an `ended_at` in the current America/Chicago day; the Vercel cron `10 9 * * *` was retired with its route and `vercel.json` declares no crons; canonical: `scripts/rank-backlog.js` (`SES-346`, ledger 53).
+> The board re-rank runs on the runner's own cycle at `docs/runbooks/runner-cycle.md` step 4c — once per CST day, on the first scheduled cycle that passes the walls, gated on `rankedTodayCycle()` in `scripts/rank-backlog.js`, which owns that precondition and answers whether the board was already ordered in the current America/Chicago day; the Vercel cron `10 9 * * *` was retired with its route and `vercel.json` declares no crons; canonical: `scripts/rank-backlog.js` (`SES-346`, ledger 53).
 
 - **Enforcement:** `script`
 - **Lives in:** `scripts/rank-backlog.js`, run by `docs/runbooks/runner-cycle.md` step 4c.

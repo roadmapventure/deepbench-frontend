@@ -116,7 +116,7 @@ export const RUNBOOK_CEILING = 381000;
 // method (the orchestration statements, (1-legacy)-(4-legacy) under ledger entry 48, the filing
 // items and the Reverse ceremony) MOVED verbatim into that playbook rather than being deleted, and
 // the step stays in place as one 4d-shaped line so ses-336's step list and the runbook's nine
-// "step 4b" cross-references still resolve. 10,561 B out, 199 B in (the pointer line): 380980 ->
+// "step 4b" cross-references still resolve. 10,763 B out, 202 B in (the pointer line): 380980 ->
 // 370419 B, 10,581 B under the ceiling -- the only re-pin here that LOWERS the number. Re-measured
 // with wc -c and re-pinned in the same commit as the removal, which is what ses-424f:291 asserts.
 // v7.0.610 (AGT-133) adds step 9's (7f) (The Development Manager rules (7e)'s findings, ~2,750 B),
