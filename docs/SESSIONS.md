@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260927-0706 (v7.0.638, 2026-09-27, unattended cycle `956c44a0-0350-43c8-9ce4-75ca833d2fe9`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, **Fable 5.1 Designer**, Opus 5 Builder) — `AGT-207` — **delivered, verdict block: the rollback ledger's record of who captured an undo could be silently overwritten, and this same run had already done it.**
+
+### The judgment lane came back to Fable mid-chain
+
+The first five cycles of this turn ran every governance agent on `claude-opus-5`, because `judgment_model()` had degraded the lane under `fable_pace` (Fable 32% against a 28.57% day-of-week share). At this cycle the meter week rolled to day 3, the share rose to 42.86%, and the lane returned to `claude-fable-5-1` with reason `lane`. `agent-prompt.js` printed it end to end, and the Designer ran roughly two and a half times faster than its Opus predecessors for a kickoff of the same quality.
+
+### What must be preserved, and what must move
+
+`runner_migration_downs` is `UNIQUE (up_name)` and `capture_migration_down` upserts on it, so re-applying a migration under a name already in the ledger overwrote the first capture's `captured_by_cycle` and `captured_at`. The Designer did not reach for "never overwrite": `down_sql`, `prior_ddl` and `classification` **legitimately** belong to the latest apply, and only the provenance columns are first-capture facts. It rejected three alternatives on evidence — a new column (an `ALTER` makes the ship card-only), versioning the row (every `[down]` reader and `readMigrationDowns`'s absent-means-not-captured semantics break, and before-images already version prior states), and refusing the recapture (which would have blocked the very AGT-184 re-land that cured the ledger orphan, leaving the engine card-only forever).
+
+### The migration edited the live definition programmatically, and that is the transferable part
+
+A `DO` block read `pg_get_functiondef`, applied the two replacements, **asserted each matched exactly once** — raising with the actual count otherwise — and `EXECUTE`d the result. Hand-copying a 9,647-character body into a migration is precisely the class of thing this repo's rules exist to stop, and this is the shape that avoids it. The trailing `DO` then proved both directions on a throwaway name and rolled them back through `AGT207_UNDO`.
+
+### The accident that became the proof
+
+While capturing the down, the orchestrator called `capture_migration_down` **twice in one statement** for this very migration — once for metadata, once to measure the down's length. Both calls were the same cycle, so nothing was lost, and because they shared one transaction timestamp the second rewrote an identical instant. Under the body this ship landed, that second call would have been a provenance no-op **by construction**. The defect demonstrated itself on the way to being fixed.
+
+### One honest debit, filed rather than hidden
+
+`tests/regression/agt-184-ledger-orphan.test.mjs` is now **red on the unchanged tree and stays red**. Its arm C pins `readDownsCapturedBy(d7790ea0)` as listing `agt138_researcher_route` — exactly the attribution AGT-207 was required to correct. AGT-184 shipped that arm two cycles earlier **in this same chain**, 3.5 hours apart, and nothing connected the two designs; the kickoff even contradicts itself, calling the red by design in §6 while requiring the test green in §2. AGT-207 names one repo file and it is not that one, so the Builder reported it instead of patching outside its cap, and it is filed as its own finding. The lesson worth keeping: **a live-world test arm that pins a mutable provenance column will be broken by any correct repair of that column** — such arms should assert the invariant, not the current occupant.
+
+### Two denials respected
+
+`git commit --amend` onto the kickoff commit was refused (Git Destructive) and not routed around, so the kickoff's single-commit request became two commits pushed together. The Builder also declined to run `scripts/verifier.js`, correctly: it writes a verdict, and that is not the Builder's to write.
+
+---
+
 ## session/cycle-20260927-0524 (v7.0.632, 2026-09-27, unattended cycle `bb6e46a8-f3ca-4807-8e75-8fe61de0941e`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-195` — **delivered, verdict block: the runner fixed a defect it had committed itself two cycles earlier, found by its own audit review.**
 
 ### The whole loop closed inside one session, with nobody watching
