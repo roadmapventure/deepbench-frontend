@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   CHECK_SLUGS, AGGREGATE_OVER, runChecks, aggregate,
-  checkNoHome, checkRepeatWorked, checkDeferralUndone, checkStale, checkClosedRed,
+  checkNoHome, checkRepeatWorked, checkDeferralUndone, checkStale, checkClosedRed, ratifiedAt,
 } from "../../scripts/audit-board.js";
 import { UNREVALIDATED_DAYS } from "../../scripts/ticket-owner.js";
 import { fingerprint, toRow } from "../../scripts/audit-ledger.js";
@@ -44,7 +44,7 @@ const row = (backlog_id, extra = {}) => ({
 });
 const board = (extra = {}) => ({
   items: [], epics: [{ id: EPIC_OK, project_id: "p1" }, { id: EPIC_ORPHAN, project_id: null }],
-  cycles: [], images: [], decisions: [], verdicts: [], ...extra,
+  cycles: [], images: [], decisions: [], accepts: [], verdicts: [], ...extra,
 });
 const ids = fs_ => fs_.map(f => f.locations[0].location);
 const roundTrip = f => {
@@ -126,17 +126,54 @@ async function run() {
     assert.equal(checkStale(board({ items }), { now: NOW, N: 4 }).length, 2, "with no override the check falls back to UNREVALIDATED_DAYS");
   }
 
-  // --- closed-red ------------------------------------------------------------------------------------
+  // --- closed-red: only an UNRATIFIED close over a block is a finding (AGT-166) ---------------------
+  // Each ratifying arm is paired with the near-miss that must still fire, so a check that treats any
+  // later row as ratification fails C-5/C-6/C-8 and one that ignores ratification fails C-4/C-7.
   {
-    const items = [row("C-1", { status: "done" }), row("C-2", { status: "done" }), row("C-3", { status: "open" })];
+    const items = ["C-1", "C-2", "C-4", "C-5", "C-6", "C-7", "C-8"].map(id => row(id, { status: "done" }))
+      .concat([row("C-3", { status: "open" })]);
     const verdicts = [
       { backlog_id: "C-1", verdict: "approve", created_at: daysAgo(3) }, { backlog_id: "C-1", verdict: "block", created_at: daysAgo(1) },
       { backlog_id: "C-2", verdict: "block", created_at: daysAgo(3) }, { backlog_id: "C-2", verdict: "approve", created_at: daysAgo(1) },
       { backlog_id: "C-3", verdict: "block", created_at: daysAgo(1) },
+      { backlog_id: "C-4", verdict: "block", created_at: daysAgo(2) },
+      { backlog_id: "C-5", verdict: "block", created_at: daysAgo(2) },
+      { backlog_id: "C-6", verdict: "block", created_at: daysAgo(2) },
+      { backlog_id: "C-7", verdict: "block", created_at: daysAgo(2) },
+      { backlog_id: "C-8", verdict: "block", created_at: daysAgo(2) },
     ];
-    const f = checkClosedRed(board({ items, verdicts }));
-    assert.deepEqual(ids(f), ["backlog_items:C-1"], "closed-red: done + latest block fires; block-then-approve or open does not");
+    const decisions = [
+      { backlog_id: "C-4", kind: "ship", status: "final", decided_at: daysAgo(1) },          // ratifies
+      { backlog_id: "C-5", kind: "hygiene", status: "final", decided_at: daysAgo(1) },       // wrong kind
+      { backlog_id: "C-6", kind: "ticket-status", status: "reversed", decided_at: daysAgo(1) }, // reversed
+      { backlog_id: "C-8", kind: "ship", status: "final", decided_at: daysAgo(3) },          // predates the block
+    ];
+    const accepts = [{ backlog_id: "C-7", decided_at: daysAgo(1) }];                          // ratifies
+    const f = checkClosedRed(board({ items, verdicts, decisions, accepts }));
+    assert.deepEqual(ids(f), ["backlog_items:C-1", "backlog_items:C-5", "backlog_items:C-6", "backlog_items:C-8"],
+      "closed-red: a later ship decision (C-4) or an accepted ship card (C-7) ratifies the close; a later hygiene decision (C-5), a reversed ticket-status (C-6) and a ship decision that predates the block (C-8) do not");
     assert.equal(f[0].kind, "contradiction");
+    for (const g of f) assert.match(g.locations[0].text, /latest verdict block at .*; never ratified$/);
+    // The same predicate the trigger enforces, exported for the burn-down test to read.
+    assert.equal(ratifiedAt(board({ decisions, accepts }), "C-4"), Date.parse(daysAgo(1)));
+    assert.equal(ratifiedAt(board({ decisions, accepts }), "C-5"), -Infinity, "a hygiene decision is not a ratification");
+  }
+
+  // --- the closed-red aggregate's fingerprint MOVED with its rule text (AGT-166) --------------------
+  // audit-ledger.js hashes normalize(governing_fact), so adding "unratified" to RULES['quality-closed-red']
+  // retires the ledger's old fingerprint and opens a new one -- the escalate rule will see this week's
+  // aggregate as a NEW finding, once, by design. Both values are pinned so neither moves silently again.
+  {
+    const items = Array.from({ length: 30 }, (_, i) => row(`Q-${i}`, { status: "done" }));
+    const verdicts = items.map(r => ({ backlog_id: r.backlog_id, verdict: "block", created_at: daysAgo(1) }));
+    const rows = checkClosedRed(board({ items, verdicts }));
+    assert.equal(rows.length, 30, "30 unratified closes, every one a finding");
+    const ag = aggregate("quality-closed-red", rows);
+    assert.equal(ag.length, 1);
+    assert.equal(fingerprint(ag[0]), "3d90f4265dc6e401", "the unratified rule text pins ONE new closed-red aggregate fingerprint");
+    assert.notEqual(fingerprint(ag[0]), "b2a8e5751044dd23", "and it is not the pre-AGT-166 fingerprint the 2026-W39 ledger carries");
+    assert.match(ag[0].governing_fact, /unratified red verdict\.$/);
+    assert.match(ag[0].proposed_resolution, /ship or ticket-status decision/);
   }
 
   // --- aggregate: flips at 26; stable fingerprint over rosters ---------------------------------------

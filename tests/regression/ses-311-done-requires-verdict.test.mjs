@@ -22,8 +22,10 @@
 //     (clause 4) and was measured at this ship inside a rolled-back DO block instead: seven
 //     assertions, all PASS -- refused for a verdict-less Selfbuild ticket with SQLSTATE 23514 citing
 //     SES-311; `delivered`/`partial`/`removed`/`open` all pass through; an `epic_id`-NULL row and a
-//     non-Selfbuild-epic row both allowed; a `verdict='block'` row SATISFIES the gate (a block is
-//     still a verdict); a `done -> done` no-op passes; and a multi-column in-place UPDATE --
+//     non-Selfbuild-epic row both allowed; a `verdict='block'` row satisfies the gate ONLY WHEN
+//     RATIFIED (AGT-166, v7.0.639 -- a non-reversed ship/ticket-status decision or an accepted ship
+//     card dated at or after the block; an unratified block is refused with SQLSTATE 23514 citing
+//     AGT-166); a `done -> done` no-op passes; and a multi-column in-place UPDATE --
 //     `reverse_decision()`'s exact shape since ses286a_restore_in_place -- DOES fire it.
 //
 //   * The CALL SITE is a repo file, and that is what clauses 1 and 2 hold down. A trigger with no
@@ -337,9 +339,14 @@ async function run(ctx = {}) {
     "live board to watch a trigger fire -- the board is the product. Measured instead at this ship " +
     "inside a single rolled-back DO block, seven assertions all PASS: refused with SQLSTATE 23514 " +
     "citing SES-311 for a verdict-less Selfbuild ticket; delivered/partial/removed/open pass " +
-    "through; epic_id NULL allowed; non-Selfbuild epic allowed; verdict='block' SATISFIES the gate; " +
-    "done->done no-op allowed; and reverse_decision()'s multi-column in-place UPDATE shape DOES " +
-    "fire it. Clause 3 above grades the same mechanism's EFFECT on real ships instead.");
+    "through; epic_id NULL allowed; non-Selfbuild epic allowed; verdict='block' satisfies the gate " +
+    "ONLY WHEN RATIFIED (AGT-166); done->done no-op allowed; and reverse_decision()'s multi-column " +
+    "in-place UPDATE shape DOES fire it. AGT-166 (v7.0.639) added the ratified arm and its own " +
+    "rolled-back probe, measured the same way and equally undeclarable here: writing done over an " +
+    "UNRATIFIED latest block (AGR-4, verdict 972eed40-6ddf-42a4-b5aa-03b67ffed438) is refused with " +
+    "SQLSTATE 23514 citing AGT-166; the identical UPDATE passes once one ship decision is recorded " +
+    "at or after that verdict; and a delivered row whose latest verdict is approve still closes. " +
+    "Clause 3 above grades the same mechanism's EFFECT on real ships instead.");
 
   return results;
 }

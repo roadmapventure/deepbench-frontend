@@ -906,7 +906,7 @@ re-derived differently:
   edit: reopening a `delivered` ticket restores the prior open state, which is exactly what decision
   1 asks of a rejection. Note plainly rather than inventing it: **the spec's decision 2 renames this
   button to "Reject"; that rename is not this ticket and has not shipped**, so the page still says
-  Reverse and so does this runbook. Do not write a rule against a button that does not exist yet.
+  Reverse and so does this runbook. Do not write a rule against a button that does not exist yet. **A close over a standing `block` is legal only when ratified — a `ship`/`ticket-status` decision or this card's Accept dated at or after the verdict (`AGT-166`; trigger `backlog_done_requires_verdict` refuses the rest).**
 
 **What this changes about waiting, which is the point of the ticket:** nothing. The runner never
 blocks on an Accept. A delivered ticket is stepped past at step 5 and is unpickable by a drain in
