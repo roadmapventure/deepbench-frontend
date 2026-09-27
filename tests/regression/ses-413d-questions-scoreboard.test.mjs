@@ -132,7 +132,9 @@ export const RUNBOOK_CEILING = 381000;
 // rotation: HEADER_STAMPS is still 5 and `ses-424c` pins v7.0.610's stamp as line 1, so a sixth or a
 // re-ordered stamp would turn a green guard red. Net 377625 -> 379314 B, 1,686 B under the ceiling.
 // Re-measured with wc -c and re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 379314;
+// v7.0.640 (AGT-202) deletes `week:W, ` at :1291 and :2974 (16 B); no stamp, line count 4,706 held.
+// Net 379314 -> 379298 B, 1,702 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
+export const BYTES_AT_SHIP = 379298;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

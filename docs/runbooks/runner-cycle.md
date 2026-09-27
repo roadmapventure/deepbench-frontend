@@ -1288,7 +1288,7 @@ Four boundaries, each of which is how this gets built wrong:
   a cycle judges — a defect it noticed, a gap it hit, a proposal it formed — becomes a **finding**:
 
 ```
-ingestFindings({ findings:[…], week:W, foundBy:'runner:cycle:<your cycle id>',
+ingestFindings({ findings:[…], foundBy:'runner:cycle:<your cycle id>',
                  findingType:'defect' | 'gap' | 'proposal' | 'security',
                  cycleId:'<your cycle id>', apply:true })
 ```
@@ -2971,7 +2971,7 @@ fixes or silently drops it. Apply the test in this order and record the answer:
    Manager files (`(7f)`):
 
 ```
-ingestFindings({ findings:[…], week:W, foundBy:'runner:cycle:<your cycle id>',
+ingestFindings({ findings:[…], foundBy:'runner:cycle:<your cycle id>',
                  findingType:'defect', cycleId:'<your cycle id>', apply:true })
 ```
 
