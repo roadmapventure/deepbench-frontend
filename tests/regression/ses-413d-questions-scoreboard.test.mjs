@@ -170,7 +170,15 @@ export const RUNBOOK_CEILING = 381000;
 // under SES-336's ceiling. A stamp costs more than the sentence it records, and 33 B of headroom on
 // a 381,000 B ceiling is REPORTED, not absorbed: the next byte any cycle adds needs a real trim.
 // Re-measured with wc -c and re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 380967;
+//
+// v7.0.654 (AGT-128) edits ONE runbook clause: trigger 2 of the close-out's status rule now reads "a
+// STOP LINE closing THIS ticket `partial`" instead of "naming `partial`", and drops one now-redundant
+// word from the gate-card half of the same sentence. Net 380967 -> 380974 B, 26 B under the ceiling. NO
+// STAMP WAS ROTATED IN and that is the decision, not an oversight: ses-424c pins v7.0.650 as
+// stamps[0], so a stamp for a one-line clause would cost a drop, a docs/SESSIONS.md append and two
+// more test edits. The 26 B of headroom is REPORTED, not absorbed -- the next cycle to touch this
+// file needs a real trim. Re-measured with wc -c and re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 380974;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

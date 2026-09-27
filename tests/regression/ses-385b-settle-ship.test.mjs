@@ -1,3 +1,5 @@
+// DeepBench v7.0.654 | tests/regression/ses-385b-settle-ship.test.mjs | AGT-128 -- TRIGGER 2 NOW
+// HAS TO BE ABOUT THIS TICKET, and group (F) below is what stops it going back to any `partial`.
 // DeepBench v7.0.519 | tests/regression/ses-385b-settle-ship.test.mjs | SES-385 slice 2 --
 // THE CLOSE-OUT SETTLES ITSELF, AND THIS FILE IS WHAT STOPS IT SETTLING WRONG.
 //
@@ -32,6 +34,18 @@
 // and got wrong, and `SES-414` is the negative control that must stay `delivered` -- without it an
 // implementation that returns `partial` unconditionally passes every other arm in this file.
 //
+// (F) AGT-128 -- WHOSE `partial` IS IT. Measured on the unchanged reader before this ship, not
+// argued: `/\bpartial\b/i` over everything after the heading fired on 46 live kickoffs, and 3 of
+// them were talking about somebody else -- `AGT-109` reporting that `AGT-88` "was left `partial`",
+// `AGT-129` and `AGT-173` naming a branch inside an `if` that did not happen. All three read
+// `partial` on a finished ship, which puts a shipped row back in the pick path (`ticket-owner.js`
+// `LIVE` and `audit-board.js` `OPEN` both read `["open","partial"]`). Four of group (F)'s seven
+// sentence arms and three of its four real kickoffs were RED on that reader; the other three arms
+// were GREEN before and after, which is what says the fix narrowed the trigger instead of moving it.
+// Every arm is one sentence dropped into ONE fixture section, so the sentence is the only variable,
+// and each is asserted through `stopLineClosesPartial()` AND through the `decideStatus()` it drives
+// -- a reader that is right while nothing threads `ticketId` to it is a fix that does not ship.
+//
 // (E) THE MUTATION CONTROL. `grep -c settle-ship` on `docs/runbooks/runner-cycle.md` and on
 // `scripts/render-cycle-card.js` both read ZERO on the unchanged tree, so the two prose halves of
 // this slice are pinned by a count that was measured red before the edit rather than asserted after
@@ -43,7 +57,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun } from "./_lib/self-run.js";
-import { readRemainder, decideStatus, planSettle, UNSETTLEABLE } from "../../scripts/settle-ship.js";
+import { readRemainder, stopLineClosesPartial, decideStatus, planSettle, UNSETTLEABLE } from "../../scripts/settle-ship.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
@@ -124,22 +138,80 @@ function run() {
   assert.throws(() => planSettle({ id: "d", status: "open" }, "docs/k.md", "blocked"),
     /not a status a close-out writes/, "only `partial` and `delivered` are close-out statuses");
 
-  // ---- (D) the four real kickoffs on disk -----------------------------------------------------
+  // ---- (D) the real kickoffs on disk, EACH READ AS ITS OWN ID ---------------------------------
+  // AGT-128 added the middle column: a kickoff is read as the ticket it belongs to, because that is
+  // how `main()` and `ticket-owner.js`'s check 12 call this. `SES-415` is the arm that needs it —
+  // its STOP LINE names its OWN id beside the word, so it fires through step 4 and would read
+  // `delivered` id-blind. The three `AGT-` rows are the flips measured this cycle: each was
+  // `partial` on the old reader and each has a STOP LINE about somebody else or about a branch.
   const REAL = [
-    ["docs/kickoffs/v7.0.514-SES-413-manager-decides-by-default.md", "partial",
+    ["docs/kickoffs/v7.0.514-SES-413-manager-decides-by-default.md", "SES-413", "partial",
       "its own section 1 says `slice 1 of 4`; this is one of the two rows the prose rule got wrong"],
-    ["docs/kickoffs/v7.0.515-SES-415-role-tagged-criteria.md", "partial",
-      "its STOP LINE says to close `partial`; the other row the prose rule got wrong"],
-    ["docs/kickoffs/v7.0.513-SES-414-final-day-stop.md", "delivered",
+    ["docs/kickoffs/v7.0.515-SES-415-role-tagged-criteria.md", "SES-415", "partial",
+      "its STOP LINE says to close `partial` and names SES-415 doing it — the other row the prose rule got wrong, and the arm an id-blind reader now fails"],
+    ["docs/kickoffs/v7.0.513-SES-414-final-day-stop.md", "SES-414", "delivered",
       "THE NEGATIVE CONTROL — a sound close-out, and an implementation that always returns `partial` must fail here"],
-    ["docs/kickoffs/v7.0.506-SES-385-shipped-slice-stops-advertising.md", "partial",
+    ["docs/kickoffs/v7.0.506-SES-385-shipped-slice-stops-advertising.md", "SES-385", "partial",
       "slice 1's own kickoff declares `slice 1 of 2`"],
+    ["docs/kickoffs/v7.0.584-AGT-109-constant-homes-slice-2.md", "AGT-109", "delivered",
+      "AGT-128's first flip: its STOP LINE reports that `AGT-88` was left `partial`, which is a PEER's status and not this ship's"],
+    ["docs/kickoffs/v7.0.587-AGT-129-task-file.md", "AGT-129", "delivered",
+      "AGT-128's second flip and the one a reader matching only its own id still fails: the sentence names `AGT-129` INSIDE an `if` whose branch did not hold"],
+    ["docs/kickoffs/v7.0.648-AGT-173-record-names-paths.md", "AGT-173", "delivered",
+      "AGT-128's third flip: `may leave \\`partial\\` ... if this ship's own record passes its own guard` is a conditional, so step 1 skips it"],
   ];
-  for (const [rel, want, why] of REAL) {
+  for (const [rel, ticketId, want, why] of REAL) {
     const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
-    const got = decideStatus({ kickoffText: text });
-    assert.strictEqual(got.status, want, `${rel} must settle \`${want}\` — ${why} (got \`${got.status}\`: ${got.reasons.join("; ")})`);
+    const got = decideStatus({ kickoffText: text, ticketId });
+    assert.strictEqual(got.status, want, `${rel} read as ${ticketId} must settle \`${want}\` — ${why} (got \`${got.status}\`: ${got.reasons.join("; ")})`);
   }
+
+  // ---- (F) AGT-128: the STOP LINE has to be closing THIS ticket ------------------------------
+  // ONE fixture section, one sentence swapped in, so the sentence is the only variable. `MINE` is
+  // the id the section is read AS; every arm that turns on step 4 names it or names a peer.
+  const MINE = "AGT-128";
+  const sect = (body) => `# k\n\n## 7. STOP LINE\n\n${body}\n`;
+  const SENTENCES = [
+    ["another ticket's id alone", false,
+      "Mark `AGT-88` done in the same close-out -- slice 1 was left `partial` pending this.",
+      "`AGT-109`'s live shape: the sentence reports a PEER's status, and the old reader settled this ship `partial` for it"],
+    ["this ticket's own id", true,
+      "Do NOT write `AGT-128` done -- cycle 2 remains: close `partial`, `design_status` cleared.",
+      "step 4 -- the sentence names THIS ticket beside the word, which is the trigger in full"],
+    ["no id at all", true,
+      "Close the ticket `partial`; the second half of the migration is not built.",
+      "step 3 -- a sentence naming no id is the ship speaking about itself, which is how 11 of the 43 that still fire are written"],
+    ["`Close as: partial`", true,
+      "Close as: partial, and hand the remainder to the next cycle.",
+      "step 2 -- the explicit form fires whatever else the section names"],
+    ["a conditional naming THIS ticket", false,
+      "if arm E had no credentials, write `partial: AGT-128 arm E not run` in the commit body.",
+      "`AGT-129`'s live shape and the arm an id-only reader still gets wrong: a branch that may not have happened is not a declaration, and the branch that DID reaches this script as `--remainder=`"],
+    ["`Close as: partial` inside an `if`", false,
+      "if the migration cannot be applied, Close as: partial.",
+      "step 1 runs BEFORE step 2 on purpose -- a conditional explicit form is still a conditional"],
+    ["a sentence in the NEXT section", false,
+      "ship it and close the row.\n\n## 8. APPENDIX\n\n`AGT-128` was left `partial` last cycle.",
+      "the section ENDS at the next `## ` heading; without that bound the reader reads the rest of the file"],
+  ];
+  for (const [name, want, body, why] of SENTENCES) {
+    assert.strictEqual(stopLineClosesPartial(sect(body), MINE), want,
+      `(F) ${name} must read ${want} — ${why}`);
+    assert.strictEqual(decideStatus({ kickoffText: sect(body), ticketId: MINE }).status,
+      want ? "partial" : "delivered",
+      `(F) ${name}: decideStatus must carry the reader's ${want} through as \`${want ? "partial" : "delivered"}\` — a reader nothing threads \`ticketId\` to is not a shipped fix`);
+  }
+  // THE SECTION-END CONTROL. The same appendix sentence with the heading removed is INSIDE section
+  // 7, and must read true — otherwise the arm above passes for the wrong reason.
+  assert.strictEqual(
+    stopLineClosesPartial(sect("ship it and close the row.\n\n`AGT-128` was left `partial` last cycle."), MINE), true,
+    "(F control) with the `## 8.` heading gone that same sentence is inside the STOP LINE section and must read true — the arm above must fail because of the BOUND, not because the sentence never matched");
+  // THE ID-BLIND CONTROL, both directions. A null `ticketId` still reads step 3 and can never reach
+  // step 4: a caller that will not say which ticket it is asking about gets no guess.
+  assert.strictEqual(stopLineClosesPartial(sect("Close the ticket `partial`."), null), true,
+    "(F control) with no `ticketId`, a sentence naming NO id still fires — step 3 does not need to know whose ship it is");
+  assert.strictEqual(stopLineClosesPartial(sect("Do NOT write `AGT-128` done: close `partial`."), null), false,
+    "(F control) with no `ticketId`, a sentence naming an id cannot fire — step 4 has nothing to compare against and must not guess that the one id present is this ship's");
 
   // ---- (E) the mutation control, plus the byte ceiling ----------------------------------------
   const md = fs.readFileSync(path.join(ROOT, RUNBOOK_REL), "utf8");
@@ -161,8 +233,8 @@ function run() {
   assert.ok(bytes <= CEILING,
     `${RUNBOOK_REL} is ${bytes} bytes against SES-336's ceiling of ${CEILING} — this edit had to free bytes before adding any`);
 
-  console.log(`[SES-385b] settle-ship: 4 real kickoffs (SES-413 partial, SES-415 partial, SES-414 delivered, SES-385 partial) · settle-ship named ${nRunbook}× in the runbook, ${nRenderer}× in the renderer · runbook ${bytes}B <= ${CEILING}`);
-  return ["reader", "decision", "verdict-not-an-input", "planSettle", "real-kickoffs", "mutation-control"];
+  console.log(`[SES-385b] settle-ship: ${REAL.length} real kickoffs each read as its OWN id (${REAL.map(([, id, want]) => `${id} ${want}`).join(", ")}) · ${SENTENCES.length} AGT-128 sentence arms + 3 controls, 4 of which were RED on the pre-AGT-128 reader · settle-ship named ${nRunbook}× in the runbook, ${nRenderer}× in the renderer · runbook ${bytes}B <= ${CEILING}`);
+  return ["reader", "decision", "verdict-not-an-input", "planSettle", "real-kickoffs", "whose-partial", "mutation-control"];
 }
 
 selfRun(import.meta.url, run);

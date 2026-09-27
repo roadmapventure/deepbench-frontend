@@ -499,6 +499,10 @@ export function classifyBoard(board, { now, rate }) {
     if (closed) {
       const d = decideStatus({
         kickoffText: kickoffText.get(row.backlog_id) ?? "",
+        // AGT-128 -- WHICH ticket the STOP LINE has to be talking about. Without it the reader is
+        // id-blind and flags a finished row whose STOP LINE merely reported a PEER's `partial`,
+        // which puts a shipped row back in the pick path (`LIVE` at :227 reads `partial`).
+        ticketId: row.backlog_id,
         gatedOpen: gatedOpen.has(row.backlog_id),
       });
       if (d.status === "partial") {

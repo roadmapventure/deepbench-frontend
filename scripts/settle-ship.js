@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// DeepBench v7.0.654 | scripts/settle-ship.js | AGT-128 -- TRIGGER 2 FIRES ONLY WHEN THE STOP LINE
+// SAYS **THIS** TICKET CLOSES `partial`. The measurement that found it, and the four ordered steps
+// that decide it, live at `stopLineClosesPartial()` below -- the one home for both.
 // DeepBench v7.0.626 | scripts/settle-ship.js | AGT-176 (part c) -- THE CLOSE-OUT RESOLVES ITS OWN
 // COST, AND AN ABSENT MEASUREMENT IS NOT A ZERO.
 //
@@ -66,7 +69,7 @@
 //
 // FOUR TRIGGERS, ANY ONE OF WHICH IS ENOUGH (`partial` iff any):
 //   1. the kickoff says `slice N of M` with N < M      -- the document admits its own remainder
-//   2. its STOP LINE section says `partial`            -- the design already decided this
+//   2. its STOP LINE closes THIS ticket `partial`      -- the design already decided this
 //   3. an undecided `gated_before_build` card is open  -- something was gated and never answered
 //   4. `--remainder=` is non-empty                     -- the operator names work left behind
 //
@@ -97,12 +100,75 @@ import { resolveCycleCost, SUBSCRIPTION_LANES } from "../lib/activity-log.js";
 const SLICE_RE = /\bslice\s+(\d+)\s+of\s+(\d+)\b/i;
 const STOP_LINE_RE = /^##\s*7\.?\s*STOP LINE/im;
 
+// AGT-128 -- THE PATTERNS THE STOP LINE READER IS WRITTEN IN. Each is named rather than inlined
+// because each one is the whole reason one of `stopLineClosesPartial()`'s ordered steps can go red
+// on its own, and a test that mutates one must have something to point at.
+const SECTION_END_RE = /^##\s/m;                 // the section ends at the NEXT `## ` heading, not at EOF
+const SENTENCE_SPLIT_RE = /(?<=[.;!?])\s+|\n+/;  // one decision per sentence; `;` splits -- a STOP LINE writes clauses
+const PARTIAL_RE = /\bpartial\b/i;               // the word itself: necessary, and since this ship never sufficient
+const CONDITIONAL_RE = /\b(?:if|unless|in case)\b/i;
+const CLOSE_AS_PARTIAL_RE = /\bclose\s+as\s*:\s*[`*_]*partial\b/i;
+const TICKET_ID_RE = /\b[A-Z]{2,6}-\d{1,4}[a-z]?\b/g;
+
 // A status this script must never touch. `done` is John's word (`SES-154`) and `removed` /
 // `removal proposed` are a different lifecycle entirely; settling one of those from a close-out
 // would overwrite a human decision with a mechanical one.
 export const UNSETTLEABLE = new Set(["done", "removed", "removal proposed"]);
 
-// readRemainder(text) -> { slice: {n, m} | null, stopPartial: boolean }
+// stopLineClosesPartial(text, ticketId = null) -> boolean
+//
+// THE DEFECT, measured 2026-09-27 by running `decideStatus()` over the live kickoffs rather than
+// recalled. The reader this replaces was `/\bpartial\b/i.test(s.slice(stop.index))`: ANY occurrence
+// of the word anywhere after the `## 7. STOP LINE` heading, with no ticket scope and no section end.
+// A STOP LINE reading "Mark `AGT-88` done -- slice 1 was left `partial` pending this" is reporting
+// ANOTHER ticket's status, and one reading "if arm E had no credentials, write `partial: ...`" is
+// naming a branch that did not happen -- and each settled its OWN finished ship `partial`. That is
+// not cosmetic: a wrongly-`partial` row stays in the pick path (`scripts/ticket-owner.js:227` and
+// `scripts/audit-board.js:59` both read `["open","partial"]`), so the runner can re-pick and
+// rebuild work that already shipped. Of the 46 live kickoffs the old reader fired on, 3 were this
+// shape and 43 were the ship speaking about itself.
+//
+// THE UNIT IS A SENTENCE, NOT THE SECTION, because a sentence is the smallest span that carries a
+// subject -- a STOP LINE routinely names this ticket, another ticket and a conditional in three
+// consecutive ones. Every sentence carrying the word is judged in this ORDER, and the order is the
+// design: step 1 runs BEFORE step 2 so that `Close as: partial` inside an `if` stays a branch.
+//
+//   1. CONDITIONAL (`if` / `unless` / `in case`) -> SKIP. An instruction is not a declaration that
+//      this ticket closed partial; the branch that actually happened arrives at this script as
+//      trigger 4, `--remainder=`, which is a fact about the run and not a sentence about a plan.
+//   2. `Close as: partial` -> TRUE. The explicit form fires whatever else the section names.
+//   3. NAMES NO ID -> TRUE. The ship speaking about itself, which is how 11 of the 43 that still
+//      fire are written -- requiring an id would strand 11 real remainders to catch 2.
+//   4. ITS IDS INCLUDE `ticketId` -> TRUE. Any other id and the sentence is about someone else,
+//      so the loop CONTINUES rather than returning: one sentence's silence is not the section's.
+//
+// A NULL `ticketId` reads step 3 and can never reach step 4 -- a caller that will not say which
+// ticket it is asking about gets the id-blind answer, never a guess at which id is "its own".
+export function stopLineClosesPartial(text, ticketId = null) {
+  const s = typeof text === "string" ? text : "";
+  const stop = s.match(STOP_LINE_RE);
+  if (!stop) return false;                    // no STOP LINE heading: no section to have said it
+  const after = s.slice(stop.index);
+  const nl = after.indexOf("\n");
+  let section = after;                        // no newline at all: the heading line IS the section
+  if (nl !== -1) {
+    const body = after.slice(nl + 1);         // searched past the heading, which itself starts `## `
+    const end = body.search(SECTION_END_RE);
+    section = after.slice(0, nl + 1 + (end === -1 ? body.length : end));
+  }
+  const want = typeof ticketId === "string" && ticketId.trim() !== "" ? ticketId.trim().toUpperCase() : null;
+  for (const sentence of section.split(SENTENCE_SPLIT_RE)) {
+    if (!PARTIAL_RE.test(sentence)) continue;
+    if (CONDITIONAL_RE.test(sentence)) continue;                              // 1
+    if (CLOSE_AS_PARTIAL_RE.test(sentence)) return true;                      // 2
+    const ids = sentence.match(TICKET_ID_RE) ?? [];
+    if (ids.length === 0) return true;                                        // 3
+    if (want !== null && ids.some(id => id.toUpperCase() === want)) return true; // 4
+  }
+  return false;
+}
+
+// readRemainder(text, ticketId = null) -> { slice: {n, m} | null, stopPartial: boolean }
 //
 // Both halves read the kickoff's OWN words. `slice` is the FIRST match in the whole document,
 // because the declaration lives in section 1 and later sections quote it; taking the last would
@@ -111,23 +177,25 @@ export const UNSETTLEABLE = new Set(["done", "removed", "removal proposed"]);
 // `stopPartial` is scoped to the STOP LINE section and not the whole file, and that scope is the
 // discriminator rather than tidiness: the word `partial` appears in ordinary kickoff prose about
 // OTHER tickets' statuses all over sections 2 and 5. A kickoff with no STOP LINE heading reads
-// false -- there is no section to have said it.
-export function readRemainder(text) {
+// false -- there is no section to have said it. Since AGT-128 the section scope is necessary but no
+// longer sufficient: `stopPartial` is true only when a sentence in that section says THIS ticket
+// closes `partial`, which is `stopLineClosesPartial()` above and `ticketId` is how it knows which
+// ticket that is.
+export function readRemainder(text, ticketId = null) {
   const s = typeof text === "string" ? text : "";
   const m = s.match(SLICE_RE);
   const slice = m ? { n: Number(m[1]), m: Number(m[2]) } : null;
-  const stop = s.match(STOP_LINE_RE);
-  const stopPartial = stop ? /\bpartial\b/i.test(s.slice(stop.index)) : false;
+  const stopPartial = stopLineClosesPartial(s, ticketId);
   return { slice, stopPartial };
 }
 
-// decideStatus({ kickoffText, gatedOpen, remainder }) -> { status, reasons[] }
+// decideStatus({ kickoffText, ticketId, gatedOpen, remainder }) -> { status, reasons[] }
 //
 // `reasons` is every trigger that fired, not the first: an operator reading the plan needs to know
 // the ticket is partial for three reasons, because clearing one of them does not settle it.
 // THERE IS NO VERDICT PARAMETER. See the header.
-export function decideStatus({ kickoffText = "", gatedOpen = false, remainder = null } = {}) {
-  const { slice, stopPartial } = readRemainder(kickoffText);
+export function decideStatus({ kickoffText = "", ticketId = null, gatedOpen = false, remainder = null } = {}) {
+  const { slice, stopPartial } = readRemainder(kickoffText, ticketId);
   const reasons = [];
   if (slice && slice.n < slice.m) reasons.push(`the kickoff declares slice ${slice.n} of ${slice.m}`);
   if (stopPartial) reasons.push("the kickoff's STOP LINE names `partial`");
@@ -372,7 +440,9 @@ async function main() {
   if (!Array.isArray(cards)) fail("read cards: the undecided-card read came back non-array — refusing to decide a status on a board that was not read.");
   const gatedOpen = cards.some(c => c.backlog_id === ticket);
 
-  const decided = decideStatus({ kickoffText, gatedOpen, remainder });
+  // AGT-128 -- the `--ticket` value read at :404, so trigger 2 knows which ticket the STOP LINE
+  // has to be talking about. Without it the reader is id-blind and settles on anyone's `partial`.
+  const decided = decideStatus({ kickoffText, ticketId: ticket, gatedOpen, remainder });
   let plan;
   try {
     plan = planSettle(row, kickoffArg, decided.status);
