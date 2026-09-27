@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260927-0158 (v7.0.623, 2026-09-27, unattended cycle `c1d1fb0c-d981-4b69-8b19-c26f961b8804`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-176` — **partial, verdict block: a refused API call has been billed since 24 September and this platform was writing it down as free.**
+
+### The ticket was about a cosmetic zero; revalidation found real money
+
+AGT-176 was filed about a ledger writing `0` where nothing was measured. The Designer's revalidation found something more expensive under it: `api/prompt/request-receivable.js` writes `billed: false` at **both** refusal sites (`:705` and `:811`, not the one the ticket named), `api/capabilities/execute.js:1297` turns that into a hard `cost_usd 0`, and Anthropic has billed refusals in three categories since 2026-09-24. So the API-dollar wall and every budget card downstream have been reading **under-reported real money**, not merely an unmeasured value. Two of the ticket's own claims were wrong and were corrected in the kickoff rather than inherited.
+
+### The distinction that changed the test: absent tokens, not unbilled calls
+
+`computeCallCost(model, null, null)` is `null`; `computeCallCost(model, 0, 0)` is `0`. So flipping `billed` does **not** blanket-NULL the refusal rows, and the guard pins all three arms — no usage block → NULL, a reported `0/0` → a measured `0`, an unbilled category → `0` — each against a priced control. That is the whole point of the ticket expressed as a test rather than as prose.
+
+### A collision the kickoff missed, and it was the same change's other home
+
+`tests/regression/log-149-api-dollars-ledger.test.mjs:179` pinned `billed === false` on a fixture whose category is `reasoning_extraction` — one of the three **billed** categories — so task 1 turned it red. Re-pinned to assert both branches. That is the third file, and it is not a second task.
+
+### The runbook coupling is now measured, and it is one file wider than known
+
+A reverted one-byte probe on `docs/runbooks/runner-cycle.md` turned three tests red: `ses-377` (card must equal the render **and** the header sha256), `ses-413d:218` (`BYTES_AT_SHIP` — "must read exactly the 377625 B its last editing ship measured"), and — **not previously recorded** — `ses-424f:291`, which imports `BYTES_AT_SHIP` from ses-413d and asserts it too. Five files against a cap of three. The code-only alternative was rejected on evidence, not taste: the kickoff's own QA asserts on the runbook **text**, and adding a resolver elsewhere while `"$0 is the normal value"` stays live would leave the defect in the instruction the runner obeys and create a second contradicting home. **This is the third cycle in one turn to hit this coupling** — AGT-170 lost a slice to it, this cycle lost two tasks, and it is now a recorded designer finding at six cycles.
+
+### AGT-174's fix caught this cycle in the act, one cycle after shipping
+
+The verifier printed: *"CLAUDE-STATE: rendered from a ledger that does not contain this cycle (c1d1fb0c) … the committed CLAUDE-STATE.md publishes the PREVIOUS ship, not this one (AGT-174 lag)."* The render had run before `push_sha` was written, which is the exact ordering defect a peer shipped a detector for hours earlier. The remedy it named was followed — write `push_sha` and `version`, then re-render — and the committed file now carries v7.0.623.
+
+### Standing down from AGT-168 was right, but this cycle's reason for it was wrong
+
+The pick path offered AGT-168 at slot 1; this cycle claimed it, then released it, believing a peer was mid-build. The Development Manager checked and that peer had **closed 32 seconds earlier** — a ten-minute-old heartbeat was read as live work, which is "an absent signal is not a result" in a fourth costume. The stand-down stands for a better reason the peer itself recorded: slice 6 was the end of what the staff can reach, and all four remaining pieces are John's. Nothing on AGT-168's row says so — `blocked_by` null, `gate_count` 0, no gated card — so the queue offers it at slot 1 every cycle and each cycle burns its pick re-deciding to skip. This cycle filed `record_skip(needs-john)` so it shows up in §10 where John reads, instead of only in a ledger.
+
+---
+
 ## session/cycle-20260927-0006 (v7.0.618, 2026-09-27, unattended cycle `f4e24696-cc8a-4ab2-884c-500ceae6ccc3`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-170` slice 2 — **partial, verdict block: the gate shipped an hour earlier was naming tests that had never run, and the platform's own auditor caught it before any human saw the card.**
 
 ### The loop closed on itself inside forty minutes
