@@ -1833,6 +1833,56 @@ export function kickoffLaneFinding(text) {
   };
 }
 
+// FEATURE: AGT-185 -- THE SCOPE PAIR A VERDICT GRADED AGAINST, SAID OUT LOUD.
+//
+// WHY A GREEN NEEDS IT (ARCHITECTURE.md 19v -- a green declares what it did NOT grade). Before this,
+// `extra_files`/`extra_tasks` appeared in this file ONLY inside a comment: the class_autonomy() row
+// was fetched, `auto_done` was read off it, and the file/task pair the ship was actually measured
+// against was never printed. A later reader of an approve had nothing to read but the flat 3/4 --
+// which is the BASELINE, and the cap for no class sitting above `runner_settings.cap_relax_rung`.
+//
+// THE ROW IS THE ARGUMENT AND THE GRANT IS NEVER RE-DERIVED HERE. `public.class_autonomy(text)` is
+// the one home for what a rung buys (SES-122a; its thresholds are stored columns, SES-146). This
+// function adds no judgment to the row -- it sums the row's OWN extras onto the baseline and names
+// both halves in the note, so a reader can check the arithmetic against the row beside it. There is
+// no rung comparison, no threshold and no per-class number anywhere in this file.
+//
+// THE BASELINE IS THE ONE NUMBER THAT HAS TO BE NAMED, and it is named once, as a default argument
+// rather than an inline literal, because no column holds it: measured this cycle, class_autonomy
+// returns work_class / rung / streak / auto_done / extra_files / extra_tasks and nothing else. Its
+// one home in prose is `docs/STANDARDS.md` Section 2, which is what every statement of it cites; a
+// caller that ever gets a stored source overrides the argument and this file loses even that.
+//
+// AN UNREAD ROW PRINTS NO PAIR -- the fail-closed half, and the reason this returns a note in the
+// same shape `ladderNote` uses rather than a number. A null row, a row whose extras are not finite
+// numbers, a failed RPC, no credentials, no class: all of them yield `{files: null, tasks: null}`
+// and a sentence saying the pair was not graded. Printing the baseline in that case would be a
+// silent 3/4 -- a verdict asserting a cap nobody looked up, which is the defect, not the degrade.
+//
+// PURE AND EXPORTED, the same shape as `kickoffLaneFinding` above and for the same reason: the
+// suite grades all three readings (a widened class, a baseline class, an unread row) without
+// running a verdict or reaching Supabase.
+export const SCOPE_BASELINE = { files: 3, tasks: 4 };
+
+export function classCapPair(row, baseline = SCOPE_BASELINE) {
+  const extraFiles = row?.extra_files;
+  const extraTasks = row?.extra_tasks;
+  if (!Number.isFinite(extraFiles) || !Number.isFinite(extraTasks)) {
+    return {
+      files: null,
+      tasks: null,
+      note: " (scope pair NOT graded: class_autonomy's extras were not read, so what this class earned is unknown -- no pair is printed, because the baseline is not the cap of any class above cap_relax_rung)",
+    };
+  }
+  const files = baseline.files + extraFiles;
+  const tasks = baseline.tasks + extraTasks;
+  return {
+    files,
+    tasks,
+    note: ` (scope pair graded against ${files} files / ${tasks} tasks -- the ${baseline.files}/${baseline.tasks} baseline plus class_autonomy's ${extraFiles}/${extraTasks} for work class ${row.work_class ?? "(unnamed)"} at rung ${row.rung ?? "(blank)"})`,
+  };
+}
+
 // FEATURE: AGT-189 -- THE BUILDER'S DECLARED MODEL, graded against the live `orchestrator` lane.
 //
 // THE MODEL ID IS AN ARGUMENT, NEVER A LITERAL IN THIS FILE, and that is why this function takes a
@@ -2958,6 +3008,9 @@ async function main() {
   } else {
     ladderNote = " (no credentials to read class_autonomy; charter decision 2's scope applies)";
   }
+  // AGT-185: the pair, derived from the row above and from nothing else, so the verdict can print
+  // what it graded against. `null` files/tasks when the row was not read -- see classCapPair().
+  const capPair = classCapPair(classAutonomy);
 
   const base = arg("base", "origin/dev");
   // FEATURE: SES-379 -- THE RESOLUTION SEAM, and the only place `[]` becomes `null`. See
@@ -3038,6 +3091,11 @@ async function main() {
     `  ${reasoning}\n` +
     `  graded sha: ${gradedSha ?? "UNREADABLE"}\n` +
     `  auto-done eligible: ${elig.eligible ? "YES" : "no"} -- ${autoDoneReason}\n` +
+    // AGT-185: one line, ALWAYS printed, never part of the verdict -- the file/task pair this ship
+    // was measured against, or the sentence saying nobody looked it up. Never a silent 3/4.
+    `  SCOPE PAIR: ${capPair.files === null
+      ? "not graded -- class_autonomy's extras were not read this run, so this verdict asserts no cap"
+      : `${capPair.files} files / ${capPair.tasks} tasks${capPair.note}`}\n` +
     // AGT-174: one line, always printed, never part of the verdict. The three cases are different
     // facts and read differently: the lag with its remedy, "pins this cycle" (the ordering held),
     // and "not measured" (nobody passed a cycle id, so nothing could be checked).
@@ -3075,6 +3133,11 @@ async function main() {
     // inside auto_done_reason, which is the free-text column that already exists to carry exactly
     // this. No new runner_verdicts column -- SES-122b asked for none.
     class_autonomy: classAutonomy,
+    // AGT-185: the pair the row above resolves to -- { files, tasks, note }, files/tasks null when
+    // the row was not read. Reported, never stored in its own column and no migration: AGT-174's
+    // precedent, AGT-170's convention. Derived ONLY from `class_autonomy` beside it, so a reader
+    // can check it against that row instead of trusting this key.
+    class_cap_pair: capPair,
     // SES-376: null when the kickoff is within cap or none was passed; the finding object when it
     // is over. Reported, never stored in its own column -- it reaches the ledger through `reasoning`
     // above, which the block already prepended it to.

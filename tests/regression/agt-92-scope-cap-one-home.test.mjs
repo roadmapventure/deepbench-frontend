@@ -53,6 +53,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { parseSnapshot } from "./ses-280-m5-governance-rules.test.mjs";
+// AGT-185: the pair helper is imported, never re-implemented here. A copy of `3 + extra_files` in a
+// test is a second home for the arithmetic, which is the defect this whole file exists to refuse.
+import { classCapPair } from "../../scripts/verifier.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -73,6 +76,40 @@ export const RIVAL_HOMES = [
 
 // The one home, as the token a statement names it by.
 export const ONE_HOME = "`docs/STANDARDS.md` Section 2";
+
+// ---------------------------------------------------------------------------
+// AGT-185 -- the flat pair stops travelling, and the pair a verdict grades gets printed
+// ---------------------------------------------------------------------------
+//
+// TWO CLAUSES, NOT ONE, because they are two facts with two different smallest mutations: the
+// runbook can stop reciting the pair while the verifier still cannot derive it, and the verifier can
+// derive it while the runbook goes on reciting a flat one. One clause carrying both would have a
+// control for whichever half its breaks() touched and no teeth at all on the other -- the SES-158
+// failure this file's own everyClauseHasTeeth() is built to catch.
+export const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
+
+// The flat pair, as the runbook used to recite it at step 6. Whitespace is NORMALISED before the
+// match because the sentence wrapped mid-phrase ("...one item, ≤3\nfiles, ≤4 tasks"): a line-bound
+// grep for "≤3 files" returned 0 both before and after the change and would have graded nothing.
+export const FLAT_PAIR = ["≤3 files", "≤4 tasks"];
+
+// The pointer that replaced it. It names step 5a and the function, never a number.
+export const POINTS_AT_STEP_5A =
+  "Implement within **one item** and the file/task pair step 5a computed from `class_autonomy()`";
+
+// FIXTURE ROWS, shaped exactly as public.class_autonomy() returns them and measured live this cycle
+// (2026-09-27): "P10 - Tooling" -> tooling, rung 32, extras 19/19; "P9 - Bug Fixes" -> bug_fix, rung
+// 1, extras 0/0. Fixtures rather than a live read, so this clause runs in arm 1 with no credentials
+// and mutates nothing (STANDARDS Section 4 -- a test reads, it never writes).
+export const CLASS_ROWS = {
+  tooling: { work_class: "tooling", rung: 32, streak: 0, auto_done: true, extra_files: 19, extra_tasks: 19 },
+  bug_fix: { work_class: "bug_fix", rung: 1, streak: 0, auto_done: false, extra_files: 0, extra_tasks: 0 },
+  unread: null,
+};
+
+// What the helper must read off those rows. The widened pair and the baseline pair are BOTH pinned:
+// a helper that returned the baseline for everything would satisfy one of them.
+export const EXPECTED_PAIRS = { tooling: [22, 23], bug_fix: [3, 4] };
 
 // The columns the snapshot carries, in its own order -- the live arm selects exactly these so the
 // two arms are compared like for like.
@@ -236,6 +273,49 @@ export const CLAUSES = [
       live: { ...b.live, "OD-33": { ...b.live["OD-33"], statement: `${b.live["OD-33"].statement} (drifted)` } },
     }),
   },
+  {
+    id: "the-runbook-recites-no-flat-pair",
+    needsLive: false,
+    detail:
+      `${RUNBOOK_REL} states the file/task pair NOWHERE as a flat literal -- neither "${FLAT_PAIR[0]}" ` +
+      `nor "${FLAT_PAIR[1]}" occurs in it once whitespace is normalised -- and step 6's build ` +
+      `sentence instead points at the pair step 5a computed ("${POINTS_AT_STEP_5A}"). Until AGT-185 ` +
+      "that sentence recited a flat pair 125 lines after step 5a had computed the real one, so a " +
+      `cycle reciting the runbook and a cycle reading ${ONE_HOME} were working to two different caps`,
+    test: b => {
+      const flowed = lf(b.runbook).replace(/\s+/g, " ");
+      if (FLAT_PAIR.some(p => flowed.includes(p))) return false;
+      return flowed.includes(POINTS_AT_STEP_5A.replace(/\s+/g, " "));
+    },
+    breaks: b => ({
+      ...b,
+      runbook: `${b.runbook}\nImplement within the scope caps (one item, ${FLAT_PAIR[0]}, ${FLAT_PAIR[1]}).\n`,
+    }),
+  },
+  {
+    id: "the-pair-is-derived-from-the-class-row",
+    needsLive: false,
+    detail:
+      "scripts/verifier.js's classCapPair() reads the pair off class_autonomy()'s OWN row: a rung-32 " +
+      `tooling row returns ${EXPECTED_PAIRS.tooling.join(" / ")}, a rung-1 bug_fix row returns ` +
+      `${EXPECTED_PAIRS.bug_fix.join(" / ")}, and a row that was never read returns NO pair and says ` +
+      "so. That third reading is the one that matters: a helper that printed the baseline when the " +
+      "lookup failed would be a verdict asserting a cap nobody looked up, which is the flat pair " +
+      `travelling again by another route. The baseline's one home stays ${ONE_HOME}`,
+    test: b => {
+      const wide = classCapPair(b.classRows.tooling);
+      const base = classCapPair(b.classRows.bug_fix);
+      const unread = classCapPair(b.classRows.unread);
+      return wide.files === EXPECTED_PAIRS.tooling[0] && wide.tasks === EXPECTED_PAIRS.tooling[1]
+        && base.files === EXPECTED_PAIRS.bug_fix[0] && base.tasks === EXPECTED_PAIRS.bug_fix[1]
+        && unread.files === null && unread.tasks === null
+        && /NOT graded/.test(String(unread.note));
+    },
+    breaks: b => ({
+      ...b,
+      classRows: { ...b.classRows, tooling: { ...b.classRows.tooling, extra_files: 0, extra_tasks: 0 } },
+    }),
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -347,7 +427,9 @@ async function run() {
   }
 
   const live = await liveRows();
-  const bundle = { rows, live };
+  // AGT-185: the runbook text and the class-row fixtures ride the same bundle every other clause
+  // reads, so a control that mutates one of them is compared against the same object the clause saw.
+  const bundle = { rows, live, runbook: lf(fs.readFileSync(path.join(ROOT, RUNBOOK_REL), "utf8")), classRows: CLASS_ROWS };
 
   grade(bundle, live ? "snapshot + live registry" : "snapshot");
   everyClauseHasTeeth(bundle, live ? "snapshot + live registry" : "snapshot");

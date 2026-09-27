@@ -151,7 +151,13 @@ export const RUNBOOK_CEILING = 381000;
 // prose, and step 7 stops offering `partial` as a cycle close. Net 380003 -> 379993 B, 1,007 B under
 // the ceiling -- a citation is shorter than the fact it points at. Re-measured with wc -c and
 // re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 379993;
+//
+// v7.0.650 (AGT-185) stops step 6 reciting a flat file/task pair 125 lines after step 5a computed
+// the real one, and rotates the header: v7.0.650 in at line 1, v7.0.535 out, its one zero-hit fact
+// relocated into the body under SES-164 step 2. Net 379993 -> 380770 B, 230 B under SES-336's
+// ceiling -- a stamp costs more than the sentence it records, and that headroom is REPORTED, not
+// absorbed silently. Re-measured with wc -c and re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 380770;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
