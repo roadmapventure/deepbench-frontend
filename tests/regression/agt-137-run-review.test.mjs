@@ -1,3 +1,9 @@
+// DeepBench v7.0.661 | tests/regression/agt-137-run-review.test.mjs | AGT-239 -- arm B retargeted:
+// --prepare now writes EIGHT keys (service and flow lead) from EIGHT calls -- the six reads, the
+// rpc/audit_flow_checks read and the open-service read. With the stub's flow list empty nothing is
+// filed, so the only non-GET is the rpc read and no table is written. Kickoff:
+// docs/kickoffs/v7.0.661-AGT-239-outcomes-first.md §5 task 7.
+//
 // DeepBench v7.0.646 | tests/regression/agt-137-run-review.test.mjs | AGT-177 -- arm D grows the row
 // assertion. au-run-intent's `method` told the reviewer to read a `gate_failed` column off
 // runner_cycles; no table in public has that column at all, and scripts/audit-run-review.js:148 never
@@ -120,7 +126,7 @@ async function run() {
   });
 
   // --- B. six reads in, two rows out -----------------------------------------------------------
-  await arm("B --prepare writes six keys and --ingest files two typed rows", async () => {
+  await arm("B --prepare writes eight keys and --ingest files two typed rows", async () => {
     const calls = [];
     const answer = (url) => {
       if (url.includes("/runner_cycles?")) return [{ outcome: "shipped", last_step: "9", started_at: "2026-09-25T20:24:37Z", notes: "n" }];
@@ -129,18 +135,22 @@ async function run() {
       if (url.includes("/ci_run_conclusions?")) return [{ run_id: 1 }];
       if (url.includes("/backlog_items?")) return [{ backlog_id: "AGT-137" }];
       if (url.includes("/audit_findings?")) return [];
+      if (url.includes("/rpc/audit_flow_checks")) return [];
       return undefined;
     };
     const out = path.join(tmp, "run.json");
     const code = await withFetch(fetchStub(answer, calls), () => runReview(["--prepare", `--cycle-id=${CID}`, `--out=${out}`], STUB_ENV));
     assert.strictEqual(code, 0, "a shipped cycle prepares");
     const doc = JSON.parse(fs.readFileSync(out, "utf8"));
-    assert.deepStrictEqual(Object.keys(doc), ["cycle", "items", "verdicts", "ci", "filings", "prior"],
-      "all six keys, in the kickoff's order");
+    assert.deepStrictEqual(Object.keys(doc), ["service", "flow", "cycle", "items", "verdicts", "ci", "filings", "prior"],
+      "all eight keys, service and flow first (AGT-239)");
     assert.strictEqual(doc.items.length, 2, "the items came from runner_items, not from another read");
     assert.strictEqual(doc.verdicts[0].gate_regression, true, "the three gates ride on the verdict row");
-    assert.strictEqual(calls.length, 6, `six reads, one per source (got ${calls.length})`);
-    assert.ok(calls.every(c => c.method === "GET"), "a prepare writes NOTHING to the database");
+    assert.strictEqual(calls.length, 8, `six reads plus the flow rpc and the service read (got ${calls.length})`);
+    const nonGet = calls.filter(c => c.method !== "GET");
+    assert.deepStrictEqual(nonGet.map(c => c.url.replace(/^.*\/rest\/v1\//, "")), ["rpc/audit_flow_checks"],
+      "the only POST is the STABLE flow rpc -- an empty flow list files nothing, so no table is written");
+    assert.ok(calls.some(c => c.url.includes("/audit_findings?family=eq.service")), "the open service findings are read");
     assert.ok(!calls.some(c => c.url.includes("gate_failed")),
       "control: runner_cycles carries no gate_failed column -- asking for one is a 400, so the read must not name it");
 

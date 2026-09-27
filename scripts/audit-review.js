@@ -1,3 +1,12 @@
+// DeepBench v7.0.661 | scripts/audit-review.js | AGT-239 -- OUTCOMES FIRST. --prepare selects each
+// finding's `family`; the default scope `outcomes` (the run tail's (7f)) drops `paperwork`, and
+// --weekly (the Auditor routine's step 4) keeps every family -- paperwork is moved to the weekly
+// review, not removed. buildTaskContext() stable-sorts the worklist by RANK (service 0, blocked 1,
+// everything else 2, input order kept within a rank), every row carries `family` and `rank`, and the
+// context carries `scope`; --apply sends that scope in p_review so apply_audit_review()'s coverage
+// rule (step 1b) asks for exactly the rows this worklist holds. A context with no scope sends none,
+// which the function reads as weekly (all). Spec: docs/kickoffs/v7.0.661-AGT-239-outcomes-first.md.
+//
 // DeepBench v7.0.609 | scripts/audit-review.js | AGT-134 -- validateReview() mirrors the one new
 // refusal apply_audit_review() gained: `needs_desktop` is the manager's "an unattended cycle must
 // not pick this straight back up" flag, and it only means something on a group that FILES a ticket
@@ -76,6 +85,12 @@ export const WEEK_RE = /^\d{4}-W\d{2}$/;
 export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)";
 // AGT-86 §11(5): the checklist rows the manager may edit. au-identity and au-guardrails are John's.
 export const EDITABLE_SLUG = /^au-(behavior|knowledge-homes|[a-z-]+-intent)$/;
+// AGT-239 D4: what is broken outranks what is stuck, which outranks everything else.
+export const FAMILY_RANK = Object.freeze({ service: 0, blocked: 1 });
+export const SCOPES = Object.freeze(["outcomes", "weekly"]);
+export function rankOf(family) {
+  return Object.prototype.hasOwnProperty.call(FAMILY_RANK, family) ? FAMILY_RANK[family] : 2;
+}
 
 const blank = v => String(v ?? "").trim() === "";
 
@@ -168,10 +183,16 @@ export function promotableOthers(allRows) {
   return out.sort((x, y) => String(x.fingerprint).localeCompare(String(y.fingerprint)));
 }
 
-export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects }) {
-  if (!Array.isArray(findings) || findings.length === 0) return null;
+export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope = "outcomes" }) {
+  // AGT-239 D3: the per-run scope leaves paperwork for the weekly review.
+  const inScope = (Array.isArray(findings) ? findings : [])
+    .filter(f => scope === "weekly" || f.family !== "paperwork");
+  if (inScope.length === 0) return null;
   const rows = Array.isArray(allRows) ? allRows : [];
-  const worklist = findings.map(f => {
+  // AGT-239 D4: a stable sort -- Array.prototype.sort is stable, and the index tiebreak says so.
+  const ranked = inScope.map((f, i) => ({ f, i, rank: rankOf(f.family) }))
+    .sort((a, b) => (a.rank - b.rank) || (a.i - b.i));
+  const worklist = ranked.map(({ f, rank }) => {
     const same = rows.filter(r => r.fingerprint === f.fingerprint);
     return {
       id: f.id,
@@ -181,6 +202,9 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
       // AGT-132: WHO reported it and WHAT it is -- the two facts the routing reads.
       source: sourceOf(f.found_by),
       finding_type: f.finding_type ?? null,
+      // AGT-239: the family and its rank, so the manager reads service and blocked first.
+      family: f.family ?? null,
+      rank,
       check_slug: f.check_slug ?? null,
       locations: f.locations ?? null,
       governing_fact: f.governing_fact ?? null,
@@ -194,6 +218,7 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
   });
   return {
     week,
+    scope,
     worklist,
     // AGT-132: the routing table as data and the projects he may pick from -- the manager is never
     // asked to remember either, and never invents a project (creating one is John's).
@@ -404,19 +429,20 @@ async function prepare(args) {
     if (!r.ok) die(1, `audit-review: GET ${q} -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
     return r.json;
   };
-  const findings = await get("audit_findings?status=in.(open,carried)&select=id,fingerprint,iso_week,kind,check_slug,locations,governing_fact,confidence,proposed_resolution,found_by,finding_type&order=created_at,id");
+  const findings = await get("audit_findings?status=in.(open,carried)&select=id,fingerprint,iso_week,kind,check_slug,locations,governing_fact,confidence,proposed_resolution,found_by,finding_type,family&order=created_at,id");
   const allRows = await get("audit_findings?select=id,fingerprint,iso_week,status,ruling,ruled_by,check_slug");
   const tickets = await get("backlog_items?source_file=eq.audit-review&status=not.in.(done,removed)&select=backlog_id,title,status,description&order=backlog_id");
   const scorecardRows = await get("audit_check_scorecard?select=*&order=check_slug,iso_week");
   const profiles = await get("skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug");
   const routes = await get("finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
   const projects = await get("projects?select=slug,name,status&order=slug");
-  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects });
+  const scope = args.weekly === true ? "weekly" : "outcomes";
+  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope });
   if (ctx === null) die(3, NOTHING_TO_REVIEW);
   const out = JSON.stringify(ctx, null, 2) + "\n";
   if (typeof args.out === "string" && args.out) {
     fs.writeFileSync(path.resolve(args.out), out, "utf8");
-    console.log(`audit-review --prepare: ${ctx.worklist.length} finding(s), ${ctx.open_audit_tickets.length} open audit ticket(s) -> ${args.out}`);
+    console.log(`audit-review --prepare (${ctx.scope}): ${ctx.worklist.length} finding(s), ${ctx.open_audit_tickets.length} open audit ticket(s) -> ${args.out}`);
   } else {
     process.stdout.write(out);
   }
@@ -458,6 +484,8 @@ async function apply(args) {
     groups: answer.groups, summary_for_john: answer.summary_for_john, patterns_applied: answer.patterns_applied,
     checklist_edits: answer.checklist_edits ?? [],
   };
+  // AGT-239: the context's scope rides to the function; absent means weekly (all), as before.
+  if (SCOPES.includes(ctx.scope)) review.scope = ctx.scope;
   const r = await rest(base, key, "POST", "rpc/apply_audit_review", {
     p_cycle_id: hasCycle ? args["cycle-id"] : null,
     p_session_name: hasSession ? args["session-name"] : null,
@@ -479,7 +507,7 @@ async function main() {
   if (args.prepare) return prepare(args);
   if (args["dry-run"]) return dryRun(args);
   if (args.apply) return apply(args);
-  die(2, "usage: audit-review.js --prepare --week=<YYYY-Www> [--out=<path>] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> --week=<w> (--cycle-id=<uuid> | --session-name=<name>)");
+  die(2, "usage: audit-review.js --prepare --week=<YYYY-Www> [--weekly] [--out=<path>] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> --week=<w> (--cycle-id=<uuid> | --session-name=<name>)");
 }
 
 // Importing this module for its exports must never run the CLI (SES-45).

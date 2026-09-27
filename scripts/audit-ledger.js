@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.661 | scripts/audit-ledger.js | AGT-239
+// FEATURE: AGT-239 -- toRow() passes a finding's `family` through (null when it names none), so a
+// flow check's `blocked`/`flow` and a run review's `outcome` land as written; a null is filled at
+// INSERT by trigger audit_findings_family from runner_settings.finding_families (D1).
+//
 // DeepBench v7.0.636 | scripts/audit-ledger.js | AGT-202
 // FEATURE: AGT-202 -- THE LEDGER STAMPS ITS OWN WEEK. `week` now defaults to isoWeek(new Date())
 // and is refused when malformed or still in the future: the table's CHECK only tests the SHAPE, so
@@ -321,6 +326,7 @@ export function toRow(finding, { week, foundBy, cycleId, sessionName, id, findin
     check_slug: finding.check_slug ?? null,
     cycle_id: cycleId ?? null,
     finding_type: findingTypeOf(finding, findingType),
+    family: finding.family ?? null,
   };
 }
 

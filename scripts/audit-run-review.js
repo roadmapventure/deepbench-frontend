@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// DeepBench v7.0.661 | scripts/audit-run-review.js | AGT-239
+// FEATURE: AGT-239 -- OUTCOMES FIRST. After the gate passes, --prepare asks public.audit_flow_checks()
+// for the four flow checks (ships not closed, a verdict gate red for days, wasted cycles, filing
+// outpacing closing), FILES what it returns through audit-ledger.js's one intake under found_by
+// `auditor:flow:<cycle id>` (the SQL's fixed governing_fact makes a second run the same week `seen`),
+// and reads the open `service` findings (db_health_tick()'s). The doc now leads with both, so the
+// reviewer reads the service and the flow before the record: keys service, flow, cycle, items,
+// verdicts, ci, filings, prior. --ingest keeps a finding's `family` only when it is `outcome`;
+// anything else goes in null and the ledger's trigger files it by found_by (`paperwork`).
+//
 // DeepBench v7.0.602 | scripts/audit-run-review.js | AGT-137
 // FEATURE: AGT-137 -- THE AUDITOR REVIEWS ONE RUN, THE WEEK IT HAPPENS. Measured live 2026-09-25:
 // there was no `audit-run-review` among the seven `audit-*` capabilities and no `run-review` string
@@ -134,6 +144,15 @@ export function restTransports(base, key) {
     if (!res.ok) throw new Error(`read ${String(q).split("?")[0]} returned HTTP ${res.status}`);
     return res.json();
   };
+  const rpc = async (fn, body) => {
+    const res = await fetch(`${base}/rest/v1/rpc/${fn}`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+    if (!res.ok) throw new Error(`rpc ${fn} returned HTTP ${res.status}`);
+    return res.json();
+  };
   const post = async (table, body) => {
     const res = await fetch(`${base}/rest/v1/${table}`, {
       method: "POST",
@@ -142,12 +161,31 @@ export function restTransports(base, key) {
     });
     if (!res.ok) throw new Error(`${table} insert returned HTTP ${res.status}`);
   };
-  return { get, post };
+  return { get, post, rpc };
 }
 
 // The six reads. `runner_cycles` carries no `gate_failed` column (measured 2026-09-26 against
 // information_schema) -- the gates live on `runner_verdicts` as gate_build / gate_regression /
 // gate_hygiene, which the third read carries, so nothing about the gates is lost.
+// AGT-239 -- the flow checks, filed, and the open service findings. `post` here is the same
+// transport the ingest uses; the rpc call is a POST because PostgREST exposes functions that way,
+// but audit_flow_checks() is STABLE and writes nothing -- the only writes are ingestFindings()'s,
+// each behind its before-image. An empty flow list files nothing and makes no ledger read.
+export async function readOutcomes(cycleId, get, rpc, post) {
+  const flow = await rpc("audit_flow_checks", {});
+  const list = Array.isArray(flow) ? flow : [];
+  let filed = { written: 0, summary: { new: 0, seen: 0, recurring: 0, ruledOut: 0 } };
+  if (list.length) {
+    filed = await ingestFindings({
+      findings: list, foundBy: `auditor:flow:${cycleId}`, findingType: "defect",
+      cycleId, apply: true, get, post,
+    });
+  }
+  const service = await get("audit_findings?family=eq.service&status=in.(open,carried)"
+    + "&select=id,check_slug,locations,governing_fact,proposed_resolution,created_at&order=created_at.desc");
+  return { service, flow: list, filed };
+}
+
 export async function readSix(cycleId, cycle, get) {
   const q = encodeURIComponent;
   const week = isoWeek(new Date());
@@ -162,7 +200,7 @@ export async function readSix(cycleId, cycle, get) {
   return { cycle, items, verdicts, ci, filings, prior };
 }
 
-async function doPrepare({ cycleId, out }, get) {
+async function doPrepare({ cycleId, out }, get, rpc, post) {
   const rows = await get(`runner_cycles?id=eq.${cycleId}&select=outcome,last_step,started_at,notes`);
   const gate = reviewGate(Array.isArray(rows) ? rows[0] : null);
   if (gate.code !== 0) {
@@ -170,12 +208,15 @@ async function doPrepare({ cycleId, out }, get) {
     else console.error(`audit-run-review: ${gate.reason}`);
     return gate.code;
   }
-  const doc = await readSix(cycleId, rows[0], get);
+  const outcomes = await readOutcomes(cycleId, get, rpc, post);
+  const six = await readSix(cycleId, rows[0], get);
+  const doc = { service: outcomes.service, flow: outcomes.flow, ...six };
   const dest = path.resolve(ROOT, out);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.writeFileSync(dest, JSON.stringify(doc, null, 2), "utf8");
   console.log(`audit-run-review: prepared ${cycleId} (${gate.reason}) -> ${out}: `
-    + `${doc.items.length} items, ${doc.verdicts.length} verdicts, ${doc.ci.length} ci, `
+    + `${doc.service.length} open service, ${doc.flow.length} flow (${outcomes.filed.written} filed, `
+    + `${outcomes.filed.summary.seen} seen), ${doc.items.length} items, ${doc.verdicts.length} verdicts, ${doc.ci.length} ci, `
     + `${doc.filings.length} filings, ${doc.prior.length} prior fingerprints`);
   return 0;
 }
@@ -187,8 +228,10 @@ async function doIngest({ ingest, apply, cycleId, sessionName }, get, post) {
   } catch (e) {
     throw new Error(`could not read --ingest=${ingest}: ${e.message}`);
   }
-  const findings = Array.isArray(doc.findings) ? doc.findings : null;
-  if (!findings) throw new Error(`the --ingest file has no top-level \`findings\` array.`);
+  const raw = Array.isArray(doc.findings) ? doc.findings : null;
+  if (!raw) throw new Error(`the --ingest file has no top-level \`findings\` array.`);
+  // AGT-239 -- only `outcome` is the reviewer's to set; anything else is filed by found_by.
+  const findings = raw.map(f => ({ ...f, family: f && f.family === "outcome" ? "outcome" : null }));
   const week = isoWeek(new Date());
   // One attribution, and a `found_by` that says which run was reviewed -- trigger `audit_findings_guard()`
   // (migration `20260926114350` dropped the CHECK `audit_findings_found_by_single`) refuses a joined value, so this is one string, never a list.
@@ -214,9 +257,9 @@ export async function run(argv, env = process.env) {
     console.error(`audit-run-review: ${c.error}`);
     return 2;
   }
-  const { get, post } = restTransports(c.base, c.key);
+  const { get, post, rpc } = restTransports(c.base, c.key);
   try {
-    return args.mode === "prepare" ? await doPrepare(args, get) : await doIngest(args, get, post);
+    return args.mode === "prepare" ? await doPrepare(args, get, rpc, post) : await doIngest(args, get, post);
   } catch (e) {
     console.error(`audit-run-review: ${e.message}`);
     return 2;

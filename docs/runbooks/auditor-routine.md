@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.587 | runbooks/auditor-routine.md | AGT-129 --task-file, delivered_at fix; AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
+<!-- DeepBench v7.0.661 | runbooks/auditor-routine.md | AGT-239 step 4 passes --weekly (paperwork is ruled here, not per run); the per-run review files the flow checks first; AGT-129 --task-file, delivered_at fix; AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
 # The Auditor routine — playbook and canonical prompt
 
 ## What this is
@@ -98,9 +98,9 @@ node scripts/audit-ledger.js --ingest=docs/audits/$W-candidates.json --week=$W -
 
 **Step 4 — the Development Manager's review, only when there is something to review.**
 ```
-node scripts/audit-review.js --prepare --week=$W --out=$S/ctx.json; echo "prepare exit $?"
+node scripts/audit-review.js --prepare --week=$W --weekly --out=$S/ctx.json; echo "prepare exit $?"
 ```
-Exit 3 → "nothing to review — no manager run" goes in the summary; skip to step 5. Exit 0 →
+`--weekly` keeps every family (`AGT-239`): the run tail's per-run review leaves `paperwork` findings for this one. Exit 3 → "nothing to review — no manager run" goes in the summary; skip to step 5. Exit 0 →
 ```
 node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json > $S/review.prompt.md
 node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
@@ -133,7 +133,7 @@ Called by `docs/runbooks/runner-cycle.md` step 9 **(7e)**, never by steps 0-7: O
 ```
 node scripts/audit-run-review.js --prepare --cycle-id=<the cycle id> --out=$S/run.json; echo "prepare exit $?"
 ```
-Exit 3 → say so and stop. Exit 0 → the file carries `{cycle, items, verdicts, ci, filings, prior}`:
+Exit 3 → say so and stop. Exit 0 → the prepare has already filed `public.audit_flow_checks()` (ships not closed, a verdict gate red for days, wasted cycles, filing outpacing closing) as `auditor:flow:<the cycle id>` findings through the one intake, and the file carries `{service, flow, cycle, items, verdicts, ci, filings, prior}` — the reviewer reads the open service findings and the flow before the record (`AGT-239`):
 ```
 node scripts/agent-prompt.js --agent=auditor --capability=audit-run-review --task-file=$S/run.json > $S/run-review.prompt.md
 node scripts/agent-prompt.js --agent=auditor --capability=audit-run-review --task-file=$S/run.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
