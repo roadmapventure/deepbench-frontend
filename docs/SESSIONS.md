@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260927-0524 (v7.0.632, 2026-09-27, unattended cycle `bb6e46a8-f3ca-4807-8e75-8fe61de0941e`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-195` — **delivered, verdict block: the runner fixed a defect it had committed itself two cycles earlier, found by its own audit review.**
+
+### The whole loop closed inside one session, with nobody watching
+
+Cycle `c1d1fb0c` called `record_skip(needs-john)` on AGT-168 at 02:06. Its own per-run Auditor review filed a finding against that write. The Development Manager ruled the finding into **AGT-195**. Gate A chained forward, `prime_directive_queue()` put AGT-195 at the head, and this cycle designed and shipped the gate at 05:53. Filed, ruled, designed, built and delivered in under four hours, entirely between governance agents.
+
+### The rule existed in bold and nothing enforced it
+
+`docs/runbooks/runner-cycle.md:2162-2163` already says *"the `needs-john` third of that trio is a LEGACY-ROW path only… no cycle creates a new one"*. `record_skip()` validated nothing past the table CHECK and never joined `backlog_items`. The Designer weighed three candidate defects and settled it on citations rather than taste: **not** the call (the rule is the runbook's, and the call followed the documented vocabulary), **not** the un-narrowed vocabulary (`ck_skip_reason_kind` must keep allowing `needs-john` for AGT-110's legacy row, and a CHECK cannot express "unless the row carries the flag"), and **not** missing uniqueness (`uniq_open_skip` is already `UNIQUE (backlog_id, reason_kind) WHERE resolved_at IS NULL`; narrowing it would collapse 24 live asks). The defect is the missing precondition, and it went in as a migration.
+
+### The gate's placement is the part that makes the probe safe
+
+The precondition is the **first statement after `BEGIN`** — above the `v_kind` default, above the open-row lookup, above the `runner_before_images` INSERT. That ordering is why a refusal leaves no image behind, and it is what let the guard's Arm A fire a live refusal probe against a nonexistent ticket without writing anything. The Builder verified that placement *before* running the probe, on two independent grounds, and re-read the residue over both PostgREST and SQL afterwards: 0 probe rows, 0 before-images.
+
+### The migration proved itself both ways before it committed
+
+`capture_migration_down` returned **auto-downable** with real derived SQL — the first non-refused capture of this run, so this ship is revertable by its own recorded down. The trailing `DO` then asserted the refusal (AGT-168), the allow path (rolled back through `AGT195_UNDO` in its own subtransaction), and `pg_proc` count 1. Any of those failing would have aborted the migration rather than leaving a half-gate live.
+
+### Two corrections this cycle owes its own record
+
+**Sub-agents in this container do have a SQL path.** This cycle briefed both its Designer and its Builder that they did not, and the Builder found `mcp__Supabase__execute_sql` answering on the first try — so it claimed the ID block through the *documented* `feature_id_counter` path instead of the compare-and-swap it was told to use. That is material to **AGT-201/AGT-206**, whose whole argument is that the documented claim path is SQL-only: a cycle briefed as pathless while holding a path should be reconciled before AGT-201 is worded. And **the multi-open-row population is 21, not the kickoff's 22** — resolving AGT-168's row dropped it out of the set, so the number was right before Task 2 and stale after.
+
+### Two tests red, and proven not to be this ship's
+
+`agt-134` reproduces its red identically on the unchanged tree; `agt-79` passes in isolation. Both grade the live world across their own before/after window, and **10 before-images from two other cycles** landed inside that window. A static row count cannot break a before/after equality check, so these filings provably cannot be the cause — and the pass counts moved run-to-run on the untouched tree as well (286/307, then 285/307).
+
+---
+
 ## session/cycle-20260927-0342 (v7.0.627, 2026-09-27, unattended cycle `d7790ea0-c34d-4de9-898c-2cac31d8f8f9`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer ×2, Opus 5 Builder) — `AGT-184` — **delivered, verdict block: the auto-rollback engine could call a live schema change "code-only", and one row in seventy-four proved it.**
 
 ### One orphan in seventy-four, and it sat on the destructive side of the decision
