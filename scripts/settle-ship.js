@@ -26,15 +26,22 @@
 // exist yet. The cycle row always does. The card PATCH is therefore CONDITIONAL on finding one, and
 // on the ordinary cycle it finds none and says so.
 //
-// `api_cost_dev_usd` IS NOT NULL, PROVEN THIS SESSION, AND THAT BOUNDS WHAT THE NULL BRANCH CAN DO.
-// A `PATCH {api_cost_dev_usd: null}` under `Prefer: tx=rollback` answers HTTP 400 / 23502, "null
-// value in column \"api_cost_dev_usd\" of relation \"runner_cycles\" violates not-null constraint".
-// The column cannot hold the `unpriced-rows` answer without a migration this session is not scoped
-// to apply. The resolution is the one that does not LIE: on `unpriced-rows` the cell is LEFT ALONE --
-// this script writes no figure at all rather than writing a 0 it knows is false -- and the absence is
-// recorded where it can be read, as `cost_basis: unpriced-rows` in `notes`, printed as
-// `cost_usd=null`. Writing 0 there would be the exact phantom-dollar defect this ticket exists to
-// remove. The NOT NULL constraint is reported as a finding, not patched around.
+// `api_cost_dev_usd` WAS NOT NULL UNTIL AGT-204 (v7.0.637); IT IS NULLABLE NOW AND THE BRANCH WRITES
+// THE NULL. HISTORY, kept because it explains the shape of the code below rather than describing it:
+// through v7.0.626-v7.0.636 a `PATCH {api_cost_dev_usd: null}` answered HTTP 400 / 23502, "null value
+// in column \"api_cost_dev_usd\" of relation \"runner_cycles\" violates not-null constraint", so the
+// `unpriced-rows` answer had nowhere to go. v7.0.626 took the only honest option left to it -- LEAVE
+// THE CELL ALONE and record the absence as `cost_basis: unpriced-rows` in `notes` -- and filed the
+// constraint as finding e5922187-882d-4d02-b37c-3ca3303cc2c1 rather than patching around it. AGT-204
+// dropped NOT NULL on BOTH cost columns (migration `agt204_cost_columns_nullable`), so `:241` is now
+// unconditional: the absence is stored AS the absence. The `notes` clause stays -- it is what says
+// WHICH branch produced the NULL, which the cell alone cannot.
+//
+// NOTHING WAS BACKFILLED, AND THAT IS A DESIGN DECISION, NOT AN OMISSION. All 729 cycle rows read 0
+// on `api_cost_dev_usd` and 726 of them on `api_cost_qa_usd` (three carry real figures: 1.2537,
+// 2.2656, 3.5144). Those zeros are not KNOWN wrong, and NULLing them would destroy the very
+// distinction this ticket creates. The column default also stays `0`. NULL means "we could not tell"
+// from AGT-204 forward; a historical 0 keeps saying exactly what it said before.
 // DeepBench v7.0.519 | scripts/settle-ship.js | SES-385 slice 2 -- THE CLOSE-OUT SETTLES ITSELF.
 //
 // THE DEFECT, measured on the live board rather than argued. `SES-385` slice 1 (`v7.0.506`) put the
@@ -210,11 +217,13 @@ function renderPlan({ ticket, kickoffRel, row, decided, plan, gatedOpen }) {
 // AGT-176 (part c) -- the write half. Two targets, one decision: the cycle row (always present at
 // step 7) and this cycle's ship card (usually absent at step 7, so conditional).
 //
-// THE NULL BRANCH WRITES NO FIGURE, AND THAT IS THE POINT OF THE TICKET. `api_cost_dev_usd` is NOT
-// NULL (proven: 23502 under Prefer: tx=rollback — see the header), so `unpriced-rows` cannot be
-// stored there. It is recorded in `notes` instead and the cell is left exactly as it was: this script
-// asserts no dollar figure it cannot stand behind. `runner_items.cost_usd` IS nullable, so the card
-// takes the NULL directly when a card exists.
+// THE NULL BRANCH WRITES THE NULL, AND THAT IS THE POINT OF THE TICKET. Since AGT-204 (v7.0.637)
+// `api_cost_dev_usd` is nullable, so `unpriced-rows` is stored there as NULL — the cell now says "we
+// could not tell" in its own right instead of keeping a default 0 that reads as a measurement. This
+// script still asserts no dollar figure it cannot stand behind; the difference is that the absence
+// is no longer invisible to anything that reads only the column. `notes` keeps `cost_basis: <basis>`
+// because two different branches can produce the same cell and only the basis separates them.
+// `runner_items.cost_usd` was already nullable, so the card takes the NULL directly when one exists.
 //
 // THE BEFORE-IMAGE ON `runner_cycles` IS A RECORD OF THE PRIOR VALUE, NOT A ONE-COMMAND UNDO:
 // `reversible_tables()` lists 16 tables and `runner_cycles` is not among them (`runner_items` IS), so
@@ -238,7 +247,8 @@ async function writeCost({ base, key, cycleId, cost }) {
   const notes = prior.includes(clause) ? prior : (prior.trim() === "" ? clause : `${prior} | ${clause}`);
 
   const cyclePatch = { notes };
-  if (cost.usd !== null) cyclePatch.api_cost_dev_usd = cost.usd;
+  // AGT-204: UNCONDITIONAL. The NULL is the answer, so it is written as the answer. See the block above.
+  cyclePatch.api_cost_dev_usd = cost.usd;
 
   const reasoning =
     `settle-ship.js resolved this cycle's own API cost with lib/activity-log.js's resolveCycleCost() over ` +
@@ -247,7 +257,7 @@ async function writeCost({ base, key, cycleId, cost }) {
     `(lanes billing nothing: ${[...SUBSCRIPTION_LANES].join(", ")}), never a positive \`executor\` match — that ` +
     `matches 0 rows platform-wide and would sum nothing while looking green. ` +
     (cost.usd === null
-      ? `\`api_cost_dev_usd\` is NOT NULL so the absence could not be stored as NULL; the cell was LEFT UNCHANGED rather than written 0, and the absence is recorded as \`${clause}\` in notes. `
+      ? `\`api_cost_dev_usd\` was SET TO NULL — the column became nullable in AGT-204 (v7.0.637), so the absence is now stored as the absence rather than left at the default 0, and \`${clause}\` in notes says which branch decided it. `
       : `\`api_cost_dev_usd\` = ${cost.usd}. `) +
     `The before-image on runner_cycles records the prior value but is NOT reversible by reverse_decision() — ` +
     `runner_cycles is not in reversible_tables(). AGT-176 part c. pattern:9 pattern:14`;
@@ -311,7 +321,7 @@ async function writeCost({ base, key, cycleId, cost }) {
   process.stdout.write(
     `  cost applied: decision ${decision}, ${images.length} before-image(s) · ` +
     `cost_usd=${cost.usd === null ? "null" : cost.usd} cost_basis=${cost.basis} · ` +
-    `runner_cycles.api_cost_dev_usd ${"api_cost_dev_usd" in cyclePatch ? `→ ${afterCycle.api_cost_dev_usd}` : `LEFT UNCHANGED at ${afterCycle.api_cost_dev_usd} (NOT NULL — the absence is in notes, never a false 0)`} · ${cardNote}\n`);
+    `runner_cycles.api_cost_dev_usd → ${afterCycle.api_cost_dev_usd === null ? "null" : afterCycle.api_cost_dev_usd} · ${cardNote}\n`);
 }
 
 async function main() {
