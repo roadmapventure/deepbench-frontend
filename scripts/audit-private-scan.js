@@ -7,7 +7,8 @@
 // findings, exit 0, before and after).
 //
 // WHY A SECOND ENTRY POINT RATHER THAN WIRING scanTree() INTO CI. Measured on this tree at the
-// ship, not recalled: 48 lines across 46 tracked files already carry a `vercel_bypass` value --
+// ship, not recalled: 42 lines across 42 tracked files (48 hits, 6 false positives before AGT-196)
+// already carry a `vercel_bypass` value --
 // every one of them historical residue under docs/kickoffs/, newest v7.0.85, so the literal
 // stopped propagating on its own. A CI step calling scanTree() would report those 48 standing
 // lines on every single run and be red forever, and a check that is always red is a check nobody
@@ -15,8 +16,8 @@
 // changed file: editing line 10 of a kickoff that carries the literal on line 155 stays green,
 // and only a line this change adds can go red.
 //
-// THIS IS PROPHYLACTIC AND SAYS SO OUT LOUD: it stops the 49th line and removes none of the 48.
-// Purging the existing ones is a ~46-file edit that needs John's own waiver of the 3-file cap,
+// THIS IS PROPHYLACTIC AND SAYS SO OUT LOUD: it stops the next line and removes none of the 42.
+// Purging the existing ones is a 42-file edit that needs John's own waiver of the 3-file cap,
 // and rotating the live bypass value is his alone. Neither is done here.
 //
 // FAIL CLOSED ON AN UNRESOLVABLE BASE -- exit 2, the same "could not run, never a pass" the
@@ -94,9 +95,18 @@ export const DETECTORS = [
   { kind: "vercel_bypass", group: 2,
     re: new RegExp("(x-vercel-protection-bypass[\"'`]?\\s*[:=]\\s*\\\\?[\"']?)" + NOT_PLACEHOLDER +
       "([^\\s\"'`\\\\<>&]{8,})", "gi") },
+  // AGT-196: `(?!\s*\()` -- a capture immediately followed by a call's `(` is the CALLEE, never a
+  // value (`const BYPASS_SECRET = loadBypassSecret();`). This is the syntactic discriminator that the
+  // mixed-case class needs, and it belongs HERE rather than in the ALLOWLIST: the live bypass value is
+  // itself 32 mixed-case alphanumerics, so widening the identifier row to `/^[A-Za-z][A-Za-z0-9_]+$/`
+  // would allowlist all 42 real hits and silently delete the detector (measured, AGT-196 item 4).
+  // `(?![A-Za-z0-9_-])` is what makes the lookahead bite: without it the greedy class BACKTRACKS one
+  // character to dodge the `(`, so a callee of 17+ characters still reports as a shortened value
+  // (measured: `loadTheBypassSecretX()` reported 19 of its 20 characters). Pinned to the maximal
+  // identifier run first, the pair reports the whole name or nothing.
   { kind: "vercel_bypass", group: 2,
     re: new RegExp("(bypass[\\s\\S]{0,80}?(?:value|secret)\\s*[:=]\\s*[`\"']?)" + NOT_PLACEHOLDER +
-      "([A-Za-z0-9_-]{16,})", "gi") },
+      "([A-Za-z0-9_-]{16,})(?![A-Za-z0-9_-])(?!\\s*\\()", "gi") },
   { kind: "secret_assignment", group: 2,
     re: new RegExp("([A-Za-z0-9_.-]*(?:KEY|TOKEN|SECRET|PASSWORD|BYPASS)[A-Za-z0-9_]*\\\\?[\"']?\\s*[:=]\\s*\\\\?[\"']?)" +
       NOT_REFERENCE + "([^\\s\"'`,;)\\\\<>]{16,})", "gi"),
@@ -120,9 +130,37 @@ export const ALLOWLIST = [
   { re: /^[A-Z][A-Z0-9_]+$/, reason: "identifier -- names the variable, not its value" },
   { re: /^(?:process\.)?env\./, reason: "environment reference" },
   { re: /\$\{/, reason: "template reference" },
+  // AGT-196: a brace-less shell reference. `docs/runbooks/mcp-server.md` documents the curl as
+  // `-H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET"`, which names the variable
+  // and never its value -- but it carries no `${`, so the template row above never saw it.
+  { re: /^\$[A-Za-z_][A-Za-z0-9_]*$/, reason: "shell variable reference -- names the variable, not its value" },
   { re: /SUPABASE_URL/, reason: "the project URL is public by design" },
   { re: /^sb_publishable_/, reason: "the publishable key ships in the browser bundle by design" },
 ];
+
+// AGT-196 -- THE ONE ALLOWLIST ENTRY POINT. Every allowlist question in this module goes through
+// here, so the skip guard in scanText() and its re-masking loop can never disagree about whether a
+// value is a leak: a value the guard declined to report would otherwise be re-masked (harmless) or,
+// worse, a value the guard allowlisted on the stripped form would stay unmasked in a neighbouring
+// hit's text. One function, two callers.
+//
+// THE TRAILING-PUNCTUATION STRIP is the fix's other half. A detector's value class is deliberately
+// wide -- row 1 accepts anything that is not whitespace or a quote -- so a header written in JS
+// (`"x-vercel-protection-bypass": BYPASS_SECRET,`) hands the allowlist `BYPASS_SECRET,` WITH the
+// comma, and `/^[A-Z][A-Z0-9_]+$/` does not match it. The identifier row is correct; what reached it
+// was not. So every row is tested against the value AND against the value with trailing `,;.:)]}`
+// removed, and the ROWS THEMSELVES ARE UNCHANGED -- widening a row to tolerate punctuation would
+// widen what it accepts everywhere else too.
+//
+// Returns the matching row's `reason` (a string a report can print) or null. Never the value.
+export function allowlistReason(value) {
+  const v = String(value ?? "");
+  const stripped = v.replace(/[,;.:)\]}]+$/, "");
+  for (const a of ALLOWLIST) {
+    if (a.re.test(v) || a.re.test(stripped)) return a.reason;
+  }
+  return null;
+}
 
 export function mask(value) {
   return `${String(value).slice(0, 4)}****`;
@@ -146,7 +184,7 @@ export function scanText(rel, text) {
         const name = d.group === 0 ? "" : (m[1] ?? "");
         if (!value || taken.has(value)) continue;
         if (d.accept && !d.accept(name, value)) continue;
-        if (ALLOWLIST.some(a => a.re.test(value))) continue;
+        if (allowlistReason(value)) continue;   // AGT-196: one entry point, punctuation stripped
         values.push(value);
       }
       if (!values.length) continue;
@@ -169,7 +207,7 @@ export function scanText(rel, text) {
       while ((m = d.re.exec(line)) !== null) {
         if (m[0].length === 0) { d.re.lastIndex++; continue; }
         const v = d.group === 0 ? m[0] : m[d.group];
-        if (v && h.text.includes(v) && !ALLOWLIST.some(a => a.re.test(v))) h.text = h.text.split(v).join(mask(v));
+        if (v && h.text.includes(v) && !allowlistReason(v)) h.text = h.text.split(v).join(mask(v));
       }
     }
   }
