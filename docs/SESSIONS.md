@@ -5,6 +5,34 @@
 
 ---
 
+## session/cycle-20260927-0006 (v7.0.618, 2026-09-27, unattended cycle `f4e24696-cc8a-4ab2-884c-500ceae6ccc3`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-170` slice 2 — **partial, verdict block: the gate shipped an hour earlier was naming tests that had never run, and the platform's own auditor caught it before any human saw the card.**
+
+### The loop closed on itself inside forty minutes
+
+The predecessor shipped AGT-170 slice 1 at v7.0.615 and wrote into its own ledger that *"no test is newly red by name because of this delivery."* Its `(7e)` Auditor review then read that claim against the run that actually graded, found the single newly-red name (`agt-103-auditor-home.test.mjs`) had no control run, and filed it `high`. `(7f)` routed all three findings **onto AGT-170** rather than new tickets. Gate A said `continue`, the chain opened this cycle in the same turn, and this slice proved the stronger version: `agt-103` is printed `[PASS]` at `baseline2.txt:225` and listed among the 71 **UNVERIFIED** at `:819` — it was never run. So was every other newly-red name either arm of slice 1 produced. The accusation was manufactured by the reader, not by the ship.
+
+### `readRegressionBaseline` counted "never run" as "was green"
+
+`tests/regression/run-all.js` prints a `NOT A FULL RUN:` line naming every part it skipped, and nothing read it. A test absent from the baseline's `[FAIL]` lines was therefore green *whether it passed or was never attempted*. The fix: `notRunTestsFrom`, `readRegressionBaseline` returning `{ names, unverified, source }`, a third delta state `unverifiedInBaseline`, and a new `--json` key. **The status rule is deliberately unchanged** — an unverified red still blocks. What changed is that it blocks as an unknown rather than as an accusation, which is step 4a's own asymmetry.
+
+### The precedence rule is a measured case, not a nicety
+
+A name can be in *both* lists, because `run-all.js` drains its not-run buffer on the FAIL arm too: 2 of the reference baseline's 18 failures (`agt-132-finding-routes`, `agt-86a-rulings-and-alerts`) were themselves in its not-run list. `names` outranks `unverified`, and that rule exists because the data demanded it.
+
+### Sequencing was decided on evidence, and the arming deferred a second time
+
+The Designer cut the arming slice rather than the defect fix, citing the Auditor's own proposed resolution — *before any runbook hands a baseline to a graded verdict* — because arming first would have put a reader that can invent a newly-red name in front of every ship, while leaving it unarmed only preserves today's already-known false block. Two files used of three; the third slot deliberately unspent. **What is still owed** is exactly 3 files: `docs/runbooks/runner-cycle.md`, `docs/runbooks/cycle-card.md` re-rendered for `SES-377`'s sha256, and `BYTES_AT_SHIP` re-pinned for `ses-424f`. It stays on AGT-170's own number, twice now, because it is the ticket's own acceptance criterion.
+
+### The trap the next slice has to respect
+
+A baseline captured **without credentials** declares far more not-run than a credentialed graded run does — so arming off such a capture would hand the gate an `unverified` list wide enough to swallow a genuinely newly-red test. The guard shipped here is `SUPABASE_SERVICE_KEY` in the conditional `ARMED` needle list, and it is the thing to check first when the arming lands.
+
+### A correction is appended, never edited
+
+Task 4 changed no file: it appended a labelled `CORRECTION` block to cycle `520c4add`'s `notes`, read back byte-identical ahead of the insertion point (19,434-byte prefix, md5 `c5a4071b…`) and idempotent on re-run. Step 7 §2 requires the Builder's `regression_summary` quote verbatim, so the wrong claim stays on the record with the correction beside it rather than being tidied away.
+
+---
+
 ## session/cycle-20260926-2140 (v7.0.615, 2026-09-26, unattended cycle `520c4add-d9b4-4505-9c2d-f2385b53f808`, `trigger = scheduled` — Opus 5 orchestrator, Opus 5 Development Manager, Opus 5 Designer, Opus 5 Builder) — `AGT-170` — **partial, verdict block: the regression gate can now grade the delta, and the thing that stopped it arming is a three-file coupling nobody had written down.**
 
 ### The gate blocked this ship for exactly the bug this ship fixes, and that is the honest outcome
