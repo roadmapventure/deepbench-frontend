@@ -745,15 +745,80 @@ export function failingTestsFrom(output) {
   return names.sort();
 }
 
+// Pure. The names `run-all.js` declared it did NOT fully run, sorted and unique.
+//
+// WHY A SECOND PARSE AT ALL, which is AGT-170 slice 2's whole reason for existing. `failingTestsFrom`
+// answers "which tests failed", and slice 1 built the delta out of that answer alone -- so a test
+// ABSENT from the baseline's `[FAIL]` lines was read as green on the unchanged tree. That inference is
+// only sound for a run that ran everything. `tests/regression/run-all.js:166-175` prints one
+// `NOT A FULL RUN:` line naming every test that declared a not-run part, and `:147` still counts those
+// tests `[PASS]` -- so the baseline's own output says "I never verified this" and slice 1 could not
+// hear it. Measured on this cycle's captures: the shipped rule named
+// `ses-413d-questions-scoreboard.test.mjs` newly red off a baseline that never ran it, and the other
+// arm named `agt-103-auditor-home.test.mjs` the same way. Two runs, two manufactured reds, and a
+// manufactured red costs a streak (`docs/ARCHITECTURE.md` §19v: the verdict is the ladder's input).
+//
+// LINE-ANCHORED, for the same mutant `failingTestsFrom` is anchored against and it is not a
+// hypothetical here: a failing test that asserts about this suite's own summary prints the notice
+// INSIDE its `[FAIL] name -- message` body, and a scan for the marker anywhere in the line would
+// harvest 71 names out of one message and mark the whole suite unverified. So the line is trimmed
+// (`run-all.js` does not indent this one, but a caller may hand over an indented capture) and it must
+// START with the marker.
+//
+// THE NAMES ARE THE `.js`/`.mjs` TOKENS BETWEEN THE FIRST `(` AND THE LAST `)`, because the notice's
+// own prose carries parentheses nowhere else but its tail sentence carries none -- `(${partialTests
+// .join(", ")})` is the only bracketed span, and taking the LAST `)` rather than the first survives a
+// future file name containing one. The `/\.m?js$/` filter is what keeps the count words ("71 tests")
+// and any prose fragment out of the set.
+//
+// NO NOTICE -> `[]`, AND THAT IS THE CORRECT DEFAULT rather than a fail-open one: `run-all.js` prints
+// the line iff `notRunParts > 0`, so its absence means the run declared nothing not-run, and for such
+// a run absence from `[FAIL]` genuinely IS green. The fail-closed direction lives in the caller --
+// `unverified` only ever ADDS names a delta must not call newly red.
+export function notRunTestsFrom(output) {
+  const MARKER = "NOT A FULL RUN:";
+  const names = [];
+  for (const raw of String(output ?? "").split("\n")) {
+    const line = raw.trim();
+    if (!line.startsWith(MARKER)) continue;
+    const open = line.indexOf("(");
+    const close = line.lastIndexOf(")");
+    if (open === -1 || close <= open) continue;
+    for (const token of line.slice(open + 1, close).split(",")) {
+      const name = token.trim();
+      if (/\.m?js$/.test(name) && !names.includes(name)) names.push(name);
+    }
+  }
+  return names.sort();
+}
+
 // Pure. The regression gate's status once the delta is taken into account.
 //
-//   absolute  what `gateStatus` said about the run: 'green' | 'red' | 'skipped'.
-//   baseline  the `[FAIL]` names from a run on the UNCHANGED tree, or null for "none handed over".
-//   post      the `[FAIL]` names from this run.
+//   absolute    what `gateStatus` said about the run: 'green' | 'red' | 'skipped'.
+//   baseline    the `[FAIL]` names from a run on the UNCHANGED tree, or null for "none handed over".
+//   post        the `[FAIL]` names from this run.
+//   unverified  (AGT-170 slice 2) the names that baseline run declared it did NOT fully run, minus the
+//               ones it also failed. Null or absent -> nothing was declared and every post name is
+//               either standing or newly red, exactly as slice 1 graded it.
 //
-// Returns { status, standing, newlyRed, reason }. `standing` and `newlyRed` are the two recorded
-// lists of fence 3 above; `reason` is built here rather than at the call site for the reason
-// `verdictFor`'s header gives -- a claim composed by its reader has no fixed home.
+// Returns { status, standing, newlyRed, unverifiedInBaseline, reason }. `standing`, `newlyRed` and
+// `unverifiedInBaseline` are the recorded lists of fence 3 above; `reason` is built here rather than at
+// the call site for the reason `verdictFor`'s header gives -- a claim composed by its reader has no
+// fixed home.
+//
+// AGT-170 SLICE 2 -- THE THIRD BUCKET, AND WHY IT IS NOT A FOURTH STATUS. Slice 1 partitioned `post`
+// into two: in the baseline -> standing, otherwise -> newly red. That `otherwise` was the bug. A test
+// the baseline never ran is not evidence of anything, so calling it newly red is an accusation this
+// delivery cannot answer -- and the verdict is the ladder's input (`docs/ARCHITECTURE.md` §19v), so the
+// accusation costs a streak. Measured on this cycle's own captures, BOTH arms slice 1 graded named a
+// test out of the baseline's 71-name not-run list and nothing else: `newlyRed` minus that list was `[]`
+// twice over.
+//
+// THE STATUS IS UNCHANGED IN EVERY CASE, which is the whole safety argument for touching a red -> green
+// rule a second time. An unverified red still blocks: `newlyRed` empty with `unverifiedInBaseline`
+// non-empty returns `absolute` -- the suite's own exit code, untouched, the same answer slice 1 gave.
+// What changes is only the CLAIM attached to the block. The ship does not move; the false accusation and
+// the streak reset it drives do.
 //
 // EVERY EXIT THAT IS NOT A PROVEN SUBSET LEAVES THE ABSOLUTE ANSWER ALONE. There are four of them
 // and they are listed together on purpose, because the fail-closed direction is the whole safety
@@ -772,8 +837,11 @@ export function failingTestsFrom(output) {
 export const REGRESSION_NO_BASELINE_REASON =
   "no baseline handed to the gate; the absolute exit code stands — fail closed (AGT-170)";
 
-export function regressionDelta({ absolute, baseline, post }) {
-  const none = (status, reason) => ({ status, standing: null, newlyRed: null, reason });
+export function regressionDelta({ absolute, baseline, post, unverified }) {
+  // Every fail-closed exit reports `unverifiedInBaseline: null` for the same reason it reports the other
+  // two lists as null -- nothing was graded, so no list may be published as if it had been. `[]` here
+  // would read as the positive fact "the baseline ran everything", off a baseline nobody parsed.
+  const none = (status, reason) => ({ status, standing: null, newlyRed: null, unverifiedInBaseline: null, reason });
 
   if (baseline === null || baseline === undefined) return none(absolute, REGRESSION_NO_BASELINE_REASON);
   if (!Array.isArray(baseline)) {
@@ -788,21 +856,59 @@ export function regressionDelta({ absolute, baseline, post }) {
 
   const baselineNames = baseline.map(n => String(n));
   const postNames = post.map(n => String(n));
-  const newlyRed = postNames.filter(n => !baselineNames.includes(n));
-  const standing = postNames.filter(n => baselineNames.includes(n));
+  // `unverified` is advisory and may be absent -- slice 1's callers pass three keys, and a reader that
+  // handed over no not-run set must grade exactly as slice 1 did rather than differently-by-accident.
+  const unverifiedNames = Array.isArray(unverified) ? unverified.map(n => String(n)) : [];
 
+  // ONE PASS, THREE BUCKETS, AND THE ORDER OF THE TESTS IS THE PRECEDENCE RULE. `baseline` is checked
+  // FIRST, so a name in both lists is standing: `run-all.js:157-162` drains the not-run buffer on the
+  // FAIL arm too, and a test that failed is a proven red whatever else it skipped. 2 of this cycle's 18
+  // baseline reds sit in both lists, so this is the measured case and not a defensive nicety. (The
+  // reader already subtracts `names` from `unverified`, so this is belt and braces on purpose: the
+  // function is exported and pure, and a caller that partitions differently must not be able to turn a
+  // proven standing red into an unverified one -- that is the only direction here that could launder a
+  // ship.)
+  const standing = [];
+  const unverifiedInBaseline = [];
+  const newlyRed = [];
+  for (const n of postNames) {
+    if (baselineNames.includes(n)) standing.push(n);
+    else if (unverifiedNames.includes(n)) unverifiedInBaseline.push(n);
+    else newlyRed.push(n);
+  }
+
+  // STILL FIRST, AND STILL BEFORE THE EMPTY-LIST TESTS BELOW. An empty `post` gives all three buckets
+  // empty, which the green test would read as a proven subset -- the most total failure the suite can
+  // have graded as its cleanest green. Keeping this exit ahead of them is the whole reason slice 1 wrote
+  // it here, and slice 2 adds a third empty list without changing that.
   if (!postNames.length) {
-    return { status: "red", standing, newlyRed,
+    return { status: "red", standing, newlyRed, unverifiedInBaseline: null,
       reason: `regression exited non-zero and named NO failing test, so there is no failing set to ` +
         `prove against the ${baselineNames.length}-name baseline -- fail closed (AGT-170)` };
   }
   if (newlyRed.length) {
-    return { status: "red", standing, newlyRed,
+    return { status: "red", standing, newlyRed, unverifiedInBaseline,
       reason: `regression RED on ${newlyRed.length} newly red ${newlyRed.length === 1 ? "test" : "tests"} ` +
         `this delivery must answer for: ${newlyRed.join(", ")} (absent from the ${baselineNames.length}-name ` +
         `baseline). ${standing.length} other red ${standing.length === 1 ? "test is" : "tests are"} standing (AGT-170)` };
   }
-  return { status: "green", standing, newlyRed,
+  // THE THIRD STATE. No name this run failed is absent from the baseline's knowledge, but at least one is
+  // a test the baseline DECLARED it never ran -- so there is no green to prove and no accusation to make.
+  // The status returned is `absolute`, which is provably "red" by the guard at the top of this function;
+  // it is written as `absolute` rather than the literal so the rule reads as what it is -- the suite's own
+  // exit code stands, the delta declining to move it -- rather than as a coincidence of two reds agreeing.
+  if (unverifiedInBaseline.length) {
+    const u = unverifiedInBaseline.length;
+    return { status: absolute, standing, newlyRed, unverifiedInBaseline,
+      reason: `regression ${absolute.toUpperCase()} and the absolute exit code STANDS: ${u} red ` +
+        `${u === 1 ? "test is" : "tests are"} absent from the ${baselineNames.length}-name baseline's ` +
+        `[FAIL] lines but named in its NOT A FULL RUN notice, so the unchanged tree never ran ` +
+        `${u === 1 ? "it" : "them"} and ${u === 1 ? "it is" : "they are"} UNVERIFIED rather than newly ` +
+        `red: ${unverifiedInBaseline.join(", ")}. 0 tests are newly red; ${standing.length} ` +
+        `${standing.length === 1 ? "is" : "are"} standing. Nothing is cleared -- an unverified red blocks ` +
+        `exactly as before, it is just not charged to this delivery (AGT-170)` };
+  }
+  return { status: "green", standing, newlyRed, unverifiedInBaseline,
     reason: `regression GREEN on the delta: all ${standing.length} red ${standing.length === 1 ? "test" : "tests"} ` +
       `in this run are in the ${baselineNames.length}-name baseline BY NAME (${standing.join(", ")}), and 0 are ` +
       `newly red. The suite's absolute exit code is red and stays reported as such (AGT-170)` };
@@ -820,14 +926,37 @@ export function regressionDelta({ absolute, baseline, post }) {
 // the fail-closed direction, but for the wrong reason and with a misleading report. It is null, and
 // the source says the file was empty. A file with real content and no `[FAIL]` line IS an empty
 // baseline, legitimately: the unchanged tree was green, so anything red here is this delivery's.
+//
+// AGT-170 SLICE 2 -- THE THIRD KEY, `unverified`, AND WHY ABSENCE FROM `[FAIL]` IS NOT ENOUGH. Slice 1
+// returned `names` and nothing else, so the delta had exactly two buckets: a post name the baseline
+// carried was standing, and every other post name was newly red. That second bucket silently asserted
+// "the unchanged tree ran this test and it passed" -- a claim the baseline's output cannot support when
+// the run declared parts not-run. `notRunTestsFrom` reads that declaration, and `unverified` is it MINUS
+// `names`.
+//
+// `names` OUTRANKS `unverified`, AND THAT PRECEDENCE IS A LIVE CASE, NOT A NICETY. `run-all.js:157-162`
+// drains the not-run buffer on the FAIL arm too -- deliberately, per its own comment: "a test that
+// declared a part and then failed still owns that declaration" -- so a test can appear in BOTH the
+// `[FAIL]` list and the notice. Measured on this cycle's baseline capture, 2 of its 18 red names
+// (`agt-132-finding-routes.test.mjs`, `agt-86a-rulings-and-alerts.test.mjs`) sit in both. Such a test is
+// a PROVEN red on the unchanged tree -- whatever it also skipped, it demonstrably failed -- so it must
+// stay standing rather than become unverified, or a real standing red would stop being provable and the
+// delta would lose the only bucket that can be shown green.
+//
+// THE NULL EXITS KEEP `unverified: null`, never `[]`. An empty list means "the baseline ran everything";
+// a baseline that was never read has no such fact to report, and reporting `[]` would let a downstream
+// reader conclude a full run from a file that does not exist. Same reasoning the null `names` above
+// already carries, and the same reasoning the delta's `unverifiedInBaseline: null` carries below.
 export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFileSync(f, "utf8")) {
-  if (!baselinePath) return { names: null, source: "no --regression-baseline passed; the gate grades the absolute exit code (AGT-170)" };
+  if (!baselinePath) return { names: null, unverified: null, source: "no --regression-baseline passed; the gate grades the absolute exit code (AGT-170)" };
   let text;
   try { text = readFile(baselinePath); }
-  catch (e) { return { names: null, source: `--regression-baseline=${baselinePath} could not be read (${e.message}); the gate grades the absolute exit code (AGT-170)` }; }
-  if (!String(text).trim()) return { names: null, source: `--regression-baseline=${baselinePath} is empty; the gate grades the absolute exit code (AGT-170)` };
+  catch (e) { return { names: null, unverified: null, source: `--regression-baseline=${baselinePath} could not be read (${e.message}); the gate grades the absolute exit code (AGT-170)` }; }
+  if (!String(text).trim()) return { names: null, unverified: null, source: `--regression-baseline=${baselinePath} is empty; the gate grades the absolute exit code (AGT-170)` };
   const names = failingTestsFrom(text);
-  return { names, source: `${baselinePath} (${names.length} red on the unchanged tree)` };
+  const unverified = notRunTestsFrom(text).filter(n => !names.includes(n));
+  return { names, unverified,
+    source: `${baselinePath} (${names.length} red on the unchanged tree, ${unverified.length} never run)` };
 }
 
 // The whole verdict rule, in one pure function.
@@ -2278,15 +2407,25 @@ async function main() {
   // delivery did not cause as this delivery's red.
   const baselineRead = readRegressionBaseline(regressionBaselinePath);
   const regressionAbsolute = gateResults.regression;
+  //
+  // AGT-170 SLICE 2: `unverified` rides in beside `baseline`. Both come off the SAME read of the SAME
+  // file, so the two lists cannot describe different baselines -- the defect
+  // `scripts/baseline-red-set.js`'s header records, applied one level down.
   const delta = regressionDelta({
     absolute: regressionAbsolute,
     baseline: baselineRead.names,
     post: gateFails.regression ?? null,
+    unverified: baselineRead.unverified,
   });
   gateResults.regression = delta.status;
   gateDetail.regression = `${gateDetail.regression} | delta: ${delta.standing === null ? "not graded" : delta.standing.length} standing, ` +
     `${delta.newlyRed === null ? "not graded" : delta.newlyRed.length} newly red` +
     `${delta.newlyRed && delta.newlyRed.length ? ` [${delta.newlyRed.join(", ")}]` : ""}` +
+    // Slice 2: the third count, and it is NAMED rather than counted alone for the same reason the newly
+    // red list is -- this line is what a later reader sees, and "1 unverified" with no name sends them
+    // back to re-run the suite to find out which. Silent when the count is 0 or nothing was graded, so a
+    // full-run baseline's detail line is byte-identical to slice 1's.
+    `${delta.unverifiedInBaseline && delta.unverifiedInBaseline.length ? `, ${delta.unverifiedInBaseline.length} unverified in baseline [${delta.unverifiedInBaseline.join(", ")}]` : ""}` +
     ` -- ${delta.reason}`;
 
   let { verdict, reasoning } = verdictFor(gateResults);
@@ -2537,6 +2676,12 @@ async function main() {
     regression_absolute: regressionAbsolute,
     regression_standing: delta.standing,
     regression_newly_red: delta.newlyRed,
+    // AGT-170 slice 2: the third list, published for the same reason as the other two -- a block whose
+    // reason says a test was never verified must let its reader check WHICH, from the grader that made
+    // the call rather than from a second run of a different instant. Null on every fail-closed exit and
+    // on a baseline that declared a full run; never stored in its own column (no migration, no
+    // `runner_verdicts` column -- the Designer's recorded call, JOHN-0925-DESIGNER-DECIDES).
+    regression_unverified_in_baseline: delta.unverifiedInBaseline,
     regression_fails: gateFails.regression ?? null,
     regression_baseline_source: baselineRead.source,
   };

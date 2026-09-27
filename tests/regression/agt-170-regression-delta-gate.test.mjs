@@ -1,4 +1,4 @@
-// DeepBench v7.0.615 | tests/regression/agt-170-regression-delta-gate.test.mjs | AGT-170
+// DeepBench v7.0.618 | tests/regression/agt-170-regression-delta-gate.test.mjs | AGT-170 (slices 1+2)
 //
 // FEATURE: AGT-170 -- THE REGRESSION GATE GRADES THE DELTA, NEVER THE SUITE'S ABSOLUTE EXIT CODE.
 // Measured on the unchanged tree at `e6676adc`: `regression suite: 279/298 passed`, exit 1, and a
@@ -63,15 +63,53 @@
 //     runbook carry the flag would be red until the arming ships; one that asserted it does NOT would
 //     go red the moment somebody correctly arms it. Conditional is the only shape that fights neither.
 
+//
+// ---- AGT-170 SLICE 2 (v7.0.618): THE BASELINE'S SILENCE IS NOT A PASS -------------------------------
+//
+// THE DEFECT SLICE 1 SHIPPED, measured on this cycle's own captures rather than reasoned about. Slice 1
+// partitioned this run's `[FAIL]` names in two: in the handed baseline -> standing, otherwise -> newly
+// red. That `otherwise` asserted the unchanged tree RAN the test and it passed. `run-all.js` prints one
+// `NOT A FULL RUN:` line naming every test that declared a not-run part and still counts those tests
+// `[PASS]` (`:147`), so a baseline can say in its own output "I never verified this" and slice 1 could
+// not hear it. Replaying slice 1's two captures through its own exports, EVERY newly red name either arm
+// produced was a test the baseline never ran: `newlyRed` minus the 71-name not-run list was `[]` twice.
+// A manufactured red is not a harmless over-block -- the verdict is the ladder's input
+// (`docs/ARCHITECTURE.md` §19v), so it costs a streak.
+//
+// (s2a) THE FIX AND THE SHIPPED RULE ON ONE FIXTURE, which is clause (b)'s discipline applied to slice 2:
+//     a baseline whose test is `[PASS]` AND named in the notice, `[FAIL]` in the post run, must read
+//     `newlyRed []` / `unverifiedInBaseline [it]` / `red` through the reader-plus-delta pair, and
+//     `newlyRed [it]` through slice 1's call shape -- the same function, one variable, the `unverified`
+//     argument. A guard that only asserted the new lists would pass against a helper that never accuses
+//     anybody of anything.
+//
+// (s2b) THE THREE NEGATIVE CONTROLS. The notice INSIDE a `[FAIL]` message harvests nothing (the same
+//     anchoring mutant as (a), and not hypothetical -- one message can carry 71 names). A name in BOTH
+//     the `[FAIL]` list and the notice reads `standing`, never unverified: `run-all.js:157-162` drains
+//     the not-run buffer on the FAIL arm too, 2 of this cycle's 18 baseline reds sit in both, and a
+//     proven red demoted to "never verified" is the one direction here that could launder a ship. And a
+//     baseline with no notice yields `unverified []`, leaving slice 1's green path byte-identical.
+//
+// (s2c) THE REAL PAIR, not a fixture, conditional on the captures being present. `AGT170_CAPTURE_DIR`
+//     names the cycle scratchpad holding `baseline2.txt` and `post-run2.txt`; absent -> `notRun()`, the
+//     declared gap rather than a silent skip, because those files are not in the repo and never will be.
+//     Where they are there, the pair must read `standing 18`, `newlyRed []`,
+//     `unverifiedInBaseline ["ses-413d-questions-scoreboard.test.mjs"]`, `red`.
+//
+// (s2d) THE ARMING NEEDLE GAINS `SUPABASE_SERVICE_KEY`, inside clause (g)'s conditional check. An
+//     uncredentialed baseline declares far more not-run than a credentialed graded run does, so a
+//     runbook that arms the flag off a capture taken without credentials would hand the gate an
+//     `unverified` list wide enough to absorb a real newly red test. The needle makes the runbook say so.
+
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { selfRun } from "./_lib/self-run.js";
+import { selfRun, notRun } from "./_lib/self-run.js";
 import { RUNBOOK_REL } from "../../scripts/render-cycle-card.js";
 import {
   GATES, gateStatus, verdictFor, failingTestsFrom, regressionDelta, readRegressionBaseline,
-  REGRESSION_NO_BASELINE_REASON,
+  REGRESSION_NO_BASELINE_REASON, notRunTestsFrom,
 } from "../../scripts/verifier.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -285,6 +323,210 @@ export default async function run() {
   assert.equal(combos, STATUSES.length ** 3, "all 27 combinations must be driven.");
   assert.equal(approves, 1, "exactly one of the 27 may approve, and it is the all-green one.");
 
+  // ================================================================================================
+  // ---- AGT-170 SLICE 2: THE BASELINE'S SILENCE IS NOT A PASS --------------------------------------
+  // ================================================================================================
+  //
+  // ---- (s2a) one fixture, two rules: the fix names nobody, slice 1 names the unverified test ------
+  //
+  // THE NOTICE FIXTURE IS PINNED TO ITS PRODUCER, same discipline as clause (a) and for the same
+  // reason: if run-all.js's notice template changes, that must surface here rather than as a silently
+  // empty not-run set. Both halves of the template are pinned -- the marker AND the parenthesised name
+  // list the parse reads.
+  assert.ok(runAllSrc.includes("`NOT A FULL RUN: ${notRunParts} ${p} declared not-run across ${partialTests.length} ${t} `"),
+    "tests/regression/run-all.js no longer prints the `NOT A FULL RUN: ...` notice in the shape " +
+    "notRunTestsFrom parses, so AGT-170 slice 2's whole not-run parse is reading for a marker nothing " +
+    "writes and every baseline will read as a full run. Re-measure the real output and re-pin this.");
+  assert.ok(runAllSrc.includes("`(${partialTests.join(\", \")}). Those parts are UNVERIFIED"),
+    "run-all.js's notice no longer carries the comma-joined file list in parentheses -- that span IS " +
+    "what notRunTestsFrom harvests, so the not-run set will be empty for every real capture.");
+  // The precedence rule below is only a real case because of THIS line: the drain happens on the FAIL
+  // arm too, so one test can be both a [FAIL] name and a not-run name.
+  assert.ok(runAllSrc.includes("const declared = takeNotRun();"),
+    "run-all.js no longer drains the not-run buffer per test, so a declaration can be attributed to " +
+    "the wrong file and the `names`-outranks-`unverified` precedence below is guarding a case that no " +
+    "longer arises the way it was measured. Re-derive it.");
+
+  // A baseline capture in run-all.js's real shape. `never-verified.test.mjs` is counted [PASS] and is
+  // ALSO named in the notice -- exactly the shape that fooled slice 1.
+  const notRunBaseline = [
+    "  [PASS] aaa-first.test.mjs",
+    "  [FAIL] standing-red.test.mjs -- expected 1 row, got 0",
+    "  [PASS] never-verified.test.mjs",
+    "       [NOT RUN] the write path -- credentials absent",
+    "",
+    "regression suite: 2/3 passed",
+    "NOT A FULL RUN: 1 part declared not-run across 1 test (never-verified.test.mjs). Those parts are " +
+      "UNVERIFIED -- a green suite does not cover them.",
+  ].join("\n");
+
+  const read2 = readRegressionBaseline("baseline2.txt", () => notRunBaseline);
+  assert.deepEqual(read2.names, ["standing-red.test.mjs"],
+    `the baseline's [FAIL] names must be unchanged by slice 2; got ${JSON.stringify(read2.names)}.`);
+  assert.deepEqual(read2.unverified, ["never-verified.test.mjs"],
+    `readRegressionBaseline must report the notice's names as \`unverified\`; got ` +
+    `${JSON.stringify(read2.unverified)}. A test the baseline never ran is the whole input slice 2 adds.`);
+  assert.ok(read2.source.includes("1 never run"),
+    `the source must carry the not-run count so the payload can be read without the file; got ` +
+    `"${read2.source}". "18 red" alone is the sentence slice 1 published while 71 tests went unrun.`);
+
+  // The post run: the standing red, plus the test the baseline never ran, now failing.
+  const post2 = ["never-verified.test.mjs", "standing-red.test.mjs"];
+
+  // THE FIXED RULE.
+  const fixed = regressionDelta({
+    absolute: "red", baseline: read2.names, post: post2, unverified: read2.unverified,
+  });
+  assert.deepEqual(fixed.newlyRed, [],
+    `a test the baseline DECLARED it never ran may not be newly red; got ` +
+    `${JSON.stringify(fixed.newlyRed)}. Absence from [FAIL] is evidence of a pass only for a run that ` +
+    `ran everything.`);
+  assert.deepEqual(fixed.unverifiedInBaseline, ["never-verified.test.mjs"],
+    `the third list must hold exactly the post names the baseline never ran; got ` +
+    `${JSON.stringify(fixed.unverifiedInBaseline)}.`);
+  assert.deepEqual(fixed.standing, ["standing-red.test.mjs"],
+    "the proven standing red must still be standing -- the third bucket may only take names the " +
+    "baseline's [FAIL] list does not carry.");
+  assert.equal(fixed.status, "red",
+    `an unverified red must STILL BLOCK: the status is the absolute exit code, untouched. Got ` +
+    `${fixed.status} -- ${fixed.reason}. Slice 2 removes a false accusation, never a stop ` +
+    `(pattern:166 -- a degrade does not remove a stop).`);
+  assert.ok(fixed.reason.includes("never-verified.test.mjs") && /UNVERIFIED/.test(fixed.reason),
+    `the reason must NAME each unverified test and say it is unverified -- the reason is what reaches ` +
+    `runner_verdicts, and a block that does not say why sends its reader back to re-run the suite. ` +
+    `Got "${fixed.reason}"`);
+  assert.ok(!/newly red (test|tests) this delivery must answer for/.test(fixed.reason),
+    `the third state's reason still accuses this delivery of a newly red test. Got "${fixed.reason}"`);
+
+  // THE CONTROL, AND IT IS THIS CLAUSE'S WHOLE POINT: slice 1's call shape, on the SAME fixture, with
+  // the SAME shipped function. One variable -- the `unverified` argument. If slice 2 changed nothing,
+  // both arms name never-verified.test.mjs and this assertion is the one that fires.
+  const sliceOne = regressionDelta({ absolute: "red", baseline: read2.names, post: post2 });
+  assert.deepEqual(sliceOne.newlyRed, ["never-verified.test.mjs"],
+    `slice 1's call shape (no \`unverified\` handed over) must still name the test newly red; got ` +
+    `${JSON.stringify(sliceOne.newlyRed)}. A reader that hands over no not-run set must grade exactly ` +
+    `as slice 1 did, or slice 2 changed the default instead of adding an input.`);
+  assert.notDeepEqual(fixed.newlyRed, sliceOne.newlyRed,
+    "both arms produced the same newly red list on one fixture -- the change did nothing, and a test " +
+    "that passes either way is not QA.");
+  assert.deepEqual(sliceOne.unverifiedInBaseline, [],
+    "with no not-run set handed over, the third list must be empty rather than null -- the partition " +
+    "ran, it just had nothing to put there.");
+
+  // ---- (s2b) the three negative controls ----------------------------------------------------------
+  //
+  // (1) THE NOTICE INSIDE A [FAIL] MESSAGE HARVESTS NOTHING. Not hypothetical: one such message can
+  // carry 71 names, and an unanchored scan would mark the entire suite unverified -- which would let a
+  // genuinely newly red test land in `unverifiedInBaseline` and be excused.
+  const poisoned = [
+    "  [FAIL] ses-424c-gate-card-census.test.mjs -- expected the line `NOT A FULL RUN: 3 parts " +
+      "declared not-run across 3 tests (aaa.test.mjs, bbb.test.mjs, ccc.test.mjs).`",
+    "regression suite: 297/298 passed",
+  ].join("\n");
+  assert.deepEqual(notRunTestsFrom(poisoned), [],
+    `notRunTestsFrom harvested names out of a failure MESSAGE body -- the parse is not anchored to the ` +
+    `start of the line. Got ${JSON.stringify(notRunTestsFrom(poisoned))}. Every name it harvests is a ` +
+    `name the delta will refuse to call newly red, so this mutant excuses real breakage.`);
+  const poisonedRead = readRegressionBaseline("poisoned.txt", () => poisoned);
+  assert.deepEqual(poisonedRead.unverified, [],
+    "a baseline whose only notice is quoted inside a failure message must report no unverified test.");
+  assert.deepEqual(
+    regressionDelta({ absolute: "red", baseline: poisonedRead.names, post: ["aaa.test.mjs"],
+      unverified: poisonedRead.unverified }).newlyRed,
+    ["aaa.test.mjs"],
+    "a name quoted inside a [FAIL] message was treated as unverified, so a real newly red test escaped " +
+    "the block. This is the anchoring mutant's consequence, asserted end to end rather than on the parse.");
+
+  // (2) A NAME IN BOTH LISTS IS STANDING, NEVER UNVERIFIED. The measured case: 2 of this cycle's 18
+  // baseline reds are also in its notice, because run-all.js drains the buffer on the FAIL arm too.
+  const bothBaseline = [
+    "  [FAIL] agt-132-finding-routes.test.mjs -- AssertionError: route absent",
+    "       [NOT RUN] the live probe -- credentials absent",
+    "",
+    "regression suite: 297/298 passed",
+    "NOT A FULL RUN: 1 part declared not-run across 1 test (agt-132-finding-routes.test.mjs). Those " +
+      "parts are UNVERIFIED -- a green suite does not cover them.",
+  ].join("\n");
+  const bothRead = readRegressionBaseline("both.txt", () => bothBaseline);
+  assert.deepEqual(bothRead.names, ["agt-132-finding-routes.test.mjs"], "the proven red must be a name.");
+  assert.deepEqual(bothRead.unverified, [],
+    `a test that FAILED is a proven red on the unchanged tree whatever else it skipped, so it must be ` +
+    `subtracted from \`unverified\`; got ${JSON.stringify(bothRead.unverified)}.`);
+  const bothDelta = regressionDelta({ absolute: "red", baseline: bothRead.names,
+    post: ["agt-132-finding-routes.test.mjs"], unverified: bothRead.unverified });
+  assert.deepEqual(bothDelta.standing, ["agt-132-finding-routes.test.mjs"],
+    "a name in both lists must read STANDING.");
+  assert.equal(bothDelta.status, "green",
+    `a run whose only red is a PROVEN baseline red must still grade green; got ${bothDelta.status} -- ` +
+    `${bothDelta.reason}. If the not-run notice can demote a proven red to "never verified", the ` +
+    `delta loses the only bucket it can ever show green and slice 2 broke slice 1.`);
+  // The precedence asserted on the PURE function too, against a caller that partitions wrongly: the
+  // reader already subtracts, so this pins the exported rule rather than the reader's arithmetic.
+  const wrongCaller = regressionDelta({ absolute: "red", baseline: ["x.test.mjs"], post: ["x.test.mjs"],
+    unverified: ["x.test.mjs"] });
+  assert.deepEqual(wrongCaller.standing, ["x.test.mjs"],
+    "`baseline` must be tested FIRST: a caller that puts one name in both lists may not be able to " +
+    "turn a proven standing red into an unverified one. That is the only direction here that could " +
+    "launder a ship.");
+  assert.deepEqual(wrongCaller.unverifiedInBaseline, [], "`names` outranks `unverified`, always.");
+
+  // (3) NO NOTICE -> `unverified []`, AND SLICE 1'S GREEN PATH IS BYTE-IDENTICAL.
+  const fullRun = [
+    "  [FAIL] standing-red.test.mjs -- boom",
+    "regression suite: 297/298 passed",
+  ].join("\n");
+  const fullRead = readRegressionBaseline("full.txt", () => fullRun);
+  assert.deepEqual(fullRead.unverified, [],
+    "a capture with no NOT A FULL RUN line declared nothing not-run, so absence from [FAIL] genuinely " +
+    "IS green and the unverified set must be empty rather than a guess.");
+  const fullDelta = regressionDelta({ absolute: "red", baseline: fullRead.names,
+    post: ["standing-red.test.mjs"], unverified: fullRead.unverified });
+  assert.equal(fullDelta.status, "green", "a full-run baseline's proven subset still grades green.");
+  assert.equal(
+    fullDelta.reason,
+    regressionDelta({ absolute: "red", baseline: fullRead.names, post: ["standing-red.test.mjs"] }).reason,
+    "the green reason changed wording when an empty not-run set was handed over. Slice 2 must be " +
+    "invisible on a full-run baseline -- same wording, same bytes, or every earlier recorded green " +
+    "reads as a different rule than the one that produced it.");
+
+  // ---- (s2c) the real pair, not a fixture ---------------------------------------------------------
+  //
+  // The captures are cycle scratchpad files and are not in the repo, so this clause is conditional and
+  // DECLARES its gap rather than skipping quietly (pattern:77) -- an invisible gap is indistinguishable
+  // from coverage.
+  const CAPTURES = process.env.AGT170_CAPTURE_DIR || "";
+  const capBaseline = CAPTURES ? path.join(CAPTURES, "baseline2.txt") : "";
+  const capPost = CAPTURES ? path.join(CAPTURES, "post-run2.txt") : "";
+  let realPair = "not run";
+  if (CAPTURES && fs.existsSync(capBaseline) && fs.existsSync(capPost)) {
+    const realRead = readRegressionBaseline(capBaseline);
+    const realPost = failingTestsFrom(fs.readFileSync(capPost, "utf8"));
+    const realDelta = regressionDelta({
+      absolute: "red", baseline: realRead.names, post: realPost, unverified: realRead.unverified,
+    });
+    assert.equal(realDelta.standing.length, 18,
+      `the real pair must read 18 standing; got ${realDelta.standing.length}. If the captures were ` +
+      `replaced, re-measure this clause against them rather than relaxing the number.`);
+    assert.deepEqual(realDelta.newlyRed, [],
+      `on the real pair the fixed rule must accuse nobody; got ${JSON.stringify(realDelta.newlyRed)}.`);
+    assert.deepEqual(realDelta.unverifiedInBaseline, ["ses-413d-questions-scoreboard.test.mjs"],
+      `the real pair's one escapee must land in the third list; got ` +
+      `${JSON.stringify(realDelta.unverifiedInBaseline)}.`);
+    assert.equal(realDelta.status, "red",
+      `the real pair must STILL BLOCK -- ${realDelta.status} means slice 2 cleared a ship it must not.`);
+    // The control on real data: slice 1's call shape manufactures the accusation.
+    const realSliceOne = regressionDelta({ absolute: "red", baseline: realRead.names, post: realPost });
+    assert.deepEqual(realSliceOne.newlyRed, ["ses-413d-questions-scoreboard.test.mjs"],
+      `slice 1's shape must still name the test on the real pair; got ` +
+      `${JSON.stringify(realSliceOne.newlyRed)}. Without this the real-data arm proves no difference.`);
+    realPair = `18 standing, 0 newly red, 1 unverified (${realDelta.status})`;
+  } else {
+    notRun("the real baseline2.txt / post-run2.txt pair",
+      `AGT170_CAPTURE_DIR is unset or the captures are absent, so clause (s2c) ran on fixtures only. ` +
+      `Those files are cycle scratchpad captures and are never committed. Re-run with ` +
+      `AGT170_CAPTURE_DIR=<cycle scratchpad> to cover the real pair.`);
+  }
+
   // ---- (g) the code is wired, the procedure arms it, both with mutants ----------------------------
   const verifierSrc = fs.readFileSync(path.join(ROOT, VERIFIER_REL), "utf8");
   const WIRING = [
@@ -322,6 +564,12 @@ export default async function run() {
   const ARMED = [
     ["regression-baseline-", "nothing captures the baseline, so there is no file for 7a to pass and the flag is armed at a path that never exists"],
     ["AGT-116", "the caveat is unstated, so a reader cannot tell what a flaky green in the baseline costs"],
+    // AGT-170 slice 2. An UNCREDENTIALED capture declares far more not-run than a credentialed graded
+    // run does -- every credential-gated test in the suite adds itself to the notice -- so arming the
+    // flag off such a capture hands the gate an `unverified` list wide enough to absorb a genuinely
+    // newly red test. The baseline must be captured the same way the graded run is, and the runbook is
+    // where that is said.
+    ["SUPABASE_SERVICE_KEY", "the runbook does not say the baseline must be captured WITH credentials, so an uncredentialed capture's much wider not-run set can absorb a real newly red test"],
   ];
   const armedCheck = (src) => {
     if (!src.includes("--regression-baseline=")) return "inert";
@@ -350,6 +598,13 @@ export default async function run() {
     `AGT-116 matrix pairs may go green and never one with an escapee; ${approves} of ${combos} ` +
     `verdict combinations approve; ${VERIFIER_REL} is wired and declares the flag inert, ` +
     `${RUNBOOK_REL} reads ${arming}, both controls red`);
+  console.log(`  [AGT-170 slice 2] a baseline's NOT A FULL RUN name reads unverified, not newly red ` +
+    `(fixed: newlyRed [] + unverifiedInBaseline [never-verified.test.mjs], status red; slice 1's shape ` +
+    `on the same fixture: newlyRed [never-verified.test.mjs]); the notice quoted inside a [FAIL] ` +
+    `message harvests 0 names and a real newly red test still escapes nothing; a name in both lists ` +
+    `reads standing and still grades green; a full-run baseline's green reason is byte-identical to ` +
+    `slice 1's; the real capture pair reads ${realPair}; the arming needles now require ` +
+    `SUPABASE_SERVICE_KEY, control red`);
 }
 
 selfRun(import.meta.url, run);
