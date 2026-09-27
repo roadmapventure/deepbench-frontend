@@ -1,3 +1,12 @@
+// DeepBench v7.0.630 | tests/regression/SES-177-claude-state-renderer.js | AGT-191 — A CARD BELONGS TO
+// THE CYCLE THAT WROTE IT. Three arms added, and the size-clause fixture's `cards` map re-keyed from the
+// ticket `"SES-381"` onto the three RENDERED cycle ids (its size directions are unchanged). The
+// load-bearing assertion in `anEarlierSliceKeepsItsOwnCard()` is a DIFFERENCE, per SES-261/SES-354: the
+// retired by-ticket map is run on the SAME two real AGT-168 rows and must LOSE on the v7.0.619 bullet. A
+// test asserting only "a bullet rendered" passes on both forms and proves nothing — it was passing on
+// `origin/dev` while `3c489041`'s bullet published slice 6's title, the string `7.0.621` and a reversal
+// handle captured under `b873597f`.
+//
 // DeepBench v7.0.470 | tests/regression/SES-177-claude-state-renderer.js | SES-381 — the size clause
 // measures the SPLIT, not the ledger. The whole-file bar (`state.length < 6000`, v7.0.228) is RETIRED, not
 // deleted: STANDARDS §4 clause 1 is retargeted onto `skeletonChars()` (< 3,000) plus a string clause that
@@ -38,6 +47,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   bodyKeepsStandingLink, renderBullet, stripId, renderBody,
   isLedgerShip, versionRank, pickVersioned, LEDGER_FILTER, skeletonChars,
+  bulletProvenanceFinding,
 } from "../../scripts/render-claude-state.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -141,6 +151,16 @@ function aCycleWithNoShipCardRendersWithoutInventingASummary() {
   const body = renderBody([CY({ item_id: "SES-999" })], new Map());
   assert.ok(body.includes("SES-999"), "the ticket id must render");
   assert.ok(!/undefined|null/.test(body), "a missing card must not leak 'undefined'/'null' into the file");
+
+  // AGT-191 — the same honesty when a SIBLING cycle of the same ticket does have a card. Under the
+  // retired by-ticket join this row borrowed the sibling's summary; under the cycle join it renders the
+  // bare ticket and no prose, which is the same rule as the publish-only cycle above.
+  const sibling = renderBody([AGT168_SLICE5_ROW], new Map([[AGT168_SLICE6_ROW.id, AGT168_SLICE6_CARD]]));
+  const bullet = sibling.split("\n").find(l => l.startsWith("- "));
+  assert.ok(bullet.includes("**`AGT-168`**."),
+    `a cycle with no card of its own must render the bare ticket and stop, even when a sibling cycle of the same ticket has one -- got: ${bullet}`);
+  assert.ok(!bullet.includes("slice 6"), "the sibling cycle's summary must not be borrowed");
+  assert.ok(!bullet.includes("7.0.621"), "and neither must the sibling's version");
 }
 
 function theIdIsNotStutteredWhenTheCardTitleAlreadyCarriesIt() {
@@ -163,9 +183,10 @@ function theSizeClauseMeasuresTheSplitNotTheLedger() {
   // Direction 1 — verbose ship cards blow past the retired bar and must NOT trip the new clause.
   const rows = Array.from({ length: 10 }, (_, i) =>
     CY({ id: `${i}${i}${i}${i}${i}${i}${i}${i}-0000-4000-8000-00000000000${i}`, item_id: "SES-381" }));
-  const cards = new Map([["SES-381", {
-    title: "SES-381 — x", plain_after: "a".repeat(3000), plain_worth: "b".repeat(2000),
-  }]]);
+  // Keyed on the three RENDERED cycle ids, not the ticket (AGT-191): `renderBody` looks a card up by
+  // `cycle.id` now, and rows 1-3 are the only ones that become bullets.
+  const verbose = { title: "SES-381 — x", plain_after: "a".repeat(3000), plain_worth: "b".repeat(2000) };
+  const cards = new Map(rows.slice(0, 3).map(r => [r.id, verbose]));
   const big = renderBody(rows, cards);
   assert.ok(big.length >= 6000,
     `the fixture must exceed the retired bar — otherwise this control proves nothing (it is ${big.length} chars)`);
@@ -181,6 +202,99 @@ function theSizeClauseMeasuresTheSplitNotTheLedger() {
   assert.ok(skeletonChars(undone) >= 3000,
     `a re-inlined standing paragraph must trip the clause; the mutated skeleton is ${skeletonChars(undone)} chars`);
   assert.ok(undone.includes("**Next session:**"), "the string clause must see the re-inlined paragraph");
+}
+
+// ---------------------------------------------------------------------------
+// AGT-191 — A CARD BELONGS TO THE CYCLE THAT WROTE IT, NOT TO THE TICKET.
+// The two real AGT-168 rows and their two real cards, verbatim from `runner_cycles` / `runner_items`
+// 2026-09-27. AGT-168 has SIX ship cards, one per slice; these are slices 6 and 5. Real text, because the
+// assertions are about the version and the reversal handle the card's own prose carries.
+// ---------------------------------------------------------------------------
+const AGT168_SLICE6_ROW = {
+  id: "b873597f-fd93-4b50-afc4-ffd8da02532d", started_at: "2026-09-27T01:19:52.657907+00:00",
+  trigger: "chained (drain continuation)", model: "claude-opus-5", version: "v7.0.621",
+  item_id: "AGT-168", push_sha: "2a4e67802626f81260b40a184b20146ff9c5bea8", outcome: "shipped",
+};
+const AGT168_SLICE5_ROW = {
+  id: "3c489041-78a0-4ffb-a97b-99b705a1e344", started_at: "2026-09-27T00:22:54.374373+00:00",
+  trigger: "chained (drain continuation)", model: "claude-opus-5", version: "v7.0.619",
+  item_id: "AGT-168", push_sha: "d7431126f5dc05604fded8060fa860b2e81b9f72", outcome: "shipped",
+};
+const AGT168_SLICE6_CARD = {
+  backlog_id: "AGT-168", cycle_id: AGT168_SLICE6_ROW.id,
+  title: "AGT-168 — The last two home-path lines are out; the rest of the ticket is yours, slice 6 (Tooling · P9 - Bug Fixes)",
+  plain_after: "Now the repo publishes no home path outside one governed file, and the four things left on this ticket are named as yours rather than sliced thinner.",
+  plain_worth: "Slice 6, and the end of what the staff can reach on AGT-168; it stays partial. Shipped as v7.0.621. Reversible via decision 2179723b-eed4-47a2-8c93-cf2cda255fc4.",
+};
+const AGT168_SLICE5_CARD = {
+  backlog_id: "AGT-168", cycle_id: AGT168_SLICE5_ROW.id,
+  title: "AGT-168 — Three kickoff docs stop publishing a home path and a personal address, slice 5 (Tooling · P9 - Bug Fixes)",
+  plain_after: "Now they say the same things without the values, and the gate proves the redaction itself added no new copy.",
+  plain_worth: "Slice 5 of AGT-168; the ticket stays partial. Shipped as v7.0.619. Reversible via decision 01b9642c-a2eb-42d4-849b-e78e6fa5c752.",
+};
+// Cycle 3c489041's OWN decision ids, read live 2026-09-27 (`runner_decisions`).
+const SLICE5_DECISION_IDS = new Set([
+  "01b9642c-a2eb-42d4-849b-e78e6fa5c752",
+  "b22a122c-d21f-4516-ba68-0ca6593cbc1c",
+]);
+
+function anEarlierSliceKeepsItsOwnCard() {
+  const rows = [AGT168_SLICE6_ROW, AGT168_SLICE5_ROW];
+  const byCycle = new Map([
+    [AGT168_SLICE6_ROW.id, AGT168_SLICE6_CARD],
+    [AGT168_SLICE5_ROW.id, AGT168_SLICE5_CARD],
+  ]);
+  const shipped = renderBody(rows, byCycle);
+  const bullets = shipped.split("\n").filter(l => l.startsWith("- "));
+  assert.strictEqual(bullets.length, 2, "both AGT-168 rows must render as bullets");
+
+  const b619 = bullets.find(l => l.includes("v7.0.619"));
+  const b621 = bullets.find(l => l.includes("v7.0.621"));
+  assert.ok(b619 && b621, "one bullet per slice, each carrying its own version");
+  assert.ok(b619.includes("slice 5"), `the v7.0.619 bullet must carry SLICE 5's text -- got: ${b619}`);
+  assert.ok(!b619.includes("slice 6"), "and must not carry slice 6's");
+  assert.ok(!b619.includes("7.0.621"),
+    "the v7.0.619 bullet must not print the string 7.0.621 -- that is the live symptom, a version captured under b873597f published on an earlier slice's row");
+  assert.ok(!b619.includes("2179723b-eed4-47a2-8c93-cf2cda255fc4"),
+    "nor b873597f's reversal handle, which would offer John an undo that reverses a different cycle");
+  assert.ok(b621.includes("slice 6"), "the v7.0.621 bullet must carry slice 6's text");
+
+  // THE RETIRED BY-TICKET MAP, run on the SAME rows, must LOSE (SES-261 / SES-354 pattern). Both rows
+  // share `item_id` AGT-168, so the newest card per ticket -- slice 6 -- reached BOTH bullets.
+  const retiredKeyedByTicket = new Map([["AGT-168", AGT168_SLICE6_CARD]]);
+  const retired = renderBody(rows, new Map(rows.map(r => [r.id, retiredKeyedByTicket.get(r.item_id)])));
+  const retired619 = retired.split("\n").filter(l => l.startsWith("- ")).find(l => l.includes("v7.0.619"));
+  assert.ok(retired619.includes("slice 6"),
+    "the retired by-ticket join must print slice 6's text on the v7.0.619 bullet here -- if it does not, this control proves nothing");
+  assert.ok(retired619.includes("7.0.621"),
+    "and it must print the string 7.0.621 there -- the exact live symptom on 3c489041. If not, this control proves nothing");
+  assert.notStrictEqual(shipped, retired,
+    "old and new must DISAGREE on this fixture; an assertion that only a bullet rendered is satisfied by both and proves nothing");
+}
+
+function theProvenanceAssertionHasTeeth() {
+  const clean = bulletProvenanceFinding(AGT168_SLICE5_ROW, AGT168_SLICE5_CARD, SLICE5_DECISION_IDS);
+  assert.strictEqual(clean, null,
+    `the v7.0.619 row with its OWN card must be clean -- it names v7.0.619 and its own decision 01b9642c. Got: ${JSON.stringify(clean)}`);
+
+  const finding = bulletProvenanceFinding(AGT168_SLICE5_ROW, AGT168_SLICE6_CARD, SLICE5_DECISION_IDS);
+  assert.ok(finding, "the v7.0.619 row carrying slice 6's card must produce a finding -- that is the shipped bullet on origin/dev");
+  assert.strictEqual(finding.cycle_id, AGT168_SLICE5_ROW.id, "the finding must name the offending cycle");
+  assert.ok(finding.offending.some(t => t.replace(/^v/, "") === "7.0.621"),
+    `the finding must name the foreign version 7.0.621 -- got ${JSON.stringify(finding.offending)}`);
+  assert.ok(finding.offending.includes("2179723b-eed4-47a2-8c93-cf2cda255fc4"),
+    `the finding must name the foreign reversal handle -- got ${JSON.stringify(finding.offending)}`);
+  assert.ok(/runner_items/.test(finding.reason) && /generated/.test(finding.reason),
+    "the reason must send the reader to the CARD, never to a hand-edit of the generated file");
+
+  // A null card is not a finding -- a publish-only cycle has none, and refusing there would wedge it.
+  assert.strictEqual(bulletProvenanceFinding(AGT168_SLICE5_ROW, null, SLICE5_DECISION_IDS), null,
+    "a cycle with no card must be clean, not a refusal");
+  // ...and an empty decision set must not make an own-version card pass by accident: the uuid half has
+  // teeth on its own.
+  const noIds = bulletProvenanceFinding(AGT168_SLICE5_ROW, AGT168_SLICE5_CARD, new Set());
+  assert.ok(noIds && noIds.offending.includes("01b9642c-a2eb-42d4-849b-e78e6fa5c752"),
+    "a reversal handle that is not among the cycle's own decisions must be named, even when the version is right");
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +411,8 @@ function run() {
   theIdIsNotStutteredWhenTheCardTitleAlreadyCarriesIt();
   renderIsPureAndDeterministic();
   theSizeClauseMeasuresTheSplitNotTheLedger();
+  anEarlierSliceKeepsItsOwnCard();
+  theProvenanceAssertionHasTeeth();
   anAttendedMultiShipCycleIsTheVersionInDev();
   versionInDevIsTheHighestPushedVersionNotTheNewestStart();
   theQuerySendsThePushPredicate();
