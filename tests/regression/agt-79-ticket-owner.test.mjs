@@ -1129,6 +1129,7 @@ async function main() {
     notRun("live census (part E)", why);
     notRun("write pass (part G)", why);
     notRun("judge gate (part K live)", why);
+    notRun("lockstep constraint arm (part N)", why);
     return;
   }
 
