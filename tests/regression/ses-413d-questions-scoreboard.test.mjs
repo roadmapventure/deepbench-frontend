@@ -161,7 +161,16 @@ export const RUNBOOK_CEILING = 381000;
 // kickoff projected.
 // Net 379993 -> 380270 B, 730 B under the ceiling. Re-measured with wc -c and re-pinned in the
 // same commit as the edit.
-export const BYTES_AT_SHIP = 380270;
+//
+// v7.0.650 (AGT-185) stops step 6 reciting a flat file/task pair 125 lines after step 5a computed
+// the real one, and rotates the header: v7.0.650 in at line 1, v7.0.535 out, its one zero-hit fact
+// relocated into the body under SES-164 step 2. Measured ON THE REBASED tree, not on the tree the
+// build ran against: the peer ship v7.0.648 had moved the baseline to 380270 B, so this stamp no
+// longer fit and the STAMP WAS TRIMMED rather than the ceiling raised -- net 380270 -> 380967 B, 33 B
+// under SES-336's ceiling. A stamp costs more than the sentence it records, and 33 B of headroom on
+// a 381,000 B ceiling is REPORTED, not absorbed: the next byte any cycle adds needs a real trim.
+// Re-measured with wc -c and re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 380967;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

@@ -52,13 +52,19 @@ export const PHRASE = "carrying an undecided gate card";
 export const ROTATED = "<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md";
 export const ROTATED_FULL = "<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7";
 export const THIS_STAMP = "<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3";
-// LATER_STAMP is whichever ship stamped the runbook LAST, so it is line 1; this slice's own
-// stamp only has to still be among the five. v7.0.602 (AGT-137, step 9's (7e)) rotated
-// v7.0.520 out and took line 1 from v7.0.555 (AGT-86 slice 8b); v7.0.610 (AGT-133, step 9's (7f))
-// rotated v7.0.531 out and took line 1 from v7.0.602.
-// rotated v7.0.531 out and took line 1 from v7.0.602; v7.0.641 (AGT-171, the fused (6) close+release)
-// rotated v7.0.532 out and took line 1 from v7.0.610.
-export const LATER_STAMP = "<!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171";
+// AGT-185 (v7.0.650) IS THE ROTATION THAT DROPPED THIS SLICE'S OWN STAMP, and this file changes
+// direction rather than being deleted with it. SES-164 step 2 is what makes that safe: a stamp may
+// retire only once every fact it alone named has a copy in the BODY, so the clause below now asserts
+// the stamp is GONE and the one zero-hit fact it named -- this guard's own filename -- is in the
+// body. A clause that still demanded the stamp's presence would forbid every future rotation past
+// this one, which is the unbounded growth check 7 exists to stop.
+export const RELOCATED_GUARD = "ses-424c-gate-card-census.test.mjs";
+// LATER_STAMP is whichever ship stamped the runbook LAST, so it is line 1. v7.0.602 (AGT-137, step
+// 9's (7e)) rotated v7.0.520 out and took line 1 from v7.0.555 (AGT-86 slice 8b); v7.0.610 (AGT-133,
+// step 9's (7f)) rotated v7.0.531 out and took line 1 from v7.0.602; v7.0.641 (AGT-171, the fused
+// (6) close+release) rotated v7.0.532 out and took line 1 from v7.0.610; v7.0.650 (AGT-185, the flat
+// pair stops travelling) rotated v7.0.535 -- THIS_STAMP -- out and took line 1 from v7.0.641.
+export const LATER_STAMP = "<!-- DeepBench v7.0.650 | runbooks/runner-cycle.md | AGT-185";
 
 // Each clause: {id, detail, test, breaks}. `test` reads the runbook; `breaks` is that clause's OWN
 // smallest mutation of the runbook text. Green-after-mutation is a failure of THIS file.
@@ -100,18 +106,21 @@ export const CLAUSES = [
     breaks: s => s.replace("Verdict `f3688e3e`\n  (`v7.0.517`) opened with the lane phrase", "Verdict unrecorded"),
   },
   {
-    id: "five-stamps-and-this-ship-is-the-first",
+    id: "five-stamps-and-this-slice-retired-into-the-body",
     detail:
-      "session-hygiene check 7 caps the runbook at 5 header stamps, and this ship's own stamp must " +
-      "be the first line -- a rotation that adds a sixth, or that files this slice below an older " +
-      "ship, is the unbounded growth the check exists to stop; since v7.0.555 (AGT-86 slice 8b moved " +
-      "step 4d to a pointer) a later ship's stamp is line 1 and this ship's stamp must still be " +
-      "among the five",
+      "session-hygiene check 7 caps the runbook at 5 header stamps, the newest ship's stamp is line " +
+      "1, and this slice's own stamp -- rotated out by v7.0.650 (AGT-185) -- is GONE from the header " +
+      "while the one fact it alone named, the guard filename, is in the BODY. That pair is SES-164 " +
+      "step 2: a stamp may retire, a fact may not, and a sixth stamp is the unbounded growth the " +
+      "check exists to stop",
     test: s => {
       const stamps = s.split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
-      return stamps.length === 5 && stamps[0].startsWith(LATER_STAMP) && stamps.some(l => l.startsWith(THIS_STAMP));
+      return stamps.length === 5
+        && stamps[0].startsWith(LATER_STAMP)
+        && !stamps.some(l => l.startsWith(THIS_STAMP))
+        && body(s).includes(RELOCATED_GUARD);
     },
-    breaks: s => s.replace(THIS_STAMP, "<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-999 slice 0"),
+    breaks: s => s.split(RELOCATED_GUARD).join("a guard file"),
   },
   {
     id: "the-v7-0-517-stamp-left-the-runbook",
@@ -119,7 +128,10 @@ export const CLAUSES = [
       "the rotation is only real if the stamp is GONE from the runbook -- a fifth stamp still " +
       "present means the count above was met by dropping somebody else's",
     test: s => !s.includes(ROTATED),
-    breaks: s => s.replace(THIS_STAMP, ROTATED + " | SES-378 slice 7 — re-added\n" + THIS_STAMP),
+    // AGT-185 dropped THIS_STAMP, so the old mutation (re-adding v7.0.517 beside it) became a no-op
+    // and this clause's control went vacuous -- the SES-158 failure, caught by the teeth check above.
+    // Re-adding the rotated stamp at line 1 needs no surviving anchor.
+    breaks: s => ROTATED_FULL + " — re-added -->\n" + s,
   },
 ];
 
@@ -181,7 +193,7 @@ async function run() {
 
   console.log(`[SES-424c] ${n} runbook clauses hold, each red under its own breaks(); the body ` +
     `(tail -n +6) carries the PHRASE "${PHRASE}", E1's gate-card exclusion and all three relocated ` +
-    `v7.0.517 facts; 5 header stamps with v7.0.602 first and v7.0.535 present, v7.0.517 out of the runbook and present ` +
+    `v7.0.517 facts; 5 header stamps with v7.0.650 first and v7.0.535 retired into the body (${RELOCATED_GUARD}), v7.0.517 out of the runbook and present ` +
     `exactly once in ${SESSIONS_REL}`);
 }
 

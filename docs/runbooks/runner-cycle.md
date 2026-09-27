@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.650 | runbooks/runner-cycle.md | AGT-185 — THE FLAT PAIR STOPS TRAVELLING: step 6 recited it 125 lines after step 5a computes the real pair from `class_autonomy()`; it now points there (`docs/STANDARDS.md` Section 2, one home). One-feature cap stays; not on the ladder. `scripts/verifier.js` gains `classCapPair(row)` so a verdict PRINTS the pair it graded (§19v); an unread row says not-graded. `CLAUDE.md:57` NOT edited (`STANDARDS.md:60`) — one yes/no `runner_questions` row. ROTATION: `v7.0.535` DROPPED, count 5, `SES-164` step 2 by grep FIRST — its one ZERO-hit fact (guard `ses-424c`) RELOCATED into `blocked_detail`'s census; "carrying an undecided gate card" keeps 1 body hit, `drain_epic_next` 19. Guard `agt-92-scope-cap-one-home.test.mjs`. -->
 <!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171 — THE (6) CLOSE RELEASES THE PUBLISH LEASE IN THE SAME STATEMENT: a CLOSED cycle held it 26 min (steals 17) because the release came after the (7e)/(7f) sub-agents. Nothing after (6) is leased; step 1's release block is gone; 0b probe (c) flags a closed holder. v7.0.532 DROPPED (docs/SESSIONS.md), 2 ZERO-hit facts RELOCATED to Reading 0; count 5. Guard agt-171-lease-released-at-close.test.mjs. -->
 <!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
 <!-- DeepBench v7.0.602 | runbooks/runner-cycle.md | AGT-137 — (7e): the Auditor reviews THIS run (`audit-run-review.js`). `v7.0.520` DROPPED, count 5. -->
 <!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b — STEP 4d IS A POINTER: the Auditor runs in its own routine (docs/runbooks/auditor-routine.md); :4720 names the fifteenth restorable table. ROTATION: v7.0.519 DROPPED, count held at 5, SES-164 step 2 by grep FIRST — all six named facts keep ≥1 body hit (`settle-ship.js` 2, `--remainder=` 2, `resolveDeliveryFiles` 1, `selfCertificationBlock` 1, `changedFilesFor` 1, `ses-379-changed-files-fail-closed` 1); none relocated into 7a. -->
-<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3 — AN ALL-GATED DRAIN IS NOT A FINISHED ONE: a member carrying an undecided gate card is out of both pick paths since slice 1, so `drain_epic_next`'s `blocked_detail` census now counts *"carrying an undecided gate card"*. `v7.0.517` VERBATIM to `docs/SESSIONS.md`, four ZERO-hit facts RELOCATED into 7a; count 5. Guard `ses-424c`. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -2266,7 +2266,8 @@ waits for John.
   blocked on another open ticket. **`blocked_detail` names which** — it is never a silent empty.
   Since `SES-424` a member carrying an undecided `gated_before_build` card is not work either, and
   `blocked_detail` counts it (*"carrying an undecided gate card"*): an all-gated list is not a
-  finished drain. **Fall through to the class-sorted board and build normally.** A drain must never
+  finished drain. Guard `ses-424c-gate-card-census.test.mjs` — relocated here from the retiring
+  `v7.0.535` stamp by `SES-164` step 2, the only fact it named with no copy in this body. **Fall through to the class-sorted board and build normally.** A drain must never
   end a cycle build-less — register B24's rule (B24 superseded 2026-09-01 by `M6-06`; `SES-285`,
   annotated `SES-289` — the one-build-per-cycle half survives that supersession and is what binds
   here), binding here for the same reason.
@@ -2822,8 +2823,9 @@ a feature mill). **Re-assert the lease (step 0) before the counter claim** — a
 after you were stolen from is a permanent gap at best — then claim your version atomically
 (`dev_version_counter`, SQL in
 `docs/runbooks/session-setup.md`). Write the kickoff doc
-(`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within the scope caps (one item, ≤3
-files, ≤4 tasks).
+(`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within **one item** and the file/task
+pair step 5a computed from `class_autonomy()` — never a pair recited here (`AGT-185`): the
+baseline and what a rung adds have one home, `docs/STANDARDS.md` Section 2.
 
 **IF YOUR BUILD APPLIES A MIGRATION, CAPTURE ITS DOWN FIRST — one call, immediately BEFORE
 `apply_migration` (`SES-182` slice 2, `v7.0.333`, migration `ses182_capture_migration_down`):**

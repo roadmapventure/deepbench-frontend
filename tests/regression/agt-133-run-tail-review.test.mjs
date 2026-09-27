@@ -127,10 +127,10 @@ async function run() {
     const stamps = md.split("\n").filter(l => l.startsWith("<!-- DeepBench v")).length;
     assert.equal(stamps, STAMP_COUNT,
       `check 7 caps the header at ${STAMP_COUNT} stamps; got ${stamps} -- a rotation drops one as it adds one`);
-    // AGT-171 (v7.0.641) took line 1 and rotated v7.0.532 out, so the NEWEST ship leads and this
+    // AGT-185 (v7.0.650) took line 1 and rotated v7.0.535 out, so the NEWEST ship leads and this
     // ship's own stamp only has to still be among the five -- ses-424c's LATER_STAMP/THIS_STAMP split.
-    assert.ok(md.startsWith("<!-- DeepBench v7.0.641 |"),
-      "the newest ship's stamp leads the header -- AGT-171 (v7.0.641) took line 1 from v7.0.610");
+    assert.ok(md.startsWith("<!-- DeepBench v7.0.650 |"),
+      "the newest ship's stamp leads the header -- AGT-185 (v7.0.650) took line 1 from v7.0.641");
     assert.ok(md.includes("v7.0.610 | runbooks/runner-cycle.md"),
       "and THIS ship's stamp must still be among the five -- a rotation that drops it loses (7f)'s record");
     assert.ok(!md.includes("v7.0.531 | runbooks/runner-cycle.md"),
