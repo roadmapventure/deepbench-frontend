@@ -137,7 +137,7 @@ export const NOTES = {
   "8b-bis":   { outcome: "exit 1 → claim one id block in ONE call, then --apply; exit 2 is never a pass", block: 1 },
   "8c":       { outcome: "age triggers, premise decides; on spare capacity, never instead of the build", block: 1 },
   "8d":       { outcome: "0 rows = nothing owed; one review per cycle, never instead of the build", block: 1 },
-  "9":        { outcome: "write the record, close your own row, THEN the gate; a continue is this turn", block: 1 },
+  "9":        { outcome: "write the record; ONE statement closes your row and releases the lease; THEN the gate", block: 2 },
 };
 
 export function runbookSha(md) {

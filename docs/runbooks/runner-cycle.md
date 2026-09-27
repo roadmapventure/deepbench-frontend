@@ -1,8 +1,8 @@
+<!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171 — THE (6) CLOSE RELEASES THE PUBLISH LEASE IN THE SAME STATEMENT: a CLOSED cycle held it 26 min (steals 17) because the release came after the (7e)/(7f) sub-agents. Nothing after (6) is leased; step 1's release block is gone; 0b probe (c) flags a closed holder. v7.0.532 DROPPED (docs/SESSIONS.md), 2 ZERO-hit facts RELOCATED to Reading 0; count 5. Guard agt-171-lease-released-at-close.test.mjs. -->
 <!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
 <!-- DeepBench v7.0.602 | runbooks/runner-cycle.md | AGT-137 — (7e): the Auditor reviews THIS run (`audit-run-review.js`). `v7.0.520` DROPPED, count 5. -->
 <!-- DeepBench v7.0.555 | runbooks/runner-cycle.md | AGT-86 slice 8b — STEP 4d IS A POINTER: the Auditor runs in its own routine (docs/runbooks/auditor-routine.md); :4720 names the fifteenth restorable table. ROTATION: v7.0.519 DROPPED, count held at 5, SES-164 step 2 by grep FIRST — all six named facts keep ≥1 body hit (`settle-ship.js` 2, `--remainder=` 2, `resolveDeliveryFiles` 1, `selfCertificationBlock` 1, `changedFilesFor` 1, `ses-379-changed-files-fail-closed` 1); none relocated into 7a. -->
 <!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3 — AN ALL-GATED DRAIN IS NOT A FINISHED ONE: a member carrying an undecided gate card is out of both pick paths since slice 1, so `drain_epic_next`'s `blocked_detail` census now counts *"carrying an undecided gate card"*. `v7.0.517` VERBATIM to `docs/SESSIONS.md`, four ZERO-hit facts RELOCATED into 7a; count 5. Guard `ses-424c`. -->
-<!-- DeepBench v7.0.532 | runbooks/runner-cycle.md | SES-423 slice 3 — A READING IS A DELTA, NEVER THE SESSION TOTAL: `get_session` counts the whole SESSION and a drain chain runs many cycles in one (`fd4e11f4` closed at 32,249,570; its continuation opened on that counter), so step 1 takes reading 0 at the INSERT (`tokens_at_open` in `notes`) and step 9 charges deltas. `v7.0.516` moved VERBATIM to `docs/SESSIONS.md`, two ZERO-hit facts RELOCATED; count 5. Guard `ses-423b`. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -452,9 +452,9 @@ SELECT id, started_at, item_id,
 -- (b) ticket claims past their 24h expiry (a session that vanished mid-build)
 SELECT backlog_id, claimed_by, claimed_at FROM public.backlog_items
  WHERE claimed_at < now() - INTERVAL '24 hours' AND claimed_by IS NOT NULL;
--- (c) the publish lease wedged past its 10-minute TTL
-SELECT holder, held_since FROM public.runner_lease
- WHERE id = 1 AND holder IS NOT NULL AND held_since < now() - INTERVAL '10 minutes';
+-- (c) the publish lease past its 10-minute TTL, or held by a CLOSED cycle (AGT-171: (6) releases it, so a closed holder means (6) was bypassed)
+SELECT l.holder, l.held_since, c.ended_at FROM public.runner_lease l LEFT JOIN public.runner_cycles c ON c.id = l.holder
+ WHERE l.id = 1 AND l.holder IS NOT NULL AND (l.held_since < now() - INTERVAL '10 minutes' OR c.ended_at IS NOT NULL);
 -- (d) the PERMISSION-STALL TRIPWIRE (SES-103): an open peer whose heartbeat is >20 min stale
 --     and who has not yet been reported — the fast detector John asked for.
 --     THE BASIS IS coalesce(heartbeat_at, started_at) — the SAME expression stall_watchdog()
@@ -630,23 +630,15 @@ value; found live, SES-78c).
 **Reading 0 (`SES-423`, `v7.0.532`): at this INSERT call `mcp__Claude_Code_Remote__get_session`
 (`session_id` omitted), sum the four `external_metadata.usage` fields and write
 `tokens_at_open: <sum>` into this row's `notes` — the counter is SESSION-cumulative and a chain
-runs several cycles in one session, so step 9 charges only the growth from here. Tool
+runs several cycles in one session (`fd4e11f4` closed at 32,249,570 and its continuation opened
+on that counter), so step 9 charges only the growth from here. Tool
 unavailable → `tokens_at_open: unmeasured`.**
 Every later step's evidence hangs off this row's id; "who is
 running right now" is `SELECT … FROM runner_cycles WHERE ended_at IS NULL` — and under
 parallel cycles (register B42) **multiple open rows are normal**, not a signal.
 
-**Release the PUBLISH lease at the end of your tail — and only if you took it.** Every cycle,
-even a wall-stop or a `failed` close, still runs the serial tail (its record must be written),
-so the release always happens there. The statement is holder-guarded so a cycle whose tail
-lease was TTL-stolen can never clobber the new holder:
-
-```sql
-UPDATE public.runner_lease
-   SET holder = NULL, released_at = now(), updated_at = now()
- WHERE id = 1 AND holder = '<your cycle id>'
-RETURNING released_at;   -- 0 rows = the tail lease was stolen; leave the new holder alone
-```
+**The publish lease is released by step 9's (6) statement — the row close and the release are
+one write (`AGT-171`); there is no separate release step.**
 
 **The routine's own prompt, checked as code (`AGT-102` slice 2, `v7.0.564`).**
 `docs/runbooks/routine-prompt.md` is the source and the live routine
@@ -4226,13 +4218,25 @@ one extra night marked new. **A CYCLE THAT DID NOT PUBLISH MUST NOT STAMP IT AT 
 bridge that is now the ordinary unattended case, and it follows from this rule rather than
 softening it: no publish means John saw nothing, so every one of those rows is still NEW and the
 stamp would eat the chip permanently. `SES-127`'s own fail direction — the worst case is one extra
-night marked new — is what makes leaving it unstamped the safe half; **(6)** close your `runner_cycles` row; **(7)** release the publish lease
-(holder-guarded statement in step 1); **(7a-bis)** re-grade the ships blocked for a cause outside themselves, **only if step 5's manager named any** — written out in its own `(7a-bis)` paragraph below, and it runs no gate (`SES-403`); **(7b)** sweep the decision windows — one idempotent call,
+night marked new — is what makes leaving it unstamped the safe half; **(6)** close your `runner_cycles` row AND release the publish lease in the ONE
+statement below (`AGT-171`) — `lease_released_at` NULL means your tail lease was TTL-stolen; leave
+the new holder alone; **(7)** retired into (6) — nothing after (6) holds the lease; **(7a-bis)** re-grade the ships blocked for a cause outside themselves, **only if step 5's manager named any** — written out in its own `(7a-bis)` paragraph below, and it runs no gate (`SES-403`); **(7b)** sweep the decision windows — one idempotent call,
 written out in its own `(7b)` paragraph below, whose **three** returned numbers go into the cycle
 `notes`; **(7c)** the class-understanding loop — one `due` check, written out in its own `(7c)`
 paragraph below, gated so it fires at most once a day; **(8)** continue the drain **in-session**, if and only if
-`drain_chain_gate()` below returns `continue` — otherwise end the session cleanly. The tail should take
-seconds to low minutes — everything long-running happened before it, in parallel.
+`drain_chain_gate()` below returns `continue` — otherwise end the session cleanly. The LEASED span (1)–(6) takes
+seconds to low minutes; (7a-bis)–(7f) run unleased and may take many minutes (`AGT-171`).
+
+**The (6) statement — the close and the release are one write (`AGT-171`):**
+
+```sql
+WITH released AS (
+  UPDATE public.runner_lease SET holder = NULL, released_at = now(), updated_at = now()
+   WHERE id = 1 AND holder = '<your cycle id>' RETURNING released_at)
+UPDATE public.runner_cycles c SET ended_at = now(), outcome = '<outcome>'
+ WHERE c.id = '<your cycle id>' AND c.ended_at IS NULL
+RETURNING c.ended_at, (SELECT released_at FROM released) AS lease_released_at;
+```
 
 **(7a-bis) RE-GRADE THE SHIPS BLOCKED FOR A CAUSE OUTSIDE THEMSELVES (`SES-403`).** <!-- FEATURE: SES-403 -->
 Only when step 5's manager named ids in `regrades` (read off `public.regradable_ships()`, which
@@ -4415,8 +4419,8 @@ Root-caused 2026-08-23 from John's *"find root cause why automation is stalling"
 §19v's *Operations* paragraph specifies the model (successive one-ticket cycles, 24×7), and John
 ordered the working form directly (in chat, 2026-08-23, `successional-review` session, replacing
 his `SES-141` ruling): **one ticket per CYCLE ROW stays the law; a session runs successive cycles
-while a drain stands.** Run this **after (6) and (7)** — never before your row is
-closed and the lease released:
+while a drain stands.** Run this **after (6)** — never before your row is
+closed, which released the lease:
 
 ```sql
 SELECT * FROM public.drain_chain_gate('<your cycle id>');

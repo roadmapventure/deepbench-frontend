@@ -56,7 +56,9 @@ export const THIS_STAMP = "<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | 
 // stamp only has to still be among the five. v7.0.602 (AGT-137, step 9's (7e)) rotated
 // v7.0.520 out and took line 1 from v7.0.555 (AGT-86 slice 8b); v7.0.610 (AGT-133, step 9's (7f))
 // rotated v7.0.531 out and took line 1 from v7.0.602.
-export const LATER_STAMP = "<!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133";
+// rotated v7.0.531 out and took line 1 from v7.0.602; v7.0.641 (AGT-171, the fused (6) close+release)
+// rotated v7.0.532 out and took line 1 from v7.0.610.
+export const LATER_STAMP = "<!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171";
 
 // Each clause: {id, detail, test, breaks}. `test` reads the runbook; `breaks` is that clause's OWN
 // smallest mutation of the runbook text. Green-after-mutation is a failure of THIS file.

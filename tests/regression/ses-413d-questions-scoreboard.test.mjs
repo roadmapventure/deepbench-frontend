@@ -138,7 +138,13 @@ export const RUNBOOK_CEILING = 381000;
 // Re-measured with wc -c and re-pinned in the same commit as the edit.
 // v7.0.640 (AGT-202) deletes `week:W, ` at :1291 and :2974 (16 B); no stamp, line count 4,706 held.
 // Net 379314 -> 379298 B, 1,702 B under the ceiling. Re-measured with wc -c and re-pinned in the same commit.
-export const BYTES_AT_SHIP = 379523;
+// v7.0.641 (AGT-171) fuses step 9's (6) close with the publish-lease release into ONE statement and
+// retires (7): step 1's release paragraph and its block come OUT (-10 lines), step 9 gains the fused
+// block, 0b's probe (c) also flags a CLOSED holder, and v7.0.532 is ROTATED OUT after RELOCATING its
+// two zero-hit facts (`fd4e11f4`, 32,249,570) into step 1's Reading 0 (SES-164 step 2, by grep first).
+// Net 379523 -> 380003 B, 997 B under the ceiling. Re-measured with wc -c and
+// re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 380003;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
