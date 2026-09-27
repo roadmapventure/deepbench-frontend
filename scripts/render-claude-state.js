@@ -304,6 +304,96 @@ export function renderingCycleFinding(fileText, cycleId) {
   };
 }
 
+// THE RENDER SAYS WHETHER THE SHIP CARD IT PRINTED EXISTS (AGT-199, v7.0.635) -- non-gating, pure, no
+// network. A SIBLING of `renderingCycleFinding` above and a DIFFERENT question: that one asks WHOSE ship
+// this file publishes (the pin), this one asks whether the bullet it published for THIS cycle was written
+// before that cycle's ship card existed.
+//
+// THE MEASURED GAP. Step 7a renders this file (`runner-cycle.md:3024-3029`); step 9 files the ship card
+// (`:4007-4010`); nothing re-renders in between or after. `renderBullet` above prints the card's
+// `plain_after` and `plain_worth`, so a render that runs BEFORE the card is filed emits the bare ticket
+// line -- correct for the ledger it read, and permanently missing the sentence John's briefing is for
+// (`docs/ARCHITECTURE.md` §19v). Live on this tree, 2 of tonight's 5 close-outs: `git show
+// ed368c9d:CLAUDE-STATE.md` line 12 is the bare `` **`AGT-194`**. `` committed 06:17:12Z while that
+// cycle's card `ab5bcbb4` was created 06:17:49Z; `f8fc2c91` line 12 is the same for `AGT-195`.
+//
+// WHY THE PIN CANNOT SEE IT, which is why this is a second function and not a branch in the first one:
+// `renderingCycleFinding` reads only the ledger pin, and on both files above the pin is correct -- the
+// cycle IS its own newest pushed row -- so it returns `null` on the very renders whose bullets are
+// card-less. The predicate that catches it is the render itself: compare the committed bullet with
+// `renderBullet(cycle, card)`, the function that wrote it. Nothing else is the real question.
+//
+// NON-GATING, on AGT-174's precedent and for its reason: this script keeps exactly ONE deliberate exit 2
+// (a body that lost the standing-brief link, John's fail-closed condition on gated card 37b22393), and a
+// second refusal path would wedge every close-out behind an ordering the cycle cannot fix from inside its
+// own render. Nothing here writes, dies, or reaches `main()`; `renderBody`, `renderBullet`,
+// `checkAgainstPin`, `LEDGER_FILTER` and `main()` are untouched.
+//
+// AT 7a THE CARD IS NOT YET FILED, so the honest reading every cycle is *card-missing*, and the finding
+// says exactly that rather than pretending the render could have known. `null` means nothing to report:
+// the bullet is a byte-exact render of a card that exists. The three kinds are different facts:
+//   - `state-render-no-bullet` -- this cycle has no bullet in the file at all (it fell off the last-3
+//     window, or the file is a render this cycle is absent from -- which is AGT-174's finding, not this
+//     one's, and saying so keeps the two apart).
+//   - `state-render-card-missing` -- the bullet IS what the renderer emits with NO card, and no card was
+//     read: the render ran before step 9. The remedy is the re-render.
+//   - `state-render-card-stale` -- the bullet is NOT what the renderer emits from the card now in hand:
+//     the committed line and the card disagree, whether the card exists (`card_exists: true`) or the
+//     bullet was rendered from one that is gone (`false`).
+// Consumer: scripts/verifier.js (`state_render_card` in `--json`, reported, never its own
+// `runner_verdicts` column -- AGT-170's convention). Guarded by
+// tests/regression/agt-199-ship-card-render.test.mjs.
+export function shipCardFinding(fileText, cycle, card) {
+  if (!cycle || !cycle.id) return null;
+  const id = String(cycle.id);
+  const short = id.slice(0, 8);
+  const remedy =
+    "Remedy: after the ship card is filed (step 9), re-run `node scripts/render-claude-state.js` and " +
+    "commit `CLAUDE-STATE.md` in the serial tail's snapshot push (runner-cycle.md tail (4)). Never " +
+    "hand-edit the file.";
+  const needle = "runner cycle `" + short + "`";
+  const bullet = String(fileText || "").split("\n")
+    .find(l => l.startsWith("- ") && l.includes(needle)) || null;
+  const expected = renderBullet(cycle, card || null);
+  if (bullet === null) {
+    return {
+      kind: "state-render-no-bullet",
+      cycle_id: id,
+      card_exists: Boolean(card),
+      bullet: null,
+      expected,
+      reason: `the committed CLAUDE-STATE.md carries no session bullet for this cycle (${short}), so it cannot be ` +
+        "shown to publish this cycle's ship card at all -- whether the file is a render this cycle is absent " +
+        `from (AGT-174's finding, read the CLAUDE-STATE line beside this one) or the bullet fell out of the ` +
+        `last-3 window. ${remedy}`,
+    };
+  }
+  if (bullet === expected) {
+    if (card) return null;
+    return {
+      kind: "state-render-card-missing",
+      cycle_id: id,
+      card_exists: false,
+      bullet,
+      expected,
+      reason: `the committed bullet for this cycle (${short}) is byte-exact what the renderer emits with NO ship ` +
+        "card, and no ship card was read for it: CLAUDE-STATE.md was rendered at step 7a, before the card was " +
+        "filed at step 9, so the ledger John judges from carries the bare ticket line without the card's plain " +
+        `sentence. ${remedy}`,
+    };
+  }
+  return {
+    kind: "state-render-card-stale",
+    cycle_id: id,
+    card_exists: Boolean(card),
+    bullet,
+    expected,
+    reason: `the committed bullet for this cycle (${short}) is not what the renderer emits from the ship card now ` +
+      `in hand (card_exists: ${Boolean(card)}): the committed line and the card disagree, so the file publishes a ` +
+      `bullet no current row would produce. ${remedy}`,
+  };
+}
+
 // EVERY BULLET'S VERSION AND REVERSAL HANDLE MUST BE ITS OWN (AGT-191, v7.0.630) -- pure, no network.
 //
 // The cycle join above makes the right card reach the right row. This asserts the card itself is not
