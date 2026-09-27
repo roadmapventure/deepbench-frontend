@@ -1,5 +1,40 @@
 #!/usr/bin/env node
-// DeepBench v7.0.525 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373 + SES-287 slices 1-2
+// DeepBench v7.0.627 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373 + SES-287 slices 1-2 + AGT-180 + AGT-184
+//
+// -- AGT-184 (v7.0.627): AN UNMOVED WATERMARK IS NOT PROOF OF A CODE-ONLY RANGE ------------
+//
+// WHAT WAS BROKEN, and it was the one direction the header below says must never be wrong.
+// rangeIsCodeOnly() compares two watermarks and NOTHING ELSE, so a cycle that touched a schema
+// object WITHOUT leaving a migration row behind reads as pure text: the watermark never moved,
+// decide() falls through to its last `return`, and the engine proposes reverting the code while the
+// schema change stands. Measured live 2026-09-27 on this very platform: runner_migration_downs held
+// 74 rows, 73 matched a migration by name, and ONE -- `agt138_researcher_route`, captured `refused`
+// 2026-09-26 -- matched none, because AGT-138 wrote `public.finding_routes` over PostgREST and never
+// applied a migration. Any red range holding that cycle answered `revert-and-card`, "code-only".
+//
+// THE SECOND WITNESS, and why it is the ledger rather than a wider watermark read. A down is only
+// ever captured BECAUSE a migration was about to be applied (§19v: no before-image logged -> the
+// write does not happen), so a captured down whose `up_name` matches no migration in the range is a
+// schema write with no watermark behind it. That is a fact read from the database on both sides --
+// the same standard the watermark itself is held to -- and it needs no new capture, no commit-message
+// scan and no diff.
+//
+// THREE PROPERTIES, each of which is how it gets rebuilt wrong:
+//   * IT KEYS ON THE ABSENCE OF A LEDGER ROW, never on a down existing. A cycle that captured a down
+//     for a migration that DID land is the ordinary schema case and still reaches the watermark
+//     branch above -- the QA triple pins exactly that difference.
+//   * A NON-ARRAY `cycleDowns` IS UNKNOWN, NOT EMPTY, and cards -- schemaPlanFor()'s reading of an
+//     absent `--migrations` and rangeIsCodeOnly()'s reading of an unknown watermark, applied here.
+//   * THE GATE SITS IMMEDIATELY BEFORE THE CODE-ONLY `return` and touches nothing above it.
+//     rangeIsCodeOnly(), TRIGGER_SOURCES, isRunGreen(), the SES-287 span gate and the schema-plan
+//     branch are byte-identical: a range whose watermark MOVED was already carded or already asked
+//     schemaPlanFor(), so this clause has only the one fall-through left to close.
+//
+// An omitted `cycleDowns` defaults to `[]`, so every pre-AGT-184 caller's answer is unchanged.
+// WHAT IS NOT COVERED, said here rather than left to be discovered: a cycle that captures NO down at
+// all leaves no signal in this ledger, and the writer-side half -- a cycle with no SQL path must stop
+// rather than write DML over PostgREST -- is John's to approve (`bd-guardrails`, filed by AGT-184).
+// Guarded by tests/regression/agt-184-ledger-orphan.test.mjs.
 //
 // -- SES-287 slice 2 (v7.0.525): THE REVERT CARD SETTLES ITS OWN OUTCOME --------------------
 // Slice 1 closed the range gate and made the REVERT_AND_CARD card say PLANNED instead of claiming
@@ -403,6 +438,35 @@ export function schemaPlanFor(migrations, downs) {
   };
 }
 
+// AGT-184. Which downs did the attributed cycle capture that NO migration in this range accounts
+// for? Pure, and it decides nothing -- decide() does, one branch below.
+//
+// `known:false` for a non-array `cycleDowns` is the same fail-closed reading schemaPlanFor() gives an
+// absent `--migrations`: not supplied is UNKNOWN, and unknown is not innocent. An EMPTY array is a
+// real answer ("this cycle captured nothing"), which is why the two are distinguished here rather
+// than collapsed -- collapsing them would make every legacy caller's silence read as a schema write.
+//
+// The match is by NAME, because `up_name` is the ledger's join key and the only column the two sides
+// share: runner_migration_downs carries no version, and a version is assigned by the migrator at
+// apply time -- which for an orphan never happened.
+export function ledgerOrphansIn(cycleDowns, migrations) {
+  if (!Array.isArray(cycleDowns)) return { orphans: [], known: false };
+
+  const landed = new Set(
+    (Array.isArray(migrations) ? migrations : [])
+      .map((m) => String(m?.name ?? ""))
+      .filter(Boolean)
+  );
+
+  const orphans = [];
+  for (const d of cycleDowns) {
+    const name = String(d?.up_name ?? "");
+    if (!name) continue;
+    if (!landed.has(name) && !orphans.includes(name)) orphans.push(name);
+  }
+  return { orphans, known: true };
+}
+
 // The whole rule, in one place, returning a named reason for every branch. A branch that returned
 // a bare action would put the "why" on the card's author instead of in the engine, which is how
 // two homes for one rule start.
@@ -417,6 +481,9 @@ export function decide(facts = {}) {
     migrations = [],
     downs = [],
     rangeShas = null,
+    // AGT-184. The downs the ATTRIBUTED cycle captured, read by up_name. Defaulted to [] so every
+    // pre-AGT-184 caller answers exactly as it did; a non-array is unknown and cards.
+    cycleDowns = [],
   } = facts;
 
   if (!TRIGGER_SOURCES.includes(trigger)) {
@@ -522,6 +589,35 @@ export function decide(facts = {}) {
     };
   }
 
+  // AGT-184, and it sits HERE -- the last gate before the one `return` that calls a range code-only.
+  // The watermark is unchanged, which is necessary and NOT sufficient: a cycle that touched a schema
+  // object without landing a migration moves no watermark at all, and reverting its code would leave
+  // that change standing. The ledger is the second witness.
+  const ledger = ledgerOrphansIn(cycleDowns, migrations);
+  if (!ledger.known || ledger.orphans.length > 0) {
+    const why =
+      ledger.orphans.length > 0
+        ? `the attributed cycle captured a migration down for ${ledger.orphans.length} name(s) that no ` +
+          `migration in this range carries (${ledger.orphans.join(", ")})`
+        : "the downs captured by the attributed cycle were not supplied, so whether one of them names a " +
+          "migration this range never landed is UNKNOWN -- unknown is not innocent, exactly as it is " +
+          "not for the watermark itself";
+    return {
+      action: ACTIONS.CARD_ONLY,
+      reason:
+        `${trigger} (${redDetail}) on unattended push ${headSha}. The migration watermark is unchanged at ` +
+        `${describeWatermark(currentWatermark)}, but ${why}. A down is only ever captured BECAUSE a ` +
+        `migration was about to be applied, so an unchanged watermark beside one is a schema write with no ` +
+        `watermark behind it -- not a code-only range. NO revert is planned: reverting the code would ` +
+        `leave that schema change standing, which is the one direction this engine must never get wrong.`,
+      attribution,
+      greenAnchor,
+      redDetail,
+      rangeSpan,
+      ledger,
+    };
+  }
+
   return {
     action: ACTIONS.REVERT_AND_CARD,
     reason:
@@ -532,6 +628,7 @@ export function decide(facts = {}) {
     redDetail,
     revertPlan: revertPlanFor(greenAnchor.commit_sha, headSha),
     rangeSpan,
+    ledger,
   };
 }
 
@@ -968,6 +1065,25 @@ export async function readMigrationDowns(base, key, names) {
   return { downs: r.rows };
 }
 
+// AGT-184. The downs THIS cycle captured, whatever they were named -- the other direction from
+// readMigrationDowns(), which starts from the migrations the cycle NAMED and can therefore never see
+// a down whose migration never landed. Keyed on captured_by_cycle, which capture_migration_down()
+// writes itself.
+//
+// No cycle id is NOT an error and NOT unknown: an unattributable red reaches ACTIONS.NONE long
+// before this fact is consulted, so `{downs: []}` is the honest answer. A REST failure IS an error
+// and main() fail(2)s on it -- reading "no orphans" out of a failed read is the false green.
+export async function readDownsCapturedBy(base, key, cycleId) {
+  if (!cycleId) return { downs: [] };
+  const r = await rest(
+    base,
+    key,
+    `runner_migration_downs?select=up_name,captured_at&captured_by_cycle=eq.${encodeURIComponent(cycleId)}`
+  );
+  if (r.error) return { error: `could not read the downs captured by cycle ${cycleId}: ${r.error}` };
+  return { downs: r.rows };
+}
+
 export async function readBeforeImages(base, key, cycleId) {
   if (!cycleId) return { images: [] };
   const r = await rest(base, key, `runner_before_images?select=table_name,pk_value&cycle_id=eq.${encodeURIComponent(cycleId)}`);
@@ -1280,8 +1396,16 @@ async function main() {
   if (anchorRes.error) fail(2, anchorRes.error);
   const cyclesRes = await readPushingCycles(base, key);
   if (cyclesRes.error) fail(2, cyclesRes.error);
+  // AGT-184. The attribution is needed HERE, one read early, because the ledger fact below is scoped
+  // to the attributed cycle -- decide() recomputes it from the same cycles list and must agree, which
+  // is why attributionOf() is CALLED rather than a second comparison written out (rangeCycleSpan()'s
+  // own reason: runner_cycles.push_sha is abbreviated by some cycles and the prefix match is
+  // load-bearing). No attribution -> no cycle -> {downs: []}, and decide() reaches ACTIONS.NONE anyway.
+  const attributed = attributionOf(headSha, cyclesRes.cycles);
   const downsRes = await readMigrationDowns(base, key, migrations.map((m) => m?.name));
   if (downsRes.error) fail(2, downsRes.error);
+  const cycleDownsRes = await readDownsCapturedBy(base, key, attributed?.cycleId ?? null);
+  if (cycleDownsRes.error) fail(2, cycleDownsRes.error);
 
   const decision = decide({
     trigger,
@@ -1292,6 +1416,10 @@ async function main() {
     cycles: cyclesRes.cycles,
     migrations,
     downs: downsRes.downs,
+    // AGT-184 sits ABOVE `rangeShas` on purpose: SES-287 assertion 7 grades `rangeShas` as the LAST
+    // key in this call (`/rangeShas,?\s*\n?\s*\}\);/`), which is how it proves the flag is threaded
+    // through rather than parsed and dropped. A new key appended after it reads as that defect.
+    cycleDowns: cycleDownsRes.downs,
     rangeShas,
   });
 
