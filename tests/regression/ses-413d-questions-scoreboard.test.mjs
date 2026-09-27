@@ -131,8 +131,12 @@ export const RUNBOOK_CEILING = 381000;
 // and the step-5 L-anchors `docs/runbooks/cycle-card.md` and `ses-378` pin stay valid). No stamp
 // rotation: HEADER_STAMPS is still 5 and `ses-424c` pins v7.0.610's stamp as line 1, so a sixth or a
 // re-ordered stamp would turn a green guard red. Net 377625 -> 379314 B, 1,686 B under the ceiling.
+// v7.0.639 (AGT-166) appends ONE sentence to the Accept-writes-`done` block (line 909, the end of the
+// Reverse bullet -- the kickoff said :908, which would have split that bullet's own sentence): a close
+// over a standing `block` is legal only when ratified. No new line and no stamp rotation, so the file is
+// still 4,706 lines and HEADER_STAMPS is still 5. Net 379314 -> 379539 B, 1,461 B under the ceiling.
 // Re-measured with wc -c and re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 379314;
+export const BYTES_AT_SHIP = 379539;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

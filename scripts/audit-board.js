@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // DeepBench v7.0.547 | scripts/audit-board.js | AGT-86 slice 4 -- BOARD-HEALTH AND WORK-QUALITY
 // CHECKS AS PLAIN CODE. The Auditor's CODE layer (AGT-86 §7/§10): five deterministic questions about
-// the backlog that no model needs to answer, asked over seven REST reads and written to ONE file.
+// the backlog that no model needs to answer, asked over eight REST reads and written to ONE file.
 //
 //   board-no-home         an open/partial row no project can ever pick: epic_id NULL, or its epic
 //                         has no project (prime_directive_queue() admits a row only through
@@ -15,7 +15,18 @@
 //                         the image -- a deferral reset nobody decided.
 //   board-stale           an 'open' row older than UNREVALIDATED_DAYS (ticket-owner.js, the SAME
 //                         number classifyBoard counts with) and never revalidated.
-//   quality-closed-red    a 'done' row whose LATEST verdict is 'block'.
+//   quality-closed-red    a 'done' row whose LATEST verdict is 'block' that was never RATIFIED
+//                         (AGT-166): no non-reversed ship/ticket-status decision and no accepted
+//                         ship card dated at or after that verdict. A ratified close is a recorded
+//                         judgment, not a contradiction -- the trigger
+//                         backlog_done_requires_verdict refuses the unratified ones outright.
+//
+// PAGING (AGT-166). PostgREST caps EVERY response at its max-rows (1,000 here) and says so only in
+// Content-Range, so a single `&limit=5000` read of the 1,077-row board came back with 1,000 rows and
+// no error: the board printed 497 homeless rows where SQL counted 546, and 394 stale where SQL
+// counted 441. readAll() now pages with `Range: <from>-<to>` until a short page arrives, and its
+// `limit` argument is the CEILING on the whole total instead of a per-request limit. Every paged
+// query must carry an `order=` -- an unordered page boundary is free to repeat or skip a row.
 //
 // VOLUME RULE. A check that yields more than AGGREGATE_OVER rows becomes ONE finding at ONE stable
 // location `audit-board/<slug>`, with the rule alone as governing_fact. audit-ledger.js's
@@ -55,7 +66,7 @@ const RULES = Object.freeze({
   "board-repeat-worked": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
   "board-deferral-undone": "A before-image recorded defer_status 'yes', the live row no longer says 'yes', and no runner_decisions row for that ticket is dated at or after the image: the deferral was reset without a decision.",
   "board-stale": "An open backlog row older than the unrevalidated-days fence that has never been revalidated is a suspect, not a plan.",
-  "quality-closed-red": "A backlog row marked done whose latest runner verdict is block was closed over a red verdict.",
+  "quality-closed-red": "A backlog row marked done whose latest runner verdict is block, and whose close no non-reversed ship or ticket-status decision and no accepted ship card ratified at or after that verdict, was closed over an unratified red verdict.",
 });
 const KINDS = Object.freeze({
   "board-no-home": "other",
@@ -69,7 +80,7 @@ const RESOLUTIONS = Object.freeze({
   "board-repeat-worked": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged.",
   "board-deferral-undone": "Restore defer_status 'yes', or record the decision that undid the deferral.",
   "board-stale": "Revalidate the row (set revalidated_at) or remove it.",
-  "quality-closed-red": "Re-open the row, or record an approve verdict that supersedes the block.",
+  "quality-closed-red": "Ratify the close with a ship or ticket-status decision dated at or after the block (or harvest John's Accept on its ship card), or re-open the row -- an unratified close over a block is now refused at write time.",
 });
 
 function finding(slug, id, evidence, fact) {
@@ -90,7 +101,7 @@ function nowMsOf(ctx) {
 }
 
 // --- the five pure checks: (board, ctx) -> finding[] -------------------------------------------
-// board = {items, epics, cycles, images, decisions, verdicts}; ctx = {now, N, unrevalidatedDays}.
+// board = {items, epics, cycles, images, decisions, accepts, verdicts}; ctx = {now, N, unrevalidatedDays}.
 
 export function checkNoHome(board) {
   const epics = new Map((board.epics ?? []).map(e => [e.id, e]));
@@ -171,6 +182,27 @@ export function checkStale(board, ctx) {
   return out;
 }
 
+// RATIFIED (AGT-166): the latest of a ticket's ratifying acts, dated at or after the block it
+// answers -- a non-reversed runner_decisions row of kind ship/ticket-status, or an accepted ship
+// card. It is the SAME predicate the trigger backlog_done_requires_verdict enforces at write time,
+// so the audit and the gate cannot disagree about which closes are legal.
+export function ratifiedAt(board, backlogId) {
+  let t = -Infinity;
+  for (const d of board.decisions ?? []) {
+    if (d.backlog_id !== backlogId) continue;
+    if (d.kind !== "ship" && d.kind !== "ticket-status") continue;
+    if (d.status === "reversed") continue;
+    const at = ts(d.decided_at);
+    if (Number.isFinite(at) && at > t) t = at;
+  }
+  for (const a of board.accepts ?? []) {
+    if (a.backlog_id !== backlogId) continue;
+    const at = ts(a.decided_at);
+    if (Number.isFinite(at) && at > t) t = at;
+  }
+  return t;
+}
+
 export function checkClosedRed(board) {
   const latest = new Map();
   for (const v of board.verdicts ?? []) {
@@ -184,7 +216,8 @@ export function checkClosedRed(board) {
     if (r.status !== "done") continue;
     const v = latest.get(r.backlog_id);
     if (!v || v.verdict !== "block") continue;
-    out.push(finding("quality-closed-red", r.backlog_id, `status done; latest verdict block at ${v.at}`));
+    if (ratifiedAt(board, r.backlog_id) >= v.t) continue; // ratified: a recorded judgment, not a contradiction
+    out.push(finding("quality-closed-red", r.backlog_id, `status done; latest verdict block at ${v.at}; never ratified`));
   }
   return out;
 }
@@ -224,10 +257,12 @@ function fail(message) {
   process.exit(2);
 }
 
-async function get(base, key, q) {
+async function get(base, key, q, extraHeaders) {
   let res;
   try {
-    res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${q}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${q}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, ...(extraHeaders ?? {}) },
+    });
   } catch (e) {
     fail(`could not reach the Supabase REST endpoint: ${e.message}`);
   }
@@ -236,28 +271,38 @@ async function get(base, key, q) {
   try { return JSON.parse(body); } catch (e) { fail(`Supabase REST returned a body that is not JSON: ${e.message}`); }
 }
 
-// A truncated read is not a board: a response AT its limit may have left rows behind (ticket-owner.js readAll).
+// A truncated read is not a board -- and `&limit=N` cannot detect the truncation, because PostgREST's
+// own max-rows cap (1,000) applies first and silently (AGT-166: 1,000 of 1,077 board rows, no error).
+// Page with Range instead, stop on the first SHORT page, and treat `limit` as the ceiling on the total.
+export const PAGE_ROWS = 1000;
 async function readAll(base, key, name, q, limit) {
-  const rows = await get(base, key, `${q}&limit=${limit}`);
-  if (!Array.isArray(rows)) fail(`the ${name} read came back non-array`);
-  if (rows.length >= limit) fail(`the ${name} read returned ${rows.length} rows at its limit of ${limit} -- truncated, refusing`);
-  return rows;
+  if (!/[?&]order=/.test(q)) fail(`the ${name} read has no order= clause -- an unordered page boundary may repeat or skip a row`);
+  const rows = [];
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const page = await get(base, key, q, { "Range-Unit": "items", Range: `${from}-${from + PAGE_ROWS - 1}` });
+    if (!Array.isArray(page)) fail(`the ${name} read came back non-array`);
+    rows.push(...page);
+    if (page.length < PAGE_ROWS) return rows;
+    if (rows.length >= limit) fail(`the ${name} read reached its ceiling of ${limit} rows and the last page was still full -- refusing a partial board`);
+  }
 }
 
 export async function readBoard(base, key) {
   const items = await readAll(base, key, "backlog_items",
     "backlog_items?select=id,backlog_id,status,epic_id,defer_status,filed_at,created_at,revalidated_at&order=backlog_id", 5000);
-  const epics = await readAll(base, key, "epics", "epics?select=id,project_id", 1000);
-  const cycles = await readAll(base, key, "runner_cycles", "runner_cycles?select=backlog_item_id,item_id", 20000);
+  const epics = await readAll(base, key, "epics", "epics?select=id,project_id&order=id", 1000);
+  const cycles = await readAll(base, key, "runner_cycles", "runner_cycles?select=backlog_item_id,item_id&order=id", 20000);
   const images = await readAll(base, key, "runner_before_images",
-    "runner_before_images?select=pk_value,row_data,created_at&table_name=eq.backlog_items&row_data->>defer_status=eq.yes", 10000);
+    "runner_before_images?select=pk_value,row_data,created_at&table_name=eq.backlog_items&row_data->>defer_status=eq.yes&order=id", 10000);
   const decisions = await readAll(base, key, "runner_decisions",
-    "runner_decisions?select=backlog_id,decided_at&backlog_id=not.is.null", 20000);
-  const verdicts = await readAll(base, key, "runner_verdicts", "runner_verdicts?select=backlog_id,verdict,created_at", 20000);
+    "runner_decisions?select=backlog_id,decided_at,kind,status&backlog_id=not.is.null&order=id", 20000);
+  const accepts = await readAll(base, key, "runner_items",
+    "runner_items?select=backlog_id,decided_at&kind=eq.ship&decision=eq.accept&order=id", 20000);
+  const verdicts = await readAll(base, key, "runner_verdicts", "runner_verdicts?select=backlog_id,verdict,created_at&order=id", 20000);
   const settings = await get(base, key, "runner_settings?select=chain_max_noship_streak&id=eq.1");
   const N = Array.isArray(settings) ? settings[0]?.chain_max_noship_streak : undefined;
   if (!Number.isInteger(N) || N < 1) fail(`runner_settings id=1 chain_max_noship_streak is not a positive integer (got ${JSON.stringify(N)})`);
-  return { board: { items, epics, cycles, images, decisions, verdicts }, N };
+  return { board: { items, epics, cycles, images, decisions, accepts, verdicts }, N };
 }
 
 async function main() {
@@ -274,7 +319,7 @@ async function main() {
   const findings = runChecks(board, ctx);
   const doc = { week: isoWeek(now), found_by: FOUND_BY, findings };
 
-  const lines = [`audit-board: ${doc.week} · ${findings.length} findings · streak cap ${N} · fence ${UNREVALIDATED_DAYS}d`];
+  const lines = [`audit-board: ${doc.week} · ${findings.length} findings · streak cap ${N} · fence ${UNREVALIDATED_DAYS}d · items read ${board.items.length}`];
   for (const slug of CHECK_SLUGS) {
     const raw = CHECKS[slug](board, ctx).length;
     const shape = raw > AGGREGATE_OVER ? "aggregate" : "per-row";
