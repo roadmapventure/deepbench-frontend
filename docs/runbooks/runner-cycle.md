@@ -4194,17 +4194,17 @@ requires you to notice and absorb; **(3)** write the harvested decisions idempot
 Accept branch is **retired** as a ladder input since `M6-07` (`SES-315`) — a `reverse` on a legacy
 `shipped` card is the only tap that still moves a rung here), store any reading/directive rows, and store any `asks` (`v7.0.145` — idempotent on
 `uniq_card_ask`) **and any `unblocks` (`SES-127`, `v7.0.162`)** **and any `settings` (`SES-143`,
-`v7.0.182` — see the block below)**; **(4)** re-export the backlog snapshot now that the harvest writes have
-landed — the fix for the one-harvest staleness `SES-109` found (`v7.0.149`). Re-run step 7's
-`scripts/export-backlog-snapshot.js`; the script is deterministic and prints `unchanged`,
-writing nothing, when John's taps moved no board row — the common case, and then there is
-nothing to push, so skip to (5). Only when it produced a diff do you commit
-`docs/backlog/BACKLOG-SNAPSHOT.md` and push it (`git fetch origin dev && git rebase origin/dev &&
+`v7.0.182` — see the block below)**; **(4)** re-export the backlog snapshot now that the harvest
+writes have landed. Re-run step 7's `scripts/export-backlog-snapshot.js`; the script is
+deterministic and prints `unchanged`, writing nothing, when John's taps moved no board row — the
+common case. Then re-run
+`SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js` because your ship card
+now exists. Commit whichever of `docs/backlog/BACKLOG-SNAPSHOT.md` and `CLAUDE-STATE.md` changed
+and push it (`git fetch origin dev && git rebase origin/dev &&
 git push origin HEAD:dev`, the rebase-retry×3 of step 7). **This is the one sanctioned second
-push of a cycle** — snapshot-only, inside the serial tail, guarded by the publish lease you
+push of a cycle** — those two files only, inside the serial tail, guarded by the publish lease you
 already hold (NOT the ticket claim, which step 7 released in its own statement after the push —
-`SES-106`, `v7.0.150`), and it fires
-only on cycles that actually changed the board, so the "one push per ship point" spirit holds. A
+`SES-106`, `v7.0.150`), so the "one push per ship point" spirit holds. A
 rebase conflict that survives the retries is not a wall: leave the snapshot one harvest stale
 exactly as before this fix — the next cycle's step-7 export captures the same writes — and note
 it in the cycle row; **(5)** rebuild cards from the DB's undecided set — **each with its More-info

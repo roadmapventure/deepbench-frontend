@@ -170,7 +170,19 @@ export const RUNBOOK_CEILING = 381000;
 // under SES-336's ceiling. A stamp costs more than the sentence it records, and 33 B of headroom on
 // a 381,000 B ceiling is REPORTED, not absorbed: the next byte any cycle adds needs a real trim.
 // Re-measured with wc -c and re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 380967;
+//
+// v7.0.656 (AGT-199) makes the serial tail's (4) re-render CLAUDE-STATE.md after step 9 has filed
+// the ship card, so the committed bullets stop rendering from a card that does not exist yet. With
+// 33 B of headroom the sentence had to pay for itself: two removals, each a single occurrence
+// file-wide and each already homed in docs/SESSIONS.md -- the `SES-109` one-harvest-staleness
+// history (71 B) and ", and it fires only on cycles that actually changed the board" (61 B, a
+// restatement of the `unchanged` clause three lines above it and newly FALSE, because a fresh ship
+// card diffs CLAUDE-STATE.md every cycle). No sixth header stamp: a stamp costs agt-133,
+// ses-424c and docs/SESSIONS.md on top of these three files, which the 3-file cap does not buy.
+// Net 380967 -> 380925 B, 75 B under the ceiling -- 42 B of that is headroom this ship did NOT
+// spend, and like the 33 B above it is REPORTED, not absorbed. Re-measured with wc -c and
+// re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 380925;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
@@ -183,6 +195,16 @@ export const METRICS = [
 // The instant this slice's migration landed. A scoreboard row taken at or after it MUST carry a
 // number; one taken before it carries NULL, because the column did not exist to be measured.
 export const SHIP_FLOOR = "2026-09-18T13:10:00.000Z";
+
+// The serial tail's step (4), sliced out of the runbook: its own `**(4)**` marker up to the
+// `**(5)**` that follows it. AGT-199's clause asserts INSIDE this slice, never file-wide: both
+// `render-claude-state.js` and `CLAUDE-STATE.md` occur elsewhere in the runbook (step 7a renders
+// the file), so a file-wide includes() would read green no matter what the tail says.
+const tail4 = s => {
+  const a = s.indexOf("**(4)** re-export the backlog snapshot");
+  const b = s.indexOf("**(5)** rebuild cards", a);
+  return a < 0 || b < 0 ? "" : s.slice(a, b);
+};
 
 // Every doc clause as {id, file, test, breaks, detail}. `breaks` is the clause's OWN mutation: the
 // smallest edit that should make it red. Green-after-mutation is a failure of this file, not a pass.
@@ -232,6 +254,19 @@ export const CLAUSES = [
       && s.includes("public.ticket_outcome")
       && !s.includes("becomes a scoreboard column in slice 4"),
     breaks: s => s.replace(`platform_scoreboard.${COLUMN}`, "becomes a scoreboard column in slice 4"),
+  },
+  {
+    id: "cycle-tail-rerenders-the-state",
+    file: CYCLE,
+    detail: "the serial tail's (4) re-renders CLAUDE-STATE.md -- naming both the renderer and the "
+      + "file -- because step 9 files the ship card BEFORE the tail runs, so the copy step 7a "
+      + "committed renders from a card that does not exist yet (AGT-199)",
+    test: s => {
+      const t = tail4(s);
+      return t.includes("node scripts/render-claude-state.js") && t.includes("`CLAUDE-STATE.md`");
+    },
+    breaks: s => s.replace("node scripts/render-claude-state.js` because your ship card",
+      "node scripts/export-backlog-snapshot.js` because your ship card"),
   },
 ];
 
