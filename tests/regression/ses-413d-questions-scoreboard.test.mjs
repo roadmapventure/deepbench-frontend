@@ -144,7 +144,14 @@ export const RUNBOOK_CEILING = 381000;
 // two zero-hit facts (`fd4e11f4`, 32,249,570) into step 1's Reading 0 (SES-164 step 2, by grep first).
 // Net 379523 -> 380003 B, 997 B under the ceiling. Re-measured with wc -c and
 // re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 380003;
+//
+// v7.0.645 (AGT-175) has four runbook lines stop restating what a row or a function decides: step 4c
+// cites `rankedTodayCycle()` instead of spelling out its once-per-day precondition, step 5(b) reads
+// the executing project off `prime_directive_queue()`'s `lane_note` instead of counting projects in
+// prose, and step 7 stops offering `partial` as a cycle close. Net 380003 -> 379993 B, 1,007 B under
+// the ceiling -- a citation is shorter than the fact it points at. Re-measured with wc -c and
+// re-pinned in the same commit as the edit.
+export const BYTES_AT_SHIP = 379993;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

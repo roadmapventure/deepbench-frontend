@@ -1883,9 +1883,9 @@ back is the design, not the `SES-218` defect.
 `v7.0.446`).** It was a Vercel cron (`/api/cron/rank-backlog`, `10 9 * * *`) until that route became
 the 13th serverless function on a 12-function Hobby plan and REFUSED every dev deploy from
 `v7.0.437`. The runner is already the schedule, so the job runs here instead, on subscription tokens
-rather than API dollars. Precondition: no `runner_cycles` row whose `notes` start
-`SCHEDULED-AGENT: rank-backlog` has an `ended_at` in the current America/Chicago day — one re-rank
-per day, on the first scheduled cycle that passes the walls. Two passes, the step-4b shape:
+rather than API dollars. Precondition, on the day's first scheduled cycle past the walls: the script
+checks this itself, so running the command IS the check and `already run today` on exit **0** answers
+it. Two passes, the two-pass shape:
 `node scripts/rank-backlog.js --cycle=<this cycle's id>` prints the Prioritizer's assembled prompt
 and exits **3**; run that prompt as a `prioritizer` sub-agent on the **judgment** lane (step 6's
 lanes table, never a literal), save its JSON, then re-run with
@@ -1966,7 +1966,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/run-project.js \
 
 **(a)** The assignment is *ticket, capability, engine* and **you execute it** — never re-derive the
 pick. **(b)** `--project` is the slug of the executing `public.projects` row that owns the queue's first
-row (three today, ranked by `priority`). **(c)** **Exit 2 naming a ticket other than the pick** → write
+row, which `prime_directive_queue()` names in `lane_note`. **(c)** **Exit 2 naming a ticket other than the pick** → write
 `MANAGER MISMATCH: assignment <X> vs queue head <Y>` in the cycle row notes, run the first
 `--record` of `SES-378`'s §4 with `--backlog=<X>` — `node scripts/staff-watch.js --record
 --cycle-id=<your cycle id> --agent=devmanager --kind='assignment mismatch' --backlog=<X>
@@ -2935,7 +2935,7 @@ node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the
    blocks the auto-done bar (correctly), so say so in `notes` rather than inventing paths.
 3. **`outcome = 'blocked'` → nothing shipped, and you do not finish it by hand.** Do not push on
    the Builder's behalf and do not widen the kickoff to get past the blocker: close the cycle
-   `gated_before_build` (or `partial` when part of the work genuinely finished and pushed), carry
+   `gated_before_build`, or `shipped` when part finished and pushed (`partial` settles the TICKET), carry
    the Builder's `deviations` into `notes` and onto the card, and let 7a grade what actually
    happened. A blocked build a cycle quietly completes itself is the caps breach the kickoff exists
    to prevent, arriving through the one door nothing watches.

@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+// DeepBench v7.0.645 | scripts/rank-backlog.js | AGT-175 -- THE ONCE-PER-DAY PRECONDITION LIVES
+// HERE NOW. `docs/runbooks/runner-cycle.md` step 4c stated it as a SENTENCE the runner was expected
+// to honour by hand, and this file never read `runner_cycles` at all -- so the guard was prose only.
+// Measured on the unedited tree 2026-09-27: cycle `90323ce7-5436-4187-9698-64b161780ac4` had already
+// re-ranked the board that America/Chicago day (notes `SCHEDULED-AGENT: rank-backlog`), and pass one
+// still assembled a 148,851-byte prompt and exited 3. `rankedTodayCycle()` reads the one indexed row
+// and `passOne()` answers from it BEFORE the board is touched, so RUNNING THE COMMAND IS THE CHECK --
+// the shape step 4e's `scripts/ticket-owner.js --nightly` already keeps, and the runbook now cites
+// this function instead of restating what it decides (one home per fact).
+//
+// THE DAY KEY IS IMPORTED, NEVER RESTATED. `sameChicagoDay()` comes from ./ticket-owner.js; a second
+// copy of the DST arithmetic here would be a second thing to get wrong twice a year (CDT midnight is
+// 05:00Z, CST midnight 06:00Z). NO `--dry-run` EXEMPTION: the board read and the 148KB assembly are
+// exactly the cost this refusal exists to refuse, and a dry run pays both.
+//
 // DeepBench v7.0.487 | scripts/rank-backlog.js | SES-386 -- THE RUN'S COST IS REPORTED BY THE RUNNER,
 // because the sub-agent cannot report it. `tokensFrom()` reads `input_tokens`/`output_tokens` off the
 // answer JSON, `pz-rank-intent`'s stored schema declares no such properties and step 4c ended at
@@ -102,6 +117,9 @@ import { runWithCallSource } from '../lib/request-context.js';
 // offending key -- generic despite the noun in its name, and already driven by AGT-67's own mutant
 // guard. A second copy here would be a second contract to keep in step.
 import { validateAgentVerdict } from './verifier.js';
+// AGT-175: the day key, IMPORTED (pattern:14). `main` there sits behind a `process.argv[1]` guard,
+// so importing this module runs nothing.
+import { sameChicagoDay } from './ticket-owner.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -277,6 +295,29 @@ async function sb(pathAndQuery, init = {}) {
 }
 
 /**
+ * AGT-175. THE PRECONDITION, ASKED OF THE DATABASE RATHER THAN OF THE READER. One indexed row: the
+ * latest ENDED cycle carrying this job's own `notes` prefix. Returns that row when it fell on the
+ * same America/Chicago day as `startedAt` -- i.e. the board has already been ordered today -- and
+ * `null` when it did not, which is the only answer that permits a re-rank.
+ *
+ * A NON-ARRAY THROWS RATHER THAN ANSWERING `null`, the same call `judgePassOne()` makes in
+ * scripts/ticket-owner.js: a precondition that could not be evaluated must stop the run, never wave
+ * it through into a second ordering of the same board on the same day.
+ *
+ * `read` is injected so tests/regression/agt-175-one-home-per-fact.test.mjs drives all three
+ * branches with no network.
+ */
+export async function rankedTodayCycle(startedAt, read = sb) {
+  const rows = await read('runner_cycles?select=id,ended_at&notes=like.'
+    + encodeURIComponent(NOTES_PREFIX + '%')
+    + '&ended_at=not.is.null&order=ended_at.desc&limit=1');
+  if (!Array.isArray(rows)) {
+    throw new Error('the once-per-day precondition read came back non-array -- refusing to re-rank on an unknown day');
+  }
+  return rows[0] && sameChicagoDay(rows[0].ended_at, startedAt) ? rows[0] : null;
+}
+
+/**
  * The candidates handed to the Prioritizer: the tickets the PICKER can actually reach, read from
  * `prime_directive_queue()` itself rather than re-derived from a `backlog_items` filter here (item
  * (2) in the header).
@@ -326,6 +367,18 @@ async function writeCycle({ startedAt, outcome, notes, tokens, cycleId }) {
 
 async function passOne(args) {
   const startedAt = new Date().toISOString();
+
+  // AGT-175. FIRST, BEFORE THE SCRATCH DIR AND BEFORE THE BOARD: the cheapest refusal comes first,
+  // so a day that has already been ranked costs one indexed read instead of a whole board and a
+  // 148KB assembly. No cycle row is written and no prompt is printed -- there is no run to record.
+  // Deliberately NOT exempted by --dry-run: the cost this refuses is the read, which a dry run pays.
+  const prior = await rankedTodayCycle(startedAt);
+  if (prior) {
+    process.stdout.write(`rank-backlog: already run today (America/Chicago) — cycle ${prior.id} `
+      + `ended ${prior.ended_at}; board not read, nothing written\n`);
+    return EXIT_OK;
+  }
+
   const scratch = args.scratch || os.tmpdir();
   fs.mkdirSync(scratch, { recursive: true });
   const stateFile = args.stateFile || statePathFor(scratch, args.cycle);
