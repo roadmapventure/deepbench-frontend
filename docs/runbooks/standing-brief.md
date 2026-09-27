@@ -44,63 +44,44 @@
 > standing filing rules — and is maintained by hand, deliberately.
 
 <!-- BEGIN GENERATED — scripts/render-standing-brief.js — do not hand-edit inside this block -->
-## Live board state — generated, do not hand-edit — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST)*
+## Live board state — generated, do not hand-edit — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST)*
 
 > Rendered from the tables by `scripts/render-standing-brief.js` at every ship. **Every number below is derived; nothing here is maintained by hand.** The judgment prose beneath this block is the opposite — hand-maintained, deliberately, and this script never writes outside these markers. Where the two disagree about a number, this block is right and the sentence below is stale: say so rather than reconciling them by hand.
 
-**Board census** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* **726 open tickets**, 698 numbered, **28 open-but-unnumbered**, 1000 rows total.
+**Board census** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* **736 open tickets**, 709 numbered, **27 open-but-unnumbered**, 1000 rows total.
 
 | `status` | rows | share of board |
 |---|---:|---:|
-| `open` | 574 | 57.4% |
-| `done` | 259 | 25.9% |
-| `delivered` | 57 | 5.7% |
-| `removal proposed` | 51 | 5.1% |
-| `partial` | 44 | 4.4% |
-| `removed` | 15 | 1.5% |
+| `open` | 588 | 58.8% |
+| `done` | 250 | 25% |
+| `delivered` | 58 | 5.8% |
+| `removal proposed` | 49 | 4.9% |
+| `partial` | 41 | 4.1% |
+| `removed` | 14 | 1.4% |
 
-**`design_status` among OPEN tickets** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* Reads for selection (`SES-114`); `NULL` is *not* `auto`, it is not-yet-triaged and no cycle may backfill it.
+**`design_status` among OPEN tickets** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* Reads for selection (`SES-114`); `NULL` is *not* `auto`, it is not-yet-triaged and no cycle may backfill it.
 
 | `design_status` | open rows | selection effect |
 |---|---:|---|
-| `NULL` | 640 | full ceremony — not yet triaged |
+| `NULL` | 649 | full ceremony — not yet triaged |
 | `needs-decision` | 43 | — |
 | `designed` | 34 | **not a skip** — build from `kickoff_link` (step 6 fast path) |
-| `needs-desktop` | 7 | skipped, `record_skip()` — needs a session John attends (B39) |
+| `needs-desktop` | 8 | skipped, `record_skip()` — needs a session John attends (B39) |
 | `auto` | 1 | full ceremony |
 | `needs-john` | 1 | skipped, `record_skip()` — John decides on a card |
 
-**Scheduler and automation settings** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* §2b of the briefing, John's own switches, binding via `scheduler_gate()` at step 1b:
+**Scheduler and automation settings** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* §2b of the briefing, John's own switches, binding via `scheduler_gate()` at step 1b:
 
 - Scheduler: **on**, every **1 hour** on John's clock grid (America/Chicago hours divisible by the interval — `SES-151`, DST-proof).
 - Cron minute **40**, manual-fire tolerance **±10 min** (a start outside it is treated as a manual fire and is never paced).
 - Standing daily max: **196M tokens**. This is rung 3 of five, **below** the 48h stale floor: a standing number must not defeat the staleness brake.
 
-**Standing epic drain** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* Created only by John; the runner may read one, never write one (`drain_epic_next()` property 5). The finish line is drawn from the members he **named** (`runner_drain_scope`), never the live `now` tier (`SES-142`) — and within that list it is the members a milestone **gate ruled required** (`milestone_required`, `SES-310`) whenever the list carries such a ruling, every named member otherwise.
+**Standing epic drain** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* Created only by John; the runner may read one, never write one (`drain_epic_next()` property 5). The finish line is drawn from the members he **named** (`runner_drain_scope`), never the live `now` tier (`SES-142`) — and within that list it is the members a milestone **gate ruled required** (`milestone_required`, `SES-310`) whenever the list carries such a ruling, every named member otherwise.
 
 - **No drain standing.** Selection is the class-sorted board exactly as it is with no drain declared.
 
-**Open decisions** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* Decisions made under `M6-02` that are still inside their reversal window (`runner_settings.reversal_window_hours` = 72h). Silence finalises them; to reverse one, run the line beside it (`docs/runbooks/session-setup.md` § Reversing a decision).
+**Open decisions** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* Decisions made under `M6-02` that are still inside their reversal window (`runner_settings.reversal_window_hours` = 72h). Silence finalises them; to reverse one, run the line beside it (`docs/runbooks/session-setup.md` § Reversing a decision).
 
-- `0432d1c6` · re-scope · `AGT-86` · AGT-86 build plan approved by John as nine slices; the Development Manager files one ticket per root cause with no cap… · finalises Sep 26, 2:23 PM CST · `select public.reverse_decision('0432d1c6-6410-4ac2-af1f-99ef2cff8481','John','<why>');`
-- `aefd0627` · agent-row · `AGT-86` · AGT-86 slice 2a: review-audit-worklist capability, dm-audit-review-intent and six links for the Development Manager · finalises Sep 26, 3:27 PM CST · `select public.reverse_decision('aefd0627-f371-469d-a0a1-0fbac32db4bf','John','<why>');`
-- `decbb801` · agent-row · `AGT-86` · AGT-86 slice 7: the Auditor's checklist (23 checks in 5 jobs) in au-behavior, nine homes and the sixth kind in au-knowl… · finalises Sep 26, 3:46 PM CST · `select public.reverse_decision('decbb801-5f99-4b85-a406-f29d1be0fcab','John','<why>');`
-- `cb459466` · filing · — · Audit review 2026-W39: 63 findings → 11 tickets, 6 not-a-defect, 0 carried, 0 escalated · finalises Sep 26, 3:53 PM CST · `select public.reverse_decision('cb459466-937a-4432-9271-faf8d597b5d9','John','<why>');`
-- `398dd7a5` · filing · `AGT-86` · Filed AGT-98..100 from AGT-86 build findings (leaked bypass secret in the public repo; Windows process.exit crash; untr… · finalises Sep 26, 4:13 PM CST · `select public.reverse_decision('398dd7a5-33ff-42a9-b85f-bd30b71d6c3c','John','<why>');`
-- `bc9f90d1` · agent-row · `AGT-86` · AGT-86: re-pin dm-knowledge-cycle-card 6a1c240089cf096c → fe7dc3e8c674527a · finalises Sep 26, 4:14 PM CST · `select public.reverse_decision('bc9f90d1-b11d-41c9-996d-c0c25b422ad2','John','<why>');`
-- `cd942b73` · agent-row · `AGT-86` · AGT-86 slice 9b: dm-audit-review-intent learns tighten, promote and checklist_edits · finalises Sep 26, 4:15 PM CST · `select public.reverse_decision('cd942b73-c0cf-49fe-aebd-5ce6a1ffea3d','John','<why>');`
-- `09d78d30` · ticket-status · `AGT-86` · AGT-86 settles delivered: all nine planned slices shipped as 16 kickoffs (v7.0.542-557); verifier e4253c97 blocked on i… · finalises Sep 26, 4:45 PM CST · `select public.reverse_decision('09d78d30-3edd-4054-8ad8-f20a67925163','John','<why>');`
-- `68209b78` · filing · `AGT-102` · Filed AGT-102: the Auditor checks the prompts the two routines actually run against their repo copies. · finalises Sep 26, 4:59 PM CST · `select public.reverse_decision('68209b78-be93-46a3-939b-14fbd110da9b','John','<why>');`
-- `0c8446d9` · directive · — · Project Auditor Enhancements created and set executing as the builder's only project; AGT-87..97 (the Development Manag… · finalises Sep 26, 5:05 PM CST · `select public.reverse_decision('0c8446d9-cfbd-4541-a2fa-81611ce352a9','John','<why>');`
-- `2a4a8a87` · filing · `AGT-103` · Filed AGT-103: every ticket the Development Manager files from an Auditor finding goes into the Auditor Enhancements pr… · finalises Sep 26, 5:05 PM CST · `select public.reverse_decision('2a4a8a87-0132-4e11-827f-623fdeea2993','John','<why>');`
-- `ac846f9f` · agent-row · `AGT-102` · au-behavior gains check routine-prompt-drift (24 checks) · finalises Sep 26, 5:21 PM CST · `select public.reverse_decision('ac846f9f-893d-44dc-9b0b-51ea88974a99','John','<why>');`
-- `12077e50` · filing · `AGT-104` · Filed AGT-104: run-project.js's refusal of a mutated state file omits the drift field agt-68 requires; the arm was dorm… · finalises Sep 26, 5:25 PM CST · `select public.reverse_decision('12077e50-f60e-4982-be93-a951c65dc3a1','John','<why>');`
-- `f2015f3a` · ticket-status · `AGT-103` · AGT-103 delivered (v7.0.558, 8bb2ffb8) and AGT-102 partial (slice 1 v7.0.559, 3a62e719; slice 2 = the builder's own sta… · finalises Sep 26, 5:38 PM CST · `select public.reverse_decision('f2015f3a-95d7-4fdc-aab0-7a05be91502e','John','<why>');`
-- `20e4130d` · scope · `AGT-82` · Jerry Maguire scope settled with John 2026-09-23: personal lane, closed store, ten Capabilities, tryout bar before the… · finalises Sep 26, 6:26 PM CST · `select public.reverse_decision('20e4130d-eb0d-494f-ade2-034f6b2640c6','John','<why>');`
-- `be7bb00c` · resolve · `AGT-83` · AGT-83 done: 38 career records loaded over the MCP into public.career_records (3 target, 4 ladder_rung, 29 resume_fact,… · finalises Sep 26, 7:09 PM CST · `select public.reverse_decision('be7bb00c-dee5-41f3-bbe6-3182d2d3d9f3','John','<why>');`
-- `a73e6712` · classification · — · board ordered: 14 ticket(s) given an automation_rank · finalises Sep 26, 7:55 PM CST · `select public.reverse_decision('a73e6712-b9cd-4c34-82e5-ff331ecc7a9f','John','<why>');`
-- `68e118b9` · hygiene · `AGT-79` · Ticket Owner: 2 derivable cell fix(es) on 2 row(s) — cost 2 · claim 0 · type 0 · finalises Sep 26, 7:55 PM CST · `select public.reverse_decision('68e118b9-23a2-4a6d-a1ca-6a316d885444','John','<why>');`
-- `5e9739d7` · scope · `AGT-105` · Salary recorded on every posting and a worth estimate per row (John 2026-09-23); the tryout watch list is graded by the… · finalises Sep 26, 8:14 PM CST · `select public.reverse_decision('5e9739d7-d524-429b-bbd3-212d0a84577a','John','<why>');`
 - `684365e7` · directive · — · John hired Jerry Maguire: agents.is_active = true for agent jerry (2026-09-23, "turn him on"); the two schedules are cr… · finalises Sep 26, 8:19 PM CST · `select public.reverse_decision('684365e7-5141-4d9b-aa70-4000b5beaecc','John','<why>');`
 - `0c237020` · ticket-status · `AGT-100` · Close-out: AGT-100 settles 'delivered' · finalises Sep 26, 8:26 PM CST · `select public.reverse_decision('0c237020-8c62-4459-9f1d-ce2036ecb899','John','<why>');`
 - `e876c678` · rollback · — · Auto-rollback held: ci-red on 7bddd22 was not reverted (card-only) · finalises Sep 26, 8:28 PM CST · `select public.reverse_decision('e876c678-9683-42bc-9a24-eb370174e33e','John','<why>');`
@@ -209,14 +190,36 @@
 - `bfef1549` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card 10917f0a49bc2b0b → 18a15447dc340890 · finalises Sep 29, 8:31 AM CST · `select public.reverse_decision('bfef1549-3c68-40b9-8ad4-892a62d6609a','John','<why>');`
 - `0638bcf6` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card 18a15447dc340890 → cbcbdc90be07ad03 · finalises Sep 29, 8:34 AM CST · `select public.reverse_decision('0638bcf6-aec7-42e8-b31d-f59ef9b93dde','John','<why>');`
 - `755b027b` · ticket-status · `AGT-134` · Close-out: AGT-134 settles 'delivered' · finalises Sep 29, 8:36 AM CST · `select public.reverse_decision('755b027b-efc7-4e96-9444-24d0bc4b0b81','John','<why>');`
+- `4de0cfc3` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card 18a15447dc340890 → cbcbdc90be07ad03 · finalises Sep 29, 8:44 AM CST · `select public.reverse_decision('4de0cfc3-2f54-4409-8761-861f2fc3a272','John','<why>');`
+- `4da5d668` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card cbcbdc90be07ad03 → ca71a87ec822eb9a · finalises Sep 29, 8:53 AM CST · `select public.reverse_decision('4da5d668-5637-49ca-9b30-006b631b7077','John','<why>');`
+- `486ea564` · mid-build-defect · `AGT-133` · Three defects the Builder found outside AGT-133's scope were CAPTURED as findings, not fixed and not filed as tickets · finalises Sep 29, 9:12 AM CST · `select public.reverse_decision('486ea564-0fd0-4c81-ab19-38868e975caa','John','<why>');`
+- `8388b82b` · ticket-status · `AGT-133` · Close-out: AGT-133 settles 'partial' · finalises Sep 29, 9:19 AM CST · `select public.reverse_decision('8388b82b-2d0c-45d0-b096-f008e367d258','John','<why>');`
+- `553d4c4f` · ticket · `AGT-116` · Homed AGT-116 (P10 - Tooling) into Agent Training at automation_rank 2, standing in for The Development Manager. · finalises Sep 29, 9:49 AM CST · `select public.reverse_decision('553d4c4f-4222-43d5-9614-27c0d575d4e4','John','<why>');`
+- `0457c839` · ticket · `AGT-159` · Filed AGT-159 (P10 - Tooling) into Dev Manager Capabilities, blocked by AGT-133: the backlog review agreed 2026-09-25 a… · finalises Sep 29, 9:54 AM CST · `select public.reverse_decision('0457c839-bbcd-4c03-9a84-fe46fd5ad5f7','John','<why>');`
+- `6a59b140` · ticket · `AGT-160` · Filed AGT-160 (P10 - Tooling) into Agent Training: an agreed 2026-09-25 workstream that was never filed. · finalises Sep 29, 9:55 AM CST · `select public.reverse_decision('6a59b140-cf17-48bc-b479-9618c769c97b','John','<why>');`
+- `768e9845` · ticket · `AGT-161` · Filed AGT-161 (P10 - Tooling) into Agent Training: an agreed 2026-09-25 workstream that was never filed. · finalises Sep 29, 9:55 AM CST · `select public.reverse_decision('768e9845-c5cf-4de1-9410-d7dc1fa19834','John','<why>');`
+- `03d69f32` · ticket-status · `AGT-145` · Close-out: AGT-145 settles 'delivered' · finalises Sep 29, 2:38 PM CST · `select public.reverse_decision('03d69f32-751e-47f8-a46e-bc9fe7373dcf','John','<why>');`
+- `7c1567d8` · filing · — · Audit review 2026-W39: 75 findings → 20 tickets, 2 not-a-defect, 0 carried, 4 escalated · finalises Sep 29, 3:03 PM CST · `select public.reverse_decision('7c1567d8-3727-404b-b0d4-8cba29c85c0b','John','<why>');`
+- `2692714e` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · finalises Sep 29, 3:41 PM CST · `select public.reverse_decision('2692714e-ffe4-4365-9974-1d8abe26c466','John','<why>');`
+- `6d04a37d` · filing · — · Audit review 2026-W39: 6 findings → 3 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Sep 29, 4:02 PM CST · `select public.reverse_decision('6d04a37d-bf66-426e-bf70-4be8e40d3b12','John','<why>');`
+- `f3f53648` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · finalises Sep 29, 5:18 PM CST · `select public.reverse_decision('f3f53648-e97d-410d-891e-997019711801','John','<why>');`
+- `ae46811d` · filing · — · Audit review 2026-W39: 6 findings → 2 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Sep 29, 5:36 PM CST · `select public.reverse_decision('ae46811d-7230-4c3b-9d89-df5cfa6021e6','John','<why>');`
+- `6061338e` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · finalises Sep 29, 6:15 PM CST · `select public.reverse_decision('6061338e-f433-4d25-82d0-54c58d83c05d','John','<why>');`
+- `6cd4e798` · filing · — · Audit review 2026-W39: 3 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Sep 29, 6:30 PM CST · `select public.reverse_decision('6cd4e798-712d-44a3-a196-196c3992f1bb','John','<why>');`
+- `440b7633` · ticket-status · `AGT-170` · Close-out: AGT-170 settles 'partial' · finalises Sep 29, 6:38 PM CST · `select public.reverse_decision('440b7633-f9bf-4178-b0d2-635de52f74cb','John','<why>');`
+- `bbfab41e` · filing · — · Audit review 2026-W39: 3 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Sep 29, 7:04 PM CST · `select public.reverse_decision('bbfab41e-3bba-4a3c-9326-886c260d9602','John','<why>');`
+- `af072c46` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · finalises Sep 29, 7:08 PM CST · `select public.reverse_decision('af072c46-1be7-4fdf-8b67-cc063ca5579c','John','<why>');`
+- `f87fdd2d` · filing · — · Audit review 2026-W39: 3 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Sep 29, 7:21 PM CST · `select public.reverse_decision('f87fdd2d-b115-4f95-a69c-1f43a950e185','John','<why>');`
+- `01b9642c` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · finalises Sep 29, 8:02 PM CST · `select public.reverse_decision('01b9642c-a2eb-42d4-849b-e78e6fa5c752','John','<why>');`
+- `b22a122c` · filing · — · Audit review 2026-W39: 6 findings → 2 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Sep 29, 8:18 PM CST · `select public.reverse_decision('b22a122c-d21f-4516-ba68-0ca6593cbc1c','John','<why>');`
 
-**91 final this week, 0 reversed this week** — *this week* is a **rolling 7 days** back from the stamp, not a calendar week and not a Friday-07:00Z reset: no such weekly-reset helper exists in this file or anywhere in `scripts/`, so a rolling window is what is used and is labelled as one. A reversal is the strongest negative signal the ladder takes (`M6-07`), so the second number is the one to read first.
+**93 final this week, 0 reversed this week** — *this week* is a **rolling 7 days** back from the stamp, not a calendar week and not a Friday-07:00Z reset: no such weekly-reset helper exists in this file or anywhere in `scripts/`, so a rolling window is what is used and is labelled as one. A reversal is the strongest negative signal the ladder takes (`M6-07`), so the second number is the one to read first.
 
-**Decided for you** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* What the runner DECIDED on your behalf, by CST day (`governance_rules.MANAGER-DECIDES-BY-DEFAULT`: *a daily list of what was decided, not questions*), with the questions that reached you anyway counted beside it — target zero. Not the `Open decisions` group above: that one is the undo list and drops a decision the moment it finalises; this one is the record of the day and keeps it. **24 decided on 2026-09-26**; **2 question(s) reached you in the last 7 days — target zero**; 19 still open.
+**Decided for you** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* What the runner DECIDED on your behalf, by CST day (`governance_rules.MANAGER-DECIDES-BY-DEFAULT`: *a daily list of what was decided, not questions*), with the questions that reached you anyway counted beside it — target zero. Not the `Open decisions` group above: that one is the undo list and drops a decision the moment it finalises; this one is the record of the day and keeps it. **46 decided on 2026-09-26**; **2 question(s) reached you in the last 7 days — target zero**; 19 still open.
 
 | CST day | decided | reversed | questions to you |
 |---|---:|---:|---:|
-| `2026-09-26` | 24 | 0 | 0 |
+| `2026-09-26` | 46 | 0 | 0 |
 | `2026-09-25` | 32 | 0 | 0 |
 | `2026-09-24` | 39 | 0 | 2 |
 | `2026-09-23` | 32 | 0 | 0 |
@@ -224,34 +227,36 @@
 | `2026-09-21` | 2 | 0 | 0 |
 | `2026-09-20` | 29 | 0 | 0 |
 
-**The 24 decided on 2026-09-26** — newest first.
+**The 46 decided on 2026-09-26** — newest first.
 
+- `b22a122c` · filing · — · Audit review 2026-W39: 6 findings → 2 tickets, 0 not-a-defect, 0 carried, 0 escalated · open
+- `01b9642c` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · open
+- `f87fdd2d` · filing · — · Audit review 2026-W39: 3 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · open
+- `af072c46` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · open
+- `bbfab41e` · filing · — · Audit review 2026-W39: 3 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · open
+- `440b7633` · ticket-status · `AGT-170` · Close-out: AGT-170 settles 'partial' · open
+- `6cd4e798` · filing · — · Audit review 2026-W39: 3 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · open
+- `6061338e` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · open
+- `ae46811d` · filing · — · Audit review 2026-W39: 6 findings → 2 tickets, 0 not-a-defect, 0 carried, 0 escalated · open
+- `f3f53648` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · open
+- `6d04a37d` · filing · — · Audit review 2026-W39: 6 findings → 3 tickets, 0 not-a-defect, 0 carried, 0 escalated · open
+- `2692714e` · ticket-status · `AGT-168` · Close-out: AGT-168 settles 'partial' · open
+- `7c1567d8` · filing · — · Audit review 2026-W39: 75 findings → 20 tickets, 2 not-a-defect, 0 carried, 4 escalated · open
+- `03d69f32` · ticket-status · `AGT-145` · Close-out: AGT-145 settles 'delivered' · open
+- `768e9845` · ticket · `AGT-161` · Filed AGT-161 (P10 - Tooling) into Agent Training: an agreed 2026-09-25 workstream that was never filed. · open
+- `6a59b140` · ticket · `AGT-160` · Filed AGT-160 (P10 - Tooling) into Agent Training: an agreed 2026-09-25 workstream that was never filed. · open
+- `0457c839` · ticket · `AGT-159` · Filed AGT-159 (P10 - Tooling) into Dev Manager Capabilities, blocked by AGT-133: the backlog review agreed 2026-09-25 a… · open
+- `553d4c4f` · ticket · `AGT-116` · Homed AGT-116 (P10 - Tooling) into Agent Training at automation_rank 2, standing in for The Development Manager. · open
+- `8388b82b` · ticket-status · `AGT-133` · Close-out: AGT-133 settles 'partial' · open
+- `486ea564` · mid-build-defect · `AGT-133` · Three defects the Builder found outside AGT-133's scope were CAPTURED as findings, not fixed and not filed as tickets · open
+- `4da5d668` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card cbcbdc90be07ad03 → ca71a87ec822eb9a · open
+- `4de0cfc3` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card 18a15447dc340890 → cbcbdc90be07ad03 · open
 - `755b027b` · ticket-status · `AGT-134` · Close-out: AGT-134 settles 'delivered' · open
 - `0638bcf6` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card 18a15447dc340890 → cbcbdc90be07ad03 · open
 - `bfef1549` · agent-row · `AGT-133` · AGT-133: re-pin dm-knowledge-cycle-card 10917f0a49bc2b0b → 18a15447dc340890 · open
-- `216358e9` · design · `AGT-136` · AGT-136's premise is alive and its kickoff is docs/kickoffs/v7.0.611-AGT-136-designer-ruling-desk.md — seven tasks over… · open
-- `736279b4` · agent-row · `AGT-134` · AGT-134: dm-audit-review-intent.method gains the upkeep paragraph — routine-prompt drift is the manager's own ruling, r… · open
-- `80d986f9` · ticket-status · `AGT-138` · Close-out: AGT-138 settles 'partial' · open
-- `a8778f93` · ticket-status · `AGT-132` · Close-out: AGT-132 settles 'delivered' · open
-- `2ddefc51` · ticket · `AGT-138` · AGT-138: supersede SES-369 and SES-430 — step 4b's invention pass is retired from the cycle, so the filing gate they de… · open
-- `c2318e42` · agent-row · `AGT-138` · AGT-138: re-pin dm-knowledge-cycle-card 2ba263050860812c → 10917f0a49bc2b0b · open
-- `2800fb74` · agent-row · `AGT-132` · AGT-132 slice 2: the runner-chain guardrail moves to the run-project Intent · open
-- `a905ce0e` · design · `AGT-138` · AGT-138's premise is alive and its kickoff is docs/kickoffs/v7.0.608-AGT-138-researcher-weekly-routine.md — nine tasks… · open
-- `01355a51` · learning · `SES-159` · class-loop learning claims for P3 - Investor Value · open
-- `1523d576` · ticket-status · `AGT-132` · Close-out: AGT-132 settles 'partial' · open
-- `6de16905` · agent-row · `AGT-132` · AGT-132: the review intent learns source, type and routing · open
-- `9d259d44` · design · `AGT-132` · AGT-132's premise is alive and its kickoff is docs/kickoffs/v7.0.605-AGT-132-finding-routes.md — slice 1 of 2, five tas… · open
-- `ea1c27fc` · ticket-status · `AGT-140` · Close-out: AGT-140 settles 'delivered' · open
-- `59e5e346` · agent-row · `AGT-140` · AGT-140: re-pin dm-knowledge-cycle-card f5444ac51be95df0 → 2ba263050860812c · open
-- `d9bf449e` · ticket-status · `AGT-135` · Close-out: AGT-135 settles 'delivered' · open
-- `69e1947c` · agent-row · `AGT-135` · AGT-135: carried the same rulings into the Designer, Auditor and Researcher Skill rows (ds-guardrails, au-knowledge-hom… · open
-- `66fdc55d` · rule · `AGT-135` · AGT-135: filed John's seven rulings of 2026-09-25 as governance_rules rows JOHN-0925-* with his verbatim words · open
-- `a12f2d93` · ticket-status · `AGT-137` · Close-out: AGT-137 settles 'delivered' · open
-- `f38d0291` · agent-row · `AGT-137` · AGT-137: re-pin dm-knowledge-cycle-card e16c0b75fa29cc58 → f5444ac51be95df0 · open
-- `ed127bf1` · hygiene · `AGT-79` · Ticket Owner: 1 derivable cell fix(es) on 1 row(s) — cost 1 · claim 0 · type 0 · open
-- `60cfc0dc` · classification · — · board ordered: 6 ticket(s) given an automation_rank · open
+- …and 21 more decided that day · `select id, kind, backlog_id, summary, status from public.runner_decisions where (decided_at at time zone 'America/Chicago')::date = '2026-09-26' order by decided_at desc;`
 
-**Judgment classes** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* What the corpus currently holds per pull test, live from `public.judgment_class_census` (`SES-84`; the same view `SES-159` reads). Ratification is a standing metric (John, 2026-08-23: a class is never finished being learned), never a finish line.
+**Judgment classes** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* What the corpus currently holds per pull test, live from `public.judgment_class_census` (`SES-84`; the same view `SES-159` reads). Ratification is a standing metric (John, 2026-08-23: a class is never finished being learned), never a finish line.
 
 | class | ratified | proposed | rejected | total |
 |---|---:|---:|---:|---:|
@@ -268,21 +273,21 @@
 
 - **FLAG: 4 live claims still `unclassed`** — after `SES-84` this is zero by construction; a non-zero here is drift (a claim inserted without a classing decision) and needs one recorded decision, never a default.
 
-**John-model** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* How often a decision that leaned on a standing pattern of John's stood unreversed through its window, live from `public.john_model_signal` (`SES-004`; the criteria are `public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md`). A rate binds only from 30 finalised-or-reversed decisions (M7 gate, ruling iii).
+**John-model** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* How often a decision that leaned on a standing pattern of John's stood unreversed through its window, live from `public.john_model_signal` (`SES-004`; the criteria are `public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md`). A rate binds only from 30 finalised-or-reversed decisions (M7 gate, ruling iii).
 
-- **99.6% agreement** over 271 finalised-or-reversed decisions (270 finalised unreversed, 1 reversed; 99 still open, 370 citing in total). A reversal is the strongest negative signal the ladder takes, so the second number is the one to read first.
+- **99.7% agreement** over 287 finalised-or-reversed decisions (286 finalised unreversed, 1 reversed; 99 still open, 386 citing in total). A reversal is the strongest negative signal the ladder takes, so the second number is the one to read first.
 
 | criterion | citing | final unreversed | reversed | open | rate |
 |---|---:|---:|---:|---:|---:|
-| `pattern:0` No standing pattern applied -- new judgment. | 190 | 127 | 0 | 63 | 100% |
-| `pattern:137` P1–P4 are pull tests, not category labels — administrative expectations never q… | 77 | 77 | 0 | 0 | 100% |
+| `pattern:0` No standing pattern applied -- new judgment. | 198 | 139 | 0 | 59 | 100% |
+| `pattern:137` P1–P4 are pull tests, not category labels — administrative expectations never q… | 78 | 77 | 0 | 1 | 100% |
 | `pattern:85` Don't gate small, reversible calls on his approval — decide and flag. | 50 | 47 | 1 | 2 | 97.9% |
-| `pattern:96` When a gap surfaces outside the session's scope, log it with its own ID rather… | 20 | 12 | 0 | 8 | — |
-| `pattern:2` Data-driven over code — hardcoding is the platform's premise to remove, not a c… | 18 | 0 | 0 | 18 | — |
+| `pattern:96` When a gap surfaces outside the session's scope, log it with its own ID rather… | 24 | 12 | 0 | 12 | — |
+| `pattern:2` Data-driven over code — hardcoding is the platform's premise to remove, not a c… | 21 | 4 | 0 | 17 | — |
 
 - A per-pattern `—` is not a zero: that criterion has not reached 30 finalised-or-reversed citations of its own, so it carries counts and no rate.
 
-**Invention in use** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* Criterion 7 (`docs/SELFBUILD-CHARTER.md`): at least one platform-originated feature — the Bench Report Card judge (`LOG-143`) — is measurably used by real visitors, live from `public.report_card_usage`. Counts only, never a rate.
+**Invention in use** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* Criterion 7 (`docs/SELFBUILD-CHARTER.md`): at least one platform-originated feature — the Bench Report Card judge (`LOG-143`) — is measurably used by real visitors, live from `public.report_card_usage`. Counts only, never a rate.
 
 - **7d:** 0 judge runs, 0 by real visitors (0 distinct).
 - **30d:** 3 judge runs, 0 by real visitors (0 distinct).
@@ -290,7 +295,7 @@
 
 - *no real-visitor use yet.*
 
-**Board by served class** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* Which class each open ticket SERVES under the served-class test (`VC-MISSION-033`), ruled by The Prioritizer's `classify-ticket` and stored on `backlog_items.supports_class` — a ticket's own class is a different question and is not restated here.
+**Board by served class** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* Which class each open ticket SERVES under the served-class test (`VC-MISSION-033`), ruled by The Prioritizer's `classify-ticket` and stored on `backlog_items.supports_class` — a ticket's own class is a different question and is not restated here.
 
 | serves | open tickets |
 |---|---:|
@@ -299,110 +304,44 @@
 | `P3 - Investor Value` | 5 |
 | `P4 - New Customers` | 2 |
 | `P7 - Agent Creation` | 1 |
-| *serves none* | 532 |
+| *serves none* | 565 |
 
 - *Negative ranks are John's own automation queue, seeded to sort ahead of anything assigned later (`SES-86`). The nightly re-rank writes 1..N and therefore sits below them — intended precedence, not a re-rank that failed.*
 
 - **Top 5 by `automation_rank`:**
   -35. `SES-288` — A schema-range red can never be auto-reverted: one refused down-migration disables rollba… *(serves none)*
   1. `AGT-128` — settle-ship.js marks a finished ticket partial when its STOP LINE mentions another ticket… *(serves none)*
+  2. `AGT-116` — The regression suite is not deterministic: three consecutive full runs gave three differe… *(serves none)*
   3. `AGT-141` — Six active product agents have no Capability, so nothing can ever call them: Robyn Castel… *(serves none)*
   4. `SES-337` — The Verifier agent must reproduce the last 30 recorded verdicts before it grades a ship,… *(serves P1 - Improves John's Skills)*
-  5. `SES-392` — The meter reader fails silently: exit 2 from 13:15 CT to 19:20 CT on 2026-09-12 with no l… *(serves P2 - Inventive)*
 
 - Last scheduled re-rank: Sep 26, 1:50 AM CST.
 
-**Governance agents, last 7 days** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* Whether the platform's own agents (`agents.lane = 'governance'`) are doing the development work, live from `public.governance_agent_usage` and `public.ship_handoff_census` (`SES-360`). A **rolling 7 days** back from render time, like the decision counts above. Counts and token sums only, never a rate.
+**Governance agents, last 7 days** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* Whether the platform's own agents (`agents.lane = 'governance'`) are doing the development work, live from `public.governance_agent_usage` and `public.ship_handoff_census` (`SES-360`). A **rolling 7 days** back from render time, like the decision counts above. Counts and token sums only, never a rate.
 
 | role | source | calls | input tokens | output tokens |
 |---|---|---:|---:|---:|
-| Governance — Development Manager | `session` | 32 (17 untokened) | 622861 | 264865 |
+| Governance — Development Manager | `session` | 48 (33 untokened) | 622861 | 264865 |
 | Governance — Researcher | `session` | 2 (2 untokened) | 0 | 0 |
 | Governance — Prioritizer | `session` | 11 (6 untokened) | 166114 | 3053 |
-| Governance — Prioritizer | *unlabelled* | 310 (310 untokened) | 0 | 0 |
-| Governance — Designer | `session` | 68 (56 untokened) | 1309762 | 195000 |
-| Governance — Builder | `session` | 42 (35 untokened) | 1178256 | 138000 |
+| Governance — Prioritizer | *unlabelled* | 365 (365 untokened) | 0 | 0 |
+| Governance — Designer | `session` | 75 (63 untokened) | 1309762 | 195000 |
+| Governance — Builder | `session` | 50 (43 untokened) | 1178256 | 138000 |
 | Governance — Verifier | *no calls in the window* | 0 | — | — |
 | Governance — Auditor | `session` | 19 (7 untokened) | 524196 | 88663 |
 | Governance — Ticket Owner | `session` | 6 | 0 | 0 |
 
-- **Ships with all four handoff rows: 14 of 28** ships in the window (`SES-345`'s four: `automation_rank`, `kickoff_link`, a per-ticket push sha, a verdict row). Missing per leg: kickoff_link 1, per-ticket sha 1, automation_rank 14, verdict 1.
+- **Ships with all four handoff rows: 14 of 33** ships in the window (`SES-345`'s four: `automation_rank`, `kickoff_link`, a per-ticket push sha, a verdict row). Missing per leg: kickoff_link 1, per-ticket sha 2, automation_rank 19, verdict 1.
 - *unlabelled* is a NULL `call_source` — the pre-attribution unknown, never read as automation (`LOG-128`); `untokened` rows carry no token counts at all (deterministic handler rows), so a large call count beside a small token sum is that, not a cheap model.
 
-**Auditor's ledger** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* What `public.audit_findings` (`AGT-70`) holds and what has left it for the board. Counts only, never a rate. Latest week 2026-W39: **100 findings (66 open · 1 resolved · 4 not a defect)** — **0 ruled** open findings (a ruled, open, `high` row is what `tripwire-to-backlog.js --from-ledger` files, at most 3 per ISO week); **0 filed** to the board from the ledger so far (`source_file = 'audit-ledger'`).
+**Auditor's ledger** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* What `public.audit_findings` (`AGT-70`) holds and what has left it for the board. Counts only, never a rate. Latest week 2026-W39: **136 findings (0 open · 1 resolved · 6 not a defect)** — **0 ruled** open findings (a ruled, open, `high` row is what `tripwire-to-backlog.js --from-ledger` files, at most 3 per ISO week); **0 filed** to the board from the ledger so far (`source_file = 'audit-ledger'`).
 
 | fingerprint | kind | confidence | fact | ruled |
 |---|---|---|---|---|
-| `04059a049757e346` | stale-or-irrelevant | high | public.runner_cycles has no gate_failed column; the three gates live on runner_… | — |
-| `0644e721c006eac7` | stale-or-irrelevant | high | An open backlog row older than the unrevalidated-days fence that has never been… | — |
-| `0b97a0130c6b56d5` | other | high | secret_assignment must not appear in a public repo | — |
-| `0fee32d1db004611` | contradiction | high | Whether a cycle can record the Development Manager's assignment through the dri… | — |
-| `148f008332025cd8` | other | high | personal_path must not appear in a public repo | — |
-| `152f40a224e3ccdf` | other | high | personal_path must not appear in a public repo | — |
-| `18880c908aff8f68` | other | high | personal_email must not appear in a public repo | — |
-| `18963eb44fd184ff` | other | high | vercel_bypass must not appear in a public repo | — |
-| `1941f78ebe983471` | contradiction | high | Which version the regenerated CLAUDE-STATE.md names as in dev: the run says it… | — |
-| `1ad6ed4df8689ad0` | contradiction | high | How many rows public.finding_routes holds: five since this ship, while agt-132-… | — |
-| `1af79d1dac15e3a0` | other | high | A ticket the runner has cycled at least chain_max_noship_streak times without r… | — |
-| `1e95ccde9ee38c6f` | contradiction | high | How long the serial tail can take against a 10-minute publish-lease TTL: (7c) a… | — |
-| `1f0bd21fae63bc44` | contradiction | high | audit_findings holds exactly two rows from this cycle and neither is the staff-… | — |
-| `2186a662fa7abc8f` | other | high | Ticket Owner check cycles-over-quote holds open judgment rows a capability must… | — |
-| `243913269c869ac0` | other | high | personal_path must not appear in a public repo | — |
-| `26a97f3b91333c3b` | other | high | secret_assignment must not appear in a public repo | — |
-| `2a434286868f4488` | other | high | personal_path must not appear in a public repo | — |
-| `324011fa0e532b01` | other | high | The hold on a CI red is recorded as a runner_decisions kind='rollback' row; the… | — |
-| `32da6396be5e06ad` | other | high | Ticket Owner check type-off-taxonomy holds open judgment rows a capability must… | — |
-| `33e539b3646db01b` | contradiction | high | the live routine prompt must equal its repo block (the repo is the source) | — |
-| `376c6e18df1b387a` | stale-or-irrelevant | high | How many capability assignments the Auditor holds: ALL_ASSIGNMENTS lists seven… | — |
-| `397cdb89a0da1318` | other | high | Ticket Owner check size-missing holds open judgment rows a capability must deci… | — |
-| `3bbbb6c2bca6bf01` | other | high | personal_path must not appear in a public repo | — |
-| `40e7fdd6ec773619` | other | high | runner_lease still names this closed cycle as holder with released_at NULL, aft… | — |
-| `45429d5db65dd50c` | other | high | Ticket Owner check cost-snapshot-missing holds open judgment rows a capability… | — |
-| `4feda382d8537b0b` | other | high | Which component enforces step 4c's one-re-rank-per-Chicago-day precondition: sc… | — |
-| `50cec657f351bab0` | contradiction | high | A token half the caller could not measure is stored NULL, never 0; ai_activity_… | — |
-| `5c1183cf316e9c13` | other | high | No finding_routes row matches source 'runner', and the same cycle left two open… | — |
-| `683413067f763697` | other | high | Ticket Owner check verdict-missing holds open judgment rows a capability must d… | — |
-| `6b21d5a6f8d92049` | other | high | Whether a cycle can record a staff-watch finding: --record exits 2 on a JSON pa… | — |
-| `6d0dd95e379424bc` | other | high | personal_path must not appear in a public repo | — |
-| `78c2259b6307b892` | contradiction | high | public.finding_routes gained a live row at 11:58:57Z while supabase_migrations… | — |
-| `8a7ff8d8ffcd699a` | other | high | personal_path must not appear in a public repo | — |
-| `8b5104bceb520cef` | other | high | secret_assignment must not appear in a public repo | — |
-| `8bdc4d01f449ed45` | stale-or-irrelevant | high | The ticket that tracks agt-70-auditor's standing red is AGT-108; AGT-119 has be… | — |
-| `921c9d1500e3640d` | other | high | A ticket the runner has cycled at least chain_max_noship_streak times without r… | — |
-| `928e873d7a454242` | contradiction | high | Whether SES-418's remaining ask — a per-row-tolerant insert or a batch validate… | — |
-| `961caae922b0381a` | other | high | Which model the orchestrator lane runs and what it costs: the lane row names cl… | — |
-| `9da758976854c095` | stale-or-irrelevant | high | Which project a cycle passes to run-project.js: step 5(b) says the one executin… | — |
-| `afa61ca383385e4a` | contradiction | high | Why AGT-132 is absent from the live queue: its blocked_by resolves to AGT-131,… | — |
-| `b071de1cdc80850f` | contradiction | high | Whether a builder cycle runs step 4b, gated only by public.invention_due(), whi… | — |
-| `b14e25e62a9a3fae` | other | high | personal_path must not appear in a public repo | — |
-| `b21f540cdbe014da` | other | high | personal_email must not appear in a public repo | — |
-| `b2a8e5751044dd23` | contradiction | high | A backlog row marked done whose latest runner verdict is block was closed over… | — |
-| `b2c6e7547528017c` | contradiction | high | How many bytes step 4b's removal took out of runner-cycle.md: the file fell 10,… | — |
-| `b4a79dd4bbaff09b` | other | high | secret_assignment must not appear in a public repo | — |
-| `b508e0bc46f0a9d1` | other | high | Ticket Owner check actual-unknown holds open judgment rows a capability must de… | — |
-| `b5791188425c8167` | other | high | Whether a promoted staff-watch fingerprint asks John once or once per cycle: --… | — |
-| `b7ab5ea9e6270608` | other | high | A ticket the runner has cycled at least chain_max_noship_streak times without r… | — |
-| `b9a1eff544a353c1` | other | high | Ticket Owner check delivered-unaccepted holds open judgment rows a capability m… | — |
-| `be357147648b9773` | other | high | Ticket Owner check remainder-stranded holds open judgment rows a capability mus… | — |
-| `c0235363de641431` | other | high | Ticket Owner check designed-closed holds open judgment rows a capability must d… | — |
-| `c032db785757a1ce` | contradiction | high | shared/ai-patterns.js SERVICE_CATALOG carries no audit-run-review slug, so the… | — |
-| `cd074976f89a0196` | other | high | An open or partial backlog row with no epic, or whose epic has no project, can… | — |
-| `d7d67bd521cb1667` | contradiction | high | A blocker the record says predates AGT-132 is carried only as AGT-132's remaind… | — |
-| `daf4de7eb3741deb` | contradiction | high | Whether a pre-output refusal is billed: the executor writes billed:false and co… | — |
-| `e2c2c390f2a15ef7` | other | high | Ticket Owner check quote-missing holds open judgment rows a capability must dec… | — |
-| `e4d79e646fca8ff5` | other | high | personal_path must not appear in a public repo | — |
-| `ee201e55a264626f` | other | high | How many runner_decisions rows AGT-135 holds: three (rule 66fdc55d, agent-row 6… | — |
-| `fdda0cbd404388fc` | other | high | Ticket Owner check claim-on-closed holds open judgment rows a capability must d… | — |
-| `087e52a3e12b5a95` | other | medium | The runner was refused 13 times this week by weekly_pace and stopped 4 times by… | — |
-| `26939874d2745c04` | contradiction | medium | 'partial' is a backlog_items status, never a runner_cycles outcome — runner_cyc… | — |
-| `4845b12563eb1150` | other | medium | How many reversible decisions this cycle wrote for AGT-140: two (agent-row 59e5… | — |
-| `6328dcd20ca39da9` | contradiction | medium | How many regression tests passed at graded_sha c98be850: the cycle row and the… | — |
-| `68670c38dbb03a81` | contradiction | medium | Which commits on dev hold this cycle's research doc and kickoff: c13086db and e… | — |
-| `d51d16ad16aac1d6` | other | medium | Whether a change to the functions that decide every pick can steer a peer cycle… | — |
 
 - *A finding leaves this table only by John's ruling — `resolved`, `not-a-defect`, or ruled and left `open` to file. Candidates a run found but nobody ingested live in `docs/audits/<week>-candidates.json`, not here.*
 
-**Ticket hygiene, last night** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* What the Ticket Owner (`AGT-79`) left on the board: `public.ticket_owner_findings` open rows by check, the newest `hygiene` decision and the newest nightly cycle row. Counts only, never a rate. **247 open findings** across 11 check(s).
+**Ticket hygiene, last night** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* What the Ticket Owner (`AGT-79`) left on the board: `public.ticket_owner_findings` open rows by check, the newest `hygiene` decision and the newest nightly cycle row. Counts only, never a rate. **247 open findings** across 11 check(s).
 
 | check | open | oldest | nights open |
 |---|---:|---|---:|
@@ -411,7 +350,7 @@
 | `size-missing` | 31 | Sep 12, 10:31 PM CST | 13 |
 | `delivered-unaccepted` | 22 | Sep 12, 10:31 PM CST | 13 |
 | `type-off-taxonomy` | 17 | Sep 12, 10:31 PM CST | 13 |
-| `designed-closed` | 12 | Sep 23, 7:50 PM CST | 2 |
+| `designed-closed` | 12 | Sep 23, 7:50 PM CST | 3 |
 | `remainder-stranded` | 8 | Sep 18, 5:38 AM CST | 8 |
 | `claim-on-closed` | 7 | Sep 26, 1:51 AM CST | 0 |
 | `quote-missing` | 7 | Sep 12, 10:31 PM CST | 13 |
@@ -422,20 +361,20 @@
 - Judgment: **the newest night was judged** — 0 unjudged nights on top, over the newest 13 on record.
 - Decision `ed127bf1` · open · Ticket Owner: 1 derivable cell fix(es) on 1 row(s) — cost 1 · claim 0 · type 0 · finalises Sep 29, 1:56 AM CST · `select public.reverse_decision('ed127bf1-cb7f-40c4-8a1c-bd9301265e5e','John','<why>');`
 
-**Staff watch** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* What the Development Manager (`SES-378`) recorded about the runner's own agents: `public.runner_staff_findings` rows per `agent_id`, with the distinct fingerprints and the distinct CYCLES behind them. Counts only, never a rate. **23 finding(s)** across 2 agent(s).
+**Staff watch** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* What the Development Manager (`SES-378`) recorded about the runner's own agents: `public.runner_staff_findings` rows per `agent_id`, with the distinct fingerprints and the distinct CYCLES behind them. Counts only, never a rate. **25 finding(s)** across 2 agent(s).
 
 | agent | findings | distinct fingerprints | distinct cycles | newest |
 |---|---:|---:|---:|---|
-| `designer` | 19 | 5 | 18 | Sep 26, 8:36 AM CST |
+| `designer` | 21 | 5 | 20 | Sep 26, 8:18 PM CST |
 | `devmanager` | 4 | 4 | 4 | Sep 24, 3:00 AM CST |
 
-**Human gates** — *as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST).* The two reads that say whether anything is waiting on a human: open `backlog_items` carrying `design_status = 'needs-john'`, and `gated_before_build` `runner_items` left with `decision IS NULL` (`M6-01`). Board state, written by no code in this repo — which is why it is REPORTED here and not asserted as a gate by the regression suite. **1 open `needs-john` ticket(s)**, **5 undecided `gated_before_build` card(s)**.
+**Human gates** — *as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST).* The two reads that say whether anything is waiting on a human: open `backlog_items` carrying `design_status = 'needs-john'`, and `gated_before_build` `runner_items` left with `decision IS NULL` (`M6-01`). Board state, written by no code in this repo — which is why it is REPORTED here and not asserted as a gate by the regression suite. **1 open `needs-john` ticket(s)**, **5 undecided `gated_before_build` card(s)**.
 
 - **`needs-john` (1):** `AGT-110`
 - **Undecided gated cards (5):** `54b42eea-be4f-434d-963a-6707873bc137`, `2d5441c7-5133-4b21-9768-7921dce0c409`, `98fc7845-dd55-426d-8d89-895385e04248`, `e8fdfaee-667c-4d45-9f45-c759a134fffb`, `03bad3ed-4c4d-4312-850d-67fc03f467d2`
 - *Open is not wrong.* A card nobody has answered yet is a real board state; what it is NOT is a regression, so nothing in the suite goes red for it.
 
-*Provenance: 1000 board rows, payload `sha256:6a7cb2f286793e4c`, as of 2026-09-26 13:37Z (Sep 26, 8:37 AM CST). The stamp says when this was last read; the sha says whether it still matches the tables. `--check` compares the sha, never the stamp — a refreshed stamp over identical facts is not drift.*
+*Provenance: 1000 board rows, payload `sha256:f47957167348e4a8`, as of 2026-09-27 01:18Z (Sep 26, 8:18 PM CST). The stamp says when this was last read; the sha says whether it still matches the tables. `--check` compares the sha, never the stamp — a refreshed stamp over identical facts is not drift.*
 <!-- END GENERATED — scripts/render-standing-brief.js -->
 
 **Next session:** none required — the runner is live and works **John's automation queue** (canonical: `docs/RUNNER-GOV-0820-REQUIREMENTS.md`): the queue is the board's leading sort key, not a list to read (`automation_rank`, v7.0.133) — `ORDER BY queue` already honours it. Classes are always written named, **`P1 - Improves John's Skills` → `P10 - Tooling`**; outcomes as plain words (“did not run”, “gated before build”); budget is two-track (API dollars + token governor). John judges from the briefing page. Runner pause: disable `deepbench-runner` at claude.ai/code/routines. **Board census measured 2026-08-23T12:5xZ by runner cycle `363b5138`, taken from the board after its own close-out recompute rather than carried forward:** **561 open tickets, 561 numbered, 0 open-but-unnumbered**, 611 rows total, **the standing Automation drain now has a FIXED finish line** — from `v7.0.179` (`SES-142`) it works the **18 members John named** on directive `b74009ea`, stored as `runner_drain_scope` FK rows, and a ticket filed into the epic *after* that naming **never joins it**: it queues normally and waits for him. The live `now` tier had already drifted to 19 against his 18. `drain_epic_next()` retires when those 18 are `done`/`removed`, and returns the new outcome **`unscoped`** — never a live-tier fallback — for any future drain declared without a list. Queue/drain state as of **v7.0.196** (2026-08-23 ~17:00Z, `successional-review` close-out, 561 rows renumbered): `SES-140` — *the successor fire is refused by the platform* and `SES-151` — *the scheduler runs on John's clock grid* are both **`done`**; the drain's nearest open member `SES-84` — *the vision corpus* (`needs-john`) waits on John's briefing decisions, so cycles step past it (`SES-114`) and work the board (`SES-121` — *shrink the `.claude/`-mutable surface* went `done` at v7.0.198; procedure text now lives in `docs/runbooks/`, cycle-writable). **The board's `title` column is trustworthy for display for the first time** (`SES-91`, v7.0.177): 98 rows that held a bare priority-class string now carry a real authored title, and the only `^P[0-9]+ - ` title left is `ADM-1`, whose title is a real sentence behind a stale class prefix and is deliberately left for `SES-117` to **accommodate** rather than repair. `SES-119` is now `done` (v7.0.184 + v7.0.185): the briefing renders `public.backlog_display_title(title, description)` rather than the read-time `gist` workaround, and **`runner-cycle.md`'s Language block now requires a ticket's title wherever John reads its ID**. Step 5's `gist` expression deliberately stays — it is still correct for any future row filed the old way, and 50 of 562 open numbered tickets still fall back to it. **From v7.0.195 the chain runs IN-SESSION (`SES-140` FINAL)** — a cycle that actually ran one (`shipped`/`gated_before_build`/`reverted`) and whose drain still returns `pick` opens its next `runner_cycles` row (trigger `chained (drain continuation)`) **in the same session** and re-enters the runbook at step 1; session-spawning is retired as platform-unsupported (`runner-cycle.md` tail step (8) carries the evidence). A **wall-stopped cycle continues nothing**, which keeps the budget wall a brake rather than a metronome. Proven live 2026-08-23: cycles `1fcd687e` → `a11c94d2`, the first chained row in the runner's life. **The briefing-redesign epic is finished** — `SES-129`, its last member, shipped in cycle `ed1a5eb3`. **A new filing rule binds from this version:** `runner_items.backlog_id` takes a **bare** ticket id or NULL and is enforced by `ck_runner_items_backlog_id_bare`; the display string belongs in `display_ref`, and the briefing's id chip reads `coalesce(backlog_id, display_ref)` (`SES-116`, v7.0.174 — `runner-cycle.md` step 9). **`design_status` reads for selection (`SES-114`, v7.0.165); among OPEN tickets measured at the v7.0.198 close-out:** 16 `designed` (incl. `SES-101`, flipped from `needs-desktop` — its one remaining edit now lives in `docs/runbooks/session-setup.md` step 3c, cycle-writable), **0 `needs-desktop`**, **1 `needs-john`** (`SES-84`), 546 `NULL` = not yet triaged, deliberately not guessed to `auto`. Measured at the v7.0.198 close-out: **11 of John's 18 named members remain open** (`SES-121` retired from the list by going `done` this session); the only `needs-john` member is `SES-84` — the rest are buildable, the drain reaches them and can retire on them. **`CHI-89`** still holds its queue slot with its removal card undecided — visible to John and skipped by cycles, exactly as `SES-113` intended. **`SES-133` is still open at `partial`** — the other half of John's 2026-08-23 emergencies directive; it sits at queue 251 rather than at the top, because the drain reads the Automation epic's `now` tier in queue order and `SES-133` is not in that epic. **From v7.0.182 John's own switches govern the cadence** (`SES-143`): the briefing's **§2b Automation panel** carries a scheduler checkbox + an every-N-hours box (the generated block above is the only home for their live values — it renders `runner_settings` row 1 fresh each cycle, `SES-151`) and a drain checkbox, and `runner-cycle.md`'s **new step 1b** calls `public.scheduler_gate()` before anything else — a scheduled cycle arriving early closes `did_not_run` with *"paced by your scheduler setting"*, and with the scheduler off it closes *"scheduler off"*. **The cron is John's own routine switch** — a cycle cannot edit its own routine — and **from v7.0.196 (`SES-151`) the gate paces by John's clock grid**: a scheduled fire runs iff its row's `started_at` falls in an America/Chicago hour divisible by `runner_settings.interval_hours` — row 1, read live, never a number written here — and the routine's cron fires in that hour (DST-proof; the mixed-clock elapsed test that wrongly paced 3 of 9 hourly fires is dead, `q-hourly-interval-boundary` answered by ship). Two consequences worth knowing before reading a quiet night as a stall: the gate **fails open** on every unknown, and it governs **scheduled** fires only, so a standing drain's chained continuation cycles run regardless — while the Automation drain stands, **the chain and not the interval is what actually sets the pace**. A manual fire (off the cron grid) is never paced; whether that is what John wants is the one thing the spec leaves open, asked as `q-manual-fire-pacing`. **From v7.0.188 that gate actually fires** (`SES-146`): until then `scheduler_gate()` matched the trigger by exact equality against the bare word `scheduled`, so a cycle passing the verbatim line step 1b asks for — `trigger: scheduled` — fell through to *"not a scheduled cycle"* and skipped **both** the pacing branch and the `scheduler_on = false` branch, and the grid test compared `now()`-at-step-1b rather than the fire time against a hardcoded ±2. Both failed open, so the panel looked live and bound nothing. The trigger is now normalised, the grid is anchored to the cycle row's own `started_at`, and the tolerance is the column `runner_settings.grid_tolerance_min` (10). **Silence is not a “no”** on any open question. **From v7.0.183 the board's open status is `open`, never `missing`** (`SES-118`): `backlog_items_status_check` now allows exactly `('open','partial','done','removal proposed','removed')` and the retired value raises `23514` — 510 rows renamed, `updated_at` deliberately untouched so step 8c's 30-day revalidation sweep still sees the sinking tail. **That consequence closed at v7.0.189** (attended session `ses118-gated`, 2026-08-23): step 3c's INSERT now writes `'open'`, zero `'missing'` literals remain under `.claude/`, and `SES-118` is `done` — its gated card `76564dde` awaits John's decision on the briefing page.
