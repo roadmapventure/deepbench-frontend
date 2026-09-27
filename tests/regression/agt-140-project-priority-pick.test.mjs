@@ -68,6 +68,12 @@
 // migration's own trailing DO block in the same transaction that wrote it. Declared, not silently
 // skipped.
 //
+// AGT-238 (v7.0.660) RETARGETS ARM B: the returned order now leads with LEVERAGE -- a ticket The
+// Development Manager marked (`backlog_items.leverage_reason` set) precedes project priority. So the
+// graded key gains a leading `lev` = leverage_reason ? 0 : 1, the inversion clause (ii) compares
+// priority only WITHIN one leverage group, and the non-vacuity pair must share its leverage group.
+// Arm A still grades AGT-140's own shipped SQL; AGT-238's text is graded by agt-238-leverage-first.
+//
 // NO MODEL CALL, NO SPEND, NO WRITES. One file read and four REST reads.
 
 import assert from "assert";
@@ -349,7 +355,7 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "arm B -- the live selfbuild lane's returned order is monotonic in [project priority, filing " +
+      "arm B -- the live selfbuild lane's returned order is monotonic in [leverage, project priority, filing " +
         "lane, queue, predicted_cycles]",
       "SUPABASE_URL and/or SUPABASE_SERVICE_KEY are absent. Arm A above still graded both pick " +
         "ORDER BYs against the shipped migration, and its SES-158 control still ran.",
@@ -366,7 +372,7 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   const laneOf = filedAt => (filedAt && Date.parse(filedAt) < laneCut ? 0 : 1);
 
   const rows = await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" });
-  const items = await pg(url, key, "backlog_items?select=backlog_id,queue,filed_at,predicted_cycles,epic_id&limit=2000");
+  const items = await pg(url, key, "backlog_items?select=backlog_id,queue,filed_at,predicted_cycles,epic_id,leverage_reason&limit=2000");
   const epics = await pg(url, key, "epics?select=id,project_id&limit=500");
   const projects = await pg(url, key, "projects?select=id,priority,status&limit=200");
 
@@ -393,12 +399,14 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   // D2: a row whose owning project is not `executing` carries NO priority key and sorts last.
   // MAX rather than 0 is the whole of D2 -- with 0 an admitted enhancement would outrank every
   // chartered ticket on the board.
+  // AGT-238: the leading `lev` key -- leverage FIRST, then project priority.
   const key4 = ref => {
     const it = byRef.get(ref);
     assert.ok(it, `prime_directive_queue() returned ${ref}, which is not in backlog_items`);
     const p = project.get(projectOfEpic.get(it.epic_id));
     const prio = p && p.status === "executing" ? p.priority : MAX;
-    return [prio, laneOf(it.filed_at), it.queue, it.predicted_cycles ?? MAX];
+    const lev = it.leverage_reason ? 0 : 1;
+    return [lev, prio, laneOf(it.filed_at), it.queue, it.predicted_cycles ?? MAX];
   };
 
   // (i) MONOTONICITY of the order the DATABASE returned. Never a re-sort in JS (SES-45).
@@ -408,10 +416,10 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
     assert.ok(
       lex(a, b) <= 0,
       `the ${LANE} lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
-        `[prio ${a[0]}, lane ${a[1]}, queue ${a[2]}, cycles ${a[3]}] precedes ${lane[i].ref} ` +
-        `[prio ${b[0]}, lane ${b[1]}, queue ${b[2]}, cycles ${b[3]}]. AGT-140 / D1 orders by ` +
-        "project priority FIRST, then SES-281 / M5-02's filing lane, then the queue, then M5-07's " +
-        "predicted_cycles nulls last",
+        `[lev ${a[0]}, prio ${a[1]}, lane ${a[2]}, queue ${a[3]}, cycles ${a[4]}] precedes ${lane[i].ref} ` +
+        `[lev ${b[0]}, prio ${b[1]}, lane ${b[2]}, queue ${b[3]}, cycles ${b[4]}]. The pick orders by ` +
+        "leverage FIRST (AGT-238), then project priority (AGT-140), then SES-281 / M5-02's filing lane, " +
+        "then the queue, then M5-07's predicted_cycles nulls last",
     );
   }
 
@@ -419,13 +427,15 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   // a reader must be able to see it fail by itself. Every pair, not just adjacent ones.
   for (let i = 0; i < lane.length; i++) {
     for (let j = i + 1; j < lane.length; j++) {
-      const a = key4(lane[i].ref)[0];
-      const b = key4(lane[j].ref)[0];
+      const [la, a] = key4(lane[i].ref);
+      const [lb, b] = key4(lane[j].ref);
+      // AGT-238: a leverage row may precede any priority; the clause holds WITHIN a leverage group.
+      if (la !== lb) continue;
       assert.ok(
         b >= a,
         `${lane[i].ref} (project priority ${a}) is served at pos ${i + 1}, ahead of ${lane[j].ref} ` +
           `(project priority ${b}) at pos ${j + 1}. A ticket in a lower-priority project may never ` +
-          "precede one in a higher-priority project -- that is the live inversion AGT-140 closed " +
+          "precede one in a higher-priority project within one leverage group (leverage FIRST (AGT-238), then project priority (AGT-140)) -- that is the live inversion AGT-140 closed " +
           "(AGT-141/agent-training p3 ahead of AGT-132/dev-manager-capabilities p2, 2026-09-26)",
       );
     }
@@ -446,9 +456,9 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   for (let i = 1; i < lane.length; i++) {
     const a = key4(lane[i - 1].ref);
     const b = key4(lane[i].ref);
-    if (a[0] < b[0] && lex(a.slice(1), b.slice(1)) > 0) {
-      discriminating = `${lane[i - 1].ref} [prio ${a[0]}, lane ${a[1]}, queue ${a[2]}, cycles ${a[3]}] ` +
-        `before ${lane[i].ref} [prio ${b[0]}, lane ${b[1]}, queue ${b[2]}, cycles ${b[3]}]`;
+    if (a[0] === b[0] && a[1] < b[1] && lex(a.slice(2), b.slice(2)) > 0) {
+      discriminating = `${lane[i - 1].ref} [lev ${a[0]}, prio ${a[1]}, lane ${a[2]}, queue ${a[3]}, cycles ${a[4]}] ` +
+        `before ${lane[i].ref} [lev ${b[0]}, prio ${b[1]}, lane ${b[2]}, queue ${b[3]}, cycles ${b[4]}]`;
       break;
     }
   }
@@ -465,8 +475,8 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   } else {
     console.log(
       `  [AGT-140] arm B: ${lane.length} ${LANE} row(s) over ${servedExecuting.length} executing ` +
-        `project(s); the returned order is monotonic in [priority, filing lane, queue, cycles] and ` +
-        `DISCRIMINATING -- ${discriminating} is a pair the pre-AGT-140 order inverted.`,
+        `project(s); the returned order is monotonic in [leverage, priority, filing lane, queue, cycles] and ` +
+        `DISCRIMINATING -- ${discriminating} is a pair the pre-AGT-140 order inverted; leverage FIRST (AGT-238), then project priority (AGT-140).`,
     );
   }
 

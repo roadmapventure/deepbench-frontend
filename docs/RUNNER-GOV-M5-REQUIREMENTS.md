@@ -586,6 +586,42 @@ executing set rather than that it is the single one.
 
 ---
 
+## Amendment note — `AGT-238`, 2026-09-27 (`v7.0.660`)
+
+<!-- FEATURE: AGT-238 slice 1 — LEVERAGE FIRST, and TICKETS ONLY FROM FINDINGS. No rule STATEMENT in
+     this register changes; M5-02 and M5-07 keep their ids, status and text and now decide within a
+     leverage group and a project. -->
+
+**Why.** Measured live 2026-09-27: the `selfbuild` lane's positions 1–10 were all
+`auditor-enhancements` findings tickets and `AGT-237` — the fix that stops the runner working into a
+database outage — sat at position 58 of 59, because nothing on the board could say that one ticket
+makes the others run better. And 9 non-John tickets had been filed since 2026-09-26 12:00 with no
+finding behind them, though only The Development Manager files tickets.
+
+- **D1 — leverage is its own column.** `backlog_items.leverage_reason` (text, NULL or non-blank):
+  what the ticket makes run better and why, written only by `public.record_leverage()`.
+  `supports_class` (a P-class) and `automation_rank` (John's C4 steps) answer other questions.
+- **D2 — the pick order is now five keys**, in both pick homes: leverage first (marked before
+  unmarked), then the owning project's `priority` (`AGT-140`), then `M5-02`'s filing lane, the queue
+  number, and `M5-07`'s `predicted_cycles` nulls last. `prime_directive_queue()` carries it as
+  `sort_leverage` ahead of `sort_project`; `drain_epic_next(uuid)`'s pick as
+  `CASE WHEN b.leverage_reason IS NOT NULL THEN 0 ELSE 1 END` ahead of `pj.priority`.
+- **D3 — the manager marks leverage in its existing `run-project` answer** (no new model call): an
+  optional `leverage` list of `{backlog_id, improves, why}`, every id a ref the queue returned;
+  `scripts/run-project.js` records it through `record_leverage()` — one decision, one before-image
+  per row, reversible.
+- **D4 — a ticket with no `audit_findings` row is refused at commit** (deferred constraint trigger
+  `backlog_requires_finding`) unless its `scope_origin` is `john-named` or `enhancement`, or its
+  `source_file` matches a pattern in `runner_settings.ticket_filing_exempt_sources` (the mechanical
+  filers `heal-engine`, `tripwire-to-backlog`, `audit-ledger`, `model-assignment`, and regression
+  fixtures). An attended session filing John's own tickets is not blocked.
+
+Migration `agt238_leverage_first` (`v7.0.660`); its down is captured in
+`public.runner_migration_downs` under that `up_name`, and the mirror is
+`docs/design/agt-238-leverage-first.sql`.
+
+---
+
 ## The M5 gate decision — `SES-184`, decided 2026-09-02 (`v7.0.370`)
 
 <!-- FEATURE: SES-184 — the M5 design gate, decided rather than asked. M6-01: no cycle blocks on a

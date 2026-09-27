@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// DeepBench v7.0.660 | scripts/run-project.js | AGT-238 -- LEVERAGE FIRST. The manager answer may
+// carry an optional `leverage` list of {backlog_id, improves, why}: `leverageErrors` refuses an id the
+// queue did not return or a blank reason, and pass two records a non-empty list through
+// `public.record_leverage()` (one decision, one before-image per row) before the stop/report/assign
+// fork. Absent `leverage`, every payload and line is byte-identical to before. Guard:
+// tests/regression/agt-238-leverage-first.test.mjs.
+//
 // DeepBench v7.0.653 | scripts/run-project.js | AGT-186 -- THIS FILE'S OWN PROVENANCE IS NOT THE
 // PICKED TICKET. The state key that carries it is now `driver_feature`, not `feature`: named
 // `feature`, next to `driver:` and nowhere near `pick` / `pick_row`, it read to a human and to a
@@ -135,6 +142,8 @@
 //   PATCH /rest/v1/backlog_items                THE ONE WRITE -- `claimed_by` = the --cycle-id
 //                                               VERBATIM (never a `run-project:` label), so register
 //                                               B42 can re-assert it. Skipped under --dry-run.
+//   POST /rest/v1/rpc/record_leverage           AGT-238: only when the answer carries a non-empty
+//                                               `leverage`; needs --cycle-id. Skipped under --dry-run.
 //
 // Pure helpers (parseArgs, statePathFor, wallReading, stateDrift, answerErrors, claimQueryFor,
 // claimOutcome, handoffContextFor) are exported so the regression suite drives every branch with no
@@ -427,6 +436,39 @@ function passOverErrors(answer, state, a, pick) {
   return null;
 }
 
+// AGT-238 (v7.0.660) -- LEVERAGE FIRST (John 2026-09-27). The manager reads the whole queue and names,
+// in an optional `leverage` list of `{backlog_id, improves, why}`, the tickets whose fix makes other
+// tickets or agents run better; `public.record_leverage()` then writes `leverage_reason`, and both pick
+// homes rank a marked ticket ahead of project priority. THE LIST IS THE LISTER'S: every id must be a
+// ref `prime_directive_queue()` returned (`state.queue`, read verbatim), the same direction `regrades`
+// and the pass-over are checked in. The function re-checks the queue itself -- this is the early,
+// legible half, never the only one. Absent `leverage` returns no lines at all.
+export function leverageErrors(answer, state) {
+  const lev = answer ? answer.leverage : undefined;
+  if (lev === undefined || lev === null) return [];
+  if (!Array.isArray(lev)) {
+    return [`"leverage" is ${typeof lev}, not an array of {backlog_id, improves, why} -- a leverage mark that cannot be checked against the queue is refused`];
+  }
+  const refs = (Array.isArray(state?.queue) ? state.queue : []).map(r => String((r && r.ref) ?? "")).filter(Boolean);
+  const errors = [];
+  lev.forEach((item, i) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      errors.push(`"leverage"[${i}] is not an object {backlog_id, improves, why}`);
+      return;
+    }
+    const id = String(item.backlog_id ?? "").trim();
+    if (!refs.includes(id)) {
+      errors.push(`"leverage"[${i}] names "${id}", which prime_directive_queue() did not return (it returned: ${refs.join(", ") || "nothing"}) -- leverage is marked only on the queue the manager was shown`);
+    }
+    for (const k of ["improves", "why"]) {
+      if (typeof item[k] !== "string" || item[k].trim() === "") {
+        errors.push(`"leverage"[${i}] (${id || "no id"}) carries a blank "${k}" -- a leverage mark says what it makes run better and why`);
+      }
+    }
+  });
+  return errors;
+}
+
 export function answerErrors(answer, state) {
   const errors = [];
   if (!answer || typeof answer !== "object" || Array.isArray(answer)) {
@@ -459,6 +501,10 @@ export function answerErrors(answer, state) {
       }
     }
   }
+
+  // FEATURE: AGT-238 -- `leverage`, OPTIONAL, checked above the action fork for the reason `regrades`
+  // is: it can ride on any of the three actions. Refusal lines only; nothing is written here.
+  errors.push(...leverageErrors(answer, state));
 
   const action = answer.action;
   // An action outside the closed set never reaches the assign branch by falling through it.
@@ -881,16 +927,48 @@ async function main() {
         prose: `run-project: the manager's answer was refused:\n  - ${errors.join("\n  - ")}\nExiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
     }
 
+    // (c2) AGT-238: a non-empty `leverage` is recorded through `public.record_leverage()` -- one
+    //      decision, one before-image per row -- BEFORE the stop/report/assign fork, because it rides
+    //      on any action. Absent `leverage`, nothing here runs and every payload and line below is
+    //      byte-identical to before. `--dry-run` writes nothing, and says so.
+    const lev = Array.isArray(answer.leverage) && answer.leverage.length ? answer.leverage : null;
+    let levExtra = {};
+    let levLine = "";
+    if (lev) {
+      if (args.dryRun) {
+        console.error(`run-project: --dry-run, so the leverage mark on ${lev.map(l => l.backlog_id).join(", ")} was NOT recorded.`);
+        levExtra = { leverage_decision: null };
+        levLine = `\n  leverage: NOT RECORDED (--dry-run) -- ${lev.map(l => l.backlog_id).join(", ")}`;
+      } else {
+        if (!String(args.cycleId ?? "").trim()) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: "--cycle-id is required to record leverage" },
+            prose: `run-project: the answer marks leverage, but --cycle-id was not given -- record_leverage() writes a decision and a decision has exactly one author. Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+        }
+        const rec = await rpc(base, key, "record_leverage", {
+          p_cycle_id: args.cycleId,
+          p_items: lev.map(l => ({ backlog_id: String(l.backlog_id).trim(), improves: String(l.improves).trim(), why: String(l.why).trim() })),
+        });
+        if (rec.error) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", error: rec.error },
+            prose: `run-project: record_leverage() refused the leverage mark: ${rec.error}. Exiting ${EXIT_CANNOT_RUN} -- the function writes all or nothing.` });
+        }
+        levExtra = { leverage_decision: rec.row ?? null };
+        levLine = `\n  leverage: recorded as decision ${rec.row} -- ${lev.map(l => l.backlog_id).join(", ")} now outrank project order`;
+      }
+    }
+
     // (d) A `stop` is an answer, not a failure. Exit 1, write nothing.
     if (answer.action === "stop") {
       return emit({ code: EXIT_STOP, json: args.json,
-        payload: { ok: true, exitCode: EXIT_STOP, kind: "stop", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [] },
-        prose: `run-project: STOP.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.` });
+        payload: { ok: true, exitCode: EXIT_STOP, kind: "stop", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra },
+        prose: `run-project: STOP.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}` });
     }
     if (answer.action === "report") {
       return emit({ code: EXIT_OK, json: args.json,
-        payload: { ok: true, exitCode: EXIT_OK, kind: "report", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [] },
-        prose: `run-project: REPORT.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.` });
+        payload: { ok: true, exitCode: EXIT_OK, kind: "report", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra },
+        prose: `run-project: REPORT.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}` });
     }
 
     // (e) `assign`. The walls are re-read HERE, after the answer, because the answer is not what
@@ -982,6 +1060,7 @@ async function main() {
         agent_id: rosterRow.agent_id, intent_slug: rosterRow.default_intent_slug, model: next.model,
         claimed: !args.dryRun, claim_rows: claim.rows.length, prompt_file: nextPromptPath,
         reason: answer.assignment.reason ?? null,
+        ...levExtra,   // AGT-238
       },
       prose: `run-project: ASSIGNED ${target} — ${rosterRow.capability_slug} — engine ${answer.assignment.engine}\n`
         + (pickSource === "own-claim"
@@ -990,7 +1069,7 @@ async function main() {
         + `  reason: ${answer.assignment.reason ?? "(none given)"}\n`
         + `  claim:  ${args.dryRun ? "NOT MADE (--dry-run)" : `held as ${claim.rows[0]?.claimed_by}`}\n`
         + `  prompt: ${nextPromptPath}\n`
-        + `  Run that prompt as a sub-agent on model ${next.model}, then re-run this driver with --step=${args.step + 1}.` });
+        + `  Run that prompt as a sub-agent on model ${next.model}, then re-run this driver with --step=${args.step + 1}.${levLine}` });
   }
 
   // ---- PASS ONE: read the board, ask the manager, write nothing. -------------------------------
