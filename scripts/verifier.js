@@ -1832,6 +1832,59 @@ export function kickoffLaneFinding(text) {
   };
 }
 
+// FEATURE: AGT-189 -- THE BUILDER'S DECLARED MODEL, graded against the live `orchestrator` lane.
+//
+// THE MODEL ID IS AN ARGUMENT, NEVER A LITERAL IN THIS FILE, and that is why this function takes a
+// second parameter instead of knowing the answer. `public.runner_model_lanes` is the source of
+// truth for which model a lane runs (ARCHITECTURE.md 19b -- routing lives in data, not code), and
+// John retunes it: a model id baked in here would keep passing every kickoff that names the OLD
+// model and refusing every kickoff that names the new one, for as long as nobody noticed -- a green
+// that grades nothing (19v, pattern:2, pattern:93). A grep of this file for ANY model id returns 0
+// and must keep returning 0 -- agt-189's suite pins that; the caller reads the row each run and
+// hands the answer in.
+//
+// THE LINE, NOT THE FILE -- the same shape as `kickoffLaneFinding` above, for the same reason. A
+// kickoff's CONTEXT and TASKS name model ids all the time (AGT-189's own does), so a document-wide
+// search would pass on a string that declares nothing. The first line carrying `Model` and a colon
+// is located once and that string is graded.
+//
+// THE `Lanes:` FALLBACK IS A REAL SHIPPED SHAPE, not a courtesy: `v7.0.609-AGT-134` has no
+// `Model` line at all and declares the build model on its `Lanes:` line ("design and build both
+// **orchestrator**", naming the lane's model inline). Refusing that shape would invalidate a
+// kickoff that DID declare its model, so the Lanes line is read when there is no Model line. Measured over the 25 kickoffs
+// `v7.0.600`-`v7.0.626` as they shipped: 23 pass, and the 2 that refuse (`v7.0.600:7`,
+// `v7.0.614:8`) both put the Builder on `mechanical` when runbook step 7 runs it on `orchestrator`.
+// AGT-189 corrected `v7.0.614:8` in the same commit as this clause; `v7.0.600:7` carries the same
+// wrong declaration and is filed, not patched -- it is outside this ticket's three files.
+//
+// CONTAINS, NEVER EQUALS. A kickoff may legitimately name another lane's model in the same line --
+// `v7.0.615` declares the judgment lane's `claude-fable-5-1` and its degrade in one breath. The
+// claim graded here is "the Builder's model is named on this line", not "no other model is".
+//
+// NULL WHEN `orchestratorModel` IS FALSY, and that direction is forced. This clause runs at runbook
+// step 6 on every cycle, and four shipped tests spawn `--check-kickoff` with both credentials
+// deleted from the child env and demand 0 or 1. A clause that refused every kickoff it could not
+// grade would wedge the entire runner -- far worse than the bug it fixes. So an unreadable row is
+// NOT GRADED, never a refusal, and saying so is the caller's job.
+export function kickoffBuilderModelFinding(text, orchestratorModel) {
+  if (!orchestratorModel) return null;
+  const s = String(text ?? "");
+  const modelLine = s.match(/^[^\n]*\bModel\b[^\n]*:[^\n]*$/m);
+  const lanesLine = s.match(/^[^\n]*\bLanes\b[^\n]*:[^\n]*$/m);
+  const line = modelLine ? modelLine[0] : (lanesLine ? lanesLine[0] : null);
+  if (line && line.includes(orchestratorModel)) return null;
+  const where = modelLine
+    ? "its first Model: line"
+    : (line ? "its Lanes: line (it carries no Model: line)" : "no Model: line and no Lanes: line");
+  return {
+    kind: "kickoff-no-lanes",
+    clause: "builder-model",
+    remedy_owner: KICKOFF_REMEDY_OWNER,
+    remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never edits the Model line',
+    reason: `kickoff does not declare the Builder's model (AGT-189): the live \`orchestrator\` row of \`runner_model_lanes\` reads \`${orchestratorModel}\`, and ${where} does not name it${line ? ` -- the line read was: ${line.trim()}` : ""}. runner-cycle.md step 7 runs the Builder on the \`orchestrator\` lane, so that is the model the kickoff's Model bullet must name; the lane table's purpose column says what a lane is FOR, never which lane the Builder runs ON. The Designer re-assembles design-kickoff ONCE with "no_lanes":true; a Model line supplied by the caller is not a declaration the Designer made.`,
+  };
+}
+
 function cap(text, limit, what) {
   const s = String(text ?? "");
   if (s.length <= limit) return s;
@@ -2317,6 +2370,46 @@ async function main() {
     if (lanes) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...lanes }, prose: lanes.reason });
     }
+    // ---- AGT-189: the Builder's DECLARED MODEL, graded against the lane row, read live. ------
+    //
+    // THE ROW IS READ HERE AND NOWHERE ELSE IN THIS BRANCH, because the answer must come from
+    // `public.runner_model_lanes` on the run rather than from a string in this file (19b,
+    // pattern:2/pattern:93). `kickoffBuilderModelFinding` stays pure and takes it as an argument.
+    //
+    // FAIL NOT-GRADED, NEVER REFUSED, WHEN THE ROW CANNOT BE READ -- missing credentials, an
+    // unreachable endpoint, an empty result. This branch is the FIRST in main() precisely because
+    // step 6 must be runnable with nothing but a local file (see the SES-376 header above), and
+    // `ses-376`, `ses-359`, `ses-378h` and every `agt-187` arm spawn it with both credentials
+    // deleted from the child env, demanding 0 or 1. Refusing every kickoff whose lane row was
+    // unreadable would turn all four red and wedge every cycle -- a far worse failure than the
+    // ungraded green it replaces. So the exit code is untouched and the green SAYS it did not grade
+    // (`builder_model_note`): an unproven claim is declared, never quietly made (19v).
+    let orchestratorModel = null;
+    let builderModelNote = "";
+    {
+      const laneUrl = process.env.SUPABASE_URL;
+      const laneKey = process.env.SUPABASE_SERVICE_KEY;
+      if (!laneUrl || !laneKey) {
+        builderModelNote = `NOT GRADED (AGT-189): the Builder's model was not checked -- ${[!laneUrl && "SUPABASE_URL", !laneKey && "SUPABASE_SERVICE_KEY"].filter(Boolean).join(" and ")} absent, so the live \`orchestrator\` row of runner_model_lanes could not be read. Exit code unchanged -- this green does NOT say the kickoff names the Builder's model.`;
+      } else {
+        // A DEADLINE, because "not graded" only protects the runner if the read cannot HANG. An
+        // 8-second abort lands in `rest()`'s own catch and comes back as an `error`, which is the
+        // not-graded path below -- the same direction as absent credentials, never a refusal.
+        const laneRes = await rest(laneUrl, laneKey, "runner_model_lanes?lane=eq.orchestrator&select=model_id",
+          { signal: AbortSignal.timeout(8000) });
+        if (laneRes.error) {
+          builderModelNote = `NOT GRADED (AGT-189): the Builder's model was not checked -- runner_model_lanes was unreadable (${laneRes.error}). Exit code unchanged.`;
+        } else if (!Array.isArray(laneRes.rows) || !laneRes.rows.length || !laneRes.rows[0].model_id) {
+          builderModelNote = "NOT GRADED (AGT-189): the Builder's model was not checked -- runner_model_lanes returned no `orchestrator` row to grade against. Exit code unchanged.";
+        } else {
+          orchestratorModel = String(laneRes.rows[0].model_id);
+        }
+      }
+    }
+    const builderModel = kickoffBuilderModelFinding(text, orchestratorModel);
+    if (builderModel) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, ...builderModel, orchestrator_lane_model: orchestratorModel }, prose: builderModel.reason });
+    }
     // ---- AGT-187: THE THIRD CLAUSE -- the green says WHOSE declaration it graded. -------------
     //
     // ORDER IS cap -> lanes -> attestation, and it is not interchangeable: the first two grade the
@@ -2363,10 +2456,12 @@ async function main() {
       }
       return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: true,
         answer_bytes: answerBytes, byte_delta: 0,
+        builder_model: orchestratorModel, builder_model_note: builderModelNote,
         attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
         prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
     }
     return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: false,
+      builder_model: orchestratorModel, builder_model_note: builderModelNote,
       attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
       prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
   }
