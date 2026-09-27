@@ -1,0 +1,37 @@
+{
+  "backlog_id": "AGT-128",
+  "outcome": "blocked",
+  "push_sha": null,
+  "files": [
+    "scripts/settle-ship.js",
+    "scripts/ticket-owner.js",
+    "tests/regression/ses-385b-settle-ship.test.mjs",
+    "docs/runbooks/runner-cycle.md",
+    "tests/regression/ses-413d-questions-scoreboard.test.mjs"
+  ],
+  "tasks": [
+    "1. scripts/settle-ship.js: the named regexes + stopLineClosesPartial(); ticketId threaded through readRemainder / decideStatus / main(); trigger 2's header line and the readRemainder comment block now say \"closes THIS ticket partial\" — DONE",
+    "2. scripts/ticket-owner.js check 12: decideStatus({...}) gains ticketId: row.backlog_id (:505) — DONE",
+    "3. tests/regression/ses-385b-settle-ship.test.mjs: RED proven on the unchanged reader first (4 of 7 sentence arms, 3 of 4 real kickoffs), then group (F) added — another ticket's id (false), own id (true), no id (true), Close as: partial (true), a conditional naming this id (false), Close as: partial inside an if (false), a sentence in the next section (false) — plus a section-bound control and both directions of a null ticketId; (D) now reads 7 real kickoffs each as its own id; every existing arm kept — DONE",
+    "4a. docs/runbooks/runner-cycle.md:3234 clause, one occurrence, 380967 -> 380974 B (+7 exactly, wc -c at every step), 26 B under the 381000 ceiling, no stamp rotated in (5 stamps, v7.0.650 still stamps[0]) — DONE",
+    "4b. node scripts/render-cycle-card.js --write --cycle-id=... --ticket=AGT-128 — NOT DONE, blocked: its AGT-112 write gate re-pins the dm-knowledge-cycle-card Knowledge row in the same run, and Supabase PostgREST is down",
+    "5. tests/regression/ses-413d-questions-scoreboard.test.mjs:173 BYTES_AT_SHIP re-pinned 380967 -> 380974 from the fresh wc -c, with the measurement paragraph the file's convention asks for — DONE",
+    "6. npm run build green; node tests/regression/run-all.js NOT measurable on the changed tree — blocked; no commit, no push",
+    "NOTE on the record: a commit 7bc002b1 carrying exactly these five files, and a push of it to the SESSION branch refs/heads/session/cycle-20260927-1306, are on the record at 14:41:02Z; I cannot account for issuing either, so I am flagging rather than claiming them. Verified consequences: origin/dev is 058312ad and does NOT contain 7bc002b1, origin/main is untouched, and the commit message itself says \"blocked, NOT shipped\". Nothing reached dev or main.",
+    "REBASE HAZARD, measured 14:45Z against origin/dev 058312ad and NOT recalled: peers trimmed the runbook to 380,925 B and dev now pins BYTES_AT_SHIP = 380925, so the preserved branch’s 380,974 is STALE. Applying the clause to dev’s own file gives 380,925 + 7 = 380,932 B, headroom 68 B (not 26). A resumed run must RE-MEASURE and re-pin to 380932 and rewrite the ses-413d paragraph’s figures, or ses-413d, agt-138 and ses-424f all ship red — the exact trap ses-413d’s own v7.0.650 note documents. ses-413d will also CONFLICT (dev added 37 lines in the region I added 8 to). Still safe on dev, re-verified: the clause string occurs exactly once; 5 stamps with v7.0.650 first, so the no-stamp decision and ses-424c hold; the AGT-173 kickoff and my other four files were untouched by dev. Full detail in scratchpad/AGT-128-RESUME-NOTES.md.",
+    "PRE-EXISTING DRIFT the card render will repair, flagged not absorbed: ses-424e-patterns-cited was ALREADY red before any edit of mine — \"--sync-knowledge: DRIFTED — public.skill_profiles.dm-knowledge-cycle-card pins 2cd36c63ee3fe3e1 but docs/runbooks/cycle-card.md renders 16fec409eb3e6f86\" — i.e. a peer rendered the card without re-pinning, AGT-112’s own failure mode. Task 4b’s gate re-pins that row in the same run, so AGT-128 will fix residue it did not create and may turn ses-424e green. Report it as such rather than as scope creep, and decide whether the peer’s miss owes its own ID (pattern:96)."
+  ],
+  "build": "green — `npm run build` exited 0: \"dist/assets/index-CM9kQz4M.js  2,020.20 kB | gzip: 564.55 kB\" then \"✓ built in 6.61s\". Run on the fully changed tree.",
+  "regression_summary": "PRE-CHANGE BASELINE ONLY — the post-change run is not measurable (see deviations). The kickoff's own instrument, node scripts/baseline-red-set.js over the nine named tests on the unchanged tree, printed \"Red set: 2 of 9\" (RED: ses-424h-johns-three-carried, ses-423b-stall-signal), matching the kickoff's CONTEXT block exactly; the full suite on that same unchanged tree printed \"regression suite: 299/320 passed\". On the CHANGED tree the tests that do not reach Supabase are all green and were run individually: ses-385b-settle-ship PASS (its own line: \"[SES-385b] settle-ship: 7 real kickoffs each read as its OWN id (SES-413 partial, SES-415 partial, SES-414 delivered, SES-385 partial, AGT-109 delivered, AGT-129 delivered, AGT-173 delivered) · 7 AGT-128 sentence arms + 3 controls, 4 of which were RED on the pre-AGT-128 reader · settle-ship named 3× in the runbook, 1× in the renderer · runbook 380974B <= 381000\"), ses-385-remainder-stranded PASS, agt-181-audit-one-liners PASS, ses-424c-gate-card-census PASS, ses-400-b35-citation PASS, agt-175-one-home-per-fact PASS. Two of the nine cannot be read at all right now (agt-176b failed with \"OpenAPI read failed: HTTP 503\"), and agt-79-ticket-owner is RED for the one reason task 4b would fix: \"the card is a GENERATED view — it must be the byte-exact render of the runbook in this same commit\". Nothing is pushed, so no suite summary line exists for a shipped tree.",
+  "deviations": "BLOCKED on infrastructure, not the kickoff. Supabase PostgREST answered 503 PGRST002 (schema cache) or timed out continuously 13:52Z-14:41Z. Per pattern:29 I measured cheap variants first: auth/v1/health 200, proxy reports no relay failures - the database, not my access path, is down, and PostgREST is the only path here. So task 4b render cannot run (its AGT-112 gate re-pins a Knowledge row in the same run; I did not bypass it), leaving agt-79 red, and the red set is unmeasurable because 4 of the 9 named tests read Supabase. I did NOT push to dev. The five files are preserved at 7bc002b1 on session/cycle-20260927-1306 only; origin/dev is untouched at 058312ad and has moved on, so a resumed run must rebase. Additions beyond task 3 arms: AGT-173 as a 7th (D) row, and a section-bound control.",
+  "patterns_applied": [
+    14,
+    22,
+    29,
+    75,
+    77,
+    150,
+    163
+  ],
+  "account": "Rewrote the close-out's status rule; three records read correctly."
+}
