@@ -1,4 +1,52 @@
 #!/usr/bin/env node
+// DeepBench v7.0.620 | scripts/staff-watch.js | AGT-172 -- `--record` CAN RECORD, AND `--promote`
+// STOPS RE-ASKING. Two defects in one file, both measured live this cycle rather than recalled.
+//
+// (a) THE RAISE AGT-131 SHIPPED HAD NEVER ONCE LANDED, AND THE ERROR IT PRINTED NAMED THE WRONG
+// CAUSE. `rest().get()` and `.post()` both ended in a bare `.json()` on the response after only
+// checking `r.ok`, and `record()` hands ingestFindings() a poster pinned to
+// `Prefer: return=minimal`. PostgREST
+// answers that header `201` WITH A ZERO-BYTE BODY -- probed at this ship against
+// `runner_before_images` with a `[]` body, which writes nothing: `return=minimal` -> 201, 0 bytes;
+// `return=representation` -> 201, `[]`. So `JSON.parse("")` threw `Unexpected end of JSON input`
+// inside the before-image write, and audit-ledger.js:454 rethrew it as `-- no before-image, so the
+// append does not happen (§19v)`. THAT POST HAD SUCCEEDED; the message accused the one thing that
+// was working. The cost, live: **0** `audit_findings` rows `found_by like 'staff-watch:%'` since
+// `v7.0.596`, against six orphan `runner_before_images` rows -- one per attempted raise.
+//
+// `restBody()` IS THE FIX, AND IT IS ONE FUNCTION BECAUSE A SUCCESS WITH NO BODY IS A PROTOCOL
+// FACT RATHER THAN A CALL-SITE QUIRK. An empty body is a SUCCESS where the caller never asked for
+// a representation and a FAILURE where it did, so `required` is the single bit that decides it --
+// and it is DERIVED FROM THE `Prefer` HEADER THE CALLER ACTUALLY SENT, never remembered per site,
+// because a per-site memory is what drifts the day a fifth caller is added. It returns `{value}`
+// or `{error}` and NEVER THROWS: a throw here rebuilds the exact confusion above, where a
+// transport-shaped exception surfaced from the middle of somebody else's guard. No
+// bare `.json()` on a response survives in this file, and the regression file greps for that exact
+// call rather than trusting the claim (arm 3).
+//
+// (b) `--promote --apply` ASKED JOHN THE SAME THING EVERY CYCLE. The INSERT named
+// `?on_conflict=target_id,asked_at,question` while setting `asked_at: new Date().toISOString()`,
+// so the conflict target could never match an earlier row -- `asked_at` is part of the key and is
+// fresh on every run, which makes the resolution unreachable by construction. Live at this ship:
+// **39** `runner_card_asks` rows with `target_kind='skill-edit'`, ALL `answer IS NULL` and
+// `status='open'`, over **THREE** fingerprints -- 13 each, +3 per cycle since `2026-09-25T19:21Z`.
+//
+// THE GUARD KEYS ON THE FINGERPRINT AND THE ANSWER, NEVER ON THE QUESTION TEXT, and that is
+// measured too. The distinct-cycle count sits INSIDE the sentence `skillEditTextFor()` builds, so
+// the same defect writes a DIFFERENT question every time the count ticks over -- two of the three
+// fingerprints above already carry 3 distinct texts across their 13 rows. A dedupe keyed on
+// `question` would therefore file a fresh ask on exactly the cycle the count moved: the same bug
+// wearing a uniqueness constraint. ONE read before the loop fetches every UNANSWERED skill-edit
+// ask; a fingerprint already holding one is `standing` and is not re-filed. ONLY AN UNANSWERED ASK
+// SUPPRESSES -- once John answers, the next sighting is a genuinely new question and gets its own
+// ask, which is the difference between a dedupe and a mute.
+//
+// THE 36 DUPLICATES ARE GONE, imaged and deleted by migration `agt172_dedupe_skill_edit_asks`
+// (DATA ONLY: one DELETE keeping each target's EARLIEST ask, one `runner_before_images` row per
+// deleted ask, no `status` invented -- the CHECK admits `open|answered` only -- and no `answer`
+// written, because writing one would forge John's). No published page had ever rendered them (live
+// page `2026-08-31T22:56Z`, before the first ask), so the cleanup removes nothing he has seen.
+//
 // DeepBench v7.0.596 | scripts/staff-watch.js | AGT-131 -- A STAFF FINDING NOW REACHES THE ONE
 // FINDINGS LIST. `runner_staff_findings` was written by this script and read by nobody: 20 rows
 // over 9 fingerprints sat in a table with no reviewer while the Development Manager reviewed
@@ -184,6 +232,27 @@ export function promotionsFrom(rows, { counter = distinctCycles, bar = PROMOTION
   return out.sort((a, b) => b.cycles - a.cycles || a.fingerprint.localeCompare(b.fingerprint));
 }
 
+// AGT-172 -- WHICH PROMOTIONS GET A FRESH ASK AND WHICH ARE ALREADY STANDING, as a pure function
+// so the regression file drives the SHIPPED rule on fixtures instead of a second copy of it.
+//
+// THE KEY IS THE FINGERPRINT, and `standingTargetIds` is deliberately a set of fingerprints rather
+// than of question texts. `skillEditTextFor()` interpolates the distinct-cycle count INTO the
+// sentence, so one defect seen a fourth time produces a question that is byte-different from its
+// own third asking -- which is precisely how `uniq_card_ask (target_id, asked_at, question)` came to
+// hold 13 rows for one fingerprint. Keying on the text would re-file on the cycle the count moved.
+//
+// ORDER IS KEPT, one entry per promotion, so the printed lines read against `promotions`
+// top-to-bottom and a caller can zip the two without a lookup.
+export function asksToFile(promotions, standingTargetIds) {
+  const standing = standingTargetIds instanceof Set
+    ? standingTargetIds
+    : new Set(standingTargetIds ?? []);
+  return (promotions ?? []).map(p => ({
+    fingerprint: p.fingerprint,
+    action: standing.has(p.fingerprint) ? "standing" : "new",
+  }));
+}
+
 // The text a `--promote` prints, and the text `--apply` files verbatim. Says what was seen, how
 // often, and what it is asking for -- an ask never states a verdict.
 export function skillEditTextFor(p) {
@@ -249,8 +318,14 @@ function rest() {
   return {
     async get(q) {
       const r = await fetch(`${base}/rest/v1/${q}`, { headers });
-      if (!r.ok) fail(`GET ${q} -> HTTP ${r.status} ${await r.text().catch(() => "")}`);
-      return r.json();
+      const text = await r.text().catch(() => "");
+      if (!r.ok) fail(`GET ${q} -> HTTP ${r.status} ${text}`);
+      // A READ ALWAYS WANTS A BODY: `required: true`. An empty 200 from a read is not a quiet
+      // success, it is a read that returned nothing to classify, and `rows.length` on `null` is a
+      // TypeError several frames away from the request that caused it.
+      const b = restBody(text, { status: r.status, what: `GET ${q}`, required: true });
+      if (b.error) fail(b.error);
+      return b.value;
     },
     // `path` carries its own `?on_conflict=` where one is needed -- see the note at each call site.
     async post(table, body, prefer) {
@@ -259,10 +334,56 @@ function rest() {
         headers: { ...headers, Prefer: prefer },
         body: JSON.stringify(body),
       });
-      if (!r.ok) fail(`POST ${table} -> HTTP ${r.status} ${await r.text().catch(() => "")}`);
-      return r.json();
+      const text = await r.text().catch(() => "");
+      if (!r.ok) fail(`POST ${table} -> HTTP ${r.status} ${text}`);
+      // AGT-172 -- THE CALLER'S OWN `Prefer` DECIDES WHETHER AN EMPTY BODY IS A FAILURE. This is
+      // read off the header that was actually sent, not off a list of which call sites happen to
+      // ask for a representation today: `return=minimal` legitimately answers 201 with 0 bytes
+      // (ingestFindings()'s poster below is pinned to it), and that is the success this file spent
+      // 24 cycles reporting as "no before-image, so the append does not happen".
+      const b = restBody(text, {
+        status: r.status,
+        what: `POST ${table}`,
+        required: /return=representation/.test(prefer ?? ""),
+      });
+      if (b.error) fail(b.error);
+      return b.value;
     },
   };
+}
+
+// AGT-172 -- ONE BODY READER FOR EVERY PostgREST ANSWER, `{value}` or `{error}`, NEVER A THROW.
+//
+// RETURNS `{ value: null }` FOR AN EMPTY BODY THE CALLER DID NOT NEED, which is the whole defect
+// this function exists to remove: `Prefer: return=minimal` is answered 201 with zero bytes, and
+// `JSON.parse("")` on that is an `Unexpected end of JSON input` that reaches the operator wearing
+// the label of whatever guard was on the stack. Where the caller DID ask for a representation, the
+// same empty body is a real failure and says so, naming the query -- an empty read silently
+// treated as `null` would classify a full ledger as empty work.
+//
+// NEVER THROWS, AND THAT IS THE POINT rather than a style choice. The error is a VALUE the caller
+// hands to `fail()` at the call site that knows what it was doing; an exception thrown from here
+// is indistinguishable from the transport exception that started all this.
+//
+// AN UNPARSEABLE BODY REPORTS ITS BYTE COUNT AND ITS FIRST 120 CHARACTERS. "Not JSON" with nothing
+// attached is the same dead end as before: a PostgREST HTML error page, a proxy notice and a
+// truncated array all say `Unexpected token` and need completely different fixes, so the answer
+// carries enough of itself to tell them apart -- and is truncated so a megabyte of HTML cannot
+// become the log.
+export function restBody(text, { status, what, required } = {}) {
+  const raw = String(text ?? "");
+  if (!raw.trim()) {
+    if (!required) return { value: null };
+    return { error: `${what} -> HTTP ${status} answered an EMPTY body where one was required` };
+  }
+  try {
+    return { value: JSON.parse(raw) };
+  } catch (e) {
+    return {
+      error: `${what} -> HTTP ${status} answered a body that is not JSON (${e.message}); `
+        + `${Buffer.byteLength(raw, "utf8")} byte(s), first 120 chars: ${raw.slice(0, 120)}`,
+    };
+  }
 }
 
 // --- the three modes ------------------------------------------------------------------------------
@@ -368,10 +489,44 @@ async function promote(args) {
   const promotions = promotionsFrom(rows);
 
   const filed = [];
+  // AGT-172 -- the standing ask per fingerprint, kept out here because the print below needs the
+  // ask's id and `asked_at` after the loop has finished.
+  const standingAsks = new Map();
   if (args.apply) {
-    for (const p of promotions) {
-      // ONE ROW EACH, never one per finding: the ask is about the fingerprint, and `uniq_card_ask
-      // (target_id, asked_at, question)` is the only thing between a re-run and a duplicated thread.
+    // ONE READ BEFORE THE LOOP, and it is the whole dedupe. Measured, not reasoned about: before
+    // this guard, `runner_card_asks` held 39 `skill-edit` rows over THREE fingerprints -- 13 each,
+    // +3 every cycle -- because the INSERT's `?on_conflict=target_id,asked_at,question` named
+    // `asked_at`, which is minted fresh on the line below it and can therefore never match an
+    // earlier row. The conflict resolution was unreachable by construction.
+    //
+    // `answer=is.null` IS PART OF THE KEY, AND THE DISTINCTION IS A DEDUPE VERSUS A MUTE. An ask
+    // John has ANSWERED does not suppress the next sighting: the defect recurring after he has
+    // ruled on it is new information and gets its own thread. Only an ask still waiting on him does.
+    //
+    // `question` IS NOT PART OF THE KEY, deliberately -- see asksToFile()'s note: the cycle count
+    // lives inside the sentence, so one defect's asks are not byte-identical to each other and a
+    // text key re-files the moment the count ticks over.
+    const open = await db.get(
+      "runner_card_asks?target_kind=eq.skill-edit&answer=is.null&select=id,target_id,asked_at");
+    for (const a of open ?? []) {
+      // The EARLIEST unanswered ask is the standing one -- the thread John is looking at, and the
+      // row the dedupe migration kept. Reporting a later duplicate would point him at the copy.
+      const prev = standingAsks.get(a.target_id);
+      if (!prev || String(a.asked_at) < String(prev.asked_at)) standingAsks.set(a.target_id, a);
+    }
+
+    for (const { fingerprint, action } of asksToFile(promotions, new Set(standingAsks.keys()))) {
+      if (action === "standing") {
+        filed.push({ fingerprint, action, standing_ask_id: standingAsks.get(fingerprint).id });
+        continue;
+      }
+      const p = promotions.find(x => x.fingerprint === fingerprint);
+      // ONE ROW EACH, never one per finding: the ask is about the fingerprint, and since AGT-172
+      // the thing between a re-run and a duplicated thread is the standing-ask read above -- NOT
+      // `uniq_card_ask (target_id, asked_at, question)`, which this INSERT names as its conflict
+      // target and which cannot fire while `asked_at` is fresh per run. The constraint is left in
+      // place as the backstop it can actually be (an identical ask inside one run); the guard is
+      // what makes a second cycle a no-op.
       //
       // DEVIATION D1 IS RETIRED as of `SES-378` slice 5 (`v7.0.511`, migration
       // `ses378e_card_ask_skill_edit`): `runner_card_asks_target_kind_check` now reads
@@ -381,7 +536,7 @@ async function promote(args) {
       // and the database's own refusal was surfaced at exit 2, so the constraint could be widened
       // deliberately. A silently substituted `'item'` would have filed every ask under the wrong
       // vocabulary and nobody would ever have learned the constraint was in the way.
-      const written = await db.post("runner_card_asks?on_conflict=target_id,asked_at,question", [{
+      await db.post("runner_card_asks?on_conflict=target_id,asked_at,question", [{
         target_kind: "skill-edit",
         target_id: p.fingerprint,
         question: skillEditTextFor(p),
@@ -389,7 +544,7 @@ async function promote(args) {
         harvested_cycle: args.cycleId,
         status: "open",
       }], "return=representation,resolution=ignore-duplicates");
-      filed.push({ fingerprint: p.fingerprint, filed: Array.isArray(written) && written.length === 1 });
+      filed.push({ fingerprint, action, standing_ask_id: null });
     }
   }
 
@@ -403,7 +558,13 @@ async function promote(args) {
     }
     if (!promotions.length) process.stdout.write("  (none -- nothing has been seen by three distinct cycles yet)\n");
     for (const f of filed) {
-      process.stdout.write(`  filed runner_card_asks for ${f.fingerprint}: ${f.filed ? "new" : "already open"}\n`);
+      // AGT-172 -- a standing ask names the row John is already looking at and WHEN it was asked, so
+      // the operator can read "this was not re-filed" and go find the one that was.
+      const standing = standingAsks.get(f.fingerprint);
+      process.stdout.write(`  filed runner_card_asks for ${f.fingerprint}: ${
+        f.action === "new"
+          ? "new"
+          : `standing (ask ${f.standing_ask_id}, asked ${standing ? standing.asked_at : "?"})`}\n`);
     }
   }
 }
