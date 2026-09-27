@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// DeepBench v7.0.622 | scripts/render-claude-state.js | AGT-174 -- ONE NEW PURE EXPORT,
+// `renderingCycleFinding(fileText, cycleId)`, and NOTHING ELSE. It answers "is the file I just rendered
+// publishing MY ship or my predecessor's?" from the pin the render already carries. It is NON-GATING by
+// construction: it returns a finding object or null, never writes, never dies, and is not called from
+// `main()` -- this script keeps exactly ONE deliberate exit 2 (a body that lost the standing-brief link,
+// John's condition on gated card 37b22393), and a second refusal path here would wedge every close-out.
+// `renderBody`, `LEDGER_FILTER`, `isLedgerShip` and `main()` are byte-identical, so no committed file
+// flips to drift and no third red appears. The measurement, the two kinds and the remedy live in the
+// function's own header. Consumer: scripts/verifier.js (`state_render_cycle` in `--json`, reported, never
+// its own `runner_verdicts` column -- AGT-170's convention). Guarded by
+// tests/regression/agt-174-state-render-self.test.mjs.
+//
 // DeepBench v7.0.470 | scripts/render-claude-state.js | SES-381 — `skeletonChars()` added and exported for
 // the SES-177 size guard, which now measures the SPLIT (everything that is not a session bullet) instead of
 // the whole file. No other change here: `renderBody`'s bytes are identical, so no committed file flips to
@@ -220,6 +232,76 @@ export function parsePin(fileText) {
   const m = fileText.match(/ledger-pin:\s*([0-9a-fA-F,-]*?)\s*-->/);
   if (!m) return [];
   return m[1].split(",").map(s => s.trim()).filter(Boolean);
+}
+
+// THE RENDER SAYS WHOSE SHIP IT IS PUBLISHING (AGT-174, v7.0.622) -- non-gating, pure, no network.
+//
+// THE MEASURED GAP. Every close-out renders this file at step 7a and pushes it, but `LEDGER_FILTER`
+// sends `push_sha=not.is.null`, so a cycle that renders BEFORE writing its own `push_sha` to
+// `runner_cycles` is invisible to its own render: the top ledger row is then the PREVIOUS ship, and
+// the committed file publishes that as "Version in dev". Live on this tree: `034876e5~1`'s
+// CLAUDE-STATE.md line 4 names v7.0.619 / `3c489041` while the cycle writing it was `f4e24696`
+// (v7.0.618) -- a correct render of a stale ledger. `034876e5` names its OWN ship only because
+// `ef3ef208` happened to write `push_sha` first. The runbook already states that order
+// (runner-cycle.md:2928-2929 and :3253-3254); nothing enforced it, and nothing SAID when it had been
+// missed. This function says it.
+//
+// IT IS A FINDING, NEVER A REFUSAL, and that is a hard constraint rather than a preference: this
+// script has exactly ONE deliberate exit 2 -- a body that lost the standing-brief link, John's
+// fail-closed condition on gated card 37b22393 -- and a second way to refuse would wedge every
+// close-out on the platform behind a lag its own cycle cannot fix from here. So nothing here writes,
+// dies, or reaches `main()`'s write path: `renderBody`, `LEDGER_FILTER`, `isLedgerShip` and `main()`
+// are untouched by AGT-174, and the file is still written whatever this returns. The caller
+// (scripts/verifier.js, reported in `--json` as `state_render_cycle`) prints it.
+//
+// THE PIN IS THE RENDER'S OWN LEDGER ROWS IN ORDER, so `pin[0]` IS the top row the file was rendered
+// from -- no second read, no live top-10 (which is the race SES-261 removed; see renderPin above).
+//
+// `null` means nothing to report, and the two non-null kinds are different facts:
+//   - `lag: true`  -- this cycle is ABSENT from the pin: rendered before its own `push_sha` landed,
+//     so the file publishes the previous ship. The remedy is in the reason, and it is the ordering
+//     the runbook already states.
+//   - `lag: false` -- this cycle IS in the pin but not first: a peer pushed after it (B42 concurrency).
+//     Expected, nothing to fix, and reported so a reader does not mistake it for the lag above.
+// `!cycleId` is NOT MEASURED, not "clean": a caller with no cycle id has no way to know, and
+// returning null here with the caller saying so in words keeps the two apart.
+export function renderingCycleFinding(fileText, cycleId) {
+  if (!cycleId) return null;
+  const id = String(cycleId);
+  const pin = parsePin(fileText);
+  if (pin.length === 0) {
+    return {
+      kind: "state-render-no-pin",
+      pin_top: null,
+      pin_index: -1,
+      lag: true,
+      reason: `the committed file carries no readable ledger-pin, so CLAUDE-STATE.md cannot be shown to publish this cycle (${id.slice(0, 8)}) -- ` +
+        "treat it as publishing the previous ship. Remedy: write this cycle's `push_sha` and `version` to its " +
+        "`runner_cycles` row, then re-render (runner-cycle.md step 7a).",
+    };
+  }
+  if (pin[0] === id) return null;
+  const idx = pin.indexOf(id);
+  if (idx === -1) {
+    return {
+      kind: "state-render-not-self",
+      pin_top: pin[0],
+      pin_index: -1,
+      lag: true,
+      reason: `rendered from a ledger that does not contain this cycle (${id.slice(0, 8)}); the newest pinned row is ` +
+        `${String(pin[0]).slice(0, 8)}, so the committed CLAUDE-STATE.md publishes the PREVIOUS ship, not this one (AGT-174 lag). ` +
+        "Remedy: write this cycle's `push_sha` and `version` to its `runner_cycles` row, then re-render " +
+        "(runner-cycle.md step 7a) -- the order the runbook already states.",
+    };
+  }
+  return {
+    kind: "state-render-not-self",
+    pin_top: pin[0],
+    pin_index: idx,
+    lag: false,
+    reason: `the committed file pins this cycle (${id.slice(0, 8)}) at position ${idx + 1}, not first: a peer cycle ` +
+      `(${String(pin[0]).slice(0, 8)}) pushed after this render. Expected under concurrent sessions (B42) -- nothing to fix.`,
+  };
 }
 
 // The comparator, pure and exported so the guard asserts the REAL predicate rather than a copy of it

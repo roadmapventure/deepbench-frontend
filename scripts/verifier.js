@@ -508,6 +508,7 @@ import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
+import { renderingCycleFinding } from "./render-claude-state.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2476,6 +2477,40 @@ async function main() {
     reasoning = kickoffNoLanes.reason + " | " + reasoning;
   }
 
+  // FEATURE: AGT-174 -- THE STATE RENDER SAYS WHEN IT IS PUBLISHING THE PREVIOUS SHIP. NON-GATING.
+  //
+  // THE MEASURED GAP. `scripts/render-claude-state.js` filters the ledger on `push_sha IS NOT NULL`
+  // and takes no cycle argument, so a close-out that renders BEFORE writing its own `push_sha` to
+  // `runner_cycles` renders a ledger it is not in: the file's top row is the PREVIOUS ship, and
+  // CLAUDE-STATE.md publishes that as the version in dev. Live on this tree: `034876e5~1`'s line 4
+  // names v7.0.619 / `3c489041` while the cycle writing it was `f4e24696` (v7.0.618). The ordering
+  // that avoids it is already written down (runner-cycle.md:2928-2929 and :3253-3254) -- what was
+  // missing was anything that NOTICED when it had been missed. This is that.
+  //
+  // IT IS REPORTED, NEVER ENFORCED, AND THAT IS THE TICKET'S OWN CONSTRAINT, not a soft start. This
+  // block assigns nothing to the mechanical lane's two outputs: no branch below may turn this
+  // finding into a block. The renderer keeps exactly ONE deliberate exit 2 (a body that lost the
+  // standing-brief link, John's fail-closed condition on gated card 37b22393), and a second way to
+  // refuse -- here or there -- would wedge EVERY close-out on the platform behind a lag the cycle
+  // cannot fix from inside its own render. Compare the two blocks above, which DO block: the
+  // difference is deliberate and the guard
+  // (tests/regression/agt-174-state-render-self.test.mjs) asserts it against this file's source,
+  // with the `kickoffNoLanes` block above as its positive control.
+  //
+  // NO SPAWN, NO WRITE. `renderingCycleFinding` is a pure function over text already on disk, so
+  // importing it does not make this script a script that writes to the tree -- the property the
+  // header calls the one most likely to be eroded. UNREADABLE stays null: the file is absent on a
+  // fresh clone before the first render, and manufacturing a finding out of a missing file would
+  // report the wrong defect (the same reasoning the kickoff blocks above give for their catch).
+  // `!cycleId` is NOT MEASURED rather than clean, and `prose` below says so in words.
+  let stateRenderCycle = null;
+  try {
+    stateRenderCycle = renderingCycleFinding(
+      fs.readFileSync(path.join(repoRoot, "CLAUDE-STATE.md"), "utf8"), cycleId);
+  } catch {
+    stateRenderCycle = null;
+  }
+
   // Eligibility reads the board, never the argv -- see the header.
   //
   // SES-340: the select EMBEDS THROUGH THE FOREIGN KEY (`epics.project_id -> projects`, constraint
@@ -2634,7 +2669,13 @@ async function main() {
     `  ${detailLine}\n` +
     `  ${reasoning}\n` +
     `  graded sha: ${gradedSha ?? "UNREADABLE"}\n` +
-    `  auto-done eligible: ${elig.eligible ? "YES" : "no"} -- ${autoDoneReason}`;
+    `  auto-done eligible: ${elig.eligible ? "YES" : "no"} -- ${autoDoneReason}\n` +
+    // AGT-174: one line, always printed, never part of the verdict. The three cases are different
+    // facts and read differently: the lag with its remedy, "pins this cycle" (the ordering held),
+    // and "not measured" (nobody passed a cycle id, so nothing could be checked).
+    `  CLAUDE-STATE: ${stateRenderCycle ? stateRenderCycle.reason
+      : cycleId ? "pins this cycle as the newest pushed row"
+      : "not measured (no --cycle-id)"}`;
 
   const payload = {
     ok: verdict === "approve",
@@ -2663,6 +2704,10 @@ async function main() {
     // SES-359: same shape, same reasons -- null when the kickoff declares its lanes or none was
     // passed, the finding object when it does not. Reported, never stored in its own column.
     kickoff_no_lanes: kickoffNoLanes,
+    // AGT-174: the finding object when this render publishes someone else's ship, null when it pins
+    // this cycle OR when no cycle id was passed (`prose` above keeps those two apart in words).
+    // Reported, never stored in its own column and no migration -- AGT-170's convention above.
+    state_render_cycle: stateRenderCycle,
     // AGT-170: the delta's five facts, reported and never stored in their own columns -- the
     // Designer's recorded call (JOHN-0925-DESIGNER-DECIDES): no new `runner_verdicts` column and no
     // migration, the lists ride `--json` and `gateDetail`. `gates.regression` above is the GRADED
@@ -2735,6 +2780,10 @@ async function main() {
       // evidence carrying less content in one lane than the other is the lane-shaped difference
       // this file's own SES-337 note calls out as a defect.
       kickoff_no_lanes: kickoffNoLanes,
+      // AGT-174: given to BOTH judge lanes, same key, same content, for the reason
+      // `code_eligibility` above records -- the same evidence key carrying less content in one lane
+      // than the other is the lane-shaped difference this file's SES-337 note calls out as a defect.
+      state_render_cycle: stateRenderCycle,
       diff: diffFor(repoRoot, base),
       // SES-344: the delivery's own account of itself, in both halves -- the commit bodies between
       // base and HEAD, and the cycle row's notes. Given to BOTH judge lanes, same key, same content,
@@ -2828,6 +2877,7 @@ async function main() {
       kickoff: readCapped(kickoffPath ? path.resolve(repoRoot, kickoffPath) : null, KICKOFF_CAP),
       kickoff_over_cap: kickoffOverCap,   // SES-376 -- see the session lane's note above.
       kickoff_no_lanes: kickoffNoLanes,   // SES-359 -- same.
+      state_render_cycle: stateRenderCycle,  // AGT-174 -- see the session lane's note above.
       diff: diffFor(repoRoot, base),
       ship_report: {                      // SES-344 -- see the session lane's note above.
         commit_messages: shipReportFor(repoRoot, base),
