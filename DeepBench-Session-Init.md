@@ -193,7 +193,7 @@ above are unavailable or stale.
 fetch from or update Drive docs.
 
 **Claude Desktop setup.** Filesystem MCP connected paths: `C:\Projects\deepbench-frontend`,
-`C:\Projects\deepbench-backend`. Config: `C:\Users\jleon\AppData\Roaming\Claude\claude_desktop_config.json`.
+`C:\Projects\deepbench-backend`. Config: `%USERPROFILE%\AppData\Roaming\Claude\claude_desktop_config.json`.
 To reconnect if MCP drops: Settings → account name → Connectors → filesystem → enable (may need an
 off/on toggle and a permission grant once per session).
 
