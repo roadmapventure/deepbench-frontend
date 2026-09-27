@@ -1,3 +1,12 @@
+// DeepBench v7.0.623 | api/prompt/request-receivable.js | AGT-176 -- A BILLED REFUSAL IS NOT FREE.
+// Both refusal gates below asserted `billed: false`, which the two cost mappers turn into a hard
+// `costUsd: 0`, which lands as a measured 0 in ai_activity_log. Anthropic has billed pre-output
+// refusals in the `bio`, `frontier_llm` and `reasoning_extraction` categories since 2026-09-24, so
+// that asserted 0 under-reports real money. refusalBilled() now decides per category, and a billed
+// refusal leaves costUsd undefined so lib/activity-log.js prices it from the row's own four token
+// columns -- returning NULL, never 0, when the row carries no tokens to price. No historical row is
+// rewritten by this change.
+//
 // DeepBench v7.0.466 | api/prompt/request-receivable.js | SES-348 -- A MODEL CALL RUNS TO THE
 // CALLER'S DEADLINE. postToAnthropicWithRetry() clamped every request's abort signal to the lesser
 // of a 55 s literal and the remaining time (and the parse-failure retry fetch did the
@@ -581,6 +590,23 @@ export function estimateInputTokens(callBody) {
 // `stop_reason: null` on every normal row would fragment the signature of the whole log. Same
 // omit-when-empty shape logAgentTurn()'s tool_calls already uses.
 //
+// FEATURE: AGT-176 -- the refusal categories Anthropic BILLS. Since 2026-09-24 a pre-output refusal
+// in one of these three is charged; every other category is not. This is the whole judgment behind
+// `billed` at both refusal gates, kept as one pure exported function so the rule has exactly one home
+// and a regression test can assert it without reaching the network (pattern:14, pattern:150).
+//
+// FAILS CLOSED TOWARDS "UNBILLED", DELIBERATELY. An absent category -- `null`, `undefined`, or a
+// category Anthropic adds after this ship -- returns false and keeps its measured 0 rather than
+// becoming an unpriceable row. A wrong `true` would hand a row to the pricer that has no tokens to
+// price and publish a NULL where a real measured 0 belongs; a wrong `false` under-reports exactly as
+// this ticket describes and is the louder, more findable failure. Neither is guessed: the set is
+// literal, and adding to it is a ticket with Anthropic's billing change cited, never a widened match.
+export const BILLED_REFUSAL_CATEGORIES = ['bio', 'frontier_llm', 'reasoning_extraction'];
+
+export function refusalBilled(category) {
+  return typeof category === 'string' && BILLED_REFUSAL_CATEGORIES.includes(category);
+}
+
 // ALL FOUR VALUES ARE BOUNDED: an error name, a faultCode from HAR-15's fixed set, Anthropic's
 // stop_reason, and a refusal category. No count, no millisecond, no id -- per
 // .claude/rules/ai-pattern-signature.md these are captured as LOG-109 diagnostic facts and are
@@ -692,17 +718,27 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
   // .claude/rules/transient-failure-recovery.md class this permanent and why the throw is here rather
   // than inside the catch.
   //
-  // NOT BILLED, AND THE ROW MUST SAY SO WITH A 0. Anthropic's published semantics: a refusal that
-  // fires BEFORE any output is charged no input and no output tokens (only a mid-stream refusal bills
-  // the streamed partial). A priced figure on this row would be the phantom-dollar defect §19v
-  // records from 2026-08-20 -- dollars in the ledger the Console never charged. `usage` is carried as
-  // the API reported it, unnormalized, because it is evidence about the call rather than a meter.
+  // FEATURE: AGT-176 -- WHETHER A REFUSAL IS BILLED IS NOW A PER-CATEGORY FACT, NOT AN ASSERTED 0.
+  // The rule this block used to state -- that a pre-output refusal is charged no input and no output
+  // tokens, so the row must say so with a 0 -- stopped being true on 2026-09-24, when Anthropic began
+  // billing pre-output refusals in the `bio`, `frontier_llm` and `reasoning_extraction` categories.
+  // An asserted 0 on one of those rows is not a measured free call, it is real money missing from the
+  // ledger. refusalBilled() decides from the category alone; every other category (and an absent one)
+  // stays unbilled and keeps its measured 0.
+  //
+  // A BILLED REFUSAL IS PRICED, NEVER ASSERTED. `billed: true` leaves `costUsd` undefined at both
+  // cost mappers (`:1218` here, `api/capabilities/execute.js:1297`), so lib/activity-log.js prices
+  // the row from its own four token columns and lands NULL -- unknown -- when there are no tokens to
+  // price. That is what keeps this from re-opening the phantom-dollar defect §19v records from
+  // 2026-08-20: nothing here invents a figure, and an unpriceable row reads absent rather than free.
+  // `usage` is carried as the API reported it, unnormalized, because it is evidence about the call
+  // rather than a meter -- and it is also what a billed refusal is priced from.
   if (llmData.stop_reason === 'refusal') {
     throw Object.assign(new Error(`Anthropic refused the request (${llmData.stop_details?.category ?? 'uncategorized'})`), {
       status: 502, upstreamStatus: 200, failureClass: 'permanent', faultCode: 'anthropic-refusal',
       detail: JSON.stringify(llmData.stop_details ?? null),
       modelCall: {
-        sent: true, billed: false, model, stop_reason: 'refusal',
+        sent: true, billed: refusalBilled(llmData.stop_details?.category ?? null), model, stop_reason: 'refusal',
         refusal_category: llmData.stop_details?.category ?? null,
         usage: llmData.usage ?? null, api_retry_count: apiRetryCount,
       },
@@ -800,7 +836,8 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
       llmData = await retryRes.json();
       // FEATURE: LOG-149 -- the same refusal gate on the retry's response. A mid-conversation refusal
       // (the corrective turn tripped a classifier the first turn did not) is the same permanent class
-      // and the same unbilled 0; without this it would fall through to parseModelTurn() and surface
+      // and, per AGT-176, the same per-category `billed` verdict -- not a blanket unbilled 0. Without
+      // this gate it would fall through to parseModelTurn() and surface
       // as the generic "Parse failed and retry also failed" 422, which names the wrong cause and,
       // being a 422, HAR-17 classes TRANSIENT -- an auto-resume into a third refused request.
       if (llmData.stop_reason === 'refusal') {
@@ -808,7 +845,7 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
           status: 502, upstreamStatus: 200, failureClass: 'permanent', faultCode: 'anthropic-refusal',
           detail: JSON.stringify(llmData.stop_details ?? null),
           modelCall: {
-            sent: true, billed: false, model, stop_reason: 'refusal',
+            sent: true, billed: refusalBilled(llmData.stop_details?.category ?? null), model, stop_reason: 'refusal',
             refusal_category: llmData.stop_details?.category ?? null,
             usage: llmData.usage ?? null, api_retry_count: apiRetryCount,
           },

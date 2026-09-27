@@ -12,7 +12,17 @@
 // refusal that fires BEFORE any output (empty content -- the SES-347 shape, 5/5) is NOT billed by
 // Anthropic (no input or output tokens). So a refusal row must land with cost_usd = 0, never a
 // priced figure -- pricing it would be the phantom-dollar defect ARCHITECTURE.md §19v records from
-// 2026-08-20. An ABORTED call (TimeoutError/AbortError after the request was sent) IS billed and
+// 2026-08-20.
+//
+// AMENDED v7.0.623 (AGT-176) -- THAT BILLING FACT IS NO LONGER UNIVERSAL, AND PART (c) MOVED WITH IT.
+// Anthropic began billing pre-output refusals in the `bio`, `frontier_llm` and `reasoning_extraction`
+// categories on 2026-09-24, so `billed` is now a per-category verdict from refusalBilled() rather
+// than a blanket false. The paragraph above still holds for every OTHER category, and part (c) now
+// asserts BOTH branches -- a billed category and an unbilled one -- rather than the single false it
+// pinned before. The phantom-dollar guard is unchanged and now lives downstream: a billed refusal
+// leaves costUsd undefined, so lib/activity-log.js prices it from the row's own tokens and writes
+// NULL when there are none. No figure is invented here, and no historical row was rewritten.
+// An ABORTED call (TimeoutError/AbortError after the request was sent) IS billed and
 // its usage is unknowable to us, so its row carries a labelled input-side estimate
 // (call_facts.tokens_estimated = true, fault = the error name) and cost_usd as a floor.
 //
@@ -80,12 +90,12 @@ async function supabaseRows(query) {
 }
 
 // A refusal response in the exact shape SES-347 measured: HTTP 200, empty content, no tool_use.
-function refusalResponse() {
+function refusalResponse(category = "reasoning_extraction") {
   return {
     ok: true, status: 200,
     json: async () => ({
       id: "msg_refused", type: "message", role: "assistant", model: "claude-fable-5-1",
-      content: [], stop_reason: "refusal", stop_details: { type: "refusal", category: "reasoning_extraction" },
+      content: [], stop_reason: "refusal", stop_details: { type: "refusal", category },
       usage: { input_tokens: 0, output_tokens: 0 },
     }),
     text: async () => "",
@@ -176,8 +186,25 @@ async function run() {
       assert.ok(err.modelCall && err.modelCall.sent === true, "e.modelCall.sent must be true: the request reached the API");
       assert.strictEqual(err.modelCall.stop_reason, "refusal");
       assert.strictEqual(err.modelCall.refusal_category, "reasoning_extraction");
-      assert.strictEqual(err.modelCall.billed, false, "a pre-output refusal is unbilled -- the row must cost 0");
+      // AGT-176: `reasoning_extraction` is one of the three categories Anthropic bills since
+      // 2026-09-24, so this arm must now read TRUE. Asserting the old blanket false here is what
+      // would let the under-reporting back in.
+      assert.strictEqual(err.modelCall.billed, true,
+        "a refusal in a BILLED category (reasoning_extraction) must carry billed: true -- an asserted 0 here is real money missing from the ledger (AGT-176)");
       assert.deepStrictEqual(err.modelCall.usage, { input_tokens: 0, output_tokens: 0 }, "usage is carried as the API reported it");
+
+      // AGT-176, THE OTHER BRANCH -- without this the assertion above could pass on a hardcoded
+      // `billed: true` that had simply replaced the hardcoded false (the LOO-013 lesson: assert
+      // WHICH branch fired). An unbilled category keeps its measured 0.
+      calls = 0;
+      globalThis.fetch = async () => { calls++; return refusalResponse("cyber"); };
+      let unbilledErr = null;
+      try { await rr.callModel(base); } catch (e) { unbilledErr = e; }
+      assert.ok(unbilledErr, "a refused call must throw whatever its category");
+      assert.strictEqual(calls, 1, "an unbilled refusal is still not parse-retried");
+      assert.strictEqual(unbilledErr.modelCall.refusal_category, "cyber");
+      assert.strictEqual(unbilledErr.modelCall.billed, false,
+        "a refusal in an UNBILLED category (cyber) must keep billed: false -- flipping every refusal would publish NULLs where a real measured 0 belongs");
 
       // timeout: the request was sent; usage unknowable; a labelled estimate rides the error
       globalThis.fetch = async () => { throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" }); };
