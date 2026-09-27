@@ -1885,6 +1885,98 @@ export function kickoffBuilderModelFinding(text, orchestratorModel) {
   };
 }
 
+// FEATURE: AGT-194 half (b) -- THE VERDICT SAYS OUT LOUD WHEN THE SHA IT GRADED HAS NO CI
+// CONCLUSION OF ITS OWN. REPORTED, NEVER A GATE.
+//
+// THE MEASURED GAP, read from `public.ci_run_conclusions` and `public.runner_verdicts` at this ship
+// rather than reasoned about. 82 of 535 conclusion rows (15.3%) carry a CANCELLED blocking job,
+// because until half (a) of this ticket every dev push shared one concurrency group and each new push
+// cancelled the last. And 16 of 127 verdict rows carrying a `graded_sha` name a sha with no
+// conclusion row AT ALL -- every one of them `verdict=block`, 7 provable ancestors of dev HEAD.
+// Nothing anywhere said so. The runner's step 4a asks "how did CI grade this ship?" and the honest
+// answer for one ship in six was "could not tell", delivered as silence.
+//
+// IT IS REPORTED AND NEVER ENFORCED, and that is the ticket's own constraint rather than a soft
+// start. No branch below assigns to `verdict` or `reasoning`, and `verdictFor()` never reads this
+// finding. A CI read that could flip a gate would re-grade every ship on the platform at once, on a
+// fact about GitHub's schedulers rather than about the change -- and it would wedge the first cycle
+// whose conclusion row simply had not been written yet. The guard
+// (tests/regression/agt-194-ci-conclusion-per-sha.test.mjs) asserts the non-gating claim against this
+// file's source with the `kickoffNoLanes` block as its positive control.
+//
+// FOUR CLAUSES, AND COLLAPSING ANY TWO WOULD ERASE THE FACT THE LEDGER IS READ FOR. "nobody could
+// tell which tree was graded" (`no-graded-sha`), "the table could not be read" (`unreadable`), "the
+// table WAS read and this sha is not in it" (`no-conclusion`) and "the run exists and a blocking job
+// never finished" (`cancelled-blocking`) are four different facts about a ship, and a reader
+// deciding whether to re-run CI needs to know which. `unreadable` is declared, never a silent empty:
+// an unreachable table reported as "no conclusion exists" would manufacture the very finding this
+// function exists to make trustworthy.
+//
+// A ROW WITH NO BLOCKING JOB IS NOT VACUOUSLY CLEAN. "every blocking job succeeded" is true of a row
+// that names none, and returning null there would report a run that graded nothing as a graded ship.
+// Non-blocking jobs are not consulted at all: `report-conclusion` is the job that WRITES this table,
+// so grading the ship on its conclusion would be grading the messenger.
+//
+// PURE AND SYNC, over rows another function already read -- which is what lets the guard drive every
+// branch with no credentials and no network (pattern:162 -- a check grades the change, never the live
+// world).
+export function ciConclusionFinding({ gradedSha, rows }) {
+  const kind = "ci-conclusion-missing";
+  const tail = "AGT-194: reported only -- this never changes the verdict. Half (a) of the same ticket " +
+    "made each pushed sha its own concurrency group so a peer push can no longer cancel this one's " +
+    "blocking jobs; a sha pushed BEFORE that landed may simply predate the fix.";
+
+  if (!gradedSha) {
+    return { kind, clause: "no-graded-sha", reason:
+      `no CI conclusion could be looked up because this run's graded sha could not be read at all ` +
+      `(gradedShaFor() returned null: no git, no checkout, or a non-hex HEAD). The verdict still ` +
+      `stands on its gates -- but it cannot be joined to a CI run, so nothing here says whether CI ` +
+      `ever graded this tree. ${tail}` };
+  }
+  if (!Array.isArray(rows)) {
+    return { kind, clause: "unreadable", reason:
+      `the CI conclusion for sha ${gradedSha} could NOT BE READ (ci_run_conclusions was unreachable, ` +
+      `or no credentials were supplied). This is a declared gap, not a clean result: "the table could ` +
+      `not be read" and "the table holds no run for this sha" are different facts and only one of them ` +
+      `means a grade is missing. ${tail}` };
+  }
+
+  const row = rows.find(r => String(r?.commit_sha ?? "") === String(gradedSha)) ?? null;
+  if (!row) {
+    const came = rows.length
+      ? `the read returned ${rows.length} row(s), none of them for this sha (` +
+        `${rows.map(r => String(r?.commit_sha ?? "?")).join(", ")})`
+      : "the table was read and holds no run for this sha";
+    return { kind, clause: "no-conclusion", reason:
+      `sha ${gradedSha} has NO CI conclusion: ${came}. A landed commit nothing ever graded -- 16 of ` +
+      `127 verdict rows with a graded sha were in exactly this state at this ship, all 16 blocked. If ` +
+      `CI is still running, the row appears when report-conclusion writes it. ${tail}` };
+  }
+
+  const jobs = Array.isArray(row.jobs) ? row.jobs : [];
+  const blocking = jobs.filter(j => /blocking/i.test(String(j?.name ?? "")));
+  if (!blocking.length) {
+    return { kind, clause: "no-conclusion", reason:
+      `sha ${gradedSha} has a ci_run_conclusions row (run ${row.run_id ?? "?"}` +
+      `${row.concluded_at ? `, concluded ${row.concluded_at}` : ""}) but it names NO blocking job` +
+      `${jobs.length ? ` -- the ${jobs.length} job(s) it does name are ` +
+        `${jobs.map(j => String(j?.name ?? "?")).join(", ")}` : " and no jobs at all"}. Nothing ` +
+      `blocking graded this tree, so the run is not a grade. ${tail}` };
+  }
+
+  const unfinished = blocking.filter(j => String(j?.conclusion ?? "") !== "success");
+  if (!unfinished.length) return null;
+
+  return { kind, clause: "cancelled-blocking", reason:
+    `sha ${gradedSha} has a CI run (run ${row.run_id ?? "?"}` +
+    `${row.concluded_at ? `, concluded ${row.concluded_at}` : ""}) whose blocking job(s) did not ` +
+    `succeed: ${unfinished.map(j => `${String(j?.name ?? "?")} = ${String(j?.conclusion ?? "null")}`).join("; ")}` +
+    `. A CANCELLED blocking job is the AGT-194 defect -- no grade was ever published for this sha, ` +
+    `which is not the same as a red grade; a FAILURE is a real grade and the regression and build ` +
+    `gates above already carry it. Read the conclusion beside each job name rather than the clause, ` +
+    `which names this finding's motivating case. ${tail}` };
+}
+
 function cap(text, limit, what) {
   const s = String(text ?? "");
   if (s.length <= limit) return s;
@@ -1979,6 +2071,28 @@ export async function cycleNotesFor(supabaseUrl, supabaseKey, cycleId) {
     return r.rows?.[0]?.notes ?? "";
   } catch (e) {
     return `[UNREADABLE: runner_cycles.notes -- ${e.message}]`;
+  }
+}
+
+// FEATURE: AGT-194 half (b), the READ -- separated from the judgment above so the judgment is a pure
+// function a guard can drive through every branch, and this is the only part that needs the network.
+// Shaped on cycleNotesFor() directly above.
+//
+// `null` ON EVERY FAILURE, AND `[]` IS NOT THE SAME ANSWER. `[]` means the table was read and holds
+// no run for this sha -- the ticket's headline finding. `null` means it could not be read at all, and
+// ciConclusionFinding() renders that as the DECLARED-unreadable clause. Returning `[]` for an
+// unreachable table would manufacture the finding out of a network error, which is the one way a
+// reported-only check can still mislead. A missing sha or missing credentials are the same unknown:
+// unreadable, never clean.
+export async function ciConclusionFor(supabaseUrl, supabaseKey, gradedSha) {
+  if (!supabaseUrl || !supabaseKey || !gradedSha) return null;
+  try {
+    const r = await rest(supabaseUrl, supabaseKey,
+      `ci_run_conclusions?select=commit_sha,run_id,concluded_at,jobs&commit_sha=eq.${encodeURIComponent(gradedSha)}&limit=1`);
+    if (r.error) return null;
+    return Array.isArray(r.rows) ? r.rows : null;
+  } catch {
+    return null;
   }
 }
 
@@ -2814,6 +2928,15 @@ async function main() {
   // calling this again: see recordJudgedVerdict()'s note on why a second read is a different fact.
   const gradedSha = gradedShaFor(repoRoot);
 
+  // AGT-194: read ONCE, here, beside the sha it is about, and carried from this point into the prose,
+  // the --json payload and BOTH judge lanes. NOTHING below may turn it into a gate -- see
+  // ciConclusionFinding()'s header for why a CI read that could flip a verdict re-grades every ship
+  // on the platform at once.
+  const ciConclusion = ciConclusionFinding({
+    gradedSha,
+    rows: await ciConclusionFor(supabaseUrl, supabaseKey, gradedSha),
+  });
+
   // FEATURE: SES-337 -- the DATABASE half of charter premise 3, read from this cycle's own
   // before-images. §19v's "no before-image, no write" is what makes them the complete record of the
   // rows this cycle touched, so a `skill_profiles` image is the only place a rewrite of the
@@ -2863,7 +2986,12 @@ async function main() {
     // and "not measured" (nobody passed a cycle id, so nothing could be checked).
     `  CLAUDE-STATE: ${stateRenderCycle ? stateRenderCycle.reason
       : cycleId ? "pins this cycle as the newest pushed row"
-      : "not measured (no --cycle-id)"}`;
+      : "not measured (no --cycle-id)"}\n` +
+    // AGT-194: one line, ALWAYS printed, never part of the verdict. The clean case is stated in
+    // words too -- a line that appeared only on a finding would leave its reader unable to tell
+    // "CI graded this sha green" from "this build of the verifier does not look".
+    `  CI CONCLUSION: ${ciConclusion ? `[${ciConclusion.clause}] ${ciConclusion.reason}`
+      : "every blocking CI job for this sha concluded success"}`;
 
   const payload = {
     ok: verdict === "approve",
@@ -2896,6 +3024,11 @@ async function main() {
     // this cycle OR when no cycle id was passed (`prose` above keeps those two apart in words).
     // Reported, never stored in its own column and no migration -- AGT-170's convention above.
     state_render_cycle: stateRenderCycle,
+    // AGT-194: the finding object when this sha has no CI conclusion of its own, null when every
+    // blocking job succeeded. Reported, never stored in its own column and NO MIGRATION -- AGT-174's
+    // precedent and AGT-170's convention; the fact reaches the ledger through `reasoning` nowhere and
+    // through this key only, because it is not a judgment about the change.
+    ci_conclusion: ciConclusion,
     // AGT-170: the delta's five facts, reported and never stored in their own columns -- the
     // Designer's recorded call (JOHN-0925-DESIGNER-DECIDES): no new `runner_verdicts` column and no
     // migration, the lists ride `--json` and `gateDetail`. `gates.regression` above is the GRADED
@@ -2972,6 +3105,10 @@ async function main() {
       // `code_eligibility` above records -- the same evidence key carrying less content in one lane
       // than the other is the lane-shaped difference this file's SES-337 note calls out as a defect.
       state_render_cycle: stateRenderCycle,
+      // AGT-194: given to BOTH judge lanes, same key, same content, for the reason
+      // `code_eligibility` above records -- the same evidence key carrying less content in one lane
+      // than the other is the lane-shaped difference this file's SES-337 note calls out as a defect.
+      ci_conclusion: ciConclusion,
       diff: diffFor(repoRoot, base),
       // SES-344: the delivery's own account of itself, in both halves -- the commit bodies between
       // base and HEAD, and the cycle row's notes. Given to BOTH judge lanes, same key, same content,
@@ -3066,6 +3203,7 @@ async function main() {
       kickoff_over_cap: kickoffOverCap,   // SES-376 -- see the session lane's note above.
       kickoff_no_lanes: kickoffNoLanes,   // SES-359 -- same.
       state_render_cycle: stateRenderCycle,  // AGT-174 -- see the session lane's note above.
+      ci_conclusion: ciConclusion,        // AGT-194 -- same: BOTH lanes, same key, same content.
       diff: diffFor(repoRoot, base),
       ship_report: {                      // SES-344 -- see the session lane's note above.
         commit_messages: shipReportFor(repoRoot, base),

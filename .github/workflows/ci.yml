@@ -1,3 +1,43 @@
+# DeepBench v7.0.631 | .github/workflows/ci.yml | AGT-194 — ONE CONCURRENCY GROUP PER PUSHED SHA,
+# so every sha that lands on dev keeps its own CI conclusion. The whole change is the `group:` key
+# below; `cancel-in-progress: true` is UNCHANGED and load-bearing.
+#
+# THE DEFECT, measured live on `public.ci_run_conclusions` at this ship rather than reasoned about.
+# The group was `ci-${{ github.ref }}`: one group per REF, while 5-7 sessions push `dev` minutes
+# apart. So every dev push shared one group and each new push CANCELLED the last. 82 of 535 rows
+# (15.3%, 2026-08-31 → 2026-09-27) carry a cancelled blocking job — 82 on `Tripwire + regression
+# (blocking)`, 8 on `Build (blocking)` — mean 3.4/day over 24 days, worst day 12. A cancelled
+# blocking job is not a softer red: NO conclusion is ever published for that sha, so the runner's
+# step 4a can only say "could not tell". 16 of 127 `runner_verdicts` rows carrying a `graded_sha`
+# name a sha with no conclusion row at all — all 16 `verdict=block`, 7 provable ancestors of dev HEAD.
+#
+# IT IS NOT ONLY A PEER PROBLEM. Ship `d524d6d0` (AGT-172) had `Tripwire + regression (blocking)`
+# cancelled at 01:53:42Z by its OWN cycle's close-out push 366 seconds later. A cycle was cancelling
+# the grade of its own ship with its own second push.
+#
+# WHY THE GUARD IS `event_name == 'push'` AND NOT A BRANCH TEST, which is the line to read twice.
+# On `pull_request` the suffix evaluates to the EMPTY STRING, so the group stays ref-wide and a
+# force-push still supersedes the run it replaced — that cancellation is wanted, because a PR's
+# superseded commit needs no conclusion of its own. On `push` the sha is appended, so `main` is
+# covered by the same line with no second condition to keep in sync. GitHub's `&&` / `||` yield
+# OPERANDS rather than booleans, so `false || ''` renders as the empty string and the pull_request
+# form is byte-identical to what shipped before this line changed.
+#
+# THE COST, NAMED RATHER THAN BURIED. Superseded dev pushes now RUN the full blocking suite instead
+# of being cancelled: ~3.4 extra blocking completions/day, worst observed day 12. Against a measured
+# peak of 65 pushes/day (≈2.7/hour) and a blocking path of a few minutes, expected overlap stays in
+# low single digits, so an Actions concurrency ceiling would present as a QUEUED run — delayed, never
+# a lost conclusion, which is the direction this ticket exists to buy. The account's plan tier and
+# its job ceiling are a billing read and were NOT verified at this ship.
+#
+# THE FAILURE DIRECTION THIS EDIT MUST NEVER TAKE. A malformed `${{ }}` expression does not fail one
+# job — it makes the WHOLE workflow invalid, so nothing runs and no sha is ever graded again, which
+# is strictly worse than the bug being fixed. So the guard
+# (tests/regression/agt-194-ci-conclusion-per-sha.test.mjs) parses this file with a REAL YAML parser
+# and asserts the job set, the trigger block and the workflow name unchanged — never a grep. Its
+# arms A and B evaluate this expression for two shas: different groups on push, one group on
+# pull_request. Either arm alone would pass a wrong fix.
+#
 # DeepBench v7.0.613 | .github/workflows/ci.yml | AGT-168 slice 1 — THE PRIVATE-INFO SCAN NOW
 # GATES, and the one line to read twice is `--base`. scripts/audit-private-scan.js has detected
 # credentials, personal addresses and home-directory paths in tracked files since v7.0.550, but its
@@ -186,7 +226,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 
 jobs:
