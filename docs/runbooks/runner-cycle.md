@@ -4651,7 +4651,7 @@ actuator is platform-refused or boots dead; the chain runs in-session only), or 
 OUTSIDE THE ONE SUCCESSION JOHN PRE-AUTHORISED** (`drain_epic_next` property 5 — John writes drains;
 see the carve-out immediately below); **skip the step-1b settings gate, or carry on past a
 non-`run` verdict** (`SES-143` — the panel is John's switch on his own runner, and a cycle that
-runs anyway has taken it back).
+runs anyway has taken it back).; **record into `notes` or a card any commit sha but the one CI graded** (`AGT-173`: the rebase before the push rewrites artifact commits, so name the PATH — the only always-true sha is `runner_verdicts.graded_sha`, the push sha, enforced by `runner_record_citation_guard()`)
 
 **RETIRED IN PLACE 2026-09-09 (`SES-340`, `v7.0.425`).** Both directives this carve-out rests on —
 the succession directive `0970abad` and Prime Directive `a0ef9525` §6 — are closed `superseded`

@@ -1,4 +1,4 @@
--- DeepBench v7.0.644 | docs/design/agt-173-card-citation-guard.sql | AGT-173 -- A CYCLE CARD AND A
+-- DeepBench v7.0.648 | docs/design/agt-173-card-citation-guard.sql | AGT-173 -- A CYCLE CARD AND A
 -- CYCLE'S NOTES CANNOT NEWLY CITE A REMOVED TICKET, AND CORRECTING ONE THAT DOES IS STILL ALLOWED.
 --
 -- WHERE THE GUARD HAD TO GO, measured rather than assumed: NOTHING composes a cycle card.
@@ -51,6 +51,22 @@
 -- `REVOKE ... FROM PUBLIC` does not touch that, so all three are revoked BY NAME and both directions
 -- are asserted at the foot).
 
+--
+-- R1 (v7.0.648, cycle ece180eb, migration `agt173_commit_sha_guard`) ADDS A SECOND BLOCK TO THE SAME
+-- GUARD FUNCTION AND THE SAME TRIGGER PAIR -- no new trigger, no new column, nothing duplicated: the
+-- record may not quote a commit sha the board cannot resolve. MEASURED, not reasoned: of the commit
+-- shas in `runner_cycles.notes` over five days, 19 of 42 are ancestors of no remote branch, because
+-- the pre-push rebase rewrites every artifact commit; while 40 of 40 `push_sha` values in that window
+-- ARE ancestors of `origin/dev` and step 7 asserts `push_sha = runner_verdicts.graded_sha`
+-- (`SES-345`). That asymmetry is what makes refusing the rest safe -- the remedy the message
+-- prescribes (name the artifact's PATH, or this cycle's push sha) is always reachable.
+-- `\b` IS BACKSPACE IN POSIX ARE, NOT A WORD BOUNDARY: the design's first form used it and returned
+-- 0 rows on a board full of offenders. The shipped form ends the token with `(?![0-9a-f])`.
+-- Down captured FIRST: `capture_migration_down('ece180eb-…', 'agt173_commit_sha_guard', …)` over both
+-- functions -> `auto-downable`, 2 objects captured, 0 refusals. Both bodies below are
+-- `pg_get_functiondef` read back live after the migration and byte-identical to it (md5, live -> file:
+-- note_unverifiable_commit_shas de66e9d032ce7dd932adaccbcd281d89 / 2,231 B;
+-- runner_record_citation_guard 1a98a3cc133aef96dcf3d058e02f63d8 / 3,307 B).
 CREATE OR REPLACE FUNCTION public.card_removed_citations(p_new text, p_old text)
  RETURNS TABLE(backlog_id text, status text)
  LANGUAGE sql
@@ -81,15 +97,60 @@ AS $function$
    order by b.backlog_id;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.note_unverifiable_commit_shas(p_new text, p_old text)
+ RETURNS TABLE(token text)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
+-- AGT-173 R1 (v7.0.648). THE ALLOWLIST IS THE JOIN, exactly as card_removed_citations() does it with
+-- backlog_items: a token is offending only when NO push_sha and NO graded_sha on the board can
+-- resolve it. 40 of 40 push_sha values in the last five days ARE ancestors of origin/dev, while 19 of
+-- 42 shas quoted in runner_cycles.notes are ancestors of no remote branch at all -- the pre-push
+-- rebase rewrote them -- so the graded sha is the only always-true one and that is what makes
+-- refusing the rest safe.
+-- PREFIX EITHER WAY, so an abbreviation and a full 40 both resolve: a 7-char token matching a stored
+-- 40, and a 40-char token matching a stored 7, are both known.
+-- \b IS BACKSPACE IN POSIX ARE, NOT A WORD BOUNDARY -- written with \b this returned 0 rows in design
+-- and looked like a clean board. The trailing (?![0-9a-f]) is the boundary that actually works.
+-- p_old IS THE GRANDFATHER CLAUSE, as in part 1: correcting a row that quotes a dead sha means
+-- quoting it while you correct it, so a token already in the row being updated is subtracted before
+-- the check. Pass '' for a fresh INSERT -- OLD is NULL there, so an insert is judged whole.
+  with new_toks as (
+    select distinct m[1] as tok
+      from regexp_matches(coalesce(p_new, ''),
+             '(?:commit(?:ted)?(?: as)?)[[:space:]]+([0-9a-f]{7,40})(?![0-9a-f])', 'g') as m
+  ),
+  old_toks as (
+    select distinct m[1] as tok
+      from regexp_matches(coalesce(p_old, ''),
+             '(?:commit(?:ted)?(?: as)?)[[:space:]]+([0-9a-f]{7,40})(?![0-9a-f])', 'g') as m
+  ),
+  known as (
+    select c.push_sha as sha from public.runner_cycles c where coalesce(c.push_sha, '') <> ''
+    union
+    select v.graded_sha from public.runner_verdicts v where coalesce(v.graded_sha, '') <> ''
+  )
+  select n.tok
+    from new_toks n
+   where not exists (select 1 from old_toks o where o.tok = n.tok)
+     and not exists (select 1 from known k
+                      where k.sha like n.tok || '%' or n.tok like k.sha || '%')
+   order by n.tok;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.runner_record_citation_guard()
  RETURNS trigger
  LANGUAGE plpgsql
  SET search_path TO 'public', 'pg_catalog'
 AS $function$
--- AGT-173 (v7.0.644). Nothing in scripts/, api/ or lib/ composes a cycle card or a cycle's notes --
--- `grep -rn runner_items scripts/ api/ lib/` finds no writer; decide-gated-card.js:337 only PRINTS
--- one -- so both are hand-composed SQL at step 9 and the only place a guard can sit is the table.
+-- AGT-173 (v7.0.644, extended v7.0.648 R1). Nothing in scripts/, api/ or lib/ composes a cycle card
+-- or a cycle's notes -- `grep -rn runner_items scripts/ api/ lib/` finds no writer;
+-- decide-gated-card.js:337 only PRINTS one -- so both are hand-composed SQL at step 9 and the only
+-- place a guard can sit is the table.
 -- BEFORE INSERT OR UPDATE, one function for both tables, the column set chosen per table below.
+-- TWO BLOCKS, ONE FUNCTION AND ONE TRIGGER PAIR (v7.0.648 R1 extends, never duplicates): block 1 is
+-- the removed-ticket citation, block 2 the unresolvable commit sha. Both read the same v_new/v_old.
 declare
   v_new       text;
   v_old       text;
@@ -122,6 +183,22 @@ begin
       'names is gone, so the sentence asserts something the board does not hold -- cite the live '
       'tracker that replaced it instead. An id ALREADY in the row you are updating is grandfathered, '
       'so correcting a wrong citation in place is always allowed. AGT-173.',
+      TG_OP, TG_TABLE_SCHEMA, TG_TABLE_NAME, v_offenders
+      using errcode = 'check_violation';
+  end if;
+
+  select string_agg(s.token, ', ' order by s.token), count(*)::integer
+    into v_offenders, v_count
+    from public.note_unverifiable_commit_shas(v_new, v_old) s;
+
+  if coalesce(v_count, 0) > 0 then
+    raise exception
+      'runner_record_citation_guard: this % on %.% records a commit sha no push_sha or graded_sha on '
+      'the board can resolve: %. The pre-push rebase rewrites every artifact commit, so a sha quoted '
+      'from before the push is an ancestor of no remote branch and can never be fetched -- name the '
+      'artifact''s PATH instead, or this cycle''s push sha (runner_verdicts.graded_sha), the one sha '
+      'that is always true. A sha ALREADY in the row you are updating is grandfathered, so correcting '
+      'a wrong one in place is always allowed. AGT-173.',
       TG_OP, TG_TABLE_SCHEMA, TG_TABLE_NAME, v_offenders
       using errcode = 'check_violation';
   end if;
@@ -169,9 +246,11 @@ $function$;
 REVOKE ALL ON FUNCTION public.card_removed_citations(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.runner_record_citation_guard() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.cycle_reversal_handles(uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.note_unverifiable_commit_shas(text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.card_removed_citations(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.runner_record_citation_guard() TO service_role;
 GRANT EXECUTE ON FUNCTION public.cycle_reversal_handles(uuid, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.note_unverifiable_commit_shas(text, text) TO service_role;
 
 DROP TRIGGER IF EXISTS trg_runner_items_citations ON public.runner_items;
 CREATE TRIGGER trg_runner_items_citations
@@ -194,10 +273,13 @@ declare
   v_tgtype smallint;
   v_cols   text[];
   v_rows   integer;
+  v_toks   text[];
+  v_full   text;
 begin
   -- 1. ONE OVERLOAD EACH (.claude/rules/supabase-function-signature.md). Never the success flag.
   foreach v_name in array array['card_removed_citations', 'runner_record_citation_guard',
-                               'cycle_reversal_handles'] loop
+                               'cycle_reversal_handles',
+                               'note_unverifiable_commit_shas'] loop
     select count(*)::integer into v_count
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = v_name;
@@ -209,7 +291,8 @@ begin
   -- 2. BOTH GRANT DIRECTIONS, per function: the two public roles denied AND service_role allowed.
   foreach v_ident in array array['public.card_removed_citations(text, text)',
                                  'public.runner_record_citation_guard()',
-                                 'public.cycle_reversal_handles(uuid, text)'] loop
+                                 'public.cycle_reversal_handles(uuid, text)',
+                                 'public.note_unverifiable_commit_shas(text, text)'] loop
     if has_function_privilege('anon', v_ident, 'EXECUTE') then
       raise exception 'agt173 gate: anon still holds EXECUTE on %', v_ident;
     end if;
@@ -275,6 +358,60 @@ begin
       'agt-70-auditor keeps its pre-existing red (AGT-108)', '');
   if v_rows <> 0 then
     raise exception 'agt173 gate: the CORRECTED sentence returned % row(s), expected 0', v_rows;
+  end if;
+  -- 5. R1 (v7.0.648): THE COMMIT-SHA BLOCK DISCRIMINATES, both halves, and the remedy the message
+  --    prescribes is itself accepted. A rule that returns NOTHING -- which is exactly what the
+  --    design's first \b form did, because \b is BACKSPACE in POSIX ARE -- passes 1-3 above too.
+  select coalesce(array_agg(t.token order by t.token), array[]::text[]) into v_toks
+    from public.note_unverifiable_commit_shas(
+      'research doc committed as bcba265c at docs/research/x.md', '') t;
+  if v_toks is distinct from array['bcba265c'] then
+    raise exception 'agt173 R1 gate: the unresolvable sha returned %, expected {bcba265c}', v_toks;
+  end if;
+
+  select c.push_sha into v_full from public.runner_cycles c where c.push_sha like '3586c345%' limit 1;
+  if v_full is null then
+    raise exception 'agt173 R1 gate: premise gone -- no push_sha starts 3586c345, so the allowlist '
+                    'half cannot be graded here';
+  end if;
+  select count(*)::integer into v_rows
+    from public.note_unverifiable_commit_shas('research doc committed as 3586c345 at docs/x.md', '');
+  if v_rows <> 0 then
+    raise exception 'agt173 R1 gate: a 7-char abbreviation of a real push sha returned % row(s), '
+                    'expected 0', v_rows;
+  end if;
+  select count(*)::integer into v_rows
+    from public.note_unverifiable_commit_shas(
+      'research doc committed as ' || v_full || ' at docs/x.md', '');
+  if v_rows <> 0 then
+    raise exception 'agt173 R1 gate: the full 40 of a real push sha returned % row(s), expected 0',
+                    v_rows;
+  end if;
+
+  -- The grandfather clause, both directions -- without the second half it is indistinguishable from
+  -- "UPDATE is never checked."
+  select count(*)::integer into v_rows
+    from public.note_unverifiable_commit_shas('kickoff committed 776af675 and more',
+                                             'kickoff committed 776af675');
+  if v_rows <> 0 then
+    raise exception 'agt173 R1 gate: a sha already in the row returned % row(s), expected 0 -- no '
+                    'cycle could correct its own record', v_rows;
+  end if;
+  select count(*)::integer into v_rows
+    from public.note_unverifiable_commit_shas('kickoff committed 776af675', '');
+  if v_rows <> 1 then
+    raise exception 'agt173 R1 gate: the same text as a fresh INSERT returned % row(s), expected 1',
+                    v_rows;
+  end if;
+
+  -- The remedy is reachable: naming the PATH passes, and so does a bare 'sha <value>' that makes no
+  -- commit claim at all.
+  select count(*)::integer into v_rows
+    from public.note_unverifiable_commit_shas(
+      'kickoff committed at docs/kickoffs/v7.0.648-AGT-173-record-names-paths.md', '');
+  if v_rows <> 0 then
+    raise exception 'agt173 R1 gate: naming the PATH returned % row(s), expected 0 -- the remedy the '
+                    'message prescribes must itself be accepted', v_rows;
   end if;
 end
 $gate$;

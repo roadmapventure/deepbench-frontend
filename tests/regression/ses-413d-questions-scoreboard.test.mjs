@@ -151,7 +151,17 @@ export const RUNBOOK_CEILING = 381000;
 // prose, and step 7 stops offering `partial` as a cycle close. Net 380003 -> 379993 B, 1,007 B under
 // the ceiling -- a citation is shorter than the fact it points at. Re-measured with wc -c and
 // re-pinned in the same commit as the edit.
-export const BYTES_AT_SHIP = 379993;
+// v7.0.648 (AGT-173 R1) appends ONE clause to the Standing prohibitions Never: paragraph at :4654, on
+// that same line -- the record may not quote any commit sha but the one CI graded, because the rebase
+// that runs before the push rewrites every artifact commit. No newline, so the line count holds at
+// 4,710 and every L-anchor below it is unmoved; no stamp, so HEADER_STAMPS stays 5 and `ses-424c` keeps v7.0.610 as
+// line 1. The clause reads `the rebase before the push` where the kickoff wrote `the pre-push rebase`,
+// because the residue ratchet in `agt-133-run-tail-review.test.mjs` matches `re-push` INSIDE the word
+// `pre-push` and counted a push instruction this clause does not contain -- 277 B, not the 270 the
+// kickoff projected.
+// Net 379993 -> 380270 B, 730 B under the ceiling. Re-measured with wc -c and re-pinned in the
+// same commit as the edit.
+export const BYTES_AT_SHIP = 380270;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

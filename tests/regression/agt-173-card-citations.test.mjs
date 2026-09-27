@@ -1,4 +1,4 @@
-// DeepBench v7.0.644 | tests/regression/agt-173-card-citations.test.mjs | AGT-173 — A CYCLE CARD AND A
+// DeepBench v7.0.648 | tests/regression/agt-173-card-citations.test.mjs | AGT-173 — A CYCLE CARD AND A
 // CYCLE'S NOTES CANNOT NEWLY CITE A REMOVED TICKET, AND CORRECTING ONE THAT DOES IS STILL ALLOWED.
 //
 // WHAT WENT WRONG, measured live 2026-09-27 over the whole recent population rather than reasoned about:
@@ -22,7 +22,7 @@
 // every other one mentioning a proposal, which is the false-refusal class that bricks step 9 rather
 // than failing a test. The literal comparison is asserted in the shipped SQL too (arm 0c).
 //
-// FIVE ARMS. Arm 0 grades the committed SQL and needs no credentials — the suite must stay runnable
+// SIX ARMS as of v7.0.648 R1. Arm 0 grades the committed SQL and needs no credentials — the suite must stay runnable
 // without them. Arms A–D are the kickoff's four, live over PostgREST:
 //   A  the refusal, discriminating: the real wrong sentence returns AGT-119 BY NAME, the same sentence
 //      with AGT-108 in its place returns nothing. Its premise (AGT-119 removed, AGT-108 not) is
@@ -33,6 +33,17 @@
 //   D  the renderer is complete: cycle_reversal_handles('7ff68b47…','AGT-140') returns EXACTLY the two
 //      decision handles 59e5e346 and ea1c27fc — finding 6136139c was a card naming one of the two —
 //      plus the migration-down captured for that cycle. Two, asserted as two, never "at least one".
+//
+//   E  v7.0.648 R1 — THE SECOND BLOCK IN THE SAME FUNCTION: the record may not quote a commit sha no
+//      push_sha and no graded_sha can resolve. Measured premise, not a reasoned one: 19 of the 42
+//      commit shas in runner_cycles.notes over five days are ancestors of no remote branch, because
+//      the pre-push rebase rewrites every artifact commit, while 40 of 40 push_sha values in that
+//      window ARE ancestors of origin/dev. The allowlist is asserted in BOTH prefix directions (a
+//      7-char abbreviation of a real push sha and its full 40 both pass) and the remedy the refusal
+//      message prescribes — naming the artifact's PATH — is asserted to be accepted, because a guard
+//      whose remedy is itself refused is a wall. §6's "part 1 holds" is discharged by arms A–D: this
+//      ship changed none of them, they run on every suite pass, and arm D still asserts AGT-140's two
+//      decision handles plus its captured down.
 //
 // WHAT THIS DOES NOT DO: it never inserts, updates or deletes a row. Every arm calls read-only
 // functions (pattern:76 — a test run never mutates working data). The trigger wiring itself is graded
@@ -86,6 +97,19 @@ export const AGT140_HANDLES = [
   "ea1c27fc-f5c5-4ecf-9098-38ddaa985612", // ticket-status: the settle decision it did name
 ];
 export const AGT140_DOWN = "agt140_project_priority_pick";
+
+// Arm E / arm 0(f). THE REGEX, VERBATIM FROM THE SHIPPED SQL. \b is BACKSPACE in a POSIX ARE, not a
+// word boundary: the design's first form used it, matched nothing, and made a board full of dead shas
+// read clean. The token therefore ends with a negative lookahead, and arm 0(f) pins the literal so a
+// later "simplification" back to \b is a red rather than a silent no-op.
+export const SHA_REGEX_LITERAL =
+  "'(?:commit(?:ted)?(?: as)?)[[:space:]]+([0-9a-f]{7,40})(?![0-9a-f])'";
+// The one sha in the AGT-140 card that was always resolvable, and the prefix arm E drives it by.
+export const GRADED_PREFIX = "3586c345";
+// Two shas quoted in real records that are ancestors of no remote branch — checked with git, not
+// recalled: `git cat-file -e` does not know either one.
+export const DEAD_SHA = "bcba265c";
+export const DEAD_SHA_2 = "776af675";
 
 // ---------------------------------------------------------------------------------------------
 // ARM 0 — THE SHIPPED SQL. No credentials, no network. Each assertion names a line whose loss
@@ -146,6 +170,61 @@ function theShippedSqlCarriesTheRule() {
     assert.ok(sql.includes(`GRANT EXECUTE ON FUNCTION ${ident} TO service_role;`),
       `${ident} does not grant EXECUTE to service_role — the step 9 writer would fail`);
   }
+
+  // (f) v7.0.648 R1 — THE COMMIT-SHA HALF, in the SAME function and the SAME trigger pair. Each
+  //     assertion names a line whose loss turns the second block into a no-op or into a wall.
+  assert.ok(
+    sql.includes("CREATE OR REPLACE FUNCTION public.note_unverifiable_commit_shas(p_new text, p_old text)"),
+    `${SQL_REL} no longer creates note_unverifiable_commit_shas by its exact identity argument list`,
+  );
+  assert.strictEqual(
+    (sql.split(SHA_REGEX_LITERAL).length - 1), 2,
+    "the p_new and p_old scans must BOTH carry the lookahead-terminated sha pattern verbatim — " +
+      "one of them was reworded, so the two halves no longer read the same text",
+  );
+  assert.ok(!sql.includes("{7,40})\\b"),
+    "a scan went back to \\b, which is BACKSPACE in a POSIX ARE — the rule would match nothing and " +
+      "every dead sha would read clean");
+
+  // THE ALLOWLIST IS THE JOIN, over both columns, and PREFIX EITHER WAY.
+  assert.ok(sql.includes("select c.push_sha as sha from public.runner_cycles c where coalesce(c.push_sha, '') <> ''"),
+    "the allowlist stopped reading runner_cycles.push_sha");
+  assert.ok(sql.includes("select v.graded_sha from public.runner_verdicts v where coalesce(v.graded_sha, '') <> ''"),
+    "the allowlist stopped reading runner_verdicts.graded_sha — the one always-true sha");
+  assert.ok(sql.includes("where k.sha like n.tok || '%' or n.tok like k.sha || '%'"),
+    "the prefix match lost a direction — a 7-char abbreviation or a full 40 of a real push sha would " +
+      "now be refused although the board holds it");
+
+  // THE GRANDFATHER CLAUSE, the R1 half of it.
+  assert.ok(sql.includes("where not exists (select 1 from old_toks o where o.tok = n.tok)"),
+    "the p_old subtraction is gone from the sha rule — a cycle could not correct a record that " +
+      "quotes a dead sha, because correcting it means quoting it");
+
+  // EXTENDED, NEVER DUPLICATED: one guard function, two blocks in order, the same two triggers.
+  assert.strictEqual(
+    (sql.match(/CREATE OR REPLACE FUNCTION public\.runner_record_citation_guard\(\)/g) || []).length, 1,
+    "two definitions of the guard in one file — a stale body would ship beside the live one (§19v, " +
+      "one home per fact)",
+  );
+  assert.strictEqual((sql.match(/^CREATE TRIGGER /gm) || []).length, 2,
+    "R1 extends the existing trigger pair; a third trigger means the guard was duplicated");
+  const guardBody = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION public.runner_record_citation_guard()"));
+  const iRemoved = guardBody.indexOf("from public.card_removed_citations(v_new, v_old) c;");
+  const iShas = guardBody.indexOf("from public.note_unverifiable_commit_shas(v_new, v_old) s;");
+  const iReturn = guardBody.indexOf("\n  return NEW;\nend");
+  assert.ok(iRemoved > 0 && iShas > iRemoved && iReturn > iShas,
+    "the sha block must sit AFTER the removed-ticket block and BEFORE the final return NEW — " +
+      `got removed=${iRemoved}, shas=${iShas}, return=${iReturn}`);
+
+  // GRANTS BY NAME for the new function, and the trailing gate asserting its single overload.
+  assert.ok(sql.includes("REVOKE ALL ON FUNCTION public.note_unverifiable_commit_shas(text, text) FROM PUBLIC, anon, authenticated;"),
+    "note_unverifiable_commit_shas is not revoked from PUBLIC, anon AND authenticated by name");
+  assert.ok(sql.includes("GRANT EXECUTE ON FUNCTION public.note_unverifiable_commit_shas(text, text) TO service_role;"),
+    "note_unverifiable_commit_shas does not grant EXECUTE to service_role — the trigger's own reader " +
+      "would fail for the step 9 writer");
+  assert.ok(sql.includes("'note_unverifiable_commit_shas'"),
+    "the trailing DO gate no longer asserts exactly one pg_proc row for the new function " +
+      "(.claude/rules/supabase-function-signature.md)");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -169,6 +248,14 @@ async function rpc(url, key, name, body) {
   return JSON.parse(text);
 }
 
+async function restGet(url, key, query) {
+  const res = await fetch(`${base(url)}/rest/v1/${query}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) throw new Error(`${query} returned HTTP ${res.status}`);
+  return res.json();
+}
+
 async function statusesOf(url, key, ids) {
   const q = `backlog_items?select=backlog_id,status&backlog_id=in.(${ids.join(",")})`;
   const res = await fetch(`${base(url)}/rest/v1/${q}`, {
@@ -185,10 +272,10 @@ async function theLiveArms() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "arms A-D: card_removed_citations() refusing the real wrong sentence by name and passing its " +
+      "arms A-E: card_removed_citations() refusing the real wrong sentence by name and passing its " +
         "correction, two whole real cards and the 'removal proposed' distinction passing, the " +
         "grandfather clause in both directions, notes-shaped text under the same rule, and " +
-        "cycle_reversal_handles() returning exactly the two AGT-140 handles plus its captured down",
+        "cycle_reversal_handles() returning exactly the two AGT-140 handles plus its captured down, and arm E: a commit sha no push_sha or graded_sha resolves coming back BY NAME while a real push sha passes as both a 7-char abbreviation and a full 40, the grandfather clause both ways, and the PATH the refusal prescribes accepted",
       "SUPABASE_URL and/or SUPABASE_SERVICE_KEY are absent. Arm 0 still graded the shipped SQL — " +
         "both triggers, the grandfather clause, the literal status test and both grant directions — " +
         "against the committed tree. Canonical invocation: STANDARDS.md Section 2 rule 5.",
@@ -265,6 +352,54 @@ async function theLiveArms() {
     assert.ok(typeof h.handle_sentence === "string" && h.handle_sentence.length > 20,
       `handle ${h.id} came back without a sentence a card could carry`);
   }
+
+  // ---- E. R1: A COMMIT SHA THE BOARD CANNOT RESOLVE -----------------------------------------
+  // Premise first, from the board, so a changed world reads as a premise failure and never as a pass.
+  const anchor = await restGet(url, key,
+    `runner_cycles?select=push_sha&push_sha=like.${GRADED_PREFIX}*&limit=1`);
+  assert.strictEqual(anchor.length, 1,
+    `premise gone: no runner_cycles.push_sha starts ${GRADED_PREFIX}, so the allowlist half of this ` +
+      "arm grades nothing");
+  const gradedFull = anchor[0].push_sha;
+  assert.strictEqual(gradedFull.length, 40,
+    `the anchor push_sha is ${gradedFull.length} chars, not a full 40 — the prefix arms below need both`);
+
+  const shas = async (p_new, p_old) =>
+    (await rpc(url, key, "note_unverifiable_commit_shas", { p_new, p_old })).map(r => r.token).sort();
+
+  // The refusal, BY NAME, on the sentence shape a research or kickoff artifact actually carries.
+  assert.deepStrictEqual(
+    await shas(`research doc committed as ${DEAD_SHA} at docs/research/x.md`, ""),
+    [DEAD_SHA], `a commit sha no push_sha or graded_sha resolves must come back named: ${DEAD_SHA}`);
+
+  // The allowlist, BOTH prefix directions. Same sentence, only the sha moves.
+  assert.deepStrictEqual(
+    await shas(`research doc committed as ${GRADED_PREFIX} at docs/research/x.md`, ""),
+    [], "a 7-char abbreviation of a real push sha must be accepted");
+  assert.deepStrictEqual(
+    await shas(`research doc committed as ${gradedFull} at docs/research/x.md`, ""),
+    [], "the full 40 of a real push sha must be accepted");
+
+  // The grandfather clause, BOTH directions — without the second half this is indistinguishable
+  // from "UPDATE is never checked", and correcting a record means quoting the dead sha while you do.
+  assert.deepStrictEqual(
+    await shas(`kickoff committed ${DEAD_SHA_2} — CORRECTION: name the path instead.`,
+               `kickoff committed ${DEAD_SHA_2}`),
+    [], "a sha already in the row being updated must be grandfathered");
+  assert.deepStrictEqual(await shas(`kickoff committed ${DEAD_SHA_2}`, ""), [DEAD_SHA_2],
+    "the same text as a fresh INSERT must still refuse — nothing is grandfathered there");
+
+  // THE REMEDY THE MESSAGE PRESCRIBES IS ITSELF ACCEPTED. A guard whose only remedy also refuses is
+  // a wall, and this one's remedy is the whole point of the ticket: name the PATH.
+  assert.deepStrictEqual(
+    await shas("kickoff committed at docs/kickoffs/v7.0.648-AGT-173-record-names-paths.md", ""),
+    [], "naming the artifact's PATH must be accepted — it is the remedy the refusal prescribes");
+
+  // SCOPE, PINNED DELIBERATELY: the rule reads a COMMIT CLAIM, not every hex token. A card that
+  // quotes `sha <value>` without claiming a commit is out of scope by construction; widening that
+  // is a later decision, not a silent one.
+  assert.deepStrictEqual(await shas(`graded at sha ${DEAD_SHA_2}`, ""), [],
+    "the rule is scoped to a commit claim — a bare 'sha <value>' is out of scope by construction");
 }
 
 export default async function run() {
