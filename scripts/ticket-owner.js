@@ -496,6 +496,13 @@ export function classifyBoard(board, { now, rate }) {
     //
     // JUDGMENT and never derivable, with NO `fix`: re-opening a stranded row is a write under one
     // reversible decision (slice 4's), and the census writes neither `status` nor `design_status`.
+    //
+    // AGT-167 -- THE DETAIL NOW CARRIES THE REMEDY, AND THE CHECK STILL CARRIES NO `fix`. The
+    // sentence a human reads used to name the defect and stop; the one command that repairs it
+    // lives in `scripts/settle-ship.js --resettle`, which is the one home for the
+    // `backlog_items.status` write. A REMEDY SENTENCE IS NOT A `fix`: the census still writes
+    // nothing, and the operator (or the Dev Manager's own ruling run, which now calls
+    // `resettleTicket()` itself) makes the write under its own reversible decision.
     if (closed) {
       const d = decideStatus({
         kickoffText: kickoffText.get(row.backlog_id) ?? "",
@@ -508,7 +515,8 @@ export function classifyBoard(board, { now, rate }) {
       if (d.status === "partial") {
         file(row, "remainder-stranded", "judgment",
           `a ${status} ticket whose own record still names unbuilt work: ${d.reasons.join("; ")}` +
-          ` (design_status ${row.design_status ?? "null"}).`);
+          ` (design_status ${row.design_status ?? "null"}).` +
+          ` Remedy: node scripts/settle-ship.js --resettle --ticket=${row.backlog_id} --cycle-id=<uuid> --apply`);
       }
     }
 

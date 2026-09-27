@@ -25,7 +25,21 @@
 //   --apply=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>)
 //       runs the SAME validateRulings() first (a refusal exits 1 and sends nothing), then POSTs
 //       rpc/apply_gate_rulings. THE FUNCTION OWNS THE WRITE, its before-images and its one decision;
-//       this file writes no table. It then prints BOTH undo lines -- see the note on Guard B below.
+//       this file writes no table ITSELF. It then prints BOTH undo lines -- see the note on Guard B
+//       below -- and finally re-settles each ruled ticket through settle-ship.js (AGT-167, below).
+//
+// AGT-167 -- THE RULING NOW RE-SETTLES THE TICKET, AND THE WRITE IS STILL NOT THIS FILE'S. Section
+// 3b of apply_gate_rulings(), read live, writes `scope_rationale` and `design_status` for a `rework`
+// and `design_status` for a `needs-desktop`, and touches `status` for NEITHER -- only `retired`
+// moves a status. So a ticket that closed `delivered` while its gate card was still open stayed
+// `delivered` after the card said "not finished", out of the pick path. After the ruling commits,
+// apply() calls settle-ship.js's exported resettleTicket() for every ruling that is `rework` or
+// `needs-desktop` and whose card names a `backlog_id`. `backlog_items.status` therefore still has
+// exactly ONE home -- scripts/settle-ship.js -- and this file delegates to it rather than growing a
+// second copy of the decision -> before-image -> read-back-PATCH sequence (pattern:14, pattern:15).
+// A FAILED RE-SETTLE NEVER FAILS THE RULING: the ruling is already committed and its undo lines are
+// already printed, so the throw is caught, `RE-SETTLE FAILED` is printed with a paste-ready command,
+// and the exit code stays 0. An exit code is not a place to report a second, separate write.
 //
 // THE TWO UNDO LINES, AND WHY ONE IS NOT ENOUGH. `reverse_decision()` restores the TICKET side of a
 // ruling and REFUSES the card stamp by name: a `kind='gated_before_build'` card survives every
@@ -42,6 +56,7 @@ import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import { assemblePrompt } from "../api/prompt/db-assembly.js";
 import { renderAssembly, resolveJudgmentModel } from "./agent-prompt.js";
+import { resettleTicket } from "./settle-ship.js";
 
 // --- pure half (imported by tests/regression/agt-127-decide-gated-card.test.mjs; no network) ------
 
@@ -158,6 +173,37 @@ export function validateRulings(answer, cards) {
     if (!seen.includes(c)) refusals.push(`card ${c} not covered`);
   }
   return { ok: refusals.length === 0, refusals };
+}
+
+// AGT-167 -- WHICH RULINGS RE-SETTLE A TICKET, decided here in the pure half so
+// tests/regression/agt-127-decide-gated-card.test.mjs can assert it by value with no network.
+//
+// TWO RULINGS AND NO MORE, and each exclusion is load-bearing rather than tidy:
+//   `accept`        -- writes no ticket band at all (section 3b's first clause); the ship stands,
+//                      so re-deciding its status would be this file inventing a verdict.
+//   `retired`       -- already writes `status = 'removal proposed'` itself, which settle-ship.js
+//                      lists in UNSETTLEABLE and refuses by name. Calling it would be a guaranteed
+//                      no-op dressed up as a write.
+//   `john`          -- stamps NO card and decides nothing; the question is still open.
+//   `rework` / `needs-desktop` -- the two that say "not finished" and move no status. These are the
+//                      whole defect, and `k_stamp` lands both on the same `rework` card stamp.
+// A card carrying no `backlog_id` names no ticket to settle, and one ticket ruled twice in a batch
+// is re-settled ONCE -- the second call would read the row the first one just wrote.
+export const RESETTLE_RULINGS = Object.freeze(["rework", "needs-desktop"]);
+
+export function resettleTargets(rulings, cards) {
+  const byCard = new Map((Array.isArray(cards) ? cards : []).map(c => [String(c.card_id ?? c.id), c]));
+  const seen = new Set();
+  const out = [];
+  for (const r of Array.isArray(rulings) ? rulings : []) {
+    if (!r || typeof r !== "object" || !RESETTLE_RULINGS.includes(r.ruling)) continue;
+    const card = byCard.get(String(r.card_id));
+    const ticket = card && !blank(card.backlog_id) ? String(card.backlog_id) : null;
+    if (ticket === null || seen.has(ticket)) continue;
+    seen.add(ticket);
+    out.push({ ticket, card_id: String(r.card_id), ruling: r.ruling });
+  }
+  return out;
 }
 
 // --- CLI -----------------------------------------------------------------------------------------
@@ -338,6 +384,27 @@ async function apply(args) {
   console.log(`Cards stamped: ${cards_stamped ?? 0}; tickets written: ${tickets_written ?? 0}; pushed to John: ${pushed_to_john ?? 0}`);
   console.log(`Counts: ${JSON.stringify(counts ?? {})}`);
   console.log(`Questions opened: ${Array.isArray(questions) && questions.length ? questions.join(", ") : "(none)"}`);
+
+  // AGT-167 -- the ruling is committed; now the ticket it ruled gets re-settled. One line per
+  // ticket, and a throw here is reported, never propagated: see the header.
+  const attribution = hasCycle
+    ? { cycleId: args["cycle-id"], sessionName: null }
+    : { cycleId: null, sessionName: args["session-name"] };
+  const paste = t => `  node scripts/settle-ship.js --resettle --ticket=${t} --cycle-id=${hasCycle ? args["cycle-id"] : "<uuid>"} --apply`;
+  for (const t of resettleTargets(answer.rulings, cards)) {
+    try {
+      const res = await resettleTicket({
+        base, key, ticket: t.ticket, ...attribution, apply: true, log: () => {},
+      });
+      console.log(res.changed
+        ? `re-settle ${t.ticket}: ${res.from} → ${res.to} (card ${t.card_id} ruled ${t.ruling})`
+        : `re-settle ${t.ticket}: no change (${res.note})`);
+    } catch (e) {
+      console.log(`re-settle ${t.ticket}: RE-SETTLE FAILED — ${e.message}`);
+      console.log("The ruling above IS committed and is not affected. Re-settle by hand:");
+      console.log(paste(t.ticket));
+    }
+  }
   process.exitCode = 0;
 }
 

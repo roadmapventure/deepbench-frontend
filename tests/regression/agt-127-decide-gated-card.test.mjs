@@ -34,6 +34,16 @@
 // asserted by the migration's own trailing DO block in the same transaction that wrote them, and
 // were re-read independently at this ship. The measured values are quoted in the declaration.
 //
+// AGT-167 ADDS PART (g): WHICH RULINGS RE-SETTLE THEIR TICKET. `apply_gate_rulings()` section 3b
+// writes `scope_rationale`/`design_status` for a `rework` and `design_status` for a `needs-desktop`
+// and touches `status` for NEITHER, so a ticket that closed `delivered` under an open card stayed
+// `delivered` after the card said otherwise. apply() now calls settle-ship.js's `resettleTicket()`
+// after the ruling commits -- and the routing decision is asserted here BY VALUE, both directions.
+// Only asserting that `rework` routes would pass an implementation that routed on every ruling, and
+// an `accept` re-settle would re-decide a ship that is standing; only asserting that `accept` does
+// not route would pass one that routed on nothing, which is the bug unchanged. The live write
+// itself is driven end to end in tests/regression/agt-167b-resettle-on-gate-ruling.test.mjs.
+//
 // NO MODEL CALL, NO SPEND. Offline parts plus REST reads, one insert pair, one PATCH, one delete pair.
 
 import assert from "assert";
@@ -41,6 +51,8 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   RULINGS, JOHN_CALLS, GATE_KIND, NOTHING_TO_RULE, qidFor, rulableCards, buildTaskContext,
   validateRulings,
+  // AGT-167 -- part (g) below.
+  RESETTLE_RULINGS, resettleTargets,
 } from "../../scripts/decide-gated-card.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 
@@ -154,6 +166,54 @@ function partB() {
   console.log("  (b) rulableCards both directions, task_context, 6 validator refusals incl. coverage -- PASS");
 }
 
+// ---- (g) AGT-167: which rulings re-settle their ticket, offline and by value ------------------
+function partG() {
+  assert.deepEqual([...RESETTLE_RULINGS], ["rework", "needs-desktop"],
+    "exactly the two rulings that say `not finished` and move no status themselves. `accept` writes " +
+    "no ticket band at all, `retired` already writes `removal proposed` (which settle-ship.js lists " +
+    "in UNSETTLEABLE and refuses by name), and `john` stamps no card and decides nothing");
+
+  const cards = [
+    { card_id: "aaaaaaaa-0000-0000-0000-000000000001", backlog_id: "ZZZ-1" },
+    { card_id: "bbbbbbbb-0000-0000-0000-000000000002", backlog_id: null },
+    { card_id: "cccccccc-0000-0000-0000-000000000003", backlog_id: "ZZZ-3" },
+    { card_id: "dddddddd-0000-0000-0000-000000000004", backlog_id: "ZZZ-1" },
+  ];
+  const only = (rulings) => resettleTargets(rulings, cards).map(t => `${t.ticket}:${t.ruling}`);
+
+  // AN `accept` ROUTES NOTHING. This is the arm that fails an implementation re-settling on every
+  // ruling, which would re-decide the status of a ship the manager just let stand.
+  assert.deepEqual(only([{ card_id: cards[0].card_id, ruling: "accept", reason: "sound" }]), [],
+    "(g) an `accept` ruling must trigger NO re-settle");
+  for (const r of ["retired", "john"]) {
+    assert.deepEqual(only([{ card_id: cards[0].card_id, ruling: r, reason: "x" }]), [],
+      `(g) a \`${r}\` ruling must trigger no re-settle`);
+  }
+
+  // A `rework` ON A CARD THAT NAMES A TICKET ROUTES EXACTLY ONE. The negative control beside it is
+  // the same ruling on a card naming no ticket: there is nothing to settle, so nothing is called.
+  assert.deepEqual(only([{ card_id: cards[0].card_id, ruling: "rework", reason: "x" }]), ["ZZZ-1:rework"],
+    "(g) a `rework` on a card carrying a backlog_id must trigger exactly one re-settle, on that ticket");
+  assert.deepEqual(only([{ card_id: cards[1].card_id, ruling: "rework", reason: "x" }]), [],
+    "(g) a `rework` on a card naming NO ticket names nothing to re-settle");
+  assert.deepEqual(only([{ card_id: cards[2].card_id, ruling: "needs-desktop", reason: "x" }]), ["ZZZ-3:needs-desktop"],
+    "(g) `needs-desktop` routes too — k_stamp lands it on the same `rework` card stamp, so one word covers both");
+  assert.deepEqual(only([{ card_id: "eeeeeeee-0000-0000-0000-000000000005", ruling: "rework", reason: "x" }]), [],
+    "(g) a ruling naming a card the context does not carry routes nothing — there is no ticket to read");
+
+  // ONE TICKET, ONE RE-SETTLE, even when a batch rules two of its cards: the second call would read
+  // the row the first one just wrote and answer `no change` for a reason that hides the first.
+  assert.deepEqual(only([
+    { card_id: cards[0].card_id, ruling: "rework", reason: "x" },
+    { card_id: cards[3].card_id, ruling: "rework", reason: "y" },
+    { card_id: cards[2].card_id, ruling: "accept", reason: "z" },
+  ]), ["ZZZ-1:rework"],
+    "(g) two cards on one ticket re-settle it ONCE, and the accepted card beside them routes nothing");
+
+  assert.deepEqual(resettleTargets(null, cards), [], "(g) a non-array answer routes nothing rather than throwing");
+  console.log("  (g) accept/retired/john route nothing; rework and needs-desktop route one ticket each, deduped -- PASS");
+}
+
 // ---- (e) the catalog entry, offline ----------------------------------------------------------
 function partE() {
   const entry = SERVICE_CATALOG.find(s => s.slug === CAPABILITY);
@@ -170,6 +230,7 @@ function partE() {
 async function run() {
   partA();
   partB();
+  partG();
   partE();
 
   const url = process.env.SUPABASE_URL;

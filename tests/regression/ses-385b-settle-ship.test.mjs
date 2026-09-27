@@ -46,6 +46,16 @@
 // and each is asserted through `stopLineClosesPartial()` AND through the `decideStatus()` it drives
 // -- a reader that is right while nothing threads `ticketId` to it is a fix that does not ship.
 //
+// (G) AGT-167 -- THE SECOND DOOR, ITS FLAG, AND THE DIRECTION IT REFUSES TO GO. `--resettle` is a
+// write path into the same three cells, so the three things that stop it being a second, looser
+// close-out are pinned here beside the first one: the flag is in `ALLOWED_FLAGS` (on `origin/dev`
+// it was not, which is what makes the AGT-167b QA file's command unreachable there); the write
+// itself is the EXPORTED `applySettle()` rather than a copy, and it refuses both attributions or
+// neither, which is `ck_decision_attribution` asserted before the 400 instead of after it; and
+// `canResettle()` answers true for exactly one status. That last arm is the load-bearing one -- a
+// `partial -> delivered` move would push a row OUT of the pick path, which is the harm AGT-167 is
+// about, so it is asserted over every status the board actually carries, not over `delivered` alone.
+//
 // (E) THE MUTATION CONTROL. `grep -c settle-ship` on `docs/runbooks/runner-cycle.md` and on
 // `scripts/render-cycle-card.js` both read ZERO on the unchanged tree, so the two prose halves of
 // this slice are pinned by a count that was measured red before the edit rather than asserted after
@@ -57,7 +67,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun } from "./_lib/self-run.js";
-import { readRemainder, stopLineClosesPartial, decideStatus, planSettle, UNSETTLEABLE } from "../../scripts/settle-ship.js";
+import {
+  readRemainder, stopLineClosesPartial, decideStatus, planSettle, UNSETTLEABLE,
+  // AGT-167 -- group (G) below. A NAMED import is deliberate here: these four are the ship, and a
+  // tree without them should fail loudly at load rather than quietly skip the arm.
+  ALLOWED_FLAGS, RESETTLE_FROM, canResettle, applySettle,
+} from "../../scripts/settle-ship.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
@@ -68,7 +83,7 @@ const CEILING = 381000;
 // says nothing else. It must read `delivered`, or none of the flips below prove anything.
 const SETTLED = "# k\n\nslice 2 of 2\n\n## 7. STOP LINE\n\nship it and close the row.\n";
 
-function run() {
+async function run() {
   // ---- (A) the reader, by value ------------------------------------------------------------
   assert.deepStrictEqual(readRemainder("a kickoff, slice 1 of 4, of the usual kind").slice, { n: 1, m: 4 },
     "readRemainder must read `slice N of M` out of ordinary prose");
@@ -213,6 +228,48 @@ function run() {
   assert.strictEqual(stopLineClosesPartial(sect("Do NOT write `AGT-128` done: close `partial`."), null), false,
     "(F control) with no `ticketId`, a sentence naming an id cannot fire — step 4 has nothing to compare against and must not guess that the one id present is this ship's");
 
+  // ---- (G) AGT-167: the flag, the one home for the write, and the one direction ---------------
+  assert.ok(ALLOWED_FLAGS.has("resettle"),
+    "`--resettle` must be an accepted flag — on origin/dev it was not, so the command exits non-zero " +
+    "with `unknown flag --resettle` and no re-settle can ever run");
+  for (const f of ["ticket", "kickoff", "cycle-id", "remainder", "apply"]) {
+    assert.ok(ALLOWED_FLAGS.has(f),
+      `--${f} must survive the AGT-167 ship — adding the second door may not narrow the first one`);
+  }
+  assert.ok(!ALLOWED_FLAGS.has("verdict"),
+    "there is still no `--verdict` flag: the verdict is not an input to this decision (see (C))");
+
+  assert.strictEqual(typeof applySettle, "function",
+    "applySettle must be EXPORTED — `main()` and resettleTicket() both write the three cells, and a " +
+    "second inline copy of the decision → before-image → read-back-PATCH order is the drift this lift " +
+    "exists to prevent (pattern:14, pattern:15)");
+  // The attribution guard, asserted BEFORE any network can be reached: `ck_decision_attribution`
+  // takes exactly one of cycle_id / session_name, and both-or-neither must refuse here, not at a 400.
+  for (const [name, attribution] of [
+    ["both", { cycleId: "c", sessionName: "s" }],
+    ["neither", { cycleId: null, sessionName: null }],
+  ]) {
+    await assert.rejects(
+      () => applySettle({
+        base: "http://127.0.0.1:1", key: "unused", ticket: "SES-999",
+        row: { id: "a-uuid", status: "delivered" }, kickoffPath: "docs/kickoffs/k.md",
+        status: "partial", reasons: [], ...attribution,
+      }),
+      /exactly one of cycleId \/ sessionName/,
+      `applySettle must refuse ${name} attribution before it writes anything — one attribution is what ` +
+      "`ck_decision_attribution` takes, and a 400 after the decision row would be a half-written handle");
+  }
+
+  assert.strictEqual(RESETTLE_FROM, "delivered",
+    "ONE DIRECTION: a re-settle moves a row OFF `delivered` and nowhere else");
+  assert.strictEqual(canResettle({ status: "delivered" }), true);
+  for (const st of ["partial", "open", "delivered ", "Delivered", ...UNSETTLEABLE]) {
+    assert.strictEqual(canResettle({ status: st }), false,
+      `canResettle must refuse ${JSON.stringify(st)} — \`partial\` is already the safe side, the ` +
+      "UNSETTLEABLE three are a human's call, and a near-miss string is not a status");
+  }
+  assert.strictEqual(canResettle(null), false, "no row is not a `delivered` row");
+
   // ---- (E) the mutation control, plus the byte ceiling ----------------------------------------
   const md = fs.readFileSync(path.join(ROOT, RUNBOOK_REL), "utf8");
   const renderer = fs.readFileSync(path.join(ROOT, CARD_RENDERER_REL), "utf8");
@@ -233,8 +290,8 @@ function run() {
   assert.ok(bytes <= CEILING,
     `${RUNBOOK_REL} is ${bytes} bytes against SES-336's ceiling of ${CEILING} — this edit had to free bytes before adding any`);
 
-  console.log(`[SES-385b] settle-ship: ${REAL.length} real kickoffs each read as its OWN id (${REAL.map(([, id, want]) => `${id} ${want}`).join(", ")}) · ${SENTENCES.length} AGT-128 sentence arms + 3 controls, 4 of which were RED on the pre-AGT-128 reader · settle-ship named ${nRunbook}× in the runbook, ${nRenderer}× in the renderer · runbook ${bytes}B <= ${CEILING}`);
-  return ["reader", "decision", "verdict-not-an-input", "planSettle", "real-kickoffs", "whose-partial", "mutation-control"];
+  console.log(`[SES-385b] settle-ship: ${REAL.length} real kickoffs each read as its OWN id (${REAL.map(([, id, want]) => `${id} ${want}`).join(", ")}) · ${SENTENCES.length} AGT-128 sentence arms + 3 controls, 4 of which were RED on the pre-AGT-128 reader · settle-ship named ${nRunbook}× in the runbook, ${nRenderer}× in the renderer · runbook ${bytes}B <= ${CEILING} \u00b7 (G) AGT-167: --resettle accepted, applySettle exported and refusing both/neither attribution, canResettle true for delivered alone`);
+  return ["reader", "decision", "verdict-not-an-input", "planSettle", "real-kickoffs", "whose-partial", "resettle-surface", "mutation-control"];
 }
 
 selfRun(import.meta.url, run);

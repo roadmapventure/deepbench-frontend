@@ -67,11 +67,17 @@
 // that can be passed to make it ignore one of its four triggers. The verdict decides whether the
 // ship is accepted; this decides whether the ship is FINISHED. They are different questions.
 //
-// FOUR TRIGGERS, ANY ONE OF WHICH IS ENOUGH (`partial` iff any):
+// FIVE TRIGGERS, ANY ONE OF WHICH IS ENOUGH (`partial` iff any):
 //   1. the kickoff says `slice N of M` with N < M      -- the document admits its own remainder
 //   2. its STOP LINE closes THIS ticket `partial`      -- the design already decided this
 //   3. an undecided `gated_before_build` card is open  -- something was gated and never answered
 //   4. `--remainder=` is non-empty                     -- the operator names work left behind
+//   5. a `gated_before_build` card on it was ruled `rework` -- AGT-167: the gate answered, and the
+//      answer was "not finished". Trigger 3 stops firing the instant the card is stamped, and
+//      `public.apply_gate_rulings()` section 3b writes `scope_rationale` and `design_status` and
+//      NEVER `status` -- so without this trigger a row that went `delivered` under an open card
+//      keeps reading `delivered` after the card says otherwise. `k_stamp` maps `needs-desktop` onto
+//      the SAME `rework` stamp, so one word covers both rulings and there is no second branch here.
 //
 // THE WRITE PATH IS COPIED, NOT REINVENTED: `rest()` (scripts/ticket-owner.js:653) and the
 // decision -> full-row image -> read-back-PATCH order of `applyPlan()` (:729). The ORDER is the
@@ -189,20 +195,26 @@ export function readRemainder(text, ticketId = null) {
   return { slice, stopPartial };
 }
 
-// decideStatus({ kickoffText, ticketId, gatedOpen, remainder }) -> { status, reasons[] }
+// decideStatus({ kickoffText, ticketId, gatedOpen, gateReworked, remainder }) -> { status, reasons[] }
 //
 // `reasons` is every trigger that fired, not the first: an operator reading the plan needs to know
 // the ticket is partial for three reasons, because clearing one of them does not settle it.
 // THERE IS NO VERDICT PARAMETER. See the header.
-export function decideStatus({ kickoffText = "", ticketId = null, gatedOpen = false, remainder = null } = {}) {
+//
+// AGT-167 -- `gateReworked` IS OPTIONAL AND DEFAULTS `false` ON PURPOSE. Both callers that existed
+// before this ship (`main()` below and `scripts/ticket-owner.js` check 12) keep byte-identical
+// answers until they pass it, so adding trigger 5 cannot move a single existing verdict; the new
+// trigger reaches the board only through `resettleTicket()`, which reads the ruled card itself.
+export function decideStatus({ kickoffText = "", ticketId = null, gatedOpen = false, gateReworked = false, remainder = null } = {}) {
   const { slice, stopPartial } = readRemainder(kickoffText, ticketId);
   const reasons = [];
   if (slice && slice.n < slice.m) reasons.push(`the kickoff declares slice ${slice.n} of ${slice.m}`);
   if (stopPartial) reasons.push("the kickoff's STOP LINE names `partial`");
   if (gatedOpen) reasons.push("an undecided `gated_before_build` card is open on this ticket");
+  if (gateReworked) reasons.push("a `gated_before_build` card on this ticket was ruled `rework`");
   if (typeof remainder === "string" && remainder.trim() !== "") reasons.push(`a remainder was declared: ${remainder.trim()}`);
   if (reasons.length > 0) return { status: "partial", reasons };
-  return { status: "delivered", reasons: ["the record names no unbuilt work: no slice remainder, no STOP LINE `partial`, no open card, no declared remainder"] };
+  return { status: "delivered", reasons: ["the record names no unbuilt work: no slice remainder, no STOP LINE `partial`, no open card, no card ruled `rework`, no declared remainder"] };
 }
 
 // planSettle(row, kickoffPath, status) -> { id, patch: { status, design_status, kickoff_link } }
@@ -233,11 +245,28 @@ export function planSettle(row, kickoffPath, status) {
 // ---------------------------------------------------------------------------------------------
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply"]);
+export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle"]);
+
+// AGT-167 -- ONE DIRECTION, and the constant is here rather than inline so the guard has a name a
+// test can point at. `resettleTicket()` moves a row OFF `delivered` and nothing else: `partial` is
+// already the safe side of this decision (a wrongly-`partial` row is merely re-pickable, a wrongly-
+// `delivered` one is out of the pick path entirely), and `done` / `removed` / `removal proposed`
+// are `UNSETTLEABLE` above. The reverse move, `partial -> delivered`, needs a done-predicate this
+// ticket's own gate ruling parked, so it is not written here on a guess.
+export const RESETTLE_FROM = "delivered";
+export const canResettle = row => Boolean(row) && typeof row === "object" && row.status === RESETTLE_FROM;
+
+// AGT-167 -- `fail()` THROWS; only the CLI entry point turns it into an exit code. It used to call
+// `process.exit(2)` directly, which was correct while this file was a command and nothing else.
+// `scripts/decide-gated-card.js` now calls `resettleTicket()` IN PROCESS after
+// `apply_gate_rulings()` has already committed, and its contract is that a failed re-settle never
+// fails the ruling -- a `process.exit()` inside `rest()` would take the ruling's own exit code and
+// its undo lines with it, which is exactly the failure that contract forbids. The CLI behaviour is
+// unchanged: same `settle-ship: <message>` on stderr, same exit 2.
+export class SettleShipError extends Error {}
 
 function fail(message) {
-  process.stderr.write(`settle-ship: ${message}\n`);
-  process.exit(2);
+  throw new SettleShipError(message);
 }
 
 function arg(argv, name) {
@@ -392,12 +421,193 @@ async function writeCost({ base, key, cycleId, cost }) {
     `runner_cycles.api_cost_dev_usd → ${afterCycle.api_cost_dev_usd === null ? "null" : afterCycle.api_cost_dev_usd} · ${cardNote}\n`);
 }
 
+// AGT-167 -- THE ONE HOME FOR THE `backlog_items.status` WRITE. This block was inline in `main()`
+// until this ship, which made it reachable only by running the close-out command with a `--kickoff`
+// path in hand. `resettleTicket()` below needs the identical decision -> before-image ->
+// read-back-PATCH sequence from a different entry door, and a second copy of it is exactly the
+// drift `pattern:14`/`pattern:15` exist to stop -- so the block was LIFTED, not re-implemented, and
+// `main()` now calls it like everyone else.
+//
+// THE ORDER IS THE SAFETY PROPERTY, unchanged: the decision row exists before the image, and the
+// image exists before the cell it images moves, so one `reverse_decision()` puts the row back
+// whatever failed halfway. The PATCH is read back key by key because PostgREST answers 200 with the
+// OLD value when the role cannot write a column.
+//
+// EXACTLY ONE OF `cycleId` / `sessionName` IS SENT, refused here rather than at the 400:
+// `ck_decision_attribution` on `runner_decisions` and `ck_before_image_attribution` on
+// `runner_before_images` each take one attribution, never both and never neither.
+export async function applySettle({
+  base, key, cycleId = null, sessionName = null, ticket, row, kickoffPath, status, reasons = [],
+  log = s => process.stdout.write(s),
+} = {}) {
+  const hasCycle = typeof cycleId === "string" && cycleId !== "";
+  const hasSession = typeof sessionName === "string" && sessionName !== "";
+  if (hasCycle === hasSession) {
+    fail("applySettle: exactly one of cycleId / sessionName — `ck_decision_attribution` takes one attribution, never both and never neither.");
+  }
+  const plan = planSettle(row, kickoffPath, status);
+
+  // 1 -- the decision. It exists before the image, and the image before the cell.
+  const summary = `Close-out: ${ticket} settles \`${plan.patch.status}\``;
+  const reasoning =
+    `settle-ship.js read ${kickoffPath} and the undecided \`gated_before_build\` cards, and decided \`${plan.patch.status}\`: ` +
+    `${(Array.isArray(reasons) ? reasons : []).join("; ")}. The verdict is not an input — a \`delivered\` on a record naming unbuilt work is a bug, never an override. ` +
+    `Writing status, \`design_status\` NULL (a spent kickoff stops advertising a built design) and \`kickoff_link\` = this kickoff (\`ship_handoff_census\` reads it). SES-385 slice 2. pattern:0`;
+
+  const decision = await rest(base, key, "rpc/record_decision", {
+    method: "POST",
+    body: JSON.stringify({
+      p_cycle_id: hasCycle ? cycleId : null,
+      p_session_name: hasSession ? sessionName : null,
+      p_kind: "ticket-status",
+      p_backlog_id: ticket,
+      p_summary: summary,
+      p_reasoning: reasoning,
+      p_ladder_work_class: null,
+    }),
+  }, "record_decision");
+  if (typeof decision !== "string" || decision.length !== 36) {
+    fail(`record_decision: returned ${JSON.stringify(decision)}, which is not a decision id`);
+  }
+  const where = step => `${step} (decision ${decision})`;
+
+  // 2 -- the FULL row imaged, before a single cell moves. `row` is already a select=* read.
+  await rest(base, key, "runner_before_images", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify([{
+      cycle_id: hasCycle ? cycleId : null,
+      session_name: hasSession ? sessionName : null,
+      table_name: "backlog_items",
+      pk_value: row.id,
+      row_data: row,
+      decision_id: decision,
+    }]),
+  }, where("image row"));
+
+  // 3 -- the PATCH, READ BACK key by key. A PATCH PostgREST accepted and silently did not apply
+  // answers 200 with the old value, so the representation is compared rather than trusted.
+  const back = await rest(base, key, `backlog_items?id=eq.${row.id}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(plan.patch),
+  }, where("patch"));
+  const after = Array.isArray(back) ? back[0] : null;
+  if (!after) fail(`${where("patch")}: the PATCH returned no row`);
+  for (const k of Object.keys(plan.patch)) {
+    const got = after[k];
+    const want = plan.patch[k];
+    if (String(got ?? null) !== String(want ?? null)) {
+      fail(`${where("patch")}: ${k} read ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+    }
+  }
+
+  log(`  applied: decision ${decision}, 1 before-image, ${ticket} now \`${after.status}\` · design_status ${JSON.stringify(after.design_status)} · kickoff_link ${JSON.stringify(after.kickoff_link)}\n`);
+
+  return { decision, plan, after };
+}
+
+// AGT-167 -- `--resettle`: NOTHING RE-SETTLED A ROW WHEN ITS CARD WAS RULED, AND THIS IS THAT WRITE.
+//
+// THE DEFECT, measured this cycle rather than recalled. One script, one kickoff, one ticket, one
+// cycle, 23 minutes apart, opposite answers, and the only input that moved was the card census:
+// `runner_decisions 0555f4f6` (12:08:05Z) settled `AGT-167` `delivered` -- "no open card" -- three
+// minutes before `runner_items e221020c` was filed against it; the same script re-run by hand at
+// 12:31:39Z (`1d6a2bb4`) settled it `partial`. It sat `delivered` under an open card for 23 minutes,
+// out of the pick path (`scripts/ticket-owner.js:227` reads `["open","partial"]`). The card was then
+// stamped `rework` at 13:00:24Z and `public.apply_gate_rulings()` section 3b, read live, writes
+// `scope_rationale` and `design_status` for that ruling and NEVER `status` -- only `retired` moves a
+// status. `updated_at` moved; `status` did not. Detection already existed and could not write:
+// `ticket-owner.js` check 12 re-derives the same answer with the same exported `decideStatus()` and
+// is `judgment` with no `fix`.
+//
+// ONE DIRECTION, AND IT IS THE LOAD-BEARING CONSTRAINT. This acts only on `RESETTLE_FROM`
+// (`delivered`); every other status prints and returns having written nothing. `partial -> delivered`
+// is the move that needs a done-predicate nothing here owns, and writing it on a guess would push a
+// row OUT of the pick path -- the exact harm the ticket exists to undo.
+//
+// THE KICKOFF COMES FROM THE ROW, NEVER THE COMMAND LINE. The status is read from the document the
+// row itself links, so `--kickoff` is refused beside `--resettle`: a re-settle that let the operator
+// hand in a different document would be deciding against a record the board does not hold. A NULL or
+// unopenable `kickoff_link` is an HONEST ABSENCE -- it throws (exit 2 at the CLI) and writes nothing,
+// rather than settling a status from a document nobody could read.
+//
+// THE CENSUS HAS NO `decided_at` FILTER, which is the whole difference from `main()`'s read. `main()`
+// asks "is a card still open?" and a stamped card correctly drops out of that question. This asks
+// BOTH questions of the same rows: `gatedOpen` = `decided_at` is NULL (trigger 3), `gateReworked` =
+// `decision` is `rework` (trigger 5). `k_stamp` maps `needs-desktop` onto the `rework` stamp too, so
+// the one word covers both rulings.
+export async function resettleTicket({
+  base, key, ticket, cycleId = null, sessionName = null, apply = false,
+  log = s => process.stdout.write(s),
+} = {}) {
+  if (typeof ticket !== "string" || ticket.trim() === "") {
+    fail("resettle: --ticket=<ID> is required — a re-settle acts on exactly one ticket.");
+  }
+  const rows = await rest(base, key, `backlog_items?backlog_id=eq.${encodeURIComponent(ticket)}&select=*`, {}, "resettle read row");
+  if (!Array.isArray(rows) || rows.length !== 1) {
+    fail(`resettle read row: ${ticket} matched ${Array.isArray(rows) ? rows.length : 0} rows — one is the only number that can be re-settled.`);
+  }
+  const row = rows[0];
+
+  if (!canResettle(row)) {
+    log(`settle-ship --resettle: ${ticket} reads \`${row.status}\` — no change. ONE DIRECTION: only \`${RESETTLE_FROM}\` is re-settled here.\n`);
+    return { ticket, from: row.status, to: row.status, changed: false, decision: null, note: `reads \`${row.status}\`, not \`${RESETTLE_FROM}\`` };
+  }
+
+  const link = typeof row.kickoff_link === "string" ? row.kickoff_link.trim() : "";
+  if (link === "") {
+    fail(`resettle: ${ticket} carries no \`kickoff_link\` — the status is read from the document, so an absent one is an honest absence and nothing is written.`);
+  }
+  const abs = path.isAbsolute(link) ? link : path.join(ROOT, link);
+  let kickoffText;
+  try {
+    kickoffText = fs.readFileSync(abs, "utf8");
+  } catch (e) {
+    fail(`resettle: ${ticket}'s kickoff_link ${link} could not be read: ${e.message} — nothing is written.`);
+  }
+
+  const cards = await rest(base, key,
+    `runner_items?select=id,kind,decision,decided_at,backlog_id&kind=eq.gated_before_build&backlog_id=eq.${encodeURIComponent(ticket)}&limit=10000`,
+    {}, "resettle read cards");
+  if (!Array.isArray(cards)) {
+    fail("resettle read cards: the card census came back non-array — refusing to decide a status on a census that was not read.");
+  }
+  const gatedOpen = cards.some(c => c.decided_at === null || c.decided_at === undefined);
+  const gateReworked = cards.some(c => c.decision === "rework");
+
+  const decided = decideStatus({ kickoffText, ticketId: ticket, gatedOpen, gateReworked });
+
+  log(`settle-ship --resettle: ${ticket} — ${row.status} → ${decided.status}\n`);
+  log(`  kickoff (from the row) ${link}\n`);
+  log(`  gated_before_build cards on this ticket: ${cards.length}\n`);
+  log(`  open gated_before_build card: ${gatedOpen ? "yes" : "no"}\n`);
+  log(`  card ruled rework: ${gateReworked ? "yes" : "no"}\n`);
+  for (const r of decided.reasons) log(`  · ${r}\n`);
+
+  if (decided.status === row.status) {
+    log(`  no change — the record still settles \`${row.status}\`; nothing was written.\n`);
+    return { ticket, from: row.status, to: row.status, changed: false, decision: null, note: "the record still settles the same way" };
+  }
+  if (!apply) {
+    log("  (no --apply; nothing was written)\n");
+    return { ticket, from: row.status, to: decided.status, changed: false, decision: null, note: "plan only — no --apply" };
+  }
+
+  // `kickoffPath` is the row's OWN link, so `planSettle()` writes `kickoff_link` back unchanged.
+  const { decision } = await applySettle({
+    base, key, cycleId, sessionName, ticket, row,
+    kickoffPath: link, status: decided.status, reasons: decided.reasons, log,
+  });
+  return { ticket, from: row.status, to: decided.status, changed: true, decision, note: "re-settled" };
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   for (const a of argv) {
     const name = a.startsWith("--") ? a.slice(2).split("=")[0] : a;
     if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
-      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text> and --apply.`);
+      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --resettle and --apply.`);
     }
   }
 
@@ -406,8 +616,33 @@ async function main() {
   const cycleId = arg(argv, "cycle-id");
   const remainderArg = arg(argv, "remainder");
   const applyArg = arg(argv, "apply");
+  const resettleArg = arg(argv, "resettle");
 
   if (typeof ticket !== "string" || ticket === "") fail("--ticket=<ID> is required — this script settles exactly one ticket.");
+
+  // AGT-167 -- THE SECOND DOOR, and it takes no `--kickoff`. A re-settle reads the document the ROW
+  // links, so a path handed in on the command line would decide a status against a record the board
+  // does not hold; the two flags are refused together rather than one quietly winning.
+  if (resettleArg !== undefined) {
+    if (kickoffArg !== undefined) {
+      fail("--kickoff is refused beside --resettle — a re-settle reads the row's OWN `kickoff_link`, never a path handed in on the command line.");
+    }
+    if (applyArg !== undefined && (typeof cycleId !== "string" || cycleId === "")) {
+      fail("--apply needs --cycle-id=<uuid> — every write is attributed to the cycle that made it.");
+    }
+    const rbase = process.env.SUPABASE_URL;
+    const rkey = process.env.SUPABASE_SERVICE_KEY;
+    if (!rbase) fail("SUPABASE_URL is not set — the ticket row is read over REST.");
+    if (!rkey) fail("SUPABASE_SERVICE_KEY is not set — the ticket row is read over REST.");
+    await resettleTicket({
+      base: rbase, key: rkey, ticket,
+      cycleId: typeof cycleId === "string" && cycleId !== "" ? cycleId : null,
+      sessionName: null,
+      apply: applyArg !== undefined,
+    });
+    process.exit(0);
+  }
+
   if (typeof kickoffArg !== "string" || kickoffArg === "") fail("--kickoff=<path> is required — the kickoff's own words decide the status, and its path is the link this write sets.");
   // The attribution constraint (`ck_decision_attribution`) takes exactly one of cycle_id /
   // session_name and this script is always a cycle. Refusing here beats a 400 after the read.
@@ -474,62 +709,10 @@ async function main() {
     process.exit(0);
   }
 
-  // 1 -- the decision. It exists before the image, and the image before the cell.
-  const summary = `Close-out: ${ticket} settles \`${plan.patch.status}\``;
-  const reasoning =
-    `settle-ship.js read ${kickoffArg} and the undecided \`gated_before_build\` cards, and decided \`${plan.patch.status}\`: ` +
-    `${decided.reasons.join("; ")}. The verdict is not an input — a \`delivered\` on a record naming unbuilt work is a bug, never an override. ` +
-    `Writing status, \`design_status\` NULL (a spent kickoff stops advertising a built design) and \`kickoff_link\` = this kickoff (\`ship_handoff_census\` reads it). SES-385 slice 2. pattern:0`;
-
-  const decision = await rest(base, key, "rpc/record_decision", {
-    method: "POST",
-    body: JSON.stringify({
-      p_cycle_id: cycleId,
-      p_session_name: null,
-      p_kind: "ticket-status",
-      p_backlog_id: ticket,
-      p_summary: summary,
-      p_reasoning: reasoning,
-      p_ladder_work_class: null,
-    }),
-  }, "record_decision");
-  if (typeof decision !== "string" || decision.length !== 36) {
-    fail(`record_decision: returned ${JSON.stringify(decision)}, which is not a decision id`);
-  }
-  const where = step => `${step} (decision ${decision})`;
-
-  // 2 -- the FULL row imaged, before a single cell moves. `row` is already a select=* read.
-  await rest(base, key, "runner_before_images", {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify([{
-      cycle_id: cycleId,
-      session_name: null,
-      table_name: "backlog_items",
-      pk_value: row.id,
-      row_data: row,
-      decision_id: decision,
-    }]),
-  }, where("image row"));
-
-  // 3 -- the PATCH, READ BACK key by key. A PATCH PostgREST accepted and silently did not apply
-  // answers 200 with the old value, so the representation is compared rather than trusted.
-  const back = await rest(base, key, `backlog_items?id=eq.${row.id}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify(plan.patch),
-  }, where("patch"));
-  const after = Array.isArray(back) ? back[0] : null;
-  if (!after) fail(`${where("patch")}: the PATCH returned no row`);
-  for (const k of Object.keys(plan.patch)) {
-    const got = after[k];
-    const want = plan.patch[k];
-    if (String(got ?? null) !== String(want ?? null)) {
-      fail(`${where("patch")}: ${k} read ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
-    }
-  }
-
-  process.stdout.write(`  applied: decision ${decision}, 1 before-image, ${ticket} now \`${after.status}\` · design_status ${JSON.stringify(after.design_status)} · kickoff_link ${JSON.stringify(after.kickoff_link)}\n`);
+  await applySettle({
+    base, key, cycleId, sessionName: null, ticket, row,
+    kickoffPath: kickoffArg, status: plan.patch.status, reasons: decided.reasons,
+  });
 
   // 4 -- AGT-176 (part c): the ledger figure, its own decision and its own before-images, in the same
   // decision -> image -> read-back-PATCH order as the status write above. It runs AFTER the status
@@ -541,6 +724,15 @@ async function main() {
 }
 
 // SES-176's contract: importing this module for its exports must never run the CLI.
+// AGT-167: `fail()` throws now (see its header), so the exit code it used to take itself is taken
+// HERE -- exit 2 for a refusal this script recognises, exit 1 with a stack for one it does not.
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
-  main();
+  main().catch(e => {
+    if (e instanceof SettleShipError) {
+      process.stderr.write(`settle-ship: ${e.message}\n`);
+      process.exit(2);
+    }
+    process.stderr.write(`settle-ship: ${e.stack || e.message}\n`);
+    process.exit(1);
+  });
 }
