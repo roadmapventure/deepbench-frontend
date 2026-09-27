@@ -262,8 +262,18 @@ async function run() {
     // THE COUNT LIVES IN `text` AND NOWHERE ELSE, so the fingerprint is stable per slug and week --
     // a governing fact carrying the number would mint a new finding every night it moved.
     assert.ok(!/\d+ open rows/.test(cf.governing_fact), "no count in the governing fact");
-    assert.equal(ledger.fingerprint(cf), ledger.fingerprint(owner.censusFindingFor({ slug, count: 99, oldest: mixed[0].oldest })),
-      "the same check with a different count is the SAME finding");
+    assert.equal(ledger.fingerprint(cf), ledger.fingerprint(owner.censusFindingFor({ slug, count: 24, oldest: mixed[0].oldest })),
+      "the same check with a different count inside one band is the SAME finding");
+    // AGT-169 -- AND THE ONE EXCEPTION, which is the fence this whole property used to make
+    // impossible. Carrying forever is right until a check GROWS: 247 open rows at AGT-169's filing
+    // became 259 with no new finding raised, because the count is deliberately absent from the
+    // governing fact. Crossing a FENCE_BANDS rung appends the BAND -- not the count -- so the
+    // fingerprint changes exactly once per rung and the check returns to the weekly list. 3 and 24
+    // are both under the first band and agree above; 45 is past 25 and must not.
+    assert.notEqual(ledger.fingerprint(cf), ledger.fingerprint(owner.censusFindingFor({ slug, count: 45, oldest: mixed[0].oldest })),
+      "a check that crossed a fence band must mint a NEW finding, or it can never re-raise however far it grows");
+    assert.ok(owner.censusFindingFor({ slug, count: 45, oldest: mixed[0].oldest }).governing_fact.endsWith(" (past 25 open rows)"),
+      "the band, and never the count, is what the governing fact gains");
 
     const posted2 = [];
     const ownerRun = await ingestFindings({

@@ -185,6 +185,41 @@ export const CHECKS = Object.freeze([
   "unrevalidated-30d",
 ]);
 
+// AGT-169 -- THE CHECKS THAT ARE NO LONGER ASKED, and the recorded reason each one was retired.
+// Frozen, and a slug in here is still a slug in CHECKS: a retired check keeps its line in the
+// census (`retired  counted <n>`) so that its absence can never be read as a check that quietly
+// stopped running. The reason rides HERE and in the night's decision narrative, never in a comment
+// alone -- this file's own convention for a recorded Designer call (FENCES, UNREVALIDATED_BATCH).
+//
+// `actual-unknown` is the Designer's call (ii), and it is retirement by CONSTRUCTION rather than by
+// preference: `cost_pct_snapshot` has no reader anywhere outside this script and its own tests, and
+// the finding's own sentence says no reading fixes it -- a closed row with no `ticket_matrix` cycle
+// row can never gain a snapshot. 103 open rows clear on the first night this ships. `size-missing`
+// is deliberately NOT here (call iii): a null there under-counts a breakdown build-briefing.mjs
+// puts in front of John, which is live evidence over the ticket's own stated guess.
+export const RETIRED_CHECKS = Object.freeze({
+  "actual-unknown":
+    "cost_pct_snapshot has no reader outside scripts/ticket-owner.js, and a closed row with no " +
+    "ticket_matrix cycle row can never gain a snapshot, so the check is unanswerable by " +
+    "construction — AGT-169, 2026-09-27",
+});
+
+// AGT-169 -- THE FENCE. `censusFindingFor` keeps the count OUT of `governing_fact` on purpose
+// (fingerprint() is `kind|locations|governing_fact`), which is what lets one finding per check
+// carry night after night without minting a new row every time the number moves. The cost of that
+// is the hole this ticket was filed for: a slug ruled `ticketed` once NEVER re-raises, however far
+// it grows -- 247 rows at filing, 259 four nights later, and nothing said so. The bands are the
+// smallest fix that keeps both properties: the governing fact is still count-free WITHIN a band, so
+// an ordinary night is byte-identical and carries; crossing a band mints exactly ONE new
+// fingerprint, which puts the check back on the Development Manager's weekly list once per band and
+// not once per row.
+//
+// A FIXED DECLARED LADDER, never a computed one (pattern:18): a band derived from the current
+// population would move under its own findings and two nights could disagree about which band a
+// count is in. Under the first band there is no suffix at all, so today's ticketed findings keep
+// the exact fingerprints they already carry.
+export const FENCE_BANDS = Object.freeze([25, 50, 100, 200, 400]);
+
 // AGT-166 slice 2, the Designer's call (ii): 25 rows a night, oldest first. A fixed declared
 // constant and not a measurement -- the batch size is what the judgment lane can read in one turn,
 // and the census still reports the WHOLE population every night so the drain's remaining depth is
@@ -232,6 +267,47 @@ const round2 = x => Math.round(x * 100) / 100;
 const ts = v => (v == null ? NaN : Date.parse(v));
 
 // --- the pure half -----------------------------------------------------------------------------
+
+// retiredChecks(rulings) -> Map<slug, reason>: which of the 13 checks are no longer asked tonight.
+//
+// TWO SOURCES, ONE MAP. `RETIRED_CHECKS` is the standing list -- a Designer's call recorded in the
+// tree. `rulings` is the LIVE half and the whole point of AGT-169: a `not-a-defect` ruling on
+// `owner:<slug>` in `audit_findings` retires that check, so the weekly review the Development
+// Manager already runs becomes the ruler rather than the place rulings go to die. No code edit and
+// no deploy stands between his ruling and the check stopping.
+//
+// FAIL CLOSED, and closed here means MORE checking, not less. A null, empty, non-array or
+// unreadable `rulings` contributes NOTHING: the census then runs every check the tree has not
+// already retired, which over-reports rather than under-reports. A ruling row is honoured only when
+// it is exactly what it claims to be -- `status === "not-a-defect"`, an `owner:` prefix, and a
+// remainder that is a slug this script actually runs. An `owner:` slug outside CHECKS is somebody
+// else's row (or a typo) and must never silence a check by accident.
+export function retiredChecks(rulings) {
+  const out = new Map(Object.entries(RETIRED_CHECKS));
+  if (!Array.isArray(rulings)) return out;
+  for (const r of rulings) {
+    if (!r || typeof r !== "object") continue;
+    if (r.status !== "not-a-defect") continue;
+    const slug = typeof r.check_slug === "string" && r.check_slug.startsWith("owner:")
+      ? r.check_slug.slice("owner:".length)
+      : null;
+    if (slug === null || !CHECKS.includes(slug)) continue;
+    // The standing list wins on a collision: its reason is the recorded call, and a later ruling
+    // re-retiring the same check says nothing new.
+    if (out.has(slug)) continue;
+    out.set(slug, `${r.ruling ?? "ruled not-a-defect"} — ruled by ${r.ruled_by ?? "unknown"} at ${r.ruled_at ?? "unknown"}`);
+  }
+  return out;
+}
+
+// bandFor(count) -> the highest FENCE_BANDS rung at or below `count`, else null (below the first).
+// Pure arithmetic over a frozen ladder, so two readings of one count can never disagree.
+export function bandFor(count) {
+  if (typeof count !== "number" || !Number.isFinite(count)) return null;
+  let band = null;
+  for (const b of FENCE_BANDS) if (count >= b) band = b;
+  return band;
+}
 
 // selectRevalidationBatch(items, {now, carried}) -> {population, carried, batch}
 //
@@ -309,7 +385,12 @@ export function premiseDetail(row, premise, { rank, population, now, statusById 
 // openCycles}. `now` is an ISO string; `rate` is public.runner_pct_per_cycle() for the night.
 // One finding per (row, check). `fix` is present ONLY on a derivable finding and holds exactly the
 // columns slice 2 will write -- so a fix object is a write statement, not a suggestion.
-export function classifyBoard(board, { now, rate }) {
+// AGT-169: `retired` is optional and defaults to the ruler's own answer over `board.ownerRulings`,
+// so the live census, the `--board` fixture and a direct call all see the same retirement set
+// without the CLI having to plumb it. An explicit `retired` (a Map or anything with `.has`/`.get`)
+// overrides, which is what lets a test drive one variable.
+export function classifyBoard(board, { now, rate, retired } = {}) {
+  const retiredMap = retired ?? retiredChecks(board.ownerRulings);
   const items = board.items ?? [];
   const nowMs = Date.parse(now);
   if (!Number.isFinite(nowMs)) throw new Error(`classifyBoard: \`now\` is not a parseable ISO instant (got ${now})`);
@@ -368,9 +449,23 @@ export function classifyBoard(board, { now, rate }) {
     // The drain's two halves of tonight, beside the population count the fences line already carried.
     unrevalidated_batch: revalidation.batch.length,
     unrevalidated_carried: revalidation.carried.length,
+    // AGT-169: {slug: rows it would have filed}. Seeded at 0 for every retired slug so a check that
+    // retired AND found nothing still reports itself — an absent key would read as a check that
+    // never ran, which is the exact ambiguity CHECKS' fixed print order exists to prevent.
+    retired: Object.fromEntries([...retiredMap.keys()].filter(s => CHECKS.includes(s)).map(s => [s, 0])),
   };
 
+  // AGT-169 -- THE GUARD IS HERE AND NOWHERE ELSE. One place covers all thirteen checks, so a
+  // fourteenth written next year is retirable the day it ships without a second edit, and no check
+  // can be "retired" in the census line while still filing rows from its own branch. The row is
+  // COUNTED, never dropped silently, and nothing is filed: planWrites then routes every prior
+  // ledger row of that slug into `clear` on its own terms (`clear = prior − tonight`), which is why
+  // no delete path is needed and why a cleared row keeps its history.
   const file = (row, check, verdict, detail, fix) => {
+    if (retiredMap.has(check)) {
+      backlog.retired[check] = (backlog.retired[check] ?? 0) + 1;
+      return;
+    }
     const f = { backlog_id: row.backlog_id, check, verdict, detail };
     if (fix !== undefined) f.fix = fix;
     findings.push(f);
@@ -569,6 +664,10 @@ export function classifyBoard(board, { now, rate }) {
   return {
     findings,
     backlog,
+    // AGT-169: the REASONS, beside the counts in `backlog.retired`. renderCensus prints the reason
+    // on the retired line, so a reader of the night's report is told why a check stopped without
+    // having to find the constant or the ruling row that stopped it.
+    retired: Object.fromEntries([...retiredMap.entries()].filter(([s]) => CHECKS.includes(s))),
     counts: { rows: items.length, findings: findings.length, derivable, judgment: findings.length - derivable },
   };
 }
@@ -587,7 +686,19 @@ export function censusLine(result) {
     // The population and NOT the remainder after tonight -- two consecutive nights printing the same
     // number is the revisit trigger, and a number that shrank by the batch size whether or not the
     // judge ruled anything would hide exactly that (kickoff §7).
-    ` · revalidation ${b.unrevalidated_30d} left (batch ${b.unrevalidated_batch}, carried ${b.unrevalidated_carried})`;
+    ` · revalidation ${b.unrevalidated_30d} left (batch ${b.unrevalidated_batch}, carried ${b.unrevalidated_carried})` +
+    // AGT-169: what the census DID NOT ask tonight, in the one string the nightly cycle row carries
+    // verbatim. A retirement that showed up only as a smaller findings count would be
+    // indistinguishable on John's brief from a board that got better on its own.
+    ` · retired ${retiredSummary(b.retired)}`;
+}
+
+// `retired 1 check / 103 rows` — the counts, pluralised, out of `backlog.retired`. A slug with no
+// rows tonight still counts as a retired CHECK; it just contributes no rows.
+function retiredSummary(retired) {
+  const entries = Object.entries(retired ?? {});
+  const rows = entries.reduce((n, [, c]) => n + c, 0);
+  return `${entries.length} ${entries.length === 1 ? "check" : "checks"} / ${rows} ${rows === 1 ? "row" : "rows"}`;
 }
 
 // renderCensus(result, nowIso) -> the census text. Pure, and byte-stable for a given result: the
@@ -598,6 +709,13 @@ export function renderCensus(result, nowIso) {
     `ticket-owner census ${nowIso}: ${censusLine(result)}`,
   ];
   for (const check of CHECKS) {
+    // AGT-169: a retired check PRINTS, with its count and the reason it stopped. Dropping the line
+    // would make a retirement look exactly like a check that fell out of the loop.
+    if (result.retired && Object.prototype.hasOwnProperty.call(result.retired, check)) {
+      const counted = result.backlog?.retired?.[check] ?? 0;
+      lines.push(`  ${check.padEnd(22)}  retired  counted ${counted}  ${result.retired[check]}`);
+      continue;
+    }
     const mine = result.findings.filter(f => f.check === check);
     const ids = mine.map(f => f.backlog_id).sort();
     const shown = ids.length === 0
@@ -973,7 +1091,40 @@ async function readBoard(base, key, now) {
     "backlog_items?select=backlog_id,title,description,priority_class" +
     `&backlog_id=in.(${batch.map(r => r.backlog_id).join(",")})&order=backlog_id`,
     UNREVALIDATED_BATCH + 1);
-  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs, ownerFindings, premises };
+  // AGT-169 -- THE RULER. The Development Manager's weekly review already rules `audit_findings`;
+  // this read is what makes one of those rulings DO something. A `not-a-defect` on `owner:<slug>`
+  // retires that check tonight, with no code edit and no deploy between his ruling and the effect.
+  //
+  // SOFT BY DESIGN, and it is the ONE read in this function that may fail without stopping the
+  // census. Every other read is board data: a truncated board is not a census, so `readAll` exits
+  // 2. This read only ever REMOVES work, so losing it costs nothing but a night of extra checking
+  // — which is why it fails to `[]` (every check runs) instead of exiting. A full first page is
+  // treated as unreadable for the same reason `readAll` refuses one: an unknown remainder here
+  // would silence an unknown set of checks.
+  const ownerRulings = await readRulings(base, key);
+  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs, ownerFindings, premises, ownerRulings };
+}
+
+const RULINGS_QUERY = "audit_findings?select=check_slug,status,ruling,ruled_by,ruled_at" +
+  "&check_slug=like.owner:*&status=eq.not-a-defect&order=id";
+
+export async function readRulings(base, key, fetchImpl = fetch) {
+  const soft = why => {
+    process.stderr.write(`ticket-owner: the owner-rulings read ${why} — retiring nothing from it; every check runs tonight\n`);
+    return [];
+  };
+  try {
+    const res = await fetchImpl(`${base.replace(/\/+$/, "")}/rest/v1/${RULINGS_QUERY}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Range-Unit": "items", Range: `0-${PAGE_ROWS - 1}` },
+    });
+    if (!res.ok) return soft(`answered HTTP ${res.status}`);
+    const rows = JSON.parse(await res.text());
+    if (!Array.isArray(rows)) return soft("came back non-array");
+    if (rows.length >= PAGE_ROWS) return soft(`filled its only page (${rows.length} rows), so the remainder is unknown`);
+    return rows;
+  } catch (e) {
+    return soft(`could not be completed: ${e.message}`);
+  }
 }
 
 async function readRate(base, key) {
@@ -1017,12 +1168,27 @@ export function openJudgmentBySlug(prior, ledger, now) {
 }
 
 // The finding a still-open check raises, pure so the regression file can pin its exact shape.
+//
+// AGT-169 -- THE BAND IS THE ONLY THING THAT MAY TOUCH `governing_fact`, and only once per rung.
+// The count deliberately lives in the location `text` (see openJudgmentBySlug above), because
+// fingerprint() is `kind | locationKeys | normalize(governing_fact)` and a count in the governing
+// fact would mint a new finding every night the number moved. But the same property is why a slug
+// ruled `ticketed` once could never re-raise however far it grew: 247 open rows at AGT-169's
+// filing, 259 four nights later, and the ledger had no way to say so. Appending the BAND -- not the
+// count -- keeps every ordinary night byte-identical while a crossing mints exactly one new
+// fingerprint, which is one appearance on the Development Manager's weekly list per rung.
+//
+// Below the first band there is NO suffix, byte for byte. That is not a micro-optimisation: it is
+// what lets the findings already ticketed against this very ticket keep their fingerprints and stay
+// carried rather than re-raising as duplicates on the night this ships.
 export function censusFindingFor({ slug, count, oldest }) {
+  const band = bandFor(count);
   return {
     kind: "other",
     check_slug: `owner:${slug}`,
     locations: [{ location: `ticket_owner_findings:${slug}`, text: `${count} open rows, oldest first_seen ${oldest}` }],
-    governing_fact: `Ticket Owner check ${slug} holds open judgment rows a capability must decide`,
+    governing_fact: `Ticket Owner check ${slug} holds open judgment rows a capability must decide`
+      + (band === null ? "" : ` (past ${band} open rows)`),
     confidence: "high",
     proposed_resolution: "rule the rows or retire the check",
   };

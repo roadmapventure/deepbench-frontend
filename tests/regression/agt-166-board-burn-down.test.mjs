@@ -343,8 +343,11 @@ async function run() {
       `live: the census reports ${census.backlog.unrevalidated_30d} unrevalidated rows where count=exact reads ${popBefore} — one of the two is not reading the whole board`);
     // The CLI's own first line, which is the string the nightly cycle row carries verbatim.
     const headline = c.stdout.split("\n")[0];
-    assert.match(headline, / · revalidation \d+ left \(batch \d+, carried \d+\)$/,
-      `the census line must end in the drain's depth; got: ${headline.slice(-90)}`);
+    // AGT-169 appended the night's retirement counts after the drain's depth, so the depth is no
+    // longer last. Both clauses are pinned, in order, rather than loosening the match to a bare
+    // `includes` -- the order is what makes the line diffable night over night.
+    assert.match(headline, / · revalidation \d+ left \(batch \d+, carried \d+\) · retired \d+ check(?:s)? \/ \d+ row(?:s)?$/,
+      `the census line must end in the drain's depth and the night's retirements; got: ${headline.slice(-120)}`);
     assert.ok(headline.includes(` · revalidation ${popBefore} left `),
       `the census line must quote the population count=exact reads (${popBefore}); got: ${headline.slice(-90)}`);
 

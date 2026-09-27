@@ -183,7 +183,15 @@ const SEED_REL = "docs/design/agt-79-ticket-owner-seed.sql";
 const F = JSON.parse(fs.readFileSync(path.join(ROOT, FIXTURE_REL), "utf8"));
 
 const clone = v => JSON.parse(JSON.stringify(v));
-const run = (over = {}) => classifyBoard(over.board ?? F.board, { now: over.now ?? F.now, rate: over.rate ?? F.rate });
+// AGT-169: EVERY ARM IN THIS FILE GRADES THE THIRTEEN CHECKS WITH NONE OF THEM RETIRED, and says
+// so explicitly rather than by accident. `classifyBoard` now defaults its retirement set to
+// `retiredChecks(board.ownerRulings)`, which retires `actual-unknown` by the Designer's standing
+// call — so a fixture arm that took the default would silently lose a check's coverage the day the
+// ruler shipped. Passing an empty Map is this file's one-variable discipline applied to the new
+// input: the retirement path itself is graded end to end, defaults included, in
+// tests/regression/agt-169-findings-ruler.test.mjs.
+const NO_RETIREMENT = new Map();
+const run = (over = {}) => classifyBoard(over.board ?? F.board, { now: over.now ?? F.now, rate: over.rate ?? F.rate, retired: over.retired ?? NO_RETIREMENT });
 const byCheck = (r, c) => r.findings.filter(f => f.check === c).map(f => f.backlog_id).sort();
 const only = (r, id, c) => r.findings.find(f => f.backlog_id === id && f.check === c);
 
@@ -270,6 +278,10 @@ async function main() {
     quote_prefence: 1, size_prefence: 1, cost_prefence: 1,
     verdict_prefence: 1, unrevalidated_30d: 1, attended_actual_null: 2,
     unrevalidated_batch: 1, unrevalidated_carried: 0,
+    // AGT-169: the retirement counter is part of the backlog block now, and empty under
+    // NO_RETIREMENT. Asserted whole rather than key by key -- an unexpected key here is a check
+    // that stopped filing without anyone saying so.
+    retired: {},
   }, "rows behind a fence are counted, never flagged");
 
   for (const f of r.findings) {
@@ -359,7 +371,7 @@ async function main() {
     items: DRAIN, matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [],
     ownerFindings: [], premises: PREMISES, ...over,
   });
-  const drainRun = (over = {}) => classifyBoard(drainBoard(over), { now: NOW166, rate: 0.5 });
+  const drainRun = (over = {}) => classifyBoard(drainBoard(over), { now: NOW166, rate: 0.5, retired: NO_RETIREMENT });
   const slug166 = res => res.findings.filter(f => f.check === REVALIDATION_CHECK);
 
   // (vii) THIRTY PAST THE FENCE, NONE CARRIED -> exactly 25 derivable and 0 judgment. The whole
@@ -374,8 +386,10 @@ async function main() {
   assert.strictEqual(d1.backlog.unrevalidated_30d, 30, "the census reports the WHOLE population, never tonight's bite");
   assert.strictEqual(d1.backlog.unrevalidated_batch, 25);
   assert.strictEqual(d1.backlog.unrevalidated_carried, 0);
-  assert.ok(censusLine(d1).endsWith(" · revalidation 30 left (batch 25, carried 0)"),
-    `the census line must carry the drain's depth; got: ${censusLine(d1).slice(-70)}`);
+  // AGT-169 appended the retirement counts after the drain's depth; with NO_RETIREMENT in force
+  // they read zero, which is itself the assertion that an explicit empty set retires nothing.
+  assert.ok(censusLine(d1).endsWith(" · revalidation 30 left (batch 25, carried 0) · retired 0 checks / 0 rows"),
+    `the census line must carry the drain's depth; got: ${censusLine(d1).slice(-90)}`);
 
   // OLDEST FIRST, and the whole ordered list is asserted rather than its first element.
   assert.deepStrictEqual(slug166(d1).map(f => f.backlog_id),
@@ -468,7 +482,7 @@ async function main() {
   // (x) THE READ ORDER MUST NOT MATTER. Same thirty rows handed over backwards: the same twenty-five
   // ids, in the same order, with the same ranks. Without this arm a sort that fell back to REST's
   // order would pass every arm above and judge a different set on every run.
-  const rev = classifyBoard(drainBoard({ items: [...DRAIN].reverse() }), { now: NOW166, rate: 0.5 });
+  const rev = classifyBoard(drainBoard({ items: [...DRAIN].reverse() }), { now: NOW166, rate: 0.5, retired: NO_RETIREMENT });
   assert.deepStrictEqual(slug166(rev).map(f => f.backlog_id), slug166(d1).map(f => f.backlog_id),
     "the batch is a function of the board, never of the order it was read in");
   assert.deepStrictEqual(slug166(rev).map(f => f.detail), slug166(d1).map(f => f.detail),
@@ -538,12 +552,22 @@ async function main() {
   const cJson = spawnCli([`--board=${FIXTURE_REL}`, "--json"]);
   assert.strictEqual(cJson.status, 0, `the fixture census must run without credentials; stderr: ${cJson.stderr}`);
   const parsed = JSON.parse(cJson.stdout);
-  assert.deepStrictEqual(parsed.counts, r.counts, "the CLI must report the same classification the library computes");
+  // AGT-169: the CLI takes classifyBoard's DEFAULT retirement set, which is the ruler's answer over
+  // `board.ownerRulings` -- absent from this fixture, so it is `RETIRED_CHECKS` alone. Comparing
+  // the spawned run against `rDefault` rather than against `r` is what makes the two arms grade
+  // different things: `r` proves the thirteen checks still classify, `rDefault` proves the shipped
+  // default actually retires one of them end to end, through a real process.
+  const rDefault = classifyBoard(F.board, { now: F.now, rate: F.rate });
+  assert.strictEqual(rDefault.counts.findings, r.counts.findings - 1,
+    "the default retirement must remove exactly the fixture's one actual-unknown finding");
+  assert.deepStrictEqual(rDefault.backlog.retired, { "actual-unknown": 1 },
+    "the retired check is COUNTED, never silently dropped");
+  assert.deepStrictEqual(parsed.counts, rDefault.counts, "the CLI must report the same classification the library computes");
   assert.strictEqual(parsed.measured_at, "2026-09-13T02:00:00Z", "the fixture's own clock wins, never the wall clock");
 
   const cText = spawnCli([`--board=${FIXTURE_REL}`]);
   assert.strictEqual(cText.status, 0, `stderr: ${cText.stderr}`);
-  assert.strictEqual(cText.stdout, text, "the CLI's default output is renderCensus, byte for byte");
+  assert.strictEqual(cText.stdout, renderCensus(rDefault, F.now), "the CLI's default output is renderCensus, byte for byte");
 
   const cNoCreds = spawnCli(["--census"]);
   assert.strictEqual(cNoCreds.status, 2, "a live census without credentials is not a pass");
@@ -1385,7 +1409,7 @@ async function main() {
     // (2) Census the four rows through the REAL projection readBoard() uses -- a column the census
     // reads but this test forgot to select would classify as null and quietly change the answer.
     const board = { items: await readFixture(), matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] };
-    const r1 = classifyBoard(board, { now, rate: RATE });
+    const r1 = classifyBoard(board, { now, rate: RATE, retired: NO_RETIREMENT });
     // AGT-166 slice 2: ZZTO-794 is open, filed before the fences and never revalidated, so it is the
     // thirteenth check's whole population and lands as JUDGMENT — the live projection below does not
     // select title/description, so no `premises` entry reaches the census and an unread premise is
@@ -1470,7 +1494,7 @@ async function main() {
     // (6) SECOND NIGHT, unchanged board: the fix is already made, so nothing is written but a touch.
     const now2 = new Date(Date.now() + 1000).toISOString();
     const board2 = { ...board, items: await readFixture() };
-    const r2 = classifyBoard(board2, { now: now2, rate: RATE });
+    const r2 = classifyBoard(board2, { now: now2, rate: RATE, retired: NO_RETIREMENT });
     assert.strictEqual(r2.counts.derivable, 0, "the cell the first night fixed must not be found again");
     assert.strictEqual(r2.counts.findings, 5);
     const priorLed = led.map(x => ({ id: x.id, backlog_id: x.backlog_id, check_slug: x.check_slug }));
