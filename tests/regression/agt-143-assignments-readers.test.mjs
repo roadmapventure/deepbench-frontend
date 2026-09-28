@@ -60,6 +60,13 @@ async function rows(query) {
 // can no longer move, because nothing assigns their model. A NULL `llm_model` is carried as
 // "<NULL>" rather than dropped -- a Skill with no model at all is stranded too, and silently
 // filtering it out is the vacuous version of this check.
+//
+// AGT-162 (v7.0.682) ADDS THE ONE EXEMPTION, AND IT IS NOT "drop the NULLs". A Skill whose
+// `traits.handler` names a deterministic handler runs NO model by design, so it has no model to be
+// stranded on -- that is a different fact from a Skill that lost its model, which is what this
+// check exists to catch. Exempting on the DECLARED handler keeps the non-vacuous half above:
+// a NULL `llm_model` with no handler is still an orphan and still fails. Blanket-filtering NULL
+// would be exactly the vacuous version the paragraph above forbids.
 export function orphanModels(skillRows, assignRows) {
   const assigned = new Set(
     (Array.isArray(assignRows) ? assignRows : [])
@@ -67,6 +74,7 @@ export function orphanModels(skillRows, assignRows) {
       .filter(m => typeof m === "string"));
   const held = new Set(
     (Array.isArray(skillRows) ? skillRows : [])
+      .filter(r => !(r && r.traits && typeof r.traits.handler === "string" && r.traits.handler))
       .map(r => (r == null || r.llm_model == null ? "<NULL>" : r.llm_model)));
   return [...held].filter(m => !assigned.has(m)).sort();
 }
@@ -192,7 +200,7 @@ async function run() {
   console.log(`  (d) LIVE: ${caps.length} capability rows = their Skills, ${laneAssigns.length} lanes mirrored -- PASS`);
 
   // (e) NO-ORPHAN INVARIANT
-  const skillRows = await rows("skill_profiles?select=llm_model");
+  const skillRows = await rows("skill_profiles?select=llm_model,traits");
   assert.ok(skillRows.length > 0,
     "public.skill_profiles returned no rows -- (e) would hold vacuously over an empty set");
   assert.deepStrictEqual(orphanModels(skillRows, assigns), [],

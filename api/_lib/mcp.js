@@ -1,3 +1,24 @@
+// DeepBench v7.0.682 | api/_lib/mcp.js | AGT-162 -- a capability can now answer a `tools/call`
+// WITHOUT a model call. Until this ticket every tools/call reached runThroughExecutor() ->
+// runCapability(), so an outside platform asking DeepBench for an agent's scaffold paid for a model
+// turn and got prose ABOUT the scaffold instead of the scaffold. The seam is a READ of the column
+// that has carried this fact since AG-13: `capabilities.execution_type`. `deterministic` goes to
+// runDeterministic(), `ai` goes to the same executor it always did, and there is still no `if` on a
+// slug anywhere in this file -- DETERMINISTIC_HANDLERS is keyed on the handler NAME the Intent row
+// declares in `traits.handler`, exactly as api/prompt/request-receivable.js's HANDLERS is keyed on
+// `format_contract.handler`. A `deterministic` row whose Intent names no handler is DROPPED from the
+// list rather than advertised, the same posture already taken for a capability with no active holder.
+//
+// WHY NOT `resources/*`, which is the obvious MCP answer and was rejected on the spec: a resource is
+// APPLICATION-driven -- the user or host attaches it -- so the calling model cannot fetch it itself,
+// which is the entire use case. `resources/list` would also be a second inventory that visibleRows()
+// does not govern, with no `capabilities` row behind it (§19b). The reasoning is docs/harvests/AGT-162.md §2.
+//
+// AND THE INPUT CONTRACT MOVED HOME. TOOL_INPUT_SCHEMAS' own comment below named the condition for
+// retiring the table -- "the SECOND capability that needs one". This is it, so the second contract
+// ships as DATA (`skill_profiles.traits.input_schema`), read generically and published in tools/list
+// beside the code-side entry. `verify-ship` stays in the table for the reason stated there.
+//
 // DeepBench v7.0.446 | api/_lib/mcp.js | SES-346 -- THIS FILE MOVED OUT OF api/ AND IS NO LONGER A
 // SERVERLESS FUNCTION. Vercel's Hobby plan caps a deployment at 12 serverless functions and every
 // top-level file under api/ outside an underscore-prefixed directory is one; MCP-3 made it 13 and
@@ -81,6 +102,7 @@
 import { createRequire } from 'node:module';
 import { timingSafeEqual } from 'node:crypto';
 import { runCapability } from '../capabilities/execute.js';
+import { handle as agentBundleHandle } from './handlers/agent-bundle.js';
 import { withRequestContext, getRequestContext, runWithCallSource } from '../../lib/request-context.js';
 
 // package.json is read through createRequire rather than an import attribute so the Vercel builder
@@ -181,11 +203,25 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
     if (!holder) continue;
     const intent = c.default_intent_slug ? intentBySlug.get(c.default_intent_slug) : null;
     const schema = intent && intent.traits && intent.traits.schema;
+    // FEATURE: AGT-162 -- the two data-side halves of a deterministic tool: WHO runs it
+    // (`traits.handler`, resolved against DETERMINISTIC_HANDLERS by name) and WHAT it requires
+    // (`traits.input_schema`, the home TOOL_INPUT_SCHEMAS' comment names for the second contract).
+    const handler = (intent && intent.traits && intent.traits.handler) || null;
+    const inputSchema = intent && intent.traits && intent.traits.input_schema;
+    const executionType = c.execution_type || 'ai';
+    // A DETERMINISTIC ROW WITH NO HANDLER CANNOT RUN, so it is dropped rather than advertised --
+    // the same rule the holder check above applies, for the same reason: listing it would publish a
+    // tool that answers every call with an internal error. An `ai` row needs no handler and keeps
+    // its place, which is why this reads the column rather than the handler's presence alone.
+    if (executionType === 'deterministic' && !handler) continue;
     rows.push({
       slug: c.slug,
       name: c.name || c.slug,
       description: c.description || '',
-      execution_type: c.execution_type || 'ai',
+      execution_type: executionType,
+      handler,
+      // Only an object is usable as an input contract; anything else is dropped rather than half-read.
+      input_schema: inputSchema && typeof inputSchema === 'object' && !Array.isArray(inputSchema) ? inputSchema : null,
       default_intent_slug: c.default_intent_slug || null,
       tenant_id: c.tenant_id || 'global',
       agent_id: holder.id,
@@ -325,9 +361,12 @@ export function normalizeGateEvidence(gates, gateDetail) {
  *
  * A capability with no registry entry is unconstrained, exactly as before this ticket: the generic
  * `task_context` object check in callToolThroughExecutor() is still the floor for all 25 tools.
+ *
+ * FEATURE: AGT-162 -- `spec` became a parameter so the contract can come from EITHER home: the code
+ * table above, or the row's own `traits.input_schema`. The validation is unchanged and there is one
+ * copy of it; only where the spec was read from moved.
  */
-export function validateToolInput(slug, taskContext) {
-  const spec = TOOL_INPUT_SCHEMAS[slug];
+export function validateToolInput(slug, taskContext, spec = TOOL_INPUT_SCHEMAS[slug]) {
   if (!spec) return { ok: true, missing: [] };
   if (!taskContext || typeof taskContext !== 'object' || Array.isArray(taskContext)) {
     return { ok: false, missing: spec.required.slice() };
@@ -361,7 +400,9 @@ export function toTool(row) {
   // SES-339: a registry entry PUBLISHES what tools/call enforces, so a client learns the contract
   // from the list instead of from a refusal. `additionalProperties` is deliberately left open --
   // every extra key is still serialized into the prompt, which is the executor's whole design.
-  const inputSpec = TOOL_INPUT_SCHEMAS[row.slug];
+  // AGT-162: the code table first, then the row's own data-side contract. Both publish identically,
+  // which is the point -- a client cannot tell (and should not care) which home a contract came from.
+  const inputSpec = TOOL_INPUT_SCHEMAS[row.slug] || row.input_schema;
   const taskContextSchema = {
     type: 'object',
     description: inputSpec
@@ -574,7 +615,56 @@ async function runThroughExecutor({ row, intentSlug, taskContext }) {
   );
 }
 
-export async function callToolThroughExecutor({ name, args, rows, execute = runThroughExecutor }) {
+/**
+ * FEATURE: AGT-162 -- THE DETERMINISTIC SEAM, and the registry that serves it.
+ *
+ * Keyed on the handler NAME the Intent row declares, never on a capability slug: the same shape as
+ * api/prompt/request-receivable.js's HANDLERS, which dispatches on `format_contract.handler`. A
+ * second map rather than that one because the `content` a handler here receives is the CALLER's
+ * task_context, while request-receivable.js's handlers receive the MODEL's structured output after a
+ * turn. Same signature, different provenance; merging them is filed residue, not this ticket.
+ */
+export const DETERMINISTIC_HANDLERS = Object.freeze({ 'agent-bundle': agentBundleHandle });
+
+/**
+ * The deterministic twin of runThroughExecutor(). It establishes the SAME attribution -- call_source
+ * and screen_origin 'mcp', the real caller's ip/device/visitor carried through -- so the audit row
+ * the handler writes is indistinguishable from a model call's in every respect EXCEPT the one that
+ * matters: no model, no tokens, no cost. That absence is the ticket's own proof.
+ *
+ * `governanceUnlocked` is forwarded rather than re-derived: the handler applies the same lane rule to
+ * the agent it was ASKED about that visibleRows() applies to the tool list, and a second derivation
+ * is a second answer waiting to disagree with the first.
+ */
+export async function runDeterministic({ row, taskContext, governanceUnlocked }) {
+  const ctx = getRequestContext();
+  const handle = DETERMINISTIC_HANDLERS[row.handler];
+  // Unreachable through assembleCapabilityRows(), which drops a handler-less deterministic row --
+  // this catches a handler named in data that no deployment carries, which is a real failure mode
+  // the moment a migration lands before the code that serves it.
+  if (!handle) throw new Error(`No deterministic handler named "${row.handler}" is registered in this deployment`);
+  const result = await runWithCallSource(
+    'mcp',
+    () =>
+      handle({
+        agent_id: row.agent_id,
+        tenant_id: row.tenant_id,
+        content: taskContext,
+        handler_context: { governance_unlocked: governanceUnlocked === true },
+      }),
+    { ...ctx, screenOrigin: 'mcp' },
+  );
+  return toToolResult({ content: result }, row);
+}
+
+export async function callToolThroughExecutor({
+  name,
+  args,
+  rows,
+  execute = runThroughExecutor,
+  executeDeterministic = runDeterministic,
+  governanceUnlocked = false,
+}) {
   const row = rows.find(r => r.slug === name);
   if (!row) {
     // The SAME message whether the tool does not exist or exists in the governance lane and this
@@ -590,7 +680,7 @@ export async function callToolThroughExecutor({ name, args, rows, execute = runT
   // that was never in the prompt. -32602 is a PROTOCOL error rather than an isError result on
   // purpose: the arguments are wrong, the tool never ran, and a client that re-plans on isError
   // would be re-planning around an answer nobody gave.
-  const inputCheck = validateToolInput(row.slug, taskContext);
+  const inputCheck = validateToolInput(row.slug, taskContext, TOOL_INPUT_SCHEMAS[row.slug] || row.input_schema);
   if (!inputCheck.ok) {
     throw new RpcError(
       INVALID_PARAMS,
@@ -608,6 +698,13 @@ export async function callToolThroughExecutor({ name, args, rows, execute = runT
   // is null -- it assembles with every Intent Skill skipped. Resolving the default HERE is therefore
   // load-bearing, not a convenience, and it is a generic column read, never a slug conditional.
   try {
+    // FEATURE: AGT-162 -- ONE COLUMN READ, and it is the whole branch. Not a slug, not a handler
+    // lookup, not a second registry of names this file knows: the capability's own declared
+    // `execution_type`, the column buildSignatureConfig() already stamps into every call_facts and
+    // toTool() already prints in the description. Everything `ai` takes the path it always took.
+    if (row.execution_type === 'deterministic') {
+      return await executeDeterministic({ row, taskContext, governanceUnlocked });
+    }
     const result = await execute({ row, intentSlug, taskContext });
     return toToolResult(result, row);
   } catch (e) {
@@ -665,22 +762,28 @@ async function handler(req, res) {
     );
   }
 
-  // Scope, resolved once per request and shared by list and call.
-  let rowsPromise = null;
+  // Scope, resolved once per request and shared by list and call. AGT-162: the KEY'S VERDICT rides
+  // alongside the rows rather than being recomputed, because a deterministic handler applies the
+  // same lane rule to the agent it was asked ABOUT that visibleRows() applies to the tool list --
+  // one derivation, two consumers, exactly as listing and calling already share one visibility function.
+  let scopePromise = null;
   const visible = async () => {
-    if (!rowsPromise) {
-      rowsPromise = (async () => {
+    if (!scopePromise) {
+      scopePromise = (async () => {
         const [all, secret] = await Promise.all([fetchCapabilityRows(), readGovernanceSecret()]);
         const governanceUnlocked = keysMatch(req.headers[GOVERNANCE_KEY_HEADER], secret);
-        return visibleRows(all, { governanceUnlocked });
+        return { rows: visibleRows(all, { governanceUnlocked }), governanceUnlocked };
       })();
     }
-    return rowsPromise;
+    return scopePromise;
   };
 
   const response = await dispatchJsonRpc(message, {
-    listTools: async () => (await visible()).map(toTool),
-    callTool: async ({ name, args }) => callToolThroughExecutor({ name, args, rows: await visible() }),
+    listTools: async () => (await visible()).rows.map(toTool),
+    callTool: async ({ name, args }) => {
+      const { rows, governanceUnlocked } = await visible();
+      return callToolThroughExecutor({ name, args, rows, governanceUnlocked });
+    },
   });
 
   // A notification is owed 202 Accepted with no body -- literally, per the transport spec.
