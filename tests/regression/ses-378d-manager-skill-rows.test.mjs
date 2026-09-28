@@ -1,3 +1,8 @@
+// DeepBench v7.0.674 | tests/regression/ses-378d-manager-skill-rows.test.mjs | AGT-157 -- the
+// must_not count was already re-pointed to 11 by AGT-145 (v7.0.612) and this file is GREEN; what
+// ships here is the CITATION of the agent-row decision that moved it, and the direct assertion the
+// count was only ever a proxy for: the chain rule is NOT in must_not.
+//
 // DeepBench v7.0.612 | tests/regression/ses-378d-manager-skill-rows.test.mjs | AGT-145 -- the
 // chain rule's line pin re-pointed 47 -> 55. AGT-145 added a paragraph above the prompt block;
 // the rule's bytes are unchanged (see CHAIN_RULE_LINE below).
@@ -98,7 +103,7 @@ const GUARDRAILS_SLUG = "dm-guardrails";
 const RUN_INTENT_SLUG = "dm-run-intent";
 // AGT-132 slice 2: the chain rule left `must` (back to its pre-SES-378d 5) for dm-run-intent.method.
 const MUST_AFTER = 5;
-// Live at 11 since AGT-144 appended five: this pin was stale, the data was not. Re-pointed, not relaxed.
+// 11 since AGT-144 appended five under agent-row decision dca8d972-e010-4539-a6d4-02cbb28c4fde (its before-image of this row holds 6).
 const MUST_NOT_UNCHANGED = 11;
 const LINKS_AFTER = 7;
 const DECISION_KIND = "agent-row";
@@ -225,6 +230,12 @@ async function run() {
     `${GUARDRAILS_SLUG}.guardrails.must must hold ${MUST_AFTER} entries (it held 5 before this slice). got ${JSON.stringify(guard.must && guard.must.length)}`);
   assert.strictEqual(Array.isArray(guard.must_not) ? guard.must_not.length : -1, MUST_NOT_UNCHANGED,
     `${GUARDRAILS_SLUG}.guardrails.must_not must be UNCHANGED at ${MUST_NOT_UNCHANGED} -- an append that landed in the wrong array would still make the pair total 12`);
+  // What the count was only ever a PROXY for, asserted directly and through the SAME matcher (c)
+  // and (e) share, so (e)'s one-character mutation controls this arm too. A count says "eleven
+  // things are here"; it cannot say the chain rule is not one of them, and after AGT-144 appended
+  // five the count alone would have been satisfied by an append that landed in this array.
+  assert.strictEqual(indexOfExact(guard.must_not, rule), -1,
+    `${GUARDRAILS_SLUG}.guardrails.must_not holds the chain rule -- the chain rule landed in must_not, the wrong array. It is a POSITIVE instruction ("execute a continue verdict in the same turn"), and AGT-132 slice 2 gave it one home: ${RUN_INTENT_SLUG}.method. A must_not copy inverts it.`);
   assert.strictEqual(indexOfExact(guard.must, rule), -1,
     `${GUARDRAILS_SLUG}.guardrails.must still holds the chain rule. AGT-132 slice 2 MOVED it to ${RUN_INTENT_SLUG}.method because ${GUARDRAILS_SLUG} is linked to four capabilities and the rule governs only the runner chain. Two homes is worse than the wrong one: the manager would read it twice, and a later edit to either copy would leave the two disagreeing.`);
 

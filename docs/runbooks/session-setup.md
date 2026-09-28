@@ -421,10 +421,12 @@ in `public.runner_decision_patterns`, identically for both the attended and unat
   only where it is still NULL.
 - **`attach_before_images()` REFUSES the whole call if any image names a table
   `reverse_decision()` cannot replay (`SES-399`, `v7.0.502`).** The restorable tables are the
-  fifteen `public.reversible_tables()` returns — the twin of `reverse_decision()`'s own
-  `k_allowed`, widened 7 → 14 by `SES-364` and to 15 by `AGT-86` slice 1b (`v7.0.543`:
+  seventeen `public.reversible_tables()` returns — the twin of `reverse_decision()`'s own
+  `k_allowed`, widened 7 → 14 by `SES-364`, to 15 by `AGT-86` slice 1b (`v7.0.543`:
   `audit_findings`, whose ruling band restores and whose INSERT undo the ledger guard refuses —
-  read `restored_unverified`, it has no `updated_at`). Name anything else and the call raises, **nothing is
+  read `restored_unverified`, it has no `updated_at`), to 16 by `AGT-152` (`v7.0.597`:
+  `model_assignments`) and to 17 by `AGT-240` D8 (`v7.0.662`: `projects`). Name anything else and
+  the call raises, **nothing is
   attached, not even the restorable images in the same batch**, and the message lists every
   offending image id with its table. *Why all-or-nothing:* a partial attach would hand you a
   decision whose undo set quietly omits rows — §19v's promise (*"no before-image logged → the

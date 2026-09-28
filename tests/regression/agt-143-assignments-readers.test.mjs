@@ -1,3 +1,8 @@
+// DeepBench v7.0.674 | tests/regression/agt-143-assignments-readers.test.mjs | AGT-157 -- (e) is
+// the NO-ORPHAN INVARIANT now, not four absolute Skill counts. The counts were a pin on live data
+// that a legitimate switch moves (AGT-144 took them 54/30/21/48 -> 56/34/21/48 and this file went
+// red for it); the invariant is a property of the switch mechanism, which is what AGT-143 shipped.
+//
 // DeepBench v7.0.589 | tests/regression/agt-143-assignments-readers.test.mjs | AGT-143 (P10 - Tooling)
 // -- every script reads its model from public.model_assignments.
 //
@@ -20,7 +25,11 @@
 //     to exactly one row -- so the captured down is the live evidence used instead.
 // (d) LIVE coherence: each capability row equals its default Intent Skill's llm_model; each lane
 //     row equals runner_model_lanes.
-// (e) LIVE: the migration's proof block rolled back -- Skill counts per model are 54/30/21/48.
+// (e) LIVE NO-ORPHAN INVARIANT: every `skill_profiles.llm_model` is a `model_assignments.model_id`,
+//     so no Skill is stranded on a model no assignment row can switch work off. Absolute counts are
+//     NOT pinned -- a switch is allowed to move them, and pinning them made this file red for the
+//     mechanism working. Controlled both ways: a fixture beside (a), and live rows with one
+//     assignment dropped, which must name exactly the model that drop stranded (SES-158).
 //
 // Live parts declare themselves NOT RUN without SUPABASE_URL + SUPABASE_SERVICE_KEY. Read-only.
 
@@ -43,6 +52,23 @@ async function rows(query) {
   });
   if (!r.ok) throw new Error(`Supabase read ${query} failed: HTTP ${r.status}`);
   return r.json();
+}
+
+// Pure, exported, and the ONE function the offline fixture arm and the live (e) both go through --
+// a second implementation agreeing with itself proves nothing (SES-45). Returns the sorted distinct
+// `llm_model` values held by Skill rows that NO model_assignments row carries: the Skills a switch
+// can no longer move, because nothing assigns their model. A NULL `llm_model` is carried as
+// "<NULL>" rather than dropped -- a Skill with no model at all is stranded too, and silently
+// filtering it out is the vacuous version of this check.
+export function orphanModels(skillRows, assignRows) {
+  const assigned = new Set(
+    (Array.isArray(assignRows) ? assignRows : [])
+      .map(a => (a == null ? undefined : a.model_id))
+      .filter(m => typeof m === "string"));
+  const held = new Set(
+    (Array.isArray(skillRows) ? skillRows : [])
+      .map(r => (r == null || r.llm_model == null ? "<NULL>" : r.llm_model)));
+  return [...held].filter(m => !assigned.has(m)).sort();
 }
 
 async function run() {
@@ -106,8 +132,18 @@ async function run() {
     "the capability header line must be printed by main()");
   console.log("  (a) offline: capability / lane / degrade-on-capability / foreign-slug / no-slug -- PASS");
 
+  // Offline, beside (a): the same matcher (e) runs on, over a fixture whose answer is non-empty.
+  // (e) is green when live data is clean, so without this arm a matcher that ALWAYS answered []
+  // would pass it (SES-158).
+  assert.deepStrictEqual(
+    orphanModels([{ llm_model: "claude-x" }, { llm_model: "claude-opus-5" }],
+      [{ model_id: "claude-opus-5" }]),
+    ["claude-x"],
+    "orphanModels() must name a Skill model that no model_assignments row carries");
+  console.log("  (a) offline: orphanModels() over a fixture -> [\"claude-x\"] -- PASS");
+
   if (!hasCreds()) {
-    for (const p of ["(b) live capability answer", "(c) live migration evidence", "(d) coherence", "(e) counts"]) {
+    for (const p of ["(b) live capability answer", "(c) live migration evidence", "(d) coherence", "(e) the no-orphan invariant over live skill_profiles"]) {
       notRun(`AGT-143 ${p}`, CRED_HINT);
     }
     return;
@@ -155,21 +191,24 @@ async function run() {
   }
   console.log(`  (d) LIVE: ${caps.length} capability rows = their Skills, ${laneAssigns.length} lanes mirrored -- PASS`);
 
-  // (e)
-  const counts = {};
-  for (const m of ["claude-fable-5-1", "claude-opus-5", "claude-sonnet-4-6", HAIKU]) {
-    const r = await fetch(`${url}/rest/v1/skill_profiles?llm_model=eq.${m}&select=slug`,
-      { method: "HEAD", headers: { ...headers, Prefer: "count=exact" } });
-    counts[m] = Number((r.headers.get("content-range") || "*/-1").split("/")[1]);
-  }
-  const judgmentId = lanes.find(l => l.lane === "judgment").model_id;
-  if (judgmentId === "claude-fable-5-1") {
-    assert.deepStrictEqual(Object.values(counts), [54, 30, 21, 48],
-      `Skill counts moved: ${JSON.stringify(counts)} -- the proof block did not roll back`);
-    console.log(`  (e) LIVE: counts ${JSON.stringify(counts)} -- PASS`);
-  } else {
-    notRun("AGT-143 (e) 54/30/21/48 counts", `the judgment lane has since moved to ${judgmentId}; the pinned counts no longer apply`);
-  }
+  // (e) NO-ORPHAN INVARIANT
+  const skillRows = await rows("skill_profiles?select=llm_model");
+  assert.ok(skillRows.length > 0,
+    "public.skill_profiles returned no rows -- (e) would hold vacuously over an empty set");
+  assert.deepStrictEqual(orphanModels(skillRows, assigns), [],
+    `Skill rows are stranded by a switch: no model_assignments row carries ${JSON.stringify(orphanModels(skillRows, assigns))}, so nothing can move the Skills on it. AGT-143's whole premise is that the assignment table is where a model is chosen; a Skill model absent from it is unreachable by the switch.`);
+
+  // SES-158 control on LIVE data, not a fixture: drop ONE real assignment and the same matcher must
+  // name exactly the model that drop stranded (or [] when no Skill sits on it) -- the proof that the
+  // [] above is the data's answer and not the matcher's only answer.
+  const one = assigns[0].model_id;
+  assert.deepStrictEqual(
+    orphanModels(skillRows, assigns.filter(a => a.model_id !== one)),
+    skillRows.some(r => r.llm_model === one) ? [one] : [],
+    `dropping every assignment for ${one} must strand exactly the Skills on it`);
+
+  const models = new Set(skillRows.map(r => (r.llm_model == null ? "<NULL>" : r.llm_model)));
+  console.log(`  (e) LIVE: ${skillRows.length} Skills across ${models.size} models, 0 orphans -- PASS`);
 }
 
 export default run;
