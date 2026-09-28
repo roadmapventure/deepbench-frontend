@@ -724,6 +724,79 @@ export function handoffContextFor({ answer, state }) {
   };
 }
 
+// AGT-232 (v7.0.669) -- A DECLINED HEAD IS RECORDED, SO THE TURN BUYS A ROW. All three shapes a
+// correct read of an unbuildable head can take -- `stop`, `report`, and an `assign` that names some
+// other row and is refused at (c) -- wrote NOTHING at all before this ticket: the cycle paid for a
+// model call and the board kept no trace, so the next cycle re-picked the same head and re-declined
+// it. The ledger is the EXISTING `public.record_skip()` (one overload, ACL `service_role`, measured
+// live this ship): it writes its own `runner_before_images` row first (§19v) and then inserts or
+// increments `runner_skips.skip_count`, which `scripts/build-briefing.mjs` already reads unfiltered
+// into John's briefing §10. No new table, function, column or view -- pattern:17.
+//
+// THE ID IS THE DRIVER'S, NEVER THE MANAGER'S. `p_backlog_id` is `state.pick.backlog_id` -- the pick
+// this driver read for itself at (b) -- and never `answer.assignment.backlog_id`. That is the whole
+// reason this write cannot become a re-ordering device wearing a ledger's clothes: a manager that
+// names another row still has the skip recorded against THE HEAD, so naming a row moves nothing at
+// all. The id it wanted is appended to the reason as prose, where it is evidence and not an
+// instruction (Rule #1, §19d/§19e).
+//
+// `reason_kind` IS FIXED AT `'other'`. `ck_skip_reason_kind` admits it, and `'other'` defaults
+// `unblock_kind` to `'question'`: the five named kinds are the board's own structural reasons, and a
+// head unbuildable for a reason `project_blockers` does not carry is exactly what this records.
+//
+// IT FAILS CLOSED. No pick, `--dry-run`, or no `--cycle-id` returns no skip and a note saying which,
+// and the caller prints that note and leaves its exit code and every existing line alone. A decline
+// is still a decline when it cannot be recorded -- the recording never becomes a second way to
+// refuse, and never a wall that swallows the manager's answer.
+//
+// `declined` SAYS WHETHER THE ANSWER DECLINED THE PICK AT ALL, which `skip: null` cannot: the (c)
+// return is also reached by an ON-pick assignment that is merely malformed (a bad engine, a
+// capability off the roster), and that is not a decline of the head. Without this field the caller
+// would have to re-derive the decline test it just called -- two copies of one rule, §45's defect.
+export function declineSkipFor({ answer, state, cycleId, dryRun } = {}) {
+  const a = answer && typeof answer === "object" && !Array.isArray(answer) ? answer : {};
+  const pickId = String(state?.pick?.backlog_id ?? "").trim();
+  const wanted = String((a.assignment && a.assignment.backlog_id) ?? "").trim();
+
+  let shape = null;
+  if (a.action === "stop" || a.action === "report") {
+    shape = a.action;
+  } else if (a.action === "assign" && pickId && wanted && wanted !== pickId && answerErrors(a, state).length) {
+    // The off-pick `assign` refused at (c): a correct read that the head is unbuildable, said in the
+    // only other vocabulary the contract gives the manager. An ON-pick assign that merely fails a
+    // check is NOT this -- it tried to build the head, so the head was not declined.
+    shape = "off-pick assign";
+  }
+  if (!shape) {
+    return { declined: false, skip: null,
+      note: `the answer does not decline the pick (action "${a.action}"), so there is nothing to record` };
+  }
+  if (!pickId) {
+    return { declined: true, skip: null,
+      note: "the state carries no pick, so there is no head a skip could be recorded against" };
+  }
+  if (dryRun) {
+    return { declined: true, skip: null, note: "this is a --dry-run pass" };
+  }
+  if (!String(cycleId ?? "").trim()) {
+    return { declined: true, skip: null,
+      note: "--cycle-id was not given, and record_skip() writes a decision that has exactly one author" };
+  }
+  let reason = String(a.report ?? "").trim();
+  if (!reason) reason = `the manager answered ${shape} and left the report blank`;
+  if (shape === "off-pick assign") reason = `${reason} -- the answer named ${wanted}, not the pick ${pickId}`;
+  return {
+    declined: true,
+    note: null,
+    skip: {
+      p_cycle_id: String(cycleId).trim(),
+      p_backlog_id: pickId,
+      p_reason_kind: "other",
+      p_reason: reason,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Network. Everything below this line touches the database.
 // ---------------------------------------------------------------------------------------------
@@ -754,6 +827,31 @@ async function rpc(base, key, name, body = {}) {
   if (r.error) return { error: r.error };
   const rows = Array.isArray(r.rows) ? r.rows : [r.rows];
   return { row: rows[0] ?? null, rows };
+}
+
+// AGT-232: THE ONE `record_skip()` CALL SITE, reached from the (c) refusal return and from the (d)
+// `stop`/`report` returns. What it hands back is the `levExtra`/`levLine` shape those returns already
+// carry, for the reason that shape exists: the decline's exit code and every line it printed before
+// this ticket stay byte-identical, and the record arrives as ONE added line and ONE added payload key.
+// A refused RPC is reported on that line and changes NOTHING else -- an unrecordable decline is still
+// the decline the manager made, and a ledger that could swallow an answer would be a wall.
+async function recordDeclineSkip({ base, key, args, answer, state }) {
+  const dec = declineSkipFor({ answer, state, cycleId: args.cycleId, dryRun: args.dryRun });
+  if (!dec.declined) return { extra: {}, line: "" };
+  if (!dec.skip) {
+    console.error(`run-project: the answer declines the pick, but NO skip was recorded -- ${dec.note}.`);
+    return { extra: { skip_recorded: null }, line: `\n  skip: NOT RECORDED -- ${dec.note}` };
+  }
+  const rec = await rpc(base, key, "record_skip", dec.skip);
+  if (rec.error) {
+    console.error(`run-project: record_skip() refused the decline on ${dec.skip.p_backlog_id}: ${rec.error}`);
+    return { extra: { skip_recorded: null }, line: `\n  skip: NOT RECORDED -- record_skip() refused it: ${rec.error}` };
+  }
+  return {
+    extra: { skip_recorded: rec.row ?? null },
+    line: `\n  skip: recorded on ${dec.skip.p_backlog_id} (reason_kind other) as ${rec.row ?? "no id returned"}`
+      + ` -- the ledger row is the only write; the board was not moved`,
+  };
 }
 
 // The Intent's stored contract, read off the row rather than written here. Handed to the sub-agent
@@ -1037,9 +1135,14 @@ async function main() {
     // (c) The answer against the state it was given.
     const errors = answerErrors(answer, state);
     if (errors.length) {
+      // AGT-232: the skip PRECEDES the refusal return, so a correct read that the head is unbuildable
+      // -- said as an `assign` naming another row -- buys a `runner_skips` row instead of nothing.
+      // `answer_errors` is untouched, which is what keeps the `may not re-order the board` line
+      // byte-identical for `ses-378` and `agt-68`.
+      const dec = await recordDeclineSkip({ base, key, args, answer, state });
       return emit({ code: EXIT_CANNOT_RUN, json: args.json,
-        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", answer_errors: errors },
-        prose: `run-project: the manager's answer was refused:\n  - ${errors.join("\n  - ")}\nExiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", answer_errors: errors, ...dec.extra },
+        prose: `run-project: the manager's answer was refused:\n  - ${errors.join("\n  - ")}\nExiting ${EXIT_CANNOT_RUN} -- nothing was written.${dec.line}` });
     }
 
     // (c2) AGT-238: a non-empty `leverage` is recorded through `public.record_leverage()` -- one
@@ -1114,16 +1217,22 @@ async function main() {
       }
     }
 
-    // (d) A `stop` is an answer, not a failure. Exit 1, write nothing.
+    // (d) A `stop` is an answer, not a failure. Exit 1, write nothing TO THE BOARD -- since AGT-232
+    //     the decline itself is recorded as a `runner_skips` row on the pick (`recordDeclineSkip`,
+    //     one call site, the driver's own id), so the turn buys a row rather than nothing. The exit
+    //     code and every line below are byte-identical; the payload gains `skip_recorded` and the
+    //     prose gains one line, the same way `leverage` and `concurrency` do above.
     if (answer.action === "stop") {
+      const dec = await recordDeclineSkip({ base, key, args, answer, state });
       return emit({ code: EXIT_STOP, json: args.json,
-        payload: { ok: true, exitCode: EXIT_STOP, kind: "stop", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra },
-        prose: `run-project: STOP.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}` });
+        payload: { ok: true, exitCode: EXIT_STOP, kind: "stop", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra, ...dec.extra },
+        prose: `run-project: STOP.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}${dec.line}` });
     }
     if (answer.action === "report") {
+      const dec = await recordDeclineSkip({ base, key, args, answer, state });
       return emit({ code: EXIT_OK, json: args.json,
-        payload: { ok: true, exitCode: EXIT_OK, kind: "report", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra },
-        prose: `run-project: REPORT.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}` });
+        payload: { ok: true, exitCode: EXIT_OK, kind: "report", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra, ...dec.extra },
+        prose: `run-project: REPORT.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}${dec.line}` });
     }
 
     // (e) `assign`. The walls are re-read HERE, after the answer, because the answer is not what
