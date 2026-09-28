@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// DeepBench v7.0.681 | scripts/market-agent.js | AGT-161 -- THE PRODUCT LANE'S PROPOSALS REACH THE ONE
+// FINDINGS LIST. --write used to end at market_records: a `feature_signal` row carrying a whole
+// `data.proposed_ticket` sat in the marketing table, on no list the Development Manager reviews, so
+// every proposal this lane produced needed a human to notice it and re-type it as a ticket. It now
+// files each one as an `audit_findings` row through audit-ledger.js's ONE intake (AGT-131) in the same
+// run, and `--raise-findings` does the same over the rows already in the table.
+//
+// NO MODEL CALL IS ADDED, and that is the whole design (pattern:9, pattern:10): the proposal already
+// EXISTS in the record the platform just wrote and validateMarketAnswer() already checked, so the
+// finding is DERIVED from it deterministically rather than asked of a second model turn that could
+// word it differently every Wednesday. See proposalFindings() for the field-by-field derivation.
+//
 // DeepBench v7.0.583 | scripts/market-agent.js | AGT-121 -- the call path for a product-lane marketing agent run
 // inside a Claude session: read its market records and the platform rows its capability needs,
 // assemble its prompt, and write its checked answer back. First caller: nathan (Nathan Laan, the
@@ -30,7 +42,9 @@
 //     --render --agent=<id> --capability=pmm-why-deepbench [--ask=<text>] [--input-file=<path>]
 //     [--napkin-file=<path.json>] [--since=<iso>] [--out=<path>] [--json]
 //   ... --write --agent=<id> --capability=pmm-competitors --answer=<json | path to .json>
-//     [--session-name=<n>]
+//     [--session-name=<n> | --cycle-id=<uuid>]
+//   ... --raise-findings --agent=<id> --capability=<slug> [--apply]
+//     [--cycle-id=<uuid> | --session-name=<n>]
 //
 // --render   since = --since, else the newest ai_activity_log.created_at for this agent with feature
 //            like '<slug>:%', else null. Reads the capability's kinds (READ_MAP, status not retired)
@@ -39,15 +53,32 @@
 //            {model, since, records_loaded, napkin_entries, prompt_bytes} on stdout.
 // --write    validateMarketAnswer() refuses a bad answer (exit 2, nothing written); otherwise ONE
 //            insert of records_to_write with source '<slug> <ISO date>'. Prints
-//            {inserted, ids, napkin_notes}.
+//            {inserted, ids, napkin_notes, findings}. `findings` is AGT-161: every `feature_signal`
+//            row this run inserted is raised on public.audit_findings through raiseFindings(), so
+//            the row and its finding cannot drift apart between two commands nobody remembers to
+//            pair. Attribution is --cycle-id when given, else --session-name, else the source line.
+// --raise-findings
+//            AGT-161's backfill and re-run door: reads every non-retired `feature_signal` row and
+//            raises the ones the ledger does not already hold. Prints {considered, verdicts, raised}.
+//            A DRY RUN (no --apply) writes nothing and is the whole point -- its EXIT CODE is the
+//            answer: 1 while `new + recurring` > 0 (work the ledger does not hold for this week),
+//            0 when there is none. --apply needs exactly one of --cycle-id / --session-name.
 //
-// EXIT CODES: 0 ok; 2 missing/invalid input or credential, a refused answer, or a failed read/write.
+// EXIT CODES: 0 ok; 1 a --raise-findings DRY RUN with findings the ledger does not yet hold (a
+//             report, never a failure); 2 missing/invalid input or credential, a refused answer, or
+//             a failed read/write.
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { assemblePrompt } from '../api/prompt/db-assembly.js';
 import { renderAssembly, resolveJudgmentModel } from './agent-prompt.js';
+// ONE INTAKE FOR THE FINDINGS LIST (AGT-131, pattern:14/pattern:15): the read, the four-way
+// classification and the appended before-image + row live in audit-ledger.js and are CALLED here,
+// never re-spelled. `attribution` comes from the same module for the same reason -- the
+// exactly-one-of-cycle-or-session rule is that file's, and a second copy of it here is a copy that
+// drifts (scripts/audit-cluster.js imports it on the same footing).
+import { ingestFindings, attribution } from './audit-ledger.js';
 
 // Same tenant agent-prompt.js measured: every agent_configs / assignment row carries 'global'.
 const TENANT = 'global';
@@ -205,15 +236,72 @@ export function validateMarketAnswer(answer, capability) {
   return { ok: true };
 }
 
+// --- AGT-161: a proposal already in the record becomes a finding on the ONE list -----------------
+//
+// PURE, AND THAT IS LOAD-BEARING. rows in, findings out, no network and no clock: the same five
+// market_records rows derive the same five fingerprints on every run, which is what makes a second
+// `--raise-findings` read `seen` rather than filing a sixth copy (pattern:3).
+//
+// `kind` IS 'other' BY THE TABLE'S OWN CONSTRAINT, not by preference. audit_findings_kind_check
+// allows exactly six values -- duplicate, contradiction, redundant, stale-or-irrelevant,
+// competing-purpose, other -- and a proposal is none of the first five. The column that says what
+// this IS is `finding_type` ('proposal'), which is the distinction AGT-131 shipped two columns for;
+// the description travels in `governing_fact`, which is also the field the fingerprint hashes.
+//
+// ONE LOCATION, THE ROW ITSELF: `market_records:<uuid>`. locationKey() drops a trailing `:<line>`
+// from a file citation and a uuid has none, so the home is the record and the finding is stable
+// across re-wordings of the title.
+//
+// A NON-PROPOSAL KIND YIELDS NOTHING rather than an error: --write's answer legitimately carries
+// `market_size`, `competitor` and the other eleven kinds, and only a `feature_signal` names a ticket.
+export function proposalFindings(rows) {
+  return (rows ?? [])
+    .filter(row => row?.kind === 'feature_signal')
+    .map(row => {
+      const pt = row.data?.proposed_ticket ?? {};
+      return {
+        kind: 'other',
+        finding_type: 'proposal',
+        check_slug: 'market:feature_signal',
+        locations: [{ location: `market_records:${row.id}`, text: row.title }],
+        governing_fact: `${row.title} -- ${pt.title ?? row.title}`,
+        confidence: 'high',
+        proposed_resolution: `${pt.description ?? 'The Development Manager decides'} `
+          + `[suggested class: ${pt.suggested_class ?? 'unassigned'}]`,
+      };
+    });
+}
+
+// `get` AND `post` ARE THE CALLER'S, which is the contract that lets this share AGT-131's intake
+// rather than open a fifth writer of public.audit_findings. A script hands in its own REST pair; the
+// regression guard hands in two stubs and never touches the live ledger (SES-382).
+//
+// AGENT-AGNOSTIC (§19d/§19e Rule #1, pattern:13): `found_by` is 'agent:' + the --agent flag. No
+// agent is named in this file's code or in the row it writes, and agt-121 part (a) greps for it.
+export async function raiseFindings(rows, { agent, cycleId, sessionName, get, post, apply } = {}) {
+  // Refused HERE, before the read and before the first before-image, rather than as a 23514 from
+  // runner_before_images.ck_before_image_attribution after half a batch has been classified.
+  attribution({ cycleId, sessionName, apply });
+  return ingestFindings({
+    findings: proposalFindings(rows),
+    foundBy: `agent:${agent}`,
+    cycleId: cycleId ?? null,
+    sessionName: sessionName ?? null,
+    get,
+    post,
+    apply,
+  });
+}
+
 export function parseArgs(argv) {
-  const out = { json: false };
+  const out = { json: false, apply: false };
   const modes = [];
   for (const raw of argv) {
     const m = /^--([a-z-]+)(?:=([\s\S]*))?$/.exec(raw);
     if (!m) return { error: `unrecognized argument "${raw}"` };
     const [, key, value] = m;
     switch (key) {
-      case 'render': case 'write': modes.push(key); break;
+      case 'render': case 'write': case 'raise-findings': modes.push(key); break;
       case 'agent': out.agent = value; break;
       case 'capability': out.capability = value; break;
       case 'ask': out.ask = value; break;
@@ -223,17 +311,25 @@ export function parseArgs(argv) {
       case 'out': out.out = value; break;
       case 'answer': out.answer = value; break;
       case 'session-name': out.sessionName = value; break;
+      case 'cycle-id': out.cycleId = value; break;
+      case 'apply': out.apply = true; break;
       case 'json': out.json = true; break;
       default: return { error: `unrecognized flag "--${key}"` };
     }
   }
-  if (modes.length !== 1) return { error: 'exactly one of --render, --write is required' };
+  if (modes.length !== 1) return { error: 'exactly one of --render, --write, --raise-findings is required' };
   out.mode = modes[0];
   if (!out.agent) return { error: '--agent=<agents.id> is required' };
   if (!out.capability) return { error: '--capability=<slug> is required' };
   if (!READ_MAP[out.capability]) return { error: `--capability "${out.capability}" is not in the read map` };
   if (out.since && Number.isNaN(Date.parse(out.since))) return { error: `--since "${out.since}" is not an ISO date` };
   if (out.mode === 'write' && !out.answer) return { error: '--answer=<json | path> is required with --write' };
+  // AGT-161 -- the same exactly-one rule audit-ledger.js's attribution() enforces, refused at the
+  // command line so a --apply run cannot get as far as the ledger with two attributions or none.
+  if (out.cycleId && out.sessionName) return { error: 'exactly one of --cycle-id / --session-name' };
+  if (out.mode === 'raise-findings' && out.apply && !out.cycleId && !out.sessionName) {
+    return { error: '--apply needs exactly one of --cycle-id / --session-name' };
+  }
   return out;
 }
 
@@ -399,7 +495,69 @@ async function write(args) {
   if (rows.length) {
     try { inserted = await rest().insert('market_records', rows); } catch (e) { fail(e.message); }
   }
-  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), napkin_notes: answer.napkin_notes }) + '\n');
+
+  // AGT-161 -- IN THE SAME RUN, over the rows that actually landed (never over `answer`): a finding
+  // whose location cites a market_records id must cite an id that exists. A write carrying no
+  // `feature_signal` raises nothing and says so with `raised: 0`, which is a measurement rather
+  // than a silence.
+  let raised;
+  try {
+    raised = await raiseFindings(inserted, {
+      agent: args.agent,
+      cycleId: args.cycleId ?? null,
+      sessionName: args.cycleId ? null : (args.sessionName ?? source),
+      get: q => rest().get(q),
+      post: (t, b) => rest().insert(t, [b]),
+      apply: true,
+    });
+  } catch (e) { fail(e.message); }
+
+  process.stdout.write(JSON.stringify({
+    inserted: inserted.length,
+    ids: inserted.map(r => r.id),
+    napkin_notes: answer.napkin_notes,
+    findings: {
+      raised: raised.written,
+      verdicts: raised.verdicts.map(v => ({ fingerprint: v.fingerprint, verdict: v.verdict })),
+    },
+  }) + '\n');
+}
+
+// --raise-findings: the backfill and re-run door over the rows already in the table. It reads the
+// SAME projection proposalFindings() needs and nothing else, and its dry run is the cheap, safe form
+// of the command -- so the dry run is what carries the exit code, never a refusal.
+async function doRaise(args) {
+  const db = rest();
+  let rows = [];
+  try {
+    rows = await db.get(
+      'market_records?select=id,kind,title,data&kind=eq.feature_signal&status=neq.retired&order=created_at.asc');
+  } catch (e) { fail(e.message); }
+
+  let result;
+  try {
+    result = await raiseFindings(rows, {
+      agent: args.agent,
+      cycleId: args.cycleId ?? null,
+      sessionName: args.cycleId ? null : (args.sessionName ?? null),
+      get: q => db.get(q),
+      post: (t, b) => db.insert(t, [b]),
+      apply: args.apply,
+    });
+  } catch (e) { fail(e.message); }
+
+  process.stdout.write(JSON.stringify({
+    considered: rows.length,
+    verdicts: result.verdicts.map(v => ({ fingerprint: v.fingerprint, verdict: v.verdict })),
+    raised: result.written,
+  }) + '\n');
+
+  // `new + recurring` AND NOT `new` ALONE: both are work this week's ledger does not hold yet
+  // (audit-ledger.js's header carries the reasoning -- `recurring` appends, `seen` cannot). And
+  // process.exitCode, never process.exit(): on Node 24 a process.exit() straight after a fetch
+  // aborts on the libuv UV_HANDLE_CLOSING assertion and the code never reaches the caller (AGT-86).
+  const outstanding = result.summary.new + result.summary.recurring;
+  process.exitCode = (!args.apply && outstanding > 0) ? 1 : 0;
 }
 
 async function main() {
@@ -408,6 +566,7 @@ async function main() {
   if (!process.env.SUPABASE_URL) fail('SUPABASE_URL not set');
   if (!process.env.SUPABASE_SERVICE_KEY) fail('SUPABASE_SERVICE_KEY not set');
   if (args.mode === 'render') return render(args);
+  if (args.mode === 'raise-findings') return doRaise(args);
   return write(args);
 }
 

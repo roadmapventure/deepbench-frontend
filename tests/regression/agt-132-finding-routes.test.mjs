@@ -116,9 +116,16 @@ const ROUTES = [
 // made finding_group_epic() RAISE on every clean drift finding and stopped the whole review) and
 // `runner`. All three are precedence 30 / project_slug NULL -- the Development Manager picks the
 // project; creating one is still John's.
+// AGT-161 (v7.0.681) MADE IT EIGHT: migration `agt161_finding_routes_agent` added `agent`, the source
+// scripts/market-agent.js files a product-lane proposal under (`found_by 'agent:<agents.id>'`).
+// precedence 30 / project_slug NULL, the staff-watch shape -- the Development Manager picks the
+// project. This constant has a SECOND home in agt-132's LIVE_ROUTES / agt-134's ROUTES; both were
+// updated in that same ship, because a route row the platform holds and a test still pins at seven
+// is a false red that costs the next cycle a diagnosis (pattern:163).
 const LIVE_ROUTES = [
   { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
   { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
+  { precedence: 30, source: "agent", finding_type: "*", project_slug: null },
   { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
   { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
   { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
@@ -248,7 +255,7 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, LIVE_ROUTES, "the seven routing rows, exactly");
+    assert.deepEqual(r.json, LIVE_ROUTES, "the eight routing rows, exactly");
     assert.ok(!r.json.some(x => x.source === "*" && x.finding_type === "*"),
       "there is deliberately no catch-all row: an unmapped source must stop the review");
     // The precedence ORDER is the invariant a new row must not disturb: security outranks everything.
