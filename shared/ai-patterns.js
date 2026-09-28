@@ -1,3 +1,4 @@
+// DeepBench v7.0.680 | shared/ai-patterns.js | AGT-136 -- `design-ruling` enters the catalog with the Designer's capability row: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per ruling run would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.662 | shared/ai-patterns.js | AGT-240 -- `audit-finish-review` and `propose-project` enter the catalog with their capability rows: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.646 | shared/ai-patterns.js | AGT-177 -- `audit-run-review` enters the catalog: the capability row (public.capabilities, default_intent_slug au-run-intent) shipped in AGT-137/v7.0.602 WITHOUT its catalog slug, so scripts/agent-log.js refuses every --ai-type=audit-run-review and docs/runbooks/auditor-routine.md:143 -- prescribed verbatim -- exits 2. Live proof: 7 turns on feature `audit-run-review:au-run-intent:depth1`, every one logged ai_type `agent-turn`, zero with ai_type `audit-run-review`. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.590 | shared/ai-patterns.js | AGT-144 -- `model-assignment` enters the catalog with its capability row: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
@@ -330,6 +331,20 @@ export const SERVICE_CATALOG = [
   // WebFetch/WebSearch; 'Structured Output' because both Intents answer a stored schema that
   // public.apply_model_assignment() enforces before any write. No AI_TYPE_TO_SERVICE entry.
   { slug: 'model-assignment',        name: 'Model Assignment (The Development Manager)', serviceType: 'ai', patterns: ['Tool Use', 'Structured Output'], roadmap: 'now' },
+  // AGT-136 -- design-ruling, the Designer's SECOND capability (she held design-kickoff and
+  // nothing else, so she could rule nothing). Same MANDATORY reason as decide-gated-card above:
+  // scripts/agent-log.js:227 refuses an --ai-type this array does not carry, so the Layer-3 row
+  // for the one call per run -- `agent-log.js --agent=designer --capability=design-ruling
+  // --ai-type=design-ruling --feature=design-ruling:ds-ruling-intent:depth1` -- would be refused
+  // and the run would go unlogged (SES-338; .claude/rules/capability-logging.md).
+  // decide-gated-card's PATTERNS, and for decide-gated-card's reasons: 'Structured Output'
+  // because the answer is validated against ds-ruling-intent's stored schema -- offline by
+  // validateRulings() and again inside public.apply_design_rulings() -- before one question is
+  // answered; 'LLM-as-Judge / Verifier' because the turn IS the judgment: each open question is
+  // ruled yes, no, withdrawn, or left for John. NOT 'Guardrails / Output Filtering': the refusals
+  // are enforced by SQL after the turn, never by the model declining to answer. No
+  // AI_TYPE_TO_SERVICE entry -- ai_type equals the slug via the `|| e.type` fallback.
+  { slug: 'design-ruling',           name: 'Design Ruling (The Designer)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 ];
 
 // FEATURE: AI-53 -- generated from SERVICE_CATALOG itself so a slug constant can never diverge

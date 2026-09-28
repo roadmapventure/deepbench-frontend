@@ -148,8 +148,17 @@ export default async function run() {
     `knowledge twice since SES-396 slice 2 -- and no Format Skill), got ${links.length}`);
   assert.deepEqual(links.map(l => l.skill_profile_slug).sort(), [...SKILL_SLUGS].sort());
 
-  const assigns = await rest(`agent_capability_assignments?agent_id=eq.${AGENT_ID}&select=capability_slug`);
-  assert.deepEqual(assigns.map(a => a.capability_slug), [CAPABILITY]);
+  // AGT-136 (v7.0.680) RE-PINS THIS LINE, and the re-pin lands in the SAME commit as the change
+  // that moves it (the ses-424f:291 / agt-138 convention). The Designer held `design-kickoff` and
+  // NOTHING ELSE, which is precisely the defect AGT-136 names: a capability that designs kickoffs
+  // can rule nothing, so the 21 open `runner_questions` rows had exactly one addressee -- John --
+  // while governance_rules:JOHN-0925-DESIGNER-DECIDES says those calls are hers. `design-ruling`
+  // is that second capability. The assertion stays EXACT (both directions, sorted) rather than
+  // becoming a `>= 1` containment check: a list is what pins a roster, and a loosened one would
+  // pass a third capability nobody agreed to.
+  const assigns = await rest(`agent_capability_assignments?agent_id=eq.${AGENT_ID}&select=capability_slug&order=capability_slug`);
+  assert.deepEqual(assigns.map(a => a.capability_slug), [CAPABILITY, "design-ruling"],
+    "the Designer holds design-kickoff AND design-ruling (AGT-136) -- and only those two");
   const cap = (await rest(`capabilities?slug=eq.${CAPABILITY}&select=slug,execution_type,default_intent_slug`))[0];
   assert.equal(cap.default_intent_slug, INTENT_SLUG, "the capability must default to the kickoff Intent");
   assert.equal(cap.execution_type, "ai");
