@@ -39,7 +39,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { parseSteps, runbookSha } from "../../scripts/render-cycle-card.js";
+import { parseSteps, runbookSha, NOTES } from "../../scripts/render-cycle-card.js";
 import { routeGroup } from "../../scripts/audit-review.js";
 import { isoWeek } from "../../scripts/audit-ledger.js";
 
@@ -53,6 +53,19 @@ const STAMP_COUNT = 5;
 // The residue AGT-133 reported rather than fixed. Lower this only by actually removing a push.
 const PUSH_RESIDUE = 10;
 const RESIDUE_RE = /push John|push channel|Send the push|re-push|one push per block|into a push/g;
+
+// AGT-133 slice 2 (v7.0.666). The card's ONE hand-written part -- NOTES in render-cycle-card.js --
+// outlived the runbook it summarises: it still said `pushed to John` / `one push per cycle` at the
+// v7.0.610 ship, which rendered verbatim into cycle-card.md and assembled the Development Manager
+// from a procedure that instructs a push the runbook no longer instructs. Arm E pins the repair in
+// the generator, which is why the runbook's bytes below must NOT have moved: this slice spends zero
+// runbook bytes against the SES-336 ceiling, and PUSH_RESIDUE stays 10 because the ten lines it
+// counts sit on audit_findings 639f07b6-1e06-4454-91e7-bc010d00d1d6 -- escalated to John, unanswered.
+const CARD_PUSH_RE = /pushed to John|one push per cycle/g;
+const CYCLE_BYTES_AT_SLICE2 = 380862;
+const NOTE_0B = "a silent predecessor is REPORTED IN A ROW John reads; never close a row that is not yours";
+const NOTE_1 = "insert runner_cycles with the claimed id, outcome NULL; this step notifies nothing";
+const NOTE_MAX = 90;
 
 const lf = t => String(t).replace(/\r\n/g, "\n");
 
@@ -271,6 +284,45 @@ async function run() {
       console.log(`      [AGT-133 arm D] ${rows.length} routes, ${ctx.worklist.length} findings in ${week}, ${runnerRows.length} runner-sourced, all routed`);
     });
   }
+
+  // --- E. the card instructs no push ---------------------------------------------------------------
+  await arm("E the card instructs no push", () => {
+    const card = lf(fs.readFileSync(CARD_MD, "utf8"));
+    const notesText = Object.entries(NOTES).map(([k, v]) => `${k}: ${v.outcome}`).join("\n");
+
+    // The two surfaces that carried it: the generator's hand-written NOTES, and the card they render
+    // into. Both must be clean -- a card cleaned by hand with the generator left dirty would come back
+    // on the next --write.
+    const inCard = card.match(CARD_PUSH_RE) ?? [];
+    assert.equal(inCard.length, 0,
+      `cycle-card.md still instructs a push (${JSON.stringify(inCard)}) -- the runbook stopped saying this at v7.0.610`);
+    const inNotes = notesText.match(CARD_PUSH_RE) ?? [];
+    assert.equal(inNotes.length, 0,
+      `render-cycle-card.js NOTES still instructs a push (${JSON.stringify(inNotes)}) -- the card is generated, so the fix belongs here`);
+
+    // CONTROL: the matcher finds a push that IS there, so the two zeroes above are the text being
+    // clean and not the regex being broken.
+    const injected = (`${NOTES["0b"].outcome} pushed to John`).match(CARD_PUSH_RE) ?? [];
+    assert.equal(injected.length, 1,
+      `control: the matcher detects an injected push; found ${injected.length}`);
+
+    // The replacement text, in the generator and rendered through to the card, within the <= 90 char
+    // budget the NOTES comment declares.
+    assert.equal(NOTES["0b"].outcome, NOTE_0B, "0b's outcome reports the predecessor in a row John reads");
+    assert.equal(NOTES["1"].outcome, NOTE_1, "step 1's outcome says it notifies nothing");
+    assert.ok(NOTE_0B.length <= NOTE_MAX, `0b's outcome is ${NOTE_0B.length} chars against the ${NOTE_MAX} cap`);
+    assert.ok(NOTE_1.length <= NOTE_MAX, `step 1's outcome is ${NOTE_1.length} chars against the ${NOTE_MAX} cap`);
+    assert.ok(card.includes(NOTE_0B), "and 0b's new text rendered through into the card");
+    assert.ok(card.includes(NOTE_1), "and step 1's did too -- the card was re-rendered, not hand-edited");
+
+    // ZERO RUNBOOK BYTES. The repair was in the generator, so the SES-336 ceiling is untouched...
+    assert.equal(Buffer.byteLength(md, "utf8"), CYCLE_BYTES_AT_SLICE2,
+      `this slice opens no runbook bytes: runner-cycle.md must still be ${CYCLE_BYTES_AT_SLICE2} B`);
+    // ...and the held residue is still held. The ten lines counted by arm B sit on an escalated,
+    // unanswered finding; clearing them is John's call, never a cycle's.
+    assert.equal(PUSH_RESIDUE, 10,
+      "the ten runbook push lines stay held at 10 -- audit_findings 639f07b6 is escalated to John and unanswered");
+  });
 
   if (failures.length) throw new Error(`${failures.length} arm(s) failed:\n      ${failures.join("\n      ")}`);
   console.log(`[AGT-133] run tail: (7f) rules (7e)'s findings between (7e) and (8) · runner-cycle.md ${Buffer.byteLength(md, "utf8")}B <= ${CYCLE_CEILING}, ${STAMP_COUNT} stamps, 0 push notifications (${PUSH_RESIDUE} reported residue) · runner routes at 30/null`);

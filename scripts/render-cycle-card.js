@@ -113,8 +113,8 @@ export function blocksByStep(steps, blocks) {
 export const NOTES = {
   gate:       { outcome: "should_boot true → step 0; false → one did_not_run row and end, nothing else", block: 1 },
   "0":        { outcome: "branch session/cycle-<UTC>; never main; an unattended cycle writes no .claude/", block: 1 },
-  "0b":       { outcome: "a silent predecessor is pushed to John; never close a row that is not yours", block: 1 },
-  "1":        { outcome: "insert runner_cycles with the claimed id, outcome NULL; one push per cycle open", block: 1 },
+  "0b":       { outcome: "a silent predecessor is REPORTED IN A ROW John reads; never close a row that is not yours", block: 1 },
+  "1":        { outcome: "insert runner_cycles with the claimed id, outcome NULL; this step notifies nothing", block: 1 },
   "1b":       { outcome: "verdict 'run' → step 2; anything else → close did_not_run, run the tail, end", block: 1 },
   "2":        { outcome: "read-only here; the harvest writes happen in the step-9 serial tail", block: 2 },
   "2b":       { outcome: "every Requirement becomes exactly ONE artifact, and the card says which", block: 1 },

@@ -12,7 +12,7 @@ SELECT * FROM public.runner_should_boot();
 
 **0.** Bootstrap · L232 · branch session/cycle-<UTC>; never main; an unattended cycle writes no .claude/ · blocks: L287(sql 630B) L353(sql 299B)
 
-**0b.** A SILENT predecessor is REPORTED IN A ROW John reads · L386 · a silent predecessor is pushed to John; never close a row that is not yours · blocks: L414(sql 199B) L451(sql 1684B) L540(sql 55B)
+**0b.** A SILENT predecessor is REPORTED IN A ROW John reads · L386 · a silent predecessor is REPORTED IN A ROW John reads; never close a row that is not yours · blocks: L414(sql 199B) L451(sql 1684B) L540(sql 55B)
 
 ```sql
 UPDATE public.runner_cycles
@@ -21,7 +21,7 @@ UPDATE public.runner_cycles
 RETURNING id, (SELECT level FROM public.db_health_level()) AS db_level;
 ```
 
-**1.** Open the cycle · L625 · insert runner_cycles with the claimed id, outcome NULL; one push per cycle open · blocks: L656(bash 110B)
+**1.** Open the cycle · L625 · insert runner_cycles with the claimed id, outcome NULL; this step notifies nothing · blocks: L656(bash 110B)
 
 ```bash
 node scripts/check-routine-prompt.js --routine=runner --prompt="$T" --out=docs/audits/runner-prompt-drift.json
