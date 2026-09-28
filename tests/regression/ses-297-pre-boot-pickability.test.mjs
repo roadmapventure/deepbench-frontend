@@ -1,3 +1,7 @@
+// DeepBench v7.0.689 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-265 -- `lanes_full`
+// sits right after `db_pressure`: REASONS grows to nine, the oracle counts live runner lanes from the raw
+// runner_cycles rows against runner_settings.max_lanes, and the live arm grades detail.live_lanes /
+// max_lanes against those same raw reads.
 // DeepBench v7.0.658 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-237 -- `db_pressure`
 // is refusal 6 (M6-14): REASONS grows to eight, the oracle refuses on anything but green read over
 // rpc/db_health_level, and the live arm grades detail.db_level / db_reasons against that same rpc.
@@ -96,7 +100,7 @@ const SESSIONS = path.join(ROOT, SESSIONS_REL);
 const BLOCK_START = "**PRE-BOOT GATE — ONE QUERY";
 const BLOCK_END = "**0. Bootstrap.**";
 
-// The eight refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
+// The nine refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
 // what each one MEANS is read out of the runbook by the clauses below, never restated.
 export const REASONS = [
   "scheduler_off",
@@ -116,6 +120,10 @@ export const REASONS = [
   // AGT-237 / M6-14: the database's own health. After every spend wall, before the pickable split,
   // and NOT under meter_limiter_off -- anything but green in the window (incl. `unsafe`) refuses.
   "db_pressure",
+  // AGT-265: live runner lanes (open runner-stamped cycles, heartbeat inside 20 min) at or past
+  // runner_settings.max_lanes. After the database, before the pickable split; a concurrency cap,
+  // so NOT under meter_limiter_off.
+  "lanes_full",
   "nothing_pickable",
   "unaffordable",
 ];
@@ -198,7 +206,7 @@ export const CLAUSES = [
   {
     id: "all-six-refusals-are-named",
     detail:
-      "every one of the eight reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 / M6-14 " +
+      "every one of the nine reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 / M6-14 " +
       "attributed -- a cycle that meets a reason this file does not name cannot write a truthful " +
       "last_step, and a reader cannot tell a refusal from a failure",
     test: s =>
@@ -592,6 +600,8 @@ export function expectedReason(f) {
   // AGT-237: refusal 6. IS DISTINCT FROM green in the SQL, so a missing level refuses too -- the
   // oracle mirrors that with !==, never with a truthiness check that would let null through.
   if (f.dbLevel !== "green") return "db_pressure";
+  // AGT-265: at-or-above refuses (4 of 4 refuses, 3 of 4 boots). Both sides are read, never assumed.
+  if (f.liveLanes !== null && f.maxLanes !== null && f.liveLanes >= f.maxLanes) return "lanes_full";
   // AGT-127: refusal 6 splits, and the oracle splits with it. Both halves are graded, so a gate
   // that counted EVERY undecided card (re-firing forever on one whose decision is John's, since a
   // `john` ruling writes no card) and a gate that counted none both disagree here.
@@ -645,7 +655,15 @@ async function theLiveGateObeysItsOwnLadder() {
 
   // --- Build the oracle from the raw tables.
   const settings = asArray(
-    await pg(url, key, "runner_settings?select=id,scheduler_on,meter_stale_hours&id=eq.1"), "runner_settings");
+    await pg(url, key, "runner_settings?select=id,scheduler_on,meter_stale_hours,max_lanes&id=eq.1"), "runner_settings");
+  // AGT-265: the live lanes, from the RAW rows -- open, runner-stamped, and a heartbeat (or, with
+  // none, the start) inside the last 20 minutes. The window arithmetic is done here, not read back.
+  const openCycles = asArray(
+    await pg(url, key,
+      "runner_cycles?select=id,started_at,heartbeat_at&ended_at=is.null&stamp=like.DEEPBENCH-RUNNER-AUTOMATED-*"),
+    "runner_cycles (open, runner-stamped)");
+  const liveLanes = openCycles.filter(c =>
+    Date.parse(c.heartbeat_at ?? c.started_at) > Date.now() - 20 * 60_000).length;
   const readings = asArray(
     await pg(url, key, "runner_usage_readings?select=taken_at,all_models_pct,fable_pct&order=taken_at.desc&limit=1"),
     "runner_usage_readings");
@@ -736,6 +754,8 @@ async function theLiveGateObeysItsOwnLadder() {
     cheapestPctOfWeek: priced.length ? Math.min(...priced) : null,
     gateCardsToRule,
     dbLevel: db.level,
+    liveLanes,
+    maxLanes: settings[0]?.max_lanes == null ? null : Number(settings[0].max_lanes),
   };
 
   const want = expectedReason(facts);
@@ -901,6 +921,16 @@ async function theLiveGateObeysItsOwnLadder() {
     `detail.db_reasons=${JSON.stringify(d.db_reasons)} but db_health_level() says ${JSON.stringify(db.reasons)}`);
   if (v.reason === "db_pressure") {
     assert.notStrictEqual(d.db_level, "green", "a db_pressure refusal must be justified by its own payload");
+  }
+  // AGT-265: the lane count and the cap the gate graded, against the raw rows and the setting.
+  assert.ok(Object.prototype.hasOwnProperty.call(d, "live_lanes") && Object.prototype.hasOwnProperty.call(d, "max_lanes"),
+    "detail must always carry live_lanes and max_lanes -- a lanes_full refusal with no count cannot be audited");
+  assert.strictEqual(Number(d.max_lanes), facts.maxLanes,
+    `detail.max_lanes=${d.max_lanes} but runner_settings.max_lanes is ${facts.maxLanes}`);
+  assert.strictEqual(Number(d.live_lanes), facts.liveLanes,
+    `detail.live_lanes=${d.live_lanes} but ${facts.liveLanes} open runner-stamped cycles beat inside 20 min`);
+  if (v.reason === "lanes_full") {
+    assert.ok(Number(d.live_lanes) >= Number(d.max_lanes), "a lanes_full refusal must be justified by its own payload");
   }
 
   assert.strictEqual(d.pickable_count, lanes.length,

@@ -1,5 +1,6 @@
 # DeepBench — Architecture North Star
 # Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-OWNERSHIP-01-design — Resource Ownership Brokers (§19e), corrects §19d's agent-naming mistake
+# Amended v7.0.689 | 2026-09-28 | lanes-0928 (attended, The Builder) — AGT-265: §19v Operations gains one sentence — four runner lanes build in parallel and their test-suite runs wait in one line for a green database. `runner_should_boot()` refuses `lanes_full` at `runner_settings.max_lanes` live lanes (open runner-stamped cycles, heartbeat inside 20 min); `public.test_slots` + `test_slot_acquire()`/`test_slot_release()` hold the line (`test_slot_capacity`, 10-minute lease), `scripts/test-slot.js` is its one client. Mirror `docs/design/agt-265-lanes-test-slot.sql`.
 # Amended v7.0.688 | 2026-09-28 | cycle-20260928-1420 (runner) — AGT-173 R2: §19v Operations gains one sentence — the reason a ticket is not pickable is the pick predicate's own, rendered by `public.pick_exclusions()` (one CASE per `buildable` clause, firing on `NOT (<clause>)`), which `prime_directive_queue()`'s `buildable` joins as `reasons = '{}'`, the `project_blockers` view joins for the rest, and `scripts/run-project.js`'s `passOverNote()` words for the `assigned` payload's `pass_over_note` — so the queue, the board and the driver cannot disagree about why a row is out. Mirror `docs/design/agt-173-pick-exclusions.sql`; guard `tests/regression/agt-173-card-citations.test.mjs`.
 # Amended v7.0.667 | 2026-09-28 | cycle-20260928-0042 (runner) — AGT-238 slice 2: §19v Operations gains one sentence — how many projects hold an executing slot, and in what order, is The Development Manager's recorded, reversible decision, not a rule in code and not a knob. `project_concurrency_corpus()` is the one deterministic read it decides from (one row per project, LEFT JOINed so an epic-less project shows `epics=0` rather than vanishing: tickets left, blocked counts, leverage marks, close-rate proxy, `proposal_due`); `record_concurrency()` is its one writer — one `kind='concurrency'` decision, then one `runner_before_images` row per CHANGED row THEN the UPDATE, so `reverse_decision()` restores `projects`; `projects.status='executing'` stays the count and `projects.priority` stays the order, so no new column and no `max_concurrent` knob exists to disagree with them. It RAISES on a `proposed` or `planned` slug: starting a project that has never run stays John's words through `start_proposed_project()` (AGT-240). Mirror `docs/design/agt-238-concurrency-corpus.sql`; guard `tests/regression/agt-238-concurrency-corpus.test.mjs`.
 # Amended v7.0.662 | 2026-09-27 | opsflow-0927 (attended, The Builder) — AGT-240: §19v Operations gains one sentence — projects get a finish line. A project's list (its epic, `epics.locked_at`) locks when it starts executing and `epic_lock_guard` refuses a findings-born ticket into it, so what is found meanwhile waits on the findings list as `listed`; when every locked member is `done` or `removed`, The Auditor grades what the batch built and The Development Manager proposes ONE next project (`finish_project_batch()`, a `proposed` project whose tickets are not picked), which only a session on John's words starts (`start_proposed_project()`); `reverse_decision()` restores `projects`.
@@ -2718,6 +2719,16 @@ classification → gated, always.**
   fence, which left `AGT-138`, `AGT-141` and `AGT-164` out of the queue with no reason anywhere
   (18 open/partial tickets in executing projects, 0 in the queue, reasons for 15 → reasons for 18).
   `drain_epic_next()`'s own copy stands, because a drain pick writes no exclusion reason.
+
+  **AGT-265 (`v7.0.689`) — four lanes, one test line.** Up to `runner_settings.max_lanes` (4) runner
+  routines build in parallel — `runner_should_boot()` counts open `DEEPBENCH-RUNNER-AUTOMATED-%`
+  cycles with a heartbeat inside 20 minutes and refuses `lanes_full` right after `db_pressure` — while
+  their regression suites wait in ONE line, `public.test_slots`, where `test_slot_acquire()` grants a
+  slot only while `db_health_level()` is green, fewer than `test_slot_capacity` are held and the
+  caller is first (10-minute lease, beaten every 60 s by `scripts/test-slot.js`, the line's one
+  client, used by `tests/regression/run-all.js` and the verifier's regression gate), and
+  `ticket_matrix.lane_status` shows a built ticket waiting or testing. Mirror
+  `docs/design/agt-265-lanes-test-slot.sql`; guard `tests/regression/agt-265-lanes-test-slot.test.mjs`.
 
 ### The blocker sweep & feature-owns-its-bugs
 

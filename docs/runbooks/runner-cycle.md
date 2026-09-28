@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.658 | runbooks/runner-cycle.md | AGT-237 — DB gates. v7.0.555 out. -->
+<!-- DeepBench v7.0.658 | runbooks/runner-cycle.md | AGT-237/265 — lanes. -->
 <!-- DeepBench v7.0.650 | runbooks/runner-cycle.md | AGT-185 — THE FLAT PAIR STOPS TRAVELLING: step 6 recited it 125 lines after step 5a computes the real pair from `class_autonomy()`; it now points there (`docs/STANDARDS.md` Section 2, one home). One-feature cap stays; not on the ladder. `scripts/verifier.js` gains `classCapPair(row)` so a verdict PRINTS the pair it graded (§19v); an unread row says not-graded. `CLAUDE.md:57` NOT edited (`STANDARDS.md:60`) — one yes/no `runner_questions` row. ROTATION: `v7.0.535` DROPPED, count 5, `SES-164` step 2 by grep FIRST — its one ZERO-hit fact (guard `ses-424c`) RELOCATED into `blocked_detail`'s census; "carrying an undecided gate card" keeps 1 body hit, `drain_epic_next` 19. Guard `agt-92-scope-cap-one-home.test.mjs`. -->
 <!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171 — THE (6) CLOSE RELEASES THE PUBLISH LEASE IN THE SAME STATEMENT: a CLOSED cycle held it 26 min (steals 17) because the release came after the (7e)/(7f) sub-agents. Nothing after (6) is leased; step 1's release block is gone; 0b probe (c) flags a closed holder. v7.0.532 DROPPED (docs/SESSIONS.md), 2 ZERO-hit facts RELOCATED to Reading 0; count 5. Guard agt-171-lease-released-at-close.test.mjs. -->
 <!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
@@ -124,9 +124,6 @@ RETURNING id;
   Then **end**. No session rename, no serial tail, no successor fire. (Nothing notifies John from
   anywhere in this runbook any more — `JOHN-0925-NOTIFICATIONS-OFF`, `AGT-133`.)
 
-**`SES-298` / `SES-302` wording corrections: archived VERBATIM in `docs/SESSIONS.md`**
-(appendix *runner-cycle.md rationale retired by `SES-336`*, entry A, ledger 51). Live rule below.
-
 **So: the gate reports `reading_age_hours` and a `cap_authority` pointer, and grades that age
 against one setting and nothing else.** <!-- FEATURE: SES-389 --> It carries no `token_cap` and
 refuses `meter_stale` past `runner_settings.meter_stale_hours` (`SES-389`, default 2 — the reader
@@ -136,7 +133,7 @@ exactly one home — `public.resolve_day_token_cap()`, read at step 3** — and 
 ceiling there, never here. A reading inside the threshold still grades the weekly wall in (3): a
 63% taken an hour ago is better evidence than none.
 
-**The eight refusal reasons, in the precedence the function applies them.**
+**The nine refusal reasons, in the precedence the function applies them.**
 Each names itself, always: **a bare `false` is the "NULL is not zero" defect this codebase has paid
 for repeatedly.**
 
@@ -174,13 +171,14 @@ for repeatedly.**
    is NULL, and with no reading (4)'s is too, so the ladder falls through to (5).
 6. `db_pressure` — **`M6-14`**: `db_health_level()` not `green`.
    Not under `meter_limiter_off`; `detail.db_*`.
-7. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
+7. `lanes_full` — live lanes ≥ `runner_settings.max_lanes`.
+8. `nothing_pickable` — **`M6-09`**: `prime_directive_queue()` returns no `drain` or `selfbuild`
    lane row — `runner_should_boot()`'s `pickable` CTE is `WHERE q.lane IN ('drain','selfbuild')`,
    so a queued **directive** row alone is not pickable. **`AGT-127` splits this slot:** an undecided
    `gated_before_build` card no open `gate-card-…` question names answers `gate_cards_to_rule`:
    `should_boot=true`, `detail.mode='rule-cards-only'`, `detail.gate_cards_to_rule=<n>`, placed
    HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged.
-8. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
+9. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
 

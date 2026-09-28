@@ -1,3 +1,5 @@
+// DeepBench v7.0.689 | tests/regression/_lib/self-run.js | AGT-265 -- re-exports takeTestSlot for run-all.js.
+//
 // DeepBench v7.0.657 | tests/regression/_lib/self-run.js | AGT-116 -- a direct run gets the same
 // transport watcher and the same rule as run-all.js: a test that threw while its database calls got
 // no answer prints `[NOT RUN] <name> -- transport ...` and exits 2, never `[FAIL]` / exit 1. The
@@ -37,6 +39,9 @@ import { fileURLToPath } from "url";
 import { ensureTransportWatch, incidentsSince, logSize, removeTransportLog } from "./transport-watch.js";
 // Re-exported for run-all.js, which must keep a single relative import (SES-215's relocation control).
 export { ensureTransportWatch, incidentsSince, logSize, removeTransportLog };
+// AGT-265: the test-slot line, re-exported for the same reason -- run-all.js takes its slot through
+// this one relative import, so SES-215's relocated control copy still resolves.
+export { takeTestSlot } from "../../../scripts/test-slot.js";
 
 // Pure -- tests/regression/SES-28-self-run-guard.js asserts this directly.
 // Windows: argv[1] and import.meta.url can disagree on drive-letter case, so compare

@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.689 | scripts/verifier.js | AGT-265 -- the regression gate takes a test slot. The gate
+// loop wraps `regression` in withTestSlot() (scripts/test-slot.js): the suite waits in the one line
+// for a green database, beating the slot every 60 s while it runs, and its child run-all.js gets
+// DEEPBENCH_TEST_SLOT=held so it does not queue behind its own parent. No slot inside 60 min is a RED
+// gate naming the level -- never a skip, never a pass. runGate() takes the child env and is async
+// (spawn, not spawnSync): a synchronous 20-minute spawn blocks the event loop, so the 60 s beat could
+// never fire and the 10-minute lease would expire under a running suite.
+//
 // DeepBench v7.0.500 | scripts/verifier.js | SES-403 -- `--regrade`: A SHIP BLOCKED FOR A CAUSE
 // OUTSIDE ITSELF CAN BE GRADED AGAIN, and the thing to read twice is that this branch RUNS NO GATE.
 // Measured live 2026-09-15: SES-379/383/388/390/394/395/398 are all `delivered`, each with its
@@ -516,10 +524,11 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import { renderingCycleFinding } from "./render-claude-state.js";
 import { shipCardFinding } from "./render-claude-state.js";
+import { withTestSlot } from "./test-slot.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1639,20 +1648,36 @@ export function spawnCommandFor(cmd, shell) {
   return `"${s}"`;
 }
 
-function runGate(gate, repoRoot) {
-  let res;
+// AGT-265: async, and the child env is a parameter -- see the header. The result object mirrors
+// spawnSync's ({ status, signal, stdout, stderr, error }) so everything below is unchanged.
+function spawnGate(cmd, argv, opts) {
+  return new Promise(resolve => {
+    let child;
+    try {
+      child = spawn(cmd, argv, { ...opts, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) {
+      resolve({ thrown: e });
+      return;
+    }
+    let stdout = "", stderr = "", error = null, done = false;
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", d => { stdout += d; });
+    child.stderr.on("data", d => { stderr += d; });
+    child.on("error", e => { error = e; if (!done) { done = true; resolve({ status: null, signal: null, stdout, stderr, error }); } });
+    child.on("close", (status, signal) => { if (!done) { done = true; resolve({ status, signal, stdout, stderr, error }); } });
+  });
+}
+
+async function runGate(gate, repoRoot, env = process.env) {
   const shell = process.platform === "win32";
-  try {
-    res = spawnSync(spawnCommandFor(gate.cmd, shell), gate.argv, {
-      cwd: repoRoot,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell,
-      timeout: 20 * 60 * 1000,
-    });
-  } catch (e) {
-    return { status: "skipped", fails: null, detail: `spawn threw: ${e.message}` };
-  }
+  const res = await spawnGate(spawnCommandFor(gate.cmd, shell), gate.argv, {
+    cwd: repoRoot,
+    env,
+    shell,
+    timeout: 20 * 60 * 1000,
+  });
+  if (res.thrown) return { status: "skipped", fails: null, detail: `spawn threw: ${res.thrown.message}` };
   if (res.error) return { status: "skipped", fails: null, detail: `could not run: ${res.error.message}` };
   // A signal kill leaves status null -- gateStatus() reads that as skipped, which is why the raw
   // status is passed through rather than defaulted to a number here.
@@ -2943,7 +2968,16 @@ async function main() {
   const gateDetail = {};
   const gateFails = {};
   for (const gate of GATES) {
-    const r = runGate(gate, repoRoot);
+    // AGT-265: the regression gate waits in the one test-slot line; no slot is RED, naming the level.
+    let r;
+    if (gate.key === "regression") {
+      const slotEnv = cycleId ? { ...process.env, DEEPBENCH_CYCLE_ID: cycleId } : process.env;
+      const taken = await withTestSlot(slotEnv, () =>
+        runGate(gate, repoRoot, { ...process.env, DEEPBENCH_TEST_SLOT: "held" }));
+      r = taken.ran ? taken.value : { status: "red", fails: null, detail: taken.notRun };
+    } else {
+      r = await runGate(gate, repoRoot);
+    }
     gateResults[gate.key] = r.status;
     gateDetail[gate.key] = r.detail;
     if (r.fails) gateFails[gate.key] = r.fails;

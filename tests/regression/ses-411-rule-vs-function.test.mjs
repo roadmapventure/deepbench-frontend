@@ -82,6 +82,8 @@ const BODY_TODAY = [
   "      when u.all_models_pct >= s.pace_share                 THEN 'weekly_pace'",
   "      when b.id is null                                     THEN 'no_budget_row'",
   "      when d.level is distinct from 'green'                 THEN 'db_pressure'",
+  // AGT-265 (v7.0.689): the lanes cap, right after the database.
+  "      when l.live_lanes >= s.max_lanes                      THEN 'lanes_full'",
   "      when q.id is null                                     THEN 'nothing_pickable'",
   "      when q.predicted_tokens > b.remaining                 THEN 'unaffordable'",
   "      else 'pickable' end,",
@@ -130,7 +132,8 @@ async function run() {
   assert.strictEqual(CLOSED_SETS.runner_should_boot, REASONS,
     "CLOSED_SETS.runner_should_boot must BE the imported REASONS array -- a copy in audit-corpus.js " +
     "would be a second home for exactly the kind of claim this detector exists to find");
-  assert.strictEqual(REASONS.length, 8, "the closed set is the eight refusals");
+  // AGT-265 (v7.0.689): nine -- `lanes_full` joins after `db_pressure` (ses-297's REASONS).
+  assert.strictEqual(REASONS.length, 9, "the closed set is the nine refusals");
   assert.deepStrictEqual(detectRuleFunctionDrift(RULES, [mkFn()], CLOSED_SETS), [],
     "today's body, comment, rules and REASONS agree -- anything here is a false positive");
   results.push("today-is-clean");
@@ -244,7 +247,8 @@ async function run() {
   // AGT-237: that body was captured before refusal 6 existed. Put `db_pressure` back as TEXT (after
   // no_budget_row, where the live gate applies it) so the control grades ONE missing branch --
   // weekly_pace -- and not the later ticket's addition too. The same textual-restore move as below.
-  const priorBody = capturedBody.replace("THEN 'no_budget_row'", "THEN 'no_budget_row'\n      when false THEN 'db_pressure'");
+  // AGT-265: `lanes_full` likewise post-dates the capture, so it goes back as text beside it.
+  const priorBody = capturedBody.replace("THEN 'no_budget_row'", "THEN 'no_budget_row'\n      when false THEN 'db_pressure'\n      when false THEN 'lanes_full'");
   assert.notStrictEqual(priorBody, capturedBody,
     "control: the db_pressure restore changed nothing -- the captured body no longer carries no_budget_row (the SES-158 failure)");
   assert.notStrictEqual(priorBody, String(fns[0].definition),

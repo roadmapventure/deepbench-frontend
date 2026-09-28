@@ -58,7 +58,10 @@ const RUNBOOK_REL = "docs/runbooks/routine-prompt.md";
 // A bump here is therefore a statement, not a formality: the repo block and the LIVE deepbench-runner
 // prompt now differ by more than they did, and only John's word closes that (SES-355). The three ids
 // this edit removed are refused from here on by ses-355-routine-prompt.test.mjs.
-const PROMPT_BLOCK_SHA256 = "d4de6fa97d21d9772ff10267b552c35a74a8910c0f4a481393179a4982dcbfa6";
+// RE-PINNED d4de6fa9 -> bb492c71 BY AGT-265 (v7.0.689): step 1's refusal list gains ", and since
+// AGT-237/AGT-265 also db_pressure, hard_stop and lanes_full" -- a deliberate block edit; the live
+// routines take it on the attended RemoteTrigger update.
+const PROMPT_BLOCK_SHA256 = "bb492c716d3919e9f31fee7477b4e68e70cd6afc9ed9a6d15e0c3d604832177c";
 
 const PINNED = "claude-opus-5";
 const INTENDED = "claude-opus-5-5";

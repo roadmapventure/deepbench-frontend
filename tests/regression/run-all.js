@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.689 | tests/regression/run-all.js | AGT-265 -- the suite waits in ONE line for a
+// green database. Right after the transport watch, takeTestSlot() (scripts/test-slot.js, through
+// self-run.js so SES-215's relocated control still resolves) queues for public.test_slots: no slot
+// inside DEFAULT_MAX_MINUTES, or the line not deployed, prints `[NOT RUN] regression suite --
+// transport: <why>` and exits 2 (a run that did not happen, never a verdict). A granted slot sets
+// DEEPBENCH_TEST_SLOT=held BEFORE the first per-test snapshot, so every child suite a test spawns
+// skips the line instead of queueing behind its own parent; it is released in `finally`.
+// DEEPBENCH_TEST_SLOT=off opts a run out; no credentials skips it.
+//
 // DeepBench v7.0.657 | tests/regression/run-all.js | AGT-116 -- transport is not a verdict. A test
 // that THREW while its database calls got no answer (502/503/504, a >=500 PGRST002/57014 body, or a
 // connect/timeout error on the SUPABASE_URL origin -- observed by _lib/transport-watch.js, never
@@ -91,7 +100,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 // import -- SES-215's control relocates a copy of this runner by rewriting that one specifier.
 import {
   takeNotRun, renderNotRun, installHintRepair, notRun,
-  ensureTransportWatch, incidentsSince, logSize, removeTransportLog,
+  ensureTransportWatch, incidentsSince, logSize, removeTransportLog, takeTestSlot,
 } from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -138,13 +147,37 @@ async function main() {
   // AGT-116: BEFORE any per-test snapshot, so every snapshot carries the log path and NODE_OPTIONS.
   const transport = ensureTransportWatch();
 
+  // AGT-265: one line for the database, BEFORE the first snapshot -- see the header.
+  const slot = await takeTestSlot(process.env);
+  if (slot.notRun) {
+    console.log(`  [NOT RUN] regression suite -- transport: ${slot.notRun}`);
+    if (transport.created) removeTransportLog(transport.file);
+    process.exit(2);
+  }
+  if (slot.holder) process.env.DEEPBENCH_TEST_SLOT = "held";
+
+  // The lease is 10 minutes and a full suite runs longer: beat it every 60 s while the tests run
+  // (unref'd, so a beat never holds the process open).
+  const beat = slot.beat ? setInterval(() => { slot.beat().catch(() => null); }, 60_000) : null;
+  if (beat) beat.unref();
+  let code = 0;
+  try {
+    code = await runSuite(transport);
+  } finally {
+    if (beat) clearInterval(beat);
+    if (slot.release) await slot.release();
+  }
+  process.exit(code);
+}
+
+async function runSuite(transport) {
   const files = fs.readdirSync(DIR)
     .filter(f => (f.endsWith(".js") || f.endsWith(".mjs")) && f !== "run-all.js" && !f.startsWith("_"))
     .sort();
 
   if (files.length === 0) {
     console.log("regression suite: no test files found in " + DIR);
-    process.exit(0);
+    return 0;
   }
 
   let failCount = 0;
@@ -203,7 +236,7 @@ async function main() {
     );
   }
   if (transport.created) removeTransportLog(transport.file);
-  process.exit(failCount > 0 ? 1 : transportNotRun > 0 ? 2 : 0);
+  return failCount > 0 ? 1 : transportNotRun > 0 ? 2 : 0;
 }
 
 main();

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// DeepBench v7.0.689 | scripts/check-routine-prompt.js | AGT-265 -- the runner prompt runs in FOUR
+// sibling routines, each carrying its OWN trigger id in the stamp. For `runner` only, both sides are
+// canonicalized first: `DEEPBENCH-RUNNER-AUTOMATED-trig_<id>` -> the canonical id, so a sibling
+// routine's own stamp is not drift, while any other difference still is.
 // DeepBench v7.0.678 | scripts/check-routine-prompt.js | AGT-102 slice 1; AGT-138 -- the Researcher's
 // own routine is the third the check knows, and the first whose drift is expected by design;
 // AGT-146 -- model-watch is the fourth, and the first the check knows BEFORE the routine exists
@@ -68,6 +72,8 @@ export const ROUTINES = {
     begin: "<!-- ROUTINE-PROMPT-BEGIN -->",
     end: "<!-- ROUTINE-PROMPT-END -->",
     id: "trig_017TZ3JZcLBK6AYH6DKURqMH",
+    // AGT-265: the lane routines share this block and differ only in the stamp's trigger id.
+    stamp: /DEEPBENCH-RUNNER-AUTOMATED-trig_[A-Za-z0-9]{20,}/g,
   },
   auditor: {
     file: "auditor-routine.md",
@@ -106,6 +112,11 @@ class UsageError extends Error {}
 
 export const canon = t => String(t).replace(/\r\n/g, "\n").replace(/\n+$/, "");
 
+// AGT-265: a routine with a `stamp` pattern normalizes every stamp to its canonical id. Only the id
+// is normalized; the stamp's prefix and everything around it are compared byte-for-byte.
+export const canonFor = (t, r) =>
+  r && r.stamp ? canon(t).replace(r.stamp, `DEEPBENCH-RUNNER-AUTOMATED-${r.id}`) : canon(t);
+
 // The block and the 1-based line numbers of both markers; throws UsageError on a marker count != 1.
 export function extractBlock(md, r) {
   const lines = String(md).replace(/\r\n/g, "\n").split("\n");
@@ -134,7 +145,7 @@ function finding(r, liveText, repoLine, repoText, confidence, name) {
 
 // Prompt mode: [] when equal, else ONE finding at the first differing line.
 export function comparePrompt(live, block, r, name) {
-  const L = canon(live), R = canon(block.text);
+  const L = canonFor(live, r), R = canonFor(block.text, r);
   if (L === R) return [];
   const ll = L.split("\n"), rl = R.split("\n");
   let i = 0;

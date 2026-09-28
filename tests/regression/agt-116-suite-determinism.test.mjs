@@ -57,7 +57,9 @@ function run(cmd, args, env) {
 // The child env: the stub is the database, and NO inherited watcher -- when this test itself runs
 // inside run-all.js, the parent's log and NODE_OPTIONS must not leak into the child suite.
 function childEnv(dbOrigin) {
-  const env = { ...process.env, SUPABASE_URL: dbOrigin, SUPABASE_SERVICE_KEY: "agt116-stub" };
+  // AGT-265: DEEPBENCH_TEST_SLOT off -- the stub database has no test_slot_acquire, and a child
+  // suite queueing for the real line would be grading the line, not transport.
+  const env = { ...process.env, SUPABASE_URL: dbOrigin, SUPABASE_SERVICE_KEY: "agt116-stub", DEEPBENCH_TEST_SLOT: "off" };
   delete env.DEEPBENCH_TRANSPORT_LOG;
   delete env.NODE_OPTIONS;
   return env;
