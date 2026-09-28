@@ -1936,6 +1936,176 @@ export function kickoffBuilderModelFinding(text, orchestratorModel) {
   };
 }
 
+// FEATURE: AGT-226 -- THE FACTS THE BUILD WILL ACT ON, DECLARED BY THE KICKOFF AND RESOLVED
+// AGAINST THE TREE.
+//
+// WHAT THE THREE CLAUSES ABOVE DO NOT GRADE, and the gap this one closes. `kickoffCapFinding`
+// grades bytes, `kickoffLaneFinding` grades the presence of a line, `kickoffBuilderModelFinding`
+// grades one model id against one row. None of them looks at a single string the kickoff tells the
+// build to EDIT -- so a kickoff may name three literals in a file, be graded green three ways, and
+// hand the Builder two that no longer exist. Measured: 26 of the newest 40 `runner_staff_findings`
+// rows are `kind='kickoff lacked a fact'`. AGT-147's own kickoff is the worked case -- its section 4
+// named three parentheticals in the runbook, and at the tree its build started from only some of
+// them were still there. AGT-169's build touched 5 files against a kickoff that named 2, because
+// three sibling tests pinned a string it changed and the kickoff named none of them.
+//
+// DECLARED, NEVER INFERRED, and that is the ticket's central choice rather than a convenience.
+// Inferring the anchors from a kickoff's prose -- every backticked path, every quoted string --
+// measured 201 false positives of 377 candidates at HEAD. A check whose inputs are wrong one time
+// in two is a check nobody can act on. So the Designer writes the block, one line per fact, and
+// this function grades exactly what was written: `<path> | <count of tracked files holding it> |
+// <the exact literal>`, split on the FIRST TWO pipes so the literal may itself contain pipes.
+//
+// THE RESOLVER IS AN ARGUMENT, NEVER A SUBPROCESS IN HERE -- the same shape and the same reason as
+// `kickoffBuilderModelFinding` taking the lane's model as an argument. This function stays pure, so
+// the suite can grade it against a tree that no longer exists (arm (A) resolves AGT-147's three
+// literals at commit `fe2a3479`) without running git, and the CLI's one `git grep` has one home.
+//
+// NOT GRADED, NEVER REFUSED, WHEN THERE IS NOTHING TO GRADE -- AGT-189's direction, taken for its
+// reason and not its precedent. This clause runs at runbook step 6 on every cycle, ahead of the
+// credential check, and five shipped tests spawn `--check-kickoff` demanding 0 or 1. Most kickoffs
+// in the corpus predate the block entirely. A clause that refused every kickoff carrying no block
+// would refuse the whole corpus and wedge the runner -- far worse than the ungraded green it
+// replaces. So no block, no lines, and an unresolvable literal are all NOT GRADED, the exit code is
+// untouched, and the green SAYS so (19v: a green declares what it did NOT grade).
+//
+// THE NOTE TRAVELS ON `out`, NOT ON THE RETURN, and that is deliberate. The caller needs two facts
+// -- "is this a refusal?" and "how much did you actually grade?" -- and the first must stay a plain
+// truthiness test. A function named `...Finding` that returned `{finding:null, note}` would be
+// TRUTHY on the not-graded path, and the one `if (finding)` at the call site would then refuse every
+// kickoff it could not grade: precisely the wedge the paragraph above exists to prevent. So the
+// return value is `null` or the refusal, exactly like its three siblings, and the note is written
+// into the caller's own object.
+export const ANCHOR_CLAUSE = "anchors";
+
+// Pure and exported so the suite can grade the parse without a resolver: the FIRST fenced block
+// whose info string is exactly `anchors`, ended by the next fence line. Blank lines are skipped
+// (an author's spacing is not a declaration); every other line is an anchor, malformed or not, and
+// a malformed one is named rather than dropped -- a silently skipped anchor is a fact the kickoff
+// declared and nobody checked.
+export function anchorBlockLines(text) {
+  const lines = String(text ?? "").split("\n");
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const fence = lines[i].match(/^\s*`{3,}\s*(.*?)\s*$/);
+    if (fence && fence[1] === ANCHOR_CLAUSE) { start = i + 1; break; }
+  }
+  if (start === -1) return [];
+  const out = [];
+  for (let i = start; i < lines.length; i++) {
+    if (/^\s*`{3,}/.test(lines[i])) break;
+    const raw = lines[i];
+    if (!raw.trim()) continue;
+    const first = raw.indexOf("|");
+    const second = first === -1 ? -1 : raw.indexOf("|", first + 1);
+    if (first === -1 || second === -1) {
+      out.push({ raw, path: null, declared: null, literal: null });
+      continue;
+    }
+    const declaredRaw = raw.slice(first + 1, second).trim();
+    const declared = /^\d+$/.test(declaredRaw) ? Number(declaredRaw) : null;
+    // ONE separator space is removed, never a trim: the literal is what `git grep -F` will be given,
+    // and trimming it would quietly grade a different string than the kickoff declared.
+    out.push({
+      raw,
+      path: raw.slice(0, first).trim(),
+      declared,
+      literal: raw.slice(second + 1).replace(/^ /, ""),
+    });
+  }
+  return out;
+}
+
+export function kickoffAnchorFinding(text, resolve, out = {}) {
+  const anchors = anchorBlockLines(text);
+  out.declared = anchors.length;
+  out.graded = 0;
+  if (!anchors.length) {
+    out.note = "NOT GRADED (AGT-226): the kickoff carries no `anchors` block with lines in it, so no "
+      + "string the build will edit was resolved against the tree. Exit code unchanged -- this green "
+      + "does NOT say the facts the kickoff names still exist.";
+    return null;
+  }
+
+  const ungraded = [];
+  for (const a of anchors) {
+    if (a.path === null || a.literal === null) {
+      out.note = `anchors: 0 of ${anchors.length} graded -- the block is malformed (AGT-226).`;
+      return {
+        kind: "kickoff-no-lanes",
+        clause: ANCHOR_CLAUSE,
+        remedy_owner: KICKOFF_REMEDY_OWNER,
+        remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never edits the anchors block',
+        reason: `kickoff anchor is not a declaration (AGT-226): the line \`${a.raw.trim()}\` does not split `
+          + "on two pipes into `<path> | <count of tracked files holding it> | <the exact literal>`, so there "
+          + "is nothing to resolve. The Designer re-assembles design-kickoff ONCE; an anchors block "
+          + "repaired by the caller is not a declaration the Designer made.",
+      };
+    }
+    if (a.declared === null) {
+      out.note = `anchors: 0 of ${anchors.length} graded -- a declared count is not a number (AGT-226).`;
+      return {
+        kind: "kickoff-no-lanes",
+        clause: ANCHOR_CLAUSE,
+        remedy_owner: KICKOFF_REMEDY_OWNER,
+        remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never edits the anchors block',
+        reason: `kickoff anchor declares no file count (AGT-226): the line \`${a.raw.trim()}\` carries no `
+          + "whole number between its first two pipes, and the count is the half of the anchor that can be "
+          + "wrong without anyone noticing. The Designer re-assembles design-kickoff ONCE; an anchors block "
+          + "repaired by the caller is not a declaration the Designer made.",
+      };
+    }
+
+    let resolved = null;
+    try { resolved = typeof resolve === "function" ? resolve(a.literal) : null; } catch { resolved = null; }
+    const files = resolved && Array.isArray(resolved.files) ? resolved.files.map(String) : null;
+    if (files === null) {
+      ungraded.push(a);
+      continue;
+    }
+    out.graded += 1;
+
+    const found = files.length ? files.join(", ") : "(none)";
+    const shared = `The anchor line was: \`${a.raw.trim()}\`. Files holding that literal in the tree `
+      + `(\`git grep -F -l\`, excluding docs/kickoffs/ and docs/harvests/): ${found}.`;
+    const refuse = (why) => ({
+      kind: "kickoff-no-lanes",
+      clause: ANCHOR_CLAUSE,
+      remedy_owner: KICKOFF_REMEDY_OWNER,
+      remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never edits the anchors block',
+      reason: `kickoff anchor does not resolve (AGT-226): ${why} ${shared} A kickoff that names a string the `
+        + "tree does not hold hands the Builder a fact to act on that is not there -- re-measure the anchor "
+        + "at the tree the build will start from. The Designer re-assembles design-kickoff ONCE; an anchors "
+        + "block repaired by the caller is not a declaration the Designer made.",
+    });
+
+    if (files.length === 0) {
+      out.note = `anchors: ${out.graded} of ${anchors.length} graded -- one anchor is in NO file (AGT-226).`;
+      return refuse(`the literal declared for \`${a.path}\` is in NO tracked file at all.`);
+    }
+    if (files.length !== a.declared) {
+      out.note = `anchors: ${out.graded} of ${anchors.length} graded -- one anchor's file count is wrong (AGT-226).`;
+      return refuse(`the literal declared for \`${a.path}\` is in ${files.length} tracked file(s), not the `
+        + `${a.declared} the kickoff declared.`);
+    }
+    if (!files.includes(a.path)) {
+      out.note = `anchors: ${out.graded} of ${anchors.length} graded -- one anchor names a file that does not hold it (AGT-226).`;
+      return refuse(`\`${a.path}\` is the path the anchor names, and it is NOT among the files holding the literal.`);
+    }
+  }
+
+  if (ungraded.length) {
+    out.note = `anchors: ${out.graded} of ${anchors.length} graded (AGT-226) -- `
+      + `${ungraded.length} NOT GRADED because the resolver could not answer for `
+      + `${ungraded.map(a => `\`${a.path}\``).join(", ")}. Exit code unchanged -- this green does NOT say `
+      + "those literals exist.";
+    return null;
+  }
+  out.note = `anchors graded (AGT-226): all ${anchors.length} declared anchor(s) resolve in the tree, each in `
+    + "the file it names and in the number of tracked files it declares.";
+  return null;
+}
+
 // FEATURE: AGT-194 half (b) -- THE VERDICT SAYS OUT LOUD WHEN THE SHA IT GRADED HAS NO CI
 // CONCLUSION OF ITS OWN. REPORTED, NEVER A GATE.
 //
@@ -2575,6 +2745,38 @@ async function main() {
     if (builderModel) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...builderModel, orchestrator_lane_model: orchestratorModel }, prose: builderModel.reason });
     }
+    // ---- AGT-226: the ANCHORS -- every fact the build will act on, resolved against the tree. --
+    //
+    // FOURTH, AFTER THE MODEL AND BEFORE THE ATTESTATION, and the order is the same argument the
+    // AGT-187 header below makes: the first three clauses grade the DOCUMENT and can refuse it
+    // outright, so a file that is not a kickoff yet must never be measured against the tree; and
+    // attestation is the last question, asked only of a file that has passed everything.
+    //
+    // THE EXCLUDES ARE LOAD-BEARING, not tidiness. runbook step 6 commits the kickoff BEFORE the
+    // build runs, so every literal the kickoff quotes is in the kickoff itself: without
+    // `:(exclude)docs/kickoffs` every count is off by exactly one and every anchor refuses.
+    // `docs/harvests/` is excluded for the same reason -- the reasoning doc quotes the same
+    // strings, and it is written by the same assembly.
+    //
+    // STATUS 0 IS A HIT LIST, 1 IS AN HONEST ZERO, AND ANYTHING ELSE IS NOT AN ANSWER. `git grep`
+    // exits 1 when it matched nothing, which is a measurement; it exits 2 (or fails to spawn at
+    // all) when it could not look, which is not. Collapsing the two would turn "git is unavailable
+    // in this container" into "your anchor is in no file" -- a refusal manufactured out of the
+    // runner's own environment. So 2-and-anything-else returns null, the anchor is NOT GRADED, the
+    // exit code is untouched, and the green says which anchors it skipped.
+    const anchorOut = {};
+    const anchors = kickoffAnchorFinding(text, (literal) => {
+      const g = spawnSync("git",
+        ["-C", repoRoot, "grep", "-F", "-l", "-e", literal, "--", ".", ":(exclude)docs/kickoffs", ":(exclude)docs/harvests"],
+        { encoding: "utf8" });
+      if (g.error) return null;
+      if (g.status === 0) return { files: String(g.stdout || "").split("\n").map(s => s.trim()).filter(Boolean) };
+      if (g.status === 1) return { files: [] };
+      return null;
+    }, anchorOut);
+    if (anchors) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, ...anchors, anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared }, prose: anchors.reason });
+    }
     // ---- AGT-187: THE THIRD CLAUSE -- the green says WHOSE declaration it graded. -------------
     //
     // ORDER IS cap -> lanes -> attestation, and it is not interchangeable: the first two grade the
@@ -2622,11 +2824,13 @@ async function main() {
       return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: true,
         answer_bytes: answerBytes, byte_delta: 0,
         builder_model: orchestratorModel, builder_model_note: builderModelNote,
+      anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
         attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
         prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
     }
     return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: false,
       builder_model: orchestratorModel, builder_model_note: builderModelNote,
+      anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
       attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
       prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
   }
