@@ -5,6 +5,30 @@
 
 ---
 
+## session/cycle-20260928-1851 (v7.0.695, 2026-09-28, unattended cycle `724303a8-70d3-43fb-90a8-0bc9a61077f3`, `trigger = scheduled`, lane 2 — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder) — `AGT-138` — **shipped, verdict block: the routine prompt stopped citing a step that was retired three weeks ago.**
+
+### The remainder was a cycle's work, and the previous cycle's ruling was right
+
+`AGT-138` has sat `partial` at the queue head since `v7.0.608`, and `session/cycle-20260928-1741` ruled its card `rework` on the ground that the remainder — `docs/runbooks/routine-prompt.md` still citing runner step `4b` — is a cycle's edit, not John's. This cycle built exactly that: step 8 of the prompt block now names steps `4c`, `6` and `7` and four sub-agents with a parenthetical saying where the Researcher went, and the `WebSearch` paragraph points at `docs/runbooks/researcher-routine.md`, which owns the egress probe. 2 files, 3 tasks, `grep` for the two phrases 2 → 0. Because line 54 sits inside the pinned block (markers at 42/56), `PROMPT_BLOCK_SHA256` was re-pinned `bb492c71` → `3cc55a68` in the same commit, and the header stamps were rotated (oldest dropped, count still 5) so `ses-378d`'s line-55 pin never moved. Ship `fe93029`.
+
+### The QA discriminated, which is the only reason the re-pin can be trusted
+
+Between tasks 1 and 2 `agt-145-sync-routine-models.test.mjs` went red with the exact line the kickoff predicted — *"the prompt block moved: sha256 3cc55a68…, expected bb492c71…"* — and green after. A green that would also have been green if the edit had done nothing would have proven nothing about a sha pin.
+
+### The verdict is `block`, and two of its three newly-red tests are this cycle's own ordering mistake
+
+`runner_verdicts 432a7e1b`: build green, hygiene green, regression red — *"26 standing, 3 newly red [SES-177-claude-state-renderer.js, SES-261-ledger-pin.js, agt-136-design-ruling.test.mjs]"*. `SES-177` and `SES-261` both assert that the committed `CLAUDE-STATE.md` is a byte-exact render of the ledger; this cycle rendered it at 7a **before** writing its own `push_sha` and `version` to `runner_cycles`, which is the reverse of the order step 7a states, and then did not commit the file until the tail. The runbook's remedy is the one taken here (write the row, re-render, commit in the tail's snapshot push) — but the block is recorded, the ladder took its reset (`tooling`, streak 0, rung 36 unmoved), and the correct order is worth stating: **the row first, then the render.**
+
+### The third red was proven not to be this diff, and was captured rather than fixed
+
+`agt-136-design-ruling.test.mjs` arm C asserts a live `skill_profiles` row's `traits.schema rulings.items.required` equals `[qid, ruling, reason]`; the live row now holds `[ruling, reason]`. The Builder reverted both changed files, re-ran on a pristine tree, and it was still red — live-row drift that landed after the baseline was captured. It lives in no file the kickoff names and a repair is an `UPDATE` over an active agent's Knowledge, so limb 1 of `AGT-133`'s fix-now test fails and it was captured: `audit_findings ba684db1a1d76b4e`, alongside `6811a5030c5e0d88` for `researcher-routine.md:31`, which still points at the retired step 4b that now points back at it. Both under one `finding-routing` decision, `931600c4`.
+
+### Four environment facts a later cycle on this container will meet
+
+`node_modules` was empty again, so `npm install` had to run before the first dependent script — the same thing `v7.0.693` measured. The shared single test slot (`public.test_slots`, capacity 1) queued this cycle three separate times with four peers waiting; the first baseline attempt was killed by its own `timeout 900` **while still queued**, having run no test at all, so a suite run on this platform needs no timeout and a background window, never a bounded one. `rollback-on-red.js --apply` was denied by the auto-mode classifier as `[Blind Apply]`; per `CLAUDE.md`/`SES-019` it was not re-routed, the read-only form of the same call was run instead, and the denial's own stated remedy — a first-hand read of what the apply would write — cleared it, so the post-push `card-only` record landed properly (`card 28414ee0`, `decision e822abdb`). And `check-deploy-serving.js` / `check-deploy-quota.js` could not run at all: `VERCEL_TOKEN` and `VERCEL_AUTOMATION_BYPASS_SECRET` are not in this container's env and reading them from `runner_secrets` would print a secret value, so both are exit-2 *could not tell*, and an unauthenticated probe of the dev URL answered `302` — deployment protection, which is not a health signal either way.
+
+---
+
 ## session/cycle-20260928-1741 (v7.0.693, 2026-09-28, unattended cycle `aded348d-a54f-4bab-8fb6-167b6ab8b221`, `trigger = scheduled`, lane 4 — Opus 5 orchestrator, Opus 5 Development Manager ×2) — directive `b1d5c864` — **shipped: the manager declined the board's ticket pick to obey John's word, and ruled the seven cards that were holding the board shut.**
 
 ### The queue's first row was not a ticket, and the manager said so
