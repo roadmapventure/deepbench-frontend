@@ -1,4 +1,4 @@
-// DeepBench v7.0.612 | tests/regression/agt-145-sync-routine-models.test.mjs | AGT-145 (P10 - Tooling)
+// DeepBench v7.0.695 | tests/regression/agt-145-sync-routine-models.test.mjs | AGT-145 (P10 - Tooling)
 //
 // FEATURE: AGT-145 -- a routine's model pin follows public.model_assignments. scripts/sync-routine-models.js
 // plans the change, builds the whole-`ccr` update body, grades the read-back and records the decision
@@ -61,7 +61,10 @@ const RUNBOOK_REL = "docs/runbooks/routine-prompt.md";
 // RE-PINNED d4de6fa9 -> bb492c71 BY AGT-265 (v7.0.689): step 1's refusal list gains ", and since
 // AGT-237/AGT-265 also db_pressure, hard_stop and lanes_full" -- a deliberate block edit; the live
 // routines take it on the attended RemoteTrigger update.
-const PROMPT_BLOCK_SHA256 = "bb492c716d3919e9f31fee7477b4e68e70cd6afc9ed9a6d15e0c3d604832177c";
+// RE-PINNED bb492c71 -> 3cc55a68 BY AGT-138 close-out (v7.0.695): step 8 stops citing step 4b and
+// names four sub-agents -- a deliberate block edit; the live lanes take it on the attended
+// RemoteTrigger update.
+const PROMPT_BLOCK_SHA256 = "3cc55a688ec5f5a5dfc9a3053839aec4b8fa08e814e590480a77da7d471028d8";
 
 const PINNED = "claude-opus-5";
 const INTENDED = "claude-opus-5-5";
