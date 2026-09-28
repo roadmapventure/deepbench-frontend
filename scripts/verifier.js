@@ -1753,7 +1753,7 @@ async function runGate(gate, repoRoot, env = process.env) {
 // Network
 // ---------------------------------------------------------------------------
 
-async function rest(base, key, pathAndQuery, init = {}) {
+export async function rest(base, key, pathAndQuery, init = {}) {
   const url = `${base.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`;
   let res;
   try {
@@ -2424,7 +2424,7 @@ export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, 
 
 // The single write this script makes, in one place, so the judged lane and the mechanical lane
 // cannot drift into two payload shapes for one table.
-async function insertVerdict(args) {
+export async function insertVerdict(args) {
   const ins = await rest(args.supabaseUrl, args.supabaseKey, "runner_verdicts", {
     method: "POST",
     headers: { Prefer: "return=representation" },
