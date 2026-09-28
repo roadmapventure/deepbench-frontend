@@ -77,14 +77,22 @@ async function run() {
       { path: "scripts/fixture-patch.js", text: 'await fetch(`${base}/rest/v1/backlog_items?id=eq.${id}`, { method: "PATCH", headers, body });' },
       // A file that never mentions the table at all.
       { path: "scripts/fixture-unrelated.js", text: 'await fetch(`${base}/rest/v1/audit_findings`, { method: "POST", headers, body });' },
+      // PROSE, NOT A CALL. This fixture is the defect the check found in ITSELF the moment it became
+      // a tracked file: a comment that quotes `fetch(`, quotes rest/v1/backlog_items and quotes
+      // method: "POST" opened a slice inside the prose, never balanced it, and swept the cap's worth
+      // of comment into one "call". A header comment describing the filing path is not a filing path.
+      { path: "scripts/fixture-comment-only.js", text: '// A `fetch(` call to `rest/v1/backlog_items` carrying\n// method: "POST" is what clause A counts.\nexport const NOTHING = 1;\n' },
     ];
     assert.deepEqual(filingPaths(fixtures), ["scripts/fixture-client-insert.js", "scripts/fixture-posts.js"],
-      "only the POST and the client insert file a ticket; the GET, the select, the PATCH and the unrelated POST do not");
+      "only the POST and the client insert file a ticket; the GET, the select, the PATCH, the unrelated POST and the COMMENT do not");
 
-    // THE LIVE CONTROL, not a fixture: the real two files, read off this tree.
-    const live = [FILER, GETTER].map(p => ({ path: p, text: fs.readFileSync(path.join(ROOT, p), "utf8") }));
+    // THE LIVE CONTROLS, not fixtures: the real files, read off this tree. The check's OWN source is
+    // one of them, and it is the strongest negative control there is -- it quotes the POST, the URL
+    // and the table in its header prose and files nothing.
+    const live = [FILER, GETTER, "scripts/check-findings-intake.js"]
+      .map(p => ({ path: p, text: fs.readFileSync(path.join(ROOT, p), "utf8") }));
     assert.deepEqual(filingPaths(live), [FILER],
-      `${FILER} files and ${GETTER} does not -- a URL-only matcher would refuse the snapshot exporter for reading the board`);
+      `${FILER} files; ${GETTER} does not (a URL-only matcher would refuse the snapshot exporter for reading the board) and neither does the check's own source (a comment quoting the call is not the call)`);
 
     // The comparison passes on the real tree...
     const ok = filingVerdict([FILER]);

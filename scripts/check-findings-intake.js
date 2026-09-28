@@ -60,8 +60,23 @@ const SCAN_EXTS = Object.freeze([".js", ".mjs"]);
 const TABLE = "backlog_items";
 const REST_PATH = `rest/v1/${TABLE}`;
 
+// A COMMENT IS PROSE, NEVER A CALL, and dropping comment-only lines before any matching is the
+// root-cause fix for a false positive this check produced against ITSELF the moment it became a
+// tracked file (v7.0.673, found by running it rather than by reasoning about it): the header above
+// QUOTES `fetch(`, quotes the table's REST path, and later quotes `method: "POST"`, so the matcher
+// opened a slice inside the prose, never balanced it, swept the cap's worth of comment, and read
+// this file as a second filing path. Both halves of the fix matter -- see the balance guard below.
+export function stripCommentLines(text) {
+  return String(text).split("\n").map(l => (/^\s*(\/\/|\/\*|\*)/.test(l) ? "" : l)).join("\n");
+}
+
 // A `fetch(` call's own text, parens balanced, strings skipped so a `(` inside a literal or a
 // template cannot end the slice early. Capped, because an unterminated call must not walk the file.
+//
+// AN UNBALANCED SLICE IS NOT A CALL AND IS DISCARDED. That is the second half of the fix above and
+// it is the structural half: a comment-only line can be dropped, but an inline `// see fetch(` on a
+// line of real code cannot, and the cap's worth of text after it would otherwise be searched as if
+// it were one call's options. A real call closes its parens.
 function fetchCallSlices(text, cap = 4000) {
   const slices = [];
   const re = /\bfetch\s*\(/g;
@@ -71,7 +86,6 @@ function fetchCallSlices(text, cap = 4000) {
     const end = Math.min(text.length, openIdx + cap);
     let depth = 0;
     let quote = null;
-    let sliced = text.slice(openIdx, end);
     for (let i = openIdx; i < end; i++) {
       const c = text[i];
       if (quote) {
@@ -83,10 +97,9 @@ function fetchCallSlices(text, cap = 4000) {
       if (c === "(") depth++;
       else if (c === ")") {
         depth--;
-        if (depth === 0) { sliced = text.slice(openIdx, i + 1); break; }
+        if (depth === 0) { slices.push(text.slice(openIdx, i + 1)); break; }
       }
     }
-    slices.push(sliced);
   }
   return slices;
 }
@@ -121,8 +134,9 @@ function hasRestPost(text) {
 export function filingPaths(files) {
   const hits = [];
   for (const f of Array.isArray(files) ? files : []) {
-    const text = typeof f?.text === "string" ? f.text : "";
-    if (!text.includes(TABLE)) continue;
+    const raw = typeof f?.text === "string" ? f.text : "";
+    if (!raw.includes(TABLE)) continue;
+    const text = stripCommentLines(raw);
     if (hasRestPost(text) || hasClientInsert(text)) hits.push(f.path);
   }
   return hits.sort();
