@@ -124,6 +124,9 @@ RETURNING id;
   Then **end**. No session rename, no serial tail, no successor fire. (Nothing notifies John from
   anywhere in this runbook any more — `JOHN-0925-NOTIFICATIONS-OFF`, `AGT-133`.)
 
+**`SES-298` / `SES-302` wording corrections: archived VERBATIM in `docs/SESSIONS.md`**
+(appendix *runner-cycle.md rationale retired by `SES-336`*, entry A, ledger 51). Live rule below.
+
 **So: the gate reports `reading_age_hours` and a `cap_authority` pointer, and grades that age
 against one setting and nothing else.** <!-- FEATURE: SES-389 --> It carries no `token_cap` and
 refuses `meter_stale` past `runner_settings.meter_stale_hours` (`SES-389`, default 2 — the reader
@@ -187,8 +190,8 @@ now has **two** consequences with one home each (`M5-15`, `SES-389`): **past
 `meter_stale_hours` this gate refuses at (2)**, and past 48h it lowers the **ceiling**, which is
 `resolve_day_token_cap()`'s RUNG 2 to apply at step 3 and never this gate's. **Under** the threshold
 the age is reported and nothing more. Read `detail.reading_age_hours` and `detail.meter_stale_hours`
-if you want to know how old the meter is and what it was graded against; read the resolver if you
-want to know what you may spend.
+for the meter's age and the threshold it was graded against; read the resolver for what you
+may spend.
 
 **This gate and `scheduler_gate()` answer different questions and both hold.** `scheduler_gate()`
 asks *is this fire admissible on John's clock grid*; this one asks *is there anything to do at all*.

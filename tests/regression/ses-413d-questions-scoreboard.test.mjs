@@ -217,11 +217,11 @@ export const RUNBOOK_CEILING = 381000;
 // (no new line, no new header stamp — ses-424c pins stamps[0]). Net +74 B: 380862 -> 380936, 64 B under
 // SES-336's ceiling. Re-measured with wc -c on this tree.
 // v7.0.689 (AGT-265) adds `lanes_full` as refusal 7 of nine in step 0's ladder (one new line, 8 -> 9
-// renumber, "eight" -> "nine", +63 B), line 1's tail becomes `AGT-237/265 — lanes. -->` (−13 B; stamps[0]
-// keeps its v7.0.658 AGT-237 prefix for ses-424c), and -- agt-138 requires the file stay under its
-// 380980 B pre-change mark, so the room was 43 B < 48 -- the unpinned SES-298/302 archive pointer
-// (3 lines, −186 B) is deleted as the kickoff directs. Net −136 B: 380936 -> 380800. Re-measured.
-export const BYTES_AT_SHIP = 380800;
+// renumber, "eight" -> "nine", +63 B) and line 1's tail becomes `AGT-237/265 — lanes. -->` (−13 B;
+// stamps[0] keeps its v7.0.658 AGT-237 prefix for ses-424c). agt-138 requires the file stay under its
+// 380980 B pre-change mark, and the SES-298/302 pointer stays (ses-336 needs entry A), so the bytes
+// came from step 0's meter-age prose (−28 B). Net +22 B: 380936 -> 380958. Re-measured with wc -c.
+export const BYTES_AT_SHIP = 380958;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
