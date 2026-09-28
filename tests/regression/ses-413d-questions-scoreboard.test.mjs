@@ -230,7 +230,15 @@ export const RUNBOOK_CEILING = 381000;
 // v7.0.694 (AGT-133 slice 3) converts the runner's three alarms from a push to a `john_alerts` row: the
 // eight replacements net -373 B (the THE ALERT ROW paragraph and its sql block cost bytes, the 0f292cfa
 // quotation and the ONE PUSH PER HOLE rule give back more). No header stamp. Re-measured with wc -c.
-export const BYTES_AT_SHIP = 380598;   // 380971 -> 380598
+// v7.0.696 (AGT-136 slice 2) adds step 9's `(7g)` -- THE DESIGNER RULES, the second desk and the first
+// runbook line that names `scripts/design-ruling.js` (462 B, agt-136's RUNBOOK_NAMES_SCRIPT flips true) --
+// and, as the pin requires, takes the bytes OUT of the `(7d)` block FIRST: its "close the tail" opener,
+// the exit-2 parenthetical, the whole `fingerprintFor()` grouping sentence (its subject has ONE home in
+// `scripts/staff-watch.js` and is pinned by ses-378f/g/h), and the John-rules-the-promotion clause, which
+// (7d) now hands to `(7g)` instead. 483 B out, 462 B in. Re-measured with wc -c AFTER the rebase onto
+// AGT-133 slice 3's -373 B, never carried over from the pre-rebase tree: 380598 -> 380577 B, 423 B under
+// SES-336's ceiling. No header stamp (ses-424c pins stamps[0]), so HEADER_STAMPS stays 5.
+export const BYTES_AT_SHIP = 380577;   // 380598 -> 380577
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

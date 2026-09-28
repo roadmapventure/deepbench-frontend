@@ -4361,17 +4361,11 @@ by construction, not by omission. A claim becomes `ratified` only through John's
 attended sitting, exactly as `SES-84`'s classification decisions already are — this step proposes,
 it never ratifies, the same boundary `(7b)`'s decisions and `SES-84`'s corpus classing both hold.
 
-**(7d) THE STAFF WATCH PROMOTES (`SES-378`).** Close the tail by running the watch over the
-findings this cycle and its predecessors recorded. **It reports, it never gates:** exit **0 at any
-count** — no findings, one finding, or a fingerprint standing at the 3-cycle bar — and exit 2 means
-only that it could not run (an unrecognised `--kind`, a missing credential, a write the database
-refused), never that the cycle is in trouble. Findings group by `fingerprintFor()`, which masks
-uuids and nothing else, so one defect seen by three cycles is ONE fingerprint at three cycles while
-three rows written by ONE cycle stay at one — the ticket rides in `--backlog=`, never in the
-detail. **A promotion is a `runner_card_asks` row of kind `skill-edit` asking John to rule, NEVER a
-Skill edit this cycle performs:**
-the manager may count a defect in a governance agent's text and
-it is John who changes that text (the `SES-45` boundary, Rule #1).
+**(7d) THE STAFF WATCH PROMOTES (`SES-378`).** **It reports, it never gates:** exit **0 at any
+count** — no findings, one finding, or a fingerprint standing at the 3-cycle bar — and exit 2
+means only that it could not run, never that the cycle is in trouble. **A promotion is a
+`runner_card_asks` row of kind `skill-edit` never an edit the manager performs (`SES-45`, Rule
+#1):** a Designer Knowledge ask is ruled at `(7g)`; every other agent's waits for John.
 
 ```
 node scripts/staff-watch.js --promote --apply --cycle-id=<your cycle id>
@@ -4423,6 +4417,12 @@ unread finding stop its own drain would have inverted both.
 Development Manager files, for every source. `--apply` is the one filing path for a finding, and it
 claims its ids the same atomic way every other filing site does.
 
+
+**(7g) THE DESIGNER RULES (`AGT-136`; `JOHN-0925-DESIGNER-DECIDES`).** `node scripts/design-ruling.js
+--prepare --cycle-id=<your cycle id> --out=$S/ruling.json`; exit 3 = nothing open, no cost. Exit 0 →
+the `designer` sub-agent as `(7f)` runs the manager (`--agent=designer --capability=design-ruling`;
+log `--ai-type=design-ruling --feature=design-ruling:ds-ruling-intent:depth1`), then `--dry-run` →
+`--apply … --cycle-id=<your cycle id>`. Never gates.
 
 **(8) A DRAINING CYCLE CONTINUES THE DRAIN IN-SESSION — SIX GATES, ONE CALL (`SES-139`,
 `v7.0.176`; actuator replaced by `SES-141` `v7.0.180`, replaced again and FINAL by `SES-140`
