@@ -1,3 +1,17 @@
+// DeepBench v7.0.684 | api/_lib/mcp.js | AGT-163 -- an MCP key's NAME becomes the caller's visitor_id.
+// Every `call_source = 'mcp'` row in `ai_activity_log` carried `visitor_id NULL` (all 32, measured
+// 2026-09-28) while the web path attributes 3,518 of 4,283. IP capture already works over the wire
+// (3 of the 4 genuinely remote calls carry `caller_ip`); IDENTITY was the whole gap, because an MCP
+// client sends no cookie and no `x-db-visitor-id`, and the one signal it does send -- its key -- was
+// read as a single secret and reduced to a boolean right here, discarding WHICH key matched.
+// Now: readMcpKeys() reads every `runner_secrets` row named `MCP_*` by name in one call,
+// resolveCallerKey() constant-time-matches the presented `x-deepbench-mcp-key` against all of them,
+// and mcpAttribution() -- the one core BOTH seams call -- writes the matched row's NAME into the
+// call's `visitor_id`. `MCP_API_KEY` remains the sole governance unlock. THE VALUE NEVER LEAVES
+// keysMatch(): no key is minted, printed, logged or committed by this file or its tests, and no
+// column, grant or screen changed -- `known_callers` (`match_type 'visitor_id'`) already resolves a
+// visitor_id to a display name. Adding a caller is one `runner_secrets` row and no deploy.
+//
 // DeepBench v7.0.682 | api/_lib/mcp.js | AGT-162 -- a capability can now answer a `tools/call`
 // WITHOUT a model call. Until this ticket every tools/call reached runThroughExecutor() ->
 // runCapability(), so an outside platform asking DeepBench for an agent's scaffold paid for a model
@@ -441,23 +455,84 @@ export function toTool(row) {
 // The governance key
 // ---------------------------------------------------------------------------------------------
 
-let secretCache = { value: null, at: 0 };
+let keysCache = { rows: null, at: 0 };
 
-async function readGovernanceSecret() {
+/**
+ * FEATURE: AGT-163 -- EVERY `MCP_*` ROW IS A KEY, and the read is one call, not one per key.
+ *
+ * Until this ticket this function read exactly one secret and the caller reduced it to a boolean,
+ * so the server knew THAT it had been called with a valid key and never WHICH -- which is why all 32
+ * `call_source = 'mcp'` rows in `ai_activity_log` carry `visitor_id NULL`. An MCP client sends no
+ * cookie and no `x-db-visitor-id` (lib/request-context.js), so the key is its only identity signal.
+ *
+ * The name pattern IS the registry: adding a tester costs one `runner_secrets` row and no deploy
+ * (.claude/rules/capabilities-are-data.md's posture, applied to credentials). `MCP_API_KEY` keeps its
+ * separate job -- it alone unlocks the governance lane, see resolveCallerKey() -- but every matched
+ * row's NAME becomes the call's attribution. No value is ever returned past keysMatch().
+ */
+async function readMcpKeys() {
   const now = Date.now();
-  if (secretCache.at && now - secretCache.at < SECRET_TTL_MS) return secretCache.value;
-  let value = null;
+  if (keysCache.at && now - keysCache.at < SECRET_TTL_MS) return keysCache.rows;
+  let rows = [];
   try {
-    const rows = await sbSelect(`runner_secrets?name=eq.${encodeURIComponent(SECRET_NAME)}&select=value&limit=1`);
-    value = rows[0] && typeof rows[0].value === 'string' && rows[0].value ? rows[0].value : null;
+    // `like.MCP_*` is PostgREST's wildcard form; `_` is also a SQL LIKE single-char wildcard, so the
+    // prefix is re-checked here rather than trusted to the filter.
+    const raw = await sbSelect('runner_secrets?name=like.MCP_*&select=name,value');
+    rows = (Array.isArray(raw) ? raw : []).filter(
+      r =>
+        r &&
+        typeof r.name === 'string' &&
+        r.name.startsWith('MCP_') &&
+        typeof r.value === 'string' &&
+        r.value !== '',
+    );
   } catch (e) {
-    // FAILS CLOSED. An unreadable secret means no governance tools, never all of them. One line,
-    // never the value.
-    console.error(`[mcp] could not read ${SECRET_NAME}: ${e && e.message ? e.message : String(e)}`);
-    value = null;
+    // FAILS CLOSED. An unreadable secret list means no governance tools and no key attribution,
+    // never all of them. One line, never a value and never a name count that implies one.
+    console.error(`[mcp] could not read MCP_* keys: ${e && e.message ? e.message : String(e)}`);
+    rows = [];
   }
-  secretCache = { value, at: now };
-  return value;
+  keysCache = { rows, at: now };
+  return rows;
+}
+
+/**
+ * FEATURE: AGT-163 -- the presented key, resolved to a NAME.
+ *
+ * NO EARLY RETURN, on purpose: every row is compared on every call, so the work done does not depend
+ * on which row matched or on how many rows sit before it. keysMatch() is already constant-time per
+ * comparison; stopping at the first hit would leak the ordinal through the clock.
+ *
+ * `governanceUnlocked` stays exactly what it was -- a match on `MCP_API_KEY` and nothing else -- so a
+ * tester's key attributes his calls without widening what he can see.
+ */
+export function resolveCallerKey(presented, rows) {
+  let name = null;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (row && keysMatch(presented, row.value)) name = row.name;
+  }
+  return { name, governanceUnlocked: name === SECRET_NAME };
+}
+
+/**
+ * FEATURE: AGT-163 -- THE ONE ATTRIBUTION CORE both seams call.
+ *
+ * runThroughExecutor() and runDeterministic() each establish the same attribution, and two copies of
+ * this object literal is two answers waiting to disagree (the `screenOrigin: 'mcp'` spread already
+ * existed twice). The matched key's NAME goes into `visitorId` -- the plumbing identity slot
+ * ARCHITECTURE §19k reserves for exactly this, a non-browser caller with no other way to fill it --
+ * and a `known_callers` row with `match_type 'visitor_id'` on that NAME labels it in the AI Audit,
+ * so no column, no grant and no screen changes.
+ *
+ * A keyless caller is untouched: whatever `x-db-visitor-id` it sent still stands, else null.
+ * THE VALUE NEVER ARRIVES HERE -- only the name does.
+ */
+export function mcpAttribution(ctx, callerKeyName) {
+  return {
+    ...ctx,
+    screenOrigin: 'mcp',
+    visitorId: callerKeyName || (ctx && ctx.visitorId) || null,
+  };
 }
 
 /** Constant-time, and never throws on a length mismatch (timingSafeEqual does). */
@@ -597,7 +672,7 @@ export function toToolResult(result, row) {
  * because both paths end in "no verdict". A spy passed in here can only be called if the guard let
  * the request through. Production never passes `execute`.
  */
-async function runThroughExecutor({ row, intentSlug, taskContext }) {
+async function runThroughExecutor({ row, intentSlug, taskContext, callerKeyName = null }) {
   const ctx = getRequestContext();
   return runWithCallSource(
     'mcp',
@@ -609,9 +684,10 @@ async function runThroughExecutor({ row, intentSlug, taskContext }) {
         task_context: taskContext,
         tenant_id: row.tenant_id,
       }),
-    // Spread first: runWithCallSource writes callSource last, so the real caller's ip / device /
-    // visitor attribution rides through untouched while screen_origin becomes 'mcp'.
-    { ...ctx, screenOrigin: 'mcp' },
+    // Spread first: runWithCallSource writes callSource last, so the real caller's ip / device
+    // attribution rides through untouched while screen_origin becomes 'mcp' and AGT-163's key name
+    // takes the visitor slot.
+    mcpAttribution(ctx, callerKeyName),
   );
 }
 
@@ -636,7 +712,7 @@ export const DETERMINISTIC_HANDLERS = Object.freeze({ 'agent-bundle': agentBundl
  * the agent it was ASKED about that visibleRows() applies to the tool list, and a second derivation
  * is a second answer waiting to disagree with the first.
  */
-export async function runDeterministic({ row, taskContext, governanceUnlocked }) {
+export async function runDeterministic({ row, taskContext, governanceUnlocked, callerKeyName = null }) {
   const ctx = getRequestContext();
   const handle = DETERMINISTIC_HANDLERS[row.handler];
   // Unreachable through assembleCapabilityRows(), which drops a handler-less deterministic row --
@@ -652,7 +728,7 @@ export async function runDeterministic({ row, taskContext, governanceUnlocked })
         content: taskContext,
         handler_context: { governance_unlocked: governanceUnlocked === true },
       }),
-    { ...ctx, screenOrigin: 'mcp' },
+    mcpAttribution(ctx, callerKeyName),
   );
   return toToolResult({ content: result }, row);
 }
@@ -664,6 +740,9 @@ export async function callToolThroughExecutor({
   execute = runThroughExecutor,
   executeDeterministic = runDeterministic,
   governanceUnlocked = false,
+  // AGT-163: the matched key's NAME, resolved once per request in visible() and forwarded to both
+  // seams. `null` is a keyless caller, which attributes exactly as it did before this ticket.
+  callerKeyName = null,
 }) {
   const row = rows.find(r => r.slug === name);
   if (!row) {
@@ -703,9 +782,9 @@ export async function callToolThroughExecutor({
     // `execution_type`, the column buildSignatureConfig() already stamps into every call_facts and
     // toTool() already prints in the description. Everything `ai` takes the path it always took.
     if (row.execution_type === 'deterministic') {
-      return await executeDeterministic({ row, taskContext, governanceUnlocked });
+      return await executeDeterministic({ row, taskContext, governanceUnlocked, callerKeyName });
     }
-    const result = await execute({ row, intentSlug, taskContext });
+    const result = await execute({ row, intentSlug, taskContext, callerKeyName });
     return toToolResult(result, row);
   } catch (e) {
     // MCP's own rule: a TOOL failure is a result with isError, not a protocol error, so the calling
@@ -770,9 +849,11 @@ async function handler(req, res) {
   const visible = async () => {
     if (!scopePromise) {
       scopePromise = (async () => {
-        const [all, secret] = await Promise.all([fetchCapabilityRows(), readGovernanceSecret()]);
-        const governanceUnlocked = keysMatch(req.headers[GOVERNANCE_KEY_HEADER], secret);
-        return { rows: visibleRows(all, { governanceUnlocked }), governanceUnlocked };
+        const [all, keys] = await Promise.all([fetchCapabilityRows(), readMcpKeys()]);
+        // AGT-163: one resolution, three consumers -- the lane gate, the deterministic handler's
+        // own lane rule, and the attribution written on the call's audit row.
+        const { name, governanceUnlocked } = resolveCallerKey(req.headers[GOVERNANCE_KEY_HEADER], keys);
+        return { rows: visibleRows(all, { governanceUnlocked }), governanceUnlocked, callerKeyName: name };
       })();
     }
     return scopePromise;
@@ -781,8 +862,8 @@ async function handler(req, res) {
   const response = await dispatchJsonRpc(message, {
     listTools: async () => (await visible()).rows.map(toTool),
     callTool: async ({ name, args }) => {
-      const { rows, governanceUnlocked } = await visible();
-      return callToolThroughExecutor({ name, args, rows, governanceUnlocked });
+      const { rows, governanceUnlocked, callerKeyName } = await visible();
+      return callToolThroughExecutor({ name, args, rows, governanceUnlocked, callerKeyName });
     },
   });
 

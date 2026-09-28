@@ -1,3 +1,8 @@
+<!-- DeepBench v7.0.684 | docs/runbooks/mcp-server.md | AGT-163 -- the key no longer only unlocks, it
+     ATTRIBUTES. Every `runner_secrets` row named `MCP_*` is an MCP key; the matched row's NAME becomes the
+     call's `ai_activity_log.visitor_id`, which is what makes an outside caller identifiable in the AI Audit
+     without a cookie. The value never leaves `keysMatch()`. The two-headers table and the paragraph under it
+     carry the rule. -->
 <!-- DeepBench v7.0.450 | docs/runbooks/mcp-server.md | LOG-149 -- the `reasoning` refusal no longer
      "presents as silence". That sentence was true and is now dated: since LOG-149 a refusal is caught
      in callModel() before parseModelTurn() ever sees the empty content, surfaces as a PERMANENT
@@ -33,7 +38,11 @@ a notification returns 202 with no body; the server is stateless and issues no `
 | Header | What it does | Where the value lives |
 |---|---|---|
 | `x-db-gate-bypass` | Clears the HAR-33 per-IP edge gate in `middleware.js`, which fronts every `/api/*` route. Not needed from an IP with an `ip_org_cache.permission = 'unlimited'` row. | Vercel env `GATE_BYPASS_SECRET` |
-| `x-deepbench-mcp-key` | Unlocks the **governance lane**. Nothing else — it is scope, never access. | `runner_secrets` row `MCP_API_KEY` |
+| `x-deepbench-mcp-key` | Unlocks the **governance lane**. Nothing else — it is scope, never access. It also NAMES the caller: see below. | `runner_secrets` rows named `MCP_*`. `MCP_API_KEY` unlocks the governance lane; every matched key's NAME (never its value) is written to the call's `ai_activity_log.visitor_id` (AGT-163), so one `known_callers` row (`match_type 'visitor_id'`) labels that key's caller in the AI Audit. |
+
+A caller with no key, or a key that matches no row, keeps whatever `x-db-visitor-id` it sent, else `visitor_id` is null; the product lane stays open either way. The presented value is compared in constant time against every `MCP_*` row and is never logged, printed or echoed.
+
+Adding a caller is therefore one `runner_secrets` row and no deploy: name it `MCP_KEY_<their name>`, and add a `known_callers` row with `match_type 'visitor_id'` and `match_value` that same NAME to show them by name on the AI Audit. No key value ever belongs in this repo.
 
 Deployment protection also applies to the preview deployments, so a call to the dev URL adds
 `x-vercel-protection-bypass` (`VERCEL_AUTOMATION_BYPASS_SECRET`), exactly as every other live API
