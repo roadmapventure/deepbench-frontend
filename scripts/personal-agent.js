@@ -1,4 +1,17 @@
 #!/usr/bin/env node
+// DeepBench v7.0.697 | scripts/personal-agent.js | AGT-106 -- READ_MAP hands the four judgment
+// capabilities the record kinds their Intents already name. strengths-gaps, posting-review and
+// match-finder now read `market_requirement` and `posting`; growth-review also gains `evidence`
+// and `resume_fact` (finding b115bc51: its 2026-09-28 run saw 41 records, graded both rungs "not
+// yet" with no evidence to cite, and returned sample_size 0 on every worth row -- an empty shelf,
+// not a judgment). KIND_FILTERS gains REVIEWED_POSTINGS for the three readers whose Intents select
+// postings "that carry pay" or "past their verdict": it is the exact mirror of match-finder's
+// `status === 'new'` on the same per-capability seam (pattern:17, pattern:18), so the 148 raw
+// intake cards -- 1,010 KB carrying neither pay nor verdict -- stay out of those prompts while
+// every reviewed row is in. Match-finder's own filter is unchanged, and readRecords is untouched.
+// Reversible: delete the three KIND_FILTERS entries and those readers see all 310 postings.
+// Kickoff: docs/kickoffs/v7.0.697-AGT-106-read-map-record-kinds.md.
+//
 // DeepBench v7.0.686 | scripts/personal-agent.js | AGT-154 -- the LinkedIn Alert Review capability's
 // call path. Four seams, all keyed by capability slug so no agent and no `if (capability === …)`
 // enters the script (pattern:13, pattern:2): READ_MAP gains the 12th capability; KIND_FILTERS is
@@ -107,14 +120,14 @@ export const READ_MAP = {
   'career-resume-review': PROFILE,
   'career-intro-pitch': PROFILE,
   'career-cover-letter': PROFILE,
-  'career-strengths-gaps': PROFILE,
-  'career-posting-review': PROFILE,
-  'career-match-finder': [...PROFILE, 'posting'],
+  'career-strengths-gaps': [...PROFILE, 'market_requirement', 'posting'],
+  'career-posting-review': [...PROFILE, 'market_requirement', 'posting'],
+  'career-match-finder': [...PROFILE, 'market_requirement', 'posting'],
   'career-interview-prep': ['resume_fact', 'target', 'network_contact', 'log'],
   'career-outreach-plan': ['network_contact', 'target'],
   'career-market-watch': ['target', 'market_requirement', 'watch_company'],
   'career-evidence-mining': ['evidence', 'resume_fact', 'target'],
-  'career-growth-review': ['ladder_rung', 'target', 'log', 'review'],
+  'career-growth-review': ['ladder_rung', 'target', 'log', 'review', 'evidence', 'resume_fact', 'market_requirement', 'posting'],
   'career-linkedin-alerts': ['resume_fact', 'target', 'ladder_rung', 'evidence', 'network_contact', 'posting', 'log'],
 };
 
@@ -124,8 +137,15 @@ export const READ_MAP = {
 // is unchanged; alert review deliberately has no entry, because its verification rules count the
 // reposting history and its skip rule reads the already-applied rows, both of which live in the
 // postings match-finder filters out.
+// AGT-106: the mirror of match-finder's predicate -- it drops only the raw `status:'new'` intake
+// cards (what --fetch-postings and the alert intake write) and keeps every other status, null too.
+const REVIEWED_POSTINGS = { posting: rec => rec?.data?.status !== 'new' };
+
 export const KIND_FILTERS = {
   'career-match-finder': { posting: rec => rec?.data?.status === 'new' },
+  'career-strengths-gaps': REVIEWED_POSTINGS,
+  'career-posting-review': REVIEWED_POSTINGS,
+  'career-growth-review': REVIEWED_POSTINGS,
 };
 
 // Extra, capability-specific reads that are not career_records. The value names the task_context key.

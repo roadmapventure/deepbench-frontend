@@ -1,3 +1,14 @@
+// DeepBench v7.0.697 | tests/regression/agt-84-personal-agent.test.mjs | AGT-84, extended by AGT-154
+// and AGT-106
+//
+// AGT-106 extends the same three parts rather than opening a parallel file (pattern:17), because the
+// change is four READ_MAP values and three KIND_FILTERS entries in the script these parts already
+// pin: (b) gains the four judgment capabilities' kinds, (f) gains the REVIEWED_POSTINGS mirror with
+// match-finder as its control, and (e) gains the one arm that is actual proof -- a LIVE render whose
+// prompt carries a market_requirement record and a reviewed posting record BY ID and carries no raw
+// intake card. The shape assertions in (b) and (f) cannot show that the shelf stopped being empty;
+// only the render can (pattern:73, pattern:129).
+//
 // DeepBench v7.0.686 | tests/regression/agt-84-personal-agent.test.mjs | AGT-84, extended by AGT-154
 //
 // AGT-154 adds the twelfth capability (career-linkedin-alerts) and four seams to the same script, so
@@ -17,12 +28,16 @@
 //       Negative controls: a copy with `agent = 'jerry'` spliced in fails the name check, and a copy
 //       with a child_process import spliced in fails the one-path check.
 //   (b) STATIC -- READ_MAP's keys are exactly the 11 career-* slugs; every kind it reads is in KINDS.
+//       AGT-106: strengths-gaps, posting-review, match-finder and growth-review each read
+//       market_requirement and posting, and growth-review also reads evidence and resume_fact.
 //   (c) STATIC -- validateAnswer refuses an unknown kind and a missing title, accepts a titled log.
 //   (d) STATIC -- pickPostings over the real normalizeBoard() of Greenhouse and Lever fixtures keeps
 //       "Senior Product Manager", drops "Staff Engineer", drops a stored url and a repeated one.
 //   (f) STATIC (AGT-154) -- KIND_FILTERS is keyed by CAPABILITY: match-finder's posting filter drops
 //       a reviewed row and keeps a new one, and the alert slug has NO entry, so alert review sees
-//       every posting (its reposting and already-applied rules read the old ones).
+//       every posting (its reposting and already-applied rules read the old ones). AGT-106: the
+//       three reviewed-posting readers hold the mirror predicate -- status:new out, "read" and a
+//       missing status in -- with match-finder's answer on the same row as the control.
 //   (g) STATIC (AGT-154) -- loadInput() reads the file by its SHAPE: a JSON file carrying a `cards`
 //       array becomes {intake, input:null}; a text file becomes {input, intake:null}. Control: JSON
 //       with no `cards` array stays raw text.
@@ -38,6 +53,10 @@
 //       reports >= 30 records, > 4000 prompt bytes and the judgment lane's model; --write inserts
 //       exactly 2 rows (the item + the run log), read back by id, deleted after; a refused answer
 //       exits 2 and writes nothing. READ_MAP's keys equal the live career-* capabilities.
+//       AGT-106: a strengths-gaps render over --target=pe-saas loads strictly more records than the
+//       resume review beside it (both read PROFILE; before this ticket strengths-gaps loaded FEWER)
+//       and its prompt carries a real market_requirement id and a real reviewed posting id, while
+//       the raw status:new intake card's id is absent.
 //
 // BASELINE (`node scripts/baseline-red-set.js --tests=tests/regression/agt-84-personal-agent.test.mjs`,
 // unchanged tree, exit 2):
@@ -70,6 +89,13 @@ const CAREER_SLUGS = [
   "career-outreach-plan", "career-posting-review", "career-resume-review", "career-strengths-gaps",
 ];
 const ALERTS = "career-linkedin-alerts";
+// AGT-106: the four capabilities whose Intents grade against market requirements and postings, and
+// the three of them that want the reviewed rows rather than the raw intake cards (match-finder keeps
+// its own new-only filter, which is this list's control in part (f)).
+const JUDGMENT_SLUGS = [
+  "career-strengths-gaps", "career-posting-review", "career-match-finder", "career-growth-review",
+];
+const REVIEWED_POSTING_READERS = ["career-strengths-gaps", "career-posting-review", "career-growth-review"];
 const SEED_REL = "docs/design/agt-154-linkedin-alerts-seed.sql";
 // The seven strings AGT-154 appends to jm-guardrails.must_not, in order (harvest AGT-154 section 3d).
 const APPENDED_MUST_NOT = [
@@ -142,13 +168,29 @@ async function partB() {
     for (const k of kinds) assert.ok(KINDS.includes(k), `READ_MAP["${slug}"] reads unknown kind "${k}"`);
   }
   assert.ok(READ_MAP["career-match-finder"].includes("posting"), "match-finder does not read postings");
+  // AGT-106: the four judgment capabilities read what their Intents grade against. Before this
+  // ticket strengths-gaps and posting-review read PROFILE alone, match-finder had no
+  // market_requirement, and growth-review read four kinds -- so every WORTH and gap clause in those
+  // Intents was graded over records that were never loaded (finding b115bc51: sample_size 0).
+  for (const slug of JUDGMENT_SLUGS) {
+    for (const k of ["market_requirement", "posting"]) {
+      assert.ok(READ_MAP[slug].includes(k),
+        `READ_MAP["${slug}"] does not read ${k} -- it is ${JSON.stringify(READ_MAP[slug])}`);
+    }
+  }
+  for (const k of ["evidence", "resume_fact"]) {
+    assert.ok(READ_MAP["career-growth-review"].includes(k),
+      `READ_MAP["career-growth-review"] does not read ${k} -- its must rule cannot grade a rung ` +
+      `without an evidence record to cite (finding b115bc51)`);
+  }
   // AGT-154: alert review reads the history its rules need -- postings (reposting, already-applied)
   // and log rows (already-applied stated in words) -- plus the profile it scores fit against.
   assert.deepStrictEqual(READ_MAP[ALERTS],
     ["resume_fact", "target", "ladder_rung", "evidence", "network_contact", "posting", "log"],
     `READ_MAP["${ALERTS}"] is ${JSON.stringify(READ_MAP[ALERTS])}`);
   assert.strictEqual(REPOS.length, 6, `REPOS has ${REPOS.length} entries, expected 6`);
-  return ["read-map-is-the-12-career-slugs", "read-map-kinds-all-known", "alerts-reads-postings-and-log"];
+  return ["read-map-is-the-12-career-slugs", "read-map-kinds-all-known", "alerts-reads-postings-and-log",
+          "four-judgment-caps-read-market-requirement-and-posting", "growth-review-reads-evidence-and-resume-fact"];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -209,7 +251,27 @@ async function partF() {
     `KIND_FILTERS["${ALERTS}"] exists -- alert review must see every posting row`);
   assert.ok(!Object.prototype.hasOwnProperty.call(KIND_FILTERS, "posting"),
     "KIND_FILTERS still carries a top-level `posting` key -- it is keyed by kind, not by capability");
-  return ["kind-filters-keyed-by-capability", "match-finder-filter-unchanged", "alerts-has-no-filter"];
+
+  // AGT-106: the three readers whose Intents select postings "that carry pay" or "past their
+  // verdict" hold the MIRROR of match-finder's predicate on the same per-capability seam. The two
+  // rows that discriminate are the ones the two predicates disagree on: a raw status:new intake card
+  // (no pay, no verdict) is dropped, a reviewed row is kept, and a row with NO status is kept --
+  // status:new is written by construction, so absence is not newness.
+  for (const slug of REVIEWED_POSTING_READERS) {
+    const f = KIND_FILTERS[slug];
+    assert.ok(f && typeof f.posting === "function", `KIND_FILTERS has no ${slug}.posting filter`);
+    assert.strictEqual(f.posting({ data: { status: "new" } }), false, `${slug} kept a raw status:new intake card`);
+    assert.strictEqual(f.posting({ data: { status: "read" } }), true, `${slug} dropped a reviewed (status:read) posting`);
+    assert.strictEqual(f.posting({ data: {} }), true, `${slug} dropped a posting carrying no status at all`);
+    // Control: match-finder's own filter answers the OPPOSITE on the same row, so these are
+    // genuinely complementary predicates and not one shared function reached twice.
+    assert.strictEqual(mf.posting({ data: { status: "new" } }), !f.posting({ data: { status: "new" } }),
+      `match-finder and ${slug} agree on a status:new posting -- the mirror is not in force`);
+    assert.strictEqual(mf.posting({ data: { status: "read" } }), !f.posting({ data: { status: "read" } }),
+      `match-finder and ${slug} agree on a reviewed posting -- the mirror is not in force`);
+  }
+  return ["kind-filters-keyed-by-capability", "match-finder-filter-unchanged", "alerts-has-no-filter",
+          "reviewed-postings-filter-for-three-readers"];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -447,6 +509,48 @@ async function partE() {
   assert.strictEqual(out.model, expected, `--render printed model ${out.model}, the judgment lane runs ${expected}`);
   assert.ok(r.stderr.includes(`# model: ${out.model}`), "--render did not print `# model: <id>` on stderr");
   results.push("render-loads-records-and-judgment-model");
+
+  // AGT-106 LIVE -- the proof, not the shape. Part (b) can only show the map now NAMES the kinds;
+  // what the ticket claims is that four capabilities were reading an empty shelf, and only a real
+  // render shows the shelf is stocked. Three ids picked live: a pe-saas market_requirement (M), a
+  // pe-saas posting past its verdict (P) and a raw status:new intake card (N). The prompt must carry
+  // M and P and must NOT carry N -- the last is what proves REVIEWED_POSTINGS is in force rather
+  // than the filter simply being absent.
+  const oneId = async q => (await getJson(`career_records?${q}&select=id&limit=1`))[0]?.id;
+  const M = await oneId("kind=eq.market_requirement&target_row=eq.pe-saas");
+  const P = await oneId("kind=eq.posting&target_row=eq.pe-saas&data->>status=neq.new");
+  const N = await oneId("kind=eq.posting&data->>status=eq.new");
+  if (!M || !P || !N) {
+    notRun("the AGT-106 live arm (strengths-gaps carries requirements and reviewed postings)",
+      `career_records has nothing to discriminate with: pe-saas market_requirement ${M}, reviewed ` +
+      `pe-saas posting ${P}, raw status:new posting ${N}. Measured 2026-09-28: 132 / 162 / 148 rows, ` +
+      `and the render carried M and P and not N (strengths-gaps --target=pe-saas 108 -> 186 records).`);
+  } else {
+    const sgFile = path.join(os.tmpdir(), `agt-106-${RUN}-strengths-gaps.md`);
+    try {
+      const sg = runScript(["--render", "--agent=jerry", "--capability=career-strengths-gaps",
+        "--target=pe-saas", `--out=${sgFile}`, "--json"], env);
+      assert.strictEqual(sg.status, 0, `--render for career-strengths-gaps exited ${sg.status}: ${sg.stderr.trim()}`);
+      const sgOut = JSON.parse(sg.stdout.trim());
+      console.log(`  [AGT-106] strengths-gaps --target=pe-saas: records_loaded=${sgOut.records_loaded} ` +
+        `prompt_bytes=${sgOut.prompt_bytes} vs resume-review ${out.records_loaded} over the same target`);
+      // Both read PROFILE over the same target, so resume-review is the live yardstick: strengths-gaps
+      // loaded FEWER than it before this ticket (108 vs 112 on 2026-09-28) and must load strictly
+      // more now. A pinned absolute count would go red every time a resume_fact row is added.
+      assert.ok(sgOut.records_loaded > out.records_loaded,
+        `strengths-gaps loaded ${sgOut.records_loaded} records and the resume review ${out.records_loaded} -- ` +
+        `it reads two kinds more over the same target, so it cannot load fewer`);
+      const sgMd = fs.readFileSync(sgFile, "utf8");
+      assert.ok(sgMd.includes(M), `the strengths-gaps prompt carries no market_requirement record (${M})`);
+      assert.ok(sgMd.includes(P), `the strengths-gaps prompt carries no reviewed posting record (${P})`);
+      assert.ok(!sgMd.includes(N), `the strengths-gaps prompt carries the raw status:new intake card ${N} -- ` +
+        `REVIEWED_POSTINGS is not filtering`);
+      console.log(`  [AGT-106] prompt carries market_requirement ${M} and reviewed posting ${P}; raw card ${N} absent`);
+      results.push("strengths-gaps-carries-requirements-and-priced-postings");
+    } finally {
+      fs.rmSync(sgFile, { force: true });
+    }
+  }
 
   // AGT-154 LIVE: the render carries the intake card and both enum vocabularies into the prompt.
   const intakeFile = writeTmp("live-intake.json", JSON.stringify(FIXTURE_INTAKE));
