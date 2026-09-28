@@ -1,5 +1,6 @@
 # DeepBench — Architecture North Star
 # Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-OWNERSHIP-01-design — Resource Ownership Brokers (§19e), corrects §19d's agent-naming mistake
+# Amended v7.0.688 | 2026-09-28 | cycle-20260928-1420 (runner) — AGT-173 R2: §19v Operations gains one sentence — the reason a ticket is not pickable is the pick predicate's own, rendered by `public.pick_exclusions()` (one CASE per `buildable` clause, firing on `NOT (<clause>)`), which `prime_directive_queue()`'s `buildable` joins as `reasons = '{}'`, the `project_blockers` view joins for the rest, and `scripts/run-project.js`'s `passOverNote()` words for the `assigned` payload's `pass_over_note` — so the queue, the board and the driver cannot disagree about why a row is out. Mirror `docs/design/agt-173-pick-exclusions.sql`; guard `tests/regression/agt-173-card-citations.test.mjs`.
 # Amended v7.0.667 | 2026-09-28 | cycle-20260928-0042 (runner) — AGT-238 slice 2: §19v Operations gains one sentence — how many projects hold an executing slot, and in what order, is The Development Manager's recorded, reversible decision, not a rule in code and not a knob. `project_concurrency_corpus()` is the one deterministic read it decides from (one row per project, LEFT JOINed so an epic-less project shows `epics=0` rather than vanishing: tickets left, blocked counts, leverage marks, close-rate proxy, `proposal_due`); `record_concurrency()` is its one writer — one `kind='concurrency'` decision, then one `runner_before_images` row per CHANGED row THEN the UPDATE, so `reverse_decision()` restores `projects`; `projects.status='executing'` stays the count and `projects.priority` stays the order, so no new column and no `max_concurrent` knob exists to disagree with them. It RAISES on a `proposed` or `planned` slug: starting a project that has never run stays John's words through `start_proposed_project()` (AGT-240). Mirror `docs/design/agt-238-concurrency-corpus.sql`; guard `tests/regression/agt-238-concurrency-corpus.test.mjs`.
 # Amended v7.0.662 | 2026-09-27 | opsflow-0927 (attended, The Builder) — AGT-240: §19v Operations gains one sentence — projects get a finish line. A project's list (its epic, `epics.locked_at`) locks when it starts executing and `epic_lock_guard` refuses a findings-born ticket into it, so what is found meanwhile waits on the findings list as `listed`; when every locked member is `done` or `removed`, The Auditor grades what the batch built and The Development Manager proposes ONE next project (`finish_project_batch()`, a `proposed` project whose tickets are not picked), which only a session on John's words starts (`start_proposed_project()`); `reverse_decision()` restores `projects`.
 # Amended v7.0.661 | 2026-09-27 | opsflow-0927 (attended, The Builder) — AGT-239: §19v Operations gains one sentence — the Auditor checks outcomes first. Every `audit_findings` row carries a `family` (service, blocked, flow, outcome, paperwork, other) set at INSERT from `runner_settings.finding_families`; `db_health_tick()` also files `db-restarted` and `db-pressure-red-repeat`; the per-run review files `audit_flow_checks()` (ships not closed, a verdict gate red for days, wasted cycles, filing outpacing closing) and its manager review ranks service before blocked before the rest and leaves `paperwork` to the weekly review.
@@ -2703,6 +2704,20 @@ classification → gated, always.**
   at grading time the card does not exist — which is exactly why `AGT-199` shipped the
   `state-render-card-missing` finding. A key reading a card its cycle has not written yet reports
   "not measured" on every honest cycle.
+
+  **AGT-173 R2 (`v7.0.688`) — the exclusion reason is the predicate's.** `public.pick_exclusions()`
+  is the ONE home of the pick-exclusion predicate and of the sentence for every clause it fails: one
+  CASE per `buildable` clause, each firing on `NOT (<clause>)` and each reading the setting or the
+  helper function rather than a copy of it. `prime_directive_queue()`'s `buildable` is now that core
+  joined on `reasons = '{}'`, the `project_blockers` view is the same core joined and kept for the
+  rows with reasons (appending only `no priority class`, board hygiene and never a `buildable`
+  clause), and `scripts/run-project.js`'s `passOverNote()` words the `assigned` payload's
+  `pass_over_note` from those same reasons — never from the manager's own `reason` (pattern 10). So
+  the queue, the board and the driver cannot disagree about why a row is out: before this ship the
+  view hand-copied six clauses as literals and carried neither the gate-card clause nor the EL-01
+  fence, which left `AGT-138`, `AGT-141` and `AGT-164` out of the queue with no reason anywhere
+  (18 open/partial tickets in executing projects, 0 in the queue, reasons for 15 → reasons for 18).
+  `drain_epic_next()`'s own copy stands, because a drain pick writes no exclusion reason.
 
 ### The blocker sweep & feature-owns-its-bugs
 

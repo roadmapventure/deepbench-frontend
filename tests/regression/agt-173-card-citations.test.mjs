@@ -72,9 +72,13 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { passOverNote } from "../../scripts/run-project.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SQL_REL = "docs/design/agt-173-card-citation-guard.sql";
+// R2 (v7.0.688). The mirror of migration `agt173_pick_exclusions`: the ONE home of the pick-exclusion
+// predicate, and the two readers that now join it instead of re-stating it.
+const SQL_REL2 = "docs/design/agt-173-pick-exclusions.sql";
 
 // The eight runner_items columns the card trigger watches, in the order the migration names them.
 export const CARD_COLUMNS = [
@@ -124,6 +128,27 @@ export const COMPLETED_CARD = "7c55bf10-3aba-44fe-a561-20d2cbed4683";
 export const BLOCK_ORDER_CYCLE = "4370e9cb-cc9e-4292-88bd-c38028298cbc";
 export const BLOCK_ORDER_TICKET = "SES-378";
 export const BLOCK_ORDER_HANDLE = "4df45c61";
+
+// Arm J (R2). agt-68-devmanager's own pass-over fixture, frozen here for the same reason every other
+// fixture in this file is frozen: cycle `c50ee60d` went past AGT-168 -- which project_blockers named
+// "needs a session John attends (needs-desktop)" -- for AGT-178, the next admitted row. `reasons` is a
+// STRING in that fixture and a text[] over PostgREST; the note must render both, so the shape is kept
+// exactly as the driver's own test states it.
+export const PASS_OVER_STATE = Object.freeze({
+  pick: { lane: "selfbuild", backlog_id: "AGT-168", title: "needs a session John attends" },
+  queue: [{ pos: 1, ref: "AGT-168" }, { pos: 2, ref: "AGT-178" }],
+  blockers: [{ backlog_id: "AGT-168", reasons: "needs a session John attends (needs-desktop)" }],
+  roster: [{ capability_slug: "build-ticket", engines: ["session", "executor"] }],
+});
+// The manager's OWN reason, which the note must not carry: the board's sentence is the board's.
+export const MANAGER_REASON = "AGT-168 looked unavailable to me, so I took the next one";
+export const PASS_OVER_ANSWER = Object.freeze({
+  action: "assign",
+  assignment: { backlog_id: "AGT-178", capability_slug: "build-ticket", engine: "session", reason: MANAGER_REASON },
+  passed_over: [{ backlog_id: "AGT-168", reason: "in project_blockers: needs a session John attends" }],
+});
+export const PASS_OVER_NOTE =
+  "MANAGER PASS-OVER: AGT-178 over AGT-168 (blocked: AGT-168: needs a session John attends (needs-desktop))";
 
 // Arm E / arm 0(f). THE REGEX, VERBATIM FROM THE SHIPPED SQL. \b is BACKSPACE in a POSIX ARE, not a
 // word boundary: the design's first form used it, matched nothing, and made a board full of dead shas
@@ -311,6 +336,106 @@ function theShippedSqlCarriesTheRule() {
   assert.ok(sql.includes("array['59e5e346', 'agt140_project_priority_pick', 'ea1c27fc']"),
     "the trailing DO gate no longer proves handle_token comes back populated for AGT-140 — a NULL " +
       "column passes every other assertion in that gate");
+}
+
+// ---------------------------------------------------------------------------------------------
+// ARM 0(h) — THE CORE IS ONE HOME (R2, v7.0.688). The whole of AGT-173's last finding is that the
+// exclusion PREDICATE had one home and the exclusion REASON had two, so this arm grades exactly that:
+// the core is defined once, BOTH readers join it, and the six clauses the view used to re-state as
+// literals are gone from it. Each assertion names a line whose loss puts the second copy back.
+// ---------------------------------------------------------------------------------------------
+
+function theCoreIsTheOnlyHome() {
+  const sql = fs.readFileSync(path.join(REPO, SQL_REL2), "utf8");
+
+  // DEFINED ONCE, and by its exact identity argument list — a retyped signature is an overload, not a
+  // replacement (.claude/rules/supabase-function-signature.md).
+  const defs = (sql.match(/CREATE OR REPLACE FUNCTION public\.pick_exclusions\(\)/g) || []).length;
+  assert.strictEqual(defs, 1,
+    `${SQL_REL2} defines public.pick_exclusions() ${defs} time(s) — the core exists to be the ONE home ` +
+      "of the predicate, and two definitions in one migration is the duplication it removes");
+
+  // JOINED IN BOTH READERS. The queue keeps the rows with no reasons; the view keeps the rest. Both
+  // spellings are asserted, because a reader that stopped joining the core has silently forked it.
+  assert.ok(sql.includes("JOIN public.pick_exclusions() x ON x.id = b.id AND x.reasons = '{}'::text[]"),
+    "prime_directive_queue()'s `buildable` no longer joins the core — its own WHERE is back, which is " +
+      "the second home this ship removed");
+  assert.ok(sql.includes("JOIN public.pick_exclusions() x ON x.id = b.id\n"),
+    "project_blockers no longer joins the core — its hand-copied clause list is back");
+
+  // THE VIEW CARRIES NO COPY OF A CLAUSE. Each literal below WAS in the shipped view before this ship
+  // and is now the core's business: the filing-lane cutoff, the claim staleness window and the
+  // unblocking-status list all read their setting or their function instead.
+  const iView = sql.indexOf("CREATE OR REPLACE VIEW public.project_blockers AS");
+  assert.ok(iView > 0, `${SQL_REL2} no longer replaces the project_blockers view`);
+  const view = sql.slice(iView, sql.indexOf("-- THE AFTER-IMAGE, materialised once.", iView));
+  assert.ok(view.length > 400, "the view span came back too short to grade — the marker after it moved");
+  for (const [literal, what] of [
+    ["'2026-08-21'", "the filing-lane cutoff (it is runner_settings.filing_lane_cutoff in the core)"],
+    ["'24:00:00'", "the claim staleness window (it is runner_settings.claim_stale_hours in the core)"],
+  ]) {
+    assert.ok(!view.includes(literal),
+      `the view carries ${literal} again — ${what}. That literal drifting out of step with the queue is ` +
+        "the defect AGT-173 R2 removed");
+  }
+  assert.ok(!/ARRAY\[\s*'done'(::text)?,\s*'removed'(::text)?,\s*'delivered'(::text)?\s*\]/.test(view),
+    "the view carries its own copy of the unblocking-status list again — that list is " +
+      "public.backlog_unblocking_statuses(), read by the core (SES-424 slice 7)");
+  // The one reason that is NOT a pick clause stays in the view, appended to the core's — folding it
+  // into the core would make an unclassed ticket unbuildable, which is a behaviour change.
+  assert.ok(view.includes("'no priority class'::text"),
+    "'no priority class' left the view — it is board hygiene, never a `buildable` clause, so it is " +
+      "appended to the core's reasons rather than moved into them");
+
+  // THE TRAILING GATE, and it is the gate that proves the ship rather than the migration's success
+  // flag (.claude/rules/supabase-column-grants.md: a migration reported success and changed nothing).
+  assert.ok(sql.includes("expected exactly 1"),
+    `${SQL_REL2}'s trailing DO no longer asserts exactly one overload per function name ` +
+      "(.claude/rules/supabase-function-signature.md)");
+
+  // BOTH GRANTS. The pick predicate is runner-internal and the anon key ships in the browser bundle.
+  assert.ok(sql.includes("REVOKE ALL ON FUNCTION public.pick_exclusions() FROM PUBLIC, anon, authenticated;"),
+    `${SQL_REL2} no longer revokes EXECUTE on the core from PUBLIC, anon and authenticated`);
+  assert.ok(sql.includes("GRANT EXECUTE ON FUNCTION public.pick_exclusions() TO service_role;"),
+    `${SQL_REL2} no longer grants EXECUTE on the core to service_role — the runner reads it, so a bare ` +
+      "REVOKE would take the queue down");
+}
+
+// ---------------------------------------------------------------------------------------------
+// ARM J — THE DRIVER WORDS THE PASS-OVER LINE (R2). No credentials: passOverNote is pure. The note
+// exists because the manager's own `reason` was the only account of why a row was skipped; the board
+// already holds that answer, and after this ship the board's answer IS the pick predicate's.
+// ---------------------------------------------------------------------------------------------
+
+function theDriverWordsThePassOver() {
+  const note = passOverNote(PASS_OVER_ANSWER, PASS_OVER_STATE);
+  assert.strictEqual(note, PASS_OVER_NOTE,
+    "passOverNote must name the assignment, the pick it went past, and the BOARD's reason for that row");
+  assert.ok(!note.includes(MANAGER_REASON),
+    "the note carries the manager's own `reason` — the reasons in this line come from state.blockers " +
+      "(project_blockers, whose reasons are now pick_exclusions()'s), never from the answer");
+
+  // A text[] `reasons` — the shape PostgREST actually returns — renders the same line, joined '; '.
+  assert.strictEqual(
+    passOverNote(PASS_OVER_ANSWER, {
+      ...PASS_OVER_STATE,
+      blockers: [{ backlog_id: "AGT-168", reasons: ["needs a session John attends (needs-desktop)", "no queue number"] }],
+    }),
+    "MANAGER PASS-OVER: AGT-178 over AGT-168 (blocked: AGT-168: needs a session John attends " +
+      "(needs-desktop); no queue number)",
+    "a text[] of reasons must render as one segment with '; ' between the sentences");
+
+  // NULL WITHOUT A PASS-OVER — the ordinary assignment. A note on every run would make the payload
+  // claim a pass-over that never happened.
+  const { passed_over, ...noPassOver } = PASS_OVER_ANSWER;
+  assert.strictEqual(passOverNote(noPassOver, PASS_OVER_STATE), null,
+    "an assignment with no `passed_over` must produce no note at all");
+  assert.strictEqual(passOverNote({ ...PASS_OVER_ANSWER, passed_over: [] }, PASS_OVER_STATE), null,
+    "an empty `passed_over` records nothing, so there is nothing to word");
+  // AND NULL WHEN THE PASS-OVER IS INADMISSIBLE: `answerErrors` refuses it, so no assignment is made
+  // and a note would describe a run that did not happen.
+  assert.strictEqual(passOverNote(PASS_OVER_ANSWER, { ...PASS_OVER_STATE, blockers: [] }), null,
+    "a pass-over passOverErrors refuses must produce no note — the refusal is the outcome, not a note");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -564,9 +689,120 @@ async function theLiveArms() {
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// ARM I — ONE PREDICATE, LIVE (R2). The census this ticket was filed over, re-measured as an
+// assertion: `pick_exclusions().reasons = '{}'` and "prime_directive_queue() returned it" must be the
+// SAME statement over every open/partial ticket of an executing project, and every absent row must
+// have its reasons on the board. Read-only — three RPCs and one view read, no write anywhere.
+// ---------------------------------------------------------------------------------------------
+
+async function theOnePredicateIsLive() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) {
+    notRun(
+      "arm I: pick_exclusions() and prime_directive_queue() agreeing row for row over every " +
+        "open/partial ticket of an executing project, and every absent one carrying its reasons in " +
+        "project_blockers",
+      "SUPABASE_URL and/or SUPABASE_SERVICE_KEY are absent. Arm 0(h) still graded the shipped SQL and " +
+        "arm J the driver's note. Canonical invocation: STANDARDS.md Section 2 rule 5.",
+    );
+    return;
+  }
+  // The anon half of the grant is not reachable here and is labelled rather than skipped (pattern:77):
+  notRun(
+    "arm I's anon-denied half — that anon and authenticated cannot EXECUTE public.pick_exclusions()",
+    "VITE_SUPABASE_ANON_KEY is absent from this environment, and pg_proc/proacl is not readable over " +
+      "PostgREST. Asserted at this ship (2026-09-28, v7.0.688) by migration agt173_pick_exclusions' own " +
+      "trailing DO block, in the SAME transaction that created the function and re-read after it: " +
+      "has_function_privilege('anon', 'public.pick_exclusions()', 'execute') = false, " +
+      "authenticated = false, service_role = true.",
+  );
+
+  // THE POPULATION, built from top-level filters only so a PostgREST embedding change cannot silently
+  // empty it: executing projects -> their epics -> their open/partial tickets.
+  const projects = await restGet(url, key, "projects?select=id&status=eq.executing");
+  assert.ok(projects.length > 0,
+    "premise gone: no project reads 'executing', so the Prime Directive does not stand and this arm " +
+      "grades nothing");
+  const epics = await restGet(url, key,
+    `epics?select=id&project_id=in.(${projects.map(p => p.id).join(",")})`);
+  assert.ok(epics.length > 0, "premise gone: no epic belongs to an executing project");
+  const tickets = await restGet(url, key,
+    `backlog_items?select=id,backlog_id,status&status=in.(open,partial)&epic_id=in.(${epics.map(e => e.id).join(",")})`);
+  assert.ok(tickets.length > 0,
+    "premise gone: no open or partial ticket belongs to an executing project");
+
+  const core = await rpc(url, key, "pick_exclusions", {});
+  const reasonsOf = Object.fromEntries(core.map(r => [r.backlog_id, r.reasons || []]));
+  const queue = await rpc(url, key, "prime_directive_queue", {});
+  const listed = new Set(queue.filter(r => r.ref).map(r => r.ref));
+  const board = await restGet(url, key, "project_blockers?select=backlog_id,reasons&scope=eq.ticket");
+  const boardReasons = new Map(board.map(r => [r.backlog_id, r.reasons || []]));
+  const settings = await restGet(url, key, "runner_settings?select=chain_max_noship_streak&id=eq.1");
+  const maxNoship = settings[0]?.chain_max_noship_streak;
+  assert.ok(Number.isInteger(maxNoship),
+    "runner_settings.chain_max_noship_streak did not come back as a number, so lane (c)'s fence cannot " +
+      "be excluded from this pairing and the arm would grade the wrong rows");
+
+  let graded = 0;
+  let absent = 0;
+  for (const t of tickets) {
+    // Lane (c)'s noship fence is NOT a pick_exclusions() clause — it is a property of the lane, not of
+    // the ticket — so a row it holds back is out of the population by design, never a disagreement.
+    const noship = await rpc(url, key, "ticket_noship_cycles", { p_backlog_id: t.backlog_id });
+    if (Number(noship) >= maxNoship) continue;
+    graded += 1;
+
+    const reasons = reasonsOf[t.backlog_id];
+    assert.ok(Array.isArray(reasons),
+      `pick_exclusions() returned no row for ${t.backlog_id} — the core must speak for every ticket, or ` +
+        "the queue joins nothing and the board explains nothing");
+    assert.strictEqual(reasons.length === 0, listed.has(t.backlog_id),
+      `${t.backlog_id}: pick_exclusions() gives ${reasons.length} reason(s) ` +
+        `(${reasons.join("; ") || "none"}) and prime_directive_queue() ` +
+        `${listed.has(t.backlog_id) ? "DID" : "did NOT"} return it. Those are the same statement after ` +
+        "AGT-173 R2: the queue's `buildable` IS `reasons = '{}'`");
+
+    if (listed.has(t.backlog_id)) continue;
+    absent += 1;
+    // THE FINDING THIS TICKET WAS FILED OVER: an absent row with no reason anywhere. On origin/dev
+    // AGT-138, AGT-141 and AGT-164 were exactly that — out on an undecided gated_before_build card,
+    // a clause the view never carried.
+    assert.ok(reasons.length > 0,
+      `${t.backlog_id} is absent from the queue and pick_exclusions() gives NO reason — that is the ` +
+        "defect AGT-173 R2 removed, not a passing case");
+    const onBoard = boardReasons.get(t.backlog_id);
+    assert.ok(Array.isArray(onBoard),
+      `${t.backlog_id} is excluded for ${reasons.length} reason(s) and has no project_blockers row at ` +
+        "all — the board is where a human reads the reason, so a reason only the core knows is not a " +
+        "reason anybody has");
+    const missing = reasons.filter(r => !onBoard.includes(r));
+    assert.deepStrictEqual(missing, [],
+      `project_blockers for ${t.backlog_id} is missing ${missing.join("; ")} — the view appends its own ` +
+        "'no priority class' to the core's reasons and subtracts nothing");
+  }
+
+  assert.ok(graded > 0,
+    `all ${tickets.length} ticket(s) are held back by lane (c)'s noship fence, so this arm graded 0 ` +
+      "rows — an empty pairing proves nothing");
+  if (absent === 0) {
+    notRun(
+      "arm I's absent-row half — that a ticket the queue leaves out carries every one of its reasons " +
+        "in project_blockers",
+      `all ${graded} graded ticket(s) are currently IN the queue, so there is no absent row to grade. ` +
+        "The pairing above still ran on every one of them. At this ship (2026-09-28) 18 of 18 were " +
+        "absent, 3 of them (AGT-138, AGT-141, AGT-164) with no reason anywhere before the change.",
+    );
+  }
+}
+
 export default async function run() {
   theShippedSqlCarriesTheRule();
+  theCoreIsTheOnlyHome();
+  theDriverWordsThePassOver();
   await theLiveArms();
+  await theOnePredicateIsLive();
 }
 
 selfRun(import.meta.url, run);

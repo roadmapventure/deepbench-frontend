@@ -451,6 +451,39 @@ function passOverErrors(answer, state, a, pick) {
   return null;
 }
 
+// AGT-173 R2 (v7.0.688) -- THE DRIVER WORDS THE PASS-OVER LINE, AND THE REASONS ARE THE BOARD'S.
+//
+// `passOverErrors` above decides whether a pass-over is admissible. What it did NOT do was say, in the
+// `assigned` payload, which rows the manager went past and WHY -- so a reader of the run had the
+// assignment and no trace of the skipped rows, and the only account of "why AGT-168 was skipped" was
+// whatever the manager wrote in `assignment.reason`: a model's sentence about a fact the board already
+// holds (pattern:10 -- when a correct value exists deterministically, no model is put in charge of it).
+//
+// So the note is composed HERE, from `state.blockers` -- `project_blockers`, read verbatim, whose
+// `reasons` are now `public.pick_exclusions()`'s and therefore the same predicate the queue used to
+// leave the row out (AGT-173's one home). The manager's own `reason` on each `passed_over` entry is
+// deliberately NOT read: it is the manager's opinion of the board, and this line is the board's.
+//
+// `null` unless there is something recorded AND it is admissible -- an inadmissible pass-over is
+// refused by `answerErrors` and never reaches an assignment, so a note for one would describe a run
+// that did not happen. `[].concat(b.reasons ?? [])` because `project_blockers.reasons` is a text[] over
+// PostgREST and a single sentence in the driver's own fixtures; both render the same line.
+export function passOverNote(answer, state) {
+  const po = answer ? answer.passed_over : undefined;
+  if (!Array.isArray(po) || po.length === 0) return null;
+  const a = answer.assignment;
+  const pick = state ? state.pick : null;
+  if (!a || typeof a !== "object" || Array.isArray(a) || !pick) return null;
+  if (passOverErrors(answer, state, a, pick)) return null;
+  const blockers = Array.isArray(state?.blockers) ? state.blockers : [];
+  const blocked = po.map(r => {
+    const id = String((r && r.backlog_id) ?? "");
+    const row = blockers.find(b => String(b && b.backlog_id) === id);
+    return `${id}: ${[].concat(row?.reasons ?? []).join("; ")}`;
+  });
+  return `MANAGER PASS-OVER: ${a.backlog_id} over ${pick.backlog_id} (blocked: ${blocked.join(" | ")})`;
+}
+
 // AGT-238 (v7.0.660) -- LEVERAGE FIRST (John 2026-09-27). The manager reads the whole queue and names,
 // in an optional `leverage` list of `{backlog_id, improves, why}`, the tickets whose fix makes other
 // tickets or agents run better; `public.record_leverage()` then writes `leverage_reason`, and both pick
@@ -1324,6 +1357,9 @@ async function main() {
         agent_id: rosterRow.agent_id, intent_slug: rosterRow.default_intent_slug, model: next.model,
         claimed: !args.dryRun, claim_rows: claim.rows.length, prompt_file: nextPromptPath,
         reason: answer.assignment.reason ?? null,
+        // AGT-173 R2: the rows the manager went past and the BOARD's reason for each, or null when
+        // nothing was recorded. Composed by passOverNote, never by the manager.
+        pass_over_note: passOverNote(answer, state),
         ...levExtra,   // AGT-238
         ...concExtra,  // AGT-238 slice 2
       },
