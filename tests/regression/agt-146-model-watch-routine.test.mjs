@@ -1,3 +1,7 @@
+// DeepBench v7.0.691 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-155 -- arm D's
+// registry pin moves from four routines to five: `market` (trig_015K3zgtnMztuNritHxC6uSW) joined the
+// drift check. The pin is the point -- a routine may only be added deliberately, in a session that
+// says so here.
 // DeepBench v7.0.678 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-146
 // FEATURE: AGT-146 -- the model-watch routine runs the Model Assignment capability on schedule.
 // docs/runbooks/model-watch-routine.md is the SOURCE and the routine is the copy (ARCHITECTURE.md
@@ -15,7 +19,7 @@
 //      deliberately violating copy of the same text.
 //   C  RUNBOOK -- the table and the steps name every command, function and literal the routine runs
 //      on; <= 40,960 bytes.
-//   D  REGISTRY -- ROUTINES keys are exactly runner, auditor, researcher, model-watch; the three
+//   D  REGISTRY -- ROUTINES keys are exactly runner, auditor, researcher, model-watch, market (AGT-155); the three
 //      pre-existing ids are byte-unchanged and model-watch's is null; the three sibling suites
 //      (agt-102, ses-355, agt-86h) still exit 0 against the changed finding() signature.
 //   E  LIVE (credentialed, else notRun) -- the step-3 pair algebra on the real rows: every release
@@ -249,8 +253,8 @@ async function run() {
     });
 
     await arm("D registry", async () => {
-      assert.deepEqual(Object.keys(ROUTINES).sort(), ["auditor", "model-watch", "researcher", "runner"],
-        "four routines: AGT-138 shipped `researcher` after this kickoff was written");
+      assert.deepEqual(Object.keys(ROUTINES).sort(), ["auditor", "market", "model-watch", "researcher", "runner"],
+        "five routines: AGT-155 added market");
       assert.equal(ROUTINES.runner.id, "trig_017TZ3JZcLBK6AYH6DKURqMH", "runner id unchanged");
       assert.equal(ROUTINES.auditor.id, "trig_01BCzPdanZ1YiK956dAqU6YN", "auditor id unchanged");
       assert.equal(ROUTINES.researcher.id, "trig_01862LsK4ZQF8PTgQoK2cgCV", "researcher id unchanged");

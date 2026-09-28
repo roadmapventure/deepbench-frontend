@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.691 | scripts/check-routine-prompt.js | AGT-155 -- `market` is the FIFTH routine the
+// check knows, and the first whose drift is not merely expected but DECLARED: update_trigger refuses
+// an agent on every routine of this account, so the live Wednesday prompt stays the 2026-09-25 text
+// until John pastes the block himself. Until then `--routine=market` reports DRIFT each Wednesday --
+// a finding, never a stop -- and the leads are reviewed anyway, because the review instruction also
+// lives on the nl-competitors-intent Skill row (v7.0.691).
 // DeepBench v7.0.689 | scripts/check-routine-prompt.js | AGT-265 -- the runner prompt runs in FOUR
 // sibling routines, each carrying its OWN trigger id in the stamp. For `runner` only, both sides are
 // canonicalized first: `DEEPBENCH-RUNNER-AUTOMATED-trig_<id>` -> the canonical id, so a sibling
@@ -14,11 +20,11 @@
 // routine's runbook.
 //
 // USAGE
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch --prompt=<file> [--out=<json>]
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch --note=<file> --cycle=<uuid> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market --prompt=<file> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market --note=<file> --cycle=<uuid> [--out=<json>]
 //
 // FLAGS
-//   --routine=runner|auditor|researcher|model-watch
+//   --routine=runner|auditor|researcher|model-watch|market
 //                              required. runner  -> docs/runbooks/routine-prompt.md,
 //                              <!-- ROUTINE-PROMPT-BEGIN --> / <!-- ROUTINE-PROMPT-END -->,
 //                              trig_017TZ3JZcLBK6AYH6DKURqMH.
@@ -36,6 +42,12 @@
 //                              there is no trigger id to carry; location 1 falls back to the routine
 //                              NAME (routine/model-watch/prompt). AGT-102's placeholder drift is the
 //                              reason an absent id is written absent, never guessed.
+//                              market -> docs/runbooks/market-agent.md,
+//                              <!-- NATHAN-WEDNESDAY-PROMPT-BEGIN --> / <!-- NATHAN-WEDNESDAY-PROMPT-END -->,
+//                              trig_015K3zgtnMztuNritHxC6uSW (AGT-155). Drift is DECLARED against
+//                              this one: update_trigger refuses an agent on every routine of this
+//                              account, so the runbook block is the source and the live prompt stays
+//                              the 2026-09-25 text until John pastes it.
 //   --prompt=<file>            PROMPT MODE: the prompt text the run was given, verbatim.
 //   --note=<file>              NOTE MODE: a runner_cycles.notes text that reports routine-prompt drift.
 //   --cycle=<uuid>             the runner_cycles id the --note came from (required with --note).
@@ -98,6 +110,19 @@ export const ROUTINES = {
     begin: "<!-- MODEL-WATCH-ROUTINE-PROMPT-BEGIN -->",
     end: "<!-- MODEL-WATCH-ROUTINE-PROMPT-END -->",
     id: null,
+  },
+  // AGT-155. The Wednesday market scan. The routine EXISTS and carries a real id, but it was created
+  // through the http_api surface, so update_trigger refuses an agent ("Agents can only update
+  // routines they created" -- SES-140, AGT-145, AGT-155). The block in market-agent.md is the source
+  // and John pastes it; until he does, `--routine=market` exits 1 every Wednesday naming the first
+  // differing line. That is a finding, never a stop -- and it is not the only path to the behaviour:
+  // the leads review instruction also lives on the nl-competitors-intent Skill row, so the render
+  // carries it whether the routine has been pasted or not.
+  market: {
+    file: "market-agent.md",
+    begin: "<!-- NATHAN-WEDNESDAY-PROMPT-BEGIN -->",
+    end: "<!-- NATHAN-WEDNESDAY-PROMPT-END -->",
+    id: "trig_015K3zgtnMztuNritHxC6uSW",
   },
 };
 

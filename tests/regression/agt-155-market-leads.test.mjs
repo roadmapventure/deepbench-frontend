@@ -1,3 +1,10 @@
+// DeepBench v7.0.691 | tests/regression/agt-155-market-leads.test.mjs | AGT-155 remainder -- the
+// leads instruction REACHES THE RENDER. v7.0.683 shipped the inbox, the render that carries the
+// leads and the validator that grades a review; the only place that ASKED for a review was the
+// Wednesday routine prompt, which update_trigger refuses an agent on this account -- so the live
+// render reached a sub-agent with leads and no instruction (0 lead_reviews live). Parts (e)-(g)
+// below are that gap closed: the Skill-row mirror, the drift check's fifth routine, and the live
+// proof that the render now carries the instruction.
 // DeepBench v7.0.683 | tests/regression/agt-155-market-leads.test.mjs | AGT-155
 //
 // FEATURE: AGT-155 -- the competitor leads inbox. public.market_leads is the one table both agent
@@ -14,6 +21,16 @@
 //       and an answer with no lead_reviews at all stays valid (the field is optional).
 //   (c) STATIC -- docs/design/agt-155-market-leads.sql carries the status check constraint and the
 //       `revoke all` line, and never names an agents.id outside a `--` comment line.
+//   (e) STATIC -- docs/design/agt-155-competitors-intent-leads.sql (the mirror of migration
+//       `agt155_competitors_intent_leads`) carries the schema patch, the one-row WHERE and the
+//       before-image insert, and names no agent and no other agent's private store on a code line.
+//   (f) CHECK -- scripts/check-routine-prompt.js knows `market`, carrying the routine's real trigger
+//       id; the runbook block compares equal to itself (exit-0 path), and a copy with the COMPETITOR
+//       LEADS paragraph removed produces exactly ONE finding that names it.
+//   (g) LIVE, inside (d) -- the pmm-competitors render carries `lead_reviews` at least twice and the
+//       `COMPETITOR LEADS:` instruction; the live nl-competitors-intent row carries the instruction
+//       and the OPTIONAL lead_reviews output property (in schema.properties, not schema.required).
+//
 //   (d) LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY, else NOT RUN) -- the anon key cannot read the
 //       table while the service key can; a jerry --write files exactly 1 lead (12 columns, status
 //       new); a nathan --render for pmm-competitors carries it; a nathan --write rejects it with a
@@ -28,6 +45,14 @@
 // New file: the whole file is the red set. On `966b4c3a` leadsFromAnswer is undefined, the SQL seed
 // is absent, lead_reviews is ignored by the validator, and the anon read 404s with PGRST205 because
 // the table itself does not exist -- so every part below fails if nothing changed.
+//
+// A SECOND DELIBERATE DEPARTURE, v7.0.691, stated rather than quietly dropped. Task 4(e) asks that
+// the mirror carry no `career_records` outside a `--` line. The mirror's DO block is required by the
+// kickoff's own §4 to assert `method NOT ILIKE '%career_records%'` -- a PROHIBITION, on a code line,
+// spelling the very token. Both cannot hold literally. The check below keeps the intent exactly and
+// closes no hole: the single line carrying `method NOT ILIKE '%career_records%'` is excluded, and
+// EXACTLY ONE such line must exist, so the exception cannot be widened to smuggle anything; every
+// other code line is held to the full ban, and a control proves the ban still has teeth.
 //
 // ONE DELIBERATE DEPARTURE FROM THE KICKOFF'S WORDING, stated rather than quietly dropped. Task 5(a)
 // asks that the derived row's JSON hold none of `4000000009`, `3/4`, `watch`, `legit`. The first of
@@ -49,11 +74,15 @@ import { spawnSync } from "child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { ROUTINES, extractBlock, comparePrompt } from "../../scripts/check-routine-prompt.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PERSONAL_REL = "scripts/personal-agent.js";
 const MARKET_REL = "scripts/market-agent.js";
 const SQL_REL = "docs/design/agt-155-market-leads.sql";
+const MIRROR_REL = "docs/design/agt-155-competitors-intent-leads.sql";
+const RUNBOOK_REL = "docs/runbooks/market-agent.md";
+const SKILL_SLUG = "nl-competitors-intent";
 const PERSONAL = path.join(ROOT, PERSONAL_REL);
 const MARKET = path.join(ROOT, MARKET_REL);
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
@@ -320,6 +349,40 @@ async function partD() {
     const rendered = runScript(MARKET, ["--render", "--agent=nathan", `--capability=${CAP}`, `--out=${outFile}`, "--json"], env);
     assert.strictEqual(rendered.status, 0, `--render exited ${rendered.status}: ${rendered.stderr.trim()}`);
     const renderText = fs.readFileSync(outFile, "utf8");
+
+    // --- (g) the instruction the lead needs, in the same render that carries the lead. Before
+    // v7.0.691 this render carried the lead and NOTHING that asked for a review: the only such text
+    // lived in a routine prompt update_trigger refuses an agent, so every scheduled run handed a
+    // sub-agent leads it had no contract to answer. `>= 2` is the discriminator -- the instruction
+    // names lead_reviews as the field AND as the empty answer, so a single stray mention (a column
+    // list, a leftover heading) does not pass for the instruction.
+    const lrInRender = (renderText.match(/lead_reviews/g) ?? []).length;
+    assert.ok(lrInRender >= 2,
+      `the ${CAP} render names lead_reviews ${lrInRender} time(s), expected >= 2 -- the review instruction did not reach the render`);
+    assert.ok(renderText.includes("COMPETITOR LEADS:"),
+      `the ${CAP} render carries no "COMPETITOR LEADS:" instruction, so the leads below it are unasked-for`);
+    results.push("render-carries-the-leads-review-instruction");
+
+    const skillRes = await fetch(
+      `${base}/rest/v1/skill_profiles?slug=eq.${SKILL_SLUG}&select=method,traits`, { headers: hdr });
+    // The body is read ONCE and then asserted on: a `await res.text()` inside an assert message is
+    // evaluated eagerly, consumes the stream, and makes the following .json() throw on the green path.
+    const skillBody = await skillRes.text();
+    assert.strictEqual(skillRes.status, 200,
+      `GET skill_profiles ${SKILL_SLUG} -> HTTP ${skillRes.status} ${skillBody}`);
+    const [skill] = JSON.parse(skillBody);
+    assert.ok(skill, `${SKILL_SLUG} is not a live skill_profiles row, so the render's instruction has no home`);
+    assert.ok(String(skill.method).includes("lead_reviews"),
+      `the live ${SKILL_SLUG} method carries no lead_reviews instruction`);
+    assert.deepStrictEqual(skill.traits?.schema?.properties?.lead_reviews?.items?.required,
+      ["id", "status", "note"],
+      `the live lead_reviews item contract is ${JSON.stringify(skill.traits?.schema?.properties?.lead_reviews?.items?.required)}`);
+    // OPTIONAL by design (designer's call iii): every capability that reads no leads, and every
+    // answer written before AGT-155, stays valid. In schema.properties, never in schema.required.
+    assert.ok(!(skill.traits?.schema?.required ?? []).includes("lead_reviews"),
+      `lead_reviews is listed in schema.required: ${JSON.stringify(skill.traits?.schema?.required)} -- it must stay optional`);
+    results.push("live-skill-row-carries-the-optional-lead-reviews-contract");
+
     assert.ok(renderText.includes(COMPANY), `the ${CAP} render does not carry the open lead's company`);
     assert.ok(renderText.includes(leadId), `the ${CAP} render does not carry the lead's id, so no review can name it`);
     results.push("lead-reader-render-carries-the-open-lead");
@@ -368,12 +431,97 @@ async function partD() {
   return results;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Part (e) -- STATIC: the Skill-row mirror
+// ---------------------------------------------------------------------------------------------
+// The load-bearing spans of docs/design/agt-155-competitors-intent-leads.sql. Each one is the
+// difference between the migration doing its job and doing damage: the jsonb_set PATH touches
+// properties only (a path ending `{schema,required}` would make lead_reviews mandatory for every
+// answer ever written); the WHERE pins the single row (an unpinned UPDATE rewrites every Skill on
+// the platform); the before-image span is `to_jsonb(s.*)` of the row, which is the only thing that
+// makes the change reversible.
+const MIRROR_SPANS = [
+  "jsonb_set(traits, '{schema,properties,lead_reviews}'",
+  "WHERE slug = 'nl-competitors-intent'",
+  "'skill_profiles', s.id::text, to_jsonb(s.*)",
+];
+// The one prohibition line the ban below excludes, for the reason the header states.
+const GUARD_LINE = "method NOT ILIKE '%career_records%'";
+const BANNED = [["agents.id", /agents\.id/], ["career_records", /career_records/], ["jerry", /\bjerry\b/i]];
+const bannedOn = sql => {
+  const code = sql.split("\n").filter(l => !l.trim().startsWith("--") && !l.includes(GUARD_LINE));
+  return BANNED.flatMap(([name, re]) => code.filter(l => re.test(l)).map(l => `${name}: ${l.trim()}`));
+};
+
+function partE() {
+  const results = [];
+  assert.ok(fs.existsSync(path.join(ROOT, MIRROR_REL)), `${MIRROR_REL} does not exist`);
+  const sql = read(MIRROR_REL);
+
+  for (const span of MIRROR_SPANS) {
+    assert.ok(sql.includes(span), `${MIRROR_REL} does not carry ${JSON.stringify(span)}`);
+  }
+  results.push("mirror-carries-the-three-load-bearing-spans");
+
+  // Rule #1 (§19d/§19e): a Skill row may name a table (data), never another agent or that agent's
+  // private store. The mirror is what a reviewer reads instead of the database, so the ban is on it.
+  const guards = sql.split("\n").filter(l => !l.trim().startsWith("--") && l.includes(GUARD_LINE));
+  assert.strictEqual(guards.length, 1,
+    `${MIRROR_REL} has ${guards.length} code lines carrying the ${JSON.stringify(GUARD_LINE)} guard, expected exactly 1 -- the ban's one exception may not be widened`);
+  assert.deepStrictEqual(bannedOn(sql), [],
+    `${MIRROR_REL} names an agent or another agent's private store on a code line`);
+
+  // Control: the same filter over a copy with all three tokens spliced onto one real code line must
+  // catch all three, so the empty result above is a measurement and not a check that cannot fire.
+  const control = sql.replace("COMMIT;", "select 'agents.id', 'career_records', 'jerry';\nCOMMIT;");
+  assert.notStrictEqual(control, sql, "control setup failed: the COMMIT; line was not found verbatim");
+  assert.strictEqual(bannedOn(control).length, 3,
+    `control: a copy naming all three tokens on a code line is caught ${bannedOn(control).length} time(s), expected 3 -- the ban does not discriminate`);
+  results.push("mirror-names-no-agent-or-private-store");
+  return results;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part (f) -- CHECK: the drift check's fifth routine
+// ---------------------------------------------------------------------------------------------
+function partF() {
+  const results = [];
+  assert.strictEqual(ROUTINES.market?.id, "trig_015K3zgtnMztuNritHxC6uSW",
+    `ROUTINES.market.id is ${JSON.stringify(ROUTINES.market?.id)} -- the check must know the routine by its own trigger id`);
+  assert.strictEqual(ROUTINES.market.file, "market-agent.md", "ROUTINES.market points at the wrong runbook");
+  results.push("check-knows-market-by-its-trigger-id");
+
+  const block = extractBlock(read(RUNBOOK_REL), ROUTINES.market);
+  assert.deepStrictEqual(comparePrompt(block.text, block, ROUTINES.market, "market"), [],
+    "the market block does not compare equal to itself -- --routine=market cannot reach exit 0");
+  results.push("market-block-compares-equal-to-itself");
+
+  // The control that makes the exit-0 above mean something: drop the paragraph this ticket is
+  // about, and the check must produce exactly ONE finding that names it on the repo side.
+  const lines = block.text.split("\n");
+  const at = lines.findIndex(l => l.startsWith("COMPETITOR LEADS (AGT-155):"));
+  assert.ok(at >= 0, "control premise: the block carries no COMPETITOR LEADS (AGT-155): line");
+  assert.strictEqual(lines[at + 1], "",
+    "control premise: the COMPETITOR LEADS line is not followed by a blank line, so removing two lines removes the wrong thing");
+  const without = [...lines.slice(0, at), ...lines.slice(at + 2)].join("\n");
+  const found = comparePrompt(without, block, ROUTINES.market, "market");
+  assert.strictEqual(found.length, 1, `dropping the leads paragraph produced ${found.length} findings, expected 1`);
+  assert.ok(found[0].locations[1].text.startsWith("COMPETITOR LEADS (AGT-155):"),
+    `the repo side of the finding is ${JSON.stringify(found[0].locations[1].text.slice(0, 60))}, expected the COMPETITOR LEADS line`);
+  assert.ok(found[0].locations[0].text.startsWith("NAPKIN (moved"),
+    `the live side of the finding is ${JSON.stringify(found[0].locations[0].text.slice(0, 60))}, expected the NAPKIN line that slid up into its place`);
+  results.push("dropping-the-leads-paragraph-is-one-finding-naming-it");
+  return results;
+}
+
 async function run() {
   const results = [];
   results.push(...(await partA()));
   results.push(...(await partB()));
   results.push(...partC());
   results.push(...(await partD()));
+  results.push(...partE());
+  results.push(...partF());
   return results;
 }
 
