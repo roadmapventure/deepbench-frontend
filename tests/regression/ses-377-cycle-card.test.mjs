@@ -28,6 +28,7 @@ import {
   parseBlocks,
   blocksByStep,
   runbookSha,
+  selectedBlocks,
   NOTES,
   FULL_BLOCK_MAX,
   CARD_BYTE_CAP,
@@ -43,28 +44,37 @@ const SCRIPT_REL = "scripts/render-cycle-card.js";
 const readLf = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 
 // A card step line: `**<label>.** <title> · L<n> · <outcome> · blocks: L<n>(<lang> <n>B) …`,
-// optionally followed by the one fenced block that step carries in full.
+// followed by EVERY consecutive fenced block that step carries in full.
+//
+// AGT-245: `fences` is a LIST, because a note's `block` is now a list -- step 7 carries three commands a
+// cycle cannot reconstruct (assemble the prompt, capture the regression baseline, 7a's hand-off) and a
+// reader that stopped at the first fence would have read the other two as "not on the card" and passed
+// the card whatever they were. Collection stops at the next step line, so a fence can never be attributed
+// to the step above the one it sits under.
 export function parseCard(card) {
   const lines = card.split("\n");
   const out = [];
+  const STEP_LINE = /^\*\*([0-9a-z-]+)\.\*\* (.*)$/;
   for (let i = 0; i < lines.length; i++) {
-    const m = /^\*\*([0-9a-z-]+)\.\*\* (.*)$/.exec(lines[i]);
+    const m = STEP_LINE.exec(lines[i]);
     if (!m) continue;
     const entry = {
       label: m[1],
       at: i + 1,
       text: m[2],
       anchors: [...m[2].matchAll(/L(\d+)\((\S+) (\d+)B\)/g)].map(a => Number(a[1])),
-      fence: null,
+      fences: [],
     };
-    // The block, when shown, is the next non-blank thing under the line.
+    // Every fence under the line, in card order, up to the next step line.
     let j = i + 1;
-    while (j < lines.length && lines[j] === "") j++;
-    const open = j < lines.length ? /^```([a-z]*)\s*$/.exec(lines[j]) : null;
-    if (open) {
+    while (j < lines.length && !STEP_LINE.test(lines[j])) {
+      if (lines[j] === "") { j++; continue; }
+      const open = /^```([a-z]*)\s*$/.exec(lines[j]);
+      if (!open) break;
       let k = j + 1;
       while (k < lines.length && !/^```\s*$/.test(lines[k])) k++;
-      entry.fence = { lang: open[1], body: lines.slice(j + 1, k).join("\n") };
+      entry.fences.push({ lang: open[1], body: lines.slice(j + 1, k).join("\n") });
+      j = k + 1;
     }
     out.push(entry);
   }
@@ -85,6 +95,10 @@ export function everyStepIsOnTheCard(card, md) {
 }
 
 // (C) Every fenced block on the card is the runbook's own bytes, at an L-anchor the card names.
+//
+// AGT-245: ONE-TO-ONE WITH `selectedBlocks(note, blocks)`, not "the first fence matches". The count is
+// asserted before the bodies are, so a card that dropped step 7's baseline-capture block -- the exact
+// defect AGT-245 was opened on -- is red on the count rather than green on the one block it kept.
 export function everyCardBlockIsTheRunbooksBytes(card, md) {
   const steps = parseSteps(md);
   const by = blocksByStep(steps, parseBlocks(md));
@@ -93,34 +107,36 @@ export function everyCardBlockIsTheRunbooksBytes(card, md) {
     const note = NOTES[line.label];
     assert.ok(note, `${CARD_REL} line ${line.at}: step **${line.label}.** has no NOTES entry`);
     const blocks = by.get(line.label) || [];
-    const chosen = note.block > 0 ? blocks[note.block - 1] : null;
-    const expected = chosen && Buffer.byteLength(chosen.body, "utf8") <= FULL_BLOCK_MAX ? chosen : null;
+    const expected = selectedBlocks(note, blocks);
 
-    if (!expected) {
-      assert.strictEqual(
-        line.fence,
-        null,
-        `${CARD_REL} line ${line.at}: step **${line.label}.** carries a fenced block, but its ` +
-          "selected block is absent or over FULL_BLOCK_MAX and must render as a pointer.",
-      );
-      continue;
-    }
-    assert.ok(line.fence, `${CARD_REL} line ${line.at}: step **${line.label}.** must carry its block in full (${Buffer.byteLength(expected.body, "utf8")}B <= ${FULL_BLOCK_MAX})`);
-    assert.ok(
-      line.anchors.includes(expected.start),
-      `${CARD_REL} line ${line.at}: the block shown starts at ${RUNBOOK_REL}:${expected.start}, ` +
-        `which the step line does not name (it names ${line.anchors.join(", ") || "nothing"}). ` +
-        "The L-anchor is how a cycle finds the block in the runbook; an unnamed one is unreachable.",
-    );
-    assert.strictEqual(line.fence.lang, expected.lang, `${CARD_REL} line ${line.at}: fence language differs from ${RUNBOOK_REL}:${expected.start}`);
     assert.strictEqual(
-      line.fence.body,
-      expected.body,
-      `${CARD_REL} line ${line.at}: the block is NOT byte-identical to ${RUNBOOK_REL}:${expected.start}. ` +
-        "A card block a cycle runs must be the runbook's own bytes -- a paraphrased command is the " +
-        "second-home defect check 13 exists to stop.",
+      line.fences.length,
+      expected.length,
+      `${CARD_REL} line ${line.at}: step **${line.label}.** carries ${line.fences.length} fenced ` +
+        `block(s), but its note selects ${expected.length} ` +
+        `(block: ${JSON.stringify(note.block)}, ${blocks.length} in its span). A selected block missing ` +
+        "from the card is a command the cycle never sees; an extra one is a block nothing selected.",
     );
-    shown++;
+
+    for (let n = 0; n < expected.length; n++) {
+      const want = expected[n];
+      const got = line.fences[n];
+      assert.ok(
+        line.anchors.includes(want.start),
+        `${CARD_REL} line ${line.at}: the block shown starts at ${RUNBOOK_REL}:${want.start}, ` +
+          `which the step line does not name (it names ${line.anchors.join(", ") || "nothing"}). ` +
+          "The L-anchor is how a cycle finds the block in the runbook; an unnamed one is unreachable.",
+      );
+      assert.strictEqual(got.lang, want.lang, `${CARD_REL} line ${line.at}: fence ${n + 1}'s language differs from ${RUNBOOK_REL}:${want.start}`);
+      assert.strictEqual(
+        got.body,
+        want.body,
+        `${CARD_REL} line ${line.at}: fence ${n + 1} is NOT byte-identical to ${RUNBOOK_REL}:${want.start}. ` +
+          "A card block a cycle runs must be the runbook's own bytes -- a paraphrased command is the " +
+          "second-home defect check 13 exists to stop.",
+      );
+      shown++;
+    }
   }
   assert.ok(shown > 0, `${CARD_REL} shows no block in full at all -- the card would be a table of contents, not an executable digest`);
   return shown;

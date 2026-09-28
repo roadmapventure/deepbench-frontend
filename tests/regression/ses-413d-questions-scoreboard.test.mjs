@@ -221,7 +221,13 @@ export const RUNBOOK_CEILING = 381000;
 // stamps[0] keeps its v7.0.658 AGT-237 prefix for ses-424c). agt-138 requires the file stay under its
 // 380980 B pre-change mark, and the SES-298/302 pointer stays (ses-336 needs entry A), so the bytes
 // came from step 0's meter-age prose (−28 B). Net +22 B: 380936 -> 380958. Re-measured with wc -c.
-export const BYTES_AT_SHIP = 380958;
+// v7.0.690 (AGT-245) arms the delta gate's doc half on top of that: step 7's capture line names `$S` as
+// the scratchpad (+13 B) and 7a's hand-off loses the LITERAL two-character `\n` that had been gluing
+// `--regression-baseline` onto `--changed-files`' value (byte-neutral, the block stays 381 B). Net +13 B:
+// 380958 -> 380971, 29 B under SES-336's ceiling. No header stamp (ses-424c pins stamps[0]), so
+// HEADER_STAMPS stays 5. Re-measured with wc -c on this tree, in the same commit as the runbook edit and
+// the card re-render.
+export const BYTES_AT_SHIP = 380971;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

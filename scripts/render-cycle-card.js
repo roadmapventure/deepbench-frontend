@@ -110,6 +110,15 @@ export function blocksByStep(steps, blocks) {
 // `block` is the 1-based index of the step's fenced block to show in full (1 = the first, which is
 // the command in almost every step; 0 = the step has no block, or none worth carrying). A selected
 // block over FULL_BLOCK_MAX degrades to a pointer on its own -- that is a size fact, not an edit.
+//
+// AGT-245: `block` MAY BE A LIST, and the reason is a measured miss rather than a generalisation for
+// its own sake. Step 7 runs three commands a cycle cannot reconstruct -- assemble the Builder prompt,
+// CAPTURE THE REGRESSION BASELINE on the unchanged clone, and 7a's verdict hand-off -- and the card
+// carried only the first, so `grep -c baseline docs/runbooks/cycle-card.md` was 0 while the runbook had
+// carried the flag since v7.0.659. A cycle executing the card therefore never saw the one input the
+// delta gate cannot be graded without, and the ledger holds 47 baseline-less blocks to show it. A step
+// with several unreconstructable commands needs several blocks; one index per step was the constraint
+// that hid one of them.
 export const NOTES = {
   gate:       { outcome: "should_boot true → step 0; false → one did_not_run row and end, nothing else", block: 1 },
   "0":        { outcome: "branch session/cycle-<UTC>; never main; an unattended cycle writes no .claude/", block: 1 },
@@ -129,7 +138,7 @@ export const NOTES = {
   "5":        { outcome: "the queue's first admitted row is the pick; ONE item; rename at the pick", block: 1 },
   "5a":       { outcome: "write files N (+k) / tasks M (+k) into notes; step 7 grades the ship on them", block: 1 },
   "6":        { outcome: "premise holds → revalidated_at = now() and build; dead → removal proposed", block: 1 },
-  "7":        { outcome: "assemble build-ticket, never hand-build; ONE ship point; settle-ship.js writes the status", block: 1 },
+  "7":        { outcome: "baseline FIRST; 7a: --regression-baseline or exit 2; settle-ship.js writes the status", block: [1, 2, 5] },
   "7b":       { outcome: "every judgment write is a decision row with a handle and a reversal window", block: 2 },
   "8":        { outcome: "your own ship broke dev → revert-forward, restore before-images, 'reverted'", block: 0 },
   "8a":       { outcome: "re-run 4a with the post-push sha; the engine classifies, never you by hand", block: 0 },
@@ -139,6 +148,30 @@ export const NOTES = {
   "8d":       { outcome: "0 rows = nothing owed; one review per cycle, never instead of the build", block: 1 },
   "9":        { outcome: "write the record; ONE statement closes your row and releases the lease; THEN the gate", block: 2 },
 };
+
+// Pure. The blocks a step's note selects, in the order the note names them, each already known to fit.
+//
+// ONE INDEX OR MANY, THE SAME RULE: `[].concat(note.block)` makes `block: 1` and `block: [1, 2, 5]` the
+// same shape, so the single-index form renders exactly as it did before AGT-245 -- 40 of the 41 notes
+// are untouched by construction, not by inspection.
+//
+// A NON-POSITIVE OR ABSENT INDEX IS A POINTER, NEVER A THROW. `block: 0` is the note's own way of saying
+// "this step has no block worth carrying", and an index past the end is the same fact arrived at by
+// arithmetic; both drop out here and the step line still names every block's L-anchor and size, which is
+// what a cycle needs to go read it. And the FULL_BLOCK_MAX filter stays here rather than at the call
+// site: the card's size budget is a property of what gets carried, so the one function that decides what
+// gets carried is where it belongs -- `render()` and the guard then cannot disagree about it.
+export function selectedBlocks(note, blocks) {
+  const out = [];
+  for (const raw of [].concat(note.block)) {
+    if (!Number.isInteger(raw) || raw <= 0) continue;
+    const b = blocks[raw - 1];
+    if (!b) continue;
+    if (Buffer.byteLength(b.body, "utf8") > FULL_BLOCK_MAX) continue;
+    out.push(b);
+  }
+  return out;
+}
 
 export function runbookSha(md) {
   return crypto.createHash("sha256").update(lf(md), "utf8").digest("hex").slice(0, 16);
@@ -180,8 +213,7 @@ export function render(md) {
       ? blocks.map(b => `L${b.start}(${b.lang || "-"} ${Buffer.byteLength(b.body, "utf8")}B)`).join(" ")
       : "none";
     out.push(`**${s.label}.** ${s.title} · L${s.line} · ${note.outcome} · blocks: ${list}`);
-    const chosen = note.block > 0 ? blocks[note.block - 1] : null;
-    if (chosen && Buffer.byteLength(chosen.body, "utf8") <= FULL_BLOCK_MAX) {
+    for (const chosen of selectedBlocks(note, blocks)) {
       out.push("");
       out.push("```" + chosen.lang);
       out.push(chosen.body);

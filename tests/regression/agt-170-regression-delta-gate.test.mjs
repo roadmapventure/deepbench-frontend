@@ -101,15 +101,31 @@
 //     runbook that arms the flag off a capture taken without credentials would hand the gate an
 //     `unverified` list wide enough to absorb a real newly red test. The needle makes the runbook say so.
 
+//
+// ---- AGT-245 (v7.0.690): NO BASELINE, NO VERDICT ---------------------------------------------------
+//
+// (s3) THE OPTION BECOMES A GATE, AND THE REFUSAL IS ASSERTED FROM A REAL PROCESS. AGT-170's baseline was
+//     optional, and the ledger says what that cost: 66 `runner_verdicts` rows since 2026-09-27T00Z, 47
+//     carrying `REGRESSION_NO_BASELINE_REASON`, all blocks -- every one a delivery graded on somebody
+//     else's standing red, the defect AGT-170 was built to end. `baselineGate()` is graded on §4's three
+//     inputs (refuse / declared / real) plus a NEVER-REFUSING mutant, because a clause that only checked
+//     the happy shapes would stay green against a gate that restored the option. Then the refusal itself:
+//     `scripts/verifier.js --dry-run --json`, credentials removed, no baseline, `timeout: 90000` -> status
+//     2 and `error: "no-regression-baseline"`. The timeout is half the assertion -- on `origin/dev` that
+//     same command runs the whole suite and prints a block, which cannot finish in 90 s. And the wiring is
+//     ordered, not merely present: `baselineGate(` must appear BEFORE `for (const gate of GATES)`, since a
+//     refusal computed after the loop has already spent the ~20 minutes it exists to protect.
+
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { RUNBOOK_REL } from "../../scripts/render-cycle-card.js";
 import {
   GATES, gateStatus, verdictFor, failingTestsFrom, regressionDelta, readRegressionBaseline,
-  REGRESSION_NO_BASELINE_REASON, notRunTestsFrom,
+  REGRESSION_NO_BASELINE_REASON, notRunTestsFrom, baselineGate,
 } from "../../scripts/verifier.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -549,13 +565,16 @@ export default async function run() {
     "the wiring control did not fire -- a copy of the verifier with the delta unwired passed, so this " +
     "clause pins nothing.");
 
-  // The inertness is DECLARED, not silent: a flag no procedure passes, with nothing in the file saying
-  // so, is indistinguishable from a flag somebody forgot to wire.
-  for (const needle of ["DELIBERATELY INERT AS SHIPPED", "--regression-baseline=", "ses-413d-questions-scoreboard.test.mjs"]) {
+  // AGT-245: the ARMING is DECLARED, not silent -- the same clause, pointed the other way. It used to
+  // require the file to say the flag ships inert; now it requires the file to say the flag is armed,
+  // to name the escape hatch a cycle with no unchanged tree uses (`--no-baseline=`), and still to name
+  // what the arming cost (the three coupled files). A header left reading "inert" beside a gate that
+  // refuses is worse than no header: the next reader would take the refusal for a bug.
+  for (const needle of ["ARMED (AGT-245", "--regression-baseline=", "--no-baseline=", "ses-413d-questions-scoreboard.test.mjs"]) {
     assert.ok(verifierSrc.includes(needle),
-      `${VERIFIER_REL} must state that AGT-170's flag ships inert and name what arming it costs ` +
-      `(missing \`${needle}\`). Otherwise the next reader cannot tell an unwired flag from a ` +
-      `deliberately unarmed one -- the SES-376 / SES-359 disposition, in their own words.`);
+      `${VERIFIER_REL} must state that AGT-170's flag is now ARMED, name the declared-omission escape ` +
+      `hatch, and name what arming it costs (missing \`${needle}\`). Otherwise the next reader cannot ` +
+      `tell an armed gate from a broken one -- the SES-376 / SES-359 disposition, in their own words.`);
   }
 
   // THE ARMING CHECK, CONDITIONAL ON THE ARMING. Inert today; a real check the moment a runbook step
@@ -591,12 +610,89 @@ export default async function run() {
     "an unarmed runbook must read inert rather than throw -- this guard may not be red until the " +
     "arming ships.");
 
+  // ---- (s3) AGT-245: NO BASELINE, NO VERDICT -- the rule, the refusal, and the wiring ------------
+  //
+  // WHAT THIS CLAUSE IS FOR, and it is not "baselineGate returns objects". AGT-170 left the baseline
+  // OPTIONAL, and the measured consequence is on the ledger: 47 of 66 `runner_verdicts` rows since
+  // 2026-09-27T00Z carry `REGRESSION_NO_BASELINE_REASON`, all blocks. So the load-bearing assertion here
+  // is the REFUSAL -- a real process, credentials removed, no baseline, exiting 2 with `cannot-run`
+  // before it spawns a single gate. A pure-function-only clause would pass against a verifier that
+  // computed the refusal and then ran the suite anyway.
+  const readNone = readRegressionBaseline("");
+  const readReal = readRegressionBaseline("baseline.txt", () => "  [FAIL] a.test.mjs -- boom\n");
+  assert.strictEqual(readNone.names, null, "fixture: a baseline-less read must have names null");
+  assert.deepStrictEqual(readReal.names, ["a.test.mjs"], "fixture: the real-baseline read must parse its one name");
+
+  // §4's three inputs, exactly. Written as a function over the gate so the SAME three assertions can be
+  // re-run against a mutant -- a control that grades a different thing pins nothing (the SES-158 failure).
+  const gradeGate = (gate) => {
+    assert.deepStrictEqual(gate({ read: readNone, declared: "" }), { refuse: true, reason: readNone.source },
+      "no baseline and no declaration must REFUSE, carrying the read's own source as the reason");
+    assert.deepStrictEqual(gate({ read: readNone, declared: "attended" }),
+      { refuse: false, declared: "attended",
+        source: "omitted by declaration (--no-baseline=attended); the absolute exit code stands (AGT-245)" },
+      "a DECLARED omission must proceed and must say so in the source the row records");
+    assert.deepStrictEqual(gate({ read: readReal, declared: "" }),
+      { refuse: false, declared: null, source: readReal.source },
+      "a real baseline must proceed with declared null and the read's own source");
+    // The Designer's recorded call (JOHN-0925-DESIGNER-DECIDES, (2)): a BARE `--no-baseline` is "" out of
+    // arg() and refuses. Whitespace is the same case -- a declaration whose content is empty declares
+    // nothing, and accepting it would turn the gate back into the option AGT-170 shipped.
+    for (const empty of ["", "   ", undefined]) {
+      assert.strictEqual(gate({ read: readNone, declared: empty }).refuse, true,
+        `a bare/empty --no-baseline (${JSON.stringify(empty)}) must refuse, not pass as a declaration`);
+    }
+  };
+  gradeGate(baselineGate);
+
+  // The mutant: a gate that never refuses -- the exact regression that would restore AGT-170's optional
+  // baseline while leaving every other assertion in this file green.
+  const neverRefuses = ({ read, declared }) => ({ refuse: false, declared: declared || null, source: read.source });
+  assert.throws(() => gradeGate(neverRefuses), /REFUSE/,
+    "the (s3) control did not fire -- a gate that never refuses passed §4's inputs, so this clause pins nothing");
+
+  // THE WIRING, AND ITS ORDER. `baselineGate(` must be called BEFORE the gate loop: the loop spawns the
+  // build and the full suite (~20 min measured), and a refusal computed after that has already spent the
+  // run it exists to protect. Index order in the source is the only check that catches a correct call
+  // placed in the wrong place.
+  const gateCallAt = verifierSrc.indexOf("baselineGate(");
+  const loopAt = verifierSrc.indexOf("for (const gate of GATES)");
+  assert.ok(gateCallAt > 0, `${VERIFIER_REL} never calls \`baselineGate(\` -- the rule is a pure function nothing consults (AGT-245).`);
+  assert.ok(loopAt > 0, `${VERIFIER_REL} no longer has the \`for (const gate of GATES)\` loop to order against.`);
+  assert.ok(gateCallAt < loopAt,
+    `${VERIFIER_REL} calls baselineGate() at ${gateCallAt}, AFTER the gate loop at ${loopAt}. The refusal ` +
+    "must happen while it is still free -- a missing baseline discovered after the suite has run has " +
+    "already cost the 20 minutes and the 47 rows AGT-245 exists to stop (AGT-245).");
+  assert.ok(verifierSrc.includes('arg("no-baseline"'),
+    `${VERIFIER_REL} never reads \`--no-baseline=\`, so the declared-omission path is unreachable and the gate is a hard block (AGT-245).`);
+
+  // THE REFUSAL FROM A REAL PROCESS. Credentials REMOVED (so this never touches Supabase and never
+  // depends on them) and no --regression-baseline: --dry-run reaches the gate, and the gate must exit 2
+  // before anything is spawned. The timeout is the assertion's other half -- on `origin/dev` this same
+  // command runs the whole suite and prints a block, which takes far longer than 90 s.
+  const env = { ...process.env };
+  delete env.SUPABASE_URL;
+  delete env.SUPABASE_SERVICE_KEY;
+  const refusal = spawnSync(process.execPath, [path.join(ROOT, VERIFIER_REL), "--dry-run", "--json"],
+    { cwd: ROOT, encoding: "utf8", env, timeout: 90000 });
+  assert.strictEqual(refusal.status, 2,
+    `${VERIFIER_REL} --dry-run --json with no --regression-baseline exited ${refusal.status} (expected 2 -- ` +
+    `cannot-run, no gate, no row).\n${refusal.stdout}${refusal.stderr}`);
+  let refusalJson = null;
+  try { refusalJson = JSON.parse(String(refusal.stdout).trim().split("\n").pop()); } catch { refusalJson = null; }
+  assert.ok(refusalJson, `${VERIFIER_REL} --json printed no parseable payload on the refusal:\n${refusal.stdout}${refusal.stderr}`);
+  assert.strictEqual(refusalJson.error, "no-regression-baseline",
+    `the refusal payload's error must be "no-regression-baseline" (got ${JSON.stringify(refusalJson.error)}) -- ` +
+    "the string a cycle's own report and the runner's decision rows are keyed on.");
+  assert.strictEqual(refusalJson.kind, "cannot-run",
+    "the refusal must be kind cannot-run -- NOT a verdict, so it can never cost the ladder a streak (AGT-245).");
+
   console.log(`  [AGT-170] failingTestsFrom anchors at the line start (${names.length} names, the ` +
     `in-message [FAIL] harvested none); one exit-1 fixture reads green through the delta and ` +
     `${gateStatus({ ran: true, exitCode: 1 })} through the rule it retired; 1 newly red name is red ` +
     `and named; no baseline / skipped / no-names / unparsed all fail closed; ${greens} of ${pairs} ` +
     `AGT-116 matrix pairs may go green and never one with an escapee; ${approves} of ${combos} ` +
-    `verdict combinations approve; ${VERIFIER_REL} is wired and declares the flag inert, ` +
+    `verdict combinations approve; ${VERIFIER_REL} is wired and declares the flag ARMED, ` +
     `${RUNBOOK_REL} reads ${arming}, both controls red`);
   console.log(`  [AGT-170 slice 2] a baseline's NOT A FULL RUN name reads unverified, not newly red ` +
     `(fixed: newlyRed [] + unverifiedInBaseline [never-verified.test.mjs], status red; slice 1's shape ` +
@@ -605,6 +701,11 @@ export default async function run() {
     `reads standing and still grades green; a full-run baseline's green reason is byte-identical to ` +
     `slice 1's; the real capture pair reads ${realPair}; the arming needles now require ` +
     `SUPABASE_SERVICE_KEY, control red`);
+  console.log(`  [AGT-245] baselineGate refuses a baseline-less run and a bare --no-baseline, proceeds on ` +
+    `--no-baseline=attended with the declaration in its source, and passes a real baseline through ` +
+    `untouched; the never-refusing mutant is red; baselineGate( is wired at ${gateCallAt} BEFORE the gate ` +
+    `loop at ${loopAt}; a real uncredentialed --dry-run --json exited ${refusal.status} with ` +
+    `error=${refusalJson.error} kind=${refusalJson.kind} inside 90 s, no gate and no row`);
 }
 
 selfRun(import.meta.url, run);

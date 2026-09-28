@@ -730,19 +730,29 @@ export function summarizeGateOutput({ stdout, stderr }) {
 // `tests/regression/run-all.js:150` prints `  [FAIL] <file> -- <message>` on stdout, and the gate
 // already captures that output for `summarizeGateOutput`. Nothing new is run and nothing is trusted.
 //
-// DELIBERATELY INERT AS SHIPPED, and named here so nobody reads the silence as a bug -- the same
-// disposition `kickoffCapFinding` and `kickoffLaneFinding` shipped on, for the same reason. No
-// runbook step passes `--regression-baseline=` yet, so `baseline` is null on every production run and
-// the gate grades the absolute exit code exactly as it did before this ship. ARMING IT IS AN EDIT TO
-// THREE FILES AT ONCE, which is why it is not in this delivery and is not one line in a doc: any byte
-// change to `docs/runbooks/runner-cycle.md` also requires (1) `docs/runbooks/cycle-card.md`
-// re-rendered in the same commit, because the card's header carries a sha256 of the runbook
-// (`SES-377`, `scripts/render-cycle-card.js --write`), and (2) `BYTES_AT_SHIP` in
-// `tests/regression/ses-413d-questions-scoreboard.test.mjs` re-measured and re-pinned in the same
-// commit (`ses-424f` asserts the pair agrees). Measured on this tree: arming it inside AGT-170's
-// 3-file cap left 8 tests newly red, so the doc half is a separate attended edit. The code lands
-// first so that arming it is a doc change and a re-render rather than a code change nobody wants to
-// make under time pressure at the ship point.
+// ARMED (AGT-245, v7.0.690), and the shape of the miss is why the arming is a GATE rather than another
+// doc line. `docs/runbooks/runner-cycle.md` has carried `--regression-baseline=` since `v7.0.659`, so
+// the flag was not missing from the procedure -- it was missing from every RUN. Measured on this clone
+// at `c946790`: `grep -c baseline docs/runbooks/cycle-card.md` was `0` (the card a cycle actually
+// executes never carried step 7's capture or 7a's flag, only step 7's first block), and the runbook's
+// own hand-off line carried a LITERAL two-character `\n` where a continuation belonged, so the flag
+// arrived glued to `--changed-files`' value when it arrived at all. AGT-245's audit reads the cost off
+// the ledger: 66 `runner_verdicts` rows since 2026-09-27T00Z, 47 of them carrying
+// `REGRESSION_NO_BASELINE_REASON`, all blocks -- each one a delivery graded on somebody else's
+// standing red, which is the exact defect AGT-170 was built to end. An optional input to a fail-closed
+// gate is not a safeguard; it is a step nobody runs. So the flag is now REQUIRED rather than read:
+// `baselineGate()` refuses a run handed no baseline with exit 2 (`cannot-run`, no gate, no row), and a
+// cycle with no unchanged tree to measure declares the omission with `--no-baseline=<reason>`, which is
+// recorded in the row it then proceeds to write.
+//
+// THE RULE IT ARMS IS UNCHANGED, and the coupling that made arming it expensive is unchanged too.
+// ARMING IT IS AN EDIT TO THREE FILES AT ONCE: any byte change to `docs/runbooks/runner-cycle.md` also
+// requires (1) `docs/runbooks/cycle-card.md` re-rendered in the same commit, because the card's header
+// carries a sha256 of the runbook (`SES-377`, `scripts/render-cycle-card.js --write`), and (2)
+// `BYTES_AT_SHIP` in `tests/regression/ses-413d-questions-scoreboard.test.mjs` re-measured and
+// re-pinned in the same commit (`ses-424f` asserts the pair agrees). Measured on this tree: arming it
+// inside AGT-170's 3-file cap left 8 tests newly red, which is why the code landed first and the doc
+// half is this attended edit rather than a line somebody adds under time pressure at the ship point.
 
 // Pure. The `[FAIL]` names in a gate's output, sorted and unique. NAMES ONLY -- "newly red BY NAME"
 // is the comparison, so the message body is deliberately dropped: a test that fails with a different
@@ -924,10 +934,11 @@ export function regressionDelta({ absolute, baseline, post, unverified }) {
       reason: `regression ${absolute.toUpperCase()} and the absolute exit code STANDS: ${u} red ` +
         `${u === 1 ? "test is" : "tests are"} absent from the ${baselineNames.length}-name baseline's ` +
         `[FAIL] lines but named in its NOT A FULL RUN notice, so the unchanged tree never ran ` +
-        `${u === 1 ? "it" : "them"} and ${u === 1 ? "it is" : "they are"} UNVERIFIED rather than newly ` +
+        `${u === 1 ? "it" : "them"} and ${u === 1 ? "it is" : "they are"} UNVERIFIED, not proven red, rather than newly ` +
         `red: ${unverifiedInBaseline.join(", ")}. 0 tests are newly red; ${standing.length} ` +
         `${standing.length === 1 ? "is" : "are"} standing. Nothing is cleared -- an unverified red blocks ` +
-        `exactly as before, it is just not charged to this delivery (AGT-170)` };
+        `exactly as before, it is just not charged to this delivery; a ship blocked ONLY on unverified ` +
+        `names is AGT-245's re-grade candidate (AGT-170, AGT-245)` };
   }
   return { status: "green", standing, newlyRed, unverifiedInBaseline,
     reason: `regression GREEN on the delta: all ${standing.length} red ${standing.length === 1 ? "test" : "tests"} ` +
@@ -978,6 +989,48 @@ export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFi
   const unverified = notRunTestsFrom(text).filter(n => !names.includes(n));
   return { names, unverified,
     source: `${baselinePath} (${names.length} red on the unchanged tree, ${unverified.length} never run)` };
+}
+
+// FEATURE: AGT-245 -- NO BASELINE, NO VERDICT. The gate that makes AGT-170's fail-closed direction
+// COST something instead of being free.
+//
+// THE MEASURED GAP, on this clone at `c946790`: `runner_verdicts` since 2026-09-27T00Z holds 66 rows
+// and 47 of them carry `regression_baseline_source` = "no baseline handed to the gate; the absolute
+// exit code stands -- fail closed (AGT-170)" -- every one of them a block. AGT-170 shipped the
+// baseline as an OPTION, so the ordinary outcome of forgetting it was the pre-AGT-170 grading: the
+// suite's standing red graded as this delivery's red, 47 times over, each one a streak
+// (`docs/ARCHITECTURE.md` §19v: the verdict is the ladder's input). Fail-closed was correct and it
+// was also silent, and a silent fail-closed is indistinguishable from a step nobody runs.
+//
+// SO A MISSING BASELINE IS NOW A CANNOT-RUN, NEVER A VERDICT. `refuse` -> exit 2 with
+// `kind: "cannot-run"`, no gate spawned, and NO ROW: the distinction the file already draws
+// everywhere (`missing`, `--judge needs --ticket`, an unreadable context file) applied to the one
+// input the delta cannot be graded without. Exit 2 is not a block -- it does not reach
+// `runner_verdicts`, so it cannot cost the ladder anything, which is the whole reason it is the right
+// shape for "the grader was never given what it grades with."
+//
+// AND IT IS DECLARABLE, WHICH IS WHAT KEEPS IT FROM BEING A HARD BLOCK (pattern:19 -- gate a
+// dangerous operation through an atomic correct path rather than hard-blocking it). An attended
+// cycle that genuinely has no unchanged tree to measure passes `--no-baseline=<reason>`: the run
+// proceeds, the absolute exit code stands exactly as AGT-170 left it, and the REASON is carried into
+// `regression_baseline_source`, `delta.reason` and the verdict's own `reasoning` -- so the omission
+// is a recorded, attributable choice rather than an absence nobody can see in the row afterwards.
+//
+// A BARE `--no-baseline` REFUSES (the Designer's recorded call, `JOHN-0925-DESIGNER-DECIDES`).
+// `arg()` returns "" for a flag passed without `=`, and "" is not a reason -- a declaration whose
+// content is empty declares nothing, and accepting it would turn the gate back into the option it
+// was. Whitespace is the same case, hence `.trim()`.
+//
+// Pure and exported so the suite grades the rule without a process: `read` is
+// `readRegressionBaseline()`'s return, `declared` is the raw `--no-baseline=` value.
+export function baselineGate({ read, declared }) {
+  const reason = String(declared ?? "");
+  if (read.names === null || read.names === undefined) {
+    if (!reason.trim()) return { refuse: true, reason: read.source };
+    return { refuse: false, declared,
+      source: `omitted by declaration (--no-baseline=${declared}); the absolute exit code stands (AGT-245)` };
+  }
+  return { refuse: false, declared: null, source: read.source };
 }
 
 // The whole verdict rule, in one pure function.
@@ -2902,6 +2955,11 @@ async function main() {
   // absolute exit code alone. No flag is the ordinary case for an attended cycle and it costs nothing
   // but the grading the platform already had.
   const regressionBaselinePath = arg("regression-baseline", "");
+  // FEATURE: AGT-245 -- the DECLARED absence of a baseline. `--no-baseline=<reason>` is the only way
+  // past the gate below without one, and the reason it carries is written into the row rather than
+  // into a report nobody reads. A BARE `--no-baseline` is "" here (`arg()` needs `=`) and refuses:
+  // the Designer's recorded call, and the only reading that keeps the gate from being an option.
+  const noBaselineDeclared = arg("no-baseline", "");
   // Pass two is "session mode AND a verdict file". It re-runs NOTHING: the gates that graded this
   // delivery ran in pass one and their results are in the context file. Re-running them here would
   // grade a different instant with the same version number on it -- and would cost 20 minutes.
@@ -2964,6 +3022,35 @@ async function main() {
     return recordJudgedVerdict({ stored, agentVerdict: judged, truncations: valid.truncations, intentSlug: rows.intentSlug, cycleId, ticket, version, dryRun, supabaseUrl, supabaseKey });
   }
 
+  // ---- FEATURE: AGT-245 -- NO BASELINE, NO VERDICT, AND NOTHING RUNS. ------------------------
+  //
+  // BEFORE THE GATE LOOP, DELIBERATELY. The loop below spawns `npm run build` and the full regression
+  // suite -- ~20 minutes measured on this clone -- and its regression result cannot be GRADED without
+  // the baseline this reads. Reading the baseline after paying for the run (where AGT-170 left it) put
+  // the one unrecoverable input last: 47 of the 66 `runner_verdicts` rows since 2026-09-27T00Z spent
+  // that run and then graded the standing red as the delivery's. So the refusal happens while it is
+  // still free, and `baselineRead` is hoisted here rather than duplicated -- ONE read of ONE file
+  // feeding both the gate and the delta, the same rule `readRegressionBaseline`'s header gives for
+  // `names` and `unverified` riding home together.
+  //
+  // NO GATE RUNS AND NO ROW IS WRITTEN. Exit 2, `kind: "cannot-run"`, exactly as a missing credential
+  // or an unreadable judgment context exits -- this is the absence of a verdict, never a block, so it
+  // cannot cost the ladder a streak for a step the cycle merely skipped.
+  const baselineRead = readRegressionBaseline(regressionBaselinePath);
+  const baselineDecision = baselineGate({ read: baselineRead, declared: noBaselineDeclared });
+  if (baselineDecision.refuse) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "no-regression-baseline",
+        regression_baseline_source: baselineDecision.reason },
+      prose: `verifier: NO REGRESSION BASELINE (${baselineDecision.reason}). Exiting 2 and recording NOTHING -- `
+        + `no gate ran, no row was written, and this is NOT a verdict (AGT-245).\n`
+        + `  Capture it on the UNCHANGED clone, BEFORE the build's first edit, the way runbook step 7 says:\n`
+        + `    SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node tests/regression/run-all.js > $S/regression-baseline-<your cycle id>.txt\n`
+        + `  then pass --regression-baseline=<that file> here. Credentialed, like this run: an uncredentialed `
+        + `capture declares far more not-run and its wider unverified set can absorb a real newly red test (AGT-170).\n`
+        + `  A cycle that genuinely has no unchanged tree to measure DECLARES it: --no-baseline=<reason>. The `
+        + `reason is recorded in the row; a bare --no-baseline is not a reason and refuses.` });
+  }
+
   const gateResults = {};
   const gateDetail = {};
   const gateFails = {};
@@ -2997,7 +3084,6 @@ async function main() {
   // [FAIL] ...` tail and gains the delta line, and both lists reach `--json`. A reader who wants to
   // know whether the suite passed can still find out; what they can no longer do is read a red the
   // delivery did not cause as this delivery's red.
-  const baselineRead = readRegressionBaseline(regressionBaselinePath);
   const regressionAbsolute = gateResults.regression;
   //
   // AGT-170 SLICE 2: `unverified` rides in beside `baseline`. Both come off the SAME read of the SAME
@@ -3009,6 +3095,11 @@ async function main() {
     post: gateFails.regression ?? null,
     unverified: baselineRead.unverified,
   });
+  // AGT-245: a DECLARED omission replaces the delta's own "no baseline handed to the gate" reason with
+  // the declaration, so the row says WHY it was omitted and by whose choice rather than only that it
+  // was. The status is untouched -- `regressionDelta` already left the absolute exit code alone, which
+  // is exactly what a declaration is allowed to cost: nothing.
+  if (baselineDecision.declared) delta.reason = baselineDecision.source;
   gateResults.regression = delta.status;
   gateDetail.regression = `${gateDetail.regression} | delta: ${delta.standing === null ? "not graded" : delta.standing.length} standing, ` +
     `${delta.newlyRed === null ? "not graded" : delta.newlyRed.length} newly red` +
@@ -3021,6 +3112,13 @@ async function main() {
     ` -- ${delta.reason}`;
 
   let { verdict, reasoning } = verdictFor(gateResults);
+
+  // AGT-245: APPENDED, never replaced -- the same one-direction discipline the kickoff findings below
+  // use for their prepend. The red gate that was already the reason stays the reason; what this adds is
+  // the fact that the regression half was graded without a baseline, on a named declaration.
+  if (baselineDecision.declared) {
+    reasoning += ` Baseline omitted by declaration: ${baselineDecision.declared} (AGT-245).`;
+  }
 
   // FEATURE: SES-376 -- an over-cap kickoff BLOCKS the delivery it belongs to, not just the draft.
   //
@@ -3417,7 +3515,11 @@ async function main() {
     // `runner_verdicts` column -- the Designer's recorded call, JOHN-0925-DESIGNER-DECIDES).
     regression_unverified_in_baseline: delta.unverifiedInBaseline,
     regression_fails: gateFails.regression ?? null,
-    regression_baseline_source: baselineRead.source,
+    regression_baseline_source: baselineDecision.source,
+    // AGT-245: the declaration itself, null on every run that handed over a real baseline. Reported and
+    // never stored in its own column -- AGT-170's convention and the Designer's recorded call
+    // (JOHN-0925-DESIGNER-DECIDES): no new `runner_verdicts` column, no migration.
+    regression_no_baseline_declared: baselineDecision.declared,
   };
 
   // ---- AGT-67 pass one: hand the judgment everything, print the prompt, record NOTHING. -------

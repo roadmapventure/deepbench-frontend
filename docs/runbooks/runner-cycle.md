@@ -2910,7 +2910,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
   --task='{"kickoff_path":"docs/kickoffs/…","worktree":"<clone>","branch":"<branch>","version":"v<ver>","cycle_id":"<cid>","caps":{"files":N,"tasks":M},"heartbeat":"node scripts/cycle-heartbeat.js --cycle=<cid> --step='7 — builder: <task>'"}'
 ```
 
-   **Then capture the regression baseline on the unchanged clone, credentialed like 7a's run (`AGT-170`):**
+   **Then capture the regression baseline on the unchanged clone, credentialed like 7a's run (`$S` = your scratchpad):**
 
 ```
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js > $S/regression-baseline-<your cycle id>.txt
@@ -3035,7 +3035,8 @@ against, and an attended cycle runs no Builder.
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js --kickoff=<the ticket's kickoff_link> \
   --cycle-id=<your cycle id> --ticket=<TICKET-ID> --version=v<your version> \
-  --changed-files=$S/changed-<your cycle id>.json \n  --regression-baseline=$S/regression-baseline-<your cycle id>.txt
+  --changed-files=$S/changed-<your cycle id>.json \
+  --regression-baseline=$S/regression-baseline-<your cycle id>.txt
 ```
 
   The row carries `graded_sha` = the HEAD the gates ran on (`SES-345`), written by
