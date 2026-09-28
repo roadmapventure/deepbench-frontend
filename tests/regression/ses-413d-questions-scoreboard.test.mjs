@@ -211,7 +211,10 @@ export const RUNBOOK_CEILING = 381000;
 // untouched. Net -43 B: 380905 -> 380862, so the edit PAID for itself and added no headroom debt.
 // No header stamp, same reason AGT-170 gave: ses-424c and agt-133 both pin stamps[0] to v7.0.658,
 // and at 138 B of headroom a ~290 B stamp could not land anyway. Re-measured with wc -c.
-export const BYTES_AT_SHIP = 380862;
+// AGT-253 (v7.0.676) took line 1 with its own stamp and rotated v7.0.602 out (count stays 5), and
+// added step 6's design-only clause: +124 B net, 380862 -> 380986, 14 B under the ceiling.
+// Re-measured with wc -c on the edited file, not derived from the diff.
+export const BYTES_AT_SHIP = 380986;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
