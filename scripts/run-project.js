@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// DeepBench v7.0.667 | scripts/run-project.js | AGT-238 slice 2 -- CONCURRENCY FROM THE CORPUS. Pass
+// one reads `public.project_concurrency_corpus()` beside the queue and carries it into the state as
+// `concurrency_corpus`; the answer may carry an optional `concurrency` object
+// {execute, pause, order, why}; `concurrencyErrors` checks the same seven refusals the function does
+// against that corpus; and pass two records a non-empty one through `public.record_concurrency()`
+// (one decision, one before-image per CHANGED row) after the leverage block and before the action
+// fork. Absent `concurrency`, every payload and line is byte-identical to before. How many projects
+// execute at once and in what order is the manager's recorded, reversible decision -- never a knob
+// and never a rule in code. Guard: tests/regression/agt-238-concurrency-corpus.test.mjs.
+//
 // DeepBench v7.0.660 | scripts/run-project.js | AGT-238 -- LEVERAGE FIRST. The manager answer may
 // carry an optional `leverage` list of {backlog_id, improves, why}: `leverageErrors` refuses an id the
 // queue did not return or a blank reason, and pass two records a non-empty list through
@@ -144,6 +154,11 @@
 //                                               B42 can re-assert it. Skipped under --dry-run.
 //   POST /rest/v1/rpc/record_leverage           AGT-238: only when the answer carries a non-empty
 //                                               `leverage`; needs --cycle-id. Skipped under --dry-run.
+//   POST /rest/v1/rpc/project_concurrency_corpus  AGT-238 slice 2: the concurrency corpus, read beside
+//                                               the queue in pass one. A failed read is FATAL.
+//   POST /rest/v1/rpc/record_concurrency        AGT-238 slice 2: only when the answer carries a
+//                                               non-empty `concurrency`; needs --cycle-id. Skipped
+//                                               under --dry-run.
 //
 // Pure helpers (parseArgs, statePathFor, wallReading, stateDrift, answerErrors, claimQueryFor,
 // claimOutcome, handoffContextFor) are exported so the regression suite drives every branch with no
@@ -469,6 +484,89 @@ export function leverageErrors(answer, state) {
   return errors;
 }
 
+// AGT-238 slice 2 (v7.0.667) -- CONCURRENCY FROM THE CORPUS (John 2026-09-27). How many projects
+// execute at once, and in what order, is the manager's decision from `state.concurrency_corpus`
+// (`public.project_concurrency_corpus()`, read verbatim) -- never a fixed rule and never a knob:
+// `projects.status='executing'` IS the count and `projects.priority` IS the order.
+//
+// THE SAME SEVEN REFUSALS `public.record_concurrency()` MAKES, checked here first so a manager gets a
+// legible line instead of a Postgres exception: no cycle id to author the decision; a blank `why`; an
+// empty `execute`; a slug the corpus did not return; a slug that is `proposed` or `planned` (starting
+// one is John's, through `start_proposed_project()` -- AGT-240); a slug in both lists; and an `order`
+// that is not exactly the `execute` set, once each. The function re-checks all seven itself -- this is
+// the early, legible half, never the only one. Absent `concurrency` returns no lines at all.
+export function concurrencyErrors(answer, state) {
+  const c = answer ? answer.concurrency : undefined;
+  if (c === undefined || c === null) return [];
+  if (typeof c !== "object" || Array.isArray(c)) {
+    return [`"concurrency" is ${Array.isArray(c) ? "an array" : typeof c}, not an object {execute, pause, order, why} -- a concurrency decision that cannot be checked against the corpus is refused`];
+  }
+  const errors = [];
+
+  // (1) A decision has exactly one author. `record_concurrency()` refuses a null cycle id, and the
+  //     state carries this run's own `--cycle-id` (never anything the answer says).
+  if (!String(state?.cycle_id ?? "").trim()) {
+    errors.push('"concurrency" was answered but this run carries no cycle id -- record_concurrency() writes a decision and a decision has exactly one author');
+  }
+
+  const listOf = (key, required) => {
+    const raw = c[key];
+    if (raw === undefined || raw === null) {
+      if (required) errors.push(`"concurrency.${key}" is missing -- it is a JSON array of project slugs`);
+      return [];
+    }
+    if (!Array.isArray(raw)) {
+      errors.push(`"concurrency.${key}" is ${typeof raw}, not an array of project slugs`);
+      return [];
+    }
+    return raw.map(v => String(v ?? "").trim());
+  };
+  const exec = listOf("execute", true);
+  const pause = listOf("pause", false);
+  const order = listOf("order", true);
+
+  // (2) a blank `why`: the corpus is the evidence, and the decision says what in it decided.
+  if (typeof c.why !== "string" || c.why.trim() === "") {
+    errors.push('"concurrency.why" is blank -- a concurrency decision says what in the corpus decided it (tickets left, blocked counts, leverage marks, close rate, the walls)');
+  }
+  // (3) an empty `execute`: a board with nothing executing stops the runner.
+  if (Array.isArray(c.execute) && exec.filter(Boolean).length === 0) {
+    errors.push('"concurrency.execute" is empty -- a concurrency decision names the projects that RUN, and a board with nothing executing stops the runner');
+  }
+
+  // (4) and (5): the list is the LISTER'S. Every slug must be one the corpus returned, and a project
+  //     that has never run is not the manager's to start (AGT-240).
+  const rows = Array.isArray(state?.concurrency_corpus) ? state.concurrency_corpus : [];
+  const status = new Map(rows.map(r => [String((r && r.slug) ?? ""), String((r && r.status) ?? "")]));
+  const slugs = rows.map(r => String((r && r.slug) ?? "")).filter(Boolean);
+  for (const slug of [...exec, ...pause]) {
+    if (!status.has(slug)) {
+      errors.push(`"concurrency" names "${slug}", which project_concurrency_corpus() did not return (it returned: ${slugs.join(", ") || "nothing"}) -- concurrency is decided over the board the corpus showed`);
+    } else if (status.get(slug) === "proposed" || status.get(slug) === "planned") {
+      errors.push(`"concurrency" names "${slug}", which is ${status.get(slug)} -- starting a project that has never run is not the manager's call, it is John's words through start_proposed_project() (AGT-240); this decision moves executing <-> paused only`);
+    }
+  }
+
+  // (6) a project runs or it is paused, never both.
+  const both = exec.filter(slug => pause.includes(slug));
+  if (both.length) {
+    errors.push(`"concurrency" names ${[...new Set(both)].join(", ")} in both "execute" and "pause" -- a project runs or it is paused, never both`);
+  }
+
+  // (7) `order` must name exactly the `execute` set, once each: the order IS projects.priority, so an
+  //     order that is not the executing set would leave a priority nobody decided.
+  if (Array.isArray(c.execute) && Array.isArray(c.order)) {
+    const missing = exec.filter(slug => !order.includes(slug));
+    const extra = order.filter(slug => !exec.includes(slug));
+    const dupes = order.filter((slug, i) => order.indexOf(slug) !== i);
+    if (missing.length || extra.length || dupes.length) {
+      errors.push(`"concurrency.order" (${order.join(", ") || "nothing"}) must name exactly the projects in "concurrency.execute" (${exec.join(", ") || "nothing"}), once each -- the order IS projects.priority`
+        + `${missing.length ? `; missing ${missing.join(", ")}` : ""}${extra.length ? `; not in execute: ${extra.join(", ")}` : ""}${dupes.length ? `; named twice: ${[...new Set(dupes)].join(", ")}` : ""}`);
+    }
+  }
+  return errors;
+}
+
 export function answerErrors(answer, state) {
   const errors = [];
   if (!answer || typeof answer !== "object" || Array.isArray(answer)) {
@@ -505,6 +603,11 @@ export function answerErrors(answer, state) {
   // FEATURE: AGT-238 -- `leverage`, OPTIONAL, checked above the action fork for the reason `regrades`
   // is: it can ride on any of the three actions. Refusal lines only; nothing is written here.
   errors.push(...leverageErrors(answer, state));
+
+  // FEATURE: AGT-238 slice 2 -- `concurrency`, OPTIONAL, checked here for the reason `leverage` is:
+  // how many projects execute can ride on any of the three actions. Refusal lines only; nothing is
+  // written here.
+  errors.push(...concurrencyErrors(answer, state));
 
   const action = answer.action;
   // An action outside the closed set never reaches the assign branch by falling through it.
@@ -798,6 +901,17 @@ async function readInstruments({ base, key, project, cycleId, trigger, tenant })
   const regradable = await rpc(base, key, "regradable_ships");
   if (regradable.error) return { error: regradable.error };
 
+  // FEATURE: AGT-238 slice 2 -- THE CONCURRENCY CORPUS, read as an instrument beside the queue. How
+  // many projects execute at once and in what order is the manager's decision, and this is the
+  // evidence it decides FROM: one row per project (an epic-less project shows epics=0 rather than
+  // vanishing), tickets left, blocked counts, leverage marks and the close rate. The driver never
+  // re-derives it and never ranks it -- `projects.status` IS the count and `projects.priority` IS the
+  // order, and the ORDER BY is the function's own.
+  // A FAILED READ IS FATAL, exactly like every instrument above: a manager shown an empty corpus
+  // would conclude the board is empty, which is the assumption dm-behavior forbids.
+  const corpus = await rpc(base, key, "project_concurrency_corpus");
+  if (corpus.error) return { error: corpus.error };
+
   // Both of these need a cycle id. Absent one they are recorded as unread -- which `wallReading`
   // treats as a wall standing, so nobody gets a green board by omitting a flag.
   const dayCap = cycleId
@@ -831,6 +945,7 @@ async function readInstruments({ base, key, project, cycleId, trigger, tenant })
     schedulerGate: sched.error ? { error: sched.error } : sched.row,
     queue: queue.rows,
     regradable: regradable.rows,   // SES-403
+    concurrencyCorpus: corpus.rows,   // AGT-238 slice 2
     roster: roster.roster,
     pick,
     pickRow,
@@ -959,16 +1074,56 @@ async function main() {
       }
     }
 
+    // (c3) AGT-238 slice 2: a non-empty `concurrency` is recorded through `public.record_concurrency()`
+    //      -- one decision, one before-image per CHANGED row -- AFTER the leverage block and BEFORE the
+    //      stop/report/assign fork, because it rides on any action. Absent `concurrency`, nothing here
+    //      runs and every payload and line below is byte-identical to before. `--dry-run` writes
+    //      nothing, and says so.
+    const conc = answer.concurrency && typeof answer.concurrency === "object" && !Array.isArray(answer.concurrency)
+      && Array.isArray(answer.concurrency.execute) && answer.concurrency.execute.length
+      ? answer.concurrency
+      : null;
+    let concExtra = {};
+    let concLine = "";
+    if (conc) {
+      const shape = {
+        execute: conc.execute.map(sl => String(sl).trim()),
+        pause: Array.isArray(conc.pause) ? conc.pause.map(sl => String(sl).trim()) : [],
+        order: Array.isArray(conc.order) ? conc.order.map(sl => String(sl).trim()) : [],
+        why: String(conc.why ?? "").trim(),
+      };
+      const said = `${shape.execute.length} executing (${shape.order.join(", ")})${shape.pause.length ? `, pausing ${shape.pause.join(", ")}` : ""}`;
+      if (args.dryRun) {
+        console.error(`run-project: --dry-run, so the concurrency decision (${said}) was NOT recorded.`);
+        concExtra = { concurrency_decision: null };
+        concLine = `\n  concurrency: NOT RECORDED (--dry-run) -- ${said}`;
+      } else {
+        if (!String(args.cycleId ?? "").trim()) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: "--cycle-id is required to record concurrency" },
+            prose: `run-project: the answer decides concurrency, but --cycle-id was not given -- record_concurrency() writes a decision and a decision has exactly one author. Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+        }
+        const recC = await rpc(base, key, "record_concurrency", { p_cycle_id: args.cycleId, p_plan: shape });
+        if (recC.error) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", error: recC.error },
+            prose: `run-project: record_concurrency() refused the concurrency decision: ${recC.error}. Exiting ${EXIT_CANNOT_RUN} -- the function writes all or nothing.` });
+        }
+        concExtra = { concurrency_decision: recC.row ?? null };
+        concLine = `\n  concurrency: recorded as decision ${recC.row} -- ${said}`;
+      }
+    }
+
     // (d) A `stop` is an answer, not a failure. Exit 1, write nothing.
     if (answer.action === "stop") {
       return emit({ code: EXIT_STOP, json: args.json,
-        payload: { ok: true, exitCode: EXIT_STOP, kind: "stop", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra },
-        prose: `run-project: STOP.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}` });
+        payload: { ok: true, exitCode: EXIT_STOP, kind: "stop", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra },
+        prose: `run-project: STOP.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}` });
     }
     if (answer.action === "report") {
       return emit({ code: EXIT_OK, json: args.json,
-        payload: { ok: true, exitCode: EXIT_OK, kind: "report", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra },
-        prose: `run-project: REPORT.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}` });
+        payload: { ok: true, exitCode: EXIT_OK, kind: "report", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra },
+        prose: `run-project: REPORT.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}` });
     }
 
     // (e) `assign`. The walls are re-read HERE, after the answer, because the answer is not what
@@ -1061,6 +1216,7 @@ async function main() {
         claimed: !args.dryRun, claim_rows: claim.rows.length, prompt_file: nextPromptPath,
         reason: answer.assignment.reason ?? null,
         ...levExtra,   // AGT-238
+        ...concExtra,  // AGT-238 slice 2
       },
       prose: `run-project: ASSIGNED ${target} — ${rosterRow.capability_slug} — engine ${answer.assignment.engine}\n`
         + (pickSource === "own-claim"
@@ -1069,7 +1225,7 @@ async function main() {
         + `  reason: ${answer.assignment.reason ?? "(none given)"}\n`
         + `  claim:  ${args.dryRun ? "NOT MADE (--dry-run)" : `held as ${claim.rows[0]?.claimed_by}`}\n`
         + `  prompt: ${nextPromptPath}\n`
-        + `  Run that prompt as a sub-agent on model ${next.model}, then re-run this driver with --step=${args.step + 1}.${levLine}` });
+        + `  Run that prompt as a sub-agent on model ${next.model}, then re-run this driver with --step=${args.step + 1}.${levLine}${concLine}` });
   }
 
   // ---- PASS ONE: read the board, ask the manager, write nothing. -------------------------------
@@ -1113,6 +1269,10 @@ async function main() {
     // project this step is managing is a real state the manager has to speak to, not a bug.
     pick_in_project: inst.pickProject ? inst.pickProject === args.project : null,
     queue: inst.queue,
+    // AGT-238 slice 2: the concurrency corpus, beside the queue. The manager decides how many
+    // projects execute and in what order FROM this, in `concurrency`, or decides nothing and the
+    // board stands. Read verbatim from `project_concurrency_corpus()` -- never re-sorted here.
+    concurrency_corpus: inst.concurrencyCorpus,
     // SES-403: the ships the lister says may be graded again, beside the queue. The manager names
     // ids from THIS list in `regrades` or names none; `answerErrors` refuses anything else.
     regradable: inst.regradable,

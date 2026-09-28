@@ -622,6 +622,60 @@ Migration `agt238_leverage_first` (`v7.0.660`); its down is captured in
 
 ---
 
+## Amendment note — `AGT-238` slice 2, 2026-09-28 (`v7.0.667`)
+
+<!-- FEATURE: AGT-238 slice 2 item (d) — CONCURRENCY FROM THE CORPUS. No rule STATEMENT in this
+     register changes; M5-02 and M5-07 keep their ids, status and text. What changes is who decides
+     how many projects hold an executing slot, and on what evidence. -->
+
+**Why.** Measured live 2026-09-28: **5** projects were `executing` at priority 1–5 and the fifth,
+`trainer-authored-agents`, had **0 epics** — so `epic_project_executing()` admitted nothing from it
+and `prime_directive_queue()` could never return one of its rows. Five slots, four of them pickable,
+and **0** `runner_decisions` rows of kind `concurrency`: nothing on the board recorded why that
+number, or why that order. It was not a rule anybody had written down; it was the residue of whoever
+last edited `projects`.
+
+- **D1 — the corpus is ONE deterministic read**, `public.project_concurrency_corpus()`: one row per
+  project (`slug, status, priority, epics, locked, finished, open_tickets, partial_tickets, blocked,
+  leverage_tickets, done_7d, done_30d, proposal_due`), `ORDER BY (status='executing') DESC, priority`.
+  It LEFT JOINs `epics` and `backlog_items`, so an epic-less project shows `epics=0` rather than
+  vanishing — that reading is the corpus's own first piece of evidence. No model call computes the
+  evidence. `done_7d`/`done_30d` are a close-rate proxy from `updated_at` on a `done` row, labelled
+  as such wherever shown, because `backlog_items` has no closed-at column.
+- **D2 — the count and the order already have a home.** `projects.status='executing'` IS the count
+  (`epic_project_executing()` gates every pick on it) and `projects.priority` IS the order
+  (`prime_directive_queue()`'s `sort_project`, `drain_epic_next()`'s `pj.priority`). No new column
+  and no `max_concurrent` knob: a second home for a number the board already carries would disagree
+  with it silently.
+- **D3 — the slice-1 boundary is STRUCTURAL, not prose.** `public.record_concurrency()` RAISES on a
+  slug that is `proposed` or `planned`, naming `AGT-240` and `start_proposed_project()`: this
+  function moves `executing` ⇄ `paused` only. Starting a project that has never run stays John's
+  words. Its other six refusals: a null cycle id, a blank `why`, an empty `execute`, a slug the
+  corpus did not return, a slug in both `execute` and `pause`, and an `order` that is not exactly the
+  `execute` set, once each.
+- **D4 — the manager decides it in its existing `run-project` answer** (no new model call): an
+  optional `concurrency` object `{execute, pause, order, why}` on `skill_profiles.dm-run-intent`,
+  mirroring `leverage`. `scripts/run-project.js` reads the corpus beside the queue as
+  `state.concurrency_corpus`, checks the same seven refusals in the exported pure helper
+  `concurrencyErrors()`, and records a non-empty decision through `record_concurrency()` — one
+  decision, one before-image per CHANGED row, so `reverse_decision()` puts every row back
+  (`projects` is already in `reversible_tables()`; no schema change was needed for reversibility).
+- **D5 — the new test's anon arm is `notRun`, never FAIL.** `VITE_SUPABASE_ANON_KEY` is absent in the
+  runner environment; both functions' `anon`/`authenticated` denial is asserted instead in the
+  migration's own trailing DO block, in the same transaction that created them. The same credential
+  gap standing in `agt-240-project-finish-line`'s arm D is filed as a finding, not fixed here.
+- **D6 — the mechanism ships unexercised, by design.** The Builder is not the manager: the first real
+  `concurrency` row is the next manager turn's. `trainer-authored-agents` executing with 0 epics is
+  filed as a finding and is that turn's first piece of evidence.
+
+Migration `agt238_concurrency_corpus` (`v7.0.667`); its down is captured in
+`public.runner_migration_downs` under that `up_name` (auto-downable, both functions), and the mirror
+is `docs/design/agt-238-concurrency-corpus.sql`. The `dm-run-intent` row's undo is its own
+`agent-row` decision's `reverse_decision()`, because the capture has no `row` kind. Guarded by
+`tests/regression/agt-238-concurrency-corpus.test.mjs`.
+
+---
+
 ## The M5 gate decision — `SES-184`, decided 2026-09-02 (`v7.0.370`)
 
 <!-- FEATURE: SES-184 — the M5 design gate, decided rather than asked. M6-01: no cycle blocks on a
