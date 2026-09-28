@@ -84,6 +84,9 @@ export const ROUTINES = [
   { name: "nathan-wednesday-market-scan", id: "trig_015K3zgtnMztuNritHxC6uSW", job_kind: "lane", job_key: "orchestrator" },
   { name: "nathan-monthly-refresh", id: "trig_01TH7LgWccUrgb8R8wvYnT16", job_kind: "lane", job_key: "orchestrator" },
   { name: "researcher-weekly-market", id: "trig_01862LsK4ZQF8PTgQoK2cgCV", job_kind: "lane", job_key: "orchestrator" },
+  { name: "deepbench-runner-lane-2", id: "trig_018W86qqGPV7a4qpngXFrUFm", job_kind: "lane", job_key: "orchestrator" },
+  { name: "deepbench-runner-lane-3", id: "trig_01AAMaJbdt2ye6hMMpCDy5Yd", job_kind: "lane", job_key: "orchestrator" },
+  { name: "deepbench-runner-lane-4", id: "trig_01Mz6xT2uQ7hhmieAwcNBRdg", job_kind: "lane", job_key: "orchestrator" },
 ];
 
 export const SYNC_KIND = "routine-pin-sync";

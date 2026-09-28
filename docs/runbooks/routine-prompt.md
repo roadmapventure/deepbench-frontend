@@ -56,7 +56,7 @@ You are one cycle of DeepBench's development runner. The repo is cloned; default
 <!-- ROUTINE-PROMPT-END -->
 
 **Lanes (`AGT-265`).** Four routines run this one block: `deepbench-runner` and three siblings on
-the same cron (`40 */3 * * *`), each with its OWN trigger id in the stamp line
+staggered crons (runner `40 */3`, lane 2 `50 */3`, lane 3 `40 1-23/3`, lane 4 `40 2-23/3`, UTC), each with its OWN trigger id in the stamp line
 (`DEEPBENCH-RUNNER-AUTOMATED-<its id>`), so every `runner_cycles` row names the lane that wrote it.
 `runner_should_boot()` counts live lanes — open cycles with that stamp prefix and a heartbeat inside
 20 minutes — and refuses `lanes_full` at `runner_settings.max_lanes` (4). Their regression suites
@@ -68,9 +68,9 @@ sibling's own id is not drift. The three sibling routines are created by an atte
 | Lane | Routine | Trigger id |
 |---|---|---|
 | 1 | `deepbench-runner` | `trig_017TZ3JZcLBK6AYH6DKURqMH` |
-| 2 | sibling 1 | — (attended create) |
-| 3 | sibling 2 | — (attended create) |
-| 4 | sibling 3 | — (attended create) |
+| 2 | `deepbench-runner-lane-2` | `trig_018W86qqGPV7a4qpngXFrUFm` |
+| 3 | `deepbench-runner-lane-3` | `trig_01AAMaJbdt2ye6hMMpCDy5Yd` |
+| 4 | `deepbench-runner-lane-4` | `trig_01Mz6xT2uQ7hhmieAwcNBRdg` |
 
 ## What the rewrite retired, and why (2026-09-11, `SES-355`)
 
