@@ -51,7 +51,14 @@ const RUNBOOK_REL = "docs/runbooks/routine-prompt.md";
 
 // Measured on this tree 2026-09-26, and the point of pinning it is that AGT-145 adds a PARAGRAPH to
 // this runbook: the prompt the live routine runs must not move by one byte because of it.
-const PROMPT_BLOCK_SHA256 = "f3caf7c79f55c67677d0ab321e626b2119a7c46fa941ea55199778b021e4884c";
+// RE-PINNED f3caf7c7 -> d4de6fa9 BY AGT-147 (v7.0.665), and the pin did its job rather than being in
+// the way: AGT-147 is the first ship since AGT-145 that deliberately edits the BLOCK (step 8 stops
+// naming claude-opus-5 / claude-fable-5-1 / claude-sonnet-5 and points at public.model_assignments),
+// this clause went red naming the move, and the new bytes were read back through the same canon().
+// A bump here is therefore a statement, not a formality: the repo block and the LIVE deepbench-runner
+// prompt now differ by more than they did, and only John's word closes that (SES-355). The three ids
+// this edit removed are refused from here on by ses-355-routine-prompt.test.mjs.
+const PROMPT_BLOCK_SHA256 = "d4de6fa97d21d9772ff10267b552c35a74a8910c0f4a481393179a4982dcbfa6";
 
 const PINNED = "claude-opus-5";
 const INTENDED = "claude-opus-5-5";

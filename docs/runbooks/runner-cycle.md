@@ -2765,7 +2765,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
   --task='{"ticket":{…},"version":"v<your version>","cycle_id":"<your cycle id>","caps":{"files":N,"tasks":M},"worktree":"<absolute path>"}'
 ```
 
-   Run the rendered prompt as a sub-agent on the **`judgment`** lane (`claude-fable-5-1` — the
+   Run the rendered prompt as a sub-agent on the **`judgment`** lane (the
    lanes table below, read from `runner_model_lanes`, never a literal). `--intent` is omittable
    since `SES-332` (the capability's own `default_intent_slug` is `ds-kickoff-intent`) — name it
    anyway, for the reason step 4b gives: an assembly that resolves no Intent Skill drops the schema
@@ -2917,7 +2917,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js > $S/
 
    7a reds only a test newly red BY NAME; a flaky green here costs a false block, never a false approve (`AGT-116`).
 
-   Run the rendered prompt as a sub-agent on the **`orchestrator`** lane (`claude-opus-5` — the
+   Run the rendered prompt as a sub-agent on the **`orchestrator`** lane (the
    lanes table at step 6, read from `runner_model_lanes`; the Builder's own Skill rows carry the
    same model). `--intent` is omittable since `SES-332` (`default_intent_slug` is
    `bd-build-intent`) — name it anyway. **Open that turn with one line before the rendered

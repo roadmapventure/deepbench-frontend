@@ -1,3 +1,11 @@
+// DeepBench v7.0.665 | tests/regression/ses-355-routine-prompt.test.mjs | AGT-147 -- THE MODEL-ID
+// CLAUSE IS INVERTED. It used to demand that the prompt name ALL THREE lane ids, which made the
+// prose a second home of public.model_assignments: a lane switch in the table left the prompt
+// contradicting it and this suite green. Now the ONLY model id the prompt may carry is step 1's
+// SES-398 probe (`--model claude-fable-5-1`, pinned byte-identical by ses-398-meter-self-read
+// because only a Fable call returns seven_day_overage_included); every other id is RED, and the
+// three-lane read stays only as `lanes.size === 3`. The live arm grades the probe against
+// model_catalog's current Fable row, so a Fable rename reddens here rather than silently.
 // DeepBench v7.0.489 | tests/regression/ses-355-routine-prompt.test.mjs | SES-398 -- step 1 runs the meter
 // self-read BEFORE the gate: `seven-refusals-named` replaces `six-refusals-named` (meter_stale was
 // missing), and `self-read-before-gate` grades the ORDER of `claude -p` against the first
@@ -21,7 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { selfRun } from "./_lib/self-run.js";
+import { selfRun, notRun } from "./_lib/self-run.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PROMPT_REL = "docs/runbooks/routine-prompt.md";
@@ -89,8 +97,17 @@ export const REQUIRED = [
   { id: "mode-stamp", re: /DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH/, breaks: s => s.replace("trig_017TZ3JZcLBK6AYH6DKURqMH", "trig_unknown") },
 ];
 
-function modelIdsIn(s) {
-  return [...new Set(s.match(/claude-[a-z]+-[0-9][0-9a-z-]*/g) || [])];
+export function modelIdsIn(s) {
+  return [...new Set(String(s).match(/claude-[a-z]+-[0-9][0-9a-z-]*/g) || [])];
+}
+
+// AGT-147 -- step 1's meter probe is the ONE id the prompt is allowed to carry, and it is allowed
+// because of what it measures, not because of what lane runs it: only a Fable call's
+// rate_limit_event carries seven_day_overage_included (SES-398). Read it off the FIRST `claude -p `
+// so the fallback call cannot answer for the lean one.
+export function probeModelIn(s) {
+  const m = /claude -p [^\n]*?--model (claude-[a-z]+-[0-9][0-9a-z-]*)/.exec(String(s));
+  return m ? m[1] : null;
 }
 
 export function grade(prompt, lanes) {
@@ -121,17 +138,21 @@ export function grade(prompt, lanes) {
     `${PROMPT_REL} must run the meter self-read (claude -p) BEFORE the first runner_should_boot() ` +
       `(self-read@${selfReadAt}, gate@${gateAt}) — the gate grades the newest reading, so asking it first grades a stale one.`,
   );
-  // Model ids: every id the prompt names is a lane's id, and every lane's id is named. A prompt that
-  // names a model the lanes table does not carry is exactly the claude-fable-5 drift this ticket found.
-  const laneIds = new Set(lanes.values());
+  // AGT-147 -- MODEL IDS: the probe, and nothing else. The lanes file is still read (three lanes
+  // must exist, or the snapshot this file grades against is not the lanes snapshot), but the prompt
+  // no longer restates any lane's model: a lane switch in public.model_assignments must not leave a
+  // sentence here contradicting the table (§19b -- a table row, never a literal).
   assert.strictEqual(lanes.size, 3, `${LANES_REL} must carry the three lanes (orchestrator, judgment, mechanical); got ${lanes.size}`);
-  const named = modelIdsIn(prompt);
-  for (const id of named) {
-    assert.ok(laneIds.has(id), `${PROMPT_REL} names model ${id}, which is not a runner_model_lanes model id (${[...laneIds].join(", ")})`);
-  }
-  for (const [lane, id] of lanes) {
-    assert.ok(named.includes(id), `${PROMPT_REL} must name the ${lane} lane's model ${id}`);
-  }
+  const probe = probeModelIn(prompt);
+  assert.ok(probe && /^claude-fable-[0-9]/.test(probe),
+    `${PROMPT_REL} step 1 must run its meter probe on a Fable model (got ${probe === null ? "no --model on the first `claude -p`" : probe}) ` +
+      "-- only a Fable call's rate_limit_event carries seven_day_overage_included (SES-398), which is the " +
+      "whole reason an id is written here at all.");
+  const stray = modelIdsIn(prompt).filter(id => id !== probe);
+  assert.deepStrictEqual(stray, [],
+    `${PROMPT_REL} names model id(s) ${stray.join(", ")} beside step 1's probe ${probe}. The model for a ` +
+      "lane is a public.model_assignments row read live, never a literal in this prompt -- a switch in " +
+      "the table would leave these words contradicting it and this suite green.");
 }
 
 function everyClauseHasTeeth(prompt, lanes) {
@@ -167,6 +188,22 @@ function everyClauseHasTeeth(prompt, lanes) {
   // A foreign model id must be caught.
   assert.throws(() => grade(prompt + " Use claude-fable-5 when in doubt.", lanes), "control: an old model id slipped through");
   assert.throws(() => grade(prompt + " Escalate to claude-opus-6.", lanes), "control: an unknown model id slipped through");
+  // AGT-147's three. (1) The sentence this ticket deleted, re-added verbatim: a LANE id is now a
+  // stray id, which is exactly what the old clause required and this one refuses. A guard that only
+  // denylisted retired ids would be green on it.
+  assert.throws(() => grade(prompt + " you are the orchestrator lane, claude-opus-5.", lanes),
+    "control: a lane's model id restated in the prose still passes");
+  // (2) The probe itself moved off Fable -- the id count is unchanged (still exactly one), so a
+  // clause that merely counted ids would be green; only reading WHICH id the probe runs catches it.
+  const probeSwapped = prompt.split("--model claude-fable-5-1").join("--model claude-opus-5");
+  assert.notStrictEqual(probeSwapped, prompt, "control for probe-is-fable changed nothing (the SES-158 failure)");
+  assert.throws(() => grade(probeSwapped, lanes), "control: a probe on a non-Fable model still passes");
+  // (3) The probe's --model dropped entirely. `claude -p ` is still present, so self-read-present
+  // and self-read-before-gate both still pass; without this clause the prompt would ship a meter
+  // command that runs whatever model the CLI defaults to, and no Fable window comes back.
+  const probeGone = prompt.split(" --model claude-fable-5-1").join("");
+  assert.notStrictEqual(probeGone, prompt, "control for probe-present changed nothing (the SES-158 failure)");
+  assert.throws(() => grade(probeGone, lanes), "control: a meter command with no --model still passes");
 }
 
 function theFileStampsItself() {
@@ -176,14 +213,35 @@ function theFileStampsItself() {
   assert.ok(stamps <= 5, `${PROMPT_REL} carries ${stamps} header stamps; session-hygiene check 7 caps a runbook at 5`);
 }
 
-export function run() {
+export async function run() {
   const prompt = readPrompt(fs.readFileSync(path.join(ROOT, PROMPT_REL), "utf8"));
   const lanes = readLaneModels(fs.readFileSync(path.join(ROOT, LANES_REL), "utf8"));
   grade(prompt, lanes);
   everyClauseHasTeeth(prompt, lanes);
   theFileStampsItself();
+  const probe = probeModelIn(prompt);
+  // AGT-147 (d) LIVE -- the probe is allowed because it is a Fable call; if the catalog's current
+  // Fable row is a different id, the pinned command is measuring nothing and ses-398's byte-identical
+  // pin is holding a stale model here. Read-only, one GET.
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    const r = await fetch(
+      `${process.env.SUPABASE_URL}/rest/v1/model_catalog?select=model_id&family=eq.Fable&deprecated_on=is.null&order=first_seen.desc&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    assert.ok(r.ok, `model_catalog read failed: HTTP ${r.status}`);
+    const [row] = await r.json();
+    assert.ok(row?.model_id, "model_catalog carries no live Fable row -- the probe clause would be vacuous");
+    assert.strictEqual(row.model_id, probe,
+      `step 1's probe runs ${probe} but model_catalog's current Fable row is ${row.model_id} -- the pinned meter command ` +
+        "(ses-398-meter-self-read holds it byte-identical) is asking a model the catalog has moved past.");
+    console.log(`         (d) LIVE: model_catalog's Fable row ${row.model_id} = the probe -- PASS`);
+  } else {
+    notRun("SES-355 (d) the probe equals model_catalog's live Fable row",
+      "set SUPABASE_URL and SUPABASE_SERVICE_KEY (runner_secrets, exported inline) and re-run");
+  }
   console.log(`  [PASS] ses-355-routine-prompt.test.mjs`);
-  console.log(`         prompt ${prompt.length} chars; ${RETIRED.length} retired patterns absent; ${REQUIRED.length} pointers present; model ids ${modelIdsIn(prompt).join(", ")} = runner_model_lanes`);
+  console.log(`         prompt ${prompt.length} chars; ${RETIRED.length} retired patterns absent; ${REQUIRED.length} pointers present; probe ${probe} only; no other model id`);
 }
 
 selfRun(import.meta.url, run);

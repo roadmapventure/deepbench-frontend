@@ -204,7 +204,14 @@ export const RUNBOOK_CEILING = 381000;
 // --regression-baseline=, step 9 quotes 7a's delta: line; E1-E3 trim rationale to pay for it.
 // Net -68 B: 380973 -> 380905. No header stamp (ses-424c pins stamps[0]). Re-measured with wc -c
 // on the tree rebased onto AGT-237.
-export const BYTES_AT_SHIP = 380905;
+//
+// v7.0.665 (AGT-147) strips the two literal model ids that still sat beside a lane name in prose
+// (step 6's judgment sub-agent, step 7's orchestrator sub-agent) — the lane is the address, the
+// model is a public.model_assignments row. The rendered {{lanes}} block keeps its three ids and is
+// untouched. Net -43 B: 380905 -> 380862, so the edit PAID for itself and added no headroom debt.
+// No header stamp, same reason AGT-170 gave: ses-424c and agt-133 both pin stamps[0] to v7.0.658,
+// and at 138 B of headroom a ~290 B stamp could not land anyway. Re-measured with wc -c.
+export const BYTES_AT_SHIP = 380862;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
