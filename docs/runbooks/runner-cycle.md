@@ -4379,6 +4379,14 @@ step shipped. Same gate as `(7e)` — **shipped, gated_before_build, reverted, f
 else**; on any other outcome this step does not run. `W` is this ISO week (`isoWeek()`, exported by
 `scripts/audit-ledger.js`), `$S` your scratchpad.
 
+**FIRST THE BOARD BECOMES FINDINGS (`AGT-159`).** 15 open tickets a run, raised as `backlog-review`
+findings this step then rules; exit 3 = none left. Its `BACKLOG REVIEW: raised <n>, remaining <m>`
+line goes in `notes`. Never gates.
+
+```
+node scripts/backlog-review.js --raise --limit=15 --cycle-id=<your cycle id>; echo "raise exit $?"
+```
+
 ```
 node scripts/audit-review.js --prepare --week=$W --out=$S/ctx.json; echo "prepare exit $?"
 ```

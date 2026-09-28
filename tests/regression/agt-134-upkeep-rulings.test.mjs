@@ -72,10 +72,16 @@ const SECTION = "## How a drift finding is closed";
 // source an attended session files under (`found_by 'session:<name>'`) -- precedence 30 /
 // project_slug NULL, the same staff-watch shape, so the Development Manager picks. Two findings
 // (8a23c6f9, 07a7d637) could not be ticketed at all until this row existed.
+// AGT-159 (v7.0.699) MAKES IT TEN: migration `agt159_backlog_review` added `backlog-review`, the
+// source scripts/backlog-review.js raises an OPEN TICKET under (`found_by 'backlog-review:<cycle id>'`)
+// -- precedence 30 / project_slug NULL, the same staff-watch shape, so the Development Manager picks.
+// Without the row finding_group_epic() RAISEd `unmapped source` on every one of the 578 unreviewed
+// open tickets and the whole review stopped. Third home: agt-159-backlog-review.test.mjs.
 const ROUTES = [
   { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
   { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
   { precedence: 30, source: "agent", finding_type: "*", project_slug: null },
+  { precedence: 30, source: "backlog-review", finding_type: "*", project_slug: null },
   { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
   { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
   { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
@@ -213,7 +219,7 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, ROUTES, "the nine routing rows, exactly");
+    assert.deepEqual(r.json, ROUTES, "the ten routing rows, exactly");
     for (const src of ["check-routine-prompt", "runner"]) {
       const row = r.json.find(x => x.source === src);
       assert.ok(row, `AGT-134's ${src} route is live`);
@@ -245,8 +251,13 @@ async function run() {
     assert.equal(sp.json[0].skill_type_slug, "intent",
       "the row stays an `intent`: this is what the manager INTENDS on a class of finding, not a behaviour rule and not a guardrail (pattern:136)");
     const method = String(sp.json[0].method);
-    assert.ok(method.endsWith(UPKEEP_PARA),
-      `${INTENT_SLUG}.method must END with the upkeep paragraph, byte-for-byte. Tail read: ${JSON.stringify(method.slice(-160))}`);
+    // AGT-159 (v7.0.699) appended its own paragraph AFTER this one, so `endsWith` is no longer the
+    // right shape of the claim and pinning it would make every future append to this row a false red
+    // on THIS ticket. What AGT-134 actually owns is that ITS paragraph is in the row, byte-for-byte,
+    // exactly once, as a whole paragraph of its own -- which is what is asserted now. The row's TAIL
+    // is agt-159-backlog-review.test.mjs's business, and that test pins it there.
+    assert.ok(method.includes(`\n\n${UPKEEP_PARA}`),
+      `${INTENT_SLUG}.method must carry the upkeep paragraph as its own paragraph, byte-for-byte. Tail read: ${JSON.stringify(method.slice(-160))}`);
     assert.equal(method.split(UPKEEP_PARA).length - 1, 1, "and carry it exactly once");
   });
 

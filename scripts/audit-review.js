@@ -408,6 +408,34 @@ export function validateReview(review, worklist, week, checklist, routes, projec
   }
   for (const id of open) if (!seen.includes(id)) refusals.push(`finding ${id} not covered`);
 
+  // 4b (AGT-159), and it is LAST because that is where the function puts it: the backlog-review limb
+  // lives in apply_audit_review()'s step 4, after every validation and after coverage. Mirrored with
+  // the function's texts minus the `apply_audit_review: ` prefix (the agt-86i arm R convention).
+  //
+  // ONLY (a) AND (e) ARE MIRRORED. Both key on facts a worklist row carries on its own -- its
+  // `check_slug` and its `locations[0].location` -- so a client can refuse them before spending an
+  // --apply. (d), John's-ticket, needs the ticket's `scope_origin` from backlog_items and stays the
+  // function's, exactly as `reuse_backlog_id must be an open backlog row` already does. The manager
+  // still sees it coming: the location TEXT carries `[<scope_origin>; epic <name>]`.
+  for (const g of groups) {
+    const kind = g && g.kind;
+    const reuse = g && g.reuse_backlog_id !== undefined && g.reuse_backlog_id !== null
+      ? String(g.reuse_backlog_id) : null;
+    for (const id of idsOf(g)) {
+      const w = list.find(x => String(x.id) === id);
+      if (w === undefined || String(w.check_slug ?? "") !== "backlog-review") continue;
+      const ticket = String(w.locations?.[0]?.location ?? "").split(":")[1] ?? "";
+      if (ticket === "") continue;   // a malformed location is the function's RAISE, not a mirror's
+      if ((kind === "root-cause" && reuse === null) || kind === "cleanup") {
+        // (e) The ticket exists; a second id for it is the defect this whole limb closes.
+        refusals.push(`finding ${id} is already ticket ${ticket}; never file a second`);
+      } else if (kind === "root-cause" && reuse === ticket && blank(g.project)) {
+        // (a) Homing it needs a project. Silence is never read as "leave it where it is".
+        refusals.push(`backlog-review reuse of ${ticket} needs project (slug or general)`);
+      }
+    }
+  }
+
   return { ok: refusals.length === 0, refusals };
 }
 

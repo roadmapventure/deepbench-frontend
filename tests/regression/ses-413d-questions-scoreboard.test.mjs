@@ -238,7 +238,11 @@ export const RUNBOOK_CEILING = 381000;
 // (7d) now hands to `(7g)` instead. 483 B out, 462 B in. Re-measured with wc -c AFTER the rebase onto
 // AGT-133 slice 3's -373 B, never carried over from the pre-rebase tree: 380598 -> 380577 B, 423 B under
 // SES-336's ceiling. No header stamp (ses-424c pins stamps[0]), so HEADER_STAMPS stays 5.
-export const BYTES_AT_SHIP = 380577;   // 380598 -> 380577
+// v7.0.699 (AGT-159) adds ONE command to `(7f)`: the backlog-review raise, its exit-3 meaning, its
+// progress line's home in `notes` and its never-gates clause, +343 B. No header stamp (ses-424c pins
+// stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c AFTER the rebase onto AGT-136 slice 2's
+// -21 B, never carried over from the pre-rebase tree: 380577 -> 380920 B. No stamp added.
+export const BYTES_AT_SHIP = 380920;   // 380577 -> 380920
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

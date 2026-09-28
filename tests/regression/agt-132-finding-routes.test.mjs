@@ -126,10 +126,16 @@ const ROUTES = [
 // source an attended session files under (`found_by 'session:<name>'`) -- precedence 30 /
 // project_slug NULL, the same staff-watch shape, so the Development Manager picks. Two findings
 // (8a23c6f9, 07a7d637) could not be ticketed at all until this row existed.
+// AGT-159 (v7.0.699) MAKES IT TEN: migration `agt159_backlog_review` added `backlog-review`, the
+// source scripts/backlog-review.js raises an OPEN TICKET under (`found_by 'backlog-review:<cycle id>'`)
+// -- precedence 30 / project_slug NULL, the same staff-watch shape, so the Development Manager picks.
+// Without the row finding_group_epic() RAISEd `unmapped source` on every one of the 578 unreviewed
+// open tickets and the whole review stopped. Third home: agt-159-backlog-review.test.mjs.
 const LIVE_ROUTES = [
   { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
   { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
   { precedence: 30, source: "agent", finding_type: "*", project_slug: null },
+  { precedence: 30, source: "backlog-review", finding_type: "*", project_slug: null },
   { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
   { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
   { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
@@ -260,7 +266,7 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, LIVE_ROUTES, "the nine routing rows, exactly");
+    assert.deepEqual(r.json, LIVE_ROUTES, "the ten routing rows, exactly");
     assert.ok(!r.json.some(x => x.source === "*" && x.finding_type === "*"),
       "there is deliberately no catch-all row: an unmapped source must stop the review");
     // The precedence ORDER is the invariant a new row must not disturb: security outranks everything.
