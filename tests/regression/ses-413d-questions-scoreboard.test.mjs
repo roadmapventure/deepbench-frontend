@@ -211,7 +211,12 @@ export const RUNBOOK_CEILING = 381000;
 // untouched. Net -43 B: 380905 -> 380862, so the edit PAID for itself and added no headroom debt.
 // No header stamp, same reason AGT-170 gave: ses-424c and agt-133 both pin stamps[0] to v7.0.658,
 // and at 138 B of headroom a ~290 B stamp could not land anyway. Re-measured with wc -c.
-export const BYTES_AT_SHIP = 380862;
+// v7.0.687 (AGT-166 s4) adds 74 B to step 6's rule (1): the rule reads "never writes `status`", and a
+// judged refusal now writes exactly one — `removal proposed`, under its own reversible decision. The
+// clause names the exception in place rather than leaving the runbook contradicting the shipped code
+// (no new line, no new header stamp — ses-424c pins stamps[0]). Net +74 B: 380862 -> 380936, 64 B under
+// SES-336's ceiling. Re-measured with wc -c on this tree.
+export const BYTES_AT_SHIP = 380936;
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

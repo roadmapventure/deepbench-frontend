@@ -60,6 +60,9 @@ import {
 } from "../../scripts/design-ruling.js";
 import { qidFor } from "../../scripts/decide-gated-card.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
+// The runbook's live size has ONE home (ses-413d's BYTES_AT_SHIP, checked against the file itself by
+// ses-424f). The ratchet below reads it from there rather than carrying a third copy.
+import { BYTES_AT_SHIP } from "./ses-413d-questions-scoreboard.test.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = path.join(ROOT, "scripts", "design-ruling.js");
@@ -95,7 +98,12 @@ const CYCLE_CEILING = 381000;
 // a fire reads). The ratchet below makes the gap VISIBLE instead of silent: this test goes red the
 // day somebody adds the clause without re-pinning, and red the day the pin moves without the
 // clause. Clearing it is a runbook-bytes ticket, not a line slipped into an unrelated ship.
-const CYCLE_BYTES_AT_SHIP = 380862;
+// AGT-166 s4 (v7.0.687): this WAS a literal 380862, which made this file a THIRD home for the
+// runbook's live size and reddened it the first time a later ticket legitimately spent a byte (s4 adds
+// 74 B to step 6's rule (1): a judged refusal writes `status = 'removal proposed'`). The ratchet this
+// arm exists to hold is the one on the NEXT line -- `RUNBOOK_NAMES_SCRIPT`, the clause that did not
+// ship -- and that ratchet works against the declared pin just as well. Read from the one home.
+const CYCLE_BYTES_AT_SHIP = BYTES_AT_SHIP;   // 380862 at AGT-136, 380936 since AGT-166 s4
 const RUNBOOK_NAMES_SCRIPT = false;
 
 const lf = t => String(t).replace(/\r\n/g, "\n");

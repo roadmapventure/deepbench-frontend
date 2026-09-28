@@ -1,4 +1,26 @@
 #!/usr/bin/env node
+// DeepBench v7.0.687 | scripts/ticket-owner.js | AGT-166 slice 4 -- ARM (b)'S TWO EXITS. The drain
+// had a way IN for every open premise and a way OUT for only the confirmed ones. Measured
+// 2026-09-28: `board-stale` reads 430, and the twelve refusals of the first completed night sit in
+// `ticket_owner_findings` as open rows whose `detail` begins `judge refused: ` -- re-filed nightly
+// by classifyBoard's carried branch, never re-judged, and never ruled either, because AGT-169's
+// ruler rules a CHECK and not a row. A refused premise could therefore never leave the population
+// it was refused out of.
+//
+// EXIT ONE -- A JUDGED REFUSAL *IS* THE REMOVAL PROPOSAL (Designer's call i, the AGT-178 shape). The
+// refusal now writes the row it is about: its own `removal-proposal` decision, a full-row image
+// under that decision, and `status = 'removal proposed'`. One Reverse puts the row back in the drain
+// and `removed` stays John's alone (SES-113) -- a proposed row waits for him and is never removed
+// unattended. The slug files NO ledger row any more (call iii): the twelve carried rows replay once
+// from their own `judge refused: ` detail and then clear, so `carried` reads 0 the night after this
+// ships and the population drains instead of circling.
+//
+// EXIT TWO -- NO JUDGE, NO STAMP (call ii). `planWrites` took every `derivable` finding whatever
+// produced it, so cycle 26d9662f, which ran `--nightly` with no judgment pass at all (4e rule 4),
+// planned 25 `revalidated_at` stamps over premises nobody had read; only the read-back defect fixed
+// in 8bc7f5e stopped it at one row. `planWrites` now takes `judged` and drops the revalidation check
+// from `fixes` without it: an unjudged night reports the population and writes nothing to it.
+//
 // DeepBench v7.0.675 | scripts/ticket-owner.js | AGT-166 slice 2 defect -- THE READ-BACK ACCEPTS AN
 // INSTANT, WHATEVER ITS OFFSET. The key-by-key read-back below (step 3 of applyPlan) is right to
 // distrust a 200: a PATCH the role cannot write answers with the old value. But it compared an
@@ -254,6 +276,23 @@ export const PREMISE_EXCERPT = 600;
 // read and the file would carry a night's judgment into a row nothing else can find.
 export const REVALIDATION_CHECK = "unrevalidated-30d";
 
+// The refusal's own prefix, named once (slice 4). ingestJudgment WRITES it onto a refused finding's
+// detail and classifyBoard's carried branch READS it back off the ledger a night later -- so the
+// string is the whole channel between a judge's refusal and the removal proposal it becomes. A
+// literal at either end that drifted from the other would leave a refused premise carried forever,
+// which is the defect this slice exists to close.
+export const REFUSED_PREFIX = "judge refused: ";
+
+// The decision kind a removal proposal is recorded under. Not `hygiene`: this is a JUDGED reading of
+// the row's own premise that moves the row's status, and John reverses a night by what the kind and
+// the reasoning say it did (AGT-178's shape).
+export const PROPOSAL_KIND = "removal-proposal";
+
+// The status a refused premise lands on. It is John's existing waiting room and NOT `removed`
+// (SES-113): the board already carries rows here awaiting his verdict, and nothing on this path may
+// ever write `removed` itself.
+const PROPOSED_STATUS = "removal proposed";
+
 // Every OTHER ticket a premise names, so the judge reads each one's live status beside it. Narrow on
 // purpose: two to four capitals, a hyphen, digits, which is this board's whole id vocabulary.
 const TICKET_ID = /[A-Z]{2,4}-\d+/g;
@@ -490,6 +529,11 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
   const revalidation = selectRevalidationBatch(items, { now, carried: ownerFindings.map(f => f.backlog_id) });
   const carriedSet = new Set(revalidation.carried);
   const carriedSince = new Map(ownerFindings.map(f => [f.backlog_id, f.first_seen_at]));
+  // AGT-166 slice 4: the ledger row's OWN detail, which is where a refusal's reason has been sitting
+  // since the night the judge wrote it. `judge refused: <reason>` is the only detail this slug ever
+  // files, so the prefix test is what tells a refusal from any other carried row, and a row whose
+  // detail does not carry it gets no proposal at all rather than an invented one.
+  const carriedDetail = new Map(ownerFindings.map(f => [f.backlog_id, f.detail]));
   const batchRank = new Map(revalidation.batch.map((r, i) => [r.backlog_id, i + 1]));
   // Read for the ≤25 batch rows only (readBoard), so a row with no entry is a row whose premise text
   // was never fetched -- which is a judgment, never a confirmation.
@@ -515,13 +559,17 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
   // COUNTED, never dropped silently, and nothing is filed: planWrites then routes every prior
   // ledger row of that slug into `clear` on its own terms (`clear = prior − tonight`), which is why
   // no delete path is needed and why a cleared row keeps its history.
-  const file = (row, check, verdict, detail, fix) => {
+  const file = (row, check, verdict, detail, fix, proposal) => {
     if (retiredMap.has(check)) {
       backlog.retired[check] = (backlog.retired[check] ?? 0) + 1;
       return;
     }
     const f = { backlog_id: row.backlog_id, check, verdict, detail };
     if (fix !== undefined) f.fix = fix;
+    // AGT-166 slice 4: a finding that carries a REMOVAL PROPOSAL. It rides on the finding rather
+    // than on a second list because planWrites reads the census and nothing else -- a proposal
+    // computed anywhere but here would be a second reading of the same board.
+    if (proposal !== undefined) f.proposal = proposal;
     findings.push(f);
   };
 
@@ -672,9 +720,11 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
     // 13 unrevalidated-30d (AGT-166 slice 2, arm (b)) -- an open row whose premise nobody has re-read
     // in over a month. Three branches, and the split is the whole design:
     //
-    //   CARRIED   -- a removal proposal is already open for this row. Re-filed as `judgment` so the
-    //                ledger keeps it and its age, and never re-judged: the Development Manager rules
-    //                it, and asking the judge again nightly would be 259 rows of noise (AGT-169).
+    //   CARRIED   -- a refusal is already on the ledger for this row. Re-filed as `judgment` and never
+    //                re-judged, and since slice 4 it carries the PROPOSAL its own `judge refused: `
+    //                detail holds: the row is proposed for removal once, from the reason the judge
+    //                gave, and then it clears. The Development Manager never had a way to rule a ROW
+    //                (AGT-169 rules checks), which is why a carried row could otherwise never exit.
     //   DERIVABLE -- the premise text was read, so the judge can rule it. `fix: {revalidated_at}` and
     //                NOT a ledger row: a confirmed premise files nothing (AGT-169 again), and the
     //                stamp lands only on an explicit `apply: true` (ingestJudgment fails closed).
@@ -683,9 +733,14 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
     //   JUDGMENT  -- in the batch but with no premises entry, so the text was not read. A row nobody
     //                showed the judge must never be stamped as re-read.
     if (carriedSet.has(row.backlog_id)) {
+      const led = carriedDetail.get(row.backlog_id);
+      const proposal = typeof led === "string" && led.startsWith(REFUSED_PREFIX)
+        ? { reason: led.slice(REFUSED_PREFIX.length), since: carriedSince.get(row.backlog_id) ?? now }
+        : undefined;
       file(row, REVALIDATION_CHECK, "judgment",
         `a removal proposal for this premise has been open since ${carriedSince.get(row.backlog_id) ?? now}` +
-        " and is awaiting the Development Manager's ruling; re-filed tonight, never re-judged.");
+        " and is awaiting the Development Manager's ruling; re-filed tonight, never re-judged.",
+        undefined, proposal);
     } else if (batchRank.has(row.backlog_id)) {
       const premise = premiseById.get(row.backlog_id);
       if (premise) {
@@ -781,7 +836,7 @@ export function renderCensus(result, nowIso) {
   return lines.join("\n") + "\n";
 }
 
-// planWrites(result, prior, items, {rate}) -> {fixes, ledger: {insert, reseen, clear}, meta}
+// planWrites(result, prior, items, {rate, judged}) -> {fixes, proposals, ledger: {insert, reseen, clear}, meta}
 //
 // The census says what is wrong; this says what will be WRITTEN, and nothing here touches the
 // network. `prior` is the open ledger (uncleared ticket_owner_findings rows) as
@@ -793,25 +848,52 @@ export function renderCensus(result, nowIso) {
 // ledger is a RE-SEEN (touch last_seen_at) rather than a second row. The three ledger lists are
 // exhaustive over `prior` by construction: every open row is either seen again tonight or cleared.
 // Clearing is not deletion -- a cleared row keeps its history and simply stops being open.
-export function planWrites(result, prior, items, { rate } = {}) {
+export function planWrites(result, prior, items, { rate, judged } = {}) {
   const byId = new Map((items ?? []).map(i => [i.backlog_id, i.id]));
   const key = f => `${f.backlog_id} ${f.check ?? f.check_slug}`;
 
   // A fix without a primary key is not a write, so this throws rather than silently planning a
   // PATCH it cannot address -- a dropped fix would read as a clean board on the next census.
-  const fixes = result.findings.filter(f => f.verdict === "derivable").map(f => {
-    const id = byId.get(f.backlog_id);
-    if (id === undefined) {
-      throw new Error(`planWrites: no backlog_items id for ${f.backlog_id} (${f.check}) — a fix without a primary key is not a write`);
-    }
-    return { backlog_id: f.backlog_id, id, check: f.check, patch: f.fix };
-  });
+  // NO JUDGE, NO STAMP (AGT-166 slice 4, the Designer's call ii). Twelve of the thirteen checks are
+  // arithmetic and are the column's own rule, so an unjudged night writes them exactly as before.
+  // The thirteenth is a READING of a premise, and a night with no judgment pass has not read one:
+  // cycle 26d9662f ran `--nightly` alone and planned 25 `revalidated_at` stamps over premises nobody
+  // had looked at. The gate is here rather than in the census because the census must keep REPORTING
+  // the population every night -- what an unjudged night loses is the right to write to it.
+  const fixes = result.findings
+    .filter(f => f.verdict === "derivable" && (judged ? true : f.check !== REVALIDATION_CHECK))
+    .map(f => {
+      const id = byId.get(f.backlog_id);
+      if (id === undefined) {
+        throw new Error(`planWrites: no backlog_items id for ${f.backlog_id} (${f.check}) — a fix without a primary key is not a write`);
+      }
+      return { backlog_id: f.backlog_id, id, check: f.check, patch: f.fix };
+    });
 
   const judgment = result.findings.filter(f => f.verdict === "judgment");
-  const tonight = new Set(judgment.map(key));
+
+  // THE REMOVAL PROPOSALS (slice 4). A refused premise -- refused tonight by the judge, or refused on
+  // an earlier night and replayed off its own ledger detail -- is a proposal to remove the row, and
+  // applyPlan writes it as one. A proposal addresses its row by primary key for the same reason a fix
+  // does: it images and patches that row, and a proposal that could not be addressed is not a write.
+  const proposals = judgment.filter(f => f.check === REVALIDATION_CHECK && f.proposal).map(f => {
+    const id = byId.get(f.backlog_id);
+    if (id === undefined) {
+      throw new Error(`planWrites: no backlog_items id for ${f.backlog_id} (${f.check}) — a removal proposal without a primary key is not a write`);
+    }
+    return { backlog_id: f.backlog_id, id, reason: f.proposal.reason, since: f.proposal.since ?? null };
+  });
+
+  // THE SLUG FILES NO LEDGER ROW AT ALL ANY MORE (call iii). `ticket_owner_findings` had no reviewer
+  // for a ROW (AGT-169 rules checks), so every revalidation row filed there was permanent: a confirmed
+  // premise already filed nothing, and now a refused one writes the board instead and a row nobody
+  // could read is not filed either. Being absent from `tonight` is also what CLEARS the twelve rows
+  // the earlier nights left behind -- `clear = prior − tonight`, one replay each, then gone.
+  const ledgerable = judgment.filter(f => f.check !== REVALIDATION_CHECK);
+  const tonight = new Set(ledgerable.map(key));
   const priorKeys = new Set((prior ?? []).map(key));
 
-  const insert = judgment.filter(f => !priorKeys.has(key(f))).map(f => ({
+  const insert = ledgerable.filter(f => !priorKeys.has(key(f))).map(f => ({
     id: randomUUID(),
     backlog_id: f.backlog_id,
     check_slug: f.check,
@@ -821,7 +903,7 @@ export function planWrites(result, prior, items, { rate } = {}) {
   const reseen = (prior ?? []).filter(p => tonight.has(key(p))).map(p => p.id);
   const clear = (prior ?? []).filter(p => !tonight.has(key(p))).map(p => p.id);
 
-  return { fixes, ledger: { insert, reseen, clear }, meta: { counts: result.counts, rate } };
+  return { fixes, proposals, ledger: { insert, reseen, clear }, meta: { counts: result.counts, rate } };
 }
 
 // sameChicagoDay(aIso, bIso) -> do these two instants fall on the same America/Chicago calendar
@@ -851,7 +933,12 @@ export function sameChicagoDay(aIso, bIso) {
 // lengthening the tail changes what John reads and nothing that matches it.
 export function nightlyNotes(line, applied, judged) {
   const a = applied ?? {};
-  const head = `${NIGHTLY_PREFIX} — ${line} · fixed ${a.fixed} · findings +${a.inserted} ~${a.reseen} −${a.cleared}`;
+  // AGT-166 slice 4: `proposed N` lands after `fixed N`, and ONLY when N > 0. A night that proposed
+  // nothing prints the string it printed before -- the standing brief diffs these notes night over
+  // night, and a ` · proposed 0` on every row would be 430 nights of noise saying nothing happened.
+  const head = `${NIGHTLY_PREFIX} — ${line} · fixed ${a.fixed}` +
+    (a.proposed > 0 ? ` · proposed ${a.proposed}` : "") +
+    ` · findings +${a.inserted} ~${a.reseen} −${a.cleared}`;
   const tail = a.decision
     ? ` · decision ${a.decision} — reversible until ${a.expires_at}`
     : " · no decision (nothing to fix)";
@@ -984,7 +1071,16 @@ export function ingestJudgment(answer, state) {
       delete merged.fix;
       if (fix) {
         refusedCount++;
-        merged.detail = `judge refused: ${fix.reason}`;
+        merged.detail = `${REFUSED_PREFIX}${fix.reason}`;
+        // AGT-166 slice 4, the Designer's call (i): A JUDGED REFUSAL *IS* THE REMOVAL PROPOSAL, the
+        // same night, and not a row filed for somebody to rule later. `since` is absent on purpose --
+        // this proposal is made tonight; only a CARRIED refusal has an age to report.
+        //
+        // THE THIRTEENTH CHECK AND NO OTHER. A refused cost stamp or type spelling is the judge
+        // declining one arithmetic write; it says nothing about whether the TICKET should exist. Only
+        // the revalidation check asks that question, so only its refusal carries a proposal — a
+        // `proposal` on any other refusal would be a removal waiting for a widened filter to find it.
+        if (f.check === REVALIDATION_CHECK) merged.proposal = { reason: fix.reason };
       } else {
         unconfirmed++;
         merged.detail = `judge: not confirmed -- ${f.detail}`;
@@ -1130,7 +1226,10 @@ async function readBoard(base, key, now) {
   //
   // `ownerFindings` is the uncleared ledger for the revalidation slug ALONE -- the whole open ledger
   // is read separately by the write pass, and classifyBoard must not learn to treat any other slug's
-  // open row as a carried premise.
+  // open row as a carried premise. AGT-166 slice 4: `detail` joins the projection, because the
+  // REFUSAL'S REASON lives in it and nowhere else. Without it the twelve carried rows are re-filed
+  // as bare "awaiting a ruling" findings forever; with it each one replays as the removal proposal
+  // the judge already made.
   //
   // `premises` is `title, description, priority_class` for the ≤25 rows tonight's batch actually
   // picks, which is why selectRevalidationBatch runs HERE as well as inside classifyBoard: both calls
@@ -1139,7 +1238,7 @@ async function readBoard(base, key, now) {
   // read misses lands `judgment` rather than a confirmation, so a short read costs a ruling, never a
   // wrong stamp.
   const ownerFindings = await readAll(base, key, "ticket_owner_findings (revalidation)",
-    `ticket_owner_findings?select=backlog_id,check_slug,first_seen_at&cleared_at=is.null&check_slug=eq.${REVALIDATION_CHECK}&order=id`, 10000);
+    `ticket_owner_findings?select=backlog_id,check_slug,first_seen_at,detail&cleared_at=is.null&check_slug=eq.${REVALIDATION_CHECK}&order=id`, 10000);
   const batch = selectRevalidationBatch(items, { now, carried: ownerFindings.map(f => f.backlog_id) }).batch;
   const premises = batch.length === 0 ? [] : await readAll(base, key, "backlog_items (premises)",
     "backlog_items?select=backlog_id,title,description,priority_class" +
@@ -1349,6 +1448,60 @@ export async function applyPlan(base, key, plan, { cycleId, sessionName, now, ju
     }
   }
 
+  // 3b -- THE REMOVAL PROPOSALS (AGT-166 slice 4). After the fixes and before the ledger, because a
+  // proposal is a write to the BOARD and the ledger is bookkeeping about it; and each one carries its
+  // OWN decision rather than joining the night's hygiene decision, because the two are different
+  // undos. Reversing the hygiene decision puts stamps back; reversing a proposal returns ONE row to
+  // the drain, which is the grain John needs to answer it. `removed` is never written here (SES-113):
+  // the row lands in his waiting room and stops being in the drain's population, and that is all.
+  let proposed = 0;
+  for (const p of plan.proposals ?? []) {
+    const step0 = where(`propose ${p.backlog_id}`);
+    const pDecision = await rest(base, key, "rpc/record_decision", {
+      method: "POST",
+      body: JSON.stringify({
+        p_cycle_id: cycleId ?? null,
+        p_session_name: sessionName ?? null,
+        p_kind: PROPOSAL_KIND,
+        p_backlog_id: p.backlog_id,
+        p_summary: `${p.backlog_id} removal proposed: ${p.reason}`,
+        p_reasoning: `AGT-166 revalidation, night ${now}: premise re-read and refused — ${p.reason}.` +
+          " Reverse this decision to return the row to the drain; removed stays John's (SES-113). pattern:0",
+        p_ladder_work_class: null,
+      }),
+    }, step0);
+    if (typeof pDecision !== "string" || pDecision.length !== 36) {
+      fail(`${step0}: record_decision returned ${JSON.stringify(pDecision)}, which is not a decision id`);
+    }
+    const step = `${step0} (proposal decision ${pDecision})`;
+    // The FULL row, imaged under the proposal's own decision -- reverse_decision() rewrites every
+    // column from row_data, so a partial image would restore a partial row. Read before the patch:
+    // an image taken afterwards restores the very status it was meant to undo.
+    const imaged = await rest(base, key, `backlog_items?id=eq.${p.id}&select=*`, {}, step);
+    if (!Array.isArray(imaged) || imaged.length !== 1) {
+      fail(`${step}: read ${Array.isArray(imaged) ? imaged.length : 0} of 1 row to image`);
+    }
+    await rest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([{ ...A, table_name: "backlog_items", pk_value: p.id, row_data: imaged[0], decision_id: pDecision }]),
+    }, step);
+    // ONE column, read back key by key exactly as step 3 does. `updated_at` is never named: a stamp
+    // later than the decision's own decided_at makes reverse_decision() refuse the row (SES-316), and
+    // a proposal John cannot reverse is a removal nobody approved.
+    const back = await rest(base, key, `backlog_items?id=eq.${p.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: PROPOSED_STATUS }),
+    }, step);
+    const row = Array.isArray(back) ? back[0] : null;
+    if (!row) fail(`${step}: the PATCH returned no row`);
+    if (!cellMatches("status", row.status, PROPOSED_STATUS)) {
+      fail(`${step}: status read ${JSON.stringify(row.status)}, wanted ${JSON.stringify(PROPOSED_STATUS)}`);
+    }
+    proposed++;
+  }
+
   // 4 -- the ledger inserts, each preceded by a NULL-row image. A null row_data is how the
   // reversal chain says "this row did not exist before"; without it a reversal would have nothing
   // to say about a finding the night invented.
@@ -1428,6 +1581,7 @@ export async function applyPlan(base, key, plan, { cycleId, sessionName, now, ju
     decision,
     expires_at,
     fixed: plan.fixes.length,
+    proposed,
     inserted: insert.length,
     reseen: reseen.length,
     cleared: clear.length,
@@ -1615,7 +1769,7 @@ async function judgePassTwo({ argv, nightly, cycleId, answerArg, stateFile, dryR
 
   let plan;
   try {
-    plan = planWrites(result, state.prior, state.items, { rate: state.rate });
+    plan = planWrites(result, state.prior, state.items, { rate: state.rate, judged });
   } catch (e) {
     fail(e.message);
   }
@@ -1630,6 +1784,7 @@ async function judgePassTwo({ argv, nightly, cycleId, answerArg, stateFile, dryR
       refused: judged.refused,
       unconfirmed: judged.unconfirmed,
       fixes: plan.fixes.length,
+      proposed: plan.proposals.length,
       insert: plan.ledger.insert.length,
       reseen: plan.ledger.reseen.length,
       clear: plan.ledger.clear.length,
@@ -1714,7 +1869,9 @@ async function judgePassTwo({ argv, nightly, cycleId, answerArg, stateFile, dryR
 // documentation is not reversible in practice.
 function applyLine(applied) {
   if (!applied) return "";
-  const head = `ticket-owner apply: fixed ${applied.fixed} · findings +${applied.inserted} ~${applied.reseen} −${applied.cleared}`;
+  const head = `ticket-owner apply: fixed ${applied.fixed}` +
+    (applied.proposed > 0 ? ` · proposed ${applied.proposed}` : "") +
+    ` · findings +${applied.inserted} ~${applied.reseen} −${applied.cleared}`;
   return applied.decision
     ? `${head} · decision ${applied.decision} — reversible until ${applied.expires_at}: select public.reverse_decision('${applied.decision}','John','<why>');\n`
     : `${head} · no decision (nothing to fix)\n`;

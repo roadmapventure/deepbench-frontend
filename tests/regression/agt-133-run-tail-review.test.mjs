@@ -42,6 +42,9 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import { parseSteps, runbookSha, NOTES } from "../../scripts/render-cycle-card.js";
 import { routeGroup } from "../../scripts/audit-review.js";
 import { isoWeek } from "../../scripts/audit-ledger.js";
+// The runbook's live size has ONE home (ses-413d's BYTES_AT_SHIP, checked against the file itself by
+// ses-424f). Arm E reads it from there rather than carrying a second copy — see CYCLE_BYTES note below.
+import { BYTES_AT_SHIP } from "./ses-413d-questions-scoreboard.test.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CYCLE_MD = path.join(ROOT, "docs", "runbooks", "runner-cycle.md");
@@ -62,7 +65,13 @@ const RESIDUE_RE = /push John|push channel|Send the push|re-push|one push per bl
 // runbook bytes against the SES-336 ceiling, and PUSH_RESIDUE stays 10 because the ten lines it
 // counts sit on audit_findings 639f07b6-1e06-4454-91e7-bc010d00d1d6 -- escalated to John, unanswered.
 const CARD_PUSH_RE = /pushed to John|one push per cycle/g;
-const CYCLE_BYTES_AT_SLICE2 = 380862;
+// AGT-166 s4 (v7.0.687): this WAS a literal 380862 — a second home for the runbook's live size, which
+// went red the first time a later ticket legitimately spent a runbook byte (s4 adds 74 B to step 6's
+// rule (1): a judged refusal writes `status = 'removal proposed'`). The CLAIM arm E makes is about
+// AGT-133 slice 2 — that ITS repair was in the generator and cost the ceiling nothing — and the way to
+// keep that claim true without re-pinning the file forever is to grade against the one declared home.
+// A drift between the file and that pin still reddens; it just reddens in ses-424f, where it belongs.
+const CYCLE_BYTES_AT_SLICE2 = BYTES_AT_SHIP;   // 380862 at AGT-133 slice 2, 380936 since AGT-166 s4
 const NOTE_0B = "a silent predecessor is REPORTED IN A ROW John reads; never close a row that is not yours";
 const NOTE_1 = "insert runner_cycles with the claimed id, outcome NULL; this step notifies nothing";
 const NOTE_MAX = 90;
@@ -315,9 +324,11 @@ async function run() {
     assert.ok(card.includes(NOTE_0B), "and 0b's new text rendered through into the card");
     assert.ok(card.includes(NOTE_1), "and step 1's did too -- the card was re-rendered, not hand-edited");
 
-    // ZERO RUNBOOK BYTES. The repair was in the generator, so the SES-336 ceiling is untouched...
+    // ZERO RUNBOOK BYTES OF ITS OWN. The repair was in the generator, so this slice spent nothing
+    // against the SES-336 ceiling — and the file must still agree with the ONE pin that declares its
+    // size, whatever a later ticket has legitimately spent since.
     assert.equal(Buffer.byteLength(md, "utf8"), CYCLE_BYTES_AT_SLICE2,
-      `this slice opens no runbook bytes: runner-cycle.md must still be ${CYCLE_BYTES_AT_SLICE2} B`);
+      `runner-cycle.md is ${Buffer.byteLength(md, "utf8")} B but the declared pin reads ${CYCLE_BYTES_AT_SLICE2} B`);
     // ...and the held residue is still held. The ten lines counted by arm B sit on an escalated,
     // unanswered finding; clearing them is John's call, never a cycle's.
     assert.equal(PUSH_RESIDUE, 10,

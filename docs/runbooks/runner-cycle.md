@@ -1948,7 +1948,7 @@ one-to-one type spelling) under ONE `kind = 'hygiene'` decision with full-row be
 JUDGMENT gaps in `ticket_owner_findings` (new rows inserted, re-seen rows touched, closed gaps cleared),
 and records itself as one `trigger = 'scheduled'` cycle row whose `notes` carry the census line, the four
 counts and the decision handle. Four rules, none tunable here: (1) it never writes `status`,
-`predicted_cycles` or `design_status` — a verdict's, a quote-owner's and a designer's words; (2) the
+`predicted_cycles` or `design_status` — a verdict's, a quote-owner's and a designer's words — save `status = 'removal proposed'` on a judged refusal (`AGT-166` s4); (2) the
 arithmetic half calls no model — it is the column's own rule, on this session's subscription tokens — and
 the judgment half calls one, ONCE, on the `judgment` lane read live from `runner_model_lanes`;
 (3) exit **2** is a refusal and names the step that stopped — write it in `notes` and **continue to step 5

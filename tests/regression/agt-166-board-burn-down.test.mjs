@@ -1,3 +1,22 @@
+// DeepBench v7.0.687 | tests/regression/agt-166-board-burn-down.test.mjs | AGT-166 slice 4 --
+// ARM (F) WAS RED ON A BOARD THAT WAS WORKING, and a new arm (H) pins the write gate.
+//
+// (F) counted "tonight's batch" as every finding of the slug. The first completed night left twelve
+//     refusals on the ledger, which classifyBoard re-files every night, so the count read 37 and the
+//     arm failed `which is not 1..25` with nothing wrong. A batch is what tonight may WRITE, so the
+//     definition now carries the verdict: `derivable` findings only. The carried half is graded on its
+//     own terms instead -- each carried REFUSAL (its ledger detail begins `judge refused: `) replays as
+//     a removal proposal, so the dry run now asserts `insert 0` and `proposed = the carried refusals`.
+//     Those two numbers are the two exits slice 4 gave the drain: the ledger pile stops growing and
+//     the refused population finally leaves.
+//
+// (H) NO JUDGE, NO STAMP. One census, two plans, `judged` the only variable: an arithmetic-only night
+//     plans 0 revalidation fixes and the same census judged plans 1. Cycle 26d9662f really did plan 25
+//     stamps over premises nobody had read (decision e6ef36c6); only an unrelated defect stopped it.
+//
+// Arm (E)'s degraded control moved with the same contract: a degraded premise finding now reaches
+// neither the row nor the ledger, which is why the judgement catches it by the missing FIX.
+//
 // DeepBench v7.0.643 | tests/regression/agt-166-board-burn-down.test.mjs | AGT-166 slices 1-2 --
 // SLICE 2 (v7.0.643) ADDS THREE ARMS, keeping (A)-(D) as they shipped:
 //
@@ -78,6 +97,7 @@ import { checkClosedRed, ratifiedAt, PAGE_ROWS } from "../../scripts/audit-board
 import {
   classifyBoard, planWrites, selectRevalidationBatch, REVALIDATION_CHECK, UNREVALIDATED_BATCH,
   UNREVALIDATED_DAYS, PAGE_ROWS as OWNER_PAGE_ROWS, chicagoDay, cellMatches, ISO_INSTANT,
+  REFUSED_PREFIX,
 } from "../../scripts/ticket-owner.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -193,7 +213,7 @@ async function run() {
 
     // THE JUDGEMENT, factored so the mutants run the same code.
     const assertFixNeverLedger = result => {
-      const plan = planWrites(result, [], [premiseRow], { rate: 0.5 });
+      const plan = planWrites(result, [], [premiseRow], { rate: 0.5, judged: true });
       const mine = plan.fixes.filter(f => f.check === REVALIDATION_CHECK);
       assert.equal(mine.length, 1, "a confirmed premise must be ONE row patch");
       assert.deepEqual(mine[0].patch, { revalidated_at: NOW166 },
@@ -221,10 +241,16 @@ async function run() {
     asJudgment.counts = { ...asJudgment.counts, derivable: 0, judgment: asJudgment.counts.judgment + 1 };
     assert.throws(() => assertFixNeverLedger(asJudgment),
       "CONTROL: a premise that reached the ledger instead of the row must fail the judgement");
-    const degradedPlan = planWrites(asJudgment, [], [premiseRow], { rate: 0.5 });
+    const degradedPlan = planWrites(asJudgment, [], [premiseRow], { rate: 0.5, judged: true });
     assert.deepEqual(degradedPlan.fixes, [], "the degraded control must really produce no fix — else it proves nothing");
-    assert.deepEqual(degradedPlan.ledger.insert.map(f => f.check_slug), [REVALIDATION_CHECK],
-      "and it must really file the ledger row the live path must never file");
+    // AGT-166 slice 4 (Designer's call iii): the degraded finding now reaches NEITHER the row nor the
+    // ledger. That is a stronger statement of the same property, and it is why the judgement above has
+    // to catch the degradation by the missing FIX: a premise that quietly went nowhere is exactly the
+    // silent under-write this arm exists to make impossible.
+    assert.deepEqual(degradedPlan.ledger.insert, [],
+      "the revalidation slug files no ledger row in any direction — a filed row would be permanent, since nothing rules a row (AGT-169)");
+    assert.deepEqual(degradedPlan.proposals, [],
+      "and a degraded finding with no judge's refusal behind it is never a removal proposal either");
     results.push("confirmed-premise-is-a-fix+2-controls");
   }
 
@@ -264,6 +290,52 @@ async function run() {
     assert.equal(ISO_INSTANT.test(stampZ) && ISO_INSTANT.test(stampOffset), true);
     assert.equal(ISO_INSTANT.test("2026-09-28 05:08:10"), false, "a space-separated stamp carries no offset and is not accepted");
     results.push("cell-matches-instant");
+  }
+
+  // --- (H) NO JUDGE, NO STAMP (slice 4, the Designer's call ii) -----------------------------------
+  //
+  // MEASURED, not recalled: cycle 26d9662f ran `node scripts/ticket-owner.js --nightly` with no
+  // judgment pass at all -- step 4e rule (4)'s fallback, which is legal -- and its decision e6ef36c6
+  // PLANNED 25 `revalidated_at` stamps over premises no capability had read. Only the read-back defect
+  // fixed in 8bc7f5e stopped it at one row. A stamp means "somebody re-read this premise and it still
+  // names work the board does not show done"; an arithmetic-only night has read nothing, so it may
+  // report the population and must not write to it.
+  //
+  // ONE CENSUS, TWO PLANS, and the only variable is `judged`. That is the whole discrimination: a gate
+  // that lived in the census would also stop the night COUNTING the drain, which is the number the
+  // close condition reads.
+  {
+    const NOWH = "2026-09-28T00:00:00.000Z";
+    const row = {
+      id: "00000000-0000-4000-8000-166000000002", backlog_id: "ZZ166H-01", status: "open",
+      type: "Tooling", tier: "later", claimed_by: null, claimed_at: null, predicted_cycles: 1,
+      size_stamp: "S", design_status: null, kickoff_link: null, cost_pct_snapshot: null,
+      cost_cycles_snapshot: null, revalidated_at: null, actual_tokens_attended: 1,
+      filed_at: "2026-06-01T00:00:00+00:00", created_at: "2026-06-01T00:00:00+00:00",
+      updated_at: "2026-06-01T00:00:00+00:00",
+    };
+    const census = classifyBoard({
+      items: [row], matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [],
+      ownerFindings: [],
+      premises: [{ backlog_id: "ZZ166H-01", title: "ZZ166H premise", description: "Still open.", priority_class: "P10 - Tooling" }],
+    }, { now: NOWH, rate: 0.5 });
+    const only = census.findings.filter(f => f.check === REVALIDATION_CHECK);
+    assert.equal(only.length, 1, "the fixture row must reach the thirteenth check, or the arm grades nothing");
+    assert.equal(only[0].verdict, "derivable", "its premise was read, so it is the judge's to rule");
+
+    const unjudged = planWrites(census, [], [row], { rate: 0.5 });
+    assert.equal(unjudged.fixes.length, 0,
+      "an UNJUDGED night plans NO revalidation stamp — e6ef36c6 planned 25 over premises nobody read");
+    assert.deepEqual(unjudged.ledger.insert, [],
+      "and it files nothing either: the night reports the population and leaves it exactly as it found it");
+
+    const judged = planWrites(census, [], [row], { rate: 0.5, judged: { confirmed: 1, refused: 0, unconfirmed: 0 } });
+    assert.equal(judged.fixes.length, 1, "THE CONTROL: the same census, judged, plans the one stamp — the gate is the judge and not the check");
+    assert.deepEqual(judged.fixes[0].patch, { revalidated_at: NOWH },
+      "and the judged write is still `revalidated_at` alone — never status, never updated_at (SES-316)");
+    assert.equal(census.backlog.unrevalidated_batch, 1,
+      "the CENSUS is unchanged in both directions: an unjudged night still counts tonight's batch, or the close condition stops being readable");
+    results.push("no-judge-no-stamp+control");
   }
 
   // --- (B) the ratified predicate, by value ------------------------------------------------------
@@ -389,10 +461,32 @@ async function run() {
     assert.ok(headline.includes(` · revalidation ${popBefore} left `),
       `the census line must quote the population count=exact reads (${popBefore}); got: ${headline.slice(-90)}`);
 
-    const batchIds = census.findings.filter(f => f.check === REVALIDATION_CHECK).map(f => f.backlog_id);
+    // AGT-166 slice 4: THE BATCH IS THE DERIVABLE HALF, and the verdict is part of the definition.
+    // Once the first night completed, the slug's findings were 25 rulings PLUS the 12 carried refusals
+    // it re-files, and a filter on the check alone read that as a 37-row batch — "which is not 1..25",
+    // red on a board that was behaving exactly as designed. A batch is what tonight may WRITE; a
+    // carried row is a replay of a judgment already made.
+    const slugFindings = census.findings.filter(f => f.check === REVALIDATION_CHECK);
+    const batchIds = slugFindings.filter(f => f.verdict === "derivable").map(f => f.backlog_id);
     assert.ok(batchIds.length > 0 && batchIds.length <= UNREVALIDATED_BATCH + 0,
       `live: tonight's batch is ${batchIds.length} rows, which is not 1..${UNREVALIDATED_BATCH}`);
     assert.equal(batchIds.length, new Set(batchIds).size, "live: one finding per row, never two");
+    // The carried half, by the one thing that makes a carried row exitable: its ledger detail begins
+    // with the judge's own refusal prefix, which is what replays as a removal proposal below.
+    const carried = slugFindings.filter(f => f.detail.includes("never re-judged"));
+    const carriedRefusals = carried.filter(f => f.proposal);
+    assert.equal(census.backlog.unrevalidated_carried, carried.length,
+      `live: the census counts ${census.backlog.unrevalidated_carried} carried rows but re-files ${carried.length} — ` +
+      "the count and the findings are one reading of one ledger");
+    for (const f of carriedRefusals) {
+      assert.ok(!f.proposal.reason.startsWith(REFUSED_PREFIX),
+        `live: ${f.backlog_id}'s proposal reason still carries the prefix — the judge's words reach John's ` +
+        "decision summary, and a doubled `judge refused: judge refused: ` there is the channel read twice");
+      assert.ok(f.proposal.reason.length > 0 && f.proposal.since != null,
+        `live: ${f.backlog_id} is proposed with no reason or no age — the reason is the judge's own sentence and the age is the ledger's`);
+    }
+    assert.ok(batchIds.length <= census.backlog.unrevalidated_batch,
+      `live: ${batchIds.length} rulings over a batch of ${census.backlog.unrevalidated_batch} — a ruling outside tonight's batch is a row nobody selected`);
 
     // The whole two-pass merge over the LIVE census with the writer removed. The state is assembled
     // here exactly as pass one writes it, from the seed's own stored schema (the fixture holds it byte
@@ -438,8 +532,15 @@ async function run() {
       assert.equal(d.dry_run, true);
       assert.equal(d.confirmed, derivable.length, `the dry run confirmed ${d.confirmed} of ${derivable.length}`);
       assert.equal(d.fixes, derivable.length, "every confirmed premise is a row patch");
-      assert.equal(d.insert, mine.length - derivable.length,
-        "and ONLY the unconfirmable ones reach the ledger — a confirmed premise files no finding (AGT-169)");
+      // AGT-166 slice 4: the slug files NOTHING on the ledger any more, in either direction, and every
+      // carried refusal replays as a removal proposal instead. These two numbers are the exits the
+      // drain gained: `insert 0` is the pile that stopped growing, `proposed N` is the population
+      // finally leaving. On 1ae77169 `d.proposed` is undefined and `d.insert` is the carried count.
+      assert.equal(d.insert, 0,
+        "no `unrevalidated-30d` row reaches the ledger at all now — a confirmed premise is a patch, a refused one a proposal");
+      assert.equal(d.proposed, carriedRefusals.length,
+        `the dry run proposes one removal per carried refusal (${carriedRefusals.length} tonight) — that is how the ` +
+        `refused half leaves board-stale, and a 0 here means the refusals are circling again`);
     } finally {
       for (const f of [sf, af]) { try { fs.unlinkSync(f); } catch { /* absent */ } }
     }
@@ -448,7 +549,8 @@ async function run() {
     const popAfter = await countOf(POP_Q);
     assert.equal(popAfter, popBefore,
       `live: --dry-run moved the board — the population read ${popBefore} before and ${popAfter} after, and a dry run that writes is not dry`);
-    results.push(`live-drain(population ${popBefore}, board ${boardRows} rows, batch ${batchIds.length}, dry-run moved 0)`);
+    results.push(`live-drain(population ${popBefore}, board ${boardRows} rows, batch ${batchIds.length}, ` +
+      `carried refusals ${carriedRefusals.length}, dry-run moved 0)`);
   } finally {
     try { fs.unlinkSync(censusOut); } catch { /* absent */ }
   }

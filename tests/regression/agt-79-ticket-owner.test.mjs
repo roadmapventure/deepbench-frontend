@@ -1,3 +1,20 @@
+// DeepBench v7.0.687 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-166 slice 4 -- NEW PART
+// O: A JUDGED REFUSAL IS A REMOVAL PROPOSAL, and an UNJUDGED night stamps nothing. Part G proved the
+// CONFIRMED half of the drain end to end; the refused half had no exit to prove -- a refusal filed a
+// `ticket_owner_findings` row that nothing could rule (AGT-169 rules checks, never rows), so the row
+// was re-filed nightly and stayed in the population forever. Part O drives the other half: pure, a
+// refused premise carries the judge's own reason as its proposal while a refused CLAIM fix carries
+// none, and 25 stamps + 1 claim clear plan as 1 write unjudged and 26 judged; live, ZZTO-795 is born
+// before the fence, refused, and comes back reading `removal proposed` under its OWN
+// `removal-proposal` decision with one full-row image, zero ledger rows, and one Reverse that returns
+// it to the drain. On 1ae77169 the live arm cannot even run: `planWrites` returns no `proposals`.
+//
+// Three arms already in this file MOVED with the contract rather than around it, and each movement is
+// now an assertion in its own right: A2 (viii)'s carried rows CLEAR instead of being touched (the slug
+// files no ledger row any more), A2 (ix)'s unread premise files nothing, and F's
+// `["QA-79-02", "unrevalidated-30d"]` insert is gone. Every planWrites call that means a judged night
+// now says `judged` -- which is the point of the flag: the ones that do not, do not stamp.
+//
 // DeepBench v7.0.675 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-166 slice 2 defect --
 // PART G NOW STAMPS A ROW, so the read-back runs over a real timestamptz round trip. ZZTO-794 gains
 // a `premises` entry, which moves the thirteenth check from `judgment` to `derivable` and gives the
@@ -149,6 +166,11 @@
 // source-only, so they run BEFORE part E's credential gate returns -- a clean checkout still
 // exercises them.
 //
+// (O) THE REFUSED HALF OF THE DRAIN (slice 4), pure and then live on one fixture row: a refusal
+// becomes a removal proposal with its own decision and image, files no ledger row, stamps nothing,
+// and reverses in one call. Its controls are the two directions that must NOT propose -- a refused
+// arithmetic fix and an unconfirmed premise -- plus the unjudged/judged pair over one census.
+//
 // (K) THE JUDGMENT PASS (slice 4), and its whole subject is what the code does with an answer it
 // did not write. The merge is driven by the real fixture answer and then by TEN mutations of it,
 // each of which must be REFUSED BY NAME -- a window from another night, a fix naming a judgment
@@ -180,6 +202,7 @@ import {
   censusLine, sameChicagoDay, nightlyNotes, NIGHTLY_PREFIX,
   chicagoDay, judgeTask, ingestJudgment, statePathFor, EXIT_AWAITING_ANSWER,
   selectRevalidationBatch, premiseDetail, UNREVALIDATED_BATCH, PREMISE_EXCERPT, REVALIDATION_CHECK,
+  REFUSED_PREFIX, PROPOSAL_KIND,
 } from "../../scripts/ticket-owner.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 import { renderTicketHygiene, factsSha, cst, BEGIN, END, HYGIENE_NIGHTS_READ } from "../../scripts/render-standing-brief.js";
@@ -414,11 +437,25 @@ async function main() {
 
   // AGT-169, THE HARD CONSTRAINT: a confirmed premise files NO ledger row. 259 open findings over 10
   // slugs already sit unruled, so a drain that filed one row per judged premise would add 438 more.
-  const d1plan = planWrites(d1, [], DRAIN, { rate: 0.5 });
+  // AGT-166 slice 4: `judged` is now what buys the right to stamp. These 25 rulings are a JUDGED
+  // night's, so the flag is passed; the unjudged direction is the next two lines and (H) in
+  // agt-166-board-burn-down.test.mjs.
+  const d1plan = planWrites(d1, [], DRAIN, { rate: 0.5, judged: true });
   assert.strictEqual(d1plan.fixes.length, 25, "all 25 rulings are row patches");
   assert.deepStrictEqual(d1plan.ledger.insert, [],
     "a confirmed premise writes the row and files NOTHING — the ledger is for refusals only (AGT-169)");
   assert.deepStrictEqual([...new Set(d1plan.fixes.map(f => f.check))], [REVALIDATION_CHECK]);
+  // NO JUDGE, NO STAMP (slice 4, call ii). The SAME census, planned without `judged`: cycle 26d9662f
+  // ran `--nightly` alone and planned 25 stamps over premises nobody had read, and only the read-back
+  // defect stopped it at one row. The population is still reported; what the night loses is the write.
+  const d1unjudged = planWrites(d1, [], DRAIN, { rate: 0.5 });
+  assert.deepStrictEqual(d1unjudged.fixes, [],
+    "an UNJUDGED night stamps nothing — a premise no capability read may never be recorded as re-read");
+  assert.deepStrictEqual(d1unjudged.ledger.insert, [],
+    "and it files nothing either: an unjudged night leaves the drain exactly as it found it");
+  assert.deepStrictEqual(d1unjudged.proposals, [], "nothing was refused, so nothing is proposed");
+  assert.strictEqual(d1.backlog.unrevalidated_batch, 25,
+    "the CENSUS still reports tonight's batch whether or not a judge ran — the gate is on the write, never on the count");
 
   // premiseDetail, on the row built to exercise it: the age, the rank over the population, the cut at
   // PREMISE_EXCERPT, and the LIVE STATUS of every OTHER ticket the premise names — including one the
@@ -443,9 +480,15 @@ async function main() {
 
   // (viii) THREE CARRIED -> 25 derivable + 3 judgment, and the three are OUT of the batch: 25
   // DIFFERENT rows are ruled tonight, so an open removal proposal never costs the drain a slot.
+  // AGT-166 slice 4: a carried row's `detail` IS the channel. Two of the three carry a real refusal
+  // (`judge refused: <reason>`) and the third carries a detail that does not, which is the control:
+  // one replays as a removal proposal, the other must not be proposed at all.
   const CARRIED3 = ["ZQTO-01", "ZQTO-02", "ZQTO-03"].map((backlog_id, i) => ({
     id: `00000000-0000-4000-8000-16600000c0${pad2(i + 1)}`,
     backlog_id, check_slug: REVALIDATION_CHECK, first_seen_at: "2026-09-20T03:00:00+00:00",
+    detail: backlog_id === "ZQTO-03"
+      ? "a removal proposal for this premise has been open since 2026-09-20T03:00:00+00:00 and is awaiting the Development Manager's ruling; re-filed tonight, never re-judged."
+      : `${REFUSED_PREFIX}superseded by ZQTO-99, which shipped the same premise.`,
   }));
   const d2 = drainRun({ ownerFindings: CARRIED3 });
   const d2d = slug166(d2).filter(f => f.verdict === "derivable").map(f => f.backlog_id);
@@ -465,16 +508,34 @@ async function main() {
       `a carried finding states how long the proposal has waited; got: ${f.detail}`);
     assert.ok(f.detail.includes("never re-judged"), `got: ${f.detail}`);
   }
-  // THE WRITE SIDE of the same arm: the three are absent from `fixes`, and they are TOUCHED on the
-  // ledger rather than inserted a second time.
-  const d2plan = planWrites(d2, CARRIED3, DRAIN, { rate: 0.5 });
+  // AGT-166 slice 4: A CARRIED REFUSAL CARRIES ITS PROPOSAL, read back off the ledger detail the
+  // judge wrote, with the age the ledger row has held since.
+  const p01 = slug166(d2).find(f => f.backlog_id === "ZQTO-01").proposal;
+  assert.deepStrictEqual(p01, { reason: "superseded by ZQTO-99, which shipped the same premise.", since: "2026-09-20T03:00:00+00:00" },
+    "a carried refusal replays as the proposal the judge already made — the reason is the judge's own words, never re-derived");
+  assert.ok(!("proposal" in slug166(d2).find(f => f.backlog_id === "ZQTO-03")),
+    "CONTROL: a carried row whose detail is NOT a `judge refused: ` refusal is proposed for nothing — " +
+    "the prefix is the channel, and a row without it has no reason to quote");
+
+  // THE WRITE SIDE of the same arm: the three are absent from `fixes`; the two refusals are PROPOSALS;
+  // and every carried row CLEARS off the ledger rather than being touched for another night. The slug
+  // files no row at all now (call iii), so `clear = prior − tonight` empties it on the first night.
+  const d2plan = planWrites(d2, CARRIED3, DRAIN, { rate: 0.5, judged: true });
   assert.strictEqual(d2plan.fixes.length, 25);
   for (const id of ["ZQTO-01", "ZQTO-02", "ZQTO-03"]) {
     assert.ok(!d2plan.fixes.some(f => f.backlog_id === id), `${id} is carried and must never be stamped`);
   }
-  assert.deepStrictEqual(d2plan.ledger.insert, [], "a carried row is already on the ledger");
-  assert.deepStrictEqual(d2plan.ledger.reseen, CARRIED3.map(c => c.id), "a carried row is touched, keeping its age");
-  assert.deepStrictEqual(d2plan.ledger.clear, []);
+  assert.deepStrictEqual(d2plan.proposals.map(p => [p.backlog_id, p.reason, p.since]), [
+    ["ZQTO-01", "superseded by ZQTO-99, which shipped the same premise.", "2026-09-20T03:00:00+00:00"],
+    ["ZQTO-02", "superseded by ZQTO-99, which shipped the same premise.", "2026-09-20T03:00:00+00:00"],
+  ], "each carried refusal becomes exactly one removal proposal, in the census's own order");
+  assert.deepStrictEqual(d2plan.proposals.map(p => p.id), ["ZQTO-01", "ZQTO-02"].map(id => DRAIN.find(r => r.backlog_id === id).id),
+    "a proposal addresses its row by primary key — it images and patches that row");
+  assert.deepStrictEqual(d2plan.ledger.insert, [], "the revalidation slug files no ledger row at all any more (call iii)");
+  assert.deepStrictEqual(d2plan.ledger.reseen, [],
+    "a carried row is NOT touched for another night — it replays once and leaves, or `board-stale` carries it forever");
+  assert.deepStrictEqual(d2plan.ledger.clear, CARRIED3.map(c => c.id),
+    "every carried row clears: one replay each, and `carried` reads 0 the night after this ships");
 
   // (ix) A BATCH ROW WITH NO PREMISES ENTRY -> judgment, no fix. The read is what puts a premise in
   // front of the judge; a row nobody showed him must never be stamped as re-read.
@@ -485,9 +546,15 @@ async function main() {
   assert.ok(d3f.detail.includes("premise text was not read"), `got: ${d3f.detail}`);
   assert.strictEqual(slug166(d3).filter(f => f.verdict === "derivable").length, 24,
     "the other twenty-four are untouched by one missing premise");
-  assert.strictEqual(planWrites(d3, [], DRAIN, { rate: 0.5 }).fixes.length, 24);
-  assert.deepStrictEqual(planWrites(d3, [], DRAIN, { rate: 0.5 }).ledger.insert.map(f => f.backlog_id),
-    ["ZQTO-07"], "the unread premise is the ONE row that reaches the ledger");
+  assert.strictEqual(planWrites(d3, [], DRAIN, { rate: 0.5, judged: true }).fixes.length, 24);
+  // AGT-166 slice 4 (call iii): the slug files NO ledger row, so the unread premise reaches neither
+  // the board nor the ledger — it is simply not stamped, and tomorrow's batch reads it again. A row
+  // filed here would be permanent: nothing rules a ROW (AGT-169 rules checks), which is exactly how
+  // twelve refusals came to sit in `board-stale` forever.
+  assert.deepStrictEqual(planWrites(d3, [], DRAIN, { rate: 0.5, judged: true }).ledger.insert, [],
+    "an unread premise is not stamped and not filed — the drain re-reads it, it does not accumulate");
+  assert.deepStrictEqual(planWrites(d3, [], DRAIN, { rate: 0.5, judged: true }).proposals, [],
+    "and nothing unread is ever PROPOSED for removal — a proposal needs a judge's refusal behind it");
 
   // (x) THE READ ORDER MUST NOT MATTER. Same thirty rows handed over backwards: the same twenty-five
   // ids, in the same order, with the same ranks. Without this arm a sort that fell back to REST's
@@ -654,8 +721,13 @@ async function main() {
   }
 
   const ins = plan.ledger.insert;
+  // AGT-166 slice 4 (Designer's call iii): `["QA-79-02", "unrevalidated-30d"]` is NO LONGER HERE, and
+  // its absence is the assertion. The thirteenth check files no ledger row in any direction now — a
+  // confirmed premise is a row patch, a refused one is a removal proposal, and an unread one waits for
+  // tomorrow's batch. A row filed here would be permanent, because nothing rules a ROW.
+  assert.ok(!ins.some(f => f.check_slug === "unrevalidated-30d"),
+    "the revalidation check must file no ledger row at all — twelve such rows sat unruled in board-stale");
   assert.deepStrictEqual(ins.map(f => [f.backlog_id, f.check_slug]).sort(), [
-    ["QA-79-02", "unrevalidated-30d"],
     ["QA-79-04", "actual-unknown"],
     ["QA-79-04", "remainder-stranded"],
     ["QA-79-08", "verdict-missing"],
@@ -687,7 +759,7 @@ async function main() {
   // (ii) CONTROL -- add a prior row matching tonight: it moves OUT of insert and INTO reseen, so
   // the two lists are proven disjoint rather than merely both populated.
   const p4 = planWrites(r, [...P, { id: "p4", backlog_id: "QA-79-04", check_slug: "actual-unknown" }], F.board.items, { rate: F.rate });
-  assert.strictEqual(p4.ledger.insert.length, 7, "a finding already on the ledger must not be inserted a second time");
+  assert.strictEqual(p4.ledger.insert.length, 6, "a finding already on the ledger must not be inserted a second time");
   assert.deepStrictEqual(p4.ledger.reseen, ["p1", "p4"]);
 
   // (iii) A fix with no primary key is not a write -- it throws rather than planning a PATCH it
@@ -946,10 +1018,15 @@ async function main() {
   assert.strictEqual(only(g.result, "QA-79-04", "actual-unknown").detail, only(r, "QA-79-04", "actual-unknown").detail,
     "a judgment finding the answer said nothing about keeps the census's detail");
 
-  const pj = planWrites(g.result, J.prior, F.board.items, { rate: F.rate });
+  const pj = planWrites(g.result, J.prior, F.board.items, { rate: F.rate, judged: g.judged });
   assert.deepStrictEqual(pj.fixes.map(f => f.backlog_id), ["QA-79-03", "QA-79-07", "QA-79-12"],
     "only the confirmed fixes become writes");
-  assert.strictEqual(pj.ledger.insert.length, 9, "ten judgment pairs minus the one already on the ledger");
+  assert.strictEqual(pj.ledger.insert.length, 8,
+    "ten judgment pairs, minus the one already on the ledger, minus the revalidation pair the slug no longer files (slice 4)");
+  // AGT-166 slice 4: a refused COST fix is not a removal proposal. The judge declining one arithmetic
+  // write says nothing about whether the ticket should exist — only the thirteenth check asks that.
+  assert.ok(!("proposal" in q5), "a refused claim fix carries no removal proposal — only a refused PREMISE does");
+  assert.deepStrictEqual(pj.proposals, [], "and nothing is proposed from a night whose only refusal was arithmetic");
   assert.deepStrictEqual(pj.ledger.reseen, ["00000000-0000-4000-8000-0000000000a1"]);
   assert.deepStrictEqual(pj.ledger.clear, ["00000000-0000-4000-8000-0000000000a2"]);
 
@@ -1031,7 +1108,7 @@ async function main() {
   assert.strictEqual(kDry.status, 0, `--answer --dry-run needs no cycle and no creds; stderr: ${kDry.stderr}`);
   assert.deepStrictEqual(JSON.parse(kDry.stdout), {
     ok: true, dry_run: true, confirmed: 3, refused: 1, unconfirmed: 0,
-    fixes: 3, insert: 9, reseen: 1, clear: 1,
+    fixes: 3, proposed: 0, insert: 8, reseen: 1, clear: 1,
   }, "the dry run must report the same plan the pure half computes");
 
   const kNoState = spawnCli(["--judge", `--answer=${answerPath}`, `--state-file=${path.join(D, "missing.json")}`, "--dry-run"]);
@@ -1164,6 +1241,7 @@ async function main() {
     notRun("write pass (part G)", why);
     notRun("judge gate (part K live)", why);
     notRun("lockstep constraint arm (part N)", why);
+    notRun("the removal-proposal round trip (part O, AGT-166 slice 4)", why);
     return;
   }
 
@@ -1309,6 +1387,7 @@ async function main() {
     notRun("live census no-write negative (rest of part E)", why);
     notRun("judge gate (part K live)", why);
     notRun("write pass (part G)", why);
+    notRun("the removal-proposal round trip (part O, AGT-166 slice 4)", why);
     return;
   }
 
@@ -1441,7 +1520,7 @@ async function main() {
     assert.deepStrictEqual(byCheck(r1, "claim-on-closed"), ["ZZTO-791"]);
 
     // (3) Plan against an empty ledger: everything is new tonight.
-    const plan1 = planWrites(r1, [], board.items, { rate: RATE });
+    const plan1 = planWrites(r1, [], board.items, { rate: RATE, judged: true });
     assert.strictEqual(plan1.fixes.length, 2, "the stale claim and 794's revalidation stamp are both derivable tonight");
     assert.deepStrictEqual([...plan1.fixes].map(f => f.id).sort(), [id791, id794].sort(),
       "both fixes must address their row by the primary key the insert returned, never by backlog_id");
@@ -1458,6 +1537,7 @@ async function main() {
     // never returned — the process exited 2 with the write already landed.
     const res1 = await applyPlan(url, key, plan1, { sessionName: S, now });
     assert.strictEqual(res1.fixed, 2);
+    assert.strictEqual(res1.proposed, 0, "nothing was refused on this board, so no row was proposed for removal");
     assert.strictEqual(res1.inserted, 4);
     assert.strictEqual(res1.reseen, 0);
     assert.strictEqual(res1.cleared, 0);
@@ -1544,7 +1624,7 @@ async function main() {
       "neither cell the first night fixed may be found again -- 794 now carries a stamp, so it leaves the fence population entirely");
     assert.strictEqual(r2.counts.findings, 4);
     const priorLed = led.map(x => ({ id: x.id, backlog_id: x.backlog_id, check_slug: x.check_slug }));
-    const plan2 = planWrites(r2, priorLed, board2.items, { rate: RATE });
+    const plan2 = planWrites(r2, priorLed, board2.items, { rate: RATE, judged: true });
     assert.deepStrictEqual(plan2.fixes, []);
     assert.deepStrictEqual(plan2.ledger.insert, [], "a finding already on the ledger is touched, never duplicated");
     assert.strictEqual(plan2.ledger.reseen.length, 4);
@@ -1556,7 +1636,7 @@ async function main() {
     // assertion: this call passes no `prior`, and with no ledger to compute `prior ∪ insert − clear`
     // from, applyPlan raises nothing rather than guessing from `insert` alone. That is also what
     // keeps this fixture out of a table whose guard refuses every DELETE.
-    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 4, cleared: 0, raised: 0 },
+    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, proposed: 0, inserted: 0, reseen: 4, cleared: 0, raised: 0 },
       "a night with nothing to fix records NO decision -- an empty decision row is noise John has to read");
     assert.strictEqual((await rest(`runner_decisions?session_name=eq.${encodeURIComponent(S)}&select=id`)).length, 1,
       "two nights, one decision: the second wrote no board cell, so it decided nothing");
@@ -1570,7 +1650,7 @@ async function main() {
 
     // (7) CLEAR CONTROL, pure: a prior finding the board no longer shows must clear. Without this,
     // a planner that never cleared anything would pass every arm above.
-    const ghosted = planWrites(r2, [...priorLed, { id: "ghost", backlog_id: "ZZTO-791", check_slug: "claim-on-closed" }], board2.items, { rate: RATE });
+    const ghosted = planWrites(r2, [...priorLed, { id: "ghost", backlog_id: "ZZTO-791", check_slug: "claim-on-closed" }], board2.items, { rate: RATE, judged: true });
     assert.deepStrictEqual(ghosted.ledger.clear, ["ghost"], "a finding that is no longer true tonight clears");
 
     // (8) THE WHOLE POINT: one decision id puts every cell back.
@@ -1613,6 +1693,209 @@ async function main() {
     assert.strictEqual(await countWhere("backlog_items", "backlog_id=like.ZZTO-79*"), 0, "part G left fixture tickets on the live board");
     assert.strictEqual(await countWhere("runner_before_images", `session_name=eq.${encodeURIComponent(S)}`), 0, "part G left before-images behind");
     assert.strictEqual(await countWhere("runner_decisions", `session_name=eq.${encodeURIComponent(S)}`), 0, "part G left decision rows behind");
+  }
+
+  // --- O: A JUDGED REFUSAL IS A REMOVAL PROPOSAL (AGT-166 slice 4) -------------------------------
+  // The pure half first, then the same path live on one fixture row and reversed.
+  //
+  // WHY THIS PART EXISTS. Arm (b) drained a premise it could CONFIRM and had no exit at all for one
+  // it refused: the twelve refusals of the first completed night sat in `ticket_owner_findings` as
+  // open rows, re-filed nightly, and nothing could rule them -- AGT-169's ruler rules a CHECK, never
+  // a row. On 1ae77169 a refused `ZZTO-795` files a ledger row and stays `open` forever; after slice 4
+  // it reads `removal proposed` under its own decision and ONE Reverse puts it back in the drain.
+  //
+  // (i) THE MERGE: a refused PREMISE carries the judge's reason as its proposal; a refused arithmetic
+  // fix carries none. Both directions, because a `proposal` on a refused cost stamp would be a removal
+  // waiting for a widened filter to find it.
+  const oWindow = chicagoDay(NOW166);
+  const oClaimFix = {
+    backlog_id: "ZQTO-30", check: "claim-on-closed", verdict: "derivable",
+    detail: "claimed_by is set on a done ticket.", fix: { claimed_by: null, claimed_at: null },
+  };
+  const oCensus = {
+    findings: [...d1.findings, oClaimFix],
+    backlog: d1.backlog,
+    counts: { rows: d1.counts.rows, findings: d1.counts.findings + 1, derivable: d1.counts.derivable + 1, judgment: d1.counts.judgment },
+  };
+  // 25 revalidation stamps + 1 claim clear, and the split between them is exactly `judged`.
+  assert.strictEqual(planWrites(oCensus, [], DRAIN, { rate: 0.5 }).fixes.length, 1,
+    "an UNJUDGED night writes the twelve arithmetic checks and NOT the premise re-reads — one claim clear, no stamps");
+  assert.deepStrictEqual(planWrites(oCensus, [], DRAIN, { rate: 0.5 }).fixes.map(f => f.check), ["claim-on-closed"],
+    "and the one write it does make is the column's own rule, never a reading of a premise");
+  assert.strictEqual(planWrites(oCensus, [], DRAIN, { rate: 0.5, judged: true }).fixes.length, 26,
+    "a JUDGED night writes all 26 — the gate is the judge, not the check");
+
+  const oState = {
+    version: 1, started_at: NOW166, cycle_id: "00000000-0000-4000-8000-000000000000", nightly: false,
+    capability: "audit-board", intent: "to-audit-intent", agent: "ticketowner",
+    model: "claude-fable-5-1", schema: J.schema, now: NOW166, rate: 0.5, window: oWindow,
+    census: { measured_at: NOW166, rate: 0.5, fences: FENCES, counts: oCensus.counts, backlog: oCensus.backlog, findings: oCensus.findings },
+    prior: [{ id: "o-prior", backlog_id: "ZQTO-05", check_slug: REVALIDATION_CHECK, first_seen_at: "2026-09-20T03:00:00+00:00" }],
+    items: DRAIN.map(i => ({ id: i.id, backlog_id: i.backlog_id })),
+  };
+  const O_REASON = "ZQTO-99 shipped this premise on 2026-09-01; nothing here is left to build.";
+  const oAnswer = {
+    window: oWindow,
+    fixes: [
+      { backlog_id: "ZQTO-01", check: REVALIDATION_CHECK, apply: false, reason: O_REASON },
+      { backlog_id: "ZQTO-30", check: "claim-on-closed", apply: false, reason: "The close-out may still be in flight." },
+    ],
+    findings: [],
+    report: "AGT-166 slice 4 part O: one premise refused, one claim clear declined.",
+    account: "Refused one stale premise and declined one claim clear",
+  };
+  const og = ingestJudgment(oAnswer, oState);
+  assert.deepStrictEqual(og.errors, [], `the answer must be accepted; got: ${og.errors.join(" | ")}`);
+  assert.strictEqual(og.judged.refused, 2, "both fixes were refused");
+  const oRefused = only(og.result, "ZQTO-01", REVALIDATION_CHECK);
+  assert.strictEqual(oRefused.verdict, "judgment", "a refused fix is never still a write");
+  assert.deepStrictEqual(oRefused.proposal, { reason: O_REASON },
+    "a refused PREMISE carries the judge's own reason as its removal proposal — never a re-derived sentence");
+  assert.strictEqual(oRefused.detail, `${REFUSED_PREFIX}${O_REASON}`,
+    "and the detail is the prefixed reason, which is what a carried row replays from a night later");
+  assert.ok(!("proposal" in only(og.result, "ZQTO-30", "claim-on-closed")),
+    "CONTROL: a refused CLAIM fix proposes nothing — declining one arithmetic write says nothing about whether the ticket should exist");
+  const oUnconfirmed = only(og.result, "ZQTO-02", REVALIDATION_CHECK);
+  assert.ok(oUnconfirmed.detail.startsWith("judge: not confirmed"), `an unmentioned fix is unconfirmed; got: ${oUnconfirmed.detail.slice(0, 30)}`);
+  assert.ok(!("proposal" in oUnconfirmed),
+    "silence is not a refusal: an UNCONFIRMED premise is neither stamped nor proposed for removal");
+
+  // (ii) THE PLAN: one proposal, no ledger row for the slug in either direction, and the prior row
+  // clears rather than being carried into a thirteenth night.
+  const oPlan = planWrites(og.result, oState.prior, DRAIN, { rate: 0.5, judged: og.judged });
+  assert.deepStrictEqual(oPlan.fixes, [], "nothing was confirmed, so nothing is written to a cell");
+  assert.deepStrictEqual(oPlan.proposals.map(p => [p.backlog_id, p.reason]), [["ZQTO-01", O_REASON]],
+    "the one refusal is the one removal proposal");
+  assert.ok(!oPlan.ledger.insert.some(f => f.check_slug === REVALIDATION_CHECK),
+    "a refusal files NO `unrevalidated-30d` row — it writes the board instead, which is the exit the slug never had");
+  assert.deepStrictEqual(oPlan.ledger.insert.map(f => f.check_slug), ["claim-on-closed"],
+    "the refused arithmetic fix still files its judgment row: only the thirteenth check stopped filing");
+  assert.deepStrictEqual(oPlan.ledger.clear, ["o-prior"],
+    "and the prior revalidation row clears — one replay each, then gone, or board-stale carries it forever");
+
+  // (iii) LIVE, WRITTEN, AND REVERSED. One fixture row, born before the fence, refused, and put back.
+  const S2 = `agt-166-s4-qa:${Date.now()}`;
+  const now3 = new Date().toISOString();
+  const read795 = () => rest(`backlog_items?backlog_id=eq.ZZTO-795&select=${PROJECTION}`);
+  let passed2 = false;
+  try {
+    await rest("backlog_items?backlog_id=eq.ZZTO-795", { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    const ins795 = await rest("backlog_items", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify([{
+        backlog_id: "ZZTO-795", tier: "later", type: "Tooling", priority_class: "P10 - Tooling", status: "open",
+        title: "AGT-166 fixture: a premise the judge refuses — inserted and deleted by agt-79-ticket-owner.test.mjs",
+        description: "Fixture. Never a real ticket.", source_file: "tests/regression/agt-79-ticket-owner.test.mjs",
+        row_ordinal: 999795, predicted_cycles: 1, size_stamp: "S",
+        filed_at: "2026-08-01T00:00:00+00:00", created_at: "2026-08-01T00:00:00+00:00", updated_at: "2026-08-01T00:00:00+00:00",
+      }]),
+    });
+    assert.strictEqual(ins795.length, 1, "the fixture premise must insert");
+    const id795 = ins795[0].id;
+    const upd795 = ins795[0].updated_at;
+
+    // The census, with the premise text read exactly as readBoard() reads it for tonight's batch --
+    // which is what makes the finding `derivable` and therefore refusable at all.
+    const board795 = {
+      items: await read795(), matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [],
+      ownerFindings: [],
+      premises: [{
+        backlog_id: "ZZTO-795",
+        title: "AGT-166 fixture: a premise the judge refuses — inserted and deleted by agt-79-ticket-owner.test.mjs",
+        description: "Fixture. Never a real ticket.", priority_class: "P10 - Tooling",
+      }],
+    };
+    const r795 = classifyBoard(board795, { now: now3, rate: RATE, retired: NO_RETIREMENT });
+    assert.deepStrictEqual(byCheck(r795, REVALIDATION_CHECK), ["ZZTO-795"],
+      "the fixture row is born before the fence and never revalidated, so the thirteenth check must reach it");
+    assert.strictEqual(only(r795, "ZZTO-795", REVALIDATION_CHECK).verdict, "derivable");
+
+    const liveWindow = chicagoDay(now3);
+    const state795 = {
+      version: 1, started_at: now3, cycle_id: "00000000-0000-4000-8000-000000000000", nightly: false,
+      capability: "audit-board", intent: "to-audit-intent", agent: "ticketowner",
+      model: "claude-fable-5-1", schema: J.schema, now: now3, rate: RATE, window: liveWindow,
+      census: { measured_at: now3, rate: RATE, fences: FENCES, counts: r795.counts, backlog: r795.backlog, findings: r795.findings },
+      prior: [], items: board795.items.map(i => ({ id: i.id, backlog_id: i.backlog_id })),
+    };
+    const REASON795 = "The fixture premise names no work the board does not show done; refused by part O.";
+    const g795 = ingestJudgment({
+      window: liveWindow,
+      fixes: [{ backlog_id: "ZZTO-795", check: REVALIDATION_CHECK, apply: false, reason: REASON795 }],
+      findings: [],
+      report: "AGT-166 slice 4 part O, live: one premise refused.",
+      account: "Refused one fixture premise on the live board",
+    }, state795);
+    assert.deepStrictEqual(g795.errors, [], `the live answer must be accepted; got: ${g795.errors.join(" | ")}`);
+    const plan795 = planWrites(g795.result, [], board795.items, { rate: RATE, judged: g795.judged });
+    assert.deepStrictEqual(plan795.proposals.map(p => p.backlog_id), ["ZZTO-795"]);
+
+    // THE WRITE. `fixed 0`, `proposed 1`, and NO hygiene decision at all: nothing arithmetic happened
+    // tonight, and an empty hygiene decision is noise John has to read.
+    const res795 = await applyPlan(url, key, plan795, { sessionName: S2, now: now3 });
+    assert.deepStrictEqual(res795, { decision: null, expires_at: null, fixed: 0, proposed: 1, inserted: 0, reseen: 0, cleared: 0, raised: 0 },
+      "a refused premise proposes exactly one removal and writes nothing else — no stamp, no ledger row, no hygiene decision");
+
+    const after795 = (await read795())[0];
+    assert.strictEqual(after795.status, "removal proposed",
+      "the refused premise must actually land in John's waiting room — on 1ae77169 it stays `open` and is re-filed forever");
+    assert.strictEqual(after795.revalidated_at, null,
+      "a REFUSED premise is never stamped as re-read — the stamp is what `apply: true` buys");
+    assert.strictEqual(after795.updated_at, upd795,
+      "updated_at must be untouched, or reverse_decision() refuses the row and the proposal is unreversible (SES-316)");
+
+    const dec795 = await rest(`runner_decisions?session_name=eq.${encodeURIComponent(S2)}&select=id,kind,backlog_id,status,summary,reasoning,cycle_id`);
+    assert.strictEqual(dec795.length, 1, "one refusal, ONE decision — the grain John reverses is the row");
+    assert.strictEqual(dec795[0].kind, PROPOSAL_KIND, "a removal proposal is not a hygiene write and must not be filed as one");
+    assert.strictEqual(dec795[0].backlog_id, "ZZTO-795", "the decision is ABOUT the row it proposes to remove");
+    assert.strictEqual(dec795[0].cycle_id, null, "exactly one of cycle_id / session_name — this run is the session side");
+    assert.ok(dec795[0].summary.startsWith("ZZTO-795 removal proposed:"), `summary reads: ${dec795[0].summary}`);
+    assert.ok(dec795[0].reasoning.includes(REASON795), "the judge's own reason must ride on the decision John reads");
+    assert.ok(dec795[0].reasoning.includes("removed stays John's (SES-113)"),
+      "and the reasoning must say what this is NOT: a removal. Nothing on this path may write `removed`");
+    assert.ok(dec795[0].reasoning.includes("pattern:0"), "the reasoning must carry the no-standing-pattern handle");
+
+    const img795 = await rest(`runner_before_images?decision_id=eq.${dec795[0].id}&select=table_name,pk_value,row_data`);
+    assert.strictEqual(img795.length, 1, `expected one full-row image under the proposal's own decision, got ${img795.length}`);
+    assert.strictEqual(img795[0].table_name, "backlog_items");
+    assert.strictEqual(img795[0].pk_value, id795, "the image addresses its row by primary key");
+    assert.strictEqual(img795[0].row_data.status, "open",
+      "the image must hold the PRIOR status — an image taken after the patch restores the proposal it was meant to undo");
+    assert.strictEqual(typeof img795[0].row_data.title, "string",
+      "the image is the FULL row: reverse_decision() rewrites every column from row_data");
+
+    assert.strictEqual(await countWhere("ticket_owner_findings", "backlog_id=eq.ZZTO-795"), 0,
+      "and NOT ONE ledger row: the refusal wrote the board, which is the whole exit (Designer's call iii)");
+
+    // ONE REVERSE PUTS IT BACK IN THE DRAIN. This is what makes the proposal a proposal.
+    const rev795 = (await rest("rpc/reverse_decision", {
+      method: "POST",
+      body: JSON.stringify({ p_decision: dec795[0].id, p_actor: S2, p_reason: "fixture rollback" }),
+    }))[0];
+    assert.strictEqual(rev795.outcome, "applied", `reverse_decision returned ${JSON.stringify(rev795)}`);
+    assert.strictEqual(rev795.restored, 1, "one decision id returns the row to the drain");
+    assert.strictEqual(rev795.refused_written_since, 0, "a refusal here means the proposal bumped updated_at and locked itself out");
+    assert.strictEqual((await read795())[0].status, "open",
+      "the reversal must put the row back where the drain can read it — a proposal nobody can undo is a removal");
+
+    console.log(`[AGT-79] part O: ZZTO-795 refused -> proposed 1 under decision ${dec795[0].id} (kind ${dec795[0].kind}), ` +
+      `0 ledger rows, reversed: restored ${rev795.restored}`);
+    passed2 = true;
+  } finally {
+    const del = q => fetch(`${url}/rest/v1/${q}`, { method: "DELETE", headers: H }).catch(() => {});
+    await del("ticket_owner_findings?backlog_id=eq.ZZTO-795");
+    await del(`runner_before_images?session_name=eq.${encodeURIComponent(S2)}`);
+    await del(`runner_decisions?session_name=eq.${encodeURIComponent(S2)}&kind=eq.reversal`);
+    await del(`runner_decisions?session_name=eq.${encodeURIComponent(S2)}`);
+    await del("backlog_items?backlog_id=eq.ZZTO-795");
+  }
+
+  if (passed2) {
+    assert.strictEqual(await countWhere("backlog_items", "backlog_id=eq.ZZTO-795"), 0, "part O left its fixture ticket on the live board");
+    assert.strictEqual(await countWhere("ticket_owner_findings", "backlog_id=eq.ZZTO-795"), 0, "part O left findings rows on the live ledger");
+    assert.strictEqual(await countWhere("runner_before_images", `session_name=eq.${encodeURIComponent(S2)}`), 0, "part O left before-images behind");
+    assert.strictEqual(await countWhere("runner_decisions", `session_name=eq.${encodeURIComponent(S2)}`), 0, "part O left decision rows behind");
   }
 }
 
