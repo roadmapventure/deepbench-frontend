@@ -13,7 +13,7 @@ identified, where the table had no point-in-time recovery path independent of Su
 backups. Every runner ship point regenerates this file and commits it if changed, so
 `git log` on this path is a durable history of the table's state across sessions.
 
-**Tickets:** 1125 · **Payload sha256:** `ef23d7bab395243e4c80bb2b188c28694bf832f0c14eabb502cf73034011ff57`
+**Tickets:** 1128 · **Payload sha256:** `2b1afbfc1ba5edcde5a3dadfaddfbcede505d2a2b691003daa89bb461676621e`
 
 Cell escaping (applied in this order so it is mechanically invertible): a literal backslash
 `\` becomes `\\`, a literal pipe `|` becomes `\|`, and a literal newline becomes the
@@ -1855,6 +1855,14 @@ nearly every run and destroy the byte-identical guarantee above.
 | # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic | Design status | Kickoff | History residue |
 |---|----|------|----------------|-------|--------|---------|---------|-------------|------|---------------|---------|-----------------|
 | 1054 | SES-260 | Tooling | P10 - Tooling | .env.local copies still carry other privileged keys after SES-258 | done | design-ses-260-0902 2026-09-02 (v7.0.381, push e45ccf52) |  | **P10 - Tooling.** SES-258 (2026-08-31) deleted SUPABASE_SERVICE_KEY from all 23 .env.local copies, scoped deliberately to that one key per the ticket's own over-reach boundary. But John's ruling d7670e18 says .env.local copies may carry ONLY publishable values, and the copies still hold ANTHROPIC_API_KEY, OPENAI_API_KEY (frontend+worktrees), VERCEL_TOKEN (5 copies), VERCEL_AUTOMATION_BYPASS_SECRET (all frontend copies). Per the ruling's standing consequence these are defects. Needs a decision first: which of these get a sanctioned second home (runner_secrets / cloud env) before deletion — local Node tests and Vercel CLI QA consume them today, so deleting without a fetch-at-session-start pattern for each breaks those paths. needs-desktop for the deletion itself.\n\nDECIDED 2026-09-02 (John, session design-m5-milestone-0902): epic stays M5 (his call); one of five tickets John named as prerequisites — verbatim "These are functions i need built before we start M5: Ses-295, ses-284, ses-283, ses-247, ses-260" — built ahead of the remaining M5 required work (SES-303, SES-277).\n\nDECIDED + SHIPPED 2026-09-02 (John: "are you fixing everything?" — yes; session design-ses-260-0902, v7.0.381): sanctioned homes, verified on the desktop — VERCEL_TOKEN → the Vercel CLI login (vercel whoami = roadmapventure); ANTHROPIC_API_KEY / OPENAI_API_KEY / SUPABASE_SERVICE_KEY → the Vercel project env, pulled per session to <scratch>/session.env outside the repo (vercel env pull … --cwd <scratch>/vlink; verified it does not recreate .env.local); VERCEL_AUTOMATION_BYPASS_SECRET → runner_secrets by name (not a Vercel env var). All five names stripped from all 25 .env.local copies (0 remaining, names re-inventoried); guard test tests/regression/ses-260-env-local-publishable-only.test.mjs; session-setup step 1b and STANDARDS rule 5 carry the pattern. | Selfbuild M5 - Closed-Loop Healing |  |  |  |
+
+## tier `later` — `tests/regression/agt-167b-resettle-on-gate-ruling.test.mjs` (3 tickets)
+
+| # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic | Design status | Kickoff | History residue |
+|---|----|------|----------------|-------|--------|---------|---------|-------------|------|---------------|---------|-----------------|
+| 16727044 | ZRST-16727044 |  |  | AGT-167 regression fixture — re-settle after the ruling | delivered |  |  |  | Intake — ZRST |  | docs/kickoffs/v7.0.642-AGT-167-noship-cap-binds.md |  |
+| 16743240 | ZRST-16743240 |  |  | AGT-167 regression fixture — re-settle after the ruling | delivered |  |  |  | Intake — ZRST |  | docs/kickoffs/v7.0.642-AGT-167-noship-cap-binds.md |  |
+| 16783052 | ZRST-16783052 |  |  | AGT-167 regression fixture — re-settle after the ruling | delivered |  |  |  | Intake — ZRST |  | docs/kickoffs/v7.0.642-AGT-167-noship-cap-binds.md |  |
 
 ## tier `later` — `tests/regression/ses-424a-gate-card-excludes-pick.test.mjs` (1 ticket)
 
