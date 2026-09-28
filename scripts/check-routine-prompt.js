@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v7.0.608 | scripts/check-routine-prompt.js | AGT-102 slice 1; AGT-138 -- the Researcher's
-// own routine is the third the check knows, and the first whose drift is expected by design
+// DeepBench v7.0.678 | scripts/check-routine-prompt.js | AGT-102 slice 1; AGT-138 -- the Researcher's
+// own routine is the third the check knows, and the first whose drift is expected by design;
+// AGT-146 -- model-watch is the fourth, and the first the check knows BEFORE the routine exists
 // FEATURE: AGT-102 -- THE PROMPT A LIVE ROUTINE RUNS MUST EQUAL ITS REPO BLOCK. The runbook is the
 // source and the routine a copy (ARCHITECTURE.md §19v); nothing compared the two, so the Auditor
 // routine ran with the placeholder "DEEPBENCH-AUDITOR-<routine id>" for its first week. This script
@@ -9,11 +10,11 @@
 // routine's runbook.
 //
 // USAGE
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher --prompt=<file> [--out=<json>]
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher --note=<file> --cycle=<uuid> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch --prompt=<file> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch --note=<file> --cycle=<uuid> [--out=<json>]
 //
 // FLAGS
-//   --routine=runner|auditor|researcher
+//   --routine=runner|auditor|researcher|model-watch
 //                              required. runner  -> docs/runbooks/routine-prompt.md,
 //                              <!-- ROUTINE-PROMPT-BEGIN --> / <!-- ROUTINE-PROMPT-END -->,
 //                              trig_017TZ3JZcLBK6AYH6DKURqMH.
@@ -25,6 +26,12 @@
 //                              trig_01862LsK4ZQF8PTgQoK2cgCV (AGT-138). Drift is EXPECTED against
 //                              this one until John runs RemoteTrigger update -- the playbook is the
 //                              source and the live prompt is still its INTERIM text.
+//                              model-watch -> docs/runbooks/model-watch-routine.md,
+//                              <!-- MODEL-WATCH-ROUTINE-PROMPT-BEGIN --> / <!-- MODEL-WATCH-ROUTINE-PROMPT-END -->,
+//                              id null (AGT-146). The runbook is built BEFORE the routine exists, so
+//                              there is no trigger id to carry; location 1 falls back to the routine
+//                              NAME (routine/model-watch/prompt). AGT-102's placeholder drift is the
+//                              reason an absent id is written absent, never guessed.
 //   --prompt=<file>            PROMPT MODE: the prompt text the run was given, verbatim.
 //   --note=<file>              NOTE MODE: a runner_cycles.notes text that reports routine-prompt drift.
 //   --cycle=<uuid>             the runner_cycles id the --note came from (required with --note).
@@ -76,6 +83,16 @@ export const ROUTINES = {
     end: "<!-- RESEARCHER-ROUTINE-PROMPT-END -->",
     id: "trig_01862LsK4ZQF8PTgQoK2cgCV",
   },
+  // AGT-146. The first routine the check knows before the routine exists: the runbook ships, then an
+  // attended session creates the routine and fills the id here and in the runbook's table. `id: null`
+  // is the honest value meanwhile -- finding() falls back to the routine NAME, so the fingerprint is
+  // the same before and after the id is filled and filling it is not itself a drift (AGT-102).
+  "model-watch": {
+    file: "model-watch-routine.md",
+    begin: "<!-- MODEL-WATCH-ROUTINE-PROMPT-BEGIN -->",
+    end: "<!-- MODEL-WATCH-ROUTINE-PROMPT-END -->",
+    id: null,
+  },
 };
 
 export const CHECK_SLUG = "routine-prompt-drift";
@@ -100,12 +117,13 @@ export function extractBlock(md, r) {
   return { text: lines.slice(a[0] + 1, b[0]).join("\n"), beginLine: a[0] + 1, endLine: b[0] + 1, beginText: r.begin, endText: r.end };
 }
 
-function finding(r, liveText, repoLine, repoText, confidence) {
+// `name` is the ROUTINES key; a routine with no trigger id yet (AGT-146) locates by that name.
+function finding(r, liveText, repoLine, repoText, confidence, name) {
   return {
     kind: "contradiction",
     check_slug: CHECK_SLUG,
     locations: [
-      { location: `routine/${r.id}/prompt`, text: liveText },
+      { location: `routine/${r.id ?? name}/prompt`, text: liveText },
       { location: `docs/runbooks/${r.file}:${repoLine}`, text: repoText },
     ],
     governing_fact: GOVERNING_FACT,
@@ -115,7 +133,7 @@ function finding(r, liveText, repoLine, repoText, confidence) {
 }
 
 // Prompt mode: [] when equal, else ONE finding at the first differing line.
-export function comparePrompt(live, block, r) {
+export function comparePrompt(live, block, r, name) {
   const L = canon(live), R = canon(block.text);
   if (L === R) return [];
   const ll = L.split("\n"), rl = R.split("\n");
@@ -125,12 +143,12 @@ export function comparePrompt(live, block, r) {
   // Past the block's last line the repo line at that position is the END marker line.
   const repoLine = i < rl.length ? block.beginLine + 1 + i : block.endLine;
   const repoText = i < rl.length ? rl[i] : block.endText;
-  return [finding(r, liveText, repoLine, repoText, "high")];
+  return [finding(r, liveText, repoLine, repoText, "high", name)];
 }
 
 // Note mode: a runner cycle reported drift in prose -- always one medium-confidence finding.
-export function noteFinding(note, cycle, block, r) {
-  return [finding(r, `cycle ${cycle}: ` + String(note).slice(0, 300), block.beginLine, block.beginText, "medium")];
+export function noteFinding(note, cycle, block, r, name) {
+  return [finding(r, `cycle ${cycle}: ` + String(note).slice(0, 300), block.beginLine, block.beginText, "medium", name)];
 }
 
 export function parseArgs(argv) {
@@ -141,7 +159,7 @@ export function parseArgs(argv) {
     if (!["routine", "prompt", "note", "cycle", "out"].includes(m[1])) throw new UsageError(`unknown flag --${m[1]}`);
     a[m[1]] = m[2] ?? "";
   }
-  if (!a.routine) throw new UsageError("--routine=runner|auditor is required");
+  if (!a.routine) throw new UsageError(`--routine=${Object.keys(ROUTINES).join("|")} is required`);
   if (!Object.hasOwn(ROUTINES, a.routine)) throw new UsageError(`--routine must be one of ${Object.keys(ROUTINES).join(", ")} (got ${a.routine})`);
   const hasPrompt = a.prompt !== undefined, hasNote = a.note !== undefined;
   if (hasPrompt === hasNote) throw new UsageError("exactly one of --prompt=<file> / --note=<file>");
@@ -164,8 +182,8 @@ export function main(argv = process.argv.slice(2)) {
     const r = ROUTINES[a.routine];
     const block = extractBlock(read(path.join(ROOT, "docs", "runbooks", r.file), "runbook"), r);
     const findings = a.prompt !== undefined
-      ? comparePrompt(read(a.prompt, "--prompt"), block, r)
-      : noteFinding(read(a.note, "--note"), a.cycle, block, r);
+      ? comparePrompt(read(a.prompt, "--prompt"), block, r, a.routine)
+      : noteFinding(read(a.note, "--note"), a.cycle, block, r, a.routine);
     const out = { found_by: `check-routine-prompt:${a.routine}`, findings, carried: [], gone: [] };
     if (a.out) fs.writeFileSync(a.out, JSON.stringify(out, null, 2));
     if (findings.length) {
