@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.683 | scripts/market-agent.js | AGT-155 -- the competitor leads inbox, read side.
+// A capability in LEAD_READERS now renders with `leads`: the status-new rows of public.market_leads,
+// filed by another lane, carrying seven public columns and nothing else. The answer may come back
+// with lead_reviews[] -- one {id, status, note} per lead -- and --write PATCHes exactly the three
+// review columns (status, reviewer_note, reviewed_at) of those rows. A `confirmed` review is refused
+// unless the same answer writes a competitor record, so a lead cannot be confirmed into nothing.
+// This script never reads the personal lane's records and never files a lead -- it only reviews one.
+// Kickoff: docs/kickoffs/v7.0.683-AGT-155-competitor-leads-inbox.md.
+//
 // DeepBench v7.0.681 | scripts/market-agent.js | AGT-161 -- THE PRODUCT LANE'S PROPOSALS REACH THE ONE
 // FINDINGS LIST. --write used to end at market_records: a `feature_signal` row carrying a whole
 // `data.proposed_ticket` sat in the marketing table, on no list the Development Manager reviews, so
@@ -52,8 +61,10 @@
 //            header + prompt (to --out when given); stderr `# model: <id>`; --json prints
 //            {model, since, records_loaded, napkin_entries, prompt_bytes} on stdout.
 // --write    validateMarketAnswer() refuses a bad answer (exit 2, nothing written); otherwise ONE
-//            insert of records_to_write with source '<slug> <ISO date>'. Prints
-//            {inserted, ids, napkin_notes, findings}. `findings` is AGT-161: every `feature_signal`
+//            insert of records_to_write with source '<slug> <ISO date>', then one PATCH per
+//            lead_reviews[] entry over public.market_leads (status, reviewer_note, reviewed_at --
+//            never another column). Prints {inserted, ids, napkin_notes, findings, leads_reviewed}.
+//            `findings` is AGT-161: every `feature_signal`
 //            row this run inserted is raised on public.audit_findings through raiseFindings(), so
 //            the row and its finding cannot drift apart between two commands nobody remembers to
 //            pair. Attribution is --cycle-id when given, else --session-name, else the source line.
@@ -114,6 +125,18 @@ export const PLATFORM = Object.fromEntries(Object.keys(READ_MAP).map(slug => [sl
   ...(slug === 'pmm-moat-and-ip' ? ['inventive'] : []),
   ...(['pmm-moat-and-ip', 'pmm-why-deepbench', 'pmm-customer-profile'].includes(slug) ? ['catalog'] : []),
 ]]));
+
+// --- AGT-155: which capabilities are handed the shared leads inbox ----------------------------
+// Keyed by capability slug, never by agent (§19e Rule #1, pattern:13). A render for any other slug
+// carries no `leads` key at all -- absent, not null -- so the inbox reaches exactly one question.
+export const LEAD_READERS = ['pmm-competitors'];
+
+// The seven public columns a lead is rendered with. The inbox holds review columns too
+// (reviewer_note, reviewed_at) and a session_name; none of them is read back into a prompt.
+const LEAD_FIELDS = 'id,company,what_they_sell,overlap_with_deepbench,public_url,seen_on,source_capability';
+
+// A review's two allowed landing statuses. `new` is the filing lane's, never a review's.
+const LEAD_REVIEW_STATUSES = ['confirmed', 'rejected'];
 
 // The capabilities whose records must carry data.copy_tests (THE COPY TEST in the knowledge Skill).
 const COPY_TESTED = ['pmm-why-deepbench', 'pmm-competitors', 'pmm-objections', 'pmm-messaging'];
@@ -194,6 +217,28 @@ export function validateMarketAnswer(answer, capability) {
     }
     if (typeof n.note !== 'string' || n.note.length > 200) {
       return { error: `napkin_notes[${i}].note is missing or over 200 characters` };
+    }
+  }
+  // AGT-155: lead_reviews is OPTIONAL -- an answer from a capability that reads no leads, and every
+  // answer written before this shipped, carries none and stays valid. When it is present every entry
+  // is checked, and a `confirmed` verdict must be backed by a competitor record in this same answer:
+  // confirming a lead and writing nothing is the failure mode the check exists to refuse.
+  if (answer.lead_reviews !== undefined) {
+    if (!Array.isArray(answer.lead_reviews)) return { error: 'lead_reviews is not an array' };
+    for (const [i, review] of answer.lead_reviews.entries()) {
+      const at = `lead_reviews[${i}]`;
+      if (!isObj(review)) return { error: `${at} is not an object` };
+      if (typeof review.id !== 'string' || !review.id.trim()) return { error: `${at} names no lead id` };
+      if (!LEAD_REVIEW_STATUSES.includes(review.status)) {
+        return { error: `${at} has status "${review.status}" -- only confirmed or rejected are written` };
+      }
+      if (typeof review.note !== 'string' || !review.note.trim() || review.note.length > 400) {
+        return { error: `${at}.note is missing, empty, or over 400 characters` };
+      }
+    }
+    const confirms = answer.lead_reviews.some(r => r.status === 'confirmed');
+    if (confirms && !answer.records_to_write.some(it => isObj(it) && it.kind === 'competitor')) {
+      return { error: 'a lead is confirmed but no competitor record is written -- a confirmed lead becomes a competitor record in the same answer' };
     }
   }
   for (const [i, item] of answer.records_to_write.entries()) {
@@ -351,7 +396,18 @@ function rest() {
     if (!r.ok) throw new Error(`insert into ${table} returned HTTP ${r.status} ${await r.text()}`);
     return r.json();
   }
-  return { root, headers, get, insert };
+  // AGT-155: the ONLY write this lane makes outside its own records, and it is narrow by
+  // construction -- the caller names the row and hands the three review columns, nothing else.
+  async function patch(pathAndQuery, body) {
+    const r = await fetch(`${root}/rest/v1/${pathAndQuery}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`PATCH ${pathAndQuery.split('?')[0]} returned HTTP ${r.status} ${await r.text()}`);
+    return r.json();
+  }
+  return { root, headers, get, insert, patch };
 }
 
 // The last run of this capability by this agent, from the audit log (§19k), else null.
@@ -393,6 +449,11 @@ async function readPlatform(db, capability, since) {
   return platform;
 }
 
+// AGT-155: the open leads, oldest first. status=new only -- a reviewed lead never comes back.
+async function readLeads(db) {
+  return db.get(`market_leads?status=eq.new&select=${LEAD_FIELDS}&order=seen_on.asc`);
+}
+
 // The session's Napkin scratch file: an array of entries, or {entries|docs|documents: [...]}.
 export function loadNapkin(file) {
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -419,6 +480,9 @@ async function render(args) {
     try { napkin = loadNapkin(args.napkinFile); } catch (e) { fail(`--napkin-file: ${e.message}`); }
   }
   const task_context = { ask: args.ask || null, since, records, corrections, platform, napkin, input };
+  // Added, never defaulted: a capability that is not a lead reader renders with no `leads` key, so
+  // its prompt carries no empty-inbox line to explain away (kickoff §6, "by construction").
+  if (LEAD_READERS.includes(args.capability)) task_context.leads = await readLeads(db);
 
   let assembly;
   try {
@@ -491,9 +555,10 @@ async function write(args) {
     session_name,
   }));
 
+  const db = rest();
   let inserted = [];
   if (rows.length) {
-    try { inserted = await rest().insert('market_records', rows); } catch (e) { fail(e.message); }
+    try { inserted = await db.insert('market_records', rows); } catch (e) { fail(e.message); }
   }
 
   // AGT-161 -- IN THE SAME RUN, over the rows that actually landed (never over `answer`): a finding
@@ -512,6 +577,23 @@ async function write(args) {
     });
   } catch (e) { fail(e.message); }
 
+  // AGT-155: the reviews follow the records, because a `confirmed` verdict is only honest once the
+  // competitor record it cites is stored. One PATCH per lead, three columns, by id.
+  const reviews = Array.isArray(answer.lead_reviews) ? answer.lead_reviews : [];
+  const reviewedAt = new Date().toISOString();
+  let leadsReviewed = 0;
+  for (const review of reviews) {
+    try {
+      const patched = await db.patch(`market_leads?id=eq.${encodeURIComponent(review.id)}`, {
+        status: review.status,
+        reviewer_note: review.note,
+        reviewed_at: reviewedAt,
+      });
+      leadsReviewed += patched.length;
+    } catch (e) {
+      fail(e.message);
+    }
+  }
   process.stdout.write(JSON.stringify({
     inserted: inserted.length,
     ids: inserted.map(r => r.id),
@@ -520,6 +602,7 @@ async function write(args) {
       raised: raised.written,
       verdicts: raised.verdicts.map(v => ({ fingerprint: v.fingerprint, verdict: v.verdict })),
     },
+    leads_reviewed: leadsReviewed,
   }) + '\n');
 }
 

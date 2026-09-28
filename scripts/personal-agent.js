@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.683 | scripts/personal-agent.js | AGT-155 -- the competitor leads inbox. An answer
+// whose jobs[] marks a posting `competitor: true` now also files a LEAD in public.market_leads, the
+// one table both lanes share. The row is built BY CODE from four named job fields
+// (leadsFromAnswer), never composed by the model, so the job id, title, fit, legit verdict and act
+// call cannot ride along; validateLeads refuses a lead with no company, no overlap reason or a
+// tracking URL, and --write refuses the whole answer before anything is written. This script never
+// reads the product lane's records and never reviews a lead -- it only files one.
+// Kickoff: docs/kickoffs/v7.0.683-AGT-155-competitor-leads-inbox.md.
+//
 // DeepBench v7.0.598 | scripts/personal-agent.js | AGT-153 -- --fetch-linkedin-alerts: read the
 // LinkedIn job-alert mail from the Yahoo inbox READ-ONLY (lib/imap-readonly.js: EXAMINE, BODY.PEEK,
 // an allow-list of six verbs), parse each alert's job cards, drop the ones already stored or already
@@ -35,6 +44,8 @@
 //     [--input-file=<path>] [--out=<path>] [--json]
 //   ... --write --agent=jerry --capability=career-resume-review --answer=<json | path to .json>
 //     [--session-name=<n>]
+//     ... and, when the answer's jobs[] marks a posting competitor, one market_leads row per
+//     marked job; stdout gains `leads: n`.
 //   ... --fetch-postings --agent=jerry
 //   ... --fetch-linkedin-alerts --agent=jerry --out=<path> [--from=<addr>] [--days=<n>] [--json]
 //
@@ -117,8 +128,62 @@ function fail(message) {
   process.exit(2);
 }
 
+// --- AGT-155: the competitor leads inbox -------------------------------------------------------
+//
+// PUBLIC FACTS ONLY, BY CONSTRUCTION (pattern:10, pattern:99). The answer never composes a lead
+// object. A lead is derived here from FOUR named fields of a job the answer already marked
+// `competitor: true` -- company, url, competitor_why and the optional what_they_sell. The job id,
+// the title, the fit, the legit verdict and the act call have no route into the row, so "public
+// facts only" is a property of the code path rather than an instruction the model is asked to obey.
+// The eight keys below are the row, in order; the regression guard asserts Object.keys() equals them.
+export const LEAD_COLUMNS = [
+  'company', 'what_they_sell', 'overlap_with_deepbench', 'public_url', 'seen_on',
+  'source_capability', 'status', 'session_name',
+];
+
+export function leadsFromAnswer(answer, capability = null, seenOn = null, sessionName = null) {
+  const jobs = Array.isArray(answer?.jobs) ? answer.jobs : [];
+  return jobs.filter(job => job?.competitor === true).map(job => ({
+    company: job.company,
+    what_they_sell: job.what_they_sell ?? null,
+    overlap_with_deepbench: job.competitor_why,
+    public_url: job.url,
+    seen_on: seenOn,
+    source_capability: capability,
+    status: 'new',
+    session_name: sessionName,
+  }));
+}
+
+// A tracking URL is a personal fact wearing a link's clothes: trackingId / otpToken identify the
+// mailbox the alert was sent to, and the /comm/ form is the mail-client redirect that carries them.
+// Only the canonical public posting URL is ever stored, so these are refused before any write.
+const LEAD_TRACKING = [/trackingId=/i, /otpToken=/i, /\/comm\//i];
+
+export function validateLeads(leads) {
+  if (!Array.isArray(leads)) return { error: 'leads must be an array' };
+  for (const [i, lead] of leads.entries()) {
+    const at = `lead[${i}]`;
+    if (lead === null || typeof lead !== 'object' || Array.isArray(lead)) return { error: `${at} is not an object` };
+    for (const field of ['company', 'overlap_with_deepbench', 'public_url']) {
+      if (typeof lead[field] !== 'string' || !lead[field].trim()) {
+        return { error: `${at} has no ${field} -- a competitor job needs a company, a competitor_why and a url` };
+      }
+    }
+    if (!lead.public_url.startsWith('https://')) {
+      return { error: `${at}.public_url is not an https:// url: ${lead.public_url}` };
+    }
+    const tracking = LEAD_TRACKING.find(re => re.test(lead.public_url));
+    if (tracking) {
+      return { error: `${at}.public_url carries a tracking form (${tracking.source}) -- store the canonical public url only` };
+    }
+  }
+  return { ok: true };
+}
+
 // The answer's records_to_write, checked before anything is written: every item needs a kind the
-// table allows and a non-empty title. Returns {ok} or {error}; nothing is written on an error.
+// table allows and a non-empty title. The leads the answer implies are checked here too, so a bad
+// lead refuses the WHOLE answer and neither table is touched. Returns {ok} or {error}.
 export function validateAnswer(answer) {
   if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) {
     return { error: 'the answer must be a JSON object' };
@@ -137,6 +202,8 @@ export function validateAnswer(answer) {
       return { error: `records_to_write[${i}].data must be an object` };
     }
   }
+  const leads = validateLeads(leadsFromAnswer(answer));
+  if (leads.error) return leads;
   return { ok: true };
 }
 
@@ -345,7 +412,8 @@ async function write(args) {
   const check = validateAnswer(answer);
   if (check.error) fail(`answer refused, nothing written: ${check.error}`);
 
-  const source = `${args.capability} ${new Date().toISOString().slice(0, 10)}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const source = `${args.capability} ${today}`;
   const session_name = args.sessionName || null;
   const rows = answer.records_to_write.map(item => ({
     kind: item.kind,
@@ -359,9 +427,19 @@ async function write(args) {
   const runData = Object.fromEntries(Object.entries(answer).filter(([, v]) => !Array.isArray(v)));
   rows.push({ kind: 'log', title: `${args.capability} ran`, body: null, data: runData, target_row: null, source, session_name });
 
+  const db = rest();
   let inserted;
-  try { inserted = await rest().insert('career_records', rows); } catch (e) { fail(e.message); }
-  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id) }) + '\n');
+  try { inserted = await db.insert('career_records', rows); } catch (e) { fail(e.message); }
+
+  // The leads follow the records, never precede them: a lead is a by-product of a reviewed job, and
+  // filing one for an answer whose own records failed to land would put a lead in the shared inbox
+  // with nothing behind it. validateAnswer already refused every bad lead above.
+  const leads = leadsFromAnswer(answer, args.capability, today, session_name);
+  let filed = [];
+  if (leads.length) {
+    try { filed = await db.insert('market_leads', leads); } catch (e) { fail(e.message); }
+  }
+  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), leads: filed.length }) + '\n');
 }
 
 async function fetchPostings() {
