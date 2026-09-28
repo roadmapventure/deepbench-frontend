@@ -1,3 +1,13 @@
+// DeepBench v7.0.675 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-166 slice 2 defect --
+// PART G NOW STAMPS A ROW, so the read-back runs over a real timestamptz round trip. ZZTO-794 gains
+// a `premises` entry, which moves the thirteenth check from `judgment` to `derivable` and gives the
+// night a second fix: `revalidated_at` written as `...Z` and read back by PostgREST as `...+00:00`.
+// On 8264720b that read-back exits 2 at 794's patch AFTER the write lands -- the exact live failure
+// that lost 7 of 14 fixes on the 2026-09-28 night -- so this part is the live half of the v7.0.675
+// fix and cannot pass without it. Every count below moves with it: 2 derivable / 4 judgment, four
+// ledger rows instead of five (a confirmed premise files nothing, AGT-169), two before-images, and
+// reverse_decision restores BOTH rows -- 791's claim and 794's null stamp.
+//
 // DeepBench v7.0.518 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-79 slice 7 -- NEW PART
 // N: THE LIVE CONSTRAINT IS IN LOCKSTEP WITH CHECKS. Slice 1 of SES-385 appended the twelfth slug
 // `remainder-stranded` to CHECKS in scripts/ticket-owner.js and never to
@@ -1405,30 +1415,50 @@ async function main() {
     assert.strictEqual(inserted.length, 4, "the four fixture rows must all insert");
     const id791 = inserted.find(x => x.backlog_id === "ZZTO-791").id;
     const upd791 = inserted.find(x => x.backlog_id === "ZZTO-791").updated_at;
+    const id794 = inserted.find(x => x.backlog_id === "ZZTO-794").id;
+    const upd794 = inserted.find(x => x.backlog_id === "ZZTO-794").updated_at;
 
     // (2) Census the four rows through the REAL projection readBoard() uses -- a column the census
     // reads but this test forgot to select would classify as null and quietly change the answer.
-    const board = { items: await readFixture(), matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] };
+    // AGT-166 slice 2 defect (v7.0.675): the premise text for ZZTO-794 IS read here, exactly as
+    // readBoard() reads it for the ≤25 rows of a real night. That is what makes the thirteenth check
+    // `derivable` rather than `judgment`, and a derivable revalidation carries `fix:
+    // {revalidated_at}` — so this part now drives a timestamptz through the live PATCH and its
+    // read-back, which is the only place the `...Z` vs `...+00:00` defect is visible. Without this
+    // entry the row files a ledger line and nothing is ever stamped, and the defect that lost seven
+    // of the 2026-09-28 night's fourteen fixes cannot be caught by any test in this suite.
+    const premises = [{
+      backlog_id: "ZZTO-794",
+      title: "AGT-79 fixture: filed before the fences — inserted and deleted by agt-79-ticket-owner.test.mjs",
+      description: "Fixture. Never a real ticket.",
+      priority_class: "P10 - Tooling",
+    }];
+    const board = { items: await readFixture(), matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [], ownerFindings: [], premises };
     const r1 = classifyBoard(board, { now, rate: RATE, retired: NO_RETIREMENT });
-    // AGT-166 slice 2: ZZTO-794 is open, filed before the fences and never revalidated, so it is the
-    // thirteenth check's whole population and lands as JUDGMENT — the live projection below does not
-    // select title/description, so no `premises` entry reaches the census and an unread premise is
-    // never stamped as re-read. That is the same fail-closed direction the fixture arms pin.
-    assert.deepStrictEqual(r1.counts, { rows: 4, findings: 6, derivable: 1, judgment: 5 },
-      "the four fixture rows must classify to exactly one derivable fix and five judgment findings");
+    assert.deepStrictEqual(r1.counts, { rows: 4, findings: 6, derivable: 2, judgment: 4 },
+      "the four fixture rows must classify to two derivable fixes — the stale claim and 794's re-read premise — and four judgment findings");
     assert.deepStrictEqual(byCheck(r1, "unrevalidated-30d"), ["ZZTO-794"]);
     assert.deepStrictEqual(byCheck(r1, "claim-on-closed"), ["ZZTO-791"]);
 
     // (3) Plan against an empty ledger: everything is new tonight.
     const plan1 = planWrites(r1, [], board.items, { rate: RATE });
-    assert.strictEqual(plan1.fixes.length, 1);
-    assert.strictEqual(plan1.fixes[0].id, id791, "the fix must address ZZTO-791 by the primary key the insert returned");
-    assert.strictEqual(plan1.ledger.insert.length, 5);
+    assert.strictEqual(plan1.fixes.length, 2, "the stale claim and 794's revalidation stamp are both derivable tonight");
+    assert.deepStrictEqual([...plan1.fixes].map(f => f.id).sort(), [id791, id794].sort(),
+      "both fixes must address their row by the primary key the insert returned, never by backlog_id");
+    const fix794 = plan1.fixes.find(f => f.id === id794);
+    assert.deepStrictEqual(Object.keys(fix794.patch), ["revalidated_at"],
+      "a revalidation writes ONE column: never status, and never updated_at (SES-316)");
+    assert.strictEqual(plan1.ledger.insert.length, 4,
+      "a CONFIRMED premise files no ledger row at all (AGT-169) — 794's finding became a fix, so four judgment rows remain");
 
     // (4) THE WRITE.
+    // THIS CALL IS THE LIVE HALF OF THE v7.0.675 FIX. applyPlan reads every patch back key by key;
+    // 794's `revalidated_at` goes out as `...Z` and comes back as `...+00:00`. Before the fix the
+    // comparison was a string compare with one hardcoded escape for `cost_snapshot_at`, so this line
+    // never returned — the process exited 2 with the write already landed.
     const res1 = await applyPlan(url, key, plan1, { sessionName: S, now });
-    assert.strictEqual(res1.fixed, 1);
-    assert.strictEqual(res1.inserted, 5);
+    assert.strictEqual(res1.fixed, 2);
+    assert.strictEqual(res1.inserted, 4);
     assert.strictEqual(res1.reseen, 0);
     assert.strictEqual(res1.cleared, 0);
     assert.strictEqual(typeof res1.decision, "string", "the write pass must return the decision id John reverses");
@@ -1442,6 +1472,14 @@ async function main() {
     assert.strictEqual(after.updated_at, upd791,
       "updated_at must be untouched -- a stamp later than the decision's decided_at makes reverse_decision() refuse this row (SES-316)");
     const fixtureAfter = await readFixture();
+    const after794 = fixtureAfter.find(x => x.backlog_id === "ZZTO-794");
+    assert.strictEqual(Date.parse(after794.revalidated_at), Date.parse(now),
+      `794's stamp must be the census instant, whatever spelling PostgREST returns it in — read ${after794.revalidated_at}, wrote ${now}`);
+    assert.notStrictEqual(after794.revalidated_at, now,
+      "and the spellings really do differ on the wire — if they were byte-equal this arm would prove nothing about the defect");
+    assert.strictEqual(after794.status, "open", "a revalidation stamps the row and never touches its status");
+    assert.strictEqual(after794.updated_at, upd794,
+      "updated_at must be untouched here too, or reverse_decision() refuses 794's row (SES-316)");
     assert.strictEqual(fixtureAfter.find(x => x.backlog_id === "ZZTO-792").status, "delivered",
       "a judgment finding writes the ledger, never the row it is about");
     assert.strictEqual(fixtureAfter.find(x => x.backlog_id === "ZZTO-793").predicted_cycles, null,
@@ -1454,19 +1492,26 @@ async function main() {
     assert.strictEqual(dec.cycle_id, null, "exactly one of cycle_id / session_name -- this run is the session side");
     assert.strictEqual(dec.ladder_work_class, null, "hygiene moves no rung on the ladder");
     assert.strictEqual(dec.status, "open");
-    assert.ok(dec.summary.startsWith("Ticket Owner: 1 derivable cell fix(es) on 1 row(s)"), `summary reads: ${dec.summary}`);
+    assert.ok(dec.summary.startsWith("Ticket Owner: 2 derivable cell fix(es) on 2 row(s)"), `summary reads: ${dec.summary}`);
     assert.ok(dec.reasoning.includes("pattern:0"), "the reasoning must carry the no-standing-pattern handle");
 
     const imgs = await rest(`runner_before_images?decision_id=eq.${res1.decision}&select=table_name,pk_value,row_data`);
-    assert.strictEqual(imgs.length, 1, `expected exactly one before-image under decision ${res1.decision}, got ${imgs.length}`);
-    assert.strictEqual(imgs[0].table_name, "backlog_items");
-    assert.strictEqual(imgs[0].pk_value, id791, "the image addresses the row by primary key, not by backlog_id");
-    assert.strictEqual(imgs[0].row_data.claimed_by, "zz-stale", "the image must hold the PRIOR state -- an image of the new state restores nothing");
-    assert.strictEqual(typeof imgs[0].row_data.title, "string",
-      "the image must be the FULL row: reverse_decision() rewrites every column from row_data, so a partial image restores a partial row");
+    assert.strictEqual(imgs.length, 2, `expected one before-image per patched row under decision ${res1.decision}, got ${imgs.length}`);
+    assert.deepStrictEqual([...imgs].map(i => i.pk_value).sort(), [id791, id794].sort(),
+      "the images address their rows by primary key, not by backlog_id");
+    const img791 = imgs.find(i => i.pk_value === id791);
+    const img794 = imgs.find(i => i.pk_value === id794);
+    for (const img of imgs) {
+      assert.strictEqual(img.table_name, "backlog_items");
+      assert.strictEqual(typeof img.row_data.title, "string",
+        "the image must be the FULL row: reverse_decision() rewrites every column from row_data, so a partial image restores a partial row");
+    }
+    assert.strictEqual(img791.row_data.claimed_by, "zz-stale", "the image must hold the PRIOR state -- an image of the new state restores nothing");
+    assert.strictEqual(img794.row_data.revalidated_at, null,
+      "794's image must hold the NULL stamp -- an image taken after the write would restore the stamp it was meant to undo");
 
     const nullImgs = await rest(`runner_before_images?session_name=eq.${encodeURIComponent(S)}&table_name=eq.ticket_owner_findings&select=pk_value,row_data,decision_id`);
-    assert.strictEqual(nullImgs.length, 5, "every ledger row the night invented gets its own null-row image");
+    assert.strictEqual(nullImgs.length, 4, "every ledger row the night invented gets its own null-row image -- four, not five, now 794 is a fix");
     for (const img of nullImgs) {
       assert.strictEqual(img.row_data, null, "a null row_data is how the chain says this row did not exist before");
       assert.strictEqual(img.decision_id, null, "the findings images hang off the session, not off the board's decision");
@@ -1478,12 +1523,12 @@ async function main() {
       ["ZZTO-792", "delivered-unaccepted"],
       ["ZZTO-792", "verdict-missing"],
       ["ZZTO-793", "quote-missing"],
-      // AGT-166 slice 2, and it lands on the LIVE table: the thirteenth slug is only insertable
-      // because docs/design/agt-166-unrevalidated-slug.sql widened
-      // ticket_owner_findings_check_slug_check first. On the unwidened constraint this POST is one
-      // array of five and answers 400 / 23514, taking the whole night with it (SES-418).
-      ["ZZTO-794", "unrevalidated-30d"],
-    ], "exactly the five judgment findings reach the ledger, one row per (ticket, check)");
+      // AGT-166 slice 2 defect (v7.0.675): ZZTO-794 is NOT here, and its absence is an assertion.
+      // Its premise was read and confirmed, so the night stamped the row and filed nothing — a
+      // confirmed premise files no ledger row at all (AGT-169). A `["ZZTO-794",
+      // "unrevalidated-30d"]` line reappearing here means the premise stopped reaching the census
+      // and the drain went back to asking instead of draining.
+    ], "exactly the four judgment findings reach the ledger, one row per (ticket, check)");
     for (const x of led) {
       assert.strictEqual(x.verdict, "judgment");
       assert.strictEqual(x.cleared_at, null, "a finding filed tonight is open, never born cleared");
@@ -1495,13 +1540,14 @@ async function main() {
     const now2 = new Date(Date.now() + 1000).toISOString();
     const board2 = { ...board, items: await readFixture() };
     const r2 = classifyBoard(board2, { now: now2, rate: RATE, retired: NO_RETIREMENT });
-    assert.strictEqual(r2.counts.derivable, 0, "the cell the first night fixed must not be found again");
-    assert.strictEqual(r2.counts.findings, 5);
+    assert.strictEqual(r2.counts.derivable, 0,
+      "neither cell the first night fixed may be found again -- 794 now carries a stamp, so it leaves the fence population entirely");
+    assert.strictEqual(r2.counts.findings, 4);
     const priorLed = led.map(x => ({ id: x.id, backlog_id: x.backlog_id, check_slug: x.check_slug }));
     const plan2 = planWrites(r2, priorLed, board2.items, { rate: RATE });
     assert.deepStrictEqual(plan2.fixes, []);
     assert.deepStrictEqual(plan2.ledger.insert, [], "a finding already on the ledger is touched, never duplicated");
-    assert.strictEqual(plan2.ledger.reseen.length, 5);
+    assert.strictEqual(plan2.ledger.reseen.length, 4);
     assert.deepStrictEqual(plan2.ledger.clear, []);
 
     const res2 = await applyPlan(url, key, plan2, { sessionName: S, now: now2 });
@@ -1510,7 +1556,7 @@ async function main() {
     // assertion: this call passes no `prior`, and with no ledger to compute `prior ∪ insert − clear`
     // from, applyPlan raises nothing rather than guessing from `insert` alone. That is also what
     // keeps this fixture out of a table whose guard refuses every DELETE.
-    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 5, cleared: 0, raised: 0 },
+    assert.deepStrictEqual(res2, { decision: null, expires_at: null, fixed: 0, inserted: 0, reseen: 4, cleared: 0, raised: 0 },
       "a night with nothing to fix records NO decision -- an empty decision row is noise John has to read");
     assert.strictEqual((await rest(`runner_decisions?session_name=eq.${encodeURIComponent(S)}&select=id`)).length, 1,
       "two nights, one decision: the second wrote no board cell, so it decided nothing");
@@ -1533,18 +1579,21 @@ async function main() {
       body: JSON.stringify({ p_decision: res1.decision, p_actor: S, p_reason: "fixture rollback" }),
     }))[0];
     assert.strictEqual(rev.outcome, "applied", `reverse_decision returned ${JSON.stringify(rev)}`);
-    assert.strictEqual(rev.restored, 1);
+    assert.strictEqual(rev.restored, 2, "one decision id puts BOTH cells back -- the claim and the stamp");
     assert.strictEqual(rev.refused, 0);
     assert.strictEqual(rev.refused_written_since, 0, "a refusal here means the write pass bumped updated_at and locked itself out");
     assert.strictEqual(typeof rev.reversal_id, "string");
 
-    const restored = (await readFixture()).find(x => x.backlog_id === "ZZTO-791");
+    const restoredRows = await readFixture();
+    const restored = restoredRows.find(x => x.backlog_id === "ZZTO-791");
     assert.strictEqual(restored.claimed_by, "zz-stale", "the reversal must put the ORIGINAL claim back");
     assert.strictEqual(Date.parse(restored.claimed_at), Date.parse("2026-09-01T00:00:00+00:00"));
     assert.strictEqual(restored.status, "done", "the reversal restores the whole row, including the columns nobody wrote");
+    assert.strictEqual(restoredRows.find(x => x.backlog_id === "ZZTO-794").revalidated_at, null,
+      "and 794 goes back to never-revalidated -- a stamp the reversal cannot undo would make the drain unreversible");
 
-    console.log(`[AGT-79] part G: decision ${res1.decision} (expires ${res1.expires_at}) — 1 fix, 5 findings, reversed: ` +
-      `restored ${rev.restored} refused ${rev.refused}`);
+    console.log(`[AGT-79] part G: decision ${res1.decision} (expires ${res1.expires_at}) — ` +
+      `${res1.fixed} fix, ${res1.inserted} findings, reversed: restored ${rev.restored} refused ${rev.refused}`);
     passed = true;
   } finally {
     // Order matters: runner_before_images.decision_id FKs runner_decisions, and the reversal row

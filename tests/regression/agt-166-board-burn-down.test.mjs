@@ -77,7 +77,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import { checkClosedRed, ratifiedAt, PAGE_ROWS } from "../../scripts/audit-board.js";
 import {
   classifyBoard, planWrites, selectRevalidationBatch, REVALIDATION_CHECK, UNREVALIDATED_BATCH,
-  UNREVALIDATED_DAYS, PAGE_ROWS as OWNER_PAGE_ROWS, chicagoDay,
+  UNREVALIDATED_DAYS, PAGE_ROWS as OWNER_PAGE_ROWS, chicagoDay, cellMatches, ISO_INSTANT,
 } from "../../scripts/ticket-owner.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -226,6 +226,44 @@ async function run() {
     assert.deepEqual(degradedPlan.ledger.insert.map(f => f.check_slug), [REVALIDATION_CHECK],
       "and it must really file the ledger row the live path must never file");
     results.push("confirmed-premise-is-a-fix+2-controls");
+  }
+
+  // --- (G) the read-back accepts an instant, whatever its offset (v7.0.675) ----------------------
+  //
+  // TONIGHT'S EXACT PAIR IS THE FIRST CASE. `cellMatches` is the comparison applyPlan's step 3 runs
+  // over every patched cell. Before v7.0.675 it escaped instant-equality for the single name
+  // `cost_snapshot_at`, so the first `revalidated_at` stamp of the 2026-09-28 night -- written as
+  // `...164Z`, read back by PostgREST as `...164+00:00` -- was compared as a string, failed, and
+  // exited 2 after the write had landed, losing 7 of 14 judged fixes. The pair below is that
+  // literal pair. On 8264720b this arm is a TypeError: `cellMatches` is not exported at all.
+  {
+    const stampZ = "2026-09-28T05:08:10.164Z";
+    const stampOffset = "2026-09-28T05:08:10.164+00:00";
+
+    // The same instant, two spellings -- and NOT under a blessed column name, which is the fix.
+    assert.equal(cellMatches("revalidated_at", stampOffset, stampZ), true,
+      "tonight's own pair: the write landed and the read-back must say so");
+    assert.equal(cellMatches("cost_snapshot_at", stampOffset, stampZ), true,
+      "the column the old form escaped by name still matches -- the rule replaced the list, it did not drop it");
+
+    // The other two ways to be equal, both round-trip facts rather than looseness.
+    assert.equal(cellMatches("claimed_by", null, null), true, "a cleared column reads back as written");
+    assert.equal(cellMatches("cost_pct_snapshot", "1", 1), true, "a numeric column comes back as a string");
+    assert.equal(cellMatches("size_stamp", "S", "S"), true, "and the ordinary string case still matches");
+
+    // THE CONTROLS -- each one a silent non-write the read-back must still catch. If any of these
+    // passed, the loosening would have gone past instants and the gate would be decorative.
+    assert.equal(cellMatches("revalidated_at", "2026-09-28T05:08:11.164+00:00", stampZ), false,
+      "one second apart is a different instant -- a stale value that merely looks like a timestamp is still red");
+    assert.equal(cellMatches("type", "feature", "Feature"), false,
+      "case is not an instant: the TYPE_MAP patch that did not land is still caught");
+    assert.equal(cellMatches("revalidated_at", stampZ, 1790000000000), false,
+      "an epoch number is not an ISO instant -- both sides must carry the shape before either is parsed");
+
+    // And the shape test is a shape test: it never decides equality on its own.
+    assert.equal(ISO_INSTANT.test(stampZ) && ISO_INSTANT.test(stampOffset), true);
+    assert.equal(ISO_INSTANT.test("2026-09-28 05:08:10"), false, "a space-separated stamp carries no offset and is not accepted");
+    results.push("cell-matches-instant");
   }
 
   // --- (B) the ratified predicate, by value ------------------------------------------------------

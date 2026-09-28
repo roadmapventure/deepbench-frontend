@@ -1,4 +1,22 @@
 #!/usr/bin/env node
+// DeepBench v7.0.675 | scripts/ticket-owner.js | AGT-166 slice 2 defect -- THE READ-BACK ACCEPTS AN
+// INSTANT, WHATEVER ITS OFFSET. The key-by-key read-back below (step 3 of applyPlan) is right to
+// distrust a 200: a PATCH the role cannot write answers with the old value. But it compared an
+// instant as a STRING, with one hardcoded escape for `cost_snapshot_at`. `nowStamp` is
+// `toISOString()` -- `...Z` -- and PostgREST returns timestamptz as `...+00:00`, so the very first
+// `revalidated_at` patch of every night read back as a mismatch and killed the pass with exit 2
+// AFTER its write had landed. On 2026-09-28 that lost 7 of 14 judged fixes: the six mechanical ones
+// sort ahead in CHECKS order and landed, DL-01's stamp landed, and LA-01, SH-09, DL-02, DL-03,
+// TI-14, TI-15 and TI-16 were never reached -- so arm (b) has still never completed a batch and
+// `ticket_owner_findings` holds zero `unrevalidated-30d` rows.
+//
+// The fix is STRUCTURAL, not a second column name (pattern:10, pattern:99): `cellMatches()` accepts
+// two values whose ISO shape parses to the same instant, for ANY cell, and the escape is gone. The
+// loosening is instant-only by construction -- `feature` vs `Feature`, or two stamps a second
+// apart, still fail -- so a silent non-write on any other column is caught exactly as before, and
+// fail-fast stays: the ORDER of the fixes is the safety property. `nowStamp` itself does not move;
+// it is census time, the instant the row was read.
+//
 // DeepBench v7.0.643 | scripts/ticket-owner.js | AGT-166 slice 2, arm (b) -- THE REVALIDATION DRAIN.
 // The thirteenth check. 438 open rows are past the 30-day fence with `revalidated_at` null, and
 // until now the census only COUNTED them (`backlog.unrevalidated_30d`): no slug among the twelve, so
@@ -258,6 +276,12 @@ export const JUDGE_TENANT = "global";
 // simply no judgment yet. A caller that read 3 as a failure would retry a pass that succeeded.
 export const EXIT_AWAITING_ANSWER = 3;
 
+// The shape of an ISO-8601 instant, offset or `Z`, with optional fractional seconds. This is a
+// SHAPE test and nothing more -- the instants themselves are compared by `Date.parse`, never by
+// this pattern. It exists so `cellMatches` can tell "both of these are timestamps" from "one of
+// these is a string that happens to parse", which is what keeps the loosening instant-only.
+export const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})$/;
+
 const CLOSED = new Set(["done", "delivered"]);
 const LIVE = new Set(["open", "partial"]);
 const HOUR = 3600 * 1000;
@@ -267,6 +291,36 @@ const round2 = x => Math.round(x * 100) / 100;
 const ts = v => (v == null ? NaN : Date.parse(v));
 
 // --- the pure half -----------------------------------------------------------------------------
+
+// cellMatches(key, got, want) -> boolean: did the PATCH actually write `want` into this cell?
+//
+// THREE WAYS TO BE EQUAL, and every one of them is a real round-trip difference PostgREST makes
+// rather than a licence to be approximate:
+//   (a) the strings agree -- the ordinary case, and the one that catches a silent non-write;
+//   (b) both read as finite numbers and those numbers agree -- a numeric column comes back as the
+//       string "1" for the number 1;
+//   (c) both LOOK like ISO instants and parse to the same millisecond -- `...Z` in, `...+00:00`
+//       back, the same moment written two ways.
+//
+// (c) IS THE WHOLE FIX AND IT IS DELIBERATELY NOT A COLUMN LIST. The old form escaped exactly one
+// name, `cost_snapshot_at`, so the next timestamp column to be written -- `revalidated_at` -- broke
+// the pass. A rule over provable facts about the VALUES beats a list somebody has to remember to
+// extend (pattern:99, pattern:10). `key` is never read by a branch: it is here so the caller's
+// exit-2 message can name the cell, and so a future reader is not tempted to special-case one.
+//
+// It stays tight in the direction that matters. Both sides must match `ISO_INSTANT`, so a millis
+// epoch number never compares equal to a stamp, `"feature"` never equals `"Feature"`, and two
+// instants one second apart are still a mismatch -- the read-back keeps catching the failure it was
+// built for. `null` and `undefined` both stringify to `"null"` by (a), which is how a cleared
+// column (`claimed_by: null`) reads back as written.
+export function cellMatches(key, got, want) {
+  if (String(got ?? null) === String(want ?? null)) return true;
+  if (got != null && want != null && Number.isFinite(Number(got)) && Number.isFinite(Number(want))
+    && Number(got) === Number(want)) return true;
+  if (typeof got === "string" && typeof want === "string" && ISO_INSTANT.test(got) && ISO_INSTANT.test(want)
+    && Number.isFinite(Date.parse(got)) && Date.parse(got) === Date.parse(want)) return true;
+  return false;
+}
 
 // retiredChecks(rulings) -> Map<slug, reason>: which of the 13 checks are no longer asked tonight.
 //
@@ -1290,11 +1344,7 @@ export async function applyPlan(base, key, plan, { cycleId, sessionName, now, ju
       for (const k of Object.keys(fix.patch)) {
         const got = row[k];
         const want = fix.patch[k];
-        const numeric = got != null && want != null && Number.isFinite(Number(got)) && Number.isFinite(Number(want));
-        const ok = String(got ?? null) === String(want ?? null)
-          || (numeric && Number(got) === Number(want))
-          || (k === "cost_snapshot_at" && Number.isFinite(Date.parse(got)) && Date.parse(got) === Date.parse(want));
-        if (!ok) fail(`${step}: ${k} read ${JSON.stringify(got)}`);
+        if (!cellMatches(k, got, want)) fail(`${step}: ${k} read ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
       }
     }
   }
