@@ -1,4 +1,9 @@
-// DeepBench v7.0.561 | tests/regression/agt-84-personal-agent.test.mjs | AGT-84
+// DeepBench v7.0.686 | tests/regression/agt-84-personal-agent.test.mjs | AGT-84, extended by AGT-154
+//
+// AGT-154 adds the twelfth capability (career-linkedin-alerts) and four seams to the same script, so
+// its proofs land here rather than in a parallel file (pattern:17): the 12th READ_MAP key is exactly
+// what turns part (b) red, and a red a feature itself causes is fixed inside that feature
+// (pattern:124). New parts (f)-(i) and four live assertions are marked AGT-154 below.
 //
 // FEATURE: AGT-84 -- the call path for a personal-lane agent (first one: Jerry Maguire, the career
 // agent): scripts/personal-agent.js reads the capability's career_records, assembles the prompt
@@ -15,6 +20,20 @@
 //   (c) STATIC -- validateAnswer refuses an unknown kind and a missing title, accepts a titled log.
 //   (d) STATIC -- pickPostings over the real normalizeBoard() of Greenhouse and Lever fixtures keeps
 //       "Senior Product Manager", drops "Staff Engineer", drops a stored url and a repeated one.
+//   (f) STATIC (AGT-154) -- KIND_FILTERS is keyed by CAPABILITY: match-finder's posting filter drops
+//       a reviewed row and keeps a new one, and the alert slug has NO entry, so alert review sees
+//       every posting (its reposting and already-applied rules read the old ones).
+//   (g) STATIC (AGT-154) -- loadInput() reads the file by its SHAPE: a JSON file carrying a `cards`
+//       array becomes {intake, input:null}; a text file becomes {input, intake:null}. Control: JSON
+//       with no `cards` array stays raw text.
+//   (h) STATIC (AGT-154) -- validateAnswer refuses a titled `posting` whose data.url carries a
+//       tracking form, and one whose linkedin_job_id and url disagree; it accepts the canonical
+//       pair. Control: the same items with the url corrected are accepted, so the refusals are not
+//       firing on the title or the kind.
+//   (i) STATIC (AGT-154) -- the seed file carries the capability, the three new jm- slugs, both
+//       verdict/act enum strings, two inline Knowledge rows and the seven appended must_not rules,
+//       and names no agent id but jerry. Controls: a spliced agent id is caught, and dropping one
+//       must_not string is caught.
 //   (e) LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY, else NOT RUN) -- --render for the resume review
 //       reports >= 30 records, > 4000 prompt bytes and the judgment lane's model; --write inserts
 //       exactly 2 rows (the item + the run log), read back by id, deleted after; a refused answer
@@ -31,6 +50,7 @@
 
 import assert from "assert";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 import { randomUUID } from "node:crypto";
@@ -43,10 +63,23 @@ const SCRIPT = path.join(ROOT, SCRIPT_REL);
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 const RUN = randomUUID().slice(0, 8);
 
+// Sorted, and twelve since AGT-154 added career-linkedin-alerts.
 const CAREER_SLUGS = [
   "career-cover-letter", "career-evidence-mining", "career-growth-review", "career-interview-prep",
-  "career-intro-pitch", "career-market-watch", "career-match-finder", "career-outreach-plan",
-  "career-posting-review", "career-resume-review", "career-strengths-gaps",
+  "career-intro-pitch", "career-linkedin-alerts", "career-market-watch", "career-match-finder",
+  "career-outreach-plan", "career-posting-review", "career-resume-review", "career-strengths-gaps",
+];
+const ALERTS = "career-linkedin-alerts";
+const SEED_REL = "docs/design/agt-154-linkedin-alerts-seed.sql";
+// The seven strings AGT-154 appends to jm-guardrails.must_not, in order (harvest AGT-154 section 3d).
+const APPENDED_MUST_NOT = [
+  "apply to, message or contact anyone",
+  "click an email link - rebuild the job URL from the id",
+  "log into LinkedIn or any job site",
+  "change the mailbox (flag, move, delete, reply)",
+  "share personal data outside career_records",
+  "spend money",
+  "estimate pay - stated pay only",
 ];
 
 async function load() {
@@ -102,14 +135,20 @@ function partA() {
 async function partB() {
   const { READ_MAP, KINDS, REPOS } = await load();
   assert.strictEqual(KINDS.length, 11, `KINDS has ${KINDS.length} entries, expected 11`);
-  assert.deepStrictEqual(Object.keys(READ_MAP).sort(), CAREER_SLUGS, "READ_MAP keys are not exactly the 11 career-* slugs");
+  assert.strictEqual(CAREER_SLUGS.length, 12, `CAREER_SLUGS has ${CAREER_SLUGS.length} entries, expected 12`);
+  assert.deepStrictEqual(Object.keys(READ_MAP).sort(), CAREER_SLUGS, "READ_MAP keys are not exactly the 12 career-* slugs");
   for (const [slug, kinds] of Object.entries(READ_MAP)) {
     assert.ok(Array.isArray(kinds) && kinds.length, `READ_MAP["${slug}"] reads no kinds`);
     for (const k of kinds) assert.ok(KINDS.includes(k), `READ_MAP["${slug}"] reads unknown kind "${k}"`);
   }
   assert.ok(READ_MAP["career-match-finder"].includes("posting"), "match-finder does not read postings");
+  // AGT-154: alert review reads the history its rules need -- postings (reposting, already-applied)
+  // and log rows (already-applied stated in words) -- plus the profile it scores fit against.
+  assert.deepStrictEqual(READ_MAP[ALERTS],
+    ["resume_fact", "target", "ladder_rung", "evidence", "network_contact", "posting", "log"],
+    `READ_MAP["${ALERTS}"] is ${JSON.stringify(READ_MAP[ALERTS])}`);
   assert.strictEqual(REPOS.length, 6, `REPOS has ${REPOS.length} entries, expected 6`);
-  return ["read-map-is-the-11-career-slugs", "read-map-kinds-all-known"];
+  return ["read-map-is-the-12-career-slugs", "read-map-kinds-all-known", "alerts-reads-postings-and-log"];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -156,6 +195,183 @@ async function partD() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Part (f) -- STATIC (AGT-154): KIND_FILTERS is keyed by capability, not by kind
+// ---------------------------------------------------------------------------------------------
+async function partF() {
+  const { KIND_FILTERS } = await load();
+  const mf = KIND_FILTERS["career-match-finder"];
+  assert.ok(mf && typeof mf.posting === "function", "KIND_FILTERS has no career-match-finder.posting filter");
+  assert.strictEqual(mf.posting({ data: { status: "reviewed" } }), false, "match-finder kept a reviewed posting");
+  assert.strictEqual(mf.posting({ data: { status: "new" } }), true, "match-finder dropped a new posting");
+  // The point of re-keying: the filter is match-finder's alone. An entry here would silently hide
+  // the reposting history and the already-applied rows the alert review's rules are counted over.
+  assert.strictEqual(KIND_FILTERS[ALERTS], undefined,
+    `KIND_FILTERS["${ALERTS}"] exists -- alert review must see every posting row`);
+  assert.ok(!Object.prototype.hasOwnProperty.call(KIND_FILTERS, "posting"),
+    "KIND_FILTERS still carries a top-level `posting` key -- it is keyed by kind, not by capability");
+  return ["kind-filters-keyed-by-capability", "match-finder-filter-unchanged", "alerts-has-no-filter"];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part (g) -- STATIC (AGT-154): loadInput reads the file by its shape
+// ---------------------------------------------------------------------------------------------
+const FIXTURE_JOB_ID = "4000000009";
+const FIXTURE_INTAKE = {
+  cards: [{ job_id: FIXTURE_JOB_ID, url: `https://www.linkedin.com/jobs/view/${FIXTURE_JOB_ID}/`, title: "Senior Product Manager" }],
+};
+
+function writeTmp(name, body) {
+  const file = path.join(os.tmpdir(), `agt-154-${RUN}-${name}`);
+  fs.writeFileSync(file, body, "utf8");
+  return file;
+}
+
+async function partG() {
+  const { loadInput } = await load();
+  assert.strictEqual(typeof loadInput, "function", "loadInput is not exported from the script");
+
+  const jsonFile = writeTmp("intake.json", JSON.stringify(FIXTURE_INTAKE));
+  const asIntake = loadInput(jsonFile);
+  assert.strictEqual(asIntake.input, null, `an intake file left input set: ${JSON.stringify(asIntake.input)}`);
+  assert.ok(asIntake.intake && Array.isArray(asIntake.intake.cards), "an intake file did not parse into intake.cards");
+  assert.strictEqual(asIntake.intake.cards.length, 1, `intake.cards.length is ${asIntake.intake.cards.length}, expected 1`);
+  assert.strictEqual(asIntake.intake.cards[0].job_id, FIXTURE_JOB_ID, "the card's job_id did not survive the parse");
+
+  const textFile = writeTmp("pasted.txt", "Senior Product Manager at Acme -- pasted by hand, not JSON.");
+  const asText = loadInput(textFile);
+  assert.strictEqual(asText.intake, null, `a text file produced an intake: ${JSON.stringify(asText.intake)}`);
+  assert.ok(typeof asText.input === "string" && asText.input.includes("pasted by hand"), "a text file lost its raw text");
+
+  // Control: it is the `cards` array that decides, not "the file happens to be JSON".
+  const noCards = writeTmp("nocards.json", JSON.stringify({ fetched_at: "2026-09-28", jobs: [] }));
+  const asOther = loadInput(noCards);
+  assert.strictEqual(asOther.intake, null, "JSON with no cards array was taken as an intake -- the shape check does not discriminate");
+  assert.ok(typeof asOther.input === "string", "JSON with no cards array lost its raw text");
+  for (const f of [jsonFile, textFile, noCards]) fs.rmSync(f, { force: true });
+  return ["loadinput-parses-an-intake", "loadinput-keeps-text-raw", "control-json-without-cards-stays-text"];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part (h) -- STATIC (AGT-154): no tracking url, and a posting's id and url must agree
+// ---------------------------------------------------------------------------------------------
+const posting = data => ({ records_to_write: [{ kind: "posting", title: "Senior Product Manager", data }] });
+
+async function partH() {
+  const { validateAnswer } = await load();
+
+  const tracked = validateAnswer(posting({ url: "https://www.linkedin.com/comm/jobs/view/1/?trackingId=abc" }));
+  assert.ok(tracked.error && !tracked.ok, `validateAnswer accepted a tracking url: ${JSON.stringify(tracked)}`);
+
+  const mismatch = validateAnswer(posting({ linkedin_job_id: "1", url: "https://example.com/" }));
+  assert.ok(mismatch.error && !mismatch.ok, `validateAnswer accepted a posting whose url is not its job id's: ${JSON.stringify(mismatch)}`);
+  assert.ok(/linkedin_job_id/.test(mismatch.error), `the refusal does not name the mismatch: ${mismatch.error}`);
+
+  const good = validateAnswer(posting({ linkedin_job_id: "1", url: "https://www.linkedin.com/jobs/view/1/" }));
+  assert.ok(good.ok && !good.error, `validateAnswer refused the canonical id/url pair: ${JSON.stringify(good)}`);
+
+  // Controls: the refusals fire on the URL, not on the kind or the title. The same titled posting
+  // with the url corrected is accepted, and a non-posting kind carrying a tracking url is still
+  // refused -- the tracking rule is not scoped to postings.
+  const otherKind = validateAnswer({ records_to_write: [{ kind: "log", title: "ran", data: { url: "https://x.test/?otpToken=zz" } }] });
+  assert.ok(otherKind.error, "a tracking url on a non-posting kind was accepted -- the rule is scoped too narrowly");
+  const idNoUrlCheckNeeded = validateAnswer({ records_to_write: [{ kind: "posting", title: "p", data: { company: "Acme" } }] });
+  assert.ok(idNoUrlCheckNeeded.ok, `a posting with no url at all was refused: ${JSON.stringify(idNoUrlCheckNeeded)}`);
+  return ["refuses-tracking-url", "refuses-id-url-mismatch", "accepts-canonical-pair", "control-tracking-rule-not-posting-only"];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part (i) -- STATIC (AGT-154): the seed carries what was designed, and names no other agent
+// ---------------------------------------------------------------------------------------------
+const escapeRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function seedNamesAgents(seed, ids) {
+  // The Skill text is what reaches the database; the file's own -- comments are not a Skill row.
+  const body = seed.split("\n").filter(l => !l.trim().startsWith("--")).join("\n");
+  return ids.filter(id => id && id.toLowerCase() !== "jerry" && new RegExp("\\b" + escapeRe(id) + "\\b", "i").test(body));
+}
+
+async function liveAgentIds() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) return null;
+  const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/agents?select=id`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  if (!res.ok) assert.fail(`agents?select=id failed: HTTP ${res.status} ${await res.text()}`);
+  return (await res.json()).map(r => r.id);
+}
+
+async function partI() {
+  const results = [];
+  assert.ok(fs.existsSync(path.join(ROOT, SEED_REL)), `${SEED_REL} does not exist`);
+  const seed = read(SEED_REL);
+
+  for (const slug of [ALERTS, "jm-linkedin-alerts-intent", "jm-knowledge-posting-verification", "jm-knowledge-act-call"]) {
+    assert.ok(seed.includes(slug), `the seed does not carry "${slug}"`);
+  }
+  for (const phrase of ["could not verify", "apply with prep"]) {
+    assert.ok(seed.includes(phrase), `the seed does not carry the enum value "${phrase}"`);
+  }
+  const inline = seed.split('{"source":"inline"}').length - 1;
+  assert.strictEqual(inline, 2, `the seed carries ${inline} inline Knowledge rows, expected 2 (SES-341)`);
+  results.push("seed-carries-the-capability-and-three-skills", "seed-knowledge-rows-are-inline");
+
+  // AGT-90: the claude-fable family REJECTS a stored temperature, and all 15 earlier jm- rows carry
+  // NULL. The kickoff's harvest still said "temperature 0, as the jm- rows" -- true when it was
+  // measured, false since v7.0.568 -- so the first apply turned agt-90 red on these three rows.
+  // Pinned here so the seed file cannot drift back, with agt-90 guarding the live board.
+  const fableRows = [...seed.matchAll(/'claude-fable-5-1',\s*\d+,\s*([A-Za-z0-9.]+),/g)].map(m => m[1]);
+  assert.strictEqual(fableRows.length, 3, `expected 3 fable Skill rows in the seed, found ${fableRows.length}`);
+  assert.deepStrictEqual(fableRows, ["NULL", "NULL", "NULL"],
+    `a seeded fable row stores a temperature (AGT-90 rejects it): ${JSON.stringify(fableRows)}`);
+  // Control: the matcher really reads that column -- a 0 spliced back in is caught.
+  const withTemp = seed.replace("'claude-fable-5-1', 12000, NULL,", "'claude-fable-5-1', 12000, 0,");
+  assert.notStrictEqual(withTemp, seed, "control setup failed: the intent row's model/token/temperature tuple moved");
+  assert.ok([...withTemp.matchAll(/'claude-fable-5-1',\s*\d+,\s*([A-Za-z0-9.]+),/g)].map(m => m[1]).includes("0"),
+    "control: a temperature spliced back into a fable row was not caught");
+  results.push("seed-fable-rows-store-no-temperature", "control-spliced-temperature-caught");
+
+  for (const rule of APPENDED_MUST_NOT) {
+    assert.ok(seed.includes(rule), `the seed does not append the must_not rule "${rule}"`);
+  }
+  // The seed must APPEND, never rewrite: the update concatenates onto the stored list.
+  assert.ok(/guardrails->'must_not'\)\s*\|\|/.test(seed),
+    "the seed does not concatenate onto the existing must_not -- an append must not rewrite the list");
+  results.push(`seed-appends-the-seven-must-not-rules (${APPENDED_MUST_NOT.length})`);
+
+  // Control: dropping one rule is caught, so the loop above is not vacuous. The rule is removed
+  // EVERYWHERE -- it appears twice on purpose (the append, and the seed's own DO-block assertion),
+  // and a control that struck only one copy would be satisfied by the other and prove nothing.
+  const victim = APPENDED_MUST_NOT[6];
+  const dropped = seed.split(victim).join("something else");
+  assert.notStrictEqual(dropped, seed, `control setup failed: "${victim}" is not in the seed verbatim`);
+  assert.strictEqual(seed.split(victim).length - 1, 2,
+    `"${victim}" appears ${seed.split(victim).length - 1} times in the seed, expected 2 (the append and the DO block)`);
+  assert.ok(!dropped.includes(victim), "control: a dropped must_not rule was not caught");
+  results.push("control-dropped-must-not-rule-caught");
+
+  // Rule #1 over the Skill text: no agent id but jerry.
+  let ids = await liveAgentIds();
+  let source = "live agents?select=id";
+  if (!ids) {
+    const { AGENTS } = await import("../../src/data/agents.js");
+    ids = AGENTS.map(a => a.id);
+    source = "src/data/agents.js";
+  }
+  assert.ok(ids.length > 1, `too few agent ids from ${source}`);
+  assert.ok(new RegExp("\\bsam\\b", "i").test("ask sam now") && !new RegExp("\\bsam\\b", "i").test("samples"),
+    "word-boundary regex self-check failed");
+  const named = seedNamesAgents(seed, ids);
+  assert.deepStrictEqual(named, [], `the seed names another agent (Rule #1), ids from ${source}: ${named.join(", ")}`);
+  const other = ids.find(id => id.toLowerCase() !== "jerry");
+  const anchorText = "Hold the rule that turns a verdict and a fit into one of four calls.";
+  const spliced = seed.replace(anchorText, `${anchorText} Hand it to ${other}.`);
+  assert.notStrictEqual(spliced, seed, "control setup failed: the jm-knowledge-act-call objective is not in the seed verbatim");
+  assert.ok(seedNamesAgents(spliced, ids).includes(other), `control: a spliced agent id "${other}" was not caught`);
+  results.push(`seed-names-no-other-agent (${ids.length} ids, ${source})`, "control-spliced-agent-id-caught");
+  return results;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Part (e) -- LIVE: render numbers, the write/delete pair, a refused write
 // ---------------------------------------------------------------------------------------------
 function runScript(args, env) {
@@ -188,6 +404,32 @@ async function partE() {
   assert.deepStrictEqual(caps.map(c => c.slug).sort(), Object.keys(READ_MAP).sort(), "READ_MAP keys differ from the live career-* capabilities");
   results.push("read-map-matches-live-capabilities");
 
+  // AGT-154 LIVE: the seeded rows are actually there -- the capability wired to its Intent, the
+  // seven links, the assignment, and the appended never-rules.
+  const alertCap = await getJson(`capabilities?slug=eq.${ALERTS}&select=slug,default_intent_slug,execution_type,tenant_id`);
+  assert.strictEqual(alertCap.length, 1, `capabilities has ${alertCap.length} rows for ${ALERTS}, expected 1`);
+  assert.strictEqual(alertCap[0].default_intent_slug, "jm-linkedin-alerts-intent",
+    `${ALERTS}.default_intent_slug is ${alertCap[0].default_intent_slug}`);
+  const links = await getJson(`capability_skill_profiles?capability_slug=eq.${ALERTS}&select=skill_profile_slug,display_order&order=display_order.asc`);
+  assert.deepStrictEqual(links.map(l => l.skill_profile_slug),
+    ["jm-identity", "jm-knowledge-method", "jm-behavior", "jm-linkedin-alerts-intent",
+     "jm-knowledge-posting-verification", "jm-knowledge-act-call", "jm-guardrails"],
+    `${ALERTS} links are ${JSON.stringify(links.map(l => l.skill_profile_slug))}`);
+  const assigned = await getJson(`agent_capability_assignments?capability_slug=eq.${ALERTS}&select=agent_id,tenant_id`);
+  assert.strictEqual(assigned.length, 1, `${ALERTS} has ${assigned.length} assignments, expected 1`);
+  const rails = await getJson("skill_profiles?slug=eq.jm-guardrails&select=guardrails");
+  const mustNot = rails[0]?.guardrails?.must_not || [];
+  // The seven are asserted by NAME; the count is reported, because the list grows by John's word and
+  // a pinned total would go red on a change this ticket did not make (it already had: the kickoff
+  // measured 6 on 09-25, live carried 8 on 09-28).
+  for (const rule of APPENDED_MUST_NOT) {
+    assert.ok(mustNot.includes(rule), `jm-guardrails.must_not is missing "${rule}"`);
+  }
+  assert.ok(mustNot.length >= APPENDED_MUST_NOT.length + 8,
+    `jm-guardrails.must_not holds ${mustNot.length} entries -- the seven were appended to a list of at least 8`);
+  console.log(`  [AGT-154] live rows: 1 capability, ${links.length} links, ${assigned.length} assignment, must_not ${mustNot.length} (7 appended)`);
+  results.push("alerts-capability-links-and-guardrails-live");
+
   // Render.
   const lanes = await getJson("runner_model_lanes?select=lane,model_id");
   const judgment = lanes.find(l => l.lane === "judgment")?.model_id;
@@ -205,6 +447,35 @@ async function partE() {
   assert.strictEqual(out.model, expected, `--render printed model ${out.model}, the judgment lane runs ${expected}`);
   assert.ok(r.stderr.includes(`# model: ${out.model}`), "--render did not print `# model: <id>` on stderr");
   results.push("render-loads-records-and-judgment-model");
+
+  // AGT-154 LIVE: the render carries the intake card and both enum vocabularies into the prompt.
+  const intakeFile = writeTmp("live-intake.json", JSON.stringify(FIXTURE_INTAKE));
+  const mdFile = path.join(os.tmpdir(), `agt-154-${RUN}-render.md`);
+  try {
+    const ar = runScript(["--render", "--agent=jerry", `--capability=${ALERTS}`,
+      `--input-file=${intakeFile}`, `--out=${mdFile}`, "--json"], env);
+    assert.strictEqual(ar.status, 0, `--render for ${ALERTS} exited ${ar.status}: ${ar.stderr.trim()}`);
+    const aout = JSON.parse(ar.stdout.trim());
+    console.log(`  [AGT-154] render: model=${aout.model} records_loaded=${aout.records_loaded} prompt_bytes=${aout.prompt_bytes}`);
+    assert.ok(aout.records_loaded >= 60, `${ALERTS} loaded ${aout.records_loaded} records, expected >= 60 -- it must see every posting, not only the new ones`);
+    assert.ok(aout.prompt_bytes > 4000, `${ALERTS} prompt is ${aout.prompt_bytes} bytes, expected > 4000`);
+    assert.strictEqual(aout.model, expected, `${ALERTS} rendered model ${aout.model}, the judgment lane runs ${expected}`);
+    const md = fs.readFileSync(mdFile, "utf8");
+    for (const needle of [FIXTURE_JOB_ID, "could not verify", "apply with prep"]) {
+      assert.ok(md.includes(needle), `the rendered prompt does not carry "${needle}"`);
+    }
+    // Discriminating: alert review counts postings match-finder's filter hides, so it loads strictly
+    // more records than match-finder over the same database.
+    const mf = runScript(["--render", "--agent=jerry", "--capability=career-match-finder", "--json"], env);
+    assert.strictEqual(mf.status, 0, `--render for career-match-finder exited ${mf.status}: ${mf.stderr.trim()}`);
+    const mfOut = JSON.parse(mf.stdout.trim());
+    console.log(`  [AGT-154] match-finder still filtered: records_loaded=${mfOut.records_loaded} vs alerts ${aout.records_loaded}`);
+    assert.ok(aout.records_loaded > mfOut.records_loaded,
+      `alert review loaded ${aout.records_loaded} and match-finder ${mfOut.records_loaded} -- the per-capability filter is not in force`);
+    results.push("alerts-render-carries-intake-and-enums", "match-finder-filter-still-narrower");
+  } finally {
+    for (const f of [intakeFile, mdFile]) fs.rmSync(f, { force: true });
+  }
 
   // Write -- before-image first: this run's session tag must hold no rows.
   const session = `agt-84-regression-${RUN}`;
@@ -255,6 +526,10 @@ async function run() {
   results.push(...(await partB()));
   results.push(...(await partC()));
   results.push(...(await partD()));
+  results.push(...(await partF()));
+  results.push(...(await partG()));
+  results.push(...(await partH()));
+  results.push(...(await partI()));
   results.push(...(await partE()));
   return results;
 }

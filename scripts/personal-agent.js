@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// DeepBench v7.0.686 | scripts/personal-agent.js | AGT-154 -- the LinkedIn Alert Review capability's
+// call path. Four seams, all keyed by capability slug so no agent and no `if (capability === …)`
+// enters the script (pattern:13, pattern:2): READ_MAP gains the 12th capability; KIND_FILTERS is
+// re-keyed BY CAPABILITY (match-finder keeps seeing only `status=new` postings, alert review needs
+// every posting row -- reposting history and the already-applied rule read old rows); loadInput()
+// parses an --input-file that is JSON with a `cards` array into task_context.intake and leaves
+// anything else as raw text; and EXTRA_READS puts the public competitor list on task_context.
+// validateAnswer now also refuses a records_to_write url carrying a tracking form and a `posting`
+// whose linkedin_job_id and url disagree -- it EXTENDS AGT-155's TRACKING_FORMS rather than
+// declaring a second copy of the same rule (pattern:14).
+// Kickoff: docs/kickoffs/v7.0.599-AGT-154-linkedin-alert-review.md.
+//
 // DeepBench v7.0.683 | scripts/personal-agent.js | AGT-155 -- the competitor leads inbox. An answer
 // whose jobs[] marks a posting `competitor: true` now also files a LEAD in public.market_leads, the
 // one table both lanes share. The row is built BY CODE from four named job fields
@@ -103,10 +115,21 @@ export const READ_MAP = {
   'career-market-watch': ['target', 'market_requirement', 'watch_company'],
   'career-evidence-mining': ['evidence', 'resume_fact', 'target'],
   'career-growth-review': ['ladder_rung', 'target', 'log', 'review'],
+  'career-linkedin-alerts': ['resume_fact', 'target', 'ladder_rung', 'evidence', 'network_contact', 'posting', 'log'],
 };
 
-// A kind-level read filter: match-finder reads only postings not yet reviewed (data.status = new).
-const KIND_FILTERS = { posting: rec => rec?.data?.status === 'new' };
+// A read filter, keyed by CAPABILITY and then by kind (AGT-154). It was keyed by kind alone, which
+// made "postings not yet reviewed" a property of the posting kind rather than of the one capability
+// that wants it -- so every later reader of `posting` silently inherited it. Match-finder's filter
+// is unchanged; alert review deliberately has no entry, because its verification rules count the
+// reposting history and its skip rule reads the already-applied rows, both of which live in the
+// postings match-finder filters out.
+export const KIND_FILTERS = {
+  'career-match-finder': { posting: rec => rec?.data?.status === 'new' },
+};
+
+// Extra, capability-specific reads that are not career_records. The value names the task_context key.
+export const EXTRA_READS = { 'career-linkedin-alerts': 'competitors' };
 
 // The evidence sources the design named, read-only (git log, files). Paths only -- no remote, no
 // credential. deepbench-personal is the personal-lane clone of dev -- never the shared checkout
@@ -158,7 +181,12 @@ export function leadsFromAnswer(answer, capability = null, seenOn = null, sessio
 // A tracking URL is a personal fact wearing a link's clothes: trackingId / otpToken identify the
 // mailbox the alert was sent to, and the /comm/ form is the mail-client redirect that carries them.
 // Only the canonical public posting URL is ever stored, so these are refused before any write.
-const LEAD_TRACKING = [/trackingId=/i, /otpToken=/i, /\/comm\//i];
+//
+// AGT-154 extends this ONE list to every records_to_write url rather than declaring a second copy
+// (pattern:14, pattern:15): AGT-155 applied it to a lead's public_url, but the same alert url also
+// reaches career_records as a posting's data.url, and a rule with two homes drifts. `/comm/` is the
+// broader form of the alert review's `/comm/jobs/` and already refuses it.
+export const TRACKING_FORMS = [/trackingId=/i, /otpToken=/i, /\/comm\//i];
 
 export function validateLeads(leads) {
   if (!Array.isArray(leads)) return { error: 'leads must be an array' };
@@ -173,7 +201,7 @@ export function validateLeads(leads) {
     if (!lead.public_url.startsWith('https://')) {
       return { error: `${at}.public_url is not an https:// url: ${lead.public_url}` };
     }
-    const tracking = LEAD_TRACKING.find(re => re.test(lead.public_url));
+    const tracking = TRACKING_FORMS.find(re => re.test(lead.public_url));
     if (tracking) {
       return { error: `${at}.public_url carries a tracking form (${tracking.source}) -- store the canonical public url only` };
     }
@@ -200,6 +228,26 @@ export function validateAnswer(answer) {
     }
     if (item.data !== undefined && (item.data === null || typeof item.data !== 'object' || Array.isArray(item.data))) {
       return { error: `records_to_write[${i}].data must be an object` };
+    }
+    // AGT-154: no tracking url reaches career_records, and a posting's id and url must agree. Both
+    // are checked HERE, before any write, so "the canonical public url only" is a property of the
+    // code path and not an instruction the model is asked to obey (pattern:10).
+    const url = item.data?.url;
+    if (url !== undefined && typeof url !== 'string') {
+      return { error: `records_to_write[${i}].data.url must be a string` };
+    }
+    if (typeof url === 'string') {
+      const tracking = TRACKING_FORMS.find(re => re.test(url));
+      if (tracking) {
+        return { error: `records_to_write[${i}].data.url carries a tracking form (${tracking.source}) -- store the canonical public url only` };
+      }
+    }
+    const jobId = item.data?.linkedin_job_id;
+    if (item.kind === 'posting' && jobId !== undefined && jobId !== null) {
+      const canonical = jobUrl(jobId);
+      if (url !== canonical) {
+        return { error: `records_to_write[${i}] is a posting for linkedin_job_id ${jobId} whose data.url is ${JSON.stringify(url)} -- it must be ${canonical}, rebuilt from the id` };
+      }
     }
   }
   const leads = validateLeads(leadsFromAnswer(answer));
@@ -319,8 +367,9 @@ async function readRecords(db, capability, target) {
   if (target) q += `&or=(target_row.is.null,target_row.eq.${encodeURIComponent(target)})`;
   const rows = await db.get(q);
   const records = Object.fromEntries(kinds.map(k => [k, []]));
+  const filters = KIND_FILTERS[capability];
   for (const r of rows) {
-    if (KIND_FILTERS[r.kind] && !KIND_FILTERS[r.kind](r)) continue;
+    if (filters?.[r.kind] && !filters[r.kind](r)) continue;
     records[r.kind].push({ id: r.id, title: r.title, body: r.body, data: r.data, target_row: r.target_row });
   }
   const corrections = (await db.get(
@@ -339,6 +388,29 @@ async function readWeek(db) {
   return { since, cycles, decisions };
 }
 
+// --input-file, read by its SHAPE and not by a flag or a capability branch (pattern:2). A file that
+// parses as JSON carrying a `cards` array is the platform's own intake (what --fetch-linkedin-alerts
+// writes) and becomes task_context.intake, structured, addressable by job_id; anything else -- a
+// pasted posting, a note, malformed JSON -- stays the raw text task_context.input has always been.
+// Exactly one of the two is ever set.
+export function loadInput(filePath) {
+  const text = fs.readFileSync(filePath, 'utf8');
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { return { input: text, intake: null }; }
+  if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.cards)) {
+    return { input: null, intake: parsed };
+  }
+  return { input: text, intake: null };
+}
+
+// The competitor list: public company names and domains from market_records (AGT-120's table), the
+// only outside data this capability reads. Never a lead, never a person -- the flag the answer sets
+// is output, and AGT-155 owns the routing.
+async function readCompetitors(db) {
+  const rows = await db.get('market_records?kind=eq.competitor&status=neq.retired&select=title,data');
+  return rows.map(r => ({ name: r.title, domain: r.data?.domain ?? null }));
+}
+
 async function render(args) {
   const db = rest();
   const caps = await db.get(`capabilities?slug=eq.${encodeURIComponent(args.capability)}&tenant_id=eq.${TENANT}&select=default_intent_slug&limit=1`);
@@ -348,8 +420,16 @@ async function render(args) {
   const { records, corrections } = await readRecords(db, args.capability, args.target);
   const week = args.capability === 'career-growth-review' ? await readWeek(db) : null;
   let input = null;
+  let intake = null;
   if (args.inputFile) {
-    try { input = fs.readFileSync(args.inputFile, 'utf8'); } catch (e) { fail(`--input-file: ${e.message}`); }
+    try { ({ input, intake } = loadInput(args.inputFile)); } catch (e) { fail(`--input-file: ${e.message}`); }
+  }
+  // The capability's extra read, by slug -- absent for the other eleven, so task_context is unchanged
+  // for them and the key is null rather than missing when the read returns nothing.
+  const extra = {};
+  if (EXTRA_READS[args.capability] === 'competitors') {
+    const competitors = await readCompetitors(db);
+    extra.competitors = competitors.length ? competitors : null;
   }
   const task_context = {
     ask: args.ask || null,
@@ -359,6 +439,8 @@ async function render(args) {
     repos: REPOS,
     week,
     input,
+    intake,
+    ...extra,
   };
 
   let assembly;
