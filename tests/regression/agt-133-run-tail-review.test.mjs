@@ -21,16 +21,17 @@
 //      catch-all, and `audit-review.js --prepare` for this ISO week exits 0 with a worklist whose
 //      rows each name a source and a type. Nothing here writes.
 //
-// AGT-133's REPORTED RESIDUE, asserted as a ratchet rather than hidden (pattern:75 -- a gate's false
-// green must be structurally impossible). The kickoff inventoried the runbook's pushes with
-// `grep -c "push notification"` and named five sites. That phrase is now gone, but three further
-// mechanisms still instruct a push to John under a different wording -- step 4a-bis's deploy-quota
-// crossing, step 4a-quater's IP spend-gate block (built on John's verbatim `0f292cfa` design, which
-// says the push channel IS the design) and the cadence alert. Converting those needs a per-site
-// destination call and an amendment to a section quoting John verbatim, so AGT-133 REPORTED them
-// instead of fixing them -- they are outside the kickoff's named sites. Arm B pins the count so the
-// residue can only shrink: a NEW push added anywhere fails this test, and clearing the residue fails
-// it too, in the direction that makes someone lower the pin on purpose.
+// AGT-133's RESIDUE, CLEARED BY SLICE 3 (v7.0.694) -- still asserted as a ratchet rather than hidden
+// (pattern:75 -- a gate's false green must be structurally impossible). The kickoff inventoried the
+// runbook's pushes with `grep -c "push notification"` and named five sites; that phrase went at
+// v7.0.610, and ten further lines instructed a push under a different wording -- step 4a-bis's
+// deploy-quota crossing, step 4a-quater's IP spend-gate block (built on John's verbatim `0f292cfa`
+// design, which said the push channel IS the design) and the cadence alert. Slice 3 converted all
+// three: every alarm now writes a `john_alerts` row, fingerprint-keyed and left unclaimed, per
+// `JOHN-0925-NOTIFICATIONS-OFF` and the Designer's call recorded as decision c991f6b3-626c-4edc-9d81-48baf8fdbc21
+// (audit_findings 639f07b6, escalated to John and unanswered, is resolved by it). The pin is now ZERO
+// and still only shrinks: a NEW push added anywhere fails arm B, and arm F proves 4a-bis's own span
+// instructs none, so nobody can raise the pin instead of removing the push.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -53,8 +54,9 @@ const REVIEW_JS = path.join(ROOT, "scripts", "audit-review.js");
 const CYCLE_CEILING = 381000;
 const STAMP_COUNT = 5;
 
-// The residue AGT-133 reported rather than fixed. Lower this only by actually removing a push.
-const PUSH_RESIDUE = 10;
+// The residue AGT-133 reported at v7.0.610 and CLEARED at slice 3 (v7.0.694). Raise this only by
+// putting a push back, which is John's word alone (`JOHN-0925-NOTIFICATIONS-OFF`).
+const PUSH_RESIDUE = 0;
 const RESIDUE_RE = /push John|push channel|Send the push|re-push|one push per block|into a push/g;
 
 // AGT-133 slice 2 (v7.0.666). The card's ONE hand-written part -- NOTES in render-cycle-card.js --
@@ -181,9 +183,9 @@ async function run() {
     const body = md.split("\n").filter(l => !l.startsWith("<!-- DeepBench v")).join("\n");
     const residue = (body.match(RESIDUE_RE) ?? []).length;
     assert.equal(residue, PUSH_RESIDUE,
-      `AGT-133 reported ${PUSH_RESIDUE} remaining push-to-John lines (4a-bis, 4a-quater, the cadence alert) rather than ` +
-      `fixing them -- they sit outside the kickoff's named sites. Found ${residue}: a NEW push was added, or the ` +
-      `residue was cleared and this pin must come DOWN in the same change.`);
+      `slice 3 cleared every push-to-John line (4a-bis, 4a-quater, the cadence alert) to ${PUSH_RESIDUE}. ` +
+      `Found ${residue}: a push was put BACK, which is John's word alone -- or a new one was added. The pin ` +
+      `never goes up to fit the text; the text comes down to fit the pin.`);
 
     // THE FILING SITES. The runner's judgment filing stopped; four deterministic sites remain, and the
     // rule-body sentence names them. m7-ledger-and-card-idiom no longer asserts this sentence exists
@@ -329,10 +331,55 @@ async function run() {
     // size, whatever a later ticket has legitimately spent since.
     assert.equal(Buffer.byteLength(md, "utf8"), CYCLE_BYTES_AT_SLICE2,
       `runner-cycle.md is ${Buffer.byteLength(md, "utf8")} B but the declared pin reads ${CYCLE_BYTES_AT_SLICE2} B`);
-    // ...and the held residue is still held. The ten lines counted by arm B sit on an escalated,
-    // unanswered finding; clearing them is John's call, never a cycle's.
-    assert.equal(PUSH_RESIDUE, 10,
-      "the ten runbook push lines stay held at 10 -- audit_findings 639f07b6 is escalated to John and unanswered");
+    // ...and the residue that was held here is gone. The ten lines arm B counted sat on audit_findings
+    // 639f07b6, escalated to John and unanswered; the Designer answered it under JOHN-0925-DESIGNER-DECIDES.
+    assert.equal(PUSH_RESIDUE, 0, "slice 3 (v7.0.694) cleared the ten lines — decision c991f6b3-626c-4edc-9d81-48baf8fdbc21");
+  });
+
+  // --- F. 4a-bis instructs no push ------------------------------------------------------------------
+  await arm("F 4a-bis instructs no push", () => {
+    const span = stepSpan(md, "4a-bis");
+    const card = lf(fs.readFileSync(CARD_MD, "utf8"));
+
+    // The three phrases that legitimately survive: 4a-ter's *yield* posture ("prefer a gated-before-build
+    // item over a push this cycle"), and the two places the span QUOTES John's 2026-09-25 ruling to say
+    // what it no longer does ("what would have been pushed is written as a row he reads", "turning pushes
+    // back on is his word alone"). Scrub exactly those, and no instruction to push may remain anywhere in
+    // the span -- not "push John once", not "Send the push", not a wording nobody has thought of yet.
+    const scrub = s => s.replace(/over a push this cycle|would have been pushed|turning pushes back on/g, "");
+    const left = scrub(span).match(/.{0,70}\bpush.{0,70}/i);
+    assert.equal(left, null, `4a-bis still instructs a push: ${left && JSON.stringify(left[0])}`);
+
+    // CONTROL: the same scrub over the same span with one push put back DOES match, so the null above is
+    // the text being clean and not the scrub having eaten the evidence.
+    assert.ok(/\bpush/i.test(scrub(span + " push John once")),
+      "control: the matcher detects a push injected into this very span");
+
+    // ...and what replaced it. One destination, one dedupe mechanism, three fingerprints -- reverting any
+    // single site drops its own prefix and reds this arm by name.
+    assert.ok(span.includes("on conflict (fingerprint) do nothing"),
+      "4a-bis carries the john_alerts insert whose UNIQUE fingerprint IS the crossing rule");
+    for (const fp of ["deploy-quota:<CST day>", "ip-block:<masked_ip>:<blocked_at>", "cadence:<suppressionKey>"]) {
+      assert.ok(span.includes(fp), `4a-bis names the ${fp} fingerprint -- one per alarm site`);
+    }
+    // The card is generated from the runbook, so the destination must have rendered through -- a runbook
+    // converted with a stale card would come back on the next --write. The card carries ONE LINE PER STEP
+    // and renders a fenced block as an `L<line>(<kind> <bytes>)` summary, never its text, so the proof is
+    // 4a-bis's line naming a `sql` block AT the runbook line where the insert actually opens. Derived, not
+    // pinned: a byte shift moves the anchor, and a revert of this site removes the block entirely.
+    const lines = lf(md).split("\n");
+    const iInsert = lines.findIndex(l => l.includes("on conflict (fingerprint) do nothing"));
+    assert.ok(iInsert > 0, "the runbook carries the john_alerts insert");
+    let iFence = iInsert;
+    while (iFence >= 0 && lines[iFence].trim() !== "\`\`\`sql") iFence--;
+    assert.ok(iFence >= 0, "and it sits inside a fenced sql block");
+    const cardLine = card.split("\n").find(l => l.startsWith("**4a-bis.**"));
+    assert.ok(cardLine, "cycle-card.md carries a 4a-bis line");
+    assert.ok(cardLine.includes(`L${iFence + 1}(sql `),
+      `cycle-card.md's 4a-bis line must name the alert-row sql block at L${iFence + 1}; it reads: ${cardLine}`);
+    // CONTROL: the anchor is the block's, not any sql block's -- 4a's block must NOT satisfy it.
+    assert.ok(!(card.split("\n").find(l => l.startsWith("**4a.**")) ?? "").includes(`L${iFence + 1}(sql `),
+      "control: the L-anchor asserted above belongs to 4a-bis's block, not a neighbouring step's");
   });
 
   if (failures.length) throw new Error(`${failures.length} arm(s) failed:\n      ${failures.join("\n      ")}`);

@@ -52,9 +52,9 @@
 // probe and check-deploy-quota.js for an undeterminable count: the fail direction is away from
 // acting on a number nobody observed.
 //
-// IT REPORTS AND NEVER NOTIFIES. The push is the CYCLE's, gated to one per hole in the runbook, for
-// the same reason rollback-on-red.js never pushes to git: a script that reached past the
-// notification gate would be the SES-019 shape.
+// IT REPORTS AND NEVER NOTIFIES. The john_alerts row is the CYCLE's, one per hole by fingerprint in
+// the runbook, for the same reason rollback-on-red.js never pushes to git: a script that reached
+// past the notification gate would be the SES-019 shape.
 //
 // Exit 0 clear -- 1 a silence at or past the threshold -- 2 could not run. Exit 2 is NEVER a pass.
 

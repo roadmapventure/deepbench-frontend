@@ -10,9 +10,9 @@
 // quoted because a later cycle reading a red headroom number is exactly who needs it: "If tracking
 // later shows sustained pressure, the $20/mo question returns to John with measured numbers --
 // no cycle may upgrade on its own." So this reports; it does not remediate. It also sends nothing --
-// the CYCLE pushes, for the same reason rollback-on-red.js never pushes to git: the notification
-// gates (one push per crossing, claimed atomically) live in the runbook, and a script that reached
-// past them would be the SES-019 shape.
+// the CYCLE writes the john_alerts row, for the same reason rollback-on-red.js never pushes to git:
+// the dedupe (one row per crossing, its UNIQUE fingerprint) live in the runbook, and a script that
+// reached past them would be the SES-019 shape.
 //
 // -- THE WINDOW IS A TRAILING 24 HOURS, AND THAT IS THE FAIL-CLOSED CHOICE ------------------
 // Two calendar days are in play and NEITHER is knowable here. John's spending day is

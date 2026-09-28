@@ -1704,20 +1704,26 @@ VERCEL_TOKEN=… node scripts/check-deploy-quota.js --json
 ```
 
 Exit **0** `deploy-quota-clear` → nothing to do; carry on. Exit **1** `deploy-quota-alert` → the
-day's deployments are **at or past 80** of the 100 cap: **push John once** (see the crossing rule
-below), put `used` / `remaining` / `byProject` in your cycle row's `notes`, and **prefer a
-gated-before-build item over a push this cycle** — the same *yield* posture step 3's deploy-quota
-bullet already takes, never a `did_not_run`. Exit **2** is *could not run* (no `VERCEL_TOKEN`, the
-API unreachable) and is **not a pass**: note it exactly as a failed export is noted, and never
-record a headroom figure you did not observe.
+day's deployments are **at or past 80** of the 100 cap: **write the alert row** (the block below,
+`fingerprint` `deploy-quota:<CST day>` — one row per crossing however many cycles cross it), put
+`used` / `remaining` / `byProject` in your cycle row's `notes`, and **prefer a gated-before-build
+item over a push this cycle** — the same *yield* posture step 3's deploy-quota bullet already
+takes, never a `did_not_run`. Exit **2** is *could not run* (no `VERCEL_TOKEN`, the API
+unreachable) and is **not a pass**: note it exactly as a failed export is noted, and never record a
+headroom figure you did not observe.
 
-**ONE PUSH PER CROSSING, NOT ONE PER CYCLE — and the designation is the one step 4b already uses.**
-Send the push **iff no `runner_cycles` row in the current America/Chicago day carries
-`DEPLOY QUOTA ALERT` in `notes`** (the step-3 CST day window), and write that marker into your own
-notes when you send it. Eight cycles a day past the line would otherwise send John eight copies of
-one alarm, which is how an actionable notification stops being read — `record_skip()`'s
-`skip_count` boundary, arriving here. Under parallel cycles two simultaneous first-fires may rarely
-both push: self-limiting and harmless, exactly the slack step 4b accepts for the invention pass.
+**THE ALERT ROW — every alarm in 4a-ter, 4a-quater and 4a-quinquies lands here and never on a
+phone (`JOHN-0925-NOTIFICATIONS-OFF`, John 2026-09-25: what would have been pushed is written as a
+row he reads, `john_alerts` left unclaimed; turning pushes back on is his word alone).** The
+`fingerprint` is UNIQUE, so `on conflict … do nothing` is the whole crossing rule — atomic under
+parallel cycles, no `notes` scan, and a re-run is a no-op.
+
+```sql
+insert into public.john_alerts (source, summary, detail, ref_table, ref_id, fingerprint)
+values ('runner', '<what fired and its figures, one line, CST>', '<the figures verbatim>',
+        'runner_cycles', '<your cycle id>', '<the site''s fingerprint>')
+on conflict (fingerprint) do nothing;
+```
 
 **WHAT A RED HEADROOM NUMBER DOES NOT AUTHORISE, and it is the tempting reading because the fix
 costs $20:** upgrading. John's ruling carries its own standing prohibition, verbatim — *"If tracking
@@ -1740,7 +1746,7 @@ directive `27b5d8cb` (his *"b with the bridge"*) bars an unattended cycle from r
 until the database-rendered briefing lands — so the render would be invisible until an attended
 session republished. `SES-47` is therefore `partial`, not delivered, with that half on its ship card.
 
-**4a-quater. IP SPEND-GATE BLOCKS — John hears about a new block, on the push channel (`HAR-34`,
+**4a-quater. IP SPEND-GATE BLOCKS — John hears about a new block, in a row he reads (`HAR-34`,
 `v7.0.349`; John, attended architect session 2026-08-31, standing decision `0f292cfa`, verbatim
 *"i don't need email notifications at thist ime"*).** `HAR-33`'s access gate has recorded every
 block on the row it blocked since `v7.0.76` — `blocked_at` / `block_reason` / `blocked_attempts` —
@@ -1751,19 +1757,16 @@ call, right after the deploy probes:
 SELECT * FROM public.ip_block_alert_claim('<your cycle id>');
 ```
 
-**0 rows is the normal, quiet case and says nothing on the page.** 1+ rows → **push John once**,
-carrying `masked_ip`, `org`, `blocked_at` **rendered CST**, `block_reason` and `blocked_attempts`,
-and put the same figures in your cycle row's `notes`. The call has already stamped the rows, so the
-push is the whole of your remaining obligation and a re-run is a no-op.
+**0 rows is the normal, quiet case and says nothing on the page.** 1+ rows → **one alert row per
+returned row** (4a-ter's block, `fingerprint` `ip-block:<masked_ip>:<blocked_at>`), carrying
+`masked_ip`, `org`, `blocked_at` **rendered CST**, `block_reason` and `blocked_attempts`, and put
+the same figures in your cycle row's `notes`. The call has already stamped the rows, so the row is
+the whole of your remaining obligation and a re-run is a no-op.
 
 **THE TICKET SAID "email or text"; JOHN RE-SCOPED IT HIMSELF, and that is why this is not gated.**
-`0f292cfa` in full on this point: the alert *"is to be built on the push channel cycles already use
-(the same mechanism as the cycle-open push), needing no credentials and no John input — its
-`needs-john` flag is addressed by this ruling"*, and *"any ticket blocked on 'needs an email/SMS
-provider' is **mis-blocked**"*. The premise's other half was re-verified live at this ship rather
-than quoted: `grep -niE "sendgrid|resend|nodemailer|smtp|twilio|postmark|mailgun"` over
-`package.json`, `api/`, `lib/`, `src/`, `scripts/` still returns **zero** — there is still no
-outbound mail path, which is exactly why the push channel is the whole design.
+`0f292cfa`: no credentials, no John input, and *"any ticket blocked on 'needs an email/SMS
+provider' is **mis-blocked**"*. On 2026-09-25 he then switched the phone channel off
+(`JOHN-0925-NOTIFICATIONS-OFF`); the row keeps every part of `0f292cfa` but the channel.
 
 **THE PREDICATE IS A TIMESTAMP COMPARISON — `block_notified_at < blocked_at` — NEVER
 `block_notified_at IS NULL`, and that is the half a rebuild drops.** An address that was blocked,
@@ -1775,8 +1778,8 @@ runs that retired form on the **same** fixture and asserts it **loses**, a diffe
 property both share.
 
 **THE EDIT THIS STEP FORBIDS, and it is the tempting one because the raw value is right there:
-adding `caller_ip` to what the call returns.** This row exists to be read out into a push
-notification — i.e. **off-platform**. `LOG-124` (`v7.0.39`) is the live incident where a visitor's
+adding `caller_ip` to what the call returns.** This row exists to be read out to John
+— i.e. **off-platform**. `LOG-124` (`v7.0.39`) is the live incident where a visitor's
 raw IP became publicly readable, and `.claude/rules/supabase-column-grants.md` is written from it.
 The function returns `masked_ip` (the generated `caller_ip_masked` column, read from `pg_get_expr`
 at this ship rather than recalled: v4 → `xxx.xx.` + the last two octets, v6 → `xxxx:` + the last 9
@@ -1787,11 +1790,11 @@ a rule a cycle must remember.
 claims a SET of rows rather than one** (relocated into this step by `SES-289` from the retiring
 `v7.0.349` stamp — `SES-164` step 2, the one warning of that stamp's five that appeared **zero**
 times outside it). N parallel cycles (register B42) each lock a disjoint subset, so John gets
-exactly **one** push per block however many peers sweep, and locking **before** the before-images is
+exactly **one** row per block however many peers sweep, and locking **before** the before-images is
 what lets §19v's *"no before-image, no write"* hold without a losing peer leaving stray ledger rows
 — `stall_watchdog()`'s `40001`-rollback shape expressed as a lock.
 
-**Nothing was backfilled: the one historical block on the board at that ship (`2026-08-08`, 24 cached addresses, 1 blocked) was never alerted, so the alarm's first real fire carries it, named in the push as inherited backlog rather than as something that just happened.** The reasoning — stamping it "already notified" would have been a value nobody observed, the `SES-104` defect — is archived VERBATIM in `docs/SESSIONS.md`, appendix *runner-cycle.md rationale retired by `SES-336`*, entry F (ledger entry 51).
+**Nothing was backfilled: the one historical block on the board at that ship (`2026-08-08`, 24 cached addresses, 1 blocked) was never alerted, so the alarm's first real fire carries it, named in the row as inherited backlog rather than as something that just happened.** The reasoning — stamping it "already notified" would have been a value nobody observed, the `SES-104` defect — is archived VERBATIM in `docs/SESSIONS.md`, appendix *runner-cycle.md rationale retired by `SES-336`*, entry F (ledger entry 51).
 
 **Rollback class, disclosed rather than discovered later:** the migration adds a column to an
 existing table, an in-place `ALTER` that `capture_migration_down()` refuses by design, so a red
@@ -1808,11 +1811,12 @@ silence has no open row — and `deepbench-staleness-watchdog` reads `runner_usa
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/check-cycle-cadence.js --json
 ```
 
-Exit **0** `cadence-clear` → nothing to do; carry on. Exit **1** `cadence-alert` → **push John once
-per hole** (the crossing rule below), and put `worst` (its hours and both endpoints, rendered CST),
-`thresholdHours` and `intervalHours` in your cycle row's `notes`. Exit **2** is *could not run* (no
-credentials, a REST failure, fewer than two rows to measure between) and is **not a pass**: note it
-exactly as a failed export is noted, and never record a cadence you did not observe.
+Exit **0** `cadence-clear` → nothing to do; carry on. Exit **1** `cadence-alert` → **one alert row
+per hole** (4a-ter's block, `fingerprint` `cadence:<suppressionKey>`), and put `worst` (its hours
+and both endpoints, rendered CST), `thresholdHours` and `intervalHours` in your cycle row's `notes`.
+Exit **2** is *could not run* (no credentials, a REST failure, fewer than two rows to measure
+between) and is **not a pass**: note it exactly as a failed export is noted, and never record a
+cadence you did not observe.
 
 **THE MEASUREMENT IS A GAP BETWEEN FIRES, NOT THE AGE OF THE NEWEST ROW — and that is the half a
 rebuild drops.** The ticket's own Fix line reads *"a 'no fire in N hours' line"*, whose literal
@@ -1827,12 +1831,9 @@ same instant and asserts it **loses**.
 
 **A day-bucket form on any clock cannot see a hole shorter than a day, and `SES-269`'s own "2026-08-27 produced ZERO rows" is true only of the UTC day — on John's clock that date held two rows.** The measurement, and both controls in the guard, are archived VERBATIM in `docs/SESSIONS.md`, appendix *runner-cycle.md rationale retired by `SES-336`*, entry G (ledger entry 51).
 
-**ONE PUSH PER HOLE, NOT ONE PER CYCLE OR ONE PER DAY.** The script returns a `suppressionKey` keyed
-on **that gap's own end** (its start, while it is still open). Send the push **iff no
-`runner_cycles` row carries that exact key in `notes`**, and write the key into your own notes when
-you send it. A per-day marker would re-push a 39-hour hole on each calendar day it touched and a
-per-cycle one would push hourly for a week — `record_skip()`'s `skip_count` boundary arriving here:
-an alarm John receives eight times stops being read.
+**ONE ROW PER HOLE, NOT ONE PER CYCLE OR ONE PER DAY.** The script returns a `suppressionKey` keyed
+on **that gap's own end** (its start, while it is still open); it is the fingerprint, so a hole is
+written once ever. Why the day-keyed and cycle-keyed forms lose: `check-cycle-cadence.js:161`.
 
 **RELOCATED HERE FROM THE RETIRING `v7.0.345` STAMP (`SES-269`, the `SES-164` step 2 that makes a
 trim safe, run by grep rather than recollection): AN UNKNOWN MUST NOT BE RENDERED AS THE SAFEST

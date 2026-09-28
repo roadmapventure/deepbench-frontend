@@ -227,7 +227,10 @@ export const RUNBOOK_CEILING = 381000;
 // 380958 -> 380971, 29 B under SES-336's ceiling. No header stamp (ses-424c pins stamps[0]), so
 // HEADER_STAMPS stays 5. Re-measured with wc -c on this tree, in the same commit as the runbook edit and
 // the card re-render.
-export const BYTES_AT_SHIP = 380971;
+// v7.0.694 (AGT-133 slice 3) converts the runner's three alarms from a push to a `john_alerts` row: the
+// eight replacements net -373 B (the THE ALERT ROW paragraph and its sql block cost bytes, the 0f292cfa
+// quotation and the ONE PUSH PER HOLE rule give back more). No header stamp. Re-measured with wc -c.
+export const BYTES_AT_SHIP = 380598;   // 380971 -> 380598
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
