@@ -5,6 +5,30 @@
 
 ---
 
+## session/cycle-20260928-1741 (v7.0.693, 2026-09-28, unattended cycle `aded348d-a54f-4bab-8fb6-167b6ab8b221`, `trigger = scheduled`, lane 4 — Opus 5 orchestrator, Opus 5 Development Manager ×2) — directive `b1d5c864` — **shipped: the manager declined the board's ticket pick to obey John's word, and ruled the seven cards that were holding the board shut.**
+
+### The queue's first row was not a ticket, and the manager said so
+
+`runner_should_boot()` priced `AGT-133` as the pick, and every earlier cycle would have built it. But `prime_directive_queue()` put two of John's directives above the selfbuild lane, and the manager read them rather than the gate's convenience: pos 1 (`009eeb7a`) defers itself behind `a969ecb2`, still `in_progress`, so it is not actionable and keeps its slot; pos 2 (`b1d5c864`) is his *"do both"* — **rule every undecided gate card NOW, before picking any build**. The manager returned `action: report` with `assignment: null`, and `run-project.js` accepted it (exit 0). `AGT-133` kept its slot and was recorded as a skip, not a rejection.
+
+### The contract could not express the right answer, and that is the finding
+
+`run-project.js` admits an `assign` only when `assignment.backlog_id` equals `runner_should_boot()`'s pick, and its pass-over path requires the pick to appear in `project_blockers`. `AGT-133` lives in `dev-manager-capabilities`, not in this project's blockers, so **a directive row that `prime_directive_queue()` itself ranks first is unreachable as an assignment**. Pairing `AGT-133`'s id with `decide-gated-card` would have validated — and would have claimed a ticket for 24 hours without building it. The manager declined the head in the vocabulary the driver documents for exactly that (`AGT-232`) and filed the gap as a finding rather than an ask. Second finding of the same shape: `record_leverage()` admits a directive ref from the queue and then raises on the `backlog_items` lookup, so `leverage` could name only the two ticket refs.
+
+### Seven cards, six reworks, and two premises that did not survive checking
+
+The ruling ran through `decide-gated-card.js` (prepare exit 3, 7 rulable cards, 77,605-byte prompt), `--dry-run` clean, `--apply` exit 0 under one reversible decision (`b8586129`): **7 cards stamped, 6 tickets written, 0 pushed to John.** Two rulings are worth keeping because the card's own diagnosis was wrong, not merely incomplete. `AGT-138`'s card said its remainder was John's alone to push; `AGT-147` (`v7.0.665`) and `AGT-265` (`v7.0.689` — this clone's own base) had both already edited that block and re-pinned `PROMPT_BLOCK_SHA256`, so the remainder is a cycle's. `AGT-158` was waiting on three recent Verifier turns that **can never appear**: 20 `verify-ship` rows in the log, 15 with `visitor_id` NULL, and `pickJobs()`'s `&& r.visitor_id` gate excludes precisely the unattended turns the Verifier only ever runs. `AGT-149` is the tidiest of the set — the test asserting the runbook carries a model id is the exact inverse of the ticket that deletes it. Only `AGT-165` was accepted outright: its stop was correct (0 Brittany of 32 agents) and its scope needs no change.
+
+### What the ruling did and did not move
+
+`apply_gate_rulings()` touches `status` for `retired` alone, so `settle-ship.js`'s re-settle read all six as `open`/`partial` and moved nothing — correct, and worth stating because a reader expecting six status changes would think the call half-ran. Undecided gate cards fell from 10 to 3, and all three are John's own kept calls: `SES-364` (may a person undo a hire), the 20-assignment promotion bar he ratifies, and `AGT-141`'s agent-retirement half — which his own directive left escalated. The directive's done-when is therefore met exactly as written, and it closed `shipped`.
+
+### Two things this cycle could not do, named rather than hidden
+
+`rollback-on-red.js --apply` was **denied by the harness's auto-mode classifier** (`[Modify Shared Resources]`). Per `CLAUDE.md`/`SES-019` it was not re-routed through another tool; the read-only form of the same call then returned `action: none` for the standing `Tripwire + regression (blocking)` red — dev's head is unattributed to any runner cycle, so it is not this machine's to undo — which means the denied `--apply` had nothing to write. And `check-deploy-serving.js` exited 2 (403 deployment protection) because `VERCEL_AUTOMATION_BYPASS_SECRET` is not in this container's env and reading it would print a secret value. Unknown is not red; nothing was triggered. Also measured: `node_modules` was empty on this container, so `npm ci` had to run before any dependent script — the first three checks of the cycle happened to be dependency-free and hid it.
+
+---
+
 ## session/cycle-20260927-0706 (v7.0.638, 2026-09-27, unattended cycle `956c44a0-0350-43c8-9ce4-75ca833d2fe9`, `trigger = chained (drain continuation)` — Opus 5 orchestrator, Opus 5 Development Manager, **Fable 5.1 Designer**, Opus 5 Builder) — `AGT-207` — **delivered, verdict block: the rollback ledger's record of who captured an undo could be silently overwritten, and this same run had already done it.**
 
 ### The judgment lane came back to Fable mid-chain
