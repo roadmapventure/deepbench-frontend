@@ -1,3 +1,11 @@
+// DeepBench v7.0.692 | scripts/audit-review.js | AGT-264 -- AGENT TRAINING ACCEPTS FINDINGS. The
+// route mirror's lock reads one more column: listLocked() refuses a project whose list is locked
+// UNLESS its projects row carries `accepts_findings` true, which mirrors finding_group_epic()'s
+// `AND NOT v_acc` byte-for-byte -- the refusal SENTENCE is unchanged, only what reaches it. A
+// context row that carries no `accepts_findings` (a pre-AGT-264 fixture) stays locked, so the
+// mirror fails closed. --prepare selects the column so the manager's pick is informed by data
+// rather than memory. Spec: docs/kickoffs/v7.0.692-AGT-264-agent-training-accepts-findings.md.
+//
 // DeepBench v7.0.662 | scripts/audit-review.js | AGT-240 -- THE LOCKED LIST. KINDS gains `list` (needs a
 // reason): apply_audit_review() rules those findings `listed`, and they wait on the findings list until
 // the project finishes and propose-project.js answers them. The route mirror refuses a filing group
@@ -95,6 +103,10 @@ export const LOCKED_PROJECT_STATUSES = Object.freeze(["executing", "proposed", "
 export function lockedListRefusal(slug, status) {
   return `project ${slug} is ${status} -- its list is locked; use kind list (AGT-240)`;
 }
+// AGT-264: a locked list still refuses -- unless the project accepts findings while it runs
+// (projects.accepts_findings, true for the perpetual Agent Training project). Mirrors
+// finding_group_epic()'s `IF v_pst IN (...) AND NOT v_acc`. A home with no such field stays locked.
+export function listLocked(home) { return !!home && LOCKED_PROJECT_STATUSES.includes(home.status) && home.accepts_findings !== true; }
 export const WEEK_RE = /^\d{4}-W\d{2}$/;
 export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)";
 // AGT-86 §11(5): the checklist rows the manager may edit. au-identity and au-guardrails are John's.
@@ -378,7 +390,7 @@ export function validateReview(review, worklist, week, checklist, routes, projec
       // AGT-240 (b): finding_group_epic()'s lock refusal, in its place -- after the route (or the
       // pick) names the project, before the epic count the function keeps.
       const home = slug !== null && Array.isArray(projects) ? projects.find(p => String(p.slug) === slug) : undefined;
-      if (home && LOCKED_PROJECT_STATUSES.includes(home.status)) {
+      if (listLocked(home)) {
         refusals.push(lockedListRefusal(slug, home.status));
       }
     }
@@ -463,7 +475,7 @@ async function prepare(args) {
   const scorecardRows = await get("audit_check_scorecard?select=*&order=check_slug,iso_week");
   const profiles = await get("skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug");
   const routes = await get("finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
-  const projects = await get("projects?select=slug,name,status&order=slug");
+  const projects = await get("projects?select=slug,name,status,accepts_findings&order=slug");
   const scope = args.weekly === true ? "weekly" : "outcomes";
   const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope });
   if (ctx === null) die(3, NOTHING_TO_REVIEW);

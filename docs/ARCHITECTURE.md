@@ -2890,7 +2890,7 @@ citation `paperwork` to the weekly review (moved, not removed). **Projects get a
 list (`listed`) instead of growing the running project, and when every locked ticket is `done` or
 `removed` The Auditor grades what it built and The Development Manager proposes ONE next project with
 its tickets and why (`finish_project_batch()`, status `proposed`, not picked) — which only a session on
-John's words starts (`start_proposed_project()`).
+John's words starts (`start_proposed_project()`). A project whose `projects.accepts_findings` is true (Agent Training, John 2026-09-28) keeps taking approved agent findings while it executes, so `finding_group_epic()` and `epic_lock_guard()` skip that lock for it alone (`AGT-264`).
 
 ### Vision-drift protection
 

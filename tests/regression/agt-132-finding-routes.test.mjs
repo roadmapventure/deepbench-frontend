@@ -122,6 +122,10 @@ const ROUTES = [
 // project. This constant has a SECOND home in agt-132's LIVE_ROUTES / agt-134's ROUTES; both were
 // updated in that same ship, because a route row the platform holds and a test still pins at seven
 // is a false red that costs the next cycle a diagnosis (pattern:163).
+// AGT-264 (v7.0.692) MAKES IT NINE: migration `agt264_accepts_findings` added `session`, the
+// source an attended session files under (`found_by 'session:<name>'`) -- precedence 30 /
+// project_slug NULL, the same staff-watch shape, so the Development Manager picks. Two findings
+// (8a23c6f9, 07a7d637) could not be ticketed at all until this row existed.
 const LIVE_ROUTES = [
   { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
   { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
@@ -129,6 +133,7 @@ const LIVE_ROUTES = [
   { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
   { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
   { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
+  { precedence: 30, source: "session", finding_type: "*", project_slug: null },
   { precedence: 30, source: "staff-watch", finding_type: "*", project_slug: null },
   { precedence: 30, source: "ticket-owner", finding_type: "*", project_slug: null },
 ];
@@ -255,7 +260,7 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, LIVE_ROUTES, "the eight routing rows, exactly");
+    assert.deepEqual(r.json, LIVE_ROUTES, "the nine routing rows, exactly");
     assert.ok(!r.json.some(x => x.source === "*" && x.finding_type === "*"),
       "there is deliberately no catch-all row: an unmapped source must stop the review");
     // The precedence ORDER is the invariant a new row must not disturb: security outranks everything.
