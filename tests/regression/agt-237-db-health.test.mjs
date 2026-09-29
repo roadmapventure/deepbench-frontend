@@ -1,5 +1,5 @@
-// DeepBench v7.0.658 | tests/regression/agt-237-db-health.test.mjs | AGT-237 -- the runner reads the
-// database's health every 5 minutes and stops starting work into an outage.
+// DeepBench v7.0.709 | tests/regression/agt-237-db-health.test.mjs | AGT-237 -- the runner reads the
+// database's health every 5 minutes and stops starting work into an outage. AGT-276 adds swap grading.
 //
 // WHAT THIS GUARDS, and why each arm discriminates (STANDARDS.md Section 4, the LOO-013 lesson):
 //   A  PURE -- scripts/db-pressure.js: the exit-code contract (0 green / 1 amber / 3 red, unsafe,
@@ -219,6 +219,39 @@ async function armLive(base, key) {
   // reset branch firing, not iowait being ignored.
   const up = await grade({ cpu_iowait_s: 0, cpu_total_s: 0 }, { cpu_iowait_s: 90, cpu_total_s: 100 }, 200, 10);
   assert.strictEqual(up.level, "red", "control: 90% on rising counters must be red");
+
+  // AGT-276 (v7.0.709): swap is graded -- the signal that led the 2026-09-28 outage, when iowait and
+  // the probe read green for four hours. Built from the LIVE thresholds, each -1 / at, like the table.
+  const asi = Number(t.amber_swapin_per_s), rsi = Number(t.red_swapin_per_s);
+  const asu = Number(t.amber_swap_used_mb), rsu = Number(t.red_swap_used_mb);
+  assert.ok([asi, rsi, asu, rsu].every(Number.isFinite),
+    `db_health_thresholds lacks the AGT-276 swap keys: ${JSON.stringify(t)}`);
+  const sPrev = { cpu_iowait_s: 0, cpu_total_s: 0, pswpin: 0, secs: 100 };
+  const sw = (perS, usedMb) => ({ cpu_iowait_s: 0, cpu_total_s: 100, pswpin: perS * 100,
+    swap_total_bytes: 2e9, swap_free_bytes: 2e9 - usedMb * 1e6 });
+  const swapTable = [
+    ["swap-in amber-1", sPrev, sw(asi - 1, 0), "green"],
+    ["swap-in amber", sPrev, sw(asi, 0), "amber"],
+    ["swap-in red-1", sPrev, sw(rsi - 1, 0), "amber"],
+    ["swap-in red", sPrev, sw(rsi, 0), "red"],
+    ["swap used amber-1", sPrev, sw(0, asu - 1), "green"],
+    ["swap used amber", sPrev, sw(0, asu), "amber"],
+    ["swap used red-1", sPrev, sw(0, rsu - 1), "amber"],
+    ["swap used red", sPrev, sw(0, rsu), "red"],
+    // No previous swap counter (a first reading, or AGT-237's prev shape): swap-in is not graded.
+    ["swap-in no prev counter", { cpu_iowait_s: 0, cpu_total_s: 0 }, sw(rsi * 10, 0), "green"],
+    // The counter went DOWN (restart): not graded, same rule as iowait.
+    ["swap-in restart reset", { ...sPrev, pswpin: 1e12 }, sw(rsi * 10, 0), "green"],
+  ];
+  for (const [label, p, c, want] of swapTable) {
+    const g = await grade(p, c, 200, 10);
+    assert.strictEqual(g.level, want, `${label}: graded ${g.level}, expected ${want} (reasons ${JSON.stringify(g.reasons)})`);
+  }
+  // Control for the two "not graded" rows: the same rate on a rising counter with an interval is red,
+  // so their green is the skip branch firing, not swap being ignored.
+  const swUp = await grade(sPrev, sw(rsi * 10, 0), 200, 10);
+  assert.strictEqual(swUp.level, "red", "control: a swap-in rate 10x red on rising counters must be red");
+  assert.ok(swUp.reasons.some(r => /swap-in/.test(r)), `the swap-in red must say why: ${swUp.reasons}`);
 
   const level = await rpc(base, key, "db_health_level");
   assert.strictEqual(level.length, 1, `db_health_level() returned ${level.length} rows`);
