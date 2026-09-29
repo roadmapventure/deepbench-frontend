@@ -1,4 +1,4 @@
-// DeepBench v7.0.698 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-245 slice 3 of 5
+// DeepBench v7.0.705 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-245 slices 3-5 of 5
 //
 // FEATURE: ONE DELIVERED TICKET, RE-GRADED ON THE DELTA BETWEEN ITS OWN TWO TREES. 77 `delivered`
 // tickets sit on a block whose only red gate is `regression`, and the suite has never been green on
@@ -78,6 +78,20 @@
 //     from the frozen cohort, never pasted, so a re-freeze that moved the pair fails instead of
 //     silently vouching for the old one.
 //
+// (h) THE PICKER WALKS IN ORDER (slice 5). `--next` is what lets the tail run this EVERY cycle with
+//     nothing to name, and its one failure mode is invisible: a picker that re-hands a pair already
+//     answered re-grades the same ticket forever, and one that walks a row too far leaves a pair
+//     unrun forever, because nothing in this lane ever walks backwards. The three cases differ ONLY
+//     in which ids are already re-graded and each names a DIFFERENT id, so no single wrong picker
+//     passes more than one; three more mutations prove a permanently-refusable row is stepped OVER
+//     with its reason reported rather than parked on, which is the whole of the drain.
+//
+// (i) THE SECOND ROW IS IN THE LEDGER (slice 5). Exactly ONE `AGT-245 delta re-grade of` row existed
+//     board-wide before this slice; a slice whose `--next` ran both legs of `AGT-100` and wrote
+//     nothing leaves that count at 1 and this arm goes red. Same shape as (g) -- prefix and
+//     `graded_sha` derived from the frozen cohort, never pasted -- plus the board-wide count, which
+//     is the only assertion that says the DRAIN moved rather than that one row exists.
+//
 // NOT DONE HERE, and named rather than skipped: the WRITE path. Both live runs are `--dry-run`, and
 // `--suite=` can never record by construction. A permanent regression test does not write the live
 // verdict ledger (ses-315 / ses-320's standing refusal) -- slice 4 is the first real pair with the
@@ -90,7 +104,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { deltaVerdict, legNames, pairFor, DEFAULT_SUITE } from "../../scripts/regrade-delivered.js";
+import { deltaVerdict, legNames, pairFor, nextPair, REGRADE_PREFIX, DEFAULT_SUITE } from "../../scripts/regrade-delivered.js";
 import { COHORT_PATH } from "../../scripts/regrade-cohort.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -100,6 +114,8 @@ const CYCLE = "c0e2aa82-1940-4ac6-97bd-575d4b1d4e42";
 // AGT-101's frozen pair, re-read from the cohort file rather than pasted, so a re-freeze that moved
 // the pair fails here instead of silently grading a different one.
 const TICKET = "AGT-101";
+// Slice 5's pair: the cohort's FIRST row, which is what `--next` must reach past AGT-101.
+const NEXT_TICKET = "AGT-100";
 
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
 const TER_MARKER = "**(7a-ter) DELTA RE-GRADE";
@@ -160,7 +176,8 @@ export function theTailCarriesTheDeltaRegrade(md) {
   const span = norm(md.slice(at, end));
   const required = [
     ["scripts/regrade-delivered.js", "the command the cycle actually runs -- the whole point of putting the step here"],
-    ["--ticket=", "ONE ticket per run, and the pair is that ticket's own"],
+    ["--next", "slice 5: the tail runs this EVERY cycle with nothing to name, and a step that still "
+      + "spelled --ticket= would be one no unattended cycle could run"],
     ["--cycle-id=", "the verdict row and the ship decision both hang off the cycle"],
     ["ONE test slot for BOTH legs", "one acquisition across base and ship: a pair that releases the line " +
       "between its legs races a peer cycle's suite, which is the one thing that line exists to stop"],
@@ -221,6 +238,107 @@ async function firstCurrentPair(url, key, cohort) {
     return { ...row, ownTests };
   }
   return null;
+}
+
+// (h) THE PICKER WALKS IN ORDER (slice 5). Pure, no credentials, over the REAL frozen cohort -- the
+// board is hand-built so the walk is asserted rather than whatever today's ledger happens to say.
+//
+// WHY THE CONTROL IS THE LOAD-BEARING HALF. `AGT-101` is the one cohort row this lane has already
+// answered and `AGT-100` is the row above it, so a picker that ignored `regraded` entirely returns
+// `AGT-101` (grading the same pair twice), and one that skipped a row too far returns `AGT-102`
+// (leaving `AGT-100` unrun forever, since nothing ever walks backwards). The three cases differ only
+// in the `regraded` set and each names a DIFFERENT id, so no single wrong picker passes more than one.
+export function thePickerWalksInOrder(cohort) {
+  const resolved = (cohort.rows || []).filter(r => r && r.status === "resolved");
+  assert.ok(resolved.length >= 3, `the frozen cohort must still hold at least three resolved rows; it holds ${resolved.length}`);
+  assert.equal(resolved[0].backlog_id, NEXT_TICKET, `the cohort's first resolved row must still be ${NEXT_TICKET}`);
+  assert.equal(resolved[1].backlog_id, TICKET, `and the second must still be ${TICKET}, the row slice 4 answered`);
+  // The board every case starts from: every resolved row current, delivered and dependency-clean, so
+  // the ONLY thing moving between the three cases below is which ids are already re-graded.
+  const latestById = Object.fromEntries(resolved.map(r => [String(r.backlog_id), String(r.verdict_id)]));
+  const statusById = Object.fromEntries(resolved.map(r => [String(r.backlog_id), "delivered"]));
+  const board = regraded => nextPair(cohort, { regraded: new Set(regraded), latestById, statusById, depsClean: () => true });
+
+  // CONTROL, and it runs first: with only slice 4's row on the board the pick is AGT-100, never a
+  // later one. A picker that walked past an eligible row fails here while still passing the case below.
+  const control = board([TICKET]);
+  assert.equal(control.pair && control.pair.backlog_id, NEXT_TICKET,
+    `with only ${TICKET} re-graded the pick is ${NEXT_TICKET}, the first eligible row -- a pick further down the file ` +
+      "leaves an eligible pair unrun forever, because nothing in this lane ever walks backwards");
+  assert.deepEqual(control.skipped, [], `and nothing above ${NEXT_TICKET} is skipped -- it IS the first row`);
+
+  // One more answered, one row further on.
+  const second = board([NEXT_TICKET, TICKET]);
+  assert.equal(second.pair && second.pair.backlog_id, resolved[2].backlog_id,
+    `with ${NEXT_TICKET} and ${TICKET} both re-graded the pick moves to ${resolved[2].backlog_id} -- a picker that ` +
+      "ignored `regraded` would hand back a pair this lane has already answered and re-grade it every cycle");
+  assert.deepEqual(second.skipped, [[NEXT_TICKET, "already-regraded"], [TICKET, "already-regraded"]],
+    "and both are reported BY REASON rather than silently jumped -- a skip nobody can see is a drain nobody can audit");
+
+  // Drained: `pair: null`, which the script turns into exit 3 rather than a refusal.
+  const drained = board(resolved.map(r => r.backlog_id));
+  assert.equal(drained.pair, null, "every resolved row answered is a DRAINED cohort, not a refusal");
+  assert.equal(drained.skipped.length, resolved.length, "and every row is accounted for in the skip list");
+
+  // The three permanently-refusable reasons, each skipped PAST rather than parked on (Designer's call
+  // 2). Each mutation moves exactly one row out of the way and the pick must step over it.
+  const one = why => {
+    const latest = { ...latestById }, status = { ...statusById };
+    let deps = () => true;
+    if (why === "superseded") latest[NEXT_TICKET] = "a-newer-row";
+    if (why === "not-delivered") status[NEXT_TICKET] = "done";
+    if (why === "deps-changed") deps = row => String(row.backlog_id) !== NEXT_TICKET;
+    const got = nextPair(cohort, { regraded: new Set([TICKET]), latestById: latest, statusById: status, depsClean: deps });
+    assert.equal(got.pair && got.pair.backlog_id, resolved[2].backlog_id,
+      `a ${why} row must be stepped OVER, not parked on: a picker that stopped there would return the same refusal ` +
+        "every cycle from now on and the 48 pairs below it would never be reached");
+    assert.deepEqual(got.skipped, [[NEXT_TICKET, why], [TICKET, "already-regraded"]],
+      `and the skip names \`${why}\` -- the reason is the only thing that distinguishes a drained cohort from a stuck one`);
+  };
+  one("superseded");
+  one("not-delivered");
+  one("deps-changed");
+  return { resolved: resolved.length, first: NEXT_TICKET };
+}
+
+// (i) THE SECOND ROW IS IN THE LEDGER (slice 5). Credentialed. Exactly ONE `AGT-245 delta re-grade of`
+// row existed board-wide before this slice ran, so a slice that walked both legs of AGT-100 and wrote
+// nothing leaves the count at 1 and this arm goes red. `graded_sha` must be the pair's SHIP tree, not
+// dev HEAD: a row from the ordinary verifier carries whatever was pushed last, which is a peer's tree.
+export async function theSecondRowIsInTheLedger(base, key) {
+  const cohort = JSON.parse(fs.readFileSync(path.join(ROOT, COHORT_PATH), "utf8"));
+  const pair = pairFor(cohort, NEXT_TICKET);
+  assert.ok(!pair.refuse, `${NEXT_TICKET} must still resolve to a pair in the frozen cohort`);
+  const prefix = `${REGRADE_PREFIX}${NEXT_TICKET}: prior ${pair.verdict_id} (${pair.version}); base ${pair.base_sha}`;
+  const url = base.replace(/\/+$/, "");
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const res = await fetch(
+    `${url}/rest/v1/runner_verdicts?select=id,created_at,verdict,reasoning,graded_sha&backlog_id=eq.${NEXT_TICKET}` +
+      "&order=created_at.desc", { headers });
+  assert.equal(res.status, 200, `runner_verdicts read answered HTTP ${res.status}`);
+  const rows = await res.json();
+  assert.ok(rows.length >= 2,
+    `${NEXT_TICKET} must carry at least TWO runner_verdicts rows -- the ${pair.version} block and AGT-245's delta ` +
+      `re-grade of it -- and it carries ${rows.length}. A --next that graded both legs and recorded nothing leaves this at 1`);
+  const row = rows[0];
+  assert.ok(String(row.reasoning || "").startsWith(prefix),
+    `${NEXT_TICKET}'s newest verdict does not open with ${JSON.stringify(prefix)} -- so it was not written by this lane ` +
+      `about this pair. It reads: ${JSON.stringify(String(row.reasoning || "").slice(0, 160))}`);
+  assert.equal(row.graded_sha, pair.ship_sha,
+    `the re-grade must be filed against the pair's SHIP tree ${String(pair.ship_sha).slice(0, 8)}, never dev HEAD`);
+
+  // THE COUNT IS THE DRAIN. Board-wide, this lane's rows must now be at least TWO: slice 4's AGT-101
+  // and slice 5's AGT-100. One means the tail ran and wrote nothing, which is the failure this whole
+  // slice exists to make impossible.
+  const all = await fetch(
+    `${url}/rest/v1/runner_verdicts?select=id,backlog_id&reasoning=like.${encodeURIComponent(`${REGRADE_PREFIX}%`)}`,
+    { headers });
+  assert.equal(all.status, 200, `the board-wide re-grade count answered HTTP ${all.status}`);
+  const lane = await all.json();
+  assert.ok(lane.length >= 2,
+    `the board must carry at least TWO ${JSON.stringify(REGRADE_PREFIX)} rows once the cohort has drained a second pair ` +
+      `-- it carries ${lane.length}. Exactly one existed before this slice, so this is the count that proves the drain moved`);
+  return { rows: rows.length, id: row.id, verdict: row.verdict, lane: lane.length };
 }
 
 async function run() {
@@ -315,13 +433,16 @@ async function run() {
   assert.throws(() => theTailCarriesTheDeltaRegrade(noCommand), /does not name/,
     "CONTROL: with the command line stripped the (f) arm must THROW -- a clause that still passes without the command pins prose, not the step");
 
+  // ---- (h) the picker walks in order (slice 5) -------------------------------------------------
+  const picker = thePickerWalksInOrder(cohort);
+
   // ---- (d) the real trees, twice ----------------------------------------------------------------
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun("AGT-245 (d)", "no SUPABASE_URL / SUPABASE_SERVICE_KEY, so the two live dry-runs on AGT-101's real trees " +
       "(the sha probe that names the ship tree newly red, and the row count before/after) are unverified here");
-    return report(pair, null, terSpan, null);
+    return report(pair, null, terSpan, null, picker, null);
   }
   // The write's own consequence, asserted rather than discovered by the next slice: AGT-245's row IS
   // a newer verdict for AGT-101, so the cohort row that named the v7.0.563 block is stale for it and
@@ -384,12 +505,13 @@ async function run() {
   assert.equal(after, before,
     `${probe.backlog_id} had ${before} runner_verdicts rows before the two dry-runs and ${after} after — a dry-run that wrote one would be caught here`);
 
-  // ---- (g) the row slice 4 wrote ---------------------------------------------------------------
+  // ---- (g) the row slice 4 wrote, and (i) the row slice 5's --next wrote ------------------------
   const ledger = await theRowIsInTheLedger(url, key);
-  return report(pair, { before, after, sha: shaPay, constant: constPay, probe }, terSpan, ledger);
+  const second = await theSecondRowIsInTheLedger(url, key);
+  return report(pair, { before, after, sha: shaPay, constant: constPay, probe }, terSpan, ledger, picker, second);
 }
 
-function report(pair, live, terSpan, ledger) {
+function report(pair, live, terSpan, ledger, picker, second) {
   const head =
     `  [AGT-245] delta re-grade: a red only on the ship leg is newlyRed/block, the SAME red on both legs is ` +
     `standing/approve, and those identical captures flip to block when the file is in ownTests (the base tree ran a ` +
@@ -397,10 +519,16 @@ function report(pair, live, terSpan, ledger) {
     `results. legNames: a [NOT RUN] transport capture is ran:false, a [PASS] capture is ran:true, and a test that ` +
     `failed AND skipped a part stays a proven red. AGT-202 exits 2 no-version; --suite=x without --dry-run exits 2 ` +
     `suite-override-requires-dry-run with the credentials stripped, while the default suite passes the fence.` +
-    `\n       The tail's (7a-ter) paragraph (${terSpan} B normalised) names the command, --ticket=, --cycle-id= and ONE ` +
+    `\n       The tail's (7a-ter) paragraph (${terSpan} B normalised) names the command, --next, --cycle-id= and ONE ` +
     `test slot for BOTH legs, sits after (7a-bis) and above the sweep call, and its arm throws with the command line stripped.` +
+    (picker ? `\n       The picker walks ${picker.resolved} resolved rows in file order: with only ${TICKET} re-graded it ` +
+      `picks ${picker.first} (the control), with both re-graded it steps to the next row, a superseded / not-delivered / ` +
+      `deps-changed row is stepped OVER with its reason reported, and every row answered is pair:null (exit 3, drained).` : "") +
     (ledger ? `\n       Ledger: ${TICKET} carries ${ledger.rows} runner_verdicts rows; the newest (${ledger.id}, ${ledger.verdict}) ` +
-      `opens with AGT-245's own re-grade prefix and is graded against the pair's ship tree.` : "");
+      `opens with AGT-245's own re-grade prefix and is graded against the pair's ship tree.` : "") +
+    (second ? `\n       Drained one more: ${NEXT_TICKET} carries ${second.rows} rows, the newest (${second.id}, ${second.verdict}) ` +
+      `opens with this lane's prefix and is graded against that pair's ship tree; ${second.lane} rows board-wide carry the ` +
+      `re-grade prefix (exactly 1 did before this slice).` : "");
   if (!live) return console.log(head);
   const b = String(live.probe.base_sha).slice(0, 8);
   const s = String(live.probe.ship_sha).slice(0, 8);

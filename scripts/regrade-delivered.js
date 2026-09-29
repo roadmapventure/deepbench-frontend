@@ -49,13 +49,22 @@
 // writes nothing.
 //
 // Usage:
+//   node scripts/regrade-delivered.js --next --cycle-id=<uuid> [--dry-run] [--json]
 //   node scripts/regrade-delivered.js --ticket=AGT-101 --cycle-id=<uuid> [--dry-run] [--json]
 //                                    [--suite=<cmd>] [--scratch=<dir>] [--cohort=<path>] [--repo=<dir>]
 //
-// Exit codes, the verifier's table exactly:
+// `--next` (slice 5) is how the tail runs this EVERY cycle with nothing to name: it walks the frozen
+// cohort in file order and takes the first row still eligible, skipping past the permanently
+// refusable ones with their reasons rather than parking on the first of them. It is exclusive with
+// `--ticket` -- the same argument answered twice -- and the pick then runs this file's existing path
+// unchanged.
+//
+// Exit codes, the verifier's table exactly, plus slice 5's 3:
 //   0  approve -- recorded, with its ship decision written (or `recorded:false` under --dry-run).
 //   1  a VERDICT of block, or a refusal that leaves the prior block standing (`not-regression-only`).
 //   2  THE RE-GRADE COULD NOT RUN -- and it is NOT a verdict. No row is ever written on a 2.
+//   3  `--next` only: THE COHORT IS DRAINED. Every resolved row is answered or skipped for a named
+//      reason. Nothing recorded, and NOT a failure -- the lane finished.
 
 import fs from "fs";
 import os from "os";
@@ -74,6 +83,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..");
 
 export const DEFAULT_SUITE = "node tests/regression/run-all.js";
+// The `reasoning` opening every row THIS lane writes (see the insert below). It is how `--next`
+// recognises a pair it has already answered without keeping a second list anywhere: the ledger row IS
+// the record (`pattern:16` -- a tracking system maintains itself, and a parallel "done" file would be
+// a second source of truth that drifts the first time a run half-finishes).
+export const REGRADE_PREFIX = "AGT-245 delta re-grade of ";
 export const LEGS = Object.freeze(["base", "ship"]);
 
 // --- the pure core -----------------------------------------------------------------------------
@@ -95,6 +109,42 @@ export function pairFor(cohort, ticket) {
     return { refuse: String(row.reason || "").trim() || "refused-without-reason" };
   }
   return row;
+}
+
+// THE PICKER (slice 5). The cohort drains itself: one pair a cycle, in file order, with no slice
+// naming a ticket. Pure, so the walk is four assertions rather than 49 suite runs -- every board
+// fact it reads is handed in, and the one io call (`depsClean`) is a callback so the caller decides
+// how many git diffs it pays for.
+//
+// IT SKIPS PAST A PERMANENTLY-REFUSABLE ROW RATHER THAN PARKING ON IT (Designer's call 2 of slice
+// 5). A row whose latest verdict is no longer the cohort's is `superseded`, a row the board has
+// since moved off `delivered` is `not-delivered`, a row this lane already answered is
+// `already-regraded`, and a pair that moved `package.json`/`package-lock.json` is `deps-changed`.
+// A picker that stopped at the first such row would return the same refusal every cycle forever and
+// the remaining 48 pairs would never be reached. Every skip is REPORTED with its reason, so the
+// walk is auditable rather than a silent jump.
+//
+// ORDER MATTERS between `already-regraded` and `superseded`: this lane's own row IS a newer verdict,
+// so a ticket it graded reads as `superseded` too. Naming the re-grade first is the difference
+// between "we answered this" and "the cohort is stale here", which are different facts about
+// different rows.
+export function nextPair(cohort, { regraded, latestById, statusById, depsClean } = {}) {
+  const rows = cohort && Array.isArray(cohort.rows) ? cohort.rows : [];
+  const done = regraded instanceof Set ? regraded : new Set(Array.isArray(regraded) ? regraded : []);
+  const latest = latestById || {};
+  const statuses = statusById || {};
+  const clean = typeof depsClean === "function" ? depsClean : () => true;
+  const skipped = [];
+  for (const row of rows) {
+    if (!row || row.status !== "resolved") continue;
+    const id = String(row.backlog_id);
+    if (done.has(id)) { skipped.push([id, "already-regraded"]); continue; }
+    if (String(latest[id] ?? "") !== String(row.verdict_id)) { skipped.push([id, "superseded"]); continue; }
+    if (statuses[id] !== "delivered") { skipped.push([id, "not-delivered"]); continue; }
+    if (!clean(row)) { skipped.push([id, "deps-changed"]); continue; }
+    return { pair: row, skipped };
+  }
+  return { pair: null, skipped };
 }
 
 // One leg's capture, read three ways. `ran` is the question the exit code CANNOT answer: a suite
@@ -250,7 +300,8 @@ export async function main(argv, { env = process.env, out = null } = {}) {
   // caller that will one day parse the prose instead -- slice 4/5 reads this payload.
   const say = out ?? (s => (json ? console.error(s) : console.log(s)));
   const dryRun = argv.includes("--dry-run");
-  const ticket = argOf(argv, "ticket");
+  const next = argv.includes("--next");
+  let ticket = argOf(argv, "ticket");
   const cycleId = argOf(argv, "cycle-id");
   const suite = argOf(argv, "suite") ?? DEFAULT_SUITE;
   const repo = path.resolve(argOf(argv, "repo") || REPO);
@@ -259,6 +310,16 @@ export async function main(argv, { env = process.env, out = null } = {}) {
   const cannot = (kind, prose, extra = {}) => emit({
     code: 2, json, payload: { ok: false, exitCode: 2, kind, ticket: ticket || null, recorded: false, ...extra },
     prose: `regrade-delivered: ${prose}\n  Exiting 2 — the re-grade COULD NOT RUN. This is NOT a verdict; the prior block stands and nothing was recorded.`,
+  });
+  // EXIT 3 IS NOT EXIT 2. A drained cohort is the lane finishing its work, not a run that could not
+  // happen: every resolved row has either been answered or been skipped for a named reason, and a
+  // tail that read that as `could not run` would report a failure every cycle from here on.
+  const drained = skipped => emit({
+    code: 3, json,
+    payload: { ok: false, exitCode: 3, kind: "cohort-drained", ticket: null, recorded: false, next: true, skipped },
+    prose: `regrade-delivered: the frozen cohort is DRAINED — no resolved row is still eligible ` +
+      `(${skipped.length} skipped: ${skipped.map(([id, why]) => `${id} ${why}`).join(", ") || "none"}).\n` +
+      `  Exiting 3 — nothing left to grade and nothing recorded. This is the lane finishing, not a failure.`,
   });
 
   // ---- FENCE 3, AND IT IS FIRST ON PURPOSE. ---------------------------------------------------
@@ -270,7 +331,12 @@ export async function main(argv, { env = process.env, out = null } = {}) {
       `script's plumbing rather than a regression run. A probe NEVER records: pass --dry-run, or drop --suite.`,
       { suite });
   }
-  const missing = [!ticket && "--ticket", !cycleId && "--cycle-id"].filter(Boolean);
+  if (next && ticket) {
+    return cannot("ticket-and-next",
+      `--ticket=${ticket} and --next are the same argument answered twice, and a run that honoured one of them would ` +
+      `silently ignore the other. --next IS the pick: drop the ticket, or drop --next.`, { next: true });
+  }
+  const missing = [!next && !ticket && "--ticket", !cycleId && "--cycle-id"].filter(Boolean);
   if (missing.length) return cannot("missing-args", `missing ${missing.join(", ")}.`, { missing });
 
   // ---- (a) THE PAIR, FROM THE FROZEN COHORT. --------------------------------------------------
@@ -280,20 +346,66 @@ export async function main(argv, { env = process.env, out = null } = {}) {
   } catch (e) {
     return cannot("cohort-unreadable", `${cohortAbs} could not be read (${e.message}).`);
   }
-  const pair = pairFor(cohort, ticket);
-  if (pair.refuse) {
-    return cannot(pair.refuse,
-      `the frozen cohort refuses ${ticket}: ${pair.refuse}. Slice 1 measured that refusal against the git log; a pair ` +
-      `guessed here would be the approximation ${COHORT_PATH} exists to prevent.`,
-      { refuse: pair.refuse });
-  }
-
   const supabaseUrl = env.SUPABASE_URL;
   const supabaseKey = env.SUPABASE_SERVICE_KEY;
   // No --dry-run relaxation on the READS: every fact this grade rests on is a row. --dry-run means
   // "write nothing", never "invent the board".
   const noCreds = [!supabaseUrl && "SUPABASE_URL", !supabaseKey && "SUPABASE_SERVICE_KEY"].filter(Boolean);
-  if (noCreds.length) return cannot("no-credentials", `missing ${noCreds.join(", ")}.`, { missing: noCreds });
+
+  // `--next` PICKS THE PAIR OFF THE BOARD; `--ticket` takes the caller's. Either way what comes out
+  // of here is one cohort row, and everything below -- fences (b) through (e), the slot, the grade,
+  // the insert -- is the SAME path. The pick is a pre-filter that reads the board ONCE for all 56
+  // resolved ids rather than 56 single-row reads, and the fences below then re-check the pick's own
+  // ticket row by row: a pre-filter that disagreed with the fence would be caught there, not trusted.
+  let pair;
+  let skipped = [];
+  if (next) {
+    if (noCreds.length) return cannot("no-credentials", `missing ${noCreds.join(", ")}.`, { missing: noCreds });
+    const resolved = (Array.isArray(cohort.rows) ? cohort.rows : []).filter(r => r && r.status === "resolved");
+    // The ids go into a PostgREST `in.()` list, so anything that is not a plain ticket id is dropped
+    // rather than interpolated -- the cohort file is ours, but a filter built by string concatenation
+    // is a filter one bad row turns into a different query.
+    const ids = [...new Set(resolved.map(r => String(r.backlog_id)).filter(id => /^[A-Za-z0-9._-]+$/.test(id)))];
+    if (!ids.length) return cannot("cohort-empty", `${cohortAbs} holds no resolved rows, so --next has nothing to walk.`);
+    const inList = `in.(${ids.join(",")})`;
+    const board = await rest(supabaseUrl, supabaseKey,
+      `runner_verdicts?select=id,backlog_id,created_at,reasoning&backlog_id=${inList}&order=created_at.desc&limit=5000`);
+    if (board.error) return cannot("verdict-unreadable", `runner_verdicts could not be read for the pick (${board.error}).`);
+    const latestById = {};
+    const regraded = new Set();
+    for (const row of (Array.isArray(board.rows) ? board.rows : [])) {
+      const id = String(row.backlog_id);
+      if (!(id in latestById)) latestById[id] = String(row.id);   // the read is created_at DESC
+      if (String(row.reasoning || "").startsWith(REGRADE_PREFIX)) regraded.add(id);
+    }
+    const items = await rest(supabaseUrl, supabaseKey, `backlog_items?select=backlog_id,status&backlog_id=${inList}&limit=5000`);
+    if (items.error) return cannot("backlog-unreadable", `backlog_items could not be read for the pick (${items.error}).`);
+    const statusById = {};
+    for (const row of (Array.isArray(items.rows) ? items.rows : [])) statusById[String(row.backlog_id)] = row.status;
+    // LAZY BY CONSTRUCTION: `nextPair` calls this only for a candidate that already cleared the three
+    // row checks, so the walk pays one git diff per surviving candidate rather than 56 up front.
+    const depsClean = row => {
+      const d = git(repo, ["diff", "--name-only", row.base_sha, row.ship_sha, "--", "package.json", "package-lock.json"]);
+      return d.status === 0 && !d.out;
+    };
+    const picked = nextPair(cohort, { regraded, latestById, statusById, depsClean });
+    skipped = picked.skipped;
+    say(`regrade-delivered: --next walked ${resolved.length} resolved rows, skipped ${skipped.length}` +
+      `${skipped.length ? ` (${skipped.map(([id, why]) => `${id} ${why}`).join(", ")})` : ""}` +
+      ` and picked ${picked.pair ? picked.pair.backlog_id : "nothing"}.`);
+    if (!picked.pair) return drained(skipped);
+    pair = picked.pair;
+    ticket = String(pair.backlog_id);
+  } else {
+    pair = pairFor(cohort, ticket);
+    if (pair.refuse) {
+      return cannot(pair.refuse,
+        `the frozen cohort refuses ${ticket}: ${pair.refuse}. Slice 1 measured that refusal against the git log; a pair ` +
+        `guessed here would be the approximation ${COHORT_PATH} exists to prevent.`,
+        { refuse: pair.refuse });
+    }
+    if (noCreds.length) return cannot("no-credentials", `missing ${noCreds.join(", ")}.`, { missing: noCreds });
+  }
 
   // ---- (b) THE COHORT ROW IS STILL THE BOARD'S ANSWER. ----------------------------------------
   // The cohort was frozen 2026-09-28 against a LIVE predicate, and the board moves under it. If a
@@ -381,7 +493,7 @@ export async function main(argv, { env = process.env, out = null } = {}) {
     ownTests,
   });
   const common = {
-    ticket, version: pair.version ?? null, cycle_id: cycleId,
+    ticket, next, skipped, version: pair.version ?? null, cycle_id: cycleId,
     prior_verdict_id: pair.verdict_id, prior_version: priorRow.version ?? null,
     base_sha: pair.base_sha, ship_sha: pair.ship_sha, own_tests: ownTests,
     suite, dry_run: dryRun,

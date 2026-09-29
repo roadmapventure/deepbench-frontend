@@ -4228,7 +4228,7 @@ lands silently eats the chip on rows John never saw, and stamping after means th
 one extra night marked new. **A CYCLE THAT DID NOT PUBLISH MUST NOT STAMP IT AT ALL** — under the
 bridge that is now the ordinary unattended case; **(6)** close your `runner_cycles` row AND release the publish lease in the ONE
 statement below (`AGT-171`) — `lease_released_at` NULL means your tail lease was TTL-stolen; leave
-the new holder alone; **(7)** retired into (6) — nothing after (6) holds the lease; **(7a-bis)** re-grade the ships blocked for a cause outside themselves, **only if step 5's manager named any** — written out in its own `(7a-bis)` paragraph below, and it runs no gate (`SES-403`); **(7a-ter)** delta re-grade ONE delivered ticket, if the slice names one — paragraph below; **(7b)** sweep the decision windows — one idempotent call,
+the new holder alone; **(7)** retired into (6) — nothing after (6) holds the lease; **(7a-bis)** re-grade the ships blocked for a cause outside themselves, **only if step 5's manager named any** — written out in its own `(7a-bis)` paragraph below, and it runs no gate (`SES-403`); **(7a-ter)** delta re-grade the cohort's next ticket with `--next`, every cycle — paragraph below; **(7b)** sweep the decision windows — one idempotent call,
 written out in its own `(7b)` paragraph below, whose **three** returned numbers go into the cycle
 `notes`; **(7c)** the class-understanding loop — one `due` check, written out in its own `(7c)`
 paragraph below, gated so it fires at most once a day; **(8)** continue the drain **in-session**, if and only if
@@ -4266,12 +4266,12 @@ ancestry check refused it, recording nothing; **2** = could not run, not a verdi
 **No card to John** (ruling 2026-09-15, directive `6f33ec28`). A ship blocked on its OWN diff is
 never listed: that diff is in `dev`, so the job it broke still fails there.
 
-**(7a-ter) DELTA RE-GRADE ONE DELIVERED TICKET (`AGT-245`).** <!-- FEATURE: AGT-245 -->
-Only when the slice names one:
-`node scripts/regrade-delivered.js --ticket=<ID> --cycle-id=<your cycle id>`. ONE test slot for
-BOTH legs. The pair is the frozen cohort's, never `graded_sha` (dev HEAD, a peer's tree).
-**0** = an `approve` row plus its ship decision; **1** = a block row, or a refusal recording
-nothing; **2** = could not run, recording nothing, not a verdict. **No card to John**, as `(7a-bis)`.
+**(7a-ter) DELTA RE-GRADE THE COHORT'S NEXT TICKET (`AGT-245`).** <!-- FEATURE: AGT-245 -->
+EVERY cycle, nothing to name:
+`node scripts/regrade-delivered.js --next --cycle-id=<your cycle id>`. ONE test slot for
+BOTH legs; `--next` takes the frozen cohort's first still-eligible row, never `graded_sha`.
+**0** = an `approve` row plus its ship decision; **1** = a block row or a refusal; **2** = could
+not run, not a verdict; **3** = DRAINED. Nothing recorded on a 2 or a 3.
 
 **(7b) SWEEP THE DECISION WINDOWS (`SES-286`, `v7.0.395` — `M6-02`, `M6-07`).** <!-- FEATURE: SES-286 (b) — the cycle tail closes the windows that expired while it ran. -->
 One call, idempotent, safe to run on a cycle that decided nothing:
