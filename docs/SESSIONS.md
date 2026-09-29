@@ -5,6 +5,30 @@
 
 ---
 
+## session/cycle-20260928-2148 (v7.0.698, 2026-09-29, unattended cycle `c0e2aa82-1940-4ac6-97bd-575d4b1d4e42`, `trigger = chained (drain continuation)`, lane 2 — Opus 5 orchestrator, Opus 5 Development Manager, Fable 5.1 Designer, Opus 5 Builder) — `AGT-245` — **shipped, verdict block: the per-ticket delta re-grade exists and proved itself on a real pair, slice 3 of 5.**
+
+### The chain continued in the same turn, and the manager corrected the shape of the work
+
+`drain_chain_gate()` answered `continue` on §2e, the pre-boot gate answered `pickable`, and `prime_directive_queue()`'s head was `AGT-245`. The Development Manager's own reading changed what this cycle did: slices 1 and 2 had already shipped (`v7.0.668` cohort frozen, `v7.0.690` delta gate armed) and the ticket's `kickoff_link` still pointed at that arming slice, whose own header says *"Re-grade slices follow; this one re-grades nothing."* So the missing handoff row was the Designer's, not another Builder run on shipped work — it assigned `design-kickoff`, and the driver's `--step=2` (which offers the project's next assignment, `AGT-164`) was deliberately not taken: one item per cycle.
+
+### What the Designer measured, and why it is worth more than the slice itself
+
+The ticket's own cost line — ~142 suite runs, ~47 hours on the NANO database — does **not** apply to the lane it names. `verifier.js --regrade` grades CI's newest `ref='dev'` conclusion and runs no suite at all, so that lane is free. It is also **starved**: `regradable_ships()` returns 0 rows because the newest eight `ref='dev'` conclusions all carry `Tripwire + regression (blocking)` = failure. And grading from stored rows is dead too — all 77 delivered tickets carry `[FAIL]` names in `reasoning`, but cut at `DETAIL_CAP = 600`, so no row holds a full failing set. Checked, not assumed.
+
+### The slice, and the QA that would fail if the change did nothing
+
+`scripts/regrade-delivered.js` takes a frozen pair, runs both legs in throwaway worktrees under **one** `withTestSlot` held across both, grades the delta, and charges a ship only for a `tests/regression` file its own diff touched. `insertVerdict` and `rest` gained `export` in `verifier.js` — nothing else — so slice 4 writes through the one home. Proven on the real `AGT-101` trees: the sha probe named a different test red on each leg → `newlyRed [tree-119ed083.test.mjs]`, verdict `block`; the constant probe named the same test red on both → `standing [same.test.mjs]`, verdict `approve`. A re-grade that ignored the delta answers identically on both. `AGT-101`'s `runner_verdicts` count was 1 before and 1 after: nothing was written, exactly as the STOP LINE requires.
+
+### The ordering lesson from the predecessor was applied, and it worked
+
+`724303a8` rendered `CLAUDE-STATE.md` before writing its own `push_sha`, and paid for it with two of the three newly-red tests in its verdict. This cycle wrote the row first and then rendered: the verdict's `CLAUDE-STATE` line reads *"pins this cycle as the newest pushed row"*, and `SES-177` / `SES-261` are absent from its delta. The remaining note is the ship-card lag the tail closes, which is inherent.
+
+### The block, and the one newly-red test that was not this diff
+
+`runner_verdicts f554ad23`: build green, hygiene green, regression red — *"24 standing, 1 newly red [agt-79-ticket-owner.test.mjs], 1 unverified in baseline"*. That test was reproduced by hand rather than argued about: it fails `the census must not have touched the board` with **1134 !== 1133**, because it compares a whole-table `backlog_items` count taken before the census with one taken after, and a peer cycle filed a ticket between the two reads. Under parallel cycles that invariant charges an unrelated delivery for a peer's write. Filed as `audit_findings cb5e76e7afd95037`, with the Designer's own discovery beside it (`fc13c23b3f681580`): `SES-352-green-anchor-from-ci.js` is red because CI has no green conclusion, and CI stays red partly because that test is red — a closed loop that starves the free re-grade lane for every future ship. Both under one `finding-routing` decision, `6eb12371`.
+
+---
+
 ## session/cycle-20260928-1851 (v7.0.695, 2026-09-28, unattended cycle `724303a8-70d3-43fb-90a8-0bc9a61077f3`, `trigger = scheduled`, lane 2 — Opus 5 orchestrator, Fable 5.1 Designer, Opus 5 Builder) — `AGT-138` — **shipped, verdict block: the routine prompt stopped citing a step that was retired three weeks ago.**
 
 ### The remainder was a cycle's work, and the previous cycle's ruling was right
