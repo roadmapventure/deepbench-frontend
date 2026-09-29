@@ -7,7 +7,7 @@
 |---|---|---|
 | name | `deepbench-auditor` | separate from `deepbench-runner` (`trig_017TZ3JZcLBK6AYH6DKURqMH`), its own switch (A-21) |
 | cron | `0 10 * * 1` (UTC) | Monday 5:00 AM CDT; after DST ends 2026-11-01 John sets `0 11 * * 1` in the routine (the runbook records `0 10 * * 1` and says so) |
-| model | the `orchestrator` row of `public.runner_model_lanes` at creation (`claude-opus-5` on 2026-09-23) | judgment work runs on the model `scripts/agent-prompt.js` prints |
+| model | the `orchestrator` row of `public.model_assignments` (`job_key='orchestrator'`; `runner_model_lanes` is its guarded mirror, AGT-142) | judgment work runs on the model `scripts/agent-prompt.js` prints |
 | sources | `roadmapventure/deepbench-frontend` (branch `dev`), `roadmapventure/interviewquestions`, `roadmapventure/claude-config` | three clones side by side; the two private ones are read-only inputs |
 | connectors | Supabase MCP (`mcp__Supabase__*`, the governance credential) | ledger, alerts, secrets by name |
 | allowed_tools | the builder routine's ten (copy from a fresh `RemoteTrigger get` of `trig_017…`) plus `WebSearch` | `au-advisor-intent` has `enable_web_search true` |

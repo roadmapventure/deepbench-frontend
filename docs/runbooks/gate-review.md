@@ -38,7 +38,7 @@ before it retired; the review asks whether the *charter claim* those tickets sto
 
 Run both, **in parallel, with fresh context**, via the `Agent` tool. Model per `runner-cycle.md`'s
 model discipline (register B21): this is judgment-dense work — the `judgment` lane of
-`runner_model_lanes` (Fable 5 at this writing, `SES-313`).
+`public.model_assignments` (`job_key='judgment'`; `SES-313`, AGT-142 — `runner_model_lanes` mirrors it).
 State the clone's absolute path in each prompt (a subagent given a bare task defaults to the
 discoverable-but-wrong shared checkout), and tell each to read `docs/SELFBUILD-CHARTER.md` and
 `CLAUDE.md` as part of its own bootstrap rather than hand-enumerating today's decisions into the

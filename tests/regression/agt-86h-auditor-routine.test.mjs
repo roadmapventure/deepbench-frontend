@@ -161,7 +161,9 @@ export default async function run() {
       const lanes = new Set([...lf(fs.readFileSync(LANES, "utf8")).matchAll(/^\|\s*(?:orchestrator|judgment|mechanical)\s*\|\s*([^|]+?)\s*\|/gm)].map(m => m[1]));
       assert.ok(lanes.size >= 3, `the lanes snapshot parses (${lanes.size} ids)`);
       const ids = [...new Set(md.match(/claude-[a-z]+-[0-9][0-9a-z-]*/g) ?? [])];
-      assert.ok(ids.length >= 1, "the runbook names the orchestrator model");
+      // AGT-149: the model cell cites public.model_assignments instead of naming an id, so the
+      // runbook may hold ZERO ids. Any id it still holds must be a snapshot id (loop below).
+      assert.ok(md.includes("public.model_assignments"), "the runbook cites public.model_assignments as the model's home");
       for (const id of ids) assert.ok(lanes.has(id), `${id} is not a MODEL-LANES-SNAPSHOT id`);
       // Control: the block is found by whole line, not by the first substring (the §15.1 table row
       // names both markers in a code span BEFORE the block).
