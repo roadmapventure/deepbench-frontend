@@ -110,6 +110,16 @@ async function run() {
     "has nothing to do with gate cards, so this file refuses to grade rather than fail misleadingly");
   const epicId = epics[0].id;
 
+  // AGT-280 (v7.0.729): a ticket reaches an executing project's list only when it cites a need
+  // source that names a row that EXISTS -- `requirement_gate` refuses it otherwise, and this
+  // fixture goes into exactly such an epic. It cites a real market record like any other filing;
+  // exempting the fixture instead would have made this file the one hole in the gate.
+  const needRows = await pg(url, key, "market_records?select=id&order=id.asc&limit=1");
+  assert.equal(needRows.length, 1,
+    "market_records is empty, so the fixture cannot cite a traceable need source (AGT-280) -- this " +
+    "file refuses to grade rather than fail for a reason that has nothing to do with gate cards");
+  const needSource = `nathan:market_records:${needRows[0].id}`;
+
   const cycles = await pg(url, key, "runner_cycles?select=id&order=started_at.desc&limit=1");
   assert.equal(cycles.length, 1, "runner_cycles is empty -- runner_items.cycle_id is NOT NULL and FK");
   const cycleId = cycles[0].id;
@@ -141,6 +151,7 @@ async function run() {
         source_file: "tests/regression/ses-424a-gate-card-excludes-pick.test.mjs",
         row_ordinal: fixOrdinal,
         epic_id: epicId,
+        need_source: needSource,             // AGT-280: the executing project's list takes no ticket without one
         queue: 999990,                       // last in the order; `queue IS NULL` is the not-pickable condition
         filed_at: "2026-08-01T00:00:00Z",    // before the 2026-08-21 M5-02 cut, so no scope_rationale is owed
         claimed_by: null,

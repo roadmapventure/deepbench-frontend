@@ -192,6 +192,16 @@ async function run() {
     "has nothing to do with the no-ship fence, so this file refuses to grade rather than fail misleadingly");
   const epicId = epics[0].id;
 
+  // AGT-280 (v7.0.729): a ticket reaches an executing project's list only when it cites a need
+  // source that names a row that EXISTS -- `requirement_gate` refuses it otherwise, and this
+  // fixture goes into exactly such an epic. It cites a real market record like any other filing;
+  // exempting the fixture instead would have made this file the one hole in the gate.
+  const needRows = await rest(url, key, "market_records?select=id&order=id.asc&limit=1");
+  assert.equal(needRows.length, 1,
+    "B: market_records is empty, so the fixture cannot cite a traceable need source (AGT-280) -- " +
+    "this file refuses to grade rather than fail for a reason that has nothing to do with the fence");
+  const needSource = `nathan:market_records:${needRows[0].id}`;
+
   const { id: fixId, ordinal: fixOrdinal, stamp: fixStamp } = fixtureNonce();
 
   // Nothing may already hold this id, or the `finally` below would delete a real row.
@@ -212,6 +222,7 @@ async function run() {
         source_file: SOURCE_FILE,
         row_ordinal: fixOrdinal,
         epic_id: epicId,
+        need_source: needSource,          // AGT-280: the executing project's list takes no ticket without one
         queue: 999991,                    // last in the order; `queue IS NULL` is the not-pickable condition
         filed_at: "2026-08-01T00:00:00Z",
         // Non-empty so the SES-295/M5-03 filing-lane cut cannot exclude the fixture whatever the
