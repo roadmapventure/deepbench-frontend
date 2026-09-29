@@ -5,6 +5,30 @@
 
 ---
 
+## session/cycle-20260929-0025 (v7.0.701, 2026-09-29, unattended cycle `9491a17b-22cb-49b6-b706-d24f61d26ea7`, `trigger = chained (drain continuation)`, lane 2 — Opus 5 throughout, judgment lane degraded to Opus by `judgment_model()` on `fable_pace`) — `AGT-245` — **shipped, verdict block: the first delivered ticket was re-graded for real, and the ledger holds that verdict.**
+
+### What slice 4 actually did
+
+`AGT-101`'s frozen pair was re-run — base tree `7bddd226`, ship tree `119ed083` — both legs inside **one** `withTestSlot` acquisition, graded on the delta, and the result written as a NEW `runner_verdicts` row (`42550abd`) beside the original rather than over it. `AGT-101`'s row count went **1 → 2**, which is the whole discriminator: slice 3 proved the machine with probes and wrote nothing, so a second row is the first evidence that it works on real trees. The `(7a-ter)` runbook sibling landed with it, `380920 → 380965` bytes, `BYTES_AT_SHIP` re-pinned in the same commit.
+
+### The re-grade said "still blocked", and that is the rule working
+
+`AGT-101`'s verdict came out **block**, so `record_ship_decision()` refused it and the ticket did not close. The reason is the stricter half of the delta rule: `agt-70-auditor.test.mjs` is the one test file `AGT-101`'s own diff touched, and it is red on its ship leg, so it is charged as newly red rather than waved through as standing. A re-grade whose first act was to close a ticket that broke its own test would have been the failure; this is the opposite.
+
+### Two byte facts the next slice needs, both paid for here
+
+The kickoff computed 80 bytes of runbook headroom against `SES-336`'s 381,000 ceiling. The **binding** bar is `agt-138`'s `PRE_CHANGE_BYTES` 380,980 (`bytes < 380980`), so the real headroom was **59**. The Builder's first cut landed 380,989, turned `agt-138` red, and was re-trimmed to 380,965. And `docs/runbooks/cycle-card.md` is **generated** from the runbook with its `sha256` pinned by `agt-133` arm B, so a runbook edit must re-render it (`--write`) in the same commit — which is why this ship spent four files rather than the kickoff's three, and why it re-pinned the live `dm-knowledge-cycle-card` Knowledge row.
+
+### The third live-board ordering assertion in one session
+
+The verdict's one newly-red name was `agt-159-backlog-review.test.mjs`, whose arm C asserts the first ticket of a **live** backlog-review batch. Reproduced by hand; peer cycles shipping `AGT-266` and `AGT-159` board writes in the same window changed which row leads it, and this cycle's four files are two runbook docs and two unrelated tests. Filed as `audit_findings 64817ec5b2860cc8` under decision `00a8030e`, and it is the third of its exact shape this session — after `agt-79-ticket-owner` (two whole-table counts) and the `agt-134` / `ses-364` board-did-not-move guards. The finding proposes ruling on the family together: under parallel cycles a live-board ordering assertion charges whichever delivery happens to be verifying when a peer writes.
+
+### Ledger hygiene worth recording
+
+The publish lease was **held by a peer** at the start of this tail (`4d2c3c4e`). The runbook says wait, never skip, so it waited one 30-second retry and took it on the second attempt. And the Designer of this slice reported its own mistake unprompted: while probing the slot line it called `test_slot_acquire()`, which is a write, and released it immediately — recorded here because a self-reported error is worth more in the log than a clean-looking absence.
+
+---
+
 ## session/cycle-20260928-2148 (v7.0.698, 2026-09-29, unattended cycle `c0e2aa82-1940-4ac6-97bd-575d4b1d4e42`, `trigger = chained (drain continuation)`, lane 2 — Opus 5 orchestrator, Opus 5 Development Manager, Fable 5.1 Designer, Opus 5 Builder) — `AGT-245` — **shipped, verdict block: the per-ticket delta re-grade exists and proved itself on a real pair, slice 3 of 5.**
 
 ### The chain continued in the same turn, and the manager corrected the shape of the work
