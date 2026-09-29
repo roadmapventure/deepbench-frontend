@@ -1,4 +1,25 @@
 #!/usr/bin/env node
+// DeepBench v7.0.704 | scripts/personal-agent.js | AGT-268 -- a capability write-back UPDATES the
+// fetched posting row instead of inserting a text-less copy of it, and a write-back about a job no
+// fetch ever stored lands as its own kind, `posting_note`. Measured live before the change (REST,
+// service key, 2026-09-29): `kind='posting'` held 310 rows -- 148 with a `fetch-postings%` source,
+// ALL 148 carrying `data.text`, and 162 with a `career-*` source, ALL 162 with an empty `data.text`,
+// 79 of them on a url a fetch row already held. So "68 of 216 fetched postings had no text"
+// (2026-09-27 market watch, repeated by the growth review) was counting the capabilities' own
+// write-backs; over fetch rows alone the figure is 0 of 148.
+//
+// THE SEPARATION IS STRUCTURAL, NEVER AN INSTRUCTION (§19b, pattern:10, pattern:99): the fork is
+// "does this data.url already exist on a posting row", a provable fact, and it is not keyed on which
+// capability wrote the item -- same shape as AGT-154's url check above validateAnswer. After this,
+// `kind:'posting'` has exactly ONE creator, fetchPostings(), so a count of fetched postings is a
+// count of rows a fetch actually wrote.
+//
+// Reversible: planPostingWriteBacks() is pure and write() is its only caller -- drop the call and
+// every item inserts as before. The de-dup reads widen to `kind=in.(posting,posting_note)`, so a
+// title a capability only ever saw on a search page stays out of a later fetch (by design: it is a
+// note, never a fetched posting with text to read).
+// Kickoff: docs/kickoffs/v7.0.704-AGT-268-posting-write-backs-own-kind.md.
+//
 // DeepBench v7.0.697 | scripts/personal-agent.js | AGT-106 -- READ_MAP hands the four judgment
 // capabilities the record kinds their Intents already name. strengths-gaps, posting-review and
 // match-finder now read `market_requirement` and `posting`; growth-review also gains `evidence`
@@ -80,7 +101,10 @@
 // --write    validates the answer (validateAnswer), then inserts records_to_write with
 //            source '<slug> <ISO date>' and one `log` row '<slug> ran' whose data is the answer's
 //            non-array top-level fields -- ONE insert statement, so nothing half-writes. Prints
-//            {inserted, ids}. --answer takes inline JSON or a path to a JSON file (the runbook's
+//            {inserted, ids, patched}. AGT-268: a `posting` item whose data.url is already on a
+//            posting row PATCHes that row's data (the item's keys win) instead of inserting, and a
+//            `posting` item whose url no row holds is inserted as `posting_note` -- so a write-back
+//            never becomes a second, text-less "fetched posting". --answer takes inline JSON or a path to a JSON file (the runbook's
 //            <scratch>.json), because an answer, like the records, can outgrow Windows argv.
 // --fetch-postings  per watch_company record with data.board in greenhouse|lever|ashby and a
 //            data.board_token, fetch the public board, keep product titles or a target's
@@ -108,10 +132,18 @@ import { readMail } from '../lib/imap-readonly.js';
 // Same tenant agent-prompt.js measured: every agent_configs / assignment row carries 'global'.
 const TENANT = 'global';
 
-// The eleven kinds career_records_kind_check allows (measured 2026-09-23 from pg_constraint).
+// The kinds a capability answer may write. `career_records_kind_check` is the database's own
+// allowlist and this list is NOT a mirror of it -- probed live 2026-09-29 over REST (PostgREST does
+// not expose pg_catalog, so the probe is an insert the check refuses): an unknown kind is rejected
+// 23514, and `posting_note` was rejected too, so AGT-268's migration widens the constraint in the
+// same ship that adds the kind here. The constraint also admits `resume_line` (105 live rows), which
+// this list deliberately still omits -- AGT-106 recorded that gap and it is not this ticket's.
+// AGT-268: `posting_note` is a capability's write-back about a job no fetch stored. It is a separate
+// KIND rather than a flag on `posting` because every count of "postings we fetched" is a count over
+// the kind, and "lead" was unavailable -- public.market_leads already owns that word (pattern:118).
 export const KINDS = [
   'resume_fact', 'target', 'ladder_rung', 'network_contact', 'log', 'market_requirement',
-  'evidence', 'posting', 'watch_company', 'correction', 'review',
+  'evidence', 'posting', 'posting_note', 'watch_company', 'correction', 'review',
 ];
 
 // What each capability reads. Keyed by capability slug, never by agent (kickoff §4).
@@ -120,15 +152,15 @@ export const READ_MAP = {
   'career-resume-review': PROFILE,
   'career-intro-pitch': PROFILE,
   'career-cover-letter': PROFILE,
-  'career-strengths-gaps': [...PROFILE, 'market_requirement', 'posting'],
-  'career-posting-review': [...PROFILE, 'market_requirement', 'posting'],
-  'career-match-finder': [...PROFILE, 'market_requirement', 'posting'],
+  'career-strengths-gaps': [...PROFILE, 'market_requirement', 'posting', 'posting_note'],
+  'career-posting-review': [...PROFILE, 'market_requirement', 'posting', 'posting_note'],
+  'career-match-finder': [...PROFILE, 'market_requirement', 'posting', 'posting_note'],
   'career-interview-prep': ['resume_fact', 'target', 'network_contact', 'log'],
   'career-outreach-plan': ['network_contact', 'target'],
   'career-market-watch': ['target', 'market_requirement', 'watch_company'],
   'career-evidence-mining': ['evidence', 'resume_fact', 'target'],
-  'career-growth-review': ['ladder_rung', 'target', 'log', 'review', 'evidence', 'resume_fact', 'market_requirement', 'posting'],
-  'career-linkedin-alerts': ['resume_fact', 'target', 'ladder_rung', 'evidence', 'network_contact', 'posting', 'log'],
+  'career-growth-review': ['ladder_rung', 'target', 'log', 'review', 'evidence', 'resume_fact', 'market_requirement', 'posting', 'posting_note'],
+  'career-linkedin-alerts': ['resume_fact', 'target', 'ladder_rung', 'evidence', 'network_contact', 'posting', 'posting_note', 'log'],
 };
 
 // A read filter, keyed by CAPABILITY and then by kind (AGT-154). It was keyed by kind alone, which
@@ -139,10 +171,17 @@ export const READ_MAP = {
 // postings match-finder filters out.
 // AGT-106: the mirror of match-finder's predicate -- it drops only the raw `status:'new'` intake
 // cards (what --fetch-postings and the alert intake write) and keeps every other status, null too.
-const REVIEWED_POSTINGS = { posting: rec => rec?.data?.status !== 'new' };
+// AGT-268: the same predicate is registered for `posting_note` in every entry that filters
+// `posting`. Without it the new kind would arrive UNFILTERED at each of these readers -- readRecords
+// only skips a row when a filter exists for its kind -- and match-finder, whose whole filter exists
+// to hand it jobs it has not judged yet, would be served all 162 reviewed write-backs. The predicate
+// is the kind-agnostic one it already was; nothing here reads the source or the capability.
+const notNew = rec => rec?.data?.status !== 'new';
+const isNew = rec => rec?.data?.status === 'new';
+const REVIEWED_POSTINGS = { posting: notNew, posting_note: notNew };
 
 export const KIND_FILTERS = {
-  'career-match-finder': { posting: rec => rec?.data?.status === 'new' },
+  'career-match-finder': { posting: isNew, posting_note: isNew },
   'career-strengths-gaps': REVIEWED_POSTINGS,
   'career-posting-review': REVIEWED_POSTINGS,
   'career-growth-review': REVIEWED_POSTINGS,
@@ -377,7 +416,19 @@ function rest() {
     if (!r.ok) throw new Error(`insert into ${table} returned HTTP ${r.status} ${await r.text()}`);
     return r.json();
   }
-  return { root, headers, get, insert };
+  // AGT-268: the write-back path. Same shape as market-agent.js's patch(), and narrow by
+  // construction -- the caller names one row by id and hands one column, `data`. The fetched row's
+  // own provenance (source, session_name) is never rewritten: it is still the row a fetch created.
+  async function patch(pathAndQuery, body) {
+    const r = await fetch(`${root}/rest/v1/${pathAndQuery}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`PATCH ${pathAndQuery.split('?')[0]} returned HTTP ${r.status} ${await r.text()}`);
+    return r.json();
+  }
+  return { root, headers, get, insert, patch };
 }
 
 async function readRecords(db, capability, target) {
@@ -508,6 +559,34 @@ function loadAnswer(raw) {
   return JSON.parse(source);
 }
 
+// --- AGT-268: a posting write-back updates the fetched row -------------------------------------
+//
+// PURE -- no network, no clock, no env. `items` is the answer's records_to_write; `byUrl` maps a
+// stored posting's `data.url` to `{id, data}`. One entry out per item in, in order:
+//
+//   kind 'posting', url in byUrl      -> {action:'patch', id, data}  data = stored data + item's keys
+//   kind 'posting', url absent/unseen -> {action:'insert', kind:'posting_note'}
+//   anything else                     -> {action:'insert', kind:<item's own>}, item untouched
+//
+// THE FORK IS A PROVABLE FACT, not a judgment and not the writer's identity: does a posting row
+// already hold this url. Nothing here reads the capability, the source or the session (§19b,
+// pattern:10, pattern:99) -- so `kind:'posting'` ends up with exactly one creator, fetchPostings(),
+// and every "how many postings did we fetch" count stops including the answers about them.
+//
+// The merge is SHALLOW and the item wins: a write-back adds `status`, `fit`, `verdict` and friends to
+// the fetched row and can correct a key it already has, but it can never drop `text` -- the one field
+// only a fetch ever supplies -- by omitting it. That is the whole defect in one line.
+export function planPostingWriteBacks(items, byUrl) {
+  const lookup = byUrl instanceof Map ? byUrl : new Map(Object.entries(byUrl || {}));
+  return (items || []).map(item => {
+    if (item?.kind !== 'posting') return { action: 'insert', kind: item?.kind, item };
+    const url = typeof item?.data?.url === 'string' ? item.data.url : null;
+    const stored = url ? lookup.get(url) : undefined;
+    if (!stored) return { action: 'insert', kind: 'posting_note', item: { ...item, kind: 'posting_note' } };
+    return { action: 'patch', kind: 'posting', id: stored.id, data: { ...(stored.data || {}), ...(item.data || {}) }, item };
+  });
+}
+
 async function write(args) {
   let answer;
   try { answer = loadAnswer(args.answer); } catch (e) { fail(`--answer is not readable JSON: ${e.message}`); }
@@ -517,8 +596,24 @@ async function write(args) {
   const today = new Date().toISOString().slice(0, 10);
   const source = `${args.capability} ${today}`;
   const session_name = args.sessionName || null;
-  const rows = answer.records_to_write.map(item => ({
-    kind: item.kind,
+  const db = rest();
+  // AGT-268: ONE read, and only when the answer actually carries a posting item -- the fork needs the
+  // stored urls and nothing else. `kind=eq.posting` is the fetched population by then, so a match is
+  // always a fetched row to update. First writer of a url wins; a duplicate url in the table cannot
+  // make the plan ambiguous.
+  const byUrl = new Map();
+  if (answer.records_to_write.some(item => item?.kind === 'posting')) {
+    let stored;
+    try { stored = await db.get('career_records?kind=eq.posting&select=id,data'); } catch (e) { fail(e.message); }
+    for (const r of stored) {
+      const u = r.data?.url;
+      if (typeof u === 'string' && u && !byUrl.has(u)) byUrl.set(u, { id: r.id, data: r.data || {} });
+    }
+  }
+  const plan = planPostingWriteBacks(answer.records_to_write, byUrl);
+
+  const rows = plan.filter(p => p.action === 'insert').map(({ item, kind }) => ({
+    kind,
     title: item.title,
     body: item.body ?? null,
     data: item.data ?? {},
@@ -529,9 +624,20 @@ async function write(args) {
   const runData = Object.fromEntries(Object.entries(answer).filter(([, v]) => !Array.isArray(v)));
   rows.push({ kind: 'log', title: `${args.capability} ran`, body: null, data: runData, target_row: null, source, session_name });
 
-  const db = rest();
   let inserted;
   try { inserted = await db.insert('career_records', rows); } catch (e) { fail(e.message); }
+
+  // The patches follow the inserts for the same reason the leads follow the records: the log row
+  // above is this run's receipt, and a PATCH that fails after it has landed is visible rather than
+  // silent. Each names one row by id and hands one column.
+  const patches = plan.filter(p => p.action === 'patch');
+  const patched = [];
+  for (const p of patches) {
+    try {
+      const [row] = await db.patch(`career_records?id=eq.${p.id}&select=id`, { data: p.data });
+      patched.push(row?.id ?? p.id);
+    } catch (e) { fail(e.message); }
+  }
 
   // The leads follow the records, never precede them: a lead is a by-product of a reviewed job, and
   // filing one for an answer whose own records failed to land would put a lead in the shared inbox
@@ -541,14 +647,23 @@ async function write(args) {
   if (leads.length) {
     try { filed = await db.insert('market_leads', leads); } catch (e) { fail(e.message); }
   }
-  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), leads: filed.length }) + '\n');
+  process.stdout.write(JSON.stringify({
+    inserted: inserted.length,
+    ids: inserted.map(r => r.id),
+    patched: patched.length,
+    patched_ids: patched,
+    leads: filed.length,
+  }) + '\n');
 }
 
 async function fetchPostings() {
   const db = rest();
   const companies = await db.get('career_records?kind=eq.watch_company&select=id,title,data');
   const targets = await db.get('career_records?kind=eq.target&select=data');
-  const stored = await db.get('career_records?kind=eq.posting&select=data');
+  // AGT-268: both populations, so a job a capability only ever saw on a search page (a
+  // `posting_note`) is not fetched again as a brand-new status:new intake card -- the backfill would
+  // otherwise re-open 162 jobs already reviewed.
+  const stored = await db.get('career_records?kind=in.(posting,posting_note)&select=data');
   const titles = targets.flatMap(t => (Array.isArray(t.data?.titles) ? t.data.titles : []));
   const existing = stored.map(p => p.data?.url).filter(Boolean);
 
@@ -706,7 +821,8 @@ async function fetchLinkedinAlerts(args) {
   const sender = args.from || watermark?.sender || LINKEDIN_ALERT_SENDER;
 
   const knownJobIds = new Set();
-  for (const p of await db.get('career_records?kind=eq.posting&select=data')) {
+  // AGT-268: both populations -- see the fetch-postings de-dup read above.
+  for (const p of await db.get('career_records?kind=in.(posting,posting_note)&select=data')) {
     if (p.data?.linkedin_job_id) knownJobIds.add(String(p.data.linkedin_job_id));
     const m = JOB_VIEW.exec(String(p.data?.url || ''));
     if (m) knownJobIds.add(m[1]);
