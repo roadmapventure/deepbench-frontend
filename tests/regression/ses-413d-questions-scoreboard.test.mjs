@@ -242,7 +242,18 @@ export const RUNBOOK_CEILING = 381000;
 // progress line's home in `notes` and its never-gates clause, +343 B. No header stamp (ses-424c pins
 // stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c AFTER the rebase onto AGT-136 slice 2's
 // -21 B, never carried over from the pre-rebase tree: 380577 -> 380920 B. No stamp added.
-export const BYTES_AT_SHIP = 380920;   // 380577 -> 380920
+// v7.0.701 (AGT-245 slice 4) adds step 9's `(7a-ter)` -- the delta re-grade of ONE delivered ticket, its
+// command, its one-slot-both-legs rule, its frozen-cohort pair and its 0/1/2 exits (501 B) -- plus its item
+// in the serial-tail list (94 B). BYTES FIRST, and against agt-138's 380980 bar rather than SES-336's
+// 381000: three single-occurrence removals of prose already homed elsewhere paid for it -- SES-127's
+// restated fail-direction clause at (5b) (134 B) and its restated no-publish-no-stamp justification
+// (177 B), both restating the sentence that still stands beside them, and the SECOND copy of the
+// "Re-assert the lease before the counter claim" sentence inside the (ceremony-legacy) block (239 B),
+// whose first copy at step 6 stays. 550 B out, 595 B in. Net +45 B: 380920 -> 380965, 14 B under agt-138's
+// bar and 35 B under SES-336's ceiling -- REPORTED, not absorbed. No header stamp (ses-424c pins
+// stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c, re-pinned and the card re-rendered in the
+// same commit as the runbook edit.
+export const BYTES_AT_SHIP = 380965;   // 380920 -> 380965
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

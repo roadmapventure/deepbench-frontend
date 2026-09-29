@@ -34,8 +34,13 @@
 //     SUPABASE_URL and no SUPABASE_SERVICE_KEY, which is how the clause proves the refusal comes
 //     first rather than after a credential check that happened to also fail.
 //
-// (d) THE REAL TREES, AND THE SHA IS THE DISCRIMINATOR (the kickoff's §6 bar). Two dry-runs on
-//     `AGT-101`'s real pair `7bddd226` → `119ed083`. The first `--suite=` prints the CHECKED-OUT
+// (d) THE REAL TREES, AND THE SHA IS THE DISCRIMINATOR (the kickoff's §6 bar). Two dry-runs on the
+//     FIRST COHORT PAIR STILL CURRENT ON THE BOARD -- which is no longer `AGT-101`, and that is a
+//     consequence of slice 4 rather than a preference: fence (b) refuses a ticket whose newest verdict
+//     is no longer the cohort's, and slice 4's own re-grade row IS a newer verdict for `AGT-101`. So
+//     the live clause picks its pair at runtime (55 of the 56 resolved rows still qualify) instead of
+//     pinning the one ticket this ship supersedes, and the supersede is asserted in its own right
+//     below. Read as: two dry-runs on a real pair `<base>` → `<ship>`. The first `--suite=` prints the CHECKED-OUT
 //     TREE'S OWN SHA as a failing test name: the base leg must name `tree-7bddd226.test.mjs` and the
 //     ship leg `tree-119ed083.test.mjs`, so the payload can only come out `newlyRed:
 //     ["tree-119ed083.test.mjs"]` / `standing: []` if each leg really ran in its own worktree -- a
@@ -59,6 +64,20 @@
 //     cohort; the script must exit 2 naming `no-version` rather than falling back to `graded_sha` for
 //     a pair -- which would hand a peer's tree to the suite wearing this ticket's id.
 //
+// (f) THE TAIL CARRIES THE STEP. A script nobody is told to run is a script nobody runs, so the
+//     `(7a-ter)` paragraph has to sit IN the serial tail -- after `(7a-bis)` and before the
+//     `sweep_decision_windows(` call whose window the ship decision it writes is for. The `SES-158`
+//     control strips the command line and the arm must THROW: a clause that still passes without the
+//     command is pinning prose, not the step.
+//
+// (g) THE ROW IS IN THE LEDGER (slice 4). `AGT-101` carried exactly ONE verdict row -- the `v7.0.563`
+//     block -- and no ship decision, so a slice that ran both legs and wrote nothing leaves the count
+//     at 1 and this arm goes red. The `reasoning` prefix pins WHICH lane wrote the row and WHICH pair
+//     it graded, and `graded_sha` must be the pair's ship tree rather than dev HEAD: a row from the
+//     ordinary verifier, or a re-grade of a different pair, fails here. Prefix and sha are DERIVED
+//     from the frozen cohort, never pasted, so a re-freeze that moved the pair fails instead of
+//     silently vouching for the old one.
+//
 // NOT DONE HERE, and named rather than skipped: the WRITE path. Both live runs are `--dry-run`, and
 // `--suite=` can never record by construction. A permanent regression test does not write the live
 // verdict ledger (ses-315 / ses-320's standing refusal) -- slice 4 is the first real pair with the
@@ -81,6 +100,12 @@ const CYCLE = "c0e2aa82-1940-4ac6-97bd-575d4b1d4e42";
 // AGT-101's frozen pair, re-read from the cohort file rather than pasted, so a re-freeze that moved
 // the pair fails here instead of silently grading a different one.
 const TICKET = "AGT-101";
+
+const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
+const TER_MARKER = "**(7a-ter) DELTA RE-GRADE";
+const BIS_MARKER = "**(7a-bis) RE-GRADE";
+const SWEEP_HEADING = "**(7b) SWEEP";
+const norm = s => String(s).replace(/\s+/g, " ");
 
 const PRIOR_GREEN = { build: "green", regression: "red", hygiene: "green" };
 const leg = (fails, notRun = []) => ({ ran: true, fails, notRun });
@@ -112,6 +137,90 @@ async function countVerdicts(base, key, ticket) {
     { headers: { apikey: key, Authorization: `Bearer ${key}` } });
   assert.equal(res.status, 200, `runner_verdicts count read answered HTTP ${res.status}`);
   return (await res.json()).length;
+}
+
+// (f) The tail's own paragraph. The marker is the PARAGRAPH's, not the bare label: the serial-tail
+// enumeration names `(7a-ter)` too, and anchoring on that would cut a span out of the list.
+export function theTailCarriesTheDeltaRegrade(md) {
+  const at = md.indexOf(TER_MARKER);
+  assert.ok(at >= 0,
+    `${RUNBOOK_REL} carries no "${TER_MARKER}" paragraph -- AGT-245's step has to live IN the serial ` +
+      "tail, not in a script nobody is told to run");
+  const bis = md.indexOf(BIS_MARKER);
+  assert.ok(bis >= 0 && bis < at,
+    `${RUNBOOK_REL}'s (7a-bis) paragraph is at ${bis} and (7a-ter) at ${at}: the free re-grade lane is ` +
+      "read first, and the delta lane is the one that runs when it returned nothing");
+  const sweep = md.indexOf("sweep_decision_windows(");
+  assert.ok(sweep > at,
+    `${RUNBOOK_REL}'s (7a-ter) paragraph is at ${at} but the sweep call is at ${sweep}. The re-grade runs ` +
+      "BEFORE the sweep: the ship decision it writes opens a window a later tail closes, and a step " +
+      "placed after the sweep is one the drain's terminating cycle never reaches");
+  const end = md.indexOf(SWEEP_HEADING, at);
+  assert.ok(end > at, `${RUNBOOK_REL}'s (7a-ter) paragraph is not followed by the "${SWEEP_HEADING}" heading`);
+  const span = norm(md.slice(at, end));
+  const required = [
+    ["scripts/regrade-delivered.js", "the command the cycle actually runs -- the whole point of putting the step here"],
+    ["--ticket=", "ONE ticket per run, and the pair is that ticket's own"],
+    ["--cycle-id=", "the verdict row and the ship decision both hang off the cycle"],
+    ["ONE test slot for BOTH legs", "one acquisition across base and ship: a pair that releases the line " +
+      "between its legs races a peer cycle's suite, which is the one thing that line exists to stop"],
+  ];
+  for (const [needle, why] of required) {
+    assert.ok(span.includes(needle),
+      `${RUNBOOK_REL}'s (7a-ter) paragraph does not name \`${needle}\` -- ${why}`);
+  }
+  return span.length;
+}
+
+// (g) The row slice 4 wrote. Credentialed; the prefix and the sha are derived from the frozen cohort.
+export async function theRowIsInTheLedger(base, key) {
+  const cohort = JSON.parse(fs.readFileSync(path.join(ROOT, COHORT_PATH), "utf8"));
+  const pair = pairFor(cohort, TICKET);
+  assert.ok(!pair.refuse, `${TICKET} must still resolve to a pair in the frozen cohort`);
+  const prefix = `AGT-245 delta re-grade of ${TICKET}: prior ${pair.verdict_id} (${pair.version}); base ${pair.base_sha}`;
+  const res = await fetch(
+    `${base.replace(/\/+$/, "")}/rest/v1/runner_verdicts?select=id,created_at,verdict,reasoning,graded_sha` +
+      `&backlog_id=eq.${TICKET}&order=created_at.desc`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  assert.equal(res.status, 200, `runner_verdicts read answered HTTP ${res.status}`);
+  const rows = await res.json();
+  assert.ok(rows.length >= 2,
+    `${TICKET} must carry at least TWO runner_verdicts rows -- the ${pair.version} block and AGT-245's delta ` +
+      `re-grade of it -- and it carries ${rows.length}. A slice that ran both legs and recorded nothing leaves ` +
+      "this at 1, which is exactly what this arm exists to catch");
+  const row = rows[0];
+  assert.ok(String(row.reasoning || "").startsWith(prefix),
+    `${TICKET}'s newest verdict does not open with ${JSON.stringify(prefix)} -- so it was not written by this ` +
+      `lane about this pair. It reads: ${JSON.stringify(String(row.reasoning || "").slice(0, 160))}`);
+  assert.equal(row.graded_sha, pair.ship_sha,
+    `the re-grade must be filed against the pair's SHIP tree ${String(pair.ship_sha).slice(0, 8)}, never dev HEAD -- ` +
+      "a row from the ordinary verifier carries whatever was pushed last, which is a peer's tree");
+  return { rows: rows.length, id: row.id, verdict: row.verdict };
+}
+
+// The live clause's pair, chosen on the board rather than pinned. `AGT-101`'s cohort row is stale for
+// it from slice 4 onward (see the header's (d)), so a pinned ticket would make this clause unrunnable
+// the moment its own feature shipped. The deps fence is checked here too: both legs share one
+// node_modules, so a pair that moved `package.json` is refused by the script and is not a probe pair.
+async function firstCurrentPair(url, key, cohort) {
+  for (const row of (cohort.rows || []).filter(r => r && r.status === "resolved")) {
+    const res = await fetch(
+      `${url.replace(/\/+$/, "")}/rest/v1/runner_verdicts?select=id&backlog_id=eq.${row.backlog_id}` +
+        `&order=created_at.desc&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    assert.equal(res.status, 200, `runner_verdicts read for ${row.backlog_id} answered HTTP ${res.status}`);
+    const rows = await res.json();
+    if (!rows[0] || String(rows[0].id) !== String(row.verdict_id)) continue;
+    const git = args => spawnSync("git", ["-C", ROOT, ...args], { encoding: "utf8" });
+    const deps = git(["diff", "--name-only", row.base_sha, row.ship_sha, "--", "package.json", "package-lock.json"]);
+    if (deps.status !== 0 || String(deps.stdout || "").trim()) continue;
+    const diff = git(["diff", "--name-only", row.base_sha, row.ship_sha]);
+    if (diff.status !== 0) continue;
+    const ownTests = String(diff.stdout || "").split("\n").map(s => s.trim())
+      .filter(f => f.startsWith("tests/regression/") && /\.m?js$/.test(f));
+    return { ...row, ownTests };
+  }
+  return null;
 }
 
 async function run() {
@@ -180,8 +289,6 @@ async function run() {
     "AGT-202 is refused in the frozen cohort and the refusal carries its own reason");
   assert.equal(pairFor(cohort, "AGT-000-not-a-ticket").refuse, "not-in-cohort",
     "a ticket the cohort never held is a different fact from a refusal");
-  const baseShort = String(pair.base_sha).slice(0, 8);
-  const shipShort = String(pair.ship_sha).slice(0, 8);
 
   const refused = runScript([`--ticket=AGT-202`, `--cycle-id=x`, "--dry-run", "--json"]);
   assert.equal(refused.status, 2, "a refused pair is `could not run` (exit 2), never a verdict on the delivery");
@@ -200,21 +307,45 @@ async function run() {
   assert.equal(payloadOf(allowed).kind, "missing-args",
     "CONTROL: the DEFAULT suite passes the fence and stops at the next check — the refusal is about the override, not about --suite existing");
 
+  // ---- (f) the tail carries the step, with the SES-158 control -------------------------------
+  const runbook = fs.readFileSync(path.join(ROOT, RUNBOOK_REL), "utf8");
+  const terSpan = theTailCarriesTheDeltaRegrade(runbook);
+  const noCommand = runbook.split("\n").filter(l => !l.includes("scripts/regrade-delivered.js")).join("\n");
+  assert.notStrictEqual(noCommand, runbook, "control for (f) changed nothing -- the mutation misses its target (the SES-158 failure)");
+  assert.throws(() => theTailCarriesTheDeltaRegrade(noCommand), /does not name/,
+    "CONTROL: with the command line stripped the (f) arm must THROW -- a clause that still passes without the command pins prose, not the step");
+
   // ---- (d) the real trees, twice ----------------------------------------------------------------
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun("AGT-245 (d)", "no SUPABASE_URL / SUPABASE_SERVICE_KEY, so the two live dry-runs on AGT-101's real trees " +
       "(the sha probe that names the ship tree newly red, and the row count before/after) are unverified here");
-    return report(pair, null);
+    return report(pair, null, terSpan, null);
   }
-  const before = await countVerdicts(url, key, TICKET);
+  // The write's own consequence, asserted rather than discovered by the next slice: AGT-245's row IS
+  // a newer verdict for AGT-101, so the cohort row that named the v7.0.563 block is stale for it and
+  // the script refuses it BY NAME. This is also a second, independent proof that the row was written.
+  const stale = runScript([`--ticket=${TICKET}`, `--cycle-id=${CYCLE}`, "--dry-run", "--json"]);
+  assert.equal(stale.status, 2, `${TICKET} must now be refused as could-not-run, never re-graded a second time off a stale cohort row`);
+  const stalePay = payloadOf(stale);
+  assert.equal(stalePay.kind, "superseded",
+    `${TICKET} must refuse as \`superseded\` once AGT-245 has re-graded it — it reads ${stalePay.kind}`);
+  assert.equal(stalePay.cohort_verdict_id, pair.verdict_id, "the cohort's verdict id is the frozen one");
+  assert.notEqual(String(stalePay.prior_verdict_id), String(pair.verdict_id),
+    "and the board's newest verdict for it is a DIFFERENT row — the one slice 4 wrote");
+
+  const probe = await firstCurrentPair(url, key, cohort);
+  assert.ok(probe, "no resolved cohort pair is still current on the board, so the live clause has no pair to grade — a re-freeze is due");
+  const baseShort = String(probe.base_sha).slice(0, 8);
+  const shipShort = String(probe.ship_sha).slice(0, 8);
+  const before = await countVerdicts(url, key, probe.backlog_id);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "agt-245-regrade-"));
   // The override suite is an echo and takes no database load, so the line exists to be inherited
   // when a parent holds it (run-all.js sets `held`) and opted out of otherwise -- never jumped.
   const env = { ...process.env, DEEPBENCH_TEST_SLOT: process.env.DEEPBENCH_TEST_SLOT || "off" };
-  const dryRun = probe => runScript(
-    [`--ticket=${TICKET}`, `--cycle-id=${CYCLE}`, "--dry-run", "--json", `--scratch=${scratch}`, `--suite=${probe}`],
+  const dryRun = suite => runScript(
+    [`--ticket=${probe.backlog_id}`, `--cycle-id=${CYCLE}`, "--dry-run", "--json", `--scratch=${scratch}`, `--suite=${suite}`],
     { env });
   let shaRun, constRun;
   try {
@@ -235,10 +366,10 @@ async function run() {
   assert.equal(shaRun.status, 1, "a block is exit 1 — a verdict, not a failure to run");
   assert.equal(shaPay.recorded, false, "--dry-run records nothing");
   assert.equal(shaPay.verdict_id, null);
-  assert.equal(shaPay.base_sha, pair.base_sha, "graded against the frozen pair, not against graded_sha or dev HEAD");
-  assert.equal(shaPay.ship_sha, pair.ship_sha);
-  assert.deepEqual(shaPay.own_tests, ["tests/regression/agt-70-auditor.test.mjs"],
-    "AGT-101's own diff carries one regression test, read from git rather than declared");
+  assert.equal(shaPay.base_sha, probe.base_sha, "graded against the frozen pair, not against graded_sha or dev HEAD");
+  assert.equal(shaPay.ship_sha, probe.ship_sha);
+  assert.deepEqual(shaPay.own_tests, probe.ownTests,
+    `${probe.backlog_id}'s own regression-test diff must be read from git rather than declared`);
 
   const constPay = payloadOf(constRun);
   assert.deepEqual(constPay.standing, ["same.test.mjs"],
@@ -249,27 +380,35 @@ async function run() {
   assert.equal(constPay.recorded, false, "and STILL records nothing — `--suite=` never writes");
   assert.equal(constPay.ship_decision_id, null, "no ship decision either");
 
-  const after = await countVerdicts(url, key, TICKET);
+  const after = await countVerdicts(url, key, probe.backlog_id);
   assert.equal(after, before,
-    `${TICKET} had ${before} runner_verdicts rows before the two dry-runs and ${after} after — a dry-run that wrote one would be caught here`);
-  return report(pair, { before, after, sha: shaPay, constant: constPay });
+    `${probe.backlog_id} had ${before} runner_verdicts rows before the two dry-runs and ${after} after — a dry-run that wrote one would be caught here`);
+
+  // ---- (g) the row slice 4 wrote ---------------------------------------------------------------
+  const ledger = await theRowIsInTheLedger(url, key);
+  return report(pair, { before, after, sha: shaPay, constant: constPay, probe }, terSpan, ledger);
 }
 
-function report(pair, live) {
+function report(pair, live, terSpan, ledger) {
   const head =
     `  [AGT-245] delta re-grade: a red only on the ship leg is newlyRed/block, the SAME red on both legs is ` +
     `standing/approve, and those identical captures flip to block when the file is in ownTests (the base tree ran a ` +
     `different file under that name); a prior block on build or hygiene refuses not-regression-only with no gate ` +
     `results. legNames: a [NOT RUN] transport capture is ran:false, a [PASS] capture is ran:true, and a test that ` +
     `failed AND skipped a part stays a proven red. AGT-202 exits 2 no-version; --suite=x without --dry-run exits 2 ` +
-    `suite-override-requires-dry-run with the credentials stripped, while the default suite passes the fence.`;
+    `suite-override-requires-dry-run with the credentials stripped, while the default suite passes the fence.` +
+    `\n       The tail's (7a-ter) paragraph (${terSpan} B normalised) names the command, --ticket=, --cycle-id= and ONE ` +
+    `test slot for BOTH legs, sits after (7a-bis) and above the sweep call, and its arm throws with the command line stripped.` +
+    (ledger ? `\n       Ledger: ${TICKET} carries ${ledger.rows} runner_verdicts rows; the newest (${ledger.id}, ${ledger.verdict}) ` +
+      `opens with AGT-245's own re-grade prefix and is graded against the pair's ship tree.` : "");
   if (!live) return console.log(head);
-  const b = String(pair.base_sha).slice(0, 8);
-  const s = String(pair.ship_sha).slice(0, 8);
-  console.log(`${head}\n       Live, ${TICKET} ${b} → ${s}: the sha probe named tree-${b}.test.mjs on the base leg and ` +
+  const b = String(live.probe.base_sha).slice(0, 8);
+  const s = String(live.probe.ship_sha).slice(0, 8);
+  console.log(`${head}\n       Live, ${live.probe.backlog_id} ${b} → ${s} (the first cohort pair still current on the board; ` +
+    `${TICKET} itself now refuses \`superseded\`, which is AGT-245's own row): the sha probe named tree-${b}.test.mjs on the base leg and ` +
     `tree-${s}.test.mjs on the ship leg → newlyRed [${live.sha.newlyRed.join(", ")}], standing [], block, recorded:false; ` +
     `the constant probe → standing [${live.constant.standing.join(", ")}], approve, recorded:false. ` +
-    `runner_verdicts rows for ${TICKET}: ${live.before} before, ${live.after} after.`);
+    `runner_verdicts rows for ${live.probe.backlog_id}: ${live.before} before, ${live.after} after.`);
 }
 
 export default run;

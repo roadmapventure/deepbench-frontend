@@ -2827,10 +2827,7 @@ at a paraphrase of itself.
 item's backlog row, the governing `ARCHITECTURE.md` section(s), every `.claude/rules/` file
 whose paths you will touch, and the real source files. Inventions additionally pass the R&D gate first (research →
 cheapest-variant POC, measured → logged go/no-go; §19d sniff test — traceable reasoning, never
-a feature mill). **Re-assert the lease (step 0) before the counter claim** — a version claimed
-after you were stolen from is a permanent gap at best — then claim your version atomically
-(`dev_version_counter`, SQL in
-`docs/runbooks/session-setup.md`). Write the kickoff doc
+a feature mill). Write the kickoff doc
 (`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within **one item** and the file/task
 pair step 5a computed from `class_autonomy()` — never a pair recited here (`AGT-185`): the
 baseline and what a rung adds have one home, `docs/STANDARDS.md` Section 2.
@@ -4229,12 +4226,9 @@ stamp `briefed_at` on the §10 skip rows you just rendered, and ONLY after the r
 resolved_at IS NULL;` — `briefed_at IS NULL` *is* the NEW chip, so stamping before the publish
 lands silently eats the chip on rows John never saw, and stamping after means the worst case is
 one extra night marked new. **A CYCLE THAT DID NOT PUBLISH MUST NOT STAMP IT AT ALL** — under the
-bridge that is now the ordinary unattended case, and it follows from this rule rather than
-softening it: no publish means John saw nothing, so every one of those rows is still NEW and the
-stamp would eat the chip permanently. `SES-127`'s own fail direction — the worst case is one extra
-night marked new — is what makes leaving it unstamped the safe half; **(6)** close your `runner_cycles` row AND release the publish lease in the ONE
+bridge that is now the ordinary unattended case; **(6)** close your `runner_cycles` row AND release the publish lease in the ONE
 statement below (`AGT-171`) — `lease_released_at` NULL means your tail lease was TTL-stolen; leave
-the new holder alone; **(7)** retired into (6) — nothing after (6) holds the lease; **(7a-bis)** re-grade the ships blocked for a cause outside themselves, **only if step 5's manager named any** — written out in its own `(7a-bis)` paragraph below, and it runs no gate (`SES-403`); **(7b)** sweep the decision windows — one idempotent call,
+the new holder alone; **(7)** retired into (6) — nothing after (6) holds the lease; **(7a-bis)** re-grade the ships blocked for a cause outside themselves, **only if step 5's manager named any** — written out in its own `(7a-bis)` paragraph below, and it runs no gate (`SES-403`); **(7a-ter)** delta re-grade ONE delivered ticket, if the slice names one — paragraph below; **(7b)** sweep the decision windows — one idempotent call,
 written out in its own `(7b)` paragraph below, whose **three** returned numbers go into the cycle
 `notes`; **(7c)** the class-understanding loop — one `due` check, written out in its own `(7c)`
 paragraph below, gated so it fires at most once a day; **(8)** continue the drain **in-session**, if and only if
@@ -4271,6 +4265,13 @@ window closing at a later tail; **1** = still a block (that row is what `SES-402
 ancestry check refused it, recording nothing; **2** = could not run, not a verdict.
 **No card to John** (ruling 2026-09-15, directive `6f33ec28`). A ship blocked on its OWN diff is
 never listed: that diff is in `dev`, so the job it broke still fails there.
+
+**(7a-ter) DELTA RE-GRADE ONE DELIVERED TICKET (`AGT-245`).** <!-- FEATURE: AGT-245 -->
+Only when the slice names one:
+`node scripts/regrade-delivered.js --ticket=<ID> --cycle-id=<your cycle id>`. ONE test slot for
+BOTH legs. The pair is the frozen cohort's, never `graded_sha` (dev HEAD, a peer's tree).
+**0** = an `approve` row plus its ship decision; **1** = a block row, or a refusal recording
+nothing; **2** = could not run, recording nothing, not a verdict. **No card to John**, as `(7a-bis)`.
 
 **(7b) SWEEP THE DECISION WINDOWS (`SES-286`, `v7.0.395` — `M6-02`, `M6-07`).** <!-- FEATURE: SES-286 (b) — the cycle tail closes the windows that expired while it ran. -->
 One call, idempotent, safe to run on a cycle that decided nothing:
