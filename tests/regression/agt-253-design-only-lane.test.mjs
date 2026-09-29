@@ -1,4 +1,4 @@
-// DeepBench v7.0.727 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-253
+// DeepBench v7.0.738 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-253
 // FEATURE: AGT-253 -- A DESIGN-ONLY LANE THAT STOPS BEFORE THE BUILD. Kickoff:
 // docs/kickoffs/v7.0.727-AGT-253-design-only-stop.md §5 task 5.
 //
@@ -17,11 +17,20 @@
 //      green here cannot be a green that could not go red (STANDARDS §4, LOO-013 -- assert WHICH
 //      branch fired). The span is the load-bearing half: the same clause pasted into step 9 would
 //      satisfy a bare file-wide includes() and tell no cycle anything.
-//   B  LIVE, READ-ONLY -- projects.design_only is true on EXACTLY trainer-authored-agents; AGT-250,
-//      AGT-251 and AGT-252 all read design_status NULL and all three come back from
-//      rpc/prime_directive_queue; rpc/ticket_design_only reads true for AGT-250 and FALSE for
-//      AGT-253 -- the pair is the discriminating one, since a function that returned true for
-//      everything would pass the first half alone.
+//   B  LIVE, READ-ONLY -- projects.design_only is true on EXACTLY trainer-authored-agents, all three
+//      members are still filed, and each member's (newest card decision, design_status, in
+//      prime_directive_queue) triple is LEGAL for the state it is in, per memberStateReason(): no
+//      card -> NULL and in the queue; an undecided card -> out of the queue and `designed` or
+//      `needs-desktop`; `accept` -> `needs-desktop` and out (D2, his yes makes the build attended,
+//      off main); `rework` -> NULL and back in. rpc/ticket_design_only reads true for AGT-250 and
+//      FALSE for AGT-253 -- the pair is the discriminating one, since a function that returned true
+//      for everything would pass the first half alone.
+//      WHY A STATE MACHINE AND NOT THREE VALUES (pattern:162 -- a check grades the change, never the
+//      live world): this arm first pinned design_status `[null, null, null]` and all three members
+//      coming back from the queue, which was the true state for one hour after v7.0.727's own task 6
+//      and false from the next cycle's stop onward -- a guard that could never go green again and so
+//      protected nothing. The triple above holds through every state the lane's own trigger writes,
+//      so the arm reddens when the LANE breaks and not when John answers a card.
 //   C  LIVE, NO WRITES -- rpc/design_only_stop refuses on AGT-253 (not a design-only project) and on
 //      AGT-250 under a cycle that does not hold the claim, each with ITS OWN sentence, not merely
 //      "a 400"; the anon key is denied both new RPCs. Row counts are re-read equal afterwards.
@@ -65,6 +74,72 @@ function stepSpan(md, label) {
   const to = i + 1 < steps.length ? steps[i + 1].line - 1 : lines.length;
   return lines.slice(from, to).join("\n");
 }
+
+// PURE, and the whole of arm B's judgment. The four states below are the ONLY ones this lane's own
+// writers produce, read this ship from pg_get_functiondef() on design_only_stop() and
+// design_only_answer_applies():
+//   no card        -- the lane has not fired; design_status NULL and the ticket is pickable.
+//   undecided NULL -- design_only_stop() filed the card and wrote `designed` (or `needs-desktop`, a
+//                     re-stop after an earlier yes); pick_exclusions()'s undecided-card clause keeps
+//                     it out of prime_directive_queue() -- never picked again until John approves.
+//   accept         -- John said yes; the trigger writes `needs-desktop`, which pick_blocking_flags()
+//                     already reads, so the approved build waits for a session he attends (D2).
+//   rework         -- John said no; the trigger clears design_status to NULL and the Designer redoes
+//                     it, so the ticket is pickable again.
+// Returns null when the triple is legal, else the sentence naming the violation.
+export function memberStateReason(cardDecision, designStatus, inQueue) {
+  if (cardDecision === undefined) {
+    if (designStatus !== null) {
+      return `no gated_before_build card, so design_only_stop() has not run and design_status must be NULL; got ${JSON.stringify(designStatus)}`;
+    }
+    if (inQueue !== true) {
+      return "no gated_before_build card, so nothing excludes it and prime_directive_queue() must still return it; it did not";
+    }
+    return null;
+  }
+  if (cardDecision === null) {
+    if (inQueue !== false) {
+      return "the card is undecided and on John's desk, so pick_exclusions()'s undecided-card clause must keep it out of prime_directive_queue() -- never picked again until John approves; it came back";
+    }
+    if (designStatus !== "designed" && designStatus !== "needs-desktop") {
+      return `the card is undecided, so design_status must be 'designed' (design_only_stop()'s own write) or 'needs-desktop' (a re-stop after an earlier yes); got ${JSON.stringify(designStatus)}`;
+    }
+    return null;
+  }
+  if (cardDecision === "accept") {
+    if (designStatus !== "needs-desktop") {
+      return `the card reads accept, so design_only_answer_applies() must have written design_status 'needs-desktop' -- D2, his yes makes the build attended, off main per the charter; got ${JSON.stringify(designStatus)}`;
+    }
+    if (inQueue !== false) {
+      return "the card reads accept and needs-desktop is a pick_blocking_flags() flag, so the ticket must stay out of prime_directive_queue() until John runs it himself; it came back";
+    }
+    return null;
+  }
+  if (cardDecision === "rework") {
+    if (designStatus !== null) {
+      return `the card reads rework, so design_only_answer_applies() must have cleared design_status to NULL for the Designer to redo it; got ${JSON.stringify(designStatus)}`;
+    }
+    if (inQueue !== true) {
+      return "the card reads rework, so the design is back with the Designer and prime_directive_queue() must return it again; it did not";
+    }
+    return null;
+  }
+  return `${JSON.stringify(cardDecision)} is not a decision this lane writes -- design_only_answer_applies() writes only accept or rework, and design_only_stop() files the card undecided`;
+}
+
+// Each of the four states paired with a wrong design_status and a wrong inQueue. Control (b) of
+// STANDARDS §4: every entry must come back with a reason, or a branch that stopped judging would
+// still read green against the live rows.
+const WRONG_STATES = [
+  [undefined, "designed", true, "no card / design_status"],
+  [undefined, null, false, "no card / queue"],
+  [null, null, false, "undecided / design_status"],
+  [null, "designed", true, "undecided / queue"],
+  ["accept", null, false, "accept / design_status"],
+  ["accept", "needs-desktop", true, "accept / queue"],
+  ["rework", "needs-desktop", true, "rework / design_status"],
+  ["rework", null, false, "rework / queue"],
+];
 
 async function req(url, key, q, { method = "GET", body, headers = {} } = {}) {
   const res = await fetch(`${url}/rest/v1/${q}`, {
@@ -161,7 +236,7 @@ async function run() {
       "Credentialed run: STANDARDS.md Section 2 rule 5");
   } else {
     // --- B. the lane exists and is scoped to ONE project -------------------------------------------
-    await arm("B design_only, members cleared, predicate", async () => {
+    await arm("B design_only, the four member states, predicate", async () => {
       const on = await req(url, key, "projects?design_only=is.true&select=slug");
       assert.equal(on.status, 200, describe(on));
       assert.deepEqual(on.json.map(r => r.slug), [DESIGN_ONLY_PROJECT],
@@ -171,15 +246,41 @@ async function run() {
         `backlog_items?backlog_id=in.(${MEMBERS.join(",")})&select=backlog_id,design_status&order=backlog_id`);
       assert.equal(mem.status, 200, describe(mem));
       assert.deepEqual(mem.json.map(r => r.backlog_id), MEMBERS, "all three members are still filed");
-      assert.deepEqual(mem.json.map(r => r.design_status), [null, null, null],
-        "AGT-250/251/252 carried needs-desktop, which pick_blocking_flags() reads; the lane cleared it");
+      const statusOf = new Map(mem.json.map(r => [r.backlog_id, r.design_status]));
 
       const q = await req(url, key, "rpc/prime_directive_queue", { method: "POST", body: {} });
       assert.equal(q.status, 200, describe(q));
       const refs = q.json.map(r => r.ref);
+
+      // CONTROL (a). An empty queue satisfies every `inQueue === false` branch below for the wrong
+      // reason -- a runner that stopped picking anything at all would read as a working lane.
+      assert.ok(refs.length >= 1,
+        `prime_directive_queue() returned nothing at all, so no "out of the queue" judgment below means ` +
+        `anything -- the lane cannot be graded against an empty queue`);
+
+      // THE STATE MACHINE, per member: the newest card's decision, the ticket's design_status and
+      // whether the queue returns it must form one of the four legal triples.
       for (const m of MEMBERS) {
-        assert.ok(refs.includes(m),
-          `${m} must come back from prime_directive_queue() -- it returned 0 of the three before this ship; got ${JSON.stringify(refs)}`);
+        const card = await req(url, key,
+          `runner_items?kind=eq.gated_before_build&backlog_id=eq.${m}&select=decision&order=created_at.desc&limit=1`);
+        assert.equal(card.status, 200, describe(card));
+        const decision = card.json.length ? card.json[0].decision : undefined;
+        const designStatus = statusOf.get(m);
+        const inQueue = refs.includes(m);
+        const reason = memberStateReason(decision, designStatus, inQueue);
+        assert.equal(reason, null,
+          `${m}: newest gated_before_build card ${card.json.length ? JSON.stringify(decision) : "(no card)"}, ` +
+          `design_status ${JSON.stringify(designStatus)}, in prime_directive_queue ${inQueue} -- ${reason}`);
+      }
+
+      // CONTROL (b). Every one of the four states, paired with a wrong design_status and a wrong
+      // inQueue, must come back with a reason -- a branch that stopped judging would otherwise sit
+      // green against whatever the live rows happen to be (STANDARDS §4, LOO-013).
+      for (const [decision, designStatus, inQueue, label] of WRONG_STATES) {
+        assert.notEqual(memberStateReason(decision, designStatus, inQueue), null,
+          `control: the ${label} pairing (${JSON.stringify(decision) ?? "no card"}, ` +
+          `${JSON.stringify(designStatus)}, ${inQueue}) is illegal and memberStateReason() returned null -- ` +
+          `that branch has stopped grading the lane`);
       }
 
       // THE DISCRIMINATING PAIR. true alone would pass for a predicate hardcoded to true.
