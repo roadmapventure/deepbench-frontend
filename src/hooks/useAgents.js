@@ -1,3 +1,16 @@
+// DeepBench v7.0.722 | useAgents.js | AGT-006 — useAgents() stops returning the static AGENTS
+// array and reads public.agents, which is now the authoritative roster store. The Designer's
+// recorded reversible decisions (JOHN-0925-DESIGNER-DECIDES), not John's: D1 public.agents is
+// authoritative for every field it holds, and agents.js keeps only what the table lacks (quip,
+// color, benchGroups, the doc/class/chunk counts) until AGT-57 retires the other; D2 where both
+// hold a value the TABLE stands — which is why nadia's role now reads "Data Analyst" on the Bench,
+// matching her prompt identity card (api/prompt/db-assembly.js), instead of the array's "Data
+// Expert"; D3 the array filled the table's blanks ONCE, in docs/design/agt-006-agents-table-seed.sql
+// — 19 of the 24 product rows, each with its own runner_before_images row under one agent-row
+// decision, is_active untouched; D4 the hook renders AGENTS first and overlays the table on
+// arrival, so the Bench never blanks while the fetch is in flight and a failed fetch leaves the
+// array standing. Five Bench strings now read the table's value; every number stays identical.
+// mergeRoster() is exported pure and pinned by tests/regression/agt-006-agents-table-authoritative.test.mjs.
 // DeepBench v7.0.306 | useAgents.js | LOG-104 — useAgentActivitySummary()'s fetchAll() pages with a
 // defined order. It had NO .order() at all across ~17 .range() pages over ~16.4k rows, so the order
 // was whatever the planner chose and could differ between pages: rows silently skipped or
@@ -37,10 +50,9 @@
 // DeepBench v6.0.43 | useAgents.js | S-MI-18b — useAgentActivitySummary() gains optional scope filter
 // FEATURE: SH-03 — Agent roster hook
 // src/hooks/useAgents.js — v5.0.0
-// Returns the agent roster. Swap internals for Supabase query when auth arrives.
 // All components use this hook — never import AGENTS directly from data/agents.js.
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { AGENTS } from "../data/agents.js";
 import { supabase } from '../lib/supabase.js';
 import { computeCallCost, pairedAgentTurnIds, CAPABILITY_WRAPPER_TYPES, PAIR_WINDOW_MS, percentile, classifyRow, buildActivitySummary } from './useAIActivity.js';
@@ -263,10 +275,40 @@ export function useDataSources() {
   return rows;
 }
 
+// FEATURE: AGT-006 — the table's column names, keyed by the AGENTS field each one overlays. The
+// key is the array's field; the value is the public.agents column. D1: the table is authoritative
+// for every field it holds, so every pair here is an overlay, and agents.js keeps only what the
+// table lacks (quip, color, benchGroups, docs/classes/chunks, hiredOn, trainable*) until AGT-57.
+export const ROSTER_TABLE_FIELDS = { name: "name", role: "role", code: "code", specialty: "specialty", arch: "architecture", skill: "skill_score", situational: "situational_awareness", salary: "salary", value: "yearly_value", hourly: "hourly_rate", reportHrs: "report_hours", reportCost: "report_cost", revenueModel: "revenue_model", trainer: "trainer_org" };
+const ROSTER_SELECT = "id,is_active," + Object.values(ROSTER_TABLE_FIELDS).join(",");
+
+// D2: where both hold a value the TABLE stands — so a non-null table column always wins, and a
+// NULL one leaves the array's value in place. Pure and exported so the regression suite can assert
+// the merge without a network call.
+export function mergeRoster(codeAgents, tableRows) {
+  const byId = new Map((tableRows || []).map(r => [r.id, r]));
+  return codeAgents.map(a => {
+    const t = byId.get(a.id);
+    if (!t) return a;
+    const out = { ...a, is_active: t.is_active ?? true };
+    for (const [k, col] of Object.entries(ROSTER_TABLE_FIELDS)) {
+      if (t[col] !== null && t[col] !== undefined) out[k] = t[col];
+    }
+    return out;
+  });
+}
+
 export function useAgents() {
-  // TODO: replace with Supabase query when Phase 0 complete + Clerk auth arrives
-  // const { data, isLoading } = useQuery(['agents', TENANT_ID], () =>
-  //   supabase.from('agents').select('*').eq('tenant_id', TENANT_ID)
-  // );
-  return useMemo(() => AGENTS, []);
+  // D4: AGENTS renders first, the table overlays it on arrival — the Bench never waits on the
+  // fetch, and an error or an empty payload leaves the array's values standing.
+  const [agents, setAgents] = useState(AGENTS);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from('agents').select(ROSTER_SELECT).eq('lane', 'product').then(({ data, error }) => {
+      if (cancelled || error || !data) return;
+      setAgents(mergeRoster(AGENTS, data));
+    });
+    return () => { cancelled = true; };
+  }, []);
+  return agents;
 }
