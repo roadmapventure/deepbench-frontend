@@ -2739,10 +2739,8 @@ measurement, superseding ticket), run the queue recompute, and **drop to the nex
 ticket per B24** — never build a dead premise and never remove unattended. <!-- FEATURE: SES-336 — the revalidation is performed INSIDE design-kickoff now; the outcome handling below is still this step's. --> **AMENDED BY `SES-336` (`v7.0.439`): the revalidation itself is PERFORMED BY THE DESIGNER, inside `design-kickoff` (`ds-identity`'s first act, `ds-guardrails`' first `must`), and reaches this step as `premise` plus `premise_evidence` — the two branches above are unchanged and are still yours to execute.**
 
 **`design_status = 'designed'` MEANS THE DESIGN ALREADY EXISTS — build from `kickoff_link`,
-do not re-design it (`SES-114`, `v7.0.165`).** 18 open numbered tickets carry it (census
-`23:11Z` 2026-08-22). The row cannot claim it without its artifact — `SES-112` shipped
-`CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` — so the link is guaranteed
-present, and re-deriving a kickoff for a ticket that has one is the same waste in a different
+do not re-design it (`SES-114`, `v7.0.165`).** The row cannot claim it without its artifact — `SES-112`'s CHECK,
+named in statement 3 — so the link is guaranteed present, and re-deriving a kickoff for a ticket that has one is the same waste in a different
 costume. `auto` or `NULL` runs the full ceremony below exactly as today. **Revalidation is NOT
 skipped by this** — a designed ticket's premise can die like any other, and the fast path starts
 after the revalidation above, never instead of it.
@@ -2787,11 +2785,9 @@ node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<
    NULL tokens — unmeasured, never free — but a lone flag, or a negative or non-numeric value,
    still exits 2.
 2. **`premise = 'dead'` is the Designer's answer to this step's own first question, and you act on
-   it rather than re-checking it.** Take its `premise_evidence` into the removal proposal: set
-   `status = 'removal proposed'`, file the briefing card carrying the ticket (ID — title) plus that
-   evidence, run `SELECT public.recompute_backlog_queue();` and **drop to the next queued ticket** —
-   never build a dead premise and never remove unattended. It is a judgment write, so record it as
-   a decision per **7b**.
+   it rather than re-checking it.** Take its `premise_evidence` into the removal proposal this step
+   opens with — `status = 'removal proposed'`, the card, `SELECT public.recompute_backlog_queue();`,
+   drop to the next ticket — and record it as a decision per **7b**.
 3. **`premise = 'alive'` → write the returned `kickoff_markdown` to the returned `kickoff_path`**
    (`docs/kickoffs/<version>-<ID>-<slug>.md`) and commit it, then set that path as the ticket's
    `kickoff_link` and `design_status = 'designed'` in ONE write, before-image first. `SES-112`'s
@@ -2810,6 +2806,7 @@ node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<
    Either cause: a second exit 1 closes the cycle `gated_before_build` with the finding verbatim in
    notes and on the card. A non-null `harvest_markdown` is written to `docs/harvests/<ID>.md` in the
    SAME commit and is never in the build's `task_context`.**
+   **Design-only project (`AGT-253`): when `public.ticket_design_only('<ID>')` is true, `public.design_only_stop(cycle id, ID, kickoff path, plain_cant, plain_after, plain_worth)` replaces this write — then close the cycle `gated_before_build`; never step 7.**
 
 <!-- FEATURE: SES-336 — the design ceremony below is RETIRED IN PLACE, kept verbatim. -->
 **RETIRED IN PLACE (`SES-336`, `v7.0.439`) — `docs/SELFBUILD-RETIREMENT-LEDGER.md` entry 49.** The
