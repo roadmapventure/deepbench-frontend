@@ -256,7 +256,7 @@ the intended owner. Never run before as its own systematic pass.
 
 **New this pass, closed:**
 - ~~Identity field completeness~~ — **resolved 2026-07-15.** Identity fields, confirmed: `name` +
-  `role` + `specialty` + `bio` (a real, authored `agents` column, confirmed dead — never read
+  `role` + `specialty` + `bio` (a real, authored `agents` column, confirmed dead 2026-07-15, rendered by `AGT-005` since v7.0.718 — before that never read
   anywhere in `api/`) + all `role_prompt` entries (Resume tab — already correctly wired, not a
   gap) + the Identity Skill's own `objective`/`method`. `architecture` column excluded — unused
   anywhere in the UI or harness, origin unknown, not counted as identity. Governing rule locked

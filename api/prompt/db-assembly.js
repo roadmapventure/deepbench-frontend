@@ -1,3 +1,6 @@
+// DeepBench v7.0.718 | api/prompt/db-assembly.js | AGT-005 -- agents.bio, selected by AA-58's
+// query since it landed and then discarded, now renders in the Identity section as its own
+// unlabelled line under the name · role · specialty card. Blank/null bio: byte-identical.
 // DeepBench v7.0.430 | api/prompt/db-assembly.js | SES-341 -- a Knowledge Skill can carry its own
 // text: traits.source = "inline" builds an inline fetch_instruction ({method,source,text,heading})
 // and fills the section content at assembly time via the new exported renderInlineKnowledge(),
@@ -242,10 +245,14 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       // FEATURE: AA-66 — additive Identity assembly: agents table + all role_prompts + skill profile
       const parts = [];
 
-      // Source 1: agents table — name, role, specialty
+      // Source 1: agents table — name, role, specialty, then bio (AGT-005; fetched since AA-58)
       if (agentRow) {
         const cardParts = [agentRow.name, agentRow.role, agentRow.specialty].filter(Boolean);
         if (cardParts.length) parts.push(cardParts.join(' · '));
+        // FEATURE: AGT-005 -- the bio joins the card as its own unlabelled line, general to
+        // specific, before the role_prompt rows. Generic field read, no identity conditional
+        // (.claude/rules/capabilities-are-data.md). Blank/absent -> byte-identical to before.
+        if (typeof agentRow.bio === 'string' && agentRow.bio.trim()) parts.push(agentRow.bio.trim());
       }
 
       // Source 2: all role_prompt entries from agent_configs (not just is_default)
