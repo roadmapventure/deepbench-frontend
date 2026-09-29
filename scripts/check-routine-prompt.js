@@ -109,7 +109,7 @@ export const ROUTINES = {
     file: "model-watch-routine.md",
     begin: "<!-- MODEL-WATCH-ROUTINE-PROMPT-BEGIN -->",
     end: "<!-- MODEL-WATCH-ROUTINE-PROMPT-END -->",
-    id: null,
+    id: "trig_01QTxphS7u5dzD5HdChCBzjV", // created 2026-09-29 by attended session status-0929
   },
   // AGT-155. The Wednesday market scan. The routine EXISTS and carries a real id, but it was created
   // through the http_api surface, so update_trigger refuses an agent ("Agents can only update

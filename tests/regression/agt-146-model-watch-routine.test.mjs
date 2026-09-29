@@ -156,8 +156,10 @@ async function run() {
       assert.equal(f[0].check_slug, "routine-prompt-drift");
       assert.equal(f[0].kind, "contradiction");
       assert.equal(f[0].confidence, "high");
-      assert.equal(f[0].locations[0].location, "routine/model-watch/prompt",
-        "an id-less routine locates by NAME, never by the string 'null'");
+      // The routine was created 2026-09-29 (status-0929), so the location now carries its id; the
+      // NAME fallback still holds for any routine registered before its id exists.
+      assert.equal(f[0].locations[0].location, "routine/trig_01QTxphS7u5dzD5HdChCBzjV/prompt",
+        "the created routine locates by its trigger id, never by the string 'null'");
       assert.ok(!f[0].locations[0].location.includes("null"), "no `routine/null/prompt`");
       assert.equal(f[0].locations[0].text, "X", "location 1 quotes the first differing live line");
       assert.match(f[0].locations[1].location, /^docs\/runbooks\/model-watch-routine\.md:\d+$/);
@@ -258,7 +260,7 @@ async function run() {
       assert.equal(ROUTINES.runner.id, "trig_017TZ3JZcLBK6AYH6DKURqMH", "runner id unchanged");
       assert.equal(ROUTINES.auditor.id, "trig_01BCzPdanZ1YiK956dAqU6YN", "auditor id unchanged");
       assert.equal(ROUTINES.researcher.id, "trig_01862LsK4ZQF8PTgQoK2cgCV", "researcher id unchanged");
-      assert.equal(ROUTINES["model-watch"].id, null, "model-watch has no id until the routine exists");
+      assert.equal(ROUTINES["model-watch"].id, "trig_01QTxphS7u5dzD5HdChCBzjV", "model-watch id filled once the routine exists (2026-09-29)");
       assert.equal(ROUTINES["model-watch"].file, "model-watch-routine.md");
       assert.equal(ROUTINES["model-watch"].begin, BEGIN);
       assert.equal(ROUTINES["model-watch"].end, END);

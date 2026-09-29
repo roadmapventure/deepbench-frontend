@@ -87,6 +87,8 @@ export const ROUTINES = [
   { name: "deepbench-runner-lane-2", id: "trig_018W86qqGPV7a4qpngXFrUFm", job_kind: "lane", job_key: "orchestrator" },
   { name: "deepbench-runner-lane-3", id: "trig_01AAMaJbdt2ye6hMMpCDy5Yd", job_kind: "lane", job_key: "orchestrator" },
   { name: "deepbench-runner-lane-4", id: "trig_01Mz6xT2uQ7hhmieAwcNBRdg", job_kind: "lane", job_key: "orchestrator" },
+  // AGT-146's model-watch, created 2026-09-29 (status-0929); it runs on the orchestrator lane's model.
+  { name: "model-watch", id: "trig_01QTxphS7u5dzD5HdChCBzjV", job_kind: "lane", job_key: "orchestrator" },
 ];
 
 export const SYNC_KIND = "routine-pin-sync";

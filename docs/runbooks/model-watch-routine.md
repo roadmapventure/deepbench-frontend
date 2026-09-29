@@ -14,7 +14,7 @@
 | environment | `env_01GuEzm2nCHbCB5SumvQVEQ1` | the environment the other DeepBench routines run in |
 | enabled | `true` at creation | John's switch alone |
 | notifications | off | nothing is sent; the record of every fire is one `runner_decisions` row the standing brief already renders |
-| routine id | **not yet created** — the attended session that creates the routine fills it here and in `ROUTINES["model-watch"].id` | AGT-102 ran the Auditor a week on an unfilled placeholder, so the id is absent by design until it is real, and the prompt block never carries one |
+| routine id | `trig_01QTxphS7u5dzD5HdChCBzjV` — created 2026-09-29 by attended session `status-0929` (first run `cse_01PJz14HXKJKsEPENSteezGk`); also in `ROUTINES["model-watch"].id` (`scripts/check-routine-prompt.js`) and `scripts/sync-routine-models.js` `ROUTINES` | AGT-102 ran the Auditor a week on an unfilled placeholder, so the id is absent by design until it is real, and the prompt block never carries one |
 | prompt | the block between `<!-- MODEL-WATCH-ROUTINE-PROMPT-BEGIN -->` / `<!-- MODEL-WATCH-ROUTINE-PROMPT-END -->` in `docs/runbooks/model-watch-routine.md`, byte-identical | the routine-prompt.md convention: the file is the source, the routine the copy |
 
 Update rule, as routine-prompt.md and auditor-routine.md: edit the block → suite → commit → on John's word `RemoteTrigger update` with the WHOLE `ccr` (`environment_id`, `events`, `session_context`) read from a fresh `get`, then read back `derived_state.model` and `allowed_tools`.
