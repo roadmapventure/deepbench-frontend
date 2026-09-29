@@ -1,3 +1,25 @@
+// DeepBench v7.0.710 | tests/regression/agt-155-market-leads.test.mjs | AGT-155 remainder -- the
+// TWO LEAD FACTS reach the PRODUCER. v7.0.683 shipped the inbox and v7.0.691 gave the reviewing
+// lane its instruction, but the producing side was never asked for the facts a lead carries: at
+// 726781a3 the career-linkedin-alerts render named `what_they_sell` 0 times and `competitor_why`
+// once (the schema property, never the method), so a job marked `competitor: true` arrived with
+// neither, validateLeads refused the answer whole, --write exited 2 and nothing was stored. Parts
+// (g) and (h) below are that gap closed: the mirror of migration `agt155_alerts_intent_lead_fields`,
+// and the live proof that the row and the render now ask for both facts.
+//
+// A THIRD DELIBERATE DEPARTURE, v7.0.710, stated rather than quietly dropped -- the same shape as
+// the second, for the same reason. Task 3(g) asks that the new mirror carry no `nathan` and no
+// `market_leads` outside a `--` line. The mirror's DO block is required by the kickoff's own §4 to
+// assert `method NOT ILIKE '%nathan%'` and `method NOT ILIKE '%market_leads%'` -- PROHIBITIONS, on a
+// code line, spelling the very tokens. Both cannot hold literally. The check keeps the intent
+// exactly and closes no hole: the single line carrying both prohibitions is excluded, EXACTLY ONE
+// such line must exist, so the exception cannot be widened to smuggle anything, and a control proves
+// the ban still has teeth on every other code line.
+//
+// A FOURTH, smaller one: the kickoff files the leadsFromAnswer unit assertion under part (h), which
+// is credential-gated. That assertion reads no database and is the one thing in (h) that a credless
+// run can still measure, so it runs BEFORE the gate -- the live arm still declares notRun without
+// credentials, exactly as asked, and nothing that needed credentials is claimed without them.
 // DeepBench v7.0.691 | tests/regression/agt-155-market-leads.test.mjs | AGT-155 remainder -- the
 // leads instruction REACHES THE RENDER. v7.0.683 shipped the inbox, the render that carries the
 // leads and the validator that grades a review; the only place that ASKED for a review was the
@@ -514,6 +536,156 @@ function partF() {
   return results;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Part (g) -- STATIC: the mirror of migration `agt155_alerts_intent_lead_fields`
+// ---------------------------------------------------------------------------------------------
+// The load-bearing spans, each one the difference between the migration doing its job and doing
+// damage. The two jsonb_set PATHS touch the job ITEM only: `{...,items,properties,what_they_sell}`
+// adds an output field, and `{...,items,allOf}` adds the CONDITIONAL rule -- a path ending
+// `{...,items,required}` would have made both facts mandatory on every job, refusing the nearly-all
+// that are not competitors. The WHERE pins the single row (an unpinned UPDATE rewrites every Skill
+// on the platform), and the before-image span is `to_jsonb(s.*)` of that row, which is the only
+// thing that makes the change reversible.
+const ALERTS_MIRROR_REL = "docs/design/agt-155-alerts-intent-lead-fields.sql";
+const SEED_REL = "docs/design/agt-154-linkedin-alerts-seed.sql";
+const ALERTS_SLUG = "jm-linkedin-alerts-intent";
+const ALERTS_MIRROR_SPANS = [
+  "'{schema,properties,jobs,items,properties,what_they_sell}'",
+  "'{schema,properties,jobs,items,allOf}'",
+  "WHERE slug = 'jm-linkedin-alerts-intent'",
+  "'skill_profiles', s.id::text, to_jsonb(s.*)",
+];
+// The one prohibition line the ban below excludes, for the reason the header states.
+const ALERTS_GUARD_LINE = "method NOT ILIKE '%nathan%' AND method NOT ILIKE '%market_leads%'";
+const ALERTS_BANNED = [
+  ["nathan", /\bnathan\b/i],
+  ["market_leads", /market_leads/],
+  ["agents.id", /agents\.id/],
+];
+const alertsBannedOn = sql => {
+  const code = sql.split("\n").filter(l => !l.trim().startsWith("--") && !l.includes(ALERTS_GUARD_LINE));
+  return ALERTS_BANNED.flatMap(([name, re]) => code.filter(l => re.test(l)).map(l => `${name}: ${l.trim()}`));
+};
+
+function partG() {
+  const results = [];
+  assert.ok(fs.existsSync(path.join(ROOT, ALERTS_MIRROR_REL)), `${ALERTS_MIRROR_REL} does not exist`);
+  const sql = read(ALERTS_MIRROR_REL);
+
+  for (const span of ALERTS_MIRROR_SPANS) {
+    assert.ok(sql.includes(span), `${ALERTS_MIRROR_REL} does not carry ${JSON.stringify(span)}`);
+  }
+  results.push("alerts-mirror-carries-the-four-load-bearing-spans");
+
+  // Rule #1 (§19d/§19e): a Skill row may name a field of its own answer, never another agent or
+  // that agent's private store. The mirror is what a reviewer reads instead of the database.
+  const guards = sql.split("\n").filter(l => !l.trim().startsWith("--") && l.includes(ALERTS_GUARD_LINE));
+  assert.strictEqual(guards.length, 1,
+    `${ALERTS_MIRROR_REL} has ${guards.length} code lines carrying the ${JSON.stringify(ALERTS_GUARD_LINE)} guard, expected exactly 1 -- the ban's one exception may not be widened`);
+  assert.deepStrictEqual(alertsBannedOn(sql), [],
+    `${ALERTS_MIRROR_REL} names the other agent or its private store on a code line`);
+
+  // Control: the same filter over a copy with all three tokens spliced onto one real code line must
+  // catch all three, so the empty result above is a measurement and not a check that cannot fire.
+  const control = sql.replace("COMMIT;", "select 'nathan', 'market_leads', 'agents.id';\nCOMMIT;");
+  assert.notStrictEqual(control, sql, "control setup failed: the COMMIT; line was not found verbatim");
+  assert.strictEqual(alertsBannedOn(control).length, 3,
+    `control: a copy naming all three tokens on a code line is caught ${alertsBannedOn(control).length} time(s), expected 3 -- the ban does not discriminate`);
+  results.push("alerts-mirror-names-no-other-agent-or-private-store");
+
+  // The designer's call (iv): AGT-154's dated snapshot is NOT edited, so this change lives in its
+  // own mirror. The seed still knowing nothing of what_they_sell is what proves the two files did
+  // not merge -- and it is the control that gives the span assertions above their meaning.
+  assert.strictEqual(read(SEED_REL).split("what_they_sell").length - 1, 0,
+    `${SEED_REL} now carries what_they_sell -- AGT-154's dated snapshot was edited instead of mirrored separately`);
+  results.push("agt-154-seed-untouched-by-this-change");
+  return results;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part (h) -- LIVE: the row asks for both facts, and so does the render
+// ---------------------------------------------------------------------------------------------
+async function partH() {
+  const results = [];
+
+  // The unit half, before the credential gate (see the header's fourth departure). This is the code
+  // path the whole ticket exists for: a job that names what it sells puts that fact ON the lead.
+  const { leadsFromAnswer } = await loadPersonal();
+  const unit = leadsFromAnswer({
+    jobs: [{
+      company: "ZZ Fixture Vendor",
+      url: "https://www.linkedin.com/jobs/view/4000000009/",
+      competitor: true, competitor_why: "x", what_they_sell: "synthetic wares",
+    }],
+  }, "career-linkedin-alerts", "2026-09-29", null);
+  assert.strictEqual(unit[0].what_they_sell, "synthetic wares",
+    `the derived lead's what_they_sell is ${JSON.stringify(unit[0]?.what_they_sell)} -- the fact the render now asks for does not reach the row`);
+  results.push("what-they-sell-reaches-the-derived-lead");
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) {
+    notRun("the live arm (the jm-linkedin-alerts-intent row and the career-linkedin-alerts render)",
+      "SUPABASE_URL / SUPABASE_SERVICE_KEY absent. Run with " +
+      "`node --env-file-if-exists=.env.local tests/regression/run-all.js`. Measured when this shipped " +
+      "(2026-09-29): before migration agt155_alerts_intent_lead_fields the render held what_they_sell 0 " +
+      "times and competitor_why 1 time; after it, 3 and 4.");
+    return results;
+  }
+
+  const base = url.replace(/\/+$/, "");
+  const hdr = { apikey: key, Authorization: `Bearer ${key}` };
+  const r = await fetch(`${base}/rest/v1/skill_profiles?slug=eq.${ALERTS_SLUG}&select=method,traits`, { headers: hdr });
+  // The body is read ONCE, before the status assertion: a template literal evaluates eagerly, so an
+  // `await r.text()` inside the assertion message consumes the stream even on the passing path and
+  // the r.json() below then throws "Body has already been read" -- a green check reported as a crash.
+  const body = await r.text();
+  assert.strictEqual(r.status, 200, `GET skill_profiles -> HTTP ${r.status} ${body}`);
+  const rows = JSON.parse(body);
+  assert.strictEqual(rows.length, 1, `skill_profiles holds ${rows.length} rows for ${ALERTS_SLUG}, expected 1`);
+  const { method, traits } = rows[0];
+
+  assert.ok(method.includes("competitor_why"), `the live method does not name competitor_why -- the render cannot ask for it`);
+  assert.ok(method.includes("what_they_sell"), `the live method does not name what_they_sell -- the render cannot ask for it`);
+  results.push("live-method-names-both-lead-facts");
+
+  const I = traits?.schema?.properties?.jobs?.items;
+  assert.ok(I, "the live traits carry no schema.properties.jobs.items");
+  assert.strictEqual(I.properties?.what_they_sell?.maxLength, 200,
+    `the job item's what_they_sell is ${JSON.stringify(I.properties?.what_they_sell)}, expected a string capped at 200`);
+  assert.deepStrictEqual(I.allOf?.[0]?.then?.required, ["competitor_why", "what_they_sell"],
+    `the conditional rule requires ${JSON.stringify(I.allOf?.[0]?.then?.required)}, expected both lead facts`);
+  results.push("live-schema-requires-both-facts-conditionally");
+
+  // The other direction, and the one that matters most: the pair is required CONDITIONALLY and the
+  // flat `required` is untouched, so a job that is not a competitor is still a valid job.
+  assert.strictEqual(I.required?.length, 12,
+    `the job item's flat required holds ${I.required?.length} keys, expected the original 12`);
+  assert.ok(!I.required.includes("competitor_why"),
+    `the flat required now lists competitor_why -- every non-competitor job is refused: ${JSON.stringify(I.required)}`);
+  results.push("flat-required-untouched-so-non-competitor-jobs-stay-valid");
+
+  // The render is the whole point: the Skill row is only worth changing if assemblePrompt() carries
+  // it to the sub-agent. At 726781a3 these counts were 0 and 1.
+  const outFile = path.join(os.tmpdir(), `agt-155-alerts-render-${RUN}.md`);
+  try {
+    const rendered = runScript(PERSONAL, ["--render", "--agent=jerry", "--capability=career-linkedin-alerts",
+      `--out=${outFile}`, "--json"], { SUPABASE_URL: url, SUPABASE_SERVICE_KEY: key });
+    assert.strictEqual(rendered.status, 0, `the career-linkedin-alerts render exited ${rendered.status}: ${rendered.stderr}`);
+    const text = fs.readFileSync(outFile, "utf8");
+    const count = tok => text.split(tok).length - 1;
+    assert.ok(count("what_they_sell") >= 2,
+      `the render names what_they_sell ${count("what_they_sell")} time(s), expected at least 2 -- it was 0 before this shipped`);
+    assert.ok(count("competitor_why") >= 2,
+      `the render names competitor_why ${count("competitor_why")} time(s), expected at least 2 -- it was 1 before this shipped`);
+    console.log(`  [AGT-155] render carries what_they_sell x${count("what_they_sell")}, competitor_why x${count("competitor_why")}`);
+    results.push("render-asks-for-both-lead-facts");
+  } finally {
+    if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
+  }
+  return results;
+}
+
 async function run() {
   const results = [];
   results.push(...(await partA()));
@@ -522,6 +694,8 @@ async function run() {
   results.push(...(await partD()));
   results.push(...partE());
   results.push(...partF());
+  results.push(...partG());
+  results.push(...(await partH()));
   return results;
 }
 
