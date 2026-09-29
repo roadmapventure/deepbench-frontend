@@ -1,3 +1,7 @@
+// DeepBench v7.0.728 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-156 -- arm D's
+// registry pin moves from five routines to six: `jerry-linkedin-alerts` (id null, the model-watch
+// precedent) joined the drift check. The pin is the point -- a routine may only be added
+// deliberately, in a session that says so here.
 // DeepBench v7.0.691 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-155 -- arm D's
 // registry pin moves from four routines to five: `market` (trig_015K3zgtnMztuNritHxC6uSW) joined the
 // drift check. The pin is the point -- a routine may only be added deliberately, in a session that
@@ -19,7 +23,8 @@
 //      deliberately violating copy of the same text.
 //   C  RUNBOOK -- the table and the steps name every command, function and literal the routine runs
 //      on; <= 40,960 bytes.
-//   D  REGISTRY -- ROUTINES keys are exactly runner, auditor, researcher, model-watch, market (AGT-155); the three
+//   D  REGISTRY -- ROUTINES keys are exactly runner, auditor, researcher, model-watch, market,
+//      jerry-linkedin-alerts (AGT-156); the three
 //      pre-existing ids are byte-unchanged and model-watch's is null; the three sibling suites
 //      (agt-102, ses-355, agt-86h) still exit 0 against the changed finding() signature.
 //   E  LIVE (credentialed, else notRun) -- the step-3 pair algebra on the real rows: every release
@@ -255,8 +260,8 @@ async function run() {
     });
 
     await arm("D registry", async () => {
-      assert.deepEqual(Object.keys(ROUTINES).sort(), ["auditor", "market", "model-watch", "researcher", "runner"],
-        "five routines: AGT-155 added market");
+      assert.deepEqual(Object.keys(ROUTINES).sort(), ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner"],
+        "six routines: AGT-156 added jerry-linkedin-alerts");
       assert.equal(ROUTINES.runner.id, "trig_017TZ3JZcLBK6AYH6DKURqMH", "runner id unchanged");
       assert.equal(ROUTINES.auditor.id, "trig_01BCzPdanZ1YiK956dAqU6YN", "auditor id unchanged");
       assert.equal(ROUTINES.researcher.id, "trig_01862LsK4ZQF8PTgQoK2cgCV", "researcher id unchanged");

@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.728 | scripts/check-routine-prompt.js | AGT-156 -- `jerry-linkedin-alerts` is the
+// SIXTH routine the check knows, and the second (after model-watch) it knows BEFORE the routine
+// exists: creating the daily 8:00 AM Central cloud routine is ATTENDED work (DM ruling 2026-09-28),
+// so `id` is null here until the attended session fills it, and location 1 falls back to the
+// routine NAME. Its block lives in docs/runbooks/personal-agent.md section (e).
 // DeepBench v7.0.691 | scripts/check-routine-prompt.js | AGT-155 -- `market` is the FIFTH routine the
 // check knows, and the first whose drift is not merely expected but DECLARED: update_trigger refuses
 // an agent on every routine of this account, so the live Wednesday prompt stays the 2026-09-25 text
@@ -20,11 +25,11 @@
 // routine's runbook.
 //
 // USAGE
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market --prompt=<file> [--out=<json>]
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market --note=<file> --cycle=<uuid> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts --prompt=<file> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts --note=<file> --cycle=<uuid> [--out=<json>]
 //
 // FLAGS
-//   --routine=runner|auditor|researcher|model-watch|market
+//   --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts
 //                              required. runner  -> docs/runbooks/routine-prompt.md,
 //                              <!-- ROUTINE-PROMPT-BEGIN --> / <!-- ROUTINE-PROMPT-END -->,
 //                              trig_017TZ3JZcLBK6AYH6DKURqMH.
@@ -48,6 +53,13 @@
 //                              this one: update_trigger refuses an agent on every routine of this
 //                              account, so the runbook block is the source and the live prompt stays
 //                              the 2026-09-25 text until John pastes it.
+//                              jerry-linkedin-alerts -> docs/runbooks/personal-agent.md,
+//                              <!-- JERRY-LINKEDIN-ALERTS-PROMPT-BEGIN --> / <!-- JERRY-LINKEDIN-ALERTS-PROMPT-END -->,
+//                              id null (AGT-156). Section (e) ships BEFORE the routine exists --
+//                              creating it is attended work, ruled so by the Dev Manager on
+//                              2026-09-28 -- so there is no trigger id to carry, and location 1
+//                              falls back to the routine NAME
+//                              (routine/jerry-linkedin-alerts/prompt), as for model-watch.
 //   --prompt=<file>            PROMPT MODE: the prompt text the run was given, verbatim.
 //   --note=<file>              NOTE MODE: a runner_cycles.notes text that reports routine-prompt drift.
 //   --cycle=<uuid>             the runner_cycles id the --note came from (required with --note).
@@ -123,6 +135,18 @@ export const ROUTINES = {
     begin: "<!-- NATHAN-WEDNESDAY-PROMPT-BEGIN -->",
     end: "<!-- NATHAN-WEDNESDAY-PROMPT-END -->",
     id: "trig_015K3zgtnMztuNritHxC6uSW",
+  },
+  // AGT-156. The daily 8:00 AM Central LinkedIn alert review. `id: null` for the model-watch reason
+  // and no other: the routine does not exist yet, because creating it is ATTENDED work the Dev
+  // Manager ruled out of a cycle on 2026-09-28. The block in personal-agent.md section (e) is the
+  // source; the attended session that creates the routine pastes it and fills the real id here, in
+  // that file table, and in scripts/sync-routine-models.js. Until then finding() locates by the
+  // routine NAME, so filling the id later is not itself a drift (AGT-102, AGT-146).
+  "jerry-linkedin-alerts": {
+    file: "personal-agent.md",
+    begin: "<!-- JERRY-LINKEDIN-ALERTS-PROMPT-BEGIN -->",
+    end: "<!-- JERRY-LINKEDIN-ALERTS-PROMPT-END -->",
+    id: null,
   },
 };
 

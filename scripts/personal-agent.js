@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// DeepBench v7.0.728 | scripts/personal-agent.js | AGT-156 - postingChannel() derives a posting's
+// CHANNEL from the same `source` stamp postingOrigin() already reads, so the Sunday market watch can
+// read the LinkedIn alert postings and only those. No 12th kind, no migration, no write-back
+// re-pointing: the channel is computed here and is never a judgment a model is asked to make.
 // DeepBench v7.0.706 | scripts/personal-agent.js | AGT-268 -- a fetched posting and a capability
 // write-back are now told apart, and only the COUNT is split. RECORD_FIELDS selects `source`, the
 // discriminator that already existed on all 310 posting rows (148 `fetch-postings <date>`, 162
@@ -143,7 +147,7 @@ export const READ_MAP = {
   'career-match-finder': [...PROFILE, 'market_requirement', 'posting'],
   'career-interview-prep': ['resume_fact', 'target', 'network_contact', 'log'],
   'career-outreach-plan': ['network_contact', 'target'],
-  'career-market-watch': ['target', 'market_requirement', 'watch_company'],
+  'career-market-watch': ['target', 'market_requirement', 'watch_company', 'posting'],
   'career-evidence-mining': ['evidence', 'resume_fact', 'target'],
   'career-growth-review': ['ladder_rung', 'target', 'log', 'review', 'evidence', 'resume_fact', 'market_requirement', 'posting'],
   'career-linkedin-alerts': ['resume_fact', 'target', 'ladder_rung', 'evidence', 'network_contact', 'posting', 'log'],
@@ -159,8 +163,16 @@ export const READ_MAP = {
 // cards (what --fetch-postings and the alert intake write) and keeps every other status, null too.
 const REVIEWED_POSTINGS = { posting: rec => rec?.data?.status !== 'new' };
 
+// AGT-156. The Sunday market watch reads the alert postings and ONLY those. Declared here, beside
+// REVIEWED_POSTINGS and ahead of KIND_FILTERS, because the object literal below evaluates at module
+// load; postingChannel() is a hoisted function declaration and is only called when a row is read.
+const LINKEDIN_ALERT_POSTINGS = { posting: rec => postingChannel(rec) === 'linkedin-alert' };
+
 export const KIND_FILTERS = {
   'career-match-finder': { posting: rec => rec?.data?.status === 'new' },
+  // AGT-156. Sunday reads the alert postings and only those; the growth review keeps REVIEWED_POSTINGS
+  // (both channels) and the alert review keeps no entry at all -- its rules count every posting row.
+  'career-market-watch': LINKEDIN_ALERT_POSTINGS,
   'career-strengths-gaps': REVIEWED_POSTINGS,
   'career-posting-review': REVIEWED_POSTINGS,
   'career-growth-review': REVIEWED_POSTINGS,
@@ -201,6 +213,19 @@ const RECORD_FIELDS = 'id,kind,title,body,data,target_row,source';
 export function postingOrigin(rec) {
   if (rec?.origin === 'fetched' || rec?.origin === 'write-back') return rec.origin;
   return String(rec?.source || '').startsWith('fetch-') ? 'fetched' : 'write-back';
+}
+
+// AGT-156: the CHANNEL -- which intake a posting arrived through -- derived from the same `source`
+// stamp, and read from `channel` first so it is correct on BOTH shapes, exactly as postingOrigin():
+// the raw PostgREST row carries `source`, the record readRecords pushes into the prompt carries the
+// label but never the raw stamp (ARCHITECTURE.md 19d/19e Rule #1). Both write paths that produce an
+// alert posting stamp a string containing `linkedin-alert`: the capability write-back
+// `career-linkedin-alerts <date>` and the intake log `fetch-linkedin-alerts <date>`. Everything else
+// -- `fetch-postings <date>`, `career-market-watch <date>` and every other capability stamp -- is a
+// board posting.
+export function postingChannel(rec) {
+  if (rec?.channel === 'linkedin-alert' || rec?.channel === 'board') return rec.channel;
+  return String(rec?.source || '').includes('linkedin-alert') ? 'linkedin-alert' : 'board';
 }
 
 // Over the posting records THIS PROMPT CARRIES -- the filtered set, not the table -- so the count
@@ -446,7 +471,9 @@ async function readRecords(db, capability, target) {
     // AGT-268: a posting carries its PROVENANCE, never its raw `source` -- the stamp is
     // `<capability slug> <date>`, and a capability slug in the prompt would name another agent's
     // work in data (§19d/§19e Rule #1). The two-value label is the whole fact the reader needs.
-    if (r.kind === 'posting') rec.origin = postingOrigin(r);
+    // AGT-156: the CHANNEL travels with the provenance, and for the same reason -- the raw `source`
+    // stamp never reaches the pushed object (Rule #1), so the derived label is the whole fact.
+    if (r.kind === 'posting') { rec.origin = postingOrigin(r); rec.channel = postingChannel(r); }
     records[r.kind].push(rec);
   }
   const corrections = (await db.get(
