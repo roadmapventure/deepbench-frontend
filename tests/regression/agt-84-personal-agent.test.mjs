@@ -57,6 +57,13 @@
 //       resume review beside it (both read PROFILE; before this ticket strengths-gaps loaded FEWER)
 //       and its prompt carries a real market_requirement id and a real reviewed posting id, while
 //       the raw status:new intake card's id is absent.
+//   (j) LIVE (AGT-268) -- postingOrigin() splits by `source`: `fetch-postings <date>` is `fetched`,
+//       `career-<slug> <date>` is `write-back`. Then the pinning arm: a match-finder render, one
+//       real write-back posting written through --write carrying BOTH data.text and status:'new'
+//       (so it enters match-finder's own filter and would raise any text-based or unfiltered
+//       count), a second render, and the assertion that posting_coverage.fetched is UNCHANGED
+//       while write_backs rose by exactly 1. Control premise: fetched >= 1 before, so an all-zero
+//       implementation cannot pass vacuously. Before-image and tagged cleanup around the write.
 //
 // BASELINE (`node scripts/baseline-red-set.js --tests=tests/regression/agt-84-personal-agent.test.mjs`,
 // unchanged tree, exit 2):
@@ -621,6 +628,63 @@ async function partE() {
   }
   assert.strictEqual((await tagged()).length, 0, "fixture rows survived the cleanup");
   results.push("fixture-rows-deleted");
+
+  // -------------------------------------------------------------------------------------------
+  // (j) AGT-268 -- provenance comes from `source`, and a write-back never moves the fetched count.
+  // Block-scoped so its own before/after names cannot collide with the AGT-84 write above.
+  // -------------------------------------------------------------------------------------------
+  {
+    const { postingOrigin, postingCoverage } = await load();
+    assert.strictEqual(postingOrigin({ source: "fetch-postings 2026-09-25" }), "fetched",
+      "a `fetch-postings <date>` source is not read as a fetched posting");
+    assert.strictEqual(postingOrigin({ source: "career-market-watch 2026-09-27" }), "write-back",
+      "a `career-<slug> <date>` source is not read as a capability write-back");
+    assert.deepStrictEqual(postingCoverage([]), { fetched: 0, fetched_with_text: 0, write_backs: 0 },
+      "postingCoverage over no postings is not the zero triple");
+    results.push("posting-origin-splits-by-source");
+
+    const render = () => {
+      const r = runScript(["--render", "--agent=jerry", "--capability=career-match-finder", "--json"], env);
+      assert.strictEqual(r.status, 0, `--render for career-match-finder exited ${r.status}: ${r.stderr.trim()}`);
+      return JSON.parse(r.stdout.trim());
+    };
+
+    const beforeCov = render();
+    console.log(`  [AGT-268] before: ${JSON.stringify(beforeCov.posting_coverage)}`);
+    // Control premise -- an implementation that counts nothing at all cannot pass this arm.
+    assert.ok(beforeCov.posting_coverage && beforeCov.posting_coverage.fetched >= 1,
+      `control premise: match-finder sees ${JSON.stringify(beforeCov.posting_coverage)} -- expected fetched >= 1`);
+
+    const pSession = "agt-268-regression-" + RUN;
+    const pTagged = async () => getJson(`career_records?session_name=eq.${pSession}&select=id`);
+    assert.strictEqual((await pTagged()).length, 0, `control premise: rows already tagged ${pSession}`);
+    try {
+      // The fixture carries data.text AND status:'new', so it lands inside match-finder's own
+      // filter: a text-based or unfiltered count would move `fetched`. Only a count keyed on
+      // `source` leaves it alone. No data.url, so validateAnswer applies no url rule.
+      const pAnswer = {
+        summary: "agt-268 fixture",
+        records_to_write: [{ kind: "posting", title: "AGT-268 fixture posting", data: { status: "new", text: "fixture text" } }],
+      };
+      const pw = runScript(["--write", "--agent=jerry", "--capability=career-match-finder",
+        `--answer=${JSON.stringify(pAnswer)}`, `--session-name=${pSession}`], env);
+      assert.strictEqual(pw.status, 0, `--write of the AGT-268 fixture exited ${pw.status}: ${pw.stderr.trim()}`);
+
+      const afterCov = render();
+      console.log(`  [AGT-268] after:  ${JSON.stringify(afterCov.posting_coverage)}`);
+      assert.strictEqual(afterCov.posting_coverage.fetched, beforeCov.posting_coverage.fetched,
+        `a capability write-back moved the fetched count from ${beforeCov.posting_coverage.fetched} to ${afterCov.posting_coverage.fetched}`);
+      assert.strictEqual(afterCov.posting_coverage.write_backs, beforeCov.posting_coverage.write_backs + 1,
+        `write_backs went ${beforeCov.posting_coverage.write_backs} -> ${afterCov.posting_coverage.write_backs}, expected +1`);
+      results.push("write-back-does-not-move-the-fetched-count");
+    } finally {
+      const pGone = await fetch(`${base}/rest/v1/career_records?session_name=eq.${pSession}`, { method: "DELETE", headers: hdr });
+      if (!pGone.ok) console.log(`  [AGT-268] WARNING: fixture cleanup failed (HTTP ${pGone.status}) -- delete session_name=${pSession} by hand`);
+      console.log(`  [AGT-268] after-image for session_name=${pSession}: ${JSON.stringify(await pTagged())}`);
+    }
+    assert.strictEqual((await pTagged()).length, 0, "AGT-268 fixture rows survived the cleanup");
+  }
+
   return results;
 }
 

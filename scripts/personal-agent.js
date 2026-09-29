@@ -1,4 +1,22 @@
 #!/usr/bin/env node
+// DeepBench v7.0.706 | scripts/personal-agent.js | AGT-268 -- a fetched posting and a capability
+// write-back are now told apart, and only the COUNT is split. RECORD_FIELDS selects `source`, the
+// discriminator that already existed on all 310 posting rows (148 `fetch-postings <date>`, 162
+// `<career-slug> <date>`, measured 2026-09-29); postingOrigin() maps it to the two-value label
+// `fetched` / `write-back`; readRecords stamps that label -- never the raw `source`, which would
+// name another capability's work in data (§19d/§19e Rule #1) -- on every posting it pushes; and
+// postingCoverage() reduces the records THIS PROMPT CARRIES to {fetched, fetched_with_text,
+// write_backs}, reaching the prompt as task_context.posting_coverage and the run as a --json key.
+// Before this, nothing in the prompt told the two apart and no code computed a "fetched postings"
+// count, so the 2026-09-27 "68 of 216 fetched postings had no text" was a model counting rows it
+// could not distinguish; the figure is now deterministic and never a model's to judge (pattern:10).
+// RECORDED DECISION (reversible, no John call): provenance is DERIVED from `source` -- no 12th
+// kind, no career_records_kind_check change, no migration, no backfill, and no re-pointing of
+// write-backs at a fetched row (the 16 search-surfaced match-finder titles have no fetched row).
+// KIND_FILTERS is deliberately untouched: match-finder still SEES a write-back, now labelled.
+// Reversible by deleting the two helpers and their three call sites.
+// Kickoff: docs/kickoffs/v7.0.706-AGT-268-fetched-vs-write-back-postings.md.
+//
 // DeepBench v7.0.697 | scripts/personal-agent.js | AGT-106 -- READ_MAP hands the four judgment
 // capabilities the record kinds their Intents already name. strengths-gaps, posting-review and
 // match-finder now read `market_requirement` and `posting`; growth-review also gains `evidence`
@@ -164,7 +182,41 @@ export const REPOS = [
 ];
 
 const BOARDS = ['greenhouse', 'lever', 'ashby'];
-const RECORD_FIELDS = 'id,kind,title,body,data,target_row';
+const RECORD_FIELDS = 'id,kind,title,body,data,target_row,source';
+
+// --- AGT-268: telling a FETCHED posting from a capability WRITE-BACK ---------------------------
+//
+// `source` is the discriminator that already exists on every posting row: --fetch-postings stamps
+// `fetch-postings <ISO date>`, and every capability write-back stamps `<slug> <ISO date>` (measured
+// 2026-09-29: 310 posting rows, 148 fetch / 162 career-). Until now `source` was never selected,
+// nothing in the prompt told the two apart, and no code computed a "fetched postings" count -- so
+// the 2026-09-27 "68 of 216 fetched postings had no text" was a model counting rows it could not
+// distinguish. The split is now a deterministic value computed here, never a judgment a model is
+// asked to make (pattern:10), at the narrowest layer that works -- no 12th kind, no migration, no
+// re-pointing of write-backs, no KIND_FILTERS change (pattern:8).
+//
+// Reads `origin` first so it is correct on BOTH shapes: the raw PostgREST row (which carries
+// `source`) and the record readRecords pushes into the prompt (which carries the label but never
+// the raw `source`, §19d/§19e Rule #1).
+export function postingOrigin(rec) {
+  if (rec?.origin === 'fetched' || rec?.origin === 'write-back') return rec.origin;
+  return String(rec?.source || '').startsWith('fetch-') ? 'fetched' : 'write-back';
+}
+
+// Over the posting records THIS PROMPT CARRIES -- the filtered set, not the table -- so the count
+// can only ever claim what the capability actually saw (ARCHITECTURE.md §19k).
+export function postingCoverage(rows) {
+  const coverage = { fetched: 0, fetched_with_text: 0, write_backs: 0 };
+  for (const rec of Array.isArray(rows) ? rows : []) {
+    if (postingOrigin(rec) === 'fetched') {
+      coverage.fetched += 1;
+      if (rec?.data?.text) coverage.fetched_with_text += 1;
+    } else {
+      coverage.write_backs += 1;
+    }
+  }
+  return coverage;
+}
 
 function fail(message) {
   console.error(`personal-agent: ${message}`);
@@ -390,7 +442,12 @@ async function readRecords(db, capability, target) {
   const filters = KIND_FILTERS[capability];
   for (const r of rows) {
     if (filters?.[r.kind] && !filters[r.kind](r)) continue;
-    records[r.kind].push({ id: r.id, title: r.title, body: r.body, data: r.data, target_row: r.target_row });
+    const rec = { id: r.id, title: r.title, body: r.body, data: r.data, target_row: r.target_row };
+    // AGT-268: a posting carries its PROVENANCE, never its raw `source` -- the stamp is
+    // `<capability slug> <date>`, and a capability slug in the prompt would name another agent's
+    // work in data (§19d/§19e Rule #1). The two-value label is the whole fact the reader needs.
+    if (r.kind === 'posting') rec.origin = postingOrigin(r);
+    records[r.kind].push(rec);
   }
   const corrections = (await db.get(
     `career_records?kind=eq.correction&data->>capability=eq.${encodeURIComponent(capability)}&select=${RECORD_FIELDS}&order=created_at.asc`,
@@ -438,6 +495,7 @@ async function render(args) {
   if (!intentSlug) fail(`capability "${args.capability}" has no capabilities row or no default_intent_slug`);
 
   const { records, corrections } = await readRecords(db, args.capability, args.target);
+  const posting_coverage = records.posting ? postingCoverage(records.posting) : null;
   const week = args.capability === 'career-growth-review' ? await readWeek(db) : null;
   let input = null;
   let intake = null;
@@ -456,6 +514,7 @@ async function render(args) {
     target: args.target || null,
     records,
     corrections,
+    posting_coverage,
     repos: REPOS,
     week,
     input,
@@ -496,7 +555,7 @@ async function render(args) {
 
   if (args.out) fs.writeFileSync(args.out, text, 'utf8');
   if (args.json) {
-    process.stdout.write(JSON.stringify({ model: assembly.llm?.model, records_loaded: recordsLoaded, prompt_bytes: Buffer.byteLength(text, 'utf8') }) + '\n');
+    process.stdout.write(JSON.stringify({ model: assembly.llm?.model, records_loaded: recordsLoaded, prompt_bytes: Buffer.byteLength(text, 'utf8'), posting_coverage }) + '\n');
   } else if (!args.out) {
     process.stdout.write(text);
   }
