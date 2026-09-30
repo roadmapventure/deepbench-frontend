@@ -1,9 +1,10 @@
 -- DeepBench v7.0.739 | docs/design/agt-273-test-slot-health-ladder.sql | AGT-273
--- Migration `agt273_test_slot_health_ladder`. NOT YET APPLIED as of this commit: the
--- apply_migration call failed with "Failed to initialise history table: Connection terminated
--- due to connection timeout" and nothing landed (column absent, function absent, no
--- schema_migrations row -- all three checked after the failure). The down was captured first,
--- so the ledger is intact. This file is the exact text to apply once the database answers.
+-- Migration `agt273_test_slot_health_ladder`. APPLIED 2026-09-30 ~02:58Z by attended session
+-- agt273-slot-ladder-0930 (supervised cycle 9351be06), after the 2026-09-29 attempt failed on a
+-- connection timeout. The statements below (1)-(5) are what was applied; the header comments above
+-- (1) were not sent. Verified after the apply, not from the success flag: one pg_proc row each for
+-- test_slot_acquire and test_slot_allowance, anon/authenticated hold no EXECUTE on the allowance,
+-- service_role does, and the schema_migrations row exists.
 --
 -- The database's health now sets the SLOT COUNT instead of switching the suite off: capacity is
 -- read from one home that narrows with health, so amber runs one suite instead of none, and red
@@ -147,13 +148,11 @@ BEGIN
     RAISE EXCEPTION 'AGT-273: public.test_slot_allowance has % overloads, expected 1', c_allowance;
   END IF;
 
-  -- The denied direction.
   IF has_function_privilege('anon', 'public.test_slot_allowance()', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.test_slot_allowance()', 'EXECUTE') THEN
     RAISE EXCEPTION 'AGT-273: the public keys still hold EXECUTE on test_slot_allowance() -- the REVOKE did not take';
   END IF;
 
-  -- The still-working direction: the projection the gate itself runs must return a row.
   IF NOT has_function_privilege('service_role', 'public.test_slot_allowance()', 'EXECUTE') THEN
     RAISE EXCEPTION 'AGT-273: service_role lost EXECUTE on test_slot_allowance() -- the GRANT did not take';
   END IF;

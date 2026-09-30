@@ -144,10 +144,13 @@ async function pg(base, key, q, init = {}) {
 }
 
 async function armLive(base, key) {
-  const s = await pg(base, key, "runner_settings?select=max_lanes,test_slot_capacity&id=eq.1");
+  const s = await pg(base, key, "runner_settings?select=max_lanes,test_slot_capacity,test_slot_ladder&id=eq.1");
   assert.strictEqual(s.status, 200, `runner_settings read answered HTTP ${s.status}`);
-  assert.strictEqual(Number(s.json[0].max_lanes), 4, `max_lanes is ${s.json[0].max_lanes}, expected 4`);
+  // John's ruling 58cf6423 (2026-09-29, after outage #3): the runner resumes on ONE lane.
+  assert.strictEqual(Number(s.json[0].max_lanes), 1, `max_lanes is ${s.json[0].max_lanes}, expected 1 (ruling 58cf6423)`);
+  // AGT-273: capacity stays 1 on John's 2026-09-30 call, so ruling 0b6d5414's 1 -> 3 was not written.
   assert.strictEqual(Number(s.json[0].test_slot_capacity), 1, `test_slot_capacity is ${s.json[0].test_slot_capacity}, expected 1`);
+  assert.strictEqual(Number(s.json[0].test_slot_ladder?.red), 0, `test_slot_ladder.red is ${JSON.stringify(s.json[0].test_slot_ladder)}, expected 0 -- red never grants (AGT-273)`);
   const tm = await pg(base, key, "ticket_matrix?select=backlog_id,lane_status&limit=1");
   assert.strictEqual(tm.status, 200, `ticket_matrix?select=lane_status answered HTTP ${tm.status}`);
   const ts = await pg(base, key, "test_slots?select=holder&limit=1");
@@ -158,7 +161,7 @@ async function armLive(base, key) {
   assert.ok(Number.isInteger(Number(d.live_lanes)), `detail.live_lanes missing: ${JSON.stringify(d.live_lanes)}`);
   assert.strictEqual(Number(d.max_lanes), Number(s.json[0].max_lanes), "detail.max_lanes must be the setting");
   if (b.json[0].reason === "lanes_full") assert.ok(Number(d.live_lanes) >= Number(d.max_lanes));
-  return `live: settings 4/1, lane_status 200, boot live_lanes ${d.live_lanes}/${d.max_lanes} (${b.json[0].reason})`;
+  return `live: settings 1/1, ladder red 0, lane_status 200, boot live_lanes ${d.live_lanes}/${d.max_lanes} (${b.json[0].reason})`;
 }
 
 async function armAnon(base, anon) {

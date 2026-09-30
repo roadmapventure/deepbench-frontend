@@ -4,9 +4,11 @@
 //
 // WHY: on the 0.5 GB NANO instance a regression suite is the heaviest thing a cycle does, and on
 // 2026-09-27/28 up to six cycles were open at once. Nothing stopped two suites landing on the
-// database together. public.test_slots is the line; public.test_slot_acquire() grants a slot only
-// while db_health_level() is green, fewer than runner_settings.test_slot_capacity are held, and the
-// caller is first. This module is the one client of that line.
+// database together. public.test_slots is the line; public.test_slot_acquire() grants a slot while
+// fewer than public.test_slot_allowance()'s capacity are held and the caller is first. The
+// allowance narrows with health (AGT-273, v7.0.739): green gives runner_settings.test_slot_capacity,
+// a level keyed in runner_settings.test_slot_ladder gives the lesser of the two, and red, unsafe or
+// an unreadable level give 0. This module is the one client of that line.
 //
 // THE CONTRACT
 //   holderId(env, os)      env.DEEPBENCH_CYCLE_ID, else "<hostname>:<pid>".
@@ -152,11 +154,13 @@ export async function main(argv, { env = process.env, doFetch = fetch, out = s =
     return res.json();
   };
   try {
-    const [settings, rows] = await Promise.all([
+    const [settings, rows, allowance] = await Promise.all([
       get("runner_settings?select=max_lanes,test_slot_capacity&id=eq.1"),
       get("test_slots?select=holder,cycle_id,state,requested_at,heartbeat_at,granted_at&order=requested_at"),
+      get("rpc/test_slot_allowance"),
     ]);
-    out(`test-slot: capacity ${settings[0]?.test_slot_capacity}, max_lanes ${settings[0]?.max_lanes}, ${rows.length} in line`);
+    const a = allowance[0] ?? {};
+    out(`test-slot: capacity ${settings[0]?.test_slot_capacity}, health ${a.level} -> effective ${a.capacity} (${a.source}), max_lanes ${settings[0]?.max_lanes}, ${rows.length} in line`);
     for (const r of rows) out(`  ${r.state.padEnd(7)} ${r.holder} (requested ${r.requested_at}, beat ${r.heartbeat_at})`);
     return 0;
   } catch (e) {
