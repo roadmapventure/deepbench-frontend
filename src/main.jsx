@@ -27,6 +27,7 @@ import BenchNewScreen         from "./screens/BenchNewScreen.jsx";
 import MarketIntelligenceScreen from "./screens/MarketIntelligenceScreen.jsx";
 import LiveAgentViewScreen      from "./screens/LiveAgentViewScreen.jsx"; // FEATURE: LAV-1b
 import AdminScreen              from "./screens/AdminScreen.jsx";           // FEATURE: ADM-1 v1
+import ConnectScreen from "./screens/ConnectScreen.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -53,6 +54,8 @@ createRoot(document.getElementById("root")).render(
               <Route path="/bench/test"                element={<TestTeamScreen />} />
               <Route path="/bench/:agentId"            element={<PersonnelScreen />} />
               <Route path="/bench/:agentId/teach"      element={<TeachScreen />} />
+              {/* FEATURE: AGT-165 — onboarding page, URL only, no nav entry (§7). */}
+              <Route path="/connect" element={<ConnectScreen />} />
               {/* FEATURE: ADM-1 v1 — hostname-gated Admin surface. The screen itself redirects to
                   / when IS_ADMIN_HOST is false, so a link shared to a production URL cannot render
                   the Admin body (defense in depth over the nav-side gate in AppShell). */}
