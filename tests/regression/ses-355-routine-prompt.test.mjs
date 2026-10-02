@@ -1,3 +1,4 @@
+// DeepBench v7.0.744 | tests/regression/ses-355-routine-prompt.test.mjs | AGT-304 -- "current" is newest released_on; first_seen is the catalog's own discovery date and the 2026-09-29 backfill made it lie.
 // DeepBench v7.0.665 | tests/regression/ses-355-routine-prompt.test.mjs | AGT-147 -- THE MODEL-ID
 // CLAUSE IS INVERTED. It used to demand that the prompt name ALL THREE lane ids, which made the
 // prose a second home of public.model_assignments: a lane switch in the table left the prompt
@@ -226,7 +227,7 @@ export async function run() {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
     const key = process.env.SUPABASE_SERVICE_KEY;
     const r = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/model_catalog?select=model_id&family=eq.Fable&deprecated_on=is.null&order=first_seen.desc&limit=1`,
+      `${process.env.SUPABASE_URL}/rest/v1/model_catalog?select=model_id&family=eq.Fable&deprecated_on=is.null&order=released_on.desc.nullslast&limit=1`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     );
     assert.ok(r.ok, `model_catalog read failed: HTTP ${r.status}`);

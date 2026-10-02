@@ -125,7 +125,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import { RUNBOOK_REL } from "../../scripts/render-cycle-card.js";
 import {
   GATES, gateStatus, verdictFor, failingTestsFrom, regressionDelta, readRegressionBaseline,
-  REGRESSION_NO_BASELINE_REASON, notRunTestsFrom, baselineGate,
+  REGRESSION_NO_BASELINE_REASON, notRunTestsFrom, baselineGate, deltaVerdictNote,
 } from "../../scripts/verifier.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -686,6 +686,60 @@ export default async function run() {
     "the string a cycle's own report and the runner's decision rows are keyed on.");
   assert.strictEqual(refusalJson.kind, "cannot-run",
     "the refusal must be kind cannot-run -- NOT a verdict, so it can never cost the ladder a streak (AGT-245).");
+
+  // ---- (s4) AGT-304: THE VERDICT NAMES THE DELTA ------------------------------------------------
+  //
+  // WHY THIS ARM EXISTS. `verdictFor()` writes `approve: all 3 mechanical gates green (...)`, and on
+  // this platform a regression "green" is a DELTA green over a suite that is still red by exit code
+  // (40 standing names the day AGT-304 shipped). So the sentence that reaches `runner_verdicts.reasoning`
+  // asserted something nobody measured. `deltaVerdictNote` appends the measured counts; the gates, the
+  // verdict and the row columns are untouched, which is what makes it safe to append one direction only.
+  //
+  // (i) IS THE CONTROL, NOT A NICETY. A note that printed on a fail-closed delta would publish
+  // "0 standing, 0 newly red" off a baseline nobody parsed -- the same laundering the delta's own
+  // `null` buckets exist to refuse. It must be the empty string.
+  assert.strictEqual(deltaVerdictNote({ standing: null, newlyRed: null }, ["a"]), "",
+    "a delta that graded nothing (standing null) must append NOTHING -- a note here would read a " +
+    "fail-closed exit as a clean delta and put counts in the row off a baseline that was never read.");
+
+  const note40 = deltaVerdictNote({ standing: ["x", "y"], newlyRed: [] }, Array(40).fill("n"));
+  for (const needle of ["40-name baseline", "2 standing, 0 newly red", "not on a green suite"]) {
+    assert.ok(note40.includes(needle),
+      `the note must carry \`${needle}\` -- the baseline's SIZE, the two counts, and the explicit ` +
+      `denial that the suite was green are the three facts a later reader cannot reconstruct. Got: ${note40}`);
+  }
+  const note1 = deltaVerdictNote({ standing: ["x"], newlyRed: ["z"] }, ["x", "z"]);
+  assert.ok(note1.includes("1 newly red"),
+    `a newly red name must be COUNTED in the note (the gate is already red on it, but the sentence ` +
+    `must not say 0): ${note1}`);
+
+  // (iv) WIRED, AND IN THE RIGHT PLACE. A pure function nothing calls grades nothing, and appending
+  // BEFORE the AGT-245 declaration note would put the delta counts ahead of the reason they were not
+  // graded. The index comparison is the ordering half.
+  const v304 = fs.readFileSync(path.join(ROOT, VERIFIER_REL), "utf8");
+  const WIRE = "reasoning += deltaVerdictNote(delta, baselineRead.names);";
+  const wiredAt = v304.indexOf(WIRE);
+  const declaredAt = v304.indexOf("Baseline omitted by declaration:");
+  assert.ok(declaredAt > 0, `${VERIFIER_REL} no longer carries the AGT-245 declaration note to order against.`);
+  assert.ok(wiredAt > declaredAt,
+    `${VERIFIER_REL} must carry \`${WIRE}\` AFTER the AGT-245 declaration append (wired at ${wiredAt}, ` +
+    `declaration at ${declaredAt}). At or before it, the verdict's reasoning either never gains the ` +
+    `delta counts at all or gains them ahead of the reason the baseline was omitted.`);
+
+  // (v) THE MUTANT. The same two assertions re-run against a copy with the wiring line removed must
+  // fail -- a control that changes nothing pins nothing (the SES-158 failure).
+  const unwired = v304.replace(WIRE, "");
+  assert.ok(!unwired.includes(WIRE), "fixture: the mutant still contains the wiring line");
+  assert.throws(() => {
+    const w = unwired.indexOf(WIRE);
+    const d = unwired.indexOf("Baseline omitted by declaration:");
+    assert.ok(w > d, "mutant must fail here");
+  }, "the wiring control did not fire -- a verifier that never appends the note passed (iv), so this " +
+     "clause pins nothing and the row could ship an approve that reads as a green suite.");
+
+  console.log(`  [AGT-304] a fail-closed delta appends "" (control); a 40-name baseline reads ` +
+    `"2 standing, 0 newly red" and denies a green suite; 1 newly red is counted as 1; the wiring is ` +
+    `at ${wiredAt} AFTER the AGT-245 note at ${declaredAt}, and the unwired mutant is red`);
 
   console.log(`  [AGT-170] failingTestsFrom anchors at the line start (${names.length} names, the ` +
     `in-message [FAIL] harvested none); one exit-1 fixture reads green through the delta and ` +

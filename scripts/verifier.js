@@ -946,6 +946,13 @@ export function regressionDelta({ absolute, baseline, post, unverified }) {
       `newly red. The suite's absolute exit code is red and stays reported as such (AGT-170)` };
 }
 
+// AGT-304: `deltaVerdictNote` is why an approve on a RED suite no longer READS as a green one --
+// `verdictFor()` writes `all 3 mechanical gates green`, true of the gates, over a still-red suite.
+export function deltaVerdictNote(delta, baselineNames) {
+  if (!delta || delta.standing === null || !Array.isArray(baselineNames)) return "";
+  return ` Regression graded on the DELTA against the ${baselineNames.length}-name baseline, not on a green suite: ${delta.standing.length} standing, ${(delta.newlyRed ?? []).length} newly red (AGT-170; AGT-304).`;
+}
+
 // AGT-170's file half, kept beside the pure core rather than inline at the call site so the
 // fail-closed cases are one readable list. Returns { names, source }: `names` is null for every case
 // that is not a real baseline, and `source` SAYS WHICH -- "no --regression-baseline passed" and "the
@@ -3119,6 +3126,11 @@ async function main() {
   if (baselineDecision.declared) {
     reasoning += ` Baseline omitted by declaration: ${baselineDecision.declared} (AGT-245).`;
   }
+
+  // AGT-304: APPENDED after the AGT-245 note, same one-direction discipline -- it changes no verdict
+  // and no gate, it only stops `approve` from reading as a green suite. Silent ("") when the delta
+  // graded nothing, so a --no-baseline=<reason> run's reasoning is byte-identical to before.
+  reasoning += deltaVerdictNote(delta, baselineRead.names);
 
   // FEATURE: SES-376 -- an over-cap kickoff BLOCKS the delivery it belongs to, not just the draft.
   //
