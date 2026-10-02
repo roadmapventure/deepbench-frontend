@@ -91,8 +91,10 @@ const RULE_ID = "JOHN-1002-PROCESS-BREAK-CLASS";
 const KNOWLEDGE_SLUG = "vc-process-break-class";
 // A phrase from John's OWN words, inside the span the migration reads out of 874648b6.reasoning.
 const JOHN_PHRASE = "becomes a high priority to fix";
-// A phrase from the class TEST the migration appends to that ruling (H3's `v_method`).
-const CLASS_PHRASE = "is in the class only when its own text shows BOTH";
+// A phrase from the class TEST appended to that ruling. The migration's H3 `v_method` required BOTH
+// halves; decision 43808c03 (John 2026-10-02, "keep the change") re-read it from his own
+// application to AGT-160: an agent breaking the ticket process is enough on its own.
+const CLASS_PHRASE = "is in the class when its own text shows an agent breaking the ticket writing and review process";
 
 // LETTERS ONLY BEFORE THE DASH, and that is not cosmetic: `runner_decisions_backlog_id_check` is
 // `^[A-Z]+-[0-9]+[a-z]?$`, so agt-280's `ZAGT280-n` shape cannot be named by a decision at all --
