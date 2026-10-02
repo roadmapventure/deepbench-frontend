@@ -161,6 +161,7 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 | Agent roster (source of truth) | `src/data/agents.js` |
 | Working with John — decision autonomy tiers, walkthrough gate | `docs/WORKING-WITH-JOHN.md` |
 | Session history + the "found live…" rationale behind these rules | `docs/SESSIONS.md` |
+| Writing or reorganizing a requirement — Victoria first (`/victoria`) | `docs/runbooks/victoria-reorg.md` |
 | System invariants — **read** when touching the files they govern (tokens→`src/`, logging/capabilities→`api/`, library→`lib/`); don't rely on auto-scoping | `.claude/rules/` |
 | Doc-bloat tripwire | `docs/runbooks/session-hygiene.md` |
 | Architecture/scope not settled — run a discovery session (decisions + constraints, no kickoff doc) | `.claude/skills/discovery/SKILL.md` |

@@ -1,3 +1,8 @@
+// DeepBench v7.0.741 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-281 -- arm D's
+// registry pin moves from six routines to seven: `victoria-reorg` (id null, the model-watch and
+// jerry-linkedin-alerts reason -- the routine is created by an attended session, AGT-281 §7). Nothing
+// else in this file moves: model-watch's own id, file and markers are asserted by value below and are
+// byte-unchanged.
 // DeepBench v7.0.728 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-156 -- arm D's
 // registry pin moves from five routines to six: `jerry-linkedin-alerts` (id null, the model-watch
 // precedent) joined the drift check. The pin is the point -- a routine may only be added
@@ -24,7 +29,7 @@
 //   C  RUNBOOK -- the table and the steps name every command, function and literal the routine runs
 //      on; <= 40,960 bytes.
 //   D  REGISTRY -- ROUTINES keys are exactly runner, auditor, researcher, model-watch, market,
-//      jerry-linkedin-alerts (AGT-156); the three
+//      jerry-linkedin-alerts (AGT-156), victoria-reorg (AGT-281); the three
 //      pre-existing ids are byte-unchanged and model-watch's is null; the three sibling suites
 //      (agt-102, ses-355, agt-86h) still exit 0 against the changed finding() signature.
 //   E  LIVE (credentialed, else notRun) -- the step-3 pair algebra on the real rows: every release
@@ -260,8 +265,9 @@ async function run() {
     });
 
     await arm("D registry", async () => {
-      assert.deepEqual(Object.keys(ROUTINES).sort(), ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner"],
-        "six routines: AGT-156 added jerry-linkedin-alerts");
+      assert.deepEqual(Object.keys(ROUTINES).sort(),
+        ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner", "victoria-reorg"],
+        "seven routines: AGT-281 added victoria-reorg");
       assert.equal(ROUTINES.runner.id, "trig_017TZ3JZcLBK6AYH6DKURqMH", "runner id unchanged");
       assert.equal(ROUTINES.auditor.id, "trig_01BCzPdanZ1YiK956dAqU6YN", "auditor id unchanged");
       assert.equal(ROUTINES.researcher.id, "trig_01862LsK4ZQF8PTgQoK2cgCV", "researcher id unchanged");

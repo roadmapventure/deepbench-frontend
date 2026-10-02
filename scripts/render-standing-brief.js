@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// DeepBench v7.0.741 | scripts/render-standing-brief.js | AGT-281 -- a ninth group, `Victoria's lists`:
+// the newest two ENDED runner_cycles rows carrying `SCHEDULED-AGENT: victoria-reorg`, each printing
+// its own run line with the prefix stripped, plus the turned-down total parsed back out of those
+// lines. Absent says so, `[]` is a measured zero (and today's true state -- the routine is attended
+// work not yet created), and NOTHING here recounts what runLine() already counted. Not in
+// factsSha(): the line moves every Tuesday by construction, and drift is for what John has to look
+// at, the same call AGT-79 slice 6 made about the hygiene streak.
 // DeepBench v7.0.662 | scripts/render-standing-brief.js | AGT-240 (d) — PROPOSED PROJECTS. John (Q3):
 // proposals are "stored in the database as proposed tickets and projects", and his status report lists
 // them. A new group, `Proposed projects`, lands right AFTER `Standing epic drain` (the other "what runs
@@ -1214,6 +1221,82 @@ export function renderTicketHygiene(hygiene, stamp, nowIso) {
   return L.join("\n");
 }
 
+/** How many of Victoria's list runs the brief reads. Two: the two lists one Tuesday fire rules. */
+export const VICTORIA_RUNS_READ = 2;
+
+/**
+ * The signature Victoria's list runs write into `runner_cycles.notes`, and the prefix this block
+ * finds them by. It is `scripts/requirement-check.js`'s `LIST_PREFIX`, written here as a literal for
+ * the same reason the hygiene group's `SCHEDULED-AGENT: audit-board` is one — this file imports no
+ * script to render a brief — and `tests/regression/agt-281-victoria-runs.test.mjs` asserts the two
+ * files still read the same string, so a rename at its home fails the suite rather than quietly
+ * emptying this block.
+ */
+export const VICTORIA_PREFIX = "SCHEDULED-AGENT: victoria-reorg";
+
+/**
+ * FEATURE: AGT-281 — `Victoria's lists`: what the weekly list reorganization ruled. Pure, like every
+ * group around it — `victoria` is the array fetchFacts() read and nothing here goes near the network
+ * or the clock.
+ *
+ * IT PRINTS THE RUN'S OWN LINE AND RECOUNTS NOTHING. Each row's `notes` is `runLine()`'s output,
+ * which already says how many items went onto how many needs, how many were turned down and the top
+ * three passes; re-deriving any of that from the board here would let the brief and the run disagree
+ * about the same Tuesday. The prefix is stripped because it is the SAME on every row — it is how the
+ * rows were found, not information about them.
+ *
+ * THREE BRANCHES, the same three every group around it uses, for the same reason:
+ *   - `victoria` absent — SAID, never rendered as a zero. "The ledger was not read" and "she has not
+ *     run" are opposite facts;
+ *   - `[]` — a MEASURED zero, and today's true state: `runner_cycles notes like
+ *     'SCHEDULED-AGENT: victoria%'` is 0 and the routine does not exist yet (AGT-281 ships the repo
+ *     half; creating it is attended work);
+ *   - rows — one line per run, newest first, plus the turned-down total across them, which is the one
+ *     number John acts on: a turned-down ticket is sitting in his waiting room on `removal proposed`.
+ */
+export function renderVictoriaList(victoria, stamp) {
+  const L = [];
+  const lead = `**Victoria's lists, last Tuesday** — *${stamp}.* What the weekly list reorganization ` +
+    "(`AGT-281`) ruled: the newest " + VICTORIA_RUNS_READ + " ended `public.runner_cycles` rows whose " +
+    "`notes` carry `" + VICTORIA_PREFIX + "`, each printing its own run line. One row per LIST, so a " +
+    "Tuesday that ruled both lists shows two.";
+
+  if (!Array.isArray(victoria)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *Victoria's run ledger was not read for this render* — which is **not** the same as *no " +
+      "run on record*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  L.push(`${lead} **${victoria.length} run(s)** on record.`);
+  L.push("");
+
+  if (victoria.length === 0) {
+    L.push("- **No run on record yet — a measured zero:** the ledger was read and holds no " +
+      `\`${VICTORIA_PREFIX}\` row. The routine is not created yet: that is attended work, and the ` +
+      "switch goes on only after John has seen the first run (`docs/runbooks/victoria-reorg.md`).");
+    L.push("");
+    return L.join("\n");
+  }
+
+  let down = 0;
+  for (const r of victoria) {
+    const notes = String(r.notes ?? "");
+    const line = notes.startsWith(VICTORIA_PREFIX) ? notes.slice(VICTORIA_PREFIX.length).replace(/^\s*[—-]\s*/, "") : notes;
+    const m = /(\d+)\s+turned down/.exec(notes);
+    if (m) down += Number(m[1]);
+    L.push(`- ${line || "*(the run wrote no line)*"} · ${r.ended_at ? cst(r.ended_at) : "—"}`);
+  }
+  L.push("");
+  L.push(`- **${down} ticket(s) turned down** across those run(s) — each one sits on \`removal ` +
+    "proposed\` in John's waiting room under its own `removal-proposal` decision, and one " +
+    "`reverse_decision()` returns it to the drain. Nothing on this path ever writes `removed` (`SES-113`).");
+  L.push("");
+  return L.join("\n");
+}
+
 /**
  * FEATURE: SES-378 slice 5 — `Staff watch`: what the Development Manager recorded about the
  * runner's own agents. Pure, like every group above it — `staff` is the array fetchFacts() read and
@@ -1413,7 +1496,9 @@ export function renderBlock(facts, nowIso) {
   // FEATURE: SES-413 slice 3 — daily joins the destructure on the same terms as staff: absent means
   // "not read", never "a quiet week in which nothing was decided for you".
   // FEATURE: AGT-240 (d) — proposedProjects joins on the same terms: absent means "not read".
-  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects } = facts;
+  // FEATURE: AGT-281 — victoria joins the destructure on the same terms as hygiene: absent means
+  // "not read", never "she has not run".
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1643,6 +1728,14 @@ export function renderBlock(facts, nowIso) {
   // it: a pure helper the guard can assert from a fixture, rendering what the tables returned and
   // printing the night's own notes rather than recounting the board behind them.
   L.push(renderTicketHygiene(hygiene, stamp, nowIso));
+
+  // ---- Victoria's lists (FEATURE: AGT-281) --------------------------------------------------
+  // AFTER Ticket hygiene and BEFORE Staff watch, which keeps Human gates the last group: this one
+  // reports what the weekly list reorganization ruled about the BOARD, which belongs beside the other
+  // board-hygiene group rather than among the groups about the runner's own agents. Same contract as
+  // the groups around it — a pure helper a fixture can drive, printing the run's own line and
+  // recounting nothing the run already counted.
+  L.push(renderVictoriaList(victoria, stamp));
 
   // ---- Staff watch (FEATURE: SES-378 slice 5) -----------------------------------------------
   // AFTER Ticket hygiene and BEFORE Human gates, which keeps Human gates the last group: this one
@@ -1986,6 +2079,22 @@ export async function fetchFacts(url, key) {
     "runner_staff_findings?select=agent_id,kind,fingerprint,cycle_id,created_at&order=created_at.desc&limit=10000");
   if (!Array.isArray(staff)) die("the runner_staff_findings read came back non-array — refusing to render the staff-watch group from nothing");
 
+  // FEATURE: AGT-281 — Victoria's list runs, one read, no view. The newest VICTORIA_RUNS_READ ENDED
+  // rows carrying the prefix, which is one Tuesday's two lists; a run still in flight has no line to
+  // print yet, so `ended_at is not null` is the same filter the hygiene nights read uses.
+  //
+  // THE ROWS, NOT A SUMMARY: the group prints each row's own `notes` (runLine()'s output) and the
+  // turned-down total it parses back out of them, so the brief and the run cannot disagree about one
+  // Tuesday. Columns are NAMED, never `select=*` (.claude/rules/supabase-column-grants.md).
+  //
+  // AN EMPTY LEDGER IS A REAL STATE and today's true one (0 rows, the routine is not created yet),
+  // but a read that did not happen is not: a non-array refuses rather than publishing a measured zero
+  // nobody measured.
+  const victoria = await rest(url, key,
+    "runner_cycles?select=id,ended_at,outcome,notes,model&notes=like." + encodeURIComponent(VICTORIA_PREFIX + "%") +
+    `&ended_at=not.is.null&order=ended_at.desc&limit=${VICTORIA_RUNS_READ}`);
+  if (!Array.isArray(victoria)) die("the victoria-reorg cycle read came back non-array — refusing to render her list group from nothing");
+
   // FEATURE: SES-386 — the two human-gate reads, moved here from two regression guards.
   //
   // THE FILTERS ARE THE ONES ses-285 ASSERTION 6 AND ses-373 ASSERTION 1 RAN, character for
@@ -2012,7 +2121,7 @@ export async function fetchFacts(url, key) {
     "proposed_projects?select=slug,name,proposal_reason,proposed_at,tickets,by_class,cycles&order=proposed_at,slug");
   if (!Array.isArray(proposedProjects)) die("the proposed_projects read came back non-array — refusing to render the proposed-projects group from nothing");
 
-  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects };
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria };
 }
 
 async function main() {

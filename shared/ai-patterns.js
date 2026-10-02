@@ -1,3 +1,4 @@
+// DeepBench v7.0.741 | shared/ai-patterns.js | AGT-281 -- `requirement-check` enters the catalog beside the audit-run-review row whose shape it copies: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per list turn that docs/runbooks/victoria-reorg.md prescribes verbatim would be refused. Measured at this ship: the capability and its two intents are live and this file named it 0 times. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.680 | shared/ai-patterns.js | AGT-136 -- `design-ruling` enters the catalog with the Designer's capability row: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per ruling run would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.662 | shared/ai-patterns.js | AGT-240 -- `audit-finish-review` and `propose-project` enter the catalog with their capability rows: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.646 | shared/ai-patterns.js | AGT-177 -- `audit-run-review` enters the catalog: the capability row (public.capabilities, default_intent_slug au-run-intent) shipped in AGT-137/v7.0.602 WITHOUT its catalog slug, so scripts/agent-log.js refuses every --ai-type=audit-run-review and docs/runbooks/auditor-routine.md:143 -- prescribed verbatim -- exits 2. Live proof: 7 turns on feature `audit-run-review:au-run-intent:depth1`, every one logged ai_type `agent-turn`, zero with ai_type `audit-run-review`. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
@@ -297,6 +298,21 @@ export const SERVICE_CATALOG = [
   // validated against au-run-intent's stored schema before any finding is filed, and
   // 'LLM-as-Judge / Verifier' because the turn IS the judgment on one finished cycle.
   { slug: 'audit-run-review',        name: 'Audit Run Review (The Auditor)',    serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+
+  // AGT-281 -- requirement-check, Victoria's requirement judgment, on the audit-run-review row's own
+  // shape immediately above. MANDATORY, not decorative: scripts/agent-log.js refuses any --ai-type
+  // this array does not carry ("not a SERVICE_CATALOG slug", SES-338), so the Layer-3 row the
+  // victoria-reorg block prescribes VERBATIM -- `--ai-type=requirement-check` -- would be refused and
+  // her turns would log as `agent-turn`, exactly the defect AGT-177 measured on audit-run-review's 7
+  // runs. Measured at this ship: the capability row and its two intent links are live
+  // (vc-requirement-intent since AGT-280 slice 2, vc-reorganize-intent as of this migration) and
+  // `requirement-check` appeared nowhere in this file. Judge patterns for the same reason as the rows
+  // above: 'Structured Output' because the answer is validated against the fired intent's stored
+  // schema -- offline by validateVerdict()/validateListVerdict() and again inside
+  // apply_requirement_verdict() -- before one ticket moves, and 'LLM-as-Judge / Verifier' because the
+  // turn IS the judgment on whether a cited need source supports a proposal. No AI_TYPE_TO_SERVICE
+  // entry -- ai_type equals capability_slug via the `|| e.type` fallback.
+  { slug: 'requirement-check',       name: 'Requirement Check (The Requirements Analyst)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // AGT-240 -- the finish line's two turns enter the catalog with their capability rows (migration
   // agt240_project_finish_line): scripts/agent-log.js refuses any --ai-type this array does not carry,

@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.741 | scripts/check-routine-prompt.js | AGT-281 -- `victoria-reorg` is the SEVENTH
+// routine the check knows, and the third (after model-watch and jerry-linkedin-alerts) it knows
+// BEFORE the routine exists: creating the weekly Tuesday 5:00 AM Central routine, filling its id and
+// turning it on are ATTENDED work (AGT-281 kickoff §7, the switch only after John has seen the first
+// run), so `id` is null here until the attended session fills it, and location 1 falls back to the
+// routine NAME. Its block lives in docs/runbooks/victoria-reorg.md section (c).
 // DeepBench v7.0.728 | scripts/check-routine-prompt.js | AGT-156 -- `jerry-linkedin-alerts` is the
 // SIXTH routine the check knows, and the second (after model-watch) it knows BEFORE the routine
 // exists: creating the daily 8:00 AM Central cloud routine is ATTENDED work (DM ruling 2026-09-28),
@@ -25,11 +31,11 @@
 // routine's runbook.
 //
 // USAGE
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts --prompt=<file> [--out=<json>]
-//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts --note=<file> --cycle=<uuid> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts|victoria-reorg --prompt=<file> [--out=<json>]
+//   node scripts/check-routine-prompt.js --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts|victoria-reorg --note=<file> --cycle=<uuid> [--out=<json>]
 //
 // FLAGS
-//   --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts
+//   --routine=runner|auditor|researcher|model-watch|market|jerry-linkedin-alerts|victoria-reorg
 //                              required. runner  -> docs/runbooks/routine-prompt.md,
 //                              <!-- ROUTINE-PROMPT-BEGIN --> / <!-- ROUTINE-PROMPT-END -->,
 //                              trig_017TZ3JZcLBK6AYH6DKURqMH.
@@ -60,6 +66,13 @@
 //                              2026-09-28 -- so there is no trigger id to carry, and location 1
 //                              falls back to the routine NAME
 //                              (routine/jerry-linkedin-alerts/prompt), as for model-watch.
+//                              victoria-reorg -> docs/runbooks/victoria-reorg.md,
+//                              <!-- VICTORIA-REORG-PROMPT-BEGIN --> / <!-- VICTORIA-REORG-PROMPT-END -->,
+//                              id null (AGT-281). Section (c) ships BEFORE the routine exists --
+//                              creating it, filling its id and enabling it are attended work, and
+//                              the switch goes on only after John has seen the first run -- so there
+//                              is no trigger id to carry, and location 1 falls back to the routine
+//                              NAME (routine/victoria-reorg/prompt), as for the two above.
 //   --prompt=<file>            PROMPT MODE: the prompt text the run was given, verbatim.
 //   --note=<file>              NOTE MODE: a runner_cycles.notes text that reports routine-prompt drift.
 //   --cycle=<uuid>             the runner_cycles id the --note came from (required with --note).
@@ -146,6 +159,20 @@ export const ROUTINES = {
     file: "personal-agent.md",
     begin: "<!-- JERRY-LINKEDIN-ALERTS-PROMPT-BEGIN -->",
     end: "<!-- JERRY-LINKEDIN-ALERTS-PROMPT-END -->",
+    id: null,
+  },
+  // AGT-281. The weekly Tuesday 5:00 AM Central list reorganization, and the SEVENTH routine the
+  // check knows. `id: null` for the model-watch/jerry reason and no other: the routine does not exist
+  // yet, because creating it, filling its id and enabling it are ATTENDED work (AGT-281 kickoff §7) --
+  // the switch goes on only after John has seen the first run. The block in victoria-reorg.md section
+  // (c) is the source; the attended session that creates the routine pastes it and fills the real id
+  // here, in that file's table, and in scripts/sync-routine-models.js. Until then finding() locates by
+  // the routine NAME (routine/victoria-reorg/prompt), so filling the id later is not itself a drift
+  // (AGT-102, AGT-146, AGT-156).
+  "victoria-reorg": {
+    file: "victoria-reorg.md",
+    begin: "<!-- VICTORIA-REORG-PROMPT-BEGIN -->",
+    end: "<!-- VICTORIA-REORG-PROMPT-END -->",
     id: null,
   },
 };
