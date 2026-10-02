@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// DeepBench v7.0.745 | scripts/sync-routine-models.js | AGT-281 -- the directory is FOURTEEN: the two
+// routines the attended session created on 2026-10-02 and left switched OFF, `jerry-linkedin-alerts`
+// and `victoria-reorg`, join the list so a model switch re-pins them too. Both run on the
+// orchestrator lane's model, like the twelve before them; enabling either is John's hand alone.
 // DeepBench v7.0.612 | scripts/sync-routine-models.js | AGT-145 -- THE ROUTINE PIN FOLLOWS THE
 // TABLE, AND THE THING TO READ TWICE IS THAT THIS SCRIPT NEVER CALLS A ROUTINE. It plans the
 // change, builds the body, grades the read-back and records the decision; the one act it cannot
@@ -89,6 +93,9 @@ export const ROUTINES = [
   { name: "deepbench-runner-lane-4", id: "trig_01Mz6xT2uQ7hhmieAwcNBRdg", job_kind: "lane", job_key: "orchestrator" },
   // AGT-146's model-watch, created 2026-09-29 (status-0929); it runs on the orchestrator lane's model.
   { name: "model-watch", id: "trig_01QTxphS7u5dzD5HdChCBzjV", job_kind: "lane", job_key: "orchestrator" },
+  // AGT-156 and AGT-281, created 2026-10-02 switched off; both run on the orchestrator lane's model.
+  { name: "jerry-linkedin-alerts", id: "trig_01QfQmGMv8z5ioHEwucru8Sy", job_kind: "lane", job_key: "orchestrator" },
+  { name: "victoria-reorg", id: "trig_012xvmXsXAjbVxdbYhUTq6W1", job_kind: "lane", job_key: "orchestrator" },
 ];
 
 export const SYNC_KIND = "routine-pin-sync";

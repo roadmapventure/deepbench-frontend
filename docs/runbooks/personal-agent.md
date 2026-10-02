@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.745 | runbooks/personal-agent.md | AGT-281 — the jerry-linkedin-alerts routine id is FILLED: `trig_01QfQmGMv8z5ioHEwucru8Sy`, created 2026-10-02 by the attended session (decision `956086bc-b83b-4f81-a603-de66f7b669b3`) and left **switched off**. The table below carries the id and the live `enabled` `false`; section (e)'s block is byte-unchanged and still carries no trigger id and no model id. `--routine=jerry-linkedin-alerts` now locates a finding by the id. Switching the routine ON is John's hand alone. -->
 <!-- DeepBench v7.0.728 | runbooks/personal-agent.md | AGT-156 - the jerry-linkedin-alerts routine: section (e) is the canonical prompt block for the daily 8:00 AM Central alert review, and the SOURCE the live routine copies (ARCHITECTURE.md §19v). The routine itself is created by an attended session (DM ruling 2026-09-28), so the routine id is absent here and in ROUTINES["jerry-linkedin-alerts"].id until it is real -- AGT-146's model-watch precedent. Section (d)'s two bullets now say that the Sunday and Monday runs read the alert posting records (channel linkedin-alert) and name them in their summaries; the two verbatim prompt strings John pastes are byte-unchanged. -->
 <!-- DeepBench v7.0.710 | runbooks/personal-agent.md | AGT-155 remainder — the two lead facts reach the producer. Step (b)5 now says what refuses a write: a job marked competitor with no competitor_why, which costs the whole answer — the records and the shared leads inbox both. The ask itself lives in the jm-linkedin-alerts-intent Skill row (migration `agt155_alerts_intent_lead_fields`, mirror docs/design/agt-155-alerts-intent-lead-fields.sql), where assemblePrompt() renders it on every --render: before it, the career-linkedin-alerts render named what_they_sell 0 times and competitor_why once; after it, 3 and 4. Both facts are required CONDITIONALLY, through the job item's allOf/if-then, never its flat required, so a non-competitor job stays valid. No other line moves. -->
 <!-- DeepBench v7.0.561 | runbooks/personal-agent.md | AGT-84 — the playbook the /jerry loader reads: map the ask to a capability, render, run one sub-agent, write, log. Method only: no personal fact lives here (the repo is public; John's data lives only in public.career_records). -->
@@ -76,16 +77,15 @@ compares the two.
 | connectors | Supabase MCP (`mcp__Supabase__*`), plus `WebFetch` and `WebSearch` | the records and the secrets by name; the legit check reads the public job page and the company careers page |
 | environment | `env_01GuEzm2nCHbCB5SumvQVEQ1` | the environment the other DeepBench routines run in |
 | notifications | off | John asked for no phone push (Q5); the run's record is the ONE summary the block's step 3 names |
-| enabled | `true` at creation | John's switch alone |
-| routine id | **not yet created** — the attended session that creates the routine fills it here and in `ROUTINES["jerry-linkedin-alerts"].id` | AGT-102 ran the Auditor a week on an unfilled placeholder, so the id is absent by design until it is real, and the prompt block never carries one (the `model-watch` precedent, AGT-146) |
+| enabled | `false` — created off; John's switch alone | John's switch alone |
+| routine id | `trig_01QfQmGMv8z5ioHEwucru8Sy` — created 2026-10-02 by the attended session (decision `956086bc-b83b-4f81-a603-de66f7b669b3`), **switched off**; also in `ROUTINES["jerry-linkedin-alerts"].id` (`scripts/check-routine-prompt.js`) and `scripts/sync-routine-models.js` `ROUTINES` | AGT-102 ran the Auditor a week on an unfilled placeholder, so the id is absent by design until it is real, and the prompt block never carries one (the `model-watch` precedent, AGT-146) |
 | prompt | the block between `<!-- JERRY-LINKEDIN-ALERTS-PROMPT-BEGIN -->` / `<!-- JERRY-LINKEDIN-ALERTS-PROMPT-END -->` below, byte-identical | the routine-prompt.md convention: the file is the source, the routine the copy |
 
 Update rule, as routine-prompt.md and auditor-routine.md: edit the block → suite → commit → on John's
 word `RemoteTrigger update` with the WHOLE `ccr` (`environment_id`, `events`, `session_context`) read
-from a fresh `get`, then read back `derived_state.model` and `allowed_tools`. Until the routine
-exists, `--routine=jerry-linkedin-alerts` locates a finding by the routine NAME
-(`routine/jerry-linkedin-alerts/prompt`), so the fingerprint is the same before and after the id is
-filled and filling it is not itself a drift.
+from a fresh `get`, then read back `derived_state.model` and `allowed_tools`. The routine exists, so
+`--routine=jerry-linkedin-alerts` locates a finding by its id (`routine/trig_01QfQmGMv8z5ioHEwucru8Sy/prompt`), as
+model-watch does; the block is unchanged and the live prompt equals it (checked 2026-10-02, exit 0).
 
 ### The prompt
 

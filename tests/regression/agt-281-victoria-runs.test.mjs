@@ -22,9 +22,10 @@
 //      arm reads that file), and `VICTORIA_PREFIX` in the brief must still equal `LIST_PREFIX` in the
 //      caller -- otherwise the brief's group goes quietly empty while both files look right.
 //   C  THE ROUTINE BLOCK (§6.3): equal is exit 0, one character changed is exit 1 located at
-//      `routine/victoria-reorg/prompt` (the NAME -- the routine does not exist yet, so there is no id
-//      to locate by), and the block's own content -- the three list slugs, `--apply-list`, the
-//      `--ai-type`, and NO `claude-` and NO `trig_`.
+//      `routine/trig_012xvmXsXAjbVxdbYhUTq6W1/prompt` (the ID -- the routine exists, created 2026-10-02
+//      and switched off, so location 1 is its id and never the string "null"), and the block's own
+//      content -- the three list slugs, `--apply-list`, the `--ai-type`, and NO `claude-` and NO
+//      `trig_`.
 //   D  THE BRIEF (§6.4): `renderVictoriaList()`'s three branches render differently, and
 //      `renderBlock()` carries the lead BETWEEN Ticket hygiene and Staff watch.
 //   E  THE REPO PLUMBING: the `SERVICE_CATALOG` slug the runbook's block prescribes verbatim, the
@@ -332,9 +333,8 @@ async function run() {
     assert.equal(r.file, "victoria-reorg.md");
     assert.equal(r.begin, BEGIN);
     assert.equal(r.end, END);
-    assert.equal(r.id, null,
-      "id null until the attended session creates the routine -- AGT-102 ran the Auditor a week on " +
-      "an unfilled placeholder, so an absent id is written absent, never guessed");
+    assert.equal(r.id, "trig_012xvmXsXAjbVxdbYhUTq6W1",
+      "id filled 2026-10-02 (decision 956086bc); read from the live routine, never guessed");
     assert.deepEqual(Object.keys(ROUTINES).sort(),
       ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner", "victoria-reorg"],
       "seven routines, victoria-reorg the seventh");
@@ -359,8 +359,9 @@ async function run() {
       assert.equal(bad.status, 1, `one changed character must exit 1; got ${bad.status} ${bad.stderr}`);
       const f = JSON.parse(fs.readFileSync(path.join(dir, "drift.json"), "utf8")).findings;
       assert.equal(f.length, 1, "exactly ONE finding");
-      assert.equal(f[0].locations[0].location, "routine/victoria-reorg/prompt",
-        "located by the routine NAME, because the routine has no id yet");
+      assert.equal(f[0].locations[0].location, "routine/trig_012xvmXsXAjbVxdbYhUTq6W1/prompt",
+        "located by the routine's ID, which exists as of 2026-10-02");
+      assert.ok(!f[0].locations[0].location.includes("null"), "no routine/null/prompt");
       assert.match(f[0].locations[1].location, /^docs\/runbooks\/victoria-reorg\.md:\d+$/);
       assert.equal(f[0].confidence, "high");
     } finally {

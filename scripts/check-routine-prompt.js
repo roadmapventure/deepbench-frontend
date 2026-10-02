@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// DeepBench v7.0.745 | scripts/check-routine-prompt.js | AGT-281 -- the two attended ids are FILLED:
+// `jerry-linkedin-alerts` = trig_01QfQmGMv8z5ioHEwucru8Sy and `victoria-reorg` =
+// trig_012xvmXsXAjbVxdbYhUTq6W1, both created 2026-10-02 and both left switched OFF (decision
+// 956086bc-b83b-4f81-a603-de66f7b669b3). No null id remains in this registry, so location 1 of a
+// finding is now the routine's id rather than its name. Enabling either one is John's hand alone.
 // DeepBench v7.0.741 | scripts/check-routine-prompt.js | AGT-281 -- `victoria-reorg` is the SEVENTH
 // routine the check knows, and the third (after model-watch and jerry-linkedin-alerts) it knows
 // BEFORE the routine exists: creating the weekly Tuesday 5:00 AM Central routine, filling its id and
@@ -149,31 +154,28 @@ export const ROUTINES = {
     end: "<!-- NATHAN-WEDNESDAY-PROMPT-END -->",
     id: "trig_015K3zgtnMztuNritHxC6uSW",
   },
-  // AGT-156. The daily 8:00 AM Central LinkedIn alert review. `id: null` for the model-watch reason
-  // and no other: the routine does not exist yet, because creating it is ATTENDED work the Dev
-  // Manager ruled out of a cycle on 2026-09-28. The block in personal-agent.md section (e) is the
-  // source; the attended session that creates the routine pastes it and fills the real id here, in
-  // that file table, and in scripts/sync-routine-models.js. Until then finding() locates by the
-  // routine NAME, so filling the id later is not itself a drift (AGT-102, AGT-146).
+  // AGT-156. The daily 8:00 AM Central LinkedIn alert review. The routine exists switched off,
+  // created 2026-10-02 by the attended session, so finding() locates by its id; enabling it is
+  // John's alone. The block in personal-agent.md section (e) is the source; the id lives here, in
+  // that file's table, and in scripts/sync-routine-models.js -- never inside the block itself
+  // (AGT-102, AGT-146).
   "jerry-linkedin-alerts": {
     file: "personal-agent.md",
     begin: "<!-- JERRY-LINKEDIN-ALERTS-PROMPT-BEGIN -->",
     end: "<!-- JERRY-LINKEDIN-ALERTS-PROMPT-END -->",
-    id: null,
+    id: "trig_01QfQmGMv8z5ioHEwucru8Sy", // created 2026-10-02, attended (decision 956086bc), switched off
   },
   // AGT-281. The weekly Tuesday 5:00 AM Central list reorganization, and the SEVENTH routine the
-  // check knows. `id: null` for the model-watch/jerry reason and no other: the routine does not exist
-  // yet, because creating it, filling its id and enabling it are ATTENDED work (AGT-281 kickoff §7) --
-  // the switch goes on only after John has seen the first run. The block in victoria-reorg.md section
-  // (c) is the source; the attended session that creates the routine pastes it and fills the real id
-  // here, in that file's table, and in scripts/sync-routine-models.js. Until then finding() locates by
-  // the routine NAME (routine/victoria-reorg/prompt), so filling the id later is not itself a drift
-  // (AGT-102, AGT-146, AGT-156).
+  // check knows. The routine exists switched off, created 2026-10-02 by the attended session, so
+  // finding() locates by its id (routine/trig_012xvmXsXAjbVxdbYhUTq6W1/prompt); enabling it is
+  // John's alone, after he has seen the first run's output. The block in victoria-reorg.md section
+  // (c) is the source; the id lives here, in that file's table, and in
+  // scripts/sync-routine-models.js -- never inside the block itself (AGT-102, AGT-146, AGT-156).
   "victoria-reorg": {
     file: "victoria-reorg.md",
     begin: "<!-- VICTORIA-REORG-PROMPT-BEGIN -->",
     end: "<!-- VICTORIA-REORG-PROMPT-END -->",
-    id: null,
+    id: "trig_012xvmXsXAjbVxdbYhUTq6W1", // created 2026-10-02, attended (decision 956086bc), switched off
   },
 };
 

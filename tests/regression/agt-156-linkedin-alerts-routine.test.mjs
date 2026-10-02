@@ -1,14 +1,14 @@
 // DeepBench v7.0.728 | tests/regression/agt-156-linkedin-alerts-routine.test.mjs | AGT-156 -- the
 // jerry-linkedin-alerts routine, repo half. docs/runbooks/personal-agent.md section (e) is the
 // SOURCE and the cloud routine is the copy (ARCHITECTURE.md §19v); scripts/check-routine-prompt.js
-// is what compares the two. Creating the routine itself is ATTENDED work (Dev Manager ruling
-// 2026-09-28), so nothing here depends on it existing and the registry id is null by design.
+// is what compares the two. The attended session created the routine on 2026-10-02 and left it
+// switched OFF (decision 956086bc), so the registry now carries its real id.
 // Kickoff: docs/kickoffs/v7.0.728-AGT-156-jerry-linkedin-alerts-routine.md §5 tasks 1-6, §6.
 //
 //   A  DRIFT -- the real block as --prompt -> exit 0, findings []; one character changed at block
-//      line 2 -> exit 1, ONE finding, location 1 routine/jerry-linkedin-alerts/prompt (the NAME,
-//      because the routine does not exist yet and its id is null); a copy of the runbook with a
-//      marker line removed -> exit 2.
+//      line 2 -> exit 1, ONE finding, location 1 routine/trig_01QfQmGMv8z5ioHEwucru8Sy/prompt (the ID,
+//      which the routine has carried since 2026-10-02 -- never the string "null"); a copy of the
+//      runbook with a marker line removed -> exit 2.
 //   B  CONTENT -- the block carries docs/runbooks/personal-agent.md, --fetch-linkedin-alerts,
 //      career-linkedin-alerts, YAHOO_IMAP_USER, "Yahoo connection failed", "7 days" and the ticket's
 //      Q4 NEVER list verbatim; it carries NO model id, NO trigger id and NO `<lower case>`
@@ -103,8 +103,8 @@ async function run() {
       assert.equal(f[0].check_slug, "routine-prompt-drift");
       assert.equal(f[0].kind, "contradiction");
       assert.equal(f[0].confidence, "high");
-      assert.equal(f[0].locations[0].location, "routine/jerry-linkedin-alerts/prompt",
-        "an id-less routine locates by NAME, never by the string 'null'");
+      assert.equal(f[0].locations[0].location, "routine/trig_01QfQmGMv8z5ioHEwucru8Sy/prompt",
+        "the routine has an id as of 2026-10-02, so location 1 is that id, never the string 'null'");
       assert.ok(!f[0].locations[0].location.includes("null"), "no `routine/null/prompt`");
       assert.equal(f[0].locations[0].text, "X", "location 1 quotes the first differing live line");
       assert.match(f[0].locations[1].location, /^docs\/runbooks\/personal-agent\.md:\d+$/);
@@ -172,7 +172,7 @@ async function run() {
     await arm("C registry", async () => {
       const r = ROUTINES["jerry-linkedin-alerts"];
       assert.ok(r, "ROUTINES carries jerry-linkedin-alerts");
-      assert.equal(r.id, null, "no id until the attended session creates the routine");
+      assert.equal(r.id, "trig_01QfQmGMv8z5ioHEwucru8Sy", "id filled 2026-10-02 (decision 956086bc)");
       assert.equal(r.file, "personal-agent.md");
       assert.equal(r.begin, BEGIN);
       assert.equal(r.end, END);

@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.745 | runbooks/victoria-reorg.md | AGT-281 — the routine id is FILLED: `trig_012xvmXsXAjbVxdbYhUTq6W1`, created 2026-10-02 by the attended session (decision `956086bc-b83b-4f81-a603-de66f7b669b3`) and left **switched off**. The table below carries the id and the live `enabled` `false`; section (c)'s block is byte-unchanged and still carries no trigger id and no model id. `--routine=victoria-reorg` now locates a finding by the id. Switching the routine ON is John's hand alone, after he has seen the first run's output. -->
 <!-- DeepBench v7.0.741 | runbooks/victoria-reorg.md | AGT-281 — the playbook the /victoria loader reads, and section (c) is the canonical prompt block for the weekly Tuesday 5:00 AM Central list reorganization and the SOURCE the live routine copies (ARCHITECTURE.md §19v). The routine itself is created by an attended session (kickoff §7), so the routine id is absent here and in ROUTINES["victoria-reorg"].id until it is real — the model-watch precedent, AGT-146, and AGT-102's reason for it. Method only: no ticket text, no finding text and no secret value lives here. -->
 # Victoria's lists — the call path
 
@@ -57,18 +58,17 @@ Work from the runner's checkout (the loader names it) and write every file to th
 | connectors | Supabase MCP (`mcp__Supabase__*`) | the board, the candidate sources and the secrets by name. No web access: a need source is a row, never a page |
 | environment | `env_01GuEzm2nCHbCB5SumvQVEQ1` | the environment the other DeepBench routines run in |
 | notifications | off | nothing is sent; the `runner_cycles` row each list writes is the ONE record of the run, and the standing brief renders it |
-| enabled | `true` at creation, and only after the first run has been shown to John | John's switch alone |
-| routine id | **not yet created** — the attended session that creates the routine fills it here, in `ROUTINES["victoria-reorg"].id` (`scripts/check-routine-prompt.js`) and in `scripts/sync-routine-models.js` | AGT-102 ran the Auditor a week on an unfilled placeholder, so the id is absent by design until it is real, and the prompt block never carries one (the `model-watch` precedent, AGT-146) |
+| enabled | `false` — created off; John switches it on himself, after he has seen the first run | John's switch alone |
+| routine id | `trig_012xvmXsXAjbVxdbYhUTq6W1` — created 2026-10-02 by the attended session (decision `956086bc-b83b-4f81-a603-de66f7b669b3`), **switched off**; also in `ROUTINES["victoria-reorg"].id` (`scripts/check-routine-prompt.js`) and `scripts/sync-routine-models.js` `ROUTINES` | AGT-102 ran the Auditor a week on an unfilled placeholder, so the id is absent by design until it is real, and the prompt block never carries one (the `model-watch` precedent, AGT-146) |
 | prompt | the block between `<!-- VICTORIA-REORG-PROMPT-BEGIN -->` / `<!-- VICTORIA-REORG-PROMPT-END -->` below, byte-identical | the routine-prompt.md convention: the file is the source, the routine the copy |
 
 Update rule, as routine-prompt.md and auditor-routine.md: edit the block → suite → commit → on John's
 word `RemoteTrigger update` with the WHOLE `ccr` (`environment_id`, `events`, `session_context`) read
-from a fresh `get`, then read back `derived_state.model` and `allowed_tools`. Until the routine
-exists, `--routine=victoria-reorg` locates a finding by the routine NAME
-(`routine/victoria-reorg/prompt`), so the fingerprint is the same before and after the id is filled
-and filling it is not itself a drift.
+from a fresh `get`, then read back `derived_state.model` and `allowed_tools`. The routine exists, so
+`--routine=victoria-reorg` locates a finding by its id (`routine/trig_012xvmXsXAjbVxdbYhUTq6W1/prompt`), as model-watch
+does; the block is unchanged and the live prompt equals it (checked 2026-10-02, exit 0).
 
-The block carries no trigger id and no model id: the id does not exist yet, and the model is the
+The block carries no trigger id and no model id: the id lives in the table above, never in the block, and the model is the
 `model_assignments` row the sub-agent's own assembly prints at run time.
 
 ### The prompt
@@ -89,4 +89,4 @@ This run decides and records alone, and the runner_cycles row each --apply-list 
 
 ## (d) What the first run is, and what it is not
 
-`AGT-281` ships the repo half only and stays `partial`. The routine above does NOT exist yet: creating it, filling its id in the three places the table names, and enabling it are ATTENDED work, and the switch goes on only after John has seen the first run's output (kickoff §7). Before the two list runs, the FIRST judgment this capability makes is a single-ticket one — a `--prepare` / `--apply` pair on one ticket against one of John's own recorded sources — so the narrow door is proven on one row before the wide one is pointed at 84.
+`AGT-281` ships the repo half only and stays `partial`. The routine above exists switched off (`trig_012xvmXsXAjbVxdbYhUTq6W1`, 2026-10-02); switching it on is John's alone, after he has seen the first run's output. Before the two list runs, the FIRST judgment this capability makes is a single-ticket one — a `--prepare` / `--apply` pair on one ticket against one of John's own recorded sources — so the narrow door is proven on one row before the wide one is pointed at 84.
