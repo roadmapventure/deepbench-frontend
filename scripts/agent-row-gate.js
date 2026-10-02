@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.743 | scripts/agent-row-gate.js | AGT-309 — the CLI's second limb stops being a
+// hardcoded `false`. `backlog_items.need_source` (AGT-280) is a COLUMN, so the one authority a ticket
+// id CAN settle is now read instead of understated: a `need_source` of the text
+// `john:runner_decisions:<uuid>` whose row reads back with `reversed_at IS NULL` is an unreversed John
+// decision cited BY the ticket, which is exactly the rule's second limb, and `decisionNamesTicket`
+// comes back true. A reversed row, a row that does not read back, and any other `who:table` are each
+// named in the printed line and carry nothing. The classifier is untouched: this is a new READER of
+// an existing input, never a new clause (§19v, rule AGENT-ROW-AGREED-TICKET).
+//
 // DeepBench v7.0.494 | scripts/agent-row-gate.js | SES-394 — is this agent-row write build work, or a card?
 //
 // WHAT THIS DECIDES, and why it is a script rather than one more sentence in a rule file. Before
@@ -212,7 +221,7 @@ async function main() {
   }
 
   const res = await rest(supabaseUrl, supabaseKey,
-    `backlog_items?select=backlog_id,scope_origin&backlog_id=eq.${encodeURIComponent(ticket)}&limit=1`);
+    `backlog_items?select=backlog_id,scope_origin,need_source&backlog_id=eq.${encodeURIComponent(ticket)}&limit=1`);
   if (res.error) {
     return emit(
       `agent-row-gate: cannot run — ${res.error}. Exiting 1 (gated), which is NOT a pass: ${ticket}'s row was never read.`,
@@ -225,25 +234,56 @@ async function main() {
   }
 
   const scopeOrigin = res.rows[0].scope_origin ?? null;
+  const needSource = res.rows[0].need_source ?? null;
 
-  // THE CLI JUDGES ON scope_origin ALONE, and says so in the line it prints. The rule has a second
-  // limb — "an unreversed runner_decisions row names both the ticket and the change" — which a ticket
-  // id cannot settle on its own: whether a decision names THE CHANGE is a reading, not a column.
-  // Passing `decisionNamesTicket: false` here therefore understates authority by construction, and a
-  // `gated` line from this CLI means "no authority in scope_origin", never "no authority exists".
-  // `agentKnownToJohn` is left undefined for the same reason — unknowable from a ticket id, and
-  // asserting it false would gate every call (see the header's fail-closed-one-way note).
-  const v = classifyAgentRowWrite({ action, scopeOrigin, decisionNamesTicket: false });
+  // AGT-309: THE SECOND LIMB, READ RATHER THAN ASSUMED ABSENT. The rule's second limb is "an
+  // unreversed runner_decisions row names both the ticket and the change". Which row names the
+  // TICKET is now a column — `need_source` (AGT-280) is the text `who:table:id`, and a ticket whose
+  // own row cites `john:runner_decisions:<uuid>` has named that decision itself, which is a stronger
+  // statement than any reading of the decision's prose. So the id is resolved and
+  // `reversed_at IS NULL` is the test. A `john:runner_decisions` citation that reads back REVERSED,
+  // or does not read back at all, carries nothing: that is the fail-closed direction, and the tag in
+  // the printed line says which of the three it was so a reader is never left guessing.
+  //
+  // WHAT IS STILL NOT READ HERE, and the footnote's whole remaining job: whether the decision names
+  // THE CHANGE. That is a reading, not a column, so a `gated` line on a ticket with NO need_source
+  // still means "no authority in scope_origin", never "no authority exists" — hence the footnote,
+  // which now prints only in that case. `agentKnownToJohn` is left undefined for the same reason —
+  // unknowable from a ticket id, and asserting it false would gate every call (see the header's
+  // fail-closed-one-way note).
+  const JOHN_DECISION = /^john:runner_decisions:([0-9a-f-]{36})$/;
+  let decisionNamesTicket = false;
+  let sourceTag = null;
+  if (needSource !== null) {
+    const m = JOHN_DECISION.exec(needSource);
+    if (!m) {
+      sourceTag = "not a John decision";
+    } else {
+      const dec = await rest(supabaseUrl, supabaseKey,
+        `runner_decisions?id=eq.${encodeURIComponent(m[1])}&select=id,reversed_at`);
+      // A read that failed and a read that came back empty are the same fact for this gate — the row
+      // did not read back — and both land on the safe side, carrying no authority.
+      if (dec.error || !dec.rows.length) sourceTag = "not a John decision";
+      else if (dec.rows[0].reversed_at === null) { decisionNamesTicket = true; sourceTag = "unreversed John decision"; }
+      else sourceTag = "reversed";
+    }
+  }
+
+  const v = classifyAgentRowWrite({ action, scopeOrigin, decisionNamesTicket });
 
   const line = `agent-row-gate: ${ticket} · action=${action} · scope_origin=${JSON.stringify(scopeOrigin)} ` +
     `→ ${v.verdict.toUpperCase()} — ${v.reason}` +
-    (v.clause === "no-authority"
-      ? ` (judged on scope_origin alone; an unreversed runner_decisions row naming this ticket AND this change would still make it build work.)`
-      : "");
+    (needSource === null
+      ? (v.clause === "no-authority"
+        ? ` (judged on scope_origin alone; an unreversed runner_decisions row naming this ticket AND this change would still make it build work.)`
+        : "")
+      : ` · need_source=${needSource} (${sourceTag})`);
 
   return emit(line, v.verdict === "build" ? 0 : 1,
     { ok: v.verdict === "build", exitCode: v.verdict === "build" ? 0 : 1, kind: "verdict",
-      ticket, action, scope_origin: scopeOrigin, verdict: v.verdict, rule: v.rule, clause: v.clause, reason: v.reason });
+      ticket, action, scope_origin: scopeOrigin, need_source: needSource,
+      decision_names_ticket: decisionNamesTicket,
+      verdict: v.verdict, rule: v.rule, clause: v.clause, reason: v.reason });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

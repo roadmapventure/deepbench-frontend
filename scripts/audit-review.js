@@ -1,3 +1,16 @@
+// DeepBench v7.0.743 | scripts/audit-review.js | AGT-309 -- THE PROCESS-BREAK CLASS REACHES THE
+// ROUTER. A `root-cause` group may now carry two more keys: `need_source` (the text `who:table:id`,
+// normally `john:runner_decisions:<id>`) and `home` (the executing `projects.slug` that accepts
+// findings the ticket should end up on). THEY DO NOT MOVE ANYTHING AND THEY ARE NOT A ROUTE: the
+// ticket still files to the list its route picked, apply_audit_review() ignores both keys entirely,
+// and the only thing that moves a ticket into an executing project is apply_requirement_verdict()
+// on Victoria's `pass` (AGT-309's requirement_gate clause refuses every other path). What they do is
+// carry the manager's PROPOSAL forward: --apply prints one `next:` line per such group, the
+// requirement-check prepare command with the ticket the function actually filed, so the manager
+// cannot overrule her and cannot be ignored either. validateReview() refuses one key without the
+// other, a `home` that is not an executing project that accepts findings, and either key on any
+// kind but root-cause -- offline, before an --apply is spent.
+//
 // DeepBench v7.0.692 | scripts/audit-review.js | AGT-264 -- AGENT TRAINING ACCEPTS FINDINGS. The
 // route mirror's lock reads one more column: listLocked() refuses a project whose list is locked
 // UNLESS its projects row carries `accepts_findings` true, which mirrors finding_group_epic()'s
@@ -107,6 +120,54 @@ export function lockedListRefusal(slug, status) {
 // (projects.accepts_findings, true for the perpetual Agent Training project). Mirrors
 // finding_group_epic()'s `IF v_pst IN (...) AND NOT v_acc`. A home with no such field stays locked.
 export function listLocked(home) { return !!home && LOCKED_PROJECT_STATUSES.includes(home.status) && home.accepts_findings !== true; }
+
+// --- AGT-309: the process-break class's two keys on a root-cause group --------------------------
+//
+// THE SHAPE, AND ONLY THE SHAPE. `who:table:id` is what a need_source reads. Whether the cited row
+// EXISTS, and whether its `who:table` pair is allowlisted, belong to `need_source_is_traceable()`
+// and to `scripts/requirement-check.js --prepare`; re-deciding either here would be a second
+// implementation agreeing with itself (SES-45) and would drift the day John edits
+// `runner_settings.need_source_kinds`.
+export const NEED_SOURCE_SHAPE = /^[a-z]+:[a-z_]+:[^:]+$/;
+export const NEED_SOURCE_NEEDS_HOME =
+  "a root-cause group citing need_source needs home (an executing projects.slug that accepts findings)";
+export const HOME_NEEDS_NEED_SOURCE = "home needs need_source (the text who:table:id)";
+export const CLASS_KEYS_ROOT_CAUSE_ONLY = "need_source/home apply only to a root-cause group";
+export function homeNotExecutingRefusal(slug) {
+  return `home ${slug} is not an executing project that accepts findings (AGT-240)`;
+}
+// AGT-240's own condition, stated positively: this is the destination a `pass` may MOVE a ticket
+// onto. A context row carrying no `accepts_findings` fails it, so the check fails closed exactly as
+// listLocked() does.
+export function homeAccepts(row) {
+  return !!row && row.status === "executing" && row.accepts_findings === true;
+}
+
+// The `next:` lines --apply prints, pure so the test asserts the PAIRING rather than the printing.
+// WHICH TICKET A GROUP GOT is not something this file may guess: apply_audit_review() appends one id
+// to `tickets` per FILING group, in group order, so the i-th filing group takes `tickets[i]`. A
+// reuse group filed nothing and names its own ticket. A group that carries the keys but cannot be
+// paired to an id prints no line -- a `next:` command naming the wrong ticket is worse than none.
+export function nextLines(groups, tickets) {
+  const gs = Array.isArray(groups) ? groups : [];
+  const ts = Array.isArray(tickets) ? tickets : [];
+  const lines = [];
+  let filed = 0;
+  for (const g of gs) {
+    const kind = g && g.kind;
+    const reuse = g && g.reuse_backlog_id !== undefined && g.reuse_backlog_id !== null
+      ? String(g.reuse_backlog_id) : null;
+    const files = (kind === "root-cause" && reuse === null) || kind === "cleanup";
+    const id = files ? (filed < ts.length ? String(ts[filed]) : null) : reuse;
+    if (files) filed += 1;
+    if (kind !== "root-cause" || id === null) continue;
+    const ns = blank(g.need_source) ? null : String(g.need_source).trim();
+    const home = blank(g.home) ? null : String(g.home).trim();
+    if (ns === null || home === null) continue;
+    lines.push(`next: node scripts/requirement-check.js --prepare --ticket=${id} --source=${ns} --home=${home}`);
+  }
+  return lines;
+}
 export const WEEK_RE = /^\d{4}-W\d{2}$/;
 export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)";
 // AGT-86 §11(5): the checklist rows the manager may edit. au-identity and au-guardrails are John's.
@@ -363,6 +424,33 @@ export function validateReview(review, worklist, week, checklist, routes, projec
         refusals.push("needs_desktop applies only to a group that files a ticket");
       }
     }
+    // 1a (AGT-309): the two keys of the process-break class, in group order and entirely OFFLINE.
+    // Every fact they need -- the shape of the citation, whether both keys are present, and the
+    // destination's own `projects` row -- is already in the context, so none of them is worth an
+    // --apply to discover. NEITHER KEY ROUTES ANYTHING: this group still files wherever its route
+    // says, and the keys only carry the manager's proposal forward as the `next:` line below.
+    const classNS = g && typeof g === "object" && !blank(g.need_source) ? String(g.need_source).trim() : null;
+    const classHome = g && typeof g === "object" && !blank(g.home) ? String(g.home).trim() : null;
+    if (classNS !== null || classHome !== null) {
+      if (kind !== "root-cause") {
+        // The class is about a ticket, and only a root-cause group has one (filed or reused). On any
+        // other kind the keys are REFUSED rather than dropped -- the AGT-134 needs_desktop rule, same
+        // reason: a dropped key reads as a ruling made and then ignored.
+        refusals.push(CLASS_KEYS_ROOT_CAUSE_ONLY);
+      } else {
+        // One without the other is never a ruling: a need with no destination cannot be acted on,
+        // and a destination with no need is the hand-set source AGT-309's gate clause exists to stop.
+        if (classNS !== null && classHome === null) refusals.push(NEED_SOURCE_NEEDS_HOME);
+        else if (classHome !== null && (classNS === null || !NEED_SOURCE_SHAPE.test(classNS))) {
+          refusals.push(HOME_NEEDS_NEED_SOURCE);
+        }
+        if (classHome !== null && Array.isArray(projects) &&
+            !homeAccepts(projects.find(pr => String(pr.slug) === classHome))) {
+          refusals.push(homeNotExecutingRefusal(classHome));
+        }
+      }
+    }
+
     if (Array.isArray(routes) && files) {
       let route = null;
       try {
@@ -567,6 +655,10 @@ async function apply(args) {
   console.log(`Decision ${id} — reversible until ${chicago(expires)}: select public.reverse_decision('${id}', 'John', '<why>');`);
   console.log(`Tickets: ${Array.isArray(tickets) && tickets.length ? tickets.join(", ") : "(none)"}`);
   console.log(`Counts: ${JSON.stringify(counts ?? {})}`);
+  // AGT-309: the manager's proposal printed as the command that acts on it. One line per root-cause
+  // group carrying both keys, paired with the ticket the FUNCTION filed (or the one a reuse group
+  // named) -- so the ticket in the command is the row that exists, never the title the group asked for.
+  for (const l of nextLines(answer.groups, tickets)) console.log(l);
   process.exitCode = 0;
 }
 

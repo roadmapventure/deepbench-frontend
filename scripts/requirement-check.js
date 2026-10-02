@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.743 | scripts/requirement-check.js | AGT-309 -- `--prepare` gains `--home=<slug>`,
+// the destination the manager's review routed this ticket to. The slug is checked HERE, before any
+// model turn, against `projects` (`status = 'executing'` AND `accepts_findings` -- AGT-240's own
+// condition, so a locked list that does not accept findings is refused by this file instead of by a
+// trigger after the spend), and it travels in the task_context so `--apply` can hand it to the one
+// writer as `p.home_project`. A `pass` then MOVES the ticket (the function's own UPDATE, both BEFORE
+// triggers firing) and prints `Homed: <id> -> <slug>`; a `not-needed` sends no home at all, because
+// nothing on the ticket moved. This file still writes no table.
+//
 // DeepBench v7.0.741 | scripts/requirement-check.js | AGT-281 -- THE LIST DOORS. The two doors below
 // rule ONE ticket against ONE named citation, which is the right grain for a filing as it happens
 // and the wrong grain for the work Victoria is actually waiting on: measured live 2026-10-02,
@@ -48,7 +57,7 @@
 // the function that owns the write.
 //
 // THREE DOORS, ONE VALIDATOR -- the scripts/decide-gated-card.js shape, deliberately:
-//   --prepare --ticket=<ID> --source=<who:table:id> [--out=<path>] [--json]
+//   --prepare --ticket=<ID> --source=<who:table:id> [--home=<slug>] [--out=<path>] [--json]
 //       reads the ticket, the `who:table` allowlist, and -- only if the citation is TRACEABLE -- the
 //       cited row itself, then assembles her prompt through the SAME assemblePrompt() the executor
 //       calls and renders it with agent-prompt.js's renderAssembly(). THIS FILE BUILDS NO PROMPT
@@ -123,7 +132,7 @@ export function parseSource(source) {
 
 // Victoria's task_context. The cited row travels as ITS OWN COLUMNS (minus `embedding`) -- her
 // objective is to read what it says, so a summary of it would be this file judging the source.
-export function buildTaskContext({ ticket, source, source_row, kinds }) {
+export function buildTaskContext({ ticket, source, source_row, kinds, home }) {
   const t = Object(ticket) === ticket ? ticket : {};
   return {
     proposal: {
@@ -144,6 +153,10 @@ export function buildTaskContext({ ticket, source, source_row, kinds }) {
     need_source: source ?? null,
     need_source_row: Object(source_row) === source_row ? source_row : null,
     need_source_kinds: Array.isArray(kinds) ? [...kinds] : [],
+    // AGT-309: the destination the manager's review routed this ticket to, already checked against
+    // `projects` by prepare(). NULL when `--home` was not given, and NULL is the ordinary case -- a
+    // ticket that is only being SCORED is not being moved, and `--apply` sends no home for it.
+    home: blank(home) ? null : String(home),
   };
 }
 
@@ -417,6 +430,9 @@ async function rest(base, key, method, q, body, prefer) {
 async function prepare(args) {
   const ticketId = typeof args.ticket === "string" ? args.ticket : "";
   const source = typeof args.source === "string" ? args.source : "";
+  // AGT-309: OPTIONAL. Absent means "score this ticket, do not move it" -- the AGT-280 behaviour
+  // unchanged, and the ordinary case.
+  const home = typeof args.home === "string" ? args.home.trim() : "";
   if (!ticketId || !source) {
     die(2, "requirement-check --prepare: --ticket=<ID> and --source=<who:table:id> are both required");
   }
@@ -446,6 +462,20 @@ async function prepare(args) {
       `(${kinds.join(", ")}) — ${ticketId} cites a source the platform does not recognise`);
   }
 
+  // 2b. AGT-309: THE DESTINATION, BEFORE THE MODEL TOO. `--home` is where a `pass` will move the
+  //     ticket, and AGT-240's condition on that is `status = 'executing' AND accepts_findings` --
+  //     the same condition `finding_group_epic()` and `epic_lock_guard()` apply. Checked here so a
+  //     locked list is refused for nothing rather than after a turn is spent and the function's
+  //     UPDATE rolls the whole verdict back. A missing row and a present-but-wrong row are the same
+  //     refusal: neither is a list a ticket may be moved onto.
+  if (home !== "") {
+    const projects = await get(`projects?slug=eq.${encodeURIComponent(home)}&select=slug,status,accepts_findings`);
+    const proj = Array.isArray(projects) ? projects[0] : null;
+    if (!proj || proj.status !== "executing" || proj.accepts_findings !== true) {
+      die(1, `requirement-check --prepare: --home ${home} is not an executing project that accepts findings (AGT-240)`);
+    }
+  }
+
   // 3. EXISTENCE BEFORE THE MODEL. The function that the gate itself calls answers this, so the
   //    caller and the trigger cannot disagree about what is traceable. False here = no turn, no cost.
   const tr = await rest(base, key, "POST", "rpc/need_source_is_traceable", { p_source: source });
@@ -464,14 +494,16 @@ async function prepare(args) {
   }
   delete row.embedding;
 
-  const task_context = buildTaskContext({ ticket, source, source_row: row, kinds });
+  const task_context = buildTaskContext({ ticket, source, source_row: row, kinds, home });
 
   const caps = await get(`capabilities?slug=eq.${CAPABILITY}&tenant_id=eq.${TENANT}&select=default_intent_slug&limit=1`);
   const intentSlug = caps[0]?.default_intent_slug;
   if (!intentSlug) die(1, `requirement-check: capability "${CAPABILITY}" has no capabilities row or no default_intent_slug`);
 
-  await assembleAndEmit({ base, key, args, task_context, intentSlug, head: { ticket: ticketId, source } });
-  die(3, `requirement-check --prepare: ${ticketId} cites ${source} — ${AWAITING_ANSWER}`);
+  await assembleAndEmit({ base, key, args, task_context, intentSlug,
+    head: { ticket: ticketId, source, home: home === "" ? null : home } });
+  die(3, `requirement-check --prepare: ${ticketId} cites ${source}` +
+    `${home === "" ? "" : ` and would be homed to ${home}`} — ${AWAITING_ANSWER}`);
 }
 
 // ONE ASSEMBLY PATH FOR BOTH DOORS (§19b). Extracted from prepare() by AGT-281 unchanged in every
@@ -542,11 +574,19 @@ async function apply(args) {
   const v = validateVerdict(answer, ctx);
   if (!v.ok) refuse(v.refusals); // nothing is sent
 
+  // AGT-309: THE HOME COMES FROM THE PREPARE CONTEXT, NEVER FROM HER ANSWER. Where the ticket goes
+  // is the manager's routing call, already checked against `projects` at --prepare time; what she
+  // rules is whether the need holds. So `home_project` is added to the payload here rather than
+  // being a key she could name, and it is added ONLY on a `pass` -- a `not-needed` moves nothing, so
+  // it sends none and the ticket stays on its list.
+  const homeSlug = blank(contextBody(ctx).home) ? null : String(contextBody(ctx).home);
+  const homing = answer.verdict === "pass" && homeSlug !== null;
+
   const { base, key } = creds();
   const r = await rest(base, key, "POST", "rpc/apply_requirement_verdict", {
     p_cycle: hasCycle ? args["cycle-id"] : null,
     p_session: hasSession ? args["session-name"] : null,
-    p: answer,
+    p: homing ? { ...answer, home_project: homeSlug } : answer,
   });
   if (!r.ok) die(1, `requirement-check --apply: HTTP ${r.status} ${r.text}`);
   const handle = typeof r.json === "string" ? r.json : r.json?.id ?? null;
@@ -556,6 +596,9 @@ async function apply(args) {
     const d = await rest(base, key, "GET", `runner_decisions?id=eq.${handle}&select=expires_at`);
     const expires = d.ok && Array.isArray(d.json) && d.json[0] ? d.json[0].expires_at : null;
     console.log(`${answer.backlog_id}: pass — need_source ${answer.need_source}, need_score ${answer.need_score}`);
+    // AGT-309: printed only when the ticket actually MOVED. The function's UPDATE is inside the same
+    // decision as the score, so the one reverse_decision line below puts the epic back with it.
+    if (homing) console.log(`Homed: ${answer.backlog_id} -> ${homeSlug}`);
     console.log(`Decision ${handle} — reversible until ${chicago(expires)}: select * from public.reverse_decision('${handle}', 'John', '<why>');`);
   } else {
     // A findings id, not a decision: nothing on the ticket moved, so there is nothing to put back.
@@ -780,7 +823,7 @@ async function main() {
   if (args["dry-run"]) return dryRun(args);
   if (args.apply) return apply(args);
   if (args["apply-list"]) return applyList(args);
-  die(2, "usage: requirement-check.js --prepare --ticket=<ID> --source=<who:table:id> [--out=<path>] [--json] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>) | --prepare-list --project=<slug> [--epic=<uuid>] [--out=<path>] [--json] | --apply-list=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>)");
+  die(2, "usage: requirement-check.js --prepare --ticket=<ID> --source=<who:table:id> [--home=<slug>] [--out=<path>] [--json] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>) | --prepare-list --project=<slug> [--epic=<uuid>] [--out=<path>] [--json] | --apply-list=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>)");
 }
 
 // Importing this module for its exports must never run the CLI (SES-45).

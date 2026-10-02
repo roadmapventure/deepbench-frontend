@@ -112,6 +112,18 @@ node scripts/audit-review.js --apply=$S/answer.json --context=$S/ctx.json --week
 ```
 A `--dry-run` refusal → re-run the sub-agent ONCE with the refusal lines appended to the prompt; a second refusal → no `--apply`, the summary quotes the refusals, the findings stay `open` for next week. Keep `--apply`'s `Decision <id> — reversible until …` line and its ticket ids for step 7.
 
+**The process-break class (`AGT-309`; John 2026-10-02, rule `JOHN-1002-PROCESS-BREAK-CLASS`).** A `root-cause` group may carry `need_source` (`john:runner_decisions:<id>`) and `home` (an executing project that accepts findings). The ticket still files to its routed list; `--apply` prints one `next:` line per such group. Run it — Victoria rules the ticket against the cited need AND the class before it enters:
+```
+node scripts/requirement-check.js --prepare --ticket=<ID> --source=<need_source> --home=<home> --out=$S/<ID>.prompt.md --json > $S/<ID>.json; echo "prepare exit $?"
+```
+Exit 3 → a Victoria turn on the model the prepare prints (never a hardcoded id, `AGT-147`) → `$S/<ID>-a.json`. The prompt lands in the `--out` file and the payload on stdout, so both are kept: `--context` reads the JSON, never the markdown. Then, one command per line — `--feature` is required and the turn is logged before it is applied:
+```
+node scripts/agent-log.js --agent=victoria --capability=requirement-check --model=<printed> --ai-type=requirement-check --feature=requirement-check:vc-requirement-intent:<ID>
+node scripts/requirement-check.js --dry-run=$S/<ID>-a.json --context=$S/<ID>.json
+node scripts/requirement-check.js --apply=$S/<ID>-a.json --context=$S/<ID>.json --session-name=$N
+```
+A `pass` homes the ticket with her score (`Homed: <ID> -> <slug>`); a `not-needed` leaves it on the list with her reason as a `listed` finding. Nothing else moves a discovered ticket into an executing project (`requirement_gate`, AGT-309): the manager cannot overrule her.
+
 **Step 5 — report and record.**
 ```
 node scripts/audit-ledger.js --report=$W --write
