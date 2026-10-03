@@ -1,4 +1,11 @@
 # S-PM-07 QA Findings
+
+> ## 📜 HISTORICAL (banner added 2026-08-23, Selfbuild sweep) — June-era, pre-CHI
+>
+> Recorded 2026-06-23, before the CHI redesign; the screens and pipelines it describes have
+> been rebuilt since. Read as history only; nothing here is a live finding or input to any
+> current session.
+
 > Recorded at close of S-PM-07b (2026-06-23). Input for next design session.
 
 ---

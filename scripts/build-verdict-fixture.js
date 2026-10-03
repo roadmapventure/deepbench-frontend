@@ -1,0 +1,578 @@
+#!/usr/bin/env node
+// DeepBench v7.0.476 | scripts/build-verdict-fixture.js | SES-344 slice 3 -- THE DIGESTS SURVIVE THE
+// CLONE'S SHAPE. `rawInputs()` now renders the diff with `--full-index`, because the plain rendering
+// abbreviates its `index a..b` blob ids by `core.abbrev=auto` -- a property of how many objects the
+// CLONE holds, not of the tree -- so every recorded `diff_sha256` failed in a small clone while
+// history had not moved at all. The full reasoning, the 27/27 measurement and the kickoff-digest
+// control are at `rawInputs()` and at `redigestFixture()` below; `--redigest` is the one-time
+// re-hash that carries the recorded rows onto the stable rendering.
+//
+// DeepBench v7.0.473 | scripts/build-verdict-fixture.js | SES-344 slice 2 -- THE KNOWN-BAD MUTANTS,
+// and the thing to read twice is WHY A MUTANT IS A FUNCTION OF A REAL FIXTURE RATHER THAN A
+// HAND-WRITTEN PAYLOAD. `MAX_FALSE_APPROVES = 0` has never been exercised: nothing on the recorded
+// ledger is a block the replay approves, so a bar of zero over zero candidates is a green that
+// could not have gone red. The false-approve arm needs deliveries a correct Verifier MUST block --
+// and a hand-typed one would be a straw man, gradeable only against itself. So each mutant is ONE
+// named, pure mutation (`mutateInputs()`) applied to a real shipped delivery whose diff and kickoff
+// still hash to what was judged: everything else the agent sees is the genuine article, and the
+// only thing it can be blocking on is the defect that was injected.
+//
+// THE DIGESTS ARE THE MUTANT'S, NOT THE BASE'S. `materializeMutant()` re-derives the three evidence
+// strings and checks them against `mutant.digests`, so a base commit whose history moved -- or a
+// spec edited without re-running `--mutants` -- is a loud error rather than a silently different
+// test. `--mutants` is the one writer of those digests.
+//
+// DeepBench v7.0.471 | scripts/build-verdict-fixture.js | SES-344 slice 1 -- `rawInputs()` also
+// rebuilds the SHIP REPORT (`git log -1 --format=%B <sha>`, capped at `SHIP_REPORT_CAP`) and
+// `materializeInputs()` passes it through as `ship_report`, so the replay can hand a fixture the
+// same evidence key scripts/verifier.js now puts in both judge lanes. Digest-free by decision --
+// the reason is at the `shipReport` line below.
+//
+// DeepBench v7.0.440 | scripts/build-verdict-fixture.js | SES-337 -- THE 30 RECORDED VERDICTS
+// BECOME A FIXTURE THE VERIFIER IS REPLAYED AGAINST, and the thing to read twice is WHY THE
+// RECONSTRUCTION DOES NOT COME FROM `runner_cycles.push_sha`.
+//
+// SES-337's kickoff (§4) says each fixture row carries "the inputs the verifier had (diff via
+// `git diff <base>...<sha>` reconstructed from `push_sha` on the cycle row, the kickoff file at that
+// version, the three gate outputs as stored in `reasoning`)". MEASURED 2026-09-09 rather than
+// assumed: `push_sha` is a column on `runner_cycles`, not on `runner_verdicts`, and the 23 most
+// recent verdicts all belong to ONE attended cycle (`a8000000-...-a8`) whose `push_sha` is a single
+// value written once at the start of the sitting (`6bdf6a89`, v7.0.425). One sha shared by 23
+// verdicts of 18 different tickets cannot identify any of their diffs. Following the kickoff's
+// literal wording would have produced 23 fixture rows all carrying the same wrong diff -- a fixture
+// that reproduces nothing while looking complete, which is the exact failure a reproduction test
+// exists to catch.
+//
+// SO THE SHA IS RESOLVED FROM THE VERDICT'S OWN `version` PLUS ITS `backlog_id`, against the commit
+// log. That pair is on the verdict row itself, and this repo's commit subjects are
+// `v<version> <TICKET> <summary>` by STANDARDS.md Section 1. Where `push_sha` IS per-verdict useful
+// -- the six pre-2026-09-09 rows, whose cycles are one-ticket cycles -- it is used directly and the
+// row says so in `sha_source`. A row that resolves to no commit, or to more than one candidate
+// ship commit, is marked `available: false` WITH ITS REASON and is excluded from the count. That
+// exclusion is the honest half: an unreconstructable input is missing evidence, and the Verifier's
+// own guardrails say missing evidence blocks.
+//
+// WHAT IS *NOT* A SHIP COMMIT. Prep commits carry the same `v<version>` prefix -- `... kickoff`,
+// `design records: ...`, `render: ...`, `close-out ...`, `fix: ...` -- and diffing one of those
+// against its parent hands the agent a doc change to grade as if it were the ticket. They are
+// filtered by subject, and a version+ticket pair left with zero candidates after the filter is
+// UNAVAILABLE rather than silently downgraded to the prep commit.
+//
+// THE GATE OUTPUTS ARE THE RECORDED ONES, NEVER RE-RUN. Re-running today's gates against an old
+// tree measures today's suite, not the evidence that verdict was given on -- and the stored
+// `gate_build` / `gate_regression` / `gate_hygiene` columns plus `reasoning` are exactly what the
+// judgment was handed. `mechanical` is re-derived from those three by the SHIPPED `verdictFor()`,
+// imported rather than restated, so the fixture cannot drift from the function it models.
+//
+// Usage:
+//   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/build-verdict-fixture.js
+//   [--limit=30] [--out=tests/fixtures/verdicts-30.json]
+
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { spawnSync } from "child_process";
+import { fileURLToPath, pathToFileURL } from "url";
+import { verdictFor, autoDoneEligibility, DIFF_CAP, KICKOFF_CAP, SHIP_REPORT_CAP } from "./verifier.js";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(HERE, "..");
+
+export const sha256 = s => crypto.createHash("sha256").update(String(s), "utf8").digest("hex");
+
+const arg = (n, d) => {
+  const hit = process.argv.find(a => a.startsWith(`--${n}=`));
+  return hit ? hit.slice(n.length + 3) : d;
+};
+
+// A prep commit wears the ship's version number. These are the subject shapes that are NOT the
+// ticket's own diff; the list is deliberately conservative -- a subject this does not recognise
+// becomes an extra candidate, which makes the row ambiguous and therefore UNAVAILABLE, never a
+// silent wrong pick.
+// `kickoff` is matched only where it is a WORD of its own: the AGT-65 ship subject reads
+// "... design-kickoff capability ...", and a bare /\bkickoff/ threw that real ship commit away as
+// prep -- found by this script's own first run, which is why the lookbehind is here.
+const PREP_SUBJECT = /(?<![-\w])(kickoffs?|design records|close-out|render:|render —|prerequisites|fix:)/i;
+
+function gitIn(repo, args) {
+  const r = spawnSync("git", args, { cwd: repo, encoding: "utf8", maxBuffer: 128 * 1024 * 1024 });
+  if (r.error || r.status !== 0) return null;
+  return String(r.stdout);
+}
+const git = args => gitIn(REPO, args);
+
+export function cap(text, limit, what) {
+  const s = String(text ?? "");
+  if (s.length <= limit) return s;
+  return `${s.slice(0, limit)}\n\n[TRUNCATED: this ${what} is ${s.length} characters and was cut at ${limit}. You have NOT seen all of it -- treat anything you would need the rest to judge as missing evidence.]`;
+}
+
+async function rest(base, key, q) {
+  const res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${q}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) throw new Error(`Supabase REST ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+async function rpc(base, key, fn, body) {
+  const res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] ?? null : rows;
+}
+
+// version + ticket -> the ONE ship commit, or a named reason there is none.
+function resolveSha(subjects, version, ticket) {
+  const all = subjects.filter(s => s.subject.startsWith(`${version} `) && s.subject.includes(ticket));
+  if (!all.length) return { sha: null, reason: `no commit whose subject is "${version} ... ${ticket} ..."` };
+  const ships = all.filter(s => !PREP_SUBJECT.test(s.subject));
+  if (!ships.length) return { sha: null, reason: `${all.length} commit(s) matched ${version}/${ticket} but every one is a prep commit (kickoff / design records / render / close-out / fix)` };
+  if (ships.length > 1) return { sha: null, reason: `${ships.length} ship commits matched ${version}/${ticket} (${ships.map(s => s.sha.slice(0, 8)).join(", ")}) -- ambiguous, so which diff the verdict saw cannot be established` };
+  return { sha: ships[0].sha, subject: ships[0].subject, reason: null };
+}
+
+// The kickoff the ship was built from. Preferred by version prefix; a ticket shipped under a
+// multi-ticket kickoff (v7.0.435 covers SES-332/333/334) is found by name instead.
+function findKickoff(version, ticket) {
+  const dir = path.join(REPO, "docs", "kickoffs");
+  let names;
+  try { names = fs.readdirSync(dir); } catch { return { path: null, reason: "docs/kickoffs is unreadable" }; }
+  const byVersion = names.filter(n => n.startsWith(`${version}-`));
+  // A multi-ticket kickoff names its members as a RUN -- `v7.0.435-SES-332-333-334-...`,
+  // `v7.0.431-AGT-65-66-...` -- so `SES-333` never appears as a literal substring of the file that
+  // actually specced it. Match the bare number too, but only inside a filename already carrying the
+  // ticket's own prefix, so `SES-333` cannot resolve onto an `AGT-333`.
+  const [prefix, num] = String(ticket).split("-");
+  const namesTicket = n =>
+    n.includes(ticket) || (!!num && n.includes(`${prefix}-`) && new RegExp(`-${num}(?=[-.])`).test(n));
+  const byTicket = names.filter(namesTicket);
+  const pick = byVersion.find(namesTicket) || byVersion[0] || byTicket.sort().pop();
+  if (!pick) return { path: null, reason: `no kickoff doc for ${version} or ${ticket}` };
+  return { path: path.posix.join("docs/kickoffs", pick), reason: null };
+}
+
+// THE ONE PLACE A FIXTURE'S DIFF AND KICKOFF ARE PRODUCED, called by the generator when it computes
+// the digests AND by the replay when it rebuilds the evidence. Two copies of this would be two
+// definitions of "the inputs the verifier had", and the digest check would then be comparing a
+// fixture against a second implementation of itself.
+//
+// Returns { diff, kickoff, errors } -- `errors` is the load-bearing half: a diff that cannot be
+// rebuilt, or one that no longer hashes to what was judged, is MISSING EVIDENCE and the caller must
+// treat it as such. Silence on a rewritten history is exactly the failure the digests exist for.
+export function rawInputs(repo, sha, kickoffPath) {
+  const errors = [];
+  // SES-344 slice 3: `--full-index` IS LOAD-BEARING, AND THE BUG IT FIXES IS THAT THE DIGEST WAS A
+  // FACT ABOUT THE CLONE RATHER THAN ABOUT THE TREE. A plain `git diff` abbreviates the blob ids on
+  // its `index a..b` lines by `core.abbrev=auto`, which is a function of how many objects the clone
+  // happens to hold -- 8 hex digits in the clone the fixture was recorded in, 7 in a clone under
+  // 16,384 objects. MEASURED 2026-09-13 in a 926-commit shallow clone: every recorded diff came back
+  // exactly 2 characters shorter per changed file, `materializeInputs()` reported `no longer hashes`
+  // on 27/27 usable fixtures and `materializeMutant()` on 3/3, and `git -c core.abbrev=8 diff`
+  // reproduced the recorded `diff_sha256` on 27/27 -- history had not moved at all. Under
+  // `--full-index` the blob ids are written in full, so the rendering is byte-identical under
+  // `core.abbrev=7` and `=12` (27/27, asserted with its negative control in
+  // tests/regression/ses-344c-digests-survive-clone-shape.test.mjs). Changing this re-digests every
+  // fixture row once (`--redigest`); it does not change what history says.
+  const rawDiff = gitIn(repo, ["diff", "--full-index", `${sha}^`, sha]);
+  let diff = null;
+  if (rawDiff === null) errors.push(`git diff ${String(sha).slice(0, 8)}^..${String(sha).slice(0, 8)} could not be read in ${repo}`);
+  else diff = cap(rawDiff, DIFF_CAP, "diff");
+
+  // THE KICKOFF IS NOT ALWAYS IN THE SHIP'S OWN TREE, and assuming it is cost this script a false
+  // exclusion on its second run: `SES-340` shipped at `6bdf6a89` while its kickoff was committed
+  // afterwards in that version's `design records` commit, so `git show <ship>:<kickoff>` fails on a
+  // doc that plainly exists. The fallback reads the same path at HEAD and the row SAYS WHICH -- a
+  // provenance note, never a silent substitution, because "the spec the builder worked from" and
+  // "the spec as it stands today" are different claims about the same file.
+  let kickoff = null, kickoffSource = null;
+  if (!kickoffPath) errors.push("no kickoff doc was resolved for this ship");
+  else {
+    const atShip = gitIn(repo, ["show", `${sha}:${kickoffPath}`]);
+    if (atShip !== null) { kickoff = cap(atShip, KICKOFF_CAP, "document"); kickoffSource = `at the ship commit ${String(sha).slice(0, 8)}`; }
+    else {
+      const atHead = gitIn(repo, ["show", `HEAD:${kickoffPath}`]);
+      if (atHead === null) errors.push(`${kickoffPath} is readable neither at ${String(sha).slice(0, 8)} nor at HEAD`);
+      else { kickoff = cap(atHead, KICKOFF_CAP, "document"); kickoffSource = "at HEAD -- the doc was committed after the ship it specced"; }
+    }
+  }
+  // SES-344: THE SHIP REPORT IS MATERIALISED FROM GIT, NOT STORED, and it carries NO DIGEST -- which
+  // is the one place this differs from the diff and the kickoff beside it, on purpose. The 27
+  // recorded judgments were produced against a contract that did not include a ship report, so
+  // hashing one here would pin a value nothing was ever judged on and fail every replay the first
+  // time a body was amended. `-1` rather than a range because a fixture row IS one ship commit.
+  // Slice 2 re-judges under the widened contract and records its own digest; until then this is
+  // evidence the replay can show, never evidence it can check a recording against.
+  const shipReport = cap(gitIn(repo, ["log", "-1", "--format=%B", sha]) ?? "", SHIP_REPORT_CAP, "ship report");
+
+  return { diff, kickoff, kickoffSource, shipReport, errors };
+}
+
+export function materializeInputs(repo, fixture) {
+  const i = fixture?.inputs;
+  if (!fixture?.sha || !i) return { diff: null, kickoff: null, ship_report: null, errors: ["the fixture carries no resolved sha"] };
+  const got = rawInputs(repo, fixture.sha, i.kickoff_path);
+  const errors = [...got.errors];
+  if (got.diff !== null && i.diff_sha256 && sha256(got.diff) !== i.diff_sha256) {
+    errors.push(`the diff at ${fixture.sha.slice(0, 8)} no longer hashes to the one this verdict was judged on (${got.diff.length} bytes now, ${i.diff_bytes} then) -- history moved under the fixture`);
+  }
+  if (got.kickoff !== null && i.kickoff_sha256 && sha256(got.kickoff) !== i.kickoff_sha256) {
+    errors.push(`${i.kickoff_path} at ${fixture.sha.slice(0, 8)} no longer hashes to the copy this verdict was judged on`);
+  }
+  // `ship_report` in the returned shape, `shipReport` in `rawInputs`: the caller puts this straight
+  // into a `task_context` key, and that key's name is the contract's (scripts/verifier.js V5).
+  return { ...got, ship_report: got.shipReport, errors };
+}
+
+// ---------------------------------------------------------------------------------------------
+// SES-344 slice 2: THE MUTANTS
+// ---------------------------------------------------------------------------------------------
+
+export const MUTANTS_PATH = "tests/fixtures/verdicts-30-mutants.json";
+export const MUTANT_KINDS = ["red-gate", "promised-file-absent", "ship-report-contradicts-diff"];
+
+// PURE, AND IT THROWS RATHER THAN MUTATING NOTHING. A mutation that silently no-ops produces a
+// mutant identical to a real approved ship -- which the Verifier would then correctly approve, and
+// the arm would score that approve as a FALSE one. Every kind below asserts its own precondition
+// against the evidence it was handed, so "the defect is present" is proven before the agent is
+// asked about it, never assumed from the spec's wording.
+//
+// `inputs` is the fixture's `inputs` widened with the three materialised evidence strings
+// (`diff`, `kickoff`, `ship_report: { commit_messages }`) -- the shape the task_context is built
+// from, so a mutation can reach the gate columns and the evidence in one object.
+export function mutateInputs(kind, inputs, spec = {}) {
+  if (!inputs || typeof inputs !== "object") throw new Error("mutateInputs: inputs object required");
+  const out = {
+    ...inputs,
+    gates: { ...(inputs.gates || {}) },
+    changed_files: [...(inputs.changed_files || [])],
+    ship_report: { ...(inputs.ship_report || {}) },
+  };
+
+  if (kind === "red-gate") {
+    // A RED GATE IS THE ONE BLOCK NO JUDGMENT GETS TO OVERRIDE, so this mutant makes the mechanical
+    // lane and the gate output agree that the suite failed. `gate_detail` is PREFIXED rather than
+    // replaced: the rest of the recorded gate output is what the agent reads for context, and
+    // throwing it away would leave a delivery nobody could grade for any other reason.
+    out.gates.regression = "red";
+    // CROSS-CHECKED AGAINST THE SHIPPED FUNCTION, never just against the spec's own wording: a
+    // mutant whose `mechanical` disagreed with what `verdictFor()` derives from its own gate
+    // columns would be an incoherent delivery, and an agent blocking it would be blocking the
+    // incoherence rather than the red gate. The spec supplies the reasoning text the recording is
+    // pinned to; the VERDICT has to be the one the platform would have written.
+    const mech = verdictFor(out.gates);
+    if (!spec.mechanical || spec.mechanical.verdict !== mech.verdict) {
+      throw new Error(`red-gate: spec.mechanical.verdict is ${JSON.stringify(spec.mechanical?.verdict)} but the shipped verdictFor() derives ${JSON.stringify(mech.verdict)} from these gates`);
+    }
+    out.mechanical = spec.mechanical;
+    out.gate_detail = `${spec.gate_detail_prefix ?? ""}${inputs.gate_detail ?? ""}`;
+    return out;
+  }
+
+  if (kind === "promised-file-absent") {
+    // The kickoff and the changed-files list still promise the file; the diff no longer contains it.
+    const p = spec.path;
+    if (!p) throw new Error("promised-file-absent: spec.path is required");
+    const diff = String(inputs.diff ?? "");
+    const marker = `diff --git a/${p} b/${p}`;
+    const at = diff.indexOf(marker);
+    if (at < 0) {
+      throw new Error(`promised-file-absent: the diff carries no "${marker}" section, so this mutation would change nothing and the mutant would be a real, correctly-approved ship`);
+    }
+    const next = diff.indexOf("\ndiff --git ", at + marker.length);
+    out.diff = next < 0 ? diff.slice(0, at) : diff.slice(0, at) + diff.slice(next + 1);
+    out.changed_files = out.changed_files.filter(f => f !== p);
+    if (out.changed_files.length === (inputs.changed_files || []).length) {
+      throw new Error(`promised-file-absent: changed_files does not name "${p}", so the delivery never claimed the file this mutation removes`);
+    }
+    return out;
+  }
+
+  if (kind === "ship-report-contradicts-diff") {
+    // The commit body claims files and counts the diff does not contain. Asserted against the diff
+    // the agent will actually be handed, because a "contradiction" that is really present in the
+    // delivery is not a contradiction at all.
+    for (const p of spec.absent_paths || []) {
+      if (String(inputs.diff ?? "").includes(p)) {
+        throw new Error(`ship-report-contradicts-diff: "${p}" DOES occur in the diff, so the ship report below does not contradict it and this mutant is not known-bad`);
+      }
+    }
+    if (!spec.commit_messages) throw new Error("ship-report-contradicts-diff: spec.commit_messages is required");
+    out.ship_report = { ...out.ship_report, commit_messages: spec.commit_messages };
+    return out;
+  }
+
+  throw new Error(`unknown mutant kind "${kind}" (known: ${MUTANT_KINDS.join(", ")})`);
+}
+
+// One mutant -> the fixture row and the three evidence strings the dispatcher hands the agent.
+// Shaped like `materializeInputs()`'s return on purpose: the caller builds the SAME task_context
+// for a mutant as for a real fixture, so a mutant cannot be judged through a second, friendlier
+// path than the one the reproduction uses.
+export function materializeMutant(repo, fixtures, mutant) {
+  const base = (fixtures || []).find(f => f.verdict_id === mutant?.base_verdict_id);
+  const fail = msg => ({ mutant_id: mutant?.mutant_id ?? null, fixture: null, mat: null, digests: null, errors: [msg] });
+  if (!mutant?.mutant_id) return fail("a mutant row carries no mutant_id");
+  if (!base) return fail(`${mutant.mutant_id}: no fixture carries base_verdict_id ${mutant.base_verdict_id}`);
+  if (!base.available) return fail(`${mutant.mutant_id}: its base fixture ${base.backlog_id} ${base.version} is unavailable (${base.unavailable_reason})`);
+
+  const mat = materializeInputs(repo, base);
+  if (mat.errors.length) return fail(`${mutant.mutant_id}: its base evidence could not be rebuilt -- ${mat.errors.join("; ")}`);
+
+  let mutated;
+  try {
+    mutated = mutateInputs(mutant.kind, {
+      ...base.inputs,
+      diff: mat.diff,
+      kickoff: mat.kickoff,
+      ship_report: { commit_messages: mat.ship_report },
+    }, mutant.spec || {});
+  } catch (e) {
+    return fail(`${mutant.mutant_id}: ${e.message}`);
+  }
+
+  const { diff, kickoff, ship_report, ...inputs } = mutated;
+  const digests = { diff: sha256(diff), kickoff: sha256(kickoff), ship_report: sha256(ship_report.commit_messages) };
+  const errors = [];
+  for (const k of ["diff", "kickoff", "ship_report"]) {
+    const want = mutant.digests?.[k];
+    if (want && want !== digests[k]) {
+      errors.push(`${mutant.mutant_id}: the mutated ${k} no longer hashes to what this mutant was built from (recorded ${String(want).slice(0, 12)}, now ${digests[k].slice(0, 12)}) -- the base commit or the spec moved; re-run scripts/build-verdict-fixture.js --mutants`);
+    }
+  }
+  return {
+    mutant_id: mutant.mutant_id,
+    kind: mutant.kind,
+    base_verdict_id: mutant.base_verdict_id,
+    expected_agent_verdict: mutant.expected_agent_verdict ?? "block",
+    // The fixture row a mutant is judged as: the base row, carrying the MUTATED gate columns.
+    fixture: { ...base, inputs },
+    mat: { diff, kickoff, ship_report: ship_report.commit_messages },
+    digests,
+    errors,
+  };
+}
+
+// `--mutants`: re-derive every mutant and write its digests back. No Supabase -- this reads the
+// frozen fixture and git only, so it runs in any clone that has the base commits.
+function writeMutantDigests() {
+  const fxPath = path.resolve(REPO, arg("out", "tests/fixtures/verdicts-30.json"));
+  const mPath = path.resolve(REPO, arg("mutants-out", MUTANTS_PATH));
+  const fx = JSON.parse(fs.readFileSync(fxPath, "utf8"));
+  const mf = JSON.parse(fs.readFileSync(mPath, "utf8"));
+  let failed = 0;
+  for (const m of mf.mutants) {
+    const got = materializeMutant(REPO, fx.fixtures, { ...m, digests: null });
+    if (!got.digests) { failed++; console.log(`  ERROR ${m.mutant_id}: ${got.errors.join("; ")}`); continue; }
+    m.digests = got.digests;
+    console.log(`  ${m.mutant_id} (${m.kind}, base ${String(m.base_verdict_id).slice(0, 8)}): diff ${got.digests.diff.slice(0, 12)} kickoff ${got.digests.kickoff.slice(0, 12)} ship_report ${got.digests.ship_report.slice(0, 12)}`);
+  }
+  mf.built_by = "scripts/build-verdict-fixture.js --mutants (SES-344 slice 2)";
+  fs.writeFileSync(mPath, `${JSON.stringify(mf, null, 2)}\n`, "utf8");
+  console.log(`build-verdict-fixture --mutants: ${mf.mutants.length - failed}/${mf.mutants.length} mutants materialised -> ${path.relative(REPO, mPath)}`);
+  if (failed) process.exit(2);
+}
+
+// `--redigest`: re-hash every available row's DIFF in place, and nothing else. Git only, no
+// Supabase -- a full rebuild would re-read `runner_verdicts` and could quietly pick up a different
+// set of verdicts, which is a new fixture rather than the same fixture re-rendered.
+//
+// THE KICKOFF DIGEST IS THE CONTROL, AND IT IS WHY THIS MODE IS SAFE TO RUN. `rawInputs()` produces
+// the diff and the kickoff from the same commit by the same call; if only the diff's RENDERING
+// changed, the kickoff must still hash to exactly what was recorded. A kickoff digest that moved
+// means history really did move under the fixture, and re-digesting would then launder a rewritten
+// tree into a clean replay -- so that row is a hard exit, never a rewrite. `generated_by` is left
+// alone on purpose: tests/fixtures/verdicts-30-judgments.json pins it, and the judgments were given
+// on these same 27 deliveries.
+function redigestFixture() {
+  const fxPath = path.resolve(REPO, arg("out", "tests/fixtures/verdicts-30.json"));
+  const fx = JSON.parse(fs.readFileSync(fxPath, "utf8"));
+  const rows = (fx.fixtures || []).filter(f => f.available);
+  let moved = 0;
+  for (const f of rows) {
+    const got = rawInputs(REPO, f.sha, f.inputs.kickoff_path);
+    if (got.errors.length) {
+      console.error(`build-verdict-fixture --redigest: ${f.backlog_id} ${f.version} (${String(f.sha).slice(0, 8)}) could not be rebuilt: ${got.errors.join("; ")}`);
+      process.exit(2);
+    }
+    if (f.inputs.kickoff_sha256 && sha256(got.kickoff) !== f.inputs.kickoff_sha256) {
+      console.error(`build-verdict-fixture --redigest: ${f.backlog_id} ${f.version} (${String(f.sha).slice(0, 8)}): ${f.inputs.kickoff_path} no longer hashes to the copy this verdict was judged on -- history moved under the fixture, so this is NOT a re-rendering and the diff digest must not be rewritten`);
+      process.exit(2);
+    }
+    const oldBytes = f.inputs.diff_bytes;
+    f.inputs.diff_bytes = got.diff.length;
+    f.inputs.diff_sha256 = sha256(got.diff);
+    moved++;
+    console.log(`  ${f.backlog_id} ${f.version} ${String(f.sha).slice(0, 8)} bytes ${oldBytes} -> ${f.inputs.diff_bytes}`);
+  }
+  fx.diff_form = "git diff --full-index (SES-344 slice 3)";
+  fx.redigested_at = new Date().toISOString();
+  fs.writeFileSync(fxPath, JSON.stringify(fx, null, 2), "utf8");
+  console.log(`build-verdict-fixture --redigest: ${moved}/${rows.length} available rows re-digested, 0 kickoff digests moved -> ${path.relative(REPO, fxPath)}`);
+}
+
+async function main() {
+  if (process.argv.includes("--redigest")) return redigestFixture();
+  if (process.argv.includes("--mutants")) return writeMutantDigests();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) { console.error("build-verdict-fixture: SUPABASE_URL and SUPABASE_SERVICE_KEY are required."); process.exit(2); }
+  const limit = Number(arg("limit", "30"));
+  const out = path.resolve(REPO, arg("out", "tests/fixtures/verdicts-30.json"));
+
+  const rows = await rest(url, key,
+    `runner_verdicts?select=id,created_at,cycle_id,backlog_id,version,verdict,gate_build,gate_regression,gate_hygiene,reasoning,auto_done_eligible,auto_done_reason,epic_name,priority_class&order=created_at.desc&limit=${limit}`);
+  // `runner_verdicts.cycle_id` carries no foreign key to `runner_cycles` (measured 2026-09-09:
+  // PostgREST refuses the embed), so the cycles are read in one second call and joined here.
+  const cycleIds = [...new Set(rows.map(r => r.cycle_id).filter(Boolean))];
+  const cycles = cycleIds.length
+    ? await rest(url, key, `runner_cycles?select=id,push_sha,stamp,trigger&id=in.(${cycleIds.join(",")})`)
+    : [];
+  const cycleById = new Map(cycles.map(c => [c.id, c]));
+  for (const r of rows) r.runner_cycles = cycleById.get(r.cycle_id) ?? null;
+
+  const log = (git(["log", "--all", "--format=%H%x09%s"]) || "").trim().split("\n")
+    .filter(Boolean).map(l => { const [sha, ...rest] = l.split("\t"); return { sha, subject: rest.join("\t") }; });
+
+  // push_sha is only an identifier where it is not shared. Count first, then use.
+  const shaCounts = new Map();
+  for (const r of rows) {
+    const s = r.runner_cycles?.push_sha;
+    if (s) shaCounts.set(s, (shaCounts.get(s) || 0) + 1);
+  }
+
+  // THE LADDER ANSWER, READ LIVE AND LABELLED AS SUCH. `class_autonomy()`'s row at verdict time is
+  // not stored anywhere -- `runner_verdicts` keeps only the sentence it produced -- so this is
+  // today's rung, not that day's. It is included because the Intent's own method tells the agent to
+  // BLOCK on a missing input, and handing it a null ladder would make every fixture block for a
+  // reason that has nothing to do with the delivery. The recorded `auto_done_reason` texts on the
+  // approve rows name "rung 20 >= auto_done_rung 3" for `P10 - Tooling`, which is what this lookup
+  // returns today -- measured agreement on the rows that carry it, not an assumption about all of
+  // them, and `class_autonomy_source` says so on every row.
+  const classes = [...new Set(rows.map(r => r.priority_class).filter(Boolean))];
+  const autonomy = new Map();
+  for (const c of classes) autonomy.set(c, await rpc(url, key, "class_autonomy", { p_priority_class: c }));
+
+  const fixtures = [];
+  for (const r of rows) {
+    const push = r.runner_cycles?.push_sha || null;
+    const pushUnique = push && shaCounts.get(push) === 1 && log.some(l => l.sha.startsWith(push));
+    let sha = null, shaSource = null, unavailable = null, subject = null;
+    if (pushUnique) {
+      sha = log.find(l => l.sha.startsWith(push)).sha;
+      shaSource = "runner_cycles.push_sha (unique to this verdict)";
+      subject = log.find(l => l.sha === sha).subject;
+    } else {
+      const res = resolveSha(log, r.version || "", r.backlog_id || "");
+      if (res.sha) { sha = res.sha; subject = res.subject; shaSource = `resolved from version+ticket (push_sha ${push ? `is shared by ${shaCounts.get(push)} of these verdicts` : "is null"})`; }
+      else unavailable = res.reason;
+    }
+
+    let changedFiles = null, diff = null, kickoff = null, kickoffPath = null, kickoffSource = null;
+    if (sha) {
+      const names = git(["diff", "--name-only", `${sha}^`, sha]);
+      if (names === null) unavailable = `git diff ${sha.slice(0, 8)}^..${sha.slice(0, 8)} could not be read`;
+      else {
+        changedFiles = names.split("\n").map(s => s.trim()).filter(Boolean);
+        if (!changedFiles.length) unavailable = `${sha.slice(0, 8)} has an empty diff against its parent`;
+        const k = findKickoff(r.version || "", r.backlog_id || "");
+        kickoffPath = k.path;
+        // THE SAME FUNCTION THE REPLAY WILL CALL, so the digests below are digests of exactly what
+        // the replay rebuilds -- not of a second, subtly different assembly of the same evidence.
+        const got = rawInputs(REPO, sha, k.path);
+        diff = got.diff; kickoff = got.kickoff; kickoffSource = got.kickoffSource;
+        if (got.errors.length && !unavailable) unavailable = got.errors.join("; ") + (k.reason ? ` (${k.reason})` : "");
+      }
+    }
+
+    const gates = { build: r.gate_build, regression: r.gate_regression, hygiene: r.gate_hygiene };
+    // Re-derived by the SHIPPED function from the RECORDED gate statuses -- never re-run.
+    const mechanical = verdictFor(gates);
+    const codeEligibility = autoDoneEligibility({
+      verdict: mechanical.verdict,
+      epicName: r.epic_name,
+      // Every fixture row is a Governance Agents / Selfbuild epic under a project that was
+      // `executing` when the verdict was given; the recorded `auto_done_eligible` is the ground
+      // truth for that, so it is carried rather than re-derived from today's projects table.
+      epicProjectExecuting: true,
+      priorityClass: r.priority_class,
+      changedFiles,
+      projectExecuting: true,
+      classAutonomy: autonomy.get(r.priority_class) ?? null,
+    });
+
+    fixtures.push({
+      verdict_id: r.id,
+      created_at: r.created_at,
+      cycle_id: r.cycle_id,
+      cycle_stamp: r.runner_cycles?.stamp ?? null,
+      backlog_id: r.backlog_id,
+      version: r.version,
+      recorded: {
+        verdict: r.verdict,
+        auto_done_eligible: r.auto_done_eligible,
+        auto_done_reason: r.auto_done_reason,
+      },
+      available: !unavailable,
+      unavailable_reason: unavailable,
+      sha,
+      sha_source: shaSource,
+      commit_subject: subject,
+      inputs: unavailable ? null : {
+        backlog_id: r.backlog_id,
+        version: r.version,
+        base: `${sha}^`,
+        changed_files: changedFiles,
+        gates,
+        gate_detail: r.reasoning,
+        mechanical,
+        epic_name: r.epic_name,
+        priority_class: r.priority_class,
+        class_autonomy: autonomy.get(r.priority_class) ?? null,
+        class_autonomy_source: "public.class_autonomy() read at fixture-build time -- today's rung, not the rung at verdict time (that row is not stored)",
+        epic_project_executing: true,
+        project_executing: true,
+        code_eligibility: codeEligibility,
+        // THE DIFF AND THE KICKOFF ARE STORED BY REFERENCE, NOT BY CONTENT, and that is a
+        // correctness choice before it is a size one. Inlining all 27 came to 2.6 MB, and a
+        // committed copy of a diff is a SECOND copy of the repo's own history: it can rot away from
+        // the commit it claims to be while the fixture keeps reporting a clean replay. The digest
+        // below is what makes the reference safe -- the replay materialises the diff from git and
+        // asserts it hashes to what was judged, so a rewritten history is a loud failure rather than
+        // a quiet substitution. Materialised by `materializeInputs()`.
+        kickoff_path: kickoffPath,
+        kickoff_source: kickoffSource,
+        kickoff_bytes: kickoff === null ? null : kickoff.length,
+        kickoff_sha256: kickoff === null ? null : sha256(kickoff),
+        diff_bytes: diff === null ? null : diff.length,
+        diff_sha256: diff === null ? null : sha256(diff),
+      },
+    });
+  }
+
+  const usable = fixtures.filter(f => f.available).length;
+  const payload = {
+    generated_by: "scripts/build-verdict-fixture.js (SES-337)",
+    source: "public.runner_verdicts, newest first",
+    requested: limit,
+    returned: fixtures.length,
+    usable,
+    excluded: fixtures.length - usable,
+    fixtures,
+  };
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, JSON.stringify(payload, null, 2), "utf8");
+  console.log(`build-verdict-fixture: ${fixtures.length} verdicts, ${usable} usable, ${fixtures.length - usable} excluded -> ${path.relative(REPO, out)}`);
+  for (const f of fixtures.filter(x => !x.available)) console.log(`  EXCLUDED ${f.backlog_id} ${f.version} (${f.verdict_id.slice(0, 8)}): ${f.unavailable_reason}`);
+}
+
+// Entry-guarded: `materializeInputs()` is imported by tests/verifier/ses-337-verifier-reproduction
+// and by the dispatcher, and a module that regenerates the fixture on import would rewrite the very
+// file the importer is about to assert against.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch(e => { console.error(`build-verdict-fixture: ${e.message}`); process.exit(2); });
+}

@@ -1,11 +1,14 @@
-<!-- DeepBench v6.3.129 | CLAUDE.md | SES-021 -- router + hard rules + pointers; procedures live in .claude/skills/session-setup/ -->
+<!-- DeepBench v7.0.198 | CLAUDE.md | SES-021 -- router + hard rules + pointers; procedures live in docs/runbooks/session-setup.md (SES-121: skill bodies moved to runbooks, .claude/skills/* are thin loaders) -->
 # DeepBench — Session Router
 
 **Every session, first action — before any orientation read, no matter the session type:**
 
-1. **Set up your worktree and inflight file.** Follow the **`session-setup` skill**
-   (`.claude/skills/session-setup/SKILL.md`) — worktree branched fresh from `origin/dev`,
-   `.env.local` copied in, your `.claude/inflight/<short-session-name>.md` created. Do this
+1. **Set up your worktree and inflight file.** Follow the **`session-setup` runbook**
+   (`docs/runbooks/session-setup.md`; the `.claude/skills/session-setup/` skill is a thin
+   loader pointing there since `SES-121`, v7.0.198) — worktree branched fresh from `origin/dev`,
+   `.env.local` copied in, your `inflight/<short-session-name>.md` created (repo-root
+   `inflight/` — moved out of `.claude/` 2026-08-21, John-approved, because `.claude/` paths
+   fire a harness permission prompt that parks unattended cloud sessions; register B41). Do this
    *first*, before reading or editing anything. A worktree freshly branched from `origin/dev`
    is a correct, current checkout by construction — which is what makes step 2 safe.
    This applies even to audit / investigation / multi-sweep sessions that don't cleanly fit
@@ -16,6 +19,16 @@
    *"Design session or coding session? If coding, paste the kickoff doc path."*
    (Neither — an audit/sweep/investigation? Proceed with the worktree from step 1; there's no
    separate router branch, but the isolation and freshness requirements are identical.)
+
+> **Governance mode (added 2026-08-19, `design-selfbuilding-0819`; updated 2026-08-23 —
+> registry: `docs/GOVERNANCE-MODES.md`, architecture: `docs/ARCHITECTURE.md` §19v):** a human
+> in the chat means **Manual Design & Build** — today's process, exactly as this file
+> describes; no session asks "which mode?". **Automated** mode is **LIVE (since 2026-08-20)**
+> but cannot be chosen by anyone typing it: it exists only in a session launched by the
+> approved runner (`SES-78` series), whose stamp is echoed into every `runner_cycles` row the
+> session writes — including `chained (drain continuation)` cycles (`SES-140`) — no stamp, no
+> Automated, and the session proceeds as Manual and stops at its first gate. Non-DeepBench
+> work runs under the registry's open mode and never touches this repo or its Supabase.
 
 ---
 
@@ -82,6 +95,21 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 > a signal something upstream went wrong: `git -C "C:/Projects/deepbench-frontend" fetch origin dev`
 > then read via `git … show origin/dev:<path>` instead, and flag the misdirection to John.
 
+> **Claim the ticket the moment you pick it — the worktree protects files, not tickets (2026-08-21,
+> `SES-100`; mechanism shipped `SES-86` phase 1, `v7.0.127`):** Worktree isolation stops two
+> sessions overwriting each other's *files*. It does nothing to stop them building the *same
+> ticket*, and that is not hypothetical — cycles `e36d4379` and `4da5a7bd` started 17 seconds
+> apart and both built `ADM-1`; `v7.0.103` is the permanent version gap where the discarded build
+> used to be. So the claim is the coordination point across **every** session, manual and
+> scheduled: one atomic `UPDATE … RETURNING` on `backlog_items` before any work (SQL:
+> `session-setup` skill step 2c), never check-then-claim in two statements. **1 row → it's yours;
+> 0 rows → someone holds it, take the next queued ticket.** Release it AFTER the push, in its
+> own holder-guarded `UPDATE`, never in the status write (`q-claim-release-order`, `SES-106`).
+> It serializes ticket *selection* only — the `dev` branch is still fetch/rebase/push, and the
+> briefing republish has its own lock. A claim expires after 24h, which is why a dead session
+> cannot strand a ticket; re-assert it before the push and before every counter claim. Full rule
+> with what it does and does not protect: `docs/GOVERNANCE-MODES.md`.
+
 > **Sub-agents inherit the worktree, never nest one (2026-07-16, extended 2026-07-17):** Any
 > sub-agent spawned via the `Agent` tool — coding, research, audit, or sweep — operates inside
 > *this* session's worktree; do **not** pass `isolation: "worktree"`. State the worktree's
@@ -123,18 +151,19 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 
 | Need | Home |
 |---|---|
-| **Session setup** — worktree, `.env.local`, version/ID SQL, inflight files, push/cleanup | `.claude/skills/session-setup/SKILL.md` |
+| **Session setup** — worktree, `.env.local`, version/ID SQL, inflight files, push/cleanup | `docs/runbooks/session-setup.md` |
 | Rules & reference index (versioning, scope, tokens, roster, schema, patterns) | `CLAUDE-RULES.md` |
 | Design workflow (Automated Design→Code→Verify Loop) | `CLAUDE-DESIGN.md` |
-| Current version, blockers, in-flight sessions | `CLAUDE-STATE.md` + `.claude/inflight/` |
+| Current version, blockers, in-flight sessions | `CLAUDE-STATE.md` + `inflight/` (repo root; moved from `.claude/inflight/` 2026-08-21) |
 | Standards, test categories, pre-commit checklist | `docs/STANDARDS.md` |
 | Architecture, stack, URLs, schema, capability model | `docs/ARCHITECTURE.md` |
 | Design tokens / palette / fonts (values) | `src/tokens.js` + `docs/STYLE-GUIDE.md` |
 | Agent roster (source of truth) | `src/data/agents.js` |
 | Working with John — decision autonomy tiers, walkthrough gate | `docs/WORKING-WITH-JOHN.md` |
 | Session history + the "found live…" rationale behind these rules | `docs/SESSIONS.md` |
+| Writing or reorganizing a requirement — Victoria first (`/victoria`) | `docs/runbooks/victoria-reorg.md` |
 | System invariants — **read** when touching the files they govern (tokens→`src/`, logging/capabilities→`api/`, library→`lib/`); don't rely on auto-scoping | `.claude/rules/` |
-| Doc-bloat tripwire | `.claude/skills/session-hygiene/` |
+| Doc-bloat tripwire | `docs/runbooks/session-hygiene.md` |
 | Architecture/scope not settled — run a discovery session (decisions + constraints, no kickoff doc) | `.claude/skills/discovery/SKILL.md` |
 | Session lost its frame (wrong architecture / going in circles / after a compaction) — inventory before proposing | `.claude/skills/reframe/SKILL.md` |
-| Surprise mid-session dependency ("can't do X until Y") — classify before investigating | `.claude/skills/triage/SKILL.md` |
+| Surprise mid-session dependency ("can't do X until Y") — classify before investigating | `docs/runbooks/triage.md` |

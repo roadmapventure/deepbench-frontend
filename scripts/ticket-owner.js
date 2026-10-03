@@ -1,0 +1,2062 @@
+#!/usr/bin/env node
+// DeepBench v7.0.687 | scripts/ticket-owner.js | AGT-166 slice 4 -- ARM (b)'S TWO EXITS. The drain
+// had a way IN for every open premise and a way OUT for only the confirmed ones. Measured
+// 2026-09-28: `board-stale` reads 430, and the twelve refusals of the first completed night sit in
+// `ticket_owner_findings` as open rows whose `detail` begins `judge refused: ` -- re-filed nightly
+// by classifyBoard's carried branch, never re-judged, and never ruled either, because AGT-169's
+// ruler rules a CHECK and not a row. A refused premise could therefore never leave the population
+// it was refused out of.
+//
+// EXIT ONE -- A JUDGED REFUSAL *IS* THE REMOVAL PROPOSAL (Designer's call i, the AGT-178 shape). The
+// refusal now writes the row it is about: its own `removal-proposal` decision, a full-row image
+// under that decision, and `status = 'removal proposed'`. One Reverse puts the row back in the drain
+// and `removed` stays John's alone (SES-113) -- a proposed row waits for him and is never removed
+// unattended. The slug files NO ledger row any more (call iii): the twelve carried rows replay once
+// from their own `judge refused: ` detail and then clear, so `carried` reads 0 the night after this
+// ships and the population drains instead of circling.
+//
+// EXIT TWO -- NO JUDGE, NO STAMP (call ii). `planWrites` took every `derivable` finding whatever
+// produced it, so cycle 26d9662f, which ran `--nightly` with no judgment pass at all (4e rule 4),
+// planned 25 `revalidated_at` stamps over premises nobody had read; only the read-back defect fixed
+// in 8bc7f5e stopped it at one row. `planWrites` now takes `judged` and drops the revalidation check
+// from `fixes` without it: an unjudged night reports the population and writes nothing to it.
+//
+// DeepBench v7.0.675 | scripts/ticket-owner.js | AGT-166 slice 2 defect -- THE READ-BACK ACCEPTS AN
+// INSTANT, WHATEVER ITS OFFSET. The key-by-key read-back below (step 3 of applyPlan) is right to
+// distrust a 200: a PATCH the role cannot write answers with the old value. But it compared an
+// instant as a STRING, with one hardcoded escape for `cost_snapshot_at`. `nowStamp` is
+// `toISOString()` -- `...Z` -- and PostgREST returns timestamptz as `...+00:00`, so the very first
+// `revalidated_at` patch of every night read back as a mismatch and killed the pass with exit 2
+// AFTER its write had landed. On 2026-09-28 that lost 7 of 14 judged fixes: the six mechanical ones
+// sort ahead in CHECKS order and landed, DL-01's stamp landed, and LA-01, SH-09, DL-02, DL-03,
+// TI-14, TI-15 and TI-16 were never reached -- so arm (b) has still never completed a batch and
+// `ticket_owner_findings` holds zero `unrevalidated-30d` rows.
+//
+// The fix is STRUCTURAL, not a second column name (pattern:10, pattern:99): `cellMatches()` accepts
+// two values whose ISO shape parses to the same instant, for ANY cell, and the escape is gone. The
+// loosening is instant-only by construction -- `feature` vs `Feature`, or two stamps a second
+// apart, still fail -- so a silent non-write on any other column is caught exactly as before, and
+// fail-fast stays: the ORDER of the fixes is the safety property. `nowStamp` itself does not move;
+// it is census time, the instant the row was read.
+//
+// DeepBench v7.0.643 | scripts/ticket-owner.js | AGT-166 slice 2, arm (b) -- THE REVALIDATION DRAIN.
+// The thirteenth check. 438 open rows are past the 30-day fence with `revalidated_at` null, and
+// until now the census only COUNTED them (`backlog.unrevalidated_30d`): no slug among the twelve, so
+// nothing on this board ever wrote `revalidated_at` and the number could not move. It now drains,
+// 25 a night, oldest first -- and every one of those 25 is a JUDGMENT, never arithmetic. Whether a
+// month-old premise still names work the board does not show done is a reading of the row's own
+// text, so the batch reaches the judge as `derivable` findings carrying `fix: {revalidated_at}`,
+// and only an `apply: true` writes the stamp. A refusal files a removal proposal in
+// `ticket_owner_findings` and is CARRIED -- re-filed every night, never re-judged, until the
+// Development Manager rules it (AGT-169: 259 open rows over 10 slugs already sit unruled there, so
+// a confirmed row must file NO ledger row at all).
+//
+// THE SLUG SHIPPED AFTER ITS CHECK CONSTRAINT, and that order is the whole safety property.
+// applyPlan POSTs the night's findings as ONE array (SES-418): a thirteenth slug the table does not
+// admit answers 400 / 23514 on the batch and discards an entire judged night, not one row. So
+// docs/design/agt-166-unrevalidated-slug.sql widens
+// `ticket_owner_findings_check_slug_check` to thirteen slugs FIRST; this file learns the slug second.
+//
+// DeepBench v7.0.512 | scripts/ticket-owner.js | AGT-79 slice 6 -- AN UNJUDGED NIGHT NOW SAYS SO.
+// One branch: nightlyNotes() ends ` · unjudged` where it used to end with nothing. Five
+// `audit-board` nights ran arithmetic-only and the board could not tell, because a night that
+// skipped pass two wrote a string byte-identical to slice 3's. The prefix the precondition and the
+// standing brief match on is untouched; only the tail grew.
+//
+// DeepBench v7.0.506 | scripts/ticket-owner.js | SES-385 slice 1 -- CHECK 12, `remainder-stranded`:
+// a CLOSED row whose own record still names work that was never built. Two structural halves, both
+// chosen by measurement over a notes regex (39 of 159 closed rows, mostly the word "remainder" in
+// sweep prose about OTHER tickets): `ticket_matrix.actual_cycles` below the row's own
+// `predicted_cycles`, or an UNDECIDED `runner_items` card of kind `gated_before_build`. The second
+// half is why readBoard's runner_items read dropped its `decided_at` filter and gained `kind` --
+// ONE read now answers check 10's Accepts (rows WITH a decided_at) and check 12's open cards.
+// Verdict `judgment` with no `fix`: the census writes neither `status` nor `design_status`, ever.
+//
+// DeepBench v7.0.480 | scripts/ticket-owner.js | AGT-79 slice 4 -- THE JUDGMENT PASS (--judge), the
+// two-pass `exit 3` shape scripts/rank-backlog.js already carries. The census is mechanical; the
+// JUDGMENT is not. A derivable fix is arithmetic the census can compute, but whether that
+// arithmetic should be WRITTEN to a particular row is a reading of the row's own story, and no
+// amount of column-reading answers it. So the night is two invocations with a sub-agent between:
+//
+//   pass one   --judge --cycle-id=<uuid>
+//                -> gate on the capability row, census the live board, assemble the Ticket Owner's
+//                   prompt through the EXECUTOR'S OWN assembly, write the state JSON, print the
+//                   prompt, exit 3 = AWAITING THE JUDGMENT. No row is touched.
+//   ...run that prompt as a `ticketowner` sub-agent on the judgment lane, save its JSON...
+//   pass two   --judge --cycle-id=<uuid> --answer=<path>
+//                -> ingestJudgment() merges the verdicts into the census, REFUSES the whole answer
+//                   on any problem, writes the mandatory audit row FIRST, then applies the plan.
+//
+// FAIL CLOSED IS THE WHOLE DESIGN OF THE MERGE. A derivable finding the judge did not confirm does
+// NOT get written: silence is not consent, so it degrades to a judgment finding and is filed for a
+// human to read. The only way a cell moves is an explicit `apply: true`.
+//
+// THE GATE IS ONE ROW IN ONE TABLE, NEVER A CODE EDIT. This half shipped AHEAD of its seed
+// (docs/design/agt-79-ticket-owner-seed.sql is John's to apply, .claude/rules/agent-roster-inert.md),
+// exactly as audit-cluster.js did at v7.0.465. Until `capabilities` carries an `audit-board` row,
+// pass one exits 2 at its gate having read no board and written nothing. When the row lands, the
+// same command exits 3. No line below changes on that day.
+//
+// DeepBench v7.0.477 | scripts/ticket-owner.js | AGT-79 slices 1-3 -- THE TICKET OWNER'S CENSUS:
+// one mechanical pass over the whole board that CLASSIFIES, (slice 2, only under --apply) the
+// WRITE PASS that lands every derivable fix under a single reversible decision, and (slice 3,
+// --nightly) the ONCE-PER-CHICAGO-NIGHT run that is its own precondition: it reads the newest
+// cycle row it wrote, answers `already run today` on exit 0 without reading the board, and
+// otherwise records itself as one scheduled cycle row whose notes ARE the night's report.
+//
+// WHAT THIS FILE IS. The Ticket Owner owns a ticket's ROW after it is filed -- its quote, its
+// actual, its status and its close-out. Twelve date-fenced checks read the board once and sort
+// every gap into two kinds: DERIVABLE (another column already holds the value, so the fix is
+// computed here and carried on the finding) and JUDGMENT (a capability has to decide it, so the
+// finding carries a sentence and no fix). The census half computes both and writes NOTHING.
+//
+// THE WRITE PASS (slice 2, --apply only). planWrites() turns a census into a PLAN -- the derivable
+// fixes as row patches, and the judgment findings as ledger inserts / re-seens / clears against
+// what ticket_owner_findings already holds. applyPlan() lands that plan in five REST steps under
+// ONE record_decision row, having first imaged the FULL prior row of every cell it touches. Full
+// rows, because reverse_decision() rewrites every column of a backlog_items row from the image --
+// a partial image would restore a partial row. And no PATCH ever names updated_at, because
+// reverse_decision() refuses a row whose updated_at is later than the decision (SES-316): a write
+// pass that bumped the stamp would make itself unreversible on the spot.
+//
+// ONE DECISION FOR THE WHOLE NIGHT is the design, not an optimisation. John reverses a night of
+// hygiene with a single reverse_decision() call, or he reverses none of it; forty decisions would
+// mean forty calls to undo one wrong rate.
+//
+// THE FENCES ARE THE POINT, not decoration. Every column this censuses was added to backlog_items
+// on a known date; a row filed before its column existed is not a fault, it is a row that predates
+// the question. Flagging those nightly would bury four real gaps under 467 ancient ones, so a row
+// behind a check's fence lands in a COUNT (backlog.*_prefence) and never in findings. A filing-time
+// gap is fenced on the ticket's filed_at; a close-out gap on its updated_at.
+//
+// PURE BY CONSTRUCTION. classifyBoard(), renderCensus() and planWrites() take data and return data -- no fetch,
+// no disk, no process.exit, no clock (the caller passes `now`). That is what lets the regression
+// test drive fourteen one-variable rows through the real code instead of a copy of it, and what
+// lets the write pass plan from the same classification it writes from. applyPlan() and the CLI
+// below are the only parts that read credentials, and importing this module never runs the CLI.
+//
+// THE NIGHT IS KEYED BY A CALENDAR DAY, NEVER BY AN OFFSET (slice 3). CDT midnight is 05:00Z and
+// CST midnight 06:00Z, so "has it already run tonight" cannot be answered by subtracting hours.
+// sameChicagoDay() asks the only question that survives the DST boundary: do these two instants
+// fall on the same America/Chicago calendar date. The precondition is the command itself -- a
+// cycle never compares dates by hand.
+//
+// EXIT CODES: 0 the census (and, under --apply, the write pass) ran; 2 it could not run or could
+// not finish -- missing credentials, a REST read that failed or came back truncated, unreadable
+// input, an unknown flag, --apply without a cycle id, or any write step that did not land. A
+// failed step exits 2 naming the step and the decision id, so a half-applied night is traceable
+// to the one call that stopped it.
+
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { randomUUID } from "crypto";
+import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
+// IMPORTED, NEVER RESTATED -- rank-backlog.js's item (1). `assemblePrompt` is the function
+// api/capabilities/execute.js calls and `renderAssembly` is how scripts/agent-prompt.js prints it;
+// a prompt built by hand here would be a second copy of the executor's assembly, drifting from the
+// day it was written. `validateAgentVerdict` reads whatever schema it is handed, and `tokensFrom`
+// keeps NULL-is-not-zero (SES-147) in one place. All four load credential-free.
+import { assemblePrompt } from "../api/prompt/db-assembly.js";
+import { renderAssembly } from "./agent-prompt.js";
+import { validateAgentVerdict } from "./verifier.js";
+import { tokensFrom } from "./rank-backlog.js";
+// SES-385 slice 3: check 12 reads the close-out's OWN decision function rather than a second copy
+// of its rules. settle-ship.js guards its CLI at :293, so importing it runs nothing and needs no
+// credentials -- the same import-safety contract as the four above.
+import { decideStatus } from "./settle-ship.js";
+// AGT-131: the one findings intake. Import-safe by the same contract (SES-176) -- audit-ledger.js
+// runs its CLI only as a process entry point, and ingestFindings() takes its transports as
+// arguments, so nothing here reads process.env on import.
+import { ingestFindings, isoWeek } from "./audit-ledger.js";
+
+// --- constants (exported; the regression test asserts each one) --------------------------------
+
+// The birth date of each column the census reads. Measured from the migration that added it; a row
+// whose own date is older than its check's fence is counted, never flagged.
+export const FENCES = Object.freeze({
+  size_stamp: "2026-08-28T21:34:27Z",
+  predicted_cycles: "2026-09-01T15:56:03Z",
+  cost_pct_snapshot: "2026-09-01T16:41:41Z",
+  runner_verdicts: "2026-08-25T03:50:04Z",
+});
+
+// AGT-86 slice 4: the unrevalidated-row fence, exported so scripts/audit-board.js's stale check reads
+// the SAME 30 days classifyBoard counts with -- one number, two readers.
+export const UNREVALIDATED_DAYS = 30;
+
+// docs/FEATURES.md section Type Taxonomy (eight rows) plus the two live majorities the legend has
+// never been updated to carry -- Tooling (235 rows) and Bug (43). Filed as a gap for the capability
+// that owns the legend; until then the census must not call 235 correctly-typed rows off-taxonomy.
+export const TYPE_TAXONOMY = Object.freeze([
+  "Task Success Rate", "Speed", "Architecture", "Feature",
+  "Tech Debt", "Data", "Observability", "UI",
+  "Tooling", "Bug",
+]);
+
+// The ONLY normalisations, and they are one-to-one: a casing slip and a plural. Anything else that
+// is off-taxonomy is a judgment call about what the ticket actually is, which is not a cell the
+// census may fill. Keeping this map to exactly two entries is why type-off-taxonomy can be
+// derivable at all without the census inventing a classification.
+export const TYPE_MAP = Object.freeze({ feature: "Feature", "Bug Fixes": "Bug" });
+
+// Order matters twice: findings sort by this index, and renderCensus prints one line per slug in
+// this order even at zero -- a check that found nothing must still say so, or an absent line is
+// indistinguishable from a check that stopped running.
+export const CHECKS = Object.freeze([
+  "quote-missing",
+  "size-missing",
+  "cost-snapshot-missing",
+  "actual-unknown",
+  "claim-on-closed",
+  "claim-expired",
+  "verdict-missing",
+  "designed-closed",
+  "type-off-taxonomy",
+  "delivered-unaccepted",
+  "cycles-over-quote",
+  // SES-385: the twelfth and last. A shipped slice that stops advertising a design it already built
+  // is the fix; this is the check that finds the rows where it did not happen.
+  "remainder-stranded",
+  // AGT-166 slice 2: the thirteenth. The twelve above find a gap in a row's COLUMNS; this one asks
+  // whether the row's own PREMISE is still alive. It is last because the census's whole open
+  // population lands behind it and renderCensus prints one line per slug in this order.
+  "unrevalidated-30d",
+]);
+
+// AGT-169 -- THE CHECKS THAT ARE NO LONGER ASKED, and the recorded reason each one was retired.
+// Frozen, and a slug in here is still a slug in CHECKS: a retired check keeps its line in the
+// census (`retired  counted <n>`) so that its absence can never be read as a check that quietly
+// stopped running. The reason rides HERE and in the night's decision narrative, never in a comment
+// alone -- this file's own convention for a recorded Designer call (FENCES, UNREVALIDATED_BATCH).
+//
+// `actual-unknown` is the Designer's call (ii), and it is retirement by CONSTRUCTION rather than by
+// preference: `cost_pct_snapshot` has no reader anywhere outside this script and its own tests, and
+// the finding's own sentence says no reading fixes it -- a closed row with no `ticket_matrix` cycle
+// row can never gain a snapshot. 103 open rows clear on the first night this ships. `size-missing`
+// is deliberately NOT here (call iii): a null there under-counts a breakdown build-briefing.mjs
+// puts in front of John, which is live evidence over the ticket's own stated guess.
+export const RETIRED_CHECKS = Object.freeze({
+  "actual-unknown":
+    "cost_pct_snapshot has no reader outside scripts/ticket-owner.js, and a closed row with no " +
+    "ticket_matrix cycle row can never gain a snapshot, so the check is unanswerable by " +
+    "construction — AGT-169, 2026-09-27",
+});
+
+// AGT-169 -- THE FENCE. `censusFindingFor` keeps the count OUT of `governing_fact` on purpose
+// (fingerprint() is `kind|locations|governing_fact`), which is what lets one finding per check
+// carry night after night without minting a new row every time the number moves. The cost of that
+// is the hole this ticket was filed for: a slug ruled `ticketed` once NEVER re-raises, however far
+// it grows -- 247 rows at filing, 259 four nights later, and nothing said so. The bands are the
+// smallest fix that keeps both properties: the governing fact is still count-free WITHIN a band, so
+// an ordinary night is byte-identical and carries; crossing a band mints exactly ONE new
+// fingerprint, which puts the check back on the Development Manager's weekly list once per band and
+// not once per row.
+//
+// A FIXED DECLARED LADDER, never a computed one (pattern:18): a band derived from the current
+// population would move under its own findings and two nights could disagree about which band a
+// count is in. Under the first band there is no suffix at all, so today's ticketed findings keep
+// the exact fingerprints they already carry.
+export const FENCE_BANDS = Object.freeze([25, 50, 100, 200, 400]);
+
+// AGT-166 slice 2, the Designer's call (ii): 25 rows a night, oldest first. A fixed declared
+// constant and not a measurement -- the batch size is what the judgment lane can read in one turn,
+// and the census still reports the WHOLE population every night so the drain's remaining depth is
+// never hidden by the size of one night's bite.
+export const UNREVALIDATED_BATCH = 25;
+
+// How much of a premise's own `description` reaches the judge. A premise is read to be ruled on, not
+// reproduced: 600 characters is the first paragraph of every backlog description on this board, and
+// a cut at a fixed count is reproducible where a cut at a sentence boundary is not.
+export const PREMISE_EXCERPT = 600;
+
+// The thirteenth check's slug, named once. The CHECK constraint, the ledger read, the three branches
+// and the fix count in the decision text all quote THIS string -- a slug that drifted between the
+// read and the file would carry a night's judgment into a row nothing else can find.
+export const REVALIDATION_CHECK = "unrevalidated-30d";
+
+// The refusal's own prefix, named once (slice 4). ingestJudgment WRITES it onto a refused finding's
+// detail and classifyBoard's carried branch READS it back off the ledger a night later -- so the
+// string is the whole channel between a judge's refusal and the removal proposal it becomes. A
+// literal at either end that drifted from the other would leave a refused premise carried forever,
+// which is the defect this slice exists to close.
+export const REFUSED_PREFIX = "judge refused: ";
+
+// The decision kind a removal proposal is recorded under. Not `hygiene`: this is a JUDGED reading of
+// the row's own premise that moves the row's status, and John reverses a night by what the kind and
+// the reasoning say it did (AGT-178's shape).
+export const PROPOSAL_KIND = "removal-proposal";
+
+// The status a refused premise lands on. It is John's existing waiting room and NOT `removed`
+// (SES-113): the board already carries rows here awaiting his verdict, and nothing on this path may
+// ever write `removed` itself.
+const PROPOSED_STATUS = "removal proposed";
+
+// Every OTHER ticket a premise names, so the judge reads each one's live status beside it. Narrow on
+// purpose: two to four capitals, a hyphen, digits, which is this board's whole id vocabulary.
+const TICKET_ID = /[A-Z]{2,4}-\d+/g;
+
+// The nightly run's signature in runner_cycles.notes. It is a PREFIX and not a column because the
+// precondition read is `notes=like.<prefix>%` -- one indexable question ("has this agent run?")
+// that needs no schema change, and the same string the standing brief strips before printing.
+export const NIGHTLY_PREFIX = "SCHEDULED-AGENT: audit-board";
+
+// The judgment pass's own vocabulary (slice 4). Named rather than literal so the gate, the
+// assembly, the audit row and the decision text all quote ONE string -- a slug that drifted between
+// the gate and agent-log.js would pass the gate and then be refused the mandatory row.
+export const JUDGE_CAPABILITY = "audit-board";
+export const JUDGE_AGENT = "ticketowner";
+export const JUDGE_INTENT = "to-audit-intent";
+export const JUDGE_TENANT = "global";
+
+// Three states, and collapsing any two throws away a distinction -- rank-backlog.js's own table.
+// 3 is NOT 2: pass one ran its half correctly, wrote the state and printed the prompt; there is
+// simply no judgment yet. A caller that read 3 as a failure would retry a pass that succeeded.
+export const EXIT_AWAITING_ANSWER = 3;
+
+// The shape of an ISO-8601 instant, offset or `Z`, with optional fractional seconds. This is a
+// SHAPE test and nothing more -- the instants themselves are compared by `Date.parse`, never by
+// this pattern. It exists so `cellMatches` can tell "both of these are timestamps" from "one of
+// these is a string that happens to parse", which is what keeps the loosening instant-only.
+export const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})$/;
+
+const CLOSED = new Set(["done", "delivered"]);
+const LIVE = new Set(["open", "partial"]);
+const HOUR = 3600 * 1000;
+const DAY = 24 * HOUR;
+
+const round2 = x => Math.round(x * 100) / 100;
+const ts = v => (v == null ? NaN : Date.parse(v));
+
+// --- the pure half -----------------------------------------------------------------------------
+
+// cellMatches(key, got, want) -> boolean: did the PATCH actually write `want` into this cell?
+//
+// THREE WAYS TO BE EQUAL, and every one of them is a real round-trip difference PostgREST makes
+// rather than a licence to be approximate:
+//   (a) the strings agree -- the ordinary case, and the one that catches a silent non-write;
+//   (b) both read as finite numbers and those numbers agree -- a numeric column comes back as the
+//       string "1" for the number 1;
+//   (c) both LOOK like ISO instants and parse to the same millisecond -- `...Z` in, `...+00:00`
+//       back, the same moment written two ways.
+//
+// (c) IS THE WHOLE FIX AND IT IS DELIBERATELY NOT A COLUMN LIST. The old form escaped exactly one
+// name, `cost_snapshot_at`, so the next timestamp column to be written -- `revalidated_at` -- broke
+// the pass. A rule over provable facts about the VALUES beats a list somebody has to remember to
+// extend (pattern:99, pattern:10). `key` is never read by a branch: it is here so the caller's
+// exit-2 message can name the cell, and so a future reader is not tempted to special-case one.
+//
+// It stays tight in the direction that matters. Both sides must match `ISO_INSTANT`, so a millis
+// epoch number never compares equal to a stamp, `"feature"` never equals `"Feature"`, and two
+// instants one second apart are still a mismatch -- the read-back keeps catching the failure it was
+// built for. `null` and `undefined` both stringify to `"null"` by (a), which is how a cleared
+// column (`claimed_by: null`) reads back as written.
+export function cellMatches(key, got, want) {
+  if (String(got ?? null) === String(want ?? null)) return true;
+  if (got != null && want != null && Number.isFinite(Number(got)) && Number.isFinite(Number(want))
+    && Number(got) === Number(want)) return true;
+  if (typeof got === "string" && typeof want === "string" && ISO_INSTANT.test(got) && ISO_INSTANT.test(want)
+    && Number.isFinite(Date.parse(got)) && Date.parse(got) === Date.parse(want)) return true;
+  return false;
+}
+
+// retiredChecks(rulings) -> Map<slug, reason>: which of the 13 checks are no longer asked tonight.
+//
+// TWO SOURCES, ONE MAP. `RETIRED_CHECKS` is the standing list -- a Designer's call recorded in the
+// tree. `rulings` is the LIVE half and the whole point of AGT-169: a `not-a-defect` ruling on
+// `owner:<slug>` in `audit_findings` retires that check, so the weekly review the Development
+// Manager already runs becomes the ruler rather than the place rulings go to die. No code edit and
+// no deploy stands between his ruling and the check stopping.
+//
+// FAIL CLOSED, and closed here means MORE checking, not less. A null, empty, non-array or
+// unreadable `rulings` contributes NOTHING: the census then runs every check the tree has not
+// already retired, which over-reports rather than under-reports. A ruling row is honoured only when
+// it is exactly what it claims to be -- `status === "not-a-defect"`, an `owner:` prefix, and a
+// remainder that is a slug this script actually runs. An `owner:` slug outside CHECKS is somebody
+// else's row (or a typo) and must never silence a check by accident.
+export function retiredChecks(rulings) {
+  const out = new Map(Object.entries(RETIRED_CHECKS));
+  if (!Array.isArray(rulings)) return out;
+  for (const r of rulings) {
+    if (!r || typeof r !== "object") continue;
+    if (r.status !== "not-a-defect") continue;
+    const slug = typeof r.check_slug === "string" && r.check_slug.startsWith("owner:")
+      ? r.check_slug.slice("owner:".length)
+      : null;
+    if (slug === null || !CHECKS.includes(slug)) continue;
+    // The standing list wins on a collision: its reason is the recorded call, and a later ruling
+    // re-retiring the same check says nothing new.
+    if (out.has(slug)) continue;
+    out.set(slug, `${r.ruling ?? "ruled not-a-defect"} — ruled by ${r.ruled_by ?? "unknown"} at ${r.ruled_at ?? "unknown"}`);
+  }
+  return out;
+}
+
+// bandFor(count) -> the highest FENCE_BANDS rung at or below `count`, else null (below the first).
+// Pure arithmetic over a frozen ladder, so two readings of one count can never disagree.
+export function bandFor(count) {
+  if (typeof count !== "number" || !Number.isFinite(count)) return null;
+  let band = null;
+  for (const b of FENCE_BANDS) if (count >= b) band = b;
+  return band;
+}
+
+// selectRevalidationBatch(items, {now, carried}) -> {population, carried, batch}
+//
+// WHO GETS READ TONIGHT. `population` is the drain's whole depth -- the §2.2 predicate, `status`
+// open AND `revalidated_at` null AND born more than UNREVALIDATED_DAYS ago -- and it is returned in
+// full rather than as a count, because the census reports all of it every night while ruling 25.
+// `carried` is the subset already holding an OPEN removal proposal for this slug: those are re-filed
+// and never re-judged, so they are subtracted from the batch rather than competing for its 25 slots.
+// `batch` is what is left, oldest first, sliced to UNREVALIDATED_BATCH.
+//
+// THE ORDER IS TOTAL, and that is not tidiness: (born, backlog_id) means the same board in any read
+// order yields the same 25 rows, so tonight's batch is reproducible and last night's is provably
+// disjoint from it. Sorting on `born` alone would leave same-day rows in REST's order, and two runs
+// of one night could then judge two different sets.
+//
+// Pure: no clock (the caller passes `now`), no fetch, no disk.
+export function selectRevalidationBatch(items, { now, carried } = {}) {
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) {
+    throw new Error(`selectRevalidationBatch: \`now\` is not a parseable ISO instant (got ${now})`);
+  }
+  const D30 = nowMs - UNREVALIDATED_DAYS * DAY;
+  const born = row => row.filed_at ?? row.created_at;
+  const population = (items ?? []).filter(row =>
+    row.status === "open" && row.revalidated_at == null && ts(born(row)) < D30);
+  // A carried entry may arrive as a ledger row or as a bare id; both mean the same ticket.
+  const held = new Set((carried ?? []).map(c => (typeof c === "string" ? c : c?.backlog_id)));
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  // Intersected with the population, never taken on trust: a proposal whose row has since closed or
+  // been revalidated is not part of tonight's board, and planWrites clears it on its own terms.
+  const carriedIds = population.filter(r => held.has(r.backlog_id)).map(r => r.backlog_id).sort();
+  const batch = population
+    .filter(r => !held.has(r.backlog_id))
+    .slice()
+    .sort((a, b) => cmp(ts(born(a)), ts(born(b))) || cmp(a.backlog_id, b.backlog_id))
+    .slice(0, UNREVALIDATED_BATCH);
+  return { population, carried: carriedIds, batch };
+}
+
+// premiseDetail(row, premise, {rank, population, now, statusById}) -> the one line the judge rules on
+//
+// ONE DETERMINISTIC LINE PER BATCH ROW, and every part of it is there because a judge cannot answer
+// without it: how old the premise is, where it sits in tonight's batch and how deep the drain still
+// runs, the row's own title and the first PREMISE_EXCERPT characters of its description, and -- the
+// part no premise carries about itself -- the LIVE STATUS of every other ticket it names. A premise
+// that says "blocked on AGT-140" is dead the moment AGT-140 reads `done`, and that fact is on the
+// board, not in the text. A named id the board does not carry says so rather than reading as open.
+//
+// The closing sentence is the contract, verbatim: silence is not consent (ingestJudgment), so the
+// line states what `apply: true` asserts and what a refusal has to name instead.
+export function premiseDetail(row, premise, { rank, population, now, statusById } = {}) {
+  const born = row.filed_at ?? row.created_at;
+  const days = Math.floor((Date.parse(now) - ts(born)) / DAY);
+  const title = String(premise?.title ?? "");
+  const description = String(premise?.description ?? "");
+  const excerpt = description.length > PREMISE_EXCERPT
+    ? `${description.slice(0, PREMISE_EXCERPT)}… [cut at ${PREMISE_EXCERPT}]`
+    : description;
+  const named = [...new Set(`${title}\n${description}`.match(TICKET_ID) ?? [])]
+    .filter(id => id !== row.backlog_id)
+    .sort();
+  const names = named.length
+    ? named.map(id => `${id} ${statusById?.get(id) ?? "not on the board"}`).join(", ")
+    : "none";
+  return `open ${days} days, never revalidated (born ${born}) · batch ${rank}/${UNREVALIDATED_BATCH}` +
+    ` of ${population} · ${premise?.priority_class ?? "no priority class"} · title: ${title}` +
+    ` · premise: ${excerpt} · it names: ${names}.` +
+    " Confirm apply:true only if this premise still names work the board does not show done;" +
+    " else apply:false naming the superseding ticket or the evidence it is dead.";
+}
+
+// classifyBoard(board, {now, rate}) -> {findings, backlog, counts}
+//
+// `board` holds exactly what the six reads return: {items, matrix, verdicts, accepts, decisions,
+// openCycles}. `now` is an ISO string; `rate` is public.runner_pct_per_cycle() for the night.
+// One finding per (row, check). `fix` is present ONLY on a derivable finding and holds exactly the
+// columns slice 2 will write -- so a fix object is a write statement, not a suggestion.
+// AGT-169: `retired` is optional and defaults to the ruler's own answer over `board.ownerRulings`,
+// so the live census, the `--board` fixture and a direct call all see the same retirement set
+// without the CLI having to plumb it. An explicit `retired` (a Map or anything with `.has`/`.get`)
+// overrides, which is what lets a test drive one variable.
+export function classifyBoard(board, { now, rate, retired } = {}) {
+  const retiredMap = retired ?? retiredChecks(board.ownerRulings);
+  const items = board.items ?? [];
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) throw new Error(`classifyBoard: \`now\` is not a parseable ISO instant (got ${now})`);
+  if (typeof rate !== "number" || !Number.isFinite(rate)) throw new Error(`classifyBoard: \`rate\` must be a finite number (got ${rate})`);
+
+  const H24 = nowMs - 24 * HOUR;
+  const H48 = nowMs - 48 * HOUR;
+  const D30 = nowMs - UNREVALIDATED_DAYS * DAY;
+  const nowStamp = new Date(nowMs).toISOString();
+
+  const cycles = new Map();
+  for (const r of board.matrix ?? []) cycles.set(r.backlog_id, r.actual_cycles ?? 0);
+  const verdicts = new Set((board.verdicts ?? []).map(r => r.backlog_id));
+  // ONE READ, TWO SETS (SES-385). runner_items is now read WITHOUT the `decided_at` filter, so the
+  // same rows answer both questions: a card carrying a decided_at IS the Accept check 10 reads, and
+  // an UNDECIDED card of kind `gated_before_build` is work still waiting to be built, which check 12
+  // reads. The decided_at test is what keeps the widened read from turning an open card into an
+  // Accept -- dropping the filter without it would silently answer check 10 "accepted" on every
+  // undecided card on the board.
+  const accepts = new Set((board.accepts ?? []).filter(r => r.decided_at != null).map(r => r.backlog_id));
+  const gatedOpen = new Set((board.accepts ?? [])
+    .filter(r => r.decided_at == null && r.kind === "gated_before_build")
+    .map(r => r.backlog_id));
+  const liveCycles = new Set((board.openCycles ?? []).map(r => r.id));
+  // SES-385 slice 3: each closed row's own kickoff text, read for us by readBoard() (classifyBoard
+  // is pure and never opens a file). A row with no entry, or whose link would not open, is simply
+  // absent from the map and reads as "" -- which decideStatus() answers `delivered`, so a dead link
+  // costs a finding rather than the census.
+  const kickoffText = new Map((board.kickoffs ?? [])
+    .filter(k => typeof k.text === "string")
+    .map(k => [k.backlog_id, k.text]));
+  // A later decision stands in for an Accept: John ruling on the ticket after it was delivered is
+  // the acceptance, whatever row carried it.
+  const decisions = board.decisions ?? [];
+
+  // AGT-166 slice 2: the thirteenth check's three sets, computed ONCE over the whole board before
+  // the loop. A BATCH IS A RANKING, and no per-row test can answer a ranking -- which row is 7th
+  // oldest is a fact about the other 437 rows. `ownerFindings` is the uncleared ledger for THIS slug
+  // and nothing else, so a row whose removal proposal is still open reads `carried` here and is
+  // re-filed rather than re-judged (Designer's call iii).
+  const ownerFindings = (board.ownerFindings ?? [])
+    .filter(f => (f.check_slug ?? f.check) === REVALIDATION_CHECK);
+  const revalidation = selectRevalidationBatch(items, { now, carried: ownerFindings.map(f => f.backlog_id) });
+  const carriedSet = new Set(revalidation.carried);
+  const carriedSince = new Map(ownerFindings.map(f => [f.backlog_id, f.first_seen_at]));
+  // AGT-166 slice 4: the ledger row's OWN detail, which is where a refusal's reason has been sitting
+  // since the night the judge wrote it. `judge refused: <reason>` is the only detail this slug ever
+  // files, so the prefix test is what tells a refusal from any other carried row, and a row whose
+  // detail does not carry it gets no proposal at all rather than an invented one.
+  const carriedDetail = new Map(ownerFindings.map(f => [f.backlog_id, f.detail]));
+  const batchRank = new Map(revalidation.batch.map((r, i) => [r.backlog_id, i + 1]));
+  // Read for the ≤25 batch rows only (readBoard), so a row with no entry is a row whose premise text
+  // was never fetched -- which is a judgment, never a confirmation.
+  const premiseById = new Map((board.premises ?? []).map(pr => [pr.backlog_id, pr]));
+  const statusById = new Map(items.map(i => [i.backlog_id, i.status]));
+
+  const findings = [];
+  const backlog = {
+    quote_prefence: 0, size_prefence: 0, cost_prefence: 0,
+    verdict_prefence: 0, unrevalidated_30d: 0, attended_actual_null: 0,
+    // The drain's two halves of tonight, beside the population count the fences line already carried.
+    unrevalidated_batch: revalidation.batch.length,
+    unrevalidated_carried: revalidation.carried.length,
+    // AGT-169: {slug: rows it would have filed}. Seeded at 0 for every retired slug so a check that
+    // retired AND found nothing still reports itself — an absent key would read as a check that
+    // never ran, which is the exact ambiguity CHECKS' fixed print order exists to prevent.
+    retired: Object.fromEntries([...retiredMap.keys()].filter(s => CHECKS.includes(s)).map(s => [s, 0])),
+  };
+
+  // AGT-169 -- THE GUARD IS HERE AND NOWHERE ELSE. One place covers all thirteen checks, so a
+  // fourteenth written next year is retirable the day it ships without a second edit, and no check
+  // can be "retired" in the census line while still filing rows from its own branch. The row is
+  // COUNTED, never dropped silently, and nothing is filed: planWrites then routes every prior
+  // ledger row of that slug into `clear` on its own terms (`clear = prior − tonight`), which is why
+  // no delete path is needed and why a cleared row keeps its history.
+  const file = (row, check, verdict, detail, fix, proposal) => {
+    if (retiredMap.has(check)) {
+      backlog.retired[check] = (backlog.retired[check] ?? 0) + 1;
+      return;
+    }
+    const f = { backlog_id: row.backlog_id, check, verdict, detail };
+    if (fix !== undefined) f.fix = fix;
+    // AGT-166 slice 4: a finding that carries a REMOVAL PROPOSAL. It rides on the finding rather
+    // than on a second list because planWrites reads the census and nothing else -- a proposal
+    // computed anywhere but here would be a second reading of the same board.
+    if (proposal !== undefined) f.proposal = proposal;
+    findings.push(f);
+  };
+
+  for (const row of items) {
+    const status = row.status;
+    const closed = CLOSED.has(status);
+    const live = LIVE.has(status);
+    const T = row.filed_at ?? row.created_at;
+    const U = row.updated_at;
+    const c = cycles.get(row.backlog_id) ?? 0;
+
+    // 1 quote-missing -- fenced on filing.
+    if (live && row.predicted_cycles == null) {
+      if (ts(T) >= ts(FENCES.predicted_cycles)) {
+        file(row, "quote-missing", "judgment",
+          `predicted_cycles is null on a ${status} ticket filed ${T}, after the column existed.`);
+      } else backlog.quote_prefence++;
+    }
+
+    // 2 size-missing -- fenced on filing.
+    if (live && row.size_stamp == null) {
+      if (ts(T) >= ts(FENCES.size_stamp)) {
+        file(row, "size-missing", "judgment",
+          `size_stamp is null on a ${status} ticket filed ${T}, after the column existed.`);
+      } else backlog.size_prefence++;
+    }
+
+    // 3 cost-snapshot-missing / 4 actual-unknown -- one gap, two verdicts. The split IS the
+    // derivable/judgment line: actual_cycles > 0 makes the cost arithmetic; 0 makes it unknowable
+    // (an attended or desktop session writes no cycle row), and no amount of reading fixes that.
+    if (closed && row.cost_pct_snapshot == null) {
+      if (ts(U) >= ts(FENCES.cost_pct_snapshot)) {
+        if (c > 0) {
+          file(row, "cost-snapshot-missing", "derivable",
+            `cost_pct_snapshot is null on a ${status} ticket updated ${U}; ticket_matrix.actual_cycles reads ${c}.`,
+            {
+              cost_cycles_snapshot: c,
+              cost_pct_snapshot: round2(c * rate),
+              cost_snapshot_rate: rate,
+              cost_snapshot_at: nowStamp,
+            });
+        } else {
+          file(row, "actual-unknown", "judgment",
+            `cost_pct_snapshot is null on a ${status} ticket updated ${U} and ticket_matrix.actual_cycles reads 0, so no cycle row recorded the cost.`);
+        }
+      } else backlog.cost_prefence++;   // whatever `c`: the columns did not exist when it closed.
+    }
+
+    // 5 claim-on-closed -- no fence: claimed_by and claimed_at are older than every column here.
+    if (closed && row.claimed_by != null) {
+      file(row, "claim-on-closed", "derivable",
+        `claimed_by still reads ${row.claimed_by} on a ${status} ticket (claimed_at ${row.claimed_at}).`,
+        { claimed_by: null, claimed_at: null });
+    }
+
+    // 6 claim-expired -- a claim older than 24 h whose holder is not a running cycle. Checking the
+    // holder against openCycles is what keeps a long but LIVE cycle's claim off this list.
+    if (live && row.claimed_by != null && ts(row.claimed_at) < H24 && !liveCycles.has(row.claimed_by)) {
+      file(row, "claim-expired", "derivable",
+        `claimed_by reads ${row.claimed_by} with claimed_at ${row.claimed_at}, past 24 hours, and no open cycle holds that id.`,
+        { claimed_by: null, claimed_at: null });
+    }
+
+    // 7 verdict-missing -- fenced on close-out.
+    if (closed && !verdicts.has(row.backlog_id)) {
+      if (ts(U) >= ts(FENCES.runner_verdicts)) {
+        file(row, "verdict-missing", "judgment",
+          `no runner_verdicts row for a ${status} ticket updated ${U}, after the table existed.`);
+      } else backlog.verdict_prefence++;
+    }
+
+    // 8 designed-closed -- design_status is a pre-build word; on a closed row it is stale.
+    if (closed && row.design_status === "designed") {
+      file(row, "designed-closed", "judgment",
+        `design_status reads designed on a ${status} ticket (kickoff_link ${row.kickoff_link ?? "null"}).`);
+    }
+
+    // 9 type-off-taxonomy -- derivable only through the one-to-one map; anything else is a
+    // classification, which the census never makes.
+    if (row.type == null || !TYPE_TAXONOMY.includes(row.type)) {
+      const mapped = Object.prototype.hasOwnProperty.call(TYPE_MAP, row.type) ? TYPE_MAP[row.type] : undefined;
+      if (mapped !== undefined) {
+        file(row, "type-off-taxonomy", "derivable",
+          `type reads ${row.type}, a one-to-one spelling of the taxonomy entry ${mapped}.`,
+          { type: mapped });
+      } else {
+        file(row, "type-off-taxonomy", "judgment",
+          `type reads ${row.type == null ? "null" : row.type}, which the taxonomy does not carry.`);
+      }
+    }
+
+    // 10 delivered-unaccepted -- delivered more than 48 h ago with neither an Accept nor a later
+    // decision. `laterDecision` is read against THIS row's updated_at, not against now.
+    if (status === "delivered" && ts(U) < H48 && !accepts.has(row.backlog_id)) {
+      const laterDecision = decisions.some(d => d.backlog_id === row.backlog_id && ts(d.decided_at) > ts(U));
+      if (!laterDecision) {
+        file(row, "delivered-unaccepted", "judgment",
+          `status reads delivered with updated_at ${U}, past 48 hours, and no Accept or later decision answers it.`);
+      }
+    }
+
+    // 11 cycles-over-quote -- the quote it closed against, read from the row's own predicted_cycles.
+    if (closed && row.predicted_cycles != null && c > row.predicted_cycles) {
+      file(row, "cycles-over-quote", "judgment",
+        `ticket_matrix.actual_cycles reads ${c} against predicted_cycles ${row.predicted_cycles}.`);
+    }
+
+    // 12 remainder-stranded (SES-385 slice 3) -- a CLOSED row whose OWN record still names work
+    // that was never built, decided by the SAME function the close-out settles with:
+    // decideStatus() over the row's own kickoff text plus its undecided `gated_before_build` card.
+    //
+    // THE CYCLES PROXY IS GONE, deleted on a measurement rather than an argument. Slice 1's
+    // `actual_cycles < predicted_cycles` trigger filed 88 findings on the live board; running
+    // slice 2's decideStatus() over each flagged row's own kickoff answered only 5 of them real
+    // (`AGT-79`, `LOG-149`, `SES-364`, `SES-383`, `SES-396`). Of the other 83: 55 carry no
+    // `kickoff_link` at all, 27 link a kickoff that declares itself finished, and 1 (`SES-184`)
+    // links a file that is not in the tree. 86 of the 88 fired on the cycles proxy ALONE, 2 on both
+    // halves, and NONE on the card alone -- so the proxy was 94% of the noise and none of the
+    // signal. Coming in under a quote is estimate variance, not unbuilt work, and check 11
+    // (`cycles-over-quote`) already owns the other direction of that same comparison.
+    //
+    // JUDGMENT and never derivable, with NO `fix`: re-opening a stranded row is a write under one
+    // reversible decision (slice 4's), and the census writes neither `status` nor `design_status`.
+    //
+    // AGT-167 -- THE DETAIL NOW CARRIES THE REMEDY, AND THE CHECK STILL CARRIES NO `fix`. The
+    // sentence a human reads used to name the defect and stop; the one command that repairs it
+    // lives in `scripts/settle-ship.js --resettle`, which is the one home for the
+    // `backlog_items.status` write. A REMEDY SENTENCE IS NOT A `fix`: the census still writes
+    // nothing, and the operator (or the Dev Manager's own ruling run, which now calls
+    // `resettleTicket()` itself) makes the write under its own reversible decision.
+    if (closed) {
+      const d = decideStatus({
+        kickoffText: kickoffText.get(row.backlog_id) ?? "",
+        // AGT-128 -- WHICH ticket the STOP LINE has to be talking about. Without it the reader is
+        // id-blind and flags a finished row whose STOP LINE merely reported a PEER's `partial`,
+        // which puts a shipped row back in the pick path (`LIVE` at :227 reads `partial`).
+        ticketId: row.backlog_id,
+        gatedOpen: gatedOpen.has(row.backlog_id),
+      });
+      if (d.status === "partial") {
+        file(row, "remainder-stranded", "judgment",
+          `a ${status} ticket whose own record still names unbuilt work: ${d.reasons.join("; ")}` +
+          ` (design_status ${row.design_status ?? "null"}).` +
+          ` Remedy: node scripts/settle-ship.js --resettle --ticket=${row.backlog_id} --cycle-id=<uuid> --apply`);
+      }
+    }
+
+    // 13 unrevalidated-30d (AGT-166 slice 2, arm (b)) -- an open row whose premise nobody has re-read
+    // in over a month. Three branches, and the split is the whole design:
+    //
+    //   CARRIED   -- a refusal is already on the ledger for this row. Re-filed as `judgment` and never
+    //                re-judged, and since slice 4 it carries the PROPOSAL its own `judge refused: `
+    //                detail holds: the row is proposed for removal once, from the reason the judge
+    //                gave, and then it clears. The Development Manager never had a way to rule a ROW
+    //                (AGT-169 rules checks), which is why a carried row could otherwise never exit.
+    //   DERIVABLE -- the premise text was read, so the judge can rule it. `fix: {revalidated_at}` and
+    //                NOT a ledger row: a confirmed premise files nothing (AGT-169 again), and the
+    //                stamp lands only on an explicit `apply: true` (ingestJudgment fails closed).
+    //                `revalidated_at` is the only column written; `updated_at` is never named
+    //                (SES-316) and neither is `status`.
+    //   JUDGMENT  -- in the batch but with no premises entry, so the text was not read. A row nobody
+    //                showed the judge must never be stamped as re-read.
+    if (carriedSet.has(row.backlog_id)) {
+      const led = carriedDetail.get(row.backlog_id);
+      const proposal = typeof led === "string" && led.startsWith(REFUSED_PREFIX)
+        ? { reason: led.slice(REFUSED_PREFIX.length), since: carriedSince.get(row.backlog_id) ?? now }
+        : undefined;
+      file(row, REVALIDATION_CHECK, "judgment",
+        `a removal proposal for this premise has been open since ${carriedSince.get(row.backlog_id) ?? now}` +
+        " and is awaiting the Development Manager's ruling; re-filed tonight, never re-judged.",
+        undefined, proposal);
+    } else if (batchRank.has(row.backlog_id)) {
+      const premise = premiseById.get(row.backlog_id);
+      if (premise) {
+        file(row, REVALIDATION_CHECK, "derivable",
+          premiseDetail(row, premise, {
+            rank: batchRank.get(row.backlog_id),
+            population: revalidation.population.length,
+            now: nowStamp,
+            statusById,
+          }),
+          { revalidated_at: nowStamp });
+      } else {
+        file(row, REVALIDATION_CHECK, "judgment",
+          `in tonight's revalidation batch (${batchRank.get(row.backlog_id)}/${UNREVALIDATED_BATCH}` +
+          ` of ${revalidation.population.length}) but its premise text was not read, so nothing here` +
+          " can confirm it still names work the board does not show done.");
+      }
+    }
+
+    // Counts only, never findings: both are reported once as a number, not flagged per row.
+    if (status === "open" && ts(T) < D30 && row.revalidated_at == null) backlog.unrevalidated_30d++;
+    if (closed && row.actual_tokens_attended == null) backlog.attended_actual_null++;
+  }
+
+  findings.sort((a, b) =>
+    CHECKS.indexOf(a.check) - CHECKS.indexOf(b.check) ||
+    (a.backlog_id < b.backlog_id ? -1 : a.backlog_id > b.backlog_id ? 1 : 0));
+
+  const derivable = findings.filter(f => f.verdict === "derivable").length;
+  return {
+    findings,
+    backlog,
+    // AGT-169: the REASONS, beside the counts in `backlog.retired`. renderCensus prints the reason
+    // on the retired line, so a reader of the night's report is told why a check stopped without
+    // having to find the constant or the ruling row that stopped it.
+    retired: Object.fromEntries([...retiredMap.entries()].filter(([s]) => CHECKS.includes(s))),
+    counts: { rows: items.length, findings: findings.length, derivable, judgment: findings.length - derivable },
+  };
+}
+
+// censusLine(result) -> the one-line summary of a census, WITHOUT the timestamp prefix. One
+// function, two readers: renderCensus prints it after `ticket-owner census <iso>: `, and the
+// nightly cycle row carries it verbatim in `notes` so the standing brief prints the night's own
+// words rather than recomputing a fence from a second reading of the board.
+export function censusLine(result) {
+  const b = result.backlog;
+  const c = result.counts;
+  return `${c.rows} rows · ${c.findings} findings (${c.derivable} derivable · ${c.judgment} judgment)` +
+    ` · behind the fences: quote ${b.quote_prefence} · size ${b.size_prefence} · cost ${b.cost_prefence}` +
+    ` · verdict ${b.verdict_prefence} · unrevalidated>30d ${b.unrevalidated_30d} · attended-actual null ${b.attended_actual_null}` +
+    // AGT-166 slice 2: the drain's depth, in the one string the nightly cycle row carries verbatim.
+    // The population and NOT the remainder after tonight -- two consecutive nights printing the same
+    // number is the revisit trigger, and a number that shrank by the batch size whether or not the
+    // judge ruled anything would hide exactly that (kickoff §7).
+    ` · revalidation ${b.unrevalidated_30d} left (batch ${b.unrevalidated_batch}, carried ${b.unrevalidated_carried})` +
+    // AGT-169: what the census DID NOT ask tonight, in the one string the nightly cycle row carries
+    // verbatim. A retirement that showed up only as a smaller findings count would be
+    // indistinguishable on John's brief from a board that got better on its own.
+    ` · retired ${retiredSummary(b.retired)}`;
+}
+
+// `retired 1 check / 103 rows` — the counts, pluralised, out of `backlog.retired`. A slug with no
+// rows tonight still counts as a retired CHECK; it just contributes no rows.
+function retiredSummary(retired) {
+  const entries = Object.entries(retired ?? {});
+  const rows = entries.reduce((n, [, c]) => n + c, 0);
+  return `${entries.length} ${entries.length === 1 ? "check" : "checks"} / ${rows} ${rows === 1 ? "row" : "rows"}`;
+}
+
+// renderCensus(result, nowIso) -> the census text. Pure, and byte-stable for a given result: the
+// nightly report is diffed night over night, so a rendering that reordered anything would read as
+// a change on the board that never happened.
+export function renderCensus(result, nowIso) {
+  const lines = [
+    `ticket-owner census ${nowIso}: ${censusLine(result)}`,
+  ];
+  for (const check of CHECKS) {
+    // AGT-169: a retired check PRINTS, with its count and the reason it stopped. Dropping the line
+    // would make a retirement look exactly like a check that fell out of the loop.
+    if (result.retired && Object.prototype.hasOwnProperty.call(result.retired, check)) {
+      const counted = result.backlog?.retired?.[check] ?? 0;
+      lines.push(`  ${check.padEnd(22)}  retired  counted ${counted}  ${result.retired[check]}`);
+      continue;
+    }
+    const mine = result.findings.filter(f => f.check === check);
+    const ids = mine.map(f => f.backlog_id).sort();
+    const shown = ids.length === 0
+      ? "—"
+      : ids.slice(0, 8).join(", ") + (ids.length > 8 ? ` +${ids.length - 8}` : "");
+    const d = mine.filter(f => f.verdict === "derivable").length;
+    lines.push(`  ${check.padEnd(22)}  derivable ${d}  judgment ${mine.length - d}  ${shown}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+// planWrites(result, prior, items, {rate, judged}) -> {fixes, proposals, ledger: {insert, reseen, clear}, meta}
+//
+// The census says what is wrong; this says what will be WRITTEN, and nothing here touches the
+// network. `prior` is the open ledger (uncleared ticket_owner_findings rows) as
+// [{id, backlog_id, check_slug}]; `items` is the board read, the only place a backlog_id can be
+// resolved to the primary key a PATCH addresses.
+//
+// A finding is identified by (row, check) and by nothing else -- that pair is what makes tonight's
+// census comparable with last night's ledger, and it is why a judgment finding already on the
+// ledger is a RE-SEEN (touch last_seen_at) rather than a second row. The three ledger lists are
+// exhaustive over `prior` by construction: every open row is either seen again tonight or cleared.
+// Clearing is not deletion -- a cleared row keeps its history and simply stops being open.
+export function planWrites(result, prior, items, { rate, judged } = {}) {
+  const byId = new Map((items ?? []).map(i => [i.backlog_id, i.id]));
+  const key = f => `${f.backlog_id} ${f.check ?? f.check_slug}`;
+
+  // A fix without a primary key is not a write, so this throws rather than silently planning a
+  // PATCH it cannot address -- a dropped fix would read as a clean board on the next census.
+  // NO JUDGE, NO STAMP (AGT-166 slice 4, the Designer's call ii). Twelve of the thirteen checks are
+  // arithmetic and are the column's own rule, so an unjudged night writes them exactly as before.
+  // The thirteenth is a READING of a premise, and a night with no judgment pass has not read one:
+  // cycle 26d9662f ran `--nightly` alone and planned 25 `revalidated_at` stamps over premises nobody
+  // had looked at. The gate is here rather than in the census because the census must keep REPORTING
+  // the population every night -- what an unjudged night loses is the right to write to it.
+  const fixes = result.findings
+    .filter(f => f.verdict === "derivable" && (judged ? true : f.check !== REVALIDATION_CHECK))
+    .map(f => {
+      const id = byId.get(f.backlog_id);
+      if (id === undefined) {
+        throw new Error(`planWrites: no backlog_items id for ${f.backlog_id} (${f.check}) — a fix without a primary key is not a write`);
+      }
+      return { backlog_id: f.backlog_id, id, check: f.check, patch: f.fix };
+    });
+
+  const judgment = result.findings.filter(f => f.verdict === "judgment");
+
+  // THE REMOVAL PROPOSALS (slice 4). A refused premise -- refused tonight by the judge, or refused on
+  // an earlier night and replayed off its own ledger detail -- is a proposal to remove the row, and
+  // applyPlan writes it as one. A proposal addresses its row by primary key for the same reason a fix
+  // does: it images and patches that row, and a proposal that could not be addressed is not a write.
+  const proposals = judgment.filter(f => f.check === REVALIDATION_CHECK && f.proposal).map(f => {
+    const id = byId.get(f.backlog_id);
+    if (id === undefined) {
+      throw new Error(`planWrites: no backlog_items id for ${f.backlog_id} (${f.check}) — a removal proposal without a primary key is not a write`);
+    }
+    return { backlog_id: f.backlog_id, id, reason: f.proposal.reason, since: f.proposal.since ?? null };
+  });
+
+  // THE SLUG FILES NO LEDGER ROW AT ALL ANY MORE (call iii). `ticket_owner_findings` had no reviewer
+  // for a ROW (AGT-169 rules checks), so every revalidation row filed there was permanent: a confirmed
+  // premise already filed nothing, and now a refused one writes the board instead and a row nobody
+  // could read is not filed either. Being absent from `tonight` is also what CLEARS the twelve rows
+  // the earlier nights left behind -- `clear = prior − tonight`, one replay each, then gone.
+  const ledgerable = judgment.filter(f => f.check !== REVALIDATION_CHECK);
+  const tonight = new Set(ledgerable.map(key));
+  const priorKeys = new Set((prior ?? []).map(key));
+
+  const insert = ledgerable.filter(f => !priorKeys.has(key(f))).map(f => ({
+    id: randomUUID(),
+    backlog_id: f.backlog_id,
+    check_slug: f.check,
+    verdict: "judgment",
+    detail: f.detail,
+  }));
+  const reseen = (prior ?? []).filter(p => tonight.has(key(p))).map(p => p.id);
+  const clear = (prior ?? []).filter(p => !tonight.has(key(p))).map(p => p.id);
+
+  return { fixes, proposals, ledger: { insert, reseen, clear }, meta: { counts: result.counts, rate } };
+}
+
+// sameChicagoDay(aIso, bIso) -> do these two instants fall on the same America/Chicago calendar
+// date. The ONLY correct form of "already run tonight": CDT midnight is 05:00Z and CST midnight
+// 06:00Z, so any fixed-offset arithmetic is wrong twice a year and silently. Throws on an
+// unparseable date rather than answering false -- a precondition that cannot be evaluated must
+// stop the run, never wave it through into a second write pass on the same night.
+export function chicagoDay(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) throw new Error(`chicagoDay: not a parseable instant (got ${iso})`);
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+}
+
+export function sameChicagoDay(aIso, bIso) {
+  return chicagoDay(aIso) === chicagoDay(bIso);
+}
+
+// nightlyNotes(line, applied) -> the cycle row's notes: the prefix the precondition reads, the
+// census line verbatim, the four write counts, and the decision handle with its reversal window.
+// This string is the night's whole report -- the standing brief prints it rather than recomputing
+// it, so what John reads is what the run actually said about itself.
+// `judged` is optional and the LAST thing the string says, but its absence is now SPOKEN rather
+// than silent (slice 6): an unjudged night ends ` · unjudged` where slice 3-5 ended with nothing.
+// A night that ran arithmetic-only used to be byte-identical to a night from before the judgment
+// pass existed, so five unjudged nights passed unnoticed on the board. The precondition and the
+// standing brief both read this string by its PREFIX (`NIGHTLY_PREFIX`), never by its ending, so
+// lengthening the tail changes what John reads and nothing that matches it.
+export function nightlyNotes(line, applied, judged) {
+  const a = applied ?? {};
+  // AGT-166 slice 4: `proposed N` lands after `fixed N`, and ONLY when N > 0. A night that proposed
+  // nothing prints the string it printed before -- the standing brief diffs these notes night over
+  // night, and a ` · proposed 0` on every row would be 430 nights of noise saying nothing happened.
+  const head = `${NIGHTLY_PREFIX} — ${line} · fixed ${a.fixed}` +
+    (a.proposed > 0 ? ` · proposed ${a.proposed}` : "") +
+    ` · findings +${a.inserted} ~${a.reseen} −${a.cleared}`;
+  const tail = a.decision
+    ? ` · decision ${a.decision} — reversible until ${a.expires_at}`
+    : " · no decision (nothing to fix)";
+  return head + tail + (judged
+    ? ` · judged ${judged.confirmed}/${judged.refused}/${judged.unconfirmed} on ${judged.model}`
+    : " · unjudged");
+}
+
+// --- the judgment pass, pure (slice 4) ---------------------------------------------------------
+
+// Where pass one leaves the state for pass two, DERIVED from the cycle id so the two invocations
+// find the same file without a path being carried between them. The sanitiser is not decoration: a
+// cycle id is interpolated into a filesystem path, and the only safe assumption about a string that
+// reached here from argv is that it is a string.
+export function statePathFor(dir, cycleId) {
+  const keyPart = String(cycleId).replace(/[^A-Za-z0-9_-]/g, "");
+  return path.join(dir, `ticket-owner-judge-${keyPart}.json`);
+}
+
+// judgeTask(out, prior, now) -> the task_context the Ticket Owner's prompt carries. Three members
+// and no more: the census exactly as the CLI would print it, the Chicago night it is about, and the
+// open ledger REPROJECTED -- `check`, never `check_slug`, and no `id`. The primary keys are the
+// script's business; handing a model a row id invites an answer that names one.
+export function judgeTask(out, prior, now) {
+  return {
+    census: out,
+    window: chicagoDay(now),
+    prior: (prior ?? []).map(p => ({
+      backlog_id: p.backlog_id,
+      check: p.check ?? p.check_slug,
+      first_seen_at: p.first_seen_at,
+    })),
+  };
+}
+
+// ingestJudgment(answer, state) -> {errors, result, judged}
+//
+// THE ANSWER IS VALIDATED BY CODE AND NEVER TRUSTED. Pure: no fetch, no disk, no clock, and `state`
+// is never mutated -- the caller keeps what the sub-agent really said.
+//
+// ALL-OR-NOTHING. `errors` is a list of plain-English refusals; when it is non-empty, `result` and
+// `judged` are null and the caller writes NOTHING. Every failing check appends its own line rather
+// than short-circuiting, because an operator reading a refusal wants the whole list, not the first
+// item of an unknown number. The one exception is the schema check: a shape that did not validate
+// is not trustworthy enough to inspect further, so that family stops.
+//
+// AN ANSWER MUST BE ABOUT THIS BOARD -- rank-backlog.js's item (3), the same defect in a new place.
+// A judgment file left in a scratch directory from last night satisfies the schema perfectly and
+// would confirm fixes against rows tonight's census never looked at, so every (backlog_id, check)
+// pair is checked against THIS state's census and refused if it is not there.
+//
+// FAIL CLOSED ON SILENCE. A derivable finding with no fix entry is NOT written. It degrades to a
+// judgment finding whose detail says so, and the count lands in `judged.unconfirmed`. A judge that
+// answered about half the board must not have the other half applied on its behalf.
+export function ingestJudgment(answer, state) {
+  const errors = [];
+  const refused = () => ({ errors, result: null, judged: null });
+  const pairKey = (id, check) => `${id} ${check}`;
+
+  // (1) The Intent's OWN stored schema, with no truncation: this answer drives writes, so a lens
+  // that overflowed is a refusal rather than something to quietly cut.
+  const shape = validateAgentVerdict(state?.schema, answer);
+  if (!shape.ok) {
+    errors.push(...shape.errors);
+    return refused();
+  }
+
+  // (2) The window. Same night, or nothing.
+  if (answer.window !== state.window) {
+    errors.push(`the answer is about window "${answer.window}", this state is "${state.window}" -- run pass one again`);
+  }
+
+  const censusFindings = state?.census?.findings ?? [];
+  const derivablePairs = new Set(censusFindings.filter(f => f.verdict === "derivable").map(f => pairKey(f.backlog_id, f.check)));
+  const judgmentPairs = new Set(censusFindings.filter(f => f.verdict === "judgment").map(f => pairKey(f.backlog_id, f.check)));
+
+  // (3) The fix verdicts. `validateAgentVerdict` does not descend into array ITEM properties, so
+  // every item shape is checked here -- the same re-check rank-backlog and audit-cluster both carry.
+  const fixByPair = new Map();
+  const refusedPairs = new Set();
+  const seenFix = new Set();
+  const answerFixes = Array.isArray(answer.fixes) ? answer.fixes : [];
+  answerFixes.forEach((f, i) => {
+    if (!f || typeof f !== "object" || Array.isArray(f)) { errors.push(`fixes[${i}] is not an object`); return; }
+    if (typeof f.backlog_id !== "string" || typeof f.check !== "string") { errors.push(`fixes[${i}] must carry backlog_id and check`); return; }
+    if (typeof f.apply !== "boolean") errors.push(`fixes[${i}] apply must be a boolean`);
+    if (typeof f.reason !== "string" || f.reason.length > 200) errors.push(`fixes[${i}] reason must be a string of at most 200 chars`);
+    const k = pairKey(f.backlog_id, f.check);
+    if (!derivablePairs.has(k)) errors.push(`fixes names ${f.backlog_id} ${f.check}, which is not a derivable finding of this census`);
+    if (seenFix.has(k)) errors.push(`fixes names ${f.backlog_id} ${f.check} twice`);
+    seenFix.add(k);
+    if (!fixByPair.has(k)) fixByPair.set(k, f);
+    if (f.apply === false) refusedPairs.add(k);
+  });
+
+  // (4) The sentences. A sentence may answer a judgment finding of this census, or a fix THIS
+  // answer refused (which is about to become one) -- and nothing else.
+  const detailByPair = new Map();
+  const seenFinding = new Set();
+  const answerFindings = Array.isArray(answer.findings) ? answer.findings : [];
+  answerFindings.forEach((f, i) => {
+    if (!f || typeof f !== "object" || Array.isArray(f)) { errors.push(`findings[${i}] is not an object`); return; }
+    if (typeof f.backlog_id !== "string" || typeof f.check !== "string") { errors.push(`findings[${i}] must carry backlog_id and check`); return; }
+    if (typeof f.detail !== "string" || f.detail.length === 0 || f.detail.length > 300) {
+      errors.push(`findings[${i}] detail must be a non-empty string of at most 300 chars`);
+    }
+    const k = pairKey(f.backlog_id, f.check);
+    if (!judgmentPairs.has(k) && !refusedPairs.has(k)) {
+      errors.push(`findings names ${f.backlog_id} ${f.check}, which is neither a judgment finding of this census nor a fix this answer refused`);
+    }
+    if (seenFinding.has(k)) errors.push(`findings names ${f.backlog_id} ${f.check} twice`);
+    seenFinding.add(k);
+    if (!detailByPair.has(k)) detailByPair.set(k, f.detail);
+  });
+
+  if (errors.length) return refused();
+
+  // THE MERGE, over the census in its existing order and never re-sorted: renderCensus, planWrites
+  // and the ledger all read this list, and a reordering would read as movement on the board.
+  let confirmed = 0;
+  let refusedCount = 0;
+  let unconfirmed = 0;
+  const findings = censusFindings.map(f => {
+    const k = pairKey(f.backlog_id, f.check);
+    const merged = { ...f };
+    if (f.verdict === "derivable") {
+      const fix = fixByPair.get(k);
+      if (fix && fix.apply === true) { confirmed++; return merged; }
+      merged.verdict = "judgment";
+      delete merged.fix;
+      if (fix) {
+        refusedCount++;
+        merged.detail = `${REFUSED_PREFIX}${fix.reason}`;
+        // AGT-166 slice 4, the Designer's call (i): A JUDGED REFUSAL *IS* THE REMOVAL PROPOSAL, the
+        // same night, and not a row filed for somebody to rule later. `since` is absent on purpose --
+        // this proposal is made tonight; only a CARRIED refusal has an age to report.
+        //
+        // THE THIRTEENTH CHECK AND NO OTHER. A refused cost stamp or type spelling is the judge
+        // declining one arithmetic write; it says nothing about whether the TICKET should exist. Only
+        // the revalidation check asks that question, so only its refusal carries a proposal — a
+        // `proposal` on any other refusal would be a removal waiting for a widened filter to find it.
+        if (f.check === REVALIDATION_CHECK) merged.proposal = { reason: fix.reason };
+      } else {
+        unconfirmed++;
+        merged.detail = `judge: not confirmed -- ${f.detail}`;
+      }
+      return merged;
+    }
+    const detail = detailByPair.get(k);
+    if (detail !== undefined) merged.detail = detail;
+    return merged;
+  });
+
+  const derivable = findings.filter(f => f.verdict === "derivable").length;
+  return {
+    errors,
+    // The shape classifyBoard() returns, recounted -- so planWrites() runs over it unchanged.
+    result: {
+      findings,
+      backlog: state.census.backlog,
+      counts: { rows: state.census.counts.rows, findings: findings.length, derivable, judgment: findings.length - derivable },
+    },
+    judged: {
+      confirmed,
+      refused: refusedCount,
+      unconfirmed,
+      sentences: answerFindings.length,
+      model: state.model,
+      report: answer.report,
+    },
+  };
+}
+
+// --- the CLI half (credentials, disk, exit codes) ----------------------------------------------
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ALLOWED_FLAGS = new Set([
+  "census", "board", "out", "json", "apply", "cycle-id", "nightly",
+  "judge", "answer", "state-file", "dry-run",
+]);
+
+function fail(message) {
+  process.stderr.write(`ticket-owner: ${message}\n`);
+  process.exit(2);
+}
+
+// Same shape as render-standing-brief.js:1076 -- one fetch path every read AND every write goes
+// through, so no caller gets its own error handling and its own chance to swallow a 403. `label`
+// names the write step for the exit-2 message; a read passes none.
+async function rest(base, key, pathAndQuery, init = {}, label = null) {
+  const at = label ? `${label}: ` : "";
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    ...(init.body ? { "Content-Type": "application/json" } : {}),
+    ...(init.headers ?? {}),
+  };
+  let res;
+  try {
+    res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, { ...init, headers });
+  } catch (e) {
+    fail(`${at}could not reach the Supabase REST endpoint: ${e.message}`);
+  }
+  const body = await res.text().catch(() => "");
+  if (!res.ok) fail(`${at}Supabase REST returned HTTP ${res.status} ${res.statusText}: ${body}`);
+  // A write with Prefer: return=minimal answers 201/204 with no body at all; that is a success,
+  // not a parse error.
+  if (body.trim() === "") return null;
+  try {
+    return JSON.parse(body);
+  } catch (e) {
+    fail(`${at}Supabase REST returned a body that is not JSON: ${e.message}`);
+  }
+}
+
+// A TRUNCATED BOARD IS NOT A CENSUS, and until AGT-166 slice 2 this function believed its own guard.
+// ONE PAGE IS NOT A BOARD. PostgREST caps a response at 1,000 rows whatever the query's `limit=` says,
+// so the old form — `&limit=5000` on the query and a refusal only AT 5,000 — read the first 1,000 rows
+// of a 1,019-row board and reported the other 19 as absent. Measured 2026-09-27: 420 unrevalidated
+// rows where SQL counts 438. That is not an under-count in a report, it is a FALSE ZERO in AGT-166's
+// own mechanical close condition — the drain would print `revalidation 0 left` with 19 rows it had
+// never read (kickoff §7). Slice 1 fixed the identical cap in scripts/audit-board.js and the number it
+// reported went UP, 497 to 546; this is that same Range-header paging in the script that owns the
+// drain, so the two can no longer disagree by construction.
+//
+// TWO RULES COME WITH IT, both enforced rather than documented. `limit` is the CEILING on the whole
+// total and never a per-request limit, so a query carrying its own `limit=` is refused — that clause
+// is precisely what hid the 19 rows. And every paged query must carry `order=`: an unordered page
+// boundary is free to repeat or skip a row, which is a truncation that counts wrong instead of short.
+export const PAGE_ROWS = 1000;
+
+async function readAll(base, key, name, query, limit) {
+  if (!/[?&]order=/.test(query)) {
+    fail(`the ${name} read has no order= clause — an unordered page boundary may repeat or skip a row`);
+  }
+  if (/[?&]limit=/.test(query)) {
+    fail(`the ${name} read carries its own limit= — the ceiling is this function's argument, and a per-request limit is what hid 19 rows of a 1,019-row board`);
+  }
+  const rows = [];
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const page = await rest(base, key, query, {
+      headers: { "Range-Unit": "items", Range: `${from}-${from + PAGE_ROWS - 1}` },
+    });
+    if (!Array.isArray(page)) fail(`the ${name} read came back non-array — refusing to census a board that was not read`);
+    rows.push(...page);
+    if (page.length < PAGE_ROWS) return rows;
+    if (rows.length >= limit) {
+      fail(`the ${name} read reached its ceiling of ${limit} rows and the last page was still full — the board is truncated, so this is not a census`);
+    }
+  }
+}
+
+async function readBoard(base, key, now) {
+  const items = await readAll(base, key, "backlog_items",
+    "backlog_items?select=id,backlog_id,status,type,tier,claimed_by,claimed_at,predicted_cycles,size_stamp," +
+    "design_status,kickoff_link,cost_pct_snapshot,cost_cycles_snapshot,revalidated_at,filed_at,created_at," +
+    "updated_at,actual_tokens_attended&status=in.(open,partial,done,delivered)&order=backlog_id", 5000);
+  const matrix = await readAll(base, key, "ticket_matrix",
+    "ticket_matrix?select=backlog_id,actual_cycles,predicted_cycles&order=backlog_id", 5000);
+  const verdicts = await readAll(base, key, "runner_verdicts",
+    "runner_verdicts?select=backlog_id&order=id", 10000);
+  // SES-385: the `decided_at=not.is.null` filter came OFF and `kind` went on, so this ONE read
+  // serves check 10's Accepts (the rows with a decided_at) and check 12's undecided
+  // `gated_before_build` cards. classifyBoard splits them; a second read would be a second board.
+  const accepts = await readAll(base, key, "runner_items",
+    "runner_items?select=backlog_id,kind,decided_at&backlog_id=not.is.null&order=id", 10000);
+  const decisions = await readAll(base, key, "runner_decisions",
+    "runner_decisions?select=backlog_id,decided_at&backlog_id=not.is.null&order=id", 10000);
+  const openCycles = await readAll(base, key, "runner_cycles",
+    "runner_cycles?select=id&ended_at=is.null&order=id", 1000);
+  // SES-385 slice 3: check 12 asks the closed ticket's OWN kickoff whether it names a remainder,
+  // and classifyBoard() is pure by construction -- it may not open a file. So the text is read
+  // HERE, beside the six REST reads, and arrives on the board like every other input. Only closed
+  // rows with a link are read (73 files today); an unreadable or absent path lands `text: null`
+  // rather than throwing, because SES-184 and SES-185 link kickoffs that are not in the tree and a
+  // census that crashes on one dead link censuses nothing.
+  const kickoffs = [];
+  for (const row of items) {
+    if (!CLOSED.has(row.status) || row.kickoff_link == null) continue;
+    let text = null;
+    try { text = fs.readFileSync(path.resolve(ROOT, row.kickoff_link), "utf8"); } catch { text = null; }
+    kickoffs.push({ backlog_id: row.backlog_id, kickoff_link: row.kickoff_link, text });
+  }
+  // AGT-166 slice 2, two reads and both are narrow on purpose.
+  //
+  // `ownerFindings` is the uncleared ledger for the revalidation slug ALONE -- the whole open ledger
+  // is read separately by the write pass, and classifyBoard must not learn to treat any other slug's
+  // open row as a carried premise. AGT-166 slice 4: `detail` joins the projection, because the
+  // REFUSAL'S REASON lives in it and nowhere else. Without it the twelve carried rows are re-filed
+  // as bare "awaiting a ruling" findings forever; with it each one replays as the removal proposal
+  // the judge already made.
+  //
+  // `premises` is `title, description, priority_class` for the ≤25 rows tonight's batch actually
+  // picks, which is why selectRevalidationBatch runs HERE as well as inside classifyBoard: both calls
+  // are the same pure function over the same items and the same `now`, so they pick the same rows,
+  // and reading 438 descriptions to show 25 to a judge would be 17× the bytes for nothing. A row the
+  // read misses lands `judgment` rather than a confirmation, so a short read costs a ruling, never a
+  // wrong stamp.
+  const ownerFindings = await readAll(base, key, "ticket_owner_findings (revalidation)",
+    `ticket_owner_findings?select=backlog_id,check_slug,first_seen_at,detail&cleared_at=is.null&check_slug=eq.${REVALIDATION_CHECK}&order=id`, 10000);
+  const batch = selectRevalidationBatch(items, { now, carried: ownerFindings.map(f => f.backlog_id) }).batch;
+  const premises = batch.length === 0 ? [] : await readAll(base, key, "backlog_items (premises)",
+    "backlog_items?select=backlog_id,title,description,priority_class" +
+    `&backlog_id=in.(${batch.map(r => r.backlog_id).join(",")})&order=backlog_id`,
+    UNREVALIDATED_BATCH + 1);
+  // AGT-169 -- THE RULER. The Development Manager's weekly review already rules `audit_findings`;
+  // this read is what makes one of those rulings DO something. A `not-a-defect` on `owner:<slug>`
+  // retires that check tonight, with no code edit and no deploy between his ruling and the effect.
+  //
+  // SOFT BY DESIGN, and it is the ONE read in this function that may fail without stopping the
+  // census. Every other read is board data: a truncated board is not a census, so `readAll` exits
+  // 2. This read only ever REMOVES work, so losing it costs nothing but a night of extra checking
+  // — which is why it fails to `[]` (every check runs) instead of exiting. A full first page is
+  // treated as unreadable for the same reason `readAll` refuses one: an unknown remainder here
+  // would silence an unknown set of checks.
+  const ownerRulings = await readRulings(base, key);
+  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs, ownerFindings, premises, ownerRulings };
+}
+
+const RULINGS_QUERY = "audit_findings?select=check_slug,status,ruling,ruled_by,ruled_at" +
+  "&check_slug=like.owner:*&status=eq.not-a-defect&order=id";
+
+export async function readRulings(base, key, fetchImpl = fetch) {
+  const soft = why => {
+    process.stderr.write(`ticket-owner: the owner-rulings read ${why} — retiring nothing from it; every check runs tonight\n`);
+    return [];
+  };
+  try {
+    const res = await fetchImpl(`${base.replace(/\/+$/, "")}/rest/v1/${RULINGS_QUERY}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Range-Unit": "items", Range: `0-${PAGE_ROWS - 1}` },
+    });
+    if (!res.ok) return soft(`answered HTTP ${res.status}`);
+    const rows = JSON.parse(await res.text());
+    if (!Array.isArray(rows)) return soft("came back non-array");
+    if (rows.length >= PAGE_ROWS) return soft(`filled its only page (${rows.length} rows), so the remainder is unknown`);
+    return rows;
+  } catch (e) {
+    return soft(`could not be completed: ${e.message}`);
+  }
+}
+
+async function readRate(base, key) {
+  const raw = await rest(base, key, "rpc/runner_pct_per_cycle", { method: "POST", body: "{}" });
+  const rate = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(rate)) fail(`rpc/runner_pct_per_cycle returned ${JSON.stringify(raw)}, which is not a number — the cost arithmetic has no rate`);
+  return rate;
+}
+
+// openJudgmentBySlug(prior, ledger, now) -> [{slug, count, oldest}], in CHECKS order (AGT-131)
+//
+// WHAT IS STILL OPEN AFTER TONIGHT, which is `prior ∪ insert − clear` and not any one of the three.
+// `prior` alone is last night's answer; `insert` alone is tonight's discoveries and misses every
+// gap that has been open for a month without changing; and a set that forgot `clear` would keep
+// raising a finding for a check the board just satisfied. The three lists are exhaustive over the
+// ledger by planWrites()'s own construction, so this is the whole open set and not a sample.
+//
+// PURE, AND ONE FINDING PER CHECK -- never one per row. 222 open judgment rows over 10 checks are
+// 10 questions for a capability to answer, and 222 ledger rows would be a queue nobody reads. The
+// COUNT lives in the location `text` and nowhere else, because `fingerprint()` is built from
+// `kind | locationKeys | normalize(governing_fact)`: a count in the governing fact would mint a new
+// finding every night the number moved, which is precisely a ledger that cannot carry.
+export function openJudgmentBySlug(prior, ledger, now) {
+  const cleared = new Set((ledger?.clear ?? []).map(String));
+  const open = [];
+  for (const r of prior ?? []) {
+    if (cleared.has(String(r.id))) continue;
+    open.push({ slug: r.check_slug ?? r.check, first_seen: r.first_seen_at ?? now });
+  }
+  // A row inserted tonight is first seen tonight -- it has no first_seen_at until the write lands.
+  for (const r of ledger?.insert ?? []) open.push({ slug: r.check_slug, first_seen: now });
+
+  const out = [];
+  for (const slug of CHECKS) {
+    const members = open.filter(o => o.slug === slug);
+    if (!members.length) continue;
+    const oldest = members.map(m => m.first_seen).filter(Boolean).sort()[0] ?? now;
+    out.push({ slug, count: members.length, oldest });
+  }
+  return out;
+}
+
+// The finding a still-open check raises, pure so the regression file can pin its exact shape.
+//
+// AGT-169 -- THE BAND IS THE ONLY THING THAT MAY TOUCH `governing_fact`, and only once per rung.
+// The count deliberately lives in the location `text` (see openJudgmentBySlug above), because
+// fingerprint() is `kind | locationKeys | normalize(governing_fact)` and a count in the governing
+// fact would mint a new finding every night the number moved. But the same property is why a slug
+// ruled `ticketed` once could never re-raise however far it grew: 247 open rows at AGT-169's
+// filing, 259 four nights later, and the ledger had no way to say so. Appending the BAND -- not the
+// count -- keeps every ordinary night byte-identical while a crossing mints exactly one new
+// fingerprint, which is one appearance on the Development Manager's weekly list per rung.
+//
+// Below the first band there is NO suffix, byte for byte. That is not a micro-optimisation: it is
+// what lets the findings already ticketed against this very ticket keep their fingerprints and stay
+// carried rather than re-raising as duplicates on the night this ships.
+export function censusFindingFor({ slug, count, oldest }) {
+  const band = bandFor(count);
+  return {
+    kind: "other",
+    check_slug: `owner:${slug}`,
+    locations: [{ location: `ticket_owner_findings:${slug}`, text: `${count} open rows, oldest first_seen ${oldest}` }],
+    governing_fact: `Ticket Owner check ${slug} holds open judgment rows a capability must decide`
+      + (band === null ? "" : ` (past ${band} open rows)`),
+    confidence: "high",
+    proposed_resolution: "rule the rows or retire the check",
+  };
+}
+
+// applyPlan(base, key, plan, {cycleId, sessionName, now, prior}) -> {decision, expires_at, fixed,
+// inserted, reseen, cleared, raised}
+//
+// The five steps, in this order and no other. The ORDER is the safety property: the decision row
+// exists before any image, every image exists before the cell it images is touched, and the ledger
+// is written last. If step 3 dies halfway, the rows already patched are all imaged under a
+// decision that exists, so one reverse_decision() still puts them back -- which is exactly what
+// "a half-applied plan must still be reversible" means.
+//
+// ck_decision_attribution takes exactly one of cycle_id / session_name: the nightly run is a
+// cycle, the regression fixture is a session. Passing both (or neither) is a programming error and
+// throws before a single request leaves the process.
+export async function applyPlan(base, key, plan, { cycleId, sessionName, now, judged, prior } = {}) {
+  if ((cycleId == null) === (sessionName == null)) {
+    throw new Error("applyPlan: pass exactly one of cycleId / sessionName — every write is attributed to one or the other");
+  }
+  const A = { cycle_id: cycleId ?? null, session_name: sessionName ?? null };
+  const { insert, reseen, clear } = plan.ledger;
+  const ids = [...new Set(plan.fixes.map(f => f.id))];
+
+  let decision = null;
+  let expires_at = null;
+  // Once a decision exists, every later failure message carries it -- so an operator reading the
+  // exit-2 line has the one id they need to reverse whatever did land.
+  const where = step => `${step}${decision ? ` (decision ${decision})` : ""}`;
+
+  // 1 -- the decision, and only if there is something to decide. A night with no derivable fix
+  // records no decision at all rather than an empty one.
+  if (plan.fixes.length > 0) {
+    const nCost = plan.fixes.filter(f => f.check === "cost-snapshot-missing").length;
+    const nClaim = plan.fixes.filter(f => f.check === "claim-on-closed" || f.check === "claim-expired").length;
+    const nType = plan.fixes.filter(f => f.check === "type-off-taxonomy").length;
+    const nReval = plan.fixes.filter(f => f.check === REVALIDATION_CHECK).length;
+    const counts = plan.meta.counts;
+    const rate = plan.meta.rate;
+    const p_summary = `Ticket Owner: ${plan.fixes.length} derivable cell fix(es) on ${ids.length} row(s) — cost ${nCost} · claim ${nClaim} · type ${nType} · revalidation ${nReval}`;
+    // AGT-166 slice 2: THE TEXT NO LONGER CLAIMS EVERY FIX IS ARITHMETIC, because one kind is not.
+    // A revalidation stamp is a capability's reading of the row's own premise, and John reverses a
+    // night by what this sentence says it did -- a line calling a judged stamp arithmetic would
+    // misdescribe the one fix on the row that is not mechanical.
+    let p_reasoning = `Nightly census ${now}: ${counts.rows} rows read, ${counts.findings} findings (${counts.derivable} derivable, ${counts.judgment} judgment). Not every fix here is arithmetic: ${nCost} cost snapshot(s) are (cost_pct_snapshot = round(actual_cycles × runner_pct_per_cycle(), 2) at rate ${rate}), ${nClaim} claim clear(s) are the claim column's own rule (a closed row, or 24 h past with no live cycle), ${nType} type fix(es) are a one-to-one spelling (feature → Feature, Bug Fixes → Bug), and ${nReval} revalidated_at stamp(s) are a JUDGED premise re-read — a capability confirmed the row's own text still names work the board does not show done (AGT-166), which no column can compute. Whole rows imaged under this decision; no status, quote or design_status written; judgment findings filed in ticket_owner_findings, not here. pattern:0`;
+    // A JUDGED NIGHT SAYS SO ON ITS OWN DECISION ROW (slice 4). John reads reverse_decision()
+    // candidates from `reasoning`; "a capability confirmed these three and refused that one" is the
+    // difference between a mechanical write and a ruled one, and it belongs where he is looking.
+    // Inserted before the ` pattern:0` suffix, which the AI-audit scan reads as the line's end.
+    if (judged) {
+      p_reasoning = p_reasoning.replace(" pattern:0",
+        ` Judged by capability ${JUDGE_CAPABILITY} on ${judged.model}: ${judged.confirmed} fix(es) confirmed,` +
+        ` ${judged.refused} refused, ${judged.unconfirmed} unconfirmed. pattern:0`);
+    }
+
+    decision = await rest(base, key, "rpc/record_decision", {
+      method: "POST",
+      body: JSON.stringify({
+        p_cycle_id: cycleId ?? null,
+        p_session_name: sessionName ?? null,
+        p_kind: "hygiene",
+        p_backlog_id: "AGT-79",
+        p_summary,
+        p_reasoning,
+        p_ladder_work_class: null,
+      }),
+    }, "record_decision");
+    if (typeof decision !== "string" || decision.length !== 36) {
+      fail(`record_decision: returned ${JSON.stringify(decision)}, which is not a decision id`);
+    }
+    const dec = await rest(base, key, `runner_decisions?id=eq.${decision}&select=expires_at`, {}, where("record_decision"));
+    expires_at = Array.isArray(dec) && dec[0] ? dec[0].expires_at : null;
+
+    // 2 -- image the FULL rows, before a single cell moves. select=* because reverse_decision()
+    // restores every column from row_data.
+    const rows = await rest(base, key, `backlog_items?id=in.(${ids.join(",")})&select=*`, {}, where("image rows"));
+    if (!Array.isArray(rows) || rows.length !== ids.length) {
+      fail(`${where("image rows")}: read ${Array.isArray(rows) ? rows.length : 0} of ${ids.length}`);
+    }
+    await rest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(rows.map(r => ({ ...A, table_name: "backlog_items", pk_value: r.id, row_data: r, decision_id: decision }))),
+    }, where("image rows"));
+
+    // 3 -- the patches, one row at a time, each one READ BACK. A PATCH that PostgREST accepted and
+    // silently did not apply (a column the role cannot write) answers 200 with the old value, so
+    // the returned representation is compared key by key rather than trusted.
+    for (const fix of plan.fixes) {
+      const step = where(`patch ${fix.backlog_id}`);
+      const back = await rest(base, key, `backlog_items?id=eq.${fix.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify(fix.patch),
+      }, step);
+      const row = Array.isArray(back) ? back[0] : null;
+      if (!row) fail(`${step}: the PATCH returned no row`);
+      for (const k of Object.keys(fix.patch)) {
+        const got = row[k];
+        const want = fix.patch[k];
+        if (!cellMatches(k, got, want)) fail(`${step}: ${k} read ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
+      }
+    }
+  }
+
+  // 3b -- THE REMOVAL PROPOSALS (AGT-166 slice 4). After the fixes and before the ledger, because a
+  // proposal is a write to the BOARD and the ledger is bookkeeping about it; and each one carries its
+  // OWN decision rather than joining the night's hygiene decision, because the two are different
+  // undos. Reversing the hygiene decision puts stamps back; reversing a proposal returns ONE row to
+  // the drain, which is the grain John needs to answer it. `removed` is never written here (SES-113):
+  // the row lands in his waiting room and stops being in the drain's population, and that is all.
+  let proposed = 0;
+  for (const p of plan.proposals ?? []) {
+    const step0 = where(`propose ${p.backlog_id}`);
+    const pDecision = await rest(base, key, "rpc/record_decision", {
+      method: "POST",
+      body: JSON.stringify({
+        p_cycle_id: cycleId ?? null,
+        p_session_name: sessionName ?? null,
+        p_kind: PROPOSAL_KIND,
+        p_backlog_id: p.backlog_id,
+        p_summary: `${p.backlog_id} removal proposed: ${p.reason}`,
+        p_reasoning: `AGT-166 revalidation, night ${now}: premise re-read and refused — ${p.reason}.` +
+          " Reverse this decision to return the row to the drain; removed stays John's (SES-113). pattern:0",
+        p_ladder_work_class: null,
+      }),
+    }, step0);
+    if (typeof pDecision !== "string" || pDecision.length !== 36) {
+      fail(`${step0}: record_decision returned ${JSON.stringify(pDecision)}, which is not a decision id`);
+    }
+    const step = `${step0} (proposal decision ${pDecision})`;
+    // The FULL row, imaged under the proposal's own decision -- reverse_decision() rewrites every
+    // column from row_data, so a partial image would restore a partial row. Read before the patch:
+    // an image taken afterwards restores the very status it was meant to undo.
+    const imaged = await rest(base, key, `backlog_items?id=eq.${p.id}&select=*`, {}, step);
+    if (!Array.isArray(imaged) || imaged.length !== 1) {
+      fail(`${step}: read ${Array.isArray(imaged) ? imaged.length : 0} of 1 row to image`);
+    }
+    await rest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([{ ...A, table_name: "backlog_items", pk_value: p.id, row_data: imaged[0], decision_id: pDecision }]),
+    }, step);
+    // ONE column, read back key by key exactly as step 3 does. `updated_at` is never named: a stamp
+    // later than the decision's own decided_at makes reverse_decision() refuse the row (SES-316), and
+    // a proposal John cannot reverse is a removal nobody approved.
+    const back = await rest(base, key, `backlog_items?id=eq.${p.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: PROPOSED_STATUS }),
+    }, step);
+    const row = Array.isArray(back) ? back[0] : null;
+    if (!row) fail(`${step}: the PATCH returned no row`);
+    if (!cellMatches("status", row.status, PROPOSED_STATUS)) {
+      fail(`${step}: status read ${JSON.stringify(row.status)}, wanted ${JSON.stringify(PROPOSED_STATUS)}`);
+    }
+    proposed++;
+  }
+
+  // 4 -- the ledger inserts, each preceded by a NULL-row image. A null row_data is how the
+  // reversal chain says "this row did not exist before"; without it a reversal would have nothing
+  // to say about a finding the night invented.
+  if (insert.length > 0) {
+    await rest(base, key, "runner_before_images", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(insert.map(f => ({ ...A, table_name: "ticket_owner_findings", pk_value: f.id, row_data: null }))),
+    }, where("image findings"));
+    await rest(base, key, "ticket_owner_findings", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(insert.map(f => ({
+        id: f.id,
+        backlog_id: f.backlog_id,
+        check_slug: f.check_slug,
+        verdict: "judgment",
+        detail: f.detail,
+        first_seen_at: now,
+        last_seen_at: now,
+        cycle_id: cycleId ?? null,
+      }))),
+    }, where("insert findings"));
+  }
+
+  // 5 -- the touches. Re-seen rows keep their first_seen_at (the age of a gap is the point);
+  // cleared rows keep everything and simply stop being open.
+  if (reseen.length > 0) {
+    await rest(base, key, `ticket_owner_findings?id=in.(${reseen.join(",")})`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ last_seen_at: now }),
+    }, where("reseen"));
+  }
+  if (clear.length > 0) {
+    await rest(base, key, `ticket_owner_findings?id=in.(${clear.join(",")})`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ cleared_at: now }),
+    }, where("clear"));
+  }
+
+  // 6 -- AGT-131: THE CENSUS RAISES ITS OWN GAPS INTO THE ONE FINDINGS LIST. `ticket_owner_findings`
+  // held 222 open judgment rows over 10 checks and had no reviewer; the Development Manager reviews
+  // `audit_findings`. One `gap` per still-open check reaches him there. It runs LAST, after the
+  // clears, for the same reason the clears run last: the raise must describe the ledger as tonight
+  // left it, not as it was halfway through.
+  //
+  // NO `prior`, NO RAISE, and never a guess: the open set is `prior ∪ insert − clear`, and a caller
+  // that did not hand over the ledger it planned against cannot have that set computed for it. An
+  // `insert`-only fallback would silently under-count every check that has been open since before
+  // tonight -- a wrong number in a permanent, un-deletable row.
+  let raised = 0;
+  if (prior !== undefined) {
+    const findings = openJudgmentBySlug(prior, plan.ledger, now).map(censusFindingFor);
+    if (findings.length) {
+      const ingest = await ingestFindings({
+        findings,
+        week: isoWeek(now ?? new Date()),
+        foundBy: "ticket-owner:census",
+        findingType: "gap",
+        cycleId: cycleId ?? null,
+        sessionName: sessionName ?? null,
+        apply: true,
+        get: q => rest(base, key, q, {}, where("raise findings")),
+        post: (table, body) => rest(base, key, table, {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify(body),
+        }, where("raise findings")),
+      });
+      raised = ingest.written;
+    }
+  }
+
+  return {
+    decision,
+    expires_at,
+    fixed: plan.fixes.length,
+    proposed,
+    inserted: insert.length,
+    reseen: reseen.length,
+    cleared: clear.length,
+    raised,
+  };
+}
+
+// recordNightly(...) -> the runner_cycles row the night wrote about itself. The parent cycle is
+// read for its `model` and for nothing else: the nightly pass calls no model, so copying the
+// parent's is the only honest answer to a NOT NULL column (`model` is non-null on all 446 rows).
+// Reading it also proves the cycle id addresses a real row before a second row is written against
+// it -- a nightly row attributed to a cycle that does not exist is worse than no row.
+async function recordNightly(base, key, { cycleId, startedAt, line, applied, judged }) {
+  const parent = await rest(base, key, `runner_cycles?id=eq.${cycleId}&select=model`, {}, "record cycle");
+  if (!Array.isArray(parent) || parent.length !== 1) {
+    fail(`record cycle: parent cycle ${cycleId} not found`);
+  }
+  const rows = await rest(base, key, "runner_cycles", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      started_at: startedAt,
+      ended_at: new Date().toISOString(),
+      stamp: `session ticket-owner (in cycle ${cycleId})`,
+      trigger: "scheduled",
+      model: parent[0].model,
+      outcome: "shipped",
+      item_id: null,
+      notes: nightlyNotes(line, applied, judged),
+    }),
+  }, "record cycle");
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) fail("record cycle: the POST returned no row");
+  return row;
+}
+
+// --- the judgment pass, CLI (slice 4) ----------------------------------------------------------
+
+function creds() {
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!base) fail("SUPABASE_URL is not set — the live census reads the board over REST.");
+  if (!key) fail("SUPABASE_SERVICE_KEY is not set — the live census reads the board over REST.");
+  return { base, key };
+}
+
+// PASS ONE. Its whole product is a state file, a prompt on stdout and exit 3. Every step below runs
+// in this order and no other, and the ORDER is the point: the cheapest refusal comes first, so a
+// run that cannot be judged costs one indexed read instead of a whole board.
+async function judgePassOne({ nightly, cycleId, stateFile }) {
+  const { base, key } = creds();
+  const startedAt = new Date().toISOString();
+
+  // The nightly precondition, unchanged: step 4e fires this on every cycle of the day and lets the
+  // script answer. A night already judged must not be re-read, let alone re-prompted.
+  if (nightly !== undefined) {
+    const prev = await rest(base, key,
+      "runner_cycles?select=id,ended_at&notes=like." + encodeURIComponent(NIGHTLY_PREFIX + "%") +
+      "&ended_at=not.is.null&order=ended_at.desc&limit=1");
+    if (!Array.isArray(prev)) fail("the nightly precondition read came back non-array — refusing to run a second pass on an unknown night");
+    if (prev[0] && sameChicagoDay(prev[0].ended_at, startedAt)) {
+      process.stdout.write(`ticket-owner nightly: already run today (America/Chicago) — cycle ${prev[0].id} ended ${prev[0].ended_at}; board not read, nothing written\n`);
+      process.exit(0);
+    }
+  }
+
+  // THE GATE, and it is deliberately BEFORE the board read. This half of AGT-79 shipped ahead of
+  // its seed, so the honest behaviour without the seed is not a crash mid-assembly -- it is a
+  // refusal that names the one file John has to apply, having touched nothing. One row in one table
+  // is the switch; no line of this file changes on the day it lands.
+  const cap = await rest(base, key, `capabilities?slug=eq.${JUDGE_CAPABILITY}&tenant_id=eq.${JUDGE_TENANT}&select=slug&limit=1`);
+  if (!Array.isArray(cap)) fail("the capability gate read came back non-array");
+  if (cap.length === 0) {
+    fail(`--judge: capabilities has no ${JUDGE_CAPABILITY} row — apply docs/design/agt-79-ticket-owner-seed.sql (John's word, .claude/rules/agent-roster-inert.md); board not read, nothing written`);
+  }
+
+  // Byte-identical to the census path: the judged night must be judging the same numbers an
+  // unjudged one would have reported.
+  const now = new Date().toISOString();
+  const rate = await readRate(base, key);
+  const board = await readBoard(base, key, now);
+  let result;
+  try {
+    result = classifyBoard(board, { now, rate });
+  } catch (e) {
+    fail(e.message);
+  }
+  const out = {
+    measured_at: now,
+    rate,
+    fences: FENCES,
+    counts: result.counts,
+    backlog: result.backlog,
+    findings: result.findings,
+  };
+  const prior = await readAll(base, key, "ticket_owner_findings",
+    "ticket_owner_findings?select=id,backlog_id,check_slug,first_seen_at&cleared_at=is.null&order=id", 10000);
+
+  // THE EXECUTOR'S OWN ASSEMBLY. `intent_slug` is passed explicitly and never omitted: db-assembly
+  // filters out EVERY Intent-type Skill when it is null (AA-188), so the prompt would assemble,
+  // render, and carry no schema at all -- and an answer that cannot be validated must not be asked
+  // for. An intent that did not load is a stop, never a warning (AA-108).
+  let assembly;
+  try {
+    assembly = await assemblePrompt({
+      capability_slug: JUDGE_CAPABILITY,
+      agent_id: JUDGE_AGENT,
+      tenant_id: JUDGE_TENANT,
+      intent_slug: JUDGE_INTENT,
+      task_context: judgeTask(out, prior, now),
+    });
+  } catch (e) {
+    fail(`the ${JUDGE_CAPABILITY} assembly failed: ${e.message}`);
+  }
+  if (!assembly.agent_card) fail(`no agents row for ${JUDGE_AGENT} — the seed is half applied`);
+
+  const { system_prompt, omitted } = renderAssembly(assembly);
+  if (omitted && omitted.length) {
+    process.stderr.write(`ticket-owner judge: sections omitted (empty at assembly time): ${omitted.join(", ")}\n`);
+  }
+  if (!system_prompt) fail(`${JUDGE_CAPABILITY} assembled zero renderable sections`);
+  const schema = assembly.format_contract?.schema;
+  if (!schema) fail(`the assembly carried no format contract for ${JUDGE_INTENT} — refusing to print a prompt whose answer could not be validated`);
+  const model = assembly.llm?.model;
+  if (!model) fail("the assembly names no model");
+
+  // The state IS the contract between the two invocations: pass two validates against this schema,
+  // merges into this census, and plans against this prior and these ids. Nothing is re-read.
+  const state = {
+    version: 1,
+    started_at: startedAt,
+    cycle_id: cycleId,
+    nightly: nightly !== undefined,
+    capability: JUDGE_CAPABILITY,
+    intent: JUDGE_INTENT,
+    agent: JUDGE_AGENT,
+    model,
+    schema,
+    now,
+    rate,
+    window: chicagoDay(now),
+    census: out,
+    prior,
+    items: (board.items ?? []).map(i => ({ id: i.id, backlog_id: i.backlog_id })),
+  };
+  try {
+    fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), "utf8");
+  } catch (e) {
+    fail(`could not write the judge state to ${stateFile}: ${e.message}`);
+  }
+
+  // stdout is the prompt and NOTHING else, so the caller can pipe it straight to a sub-agent.
+  process.stdout.write(system_prompt.endsWith("\n") ? system_prompt : `${system_prompt}\n`);
+  process.stderr.write(`ticket-owner judge: pass one complete — ${result.counts.rows} rows · ${result.counts.derivable} derivable · ${result.counts.judgment} judgment · model ${model}\n`);
+  process.stderr.write(`ticket-owner judge: state written to ${stateFile}\n`);
+  process.stderr.write(`ticket-owner judge: run the prompt above as a ${JUDGE_AGENT} sub-agent on the judgment lane, save its JSON, then re-run with --answer=<that file>\n`);
+  process.exit(EXIT_AWAITING_ANSWER);
+}
+
+// PASS TWO. Refuse, or write -- there is no third outcome and nothing partial.
+async function judgePassTwo({ argv, nightly, cycleId, answerArg, stateFile, dryRun }) {
+  if (!fs.existsSync(stateFile)) fail(`no state file at ${stateFile} — run pass one first (without --answer)`);
+  let state;
+  try {
+    state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  } catch (e) {
+    fail(`state file ${stateFile} is not readable JSON: ${e.message}`);
+  }
+  const answerPath = path.resolve(process.cwd(), answerArg);
+  let answer;
+  try {
+    answer = JSON.parse(fs.readFileSync(answerPath, "utf8"));
+  } catch (e) {
+    fail(`--answer file ${answerArg} is not readable JSON: ${e.message}`);
+  }
+
+  const { errors, result, judged } = ingestJudgment(answer, state);
+  if (errors.length) {
+    // REFUSED, not written -- and every problem is listed, because an operator fixing one of five
+    // and re-running to find the next is how a night gets spent on a file.
+    process.stderr.write(`ticket-owner: the judgment was REFUSED and nothing was written:\n${errors.map(e => `  - ${e}`).join("\n")}\n`);
+    process.exit(2);
+  }
+
+  let plan;
+  try {
+    plan = planWrites(result, state.prior, state.items, { rate: state.rate, judged });
+  } catch (e) {
+    fail(e.message);
+  }
+
+  // --dry-run is the whole two-pass merge with the writer removed: no credentials are read and no
+  // request leaves the process, which is what lets the regression suite drive it in a clean checkout.
+  if (dryRun !== undefined) {
+    process.stdout.write(JSON.stringify({
+      ok: true,
+      dry_run: true,
+      confirmed: judged.confirmed,
+      refused: judged.refused,
+      unconfirmed: judged.unconfirmed,
+      fixes: plan.fixes.length,
+      proposed: plan.proposals.length,
+      insert: plan.ledger.insert.length,
+      reseen: plan.ledger.reseen.length,
+      clear: plan.ledger.clear.length,
+    }) + "\n");
+    process.exit(0);
+  }
+
+  const { base, key } = creds();
+  if (cycleId !== state.cycle_id) {
+    fail(`--cycle-id ${cycleId} is not the state's ${state.cycle_id} — a judgment is about one night`);
+  }
+
+  // THE LOG ROW FIRST, and a non-zero exit stops the run before a single cell moves (§19k: log
+  // before any write). The row is mandatory, not a courtesy -- no executor call happens on this
+  // path, so without it the sub-agent's turn is invisible to the AI Audit. Ordering it first is
+  // what makes "the audit row failed" a refusal rather than an apology after the board changed.
+  const t = tokensFrom(answer);
+  const logged = spawnSync(process.execPath, [
+    path.join(ROOT, "scripts", "agent-log.js"),
+    `--agent=${JUDGE_AGENT}`, `--capability=${JUDGE_CAPABILITY}`, `--model=${state.model}`,
+    `--ai-type=${JUDGE_CAPABILITY}`, `--feature=${JUDGE_CAPABILITY}:${JUDGE_INTENT}:depth0`,
+    `--input-tokens=${t.input ?? 0}`, `--output-tokens=${t.output ?? 0}`,
+    `--cycle=${cycleId}`, "--json",
+  ], { encoding: "utf8" });
+  if (logged.status !== 0) {
+    fail(`agent-log.js refused the row (exit ${logged.status}): ${String(logged.stderr ?? "").slice(0, 400)} — nothing written`);
+  }
+  let loggedId = null;
+  try {
+    loggedId = JSON.parse(logged.stdout).id;
+  } catch {
+    loggedId = null;
+  }
+
+  const applied = await applyPlan(base, key, plan, { cycleId, now: state.now, judged, prior: state.prior });
+
+  const out = {
+    measured_at: state.now,
+    rate: state.rate,
+    fences: FENCES,
+    counts: result.counts,
+    backlog: result.backlog,
+    findings: result.findings,
+    apply: applied,
+  };
+  if (nightly !== undefined) {
+    const row = await recordNightly(base, key, {
+      cycleId, startedAt: state.started_at, line: censusLine(result), applied, judged,
+    });
+    out.nightly = { cycle: row.id, notes: row.notes };
+  }
+  out.judge = {
+    confirmed: judged.confirmed,
+    refused: judged.refused,
+    unconfirmed: judged.unconfirmed,
+    sentences: judged.sentences,
+    model: judged.model,
+    logged_id: loggedId,
+    report: judged.report,
+  };
+
+  writeOutFile(argv, out);
+  if (arg(argv, "json") !== undefined) {
+    process.stdout.write(JSON.stringify(out) + "\n");
+  } else {
+    let text = renderCensus(result, state.now);
+    text += applyLine(applied);
+    text += `ticket-owner judge: confirmed ${judged.confirmed} · refused ${judged.refused} · unconfirmed ${judged.unconfirmed}` +
+      ` · sentences ${judged.sentences} · model ${judged.model} · log ${loggedId}` +
+      (t.total === null ? " · tokens unreported" : "") + "\n";
+    // The report VERBATIM. It is the night's own words about the board, and paraphrasing it here
+    // would make what John reads different from what the capability actually said.
+    text += judged.report.endsWith("\n") ? judged.report : `${judged.report}\n`;
+    if (out.nightly) text += `ticket-owner nightly: cycle ${out.nightly.cycle} recorded\n`;
+    process.stdout.write(text);
+  }
+  process.exit(0);
+}
+
+// One apply line, two callers (the census path and the judgment path) -- the reversal SQL is
+// printed ready to paste, because a write pass whose undo has to be reconstructed from
+// documentation is not reversible in practice.
+function applyLine(applied) {
+  if (!applied) return "";
+  const head = `ticket-owner apply: fixed ${applied.fixed}` +
+    (applied.proposed > 0 ? ` · proposed ${applied.proposed}` : "") +
+    ` · findings +${applied.inserted} ~${applied.reseen} −${applied.cleared}`;
+  return applied.decision
+    ? `${head} · decision ${applied.decision} — reversible until ${applied.expires_at}: select public.reverse_decision('${applied.decision}','John','<why>');\n`
+    : `${head} · no decision (nothing to fix)\n`;
+}
+
+function writeOutFile(argv, out) {
+  const outPath = arg(argv, "out");
+  if (outPath === undefined) return;
+  if (outPath === true) fail("--out needs a path: --out=<json>.");
+  const dest = path.resolve(process.cwd(), String(outPath));
+  try {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, JSON.stringify(out, null, 2) + "\n", "utf8");
+  } catch (e) {
+    fail(`could not write --out=${outPath}: ${e.message}`);
+  }
+}
+
+function arg(argv, name) {
+  const hit = argv.find(a => a === `--${name}` || a.startsWith(`--${name}=`));
+  if (hit === undefined) return undefined;
+  return hit.includes("=") ? hit.slice(hit.indexOf("=") + 1) : true;
+}
+
+async function main() {
+  const argv = process.argv.slice(2);
+  for (const a of argv) {
+    const name = a.replace(/^--/, "").split("=")[0];
+    if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
+      fail(`unknown flag ${a} — this script takes --census, --board=<json>, --apply, --nightly, --cycle-id=<uuid>, --judge, --answer=<json>, --state-file=<path>, --dry-run, --out=<json> and --json.`);
+    }
+  }
+
+  const boardArg = arg(argv, "board");
+  const census = arg(argv, "census");
+  // The judgment pass's four flags. Three of them are meaningless on their own, and a flag that is
+  // silently ignored is how a run does something other than what its command line says.
+  const judge = arg(argv, "judge");
+  const answerArg = arg(argv, "answer");
+  const stateFileArg = arg(argv, "state-file");
+  const dryRun = arg(argv, "dry-run");
+  if (judge === undefined && (answerArg !== undefined || stateFileArg !== undefined || dryRun !== undefined)) {
+    fail("--answer/--state-file/--dry-run belong to --judge.");
+  }
+  if (dryRun !== undefined && answerArg === undefined) {
+    fail("--dry-run belongs to --judge --answer=<json> — pass one always writes its state and prints its prompt.");
+  }
+  // --nightly IS --census --apply, plus the once-a-night precondition and the cycle row. It is
+  // folded in here rather than at the source checks so that --nightly --board still lands on the
+  // apply gate's `never written` refusal instead of a confusing "two different sources".
+  const nightly = arg(argv, "nightly");
+  if (boardArg === undefined && census === undefined && nightly === undefined && judge === undefined) {
+    fail("nothing to do: pass --census (live) or --board=<json> (fixture).");
+  }
+  if (boardArg !== undefined && census !== undefined) {
+    fail("--census and --board are two different sources; pass one.");
+  }
+
+  // --apply is gated twice, and both gates are about attribution rather than convenience. A
+  // fixture board holds ids that do not address live rows, so writing from one is never right;
+  // and a write with no cycle is a change nobody can trace back to the run that made it.
+  // --judge writes exactly as --apply does, so it reads the SAME two gates rather than a second
+  // copy of them. The one carve-out is `--answer --dry-run`: it reads two files, talks to nothing,
+  // and writes nothing at all, so requiring a cycle id there would gate a pure computation.
+  const judgeIsDry = judge !== undefined && answerArg !== undefined && dryRun !== undefined;
+  const applyArg = (nightly !== undefined || judge !== undefined) ? true : arg(argv, "apply");
+  const cycleId = arg(argv, "cycle-id");
+  if (applyArg !== undefined && !judgeIsDry) {
+    if (boardArg !== undefined) fail("--apply writes the live board; a --board fixture is never written.");
+    if (typeof cycleId !== "string" || cycleId.length !== 36) {
+      fail("--apply/--nightly needs --cycle-id=<uuid> — every write is attributed to a cycle.");
+    }
+  }
+
+  if (judge !== undefined) {
+    const stateFile = (stateFileArg !== undefined && stateFileArg !== true)
+      ? path.resolve(process.cwd(), String(stateFileArg))
+      : statePathFor(os.tmpdir(), cycleId);
+    if (answerArg !== undefined) {
+      if (answerArg === true) fail("--answer needs a path: --answer=<json>.");
+      return judgePassTwo({ argv, nightly, cycleId, answerArg: String(answerArg), stateFile, dryRun });
+    }
+    return judgePassOne({ nightly, cycleId, stateFile });
+  }
+
+  let board, now, rate, base, key, startedAt = null;
+  if (boardArg !== undefined) {
+    // Fixture mode: no credentials are read at all, so a machine without them can still run the
+    // census over a board. The fixture's own `now` and `rate` win -- a fixture whose clock came
+    // from the wall would classify differently on different nights, which is not a fixture.
+    if (boardArg === true) fail("--board needs a path: --board=<json>.");
+    const file = path.resolve(ROOT, String(boardArg));
+    let parsed;
+    try {
+      parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (e) {
+      fail(`could not read --board=${boardArg}: ${e.message}`);
+    }
+    if (!parsed || typeof parsed !== "object" || !parsed.board) fail(`--board=${boardArg} is not a board fixture: expected {now, rate, board}.`);
+    board = parsed.board;
+    now = parsed.now;
+    rate = parsed.rate;
+  } else {
+    base = process.env.SUPABASE_URL;
+    key = process.env.SUPABASE_SERVICE_KEY;
+    if (!base) fail("SUPABASE_URL is not set — the live census reads the board over REST.");
+    if (!key) fail("SUPABASE_SERVICE_KEY is not set — the live census reads the board over REST.");
+
+    // THE PRECONDITION IS THE COMMAND. Step 4e fires this on every cycle of the day and lets the
+    // script answer; the newest row this pass wrote is the only record of whether tonight is done.
+    // It runs before readRate and before readBoard, so a second cycle on the same Chicago night
+    // costs one indexed read and touches nothing at all.
+    if (nightly !== undefined) {
+      startedAt = new Date().toISOString();
+      const prev = await rest(base, key,
+        "runner_cycles?select=id,ended_at&notes=like." + encodeURIComponent(NIGHTLY_PREFIX + "%") +
+        "&ended_at=not.is.null&order=ended_at.desc&limit=1");
+      if (!Array.isArray(prev)) fail("the nightly precondition read came back non-array — refusing to run a second pass on an unknown night");
+      if (prev[0] && sameChicagoDay(prev[0].ended_at, startedAt)) {
+        process.stdout.write(`ticket-owner nightly: already run today (America/Chicago) — cycle ${prev[0].id} ended ${prev[0].ended_at}; board not read, nothing written\n`);
+        process.exit(0);
+      }
+    }
+
+    now = new Date().toISOString();
+    rate = await readRate(base, key);
+    board = await readBoard(base, key, now);
+  }
+
+  let result;
+  try {
+    result = classifyBoard(board, { now, rate });
+  } catch (e) {
+    fail(e.message);
+  }
+
+  const out = {
+    measured_at: now,
+    rate,
+    fences: FENCES,
+    counts: result.counts,
+    backlog: result.backlog,
+    findings: result.findings,
+  };
+
+  // The write pass. Everything above this line is byte-identical to a read-only night; without
+  // --apply nothing below runs, so the census output never depends on whether writing was armed.
+  let applied = null;
+  if (applyArg !== undefined) {
+    const prior = await readAll(base, key, "ticket_owner_findings",
+      // AGT-131 -- first_seen_at joins the projection: step 6's raise reports the age of the
+      // oldest open row per check, and a read that omitted it would report tonight for all of them.
+      "ticket_owner_findings?select=id,backlog_id,check_slug,first_seen_at&cleared_at=is.null&order=id", 10000);
+    let plan;
+    try {
+      plan = planWrites(result, prior, board.items, { rate });
+    } catch (e) {
+      fail(e.message);
+    }
+    applied = await applyPlan(base, key, plan, { cycleId, now, prior });
+    out.apply = applied;
+
+    // Last, and only after the plan landed: the run records ITSELF. Writing the cycle row before
+    // the write pass would let a failed pass look like a finished night and lock the next cycle
+    // out until tomorrow -- exit 2 anywhere above this line writes no cycle row at all.
+    if (nightly !== undefined) {
+      const row = await recordNightly(base, key, { cycleId, startedAt, line: censusLine(result), applied });
+      out.nightly = { cycle: row.id, notes: row.notes };
+    }
+  }
+
+  writeOutFile(argv, out);
+
+  if (arg(argv, "json") !== undefined) {
+    process.stdout.write(JSON.stringify(out) + "\n");
+  } else {
+    let text = renderCensus(result, now);
+    text += applyLine(applied);
+    if (out.nightly) text += `ticket-owner nightly: cycle ${out.nightly.cycle} recorded\n`;
+    process.stdout.write(text);
+  }
+  process.exit(0);
+}
+
+// SES-176's contract: importing this module for its exports must never run the CLI.
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  main();
+}

@@ -1,3 +1,12 @@
+// DeepBench v7.0.212 | RunTasks.jsx | LAV-17 -- the Evidence card's fetch line names the RECORDS
+// that came back, not just how many chunks did. deriveDid()'s fetch branch reads the new `titles`
+// array on the assembly_work_complete frame (api/prompt/ai-enrichment.js emits it) and composes
+// `Fetched 3 records from the_library -- "A", "B" and 1 more.`; with no titles it returns the old
+// sentence character for character, which is what keeps roster/queryRAG fetches and every replayed
+// pre-v7.0.212 trace rendering exactly as before. The COUNT is deliberately kept: titles are a
+// capped sample (EVIDENCE_TITLE_CAP = 3 in api/), and a build that dropped matchCount would make
+// three names read as the whole result set. Guarded by
+// tests/regression/LAV-17-evidence-record-titles.js.
 // DeepBench v7.0.54 | RunTasks.jsx | LAV-21a -- `deriveAsked` / `deriveDid` / `deriveContent` go
 // from module-private to exported, and nothing else changes: no derivation body, no RUN_TASK_KIND
 // entry, no buildRunTaskEntries logic, no render JSX. LAV-21's Assembly view folds the SAME composed
@@ -63,6 +72,11 @@ export const RUN_TASK_KIND = {
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const countOf = (v) => (Array.isArray(v) ? v.length : null);
 const text = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
+// FEATURE: LAV-17 -- "A", "A and B", "A, B and C". Used only where the whole list is shown; a
+// list the cap held back reads "and N more" instead, composed at its own call site so the two
+// endings can never be confused for one another.
+const joinAnd = (parts) =>
+  parts.length <= 1 ? (parts[0] || "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 
 // "Run Assembly · 3 events" -- the live count lives IN the header, matching the Agent Routing
 // panel's own "Agent Routing · {n} hop{s}" treatment (LiveAgentViewScreen.jsx ~L444), which is why
@@ -227,6 +241,22 @@ export function deriveDid(evt, byId) {
       if (d.work === "fetch") {
         const src = text(d.source);
         const from = src ? ` from ${src}` : "";
+        // FEATURE: LAV-17 -- name the records when the frame carries them. The count STAYS: it is
+        // the measured fact and the titles are a capped sample, so dropping it would make a
+        // three-name list read as the whole result set. `and N more` is computed from matchCount
+        // against the names actually shown, never from a second count.
+        // The fall-through below is load-bearing, not a guard for tidiness: `roster`, queryRAG,
+        // any direct lookup, and every frame emitted before v7.0.212 carry no `titles`, and a
+        // stored trace replayed today must still render the sentence it rendered then.
+        const names = Array.isArray(d.titles)
+          ? d.titles.map(t => text(t)).filter(Boolean)
+          : [];
+        if (names.length && d.matchCount != null) {
+          const held = d.matchCount - names.length;
+          const shown = names.map(n => `"${n}"`);
+          const tail = held > 0 ? `${shown.join(", ")} and ${held} more` : joinAnd(shown);
+          return `Fetched ${plural(d.matchCount, "record")}${from} — ${tail}.`;
+        }
         return d.matchCount != null
           ? `Fetched ${plural(d.matchCount, "chunk")}${from}.`
           : `Fetched supporting material${from}.`;

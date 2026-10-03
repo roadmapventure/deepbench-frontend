@@ -1,3 +1,9 @@
+// DeepBench v7.0.224 | tests/regression/CHI-31-source-simulation-consistency.js | SES-180 (b) --
+// the credential-absence path DECLARES its not-run half via notRun() instead of a console.log the
+// harness could not see. Same text, same placement, same early return; what changes is that the
+// suite now reports the gap instead of counting this partial run toward "50/50 passed".
+// DeepBench v7.0.221 | tests/regression/CHI-31-source-simulation-consistency.js | SES-92 -- the
+// credential-absence path SKIPs loudly instead of FAILing, mirroring AGT-44/DAT-003/DAT-11/DAT-12.
 // DeepBench v6.3.208 | tests/regression/CHI-31-source-simulation-consistency.js | CHI-31
 // FEATURE: CHI-31 -- Category M persistent regression test (SES-009a standing rule).
 //
@@ -20,7 +26,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { T } from "../../src/tokens.js";
-import { selfRun } from "./_lib/self-run.js";
+import { selfRun, notRun } from "./_lib/self-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../../.env.local") });
@@ -74,7 +80,31 @@ export default async function run() {
   // pre-existing rules they sit alongside must still be intact (no accidental overwrite).
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  assert.ok(supabaseUrl && supabaseKey, "SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured (.env.local) to verify Skill Profile text");
+  // SES-92 (v7.0.221): credential absence is an ENVIRONMENT GAP, not a regression, and this test
+  // was the only one in the suite that reported it as FAIL -- identical, from the outside, to a
+  // real missing CHI-31 clause. Measured in a cloud clone 2026-08-24: 49/50 with this the sole
+  // failure, while AGT-44, DAT-003, DAT-11 and DAT-12 all skipped loudly in the same run. It
+  // matters because every Automated cycle and every CI run starts with no .env.local, and a suite
+  // that is permanently one-red cannot gate anything (SES-180 had to ship CI with the suite
+  // non-blocking for exactly this reason).
+  //
+  // THE SKIP MUST STAY EXACTLY HERE -- below every source-parsed assertion and above the first
+  // credentialed one. One line higher and it swallows the describeDataType() halves; anywhere
+  // below, a real content mismatch still FAILS, which is the behaviour being preserved, not
+  // traded away. FAIL is reserved for an actual mismatch.
+  if (!supabaseUrl || !supabaseKey) {
+    // SES-180 (b), v7.0.224: this was a bare console.log, which the harness could not see -- so
+    // the suite counted this partial run as a full PASS. notRun() is the DECLARATION run-all.js
+    // reads; the text is unchanged and so is the early return. The test still PASSES, because the
+    // describeDataType() halves above genuinely did.
+    notRun("Skill Profile half",
+      "no SUPABASE_URL / SUPABASE_SERVICE_KEY in env " +
+      "(run with `node --env-file=.env.local tests/regression/run-all.js` to include it). " +
+      "The describeDataType() halves above DID run, but this half is unverified: a green suite " +
+      "without it does NOT prove ci-answer-intent and qg-review-intent still carry their CHI-31 " +
+      "method clauses.");
+    return;
+  }
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
 
   const res = await fetch(

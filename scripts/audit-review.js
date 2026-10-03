@@ -1,0 +1,680 @@
+// DeepBench v7.0.743 | scripts/audit-review.js | AGT-309 -- THE PROCESS-BREAK CLASS REACHES THE
+// ROUTER. A `root-cause` group may now carry two more keys: `need_source` (the text `who:table:id`,
+// normally `john:runner_decisions:<id>`) and `home` (the executing `projects.slug` that accepts
+// findings the ticket should end up on). THEY DO NOT MOVE ANYTHING AND THEY ARE NOT A ROUTE: the
+// ticket still files to the list its route picked, apply_audit_review() ignores both keys entirely,
+// and the only thing that moves a ticket into an executing project is apply_requirement_verdict()
+// on Victoria's `pass` (AGT-309's requirement_gate clause refuses every other path). What they do is
+// carry the manager's PROPOSAL forward: --apply prints one `next:` line per such group, the
+// requirement-check prepare command with the ticket the function actually filed, so the manager
+// cannot overrule her and cannot be ignored either. validateReview() refuses one key without the
+// other, a `home` that is not an executing project that accepts findings, and either key on any
+// kind but root-cause -- offline, before an --apply is spent.
+//
+// DeepBench v7.0.692 | scripts/audit-review.js | AGT-264 -- AGENT TRAINING ACCEPTS FINDINGS. The
+// route mirror's lock reads one more column: listLocked() refuses a project whose list is locked
+// UNLESS its projects row carries `accepts_findings` true, which mirrors finding_group_epic()'s
+// `AND NOT v_acc` byte-for-byte -- the refusal SENTENCE is unchanged, only what reaches it. A
+// context row that carries no `accepts_findings` (a pre-AGT-264 fixture) stays locked, so the
+// mirror fails closed. --prepare selects the column so the manager's pick is informed by data
+// rather than memory. Spec: docs/kickoffs/v7.0.692-AGT-264-agent-training-accepts-findings.md.
+//
+// DeepBench v7.0.662 | scripts/audit-review.js | AGT-240 -- THE LOCKED LIST. KINDS gains `list` (needs a
+// reason): apply_audit_review() rules those findings `listed`, and they wait on the findings list until
+// the project finishes and propose-project.js answers them. The route mirror refuses a filing group
+// whose project is executing, proposed or done -- a project whose list is locked -- in
+// finding_group_epic()'s own sentence minus its "apply_audit_review: " prefix, once the route (or the
+// manager's pick) names the project and before the epic count the function keeps. It reads the status
+// off the context's `projects`, which --prepare already selects; a caller whose projects carry no
+// status is not refused here (the function still is). Spec: docs/kickoffs/v7.0.662-AGT-240-project-finish-line.md.
+//
+// DeepBench v7.0.661 | scripts/audit-review.js | AGT-239 -- OUTCOMES FIRST. --prepare selects each
+// finding's `family`; the default scope `outcomes` (the run tail's (7f)) drops `paperwork`, and
+// --weekly (the Auditor routine's step 4) keeps every family -- paperwork is moved to the weekly
+// review, not removed. buildTaskContext() stable-sorts the worklist by RANK (service 0, blocked 1,
+// everything else 2, input order kept within a rank), every row carries `family` and `rank`, and the
+// context carries `scope`; --apply sends that scope in p_review so apply_audit_review()'s coverage
+// rule (step 1b) asks for exactly the rows this worklist holds. A context with no scope sends none,
+// which the function reads as weekly (all). Spec: docs/kickoffs/v7.0.661-AGT-239-outcomes-first.md.
+//
+// DeepBench v7.0.609 | scripts/audit-review.js | AGT-134 -- validateReview() mirrors the one new
+// refusal apply_audit_review() gained: `needs_desktop` is the manager's "an unattended cycle must
+// not pick this straight back up" flag, and it only means something on a group that FILES a ticket
+// (a root-cause without reuse_backlog_id, or the cleanup), because that ticket is where it lands as
+// design_status 'needs-desktop'. On any other group it is refused, not dropped -- a dropped flag
+// reads as a ruling made and then ignored. A non-boolean is refused too. Both texts are the
+// function's, minus its "apply_audit_review: " prefix (the agt-86i arm R convention). No table is
+// written here. Spec: docs/kickoffs/v7.0.609-AGT-134-manager-rules-upkeep.md section 5 task 5.
+//
+// DeepBench v7.0.605 | scripts/audit-review.js | AGT-132 slice 1 -- the worklist gains a SOURCE and a
+// TYPE, and the manager is told where each ticket goes: --prepare selects found_by and finding_type,
+// every worklist row carries `source` (found_by's first segment) and `finding_type`, and the context
+// carries `routes` (public.finding_routes, precedence order) and `projects` (the slugs he may pick
+// from). routeGroup() mirrors public.finding_group_epic() exactly -- lowest precedence over the
+// group's findings, security before auditor before "you pick" -- and validateReview() refuses the
+// three routing refusals offline, in the function's words minus its "apply_audit_review: " prefix.
+// The epic-count refusal stays the function's, like the reuse_backlog_id rule: it needs the epics
+// table. Skipped entirely when a caller passes no routes, so a pre-AGT-132 context still validates.
+// Spec: docs/kickoffs/v7.0.605-AGT-132-finding-routes.md sections 4 and 5 task 3.
+//
+// DeepBench v7.0.554 | scripts/audit-review.js | AGT-86 slice 9b -- the manager ACTS on 9a's flags:
+// --prepare adds `checklist` (the au-* rows the manager may edit: EDITABLE_SLUG, each with objective and
+// method as they read today); validateReview() gains the four checklist-edit refusals of
+// apply_audit_review() in the function's place -- after the groups-non-empty check, before the per-group
+// loop -- with the same texts; --apply sends checklist_edits in p_review. The function owns the edit's
+// write and before-image under the review's one reversible decision; this file still writes no table.
+// Spec: docs/harvests/AGT-86.md sections 16.5 and 16.10; kickoff docs/kickoffs/v7.0.554-AGT-86-s9b-checklist-edits.md.
+//
+// DeepBench v7.0.553 | scripts/audit-review.js | AGT-86 slice 9a -- --prepare adds the per-check scorecard
+// (public.audit_check_scorecard) and two deterministic flags: flagChecks() marks a check 'tighten' when its
+// last three weeks hold >= 3 rulings at a false-alarm rate >= 0.5; promotableOthers() names an `other`
+// fingerprint ruled real (ticketed/escalated) in >= 3 distinct weeks. Flags only -- the manager acts in 9b.
+// Spec: docs/harvests/AGT-86.md section 16; kickoff docs/kickoffs/v7.0.553-AGT-86-s9a-check-scorecard.md.
+//
+// DeepBench v7.0.548 | scripts/audit-review.js | AGT-86 slice 2 (2b) -- the Development Manager's weekly
+// audit review, as a client of public.apply_audit_review(). Spec: docs/harvests/AGT-86.md section 9.4;
+// kickoff docs/kickoffs/v7.0.548-AGT-86-s2b-audit-review-script.md.
+//
+// Three doors, one validator:
+//   --prepare --week=<YYYY-Www> [--out=<path>]
+//       reads the open/carried audit_findings, every row's fingerprint history and the open audit-review
+//       tickets, and writes the manager's task context. Exit 3 when there is nothing to review (AGT-86 §6:
+//       no findings, no Dev Manager run, no cost).
+//   --dry-run=<answer.json> --context=<prepare.json>
+//       runs validateReview() over the manager's answer; prints ok or each refusal. Exit 0 / 1. No network.
+//   --apply=<answer.json> --context=<prepare.json> --week=<w> (--cycle-id=<uuid> | --session-name=<name>)
+//       runs the SAME validateReview() first (a refusal exits 1 and sends nothing), then POSTs
+//       rpc/apply_audit_review. The function owns the write, its before-images and its decision (§19b,
+//       §19v); this file never writes a table. It prints the reverse_decision() line for John.
+//
+// validateReview() mirrors the function's validation: the per-group rules first, coverage LAST, and the
+// same message texts (without the function's "apply_audit_review: " prefix). It collects every refusal
+// rather than stopping at the first, so a dry-run shows the manager the whole list. The one rule it cannot
+// see offline -- a reuse_backlog_id must be an open backlog row -- stays the function's.
+//
+// Exit codes: 0 ok; 1 refused / request failed; 2 could not run (missing credentials or arguments -- never a
+// pass); 3 nothing to review.
+
+import fs from "fs";
+import path from "path";
+import { pathToFileURL } from "url";
+
+// --- pure half (imported by tests/regression/agt-86b-audit-review.test.mjs; no network) --------------
+
+// The five calls that come to John -- AGT-86 section 5, verbatim.
+export const JOHN_CALLS = Object.freeze({
+  rules: "his own rules or past decisions -- the Dev Manager works inside his rules and never overrules them (docs/governance/ASKS-TO-JOHN.md A-03, A-07)",
+  money: "money -- nothing spends beyond what he approved, e.g. a paid plan upgrade or raising the daily token cap (A-25)",
+  production: "production releases -- dev to main (A-11, HR-MERGE); pattern tickets build to dev and wait for his release",
+  hiring: "hiring agents -- creating an agent or flipping agents.is_active on (A-09)",
+  switch: "switching agents or routines on and off (A-21), including this routine's own switch",
+});
+
+export const KINDS = Object.freeze(["root-cause", "cleanup", "not-a-defect", "carry", "escalate", "list"]);
+// AGT-240: a project in one of these has a locked list; finding_group_epic() refuses to file into it.
+export const LOCKED_PROJECT_STATUSES = Object.freeze(["executing", "proposed", "done"]);
+export function lockedListRefusal(slug, status) {
+  return `project ${slug} is ${status} -- its list is locked; use kind list (AGT-240)`;
+}
+// AGT-264: a locked list still refuses -- unless the project accepts findings while it runs
+// (projects.accepts_findings, true for the perpetual Agent Training project). Mirrors
+// finding_group_epic()'s `IF v_pst IN (...) AND NOT v_acc`. A home with no such field stays locked.
+export function listLocked(home) { return !!home && LOCKED_PROJECT_STATUSES.includes(home.status) && home.accepts_findings !== true; }
+
+// --- AGT-309: the process-break class's two keys on a root-cause group --------------------------
+//
+// THE SHAPE, AND ONLY THE SHAPE. `who:table:id` is what a need_source reads. Whether the cited row
+// EXISTS, and whether its `who:table` pair is allowlisted, belong to `need_source_is_traceable()`
+// and to `scripts/requirement-check.js --prepare`; re-deciding either here would be a second
+// implementation agreeing with itself (SES-45) and would drift the day John edits
+// `runner_settings.need_source_kinds`.
+export const NEED_SOURCE_SHAPE = /^[a-z]+:[a-z_]+:[^:]+$/;
+export const NEED_SOURCE_NEEDS_HOME =
+  "a root-cause group citing need_source needs home (an executing projects.slug that accepts findings)";
+export const HOME_NEEDS_NEED_SOURCE = "home needs need_source (the text who:table:id)";
+export const CLASS_KEYS_ROOT_CAUSE_ONLY = "need_source/home apply only to a root-cause group";
+export function homeNotExecutingRefusal(slug) {
+  return `home ${slug} is not an executing project that accepts findings (AGT-240)`;
+}
+// AGT-240's own condition, stated positively: this is the destination a `pass` may MOVE a ticket
+// onto. A context row carrying no `accepts_findings` fails it, so the check fails closed exactly as
+// listLocked() does.
+export function homeAccepts(row) {
+  return !!row && row.status === "executing" && row.accepts_findings === true;
+}
+
+// The `next:` lines --apply prints, pure so the test asserts the PAIRING rather than the printing.
+// WHICH TICKET A GROUP GOT is not something this file may guess: apply_audit_review() appends one id
+// to `tickets` per FILING group, in group order, so the i-th filing group takes `tickets[i]`. A
+// reuse group filed nothing and names its own ticket. A group that carries the keys but cannot be
+// paired to an id prints no line -- a `next:` command naming the wrong ticket is worse than none.
+export function nextLines(groups, tickets) {
+  const gs = Array.isArray(groups) ? groups : [];
+  const ts = Array.isArray(tickets) ? tickets : [];
+  const lines = [];
+  let filed = 0;
+  for (const g of gs) {
+    const kind = g && g.kind;
+    const reuse = g && g.reuse_backlog_id !== undefined && g.reuse_backlog_id !== null
+      ? String(g.reuse_backlog_id) : null;
+    const files = (kind === "root-cause" && reuse === null) || kind === "cleanup";
+    const id = files ? (filed < ts.length ? String(ts[filed]) : null) : reuse;
+    if (files) filed += 1;
+    if (kind !== "root-cause" || id === null) continue;
+    const ns = blank(g.need_source) ? null : String(g.need_source).trim();
+    const home = blank(g.home) ? null : String(g.home).trim();
+    if (ns === null || home === null) continue;
+    lines.push(`next: node scripts/requirement-check.js --prepare --ticket=${id} --source=${ns} --home=${home}`);
+  }
+  return lines;
+}
+export const WEEK_RE = /^\d{4}-W\d{2}$/;
+export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)";
+// AGT-86 §11(5): the checklist rows the manager may edit. au-identity and au-guardrails are John's.
+export const EDITABLE_SLUG = /^au-(behavior|knowledge-homes|[a-z-]+-intent)$/;
+// AGT-239 D4: what is broken outranks what is stuck, which outranks everything else.
+export const FAMILY_RANK = Object.freeze({ service: 0, blocked: 1 });
+export const SCOPES = Object.freeze(["outcomes", "weekly"]);
+export function rankOf(family) {
+  return Object.prototype.hasOwnProperty.call(FAMILY_RANK, family) ? FAMILY_RANK[family] : 2;
+}
+
+const blank = v => String(v ?? "").trim() === "";
+
+// AGT-131 made found_by a single writer id; AGT-132 reads its first segment as the SOURCE, exactly as
+// public.finding_group_epic() does with split_part(found_by, ':', 1).
+export function sourceOf(foundBy) {
+  const s = String(foundBy ?? "");
+  return s === "" ? null : s.split(":")[0];
+}
+
+// AGT-132: the mirror of public.finding_group_epic()'s route pick, and nothing more -- it answers WHICH
+// ROUTE a group takes, never which epic (that needs the epics table and stays the function's). The
+// group's route is the LOWEST precedence over its findings, tie-broken by source, so a group holding
+// one security finding is a Security ticket however it was grouped. A finding whose source no row maps
+// THROWS in the function's words: an unmapped source stops the review instead of falling through.
+// A finding the worklist does not carry is skipped here, as the SQL's join skips it -- the coverage
+// rule below is what refuses an unknown id, in both places.
+export function routeGroup(group, worklist, routes) {
+  const list = Array.isArray(worklist) ? worklist : [];
+  const rows = Array.isArray(routes) ? routes : [];
+  const ids = Array.isArray(group && group.finding_ids) ? group.finding_ids.map(String) : [];
+  const kind = (group && group.kind) ?? "(no kind)";
+  const candidates = [];
+  for (const id of ids) {
+    const w = list.find(x => String(x.id) === id);
+    if (w === undefined) continue;
+    const src = w.source ?? sourceOf(w.found_by);
+    const type = w.finding_type ?? null;
+    const matches = rows.filter(r => (r.source === src || r.source === "*") &&
+                                     (r.finding_type === type || r.finding_type === "*"));
+    if (matches.length === 0) {
+      throw new Error(`finding ${id} has unmapped source ${src} — add a finding_routes row; project creation is John's`);
+    }
+    candidates.push(...matches);
+  }
+  if (candidates.length === 0) throw new Error(`a ${kind} group has no known findings to route`);
+  candidates.sort((a, b) => (Number(a.precedence) - Number(b.precedence)) ||
+                            String(a.source).localeCompare(String(b.source)));
+  return candidates[0];
+}
+
+// The distinct sources of a group's findings, in the order the function's string_agg reports them.
+function sourcesOf(group, worklist) {
+  const list = Array.isArray(worklist) ? worklist : [];
+  const ids = Array.isArray(group && group.finding_ids) ? group.finding_ids.map(String) : [];
+  const srcs = new Set();
+  for (const id of ids) {
+    const w = list.find(x => String(x.id) === id);
+    if (w === undefined) continue;
+    const src = w.source ?? sourceOf(w.found_by);
+    if (src !== null && src !== undefined) srcs.add(String(src));
+  }
+  return [...srcs].sort();
+}
+
+// AGT-86 §11: view rows (one per check_slug and iso_week) -> one entry per check with >= 3 summed rulings.
+export function flagChecks(viewRows) {
+  const groups = new Map();
+  for (const r of Array.isArray(viewRows) ? viewRows : []) {
+    if (!groups.has(r.check_slug)) groups.set(r.check_slug, []);
+    groups.get(r.check_slug).push(r);
+  }
+  const out = [];
+  for (const [check_slug, rows] of groups) {
+    const total = rows.reduce((n, r) => n + (Number(r.rulings) || 0), 0);
+    if (total < 3) continue;
+    const weeks = [...rows].sort((x, y) => String(x.iso_week).localeCompare(String(y.iso_week)));
+    const latest = weeks[weeks.length - 1];
+    const flag = Number(latest.rulings_3w) >= 3 && Number(latest.false_alarm_rate_3w) >= 0.5 ? "tighten" : null;
+    out.push({ check_slug, weeks, flag });
+  }
+  return out.sort((x, y) => String(x.check_slug).localeCompare(String(y.check_slug)));
+}
+
+// AGT-86 §11: an `other` fingerprint ruled real in three distinct weeks is a candidate for a new check.
+export function promotableOthers(allRows) {
+  const byFp = new Map();
+  for (const r of Array.isArray(allRows) ? allRows : []) {
+    if (r.check_slug !== "other" || (r.status !== "ticketed" && r.status !== "escalated")) continue;
+    if (!byFp.has(r.fingerprint)) byFp.set(r.fingerprint, { weeks: new Set(), finding_ids: [] });
+    const e = byFp.get(r.fingerprint);
+    e.weeks.add(r.iso_week);
+    e.finding_ids.push(r.id);
+  }
+  const out = [];
+  for (const [fingerprint, e] of byFp) {
+    const weeks = [...e.weeks].sort();
+    if (weeks.length >= 3) out.push({ fingerprint, weeks, finding_ids: e.finding_ids, note: "promote to a new check" });
+  }
+  return out.sort((x, y) => String(x.fingerprint).localeCompare(String(y.fingerprint)));
+}
+
+export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope = "outcomes" }) {
+  // AGT-239 D3: the per-run scope leaves paperwork for the weekly review.
+  const inScope = (Array.isArray(findings) ? findings : [])
+    .filter(f => scope === "weekly" || f.family !== "paperwork");
+  if (inScope.length === 0) return null;
+  const rows = Array.isArray(allRows) ? allRows : [];
+  // AGT-239 D4: a stable sort -- Array.prototype.sort is stable, and the index tiebreak says so.
+  const ranked = inScope.map((f, i) => ({ f, i, rank: rankOf(f.family) }))
+    .sort((a, b) => (a.rank - b.rank) || (a.i - b.i));
+  const worklist = ranked.map(({ f, rank }) => {
+    const same = rows.filter(r => r.fingerprint === f.fingerprint);
+    return {
+      id: f.id,
+      fingerprint: f.fingerprint,
+      iso_week: f.iso_week,
+      kind: f.kind,
+      // AGT-132: WHO reported it and WHAT it is -- the two facts the routing reads.
+      source: sourceOf(f.found_by),
+      finding_type: f.finding_type ?? null,
+      // AGT-239: the family and its rank, so the manager reads service and blocked first.
+      family: f.family ?? null,
+      rank,
+      check_slug: f.check_slug ?? null,
+      locations: f.locations ?? null,
+      governing_fact: f.governing_fact ?? null,
+      confidence: f.confidence ?? null,
+      proposed_resolution: f.proposed_resolution ?? null,
+      weeks_seen: new Set(same.map(r => r.iso_week)).size,
+      prior_rulings: same
+        .filter(r => r.ruled_by !== null && r.ruled_by !== undefined)
+        .map(r => ({ iso_week: r.iso_week, status: r.status, ruling: r.ruling, ruled_by: r.ruled_by })),
+    };
+  });
+  return {
+    week,
+    scope,
+    worklist,
+    // AGT-132: the routing table as data and the projects he may pick from -- the manager is never
+    // asked to remember either, and never invents a project (creating one is John's).
+    routes: Array.isArray(routes) ? routes : [],
+    projects: Array.isArray(projects) ? projects : [],
+    open_audit_tickets: (Array.isArray(tickets) ? tickets : []).map(t => ({
+      backlog_id: t.backlog_id, title: t.title, status: t.status, description: t.description,
+    })),
+    john_calls: { ...JOHN_CALLS },
+    scorecard: (() => {
+      const checks = flagChecks(scorecardRows ?? []);
+      return { checks, tighten: checks.filter(c => c.flag === "tighten").map(c => c.check_slug) };
+    })(),
+    promotions: promotableOthers(rows),
+    checklist: (Array.isArray(profiles) ? profiles : [])
+      .filter(p => EDITABLE_SLUG.test(String(p.slug ?? "")))
+      .map(p => ({ skill_slug: p.slug, objective: p.objective, method: p.method })),
+  };
+}
+
+// review = the manager's { groups, summary_for_john, patterns_applied, checklist_edits? }; worklist = the
+// context's worklist. week is optional: when given it is checked first, as the function checks p_week first.
+// checklist is optional (the context's checklist): when given, an edit naming no row in it is refused, as
+// the function refuses an edit naming no skill_profiles row; offline without it that rule stays the function's.
+// routes / projects are optional (the context's): with them, the three AGT-132 routing refusals a
+// client CAN see offline are checked in the function's place -- inside the per-group loop, after that
+// kind's field checks, for exactly the two kinds that file a ticket. Without routes the whole block is
+// skipped, so a context written before AGT-132 validates as it always did.
+export function validateReview(review, worklist, week, checklist, routes, projects) {
+  const refusals = [];
+  if (week !== undefined && (week === null || !WEEK_RE.test(String(week)))) {
+    refusals.push(`p_week ${week} is not an ISO week (YYYY-Www)`);
+  }
+  const groups = review && review.groups;
+  if (!Array.isArray(groups) || groups.length === 0) {
+    refusals.push("p_review.groups must be a non-empty array");
+    return { ok: false, refusals };
+  }
+  // 1e. checklist edits (slice 9b), in the function's place: after the groups check, before the group loop.
+  const edits = review.checklist_edits;
+  if (edits !== undefined && edits !== null) {
+    if (!Array.isArray(edits)) {
+      refusals.push("checklist_edits must be an array");
+    } else {
+      const known = Array.isArray(checklist) ? new Set(checklist.map(c => String(c.skill_slug))) : null;
+      for (const e of edits) {
+        const slug = e && typeof e === "object" ? e.skill_slug : undefined;
+        const field = e && typeof e === "object" ? e.field : undefined;
+        const shown = slug === undefined || slug === null ? "<NULL>" : String(slug);
+        if (!EDITABLE_SLUG.test(String(slug ?? ""))) {
+          refusals.push(`checklist edit to ${shown} refused: only au-behavior, au-knowledge-homes and au-*-intent rows are the manager's; au-identity and au-guardrails are John's (AGT-86 section 11(5))`);
+        } else if (known && !known.has(String(slug))) {
+          refusals.push(`checklist edit names no skill_profiles row ${shown}`);
+        } else if (field !== "method" && field !== "objective") {
+          refusals.push(`checklist edit field ${field === undefined || field === null ? "<NULL>" : field} must be method or objective`);
+        } else if (blank(e.new_text) || blank(e.reason)) {
+          refusals.push(`checklist edit to ${shown} needs new_text and reason`);
+        }
+      }
+    }
+  }
+
+  const list = Array.isArray(worklist) ? worklist : [];
+  const seenWeeks = new Map(list.map(w => [String(w.id), Number(w.weeks_seen) || 0]));
+  const idsOf = g => (Array.isArray(g && g.finding_ids) ? g.finding_ids.map(String) : []);
+
+  // 1a. per-group content rules, in the function's order.
+  let cleanups = 0;
+  for (const g of groups) {
+    const kind = g && g.kind;
+    if (!KINDS.includes(kind)) {
+      refusals.push(`group kind ${kind ?? "<NULL>"} is not one of root-cause, cleanup, not-a-defect, carry, escalate, list`);
+      continue;
+    }
+    if (idsOf(g).length === 0) refusals.push(`a ${kind} group has no finding_ids`);
+    if (kind === "carry") {
+      if (blank(g.reason)) refusals.push("carry needs a reason");
+      for (const id of idsOf(g)) {
+        const n = seenWeeks.get(id);
+        if (n !== undefined && n >= 3) refusals.push(`finding ${id} has weeks_seen = ${n} and may not be carried again`);
+      }
+    } else if (kind === "not-a-defect") {
+      if (blank(g.reason)) refusals.push("not-a-defect needs a reason");
+    } else if (kind === "list") {
+      // AGT-240 D3: the finding waits on the findings list; the reason is its ruling.
+      if (blank(g.reason)) refusals.push("list needs a reason");
+    } else if (kind === "escalate") {
+      if (!Object.keys(JOHN_CALLS).includes(g.john_call ?? "") || blank(g.summary)) {
+        refusals.push("escalate needs john_call (rules, money, production, hiring, switch) and summary");
+      }
+    } else if (kind === "root-cause") {
+      if ((g.reuse_backlog_id === undefined || g.reuse_backlog_id === null) &&
+          (blank(g.title) || blank(g.root_cause) || blank(g.fix))) {
+        refusals.push("root-cause needs title, root_cause and fix, or reuse_backlog_id");
+      }
+    } else if (kind === "cleanup") {
+      cleanups += 1;
+      if (cleanups > 1) refusals.push("at most one cleanup group");
+      if (blank(g.fix)) refusals.push("cleanup needs fix (the bundled list)");
+    }
+
+    // 1a (AGT-132), the function's own condition: the two kinds that file a ticket need a route.
+    const files = (kind === "root-cause" && (g.reuse_backlog_id === undefined || g.reuse_backlog_id === null)) ||
+                  kind === "cleanup";
+
+    // 1a (AGT-134), in the function's place and with the function's texts minus the
+    // `apply_audit_review: ` prefix (the agt-86i arm R convention). needs_desktop asks for
+    // design_status 'needs-desktop' on the ticket this group files; on a group that files none
+    // there is nothing to write it to, so it is REFUSED rather than dropped. Only a boolean is a
+    // ruling -- `"yes"` is a typo the manager should see, not a truthy value to act on.
+    if (g && typeof g === "object" && Object.prototype.hasOwnProperty.call(g, "needs_desktop") &&
+        g.needs_desktop !== null) {
+      if (typeof g.needs_desktop !== "boolean") {
+        refusals.push("needs_desktop must be a boolean");
+      } else if (g.needs_desktop && !files) {
+        refusals.push("needs_desktop applies only to a group that files a ticket");
+      }
+    }
+    // 1a (AGT-309): the two keys of the process-break class, in group order and entirely OFFLINE.
+    // Every fact they need -- the shape of the citation, whether both keys are present, and the
+    // destination's own `projects` row -- is already in the context, so none of them is worth an
+    // --apply to discover. NEITHER KEY ROUTES ANYTHING: this group still files wherever its route
+    // says, and the keys only carry the manager's proposal forward as the `next:` line below.
+    const classNS = g && typeof g === "object" && !blank(g.need_source) ? String(g.need_source).trim() : null;
+    const classHome = g && typeof g === "object" && !blank(g.home) ? String(g.home).trim() : null;
+    if (classNS !== null || classHome !== null) {
+      if (kind !== "root-cause") {
+        // The class is about a ticket, and only a root-cause group has one (filed or reused). On any
+        // other kind the keys are REFUSED rather than dropped -- the AGT-134 needs_desktop rule, same
+        // reason: a dropped key reads as a ruling made and then ignored.
+        refusals.push(CLASS_KEYS_ROOT_CAUSE_ONLY);
+      } else {
+        // One without the other is never a ruling: a need with no destination cannot be acted on,
+        // and a destination with no need is the hand-set source AGT-309's gate clause exists to stop.
+        if (classNS !== null && classHome === null) refusals.push(NEED_SOURCE_NEEDS_HOME);
+        else if (classHome !== null && (classNS === null || !NEED_SOURCE_SHAPE.test(classNS))) {
+          refusals.push(HOME_NEEDS_NEED_SOURCE);
+        }
+        if (classHome !== null && Array.isArray(projects) &&
+            !homeAccepts(projects.find(pr => String(pr.slug) === classHome))) {
+          refusals.push(homeNotExecutingRefusal(classHome));
+        }
+      }
+    }
+
+    if (Array.isArray(routes) && files) {
+      let route = null;
+      try {
+        route = routeGroup(g, list, routes);
+      } catch (e) {
+        refusals.push(e.message);
+      }
+      let slug = null;   // AGT-240: the project this group would file into, once known
+      if (route !== null && (route.project_slug === null || route.project_slug === undefined)) {
+        // The route says the manager picks, so his pick must be explicit and must be a project that
+        // exists. An omission is never read as "the general backlog".
+        const pick = String(g.project ?? "").trim();
+        if (pick === "") {
+          const srcs = sourcesOf(g, list);
+          refusals.push(`a ${kind} group from source(s) ${srcs.length ? srcs.join(", ") : "(none)"} needs project (a projects.slug or general)`);
+        } else if (pick !== "general" && Array.isArray(projects) &&
+                   !projects.some(p => String(p.slug) === pick)) {
+          refusals.push(`project ${pick} is not a projects row; project creation is John's`);
+        } else if (pick !== "general") {
+          slug = pick;
+        }
+      } else if (route !== null) {
+        slug = String(route.project_slug);
+      }
+      // AGT-240 (b): finding_group_epic()'s lock refusal, in its place -- after the route (or the
+      // pick) names the project, before the epic count the function keeps.
+      const home = slug !== null && Array.isArray(projects) ? projects.find(p => String(p.slug) === slug) : undefined;
+      if (listLocked(home)) {
+        refusals.push(lockedListRefusal(slug, home.status));
+      }
+    }
+  }
+
+  // 1b. coverage LAST: every worklist finding exactly once, no unknown or duplicate id.
+  const open = list.map(w => String(w.id));
+  const seen = [];
+  for (const g of groups) {
+    for (const id of idsOf(g)) {
+      if (!open.includes(id)) { refusals.push(`unknown or not open/carried finding ${id}`); continue; }
+      if (seen.includes(id)) { refusals.push(`finding ${id} in two groups`); continue; }
+      seen.push(id);
+    }
+  }
+  for (const id of open) if (!seen.includes(id)) refusals.push(`finding ${id} not covered`);
+
+  // 4b (AGT-159), and it is LAST because that is where the function puts it: the backlog-review limb
+  // lives in apply_audit_review()'s step 4, after every validation and after coverage. Mirrored with
+  // the function's texts minus the `apply_audit_review: ` prefix (the agt-86i arm R convention).
+  //
+  // ONLY (a) AND (e) ARE MIRRORED. Both key on facts a worklist row carries on its own -- its
+  // `check_slug` and its `locations[0].location` -- so a client can refuse them before spending an
+  // --apply. (d), John's-ticket, needs the ticket's `scope_origin` from backlog_items and stays the
+  // function's, exactly as `reuse_backlog_id must be an open backlog row` already does. The manager
+  // still sees it coming: the location TEXT carries `[<scope_origin>; epic <name>]`.
+  for (const g of groups) {
+    const kind = g && g.kind;
+    const reuse = g && g.reuse_backlog_id !== undefined && g.reuse_backlog_id !== null
+      ? String(g.reuse_backlog_id) : null;
+    for (const id of idsOf(g)) {
+      const w = list.find(x => String(x.id) === id);
+      if (w === undefined || String(w.check_slug ?? "") !== "backlog-review") continue;
+      const ticket = String(w.locations?.[0]?.location ?? "").split(":")[1] ?? "";
+      if (ticket === "") continue;   // a malformed location is the function's RAISE, not a mirror's
+      if ((kind === "root-cause" && reuse === null) || kind === "cleanup") {
+        // (e) The ticket exists; a second id for it is the defect this whole limb closes.
+        refusals.push(`finding ${id} is already ticket ${ticket}; never file a second`);
+      } else if (kind === "root-cause" && reuse === ticket && blank(g.project)) {
+        // (a) Homing it needs a project. Silence is never read as "leave it where it is".
+        refusals.push(`backlog-review reuse of ${ticket} needs project (slug or general)`);
+      }
+    }
+  }
+
+  return { ok: refusals.length === 0, refusals };
+}
+
+// --- CLI -------------------------------------------------------------------------------------------
+
+function parseArgs(argv) {
+  const a = {};
+  for (const s of argv) {
+    const m = /^--([^=]+)(?:=(.*))?$/.exec(s);
+    if (m) a[m[1]] = m[2] === undefined ? true : m[2];
+  }
+  return a;
+}
+
+// Windows / Node 24: process.exit() right after a fetch can abort in libuv. Before any fetch die() exits
+// at once; after one it sets process.exitCode and unwinds with a sentinel main()'s catch swallows, so the
+// process ends on its own with the same code.
+class Exit extends Error {}
+let fetched = false;
+function die(code, msg) {
+  (code === 0 ? process.stdout : process.stderr).write(msg.endsWith("\n") ? msg : msg + "\n");
+  if (!fetched) process.exit(code);
+  process.exitCode = code;
+  throw new Exit(String(code));
+}
+
+function readJson(p, what) {
+  if (typeof p !== "string" || !p) die(2, `audit-review: ${what} path missing`);
+  try { return JSON.parse(fs.readFileSync(path.resolve(p), "utf8")); }
+  catch (e) { die(2, `audit-review: cannot read ${what} ${p}: ${e.message}`); }
+}
+
+function creds() {
+  const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const key = process.env.SUPABASE_SERVICE_KEY ?? "";
+  if (!base || !key) die(2, "audit-review: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set (exit 2 = could not run, never a pass).");
+  return { base, key };
+}
+
+async function rest(base, key, method, q, body) {
+  fetched = true;
+  const res = await fetch(`${base}/rest/v1/${q}`, {
+    method,
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text().catch(() => "");
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch { /* not json */ }
+  return { ok: res.ok, status: res.status, text, json };
+}
+
+async function prepare(args) {
+  const week = args.week;
+  if (typeof week !== "string" || !WEEK_RE.test(week)) die(2, "audit-review --prepare: --week=<YYYY-Www> required");
+  const { base, key } = creds();
+  const get = async q => {
+    const r = await rest(base, key, "GET", q);
+    if (!r.ok) die(1, `audit-review: GET ${q} -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
+    return r.json;
+  };
+  const findings = await get("audit_findings?status=in.(open,carried)&select=id,fingerprint,iso_week,kind,check_slug,locations,governing_fact,confidence,proposed_resolution,found_by,finding_type,family&order=created_at,id");
+  const allRows = await get("audit_findings?select=id,fingerprint,iso_week,status,ruling,ruled_by,check_slug");
+  const tickets = await get("backlog_items?source_file=eq.audit-review&status=not.in.(done,removed)&select=backlog_id,title,status,description&order=backlog_id");
+  const scorecardRows = await get("audit_check_scorecard?select=*&order=check_slug,iso_week");
+  const profiles = await get("skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug");
+  const routes = await get("finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
+  const projects = await get("projects?select=slug,name,status,accepts_findings&order=slug");
+  const scope = args.weekly === true ? "weekly" : "outcomes";
+  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope });
+  if (ctx === null) die(3, NOTHING_TO_REVIEW);
+  const out = JSON.stringify(ctx, null, 2) + "\n";
+  if (typeof args.out === "string" && args.out) {
+    fs.writeFileSync(path.resolve(args.out), out, "utf8");
+    console.log(`audit-review --prepare (${ctx.scope}): ${ctx.worklist.length} finding(s), ${ctx.open_audit_tickets.length} open audit ticket(s) -> ${args.out}`);
+  } else {
+    process.stdout.write(out);
+  }
+  process.exitCode = 0;
+}
+
+function refuse(refusals) {
+  die(1, refusals.map(r => `refused: ${r}`).join("\n"));
+}
+
+function dryRun(args) {
+  const answer = readJson(args["dry-run"], "answer");
+  const ctx = readJson(args.context, "context");
+  const v = validateReview(answer, ctx.worklist, ctx.week, ctx.checklist, ctx.routes, ctx.projects);
+  if (!v.ok) refuse(v.refusals);
+  die(0, "ok");
+}
+
+function chicago(ts) {
+  if (!ts) return "(no expiry recorded)";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+  }).format(new Date(ts));
+}
+
+async function apply(args) {
+  const hasCycle = typeof args["cycle-id"] === "string" && args["cycle-id"] !== "";
+  const hasSession = typeof args["session-name"] === "string" && args["session-name"] !== "";
+  if (hasCycle === hasSession) die(2, "audit-review --apply: exactly one of --cycle-id=<uuid> / --session-name=<name>");
+  const week = args.week;
+  const answer = readJson(args.apply, "answer");
+  const ctx = readJson(args.context, "context");
+  const v = validateReview(answer, ctx.worklist, week, ctx.checklist, ctx.routes, ctx.projects);
+  if (!v.ok) refuse(v.refusals); // nothing is sent
+
+  const { base, key } = creds();
+  const review = {
+    groups: answer.groups, summary_for_john: answer.summary_for_john, patterns_applied: answer.patterns_applied,
+    checklist_edits: answer.checklist_edits ?? [],
+  };
+  // AGT-239: the context's scope rides to the function; absent means weekly (all), as before.
+  if (SCOPES.includes(ctx.scope)) review.scope = ctx.scope;
+  const r = await rest(base, key, "POST", "rpc/apply_audit_review", {
+    p_cycle_id: hasCycle ? args["cycle-id"] : null,
+    p_session_name: hasSession ? args["session-name"] : null,
+    p_week: week,
+    p_review: review,
+  });
+  if (!r.ok) die(1, `audit-review --apply: HTTP ${r.status} ${r.text}`);
+  const { decision_id: id, tickets, counts } = r.json ?? {};
+  const d = await rest(base, key, "GET", `runner_decisions?id=eq.${id}&select=expires_at`);
+  const expires = d.ok && Array.isArray(d.json) && d.json[0] ? d.json[0].expires_at : null;
+  console.log(`Decision ${id} — reversible until ${chicago(expires)}: select public.reverse_decision('${id}', 'John', '<why>');`);
+  console.log(`Tickets: ${Array.isArray(tickets) && tickets.length ? tickets.join(", ") : "(none)"}`);
+  console.log(`Counts: ${JSON.stringify(counts ?? {})}`);
+  // AGT-309: the manager's proposal printed as the command that acts on it. One line per root-cause
+  // group carrying both keys, paired with the ticket the FUNCTION filed (or the one a reuse group
+  // named) -- so the ticket in the command is the row that exists, never the title the group asked for.
+  for (const l of nextLines(answer.groups, tickets)) console.log(l);
+  process.exitCode = 0;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.prepare) return prepare(args);
+  if (args["dry-run"]) return dryRun(args);
+  if (args.apply) return apply(args);
+  die(2, "usage: audit-review.js --prepare --week=<YYYY-Www> [--weekly] [--out=<path>] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> --week=<w> (--cycle-id=<uuid> | --session-name=<name>)");
+}
+
+// Importing this module for its exports must never run the CLI (SES-45).
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch(e => {
+    if (e instanceof Exit) return;
+    process.stderr.write(`audit-review: ${e.stack || e.message}\n`);
+    process.exitCode = 1;
+  });
+}

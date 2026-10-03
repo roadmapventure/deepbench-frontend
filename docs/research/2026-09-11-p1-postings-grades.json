@@ -1,0 +1,2996 @@
+{
+ "pass": "postings-only",
+ "egress": "WebSearch x69, WebFetch x63; 44 distinct postings retained (20 director/VP-level incl. 'Head of Product' and 'Executive Director', 24 principal/group/staff PM). Boards used: Greenhouse (job-boards.greenhouse.io; several returned the board index because the req had closed, so Built In / The Muse / Jobright / Working Nomads / Simplify mirrors were fetched), Lever (403 on direct fetch; Jobright mirror + search-result text), Ashby (search-result text), SmartRecruiters (ServiceNow), Built In / Built In SF / Built In Chicago, Workday-hosted pages (Salesforce, Workday, Bluehost, Expedia returned empty/410 so mirrors were used), amazon.jobs, careers.salesforce.com (301 -> www.salesforce.com shell; Built In SF and purpose.jobs mirrors), jobs.technyc.org, microsoft.ai, jobs.intuit.com, harvey.ai, careers.safelite.com, jobs.biospace.com, opentalent.in, lensa.com, Google Careers (JS-rendered; body truncated, title + search-result text only). Drops (not counted): plain 'Product Manager' postings at Anthropic (Agent Platform; Safeguards), OpenAI (API Agents; Enterprise Identity), Glean (Agent Security & Governance), Vercel (Agent Platform), Microsoft (Windows 365 for Agents), Apollo.io, Holistiplan, Granicus 'AI Product Lead' — all below the accepted levels; Google GPM Agentic Search (no skill sentence surfaced); Kong Senior PM AI Gateway (senior PM); JPMorgan 'product solutions director agent specialist' (404); Microsoft 'Vertical Knowledge Agents' (no URL captured). No analyst reports, vendor blogs, or memory were used; every quote is from a posting fetched today or a search result opened today that quotes the posting.",
+ "postings": [
+  {
+   "pid": "P1",
+   "employer": "Amazon (AWS)",
+   "title": "Director, Product Management, AWS Developer Tools",
+   "level": "director",
+   "url": "https://amazon.jobs/en/jobs/10513401/director-product-management-aws-developer-tools",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G1",
+    "G2",
+    "G3",
+    "G7",
+    "G18",
+    "B1",
+    "C3",
+    "C6",
+    "C7"
+   ]
+  },
+  {
+   "pid": "P2",
+   "employer": "Regeneron Pharmaceuticals",
+   "title": "Director Product Management Enterprise AI Platforms & Tools",
+   "level": "director",
+   "url": "https://jobs.biospace.com/job/3073350/director-product-management-enterprise-ai-platforms-and-tools/",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G1",
+    "G3",
+    "G5",
+    "G6",
+    "G8",
+    "G9",
+    "G10",
+    "G16",
+    "G17",
+    "G18",
+    "G25",
+    "B1",
+    "B7",
+    "C2",
+    "C4",
+    "C6",
+    "C7",
+    "C9",
+    "C23"
+   ]
+  },
+  {
+   "pid": "P3",
+   "employer": "GitLab",
+   "title": "Director of Product Management, AI Agents and Ecosystem",
+   "level": "director",
+   "url": "https://www.themuse.com/jobs/gitlab/director-of-product-management-ai-agents-and-ecosystem (mirror of https://job-boards.greenhouse.io/gitlab/jobs/8422081002)",
+   "date": "2026-02-16",
+   "supports_rows": [
+    "G9",
+    "G16",
+    "G17",
+    "G25",
+    "B22",
+    "C2",
+    "C3",
+    "C9"
+   ]
+  },
+  {
+   "pid": "P4",
+   "employer": "ServiceNow",
+   "title": "Director, Product Management- AI Agent Products",
+   "level": "director",
+   "url": "https://jobs.smartrecruiters.com/ServiceNow/744000140792139-director-product-management-ai-agent-products",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G7",
+    "G9",
+    "G10",
+    "G15",
+    "G17",
+    "G18",
+    "B1",
+    "B10",
+    "B16",
+    "C2",
+    "C5",
+    "C7"
+   ]
+  },
+  {
+   "pid": "P5",
+   "employer": "Safelite",
+   "title": "Product Director, AI & Agentic",
+   "level": "director",
+   "url": "https://careers.safelite.com/product-director-ai-agentic/job/9708A07004D533A2C521B59FC63515C1",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G1",
+    "G2",
+    "G3",
+    "G5",
+    "G6",
+    "G17",
+    "G25",
+    "B6",
+    "B12",
+    "C1",
+    "C6"
+   ]
+  },
+  {
+   "pid": "P6",
+   "employer": "Nextiva",
+   "title": "Director, Product Management (AI Agents)",
+   "level": "director",
+   "url": "https://builtin.com/job/director-product-management-ai-agents/7857120",
+   "date": "seen 2026-09-11 (Built In shows removed 2026-01-27)",
+   "supports_rows": [
+    "G9",
+    "B6",
+    "B25",
+    "C1",
+    "C12"
+   ]
+  },
+  {
+   "pid": "P7",
+   "employer": "Augment Code",
+   "title": "Director of Product, Agents",
+   "level": "director",
+   "url": "https://builtin.com/job/director-product-agents/7371475",
+   "date": "seen 2026-09-11 (Built In shows removed 2025-11-05)",
+   "supports_rows": [
+    "C3",
+    "C13"
+   ]
+  },
+  {
+   "pid": "P8",
+   "employer": "Clinically AI",
+   "title": "Head of Product",
+   "level": "director",
+   "url": "https://builtin.com/job/head-product/9534997",
+   "date": "seen 2026-09-11 (Built In: posted ~28 days ago)",
+   "supports_rows": [
+    "B17",
+    "C25"
+   ]
+  },
+  {
+   "pid": "P9",
+   "employer": "Salesforce",
+   "title": "Senior Director, Product Management - Agentforce Voice AI",
+   "level": "director",
+   "url": "https://www.builtinsf.com/job/senior-director-product-management-agentforce-voice-ai/9374921 (mirror of https://careers.salesforce.com/en/jobs/jr342470/)",
+   "date": "seen 2026-09-11 (Built In shows removed 2026-06-25)",
+   "supports_rows": [
+    "B6",
+    "B25",
+    "C1",
+    "C4",
+    "C12"
+   ]
+  },
+  {
+   "pid": "P10",
+   "employer": "CaptivateIQ",
+   "title": "Director of Product Management - Product Platform",
+   "level": "director",
+   "url": "https://jobright.ai/jobs/info/6a20c54e338c01230511b63b (mirror of https://jobs.lever.co/captivateiq/3b6badbf-19db-4fb4-8078-be83a84c22a6)",
+   "date": "seen 2026-09-11 (mirror: posted 3 weeks ago)",
+   "supports_rows": [
+    "G2",
+    "G3",
+    "G5",
+    "G7",
+    "G10",
+    "G16",
+    "B1",
+    "C2",
+    "C6",
+    "C9",
+    "C13"
+   ]
+  },
+  {
+   "pid": "P11",
+   "employer": "Resilinc",
+   "title": "Director, Product Management - AI Applications",
+   "level": "director",
+   "url": "https://jobs.lever.co/resilinc/2a64a88f-121d-496c-8220-05f07929cee9 (Lever 403 on fetch; text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G3",
+    "G24",
+    "C7",
+    "C21"
+   ]
+  },
+  {
+   "pid": "P12",
+   "employer": "Digitas / Epsilon (Publicis)",
+   "title": "Vice President, Product Management - Agentic AI",
+   "level": "vp",
+   "url": "https://lensa.com/job-v1/digitas/chicago-il/vice-president-of-product-management/1c45383520b0c11c9f786e30c8ac2112",
+   "date": "2026-08-25",
+   "supports_rows": [
+    "B1",
+    "C14"
+   ]
+  },
+  {
+   "pid": "P13",
+   "employer": "Liberate",
+   "title": "Director, Agent Product Management (Head of Agent Product Management)",
+   "level": "director",
+   "url": "https://job-boards.greenhouse.io/liberate/jobs/5049712008 (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "B1",
+    "B25",
+    "C12"
+   ]
+  },
+  {
+   "pid": "P14",
+   "employer": "JPMorgan Chase",
+   "title": "AI Product Manager - LLM Governance - Executive Director",
+   "level": "director",
+   "url": "https://www.opentalent.in/jobs/ai-product-manager-llm-governance-executive-director-jpmorganchase",
+   "date": "2026-06-08",
+   "supports_rows": [
+    "G7",
+    "G18",
+    "G21",
+    "G22",
+    "C7",
+    "C23"
+   ]
+  },
+  {
+   "pid": "P15",
+   "employer": "J.P. Morgan",
+   "title": "Product Director Databricks Genie",
+   "level": "director",
+   "url": "https://jobs.technyc.org/companies/j-p-morgan-3/jobs/63137662-product-director-databricks-genie",
+   "date": "2025-12-05",
+   "supports_rows": [
+    "B4",
+    "C11",
+    "C17"
+   ]
+  },
+  {
+   "pid": "P16",
+   "employer": "Salesforce",
+   "title": "Director, Product Management - Agentforce Contact Center Digital",
+   "level": "director",
+   "url": "https://www.purpose.jobs/discover/companies/salesforce-2/jobs/80660804-director-product-management-agentforce-contact-center-digital",
+   "date": "2026-05-28",
+   "supports_rows": [
+    "B6",
+    "C1"
+   ]
+  },
+  {
+   "pid": "P17",
+   "employer": "Google Cloud",
+   "title": "Director, Product Management, Google Cloud, Security Products",
+   "level": "director",
+   "url": "https://www.google.com/about/careers/applications/jobs/results/104336082207679174-director/ (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "C22"
+   ]
+  },
+  {
+   "pid": "P18",
+   "employer": "Google DeepMind",
+   "title": "Senior Director, Product, Model Services and Consumer Verticals",
+   "level": "director",
+   "url": "https://www.google.com/about/careers/applications/jobs/results/114128639687041734-senior-director/ (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "C23"
+   ]
+  },
+  {
+   "pid": "P19",
+   "employer": "Sentient Foundation",
+   "title": "Head of Product",
+   "level": "director",
+   "url": "https://jobs.ashbyhq.com/sentient-foundation/7e8b8663-7b34-4966-a460-e2481b4b7bf1 (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G1",
+    "G2",
+    "C6"
+   ]
+  },
+  {
+   "pid": "P20",
+   "employer": "Salesforce",
+   "title": "Director, Product Management Service Cloud",
+   "level": "director",
+   "url": "https://careers.salesforce.com/en/jobs/jr305907/director-product-management-service-cloud/ (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "B6",
+    "C1"
+   ]
+  },
+  {
+   "pid": "P21",
+   "employer": "Salesforce",
+   "title": "Principal Product Manager, AI Agents for Sales",
+   "level": "principal-or-group-pm",
+   "url": "https://salesforce.wd12.myworkdayjobs.com/en-US/External_Career_Site/job/Principal-Product-Manager--AI-Agents-for-Sales_JR318633 (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "B14",
+    "C10"
+   ]
+  },
+  {
+   "pid": "Q1",
+   "employer": "Humana",
+   "title": "Principal Product Owner / Architect",
+   "level": "principal-or-group-pm",
+   "url": "https://builtin.com/job/principal-product-owner-architect/10725577",
+   "date": "seen 2026-09-11 (Built In shows removed 2026-08-26)",
+   "supports_rows": [
+    "G1",
+    "G3",
+    "G6",
+    "G7",
+    "G9",
+    "G10",
+    "G14",
+    "G15",
+    "G16",
+    "G17",
+    "B17",
+    "C2",
+    "C4",
+    "C6",
+    "C7",
+    "C9",
+    "C13",
+    "C19",
+    "C23"
+   ]
+  },
+  {
+   "pid": "Q2",
+   "employer": "G-P (Globalization Partners)",
+   "title": "Principal Product Manager – Agentic AI Platform",
+   "level": "principal-or-group-pm",
+   "url": "https://builtin.com/job/principal-product-manager-agentic-ai-platform/9557511 (mirror of https://job-boards.greenhouse.io/globalizationpartners/jobs/7749444003)",
+   "date": "seen 2026-09-11 (Built In shows removed 2026-09-04; Working Nomads dated Aug 2026)",
+   "supports_rows": [
+    "G1",
+    "G2",
+    "G3",
+    "G5",
+    "G6",
+    "G7",
+    "G17",
+    "G18",
+    "B1",
+    "B11",
+    "C2",
+    "C6",
+    "C7",
+    "C13"
+   ]
+  },
+  {
+   "pid": "Q3",
+   "employer": "HighLevel",
+   "title": "Principal Product Manager",
+   "level": "principal-or-group-pm",
+   "url": "https://simplify.jobs/p/e9066178-1506-4b3e-93e1-8ad1dd84594d/Principal-Product-Manager",
+   "date": "seen 2026-09-11 (Simplify: 1 month ago)",
+   "supports_rows": [
+    "G1",
+    "G3",
+    "G5",
+    "G6",
+    "G7",
+    "G8",
+    "G9",
+    "G10",
+    "G12",
+    "G13",
+    "G14",
+    "G15",
+    "G16",
+    "G17",
+    "B7",
+    "B10",
+    "B22",
+    "B23",
+    "B24",
+    "C2",
+    "C4",
+    "C6",
+    "C9",
+    "C13",
+    "C18",
+    "C19"
+   ]
+  },
+  {
+   "pid": "Q4",
+   "employer": "Candescent",
+   "title": "Principal Product Manager Agentic AI",
+   "level": "principal-or-group-pm",
+   "url": "https://simplify.jobs/p/0724931b-ed04-4983-9a67-ba78cdda05a1/Principal-Product-Manager-Agentic-AI",
+   "date": "2026-05-16",
+   "supports_rows": [
+    "G8",
+    "C2",
+    "C6",
+    "C7",
+    "C11",
+    "C23"
+   ]
+  },
+  {
+   "pid": "Q5",
+   "employer": "ServiceNow",
+   "title": "Principal Product Manager, Voice AI",
+   "level": "principal-or-group-pm",
+   "url": "https://jobs.smartrecruiters.com/ServiceNow/744000140334419-principal-product-manager-voice-ai",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "B6",
+    "B25",
+    "C1",
+    "C6",
+    "C12"
+   ]
+  },
+  {
+   "pid": "Q6",
+   "employer": "Microsoft",
+   "title": "Principal Product Manager - Microsoft AI and Copilot",
+   "level": "principal-or-group-pm",
+   "url": "https://jobs.anitab.org/companies/microsoft/jobs/75872147-principal-product-manager-microsoft-ai-and-copilot",
+   "date": "2026-04-22",
+   "supports_rows": [
+    "G18",
+    "C6",
+    "C7",
+    "C13"
+   ]
+  },
+  {
+   "pid": "Q7",
+   "employer": "Amazon",
+   "title": "Principal Product Manager Tech - Credit and Fraud Risk, Amazon B2B Payments and Lending",
+   "level": "principal-or-group-pm",
+   "url": "https://www.amazon.jobs/en/jobs/10468067/principal-product-manager-tech-credit-and-fraud-risk-amazon-b2b-payments-and-lending",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "B11",
+    "C22"
+   ]
+  },
+  {
+   "pid": "Q8",
+   "employer": "Temporal Technologies",
+   "title": "Staff Product Manager, Agent Platform",
+   "level": "principal-or-group-pm",
+   "url": "https://job-boards.greenhouse.io/temporaltechnologies/jobs/5124710007 (404 on fetch; text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G6",
+    "G9",
+    "G25"
+   ]
+  },
+  {
+   "pid": "Q9",
+   "employer": "Expedia Group",
+   "title": "Principal Product Manager, Personal AI Agents",
+   "level": "principal-or-group-pm",
+   "url": "https://careers.expediagroup.com/job/principal-product-manager-personal-ai-agents/san-jose-ca/R-104243/ (410 on fetch; text from search result opened today)",
+   "date": "2026-04-02",
+   "supports_rows": [
+    "G3",
+    "G5",
+    "G10",
+    "G15",
+    "G17",
+    "B24",
+    "C18"
+   ]
+  },
+  {
+   "pid": "Q10",
+   "employer": "ComplyAdvantage",
+   "title": "Principal Product Manager – Agentic Case Remediation",
+   "level": "principal-or-group-pm",
+   "url": "https://simplify.jobs/p/9d20aecb-97b6-4214-89e1-e3af2fe46c32/Principal-Product-Manager",
+   "date": "2026-03-11",
+   "supports_rows": [
+    "G3",
+    "G7",
+    "G18",
+    "B1",
+    "B12",
+    "C7",
+    "C22"
+   ]
+  },
+  {
+   "pid": "Q11",
+   "employer": "Interface AI",
+   "title": "Principal Product Manager – AI Platform",
+   "level": "principal-or-group-pm",
+   "url": "https://www.builtinsf.com/job/principal-product-manager-ai-platform/10574998 (mirror of https://job-boards.greenhouse.io/interfaceai/jobs/4626098006)",
+   "date": "2026-08-07",
+   "supports_rows": [
+    "G2",
+    "G8",
+    "G9",
+    "G10",
+    "G12",
+    "G13",
+    "G15",
+    "G17",
+    "G19",
+    "B21",
+    "B25",
+    "C2",
+    "C6",
+    "C12",
+    "C13",
+    "C19",
+    "C23"
+   ]
+  },
+  {
+   "pid": "Q12",
+   "employer": "Bluehost / Newfold Digital",
+   "title": "Principal Product Manager, Agentic Experiences",
+   "level": "principal-or-group-pm",
+   "url": "https://simplify.jobs/p/7de34362-ec06-4783-bd93-a0c5fb807836/Principal-Product-Manager (mirror of https://web.wd1.myworkdayjobs.com/en-US/ExternalCareerSite/job/Principal-Product-Manager--Agentic-Experiences_R14983-1)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G1",
+    "G3",
+    "G5",
+    "G6",
+    "G7",
+    "G10",
+    "G14",
+    "G15",
+    "G16",
+    "G17",
+    "G24",
+    "G25",
+    "B6",
+    "B14",
+    "B15",
+    "C1",
+    "C2",
+    "C4",
+    "C6",
+    "C9",
+    "C10",
+    "C14",
+    "C19"
+   ]
+  },
+  {
+   "pid": "Q13",
+   "employer": "Intuit",
+   "title": "Principal Product Manager, Agent Development Platform",
+   "level": "principal-or-group-pm",
+   "url": "https://jobs.intuit.com/job/mountain-view/principal-product-manager-agent-development-platform/27595/99493492384",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G10",
+    "G15",
+    "B22",
+    "C2"
+   ]
+  },
+  {
+   "pid": "Q14",
+   "employer": "Elastic",
+   "title": "Principal Product Manager - Identity Threat Detection & Response",
+   "level": "principal-or-group-pm",
+   "url": "https://builtin.com/job/principal-product-manager-identity-threat-detection-response/10625516",
+   "date": "2026-08-11",
+   "supports_rows": [
+    "G3",
+    "G5",
+    "C9",
+    "C22"
+   ]
+  },
+  {
+   "pid": "Q15",
+   "employer": "GitLab",
+   "title": "Staff Product Manager, AI Agent Orchestration",
+   "level": "principal-or-group-pm",
+   "url": "https://job-boards.greenhouse.io/gitlab/jobs/8536109002 (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G9",
+    "G10",
+    "G15",
+    "B10",
+    "C3",
+    "C18"
+   ]
+  },
+  {
+   "pid": "Q16",
+   "employer": "Motorola Solutions",
+   "title": "Principal Product Manager, AI-Powered Security Operations",
+   "level": "principal-or-group-pm",
+   "url": "https://jobgether.com/offer/69cdb8ce5bd3b40540a57621-principal-product-manager-ai-powered-security-operations (403 on fetch; text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "C22"
+   ]
+  },
+  {
+   "pid": "Q17",
+   "employer": "Microsoft (M365 AIOps)",
+   "title": "Principal Product Manager",
+   "level": "principal-or-group-pm",
+   "url": "https://microsoft.ai/job/principal-product-manager-70/ (404 on fetch; text from search result opened today)",
+   "date": "2026-08-01",
+   "supports_rows": [
+    "G3",
+    "G19",
+    "C5",
+    "C7"
+   ]
+  },
+  {
+   "pid": "Q18",
+   "employer": "Microsoft (Azure AI Foundry, CoreAI)",
+   "title": "Principal Product Manager - AI Security (CoreAI)",
+   "level": "principal-or-group-pm",
+   "url": "https://www.indeed.com/viewjob?jk=f3dbdfa8577f5ffa (401 on fetch; text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G4",
+    "G5",
+    "C7",
+    "C22"
+   ]
+  },
+  {
+   "pid": "Q19",
+   "employer": "Harvey",
+   "title": "Staff Product Manager",
+   "level": "principal-or-group-pm",
+   "url": "https://www.harvey.ai/company/careers/8d092528-2554-42e4-a68b-67307b48e6aa",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G8",
+    "B3",
+    "B9",
+    "C9",
+    "C20"
+   ]
+  },
+  {
+   "pid": "Q20",
+   "employer": "Kamiwaza AI",
+   "title": "Principal Product Manager/Head of Product",
+   "level": "principal-or-group-pm",
+   "url": "https://jobs.ashbyhq.com/kamiwaza/60ddf375-b880-4426-a389-c54fcf2b114c (text from search result opened today)",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G9",
+    "C2"
+   ]
+  },
+  {
+   "pid": "Q22",
+   "employer": "Google",
+   "title": "Group Product Manager, AI Agent Security and Authorization",
+   "level": "principal-or-group-pm",
+   "url": "https://www.google.com/about/careers/applications/jobs/results/75437862740206278-group-product-manager/",
+   "date": "seen 2026-09-11",
+   "supports_rows": [
+    "G5",
+    "C9"
+   ]
+  },
+  {
+   "pid": "Q23",
+   "employer": "Workday",
+   "title": "Principal Product Manager - Workday AI - Agent Factory",
+   "level": "principal-or-group-pm",
+   "url": "https://workday.wd5.myworkdayjobs.com/en-US/Workday/job/Principal-Product-Manager---Workday-AI_JR-0102286 (empty on fetch; text from search result opened today)",
+   "date": "seen 2026-09-11 (search: active May–Aug 2026)",
+   "supports_rows": [
+    "C2",
+    "C16",
+    "C17"
+   ]
+  },
+  {
+   "pid": "Q24",
+   "employer": "Microsoft AI",
+   "title": "Principal Product Manager, Agentic Experiences",
+   "level": "principal-or-group-pm",
+   "url": "https://microsoft.ai/job/principal-product-manager-agentic-experiences/ (404 on fetch; text from search result opened today)",
+   "date": "2026-02-26",
+   "supports_rows": [
+    "B24",
+    "C18"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "id": "G1",
+   "posting_hits": 8,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "evaluation and benchmarking systems make agents effective on AWS"
+    },
+    {
+     "pid": "P2",
+     "quote": "Understanding of AI evaluation and observability building evals, measuring quality/safety, monitoring drift, and managing model/agent performance in production."
+    },
+    {
+     "pid": "P5",
+     "quote": "Own how agent performance is measured, from accuracy and resolution to revenue and customer experience"
+    },
+    {
+     "pid": "P19",
+     "quote": "turn open AI research into shipped products including agent evals, benchmarks, leaderboards, and developer tools"
+    },
+    {
+     "pid": "Q1",
+     "quote": "evaluation frameworks (LLM-as-judge, human eval pipelines), A/B testing for AI-assisted features"
+    },
+    {
+     "pid": "Q2",
+     "quote": "familiarity with AI evaluation methods such as golden datasets, test suites, trace analysis, human review, LLM-as-a-judge, regression testing, and production monitoring"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Define an evaluation architecture covering Ask AI responses, Knowledge Base retrieval, memory usage, tool selection, action accuracy, permissions, artefacts, latency, and cost."
+    },
+    {
+     "pid": "Q12",
+     "quote": "Define the metric framework for agentic experience, including task success, completion rate, hand-off, containment, time-to-value, trust, intervention rates, conversion, attach, and retention."
+    }
+   ]
+  },
+  {
+   "id": "G2",
+   "posting_hits": 6,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "benchmarks, training datasets, and simulation environments"
+    },
+    {
+     "pid": "P5",
+     "quote": "Familiarity with modern experimentation practices for AI systems, including offline evals, online testing, and human-in-the-loop review"
+    },
+    {
+     "pid": "P19",
+     "quote": "hands-on familiarity with LLMs, AI agents, evals, benchmarking, or model deployment workflows"
+    },
+    {
+     "pid": "P10",
+     "quote": "Familiarity with AI/agent stack: MCP, agent tooling, evals, context management"
+    },
+    {
+     "pid": "Q2",
+     "quote": "Define AI quality and evaluation requirements, including golden datasets, test cases, pass/fail criteria, trace reviews, regression testing, and production monitoring."
+    },
+    {
+     "pid": "Q11",
+     "quote": "Evaluation & quality: offline golden sets, regression testing, hallucination measurement, task success metrics"
+    }
+   ]
+  },
+  {
+   "id": "G3",
+   "posting_hits": 13,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "pre-execution validation, auditability, and human-in-the-loop controls"
+    },
+    {
+     "pid": "P2",
+     "quote": "Familiarity with agentic AI: autonomous and multi-step agents, tool use, planning/orchestration, and human-in-the-loop design."
+    },
+    {
+     "pid": "P5",
+     "quote": "Familiarity with modern experimentation practices for AI systems, including offline evals, online testing, and human-in-the-loop review"
+    },
+    {
+     "pid": "P10",
+     "quote": "long-running orchestration with human-in-the-loop approvals (payout processing, plan rollout, period close)"
+    },
+    {
+     "pid": "P11",
+     "quote": "knows how to drive explainability, governance, and human-in-the-loop principles into AI features"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Human-in-the-loop design: override workflows, confidence thresholds, escalation paths, and audit trails"
+    },
+    {
+     "pid": "Q2",
+     "quote": "defining key AI platform capabilities including human-in-the-loop workflows"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Establish standards for destructive actions, bulk changes, financial operations, external communication, and compliance-sensitive workflows."
+    },
+    {
+     "pid": "Q9",
+     "quote": "shapes how memory, context, orchestration, permissions, and human handoff should work in a trusted travel companion"
+    },
+    {
+     "pid": "Q10",
+     "quote": "designing the trust progression from human oversight to full autonomy"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Own shared agent primitives including identity and permissions, context and memory, intent routing, hand-off and escalation, human-in-the-loop approval, transparency and traceability, guardrails, and fallback."
+    },
+    {
+     "pid": "Q14",
+     "quote": "Make sure there is human oversight for important actions"
+    },
+    {
+     "pid": "Q17",
+     "quote": "define guardrails, blast-radius controls, approval gates, and rollback mechanisms for autonomous agentic mitigation"
+    }
+   ]
+  },
+  {
+   "id": "G4",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q18",
+     "quote": "help build the security foundation for agentic systems, addressing emerging threats such as prompt injection, sensitive data exfiltration, unsafe tool usage, model misuse, and adversarial manipulation"
+    }
+   ]
+  },
+  {
+   "id": "G5",
+   "posting_hits": 10,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Awareness of responsible and secure AI practices: guardrails, access controls, data privacy, and AI governance frameworks."
+    },
+    {
+     "pid": "P5",
+     "quote": "Working understanding of agent integration architecture: APIs, webhooks, identity, consent"
+    },
+    {
+     "pid": "P10",
+     "quote": "Scale enterprise readiness ... governance, auditability, access control, sandboxing, performance, and reliability"
+    },
+    {
+     "pid": "Q2",
+     "quote": "ensure agentic actions follow proper authentication, authorization, permissions, auditability, privacy, and compliance controls"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Partner with Security, Legal, Privacy, and Trust teams on data isolation, access control, memory, browser automation, sensitive data, source permissions, content retention, external-model processing, audit logs, and abuse prevention."
+    },
+    {
+     "pid": "Q9",
+     "quote": "shapes how memory, context, orchestration, permissions, and human handoff should work in a trusted travel companion"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Own shared agent primitives including identity and permissions, context and memory, intent routing, hand-off and escalation, human-in-the-loop approval, transparency and traceability, guardrails, and fallback."
+    },
+    {
+     "pid": "Q14",
+     "quote": "You will also own the roadmap for securing non-human and AI agent identities"
+    },
+    {
+     "pid": "Q18",
+     "quote": "addressing emerging threats such as prompt injection, sensitive data exfiltration, unsafe tool usage, model misuse, and adversarial manipulation"
+    },
+    {
+     "pid": "Q22",
+     "quote": "Group Product Manager, AI Agent Security and Authorization (posting title; body did not render on fetch)"
+    }
+   ]
+  },
+  {
+   "id": "G6",
+   "posting_hits": 7,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Understanding of AI evaluation and observability building evals, measuring quality/safety, monitoring drift, and managing model/agent performance in production."
+    },
+    {
+     "pid": "P5",
+     "quote": "use observability to find where agents fail and improve them"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Telemetry and evaluation: distributed tracing, evaluation frameworks"
+    },
+    {
+     "pid": "Q2",
+     "quote": "Define AI quality and evaluation requirements, including golden datasets, test cases, pass/fail criteria, trace reviews, regression testing, and production monitoring."
+    },
+    {
+     "pid": "Q3",
+     "quote": "Build observability and debugging experiences showing selected context, retrieved sources, model outputs, plans, tools, inputs, permissions, approvals, action results, errors, latency, and usage."
+    },
+    {
+     "pid": "Q8",
+     "quote": "distributed systems literacy—the ability to reason fluently about state, execution, fault tolerance, and observability"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Own shared agent primitives including identity and permissions, context and memory, intent routing, hand-off and escalation, human-in-the-loop approval, transparency and traceability, guardrails, and fallback."
+    }
+   ]
+  },
+  {
+   "id": "G7",
+   "posting_hits": 9,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "pre-execution validation, auditability, and human-in-the-loop controls"
+    },
+    {
+     "pid": "P4",
+     "quote": "bringing governance, auditability, and workflow intelligence to every agent action"
+    },
+    {
+     "pid": "P10",
+     "quote": "Scale enterprise readiness ... governance, auditability, access control, sandboxing, performance, and reliability"
+    },
+    {
+     "pid": "P14",
+     "quote": "enhances transparency in LLM lifecycle management with oversight of assets: use cases, models, analytical tools, asset metadata, and model supply chain"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Human-in-the-loop design: override workflows, confidence thresholds, escalation paths, and audit trails"
+    },
+    {
+     "pid": "Q2",
+     "quote": "ensure agentic actions follow proper authentication, authorization, permissions, auditability, privacy, and compliance controls"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Own the complete Ask AI experience, including chat, voice interaction, conversation history, memory, templates, artefacts, scheduled tasks, tools, actions, agent routing, browser interaction, feedback, permissions, approvals, auditability, usage, and lifecycle management."
+    },
+    {
+     "pid": "Q10",
+     "quote": "complete audit trail and clear accountability"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Own shared agent primitives including ... human-in-the-loop approval, transparency and traceability, guardrails, and fallback."
+    }
+   ]
+  },
+  {
+   "id": "G8",
+   "posting_hits": 5,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Experience with retrieval-augmented generation (RAG), vector databases, embeddings, and grounding models in enterprise data."
+    },
+    {
+     "pid": "Q3",
+     "quote": "Own the Knowledge Base platform across source ingestion, extraction, parsing, chunking, embeddings, indexing, metadata, retrieval, re-ranking, citations, freshness, versioning, testing, permissions, and observability."
+    },
+    {
+     "pid": "Q4",
+     "quote": "Deep understanding of AI limitations (e.g. model hallucination and model performance) and corresponding AI product strategy for evaluation, testing and guardrails"
+    },
+    {
+     "pid": "Q11",
+     "quote": "Evaluation & quality: offline golden sets, regression testing, hallucination measurement, task success metrics"
+    },
+    {
+     "pid": "Q19",
+     "quote": "Access Harvey where you already work and ground every answer in sources you trust."
+    }
+   ]
+  },
+  {
+   "id": "G9",
+   "posting_hits": 10,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Agent-to-Agent (A2A) protocols for multi-agent coordination"
+    },
+    {
+     "pid": "P3",
+     "quote": "Knowledge of multi-agent systems and approaches for agents from different ecosystems to work together"
+    },
+    {
+     "pid": "P4",
+     "quote": "orchestration, memory and context management, action execution"
+    },
+    {
+     "pid": "P6",
+     "quote": "agentic AI ecosystem, including intelligent virtual assistants (IVAs), conversational AI, and multi-agent architectures"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Agent orchestration: planning loops, tool/function calling, role assignment, multi-agent collaboration patterns"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Partner closely with AI and engineering leadership on LLM orchestration, model routing, context management, prompt systems, tool invocation, agent planning, memory, retrieval-augmented generation, embeddings, hybrid search, re-ranking, caching, latency, evaluation, observability, and cost."
+    },
+    {
+     "pid": "Q8",
+     "quote": "driving the multi-agent orchestration roadmap, including agent-calls-agent patterns and handoff protocols"
+    },
+    {
+     "pid": "Q11",
+     "quote": "multi-agent orchestration, memory/context management, tool routing, goal planning, and policy-aligned behavior"
+    },
+    {
+     "pid": "Q15",
+     "quote": "shaping product direction for foundational capabilities such as agent context, agent memory, background agents, and orchestration workflows"
+    },
+    {
+     "pid": "Q20",
+     "quote": "enterprise AI orchestration platform that organizations deploy to run inference, connect distributed data sources, build knowledge graphs, and orchestrate multi-agent AI workflows"
+    }
+   ]
+  },
+  {
+   "id": "G10",
+   "posting_hits": 10,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Familiarity with prompt engineering, context engineering, fine-tuning, and model customization techniques."
+    },
+    {
+     "pid": "P4",
+     "quote": "orchestration, memory and context management, action execution"
+    },
+    {
+     "pid": "P10",
+     "quote": "Familiarity with AI/agent stack: MCP, agent tooling, evals, context management"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Long- and short-term memory management, context window optimization, and retrieval strategies"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Create a shared context model spanning user identity, agency, location, role, permissions, current interface, business profile, Brand Voice, memory, Knowledge Bases, customer relationship management data, product configuration, and previous tool outputs."
+    },
+    {
+     "pid": "Q9",
+     "quote": "shapes how memory, context, orchestration, permissions, and human handoff should work in a trusted travel companion"
+    },
+    {
+     "pid": "Q11",
+     "quote": "multi-agent orchestration, memory/context management, tool routing, goal planning, and policy-aligned behavior"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Technical fluency sufficient to hold design conversations about large language model orchestration, tool and function calling, Model Context Protocol, retrieval-augmented generation, context strategy, evaluations, latency, cost trade-offs, and failure modes."
+    },
+    {
+     "pid": "Q13",
+     "quote": "Stitch together the macro ecosystem of Agent Development Life Cycle (ADLC) capabilities, context/memory architectures, and agent harness systems"
+    },
+    {
+     "pid": "Q15",
+     "quote": "translating complex technical areas such as agent context, agent memory, and background agent behavior into clear product requirements and roadmap decisions"
+    }
+   ]
+  },
+  {
+   "id": "G11",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'evaluator-optimizer', 'critique loop', 'self-critique' with Director/VP/Principal PM titles across Greenhouse, Lever, Ashby, Built In, amazon.jobs; every eval posting names LLM-as-judge/golden sets, none names an evaluator-optimizer or critique loop."
+  },
+  {
+   "id": "G12",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q3",
+     "quote": "Partner closely with AI and engineering leadership on LLM orchestration, model routing, context management, prompt systems, tool invocation, agent planning, memory, retrieval-augmented generation, embeddings, hybrid search, re-ranking, caching, latency, evaluation, observability, and cost."
+    },
+    {
+     "pid": "Q11",
+     "quote": "model selection, evaluation, benchmarking, fine-tuning enablement, and prompt optimization"
+    }
+   ]
+  },
+  {
+   "id": "G13",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q3",
+     "quote": "... embeddings, hybrid search, re-ranking, caching, latency, evaluation, observability, and cost."
+    },
+    {
+     "pid": "Q11",
+     "quote": "latency budgets, caching, batching, quantization, multi-region deployments"
+    }
+   ]
+  },
+  {
+   "id": "G14",
+   "posting_hits": 3,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q1",
+     "quote": "Reliability patterns for agentic systems: structured retries, graceful fallbacks, circuit breakers"
+    },
+    {
+     "pid": "Q1",
+     "quote": "latency/cost SLO definition"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Commercial judgment across activation, retention, packaging, usage-based pricing, infrastructure cost, AI cost, gross margin, and ecosystem economics."
+    },
+    {
+     "pid": "Q12",
+     "quote": "... retrieval-augmented generation, context strategy, evaluations, latency, cost trade-offs, and failure modes."
+    }
+   ]
+  },
+  {
+   "id": "G15",
+   "posting_hits": 8,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P4",
+     "quote": "memory architectures"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Long- and short-term memory management, context window optimization, and retrieval strategies"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Own the complete Ask AI experience, including chat, voice interaction, conversation history, memory, templates, artefacts, scheduled tasks, tools, actions, agent routing, browser interaction, feedback, permissions, approvals, auditability, usage, and lifecycle management."
+    },
+    {
+     "pid": "Q9",
+     "quote": "shapes how memory, context, orchestration, permissions, and human handoff should work in a trusted travel companion"
+    },
+    {
+     "pid": "Q11",
+     "quote": "multi-agent orchestration, memory/context management, tool routing, goal planning, and policy-aligned behavior"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Own shared agent primitives including identity and permissions, context and memory, intent routing, ..."
+    },
+    {
+     "pid": "Q13",
+     "quote": "Deep technical fluency in state-of-the-art agentic frameworks (e.g., LangGraph, Claude SDK, OpenAI SDK, open-source agent tooling), model context/memory architectures"
+    },
+    {
+     "pid": "Q15",
+     "quote": "shaping product direction for foundational capabilities such as agent context, agent memory, background agents, and orchestration workflows"
+    }
+   ]
+  },
+  {
+   "id": "G16",
+   "posting_hits": 6,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Hands-on understanding of emerging interoperability standards, including the Model Context Protocol (MCP) for connecting models to tools and data"
+    },
+    {
+     "pid": "P3",
+     "quote": "Drive the roadmap for agent interoperability, including multi-agent patterns, tool integration, and Model Context Protocol (MCP) considerations"
+    },
+    {
+     "pid": "P10",
+     "quote": "Familiarity with AI/agent stack: MCP, agent tooling, evals, context management"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Tool ecosystem integration: REST/GraphQL API orchestration, MCP server configuration, vector database design"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Define the platform model for Model Context Protocol tools, native product actions, external application programming interfaces, web search, browser execution, Knowledge Base retrieval, and other agent capabilities."
+    },
+    {
+     "pid": "Q12",
+     "quote": "Set the strategy for exposing agentic capabilities through the customer portal, APIs, Model Context Protocol servers, connectors, and channels."
+    }
+   ]
+  },
+  {
+   "id": "G17",
+   "posting_hits": 10,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Familiarity with agentic AI: autonomous and multi-step agents, tool use, planning/orchestration, and human-in-the-loop design."
+    },
+    {
+     "pid": "P3",
+     "quote": "Experience building or leading agent builder products, including defining agent instructions, tool use, and developer experience"
+    },
+    {
+     "pid": "P4",
+     "quote": "tool use, orchestration, multi-step reasoning"
+    },
+    {
+     "pid": "P5",
+     "quote": "Hands-on fluency with the platforms agentic experiences are built on: agent platforms and LLM orchestration, eval and observability tooling, retrieval and tool-use patterns"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Agent orchestration: planning loops, tool/function calling, role assignment, multi-agent collaboration patterns"
+    },
+    {
+     "pid": "Q2",
+     "quote": "agents, tools, action interfaces, API integrations, orchestration patterns, evaluation frameworks, observability, guardrails"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Define an evaluation architecture covering Ask AI responses, Knowledge Base retrieval, memory usage, tool selection, action accuracy, permissions, artefacts, latency, and cost."
+    },
+    {
+     "pid": "Q9",
+     "quote": "experience building assistants, agents, copilots, or AI products that use tools to complete tasks, with familiarity in browser or computer use"
+    },
+    {
+     "pid": "Q11",
+     "quote": "multi-agent orchestration, memory/context management, tool routing, goal planning, and policy-aligned behavior"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Enable company capabilities as safely callable tools for internal and external agents, including Claude, ChatGPT, integrated development environments, and partner platforms."
+    }
+   ]
+  },
+  {
+   "id": "G18",
+   "posting_hits": 7,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "enterprise AI governance, including security, auditability, and responsible AI"
+    },
+    {
+     "pid": "P2",
+     "quote": "Awareness of responsible and secure AI practices: guardrails, access controls, data privacy, and AI governance frameworks."
+    },
+    {
+     "pid": "P4",
+     "quote": "Familiarity with governance, compliance, and auditability requirements for enterprise AI systems"
+    },
+    {
+     "pid": "P14",
+     "quote": "practices, policies, and frameworks that guide the development, deployment, and management of large language models"
+    },
+    {
+     "pid": "Q2",
+     "quote": "agents, tools, workflows, evaluation frameworks, permissions, and governance models"
+    },
+    {
+     "pid": "Q6",
+     "quote": "Define enterprise trust models for expressive AI, including governance, admin control, safety constraints, and predictable failure modes."
+    },
+    {
+     "pid": "Q10",
+     "quote": "designing the trust progression from human oversight to full autonomy"
+    }
+   ]
+  },
+  {
+   "id": "G19",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q11",
+     "quote": "safe rollout patterns (canaries, feature flags, rollback)"
+    },
+    {
+     "pid": "Q17",
+     "quote": "define guardrails, blast-radius controls, approval gates, and rollback mechanisms for autonomous agentic mitigation"
+    }
+   ]
+  },
+  {
+   "id": "G20",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'agent skills', 'SKILL.md', 'progressive disclosure' with PM titles; only hit is Anthropic 'Product Manager, Agent Platform' (job-boards.greenhouse.io/anthropic/jobs/4978689008), which names 'skills, Model Context Protocol (MCP), and evaluation frameworks' but is a plain PM title, below the accepted levels, so it does not count."
+  },
+  {
+   "id": "G21",
+   "posting_hits": 1,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P14",
+     "quote": "enhances transparency in LLM lifecycle management with oversight of assets: use cases, models, analytical tools, asset metadata, and model supply chain"
+    }
+   ]
+  },
+  {
+   "id": "G22",
+   "posting_hits": 1,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P14",
+     "quote": "data privacy management and audits including bias, compliance, and benchmarking"
+    }
+   ]
+  },
+  {
+   "id": "G23",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'incident response', 'AI incident', 'kill switch', 'safety incident' with Director/Principal PM titles; nearest is Microsoft M365 AIOps Principal PM ('autonomous agentic mitigation'), which is service-incident mitigation, not AI-incident detection/classification/reporting, so it does not count."
+  },
+  {
+   "id": "G24",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P11",
+     "quote": "knows how to drive explainability, governance, and human-in-the-loop principles into AI features"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Define quality measures including latency, accuracy, containment, escalation, tone, and disclosure, and establish the review mechanism that enforces them."
+    }
+   ]
+  },
+  {
+   "id": "G25",
+   "posting_hits": 5,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Agent-to-Agent (A2A) protocols for multi-agent coordination"
+    },
+    {
+     "pid": "P3",
+     "quote": "Knowledge of multi-agent systems and approaches for agents from different ecosystems to work together"
+    },
+    {
+     "pid": "P5",
+     "quote": "Understanding of how agents transact with other agents and systems, and where interoperability is heading"
+    },
+    {
+     "pid": "Q8",
+     "quote": "driving the multi-agent orchestration roadmap, including agent-calls-agent patterns and handoff protocols"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Enable company capabilities as safely callable tools for internal and external agents, including Claude, ChatGPT, integrated development environments, and partner platforms."
+    }
+   ]
+  },
+  {
+   "id": "B1",
+   "posting_hits": 8,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "pre-execution validation, auditability, and human-in-the-loop controls"
+    },
+    {
+     "pid": "P2",
+     "quote": "Familiarity with agentic AI: autonomous and multi-step agents, tool use, planning/orchestration, and human-in-the-loop design."
+    },
+    {
+     "pid": "P4",
+     "quote": "enterprise workflow automation"
+    },
+    {
+     "pid": "P10",
+     "quote": "long-running orchestration with human-in-the-loop approvals (payout processing, plan rollout, period close)"
+    },
+    {
+     "pid": "P12",
+     "quote": "owns the vision, strategy, roadmap, and commercialization of AI agents and agentic workflows that deliver measurable outcomes for marketers, agencies, and publishers"
+    },
+    {
+     "pid": "P13",
+     "quote": "now expanding into full workflow automation across sales, servicing, and claims"
+    },
+    {
+     "pid": "Q2",
+     "quote": "defining key AI platform capabilities including human-in-the-loop workflows"
+    },
+    {
+     "pid": "Q10",
+     "quote": "automate high-volume operational workflows, ideally replacing manual processes with autonomous resolution at scale"
+    }
+   ]
+  },
+  {
+   "id": "B2",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched govtech/public-sector Director/VP Product with 'solicitation', 'RFP', 'procurement', 'compliance matrix'; Granicus 'AI Product Lead' is the only govtech hit and is neither director nor principal PM."
+  },
+  {
+   "id": "B3",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q19",
+     "quote": "Accelerate due diligence, contract analysis, and review with precision and control."
+    }
+   ]
+  },
+  {
+   "id": "B4",
+   "posting_hits": 1,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P15",
+     "quote": "Lead the HR Analytics implementation of Databricks Genie for conversational text-to-data capabilities."
+    }
+   ]
+  },
+  {
+   "id": "B5",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'account research', 'account intelligence', 'prospect brief', 'sales intelligence' with Director/Principal PM titles; nothing names an account-brief feature at the accepted levels."
+  },
+  {
+   "id": "B6",
+   "posting_hits": 7,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P5",
+     "quote": "Own how agent performance is measured, from accuracy and resolution to revenue and customer experience"
+    },
+    {
+     "pid": "P6",
+     "quote": "payment collection, FAQ support, and transactional agents across communication channels (voice, chat, SMS)"
+    },
+    {
+     "pid": "P9",
+     "quote": "autonomous action execution (Service Actions)"
+    },
+    {
+     "pid": "P16",
+     "quote": "AI agent-first platforms where agents work both autonomously and alongside human reps"
+    },
+    {
+     "pid": "P20",
+     "quote": "evangelizing Agentforce agentic AI solutions in the context of Service Cloud"
+    },
+    {
+     "pid": "Q5",
+     "quote": "intelligent voice agents that resolve customer interactions end-to-end"
+    },
+    {
+     "pid": "Q12",
+     "quote": "agents that support and retain"
+    }
+   ]
+  },
+  {
+   "id": "B7",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Experience with retrieval-augmented generation (RAG), vector databases, embeddings, and grounding models in enterprise data."
+    },
+    {
+     "pid": "Q3",
+     "quote": "Own the Knowledge Base platform across source ingestion, extraction, parsing, chunking, embeddings, indexing, metadata, retrieval, re-ranking, citations, freshness, versioning, testing, permissions, and observability."
+    }
+   ]
+  },
+  {
+   "id": "B8",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'meeting' + 'action items' + 'transcripts' with Director/Principal PM titles on Greenhouse/Lever/Built In/Ashby; results were guides and IC roles, no posting at level names meeting-to-action."
+  },
+  {
+   "id": "B9",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q19",
+     "quote": "enable search over data source using MCP's and deep research"
+    }
+   ]
+  },
+  {
+   "id": "B10",
+   "posting_hits": 3,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P4",
+     "quote": "long-running, self-evolving autonomous agents designed for enterprise knowledge workers"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Own the complete Ask AI experience, including ... scheduled tasks, tools, actions, agent routing, ..."
+    },
+    {
+     "pid": "Q15",
+     "quote": "shaping product direction for foundational capabilities such as agent context, agent memory, background agents, and orchestration workflows"
+    }
+   ]
+  },
+  {
+   "id": "B11",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q2",
+     "quote": "identify and prioritize high-value agentic use cases across customer experience, professional experience, reporting, onboarding, compliance, support, and internal operations"
+    },
+    {
+     "pid": "Q7",
+     "quote": "Drive innovation through Generative AI and AI agents — identify and deliver use cases"
+    }
+   ]
+  },
+  {
+   "id": "B12",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P5",
+     "quote": "Own how agent performance is measured, from accuracy and resolution to revenue and customer experience"
+    },
+    {
+     "pid": "Q10",
+     "quote": "demonstrate measurable ROI to buyers"
+    }
+   ]
+  },
+  {
+   "id": "B13",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'accounts payable', 'invoice processing', 'three-way match', 'exceptions' with Director/Product titles; only vendor content returned, no posting at level."
+  },
+  {
+   "id": "B14",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P21",
+     "quote": "lead the agentic vision and delivery of intelligent AI agents that power the Sales organization"
+    },
+    {
+     "pid": "Q12",
+     "quote": "agents that sell"
+    }
+   ]
+  },
+  {
+   "id": "B15",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q12",
+     "quote": "Own shared agent primitives including identity and permissions, context and memory, intent routing, hand-off and escalation, ..."
+    }
+   ]
+  },
+  {
+   "id": "B16",
+   "posting_hits": 1,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P4",
+     "quote": "long-running, self-evolving autonomous agents designed for enterprise knowledge workers"
+    }
+   ]
+  },
+  {
+   "id": "B17",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P8",
+     "quote": "Strong understanding of AI product design, AI workflows, prompt systems, structured outputs, or AI-assisted operational systems"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Human-in-the-loop design: override workflows, confidence thresholds, escalation paths, and audit trails"
+    }
+   ]
+  },
+  {
+   "id": "B18",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'proposal evaluation', 'bid evaluation', 'procurement' + 'AI' with Director/VP Product titles; no posting at level names it."
+  },
+  {
+   "id": "B19",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'constituent', '311', 'permits', 'multilingual' + govtech Director/VP Product; Granicus 'AI Product Lead' names 'constituent- and caseworker-facing use cases' but is below the accepted levels."
+  },
+  {
+   "id": "B20",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'regulatory change', 'GRC', 'compliance monitoring' + agents with Director/Principal PM titles; Resilinc names 'compliance violations' alerts (supply-chain risk), not regulatory-change impact analysis, so it does not count."
+  },
+  {
+   "id": "B21",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q11",
+     "quote": "Safety & compliance: PII detection/masking, prompt/response safety policies, tenant isolation, SOC2/GDPR readiness"
+    }
+   ]
+  },
+  {
+   "id": "B22",
+   "posting_hits": 3,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P3",
+     "quote": "Lead the strategy for GitLab's agent builder and broader agent ecosystem within the GitLab Duo Agent Platform"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Advance integration between Ask AI and Agent Studio so custom agents can be discovered, selected, invoked, monitored, and improved from a unified Ask AI experience."
+    },
+    {
+     "pid": "Q13",
+     "quote": "Define and drive the multi-year product vision, strategy, and roadmap for Intuit's internal Agent SDLC"
+    }
+   ]
+  },
+  {
+   "id": "B23",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q3",
+     "quote": "Own the complete Ask AI experience, including chat, voice interaction, conversation history, memory, templates, artefacts, ..."
+    }
+   ]
+  },
+  {
+   "id": "B24",
+   "posting_hits": 3,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q3",
+     "quote": "Define the platform model for Model Context Protocol tools, native product actions, external application programming interfaces, web search, browser execution, Knowledge Base retrieval, and other agent capabilities."
+    },
+    {
+     "pid": "Q9",
+     "quote": "experience building assistants, agents, copilots, or AI products that use tools to complete tasks, with familiarity in browser or computer use"
+    },
+    {
+     "pid": "Q24",
+     "quote": "architect solutions that reason, plan, and act across applications, the web, and the OS, empowering users to accomplish complex tasks"
+    }
+   ]
+  },
+  {
+   "id": "B25",
+   "posting_hits": 5,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P6",
+     "quote": "payment collection, FAQ support, and transactional agents across communication channels (voice, chat, SMS)"
+    },
+    {
+     "pid": "P9",
+     "quote": "low-latency streaming, real-time reasoning, and multi-turn conversational logic"
+    },
+    {
+     "pid": "P13",
+     "quote": "starting with voice — the hardest and most valuable channel in insurance"
+    },
+    {
+     "pid": "Q5",
+     "quote": "Fluency with voice stack: ASR, TTS, speech-to-speech, streaming, latency, endpointing, barge-in, turn-taking, noise handling"
+    },
+    {
+     "pid": "Q11",
+     "quote": "Voice & multimodal: ASR/TTS integration patterns, WER, interruption handling, turn-taking"
+    }
+   ]
+  },
+  {
+   "id": "C1",
+   "posting_hits": 7,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P5",
+     "quote": "Own how agent performance is measured, from accuracy and resolution to revenue and customer experience"
+    },
+    {
+     "pid": "P6",
+     "quote": "payment collection, FAQ support, and transactional agents across communication channels (voice, chat, SMS)"
+    },
+    {
+     "pid": "P9",
+     "quote": "Voice and AI fundamentals (LLMs, RAG, Prompt Engineering, NLU)"
+    },
+    {
+     "pid": "P16",
+     "quote": "hands-on product experience with agentic AI, LLM-powered workflows"
+    },
+    {
+     "pid": "P20",
+     "quote": "evangelizing Agentforce agentic AI solutions in the context of Service Cloud"
+    },
+    {
+     "pid": "Q5",
+     "quote": "Measurable improvement in conversational quality, containment, and reliability"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Define quality measures including latency, accuracy, containment, escalation, tone, and disclosure, and establish the review mechanism that enforces them."
+    }
+   ]
+  },
+  {
+   "id": "C2",
+   "posting_hits": 13,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Familiarity with agentic AI: autonomous and multi-step agents, tool use, planning/orchestration, and human-in-the-loop design."
+    },
+    {
+     "pid": "P3",
+     "quote": "Lead the strategy for GitLab's agent builder and broader agent ecosystem within the GitLab Duo Agent Platform"
+    },
+    {
+     "pid": "P4",
+     "quote": "bringing governance, auditability, and workflow intelligence to every agent action"
+    },
+    {
+     "pid": "P10",
+     "quote": "the AI and agent platform gives every product a consistent, agent-accessible surface"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Agent orchestration: planning loops, tool/function calling, role assignment, multi-agent collaboration patterns"
+    },
+    {
+     "pid": "Q2",
+     "quote": "agents, tools, workflows, evaluation frameworks, permissions, and governance models"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Advance integration between Ask AI and Agent Studio so custom agents can be discovered, selected, invoked, monitored, and improved from a unified Ask AI experience."
+    },
+    {
+     "pid": "Q4",
+     "quote": "Experience developing applications with modern agentic AI platforms (e.g. Google ADK, Microsoft Azure AI, or AWS agent core and bedrock)"
+    },
+    {
+     "pid": "Q11",
+     "quote": "LLM orchestration, model evaluation, fine-tuning, RAG, agentic frameworks"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Own shared agent primitives including identity and permissions, context and memory, intent routing, hand-off and escalation, human-in-the-loop approval, transparency and traceability, guardrails, and fallback."
+    },
+    {
+     "pid": "Q13",
+     "quote": "Stitch together the macro ecosystem of Agent Development Life Cycle (ADLC) capabilities, context/memory architectures, and agent harness systems"
+    },
+    {
+     "pid": "Q20",
+     "quote": "orchestrate multi-agent AI workflows"
+    },
+    {
+     "pid": "Q23",
+     "quote": "Workday Agent Factory builds autonomous AI agents that become standalone product lines, not incremental AI features bolted onto existing workflows"
+    }
+   ]
+  },
+  {
+   "id": "C3",
+   "posting_hits": 4,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "AI agents are becoming the primary way developers build and operate software"
+    },
+    {
+     "pid": "P3",
+     "quote": "Collaborate with product teams across DevSecOps and Security to enable domain experts to build high-value agents and flows"
+    },
+    {
+     "pid": "P7",
+     "quote": "Our vision is to automate all parts of the SDLC with Agents—helping enterprises move faster, improve code quality, and keep developers in flow."
+    },
+    {
+     "pid": "Q15",
+     "quote": "shaping product direction for foundational capabilities such as agent context, agent memory, background agents, and orchestration workflows"
+    }
+   ]
+  },
+  {
+   "id": "C4",
+   "posting_hits": 5,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Experience with retrieval-augmented generation (RAG), vector databases, embeddings, and grounding models in enterprise data."
+    },
+    {
+     "pid": "P9",
+     "quote": "Voice and AI fundamentals (LLMs, RAG, Prompt Engineering, NLU)"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Working knowledge of LLM integration patterns including RAG, prompt engineering, knowledge management, and fine-tuning"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Technical fluency across retrieval-augmented generation, document ingestion and parsing, chunking strategies, embeddings and vector search, keyword and hybrid retrieval, metadata filtering and query rewriting, re-ranking and source attribution."
+    },
+    {
+     "pid": "Q12",
+     "quote": "... tool and function calling, Model Context Protocol, retrieval-augmented generation, context strategy, evaluations, ..."
+    }
+   ]
+  },
+  {
+   "id": "C5",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P4",
+     "quote": "long-running, self-evolving autonomous agents designed for enterprise knowledge workers"
+    },
+    {
+     "pid": "Q17",
+     "quote": "define and drive product strategy for autonomous agentic mitigation while fostering a culture of experimentation, safety, and operational excellence"
+    }
+   ]
+  },
+  {
+   "id": "C6",
+   "posting_hits": 13,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "evaluation and benchmarking systems make agents effective on AWS"
+    },
+    {
+     "pid": "P2",
+     "quote": "Understanding of AI evaluation and observability building evals, measuring quality/safety, monitoring drift, and managing model/agent performance in production."
+    },
+    {
+     "pid": "P5",
+     "quote": "Hands-on fluency with the platforms agentic experiences are built on: agent platforms and LLM orchestration, eval and observability tooling, retrieval and tool-use patterns"
+    },
+    {
+     "pid": "P10",
+     "quote": "Familiarity with AI/agent stack: MCP, agent tooling, evals, context management"
+    },
+    {
+     "pid": "P19",
+     "quote": "turn open AI research into shipped products including agent evals, benchmarks, leaderboards, and developer tools"
+    },
+    {
+     "pid": "Q1",
+     "quote": "evaluation frameworks (LLM-as-judge, human eval pipelines), A/B testing for AI-assisted features"
+    },
+    {
+     "pid": "Q2",
+     "quote": "Define AI quality and evaluation requirements, including golden datasets, test cases, pass/fail criteria, trace reviews, regression testing, and production monitoring."
+    },
+    {
+     "pid": "Q3",
+     "quote": "Strong judgment around AI evaluation, including how retrieval, answers, plans, tools, actions, artefacts, and memory should be tested and monitored."
+    },
+    {
+     "pid": "Q4",
+     "quote": "corresponding AI product strategy for evaluation, testing and guardrails"
+    },
+    {
+     "pid": "Q5",
+     "quote": "Experience defining voice-specific evaluations (task completion, latency, transcription accuracy, interruptions, conversational quality)"
+    },
+    {
+     "pid": "Q6",
+     "quote": "Lead AI evaluation strategy for expressive and agentic experiences, defining quality bars beyond accuracy: trust, tone, appropriateness, and user confidence."
+    },
+    {
+     "pid": "Q11",
+     "quote": "Evaluation & quality: offline golden sets, regression testing, hallucination measurement, task success metrics"
+    },
+    {
+     "pid": "Q12",
+     "quote": "Define quality measures including latency, accuracy, containment, escalation, tone, and disclosure, and establish the review mechanism that enforces them."
+    }
+   ]
+  },
+  {
+   "id": "C7",
+   "posting_hits": 12,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P1",
+     "quote": "enterprise AI governance, including security, auditability, and responsible AI"
+    },
+    {
+     "pid": "P2",
+     "quote": "Awareness of responsible and secure AI practices: guardrails, access controls, data privacy, and AI governance frameworks."
+    },
+    {
+     "pid": "P4",
+     "quote": "Familiarity with governance, compliance, and auditability requirements for enterprise AI systems"
+    },
+    {
+     "pid": "P11",
+     "quote": "knows how to drive explainability, governance, and human-in-the-loop principles into AI features"
+    },
+    {
+     "pid": "P14",
+     "quote": "enhances transparency in LLM lifecycle management with oversight of assets: use cases, models, analytical tools, asset metadata, and model supply chain"
+    },
+    {
+     "pid": "Q1",
+     "quote": "model lifecycle governance, observability, evaluation frameworks, and cost/performance optimization"
+    },
+    {
+     "pid": "Q2",
+     "quote": "ensure agentic actions follow proper authentication, authorization, permissions, auditability, privacy, and compliance controls"
+    },
+    {
+     "pid": "Q4",
+     "quote": "Strong knowledge and understanding of responsible AI governance standards"
+    },
+    {
+     "pid": "Q6",
+     "quote": "Define enterprise trust models for expressive AI, including governance, admin control, safety constraints, and predictable failure modes."
+    },
+    {
+     "pid": "Q10",
+     "quote": "designing the trust progression from human oversight to full autonomy"
+    },
+    {
+     "pid": "Q17",
+     "quote": "define guardrails, blast-radius controls, approval gates, and rollback mechanisms for autonomous agentic mitigation"
+    },
+    {
+     "pid": "Q18",
+     "quote": "lead product efforts to help enterprises detect, prevent, and govern AI security risks"
+    }
+   ]
+  },
+  {
+   "id": "C8",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'intelligent document processing', 'document AI', 'document intelligence' with Director/Principal PM titles; Holistiplan 'Product Manager, AI & Document Intelligence' and a 'Senior Product Manager - Document Intelligence' are below the accepted levels."
+  },
+  {
+   "id": "C9",
+   "posting_hits": 9,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Hands-on understanding of emerging interoperability standards, including the Model Context Protocol (MCP) for connecting models to tools and data"
+    },
+    {
+     "pid": "P3",
+     "quote": "Drive the roadmap for agent interoperability, including multi-agent patterns, tool integration, and Model Context Protocol (MCP) considerations"
+    },
+    {
+     "pid": "P10",
+     "quote": "Familiarity with AI/agent stack: MCP, agent tooling, evals, context management"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Tool ecosystem integration: REST/GraphQL API orchestration, MCP server configuration, vector database design"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Experience building agent-tool ecosystems using function calling, Model Context Protocol, plugins, application programming interfaces, workflow nodes, or capability registries."
+    },
+    {
+     "pid": "Q12",
+     "quote": "Set the strategy for exposing agentic capabilities through the customer portal, APIs, Model Context Protocol servers, connectors, and channels."
+    },
+    {
+     "pid": "Q14",
+     "quote": "You will also own the roadmap for securing non-human and AI agent identities"
+    },
+    {
+     "pid": "Q19",
+     "quote": "enable search over data source using MCP's and deep research"
+    },
+    {
+     "pid": "Q22",
+     "quote": "Group Product Manager, AI Agent Security and Authorization (posting title; body did not render on fetch)"
+    }
+   ]
+  },
+  {
+   "id": "C10",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P21",
+     "quote": "lead the agentic vision and delivery of intelligent AI agents that power the Sales organization"
+    },
+    {
+     "pid": "Q12",
+     "quote": "agents that sell"
+    }
+   ]
+  },
+  {
+   "id": "C11",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P15",
+     "quote": "Partner with CDO on data governance, semantics, cataloguing, and access controls"
+    },
+    {
+     "pid": "Q4",
+     "quote": "AI-assisted workflows for bankers, and natural-language insights"
+    }
+   ]
+  },
+  {
+   "id": "C12",
+   "posting_hits": 5,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P6",
+     "quote": "payment collection, FAQ support, and transactional agents across communication channels (voice, chat, SMS)"
+    },
+    {
+     "pid": "P9",
+     "quote": "low-latency streaming, real-time reasoning, and multi-turn conversational logic"
+    },
+    {
+     "pid": "P13",
+     "quote": "starting with voice — the hardest and most valuable channel in insurance"
+    },
+    {
+     "pid": "Q5",
+     "quote": "Telephony fluency: SIP, call transfers, Amazon Connect, Genesys, Twilio, or similar CCaaS platforms"
+    },
+    {
+     "pid": "Q11",
+     "quote": "set latency budgets for real-time voice"
+    }
+   ]
+  },
+  {
+   "id": "C13",
+   "posting_hits": 7,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P7",
+     "quote": "Enterprise rollout empathy (governance, SSO/SCIM, audit, policy)."
+    },
+    {
+     "pid": "P10",
+     "quote": "Scale enterprise readiness ... governance, auditability, access control, sandboxing, performance, and reliability"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Experience with enterprise identity and access management flows, Azure Active Directory / Entra ID group governance"
+    },
+    {
+     "pid": "Q2",
+     "quote": "authentication, authorization, role-based access, policy-based access, API security"
+    },
+    {
+     "pid": "Q3",
+     "quote": "Partner with Security, Legal, Privacy, and Trust teams on data isolation, access control, memory, browser automation, sensitive data, source permissions, content retention, external-model processing, audit logs, and abuse prevention."
+    },
+    {
+     "pid": "Q6",
+     "quote": "Define enterprise trust models for expressive AI, including governance, admin control, safety constraints, and predictable failure modes."
+    },
+    {
+     "pid": "Q11",
+     "quote": "Safety & compliance: PII detection/masking, prompt/response safety policies, tenant isolation, SOC2/GDPR readiness"
+    }
+   ]
+  },
+  {
+   "id": "C14",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P12",
+     "quote": "shape how the world's largest brands harness AI to evolve planning, execution, measurement, and optimization of marketing campaigns"
+    },
+    {
+     "pid": "Q12",
+     "quote": "agents that market"
+    }
+   ]
+  },
+  {
+   "id": "C15",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'email triage', 'back-office automation', 'unstructured communications' with Director/Principal PM titles; workflow-automation postings (ServiceNow, Liberate, CaptivateIQ) name workflows generally, none names email/transcript classification."
+  },
+  {
+   "id": "C16",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q23",
+     "quote": "identifying high-conviction bets in complex, regulated domains like finance and HCM"
+    }
+   ]
+  },
+  {
+   "id": "C17",
+   "posting_hits": 2,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P15",
+     "quote": "Partner deeply with Product and Technology to embed Genie into key HR channels (e.g., Moveworks, RAGs)"
+    },
+    {
+     "pid": "Q23",
+     "quote": "identifying high-conviction bets in complex, regulated domains like finance and HCM"
+    }
+   ]
+  },
+  {
+   "id": "C18",
+   "posting_hits": 4,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q3",
+     "quote": "Own the complete Ask AI experience, including ... scheduled tasks, tools, actions, agent routing, browser interaction, ..."
+    },
+    {
+     "pid": "Q9",
+     "quote": "experience building assistants, agents, copilots, or AI products that use tools to complete tasks, with familiarity in browser or computer use"
+    },
+    {
+     "pid": "Q15",
+     "quote": "translating complex technical areas such as agent context, agent memory, and background agent behavior into clear product requirements and roadmap decisions"
+    },
+    {
+     "pid": "Q24",
+     "quote": "architect solutions that reason, plan, and act across applications, the web, and the OS, empowering users to accomplish complex tasks"
+    }
+   ]
+  },
+  {
+   "id": "C19",
+   "posting_hits": 4,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "Q1",
+     "quote": "latency/cost SLO definition"
+    },
+    {
+     "pid": "Q3",
+     "quote": "... model routing, context management, prompt systems, tool invocation, agent planning, memory, retrieval-augmented generation, embeddings, hybrid search, re-ranking, caching, latency, evaluation, observability, and cost."
+    },
+    {
+     "pid": "Q11",
+     "quote": "latency budgets, caching, batching, quantization, multi-region deployments"
+    },
+    {
+     "pid": "Q12",
+     "quote": "... retrieval-augmented generation, context strategy, evaluations, latency, cost trade-offs, and failure modes."
+    }
+   ]
+  },
+  {
+   "id": "C20",
+   "posting_hits": 1,
+   "grade": "C",
+   "quotes": [
+    {
+     "pid": "Q19",
+     "quote": "Purpose built agents execute complex legal work end to end."
+    }
+   ]
+  },
+  {
+   "id": "C21",
+   "posting_hits": 1,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P11",
+     "quote": "pioneering intelligent, autonomous systems for supply chain, using cutting-edge Agentic AI that enables global enterprises to predict disruptions, assess impact instantly, and take real-time action"
+    }
+   ]
+  },
+  {
+   "id": "C22",
+   "posting_hits": 6,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P17",
+     "quote": "capitalizing on opportunities in Security and Agentic AI, and evolving CNAPP and Bot Detection products to be AI-enabled"
+    },
+    {
+     "pid": "Q7",
+     "quote": "autonomous agents, and intelligent automation can transform credit decisioning, fraud detection"
+    },
+    {
+     "pid": "Q10",
+     "quote": "automate up to 95% of KYC, AML, and sanctions reviews"
+    },
+    {
+     "pid": "Q14",
+     "quote": "Define detection, investigation, and response for human and non-human identities"
+    },
+    {
+     "pid": "Q16",
+     "quote": "deep domain knowledge of SOC/GSOC environments or high-tempo operations centers (such as logistics, 911 dispatch, IT NOC), with understanding of alert fatigue and time-to-resolution"
+    },
+    {
+     "pid": "Q18",
+     "quote": "lead product efforts to help enterprises detect, prevent, and govern AI security risks"
+    }
+   ]
+  },
+  {
+   "id": "C23",
+   "posting_hits": 6,
+   "grade": "A",
+   "quotes": [
+    {
+     "pid": "P2",
+     "quote": "Familiarity with prompt engineering, context engineering, fine-tuning, and model customization techniques."
+    },
+    {
+     "pid": "P14",
+     "quote": "LLMs inclusive of RAG, Fine Tuning, Agents, and Governance"
+    },
+    {
+     "pid": "P18",
+     "quote": "deep understanding of LLMs, APIs, machine learning frameworks, and the lifecycle of fine-tuning models for vertical applications"
+    },
+    {
+     "pid": "Q1",
+     "quote": "Working knowledge of LLM integration patterns including RAG, prompt engineering, knowledge management, and fine-tuning"
+    },
+    {
+     "pid": "Q4",
+     "quote": "Hands-on experience of AI technologies, such as LLMs, prompt engineering, multi-modal models, model training, fine-tuning, reinforcement learning"
+    },
+    {
+     "pid": "Q11",
+     "quote": "model selection, evaluation, benchmarking, fine-tuning enablement, and prompt optimization"
+    }
+   ]
+  },
+  {
+   "id": "C24",
+   "posting_hits": 0,
+   "grade": "D",
+   "quotes": [],
+   "searched": "Searched 'legacy modernization', 'COBOL', 'mainframe' + agents with Director/VP Product titles; only vendor blogs and consultant roles returned."
+  },
+  {
+   "id": "C25",
+   "posting_hits": 1,
+   "grade": "B",
+   "quotes": [
+    {
+     "pid": "P8",
+     "quote": "Clinical Notes AI - The Chart Aware Ambient Scribe"
+    }
+   ]
+  }
+ ],
+ "ranked": [
+  {
+   "id": "G3",
+   "posting_hits": 13,
+   "grade": "A"
+  },
+  {
+   "id": "C2",
+   "posting_hits": 13,
+   "grade": "A"
+  },
+  {
+   "id": "C6",
+   "posting_hits": 13,
+   "grade": "A"
+  },
+  {
+   "id": "C7",
+   "posting_hits": 12,
+   "grade": "A"
+  },
+  {
+   "id": "G5",
+   "posting_hits": 10,
+   "grade": "A"
+  },
+  {
+   "id": "G9",
+   "posting_hits": 10,
+   "grade": "A"
+  },
+  {
+   "id": "G10",
+   "posting_hits": 10,
+   "grade": "A"
+  },
+  {
+   "id": "G17",
+   "posting_hits": 10,
+   "grade": "A"
+  },
+  {
+   "id": "G7",
+   "posting_hits": 9,
+   "grade": "A"
+  },
+  {
+   "id": "C9",
+   "posting_hits": 9,
+   "grade": "A"
+  },
+  {
+   "id": "G1",
+   "posting_hits": 8,
+   "grade": "A"
+  },
+  {
+   "id": "G15",
+   "posting_hits": 8,
+   "grade": "B"
+  },
+  {
+   "id": "B1",
+   "posting_hits": 8,
+   "grade": "A"
+  },
+  {
+   "id": "G6",
+   "posting_hits": 7,
+   "grade": "A"
+  },
+  {
+   "id": "G18",
+   "posting_hits": 7,
+   "grade": "A"
+  },
+  {
+   "id": "B6",
+   "posting_hits": 7,
+   "grade": "A"
+  },
+  {
+   "id": "C1",
+   "posting_hits": 7,
+   "grade": "A"
+  },
+  {
+   "id": "C13",
+   "posting_hits": 7,
+   "grade": "A"
+  },
+  {
+   "id": "G2",
+   "posting_hits": 6,
+   "grade": "A"
+  },
+  {
+   "id": "G16",
+   "posting_hits": 6,
+   "grade": "A"
+  },
+  {
+   "id": "C22",
+   "posting_hits": 6,
+   "grade": "B"
+  },
+  {
+   "id": "C23",
+   "posting_hits": 6,
+   "grade": "A"
+  },
+  {
+   "id": "G8",
+   "posting_hits": 5,
+   "grade": "B"
+  },
+  {
+   "id": "G25",
+   "posting_hits": 5,
+   "grade": "A"
+  },
+  {
+   "id": "B25",
+   "posting_hits": 5,
+   "grade": "A"
+  },
+  {
+   "id": "C4",
+   "posting_hits": 5,
+   "grade": "A"
+  },
+  {
+   "id": "C12",
+   "posting_hits": 5,
+   "grade": "A"
+  },
+  {
+   "id": "C3",
+   "posting_hits": 4,
+   "grade": "A"
+  },
+  {
+   "id": "C18",
+   "posting_hits": 4,
+   "grade": "B"
+  },
+  {
+   "id": "C19",
+   "posting_hits": 4,
+   "grade": "B"
+  },
+  {
+   "id": "G14",
+   "posting_hits": 3,
+   "grade": "B"
+  },
+  {
+   "id": "B10",
+   "posting_hits": 3,
+   "grade": "B"
+  },
+  {
+   "id": "B22",
+   "posting_hits": 3,
+   "grade": "B"
+  },
+  {
+   "id": "B24",
+   "posting_hits": 3,
+   "grade": "B"
+  },
+  {
+   "id": "G12",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "G13",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "G19",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "G24",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "B7",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "B11",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "B12",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "B14",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "B17",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "C5",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "C10",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "C11",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "C14",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "C17",
+   "posting_hits": 2,
+   "grade": "B"
+  },
+  {
+   "id": "G4",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "G21",
+   "posting_hits": 1,
+   "grade": "B"
+  },
+  {
+   "id": "G22",
+   "posting_hits": 1,
+   "grade": "B"
+  },
+  {
+   "id": "B3",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "B4",
+   "posting_hits": 1,
+   "grade": "B"
+  },
+  {
+   "id": "B9",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "B15",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "B16",
+   "posting_hits": 1,
+   "grade": "B"
+  },
+  {
+   "id": "B21",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "B23",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "C16",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "C20",
+   "posting_hits": 1,
+   "grade": "C"
+  },
+  {
+   "id": "C21",
+   "posting_hits": 1,
+   "grade": "B"
+  },
+  {
+   "id": "C25",
+   "posting_hits": 1,
+   "grade": "B"
+  },
+  {
+   "id": "G11",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "G20",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "G23",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "B2",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "B5",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "B8",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "B13",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "B18",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "B19",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "B20",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "C8",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "C15",
+   "posting_hits": 0,
+   "grade": "D"
+  },
+  {
+   "id": "C24",
+   "posting_hits": 0,
+   "grade": "D"
+  }
+ ],
+ "skill_frequency": [
+  {
+   "skill_phrase_as_posted": "evals / evaluation frameworks / golden sets / regression testing",
+   "postings": 13,
+   "rows": [
+    "G1",
+    "G2",
+    "C6"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "human-in-the-loop (approval / review / oversight / handoff)",
+   "postings": 12,
+   "rows": [
+    "G3",
+    "B1",
+    "C7"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "governance / auditability / audit trails / audit logs",
+   "postings": 11,
+   "rows": [
+    "G7",
+    "G18",
+    "C7",
+    "C13"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "tool use / tool integration / function calling / tool routing",
+   "postings": 10,
+   "rows": [
+    "G17"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "orchestration / multi-agent",
+   "postings": 10,
+   "rows": [
+    "G9",
+    "C2"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "context management / context engineering / context strategy",
+   "postings": 10,
+   "rows": [
+    "G10"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "identity / permissions / access control / authorization for agents",
+   "postings": 10,
+   "rows": [
+    "G5",
+    "C13"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "memory (agent memory / memory architectures / short- and long-term memory)",
+   "postings": 8,
+   "rows": [
+    "G15"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "observability / tracing / traceability",
+   "postings": 7,
+   "rows": [
+    "G6"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "Model Context Protocol (MCP)",
+   "postings": 7,
+   "rows": [
+    "G16",
+    "C9"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "retrieval-augmented generation (RAG) / grounding",
+   "postings": 7,
+   "rows": [
+    "C4",
+    "B7",
+    "G8"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "contact center / customer service / resolution / containment",
+   "postings": 7,
+   "rows": [
+    "B6",
+    "C1"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "fine-tuning / model customization",
+   "postings": 6,
+   "rows": [
+    "C23"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "SOC / fraud / AML / non-human identities",
+   "postings": 6,
+   "rows": [
+    "C22"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "voice: streaming / latency / ASR / TTS / telephony / CCaaS",
+   "postings": 5,
+   "rows": [
+    "B25",
+    "C12"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "agent interoperability / Agent-to-Agent (A2A) / agents from different ecosystems",
+   "postings": 5,
+   "rows": [
+    "G25"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "cost / latency budgets / cost trade-offs / model routing / caching",
+   "postings": 4,
+   "rows": [
+    "G12",
+    "G13",
+    "G14",
+    "C19"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "SDLC agents / developers build and operate software",
+   "postings": 4,
+   "rows": [
+    "C3"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "agent builder / Agent Studio / custom agents / agent development platform",
+   "postings": 3,
+   "rows": [
+    "B22"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "browser / computer use / act across applications, the web, and the OS",
+   "postings": 3,
+   "rows": [
+    "B24",
+    "C18"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "background agents / scheduled tasks / long-running autonomous agents",
+   "postings": 3,
+   "rows": [
+    "B10",
+    "C18"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "LLM-as-a-judge",
+   "postings": 2,
+   "rows": [
+    "G1"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "hallucination (measurement / limitations)",
+   "postings": 2,
+   "rows": [
+    "G8"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "citations / source attribution / ground every answer",
+   "postings": 2,
+   "rows": [
+    "G8",
+    "B7"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "rollback / blast-radius / approval gates / safe rollout",
+   "postings": 2,
+   "rows": [
+    "G19"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "conversational text-to-data / natural-language insights",
+   "postings": 2,
+   "rows": [
+    "B4",
+    "C11"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "explainability / transparency / disclosure",
+   "postings": 2,
+   "rows": [
+    "G24"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "use-case identification and prioritization",
+   "postings": 2,
+   "rows": [
+    "B11"
+   ]
+  },
+  {
+   "skill_phrase_as_posted": "prompt injection / data exfiltration / unsafe tool usage",
+   "postings": 1,
+   "rows": [
+    "G4"
+   ]
+  }
+ ],
+ "usage_note": "Rough token estimate for this pass: ~230k input across search/fetch results + ~40k output (script, quotes, JSON), ~270k total; cost dominated by 63 WebFetch summaries and 69 WebSearch result blocks."
+}

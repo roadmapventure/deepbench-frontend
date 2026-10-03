@@ -1,3 +1,6 @@
+<!-- DeepBench v7.0.534 | docs/WORKING-WITH-JOHN.md | SES-424 slice 2 — the Decision Authority Matrix: MANAGER-DECIDES-BY-DEFAULT extended by decision kind, rendered from the registry -->
+<!-- DeepBench v7.0.514 | docs/WORKING-WITH-JOHN.md | SES-413 — one default, three John-only calls -->
+<!-- DeepBench v7.0.114 | docs/WORKING-WITH-JOHN.md | SES-83 (d) cycle 3 — three instructions retargeted off the trimmed FEATURES*.md files onto public.backlog_items: the Tier-1 autonomy item (file choice → `tier` column), the measured-detail rule, and the log-session-findings rule. The FEATURES-ARCHIVE.md pointers and the Priority Class legend citation are unchanged — both still resolve. -->
 # Working With John — Design Session Reference
 
 > Read every session (`CLAUDE-DESIGN.md` Step 1) — short, and it shapes everything downstream, not just kickoff-doc content.
@@ -16,7 +19,7 @@ If a pattern here ever conflicts with a fresher read of `CLAUDE-DESIGN.md`/`ARCH
 - Testing/verification standard → `STANDARDS.md`.
 - Per-feature history/rationale → `docs/SESSIONS.md`/`docs/FEATURES-ARCHIVE.md`.
 
-When it's genuinely ambiguous, say so and ask rather than guessing silently — Tier 3 territory per Decision Autonomy Tiers above.
+When it's genuinely ambiguous, say so and decide, and record the call — the default under Decision Autonomy Tiers above.
 
 ---
 
@@ -24,30 +27,68 @@ When it's genuinely ambiguous, say so and ask rather than guessing silently — 
 
 *(moved here 2026-07-17 from `CLAUDE-DESIGN.md` — same content, this is just its proper home now that a dedicated interaction-patterns doc exists)*
 
-John's own framing: design sessions had been checking in on too many small decisions — not because each individual ask was unreasonable, but because the *default* was tilted too far toward asking, when most of what gets asked about here is cheap to revise if wrong (this repo is mostly markdown; a bad call is a two-minute fix, not a production incident). Three tiers, so "should I ask" stops being a fresh judgment call every time:
+*(rewritten 2026-09-18, `SES-413`; heading kept so pointers resolve)*
 
-**Tier 1 — decide and report, no check-in required:**
-- Which backlog file/tier (`FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md`) a new item goes in, when the current criterion clearly applies.
-- Whether to fold a finding into an existing row or give it its own ID, when the scope reasoning is clear-cut.
-- Wording/phrasing choices in docs that don't touch already-locked terminology.
-- Any documentation change that's cheap to revise later with zero downstream cost if it turns out wrong.
+John, 2026-09-16, answering *“Should I make that the rule?”*: *“of course! it should have been
+designed by you 3 months ago, when i first said make this autonomous. not sure why it was not your
+first impression”*
 
-**Tier 2 — decide, but flag the call clearly in the close-out report (no need to wait for a response before proceeding):**
-- Judgment calls that could reasonably go either way, where the cost of either choice is low. John sees the call made and can redirect after the fact instead of gating the work on approval before it happens.
+<!-- {{rule:MANAGER-DECIDES-BY-DEFAULT}} · rendered from public.governance_rules — do not hand-edit the quoted lines below. Edit the registry row, then run `node scripts/render-rule-blocks.js --write`. -->
+> **Rule MANAGER-DECIDES-BY-DEFAULT** — Anything that would come to John goes to The Development Manager (GV-01) first; it decides within John's standing rules, never rewrites one of them, and records each decision as a runner_decisions row with its before-images, so it can be reversed.
+> John keeps three calls: spending money, releasing to production (dev -> main), and hiring or switching on agents (agents.is_active and the routine's on/off switch included).
+> John receives a daily list of what was decided, not questions; a question that still reaches him is counted weekly, target zero.
+> Until SES-402 and SES-413 slice 2 ship, an attended session stands in for the manager under the same rule. John 2026-09-16 (decision d496fb07).
 
-**Tier 3 — ask first, always:**
-- Terminology or naming decisions that become canonical and get referenced by every future session (the specific risk: sessions "talking past" John with invented language).
-- Anything touching shared state other sessions or people depend on — pushing to `dev`, deleting a worktree, renaming a heavily cross-referenced ID.
-- Reversing or contradicting a decision John already made.
-- Anything John has told this session directly he wants to be involved in, for that topic specifically.
+- **The default — decide.** Whatever you would once have asked about, decide it inside John's
+  standing rules, record it with `record_decision()` and its before-images so it can be reversed,
+  and list it in the close-out. There is no tier to weigh any more: not one of the three below
+  means decide.
+- **The three — ask John, and the ask is counted.** Spending money; releasing to production
+  (`dev` → `main`); hiring or switching on agents (`agents.is_active`, and the routine's own
+  on/off switch). These stay his, and every question that reaches him is counted weekly against a
+  target of zero.
+- **Reversing a John ruling — file it, and the ask is counted.** The manager decides *within* his
+  standing rules and never rewrites one. To change one, file a `runner_questions` row rather than
+  deciding past it; that row is counted the same way.
 
-**When genuinely unsure which tier a call falls into, default to Tier 2** (decide, flag clearly) rather than Tier 3 (ask and wait) — the cost of a wrong Tier-2 call is a correction after the fact; the cost of defaulting to Tier 3 on everything is the exact fatigue this rule exists to fix.
+Every place that asks John today is inventoried in `docs/governance/ASKS-TO-JOHN.md`, each row
+marked `moved-to-manager` or `kept`.
+
+The daily list itself: `docs/runbooks/standing-brief.md` § **Decided for you** (`SES-413` slice 3);
+its weekly question count is graded on the board as `platform_scoreboard.questions_to_john_week`
+(`SES-413` slice 4, `v7.0.523`) — the count of `runner_questions` asked in the **trailing 7 days**,
+whatever their status, written by `snapshot_platform_scoreboard()` on every ship. It is a claimable
+metric: `enhancement_claim = 'questions_to_john_week: down'` passes `outcome_claim_is_valid()` and
+grades on `public.ticket_outcome` like any other. Rows taken before `v7.0.523` read NULL — never
+measured, not zero.
+
+---
+
+## Decision Authority Matrix
+
+*(added 2026-09-20, `SES-424` slice 2)*
+
+The section above sets the default and names the three calls that stay John's. This one extends
+it by *decision kind*: who owns each kind of call a cycle actually makes. Every row records
+authority that is already live and cites where, because writing authority down is not the same
+act as granting it; where a row would have moved one of John's calls, there is a card instead.
+
+<!-- {{rule:MANAGER-AUTHORITY-MATRIX}} · rendered from public.governance_rules — do not hand-edit the quoted lines below. Edit the registry row, then run `node scripts/render-rule-blocks.js --write`. -->
+> **Rule MANAGER-AUTHORITY-MATRIX** — By decision kind: what The Development Manager (GV-01) decides and what stays John's. Row 1, the dm-knowledge-cycle-card re-pin: when a runbook edit re-renders docs/runbooks/cycle-card.md, the Builder re-pins skill_profiles.dm-knowledge-cycle-card (traits.source_sha256, method) under the ticket whose edit moved the card, in that commit, as an agent-row decision with a full-row before-image (AGENT-ROW-AGREED-TICKET, second limb): the manager's, never a card, never John's. A rebase that re-renders the card owns its re-pin the same way. Already live, measured 2026-09-20: 16 unreversed runner_decisions agent-row re-pins of that row (2026-09-16 to 2026-09-20, 13 of them since 09-18), each under the ticket whose edit moved the card, none reversed.
+> The pick (ticket, capability, engine): the manager's, as the first row of prime_directive_queue(), recorded as the claim and the assignment. Already live: runner-cycle.md step 2 -- the assignment is ticket, capability, engine and the cycle executes it rather than re-deriving it, and a mismatch with the queue head is a finding on the manager's Skill text, never a re-ordering of the board (SES-45).
+> What a build finds (file, defer, re-scope, remove, reopen) and gate cards (runner_items.kind = gated_before_build): the manager's, within John's standing rules and the class caps; a card whose subject is one of John's calls or rulings becomes a runner_questions row and is counted. Already live: runner-cycle.md 7b, "what counts as a decision" -- deferring a ticket, removing one under M6-03, re-tiering or re-homing it, ruling a gate -- and step 2's skip table, where on any new row the cycle decides and records the handle instead of flagging needs-john; the runner_questions half is MANAGER-DECIDES-BY-DEFAULT lines 1 and 3.
+> Agent rows: the manager's under an agreed ticket (AGENT-ROW-AGREED-TICKET); John's when no agreed ticket names the write, for an agent he has not seen, and for agents.is_active on. Already live: that rule verbatim, John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566).
+> The ship verdict and the ladder effect it carries: the Verifier's, never bypassed or overruled by the manager. Already live: runner-cycle.md 7a -- the verifier is verdict-only and verdict_ladder_signal() is its output -- and bd-guardrails, which forbids the Builder writing done or a verdict. Governance rules: the manager may file one that restates John's rulings by kind, as this one does, under an imaged rule decision; it never rewrites, retires or supersedes a ruling of John's. Already live: MANAGER-DECIDES-BY-DEFAULT line 1, "decides within John's standing rules, never rewrites one of them", and decision b383cb00, which filed that rule this same way. NOT SETTLED HERE, and left with John: who may call reverse_decision() inside a decision's window. Every call site in the runbook writes John as the actor and the one reversal on record (48d2fd0e) was his, so this rule does not move it; it is on John's desk as an undecided gated_before_build card.
+> Money, production (dev -> main), hiring or switching on agents (agents.is_active, the routine switch) and ratifying a bar he set (the 20-assignment promotion bar): John's. Anything not named here: the manager's, by MANAGER-DECIDES-BY-DEFAULT. Already live: that rule's line 2 for the first three; SES-378 slices 6 to 8 and SES-424's own board row carry the 20-assignment bar as John's to ratify.
+> Filed by SES-424 slice 2 under MANAGER-DECIDES-BY-DEFAULT (John 2026-09-16, decision d496fb07). Every row above writes down authority that is already live and cites where it is already live; no row moves a decision from John to the manager.
+
+John's rulings of 2026-09-25 are registry rows `JOHN-0925-*` (`docs/governance/RULES-SNAPSHOT.md`) and the Designer, Auditor and Researcher Skill rows they name — the database is their only home, never an md file (John 2026-09-25, AGT-135).
 
 ---
 
 ## Before Writing a Kickoff Doc: Walk Through It Live
 
-A design session is a conversation, not solo research-then-document-production. After Architect Review, stop and summarize the problem + proposed approach in plain language (not kickoff-doc prose) — what's broken, what the fix does, tradeoffs or open questions — and wait for explicit approval before writing the kickoff doc file. This is the Tier-3 case of the tiers above: kickoff-doc scope becomes the thing a coding session executes unattended, so it needs a real yes, not an inferred one.
+A design session is a conversation, not solo research-then-document-production. After Architect Review, stop and summarize the problem + proposed approach in plain language (not kickoff-doc prose) — what's broken, what the fix does, tradeoffs or open questions — record that scope as a decision, then write the kickoff doc file. The yes is a recorded decision (the manager's, or the attended stand-in's): kickoff-doc scope becomes the thing a coding session executes unattended, so it needs a real yes, not an inferred one.
 
 **A vague "keep going" / "sounds good" only approves continuing the topic, not the specific scope just shown** — especially once other exchanges (side questions, tangents) have happened in between and it's no longer obviously the very next reply to the exact proposal. Before writing/committing anything, restate the specific thing about to be built (exact copy, exact scope) in one line and get a direct yes to *that*.
 
@@ -93,7 +134,7 @@ Before proposing or writing any content that creates, edits, or touches a Skill 
 
 - **Use the real, published AI/ML/agentic-systems term for any technique** — never a DeepBench-invented gloss or a loosely-borrowed term. John: "I have been fighting Claude this entire time to quit making up its own terminology." Before naming a new pattern or mechanism, verify the literature term first (WebSearch if unsure) — don't guess or paraphrase into something more "product-friendly." A rename sweeps every place the term is cited by string, not just one file.
 - **Explain DeepBench mechanics using DeepBench's own domain vocabulary** — Skill, Capability, Agent, Intent, Product Focus Area, Layer — never layperson analogies ("form," "checkbox," "option"), even in a plain-language walkthrough for accessibility. **Corrected 2026-07-17:** "Skill Profile," "schema," and "enum" are not examples of this — `Skill Profile` is just the table name (`skill_profiles`) for the same thing the product calls a **Skill** (per the corrected data model), and `schema`/`enum` are generic technical terms any codebase has, not DeepBench-specific concepts. Use them accurately when a field genuinely is a schema or enum column, but don't hold them up as "the real vocabulary" — that's what caused the original confusion this rule exists to fix. John thinks in the platform's own domain model; a layperson analogy forces an unwanted translation step. Simplify *pacing*, never *vocabulary*.
-- **Don't invent terminology solo for anything that becomes canonical** — that's Tier 3 above, ask first.
+- **Don't invent terminology solo for anything that becomes canonical** — record the naming as a decision so it can be reversed.
 
 ---
 
@@ -135,9 +176,10 @@ If a section names tables/functions/files before the "Solution" heading, it's al
 **Every reply opens with the verdict, then stops.** The Explanation Order below governs how to explain a problem once John is asking about it; it is not a licence to pad an answer. Volume is the failure mode even when every section is individually correct and on-format.
 
 - **A decision → one recommendation, no options.** Not "either is defensible, here's the measured table, my recommendation is X" — just X in one sentence, then the shortest reason that supports it. John, verbatim: *"i have no idea, you have listed about 5 ideas. i need one summary of what you think we should do."* Present alternatives only if he asks.
-- **A close-out → the two questions he will actually ask, in the first two lines:** is the item done, and what is newly open (each with its ID + Type). John, verbatim: *"I am confused. Can you be straight forward with me. Is chi-90 complete, and are there new tickets required for beta?"* — both answers were derivable from the report and neither had been stated. QA counts, before/after tables, and Tier-2 flags go below that line, or not at all.
-- **Every close-out splits its open items into a BETA section and a NON-BETA section (added 2026-07-29, `design-loo-013`, John's explicit instruction).** Verbatim: *"you have to quit naming tickets without first telling me if they are beta or not. From here on out, when you are giving feedback after a session close, have a beta section and a non-beta section so i know how to prioritize."* **Never name a ticket ID in chat before its beta status is established.** Found live: that session referenced `PRO-3`, `SES-51`, `SES-52` and `AGT-38` across several messages, classified them only when John asked directly, and left him holding four unsorted IDs plus a widening proposal — his reply was *"i am confused."* Classify each one yourself against `docs/BETA.md` §1 (surface: the CHI screen + the Bench sub-screens; bar: nothing embarrassing, nothing that undermines the claim of a real agentic platform) and §2's five buckets — **read that file, never infer the bar from the ticket's subject matter.** An empty section is a legitimate and useful answer ("Beta: none from this session"). This is what makes the list actionable: John is deciding what to work on next, and an unsorted ID list moves that decision back onto him.
-- **Measured detail belongs in the repo docs, not the chat.** `FEATURES.md`/`SESSIONS.md` rows are where before/after numbers and root-cause narrative live; a session that has written those rows properly does not need to restate them to John.
+- **A close-out → the two questions he will actually ask, in the first two lines:** is the item done, and what is newly open (each with its ID + Type). John, verbatim: *"I am confused. Can you be straight forward with me. Is chi-90 complete, and are there new tickets required for beta?"* — both answers were derivable from the report and neither had been stated. QA counts, before/after tables, and recorded decisions go below that line, or not at all.
+- **Every ticket named in a close-out carries its NAMED P1–P10 priority class + ID + stored title (superseded 2026-08-23; the prior BETA/NON-BETA close-out split was retired with the beta axis on 2026-08-19 — see the ledger note below).** Format per the Communication Pacing rules: `ID — "title" (Type)` plus the *named* class — `P10 - Tooling`, never a bare `P10` — for every ticket a close-out names. No beta section, no non-beta section: the P1–P10 class is now the whole prioritization signal, classified per the pull tests (§19v / `JOHN-DECISION-PATTERNS` 137). Never name a ticket unclassified. The underlying principle survives unchanged: an unsorted ID list moves the what-next decision back onto John.
+  - *Supersession note (2026-08-23, Selfbuild sweep — `docs/SELFBUILD-RETIREMENT-LEDGER.md`):* this bullet previously mandated a BETA/NON-BETA split classified against `docs/BETA.md` ("read that file, never infer"). Beta was retired 2026-08-19; `docs/BETA.md` is historical.
+- **Measured detail belongs in the tracked record, not the chat.** A `backlog_items` ticket's `description` and a `docs/SESSIONS.md` entry are where before/after numbers and root-cause narrative live; a session that has written those properly does not need to restate them to John.
 
 This outranks the Explanation Order and one-issue-at-a-time rules below when they conflict — those shape the body of an answer, this decides what comes first.
 
@@ -147,7 +189,9 @@ This outranks the Explanation Order and one-issue-at-a-time rules below when the
 
 - **One issue at a time, with a concrete use case.** John processes one issue at a time and needs a concrete story — specific agent, specific data, specific before/after — to reason about a proposal; an abstract mechanism description isn't enough even when technically accurate. When there are multiple findings or options, present exactly one and stop for his reaction before moving to the next — don't bundle 3-4 into one message, even related ones.
 - **Agent name + role together, every mention** — format `FirstName — Role` (e.g. "Nadia — Data Analyst"), no surname, no agent code. Name alone forces John to context-switch to look up who it is. No "same tight exchange" carve-out — a long multi-topic conversation doesn't stay tight, and bare names creep back in within a few messages of a fresh mention if the discipline lapses. Source of truth for role: `src/data/agents.js`, read fresh, not from memory of who exists.
-- **Backlog item ID + Type together, every reference** — format `ID (Type)` or `ID — Type` (e.g. "AA-191 (Architecture)"), in conversation, not just formal doc rows. For legacy area-prefix IDs, add which new screen-code bucket it maps to (or "not yet mapped" if genuinely unmapped) — never silently rename the ID itself. For anything fully shipped/archived, suffix `-done` (e.g. "AA-195-done") so status is visible without a lookup.
+- **Priority classes are always written named, never bare digits (John, 2026-08-20, `design-runner-gov-0820`)** — `P10 - Tooling`, `P9 - Bug Fixes`, never a bare `P9`, in chat, backlog rows, briefing cards, and notifications alike. John: "i don't want to have to memorize these." Canonical names: `FEATURES.md`'s Priority Class legend (P1 - Improves John's Skills, P2 - Inventive, P3 - Investor Value, P4 - New Customers, P5 - Enhancements, P6 - Agent Enhancement, P7 - Agent Creation, P8 - Determinism Removal, P9 - Bug Fixes, P10 - Tooling). Same decision renamed the runner cycle outcomes John reads: "did not run" (was `noop`) and "gated before build" (was `proposal`) — renamed in the `runner_` data too, not just display.
+- ~~Superseded by the next bullet (2026-08-22's ID + TITLE + Type rule subsumes this 2026-08-21 form — kept for history).~~ **Backlog item ID + TITLE together, every reference (John, 2026-08-21: "Always refer tickets by title and id - i don't memorize id's").** A bare ID is a lookup John has to perform; the reference is `ID — short human title` (plus Type/class where the context calls for it), e.g. "SES-87 — the revalidation flow". In chat, briefing cards, notifications, close-outs — everywhere he reads. The prior ID+Type rule below still applies where classification matters; the title is now the non-negotiable half.
+- **Backlog item ID + TITLE + Type together, every reference (title added by John, 2026-08-22, `design-backlog-model`: "always list the ticket id and its title - i don't memorize id's … across every session, display or anything that references work you perform for the backlog")** — format `ID — "title" (Type)`, using the stored `backlog_items.title`, in conversation, displays, briefings, and close-out summaries alike — never a bare ID. For legacy area-prefix IDs, add which new screen-code bucket it maps to (or "not yet mapped" if genuinely unmapped) — never silently rename the ID itself. For anything fully shipped/archived, suffix `-done` (e.g. "AA-195-done") so status is visible without a lookup.
 
 ---
 
@@ -159,6 +203,8 @@ When John states a rule in absolute terms — "only X," "no one but X," "never,"
 
 ## Approval Gates
 
+*Both gates below now route through `MANAGER-DECIDES-BY-DEFAULT` (inventory rows A-05, A-06); `SES-413` slice 2 rewrites their mechanics.*
+
 - **UI appearance decisions** — never remove, change, or add a visual element (animations, icons, colors, labels) unilaterally, even when it seems like the obviously-correct call technically. State what's changing and ask before writing it into a kickoff doc.
 - **File merges or deletions** — surface explicitly during design, before the kickoff doc is written: which files, why (e.g. Vercel file-count limit), and the consequences (callers affected, behavior changes, risk). Wait for explicit approval. **Getting approval to delete a file is not the same as having verified everything inside it is safe to lose** — read a file's full content before deleting or overwriting it if it hasn't already been fully read in the conversation, even under blanket approval; "approved for deletion" may rest on a shared understanding of the file's *purpose* that doesn't account for everything actually inside it. Check `git log --all -- <path>` first — an untracked file has no safety net.
 
@@ -168,7 +214,7 @@ When John states a rule in absolute terms — "only X," "no one but X," "never,"
 
 - **Deadlines are never a silent driver of scope or architecture.** A stated deadline anywhere in memory or docs is not automatic license to bias recommendations toward speed or a "good enough for now" scope — present the full-quality option as the default; only weight toward speed if John says so explicitly, for that decision.
 - **Persist confirmed decisions into the relevant doc the same turn** they're confirmed — a naming call, an architecture split, a process rule. Don't wait to be asked "now write it down" a second time. If unclear which doc it belongs in, make a reasonable call and say so briefly rather than asking John to decide something he doesn't have context to evaluate.
-- **Log session-only findings to the tracked backlog before the session ends** — a side discovery, an unconfirmed hypothesis, a "worth checking later" note that exists only in this conversation's context is knowledge that's lost the moment the conversation ends. Give it a real `FEATURES.md`/`FEATURES-NEXT.md`/`FEATURES-LATER.md` row (even a `❌ Missing` placeholder), not a mention buried in a kickoff doc's CONTEXT section.
+- **Log session-only findings to the tracked backlog before the session ends** — a side discovery, an unconfirmed hypothesis, a "worth checking later" note that exists only in this conversation's context is knowledge that's lost the moment the conversation ends. Give it a real `public.backlog_items` ticket (even a `❌ Missing` placeholder), not a mention buried in a kickoff doc's CONTEXT section. Filing procedure: `CLAUDE-DESIGN.md`'s Backlog Capture rule.
 - **After root-causing an incident down to its mechanism, ask what upstream process gap let the precondition exist — and propose closing it in the same pass**, not after being asked a second time. Fixing the specific instance and adding a detection rule for the narrow symptom pattern is necessary but not sufficient; a genuinely thorough pass also asks whether a missing rule, required field, or structural anchor would prevent the precondition from existing at all.
 
 ---

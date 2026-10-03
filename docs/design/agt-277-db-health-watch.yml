@@ -1,0 +1,84 @@
+# DeepBench | docs/design/agt-277-db-health-watch.yml | AGT-277 -- the health check that runs where
+# the database cannot reach it.
+#
+# THIS FILE IS NOT LIVE HERE. It is the mirror; the copy that runs must sit at
+# `.github/workflows/db-health-watch.yml` ON `main`, and putting it there is JOHN'S ONE ATTENDED
+# STEP for this ticket. Two measured reasons, neither of them a preference: the runner sessions' PAT
+# carries no `workflow` scope (`docs/runbooks/session-setup.md:732`), so a session physically cannot
+# push a file into `.github/workflows/`; and GitHub schedules `on: schedule` only from the DEFAULT
+# BRANCH, which is `main`. Until he copies it, `scripts/db-health-watch.js` is built and tested and
+# nothing runs it -- the probe is armed, not firing.
+#
+# WHY IT EXISTS. `cron.job` jobid 5 `db-health-tick` runs every 5 minutes INSIDE the database it
+# measures. On 2026-09-29 it failed eight times in a row (04:05:00Z-04:40:00Z, every
+# `return_message` = `job startup timeout`) and `public.db_health_readings` went 45 minutes without
+# a completed row -- 04:00:00.657808+00 to 04:45:00.487736+00, the only gap over 400 s in 554 rows.
+# Nothing told anyone. The tick DOES file a `db-health-readings-gap` finding for that shape, but
+# only once it runs again: a sensor cannot report its own outage. So this one watches from outside,
+# on GitHub's clock, and files under a DIFFERENT slug, `db-health-silent`.
+#
+# WHY EVERY 10 MINUTES against a 15-minute window: GitHub's scheduler is best-effort and routinely
+# fires late. At 10 minutes, one skipped or delayed fire still leaves the next one inside the window
+# that matters, so a real silence is caught rather than straddled. It is not a cost question -- the
+# job is two PostgREST reads.
+#
+# WHY `ref: dev` AND A SPARSE CHECKOUT: this file schedules from `main`, but the scripts live on
+# `dev` (`main` sits far behind and does not carry them) -- the same split `meter-reader.yml`
+# measured live on its own first run. Two files are checked out and no more:
+# `scripts/db-health-watch.js` and `scripts/audit-ledger.js`, which it imports for the one findings
+# intake.
+#
+# WHAT A FAILED RUN MEANS, and this is the alert rather than a gap in it:
+#   exit 0  fresh   -- a completed reading inside the window. The job is green and says nothing.
+#   exit 1  silent  -- the database is up enough to answer but no reading has completed inside the
+#                      window. ONE `audit_findings` row, slug `db-health-silent`, is filed for The
+#                      Development Manager; the job fails and GitHub emails it.
+#   exit 2  cannot judge -- credentials, PostgREST, a missing `window_minutes`, or a filing that did
+#                      not land. FAIL CLOSED (ARCHITECTURE.md §19o). THIS IS THE TOTAL-OUTAGE
+#                      ALARM: if the database is gone, nothing can be filed anywhere, so the alert
+#                      is the non-zero exit and GitHub's failure email -- the identical visible-
+#                      failure contract `meter-reader.yml` documents for its host. A red run here
+#                      means read the Actions tab, then AGT-237(d).
+#
+# NO NEW SECRET AND NO NEW ACCOUNT. `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are the two the
+# repository already holds and `.github/workflows/ci.yml:299-300` already uses. They are referenced
+# BY NAME only; no value appears in this file, and the script prints neither.
+
+name: db-health-watch
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-health-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Is the database still filing health readings?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # ref: dev -- see the header. Cone mode off: these are two file paths, not directories.
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          sparse-checkout: |
+            scripts/db-health-watch.js
+            scripts/audit-ledger.js
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Probe db_health_readings from outside the database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/db-health-watch.js

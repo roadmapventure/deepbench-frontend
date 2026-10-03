@@ -1,0 +1,427 @@
+{
+  "week": "2026-W37",
+  "found_by": "auditor:judgment:claude-fable-5-1",
+  "note": "candidates from the judgment run — NOT ingested; John reads, then node scripts/audit-ledger.js --ingest=docs/audits/2026-W37-candidates.json --week=2026-W37 --cycle-id=<cycle> --apply",
+  "findings": [
+    {
+      "kind": "stale-or-irrelevant",
+      "locations": [
+        {
+          "location": "governance_rules/OD-42",
+          "text": "The nightly re-rank hands the Prioritizer at most 60 candidates, taken from `public.prime_directive_queue()` itself rather than from a re-derived board filter, because `pz-rank-intent`'s `max_tokens` is 4000 and each ranked entry costs roughly 30 output tokens — a TRUNCATED ranking is worse than a refused one, since the handler would apply the half it received as if it were the whole order; canonical: `api/cron/rank-backlog.js`'s `MAX_CANDIDATES` and `public.skill_profiles.max_tokens` for `pz-rank-intent`."
+        },
+        {
+          "location": "scripts/rank-backlog.js:1",
+          "text": "// DeepBench v7.0.446 | scripts/rank-backlog.js | SES-346 -- the Prioritizer's board re-rank, moved off\n// a Vercel cron and onto the session path. This file IS `api/cron/rank-backlog.js`'s job; it is not a\n// new capability, a new schedule, or a second ranking. `docs/SELFBUILD-RETIREMENT-LEDGER.md` entry 53\n// carries what the route said and how to restore it."
+        },
+        {
+          "location": "scripts/rank-backlog.js:1",
+          "text": "the re-rank did not need a function in the\n// first place, because THE RUNNER IS ALREADY THE SCHEDULE. `docs/runbooks/runner-cycle.md` step 4c\n// runs this once per CST day on the first scheduled cycle that passes the walls, which is the same\n// clock the invention pass (step 4b) already runs on."
+        }
+      ],
+      "governing_fact": "Where the board re-rank lives: OD-42 names api/cron/rank-backlog.js, a nightly cron, as canonical; SES-346 moved it to scripts/rank-backlog.js, run by runner-cycle.md step 4c, and retired the route.",
+      "confidence": "high",
+      "proposed_resolution": "scripts/rank-backlog.js's header should win: SES-346 (v7.0.446) retired the route, retirement ledger entry 53. Re-point OD-42's canonical to scripts/rank-backlog.js's MAX_CANDIDATES and replace 'nightly' with the step-4c once-per-CST-day run; the 60-candidate cap and its max_tokens reasoning stand."
+    },
+    {
+      "kind": "redundant",
+      "locations": [
+        {
+          "location": "governance_rules/OD-07",
+          "text": "The filing-lane boundary is the literal date 2026-08-21, and it is written three separate times — `public.recompute_backlog_queue()`, `public.prime_directive_queue()`'s `buildable` CTE, and `public.drain_epic_next()`'s `c_lane_cut` constant — with no column, setting or single constant behind any of them; canonical: those three function bodies, jointly."
+        }
+      ],
+      "governing_fact": "The filing-lane boundary date 2026-08-21 has three homes — recompute_backlog_queue(), prime_directive_queue()'s buildable CTE and drain_epic_next()'s c_lane_cut — with no single constant behind them.",
+      "confidence": "medium",
+      "proposed_resolution": "prime_directive_queue()'s buildable CTE should be the one home, with recompute_backlog_queue() and drain_epic_next() reading one constant it also reads; the single-home principle is SES-45's second-copy defect as restated by SES-333 (v7.0.436, ledger entry 45) and SES-340 (v7.0.425) in runner-cycle.md's selection layer."
+    },
+    {
+      "kind": "redundant",
+      "locations": [
+        {
+          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:415",
+          "text": "**What `c_flagged` now holds: `ARRAY['needs-desktop']`, and nothing else.** It is declared identically\nin `drain_epic_next` and `drain_chain_gate`, and spelled inline in `prime_directive_queue`'s\n`buildable` CTE. Two entries left:"
+        }
+      ],
+      "governing_fact": "The flagged-prefix list c_flagged = ARRAY['needs-desktop'] is declared in three function bodies — drain_epic_next, drain_chain_gate and inline in prime_directive_queue's buildable CTE.",
+      "confidence": "medium",
+      "proposed_resolution": "prime_directive_queue()'s buildable CTE should be the one home: drain_chain_gate() already reads it for admission (SES-340, v7.0.425) and drain_epic_next() is its ordering pair (OD-05), so the other two declarations are SES-45's second-copy defect; SES-333 ledger entry 47 already gave the prose table one home."
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "location": "docs/runbooks/gate-review.md:152",
+          "text": "**Everything below happens in ONE `DO` block, and that is load-bearing rather than tidy.**\n`runner-cycle.md` 7b carries the reason in full: `now()` is frozen for the length of a transaction,\nand `reverse_decision()` refuses any row whose live `updated_at` is **later** than the image it\nwould restore from. Record the decision in one statement and file in the next, and the reversal\ncounts every row `refused`, restores nothing, and **still returns `outcome = 'applied'`** — the\ndecision is silently un-undoable, which is the one failure this whole mechanism exists to prevent."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:3387",
+          "text": "**WHY THIS IS ONE `DO` BLOCK AND NOT TWO STATEMENTS, and it is load-bearing rather than tidy.**\n`now()` is frozen for the length of a transaction, so the decision's `decided_at` and the\n`updated_at` of every row it writes come out **equal**. `reverse_decision()` refuses any row whose\nlive `updated_at` is **later than the decision's own `decided_at`** — the restore engine's own\npredicate, there to stop a reversal clobbering somebody else's later write. Record the decision in\none statement and make the write in the next, and the row's `updated_at` postdates `decided_at` by\nexactly that gap: the reversal then counts the row `refused_written_since`, restores nothing, and\nreturns **`outcome = 'refused'`** with the decision left standing and no rung moved. The undo did\nnot happen, which is the single failure this mechanism exists to prevent."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:3398",
+          "text": "**THE REFERENCE POINT IS `decided_at`, NOT THE IMAGE'S `created_at`, and reverting that is a\nregression rather than a simplification (`SES-316`, migration `ses316_reversal_survives_claims`).**"
+        }
+      ],
+      "governing_fact": "Which timestamp reverse_decision()'s written-since guard compares a row's live updated_at against: the before-image it restores from, or the decision's own decided_at.",
+      "confidence": "high",
+      "proposed_resolution": "runner-cycle.md step 7b (:3387, :3398) should win: SES-316, migration ses316_reversal_survives_claims, moved the guard to decided_at and calls reverting it a regression. gate-review.md:152 should keep its pointer to 7b and drop the restated predicate."
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "location": "docs/runbooks/gate-review.md:152",
+          "text": "**Everything below happens in ONE `DO` block, and that is load-bearing rather than tidy.**\n`runner-cycle.md` 7b carries the reason in full: `now()` is frozen for the length of a transaction,\nand `reverse_decision()` refuses any row whose live `updated_at` is **later** than the image it\nwould restore from. Record the decision in one statement and file in the next, and the reversal\ncounts every row `refused`, restores nothing, and **still returns `outcome = 'applied'`** — the\ndecision is silently un-undoable, which is the one failure this whole mechanism exists to prevent."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:3387",
+          "text": "**WHY THIS IS ONE `DO` BLOCK AND NOT TWO STATEMENTS, and it is load-bearing rather than tidy.**\n`now()` is frozen for the length of a transaction, so the decision's `decided_at` and the\n`updated_at` of every row it writes come out **equal**. `reverse_decision()` refuses any row whose\nlive `updated_at` is **later than the decision's own `decided_at`** — the restore engine's own\npredicate, there to stop a reversal clobbering somebody else's later write. Record the decision in\none statement and make the write in the next, and the row's `updated_at` postdates `decided_at` by\nexactly that gap: the reversal then counts the row `refused_written_since`, restores nothing, and\nreturns **`outcome = 'refused'`** with the decision left standing and no rung moved. The undo did\nnot happen, which is the single failure this mechanism exists to prevent."
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:400",
+          "text": "- **One transaction, and it is not a style choice.** Step 7b carries the reason in full: `now()` is\n  frozen for the length of a transaction, so the decision's `decided_at` and every write it makes\n  carry the same stamp — and `reverse_decision()` refuses any row whose live `updated_at` postdates\n  that stamp (`SES-316`; it used to compare against the *image's* `created_at`). Split this into two\n  statements and `decided_at` lands in the first while the write lands in the second, so the row\n  postdates its own decision and the reversal restores nothing — now reported honestly as\n  `outcome = 'refused'`, but still an undo that did not happen."
+        }
+      ],
+      "governing_fact": "What reverse_decision() returns as outcome when the row it would restore was written after the decision: 'applied' or 'refused'.",
+      "confidence": "high",
+      "proposed_resolution": "runner-cycle.md step 7b (:3387) should win: since SES-316 a written-since refusal is counted in refused_written_since and the call returns outcome = 'refused' (session-setup.md:400 agrees). gate-review.md:152 should say 'refused' or defer to 7b rather than restate the outcome."
+    },
+    {
+      "kind": "duplicate",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:2595",
+          "text": "**A claim is coordination, not a judgment write — so it does NOT touch `updated_at`, and that\nomission is deliberate (`SES-316`).** Step 7b's own list of what is *not* a decision already named\nthe claim; bumping `updated_at` contradicted it in SQL and made every decision on a picked ticket\nun-restorable, because `reverse_decision()` refuses a row written after the decision and a claim\nminutes later is indistinguishable from somebody else's later write. `claimed_by` / `claimed_at` are\nthe claim's own columns and nothing reads `updated_at` to learn about a claim. (Measured before the\nedit: `backlog_items` carries no `updated_at` trigger, so the omission is real rather than cosmetic.)"
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:161",
+          "text": "**A claim is coordination, not a judgment write — and it deliberately does NOT touch `updated_at`\n(`SES-316`).** Bumping it made every decision on a picked ticket un-restorable: `reverse_decision()`\nrefuses a row written after the decision, and a claim minutes later looked exactly like somebody\nelse's later write. `claimed_by` / `claimed_at` are the claim's own columns; nothing reads\n`updated_at` to learn about a claim. (7b's own list of what is *not* a decision already named the\nclaim — this is that definition honoured in the SQL.)"
+        },
+        {
+          "location": "docs/GOVERNANCE-MODES.md:58",
+          "text": "**No `updated_at`, and the omission is load-bearing (`SES-316`, `v7.0.403`).** A claim is\ncoordination, not a judgment write — the boundary this file's own *\"name what it protects\"* list\ndraws. Bumping `updated_at` made every decision on a picked ticket un-restorable, because\n`reverse_decision()` refuses a row written after the decision and could not tell a claim from\nsomebody else's later write. **This is the THIRD copy of this statement** (`runner-cycle.md` step 5\nand `session-setup.md` 2c are the others) and it was the one `SES-316` nearly missed: all three are\npinned together by `tests/regression/ses-286a-reversal-window.test.mjs`, so the next editor who\nsyncs two of them is told about the one they forgot."
+        }
+      ],
+      "governing_fact": "A ticket claim does not write updated_at on backlog_items, because reverse_decision() would refuse a row written after the decision (SES-316).",
+      "confidence": "medium",
+      "proposed_resolution": "runner-cycle.md:2595 (step 5, beside the claim SQL and the measured no-trigger note) should win as the one home; session-setup.md:161 and GOVERNANCE-MODES.md:58 should cite it instead of restating. SES-316 (v7.0.403) wrote all three and pinned them via tests/regression/ses-286a-reversal-window.test.mjs; John may rule the pinned triplication deliberate."
+    },
+    {
+      "kind": "duplicate",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:3230",
+          "text": "**No `updated_at` here either, and for the same reason as the claim at step 5 (`SES-316`):** a\n  release is the claim's mirror image, so it is coordination too. A release that stamped\n  `updated_at` would make the decision this very cycle recorded at 7b un-restorable one statement\n  after its own push."
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:184",
+          "text": "**No `updated_at` here either, and for the same reason (`SES-316`):** a release is the claim's\nmirror image, so it is coordination too. A release that stamped `updated_at` would make the\ndecision this very session just recorded un-restorable one statement after the push."
+        }
+      ],
+      "governing_fact": "A ticket release does not write updated_at on backlog_items, for the same SES-316 reason as the claim.",
+      "confidence": "medium",
+      "proposed_resolution": "runner-cycle.md:3230 should win as the one home and session-setup.md:184 should cite it; SES-316 (v7.0.403) made both true. Same deliberate-mirror caveat as the claim triplication."
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "location": "docs/runbooks/briefing-page.md:545",
+          "text": "Live proof of the discrimination, on fixtures inside a rolled-back\n  transaction: box `4` + a live override → `25,000,000 / override`; box `4` + every reading aged\n  past 48h → `3,000,000 / stale-floor`, **not** `4,000,000`; blank box → `10,000,000 / calibrated`,\n  the pre-`SES-147` number exactly."
+        },
+        {
+          "location": "governance_rules/OD-27",
+          "text": "The uncalibrated day allowance is `runner_budget.runner_day_token_allowance`, column default 10,000,000, and `public.resolve_day_token_cap()` re-states that same 10,000,000 as its own COALESCE literal; canonical: the column."
+        },
+        {
+          "location": "governance_rules/OD-24",
+          "text": "The day's token cap is resolved by five rungs tried in a fixed order: 1 John's unexpired `budget_override` for today, 2 the stale-reading floor, 3 John's standing daily-max box, 4 the calibrated allowance derived from his last night-to-morning meter pair, 5 the uncalibrated standing default — and a missing `runner_budget` row for the month short-circuits every rung into \"did not run\"; canonical: `public.resolve_day_token_cap()`."
+        }
+      ],
+      "governing_fact": "Which rung the blank-box 10,000,000 result comes from: the runbook labels it `calibrated` (rung 4, derived from a meter pair) while the registry says 10,000,000 is the uncalibrated standing default (rung 5).",
+      "confidence": "medium",
+      "proposed_resolution": "governance_rules/OD-24 and OD-27 win (canonical: the column and public.resolve_day_token_cap(); SES-147 v7.0.201 moved the ladder there). docs/runbooks/briefing-page.md:545 should re-run the fixture and relabel the blank-box 10,000,000 as the uncalibrated rung, or, if cap_reason really reads `calibrated` for that value, the registry rung names need correcting instead."
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "locations": [
+        {
+          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:284",
+          "text": "`SES-280`\nshipped this as a *refusal* at 24h; within the hour it live-blocked the drain, because the only way\nto refresh that reading is John typing it (`SES-82` is unbuilt) — a number only he can produce\nturned into a precondition for autonomy, which `M6-01` forbids."
+        },
+        {
+          "location": "docs/runbooks/routine-prompt.md:51",
+          "text": "| \"governed by John's typed-in meter readings … plan against a 50% share, 10M/day uncalibrated, 3M/day when staler than 48h\" | The meter is self-read (`SES-82`'s closer, 2026-09-11); the pace is `M5-16`; the ceiling has one home (`M5-15`, `resolve_day_token_cap()`) | Step 6: wall, pace, resolver |"
+        }
+      ],
+      "governing_fact": "Whether SES-82, the self-read usage meter, is built: the M5 requirements doc asserts in present tense that it is unbuilt and that only John can refresh the reading; the routine-prompt retirement table records SES-82's closer on 2026-09-11.",
+      "confidence": "medium",
+      "proposed_resolution": "docs/runbooks/routine-prompt.md:51 wins as the retirement record (SES-82's closer, 2026-09-11: the meter is self-read). docs/RUNNER-GOV-M5-REQUIREMENTS.md:284 should move the parenthetical to past voice (\"SES-82 was unbuilt then\") or mark the paragraph as history so it stops asserting a live precondition that no longer exists."
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "location": "governance_rules/CAP-SCOPE-FILES",
+          "text": "Modify at most 3 files per session, plus the extra files the ticket's class has earned on the trust ladder (`public.class_autonomy(priority_class).extra_files` — one per rung above `runner_settings.cap_relax_rung`; M6, SES-122). The baseline is CLAUDE.md's hard rule; the extra is the class's, read at pick time, never assumed."
+        },
+        {
+          "location": "governance_rules/OD-33",
+          "text": "The scope-cap baseline is 3 FILES and 4 TASKS, stated in `docs/runbooks/runner-cycle.md` step 5a and in CLAUDE.md's hard rules but held in NO column; `public.class_autonomy()` returns only the EXTRAS on top of it, and fails closed by null arithmetic rather than by a special case — an unclassed ticket, a class with no ladder row, or a missing `runner_settings` singleton all yield zero extras and `auto_done` false; canonical: `docs/runbooks/runner-cycle.md` step 5a for the baseline, `public.class_autonomy()` for the extras."
+        }
+      ],
+      "governing_fact": "Which document is the canonical home of the 3-file / 4-task scope-cap baseline: CLAUDE.md's hard rule (CAP-SCOPE-FILES) or docs/runbooks/runner-cycle.md step 5a (OD-33).",
+      "confidence": "medium",
+      "proposed_resolution": "OD-33 should win: it is the row that assigns canonical homes and it matches the M6 split (SES-122) in which class_autonomy() holds only the extras and the baseline lives in runner-cycle.md step 5a. CAP-SCOPE-FILES should say the baseline is stated in CLAUDE.md, not that it is CLAUDE.md's rule, or defer to OD-33's canonical clause."
+    },
+    {
+      "kind": "redundant",
+      "locations": [
+        {
+          "location": "governance_rules/HR-SCOPE",
+          "text": "Keep each session to one feature, at most 3 modified files, and at most 4 tasks — the baseline; a class's trust-ladder rung above `runner_settings.cap_relax_rung` adds one file and one task per rung (`class_autonomy()`, M6, SES-122), and a reversal takes them back."
+        },
+        {
+          "location": "governance_rules/CAP-SCOPE-FILES",
+          "text": "Modify at most 3 files per session, plus the extra files the ticket's class has earned on the trust ladder (`public.class_autonomy(priority_class).extra_files` — one per rung above `runner_settings.cap_relax_rung`; M6, SES-122). The baseline is CLAUDE.md's hard rule; the extra is the class's, read at pick time, never assumed."
+        },
+        {
+          "location": "governance_rules/CAP-SCOPE-TASKS",
+          "text": "Include at most 4 tasks per kickoff doc, plus the extra tasks the ticket's class has earned (`class_autonomy(priority_class).extra_tasks`; M6, SES-122)."
+        },
+        {
+          "location": "governance_rules/OD-32",
+          "text": "Scope caps widen by one file and one task for every ladder rung a work class holds ABOVE `runner_settings.cap_relax_rung` (column default 5, LIVE VALUE 13, raised at the M6 gate review so extras accrue only from verifier-fed promotions); canonical: that column, read by `public.class_autonomy()`."
+        }
+      ],
+      "governing_fact": "The scope-cap widening formula — one extra file and one extra task per ladder rung above runner_settings.cap_relax_rung — is stated as a rule in four live registry rows rather than one.",
+      "confidence": "medium",
+      "proposed_resolution": "OD-32 should win as the single home of the per-rung widening formula: it names runner_settings.cap_relax_rung as canonical, per the M6 gate review that set the live value (SES-122, M6). HR-SCOPE, CAP-SCOPE-FILES and CAP-SCOPE-TASKS should point to class_autonomy() for the extras instead of restating the per-rung formula."
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "locations": [
+        {
+          "location": "docs/GOVERNANCE-MODES.md:19",
+          "text": "an **America/Chicago hour divisible by `interval_hours`** (3 → **12, 3, 6, 9 AM/PM on his clock**, DST-proof, no cron realign ever)"
+        },
+        {
+          "location": "docs/GOVERNANCE-MODES.md:102",
+          "text": "an\nhour divisible by `interval_hours` (3 → 12/3/6/9 AM/PM on his clock, DST-proof)"
+        },
+        {
+          "location": "runner_settings/1/interval_hours",
+          "text": "interval_hours=1"
+        }
+      ],
+      "governing_fact": "runner_settings.interval_hours is live at 1; the '3 → 12/3/6/9 AM/PM on his clock' figures describe the value set on 2026-08-23 under SES-151, not the grid now in force.",
+      "confidence": "medium",
+      "proposed_resolution": "runner_settings row 1 wins (OD-14: canonical is those three columns, LIVE VALUE 1). GOVERNANCE-MODES.md:19 and :102 should present 3 as the column default and point to runner_settings for the live grid rather than stating 12/3/6/9 as current. Decision: runner-cycle.md:3167 rules the 12/3/6/9 prose stale against the live 1."
+    },
+    {
+      "kind": "duplicate",
+      "locations": [
+        {
+          "location": "docs/GOVERNANCE-MODES.md:19",
+          "text": "Cadence (John, 2026-08-23, `SES-151` `v7.0.196`): the cron fires **hourly at :40** and cannot be edited by a cycle; `scheduler_gate()` admits scheduled fires only on John's clock grid — an **America/Chicago hour divisible by `interval_hours`** (3 → **12, 3, 6, 9 AM/PM on his clock**, DST-proof, no cron realign ever)."
+        },
+        {
+          "location": "docs/GOVERNANCE-MODES.md:102",
+          "text": "Cadence (`SES-151`, `v7.0.196`): the cron fires **hourly at :40**\nand `scheduler_gate()` admits scheduled fires only on John's America/Chicago clock grid — an\nhour divisible by `interval_hours` (3 → 12/3/6/9 AM/PM on his clock, DST-proof)."
+        },
+        {
+          "location": "governance_rules/OD-17",
+          "text": "The scheduled-fire grid is `hour % interval_hours = 0` evaluated on the America/Chicago WALL CLOCK, anchored to the cycle row's own `started_at` rather than to call time, which makes it DST-proof by construction; canonical: `public.scheduler_gate()`."
+        }
+      ],
+      "governing_fact": "The scheduled-fire cadence rule (cron hourly at :40; scheduler_gate() admits an America/Chicago hour divisible by interval_hours, DST-proof) is stated in full twice in GOVERNANCE-MODES.md.",
+      "confidence": "medium",
+      "proposed_resolution": "governance_rules/OD-17 wins as the home of the grid rule (canonical: public.scheduler_gate()); GOVERNANCE-MODES.md:19, the mode table, keeps the one prose statement and :102 should cite SES-151 (v7.0.196) and OD-17 instead of restating the cadence. Decision: SES-151 (v7.0.196) is the ship that made the cadence true."
+    },
+    {
+      "kind": "redundant",
+      "locations": [
+        {
+          "location": "governance_rules/OD-14",
+          "text": "The runner's scheduled fire is paced by three stored numbers — `runner_settings.cron_minute` (the cron grid minute, default 40), `runner_settings.interval_hours` (the hour grid, column default 3, LIVE VALUE 1) and `runner_settings.grid_tolerance_min` (how far off the minute grid a fire may sit and still count as scheduled, default 10); canonical: those three columns."
+        },
+        {
+          "location": "governance_rules/OD-15",
+          "text": "`public.scheduler_gate()` re-states each pacing default as its own COALESCE literal — `scheduler_on` true, `interval_hours` 3, `cron_minute` 40, `grid_tolerance_min` 10 — and additionally clamps a sub-1 interval up to 1 to guard its own modulo; the literals are a second copy of the column defaults they shadow; canonical: `public.scheduler_gate()`."
+        }
+      ],
+      "governing_fact": "The default of 3 for interval_hours has two homes: the runner_settings column default and a COALESCE literal inside public.scheduler_gate().",
+      "confidence": "medium",
+      "proposed_resolution": "The runner_settings column default wins; OD-14 names those three columns canonical for the pacing numbers, so scheduler_gate() should fall back to the column default rather than carry a shadow literal, and OD-15 should then record a single home. Decision: OD-14 (canonical: those three columns)."
+    },
+    {
+      "kind": "duplicate",
+      "locations": [
+        {
+          "location": "docs/GOVERNANCE-MODES.md:19",
+          "text": "Cadence (John, 2026-08-23, `SES-151` `v7.0.196`): the cron fires **hourly at :40** and cannot be edited by a cycle; `scheduler_gate()` admits scheduled fires only on John's clock grid — an **America/Chicago hour divisible by `interval_hours`** (3 → **12, 3, 6, 9 AM/PM on his clock**, DST-proof, no cron realign ever)."
+        },
+        {
+          "location": "docs/GOVERNANCE-MODES.md:102",
+          "text": "Cadence (`SES-151`, `v7.0.196`): the cron fires **hourly at :40**\nand `scheduler_gate()` admits scheduled fires only on John's America/Chicago clock grid — an\nhour divisible by `interval_hours` (3 → 12/3/6/9 AM/PM on his clock, DST-proof)."
+        },
+        {
+          "location": "docs/RUNNER-GOV-0820-REQUIREMENTS.md:27",
+          "text": "**SUPERSEDED 2026-08-23 by `SES-151` (`v7.0.196`): the cron fires hourly\n  at :40 permanently, and `scheduler_gate()` paces by John's America/Chicago clock grid (an\n  hour divisible by `interval_hours`; 3 → 12/3/6/9 AM/PM on his clock) — DST-proof, no cron\n  realign ever.**"
+        }
+      ],
+      "governing_fact": "The Automated cadence: the cron fires hourly at :40 and scheduler_gate() admits scheduled fires only on an America/Chicago hour divisible by interval_hours (3 → 12/3/6/9 AM/PM), DST-proof.",
+      "confidence": "high",
+      "proposed_resolution": "governance_rules OD-15 and OD-17 (canonical: public.scheduler_gate()) win for the numbers and grid rule, per SES-151 v7.0.196 (John, 2026-08-23). GOVERNANCE-MODES.md:102 keeps the single prose statement; GOVERNANCE-MODES.md:19 and RUNNER-GOV-0820-REQUIREMENTS.md:27 cite it and OD-17 instead of restating the cadence."
+    },
+    {
+      "kind": "redundant",
+      "locations": [
+        {
+          "location": "docs/runbooks/standing-brief.md:235",
+          "text": "Runner pause: disable `deepbench-runner` at claude.ai/code/routines."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:130",
+          "text": "1. `scheduler_off` — `runner_settings.scheduler_on` is false. John's own switch, the same one step\n   1b's `scheduler_gate()` honours."
+        },
+        {
+          "location": "docs/runbooks/standing-brief.md:72",
+          "text": "**Scheduler and automation settings** — *as of 2026-09-12 21:05Z (Sep 12, 4:05 PM CST).* §2b of the briefing, John's own switches, binding via `scheduler_gate()` at step 1b:"
+        }
+      ],
+      "governing_fact": "The procedure by which John pauses the runner: standing-brief.md:235 names disabling the deepbench-runner routine, while runner-cycle.md:130 and standing-brief.md:72 name runner_settings.scheduler_on as John's own switch, binding via scheduler_gate().",
+      "confidence": "medium",
+      "proposed_resolution": "runner_settings.scheduler_on honoured by scheduler_gate() at step 1b wins, per governance_rules OD-15 naming public.scheduler_gate() canonical for scheduler_on and SES-151 v7.0.196 making the cron permanent and un-editable by a cycle. standing-brief.md:235 should name the switch, with the routines page at most as a secondary hard stop."
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:2405",
+          "text": "`backlog_items.automation_rank` holds his\nC4 step number (1–6; NULL = not in the lane) and is the function's **leading** key, `NULLS LAST`."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:2428",
+          "text": "The slot is therefore `min(open lane) − 1`, **never `max + 1`**."
+        },
+        {
+          "location": "docs/runbooks/standing-brief.md:206",
+          "text": "- **Top 5 by `automation_rank`:**\n  -35. `SES-288` — A schema-range red can never be auto-reverted: one refused down-migration disables rollba… *(serves none)*\n  -34. `SES-287` — The auto-rollback engine picks a stale green anchor and blames the last pusher for four c… *(serves none)*"
+        }
+      ],
+      "governing_fact": "The value domain of backlog_items.automation_rank: C4 step numbers 1–6 only, or any integer down to min(open lane)−1, negatives included.",
+      "confidence": "high",
+      "proposed_resolution": "runner-cycle.md:2428 wins: SES-101 (v7.0.147, migration ses101_automation_lane_top; John's q-lane-top answered yes 2026-08-21T20:47Z from directive 48ae1939) made the slot min(open lane)−1. Amend runner-cycle.md:2405 so '1–6' is marked as the original C4 numbering, not the live domain."
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "location": "governance_rules/OD-01",
+          "text": "The pickable board's stored order is produced by exactly six ranking keys applied in this sequence: `automation_rank` nulls last, then tier (`now` before `next` before everything else), then the numeric part of `priority_class` ascending, then the M5-02 filing lane (`coalesce(filed_at, created_at)` before 2026-08-21 first), then `predicted_cycles` ascending nulls last, then `coalesce(filed_at, created_at)` ascending, with `backlog_id` and `id` as final tiebreaks; canonical: `public.recompute_backlog_queue()`."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:2405",
+          "text": "**THE AUTOMATION LANE SITS ABOVE ALL SIX ORDER CLAUSES (`SES-86` phase 3, `v7.0.133`, directive\n`f47e5a95` — John, 2026-08-21T16:21Z).**"
+        }
+      ],
+      "governing_fact": "How many ranking keys recompute_backlog_queue() applies beneath automation_rank: five (OD-01 counts exactly six including it) or six (runner-cycle.md:2405 puts it above six).",
+      "confidence": "medium",
+      "proposed_resolution": "governance_rules/OD-01 wins; its canonical is public.recompute_backlog_queue(), the home SES-86 phase 3 (v7.0.133, directive f47e5a95) gave automation_rank. Amend runner-cycle.md:2405 to 'above the other five order clauses', or amend OD-01 to seven if the function shows six keys beneath it."
+    },
+    {
+      "kind": "duplicate",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:2428",
+          "text": "Nothing assigned `automation_rank` at filing time, so a newly\n  filed automation ticket landed in the class-sorted backlog exactly like the seven tickets that\n  sat at queue 241–281 *before the lane existed*."
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:332",
+          "text": "the function has assigned `automation_rank` since `v7.0.147`, but **nothing called\n  it at filing time**, so a newly filed automation ticket landed in the class-sorted backlog — the\n  exact failure the lane was built to end."
+        }
+      ],
+      "governing_fact": "Why a newly filed automation ticket landed in the class-sorted backlog before SES-101's filing-time call: nothing assigned automation_rank at filing.",
+      "confidence": "medium",
+      "proposed_resolution": "runner-cycle.md:2428 wins as the rule's home (SES-101, v7.0.147, q-lane-top ruling). session-setup.md:332, the procedure home since SES-121 moved the body there in v7.0.198, should keep the filing-time call and point to runner-cycle.md:2428 for the rationale."
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "location": "capabilities/design-kickoff/description",
+          "text": "Takes one claimed ticket and produces its kickoff document: premise revalidated, architecture sections read, tasks within the class caps, files named, a discriminating QA, a stop line. Writes docs/kickoffs/<version>-<ID>-<name>.md and sets kickoff_link and design_status = designed."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:2711",
+          "text": "3. **`premise = 'alive'` → write the returned `kickoff_markdown` to the returned `kickoff_path`**\n   (`docs/kickoffs/<version>-<ID>-<slug>.md`) and commit it, then set that path as the ticket's\n   `kickoff_link` and `design_status = 'designed'` in ONE write, before-image first. `SES-112`'s\n   `CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` refuses `designed` without a\n   link, so the two are one act or neither. From here the kickoff is the build's contract: step 7\n   hands it to The Builder unchanged, and a task not in it is not the build's.\n   **BEFORE the write, run `node scripts/verifier.js --check-kickoff=<the path>` (`SES-376`, cap\n   8,192 bytes and, since `SES-359`, a missing lane declaration). Exit 1 is a NAMED DEVIATION, never a quiet trim: do not write it as the kickoff, do\n   not set `designed`; re-assemble `design-kickoff` ONCE with `\"over_cap\":{\"bytes\":N,\"cap\":8192}` in\n   `task_context`; a second exit 1 closes the cycle `gated_before_build` with the finding verbatim in\n   notes and on the card. A non-null `harvest_markdown` is written to `docs/harvests/<ID>.md` in the\n   SAME commit and is never in the build's `task_context`.**"
+        }
+      ],
+      "governing_fact": "Who writes the kickoff file and sets backlog_items.kickoff_link and design_status = designed: the design-kickoff capability itself, or the cycle that receives kickoff_markdown and kickoff_path and writes them only after verifier --check-kickoff passes.",
+      "confidence": "medium",
+      "proposed_resolution": "runner-cycle.md:2711 should win: the capability returns kickoff_markdown and kickoff_path, and the cycle writes both after --check-kickoff (SES-376 size cap; SES-359 lane declaration, which refuses a kickoff before it can be saved). Reword capabilities/design-kickoff/description from 'Writes … and sets' to 'returns kickoff_markdown and kickoff_path; the cycle sets kickoff_link and design_status'."
+    },
+    {
+      "kind": "redundant",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:2711",
+          "text": "3. **`premise = 'alive'` → write the returned `kickoff_markdown` to the returned `kickoff_path`**\n   (`docs/kickoffs/<version>-<ID>-<slug>.md`) and commit it, then set that path as the ticket's\n   `kickoff_link` and `design_status = 'designed'` in ONE write, before-image first. `SES-112`'s\n   `CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` refuses `designed` without a\n   link, so the two are one act or neither. From here the kickoff is the build's contract: step 7\n   hands it to The Builder unchanged, and a task not in it is not the build's.\n   **BEFORE the write, run `node scripts/verifier.js --check-kickoff=<the path>` (`SES-376`, cap\n   8,192 bytes and, since `SES-359`, a missing lane declaration). Exit 1 is a NAMED DEVIATION, never a quiet trim: do not write it as the kickoff, do\n   not set `designed`; re-assemble `design-kickoff` ONCE with `\"over_cap\":{\"bytes\":N,\"cap\":8192}` in\n   `task_context`; a second exit 1 closes the cycle `gated_before_build` with the finding verbatim in\n   notes and on the card. A non-null `harvest_markdown` is written to `docs/harvests/<ID>.md` in the\n   SAME commit and is never in the build's `task_context`.**"
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:548",
+          "text": "```sql\nINSERT INTO runner_before_images (session_name, table_name, pk_value, row_data)\nSELECT '<session>', 'backlog_items', id::text, to_jsonb(b) FROM backlog_items b WHERE backlog_id = '<ID>';\nUPDATE backlog_items SET kickoff_link = '<kickoff_path>', design_status = 'designed' WHERE backlog_id = '<ID>';\n```"
+        }
+      ],
+      "governing_fact": "The procedure that sets backlog_items.kickoff_link and design_status = 'designed' (before-image first) has two homes: runner-cycle.md step 3, which gates the write behind verifier --check-kickoff, and a bare SQL copy in session-setup.md that shows no such gate.",
+      "confidence": "medium",
+      "proposed_resolution": "runner-cycle.md:2711 should be the single home and session-setup.md:548 should point to it rather than restate the UPDATE. SES-359 (CLAUDE-STATE.md:12) made the attended path run 'the same Designer and Builder … through the same assembly', so the --check-kickoff-before-write order (SES-376, SES-359) must reach the attended write too, and today it lives only in the runner-cycle copy."
+    },
+    {
+      "kind": "redundant",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:2891",
+          "text": "```\nSUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js\nSUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js --kickoff=<the ticket's kickoff_link> \\\n  --cycle-id=<your cycle id> --ticket=<TICKET-ID> --version=v<your version>\n```"
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:448",
+          "text": "```\nSUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js \\\n  --cycle-id=<the id returned above> --ticket=<TICKET-ID> --version=<vX.Y.Z> --base=origin/dev \\\n  --kickoff=<the ticket's kickoff_link>\n```"
+        }
+      ],
+      "governing_fact": "The delivery-side verifier invocation that takes --kickoff=<kickoff_link> is written in two runbooks, and they disagree on whether --base=origin/dev is part of it.",
+      "confidence": "medium",
+      "proposed_resolution": "session-setup.md:448 should win on the flag set, and runner-cycle.md:2891 should match it or state why the unattended path omits --base. session-setup.md:454 (SES-359) is the home that defines what --kickoff= arms, and SES-359 made both paths run the same verifier checks; one invocation home should carry the flags for both."
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:2658",
+          "text": "**`design_status = 'designed'` MEANS THE DESIGN ALREADY EXISTS — build from `kickoff_link`,\ndo not re-design it (`SES-114`, `v7.0.165`).** 18 open numbered tickets carry it (census\n`23:11Z` 2026-08-22). The row cannot claim it without its artifact — `SES-112` shipped\n`CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` — so the link is guaranteed\npresent, and re-deriving a kickoff for a ticket that has one is the same waste in a different\ncostume. `auto` or `NULL` runs the full ceremony below exactly as today. **Revalidation is NOT\nskipped by this** — a designed ticket's premise can die like any other, and the fast path starts\nafter the revalidation above, never instead of it."
+        },
+        {
+          "location": "docs/runbooks/standing-brief.md:64",
+          "text": "| `design_status` | open rows | selection effect |\n|---|---:|---|\n| `NULL` | 558 | full ceremony — not yet triaged |\n| `needs-decision` | 44 | — |\n| `designed` | 25 | **not a skip** — build from `kickoff_link` (step 6 fast path) |\n| `needs-desktop` | 7 | skipped, `record_skip()` — needs a session John attends (B39) |\n| `auto` | 1 | full ceremony |"
+        }
+      ],
+      "governing_fact": "How many open backlog rows carry design_status = 'designed': runner-cycle.md states 18 in live voice (census 23:11Z 2026-08-22), standing-brief.md's table states 25.",
+      "confidence": "medium",
+      "proposed_resolution": "standing-brief.md:64 should win as the measured-state home; runner-cycle.md:2658 should drop the dated count or point to the standing brief. The runner-cycle passage itself dates its census to 2026-08-22, and the standing brief's later table supersedes it; no registry retirement applies, the number simply aged in a procedural home."
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "locations": [
+        {
+          "location": "scripts/export-backlog-snapshot.js:1",
+          "text": "// FEATURE: SES-115 -- the snapshot carries a derived `History residue` column as its last one.\n// Rows are never deleted (John's keep-and-filter design, register B1 as revised), so a\n// done/removed row on the board is history rather than drift; this cell names the live-board\n// state such a row should NOT still hold (queue number, claim, pin) and is empty otherwise.\n// Derived rather than three raw columns on purpose -- `queue` and `claimed_at` are row churn\n// and exporting them would break this file's byte-identical-across-unchanged-runs guarantee.\n// FEATURE: SES-112 -- the snapshot carries `design_status` and `kickoff_link` as its last two\n// columns, so WHY a ticket is not being built (and the kickoff doc proving it is designed)\n// survives in the backup exactly like the ticket text does.\n// FEATURE: SES-110 -- the snapshot carries each ticket's epic NAME as its last column,\n// joined through backlog_items.epic_id, so the board's grouping survives in the backup."
+        }
+      ],
+      "governing_fact": "Which columns close the backlog snapshot: the header says History residue is last (SES-115), design_status and kickoff_link are the last two (SES-112), and epic NAME is last (SES-110), all in live voice.",
+      "confidence": "medium",
+      "proposed_resolution": "The SES-115 line should win as the latest ship recorded in the header (v7.0.173); the SES-112 and SES-110 lines should lose their 'last column' ordinal and state only what they added. SES-115 is the ship that moved kickoff_link and design_status out of last position, so those earlier lines are retired in place by it."
+    }
+  ]
+}

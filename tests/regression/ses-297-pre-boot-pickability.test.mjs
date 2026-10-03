@@ -1,0 +1,1258 @@
+// DeepBench v7.0.748 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-314 -- the
+// nothing-pickable slot splits AGAIN: `work_to_find` is the THIRD verdict that boots. BOOTING_REASONS
+// grows to three, the closed-set assertion ranges over it, the oracle counts open/carried
+// audit_findings and the open/partial tickets of every runner_settings.find_work_lists project from
+// the RAW rows, detail.mode is graded as a two-valued MODE rather than one string, the two new
+// detail counts are graded against that oracle, and a doc clause reads the rule out of the runbook.
+// DeepBench v7.0.689 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-265 -- `lanes_full`
+// sits right after `db_pressure`: REASONS grows to nine, the oracle counts live runner lanes from the raw
+// runner_cycles rows against runner_settings.max_lanes, and the live arm grades detail.live_lanes /
+// max_lanes against those same raw reads.
+// DeepBench v7.0.658 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-237 -- `db_pressure`
+// is refusal 6 (M6-14): REASONS grows to eight, the oracle refuses on anything but green read over
+// rpc/db_health_level, and the live arm grades detail.db_level / db_reasons against that same rpc.
+// DeepBench v7.0.513 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-414 -- from Thursday
+// 01:00 America/Chicago to the Friday 01:00 reset the wall grades `final_day_rest_pct` (OD-28, default
+// 90) instead of `weekly_rest_pct` (85): chicagoWeek() carries finalDay, the oracle walls on wallPct,
+// and the live arm grades detail.wall_stop / wall_pct / final_day_rest_pct and the resolver's rest_pct.
+// DeepBench v7.0.510 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-410 -- `weekly_pace`
+// refuses again (M5-16); the 2026-09-15 live fix removed it without John's word. REASONS back to seven.
+// DeepBench v7.0.489 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-398 -- the live arm
+// grades `judgment_model().fable_pct` against the newest reading SINCE THE WEEK START that carries a
+// Fable number (its own PostgREST read: fable_pct=not.is.null, taken_at=gte.<chicagoWeek start>),
+// not against the gate's newest row -- migration ses398_judgment_reads_week_fable, because the
+// routine's meter self-read writes fable_pct NULL whenever its call carried no Fable window.
+// DeepBench v7.0.486 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-395 -- the wall and
+// the pace grade `all_models_pct` again, and Fable past its own share DEGRADES the judgment lane
+// instead of refusing the cycle. The doc clause flips to `judgment_model` / `fable_rest` /
+// `fable_pace` and now asserts the ABSENCE of GREATEST; the oracle's gatedPct is allModelsPct and
+// gatedMeter the constant 'all_models', guarded by an up-front assertion that the two meters
+// actually differ so the clause cannot go vacuously green; and the live arm calls
+// `rpc/judgment_model`, grading its model_id against `runner_model_lanes` rather than a literal and
+// its reason against the closed set, then reads the same three facts back out of the gate's detail.
+// DeepBench v7.0.482 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-389 -- the gate gains
+// its SECOND refusal, `meter_stale` (M5-15, rewritten): the freshest reading's age is now GRADED
+// against runner_settings.meter_stale_hours (default 2) instead of merely printed, and the refusal
+// names reading_taken_at and the threshold it was graded against. The oracle grows the branch in the
+// ladder's real position -- below scheduler_off, above the wall -- and the live arm reads the
+// threshold out of runner_settings so a hard-coded 2 in either place is a failure, not a pass.
+// M5-15's other consequence is UNCHANGED and the clause below says so: resolve_day_token_cap()
+// RUNG 2 still owns the CEILING at 48h. Two consequences, one home each.
+// DeepBench v7.0.448 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-368 -- the gate gains
+// its third refusal, `weekly_pace` (M5-16): John's day-of-week share of the subscription week
+// (day index x 100/7, week starting Friday 01:00 America/Chicago, whole days). The oracle grows one
+// branch in the ladder's real position, a fixed-instant calendar check guards the week arithmetic
+// independently of the database, and the three new detail keys are asserted against the oracle.
+// DeepBench v7.0.364 | tests/regression/ses-297-pre-boot-pickability.test.mjs | SES-297
+//
+// FEATURE: SES-297 -- guards public.runner_should_boot(), the pre-boot pickability gate that makes
+// the FIRST executable action of a runner cycle one cheap query instead of a full orientation.
+// M6-09, absorbing M5-06 (the weekly wall) and M5-15 (no pick on a stale usage reading).
+//
+// WHAT THE DEFECT WAS, so a later editor does not "simplify" the ordering away: 53 scheduled cycles
+// in the current weekly window booted cold, discovered there was nothing to do and closed --
+// 32.4M tokens, average 611,321 each, shipping nothing -- because the decision happened AFTER
+// orientation. THE ORDERING IS THE FEATURE, which is why this file's strongest doc assertion is a
+// POSITION assertion (theGateBlockPrecedesStepZero) rather than a wording one.
+//
+// TWO ARMS, AND THE SPLIT IS DELIBERATE (the SES-281 / SES-218 / SES-275 precedent).
+//   * The DOC arm always runs. docs/runbooks/runner-cycle.md is the canonical home of the gate's
+//     CONTRACT -- what a cycle does with each verdict -- so the rules are READ OUT OF THE RUNBOOK,
+//     never restated here. A test that copies the thing it guards passes forever while the shipped
+//     thing rots. Every clause is paired with a negative control: "would this still pass if the
+//     change did nothing?" must answer "no" for each, and a meta-assertion checks the controls
+//     themselves (the SES-158 lesson -- a control that changes nothing proves nothing).
+//   * The LIVE arm runs only with SUPABASE_URL + SUPABASE_SERVICE_KEY and is DECLARED not-run
+//     otherwise (SES-180 notRun()), never silently skipped. It calls rpc/runner_should_boot over
+//     PostgREST and grades the seven-branch PRECEDENCE LADDER against an INDEPENDENT ORACLE built
+//     from the raw tables -- runner_settings, runner_usage_readings, runner_budget and
+//     rpc/prime_directive_queue -- so it asserts the REASON, never merely should_boot=false. Five
+//     branches could be dead and a should_boot-only assertion would still pass.
+//
+// PURITY IS ASSERTED BY SIDE EFFECT, because the property that matters is reachable even though
+// pg_proc is not. If a later edit rewired the gate to call drain_epic_next(uuid) -- VOLATILE,
+// retires a fully-done drain directive and writes a runner_before_images row -- then repeatedly
+// calling the gate would eventually MOVE THE BOARD. So the live arm snapshots the queued-directive
+// and before-image counts, calls the gate three times, and asserts nothing moved and all three
+// answers agree. That is a difference a rewire cannot survive, unlike a comment saying "STABLE".
+//
+// DRY-RUN RESULT, measured against unchanged state BEFORE migration ses297_runner_should_boot was
+// applied (STANDARDS.md Section 4), by the function-list query run this session rather than assumed:
+// pg_proc held ZERO functions named runner_should_boot, so every live assertion FAILS (the RPC 404s)
+// and the doc arm fails outright because the gate block did not exist in runner-cycle.md. NOTE for
+// anyone re-running the fixtures: the 2026-09 runner_budget row DOES exist (inserted during the
+// 2026-09-01 outage recovery), so a no_budget_row fixture must REMOVE it rather than rely on absence.
+//
+// WHAT THIS FILE DOES NOT COVER, declared rather than implied -- see the notRun() at the foot: the
+// function BODY ships as a Supabase migration and lives in the database, and this suite reaches
+// Supabase only over PostgREST, which cannot read pg_proc.provolatile, pg_proc.prosrc or
+// pg_get_functiondef, and cannot open a transaction -- so the seven-refusal fixture matrix cannot be
+// a permanent test without a permanent test that MUTATES runner_budget, runner_settings and the
+// standing Prime Directive on the live board. It must not. Those measurements were taken live at
+// this ship inside a deliberately failing DO block, all rolled back, and are recorded verbatim below.
+
+import assert from "assert";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { selfRun, notRun } from "./_lib/self-run.js";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
+const RUNBOOK = path.join(ROOT, RUNBOOK_REL);
+const SESSIONS_REL = "docs/SESSIONS.md";
+const SESSIONS = path.join(ROOT, SESSIONS_REL);
+
+const BLOCK_START = "**PRE-BOOT GATE — ONE QUERY";
+const BLOCK_END = "**0. Bootstrap.**";
+
+// The nine refusals plus the one pass. Held here ONLY as the closed set the live arm ranges over --
+// what each one MEANS is read out of the runbook by the clauses below, never restated.
+export const REASONS = [
+  "scheduler_off",
+  // SES-389 / M5-15 (rewritten): the age is GRADED here now, against
+  // runner_settings.meter_stale_hours. What SES-302 actually settled -- and what still holds -- is
+  // that the CAP has one home: this gate carries no token_cap and does not second-guess
+  // resolve_day_token_cap() RUNG 2's 48h ceiling brake. The 2026-09-01 defect was two homes for one
+  // consequence at two thresholds; this is two DIFFERENT consequences with one home each. Sits
+  // second: John's switch outranks it, and the wall and the pace both grade a number this branch
+  // has just called out of date. 'pickable_degraded' is still not here.
+  "meter_stale",
+  "weekly_wall",
+  // SES-368 / M5-16: John's pace. Sits between the wall and the budget-row check, and like the wall
+  // it compares NULL-safely -- no reading, no pace verdict.
+  "weekly_pace",
+  "no_budget_row",
+  // AGT-237 / M6-14: the database's own health. After every spend wall, before the pickable split,
+  // and NOT under meter_limiter_off -- anything but green in the window (incl. `unsafe`) refuses.
+  "db_pressure",
+  // AGT-265: live runner lanes (open runner-stamped cycles, heartbeat inside 20 min) at or past
+  // runner_settings.max_lanes. After the database, before the pickable split; a concurrency cap,
+  // so NOT under meter_limiter_off.
+  "lanes_full",
+  "nothing_pickable",
+  "unaffordable",
+];
+export const PASS_REASON = "pickable";
+// FEATURE: AGT-127 -- THE EIGHTH VERDICT, AND THE SECOND ONE THAT BOOTS. It is NOT a refusal, so it
+// is deliberately not in REASONS above: refusal 6 SPLIT. With nothing pickable and at least one
+// undecided `gated_before_build` card that no open `gate-card-…` question names, the fire boots to
+// rule those cards and nothing else (`detail.mode='rule-cards-only'`). It sits in refusal 6's slot,
+// AFTER every wall, so it can never boot a fire past one -- the oracle below places it there too,
+// and a gate that hoisted it above the wall disagrees with this file rather than with nobody.
+export const GATE_CARDS_REASON = "gate_cards_to_rule";
+// FEATURE: AGT-314 -- THE NINTH VERDICT, AND THE THIRD ONE THAT BOOTS. Not a refusal either, so it
+// is deliberately not in REASONS: refusal 6 split a SECOND time. With nothing pickable, no card
+// left to rule, and work that EXISTS to be found -- an open or carried `audit_findings` row, or an
+// open/partial ticket in a project named by `runner_settings.find_work_lists` -- the fire boots to
+// go and find it and nothing else (`detail.mode='find-work-only'`). It sits AFTER AGT-127's branch,
+// so a fire with a card to rule still rules it rather than going looking, and after every wall, so
+// it can never boot past one. The oracle below places it in exactly that position.
+export const FIND_WORK_REASON = "work_to_find";
+// SES-302 / AGT-127 / AGT-314: the set is kept rather than collapsed back to a string precisely so
+// a new pass reason is a one-line change here instead of a rewrite of the consistency check. It has
+// now been that one-line change twice.
+export const BOOTING_REASONS = new Set([PASS_REASON, GATE_CARDS_REASON, FIND_WORK_REASON]);
+
+// THE MODE IS WHAT A BOOTING FIRE READS, and it is now two-valued, so it is derived HERE from the
+// reason rather than compared against a literal at each call site. A fire that took the reason and
+// not the mode would try to build on a board with pickable_count = 0; a fire that read a mode the
+// gate does not set would do the wrong one thing.
+export const modeFor = reason =>
+  reason === GATE_CARDS_REASON ? "rule-cards-only" :
+  reason === FIND_WORK_REASON ? "find-work-only" : null;
+
+// ---------------------------------------------------------------------------
+// Pure readers
+// ---------------------------------------------------------------------------
+
+// Slice a bounded block out of a markdown file. Returns "" when absent -- itself a finding rather
+// than a crash, since a checker that throws on a missing section reports nothing useful.
+export function extractBlock(md, start, end) {
+  const a = md.indexOf(start);
+  if (a < 0) return "";
+  const b = md.indexOf(end, a);
+  return b < 0 ? md.slice(a) : md.slice(a, b);
+}
+
+// Markdown here is hard-wrapped, so a load-bearing phrase can straddle a line break and a literal
+// match fails for a reason that has nothing to do with the rule (the SES-194 lesson).
+export const norm = s => s.replace(/\s+/g, " ");
+
+export const gateBlock = md => norm(extractBlock(md, BLOCK_START, BLOCK_END));
+
+// ---------------------------------------------------------------------------
+// The doc clauses. A clause earns its place only if REMOVING it would change what a cycle does.
+// ---------------------------------------------------------------------------
+
+export const CLAUSES = [
+  {
+    id: "ordering-is-the-feature",
+    detail:
+      "the block must say this is the cycle's FIRST executable action, enumerate what does NOT " +
+      "precede it (CLAUDE.md, CLAUDE-STATE.md, the standing brief, the briefing page), and tell a " +
+      "refusing cycle to stop without reading anything else -- without that enumeration the next " +
+      "editor moves the call somewhere convenient and the ticket's entire saving evaporates while " +
+      "every word about a cheap query stays true",
+    test: s =>
+      /first\s+executable\s+action/i.test(s) &&
+      /CLAUDE\.md/.test(s) && /CLAUDE-STATE\.md/.test(s) &&
+      /standing-brief\.md/.test(s) && /briefing page/i.test(s) &&
+      /stop without reading anything\s+else/i.test(s),
+    breaks: s => s.replace(/first\s+executable\s+action/i, "a step of the cycle"),
+  },
+  {
+    id: "the-defect-is-a-measurement",
+    detail:
+      "the block must carry the 53 cold-booted cycles, the 32.4M total and the 611,321 average -- " +
+      "an ordering rule with no number behind it is an opinion, and this is the number that says " +
+      "why the ordering may not be relaxed for convenience",
+    test: s => /\b53\b/.test(s) && /32\.4M/.test(s) && /611,321/.test(s),
+    breaks: s => s.replace(/611,321/g, "quite a lot"),
+  },
+  {
+    id: "a-stale-meter-refuses-and-names-its-threshold",
+    detail:
+      "the block must say the gate REFUSES `meter_stale` past runner_settings.meter_stale_hours, " +
+      "must name reading_taken_at and meter_stale_hours as the detail a refusal owes its reader, " +
+      "and must keep the CEILING's separate 48h brake visible -- drop the threshold's name and the " +
+      "next editor hard-codes a literal; drop the 48h and M5-15's two consequences collapse back " +
+      "into the one-home-at-one-threshold confusion SES-302 paid for. 22 cycles shipped on a " +
+      "reading written 17:45Z on 2026-09-12 while the age was printed and not graded",
+    test: s =>
+      /`meter_stale`/.test(s) &&
+      /meter_stale_hours/.test(s) &&
+      /reading_taken_at/.test(s) &&
+      /48h/.test(s),
+    breaks: s => s.split("meter_stale_hours").join("some number"),
+  },
+  {
+    id: "all-six-refusals-are-named",
+    detail:
+      "every one of the nine reasons must appear by its exact string, with M5-16 / M5-15 / M5-06 / M6-09 / M6-14 " +
+      "attributed -- a cycle that meets a reason this file does not name cannot write a truthful " +
+      "last_step, and a reader cannot tell a refusal from a failure",
+    test: s =>
+      REASONS.every(r => s.includes(`\`${r}\``)) &&
+      /M5-16/.test(s) && /M5-15/.test(s) && /M5-06/.test(s) && /M6-09/.test(s) && /M6-14/.test(s),
+    breaks: s => s.split("`no_budget_row`").join("`some other refusal`"),
+  },
+  {
+    id: "the-pace-is-numbered-refusal-4",
+    detail: "SES-410: `weekly_pace` stays numbered refusal 4, between the wall (3) and the budget row (5)",
+    test: s => /3\. `weekly_wall`.*4\. `weekly_pace`.*5\. `no_budget_row`/.test(s),
+    breaks: s => s.replace("4. `weekly_pace`", "`weekly_pace`"),
+  },
+  {
+    id: "the-final-day-stop-is-in-refusal-3",
+    detail:
+      "SES-414 (OD-28): refusal (3) must name `final_day_rest_pct` as the stop from Thursday 01:00 to " +
+      "the Friday 01:00 reset, and `detail.wall_stop` as the field that says which stop applied -- drop " +
+      "either and the next reader grades the wall at a flat 85 all week, parking the runner through the " +
+      "last 24 hours John moved to 90",
+    test: s => /3\. `weekly_wall`.*`final_day_rest_pct`.*4\. `weekly_pace`/.test(s) && /detail\.wall_stop/.test(s),
+    breaks: s => s.split("final_day_rest_pct").join("a later stop"),
+  },
+  {
+    id: "a-refusal-always-names-itself",
+    detail:
+      'the block must state that a bare `false` is the "NULL is not zero" defect -- drop it and a ' +
+      "later simplification returns a boolean, at which point a parked runner is indistinguishable " +
+      "from a broken one and the 2026-09-01 outage class recurs with no name on it",
+    test: s => /bare\s+`false`/i.test(s) && /NULL is not zero/i.test(s),
+    breaks: s => s.replace(/NULL is not zero/i, "a fine simplification"),
+  },
+  {
+    id: "never-call-drain-epic-next",
+    detail:
+      "the block must forbid drain_epic_next by name, say WHY (VOLATILE; it retires a drain " +
+      "directive and writes a runner_before_images row), and name prime_directive_queue as the " +
+      "STABLE substitute that carries the same M5 filters. This is the single edit that would let " +
+      "a read-only probe CLOSE John's standing drain as a side effect of asking a question",
+    test: s =>
+      /never calls `drain_epic_next/i.test(s) &&
+      /VOLATILE/.test(s) &&
+      /retires/i.test(s) &&
+      /runner_before_images/.test(s) &&
+      /prime_directive_queue/.test(s) &&
+      /STABLE/.test(s),
+    breaks: s => s.replace(/never calls `drain_epic_next/i, "calls `drain_epic_next"),
+  },
+  {
+    id: "precedence-3-before-4-is-null-safe",
+    detail:
+      "the block must record that weekly_wall precedes no_budget_row deliberately and compares " +
+      "NULL-safely, and must name the 2026-09-01 outage. Reverse them, or make the wall comparison " +
+      "COALESCE to true, and a missing budget row is reported as a spent budget -- the exact " +
+      "misdiagnosis that stopped the runner and then sat unread in a card",
+    test: s =>
+      /NULL-safe/i.test(s) &&
+      /2026-09-01/.test(s) &&
+      /falls through/i.test(s) &&
+      /`no_budget_row`/.test(s) && /`weekly_wall`/.test(s),
+    // SES-389: replace-all, not first-only. The block now says "NULL-safe" twice (meter_stale is
+    // NULL-safe for the same reason the wall is), and a first-occurrence control left the second
+    // standing -- so the mutated block still passed and the control proved nothing. This is the
+    // SES-158 failure mode arriving by ADDITION rather than by edit: sibling controls in this file
+    // already use split/join for exactly this reason.
+    breaks: s => s.split("NULL-safe").join("convenient"),
+  },
+  {
+    id: "the-wall-and-pace-grade-all-models-and-fable-degrades-the-lane",
+    detail:
+      "SES-395: the block must say the wall and the pace grade `all_models_pct` and that Fable past " +
+      "its own share DEGRADES the judgment lane -- naming `detail.judgment_model` and both Fable " +
+      "reasons, `fable_rest` and `fable_pace` -- and it must no longer carry GREATEST anywhere. " +
+      "SES-390 graded GREATEST(all_models_pct, fable_pct) at both walls, which parks a WHOLE cycle " +
+      "because one delegated lane is spent: measured 2026-09-14 11:42 CT, weekly_wall on " +
+      "gated_meter='fable' at 93 vs 85 while all-models read 59. Leave GREATEST in the prose and " +
+      "the next editor restores the refusal this ticket replaced with a lane",
+    test: s =>
+      /judgment_model/.test(s) && /fable_pace/.test(s) && /fable_rest/.test(s) &&
+      /all_models_pct/.test(s) && !/GREATEST/.test(s),
+    breaks: s => s.split("judgment_model").join("some field"),
+  },
+  {
+    id: "m5-06-asks-the-cheapest-not-the-pick",
+    detail:
+      "the block must say the affordability test is asked of the CHEAPEST pickable ticket and " +
+      "never of the ticket that would be picked -- asking it of the pick makes the gate refuse to " +
+      "boot while affordable work is sitting right behind it, i.e. the gate stopping the work it " +
+      "exists to make cheap",
+    test: s =>
+      /cheapest/i.test(s) &&
+      /never of the ticket that would be picked/i.test(s) &&
+      /detail\.pick/.test(s) && /detail\.cheapest/.test(s),
+    breaks: s => s.replace(/never of the ticket that would be picked/i, "and also of the ticket that would be picked"),
+  },
+  {
+    id: "an-unpriced-ticket-is-unknown-not-free",
+    detail:
+      "the block must state that predicted_cycles IS NULL is excluded from the cheapest-cost " +
+      "arithmetic, that an all-unpriced board FAILS OPEN, and that detail.unpriced_pickable reports " +
+      "it -- counting NULL as 0 makes every board affordable and the unaffordable branch dies " +
+      "silently; counting it as infinite refuses every board",
+    test: s =>
+      /predicted_cycles` IS NULL|predicted_cycles IS NULL/i.test(s) &&
+      /fails open/i.test(s) &&
+      /unpriced_pickable/.test(s) &&
+      /Neither is a measurement/i.test(s),
+    breaks: s => s.replace(/fails open/i, "counts those tickets as free"),
+  },
+  {
+    id: "the-refusal-writes-a-did-not-run-row",
+    detail:
+      "the block must carry the runner_cycles INSERT with outcome='did_not_run' and the " +
+      "'step 0 — pre-boot refusal' last_step -- a refusal that writes no row is invisible to " +
+      "scheduler_gate's predecessor predicate, to the cadence watchdog and to the ledger, so the " +
+      "saving would show up as the runner having silently died",
+    test: s =>
+      /runner_cycles/.test(s) &&
+      /did_not_run/.test(s) &&
+      /pre-boot refusal/.test(s) &&
+      /last_step/.test(s),
+    breaks: s => s.split("did_not_run").join("finished"),
+  },
+  {
+    id: "the-month-is-johns-clock",
+    detail:
+      "the block must name America/Chicago and register B35 for the budget month, and say never " +
+      "UTC -- a UTC month boundary silently refuses or admits fires for up to six hours around " +
+      "every month end, on the one check whose absence already caused an outage",
+    test: s => /America\/Chicago/.test(s) && /B35/.test(s) && /never UTC/i.test(s),
+    breaks: s => s.replace(/America\/Chicago/g, "UTC"),
+  },
+  {
+    id: "the-skipped-tail-consequence-is-declared",
+    detail:
+      "the block must say a refusal skips the serial tail, name what that costs (John's taps are " +
+      "not harvested), and mark nothing_pickable as the UNBOUNDED case -- an undeclared cost is how " +
+      "a later cycle 'fixes' this by restoring the tail and puts the 473.1 KB briefing read back on " +
+      "the exact path the ticket exists to make cheap",
+    test: s =>
+      /serial tail/i.test(s) &&
+      /harvest John's taps/i.test(s) &&
+      /unbounded/i.test(s) &&
+      /473\.1 KB/.test(s),
+    breaks: s => s.replace(/unbounded/i, "fine"),
+  },
+  {
+    id: "find-work-boot-is-named",
+    detail:
+      "AGT-314: the block must name `work_to_find`, `find-work-only` and `find_work_lists` -- the " +
+      "verdict, the mode a booting fire reads to know it may only go looking, and the " +
+      "runner_settings column that says WHERE to look. Drop the column's name and the next editor " +
+      "hard-codes the two list slugs into the function, at which point re-pointing the find-work " +
+      "lane is a migration instead of an UPDATE (pattern:2); drop the mode and a fire that read " +
+      "only the reason would try to build on a board with pickable_count = 0. Measured before the " +
+      "ship: 8 `nothing_pickable` refusals on 2026-10-02 between 11:41 and 18:51Z while 44 " +
+      "audit_findings were open and 133 open/partial tickets sat on the two lists",
+    test: s =>
+      /`work_to_find`/.test(s) &&
+      /find-work-only/.test(s) &&
+      /find_work_lists/.test(s),
+    breaks: s => s.split("work_to_find").join("some other verdict"),
+  },
+  {
+    id: "scheduler-gate-is-a-different-question",
+    detail:
+      "the block must say this gate and scheduler_gate() answer different questions and both hold " +
+      "-- without it the next reader folds one into the other, and scheduler_gate needs a cycle row " +
+      "to close and reads the fire's own started_at, neither of which exists before the boot decision",
+    test: s => /scheduler_gate\(\)/.test(s) && /different question/i.test(s) && /both hold/i.test(s),
+    breaks: s => s.replace(/different question/i, "the same question"),
+  },
+];
+
+function readRunbook() {
+  return fs.readFileSync(RUNBOOK, "utf8");
+}
+
+function theShippedGateBlockIsClean() {
+  const s = gateBlock(readRunbook());
+  assert.ok(
+    s.length > 0,
+    `the SES-297 pre-boot gate block is missing from ${RUNBOOK_REL} -- runner_should_boot() is in ` +
+      "the database with nothing in the repo telling a cycle to call it, which is the same as not " +
+      "having shipped it",
+  );
+  for (const c of CLAUSES) {
+    assert.ok(c.test(s), `${RUNBOOK_REL} lost clause "${c.id}": ${c.detail}`);
+  }
+}
+
+// THE POSITION ASSERTION -- the strongest thing this file does. Every clause above could hold while
+// the call sat at step 4, and the ticket would have shipped nothing.
+function theGateBlockPrecedesStepZero() {
+  const md = readRunbook();
+  const gate = md.indexOf(BLOCK_START);
+  const bootstrap = md.indexOf(BLOCK_END);
+  const phase1 = md.indexOf("## Phase 1 — judgment first");
+  assert.ok(gate > 0, `${RUNBOOK_REL} has no pre-boot gate block at all`);
+  assert.ok(bootstrap > 0, `${RUNBOOK_REL} has no "0. Bootstrap." step to order against`);
+  assert.ok(phase1 > 0, `${RUNBOOK_REL} has no "Phase 1" heading`);
+  assert.ok(
+    phase1 < gate && gate < bootstrap,
+    `the pre-boot gate must sit at the START of Phase 1 and BEFORE step 0's bootstrap ` +
+      `(phase1@${phase1}, gate@${gate}, bootstrap@${bootstrap}). Ordering IS the feature: a gate ` +
+      "that runs after the clone, the leases and the orientation reads answers the same question " +
+      "for the same 611,321 tokens it was filed to stop spending",
+  );
+  const before = md.slice(phase1, gate);
+  assert.ok(
+    !/git fetch|CLAUDE-STATE\.md|standing-brief/.test(before),
+    "something that reads or clones now sits between the Phase 1 heading and the gate: " +
+      JSON.stringify(before.slice(0, 200)),
+  );
+}
+
+// FILE-LEVEL NEGATIVE CONTROL: an absent block must be reported as a finding, not crash. This is
+// the arm that fails on the pre-change runbook, where the block does not exist at all.
+function aMissingBlockIsFlagged() {
+  assert.strictEqual(
+    extractBlock("# a runbook with no pre-boot gate", BLOCK_START, BLOCK_END),
+    "",
+    "a missing gate block must return '' so the caller reports it",
+  );
+}
+
+function everyClauseHasTeeth() {
+  const block = gateBlock(readRunbook());
+  for (const c of CLAUSES) {
+    const mutated = c.breaks(block);
+    assert.notStrictEqual(
+      mutated,
+      block,
+      `control for "${c.id}" changed NOTHING -- it cannot prove the clause has teeth (the SES-158 failure)`,
+    );
+    assert.ok(
+      !c.test(mutated),
+      `clause "${c.id}" still passes after its own control removed the thing it checks -- the check is vacuous`,
+    );
+  }
+}
+
+// META-ASSERTION: prove the control-checking above can itself fail, so a future no-op `breaks`
+// cannot sail through everyClauseHasTeeth's first assert unexercised.
+function aVacuousMutationFailsItsOwnControl() {
+  const s = gateBlock(readRunbook());
+  assert.throws(
+    () => {
+      const mutated = s;
+      assert.notStrictEqual(mutated, s, "control changed NOTHING");
+    },
+    /control changed NOTHING/,
+    "the vacuous-control detector must itself fail on a no-op mutation",
+  );
+}
+
+// session-hygiene check 7: this ship added a stamp to the most-read runbook in the repo. The cap is
+// the reason it is safe to keep adding them, so the cap is asserted where the addition was made.
+function theRunbookStampCapHeld() {
+  const lines = readRunbook().split(/\r?\n/);
+  const stamps = lines.filter(l => l.startsWith("<!-- DeepBench v")).length;
+  assert.ok(
+    stamps <= 5,
+    `${RUNBOOK_REL} carries ${stamps} header stamps; session-hygiene check 7 caps it at 5. Before ` +
+      "SES-164 this header reached 45 stamps -- 34.1% of the file -- re-read in full by every cycle",
+  );
+  const sessions = fs.readFileSync(SESSIONS, "utf8");
+  assert.ok(
+    sessions.includes("<!-- DeepBench v7.0.348 | runbooks/runner-cycle.md | SES-244"),
+    `the stamp SES-297 retired is not in ${SESSIONS_REL} -- check 7 step 3 says the retired stamps ` +
+      "move VERBATIM to the appendix, because git history is not where anyone looks",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Arm 2 -- live Supabase over PostgREST. Read-only and side-effect free by construction; the
+// side-effect freedom is ASSERTED below rather than assumed.
+// ---------------------------------------------------------------------------
+
+async function pg(url, key, pathAndQuery, init) {
+  const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
+    ...init,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!res.ok) throw new Error(`${pathAndQuery} returned HTTP ${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+const asArray = (body, what) => {
+  if (!Array.isArray(body)) throw new Error(`${what} returned a non-array payload`);
+  return body;
+};
+
+// John's clock, not the runner's. Same boundary register B35 puts on every "today" in this system.
+export function chicagoMonth(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago", year: "numeric", month: "2-digit",
+  }).formatToParts(now);
+  const y = parts.find(p => p.type === "year").value;
+  const m = parts.find(p => p.type === "month").value;
+  return `${y}-${m}`;
+}
+
+// SES-368 / M5-16: John's week, computed here from the clock alone so the oracle does not read the
+// gate's own week_started_at back to itself. Week start = the most recent Friday 01:00
+// America/Chicago at or before `nowMs`; day index = whole days elapsed + 1, clamped 1..7; pace
+// limit = index x 100/7 rounded to 2dp (the SQL rounds the same way). No timeZoneName parsing:
+// the Chicago offset at an instant is recovered by formatting the instant in Chicago wall-clock
+// terms and differencing against Date.UTC of those parts, which works on every ICU build.
+const CHICAGO = "America/Chicago";
+function chicagoParts(ms) {
+  const f = new Intl.DateTimeFormat("en-US", {
+    timeZone: CHICAGO, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "short",
+  });
+  const p = Object.fromEntries(f.formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  const wall = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return {
+    y: +p.year, mo: +p.month, d: +p.day,
+    dow: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday),
+    offsetMin: Math.round((wall - Math.floor(ms / 1000) * 1000) / 60000),
+  };
+}
+function chicagoWallToMs(y, mo, d, h) {
+  let ms = Date.UTC(y, mo - 1, d, h);
+  for (let i = 0; i < 2; i++) ms = Date.UTC(y, mo - 1, d, h) - chicagoParts(ms).offsetMin * 60000;
+  return ms;
+}
+export function chicagoWeek(nowMs = Date.now()) {
+  const p = chicagoParts(nowMs);
+  const back = (p.dow + 2) % 7; // days since Friday
+  const startOf = daysBack => {
+    const l = new Date(Date.UTC(p.y, p.mo - 1, p.d - daysBack));
+    return chicagoWallToMs(l.getUTCFullYear(), l.getUTCMonth() + 1, l.getUTCDate(), 1);
+  };
+  let weekStartedAt = startOf(back);
+  if (weekStartedAt > nowMs) weekStartedAt = startOf(back + 7);
+  const weekDayIndex = Math.min(7, Math.max(1, Math.floor((nowMs - weekStartedAt) / 86400000) + 1));
+  const paceLimitPct = Math.round((weekDayIndex * 100 / 7) * 100) / 100;
+  // SES-414 (OD-28): the final 24 hours before the Friday 01:00 reset -- Chicago's Thursday an hour
+  // back, the SQL's `extract(dow FROM (now() AT TIME ZONE 'America/Chicago') - interval '1 hour') = 4`.
+  // Not weekDayIndex === 7: whole elapsed days drift by the DST hour, and the clock is John's.
+  return { weekStartedAt, weekDayIndex, paceLimitPct, finalDay: chicagoParts(nowMs - 3600000).dow === 4 };
+}
+
+// Always runs. The same instants the migration was checked against, so the JS calendar and the
+// SQL calendar are pinned to one table of expectations rather than to each other.
+function theOracleCalendarMatchesTheFixedInstants() {
+  const cases = [
+    ["Fri 2026-09-11 00:30 CT, before the reset", Date.UTC(2026, 8, 11, 5, 30), Date.UTC(2026, 8, 4, 6), 7, 100, true],
+    ["Fri 2026-09-11 01:00 CT, the reset", Date.UTC(2026, 8, 11, 6), Date.UTC(2026, 8, 11, 6), 1, 14.29, false],
+    ["Sat 2026-09-12 00:59 CT, end of day 1", Date.UTC(2026, 8, 12, 5, 59), Date.UTC(2026, 8, 11, 6), 1, 14.29, false],
+    ["Sat 2026-09-12 01:00 CT, day 2", Date.UTC(2026, 8, 12, 6), Date.UTC(2026, 8, 11, 6), 2, 28.57, false],
+    ["Thu 2026-09-17 23:00 CT, day 7", Date.UTC(2026, 8, 18, 4), Date.UTC(2026, 8, 11, 6), 7, 100, true],
+    ["Mon 2026-11-02 12:00 CST, after the DST end", Date.UTC(2026, 10, 2, 18), Date.UTC(2026, 9, 30, 6), 4, 57.14, false],
+    // SES-414: both sides of the final-day boundary, and the DST week where elapsed day 7 starts an
+    // hour before Chicago's Thursday 01:00 -- the case weekDayIndex === 7 would get wrong.
+    ["Thu 2026-09-17 00:59 CT, a minute before the final day", Date.UTC(2026, 8, 17, 5, 59), Date.UTC(2026, 8, 11, 6), 6, 85.71, false],
+    ["Thu 2026-09-17 01:00 CT, the final day starts", Date.UTC(2026, 8, 17, 6), Date.UTC(2026, 8, 11, 6), 7, 100, true],
+    ["Thu 2026-11-05 00:30 CST, elapsed day 7 but not yet the final day", Date.UTC(2026, 10, 5, 6, 30), Date.UTC(2026, 9, 30, 6), 7, 100, false],
+  ];
+  for (const [label, now, start, idx, limit, finalDay] of cases) {
+    const w = chicagoWeek(now);
+    assert.strictEqual(w.weekStartedAt, start, `${label}: week start ${new Date(w.weekStartedAt).toISOString()} != ${new Date(start).toISOString()}`);
+    assert.strictEqual(w.weekDayIndex, idx, `${label}: day index ${w.weekDayIndex} != ${idx}`);
+    assert.strictEqual(w.paceLimitPct, limit, `${label}: pace limit ${w.paceLimitPct} != ${limit}`);
+    assert.strictEqual(w.finalDay, finalDay, `${label}: finalDay ${w.finalDay} != ${finalDay}`);
+  }
+  // Negative control: a calendar that starts the week on Friday 00:00 instead of 01:00 answers the
+  // pre-reset instant as day 1 of the NEW week. If that variant passed the table, the table would
+  // not be testing the 01:00 boundary at all.
+  const wrong = Date.UTC(2026, 8, 11, 5, 30) >= Date.UTC(2026, 8, 11, 5);
+  assert.ok(wrong, "control: the 00:00 variant must classify 00:30 as the new week (so the 01:00 table discriminates)");
+}
+
+// THE INDEPENDENT ORACLE. Deliberately fed from the RAW TABLES rather than from the gate's own
+// detail payload, so it can disagree with the function. It is not a second implementation of the
+// pick predicate -- prime_directive_queue() is READ, never re-derived (the SES-45 boundary); what
+// is reimplemented is only the seven-branch LADDER, which is the thing under test.
+export function expectedReason(f) {
+  if (f.schedulerOn === false) return "scheduler_off";
+  // SES-389 / M5-15: the meter's age, graded against the SETTING rather than a literal, in the
+  // ladder's real position -- second, below John's switch and above the wall. NULL-safe on both
+  // sides exactly as the wall is: no reading (readingAgeHours null) falls through, so a missing
+  // reading is still no_budget_row's question. Strictly greater-than, so a reading exactly AT the
+  // threshold still boots -- the SQL uses > and this oracle must not quietly use >=.
+  if (f.meterStaleHours != null && f.readingAgeHours !== null && f.readingAgeHours > f.meterStaleHours)
+    return "meter_stale";
+  // SES-395: the wall grades ALL-MODELS again. Fable past its own share is not a refusal here --
+  // it degrades the judgment lane (public.judgment_model(), asserted separately below). NULL-safe
+  // exactly as before: no reading, no wall verdict.
+  // SES-414 (OD-28): against wallPct -- null with no budget row, else the column finalDay picks
+  // (final_day_rest_pct from Thursday 01:00 to the Friday 01:00 reset, weekly_rest_pct otherwise).
+  if (f.wallPct !== null && f.gatedPct !== null && f.gatedPct >= f.wallPct)
+    return "weekly_wall";
+  // SES-368 / M5-16, SES-395: the pace, in the ladder's real position -- after the wall, before the
+  // budget row, grading the SAME number the wall did. At-or-above refuses (14.29 on day 1 refuses;
+  // 14.28 boots), and NULL on either side falls through, exactly as the wall does.
+  if (f.paceLimitPct !== null && f.paceLimitPct !== undefined && f.gatedPct !== null &&
+      f.gatedPct >= f.paceLimitPct)
+    return "weekly_pace";
+  if (!f.budgetRowExists) return "no_budget_row";
+  // AGT-237: refusal 6. IS DISTINCT FROM green in the SQL, so a missing level refuses too -- the
+  // oracle mirrors that with !==, never with a truthiness check that would let null through.
+  if (f.dbLevel !== "green") return "db_pressure";
+  // AGT-265: at-or-above refuses (4 of 4 refuses, 3 of 4 boots). Both sides are read, never assumed.
+  if (f.liveLanes !== null && f.maxLanes !== null && f.liveLanes >= f.maxLanes) return "lanes_full";
+  // AGT-127: refusal 6 splits, and the oracle splits with it. Both halves are graded, so a gate
+  // that counted EVERY undecided card (re-firing forever on one whose decision is John's, since a
+  // `john` ruling writes no card) and a gate that counted none both disagree here.
+  if (f.pickableCount === 0 && f.gateCardsToRule > 0) return GATE_CARDS_REASON;
+  // AGT-314: refusal 6 splits a second time, and the oracle splits with it -- BELOW the card branch
+  // (a fire with a card to rule rules it rather than going looking) and above nothing_pickable. Both
+  // halves are ORed and both are graded, so a gate that read only the findings, a gate that read
+  // only the lists, and a gate that answered work_to_find on an empty board all disagree here.
+  // AGT-291: and a THIRD half -- a batch whose list is finished and whose proposal has not been
+  // attempted inside 24 hours (`review_due`). Same position, same OR: a finished batch is work
+  // that EXISTS to be found. A gate that read only the first two disagrees here the moment a
+  // batch finishes with nothing pickable and no card to rule.
+  if (f.pickableCount === 0 && (f.openFindings > 0 || f.listTickets > 0 || f.finishDue > 0)) return FIND_WORK_REASON;
+  if (f.pickableCount === 0) return "nothing_pickable";
+  if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
+  // SES-302 still holds for the CAP: no token_cap branch, no pickable_degraded. The age is graded
+  // at (2) above; what this gate never does is decide what a cycle may SPEND.
+  return PASS_REASON;
+}
+
+async function theLiveGateObeysItsOwnLadder() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) {
+    notRun(
+      "the live arm: runner_should_boot()'s verdict against an independent oracle, its detail " +
+        "payload, and its freedom from side effects",
+      "SUPABASE_URL and/or SUPABASE_SERVICE_KEY are absent. The doc arm above still graded all " +
+        "twelve clauses of the gate's contract, the position assertion and the stamp cap against " +
+        "the committed runbook. Canonical invocation: STANDARDS.md Section 2 rule 5.",
+    );
+    return;
+  }
+
+  const call = async () =>
+    asArray(await pg(url, key, "rpc/runner_should_boot", { method: "POST", body: "{}" }),
+            "rpc/runner_should_boot");
+
+  const rows = await call();
+  assert.strictEqual(rows.length, 1, `runner_should_boot() returned ${rows.length} rows, expected exactly 1`);
+  const v = rows[0];
+
+  assert.ok(REASONS.includes(v.reason) || v.reason === PASS_REASON ||
+            v.reason === GATE_CARDS_REASON || v.reason === FIND_WORK_REASON,
+    `runner_should_boot() returned an unknown reason ${JSON.stringify(v.reason)}; the closed set is ` +
+    `${[...REASONS, PASS_REASON, GATE_CARDS_REASON, FIND_WORK_REASON].join(", ")}`);
+  // AGT-127 / AGT-314: the mode is what a booting fire READS to know which ONE thing it may do. A
+  // fire that took the reason and not the mode would try to build on a board with
+  // pickable_count = 0; one that read a mode the gate does not set would do the wrong one thing.
+  assert.strictEqual(v.detail.mode, modeFor(v.reason),
+    `detail.mode is ${JSON.stringify(v.detail.mode)} on reason ${v.reason}; it reads rule-cards-only ` +
+    "on gate_cards_to_rule, find-work-only on work_to_find, and null on every other verdict");
+  assert.strictEqual(
+    v.should_boot, BOOTING_REASONS.has(v.reason),
+    `should_boot=${v.should_boot} disagrees with reason=${v.reason}. The two must never be able to ` +
+      "drift: a true with a refusal reason boots a cycle into a wall, a false with a booting reason " +
+      "silences the runner with nothing to point at",
+  );
+  assert.ok(v.detail && typeof v.detail === "object",
+    "the verdict carried no detail object -- a bare false is the 'NULL is not zero' defect this gate " +
+    "was written to avoid");
+
+  // --- Build the oracle from the raw tables.
+  const settings = asArray(
+    await pg(url, key,
+      "runner_settings?select=id,scheduler_on,meter_stale_hours,max_lanes,find_work_lists&id=eq.1"),
+    "runner_settings");
+  // AGT-265: the live lanes, from the RAW rows -- open, runner-stamped, and a heartbeat (or, with
+  // none, the start) inside the last 20 minutes. The window arithmetic is done here, not read back.
+  const openCycles = asArray(
+    await pg(url, key,
+      "runner_cycles?select=id,started_at,heartbeat_at&ended_at=is.null&stamp=like.DEEPBENCH-RUNNER-AUTOMATED-*"),
+    "runner_cycles (open, runner-stamped)");
+  const liveLanes = openCycles.filter(c =>
+    Date.parse(c.heartbeat_at ?? c.started_at) > Date.now() - 20 * 60_000).length;
+  const readings = asArray(
+    await pg(url, key, "runner_usage_readings?select=taken_at,all_models_pct,fable_pct&order=taken_at.desc&limit=1"),
+    "runner_usage_readings");
+  const month = chicagoMonth();
+  const budget = asArray(
+    await pg(url, key, `runner_budget?select=month,weekly_rest_pct,final_day_rest_pct&month=eq.${month}`), "runner_budget");
+  const queue = asArray(
+    await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" }),
+    "rpc/prime_directive_queue");
+  const pctPerCycle = Number(
+    await pg(url, key, "rpc/runner_pct_per_cycle", { method: "POST", body: "{}" }));
+  const items = asArray(
+    await pg(url, key, "backlog_items?select=backlog_id,predicted_cycles&limit=2000"), "backlog_items");
+
+  assert.ok(items.length > 100, `backlog_items returned ${items.length} rows -- refusing to grade a truncated read`);
+  assert.ok(Number.isFinite(pctPerCycle) && pctPerCycle > 0,
+    `runner_pct_per_cycle() returned ${pctPerCycle}; the oracle cannot price a ticket without it`);
+
+  // AGT-127, from the RAW TABLES like every other fact here: an undecided gated_before_build card
+  // counts only while no OPEN `gate-card-<first 8 of its id>` question names it.
+  const gateCards = asArray(
+    await pg(url, key, "runner_items?kind=eq.gated_before_build&decision=is.null&select=id"), "runner_items");
+  const gateQ = asArray(
+    await pg(url, key, "runner_questions?qid=like.gate-card-*&status=eq.open&select=qid"), "runner_questions");
+  const openQ = new Set(gateQ.map(q => q.qid));
+  const gateCardsToRule = gateCards.filter(c => !openQ.has(`gate-card-${String(c.id).slice(0, 8)}`)).length;
+
+  // AGT-314, from the RAW TABLES for the same reason everything else here is: the oracle must be
+  // free to disagree with the function. The findings half is a count of open OR carried rows -- a
+  // carried finding is work deferred, not work done. The lists half is re-derived from three raw
+  // reads (tickets, epics, projects) joined against the SLUGS IN THE COLUMN, never against a
+  // literal pair of slugs: a test that hard-coded dev-mgr-findings/auditor-findings here would
+  // pass after John re-points the lane with an UPDATE and stop guarding the branch it claims to.
+  const findWorkLists = settings[0]?.find_work_lists ?? null;
+  assert.ok(Array.isArray(findWorkLists),
+    `runner_settings.find_work_lists is ${JSON.stringify(findWorkLists)}; AGT-314 made it a NOT NULL ` +
+    "text[] -- a missing column means the migration agt314_find_work_boot did not land");
+  const findings = asArray(
+    await pg(url, key, "audit_findings?status=in.(open,carried)&select=id&limit=5000"),
+    "audit_findings (open or carried)");
+  const openFindings = findings.length;
+  const listCandidates = asArray(
+    await pg(url, key, "backlog_items?status=in.(open,partial)&select=id,epic_id&limit=5000"),
+    "backlog_items (open or partial)");
+  const allEpics = asArray(await pg(url, key, "epics?select=id,project_id&limit=5000"), "epics");
+  const allProjects = asArray(await pg(url, key, "projects?select=id,slug&limit=5000"), "projects");
+  const slugOfProject = new Map(allProjects.map(p => [p.id, p.slug]));
+  const projectOfEpic = new Map(allEpics.map(e => [e.id, e.project_id]));
+  const listSlugs = new Set(findWorkLists);
+  const listTickets = listCandidates.filter(
+    b => listSlugs.has(slugOfProject.get(projectOfEpic.get(b.epic_id)))).length;
+
+  // AGT-291: the finish-line count, read from the ONE function that measures the finish line
+  // (public.project_batch_state()) rather than re-derived from projects/epics/backlog_items here.
+  // LEFT and FRESH are that function's definition; a second copy in this file would be free to
+  // disagree with it, and the thing this arm grades is whether the GATE reads the sensor.
+  const batches = asArray(
+    await pg(url, key, "rpc/project_batch_state", { method: "POST", body: "{}" }),
+    "rpc/project_batch_state");
+  // The COLUMN is graded by the detail pair below (own-property finish_due, then the number), not
+  // here: this file keeps its own red on the count it already measures, and the dedicated guard
+  // tests/regression/agt-291-finish-sensor.test.mjs is the one that names an unapplied migration.
+  const finishDue = batches.filter(b => b.review_due === true).length;
+
+  // AGT-237: the database's level, read from its one home over the same rpc a cycle's step 7 uses
+  // (scripts/db-pressure.js). Never re-derived from db_health_readings here: the window arithmetic is
+  // the function's, and a second copy in this file would be free to disagree with it.
+  const dbRows = asArray(
+    await pg(url, key, "rpc/db_health_level", { method: "POST", body: "{}" }), "rpc/db_health_level");
+  assert.strictEqual(dbRows.length, 1, `db_health_level() returned ${dbRows.length} rows, expected exactly 1`);
+  const db = dbRows[0];
+  assert.ok(["green", "amber", "red", "unsafe"].includes(db.level),
+    `db_health_level() answered level=${JSON.stringify(db.level)}; the closed set is green | amber | red | unsafe`);
+
+  const cyclesOf = new Map(items.map(i => [i.backlog_id, i.predicted_cycles]));
+  const lanes = queue.filter(r => r.lane === "drain" || r.lane === "selfbuild");
+  // Unknown cost is UNKNOWN, never free -- same treatment the shipped function uses, and the
+  // clause above is what stops the two drifting apart.
+  const priced = lanes
+    .map(r => cyclesOf.get(r.ref))
+    .filter(c => c !== null && c !== undefined)
+    .map(c => Math.round(Number(c) * pctPerCycle * 100) / 100);
+
+  const takenAt = readings[0]?.taken_at ? Date.parse(readings[0].taken_at) : null;
+  const allModelsPct = readings[0]?.all_models_pct === undefined || readings[0]?.all_models_pct === null
+    ? null : Number(readings[0].all_models_pct);
+  // SES-395: the second weekly meter is still READ and still reported, and it no longer grades the
+  // boot decision. Fable past its own share degrades the judgment lane instead of refusing the
+  // cycle, so gatedPct IS allModelsPct and gatedMeter is 'all_models' by construction. Both keys
+  // are kept -- every existing reader of this payload still resolves -- and the oracle carries the
+  // constant rather than dropping the assertion, so a gate that quietly reverted to GREATEST
+  // disagrees here the moment the two meters differ (60 vs 94 on 2026-09-14).
+  const fablePct = readings[0]?.fable_pct === undefined || readings[0]?.fable_pct === null
+    ? null : Number(readings[0].fable_pct);
+  const gatedPct = allModelsPct;
+  const gatedMeter = "all_models";
+  const week = chicagoWeek();
+  // SES-414: the stop's column is picked by the clock-only finalDay, and its VALUE is read from the
+  // row, never assumed -- a hard-coded 90 here passes after John moves the column.
+  const wallColumn = week.finalDay ? "final_day_rest_pct" : "weekly_rest_pct";
+  const facts = {
+    schedulerOn: settings[0]?.scheduler_on ?? null,
+    // SES-389: read, never assumed. A test that hard-codes 2 here passes after John moves the
+    // threshold and stops grading the branch it claims to guard.
+    meterStaleHours: settings[0]?.meter_stale_hours == null ? null : Number(settings[0].meter_stale_hours),
+    readingAgeHours: takenAt === null ? null : Math.round(((Date.now() - takenAt) / 3.6e6) * 100) / 100,
+    allModelsPct,
+    fablePct,
+    gatedPct,
+    gatedMeter,
+    weeklyRestPct: budget[0]?.weekly_rest_pct ?? null,
+    finalDayRestPct: budget[0]?.final_day_rest_pct ?? null,
+    finalDay: week.finalDay,
+    wallStop: budget.length ? wallColumn : null,
+    wallPct: budget.length ? (budget[0][wallColumn] ?? null) : null,
+    budgetRowExists: budget.length > 0,
+    // SES-390: headroom stays ALL-MODELS on purpose. runner_pct_per_cycle() is calibrated from
+    // all-models deltas, so pricing a ticket against the Fable meter would compare two different
+    // units. The walls moved; the affordability arithmetic did not.
+    weeklyHeadroomPct: allModelsPct === null ? null : 100 - allModelsPct,
+    weekStartedAt: week.weekStartedAt,
+    weekDayIndex: week.weekDayIndex,
+    paceLimitPct: week.paceLimitPct,
+    pickableCount: lanes.length,
+    cheapestPctOfWeek: priced.length ? Math.min(...priced) : null,
+    gateCardsToRule,
+    openFindings,
+    listTickets,
+    finishDue,
+    dbLevel: db.level,
+    liveLanes,
+    maxLanes: settings[0]?.max_lanes == null ? null : Number(settings[0].max_lanes),
+  };
+
+  const want = expectedReason(facts);
+  assert.strictEqual(
+    v.reason, want,
+    `runner_should_boot() answered "${v.reason}" but the raw tables say "${want}". Oracle facts: ` +
+      JSON.stringify(facts) + ". This is the assertion that would catch a dead branch: five of the " +
+      "six of the seven refusals could never fire and a should_boot-only check would still pass",
+  );
+
+  // ASSERT ON WHICH BRANCH FIRED, and on the detail that branch owes its reader (the LOO-013
+  // lesson -- a pass is only meaningful if it says what actually happened).
+  const d = v.detail;
+  assert.strictEqual(d.month, month,
+    `detail.month is ${JSON.stringify(d.month)}, expected ${month} on John's America/Chicago clock`);
+  assert.ok(Object.prototype.hasOwnProperty.call(d, "pickable_count") &&
+            Object.prototype.hasOwnProperty.call(d, "unpriced_pickable"),
+    "detail must always carry pickable_count and unpriced_pickable -- they are how a reader tells " +
+    "'no work' from 'work nobody priced'");
+  // AGT-314: the two counts the find-work branch graded, on EVERY verdict, against the oracle's own
+  // raw reads. A work_to_find refusal with no counts cannot be audited, and a gate that counted
+  // only `open` findings (not `carried`), or only the two slugs it was born with, disagrees here.
+  assert.ok(Object.prototype.hasOwnProperty.call(d, "open_findings") &&
+            Object.prototype.hasOwnProperty.call(d, "list_tickets"),
+    "detail must always carry open_findings and list_tickets -- without them a reader cannot tell " +
+    "'there is nothing at all' from 'there is work to go and find'");
+  assert.strictEqual(Number(d.open_findings), openFindings,
+    `detail.open_findings=${d.open_findings} but audit_findings holds ${openFindings} open-or-carried ` +
+    "row(s). open AND carried: a carried finding is work that was deferred, not work that was done");
+  assert.strictEqual(Number(d.list_tickets), listTickets,
+    `detail.list_tickets=${d.list_tickets} but ${listTickets} open/partial ticket(s) sit in a project ` +
+    `whose slug is in runner_settings.find_work_lists (${JSON.stringify(findWorkLists)})`);
+  // AGT-291: the third count, on EVERY verdict for the same reason the other two are -- a
+  // work_to_find refusal a reader cannot attribute to one of the three halves cannot be audited.
+  assert.ok(Object.prototype.hasOwnProperty.call(d, "finish_due"),
+    "detail must always carry finish_due -- without it a reader cannot tell 'there is nothing at " +
+    "all' from 'a project batch is finished and nobody has proposed the next one'");
+  assert.strictEqual(Number(d.finish_due), finishDue,
+    `detail.finish_due=${d.finish_due} but project_batch_state() holds ${finishDue} review_due ` +
+    "batch(es). review_due, never proposal_due: a batch claimed inside 24 hours is finished but is " +
+    "not work to go and find, so counting proposal_due here would re-boot the fire every hour");
+  if (v.reason === FIND_WORK_REASON) {
+    assert.strictEqual(Number(d.pickable_count), 0,
+      "work_to_find may only be reached with pickable_count = 0; it is refusal 6's second twin, " +
+      "never a shortcut past the walls above it");
+    assert.ok(Number(d.open_findings) > 0 || Number(d.list_tickets) > 0,
+      "a work_to_find verdict must be justified by its own payload -- there must BE something to find");
+  }
+  // SES-368 / M5-16: the pace facts the verdict owes its reader, graded against the clock-only
+  // oracle. A gate that computed the week from UTC, or from Friday 00:00, disagrees here.
+  assert.strictEqual(Date.parse(d.week_started_at), facts.weekStartedAt,
+    `detail.week_started_at=${d.week_started_at} but the clock says ${new Date(facts.weekStartedAt).toISOString()} ` +
+    "(most recent Friday 01:00 America/Chicago)");
+  assert.strictEqual(Number(d.week_day_index), facts.weekDayIndex,
+    `detail.week_day_index=${d.week_day_index} but the clock says day ${facts.weekDayIndex}`);
+  assert.strictEqual(Number(d.pace_limit_pct), facts.paceLimitPct,
+    `detail.pace_limit_pct=${d.pace_limit_pct} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct}`);
+  // SES-414 (OD-28): the stop the wall graded and the column it came from, against the raw row and
+  // the clock-only finalDay. A gate that walls at a flat weekly_rest_pct on the final day, or picks
+  // the final-day stop on a UTC Thursday, disagrees here.
+  assert.strictEqual(d.wall_pct === null || d.wall_pct === undefined ? null : Number(d.wall_pct), facts.wallPct,
+    `detail.wall_pct=${d.wall_pct} but runner_budget.${facts.wallStop} is ${facts.wallPct} ` +
+      `(finalDay=${facts.finalDay}: final_day_rest_pct from Thursday 01:00 America/Chicago to the Friday 01:00 reset)`);
+  assert.strictEqual(d.wall_stop ?? null, facts.wallStop,
+    `detail.wall_stop=${JSON.stringify(d.wall_stop)} but the clock picks ${JSON.stringify(facts.wallStop)} ` +
+      `(finalDay=${facts.finalDay}) -- it must name the column the wall graded`);
+  assert.strictEqual(
+    d.final_day_rest_pct === null || d.final_day_rest_pct === undefined ? null : Number(d.final_day_rest_pct),
+    facts.finalDayRestPct,
+    `detail.final_day_rest_pct=${d.final_day_rest_pct} but runner_budget.final_day_rest_pct is ${facts.finalDayRestPct}`);
+  // One stop, two readers: resolve_day_token_cap() reports rest_wall_hit from the same number. With
+  // p_cycle_id null its calibration writes nothing, so the purity sample below is untouched.
+  const resolved = asArray(
+    await pg(url, key, "rpc/resolve_day_token_cap", { method: "POST", body: '{"p_cycle_id":null}' }),
+    "rpc/resolve_day_token_cap");
+  assert.strictEqual(resolved.length, 1, `resolve_day_token_cap() returned ${resolved.length} rows, expected exactly 1`);
+  assert.strictEqual(Number(resolved[0].rest_pct), Number(d.wall_pct),
+    `resolve_day_token_cap().rest_pct=${resolved[0].rest_pct} but runner_should_boot() walls at ${d.wall_pct} -- ` +
+      "the spend resolver and the boot gate must grade the same stop, or a cycle boots past a wall its own step 3 reports hit");
+  // SES-395: the number the wall and the pace actually graded is all_models_pct, and gated_meter
+  // says so. This is the assertion that catches a revert to GREATEST: with the live meters at 60
+  // and 94 a GREATEST gate reports 94 here and fails, which is the discrimination -- the pair only
+  // proves anything while the two meters differ, so the divergence is asserted first.
+  assert.notStrictEqual(
+    facts.fablePct, facts.allModelsPct,
+    `the two meters are equal (${facts.allModelsPct}) right now, so the gated_pct assertion below ` +
+      "cannot discriminate all-models from GREATEST. That is a fixture problem, not a pass: read " +
+      "runner_usage_readings and say so rather than letting the clause go quietly vacuous",
+  );
+  assert.strictEqual(
+    Number(d.gated_pct), facts.gatedPct,
+    `detail.gated_pct=${d.gated_pct} but the freshest reading's all_models_pct is ${facts.allModelsPct} ` +
+      `(fable_pct ${facts.fablePct} is NOT graded here since SES-395 -- it degrades the judgment lane)`,
+  );
+  assert.strictEqual(
+    d.gated_meter, "all_models",
+    `detail.gated_meter=${JSON.stringify(d.gated_meter)}; since SES-395 the boot decision is on the ` +
+      "all-models meter alone and this key is 'all_models' by construction. A 'fable' here is the " +
+      "refusal SES-395 replaced with a lane, back again",
+  );
+  assert.strictEqual(
+    d.fable_pct === null || d.fable_pct === undefined ? null : Number(d.fable_pct), facts.fablePct,
+    `detail.fable_pct=${d.fable_pct} but runner_usage_readings says ${facts.fablePct} -- null-safe: ` +
+      "a reading with no Fable number must report null, never 0, and it must still be REPORTED even " +
+      "though it no longer grades the boot decision, or nobody can audit the lane it degraded",
+  );
+  // SES-395: the lane the Fable meter actually costs. Graded against runner_model_lanes and the
+  // function's own closed reason set, not against a literal -- a hard-coded 'claude-opus-5' here
+  // would pass after John moves the orchestrator lane and stop guarding anything.
+  const modelLanes = asArray(
+    await pg(url, key, "runner_model_lanes?select=lane,model_id"), "runner_model_lanes");
+  const laneModels = new Set(modelLanes.map(l => l.model_id));
+  const laneOf = name => modelLanes.find(l => l.lane === name)?.model_id ?? null;
+  const judgment = asArray(
+    await pg(url, key, "rpc/judgment_model", { method: "POST", body: "{}" }), "rpc/judgment_model");
+  assert.strictEqual(judgment.length, 1, `judgment_model() returned ${judgment.length} rows, expected exactly 1`);
+  const j = judgment[0];
+  assert.ok(laneModels.has(j.model_id),
+    `judgment_model() answered model_id=${JSON.stringify(j.model_id)}, which is not a ` +
+      `runner_model_lanes model id (${[...laneModels].join(", ")}). The fallback must name a LANE's ` +
+      "model, never a literal -- a literal survives John moving a lane and silently spawns the wrong model");
+  assert.ok(["fable_rest", "fable_pace", "lane"].includes(j.reason),
+    `judgment_model() answered reason=${JSON.stringify(j.reason)}; the closed set is fable_rest | fable_pace | lane`);
+  // WHICH BRANCH FIRED, graded against the raw reading rather than read back off the function.
+  const wantJudgmentModel = j.reason === "lane" ? laneOf("judgment") : laneOf("orchestrator");
+  assert.strictEqual(j.model_id, wantJudgmentModel,
+    `judgment_model() answered ${j.model_id} on reason '${j.reason}', but the ${j.reason === "lane" ? "judgment" : "orchestrator"} ` +
+      `lane's model is ${wantJudgmentModel} -- the two Fable reasons take the orchestrator's model, 'lane' the judgment lane's`);
+  // SES-398: the lane grades the newest SAME-WEEK reading that CARRIES a Fable number, not the newest
+  // reading. The routine's own meter self-read writes fable_pct NULL whenever its call carried no Fable
+  // window, and grading that NULL as 'lane' would lift a same-week degrade. So the oracle is its own
+  // query from the raw table -- filtered the way migration ses398_judgment_reads_week_fable filters,
+  // on the week start the clock-only oracle computed -- never the gate's newest-row fablePct.
+  const weekFable = asArray(
+    await pg(url, key,
+      "runner_usage_readings?select=fable_pct&fable_pct=not.is.null" +
+        `&taken_at=gte.${encodeURIComponent(new Date(week.weekStartedAt).toISOString())}&order=taken_at.desc&limit=1`),
+    "runner_usage_readings (same-week Fable)");
+  const weekFablePct = weekFable.length ? Number(weekFable[0].fable_pct) : null;
+  assert.strictEqual(
+    j.fable_pct === null || j.fable_pct === undefined ? null : Number(j.fable_pct), weekFablePct,
+    `judgment_model().fable_pct=${j.fable_pct} but the newest reading since ${new Date(week.weekStartedAt).toISOString()} ` +
+      `that carries a Fable number says ${weekFablePct} -- a newer reading with no Fable window must not lift ` +
+      "a same-week degrade, and a Fable number from before the Friday 01:00 reset must not degrade the new week");
+  assert.strictEqual(Number(j.fable_share), facts.paceLimitPct,
+    `judgment_model().fable_share=${j.fable_share} but day ${facts.weekDayIndex} x 100/7 is ${facts.paceLimitPct} -- ` +
+      "Fable's share is John's share on the same calendar; a second calendar here is free to disagree with the gate's");
+  // The gate must carry the SAME answer in its own payload, so a reader of a refusal never has to
+  // make a second call to learn which model the cycle's judgment steps would have run on.
+  assert.strictEqual(d.judgment_model, j.model_id,
+    `detail.judgment_model=${JSON.stringify(d.judgment_model)} but judgment_model() says ${j.model_id}`);
+  assert.strictEqual(d.judgment_reason, j.reason,
+    `detail.judgment_reason=${JSON.stringify(d.judgment_reason)} but judgment_model() says ${j.reason}`);
+  assert.strictEqual(Number(d.fable_share), Number(j.fable_share),
+    `detail.fable_share=${d.fable_share} but judgment_model() says ${j.fable_share}`);
+
+  // Live fix, 2026-09-15: orchestrator_model() gets the same treatment judgment_model() already has
+  // above -- closed reason set, model graded against a LANE not a literal, and the gate's own detail
+  // must agree with the function rather than making a reader call twice.
+  const orchestrator = asArray(
+    await pg(url, key, "rpc/orchestrator_model", { method: "POST", body: "{}" }), "rpc/orchestrator_model");
+  assert.strictEqual(orchestrator.length, 1,
+    `orchestrator_model() returned ${orchestrator.length} rows, expected exactly 1`);
+  const o = orchestrator[0];
+  assert.ok(laneModels.has(o.model_id),
+    `orchestrator_model() answered model_id=${JSON.stringify(o.model_id)}, which is not a ` +
+      `runner_model_lanes model id (${[...laneModels].join(", ")}). The fallback must name a LANE's ` +
+      "model, never a literal -- a literal survives John moving a lane and silently spawns the wrong model");
+  assert.ok(["orchestrator_pace", "lane"].includes(o.reason),
+    `orchestrator_model() answered reason=${JSON.stringify(o.reason)}; the closed set is orchestrator_pace | lane`);
+  const wantOrchestratorModel = o.reason === "lane" ? laneOf("orchestrator") : laneOf("mechanical");
+  assert.strictEqual(o.model_id, wantOrchestratorModel,
+    `orchestrator_model() answered ${o.model_id} on reason '${o.reason}', but the ` +
+      `${o.reason === "lane" ? "orchestrator" : "mechanical"} lane's model is ${wantOrchestratorModel} -- ` +
+      "'orchestrator_pace' takes the mechanical lane's model, 'lane' the orchestrator's own");
+  assert.strictEqual(
+    o.all_models_pct === null || o.all_models_pct === undefined ? null : Number(o.all_models_pct),
+    facts.allModelsPct,
+    `orchestrator_model().all_models_pct=${o.all_models_pct} but the freshest reading says ${facts.allModelsPct}`);
+  assert.strictEqual(Number(o.pace_limit_pct), facts.paceLimitPct,
+    `orchestrator_model().pace_limit_pct=${o.pace_limit_pct} but day ${facts.weekDayIndex} x 100/7 is ` +
+      `${facts.paceLimitPct} -- a second calendar here is free to disagree with the gate's`);
+  assert.strictEqual(d.orchestrator_model, o.model_id,
+    `detail.orchestrator_model=${JSON.stringify(d.orchestrator_model)} but orchestrator_model() says ${o.model_id}`);
+  assert.strictEqual(d.orchestrator_reason, o.reason,
+    `detail.orchestrator_reason=${JSON.stringify(d.orchestrator_reason)} but orchestrator_model() says ${o.reason}`);
+
+  // AGT-237: the gate carries the level it graded, and it is the rpc's -- one home, two readers.
+  assert.strictEqual(d.db_level, db.level,
+    `detail.db_level=${JSON.stringify(d.db_level)} but db_health_level() says ${db.level}`);
+  assert.deepStrictEqual(d.db_reasons ?? null, db.reasons ?? null,
+    `detail.db_reasons=${JSON.stringify(d.db_reasons)} but db_health_level() says ${JSON.stringify(db.reasons)}`);
+  if (v.reason === "db_pressure") {
+    assert.notStrictEqual(d.db_level, "green", "a db_pressure refusal must be justified by its own payload");
+  }
+  // AGT-265: the lane count and the cap the gate graded, against the raw rows and the setting.
+  assert.ok(Object.prototype.hasOwnProperty.call(d, "live_lanes") && Object.prototype.hasOwnProperty.call(d, "max_lanes"),
+    "detail must always carry live_lanes and max_lanes -- a lanes_full refusal with no count cannot be audited");
+  assert.strictEqual(Number(d.max_lanes), facts.maxLanes,
+    `detail.max_lanes=${d.max_lanes} but runner_settings.max_lanes is ${facts.maxLanes}`);
+  assert.strictEqual(Number(d.live_lanes), facts.liveLanes,
+    `detail.live_lanes=${d.live_lanes} but ${facts.liveLanes} open runner-stamped cycles beat inside 20 min`);
+  if (v.reason === "lanes_full") {
+    assert.ok(Number(d.live_lanes) >= Number(d.max_lanes), "a lanes_full refusal must be justified by its own payload");
+  }
+
+  assert.strictEqual(d.pickable_count, lanes.length,
+    `detail.pickable_count=${d.pickable_count} but prime_directive_queue() returned ${lanes.length} ` +
+    "drain/selfbuild rows -- the gate and the picker are reading different boards");
+
+  // SES-302: the gate must NOT carry a cap or a staleness verdict of its own. These two assertions
+  // are the guard against the defect reappearing -- resolve_day_token_cap() RUNG 2 owns staleness
+  // at 48h, and a second home here at 24h returned the opposite answer on live data (35.4h reading:
+  // resolver 196M, gate 3M). Asserting the absence is the only way to catch a re-add.
+  assert.ok(!("token_cap" in d),
+    "runner_should_boot must not carry detail.token_cap -- the day cap has exactly one home, " +
+    "public.resolve_day_token_cap(), and a second copy here is free to disagree with it");
+  assert.strictEqual(d.cap_authority, "public.resolve_day_token_cap()",
+    "detail.cap_authority must name the resolver, so a reader of this payload is pointed at the " +
+    "one place the ceiling is decided rather than inferring it from a field that is not here");
+  assert.ok(d.reading_age_hours === null || typeof Number(d.reading_age_hours) === "number",
+    "the reading's age must be REPORTED on every verdict -- dropping it would leave a reader " +
+    "unable to see a stale meter at all");
+  // SES-389 / M5-15: the threshold the age was graded against, read back out of runner_settings.
+  // This is what makes `meter_stale` auditable from the payload alone, and what catches a literal
+  // creeping back into the SQL: move the setting and a hard-coded gate disagrees here immediately.
+  assert.strictEqual(
+    Number(d.meter_stale_hours), facts.meterStaleHours,
+    `detail.meter_stale_hours=${d.meter_stale_hours} but runner_settings.meter_stale_hours is ` +
+      `${facts.meterStaleHours}. The gate must grade the age against the SETTING, not a literal`,
+  );
+  if (v.reason === "meter_stale") {
+    assert.ok(d.reading_taken_at,
+      "a 'meter_stale' verdict must name reading_taken_at -- 'the meter is old' with no instant " +
+      "attached is not something John can act on, and the age alone does not say WHICH reading");
+    assert.ok(Number(d.reading_age_hours) > Number(d.meter_stale_hours),
+      `'meter_stale' fired with age ${d.reading_age_hours} against threshold ${d.meter_stale_hours} ` +
+      "-- the refusal must be justified by its own payload");
+  }
+  if (v.reason === PASS_REASON) {
+    assert.ok(d.pick && d.pick.backlog_id,
+      "a 'pickable' verdict must name the ticket it would pick -- 'there is work' with no ticket is " +
+      "not a decision anyone can act on");
+    assert.ok(cyclesOf.has(d.pick.backlog_id),
+      `detail.pick names ${d.pick.backlog_id}, which is not a backlog_items row`);
+    assert.ok(typeof d.pick.title === "string" && d.pick.title.length > 0,
+      "detail.pick carries no title -- SES-119: a ticket named anywhere John reads carries ID + title");
+  }
+  if (v.reason === "unaffordable") {
+    assert.ok(d.cheapest && d.cheapest.predicted_pct_of_week !== null,
+      "an 'unaffordable' verdict must name the cheapest ticket and its cost -- M5-06 is asked of " +
+      "that ticket, so a refusal that cannot show it cannot be audited");
+  }
+
+  // --- PURITY, asserted by SIDE EFFECT because pg_proc is unreachable from here. A gate rewired to
+  // call drain_epic_next(uuid) would retire a fully-done drain directive and write a before-image.
+  const countOf = async q => {
+    const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${q}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact", Range: "0-0" },
+    });
+    if (!res.ok) throw new Error(`${q} returned HTTP ${res.status}`);
+    return Number((res.headers.get("content-range") || "/0").split("/")[1]);
+  };
+  // Design-session follow-up (2026-09-02, design-m6-build-0902): the board is SHARED. Attended
+  // sessions and cycles write runner_before_images rows at any moment, so a single before/after
+  // sample around the call can move for reasons that have nothing to do with the function -- CI
+  // read exactly that on d1853cca while a close-out was writing images. The arm therefore samples
+  // up to three times and fails only if the board moved across EVERY sample: a STABLE function
+  // that writes would move it every time, a concurrent writer will not.
+  const sample = async () => ({
+    images: await countOf("runner_before_images?select=id"),
+    queuedDirectives: await countOf("runner_directives?select=id&status=eq.queued"),
+  });
+  let before, after, again;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    before = await sample();
+    again = [await call(), await call()];
+    after = await sample();
+    if (JSON.stringify(after) === JSON.stringify(before)) break;
+  }
+  assert.deepStrictEqual(
+    after, before,
+    "calling runner_should_boot() moved the board. It is supposed to be STABLE and read-only; the " +
+      "way this breaks is someone reusing drain_epic_next(uuid) for the pick predicate, which " +
+      "RETIRES a fully-done drain directive and writes a runner_before_images row -- i.e. a probe " +
+      `that closes John's standing drain by asking whether there is work. before=${JSON.stringify(before)} ` +
+      `after=${JSON.stringify(after)}`,
+  );
+  assert.ok(
+    again.every(r => r.length === 1 && r[0].reason === v.reason),
+    "three consecutive calls to runner_should_boot() did not agree with each other -- a gate whose " +
+      "answer changes because it was asked is not a gate",
+  );
+}
+
+async function run() {
+  theShippedGateBlockIsClean();
+  theGateBlockPrecedesStepZero();
+  aMissingBlockIsFlagged();
+  everyClauseHasTeeth();
+  aVacuousMutationFailsItsOwnControl();
+  theRunbookStampCapHeld();
+  theOracleCalendarMatchesTheFixedInstants();
+  await theLiveGateObeysItsOwnLadder();
+
+  notRun(
+    "runner_should_boot()'s pg_proc facts (provolatile, overload count, prosrc) and the seven-refusal " +
+      "fixture matrix",
+    "the body ships as migration ses297_runner_should_boot and lives in the database, not this repo; " +
+      "this suite reaches Supabase only over PostgREST, which cannot read pg_proc and cannot open a " +
+      "transaction -- so a permanent fixture matrix would have to MUTATE runner_budget, " +
+      "runner_settings and the standing Prime Directive on the live board, which a regression test " +
+      "must never do (the SES-196 / SES-218 / SES-275 refusal). MEASURED AT THIS SHIP INSTEAD, live, " +
+      "inside a deliberately failing DO block with every fixture rolled back, one variable each, and " +
+      "every assertion on the REASON rather than on should_boot: baseline usage_reading_stale " +
+      "(age 32.36h, 8 pickable); scheduler_off returned WHILE the reading was ALSO stale, so " +
+      "precedence 1-over-2 is a difference and not a coincidence; pickable naming SES-184 at 0.44% " +
+      "against 37% headroom; weekly_wall at all_models_pct 90 vs weekly_rest_pct 85; no_budget_row " +
+      "with the wall condition STILL nominally true, which is the discrimination the 2026-09-01 " +
+      "outage needed and did not have; nothing_pickable at pickable_count 0; unaffordable at headroom " +
+      "0.1 vs cheapest 0.44, with its own negative control (headroom widened to 50 -> pickable); and " +
+      "an all-unpriced board returning pickable with unpriced_pickable=8 and a null cheapest. Zero " +
+      "fixture residue on re-read: 0 fixture readings, 2 runner_budget rows, weekly_rest_pct 85, " +
+      "scheduler on, 1 queued Prime Directive, 41 priced Selfbuild tickets. pg_proc at the same ship: " +
+      "provolatile='s', exactly 1 overload, prosrc free of 'drain_epic_next', EXECUTE granted to " +
+      "service_role only. Cost: 16.794 ms execution, 9.819 ms planning, 3,518 shared buffer hits. " +
+      "SES-389 (v7.0.482, migration ses389_meter_stale_gate) MEASURED THE SAME WAY on 2026-09-14, " +
+      "one variable each, every assertion on the REASON: a 3h-old reading at all_models_pct 10 with " +
+      "every other input clear -> meter_stale, should_boot=f, detail.reading_age_hours=3.00, " +
+      "detail.meter_stale_hours=2, detail.reading_taken_at equal to the fixture's taken_at; a " +
+      "reading at now() -> pickable at age 0.00; that SAME 3h reading with meter_stale_hours moved " +
+      "to 6 -> pickable, which is the negative control (nothing about the reading changed, only the " +
+      "threshold, so the branch is reading the setting and not a literal); the boundary at 2.99 -> " +
+      "meter_stale and 3.01 -> pickable; and scheduler_on=false WHILE the reading was ALSO stale -> " +
+      "scheduler_off, so precedence 1-over-2 is a difference and not a coincidence. Zero fixture " +
+      "residue on re-read: 34 readings, 0 rows with source='ses389-qa', meter_stale_hours=2, " +
+      "scheduler on. pg_proc after the migration: exactly 1 runner_should_boot overload, " +
+      "provolatile='s'. Live board at the ship: reason=meter_stale, reading_age_hours=14.74 against " +
+      "threshold 2, reading taken 2026-09-13T16:15:27Z -- every hourly fire refuses until the " +
+      "reader writes, which is the ticket's intent; SES-388 / SES-392 own the reader. " +
+      "SES-390 (v7.0.483, migration ses390_fable_meter_gate) MEASURED THE SAME WAY on 2026-09-14, " +
+      "one variable each, every assertion on the REASON and on detail.gated_meter, all rolled back: " +
+      "all_models 20 / Fable 90 -> weekly_wall, gated_meter='fable', gated_pct=90 -- and that is the " +
+      "SEAM, because grading all_models_pct alone answers pickable at those same inputs (rest 85, " +
+      "pace 57.14), so the case discriminates the change rather than the gate; all_models 90 / Fable " +
+      "20 -> weekly_wall, gated_meter='all_models', gated_pct=90, which is the mirror control proving " +
+      "the higher meter is taken from either side; all_models 20 / Fable 20 -> pickable, " +
+      "gated_meter='all_models' (a tie is all_models), gated_pct=20; all_models 20 / Fable at the " +
+      "live pace_limit_pct + 0.5 -> weekly_pace with gated_meter='fable', and the SAME reading at " +
+      "pace_limit_pct - 0.5 -> pickable, which is the boundary control; all_models 20 / Fable NULL " +
+      "-> pickable, gated_pct=20, gated_meter='all_models' (GREATEST ignores the null side, so a " +
+      "reader that never wrote a Fable number cannot refuse a cycle); scheduler_on=false WITH the " +
+      "20/90 wall case -> scheduler_off, and that same case taken 3h ago -> meter_stale, so the two " +
+      "branches above the wall still outrank it after the wall changed the number it grades. " +
+      "weekly_headroom_pct stayed 100 - all_models_pct in every case: runner_pct_per_cycle() is " +
+      "calibrated from all-models deltas and the affordability arithmetic did not move. Zero fixture " +
+      "residue on re-read: 37 readings, 0 rows with source='ses390-qa', newest reading still the " +
+      "meter-reader's 2026-09-14T15:45:06Z, scheduler on. pg_proc after the migration: exactly 1 " +
+      "runner_should_boot overload, provolatile='s', prosrc containing fable_pct and gated_meter. " +
+      "Live board at the ship: reason=weekly_wall, gated_meter='fable', gated_pct=90 against " +
+      "weekly_rest_pct 85 while all_models_pct was 57 -- fires park until the Fable meter is back " +
+      "under 85, which is exactly the wall this ticket exists to stop booting into. " +
+      "SES-395 (v7.0.486, migration ses395_judgment_lane_fallback) MEASURED THE SAME WAY on " +
+      "2026-09-14, one variable each, every assertion on the REASON and on the lane, all rolled " +
+      "back inside a deliberately failing DO block: Fable 30 -> judgment_model() = " +
+      "claude-fable-5-1 / 'lane' and the gate pickable with gated_meter='all_models'; Fable 70 -- " +
+      "ABOVE the day-4 share 57.14 and BELOW the rest wall 85 -> claude-opus-5 / 'fable_pace', " +
+      "which is the middle branch neither wall would ever have reached; Fable 90 with all_models " +
+      "20 -> claude-opus-5 / 'fable_rest' AND THE GATE ANSWERING pickable, which is THE SEAM -- " +
+      "SES-390's gate answered weekly_wall on those exact inputs, so the case discriminates the " +
+      "change rather than the gate; Fable NULL -> claude-fable-5-1 / 'lane', because a meter " +
+      "nobody read cannot degrade a lane. Live board at the ship: reason=weekly_pace on " +
+      "all_models_pct 60 against pace_limit_pct 57.14, gated_meter='all_models', " +
+      "detail.judgment_model='claude-opus-5', detail.judgment_reason='fable_rest', " +
+      "detail.fable_share=57.14 while fable_pct read 94 -- i.e. the 11:42 CT weekly_wall refusal " +
+      "on gated_meter='fable' (93 vs 85, all-models 59) is gone and its consequence is a lane. " +
+      "Zero fixture residue on re-read: 41 readings, 0 rows with source='ses395-qa', newest " +
+      "reading still 2026-09-14T17:15:14Z. pg_proc after the migration, asserted inside the " +
+      "migration's own trailing DO block rather than afterwards: exactly 1 runner_should_boot " +
+      "overload and exactly 1 judgment_model overload, EXECUTE denied to anon AND authenticated " +
+      "and granted to service_role (both directions, per .claude/rules/supabase-column-grants.md's " +
+      "SES-315 addendum -- functions default OPEN and a PUBLIC-only revoke leaves them open). " +
+      "SES-410 (v7.0.510, ses410_weekly_pace_stop), rolled back: BEFORE " +
+      "85.71->pickable/orchestrator_pace; 85.70->pickable/lane; null->pickable/lane; " +
+      "101->weekly_wall/orchestrator_pace; AFTER 85.71->weekly_pace/orchestrator_pace; " +
+      "85.70->pickable/lane; null->pickable/lane; 101->weekly_wall/orchestrator_pace; zero residue. " +
+      "SES-414 (v7.0.513, ses414_final_day_stop), rolled back: BEFORE Thu0059 50->pickable//85/false; " +
+      "Thu0059 85->weekly_wall//85/true; Thu0059 87->weekly_wall//85/true; Thu0059 89.99->weekly_wall//85/true; " +
+      "Thu0059 90->weekly_wall//85/true; Thu0100 50->pickable//85/false; Thu0100 85->weekly_wall//85/true; " +
+      "Thu0100 87->weekly_wall//85/true; Thu0100 89.99->weekly_wall//85/true; Thu0100 90->weekly_wall//85/true; " +
+      "Fri0100 50->weekly_pace//85/false; Fri0100 85->weekly_wall//85/true; Fri0100 87->weekly_wall//85/true; " +
+      "Fri0100 89.99->weekly_wall//85/true; Fri0100 90->weekly_wall//85/true; AFTER Thu0059 50->pickable/85/85/false; " +
+      "Thu0059 85->weekly_wall/85/85/true; Thu0059 87->weekly_wall/85/85/true; Thu0059 89.99->weekly_wall/85/85/true; " +
+      "Thu0059 90->weekly_wall/85/85/true; Thu0100 50->pickable/90/90/false; Thu0100 85->pickable/90/90/false; " +
+      "Thu0100 87->pickable/90/90/false; Thu0100 89.99->pickable/90/90/false; Thu0100 90->weekly_wall/90/90/true; " +
+      "Fri0100 50->weekly_pace/85/85/false; Fri0100 85->weekly_wall/85/85/true; Fri0100 87->weekly_wall/85/85/true; " +
+      "Fri0100 89.99->weekly_wall/85/85/true; Fri0100 90->weekly_wall/85/85/true; zero residue. " +
+      "AGT-237 (v7.0.658, agt237_db_health), rolled back with live meter_limiter_off=true and " +
+      "scheduler_on set true inside the transaction: a red reading now -> db_pressure/red while the " +
+      "captured pre-AGT-237 body answered pickable on the SAME inputs; newest reading 16 min old -> " +
+      "db_pressure/unsafe; green now + red 10 min ago -> db_pressure/red; three greens -> pickable/green " +
+      "(pre-AGT-237 body: pickable); zero residue.",
+  );
+}
+
+selfRun(import.meta.url, run);
+export default run;

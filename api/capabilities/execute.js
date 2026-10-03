@@ -1,3 +1,44 @@
+// DeepBench v7.0.538 | api/capabilities/execute.js | SES-424 slice 6 -- THE TURN'S OWN CITATIONS REACH
+// THE TABLE. The three governance Intent contracts require `patterns_applied` (slice 5), so every
+// executor turn already ANSWERS with the decision criteria it applied -- and this file dropped them:
+// the loop reads turn.tool_input for self-reported claims and delegation provenance, never for that
+// key, so lib/activity-log.js (which gained a citation path this slice) was handed nothing to write.
+// Measured 2026-09-20 over 30 days by call_source, executor-side citations: design-kickoff 0,
+// build-ticket 0, run-project 0.
+//
+// ONE LINE OF CAPTURE, ONE PARAM OF FORWARDING, AND NO NEW DECISION. heldTurnLog carries
+// `patternsApplied` beside `selfReportedClaims` -- read off the same turn.tool_input, by the same
+// generic extractor posture (§19b/§19d: no capability slug, agent id or intent branch is consulted,
+// here or anywhere below). coercePatternNumbers() keeps the positive integers a model wrote and
+// drops the rest WITHOUT erroring, because attribution is best-effort and must never cost a turn its
+// mandatory audit row (pattern:105, and SES-423's lesson about a validator that refused to write).
+//
+// THE FAILURE-PATH WRITE PASSES NONE, deliberately: a refused, aborted or rejected call produced no
+// answer, so it has no criteria to cite, and a citation invented for it would be a claim about a
+// turn that never spoke. NOT a call_facts key and NOT a patterns_used slug -- the citations are
+// their own rows in public.decision_pattern_citations, so the §19k signature is untouched.
+//
+// DeepBench v7.0.466 | api/capabilities/execute.js | SES-348 -- THE EXECUTOR DECLARES ITS REAL
+// CEILING AND DERIVES ITS DEADLINES FROM IT. `config.maxDuration` was 60 on a project whose Fluid-
+// compute default timeout is 300 s, and both deadline computations (the fresh top-level call and the
+// checkpoint resume) restated that 60 as a literal. Paired with request-receivable.js's 55 s abort
+// clamp, every governance verdict -- the MCP server rides this same function after SES-346, and
+// scripts/verifier.js POSTs it directly -- ran a 54-57 s model turn inside a 55 s window: 2026-09-10
+// left one terminal row at 51,749 ms and, three minutes later, one in_progress checkpoint whose
+// recovery_ledger fault was TimeoutError. The ceiling is now stated once, in the config export, and
+// both deadlines read it. No capability slug, agent id or intent branch was added (§19b/§19d).
+//
+// DeepBench v7.0.450 | api/capabilities/execute.js | LOG-149 -- the runLoop() catch seam writes the
+// ledger row BEFORE it classifies. Both exits from that catch -- the HAR-17 transient
+// checkpoint-resume and persistFailureAndRethrow() -- returned without ever reaching logAgentTurn(),
+// so a model call the API refused, aborted or rejected left no ai_activity_log row at all. One row per
+// failed CALL: a recovered hop's resumed call writes its own, so a recovery reads as two calls because
+// it was two. logAgentTurn() gains five optional params (stopReason / refusalCategory / fault /
+// tokensEstimated / costUsd) so the platform keeps ONE turn writer instead of growing a second one
+// beside it; the four facts fold into call_facts under the same omit-when-empty contract tool_calls
+// already uses, and every pre-existing caller's row is byte-identical. classifyModelCallFailure()
+// needed no edit -- a refusal arrives already stamped `failureClass: 'permanent'` and takes the
+// surface path. Nothing in this change branches on a capability slug, intent slug or agent id.
 // DeepBench v7.0.72 | api/capabilities/execute.js | LOO-33 -- a dispatch's intent_slug is now
 // resolved by the harness from its own roster data on BOTH dispatch seams, never trusted from the
 // model's echo of the candidate list (which drops the optional field ~1 in 5 brokered picks, filing
@@ -123,9 +164,22 @@ import { sendRequest, callModel, extractSelfReportedClaims, extractDelegationPro
 import { insertPendingConfirmation, getPendingConfirmation, markEdited, resolvePendingConfirmation, getOnAcceptIntentSlug, markAcceptedDelegated, linkCheckpointJob, markAcceptFailed, getConfirmationByCheckpointJobId } from '../_lib/handlers/confirmation.js';
 import { createDurableHopRow, loadDurableHopRow, patchDurableHopRow, patchDurableHopRowChecked } from '../_lib/handlers/durable-loop.js';
 import { logActivity } from '../../lib/activity-log.js';
+// FEATURE: SES-424 slice 6 -- the lenient reader for a MODEL-authored citation list, shared with
+// scripts/agent-log.js's strict CLI parser in one module (lib/pattern-citations.js).
+import { coercePatternNumbers } from '../../lib/pattern-citations.js';
 import { withRequestContext } from '../../lib/request-context.js';
+// FEATURE: SES-346 -- TRANSPORT DELEGATION ONLY. api/_lib/mcp.js used to be api/mcp.js, a 13th
+// serverless function on a 12-function Hobby plan, and its presence REFUSED every dev deploy from
+// v7.0.437 to v7.0.445. The MCP server now rides THIS function; nothing about capability execution
+// changed and nothing may be added to this seam beyond the one-line handoff in handler() below.
+import { mcpHandler } from '../_lib/mcp.js';
 
-export const config = { maxDuration: 60, runtime: "nodejs" };
+// FEATURE: SES-348 -- 60 was a self-cap, not the platform's limit: project prj_sQyHlk19MUKmXyaAhXc4
+// FBImdTMd runs Fluid compute with a functionDefaultTimeout of 300 s. Every governance verdict (the
+// MCP server rides this function per SES-346's rewrite, and scripts/verifier.js POSTs the executor
+// directly) is a 54-57 s model turn, so a 60 s declared ceiling made each one a coin flip. The two
+// deadlines below derive from THIS number rather than restating it, so the ceiling is declared once.
+export const config = { maxDuration: 300, runtime: "nodejs" };
 
 // FEATURE: AA-80 — platform-level hard ceiling on delegate hops per top-level request. Not
 // data-overridable by any Skill Profile — infrastructure, same category as the maxDuration/
@@ -401,7 +455,14 @@ export function __resetCapabilityPhraseCache() {
 // split, now captured on the agent-turn row too. This row is the SINGLE log record for a loop-path
 // model call (LOG-91 absorbed the wrapper row), so without these params every loop-path row would
 // keep NULL cache fields forever. Plumbing values like input_tokens -- never call_facts keys.
-export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, cache_creation_input_tokens = null, cache_read_input_tokens = null, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null }) {
+// FEATURE: LOG-149 -- five optional params so the ONE existing turn writer can also write a FAILED
+// turn, instead of a second bespoke writer growing beside it. Every pre-existing caller omits all
+// five and its row is byte-identical: the four facts fold in under the same omit-when-empty shape
+// tool_calls already uses, and costUsd stays `undefined` so logActivity() prices from the tokens.
+// stopReason/refusalCategory/fault/tokensEstimated are §19k DIAGNOSTIC facts under the LOG-109
+// posture (.claude/rules/ai-pattern-signature.md) -- bounded enums and a boolean, never a count, and
+// deliberately not added to SIGNATURE_FIELDS.
+export async function logAgentTurn({ capability_slug, intent_slug, agent_id, tenant_id, model, depth, latency_ms, is_delegate_call, api_retry_count, input_tokens, output_tokens, cache_creation_input_tokens = null, cache_read_input_tokens = null, intent_technical_services = [], trace_id, usedWebSearch = false, tool_calls = [], signatureConfig = null, spanId = null, parentSpanId = null, inputReferencesOtherDeliverable = false, selfReportedClaims = null, delegationTarget = null, taskProvenance = null, task_id = null, wrapperFacts = null, dispatchLatencyMs = null, stopReason = null, refusalCategory = null, fault = null, tokensEstimated = false, costUsd = undefined, patternsApplied = [] }) {
   // FEATURE: LOG-37b -- real tool names, never pattern names. 'web_search' is the literal
   // server-side tool Anthropic ran (same mechanical detection the caller already does for
   // usedWebSearch), not a slug; folded in here rather than at the call site so any future caller
@@ -429,6 +490,15 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     // literal agent ids in them -- never legal criteria keys (§19k locked constraint 2).
     ...(delegationTarget ? { delegation_target: delegationTarget } : {}),
     ...(taskProvenance ? { task_provenance: taskProvenance } : {}),
+    // FEATURE: LOG-149 -- the failed-call facts, same omit-when-empty contract as every key above.
+    // ABSENT MEANS "NOT A FAILURE", never false: a normal turn writes none of these four, which is
+    // what keeps the §19k signature of the ~600 normal rows a month from fragmenting. tokens_estimated
+    // is the one that must never be silently dropped -- it is the label that stops an aborted call's
+    // input-side FLOOR from being read as a measured count.
+    ...(stopReason ? { stop_reason: stopReason } : {}),
+    ...(refusalCategory ? { refusal_category: refusalCategory } : {}),
+    ...(fault ? { fault } : {}),
+    ...(tokensEstimated ? { tokens_estimated: true } : {}),
   };
   // FEATURE: LOG-91 -- the turn's own call_facts exactly as before (fact-half + config-half);
   // when wrapperFacts rides along, layer it UNDER the turn half (mergeCallFacts's second arg wins,
@@ -473,6 +543,14 @@ export async function logAgentTurn({ capability_slug, intent_slug, agent_id, ten
     // FEATURE: LOG-91 -- the absorbed wrapper's model-through-dispatch latency, into its own
     // column (never call_facts). Null for every pre-existing caller.
     dispatchLatencyMs,
+    // FEATURE: LOG-149 -- passed straight through: `undefined` (every pre-existing caller) means
+    // logActivity() prices the row from its own tokens; an explicit 0 is the failure seam asserting
+    // an unbilled call. Never computed here -- one pricing site, and it is logActivity().
+    costUsd,
+    // FEATURE: SES-424 slice 6 -- the decision criteria this turn cited, forwarded verbatim. [] for
+    // every pre-existing caller and for the failure seam, and [] writes nothing and changes nothing
+    // about the row (lib/activity-log.js keeps its `return=minimal` single request when empty).
+    patternsApplied,
   });
 }
 
@@ -1184,6 +1262,41 @@ async function runLoop({
       // checkpoint-resume recovery per hop before surfacing. Hop identity = conversationHistory.length
       // at the top of the hop -- stable across checkpoint/resume (depth is NOT: a resumed continuation
       // re-enters at the decision hop's depth), monotonic within a chain.
+      // FEATURE: LOG-149 -- THE ROW IS WRITTEN BEFORE THE BRANCH, and the ordering is the whole
+      // point: below this, a transient failure returns a checkpoint and a permanent one calls
+      // persistFailureAndRethrow(), and NEITHER path reaches logAgentTurn() -- which is why every
+      // refused, aborted and rejected executor call on 2026-09-09 left no ai_activity_log row at all
+      // while the Console billed for the aborted ones. Writing here covers both branches with one
+      // call, and it is exactly one row per failed CALL: if the hop then recovers, the resumed hop
+      // makes a NEW call that writes its own row, so a recovery reads as two calls because it was two.
+      //
+      // GATED ON `sent`, NOT on the error existing: a config fault, a raw TypeError from our own
+      // bookkeeping, or a deadline-starved hop carries no modelCall and writes nothing. Nothing here
+      // reads capability_slug, intent_slug or agent_id as a CONDITION -- they are passed through as
+      // the row's own identity fields exactly as the success path passes them (§19b/§19d).
+      if (e?.modelCall?.sent) {
+        const mc = e.modelCall;
+        logAgentTurn({
+          capability_slug, intent_slug, agent_id, tenant_id,
+          model: enriched.llm.model, depth, latency_ms: Date.now() - turnStart,
+          is_delegate_call: false, api_retry_count: mc.api_retry_count || 0,
+          // Reported usage first, the labelled estimate second, NULL last. Output tokens are never
+          // estimated: an unknowable count stays NULL rather than becoming a confident zero.
+          input_tokens: mc.usage?.input_tokens ?? mc.estimated_input_tokens ?? null,
+          output_tokens: mc.usage?.output_tokens ?? null,
+          cache_creation_input_tokens: mc.usage?.cache_creation_input_tokens ?? null,
+          cache_read_input_tokens: mc.usage?.cache_read_input_tokens ?? null,
+          intent_technical_services: enriched.intent_technical_services || [],
+          trace_id, spanId: span_id, parentSpanId: parent_span_id, signatureConfig,
+          stopReason: mc.stop_reason ?? null,
+          refusalCategory: mc.refusal_category ?? null,
+          fault: mc.fault ?? null,
+          tokensEstimated: mc.tokens_estimated === true,
+          // A refusal and a rejection are unbilled: 0, asserted. An abort IS billed, so it is left to
+          // price from the estimated floor rather than claiming it was free.
+          costUsd: mc.billed === false ? 0 : undefined,
+        });
+      }
       const hopOrdinal = conversationHistory.length;
       const alreadyRecovered = recoveryLedger.some(r => r.o === hopOrdinal);
       if (classifyModelCallFailure(e) === 'transient' && !alreadyRecovered) {
@@ -1241,6 +1354,13 @@ async function runLoop({
       spanId: span_id, parentSpanId: parent_span_id,
       inputReferencesOtherDeliverable: integratedDelegateResult,
       selfReportedClaims: extractSelfReportedClaims(turn.tool_input),
+      // FEATURE: SES-424 slice 6 -- the criteria the model itself named in its structured answer,
+      // read off the SAME turn.tool_input the line above reads, and coerced rather than validated:
+      // junk is dropped, the turn still logs, and the FK to public.decision_patterns is the only
+      // authority on which numbers exist. These become ROWS in public.decision_pattern_citations,
+      // never a call_facts key -- a per-turn list there would fragment the §19k signature, the
+      // measured LOG-91 failure (720 -> 24,826 distinct signatures).
+      patternsApplied: coercePatternNumbers(turn.tool_input?.patterns_applied),
       // FEATURE: LOG-67 -- the config-half snapshot, threaded from runCapability() (off promptRequest),
       // merged into this row's call_facts alongside the fact-half tool_calls below.
       signatureConfig,
@@ -1785,9 +1905,12 @@ export async function runCapability({
   const critiqueIntentSlug = promptRequest.critiqueIntentSlug || null;
 
   // FEATURE: AA-139 -- computed only when this is the top-level call (no _deadline passed in).
-  // SAFETY_MARGIN_MS is reserved off the real 60s ceiling for the checkpoint write + response
-  // round trip on whichever hop ultimately triggers it.
-  const deadline = _deadline || (Date.now() + 60000 - SAFETY_MARGIN_MS);
+  // SAFETY_MARGIN_MS is reserved off the ceiling for the checkpoint write + response round trip on
+  // whichever hop ultimately triggers it.
+  // FEATURE: SES-348 -- the ceiling is whatever this module's own `config` export declares (line
+  // 144), read rather than restated: a literal here could drift from the maxDuration Vercel actually
+  // enforces, and the drifting copy is the one that silently truncates the run.
+  const deadline = _deadline || (Date.now() + config.maxDuration * 1000 - SAFETY_MARGIN_MS);
 
   try {
     return await runLoop({
@@ -1848,7 +1971,9 @@ export async function resumeCapability({ job_id, _onEvent = null }) {
     format_contract: row.format_contract,
     llm: row.llm,
   };
-  const deadline = Date.now() + 60000 - SAFETY_MARGIN_MS;
+  // FEATURE: SES-348 -- same derivation as runCapability()'s fresh deadline: the resume gets a new
+  // invocation's full declared budget, off config.maxDuration rather than a second literal.
+  const deadline = Date.now() + config.maxDuration * 1000 - SAFETY_MARGIN_MS;
   // FEATURE: MI-42 -- same no-op-default pattern as runCapability() above.
   const onEvent = _onEvent || (() => {});
 
@@ -2203,6 +2328,14 @@ async function streamResult(res, run) {
 }
 
 async function handler(req, res) {
+  // FEATURE: SES-346 -- the MCP transport, delegated before anything else in this function runs.
+  // `/api/mcp` is a vercel.json rewrite to `/api/capabilities/execute?transport=mcp`, so the query
+  // parameter is the only thing that tells the two callers apart. This is a TRANSPORT branch, not a
+  // capability conditional: no capability slug and no agent id is read here, so
+  // .claude/rules/capabilities-are-data.md is untouched -- mcpHandler() reaches the SAME
+  // runCapability() the lines below reach, by the same executor, with the same logging.
+  if (req.query?.transport === "mcp") return mcpHandler(req, res);
+
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");

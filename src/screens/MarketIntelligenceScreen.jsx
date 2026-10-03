@@ -1,3 +1,26 @@
+// DeepBench v7.0.417 | MarketIntelligenceScreen.jsx | LOG-143 (b) -- every finished Q&A run is graded in
+// the background by Owen Marsh -- The Proofreader's bench-report-card capability: one fire-and-forget
+// callCapability() at the point the final answer is committed to state, one call per trace ever, and one
+// appended Audit Pipeline Log line when the card lands. Three of report-card-intent's six declared inputs
+// (assembled_skill_slugs, retrieved_chunk_ids, self_reported_claims) are NOT available client-side and are
+// omitted rather than defaulted -- full field trace above gradeFinishedRun().
+// DeepBench v7.0.191 | MarketIntelligenceScreen.jsx | CHI-84 -- the chat handoff bubble's step chip is
+// now TAPPABLE: tapping it jumps Steps & Evidence to that step's drawer (opens it, scrolls its top into
+// view, pulses it once). Wiring of two shipped mechanisms, not new machinery -- CHI-82's StepChip and
+// CHI-71's data-drawer-key scroll. StepChip gains an OPTIONAL `onTap`: without it, byte-identical spans
+// (drawer-title chips stay non-interactive -- the header is already the toggle control); with it, a bare
+// <button> carrying the mock-approved minimal hover (brass square darkens, label underlines) and an
+// aria-label naming the step. The three stepRef constructors now carry `key` -- the drawer's own
+// scrollKey -- and a bubble persisted before this version simply has none and renders today's inert
+// chip. The jump signal ({key, seq}) lifts to the top-level screen because chip and drawer stack are
+// siblings; EvidenceColumn opens via the existing manual-open path, scrolls with the SAME math the
+// auto-open transition uses (hoisted to module-scope scrollDrawerIntoView, one implementation, two
+// callers), applies GLOBAL_CSS's existing borderPulse imperatively to the element the scroll located,
+// then CONSUMES the signal -- which is what stops mobile re-jumping on a later tab-switch remount.
+// setTimeout(0), never rAF: rAF never fires in a hidden pane. Mobile switches to the Steps & Evidence
+// tab first (through selectTab, so the unseen-flash bookkeeping matches a real tab press), then runs
+// the identical effect on mount. One file; SharedUI.jsx and tokens.js deliberately untouched; zero new
+// user-facing copy; at rest every chip is pixel-identical to v7.0.190.
 // DeepBench v7.0.84 | MarketIntelligenceScreen.jsx | LAV-39 -- CHI drawer title, mobile pinned-feed
 // header, and hop-summary leads relabeled "Agent Patterns" (render strings only; hop grouping, row
 // components, event copy, §19s content contract untouched -- John's call, 2026-08-10, verified
@@ -555,12 +578,34 @@ function currentStage({ qaEvidence, hypFlow }) {
 // user (§19n Decision 3: exactly one step named per handoff, number + name together, same visual
 // chip the drawer wears). Renders nothing while the step is unassigned (n == null), which is also
 // the defensive title fallback — a rendered drawer with no number shows its plain fixed name.
-const StepChip = ({ n, label }) => n == null ? null : (
-  <span style={{display:"inline-flex",alignItems:"center",gap:5,verticalAlign:"middle"}}>
-    <span style={{background:T.brass,color:T.card,fontFamily:mono,fontSize:10,fontWeight:700,padding:"1px 6px",lineHeight:1.4}}>{n}</span>
-    {label && <span style={{fontFamily:mono,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.brassDeep}}>{label}</span>}
-  </span>
-);
+// FEATURE: CHI-84 — the chip gains an OPTIONAL `onTap`. Without it this renders exactly the spans it
+// always did (drawer titles stay non-interactive — the drawer header is already the toggle control,
+// and a second control nested inside it would nest buttons). With it, the same visual chip renders as
+// a bare <button> (no button chrome) that jumps Steps & Evidence to the step's drawer, plus the mock's
+// minimal hover affordance: the brass square darkens and the label underlines. At rest the two forms
+// are pixel-identical — CHI-84 adds behavior and hover/focus, never a resting appearance change.
+const StepChip = ({ n, label, onTap }) => {
+  const [hovered, setHovered] = useState(false);
+  if (n == null) return null;
+  const active = !!onTap && hovered;
+  const frame = {display:"inline-flex",alignItems:"center",gap:5,verticalAlign:"middle"};
+  const inner = (
+    <>
+      <span style={{background:active ? T.brassDeep : T.brass,color:T.card,fontFamily:mono,fontSize:10,fontWeight:700,padding:"1px 6px",lineHeight:1.4}}>{n}</span>
+      {label && <span style={{fontFamily:mono,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.brassDeep,textDecoration:active ? "underline" : "none",textUnderlineOffset:2}}>{label}</span>}
+    </>
+  );
+  if (!onTap) return <span style={frame}>{inner}</span>;
+  return (
+    <button type="button" onClick={onTap}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}
+      aria-label={`Jump to step ${n}${label ? ` ${label}` : ""}`}
+      style={{...frame,border:"none",background:"none",padding:0,cursor:"pointer"}}>
+      {inner}
+    </button>
+  );
+};
 
 // FEATURE: AA-130 — Sam's intake-failure-intent schema (traits.schema, confirmed live in Supabase)
 // only ever outputs recommend_escalate/suggested_research_request, per the original spec
@@ -1071,6 +1116,12 @@ function describePipelineEvent(evt, opts = {}) {
     // FEATURE: MI-23 — Priya's hyp-generation-intent turn, previously unlogged anywhere on this screen.
     case "hypothesis_generation":
       return { summary: "Reviewing found data, putting together a theory", color: T.moss };
+    // FEATURE: LOG-143 (b) — the one line the Audit Pipeline Log gains when the background judge
+    // finishes. T.moss is the existing convention for "an agent completed its work cleanly"
+    // (delegation_return/hypothesis_generation above) — no new colour, no new row style, no new
+    // panel on this screen.
+    case "report_card":
+      return { summary: reportCardLogSummary(evt.data), color: T.moss };
     // FEATURE: MI-29 -- surfaces the real caught error (e.message) in the existing Pipeline Log
     // instead of it only ever reaching a devtools-only console.error. Reuses T.flag, the same
     // alert color already used for guardrail "block" results above -- no new color introduced.
@@ -1566,6 +1617,105 @@ export async function callCapability({ capability_slug, intent_slug, agent_id, t
   return finalResult;
 }
 
+// ── FEATURE: LOG-143 (b) — the Bench Report Card's trigger ───────────────────────────────────
+// Every finished Q&A run is graded in the background by Owen Marsh — The Proofreader's
+// `bench-report-card` capability (LOG-143 (a), v7.0.415). Fire-and-forget by construction: the
+// call is never awaited on the answer path, every failure is consoled and swallowed, and one
+// trace is graded at most once, ever.
+//
+// MOCK-FIDELITY FIELD TRACE — every task_context field, and where it is read from. The kickoff
+// stated all six of `report-card-intent`'s inputs are "already held client-side"; three of them
+// are not, and the verification is recorded here rather than papered over with a synthesised
+// value (C-rejected-17/18: an invented input is worse than a declared gap):
+//   • trace_id  — PASSED. `qa.trace_id`, the trace of Marcus's own `ci-answer-intent` execution,
+//     threaded out of runQaWithQualityGate() as `judgeTraceId`. Born in execute.js runCapability()
+//     (`const traceId = _trace_id || crypto.randomUUID()`), returned on runLoop()'s final result
+//     (LOG-79) and unwrapped by callCapability() above. NOT read off the qa_answer pipeline event:
+//     that event only fires when no internal delegation resolved the call (LOO-010's
+//     `display_agent_id == null` guard), so the event is a conditional carrier of the id and the
+//     return value is an unconditional one. Each top-level callCapability() opens its OWN trace,
+//     so this is deliberately the ANSWERING call's trace, not routing's, the gate's or display's.
+//   • question — PASSED. `clean`, onSend()'s own trimmed question text.
+//   • answer   — PASSED. `plainText`, the same plain-text join of the formatted card that
+//     conversationContext()/onReview already use (S-ARCH-DISPLAY-LOOP-01).
+//   • hops     — PASSED, PARTIAL. Each entry is the literal {agent_id, capability_slug,
+//     intent_slug} triple a callCapability() call site actually sent to /api/capabilities/execute
+//     (built in runIntentPipeline/runQaWithQualityGate as the calls happen), plus the display
+//     hop's real resolved `display_agent_id`. It is NOT read off the Audit Pipeline Log as the
+//     kickoff assumed: verified this session, a hop event carries `agentId` and the response
+//     content, and capability/intent slugs appear only on the delegation-family events the
+//     executor streams (`toCapabilitySlug`/`toIntentSlug`) — i.e. only when a delegation
+//     happened. `assembled_skill_slugs` is OMITTED from every hop, not defaulted to []: it is
+//     written server-side onto the ai_activity_log agent-turn row (LOG-49) and no response field
+//     or streamed event carries it, so the client cannot know it. An empty array would assert
+//     "this agent carried no Skills", which is a fabrication; an absent key is the honest
+//     "not given", and the judge's own rubric turns an unsupportable dimension into `unknown`.
+//   • retrieved_chunk_ids — OMITTED. No `src/` file has ever held this value (it is written on
+//     Eleanor Voss's librarian rows server-side). Moot in this version regardless: part (a)
+//     Blocker B means `report-card-intent` scores groundedness NULL unconditionally, because
+//     nothing on the platform can read Library chunk text by id until LOG-143 (d).
+//   • self_reported_claims — OMITTED. Same reason: extractSelfReportedClaims() runs inside
+//     request-receivable.js/execute.js and its output goes to the log row's facts half, never to
+//     the response.
+// A judged card therefore lands today with a real delegation_fit and skill_use where the routing
+// chain supports them, `unknown` where it does not, and groundedness always `unknown` — which is
+// exactly what the Report Card panel renders (never a 0/5 standing in for a gap).
+const gradedTraceIds = new Set();
+
+// One judge call per trace, ever. Not free of side effects — claiming the id IS the guard, and
+// splitting the check from the claim would reopen the double-fire window the module-scope Set
+// exists to close — but pure with respect to everything else, so the regression test can drive it
+// with its own Set and assert the second call for the same id returns false.
+export function shouldGradeTrace(traceId, seen) {
+  if (typeof traceId !== "string" || !traceId) return false;
+  if (!seen || typeof seen.has !== "function") return false;
+  if (seen.has(traceId)) return false;
+  seen.add(traceId);
+  return true;
+}
+
+// FEATURE: LOG-143 (b) — the summary text for the Audit Pipeline Log's one appended line. A NULL
+// dimension prints the word `unknown`, never 0/5 (C-rejected-17/18), and there is no blended
+// overall figure (C-rejected-27) — three dimensions, shown separately.
+export function reportCardLogSummary({ agent_name, delegation_fit, groundedness, skill_use }) {
+  const d = (v) => (v === null || v === undefined ? "unknown" : `${v}/5`);
+  return `Report card: ${agent_name || "the answering agent"} — fit ${d(delegation_fit)} · grounded ${d(groundedness)} · skills ${d(skill_use)}`;
+}
+
+// FEATURE: LOG-143 (b) — fired from onSend()'s qa branch and deliberately NOT awaited there. A
+// judge failure must not delay or alter the answer, so nothing in here can throw into the answer
+// path: shouldGradeTrace() refuses a missing/duplicate trace, and the whole call is wrapped.
+export async function gradeFinishedRun({ traceId, question, answer, hops, fallbackAgentId, resolveAgentName = (id) => id, logLine, isStale = () => false, seen = gradedTraceIds }) {
+  if (!shouldGradeTrace(traceId, seen)) return null;
+  const t0 = Date.now();
+  try {
+    const card = await callCapability({
+      capability_slug: "bench-report-card", intent_slug: "report-card-intent", agent_id: "owen",
+      task_context: { trace_id: traceId, question, answer, hops },
+      isStale,
+    });
+    // The graded agent is the judge's own answer (`card.agent_id`, the agent on the hop that
+    // produced the answer), never Owen — the same read-side twin of Rule #1 the write handler
+    // enforces. Note `card.trace_id` is NOT usable here: callCapability()'s unwrap overwrites the
+    // content's trace_id with the JUDGE's execution trace (LOG-79's generic passthrough), so the
+    // graded run's id is the one this function was handed.
+    const gradedAgentId = card?.agent_id || fallbackAgentId || null;
+    if (isStale() || typeof logLine !== "function") return card ?? null;
+    logLine(buildHopEvent("report_card", gradedAgentId, {
+      ...card,
+      trace_id: traceId, // the GRADED run's trace, restored over the judge's own
+      agent_name: resolveAgentName(gradedAgentId),
+    }, Date.now() - t0));
+    return card ?? null;
+  } catch (e) {
+    // Swallowed on purpose: the answer is already on screen and correct. Nothing is appended to
+    // the Audit Pipeline Log for a failed judge — a report-card row that does not exist must not
+    // be narrated as if it did.
+    console.error("[MarketIntelligenceScreen] FEATURE: LOG-143 — Bench Report Card judge failed (swallowed, never on the answer path)", e);
+    return null;
+  }
+}
+
 // FEATURE: MI-01d — resolve a pending_confirmation (accept/reject/edit). Generic across any
 // capability — the confirmation_id already encodes which capability/agent/intent it belongs to.
 // FEATURE: MI-42 — gains the identical onProgress/stream treatment for consistency (Nadia's
@@ -1622,6 +1772,14 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
   });
   if (isStale()) return qa; // FEATURE: CHI-04 — stop before Owen's quality-gate hop
 
+  // FEATURE: LOG-143 (b) — the run's hop list for the Bench Report Card judge, accumulated as the
+  // calls actually happen so a hop that never ran is never listed. Each entry is the literal
+  // triple this function handed /api/capabilities/execute, which is why capability_slug and
+  // intent_slug are real here and null on the Audit Pipeline Log's own hop events (see the field
+  // trace above gradeFinishedRun()). `assembled_skill_slugs` is deliberately absent from every
+  // entry — it exists only on the server-side agent-turn row.
+  const judgeHops = [{ agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-answer-intent" }];
+
   setStatus("Owen is reviewing…"); // FEATURE: MI-42 (was MI-41) -- macro-hop swap, was invisible before
   // FEATURE: MI-52 -- secondaryAgentId dropped; the retry is already named in this row's own summary
   // text (describePipelineEvent's "proofreader" case: " (Owen retried via Marcus)"), no info loss.
@@ -1644,6 +1802,7 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
     onEvent, hop_type: "proofreader",
   });
   if (isStale()) return gate; // FEATURE: CHI-04 — stop before the display hand-off hop
+  judgeHops.push({ agent_id: "owen", capability_slug: "quality-gate", intent_slug: "qg-review-intent" }); // FEATURE: LOG-143 (b)
   const retried = !!gate.final_answer;
 
   if (gate.guardrail?.result === "block") {
@@ -1709,6 +1868,10 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
     onProgress, isStale, onRecovery,
   });
   if (isStale()) return display; // FEATURE: CHI-04
+  // FEATURE: LOG-143 (b) — the display hop credits the agent Michelle's pick actually resolved to
+  // (`display_agent_id`, the executor's own generic passthrough), null when the hand-off declined
+  // its tool call and answered as plain text — never a guessed formatter.
+  judgeHops.push({ agent_id: (typeof display === "string" ? null : display.display_agent_id) || null, capability_slug: "channel-intelligence", intent_slug: "ci-answer-display-intent" });
 
   // FEATURE: AA-137 — callCapability() returns a raw string when the display/format hand-off
   // declines its tool call and responds with plain text instead (e.g. it recognizes a real problem
@@ -1732,6 +1895,9 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
       needs_review: true, review_reason: "Display agent output couldn't be rendered in the expected format — see message below.",
       displayAgentCard: typeof display === "string" ? null : display.display_agent_card,
       displayAgentId: typeof display === "string" ? null : display.display_agent_id,
+      // FEATURE: LOG-143 (b) — additive identity for the background judge; every existing caller
+      // reads named fields, so this changes nothing they see.
+      judgeTraceId: qa.trace_id ?? null, judgeHops,
     };
   }
   return {
@@ -1740,6 +1906,9 @@ export async function runQaWithQualityGate(message, conversationContext, onEvent
     citations: display.citations, confidence_tier: display.confidence_tier,
     needs_review: display.needs_review, review_reason: display.review_reason,
     displayAgentCard: display.display_agent_card, displayAgentId: display.display_agent_id,
+    // FEATURE: LOG-143 (b) — the ANSWERING call's own trace (Marcus's ci-answer-intent execution),
+    // which is the run the Report Card grades, plus the hop list built above.
+    judgeTraceId: qa.trace_id ?? null, judgeHops,
   };
 }
 
@@ -1760,7 +1929,14 @@ async function runIntentPipeline(message, conversationContext, onEvent, setStatu
   if (routing.intent !== "qa") {
     return { kind: "hyp_entry", intent: routing.intent, extractedHypothesis: routing.extracted_hypothesis, flaggedQuestion: message };
   }
-  return runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, backgroundContext, onRecovery); // FEATURE: HAR-17
+  const qaResult = await runQaWithQualityGate(message, conversationContext, onEvent, setStatus, onProgress, isStale, backgroundContext, onRecovery); // FEATURE: HAR-17
+  // FEATURE: LOG-143 (b) — the routing hop is the first hop of the run and the one that chose the
+  // Intent, so delegation_fit cannot be judged without it; it is prepended here rather than
+  // rebuilt inside runQaWithQualityGate, which never sees this call. Only the qa shapes carry a
+  // hop list (a qa_failed/non_qa run produced no answer to grade).
+  return Array.isArray(qaResult?.judgeHops)
+    ? { ...qaResult, judgeHops: [{ agent_id: "marcus", capability_slug: "channel-intelligence", intent_slug: "ci-routing-intent" }, ...qaResult.judgeHops] }
+    : qaResult;
 }
 
 // FEATURE: MI-02/MI-03 — Generate Hypotheses (Priya/hypothesis-evaluation). Skips straight to
@@ -1849,7 +2025,10 @@ async function runHypothesisTest({ hypothesis, intent, flaggedQuestion, flaggedA
 // EvidenceColumn, Task 3/4); `qaEvidence` added so the shrunk `qa` case's review-outcome note
 // (Good, thanks / Sent to Priya) can still render in chat, sourced from the shared qaEvidence
 // state slot instead of msg.reviewChoice (onGoodThanks/onReview no longer index into messages).
-function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
+// FEATURE: CHI-84 — onStepChipTap threaded in so the handoff bubble's chip can jump Column 2 to the
+// step's drawer. Only a stepRef that carries a drawer `key` gets the handler; a message persisted
+// before CHI-84 has no key and renders today's inert chip rather than a control that can't act.
+function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence, onStepChipTap }) {
   const isMobile = useIsMobile(); // FEATURE: CHI-88 — the qa pointer sentence below is surface-specific
   // FEATURE: CHI-42 — kind:"user_action" narration bubbles (pushed synchronously at the moment of
   // a user decision, before any async ack) render as "You" bubbles too, via kind rather than role —
@@ -1931,7 +2110,9 @@ function MessageBubble({ msg, index, onReview, onGoodThanks, qaEvidence }) {
         {msg.text}
         {/* FEATURE: CHI-82 — the handoff's step chip, inline at the end of the bubble text: the
             same visual chip the named drawer's title wears (§19n Decision 3). */}
-        {msg.stepRef && <span style={{marginLeft:4}}><StepChip n={msg.stepRef.n} label={msg.stepRef.label}/></span>}
+        {/* FEATURE: CHI-84 — tappable when the stepRef names a drawer key and a handler is wired. */}
+        {msg.stepRef && <span style={{marginLeft:4}}><StepChip n={msg.stepRef.n} label={msg.stepRef.label}
+          onTap={msg.stepRef.key && onStepChipTap ? () => onStepChipTap(msg.stepRef.key) : undefined}/></span>}
       </div>
       {/* FEATURE: CHI-21 — combined hop badge + elapsed-time row (was 2 stacked divs), same
           component as the qa branch above. */}
@@ -2170,6 +2351,20 @@ function selectEvidenceFooterKind(qaEvidence, hypFlow) {
   return null;
 }
 
+// FEATURE: CHI-84 — the element half of useDrawerStack's transition scroll, hoisted to module scope
+// so the chip-jump effect below (EvidenceColumn) reuses this exact math instead of keeping a second,
+// silently-diverging copy of it. Brings the named drawer's TOP into view inside `container` and
+// returns the element it scrolled to, or null when the key isn't rendered (or there's no container/
+// key at all) — the null return is what the hook's own "scroll to top instead" branch keys off.
+function scrollDrawerIntoView(container, key) {
+  const el = container && key ? container.querySelector(`[data-drawer-key="${key}"]`) : null;
+  if (!el) return null;
+  const cRect = container.getBoundingClientRect();
+  const eRect = el.getBoundingClientRect();
+  container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top), behavior: "smooth" });
+  return el;
+}
+
 // FEATURE: CHI-51 — generic drawer-stack orchestration service (STYLE-GUIDE.md §40/§29's shared
 // pattern, consolidated out of 5 previously-separate pieces of EvidenceColumn local state:
 // computeAutoCurrent(), manualOverride, the reset/auto-scroll effect, isDrawerOpen(),
@@ -2195,12 +2390,9 @@ function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, fre
     const container = scrollRef.current;
     if (!container) return;
     // FEATURE: CHI-71 -- bring the newly-active drawer's TOP into view (was: jump to column bottom)
-    const el = autoCurrent ? container.querySelector(`[data-drawer-key="${autoCurrent}"]`) : null;
-    if (el) {
-      const cRect = container.getBoundingClientRect();
-      const eRect = el.getBoundingClientRect();
-      container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top), behavior: "smooth" });
-    } else {
+    // FEATURE: CHI-84 -- the element branch is now scrollDrawerIntoView() at module scope; same math,
+    // same conditions (no key, or a key with no rendered element, both fall through to top-of-column).
+    if (!scrollDrawerIntoView(container, autoCurrent)) {
       container.scrollTo({ top: 0, behavior: "smooth" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2240,7 +2432,11 @@ function useDrawerStack(priorityChecks, scrollRef, transitionDeps, resolved, fre
 // hyp "Needs Your Decision" badges: an abandoned previous journey's ambient drawers must not
 // keep soliciting a decision. The qa/Analysis badge is deliberately NOT gated (qaEvidence is a
 // single slot overwritten each journey — no stale case).
-function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare, getStep, hypIsCurrent }) {
+// FEATURE: CHI-84 — stepJump ({key, seq} | null) is the chip-tap signal, lifted to the top-level
+// screen because the chip (Column 1) and the drawer stack (Column 2) are siblings with no shared
+// scope. onStepJumpConsumed clears it once acted on — that consumption is what stops the mobile
+// EvidenceColumn re-jumping every time a later tab switch remounts it.
+function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, onGoodThanks, onReview, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, bare, getStep, hypIsCurrent, stepJump, onStepJumpConsumed }) {
   const [customText, setCustomText] = useState("");
   const [showOwnTheory, setShowOwnTheory] = useState(false);
   const agents = useAgents();
@@ -2315,6 +2511,30 @@ function EvidenceColumn({ hypFlow, qaEvidence, onIntentChange, onSelectHypothesi
     [qaEvidence, newsCards],
     { "hyp-result": ["hyp-draft"] } // FEATURE: CHI-58
   );
+
+  // FEATURE: CHI-84 — the chat chip's jump: open the named drawer through the SAME manual-open path a
+  // header click uses, then scroll its top into view with the SAME math the auto-open transition uses
+  // (scrollDrawerIntoView), then pulse it once so the eye lands where the column just moved to.
+  // setTimeout(0), never requestAnimationFrame: the drawer's own content expands on the render this
+  // effect's toggle causes, so the measurement has to wait a tick — and rAF never fires in a hidden
+  // pane (the live-QA browser pane always reports document.hidden), where a timer fires regardless.
+  // The pulse reuses GLOBAL_CSS's existing borderPulse keyframe on the element the scroll already
+  // located — no Drawer prop, no new keyframe — and clears itself on a one-shot animationend so a
+  // repeat tap re-animates. Deliberately no clearTimeout cleanup: consuming the signal below re-runs
+  // this effect with stepJump null, and a cleanup would cancel the very timer it just scheduled.
+  useEffect(() => {
+    if (stepJump == null) return;
+    handleDrawerToggle(stepJump.key)(true);
+    setTimeout(() => {
+      const el = scrollDrawerIntoView(evidenceScrollRef.current, stepJump.key);
+      if (!el) return;
+      const clear = () => { el.style.animation = ""; el.removeEventListener("animationend", clear); };
+      el.addEventListener("animationend", clear);
+      el.style.animation = "borderPulse 1.4s ease-in-out 1";
+    }, 0);
+    if (onStepJumpConsumed) onStepJumpConsumed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepJump]);
 
   // FEATURE: CHI-46 — the true-empty-state early return that used to live here (gated on
   // `!qaEvidence && !hypFlow`, MI-59/CHI-03a/CHI-33/CHI-38) is deleted: its own News-rendering JSX
@@ -3291,7 +3511,9 @@ function DataSourceRow({ row }) {
 // drive the crumb), and this component just renders it. qaEvidence stays a raw prop — it is also
 // consumed by MessageBubble's review-outcome note, which must not be membership-filtered. The
 // bare (mobile) branch has no header and never reads crumbStage.
-function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare, qaEvidence, crumbStage }) {
+// FEATURE: CHI-84 — onStepChipTap is pass-through only (chat column -> MessageBubble); this column
+// holds no jump state of its own, the signal lives at the top level where both columns can see it.
+function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, noMinHeight, bare, qaEvidence, crumbStage, onStepChipTap }) {
   const agents = useAgents();
   const marcus = agents.find(a => a.id === "marcus");
   const [input, setInput] = useState("");
@@ -3402,7 +3624,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
           </div>
         </div>
       ) : (
-        messages.map((m, i) => <MessageBubble key={i} msg={m} index={i} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence}/>)
+        messages.map((m, i) => <MessageBubble key={i} msg={m} index={i} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} onStepChipTap={onStepChipTap}/>)
       )}
       {!bare && workingStatus && <AgentWorkingIndicator key={workingStatus.startedAt} message={workingStatus.message} startedAt={workingStatus.startedAt} turnStartedAt={workingStatus.turnStartedAt} expectation={workingStatus.expectation}/>}
     </div>
@@ -3489,7 +3711,7 @@ function InteractColumn({ messages, loading, workingStatus, onSubmit, onReview, 
 // not reimplemented). "Agent & Data Info" (renamed from "Activity") moves to the page-title row —
 // showAgentInfo/setShowAgentInfo are now owned by the parent (Task 1a) so the trigger button can live
 // there instead of inside this component.
-function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, getStep, hypIsCurrent }) { // FEATURE: CHI-82/CHI-82b — getStep + hypIsCurrent passed through to EvidenceColumn
+function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGoodThanks, onClear, hypFlow, qaEvidence, onIntentChange, onSelectHypothesis, onDiscard, onCommit, onResolveConfirmation, events, agentActivity, showAgentInfo, setShowAgentInfo, onAgentsDrawerOpen, newsCards, onAnalyzeNewsCard, newsCardLoadingUrl, newsCardsStartedAt, getStep, hypIsCurrent, stepJump, onStepChipTap, onStepJumpConsumed }) { // FEATURE: CHI-82/CHI-82b — getStep + hypIsCurrent passed through to EvidenceColumn. FEATURE: CHI-84 — stepJump/onStepJumpConsumed reach the bare EvidenceColumn below; onStepChipTap reaches the bare InteractColumn
   const [mobileTab, setMobileTab] = useState("chat");
   const [chatUnseen, setChatUnseen] = useState(false);
   const [evidenceUnseen, setEvidenceUnseen] = useState(false);
@@ -3569,6 +3791,16 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
     if (tab === "evidence") setEvidenceUnseen(false);
   };
 
+  // FEATURE: CHI-84 — mobile has no second column: EvidenceColumn is UNMOUNTED while Chat shows, so a
+  // chip tap has to bring the Steps & Evidence tab up first. Through selectTab(), not setMobileTab
+  // directly, so the unseen-flash bookkeeping behaves exactly as it does for a real tab press. The
+  // jump itself is not repeated here — EvidenceColumn mounts with the signal still pending and runs
+  // the identical effect desktop runs, then consumes it.
+  useEffect(() => {
+    if (stepJump != null) selectTab("evidence");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepJump]);
+
   // FEATURE: MI-50 — bottom-edge scroll affordance for the pinned Agent Routing feed.
   // FEATURE: CHI-29 — now backed by the shared useScrollFadeHint hook (SharedUI.jsx), extracted so
   // this mechanism isn't reimplemented by hand at the new Column 2 call site.
@@ -3627,7 +3859,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
       <div style={{flex:1,minHeight:0,display:"flex",flexDirection:"column"}}>
         {mobileTab === "chat" ? (
           <>
-          <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare/>
+          <InteractColumn messages={messages} loading={loading} onSubmit={onSubmit} onReview={onReview} onGoodThanks={onGoodThanks} qaEvidence={qaEvidence} bare onStepChipTap={onStepChipTap}/>
           <div style={{flexShrink:0,padding:"9px 14px 8px",display:"flex",alignItems:"center",gap:8,background:T.card,borderTop:`1px solid ${T.line}`}}>
             <input id="mobile-chat-input" placeholder="Ask about channel performance…" disabled={loading}
               onKeyDown={e => { if (e.key === "Enter") { onSubmit(e.target.value); e.target.value = ""; e.target.blur(); } }}
@@ -3651,7 +3883,7 @@ function MobileBody({ messages, loading, workingStatus, onSubmit, onReview, onGo
              activates the desktop-proven mechanism on mobile too. Nothing inside EvidenceColumn changes,
              and no parallel mobile footer exists. */
           <div style={{flex:1,minHeight:0,overflow:"hidden",padding:14,display:"flex",flexDirection:"column"}}>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare getStep={getStep} hypIsCurrent={hypIsCurrent}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={(card) => { selectTab("chat"); onAnalyzeNewsCard(card); }} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} bare getStep={getStep} hypIsCurrent={hypIsCurrent} stepJump={stepJump} onStepJumpConsumed={onStepJumpConsumed}/>
           </div>
         )}
       </div>
@@ -3779,6 +4011,14 @@ export default function MarketIntelligenceScreen() {
     return n;
   };
   const getStep = (key) => journeyRef.current.order[key];
+
+  // FEATURE: CHI-84 — the chip-tap jump signal. It lives here because the chip (Column 1) and the
+  // drawer stack (Column 2) are siblings with no shared scope; EvidenceColumn acts on it and clears
+  // it. `seq` bumps on every tap so tapping the SAME chip twice is two distinct signals — without it
+  // the second tap would be a no-op reference-equal value and nothing would re-open.
+  const [stepJump, setStepJump] = useState(null); // { key, seq } | null
+  const onStepChipTap = (key) => setStepJump(prev => ({ key, seq: (prev?.seq ?? 0) + 1 }));
+  const onStepJumpConsumed = () => setStepJump(null);
   const resetJourney = () => {
     // FEATURE: CHI-82a — advance the seq (nextJourney), never back to EMPTY_JOURNEY(): content
     // created in a prior journey carries that journey's seq stamp and can then never pass the
@@ -4110,7 +4350,7 @@ export default function MarketIntelligenceScreen() {
         // is computed here, synchronously, so the number is right even before the effect runs.
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: `${n} theor${n === 1 ? "y" : "ies"} ready — pick the one that best explains it, or write your own.`,
           totalElapsedMs: Date.now() - t0, hopStart: hopBeforeGen + 1, hopEnd: currentHopCount(pipelineEventsRef.current), estimate: buildEndStatusEstimate("expected < 2m"),
-          stepRef: { n: ensureStep("hyp-candidates"), label: "Theories" } })]);
+          stepRef: { n: ensureStep("hyp-candidates"), label: "Theories", key: "hyp-candidates" } })]); // FEATURE: CHI-84 -- `key` is the drawer's own scrollKey, so the chip can jump to it
       }
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
@@ -4231,6 +4471,22 @@ export default function MarketIntelligenceScreen() {
           // it alongside the real elapsed time above.
           estimate: expectationAtStart,
         })]);
+        // FEATURE: LOG-143 (b) — the finished run is graded here, at the single point where its
+        // final answer is committed to state, and the call is deliberately NOT awaited: the answer
+        // is already rendered above and a judge failure must not delay or alter it. The judge's own
+        // line is appended to the Audit Pipeline Log (Column 3) by logEvent when it lands, ~10-30s
+        // later; nothing is appended if it fails. One call per trace, ever (gradedTraceIds).
+        // Field-by-field provenance of everything passed: see the trace above gradeFinishedRun().
+        gradeFinishedRun({
+          traceId: result.judgeTraceId,
+          question: clean,
+          answer: plainText,
+          hops: result.judgeHops || [],
+          fallbackAgentId: "marcus",
+          resolveAgentName: (id) => agents.find(a => a.id === id)?.name || id,
+          logLine: logEvent,
+          isStale,
+        });
       } else if (result.kind === "qa_failed") {
         setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: result.text })]);
       } else if (result.kind === "hyp_entry") {
@@ -4408,7 +4664,7 @@ export default function MarketIntelligenceScreen() {
         totalElapsedMs: chiTestElapsedMs,
         estimate: buildEndStatusEstimate("expected < 2m"),
         isAnswer: true,
-        stepRef: { n: ensureStep("hyp-result"), label: "Theory Result" },
+        stepRef: { n: ensureStep("hyp-result"), label: "Theory Result", key: "hyp-result" }, // FEATURE: CHI-84 -- `key` is the drawer's own scrollKey, so the chip can jump to it
       })]);
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
@@ -4559,7 +4815,7 @@ export default function MarketIntelligenceScreen() {
       // chip the drawer's title wears -- §19n Decision 3); CHI-79's hop-caption fields untouched.
       setMessages(prev => [...prev, buildMessage({ kind: "non_qa", text: "Nadia drafted your forecast — review it, then Accept, Edit, or Reject.",
         totalElapsedMs: Date.now() - commitStart, hopStart: hopBeforeCommit + 1, hopEnd: currentHopCount(pipelineEventsRef.current), estimate: buildEndStatusEstimate("expected < 2m"),
-        stepRef: { n: ensureStep("hyp-draft"), label: "Draft Forecast" } })]);
+        stepRef: { n: ensureStep("hyp-draft"), label: "Draft Forecast", key: "hyp-draft" } })]); // FEATURE: CHI-84 -- `key` is the drawer's own scrollKey, so the chip can jump to it
     } catch (e) {
       // FEATURE: MI-29 -- surface real error to chat + Pipeline Log instead of a silent reset
       console.error("[MarketIntelligenceScreen] onCommit", e.message);
@@ -4718,13 +4974,14 @@ export default function MarketIntelligenceScreen() {
             events={pipelineEvents} agentActivity={agentActivity} showAgentInfo={showAgentInfo} setShowAgentInfo={setShowAgentInfo} onAgentsDrawerOpen={onAgentsDrawerOpen}
             newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt}
             getStep={getStep} hypIsCurrent={hypCurrent}
+            stepJump={stepJump} onStepChipTap={onStepChipTap} onStepJumpConsumed={onStepJumpConsumed}
           />
         ) : (
           <div style={{position:"relative",display:"grid",gridTemplateColumns:"1.15fr 1fr 0.9fr",gap:18,flex:1,minHeight:0}}>
             <FeatureBadge id="MI-02"/>
             {/* FEATURE: CHI-82b — breadcrumb stage arrives pre-filtered (crumbStage, top-level membership filter), replacing CHI-82's raw hypFlow prop */}
-            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence} crumbStage={crumbStage}/>
-            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} getStep={getStep} hypIsCurrent={hypCurrent}/>
+            <InteractColumn messages={messages} loading={loading} workingStatus={workingStatus} onSubmit={submit} onReview={onReview} onGoodThanks={onGoodThanks} onClear={onClear} qaEvidence={qaEvidence} crumbStage={crumbStage} onStepChipTap={onStepChipTap}/>
+            <EvidenceColumn hypFlow={hypFlow} qaEvidence={qaEvidence} onIntentChange={onIntentChange} onSelectHypothesis={onSelectHypothesis} onDiscard={onDiscard} onCommit={onCommit} onResolveConfirmation={onResolveConfirmation} onGoodThanks={onGoodThanks} onReview={onReview} newsCards={newsCards} onAnalyzeNewsCard={analyzeNewsCard} newsCardLoadingUrl={newsCardLoadingUrl} newsCardsStartedAt={newsCardsStartedAt} getStep={getStep} hypIsCurrent={hypCurrent} stepJump={stepJump} onStepJumpConsumed={onStepJumpConsumed}/>
             <AuditColumn events={pipelineEvents} agentActivity={agentActivity} onAgentsDrawerOpen={onAgentsDrawerOpen}/>
           </div>
         )}

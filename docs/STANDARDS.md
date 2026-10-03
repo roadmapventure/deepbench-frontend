@@ -1,7 +1,7 @@
-# DeepBench v5.1 — Session Standards & Testing
+# DeepBench — Session Standards & Testing
 
 > These are the rules. Every coding session follows them exactly.
-> Last updated: 2026-07-15 | Section 7 corrected — self-verify flow (was stale since 2026-07-02's Automated Design→Code→Verify Loop)
+> (Header de-versioned 2026-08-23 — a hardcoded version/date in a title is the stale-version-in-prose pattern; the current version lives in `CLAUDE-STATE.md`. Change history: git log on this file.)
 
 ---
 
@@ -29,24 +29,49 @@ Design sessions carry the same version tag as the coding session whose kickoff d
 
 **Every session gets a version strictly greater than `CLAUDE-STATE.md`'s current "Version in dev" — never reuse it, even for sessions within the same major-version architecture track.** Enforced by `CLAUDE-DESIGN.md` Step 4 (explicit version-assignment step) and Step 5c (close-out bump, unchanged instruction but now backstopped by the assignment-time check). History: `docs/SESSIONS.md`.
 
-Branch: commit directly to `dev`. No feature branches.
+Branch: every session works on its own `session/<name>` worktree branch (branched from
+`origin/dev`) and lands work with `git push origin HEAD:dev` — see `CLAUDE.md`'s hard rules.
+*(Corrected 2026-08-23: the old "commit directly to `dev`, no feature branches" wording
+predates the 2026-07-07 worktree discipline.)*
 `dev → main` only when John explicitly confirms.
 
 ---
 
 ## Section 2: Session Scope Rules
 
-1. One feature per session
-2. Max 3 files modified per session
-3. Max 4 tasks per kickoff doc
+**The caps below are a BASELINE PLUS WHAT THE RUNG EARNED (`SES-122` (c), `v7.0.399` — charter decision 5, the M6 gate's ruling).** Rules 2 and 3 used to be flat literals; they are now the floor under a per-class grant that the trust ladder pays out and a reversal takes back. **Rules 1–3 and the `HR-SCOPE` blockquote below them are the canonical text of `public.governance_rules` rows `CAP-SCOPE-FEATURE`, `CAP-SCOPE-FILES`, `CAP-SCOPE-TASKS` and `HR-SCOPE` — byte-for-byte, each on ONE line, guarded by `tests/regression/ses-122c-class-caps.test.mjs`.** The registry is authoritative and this section is its home: edit the row, re-export `docs/governance/RULES-SNAPSHOT.md`, then reconcile the line here — never the line alone.
+
+1. Scope every session to exactly one feature.
+2. Modify at most 3 files per session, plus the extra files the ticket's class has earned on the trust ladder (`public.class_autonomy(priority_class).extra_files` — one per rung above `runner_settings.cap_relax_rung`; M6, SES-122). The baseline is `docs/STANDARDS.md` Section 2's, the one home that CLAUDE.md's hard rule and `docs/runbooks/runner-cycle.md` step 5a restate and neither defines; the extra is the class's, read at pick time, never assumed.
+3. Include at most 4 tasks per kickoff doc, plus the extra tasks the ticket's class has earned (`class_autonomy(priority_class).extra_tasks`; M6, SES-122).
 4. If Claude Code shows "compacting" — **STOP immediately**, exit, start fresh
-5. Node.js test must pass before any commit — for any Category K or M session, `node tests/regression/run-all.js` must also pass (SES-009a). Two rules on invoking it, both from real false results found 2026-07-28 (`SES-28`):
+5. Node.js test must pass before any commit — for any Category K or M session, the suite must also pass (SES-009a). **The specced command is `node --env-file-if-exists=.env.local tests/regression/run-all.js`** (`SES-61`, `v7.0.253`). **For a credentialed run** (`SES-260`, `v7.0.381`, corrected `v7.0.383`): `.env.local` carries publishable values only, so the credentialed arms take their values from `public.runner_secrets` by name, exported inline for the one command per `docs/runbooks/session-setup.md` step 1b — `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js` — never from a pulled file (Vercel returns sensitive values empty); without them they declare NOT RUN exactly as before. Three rules on invoking it, the first two from real false results found 2026-07-28 (`SES-28`), the third from one found 2026-07-29 and re-measured 2026-08-25:
    - **`run-all.js` is the gate — never spec `node tests/regression/<file>.js` as the suite check** in a kickoff doc, runbook, or checklist. Each test file now self-runs when invoked directly (`SES-28`), so a bare invocation is real rather than vacuous, but only `run-all.js` runs all of them. (history: `docs/SESSIONS.md`)
    - **Run it against current dependencies.** A worktree has no `node_modules` of its own and resolves up to the shared checkout's tree, which may predate `package-lock.json` — run `npm install` in the worktree first. (history: `docs/SESSIONS.md`)
+   - **Give it credentials, or it can go green having verified nothing that needs them.** A test half needing `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` declares itself not-run and its file still reports `[PASS]`. **Measured live 2026-08-25 by runner cycle `860efe52`, on a real failure rather than a hypothetical:** the bare command reported **`68/68 passed`** while the credentialed command on the identical tree reported **`67/68`** — `SES-177-claude-state-renderer.js` was failing on real `CLAUDE-STATE.md` drift, and the specced invocation could not see it. `SES-180` (b)'s **`NOT A FULL RUN:`** line announces the gap; it is deliberately **not** a failure (gating on it would paint CI permanently red where credentials are absent), so reading that line is the reader's job and this rule is what makes the credentials available in the first place.
+     - **Use `--env-file-if-exists=`, never bare `--env-file=`.** This is not style. `node --env-file=.env.local` **hard-errors** (`node: .env.local: not found`) wherever the file is absent — which is *every* unattended cloud runner cycle, since `.env.local` is git-ignored and never exists in a fresh clone. So the obvious form of this fix breaks the environment that runs the suite most often. Both arms verified on Node 22.22 rather than assumed: missing file → `not found. Continuing without it.` and the run proceeds; present file → the variables load.
+     - **Credentials are not the same thing as spend.** Halves that cost real money stay gated on their own explicit flag (`DAT-12`'s `DAT12_LIVE_CHI`, two ~60 s LLM journeys) and this rule does not turn them on. A couple of REST reads should always run; a paid journey should not run because someone passed a credentials flag.
+     - Where credentials come from an exported environment instead of a file (a runner cycle reading `runner_secrets`), the flag is a harmless no-op and the halves run anyway. Secrets are read by name and exported; they never go into a committed file.
 6. `npm run build` must pass before any commit
 7. Browser console check required after every deploy
 
-**Signs a session is too big:** kickoff doc has >4 tasks, >3 files modified, session runs >20 min, or compacting starts. Split into S[X]a and S[X]b.
+**Two more rows are homed in this section as BLOCKQUOTES rather than as list items, and that placement is deliberate: the rule NUMBERS above are load-bearing** — `tests/regression/SES-61-suite-invocation.js` slices "rule 5" by its literal opening, and Section 5 plus eight test files cite "Section 2 rule 5" / "rule 7" — **so a new item 4 would renumber every one of those citations.**
+
+**`HR-SCOPE` — the hard-rule form of rules 1–3, and this section is its canonical home as of `SES-122` (c) (`v7.0.399`), re-homed from `CLAUDE.md#hard-rules`.** `CLAUDE.md` is John's file, so the row now points at the doc a ticket is allowed to reconcile; his hard-rule `Scope` line stays exactly as he wrote it and is the **baseline** the amended row cites — cited, never contradicted, and never edited by a cycle.
+
+> Keep each session to one feature, at most 3 modified files, and at most 4 tasks — the baseline; a class's trust-ladder rung above `runner_settings.cap_relax_rung` adds one file and one task per rung (`class_autonomy()`, M6, SES-122), and a reversal takes them back.
+
+**`CAP-SESSION-SPLIT-SIGNS` — when to split, reconciled to its row here by `SES-122` (c).** The paraphrase that stood here ("kickoff doc has >4 tasks, >3 files modified, session runs >20 min, or compacting starts") was stale twice over: it still carried the 20-minute wall-clock trigger `SES-296` withdrew (retirement-ledger entry 34 — a chained drain runs long by design) and it still stated the caps as flat literals, four lines under the rules that had just stopped being flat.
+
+> Split a session into S[X]a/S[X]b once its kickoff doc exceeds 4 tasks or 3 files, or compacting starts. Wall-clock duration is not a split trigger — a chained drain (M6-10) runs long by design.
+
+**How a cycle reads its caps (`SES-122` (c); scoped by `M6-13`).** At pick — step 5 of `docs/runbooks/runner-cycle.md`, once, before any design — run `SELECT * FROM public.class_autonomy('<priority_class>')` (the statement is fenced in that runbook step, and deliberately not a second fenced copy here) and write the answer into the cycle's `notes` as `files N (+k) / tasks M (+k)`, where `N`/`M` are the baseline 3 and 4 and each `k` is that class's `extra_files` / `extra_tasks`. **The reviewer then grades the ship against THOSE numbers, not against the bare 3/4** (step 7's QA bar cites them). Three boundaries, each of which is how this gets got wrong:
+
+- **A rung is a fact about the ticket's `priority_class`, not about its epic or its ticket.** The same class earns the same widening on any epic.
+- **It is read at pick and never re-derived by the caller.** `class_autonomy()` is the one home for what a rung buys, and its thresholds are stored columns (`runner_settings.cap_relax_rung`), never literals — the defect this ticket exists to remove, so re-introducing the arithmetic anywhere else re-introduces it.
+- **It fails closed.** An unclassed ticket, a class the ladder does not track, or a missing `runner_settings` singleton all earn **zero** extras, so a lookup that goes wrong narrows the cap and can never widen it. A blank rung is NULL, not 0 — rung 0 is a real rung.
+
+`M6-13` scopes all of this to the individual **cycle** — never to the chained session a drain runs inside.
 
 ---
 
@@ -54,7 +79,7 @@ Branch: commit directly to `dev`. No feature branches.
 
 Every kickoff doc must have these 11 sections in order:
 
-1. **SESSION** header (name, version, branch, files to read first)
+1. **SESSION** header (name, version, branch, files to read first, lane declaration)
 2. **CONTEXT** (what the feature does, why it exists)
 3. **AI PATTERN CHECK** — does this feature have an opportunity to use an AI pattern not yet wired in? Name the pattern + service. If N/A, one line is enough (e.g. "N/A — no api/ route touched this session") — do not write a justifying paragraph. Never skip the section itself.
 4. **STUB definitions** if any (e.g. `const MICHELLE = {...}`)
@@ -66,18 +91,27 @@ Every kickoff doc must have these 11 sections in order:
 10. **COMMIT instruction** — must include `git push origin HEAD:dev` after the commit (never bare `git push origin dev` — canonical statement and rationale: `CLAUDE.md`'s "Push with `HEAD:dev`, never bare `dev`" hard rule)
 11. **MANUAL QA CHECKLIST** (session-specific, max 12 items)
 
+Lane declaration (`SES-359`): the SESSION section carries one `Lanes:` line naming the lane of every model call the build will make — `session` (subscription; the default for governance and tooling work), `executor` (API dollars; only when the executor is the thing under test or the ticket is product-facing live QA — with a dollar band, e.g. `$1-3`) or `none` (no model call) — each with one line of reason. `node scripts/verifier.js --check-kickoff=<path>` refuses a kickoff without it.
+
+Anchor declaration (`AGT-226`): the kickoff carries one fenced `anchors` block, one line per fact the build acts on — `<path> | <count of tracked files holding it> | <the exact literal>`, split on the first two pipes, counted by `git grep -F -l` excluding `docs/kickoffs/` and `docs/harvests/`. `--check-kickoff` refuses an anchor not in the tree, or in a different number of files than declared.
+
+It is part of section 1, not a twelfth section — the count above stays **11**. The reason it is a declaration rather than a measurement is that nothing can currently read the lane off the log after the fact: measured 2026-09-12, `ai_activity_log` held 2 Designer and 1 Builder rows across the 12 kickoffs since, and `lib/request-context.js`'s `call_source` values include no executor at all. Until they do, the kickoff says it in one line, before the build starts, where it can still change what gets spent.
+
 **Standing rules by reference (added 2026-07-01).** Claude Code carries persistent cross-session memory now — the "Claude Code has no memory" premise this rule used to rest on is out of date. A kickoff doc no longer needs to restate a standing rule in full prose; naming it is enough (e.g. "STANDARDS.md Section 11 applies to all 6 agents" instead of re-listing all 23 fields; "Category M applies — see STANDARDS.md Section 5" instead of re-deriving the checklist). This applies specifically to **standing rules** — things that are true every session and don't change: the 23-field agent standard, the AI Audit wiring requirement, the Always Required / Category J/K/L/M checklist items in Section 5, the known bug patterns in Section 8.
 
 It does **not** apply to **session-specific facts** — the exact field values, exact file paths, exact scope boundaries, exact test assertions for *this* session. Those still must be fully spelled out. "As discussed" or "refer to standards" is still forbidden when what's being deferred is content specific to this session, not a standing rule. The test: could Claude Code look this up in `STANDARDS.md`, `docs/ARCHITECTURE.md`, or its own memory and get the exact same answer regardless of which session is running? If yes, reference it. If the answer depends on *this* session's specifics, spell it out.
 
 **Kickoff doc compliance check before issuing:**
 - [ ] All 11 sections present
+- [ ] Lane declaration present (`Lanes:` line — SES-359)
+- [ ] Anchors declared and resolving (AGT-226)
 - [ ] Architect Review complete: no duplicate functionality introduced — grepped for existing implementations
 - [ ] Architect Review complete: all cross-references verified consistent across every file that shares them
 - [ ] Architect Review complete: DB columns verified against actual schema before speccing any read/write
 - [ ] Architect Review complete: no layer violations in task specs
 - [ ] AI Pattern Check section present — names pattern + service, or one-line N/A
 - [ ] Node.js test is full code (not described)
+- [ ] Node.js test dry-run against unchanged source, and the kickoff records how many content assertions failed pre-change out of how many (see Section 4)
 - [ ] Category K tests if touching mergedSteps or Supabase JSONB
 - [ ] Category L live API test if touching any api/ endpoint
 - [ ] Category M consistency test if touching any cross-referenced data (see Section 4)
@@ -96,6 +130,148 @@ Every session must include a Node.js test file:
 - Run with: `node test-[session-id].mjs`
 - Deleted before committing
 - Must show `ALL TESTS PASS` to proceed
+
+### Which tests are KEPT, and which run every cycle (`SES-135` part 2, `v7.0.280`)
+
+**John's decision, card `1abe473a`, accepted 2026-08-25T14:08Z. It has three clauses and they are the
+policy of record:**
+
+1. **A regression guard gets a permanent home and is never discarded.** Its home is
+   `tests/regression/`, committed, named for the ticket it guards.
+2. **The full suite runs every cycle** — every runner cycle and every session that commits, not
+   "when the change looks risky."
+3. **A credential-gated half skips LOUDLY**, never silently.
+
+**This answers the question John asked himself** on the `q-briefing-dom-fixture` thread
+2026-08-23T00:33Z: *"yes - you should never be throwing away tests. Do we need to have a session on
+when to store tests and when to execute them?"* — and it is written down here because the answer
+being obvious is exactly what let it go unwritten.
+
+**The measurement that makes it a rule rather than a preference.** Before this shipped, the
+keep-or-discard call was a per-cycle judgement, and the judgement went the same way every time
+without anyone choosing it: the last several render harnesses were each written to a scratchpad and
+thrown away, noted in the ships as *"harness scratchpad-only"* — **six tickets deep** by the time
+`SES-135` was filed. Nobody decided to discard them. That is what an unwritten rule decides for you.
+`tests/regression/SES-135-briefing-render.js` (`v7.0.256`) is the first of that family to be kept.
+
+**Section 4's opening bullet — *"Deleted before committing"* — is NOT weakened by this, and reading
+it as weakened is the error to avoid.** The two homes are different artifacts and both are correct:
+
+| Artifact | Home | Lifetime |
+|---|---|---|
+| The session's own `test-[session-id].mjs` | worktree root, never committed | deleted before the commit |
+| A **regression guard** — a test that would notice if this defect came back | `tests/regression/` | permanent |
+
+**The question that sorts one from the other, and it is one sentence:** *would this test still be
+worth running a month from now, against a defect that could return?* Yes → it is a guard, it is
+committed, clause 1 binds. No → it verified this session's own edit and it goes with the session.
+A test does not become disposable because it was awkward to write, and **"scratchpad-only" is not a
+disposition a session may choose** — it is the failure this rule ends.
+
+**What clause 1 forbids, stated so it cannot be reasoned around:** deleting, skipping, quarantining
+or `.skip`-ing a regression guard to get a suite green. A guard that fails is reporting something.
+Fix the code, or fix the guard's assertion and say in the ship what changed and why — never remove
+the guard and never leave it passing vacuously. (This is the same boundary `SES-197`'s retargeted
+guard clause keeps: when a rule moves, the guard is retargeted, not deleted, because deleting a
+guard loses the reason with it.)
+
+**Clauses 2 and 3 are CITED here, not restated, so these rules cannot drift from their mechanics.**
+The suite's specced invocation, the `npm install` requirement and the credentials rule are Section 2
+rule 5 above — including why the form is `--env-file-if-exists=` and why a credentials flag is not a
+spend flag. The loud skip is `notRun(part, reason)` in `tests/regression/_lib/self-run.js` and the
+`NOT A FULL RUN:` line `tests/regression/run-all.js` prints from it (`SES-180` (b)). Clause 3 means
+that line is **mandatory output a reader must read**, not an optional courtesy — and it is
+deliberately not a failure, because gating on it would paint CI permanently red wherever credentials
+are absent.
+
+**The cost is real and is named rather than hidden.** Clause 2 spends budget: the suite is 85 files
+and grows with every guard clause 1 keeps. That cost was John's to accept and he accepted it — the
+card put it to him in those words (*"this half is a rule about how much of your budget the suite
+spends, so it is your call, not the runner's"*). A later session that finds the suite expensive does
+**not** get to thin it on its own judgement; that is a fresh case to put to John, exactly as the
+ladder-asymmetry rule requires.
+
+### The rule that outranks every category below (`SES-45`, `v7.0.257`)
+
+**A test must assert against the REAL implementation. Logic recreated inside the test file is not a
+test — it is a second implementation agreeing with itself.**
+
+**Found live 2026-07-28 (`S-LOG-91-design`), and the specced test would have passed against the very
+bug it existed to prevent:** `LOG-91`'s Section 8 test rebuilt the merge rules as plain JS in the
+test file and asserted against its own recreation. It went green while the shipped `logAgentTurn()`
+did something different — the `SES-44` defect — which was caught by diff review, not by the suite.
+This is the adjacent hole to `SES-28`: that one fixed tests that *run* nothing; this one is a test
+that runs something that isn't the subject.
+
+**The tension with the line above is real, and resolving it by ignoring one half is the mistake.**
+Section 4's *"Pure Node.js only — no app imports"* governs the **throwaway session test**
+(`test-[session-id].mjs`, deleted before committing), where importing app modules is often genuinely
+impractical. It has never licensed **recreating** the subject. When you cannot import the real
+implementation, you assert against the real artifact some other way and **label which**:
+
+- **Import it** — the default, and the only option that needs no label. Persisted
+  `tests/regression/` files should do this.
+- **Read the shipped file** — parse or slice the real source and exercise *that* text. Two of
+  tonight's own tests do this: `SES-208-briefing-escaping.js` slices `esc`/`question`/`plainBlock`
+  out of the shipped template by brace-matching and runs them; `SES-135-briefing-render.js` builds
+  the real page with the shipped builder rather than reading a snapshot.
+- **Seam proof** — drive the real code path and intercept its edge (the `LOG-91` session's own
+  `globalThis.fetch` interception asserting the actual `ai_activity_log` POST body). **Label it a
+  seam proof in the evidence**, per Section 2 rule 7's QA bar.
+
+**The question that decides it, and it is one sentence:** *if the shipped implementation changed
+tomorrow, would this test notice?* A test that would keep passing is asserting about its own copy.
+
+**A `NOT RUN` declaration beats a recreation.** A test that cannot reach its subject should declare
+the part not-run (`tests/regression/_lib/self-run.js`'s `notRun(part, reason)`) and say so loudly,
+which `run-all.js` reports. An honest gap is information; a recreation is a false green.
+
+**Transport is not a verdict (`AGT-116`, `v7.0.657`).** A test that throws while its database calls
+got no answer did not run; it did not fail. `tests/regression/_lib/transport-watch.js` wraps `fetch`
+(in-process, and in every node child through `NODE_OPTIONS=--import`) and logs an incident only for
+a call to the `SUPABASE_URL` origin that got a 502/503/504, a ≥500 with body code `PGRST002` or
+`57014`, or a connect/timeout error — never by matching the failure message, and never for a
+foreign origin or a plain 500. `run-all.js` and `selfRun` print such a test `[NOT RUN] <file> --
+transport …`, keep it out of the FAIL list, and exit **2** (1 still wins if anything failed), so an
+outage still blocks a ship without changing the FAIL list between two runs of one commit. A test
+that reads a live value which moves between reads declares that part `notRun` instead of grading
+it: a test grades the change, never the live world (pattern:162).
+
+**Not done here, and named rather than implied:** `SES-45` also floats a `check-session-docs.js`
+lint that would flag a kickoff Section 8 block defining the function it claims to verify. That is a
+*"consider"* in the ticket, not a scoped decision, and it is left open.
+
+### The kickoff's own test is dry-run before the kickoff commits (`SES-76`, `v7.0.266`)
+
+**A kickoff's Section 8 test must be RUN against the current, unchanged source before the kickoff
+doc commits, and every content assertion must FAIL there.** A text-slice anchor is a guess until it
+has been executed. Writing the test is not verifying it.
+
+**The two failure shapes, and the first one is invisible from the test's own output:**
+
+- **The empty slice.** `src.slice(start, end)` where the anchor's first occurrence sits *after* the
+  intended one gives `start > end` and returns `""`. Every assertion over that slice is then
+  vacuous — it cannot pass honestly and it cannot fail honestly. **Found live in `S-MOB-15`:** the
+  kickoff's T1 slice anchored on `.lav-medges`, whose first occurrence is a prose mention in a CSS
+  comment *above* the target rule; both assertions could never pass, and the coding session caught
+  it. A slice that comes back empty is a broken anchor, never a passing test — re-anchor on tokens
+  from the rule itself, not on a name that also appears in prose.
+- **The assertion that passes on unchanged source.** This is the same discrimination bar Section 2
+  rule 7 already puts on QA assertions, applied one step earlier: *would this still pass if the
+  change did nothing?* If yes, it is not measuring the change. A content assertion that is green
+  before the coding session starts is green for a reason unrelated to the work.
+
+**Why it is a rule and not a suggestion — three measured saves, none hypothetical** (full entries in
+`docs/SESSIONS.md`): `LAV-36` ran it and found the occurrence count was 3, not the guessed 2, and
+that 8 of 10 assertions correctly failed pre-change; `LAV-38`/`MOB-21` caught a regex that died on
+the `}` inside a `${…}` interpolation; `LAV-39`/`LOG-133` caught a comment-line filter that JSX block
+comments defeat. Each was fixed pre-commit instead of costing a coding-session round.
+
+**What a dry-run failure is NOT.** A content assertion failing on unchanged source is the expected
+result and the whole point — it is what proves the assertion discriminates. Only a **structural**
+failure (an empty slice, a regex that cannot match, a test that throws before asserting) is a defect
+to fix. Report both in the kickoff: say the test was dry-run, and say how many assertions failed
+pre-change out of how many.
 
 ### Test Categories
 
@@ -151,8 +327,8 @@ Mandatory M tests:
 - **Loop-closure proof specificity:** when a live test's pass condition is "does the downstream agent's output reflect a new write," the proof must be uniquely traceable to that specific write — content verbatim/near-verbatim to the new entry, or a direct citation to its row id — never a generic keyword also reachable from pre-existing seeded content.
 - **`delegation_required` intent standard:** any `delegation_required` intent's Category L test must confirm (a) the final result reaches a proper `final_delegation` shape or a thrown/guarded error, never a bare narration string accepted as an ordinary final answer, and (b) if the request checkpoints/resumes mid-flight (forceable via `__setTestBudgetMs(0)`), the persisted `delegation_required` value on the resulting `durable_hops` row matches the original capability's own trait.
 
-How to run: `node --env-file=.env.local test-[session-id]-api.mjs`
-Requires `ANTHROPIC_API_KEY` in `.env.local`. Delete before committing.
+How to run: `ANTHROPIC_API_KEY=… node test-[session-id]-api.mjs`
+Requires `ANTHROPIC_API_KEY` exported inline from `runner_secrets` by name (`session-setup.md` step 1b — never in `.env.local`, never in a pulled file, `SES-260`). Delete before committing.
 
 Mandatory L tests for any `api/plan.js` change or call site change:
 - POST to `/api/plan` with a representative goal and steps
@@ -250,11 +426,11 @@ Complete every item before committing. This is the canonical "standing checklist
 
 ### Category K — Component State Initialization
 - [ ] All mandatory K tests (Section 4) pass — see Section 4 for the full list
-- [ ] Persisted copy added to `tests/regression/`, `node tests/regression/run-all.js` passes
+- [ ] Persisted copy added to `tests/regression/`, the suite passes — **invoked per Section 2 rule 5**, which is where the command and its three invocation rules live (`SES-61`: a bare `node tests/regression/run-all.js` skips every credential-gated half and still reports PASS)
 
 ### Category M — Cross-Reference Consistency
 - [ ] All mandatory M tests (Section 4) pass — see Section 4 for the full list
-- [ ] Persisted copy added to `tests/regression/`, `node tests/regression/run-all.js` passes
+- [ ] Persisted copy added to `tests/regression/`, the suite passes — **invoked per Section 2 rule 5**, which is where the command and its three invocation rules live (`SES-61`: a bare `node tests/regression/run-all.js` skips every credential-gated half and still reports PASS)
 - [ ] `node scripts/check-ai-logging-coverage.js` run and reviewed for any session adding or touching a real LLM/embedding call site — new CRITICAL findings must be resolved before commit; new WARNING findings must at least be looked at and either fixed or explicitly logged as a follow-up ID, not silently ignored
 
 ### Category L — Live API Integration
@@ -356,7 +532,7 @@ Do not patch the call site before checking the server. Do not check the server b
 A bug that fails QA once should not fail QA twice. If it does, the root cause analysis was not deep enough.
 
 If FAIL: write a patch kickoff doc targeting the confirmed root cause only.
-If NEW REQUIREMENT: add to `docs/FEATURES.md`.
+If NEW REQUIREMENT: file it as a `public.backlog_items` row per `docs/runbooks/session-setup.md` step 3c (never a `docs/FEATURES*.md` edit — those are legend-only stubs).
 
 **Feature inventory Status column vocabulary (added 2026-07-16).** The `Status` column in `docs/FEATURES.md`, `docs/FEATURES-NEXT.md`, and `docs/FEATURES-LATER.md` must be exactly one of `✅ Done`, `🔶 Partial`, or `❌ Missing` — no other text in that cell. Any elaboration (what shipped, what's still open, measured results, caveats) goes in the Feature cell's own prose, which is already the norm for how these rows are written — every row in these files already carries full narrative detail there. Do not append descriptive text to the Status cell itself (e.g. `✅ Fixed and verified`, `✅ Closed`, `✅ Root cause fixed and measured`, `🔶 Partial (visual redesign needed)`). It exists because free-texted phrasing evaded the `session-hygiene` skill's Done-row archival check — history: `docs/SESSIONS.md`. When archiving a row to `docs/FEATURES-ARCHIVE.md`, normalize its Status cell to exactly `✅ Done` regardless of what completion phrasing the source row used.
 
@@ -466,6 +642,8 @@ Every agent added to `src/data/agents.js` MUST include ALL of the following fiel
 **Rule:** Never use short-form model IDs in `logAICall()` call sites or server-side `ai_activity_log` inserts. Always use the canonical versioned string. `MODEL_ID_NORMALIZE` in `useAIActivity.js` normalizes legacy short-form IDs as a safety net — it is not a license to keep using short-form IDs in new code.
 
 **Mechanized 2026-07-21 (`SES-010`).** `node scripts/check-model-ids.js` sweeps `api/`, `lib/`, and `src/` for this exact pattern — flags any short-form id used as a value (not a `MODEL_ID_NORMALIZE`-style lookup key), CRITICAL for server-side (a possible real API-call bug, not just a logging one), WARNING for client-side. Run before commit on any session touching a `model:` field. First run (2026-07-21) found live, pre-existing violations: `api/brief.js` and `lib/agent-run.js` both pass `"claude-sonnet-4-5"` as a real server-side call value, and `src/contexts/FetchContext.jsx`'s `logAICall()` call site uses `"claude-haiku-4-5"`. Not fixed by this session — flagged for whoever picks up the fix.
+
+**The companion check, mechanized 2026-09-24 (`AGT-90`).** `node scripts/check-skill-model-params.js` reads the live `skill_profiles` rows and fails when one stores a call parameter the model family it names rejects — today, a non-NULL `temperature` on a family listed in `shared/models.js` `NO_TEMPERATURE_PREFIXES`, which it reads from that constant rather than restating the prefix (a literal would keep printing PASS the day a second family is added). Pinned by `tests/regression/agt-90-fable-temperature.test.mjs`; exit 1 covers both a real violation and a missing env var, never a silent pass.
 
 **Why:** The AI Audit panel groups by model string. Short-form and full-version IDs produce two separate rows for the same model, splitting cost and call counts. An AI Transparency screen with fragmented model data or "Unknown provider" labels fails its purpose.
 

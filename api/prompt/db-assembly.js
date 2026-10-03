@@ -1,3 +1,22 @@
+// DeepBench v7.0.721 | api/prompt/db-assembly.js | AGT-020 -- the fired intent's link level now
+// reaches the model as a line of its own: `Execution depth: L<n> <name> -- <directive>`, appended to
+// the intent section's content. `capability_skill_profiles.level` was selected at three sites here
+// and read by nothing after (measured live 2026-09-29 across api/, lib/, scripts/, src/), so the
+// "depth and quality grade" the schema documents had no runtime. All three selects now embed the
+// new `skill_levels` row (name + execution_directive) -- migration agt020_skill_levels, mirror
+// docs/design/agt-020-skill-levels.sql -- and each row map carries it as `skill_level`. Those three
+// embeds are the whole read surface, and the guard counts them: tests/regression/
+// agt-020-level-execution-depth.test.mjs requires exactly three, so a fourth select that forgets the
+// embed (and would assemble with no depth line, silently) fails the suite. The line is
+// gated on sp.slug === intentSlug, the same fired-intent gate the llm/schema block uses, so a
+// stacked or enrichment Intent Profile never contributes one. Every profile whose level resolves to
+// no directive, and every caller that passes no intent_slug, assembles byte-identical.
+// DeepBench v7.0.430 | api/prompt/db-assembly.js | SES-341 -- a Knowledge Skill can carry its own
+// text: traits.source = "inline" builds an inline fetch_instruction ({method,source,text,heading})
+// and fills the section content at assembly time via the new exported renderInlineKnowledge(),
+// instead of a RAG fetch_instruction for a profile that holds no Library chunks. Ordering, slug
+// shape (knowledge-<slug>), sectionType and prompt_phase are unchanged; every profile without the
+// trait is byte-identical.
 // DeepBench v7.0.62 | api/prompt/db-assembly.js | LAV-28b -- universal `account` receipt injected
 // into EVERY JSON-schema format contract at the one seam where buildSections() returns it, replacing
 // LAV-26's per-row schema fields as the enforcement home (§19s Receipt-format amendment). Applied to
@@ -182,28 +201,54 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       // itself is now hoisted above (AGT-54); this comment stays for the RAG-cost rationale specific
       // to this branch.
       sectionType = "rag";
-      fetchInstruction = {
-        method: "rag",
-        agent_id: agentId || null,
-        query_from: "task_context",
-        match_count: 5,
-        scope: agentId ? "agent" : "platform",
-      };
-      // FEATURE: AG-30 — traits.source passthrough, replaces the retired traits.broker opt-in.
-      // Reads whatever source value the Skill Profile declares — never hardcoded to a name.
-      if (traits.source) fetchInstruction.source = traits.source;
-      // FEATURE: AG-33 -- data_room_tag passthrough, needed for any uber_access holder's the_library
-      // RAG search (queryLibrary()'s uber_access branch requires an explicit tag, denies without one).
-      // Generic: reads a new optional trait, not gated on any agent identity.
-      if (traits.data_room_tag) fetchInstruction.data_room_tag = traits.data_room_tag;
-      // FEATURE: DAT-12 -- stamped only when truthy, same style as the traits.source / data_room_tag
-      // passthroughs above. Unset leaves the fetch_instruction byte-identical to today.
-      if (retrievalScope) fetchInstruction.retrieval_scope = retrievalScope;
-      // FEATURE: AA-173 -- optional per-profile retrieval-breadth override. Unset (every existing
-      // Knowledge Skill Profile except this session's one opt-in on ci-knowledge) is byte-identical
-      // to today -- match_count stays 5.
-      if (Number.isInteger(traits.match_count) && traits.match_count > 0) {
-        fetchInstruction.match_count = traits.match_count;
+      // FEATURE: SES-341 -- traits.source = "inline": the Skill Profile CARRIES its own text and
+      // there is nothing to retrieve. WHAT PROBLEM THIS SOLVES: every Knowledge Skill was turned
+      // into a RAG fetch_instruction unconditionally, so a profile whose knowledge is written into
+      // its own `method` -- and which holds no Library chunks at all -- rendered EMPTY in every
+      // assembled prompt (found live 2026-09-09 by AGT-63's QA: the Prioritizer's ten-class legend
+      // and John's decision patterns were both absent from all six QA prompts, and the model cited
+      // claim refs it had never been shown). Generic and data-driven, in the same `traits.source`
+      // vocabulary AG-30 already established -- names no agent, no capability and no skill slug
+      // (.claude/rules/capabilities-are-data.md); any profile that declares the trait gets it.
+      // `content` is filled HERE as well as on the fetch_instruction, deliberately: the section is
+      // then complete at assembly time, so a reader that renders without enriching
+      // (scripts/agent-prompt.js, SES-331 -- it performs no retrieval) shows the same bytes the
+      // executor's model sees. Both sides render through renderInlineKnowledge(), one function, so
+      // the two paths cannot drift. sectionType/order/prompt_phase are untouched: an inline
+      // Knowledge Skill keeps `knowledge-<slug>`, order 13, volatile, so §19k signatures and the
+      // stable/volatile split are byte-identical to today for every other profile.
+      if (traits.source === "inline") {
+        fetchInstruction = {
+          method: "inline",
+          source: "inline",
+          text: sp.method || "",
+          heading: sp.objective || null,
+        };
+        content = renderInlineKnowledge(fetchInstruction);
+      } else {
+        fetchInstruction = {
+          method: "rag",
+          agent_id: agentId || null,
+          query_from: "task_context",
+          match_count: 5,
+          scope: agentId ? "agent" : "platform",
+        };
+        // FEATURE: AG-30 — traits.source passthrough, replaces the retired traits.broker opt-in.
+        // Reads whatever source value the Skill Profile declares — never hardcoded to a name.
+        if (traits.source) fetchInstruction.source = traits.source;
+        // FEATURE: AG-33 -- data_room_tag passthrough, needed for any uber_access holder's the_library
+        // RAG search (queryLibrary()'s uber_access branch requires an explicit tag, denies without one).
+        // Generic: reads a new optional trait, not gated on any agent identity.
+        if (traits.data_room_tag) fetchInstruction.data_room_tag = traits.data_room_tag;
+        // FEATURE: DAT-12 -- stamped only when truthy, same style as the traits.source / data_room_tag
+        // passthroughs above. Unset leaves the fetch_instruction byte-identical to today.
+        if (retrievalScope) fetchInstruction.retrieval_scope = retrievalScope;
+        // FEATURE: AA-173 -- optional per-profile retrieval-breadth override. Unset (every existing
+        // Knowledge Skill Profile except this session's one opt-in on ci-knowledge) is byte-identical
+        // to today -- match_count stays 5.
+        if (Number.isInteger(traits.match_count) && traits.match_count > 0) {
+          fetchInstruction.match_count = traits.match_count;
+        }
       }
 
     } else if (typeSlug === "identity") {
@@ -244,6 +289,29 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       if (sp.objective) intentParts.push(sp.objective);
       if (sp.method) intentParts.push(sp.method);
       if (traits.analysis_instructions) intentParts.push(traits.analysis_instructions);
+      // FEATURE: AGT-020 -- `level` becomes the execution-depth line of the FIRED intent.
+      // capability_skill_profiles.level has been written on every link since the schema was born
+      // and read by nothing: this file selected it at three sites and no file in api/, lib/,
+      // scripts/ or src/ consumed it afterwards, so ARCHITECTURE.md §2's "Depth and quality grade"
+      // and INTENT-MODEL.md:65's "quality of execution" had no runtime at all. The depth text is
+      // CONTENT, so it comes from public.skill_levels (embedded above as skill_levels(name,
+      // execution_directive)) and never from a branch here -- a level's wording changes with an
+      // UPDATE, not a deploy.
+      //
+      // GATED ON THE FIRED INTENT, reusing the same sp.slug === intentSlug test the llm/schema
+      // block below already uses (and for the same reason): several Intent Skill Profiles are
+      // loaded as stacked context on any given call, and an enrichment capability's L3 intent
+      // contributing its own depth directive would instruct the model at a depth the caller never
+      // asked for. This is not a slug conditional -- intentSlug is the caller's argument, so the
+      // gate stays agent- and capability-agnostic (.claude/rules/capabilities-are-data.md).
+      //
+      // SILENT WHERE THE DATA IS ABSENT, by all three tests: no intentSlug, a non-integer level, or
+      // a link whose level resolves to no directive all leave intentParts byte-identical to the
+      // pre-change assembly. The fkey added in the same ticket is what makes the third case
+      // unreachable through a write rather than merely unlikely.
+      if (intentSlug && sp.slug === intentSlug && Number.isInteger(sp.level) && sp.skill_level?.execution_directive) {
+        intentParts.push(`Execution depth: L${sp.level} ${sp.skill_level.name} — ${sp.skill_level.execution_directive}`);
+      }
       content = intentParts.length ? intentParts.join("\n") : null;
 
       // FEATURE: AA-75/AA-76 — Intent Skill Profiles can carry their own llm/schema data,
@@ -457,6 +525,23 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   return { sections, formatContract: injectAccountField(formatContract), synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices, enableParallelToolUse: enableParallelToolUse && !delegationRequired };
 }
 
+// FEATURE: SES-341 -- the ONE renderer for an inline Knowledge Skill's text, exported so
+// api/prompt/ai-enrichment.js's fetchSection() renders the executor's copy from the SAME function
+// buildSections() already used to fill `content`. A second copy in the enrichment file would be
+// exactly the "test asserts against its own recreation" shape STANDARDS.md Section 4 forbids, one
+// level down: two renderers that agree today and drift silently tomorrow. Takes the whole
+// fetch_instruction rather than loose args so a future field on it reaches both call sites at once.
+// Returns null (never "") for empty text, so the section falls through the existing
+// `if (!s.content)` omit path in enrichPrompt() and scripts/agent-prompt.js unchanged -- an inline
+// Skill with no method is named on stderr exactly as an empty RAG result is.
+export function renderInlineKnowledge(fetchInstruction) {
+  const fi = fetchInstruction || {};
+  const text = typeof fi.text === "string" ? fi.text.trim() : "";
+  if (!text) return null;
+  const heading = typeof fi.heading === "string" ? fi.heading.trim() : "";
+  return heading ? `${heading}\n${text}` : text;
+}
+
 function buildLabel(typeSlug, name) {
   const labels = {
     identity: "ROLE & IDENTITY",
@@ -569,7 +654,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
     const spR = await fetch(
       // FEATURE: LOG-67 -- embed the capability row via FK capability_skill_profiles_capability_slug_fkey
       // to source execution_type without a second fetch.
-      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=level,is_required,display_order,skill_profiles(*),capabilities(execution_type)&order=display_order.asc`,
+      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(capability_slug)}&select=level,is_required,display_order,skill_levels(name,execution_directive),skill_profiles(*),capabilities(execution_type)&order=display_order.asc`,
       { headers }
     );
     if (spR.ok) {
@@ -579,6 +664,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       skillProfiles = rows.map(row => ({
         ...row.skill_profiles,
         level: row.level,
+        skill_level: row.skill_levels ?? null,
         is_required: row.is_required,
         display_order: row.display_order,
       }));
@@ -594,7 +680,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
       const assignments = await assignR.json() || [];
       for (const a of assignments) {
         const spR = await fetch(
-          `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(a.capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
+          `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(a.capability_slug)}&select=level,is_required,display_order,skill_levels(name,execution_directive),skill_profiles(*)&order=display_order.asc`,
           { headers }
         );
         if (spR.ok) {
@@ -603,6 +689,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
             ...row.skill_profiles,
             source_capability_slug: a.capability_slug,
             level: row.level,
+            skill_level: row.skill_levels ?? null,
             is_required: row.is_required,
             display_order: row.display_order,
           })));
@@ -654,7 +741,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   // They produce null section content by design and do not add visible text to the assembled prompt.
   if (enrichment_capability_slug) {
     const enrichR = await fetch(
-      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(enrichment_capability_slug)}&select=level,is_required,display_order,skill_profiles(*)&order=display_order.asc`,
+      `${supabaseUrl}/rest/v1/capability_skill_profiles?capability_slug=eq.${encodeURIComponent(enrichment_capability_slug)}&select=level,is_required,display_order,skill_levels(name,execution_directive),skill_profiles(*)&order=display_order.asc`,
       { headers }
     );
     if (enrichR.ok) {
@@ -663,6 +750,7 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
         ...row.skill_profiles,
         source_capability_slug: enrichment_capability_slug,
         level: row.level,
+        skill_level: row.skill_levels ?? null,
         is_required: row.is_required,
         display_order: row.display_order,
       })));
