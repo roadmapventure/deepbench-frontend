@@ -64,8 +64,16 @@ const LINKS = [
   "dm-identity", "dm-knowledge-platform", "dm-behavior", INTENT,
   "dm-guardrails", "dm-knowledge-patterns", "dm-knowledge-cycle-card",
 ];
-// runner_should_boot()'s answer is `should_boot` for exactly these two reasons and no others.
-const BOOTING = new Set(["pickable", "gate_cards_to_rule"]);
+// runner_should_boot()'s answer is `should_boot` for exactly these three reasons and no others.
+// AGT-314 added the third: `work_to_find`, the second split of refusal 6, which boots a fire to go
+// and FIND work (detail.mode='find-work-only') when there is nothing to build and no card to rule.
+const BOOTING = new Set(["pickable", "gate_cards_to_rule", "work_to_find"]);
+// AGT-314 made the mode two-valued, so this file derives it from the reason rather than comparing
+// against one literal -- the else arm below used to assert a flat null and would now be wrong on
+// every find-work boot.
+const modeFor = reason =>
+  reason === "gate_cards_to_rule" ? "rule-cards-only" :
+  reason === "work_to_find" ? "find-work-only" : null;
 
 async function pg(url, key, pathAndQuery, init) {
   const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
@@ -265,7 +273,10 @@ async function run() {
       "gate_cards_to_rule may only be reached with pickable_count = 0; it is refusal 6's twin, " +
       "never a shortcut past the walls above it");
   } else {
-    assert.strictEqual(before.detail.mode, null, "mode is null on every other verdict");
+    assert.strictEqual(before.detail.mode, modeFor(before.reason),
+      `detail.mode is ${JSON.stringify(before.detail.mode)} on reason ${before.reason}; it reads ` +
+      "rule-cards-only on gate_cards_to_rule, find-work-only on work_to_find (AGT-314), and null " +
+      "on every other verdict");
   }
   const baseCount = Number(before.detail.gate_cards_to_rule);
   assert.ok(Number.isInteger(baseCount) && baseCount >= 0, `gate_cards_to_rule must be an integer, got ${before.detail.gate_cards_to_rule}`);

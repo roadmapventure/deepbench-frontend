@@ -180,7 +180,7 @@ for repeatedly.**
    so a queued **directive** row alone is not pickable. **`AGT-127` splits this slot:** an undecided
    `gated_before_build` card no open `gate-card-…` question names answers `gate_cards_to_rule`:
    `should_boot=true`, `detail.mode='rule-cards-only'`, `detail.gate_cards_to_rule=<n>`, placed
-   HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged.
+   HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged. **`AGT-314` splits it again:** zero cards and open/carried `audit_findings`, or an open/partial ticket in a `runner_settings.find_work_lists` project: `work_to_find`, `detail.mode='find-work-only'` — the fire runs `(7f)` with `--prepare --weekly`, then `victoria-reorg.md` (c) step 2 per list slug with `--cycle-id=<id>` (0 tickets: skip), builds nothing, closes `did_not_run`, `last_step` `find-work: <lines>`. Nothing to review: this line, unchanged.
 9. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
@@ -226,7 +226,7 @@ Four properties that are load-bearing. **Do not re-derive any of them by hand:**
   clear the wall and the pace with it, a month rolls over, a budget row is inserted) and
   `scheduler_off` is John's own deliberate choice; **`nothing_pickable`
   is the unbounded one** — no fire boots, so no fire harvests, until an attended session runs
-  (`SES-297`'s card; `AGT-127` bounds its commonest cause, 7 above). It is **not** a gap to close
+  (`SES-297`'s card; `AGT-127`/`AGT-314` bound it, 8 above). It is **not** a gap to close
   by quietly restoring the tail here: doing so restores the full page read on exactly the path this
   ticket exists to make cheap.
 
@@ -235,9 +235,9 @@ dev`, then `git checkout -B session/cycle-<UTC yyyymmdd-hhmm> origin/dev`. This 
 clone + session branch satisfies CLAUDE.md's worktree-isolation rule by construction (the rule
 exists to isolate concurrent sessions sharing one machine checkout; you have the whole clone).
 All other CLAUDE.md hard rules apply verbatim — atomic counters, `push origin HEAD:dev`,
-kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.claude/` paths are hard-coded protected and prompt for permission even in routine sessions (found live, SES-78c — two stalls), and the marker is redundant here — the exclusive clone dies with the session and your `runner_cycles` row is the liveness signal. (Laptop sessions keep the inflight convention — at repo-root `inflight/` since 2026-08-21, John-approved register B41, moved out of `.claude/` precisely because of this gate; the cloud-cycle skip stays, since the exclusive clone and the `runner_cycles` row already cover liveness.)
+kickoff-gated coding, verify-never-assert. Do NOT create an inflight file: `.claude/` paths are hard-coded protected and prompt for permission even in routine sessions (found live, SES-78c — two stalls), and the marker is redundant here — the exclusive clone dies with the session and your `runner_cycles` row is the liveness signal.
 
-**An UNATTENDED cycle writes nothing under `.claude/` — and the reason is now known, which changes what the rule is for (John, 2026-08-21, directive `34865f07`, register B39).** This clause has been rewritten four times. Read the reason before you touch it again, because three of the four rewrites argued about a mechanism nobody had observed, and John then observed it in one sentence:
+**An UNATTENDED cycle writes nothing under `.claude/` — and the reason is now known, which changes what the rule is for (John, 2026-08-21, directive `34865f07`, register B39).** John observed the reason in one sentence:
 
 > *"Those sessions came back alive because I opened them and allowed permissions. That should not be happening."*
 

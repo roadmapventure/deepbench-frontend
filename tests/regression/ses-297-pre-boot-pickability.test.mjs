@@ -1,3 +1,9 @@
+// DeepBench v7.0.748 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-314 -- the
+// nothing-pickable slot splits AGAIN: `work_to_find` is the THIRD verdict that boots. BOOTING_REASONS
+// grows to three, the closed-set assertion ranges over it, the oracle counts open/carried
+// audit_findings and the open/partial tickets of every runner_settings.find_work_lists project from
+// the RAW rows, detail.mode is graded as a two-valued MODE rather than one string, the two new
+// detail counts are graded against that oracle, and a doc clause reads the rule out of the runbook.
 // DeepBench v7.0.689 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-265 -- `lanes_full`
 // sits right after `db_pressure`: REASONS grows to nine, the oracle counts live runner lanes from the raw
 // runner_cycles rows against runner_settings.max_lanes, and the live arm grades detail.live_lanes /
@@ -135,9 +141,26 @@ export const PASS_REASON = "pickable";
 // AFTER every wall, so it can never boot a fire past one -- the oracle below places it there too,
 // and a gate that hoisted it above the wall disagrees with this file rather than with nobody.
 export const GATE_CARDS_REASON = "gate_cards_to_rule";
-// SES-302: exactly ONE reason boots. The set is kept rather than collapsed back to a string so a
-// future pass reason is a one-line change here instead of a rewrite of the consistency check.
-export const BOOTING_REASONS = new Set([PASS_REASON, GATE_CARDS_REASON]);
+// FEATURE: AGT-314 -- THE NINTH VERDICT, AND THE THIRD ONE THAT BOOTS. Not a refusal either, so it
+// is deliberately not in REASONS: refusal 6 split a SECOND time. With nothing pickable, no card
+// left to rule, and work that EXISTS to be found -- an open or carried `audit_findings` row, or an
+// open/partial ticket in a project named by `runner_settings.find_work_lists` -- the fire boots to
+// go and find it and nothing else (`detail.mode='find-work-only'`). It sits AFTER AGT-127's branch,
+// so a fire with a card to rule still rules it rather than going looking, and after every wall, so
+// it can never boot past one. The oracle below places it in exactly that position.
+export const FIND_WORK_REASON = "work_to_find";
+// SES-302 / AGT-127 / AGT-314: the set is kept rather than collapsed back to a string precisely so
+// a new pass reason is a one-line change here instead of a rewrite of the consistency check. It has
+// now been that one-line change twice.
+export const BOOTING_REASONS = new Set([PASS_REASON, GATE_CARDS_REASON, FIND_WORK_REASON]);
+
+// THE MODE IS WHAT A BOOTING FIRE READS, and it is now two-valued, so it is derived HERE from the
+// reason rather than compared against a literal at each call site. A fire that took the reason and
+// not the mode would try to build on a board with pickable_count = 0; a fire that read a mode the
+// gate does not set would do the wrong one thing.
+export const modeFor = reason =>
+  reason === GATE_CARDS_REASON ? "rule-cards-only" :
+  reason === FIND_WORK_REASON ? "find-work-only" : null;
 
 // ---------------------------------------------------------------------------
 // Pure readers
@@ -352,6 +375,23 @@ export const CLAUSES = [
       /unbounded/i.test(s) &&
       /473\.1 KB/.test(s),
     breaks: s => s.replace(/unbounded/i, "fine"),
+  },
+  {
+    id: "find-work-boot-is-named",
+    detail:
+      "AGT-314: the block must name `work_to_find`, `find-work-only` and `find_work_lists` -- the " +
+      "verdict, the mode a booting fire reads to know it may only go looking, and the " +
+      "runner_settings column that says WHERE to look. Drop the column's name and the next editor " +
+      "hard-codes the two list slugs into the function, at which point re-pointing the find-work " +
+      "lane is a migration instead of an UPDATE (pattern:2); drop the mode and a fire that read " +
+      "only the reason would try to build on a board with pickable_count = 0. Measured before the " +
+      "ship: 8 `nothing_pickable` refusals on 2026-10-02 between 11:41 and 18:51Z while 44 " +
+      "audit_findings were open and 133 open/partial tickets sat on the two lists",
+    test: s =>
+      /`work_to_find`/.test(s) &&
+      /find-work-only/.test(s) &&
+      /find_work_lists/.test(s),
+    breaks: s => s.split("work_to_find").join("some other verdict"),
   },
   {
     id: "scheduler-gate-is-a-different-question",
@@ -606,6 +646,11 @@ export function expectedReason(f) {
   // that counted EVERY undecided card (re-firing forever on one whose decision is John's, since a
   // `john` ruling writes no card) and a gate that counted none both disagree here.
   if (f.pickableCount === 0 && f.gateCardsToRule > 0) return GATE_CARDS_REASON;
+  // AGT-314: refusal 6 splits a second time, and the oracle splits with it -- BELOW the card branch
+  // (a fire with a card to rule rules it rather than going looking) and above nothing_pickable. Both
+  // halves are ORed and both are graded, so a gate that read only the findings, a gate that read
+  // only the lists, and a gate that answered work_to_find on an empty board all disagree here.
+  if (f.pickableCount === 0 && (f.openFindings > 0 || f.listTickets > 0)) return FIND_WORK_REASON;
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
   // SES-302 still holds for the CAP: no token_cap branch, no pickable_degraded. The age is graded
@@ -635,14 +680,16 @@ async function theLiveGateObeysItsOwnLadder() {
   assert.strictEqual(rows.length, 1, `runner_should_boot() returned ${rows.length} rows, expected exactly 1`);
   const v = rows[0];
 
-  assert.ok(REASONS.includes(v.reason) || v.reason === PASS_REASON || v.reason === GATE_CARDS_REASON,
+  assert.ok(REASONS.includes(v.reason) || v.reason === PASS_REASON ||
+            v.reason === GATE_CARDS_REASON || v.reason === FIND_WORK_REASON,
     `runner_should_boot() returned an unknown reason ${JSON.stringify(v.reason)}; the closed set is ` +
-    `${[...REASONS, PASS_REASON, GATE_CARDS_REASON].join(", ")}`);
-  // AGT-127: the mode is what a booting fire READS to know it may only rule cards. A fire that took
-  // the reason and not the mode would try to build on a board with pickable_count = 0.
-  assert.strictEqual(v.detail.mode, v.reason === GATE_CARDS_REASON ? "rule-cards-only" : null,
+    `${[...REASONS, PASS_REASON, GATE_CARDS_REASON, FIND_WORK_REASON].join(", ")}`);
+  // AGT-127 / AGT-314: the mode is what a booting fire READS to know which ONE thing it may do. A
+  // fire that took the reason and not the mode would try to build on a board with
+  // pickable_count = 0; one that read a mode the gate does not set would do the wrong one thing.
+  assert.strictEqual(v.detail.mode, modeFor(v.reason),
     `detail.mode is ${JSON.stringify(v.detail.mode)} on reason ${v.reason}; it reads rule-cards-only ` +
-    "on gate_cards_to_rule and null on every other verdict");
+    "on gate_cards_to_rule, find-work-only on work_to_find, and null on every other verdict");
   assert.strictEqual(
     v.should_boot, BOOTING_REASONS.has(v.reason),
     `should_boot=${v.should_boot} disagrees with reason=${v.reason}. The two must never be able to ` +
@@ -655,7 +702,9 @@ async function theLiveGateObeysItsOwnLadder() {
 
   // --- Build the oracle from the raw tables.
   const settings = asArray(
-    await pg(url, key, "runner_settings?select=id,scheduler_on,meter_stale_hours,max_lanes&id=eq.1"), "runner_settings");
+    await pg(url, key,
+      "runner_settings?select=id,scheduler_on,meter_stale_hours,max_lanes,find_work_lists&id=eq.1"),
+    "runner_settings");
   // AGT-265: the live lanes, from the RAW rows -- open, runner-stamped, and a heartbeat (or, with
   // none, the start) inside the last 20 minutes. The window arithmetic is done here, not read back.
   const openCycles = asArray(
@@ -690,6 +739,31 @@ async function theLiveGateObeysItsOwnLadder() {
     await pg(url, key, "runner_questions?qid=like.gate-card-*&status=eq.open&select=qid"), "runner_questions");
   const openQ = new Set(gateQ.map(q => q.qid));
   const gateCardsToRule = gateCards.filter(c => !openQ.has(`gate-card-${String(c.id).slice(0, 8)}`)).length;
+
+  // AGT-314, from the RAW TABLES for the same reason everything else here is: the oracle must be
+  // free to disagree with the function. The findings half is a count of open OR carried rows -- a
+  // carried finding is work deferred, not work done. The lists half is re-derived from three raw
+  // reads (tickets, epics, projects) joined against the SLUGS IN THE COLUMN, never against a
+  // literal pair of slugs: a test that hard-coded dev-mgr-findings/auditor-findings here would
+  // pass after John re-points the lane with an UPDATE and stop guarding the branch it claims to.
+  const findWorkLists = settings[0]?.find_work_lists ?? null;
+  assert.ok(Array.isArray(findWorkLists),
+    `runner_settings.find_work_lists is ${JSON.stringify(findWorkLists)}; AGT-314 made it a NOT NULL ` +
+    "text[] -- a missing column means the migration agt314_find_work_boot did not land");
+  const findings = asArray(
+    await pg(url, key, "audit_findings?status=in.(open,carried)&select=id&limit=5000"),
+    "audit_findings (open or carried)");
+  const openFindings = findings.length;
+  const listCandidates = asArray(
+    await pg(url, key, "backlog_items?status=in.(open,partial)&select=id,epic_id&limit=5000"),
+    "backlog_items (open or partial)");
+  const allEpics = asArray(await pg(url, key, "epics?select=id,project_id&limit=5000"), "epics");
+  const allProjects = asArray(await pg(url, key, "projects?select=id,slug&limit=5000"), "projects");
+  const slugOfProject = new Map(allProjects.map(p => [p.id, p.slug]));
+  const projectOfEpic = new Map(allEpics.map(e => [e.id, e.project_id]));
+  const listSlugs = new Set(findWorkLists);
+  const listTickets = listCandidates.filter(
+    b => listSlugs.has(slugOfProject.get(projectOfEpic.get(b.epic_id)))).length;
 
   // AGT-237: the database's level, read from its one home over the same rpc a cycle's step 7 uses
   // (scripts/db-pressure.js). Never re-derived from db_health_readings here: the window arithmetic is
@@ -753,6 +827,8 @@ async function theLiveGateObeysItsOwnLadder() {
     pickableCount: lanes.length,
     cheapestPctOfWeek: priced.length ? Math.min(...priced) : null,
     gateCardsToRule,
+    openFindings,
+    listTickets,
     dbLevel: db.level,
     liveLanes,
     maxLanes: settings[0]?.max_lanes == null ? null : Number(settings[0].max_lanes),
@@ -775,6 +851,26 @@ async function theLiveGateObeysItsOwnLadder() {
             Object.prototype.hasOwnProperty.call(d, "unpriced_pickable"),
     "detail must always carry pickable_count and unpriced_pickable -- they are how a reader tells " +
     "'no work' from 'work nobody priced'");
+  // AGT-314: the two counts the find-work branch graded, on EVERY verdict, against the oracle's own
+  // raw reads. A work_to_find refusal with no counts cannot be audited, and a gate that counted
+  // only `open` findings (not `carried`), or only the two slugs it was born with, disagrees here.
+  assert.ok(Object.prototype.hasOwnProperty.call(d, "open_findings") &&
+            Object.prototype.hasOwnProperty.call(d, "list_tickets"),
+    "detail must always carry open_findings and list_tickets -- without them a reader cannot tell " +
+    "'there is nothing at all' from 'there is work to go and find'");
+  assert.strictEqual(Number(d.open_findings), openFindings,
+    `detail.open_findings=${d.open_findings} but audit_findings holds ${openFindings} open-or-carried ` +
+    "row(s). open AND carried: a carried finding is work that was deferred, not work that was done");
+  assert.strictEqual(Number(d.list_tickets), listTickets,
+    `detail.list_tickets=${d.list_tickets} but ${listTickets} open/partial ticket(s) sit in a project ` +
+    `whose slug is in runner_settings.find_work_lists (${JSON.stringify(findWorkLists)})`);
+  if (v.reason === FIND_WORK_REASON) {
+    assert.strictEqual(Number(d.pickable_count), 0,
+      "work_to_find may only be reached with pickable_count = 0; it is refusal 6's second twin, " +
+      "never a shortcut past the walls above it");
+    assert.ok(Number(d.open_findings) > 0 || Number(d.list_tickets) > 0,
+      "a work_to_find verdict must be justified by its own payload -- there must BE something to find");
+  }
   // SES-368 / M5-16: the pace facts the verdict owes its reader, graded against the clock-only
   // oracle. A gate that computed the week from UTC, or from Friday 00:00, disagrees here.
   assert.strictEqual(Date.parse(d.week_started_at), facts.weekStartedAt,
