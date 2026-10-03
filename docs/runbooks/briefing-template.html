@@ -1,0 +1,2342 @@
+<title>DeepBench Morning Briefing</title>
+<!-- ^^ THIS TAG STAYS IN THE FIRST BYTES OF THIS FILE. DO NOT PREPEND ABOVE IT. ^^
+     DeepBench v7.0.175 | runbooks/briefing-template.html | SES-138 — the page keeps its name.
+     The Artifact tool scans only the FIRST 8192 BYTES of a published file for a title tag. This
+     file's provenance block below grows by one comment on every ship, so the tag used to sit at
+     byte 24,770 — present, correct, and never seen — and a cycle publishing the template-derived
+     file got an artifact named after the BUILD FILE ("briefing-out") instead of the page. John
+     finds this page by its name in his gallery and by its browser tab, so that is a real defect,
+     found live 2026-08-23 by cycle 702aa2db on the served artifact.
+     It is a RATCHET, which is why the fix is structural rather than a rule to remember: the
+     offset was 24,537 when SES-138 was filed at 02:20Z and 24,770 when it was revalidated at
+     02:34Z — 233 bytes in fourteen minutes, from one ship. Prepending a provenance comment above
+     this tag re-breaks it silently, so new comments go BELOW this block, at the top of the
+     provenance chain that starts on the next line.
+     Guarded permanently by tests/regression/SES-138-briefing-title-window.js, which fails if the
+     first title tag leaves the window — and which also fails if a tag-shaped string is written
+     into THIS comment above the real one, so keep the words "title tag" rather than the markup.
+     Belt-and-braces, NOT a substitute for this placement: the
+     rebuild also passes `title:` on every Artifact publish and asserts the name on the SERVED
+     artifact afterwards (docs/runbooks/briefing-page.md, regeneration steps 2 and 5).
+     NOT CHANGED, because it was measured and is already right: doc()'s self-publish head emits
+     its own title tag inside the first ~150 bytes, so John's taps have never been able to rename
+     the page. Only a cycle publishing this file hits the window. -->
+
+<!-- THE SEED SENTINEL (v7.0.197, directive b8d5ea7e) — READ BEFORE YOU "TIDY" THIS LINE.
+     This is deliberately NOT a valid empty state, and it must never be replaced by one. A cycle
+     rebuilding this page substitutes the VERBATIM output of `SELECT public.briefing_state_seed()`
+     here. Anything else — above all a plausible-looking `{"items":{},"asks":{},…}` — publishes a
+     page with John's ask threads and meter readings missing, and nothing on it says so. Restoring
+     the "empty" default re-opens exactly that defect. Contract: briefing-page.md regeneration 1b. -->
+<script type="application/json" id="briefing-state">{"__unseeded":true}</script>
+
+<!-- ^^ THE STATE BLOCK STAYS DIRECTLY BELOW THE TITLE GUARD. DO NOT PUSH IT DOWN. ^^
+     Provenance chain starts HERE, below the block. New stamps go at the top of THIS chain — which
+     is what makes them harmless. NOTE: no tag markup in these comments, deliberately (same reason
+     the title guard keeps the words "title tag" rather than the markup — a tag-shaped string in a
+     comment is matched by scanners that look for the real thing, and it skewed this very cycle's
+     first offset measurement before it was caught).
+
+     DeepBench v7.0.350 | runbooks/briefing-template.html | SES-244 phase A — EVERY TAP NOW WRITES A
+     ROW, and the page stops being the only place John's taps live. Per his ruling (directive
+     27b5d8cb, "b with the bridge"): the briefing page becomes a pure render of the database. Until
+     today a tap's only durable record was save() republishing this whole artifact, which is why
+     every cycle had to read the served page back before publishing — the read register B41 blocks
+     for unattended cycles, and the reason SES-244 stayed open at partial.
+     ADDITIVE, AND THAT IS THE WHOLE DESIGN OF THIS SHIP: writeTap is called ALONGSIDE save(),
+     never instead of it. Nothing is removed — not save(), not doc(), not a.publish(doc()), not the
+     state block. Phase B (removing the self-publish, repointing the harvest at briefing_taps,
+     retiring the read-back) is a separate ATTENDED session, and only after one real tap has been
+     watched landing in the table. That split is John's own SES-155 rule: build additively, repoint
+     only once verified. A phase-B edit that lands here before that verification is the bug.
+     THE CHANNEL: window.claude.use('mcp') -> callTool('Supabase','execute_sql',{query}) on artifact
+     runtime contract 0.2.9. It runs with the VIEWER's Supabase connector, so the page never holds a
+     credential and the write arrives at John's own service level — which is why public.briefing_taps
+     is created with zero anon/authenticated grants and needs none.
+     THREE RULES BAKED INTO writeTap, none of them cosmetic: user text reaches SQL ONLY through
+     sqlLit() (doubled single quotes — John's asks and reasons are free text and WILL contain
+     apostrophes); the payload is JSON.stringify'd, quoted the same way, and cast ::jsonb; and there
+     is NO RETRY, because under the mcp contract a rejected write is outcome-unknown rather than
+     proof it did not run, so a retry is how one tap becomes two rows. Every failure branch speaks
+     through the existing bar() savebar — a silent one would let him believe a tap was durable.
+     NO VISUAL CHANGE: no CSS, no class, no copy John reads, and nothing above this block moved.
+     The nine call sites are additions inside existing handlers only. Guarded by
+     tests/regression/SES-244-tap-buffer.js, whose negative control is pinned to the v7.0.349 blob
+     rather than origin/dev, which moves (the SES-240 lesson).
+
+     DeepBench v7.0.314 | runbooks/briefing-template.html | SES-236 — NEW §17, The Prime Directive,
+     APPENDED at the end of the locked order (John, gated card a8eaee1d: extend the list, never
+     renumber it — the §15/§16 precedent), plus §8's header row and board line becoming ANCHORS
+     because §8 now renders two different things. Directive a0ef9525 §7 wants its text VERBATIM on
+     every rebuild and §7b wants §8 to show the Prime-Directive pick order rather than the P1-P10
+     board. THE PANEL ADDS NO CSS AND NO NEW CLASS, and that is the SES-178 rule for the SES-188
+     reason: every rule added to #s sits ABOVE the state block. §17 is built from h2/.secnum, bare
+     <p>, .tnote, .empty, .mono, .tscroll and table/th/td.dim/td.ttl2 — all of which §8/§11/§15/§16
+     already ship. THE PLACEMENT QUESTION THE TICKET OWNED, answered by measurement and not taste:
+     briefing-state sits at byte 2,624 of this file (1.6%) and doc() emits it FIRST in the body
+     before #f/#s, while sections render into #page — AFTER it on both paths — so a ~7.6 KB verbatim
+     body is provably below the block and costs a harvesting cycle nothing. A FOLD WAS REJECTED for
+     a second reason: a folded section is one John can leave closed, and §7's point is that this is
+     standing law he reads. THE EDIT THIS FORBIDS: summarising the body to save bytes — §7 makes the
+     runner_directives row the truth and this page its mirror, so a paraphrase makes the page a
+     SECOND source that can disagree, the exact failure §7 names. §8's two new anchors are must()
+     rather than sample text for the SES-178 reason: a template edit that reflows the header row
+     fails LOUDLY at exit 2 rather than publishing board headers over pick-order rows. Guarded by
+     tests/regression/SES-236-prime-directive-briefing.js.
+
+     DeepBench v7.0.297 | runbooks/briefing-template.html | directive db84b784 — §15 GAINS ITS
+     BURN-DOWN BLOCK, and the two numbers John has twice been shown as one are finally rendered as
+     two. His word, attended architect session 2026-08-28, verbatim: "yes, build the burn-down with
+     the size stamps". THE NAMED DEVIATION, disclosed rather than buried (the SES-196 convention):
+     his directive names three contents and the FIRST of them — per-milestone closed/total M0-M7 —
+     has shipped since v7.0.231, twenty lines above this block. So it is built INTO §15 rather than
+     appended as a new §17: a new section would render that table a SECOND time, and one fact with
+     two homes is the defect this platform has already paid for at SES-116, SES-113 and SES-86 phase
+     3. Nothing is renumbered because nothing is added to the locked order, which is what his
+     "extend, never renumber" rule protects in the first place — read that before "re-homing" this
+     block into a section of its own. THE MEASUREMENT THAT MADE IT WORTH A CYCLE, taken live before
+     a line changed: the M3 drain's named scope held 3 open members against the epic's 8 open
+     tickets. Neither number was on the page and §2b showed only the first, as "N of M tickets left
+     in <epic>" — which is why briefing-automation.mjs's own header records the panel telling John
+     his standing drain had 17 tickets left against a live 11. The drain count is over
+     runner_drain_scope and is FIXED at naming time (SES-142); it is the set that retires his
+     standing order. The bucket count is LIVE and includes everything filed since. A single number
+     cannot be both, and the rendered footnote says so in his register rather than only in this
+     comment. NO NEW CSS — bdRow() is the third member of the msRow()/svRow() family and reuses
+     table / td.num / td.dim, asserted structurally rather than promised. THE ZERO THAT IS A REAL
+     ZERO: `Remaining, unstamped` renders at 0 and must keep doing so — every remaining ticket
+     carries a stamp today, and that zero is the signal db84b784's own filing rule is holding; it
+     goes non-zero the moment a cycle files without one, which is the point of showing it. Not the
+     "absent must look absent" rule being broken — the count exists and is genuinely zero.
+     NOT READ, AND SAID SO RATHER THAN IMPLIED: John's reference snapshot (artifact a1aa518d) was
+     not opened. Its body is reachable only through the permission-gated tool-results path, which an
+     unattended cycle may not enter (register B39) — so the two-number presentation is built from
+     the directive's own words, which specify it. Guarded by
+     tests/regression/db84b784-selfbuild-burndown.js, whose cross-file clause fails if this block
+     moves without its builder anchor.
+
+     DeepBench v7.0.284 | runbooks/briefing-template.html | SES-181 (b) — §16 REVIEWER LANE, appended
+     at the END of the locked order on John's directive 58db64ae item (2) ("locked section extended,
+     never renumbered"), and §15's keystone footnote CORRECTED in the same ship. THE CORRECTION IS
+     HALF THE TICKET, not tidying: §15 told John all three keystone metrics "do not exist yet …
+     all three wait on the verifier lane (SES-181), which is still open", and adding §16 without
+     touching it would have put a rendered catch rate and a claim that no catch rate exists on the
+     same page. It now names the TWO that are still absent and points at §16 for the one that is not.
+     THE CLAIM §16 MUST NEVER MAKE, and the reason its three tnote sentences are mandatory: read off
+     the first two rows alone, "30.0% >= 0.0%" says the charter's keystone bar is met. It is false
+     twice. (1) THE TWO RATES COUNT DIFFERENT POPULATIONS — measured at this ship, the lane had
+     graded 20 tickets since Aug 24 CST against 115 decided ship cards going back much further, and
+     the like-for-like overlap (a delivery carrying BOTH a verdict and a tap of John's) was FIVE, not
+     thirty. (2) A `block` IS A MECHANICAL GATE FAILING (build / regression / hygiene), never
+     necessarily a defect John would have reworked — so verifier >= John is NECESSARY for that bar
+     and never SUFFICIENT. The panel therefore reports the comparison and says the bar is NOT YET
+     ASSERTABLE, which is the same rule as §14's cost showing "—" and a NULL plain_* drawing a red
+     defect line: absent must look absent, and "not yet assertable" must not look like a pass.
+     NO NEW CSS: svRow() is table / td.num / td.dim and the bar is .bar/.dev/.barlbl, all of which
+     §8, §13 and §15 already ship — the size discipline msRow()'s own comment states. Guarded by
+     tests/regression/SES-181b-verifier-scoreboard.js, which asserts BOTH halves (§16 present with
+     its honesty clauses AND §15 no longer claiming the catch rate is absent), because an
+     absence-only test passes vacuously and a presence-only test lets the contradiction ship.
+
+     DeepBench v7.0.255 | runbooks/briefing-template.html | SES-208 — A LEFT ANGLE BRACKET IN A
+     DATABASE STRING WAS DELETING THE BOTTOM HALF OF THIS PAGE, and nothing said so. MEASURED in
+     headless Chromium and again in jsdom, not inferred: the published page rendered NINE h2
+     sections where the source carries SIXTEEN section markers — 9.1, 10 (waiting on your input),
+     11, 12, 13, 14 and 15 were absent, held instead inside a 51,860-character script element in
+     #page. Root cause one line wide: question() interpolated its DB prose (text, ctx, yesMeans,
+     noMeans) WITHOUT esc(), while esc() sat forty lines above it being used 55 times elsewhere.
+     Open question q-artifact-read-path-unreachable quotes a literal script tag while explaining the
+     SES-188 truncation measurement; that opened a real element mid-section-9 and everything after
+     became its text content. Zero console errors, no visible break — the page still ends on a
+     section boundary, which is why eight ships walked past it. THE SAME CLASS, surveyed rather than
+     assumed and fixed in the same breath: plainBlock() (runner_items.plain_*) and card()'s title
+     (backlog_display_title()) and tid. build-briefing.mjs passes all of these through J(), which is
+     JSON-for-JavaScript and NOT HTML escaping, so this render boundary is the only place it can be
+     fixed. THE EDIT THIS SHIP FORBIDS, and it is the tempting tidy-up: escaping techHtml or idLine
+     as well. Those are markup the BUILDER composed — tags, links, bold — and escaping them renders
+     the card bodies as visible source, the same defect facing the other way. The rule is written
+     next to esc() itself: escape what came out of the database, never what the builder composed,
+     and ask which side a NEW interpolation came from rather than pattern-matching its name.
+     Guarded by tests/regression/SES-208-briefing-escaping.js, which asserts BOTH halves plus a
+     behavioural clause that slices the shipped esc/question/plainBlock out of THIS file (never a
+     copy — SES-45) and renders hostile prose in jsdom: 0 script elements, the following section
+     intact, and the bracket still VISIBLE as text, so a fix that strips the text instead of
+     escaping it fails too. On origin/dev's pre-change copy, 5 of 7 clauses fail and the behavioural
+     one swallows 1,286 characters. Found while building SES-135's render test — the test caught it
+     on its first run, before it shipped, which is the ticket earning its keep early. SES-135 itself
+     was released unbuilt and returns to the drain; this preempted it under step 4's rule that a
+     user-blocking failure comes first. -->
+
+<!-- DeepBench v7.0.232 | runbooks/briefing-template.html | SES-188 (option D) — the state block is
+     PINNED ABOVE EVERY GROWTH SURFACE WE CONTROL, which is the whole fix and the thing an editor
+     will undo by habit. A cycle harvests John's taps by reading the PUBLISHED page and parsing this
+     block, and that read is served head-first under a size budget nobody has documented. Until this
+     ship the block sat at byte 33,767 — BELOW the provenance chain, below the fonts link, below the
+     whole of the stylesheet, and below the page div — i.e. downstream of the three things that grow
+     on every ship. MEASURED, NOT REASONED: the block was reached at 198.3 KB (2026-08-24 03:2xZ),
+     missed at 235.7 KB (15:41/15:57Z — SES-178's own cycle had to decline its republish), and
+     missed on BOTH documented read arms at 262.3 KB (19:57Z, cycle 90b34320: WebFetch stopped
+     inside the stylesheet, the Artifact read stopped inside the frame-runtime).
+     v7.0.223 trimmed 42,025 chars of provenance out of this file and said on its own stamp that it
+     "ONLY MOVES THE CEILING"; three ships later the ceiling was re-crossed, exactly as predicted.
+     So the fix is not another trim: it is putting the block UPSTREAM of everything that accumulates,
+     which turns its offset from "grows without bound" into "a constant plus a fixed platform
+     preamble". New provenance comments now land BELOW the block and can never push it again.
+     THE ONE THING THAT MAY NOT MOVE ABOVE IT: the title tag (SES-138 — the Artifact publisher
+     scans only the first 8192 bytes for a title, and this block is ~10 KB once seeded, so putting
+     it first would cost the page its name). Title, then this block, then everything else.
+     THE SECOND WRITER IS THE ONE THAT ACTUALLY SERVES JOHN'S TAPS, and a template-only fix would
+     look done and not be: doc() (in the code script) rebuilds the whole document on every tap via
+     claude.use('artifact').publish(doc()), and it emitted the fonts link and the stylesheet into
+     the head with the state after the page div — offset ~49.6 K served, over John's 40 K ceiling
+     on its own, which is the ~49 K SES-188 measured live. doc() therefore emits this block FIRST
+     in the body, with the link and stylesheet after it, matching this file's own structure.
+     Guarded by tests/regression/SES-188-briefing-state-offset.js, which asserts the ceiling on
+     BOTH writers and whose negative control is the pre-change file.
+     SUPERSEDES session-hygiene check 12 (count the comment blocks above the state line): after this
+     ship that count is structurally zero forever, so the check is vacuous rather than protective.
+     Re-pointing it is filed as SES-195 and named on this cycle's ship card, not silently dropped. -->
+<!-- DeepBench v7.0.231 | runbooks/briefing-template.html | SES-178 — NEW §15, Project — Selfbuild milestones, appended at the END of the locked section order (John, gated card a8eaee1d: extend the list, never renumber it). Renders docs/SELFBUILD-CHARTER.md's canonical progress query per milestone plus an overall bar. THE PANEL ADDS NO NEW CSS AND THAT IS DELIBERATE, NOT THRIFT: every rule added to #s sits ABOVE the briefing-state block in the served document and pushes it further out of a size-bounded read, which is the live SES-188 defect — the cycle that shipped this had its own harvest truncate inside briefing-state on the 235.7 KB served page and had to decline the republish. msRow() is built from table / td.num / td.dim, and the bar from .bar/.dev/.barlbl, all of which §8/§11/§13 already ship; the guard asserts structurally that §15 opens no <style> and uses no class the stylesheet does not define. TWO HONESTY CLAUSES IN THE FOOTNOTE, both mandatory: a retired milestone can read below 100% here and that is CORRECT (a drain finishes on the members John NAMED — runner_drain_scope, SES-142 — and tickets filed into the epic afterwards never join it; M0 and M1 are both retired while M1 reads 46.7%), and the charter's keystone metrics are NAMED ABSENT rather than rendered as zero, because none is online yet — they wait on SES-181's verifier lane, and a zero would claim the verifier caught nothing rather than that it does not exist. Sample rows are this cycle's real values and the builder splices over them; if it ever cannot find the anchor it dies at exit 2 rather than publishing them, proven live this cycle. -->
+<!-- DeepBench v7.0.223 | runbooks/briefing-template.html | SES-188 — THE 21-COMMENT PROVENANCE CHAIN IS TRIMMED, and this file is the one where that pile had a second, worse consequence than cost. A cycle harvests John’s taps by reading the PUBLISHED page and parsing its briefing-state block, and that read is served head-first under a size budget — so every comment above the block pushes the block further out of reach. MEASURED before the cut, not estimated: 20 comment blocks holding 42,025 chars, 24.7% of this file, ALL of them above the block (which sat at offset 66,229). Live consequence: the served page reached the block at 198.3 KB and missed it at 250 KB, 25 minutes apart, the variable being a republish — and THREE CONSECUTIVE CYCLES correctly declined to republish because they could not verify their harvest, while John’s decisions piled up behind a stale page. John’s call on gated card f6c7c54a: candidate 4 FIRST (this trim, in the SES-164 shape), then candidate 2 as the DURABLE fix — a Supabase-side buffer the page writes taps into directly, designed JOINTLY with SES-155’s briefing_comments table and SES-156’s unified card. Candidates 1 and 3 he rejected. THE HONEST BOUND, stated because the next editor deserves it and because the ticket itself makes this objection of candidate 1: THIS ONLY MOVES THE CEILING. The page still grows on every rebuild; the trim buys head room, it does not stop the growth. Capped going forward by docs/runbooks/session-hygiene.md check 12. THE THREE BLOCKS THAT ARE NOT PROVENANCE AND MUST SURVIVE ANY FUTURE TRIM: the title guard above (the Artifact publisher scans only the FIRST 8192 BYTES for a title tag — new comments go BELOW it, never above, and tests/regression/SES-138-briefing-title-window.js fails if the tag leaves the window); this stamp and the newest one; and the SEED SENTINEL immediately above the briefing-state line, which is deliberately NOT a valid empty state. CHECKED RATHER THAN ASSUMED before moving anything (SES-164 step 2, the step that makes a trim safe and the one that gets skipped): all 17 retiring comments were swept for an editor warning existing nowhere else. Sixteen were already restated in this file’s body or in briefing-page.md. The seventeenth — v7.0.193’s note that .idchip max-width is 35% because QA measured 45% letting the chip out-weigh the title — appeared NOWHERE else, and was relocated into the CSS next to the rule it protects rather than archived. The 17 are preserved verbatim in docs/SESSIONS.md under ‘Appendix — retired briefing-template.html provenance comments’, and all of them remain in git history. Body below the header proven byte-identical by sha256 before and after the cut, differing only by that one deliberate relocation. -->
+<!-- DeepBench v7.0.201 | runbooks/briefing-template.html | SES-147 — §2b gains John's DAILY MAX box, the third control on this page that changes what the RUNNER does. His words, 2026-08-23, verbatim: "In the automation section Place a <dailymax> open text box of the millions of tokens allowed during the day. for today set it 25M and make sure the routines honor it." Locked spec docs/BRIEFING-REDESIGN-0822.md §2b item 3. THE BOX IS NOT THE CAP, and the page says so rather than implying it: the cap is one of FIVE rungs resolved by migration ses147_daily_max_tokens's public.resolve_day_token_cap() — override > 48h stale floor > this box > SES-128 calibration > the 10M default — so the row renders BOTH the stored number and a cycle-written "In force now" line (AUTOMATION.daily_max_effective) carrying what the next run will actually use and why. A row that multiplied the box out locally would be confidently wrong on exactly the days a rung above it fires, which are the days John is looking. THE RUNG MOST LIKELY TO BE GOT WRONG, stated here because the page's own copy is where he will read it: a standing number does NOT defeat the staleness brake (spec, verbatim) — with the box set to 4 and every reading aged past 48h the shipped function returns 3,000,000 / stale-floor, while the obvious "the box is THE day cap" build returns 4,000,000. Proven on fixtures inside a deliberately rolled-back transaction, alongside override-beats-box (25,000,000 / override with the box set to 4) and blank-box = pre-SES-147 exactly (10,000,000 / calibrated). NULL IS NOT ZERO ANYWHERE IN THIS ROW: the DB null, settingsNow()'s `undefined`-not-falsy test, the empty-string render and the empty-box commit path are four expressions of one rule — an empty box means "no standing cap, budget as before", and rendering or storing it as 0 would read as "no tokens allowed today" and would be a number John never typed. Committed on Enter/blur only, never per keystroke ("2" on the way to "25" is a real number this page would otherwise record), and out-of-range is put back rather than stored, both the same calls sch-n already makes. Guarded by tests/regression/SES-147-daily-max-box.js. -->
+
+<link id="f" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style id="s">
+  :root{
+    --paper:#ebe5d5; --card:#f8f2e2; --card-alt:#f2ead4;
+    --navy:#12243c; --ink:#28221a;
+    --muted:#786d52; --muted-deep:#58503a; --line:#c8bb9a; --line-soft:#d8cbac;
+    --brass:#b6873a; --brass-deep:#886224; --brass-light:#e4c786;
+    --navy-text-hi:#b8c5d8; --moss:#5a7538; --moss-light:#a6bc82; --flag:#a83319; --white:#ffffff;
+    --display:"Fraunces",Georgia,serif; --body:"Inter",-apple-system,system-ui,sans-serif;
+    --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);margin:0;
+       font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:0 14px 48px}
+  header{background:var(--navy);color:var(--card);border-bottom:3px solid var(--brass);
+         padding:14px;display:flex;align-items:center;gap:11px}
+  .db{width:34px;height:34px;border-radius:50%;background:var(--brass);color:var(--navy);
+      display:flex;align-items:center;justify-content:center;font-family:var(--display);
+      font-weight:700;font-size:14px;border:2px solid var(--card);flex-shrink:0}
+  header h1{font-family:var(--display);font-size:17px;font-weight:600;margin:0;line-height:1.1}
+  header .sub{font-family:var(--mono);font-size:9px;color:var(--navy-text-hi);
+              letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+  header .date{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--brass-light);
+               text-align:right;line-height:1.3}
+  header .date b{display:block;color:var(--card);font-weight:700}
+  /* v7.0.172, directive 603f44ea — the last-action stamp, under the decisions counter. Two
+     lines, and the third only when it is true: his newest tap, this page's rebuild, and the
+     "not picked up yet" line that answers the half of his sentence a bare timestamp cannot. */
+  header .date .la{display:block;margin-top:3px;font-size:10px;line-height:1.35}
+  /* --white, not --flag: the flag red is a light-background token and disappears on navy. */
+  header .date .la .stale{display:block;color:var(--white);font-weight:700}
+  .stats{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);
+         border-radius:6px;overflow:hidden;margin:12px 0 8px}
+  .stat{flex:1;background:var(--card);padding:9px 6px;text-align:center}
+  .stat b{display:block;font-family:var(--mono);font-size:15px;font-weight:700;
+          font-variant-numeric:tabular-nums;color:var(--navy)}
+  /* SES-124 — every number is labeled, and a label may wrap to two lines ("Tokens of 10M daily
+     max"). letter-spacing drops from .8 to .6 and the label becomes a block so the wrap is even. */
+  .stat span{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+             line-height:1.3;display:block;margin-top:2px}
+  .strip-def{font-size:11.5px;color:var(--muted-deep);margin:0 0 4px;line-height:1.5}
+  .strip-def b{color:var(--ink)}
+  .finding p{margin:0 0 8px;font-size:14px}
+  h2{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.4px;
+     text-transform:uppercase;color:var(--muted-deep);margin:26px 0 10px;
+     border-bottom:1px solid var(--line);padding-bottom:5px}
+  h2 .secnum{font-family:var(--mono);font-size:11px;color:var(--brass-deep);margin-right:7px}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:7px;
+        padding:14px 14px 12px;margin-bottom:14px}
+  .item[data-decision]{border-color:var(--brass)}
+  /* ---- SES-124 · THE COLLAPSE FRAMEWORK -------------------------------------------------
+     The shared mechanism §§5/6/9/10/12 are built on (SES-125/126/127). Two shapes:
+       (a) ONE CARD folds — <div class="item fold" id="X"> with a <div class="head" data-toggle="X">
+           and a <div class="bodyc">. Closed by default; `.open` on the .item reveals the body.
+       (b) A WHOLE SECTION folds — <h2 class="clickable" data-toggle="Y"> over a
+           <div class="secwrap" id="Y">. Same `.open` switch, same chevron.
+     `fold` is deliberately a MODIFIER rather than a restyle of `.item`: the always-open cards
+     still on this page (converted by SES-125) keep their padding untouched, so this ticket can
+     ship the framework without touching a single card. The mock's cards are shape (a) with
+     `fold` added — that one word is the only difference from docs/design/briefing-redesign-mock-0822.html. */
+  .item.fold{padding:0;overflow:hidden}
+  .item.fold .head{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer}
+  .item.fold .head:hover{background:var(--card-alt)}
+  .cardnum{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brass-deep);
+           min-width:20px}
+  .head .ttl{font-family:var(--display);font-size:14.5px;font-weight:600;line-height:1.25;flex:1}
+  /* max-width:35% is DELIBERATE and was measured — QA at v7.0.194 tried 45% here and a long
+     display_ref chip out-weighed the title. Do not raise it back. (Relocated from the retired
+     v7.0.193 stamp by SES-188's trim: it was the one warning in that pile with no copy anywhere
+     else in this file or briefing-page.md.) */
+  .idchip{font-family:var(--mono);font-size:10px;color:var(--brass-deep);flex:0 1 auto;
+        min-width:0;max-width:35%;overflow-wrap:anywhere}
+  .head .st{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+  .head .st.done{color:var(--moss);font-weight:700}
+  .chev{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+  .bodyc{display:none;padding:2px 13px 13px;border-top:1px solid var(--line-soft)}
+  .item.open .bodyc,.q.open .bodyc{display:block}
+  h2.clickable{cursor:pointer}
+  h2.clickable:hover{color:var(--ink)}
+  h2 .chev{float:right;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .countchip{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--navy);
+       color:var(--white);border-radius:9px;padding:1px 8px;vertical-align:1px}
+  .secwrap{display:none}
+  .secwrap.open{display:block}
+  /* ---- SES-125 · THE DECISION CARDS -----------------------------------------------------
+     §§5/6/9/12 now USE the framework above. `.q` gains the same `fold` modifier `.item` got,
+     for the same reason: it is a modifier, so nothing that has not been converted moves.
+     `.q.fold .head` aligns to flex-start rather than center — a question's text is a sentence
+     and wraps to three lines on a phone, where a centered chevron drifts into the middle of it. */
+  .q.fold{padding:0;overflow:hidden}
+  .q.fold .head{display:flex;align-items:flex-start;gap:8px;padding:11px 13px;cursor:pointer}
+  .q.fold .head:hover{background:var(--card-alt)}
+  .q.fold .head .qtext{flex:1;margin:0;font-size:14px;line-height:1.35}
+  .head .kind{flex-shrink:0}
+  .idline{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:9px 0 8px}
+  .plain p{margin:0 0 8px;font-size:14px}
+  /* The judgment class a vision claim sets criteria for (§12). Navy on white, so it reads as a
+     label rather than competing with the brass card number beside it. */
+  .clschip{font-family:var(--mono);font-size:9.5px;color:var(--white);background:var(--navy);
+       border-radius:3px;padding:1px 6px;flex-shrink:0}
+  .tblwrap{overflow-x:auto;border-radius:7px}
+  .kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+        padding:2px 7px;border-radius:3px;border:1px solid var(--line);color:var(--muted-deep);
+        background:var(--card-alt)}
+  .kind.ship{color:var(--moss);border-color:var(--moss-light)}
+  .kind.test{color:var(--brass-deep);border-color:var(--brass-light)}
+  .kind.gate{color:var(--brass-deep);border-color:var(--brass-light)}
+  .item .top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .item .id{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+  .item h3{font-family:var(--display);font-size:17px;font-weight:600;margin:0 0 8px;text-wrap:balance}
+  .item p{margin:0 0 8px;font-size:14px}
+  .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+       color:var(--brass-deep);display:block;margin-bottom:1px}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:11px;
+        color:var(--muted-deep);margin:10px 0;font-variant-numeric:tabular-nums}
+  .links a{color:var(--brass-deep);font-weight:600;font-size:13px;text-decoration:underline;
+           text-underline-offset:2px;margin-right:14px}
+  .decide{display:flex;gap:8px;margin-top:12px}
+  .decide button{flex:1;font-family:var(--body);font-weight:600;font-size:13.5px;
+                 padding:10px 4px;border-radius:6px;border:1.5px solid var(--line);
+                 background:var(--card-alt);color:var(--ink);cursor:pointer;min-height:44px}
+  .decide button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  button.accept.on{background:var(--moss);border-color:var(--moss);color:var(--white)}
+  button.reverse.on{background:var(--flag);border-color:var(--flag);color:var(--white)}
+  button.rework.on{background:var(--brass);border-color:var(--brass-deep);color:var(--white)}
+  .verdict{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:8px;min-height:15px}
+  .reason{display:none;margin-top:9px}
+  .reason.show{display:block}
+  .reason input{width:100%;font-family:var(--body);font-size:14px;padding:9px 10px;
+                border:1.5px solid var(--brass);border-radius:6px;background:var(--white);color:var(--ink)}
+  .reason input:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .reason .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .empty{font-size:13.5px;color:var(--muted);font-style:italic;padding:4px 2px}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);
+        border-radius:7px;overflow:hidden;font-size:12.5px}
+  th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line-soft)}
+  th{font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+     color:var(--muted);background:var(--card-alt)}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  /* ---- SES-126 · THE BOARD TABLES (§§8/11/13/14) ----------------------------------------
+     §8 and §14 are six-column matrices and this page is read on a phone every morning, where
+     six columns of text either squeeze to one character per line or push the whole page
+     sideways. `.tscroll` gives the WIDE tables their own horizontal scroll so the body never
+     scrolls sideways; `.mono`/`.dim` are the two cell treatments those tables need. §11 and
+     §13 are narrow and deliberately do NOT get the wrapper — a scroll affordance on a table
+     that fits reads as a table that is cut off. */
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:7px}
+  .tscroll table{min-width:560px}
+  td.mono{font-family:var(--mono);font-size:11px}
+  td.dim{color:var(--muted)}
+  td.ttl2{font-family:var(--display);font-size:12.5px}
+  /* SES-129 — the SAME defect vocabulary `.more .missing` already uses, extended to a table cell
+     rather than a second class meaning the same thing. A missing verdict must look missing. */
+  td.missing{color:var(--flag);font-weight:600}
+  /* v7.0.197, directive b8d5ea7e — the unseeded-rebuild banner. Deliberately at the very top of
+     the page and impossible to fold: it is the one message that says the page below it is
+     incomplete, so hiding it behind a collapse would defeat the whole point of the sentinel. */
+  .seedwarn{border:2px solid var(--flag);border-radius:8px;background:var(--card);
+            color:var(--flag);font-weight:500;padding:12px 14px;margin:0 0 16px}
+  .seedwarn code{font-family:'JetBrains Mono',monospace;font-size:.9em;font-weight:700}
+  .tnote{font-size:11.5px;color:var(--muted);margin:5px 2px 0;line-height:1.45}
+  /* ---- SES-127 · §10 SKIPPED, WAITING ON YOU --------------------------------------------
+     Two cell treatments the mock's §10 needs and no earlier section did. `.unblock` is a real
+     control living inside a table cell, so it carries the same 44px tap target every other
+     button on this page has — a button John cannot reliably hit on a phone is a button that
+     records nothing. `.newchip` is the mock's per-row NEW tag; it is brass-on-card rather than
+     navy-on-white so it reads as a marker beside the button and never competes with it. */
+  button.unblock{font-family:var(--body);font-weight:600;font-size:12px;padding:7px 9px;
+       border-radius:5px;border:1.5px solid var(--brass);background:var(--card-alt);
+       color:var(--brass-deep);cursor:pointer;min-height:44px;white-space:nowrap}
+  button.unblock:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  button.unblock.on{background:var(--brass);border-color:var(--brass-deep);color:var(--white)}
+  button.unblock[disabled]{border-style:dashed;color:var(--muted);cursor:default}
+  .newchip{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.7px;
+       text-transform:uppercase;color:var(--brass-deep);border:1px solid var(--brass-light);
+       border-radius:3px;padding:1px 5px;margin-left:5px;white-space:nowrap}
+  td.reason{font-size:12px;color:var(--muted-deep);min-width:200px}
+  /* SES-119 — §10 splits into two lists (John's own cut, 2026-08-22: they trigger different
+     actions). `.listhead` labels each one INSIDE the existing fold, so the split is a sub-label
+     rather than a second section — the LOCKED SECTION ORDER is not renumbered, exactly as SES-132
+     extended §9 with a sub-block instead of inserting one. `.kick` is the kickoff-ready line on a
+     needs-desktop row that is already `designed`: it is the difference between "sit down and work
+     this out" and "sit down and paste this", which is the whole reason John asked for it. */
+  .listhead{font-family:var(--display);font-size:14px;font-weight:600;margin:14px 2px 4px;
+       color:var(--navy-text)}
+  .listhead:first-of-type{margin-top:4px}
+  .listhead .n{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);
+       margin-right:6px}
+  .kick{display:block;margin-top:3px;font-family:var(--mono);font-size:10.5px;
+       color:var(--brass-deep)}
+  .budget{background:var(--card);border:1px solid var(--line);border-radius:7px;
+          padding:13px 14px;margin-bottom:14px}
+  .budget h4{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
+             color:var(--brass-deep);margin:0 0 8px}
+  .bar{height:8px;border-radius:4px;background:var(--card-alt);border:1px solid var(--line-soft);
+       overflow:hidden;display:flex;margin:6px 0 4px}
+  .bar .dev{background:var(--navy);height:100%}
+  .bar .qa{background:var(--brass);height:100%}
+  /* SES-124 — a bar nobody can read is decoration. Every bar states what it measures. */
+  .barlbl{font-family:var(--mono);font-size:9px;letter-spacing:.6px;text-transform:uppercase;
+          color:var(--muted);margin-top:2px}
+  .recorded{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:8px}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10.5px;
+          color:var(--muted-deep);font-variant-numeric:tabular-nums}
+  .legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:baseline}
+  .calib{font-size:12.5px;color:var(--muted-deep);margin:8px 0 0;line-height:1.5}
+  .est{font-family:var(--mono);font-size:9px;letter-spacing:.7px;text-transform:uppercase;
+       color:var(--muted);border:1px solid var(--line-soft);border-radius:3px;padding:1px 5px;margin-left:6px}
+  .readgrid{display:flex;gap:8px;margin-top:9px}
+  .readgrid label{flex:1;font-family:var(--mono);font-size:9px;letter-spacing:.6px;
+       text-transform:uppercase;color:var(--muted-deep)}
+  .readgrid input{width:100%;font-family:var(--mono);font-size:15px;padding:8px 9px;margin-top:3px;
+       border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
+  .readgrid input:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .savebtn{margin-top:10px;width:100%;font-family:var(--body);font-weight:600;font-size:13.5px;
+       padding:10px;border-radius:6px;border:1.5px solid var(--moss);background:var(--moss);
+       color:var(--white);cursor:pointer;min-height:44px}
+  .savebtn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  /* ---- SES-128 · THE TWO READING SLOTS (§4) ---------------------------------------------
+     Two forms now sit on one card, so each needs a visible boundary — without the rule and the
+     inset, six number inputs in a column read as one six-field form and John saves the wrong
+     half of the pair. No new token: the divider is --line-soft, the label is the same brass the
+     other card headings use. `.slotmeans` states what the slot DOES, in the same place and the
+     same register §9's consequence lines put theirs, because "Night" and "Morning" alone do not
+     say that the pair is what recalibrates. */
+  .readslot{margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)}
+  .readslot:first-of-type{border-top:none;padding-top:2px}
+  .slotlbl{font-family:var(--mono);font-size:10px;letter-spacing:.9px;text-transform:uppercase;
+       color:var(--brass-deep);font-weight:700}
+  .slotmeans{font-size:11.5px;color:var(--muted-deep);margin-top:5px;line-height:1.45}
+  /* ---- SES-143 · §2b THE AUTOMATION PANEL ------------------------------------------------
+     John's two switches and the status line under them. Deliberately built from the vocabulary
+     already on this page — `.budget` is the card, `.slotlbl` the row label, `.slotmeans` the
+     consequence line, `.recorded` the acknowledgement — because a control that looks like a
+     different product is one John has to learn twice. The only genuinely new thing is a row
+     that puts a checkbox, a label and an inline number box on one baseline.
+     `.autorow input[type=checkbox]` is sized to 22px and the label is a real <label for>, so the
+     tap target on a phone is the whole sentence and not a 13px square. */
+  .autorow{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding-top:11px;
+       border-top:1px solid var(--line-soft)}
+  .autorow:first-of-type{border-top:none;padding-top:2px}
+  .autorow input[type=checkbox]{width:22px;height:22px;min-width:22px;margin-top:1px;
+       accent-color:var(--moss);cursor:pointer}
+  .autorow input[type=checkbox]:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .autobody{flex:1}
+  .autobody label.sw{font-size:14px;color:var(--ink);cursor:pointer;line-height:1.45}
+  .numbox{width:58px;font-family:var(--mono);font-size:14px;padding:4px 6px;margin:0 3px;
+       border:1.5px solid var(--line);border-radius:5px;background:var(--white);color:var(--ink);
+       text-align:center}
+  .numbox:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .txtbox{width:150px;font-family:var(--body);font-size:14px;padding:4px 7px;margin:0 3px;
+       border:1.5px solid var(--line);border-radius:5px;background:var(--white);color:var(--ink)}
+  .txtbox:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .autostat{font-family:var(--mono);font-size:11px;color:var(--muted-deep);margin-top:6px;
+       line-height:1.6}
+  .autostat b{color:var(--ink)}
+  .autohist{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:4px}
+  .directive textarea{width:100%;min-height:74px;font-family:var(--body);font-size:14px;
+        padding:10px 11px;border:1.5px solid var(--line);border-radius:7px;background:var(--card);
+        color:var(--ink);resize:vertical}
+  .directive textarea:focus-visible{outline:2px solid var(--brass);outline-offset:1px;border-color:var(--brass)}
+  .savebar{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:6px;min-height:14px}
+  .note{font-size:11.5px;color:var(--muted);margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+  /* SES-99 — the question list. A question is answered with a thumb, never with prose. */
+  .q{background:var(--card);border:1px solid var(--line);border-radius:7px;
+     padding:12px 13px 10px;margin-bottom:10px}
+  .q[data-answer]{border-color:var(--brass)}
+  .q .qtext{font-size:14.5px;font-weight:600;margin:0 0 4px;text-wrap:balance}
+  .q .qctx{font-size:12.5px;color:var(--muted-deep);margin:0 0 9px}
+  .yn{display:flex;gap:8px}
+  .yn button{flex:1;font-family:var(--body);font-weight:600;font-size:14px;padding:9px 4px;
+     border-radius:6px;border:1.5px solid var(--line);background:var(--card-alt);color:var(--ink);
+     cursor:pointer;min-height:44px}
+  .yn button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .yn button.yes.on{background:var(--moss);border-color:var(--moss);color:var(--white)}
+  .yn button.no.on{background:var(--flag);border-color:var(--flag);color:var(--white)}
+  .qnote{display:none;margin-top:9px}
+  .qnote.show{display:block}
+  .qnote input{width:100%;font-family:var(--body);font-size:14px;padding:8px 10px;
+     border:1.5px solid var(--line-soft);border-radius:6px;background:var(--white);color:var(--ink)}
+  .qnote input:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+  .qnote .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .qverdict{font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:7px;min-height:15px}
+  /* v7.0.145, directive edab5908 — More info. John: "often your wording is very confusing and
+     does not make sense to which button to push". The panel is plain language plus what each
+     button DOES on this card, and it sits ABOVE the buttons so the reading precedes the choice. */
+  .morebtn{width:100%;font-family:var(--body);font-weight:600;font-size:13.5px;padding:9px 4px;
+     margin-top:12px;border-radius:6px;border:1.5px dashed var(--line);background:transparent;
+     color:var(--brass-deep);cursor:pointer;min-height:44px}
+  .morebtn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .morebtn.on{background:var(--card-alt);border-style:solid}
+  .more{display:none;margin-top:10px;padding:12px 13px;background:var(--card-alt);
+        border:1px solid var(--line-soft);border-radius:7px}
+  .more.show{display:block}
+  .more p{margin:0 0 9px;font-size:13.5px}
+  .more p:last-of-type{margin-bottom:0}
+  .more .btnmeans{margin:10px 0 0;padding-top:9px;border-top:1px solid var(--line-soft);font-size:13px}
+  .more .btnmeans b{font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase}
+  .more .missing{color:var(--flag);font-weight:600}
+  .thread{margin-top:10px;padding-top:9px;border-top:1px solid var(--line-soft)}
+  .thread .qq{font-size:13.5px;font-weight:600;margin:0 0 2px}
+  .thread .aa{font-size:13.5px;margin:0 0 10px;padding-left:10px;border-left:2px solid var(--brass-light)}
+  .thread .pending{font-size:12.5px;color:var(--muted);font-style:italic;margin:0 0 10px;
+        padding-left:10px;border-left:2px solid var(--line-soft)}
+  /* SES-125 — the ask box LEAVES the More-info panel and sits under the buttons on every card
+     and every row, always visible. `.got` is the "✓ Received" acknowledgement John asked for:
+     a line he typed must visibly land, or the box reads like it swallowed it. */
+  .ask{margin-top:10px}
+  .ask input{width:100%;font-family:var(--body);font-size:14px;padding:9px 10px;margin-top:9px;
+     border:1.5px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink)}
+  .ask input:focus-visible{outline:2px solid var(--brass);outline-offset:1px;border-color:var(--brass)}
+  .ask .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .ask .got{display:none;font-family:var(--mono);font-size:11px;color:var(--moss);margin-top:4px}
+  .ask .got.show{display:block}
+  .ynmean{display:flex;gap:8px;margin-top:5px}
+  .ynmean span{flex:1;font-size:11.5px;color:var(--muted-deep);text-align:center;line-height:1.35}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div id="page"></div>
+
+<!-- The state block used to sit HERE, below the stylesheet and the page div. It is now pinned
+     directly under the title guard at the top of this file — see the v7.0.232 stamp there for why
+     (SES-188 option D). Do not move it back; the offset is the fix. -->
+
+<script id="code">
+// SES-78b v2 — classic artifact: state renders the page; every decision self-publishes a new
+// version via claude.use('artifact').publish(fullDoc). Never serializes the live DOM.
+(function(){
+  var stEl = document.getElementById('briefing-state');
+  var state = {items:{}, directive:'', reading:null, answers:{}, asks:{}};
+  try { state = JSON.parse(stEl.textContent); } catch(e) {}
+  // Recover state stashed before a publish that may not have landed (docs: stash first).
+  try {
+    var stash = sessionStorage.getItem('briefing-pending');
+    if (stash) { state = JSON.parse(stash); }
+  } catch(e) {}
+  // v7.0.197, directive b8d5ea7e — THE SEED SENTINEL, and why an empty state could not stay the
+  // template's default. thread(), orphanThreads(), readingSlot() and readingRecordedLine() read
+  // `state` and ONLY `state` — none of them queries Supabase — so a rebuild that publishes a blank
+  // block takes John's entire ask history and his meter readings off the page while the page still
+  // looks complete. MEASURED, not reasoned: the 2026-08-23T15:57Z rebuild shipped `asks:{}` and
+  // `reading:{}` against a ledger holding 8 answered threads (one on a card still awaiting his
+  // decision) and 10 readings — two hours INSIDE the window he had announced for testing that his
+  // typed lines stay on their cards. The data was never lost; the page simply stopped showing it,
+  // which is the failure a valid-looking empty object cannot distinguish itself from.
+  // The stash above wins on purpose: an unlanded tap of John's is newer than any seed.
+  var unseeded = !!(state && state.__unseeded === true);
+  if (unseeded) {
+    state = {items:{}, directive:'', reading:{}, answers:{}, asks:{}, unblocks:{}, settings:{}};
+  }
+  // SES-99: a page published before the question list existed has no `answers` key. Absent is
+  // not empty-and-broken — default it, or the first tap throws on an undefined and records
+  // nothing, which is the one failure mode a decision surface may never have.
+  if (!state.answers || typeof state.answers !== 'object') { state.answers = {}; }
+  // v7.0.145 — same defensive default for `asks`, and for the same reason SES-99 needed it:
+  // a page published before this key existed must not throw on John's first tap.
+  if (!state.asks || typeof state.asks !== 'object') { state.asks = {}; }
+  // SES-127 — same defensive default, same reason as SES-99's and v7.0.145's: a page published
+  // before §10 existed has no `unblocks` key, and John's first tap on an Unblock button must not
+  // throw on an undefined and record nothing.
+  if (!state.unblocks || typeof state.unblocks !== 'object') { state.unblocks = {}; }
+  // SES-128 — `reading` STOPS BEING ONE FLAT OBJECT and becomes slot-keyed
+  // ({night:{…}, morning:{…}, adhoc:{…}}), because the night→morning pair is what brackets a
+  // runner-only window and a reading with no slot cannot bracket anything. Same defensive
+  // default as the three above, plus the one they did not need: a page published BEFORE this
+  // shipped carries the old flat shape ({fable,all,h5,at}), and that shape must be migrated
+  // rather than dropped — John typed those numbers. It migrates to `adhoc`, never to a slot:
+  // guessing that a 13:50Z reading was "morning" because 8:50 AM in Chicago looks like one
+  // would manufacture a bracketing pair he never declared, and the calibration derived from it
+  // would look measured and be invented.
+  if (!state.reading || typeof state.reading !== 'object') { state.reading = {}; }
+  if (state.reading.fable !== undefined || state.reading.all !== undefined) {
+    state.reading = { adhoc: state.reading };
+  }
+  // SES-143 — same defensive default, fifth time and the same reason as SES-99's, v7.0.145's,
+  // SES-127's and SES-128's: a page published before §2b existed has no `settings` key, and John's
+  // first tap on the scheduler checkbox must not throw on an undefined and record nothing. An
+  // EMPTY object is the right default and is not the same as "off" — absent means "he has not
+  // touched it since the last harvest", so settingsNow() falls through to the DB's value.
+  if (!state.settings || typeof state.settings !== 'object') { state.settings = {}; }
+
+  var readOnly = false;
+
+  // SES-127 — §10's count chip, written by the rebuilding cycle from the SAME query that
+  // produced the rows below it. `n` is open skips on still-open tickets, `nnew` is how many of
+  // those have `briefed_at IS NULL`. They live together in one object because the chip's two
+  // halves disagreeing with each other — or with the rows — is the exact class of small
+  // wrongness that makes the whole page read as unmaintained (SES-124's countWaiting() rule,
+  // applied to the one counter that cannot be derived from the DOM).
+  // SES-119 — `n`/`nnew` stay the TOTAL across both lists, deliberately. The chip sits on the
+  // §10 heading, which still names one section; splitting the count into two chips would make the
+  // heading disagree with itself the moment one list emptied. Each list's own size is legible
+  // from its rows.
+  var SKIPS = { n:3, nnew:1 };
+
+  // SES-143 — §2b's cycle-written half. Everything here is a fact the PAGE cannot know: the DB's
+  // current settings, the standing drain's real progress, the last cycle's line and the next fire
+  // time. Same contract as SKIPS and PAGE_BUILT — EVERY REBUILD REGENERATES IT from
+  // runner_settings / runner_directives / runner_drain_scope / runner_cycles.
+  //
+  // `scheduler_on` and `interval_hours` here are the DB's values. John's un-harvested tap lives in
+  // `state.settings` and WINS the render (settingsNow() below) — the same precedence `items` and
+  // `answers` already use, so a switch he just flipped never appears to have been discarded while
+  // it waits for the next harvest.
+  var AUTOMATION = {
+    scheduler_on: true,          // runner_settings.scheduler_on
+    interval_hours: 3,           // runner_settings.interval_hours
+    drain_on: true,              // a queued type='drain-epic' directive exists
+    drain_epic: 'Automation',    // epics.name it resolves to
+    drain_left: 17,              // named members still open  (runner_drain_scope join)
+    drain_named: 18,             // rows in runner_drain_scope for that directive
+    drain_history: [],           // ['Automation completed — 18 tickets at 4:10 AM CST'] per finished drain
+    // SES-147 — runner_settings.daily_max_tokens_millions, John's STANDING day cap in millions.
+    // `null` is the blank box and is NOT zero: blank means "no standing number, budget exactly as
+    // you did before SES-147". Rendering a null as 0 would read as "no tokens allowed today".
+    daily_max_millions: 25,
+    // The cap the next cycle will actually use, resolved by public.resolve_day_token_cap() — NOT
+    // by multiplying the box out here. The box is only one of five rungs, and on any given day an
+    // override or the 48h stale floor may outrank it, so a page that showed the box as "the cap"
+    // would be confidently wrong on exactly the days it matters. Cycle-written, like everything
+    // else in this object.
+    daily_max_effective: 'sample value — 25,000,000 today (your override for today)',
+    last_cycle: 'sample value — 12:41 AM CST · SES-143 · shipped',
+    next_fire: 'sample value — 8:40 AM CST'
+  };
+
+  // v7.0.172, directive 603f44ea — the UTC minute THIS page was last rebuilt by a cycle, in the
+  // same 'YYYY-MM-DDTHH:MMZ' shape every tap already writes. It is the one value on the stamp
+  // that cannot be derived: `briefing-state` records what John did, never when the runner last
+  // republished. It lives in `#code` on purpose — doc() carries this script's textContent
+  // through a self-publish verbatim, so his taps cannot move it and only a rebuild can.
+  // EVERY REBUILD MUST SET THIS. A stale value renders a page that claims to be older than it
+  // is, which is worse than no stamp: it tells him a run has not picked his tap up when one has.
+  var PAGE_BUILT = '2026-08-23T01:55Z';
+
+  function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // SES-208 (v7.0.255) — THE RULE FOR WHERE esc() GOES, and it is the whole of the fix:
+  // ESCAPE WHAT CAME OUT OF THE DATABASE; NEVER ESCAPE WHAT THE BUILDER COMPOSED.
+  // Found live 2026-08-25: question q-artifact-read-path-unreachable has a `context` that quotes a
+  // literal script tag while explaining the SES-188 measurement. question() interpolated it raw, so
+  // it opened a REAL script element mid-section-9 and swallowed 51,860 characters — sections 9.1,
+  // 10, 11, 12, 13, 14 and 15 — as inert text. Measured in headless Chromium and again in jsdom:
+  // 9 h2 elements rendered where the source carries 16 section markers, with NO console error and
+  // no visible break, because the page still ends on a section boundary.
+  // build-briefing.mjs passes these values through J(), which is JSON-for-JavaScript and NOT HTML
+  // escaping, so the render boundary is the only place this can be fixed.
+  // THE HALF THAT MUST NOT BE "TIDIED" INTO A BLANKET SWEEP: techHtml and idLine are markup the
+  // BUILDER wrote (tags, links, <b>), and escaping them renders the card bodies as visible source —
+  // the same defect facing the other way. If you add a new interpolation here, ask which side of
+  // that line the value came from; do not pattern-match on the variable name.
+
+  // v7.0.145, directive edab5908 — what each button DOES, in this card's own terms. A cycle may
+  // override any of the three; these are the defaults, and they differ by card kind because a
+  // gated Accept and a shipped Accept are genuinely different transactions (John's B34 ruling).
+  function buttonMeanings(kindCls, over){
+    var d = kindCls==='gate'
+      ? { accept:'Build it. The ticket goes to the top of the queue. This is permission, not a score — it does not move the trust ladder.',
+          reverse:'Do not build it. The proposal is killed and the reason recorded.',
+          rework:'Neither yet — your line rewrites the ask and comes back changed.' }
+      : { accept:'Keep it. It counts toward the runner’s trust score for this kind of work.',
+          reverse:'Undo it. The commit is reverted forward, any data restored from before-images, and the ticket reopens carrying your line.',
+          rework:'Keep it live, but your line becomes the next cycle’s first job.' };
+    over = over || {};
+    return { accept: over.accept || d.accept, reverse: over.reverse || d.reverse,
+             rework: over.rework || d.rework };
+  }
+
+  // The conversation log for one target, newest last — John's question, then the runner's answer
+  // if a cycle has written one. A question with no answer yet says so plainly rather than
+  // rendering an empty space that reads like it was ignored.
+  //
+  // SES-132 — EVERY id this function renders is recorded, and §9.1 renders the ones it did not.
+  // The recording is the whole mechanism: `thread()` is reachable only from inside a live target
+  // (card() and question(), which visionClaim() delegates to), so an ask whose target has left
+  // the rebuild has no renderer at all and John's typed line silently disappears from the page.
+  // The set is reset at the top of every render() — a second render (saving a reading calls one)
+  // would otherwise carry the previous pass's ids and orphan nothing.
+  var threadedIds = {};
+  function thread(targetId){
+    var list = state.asks[targetId] || [];
+    threadedIds[targetId] = true;
+    if (!list.length) return '';
+    var h = '<div class="thread">';
+    for (var i=0;i<list.length;i++){
+      var t = list[i] || {};
+      h += '<p class="qq">You asked · '+esc(t.at||'')+'<br>'+esc(t.q)+'</p>';
+      h += t.a ? '<p class="aa">'+esc(t.a)+'</p>'
+               : '<p class="pending">Not answered yet — the next cycle answers it here, and keeps this thread.</p>';
+    }
+    return h + '</div>';
+  }
+
+  // SES-125 — the ask box now sits UNDER the buttons, always visible, on cards (§§5/6),
+  // questions (§9) and vision claims (§12). John's line counts the same as a tap, so it may not
+  // be hidden behind a second button. `got` is the acknowledgement: once anything has been
+  // recorded for this target the "✓ Received <ts>" line shows, carrying the time of his most
+  // recent line — a typed line that vanishes without a mark reads as a line that was lost.
+  function askBox(targetId, placeholder, hint, gotTail){
+    var list = state.asks[targetId] || [];
+    var last = list.length ? (list[list.length-1] || {}) : null;
+    return '<div class="ask"><input type="text" data-ask="'+targetId+'" value="" '
+      +'placeholder="'+placeholder+'">'
+      +'<div class="hint">'+hint+'</div>'
+      +'<div class="got'+(last?' show':'')+'">&#10003; Received '+esc(last?last.at:'')
+      +' &middot; '+gotTail+'</div></div>';
+  }
+
+  // The three plain-language sentences are the card's DEFAULT BODY now (SES-125 reverses
+  // v7.0.145's display). They are still READ from runner_items.plain_cant/.plain_after/
+  // .plain_worth and never re-authored here, and a NULL still draws the red defect line rather
+  // than a convincing blank — reversing which half is hidden changes neither rule.
+  function plainBlock(more){
+    return more
+      ? '<div class="plain">'
+        +'<p><span class="lbl">What you can’t do today</span>'+esc(more.cant)+'</p>'
+        +'<p><span class="lbl">What you could do after</span>'+esc(more.after)+'</p>'
+        +'<p><span class="lbl">Why that’s worth something</span>'+esc(more.worth)+'</p></div>'
+      : '<div class="plain"><p class="missing">This card was published without its '
+        +'plain-language summary. That is a defect in the cycle that wrote it, not something '
+        +'you need to decode.</p></div>';
+  }
+
+  // What each button does, in this card's own terms — rendered as consequence lines directly
+  // under the buttons they describe, exactly as §9's Yes/No rows have carried them since
+  // v7.0.145. They used to live inside the More-info panel; the panel now holds the technical
+  // record (SES-125), and a consequence John has to open a panel to read is one he decides
+  // without. Same defaults, same per-card override.
+  function decideMeans(kindCls, over){
+    var b = buttonMeanings(kindCls, over);
+    return '<div class="ynmean"><span>Accept &rarr; '+b.accept+'</span>'
+      +'<span>Reverse &rarr; '+b.reverse+'</span>'
+      +'<span>Rework &rarr; '+b.rework+'</span></div>';
+  }
+
+  // SES-125 — MORE INFO IS THE TECHNICAL RECORD NOW. The display is reversed from v7.0.145:
+  // the plain-language sentences are the body John reads first, and Value case / Before → after /
+  // QA evidence / meta / links — the material he told us was "too much technical jargon" — moves
+  // behind the button. Nothing is deleted; the record is still one tap away and still on the card.
+  // Default closed: a card he has asked a question about no longer opens this panel, because the
+  // thread and the ask box left the panel and now live under the buttons where he types.
+  function techPanel(id, techHtml){
+    if (!techHtml) return '';
+    return '<button class="morebtn" data-more="'+id+'">More info — the technical record</button>'
+      +'<div class="more" id="more-'+id+'">'+techHtml+'</div>';
+  }
+
+  // SES-124 — the collapse framework's card helper. One default-closed card: a clickable head
+  // (number · title · chevron) over a hidden body. `headExtra` is markup dropped between the
+  // number and the title — SES-125 puts the kind chip, ticket ID and decision state there, which
+  // is why it is a slot rather than three more arguments this ticket cannot yet fill.
+  // It carries NO `data-awaits`: folding is a view state, never a decision John owes.
+  function fold(id, num, title, bodyHtml, headExtra){
+    return '<div class="item fold" id="'+id+'">'
+      +'<div class="head" data-toggle="'+id+'"><span class="cardnum">'+num+'</span>'
+      +(headExtra||'')
+      +'<span class="ttl">'+title+'</span><span class="chev">&#9656;</span></div>'
+      +'<div class="bodyc">'+bodyHtml+'</div></div>';
+  }
+
+  // SES-132 — §9.1 · ANSWERED, YOUR PAST QUESTIONS. John, briefing page 2026-08-23T00:37Z:
+  // "I could swear i have wrote comments in the gated questions, and most are not showing.
+  // shouldn't the thread show each page refresh and what your answers are?" He was right, and
+  // the cause is that the very act of deciding removes the only thing that could render his
+  // line: §§5/6 rebuild from runner_items WHERE decision IS NULL, §9 from runner_questions
+  // WHERE status='open' capped at 5, and §12 drops a decided claim. His comment and the
+  // runner's reply then sit in runner_card_asks displayed nowhere.
+  //
+  // THE ORDERING TRAP, and it is why this is a marker rather than a call in place. §9.1 sits
+  // between §9 and §10, but §12's vision claims render AFTER it — so an orphan set computed at
+  // §9.1's own position would classify every vision-claim thread as orphaned and print it twice.
+  // The section therefore emits a marker where it belongs and render() substitutes the real
+  // block once the whole page has been built. The substitution passes a FUNCTION, never the
+  // string: `$&` and friends are special in a String.replace replacement, and thread text is
+  // John's prose, which may contain them.
+  //
+  // Rows carry NO `data-awaits`: a kept thread is information, not a decision owed, and
+  // inflating §1's counter with it is the masthead-disagrees-with-the-page failure countWaiting()
+  // exists to prevent — the same call SES-127 made for §10.
+  var ORPHAN_MARK = '<!--SES132-ORPHAN-SLOT-->';
+  function orphanThreads(){
+    var ids = Object.keys(state.asks).filter(function(id){
+      return !threadedIds[id] && (state.asks[id] || []).length;
+    });
+    if (!ids.length) return '';
+    var rows = '';
+    for (var i=0; i<ids.length; i++){
+      rows += fold('past-'+ids[i], '9.1.'+(i+1), esc(ids[i]),
+        '<p class="qctx">You decided this one, so the card or row it was attached to stopped '
+        +'being rebuilt. Your line and my answer are kept here.</p>'
+        + thread(ids[i]));
+    }
+    return '<h2 class="clickable" data-toggle="pastasks"><span class="secnum">9.1</span>'
+      +'Answered &mdash; your past questions <span class="countchip">'+ids.length+'</span> '
+      +'<span class="chev">&#9656;</span></h2>'
+      +'<div class="secwrap" id="pastasks">'
+      +'<p class="strip-def">Every question you have typed on this page, kept after the card or '
+      +'row it was attached to was decided and stopped being rebuilt. Nothing here needs a '
+      +'decision — it is your record, not a list of work.</p>'
+      + rows
+      +'</div>';
+  }
+
+  // SES-128 — §4's reading slots. ONE function renders both rows, for the same reason §9 and §12
+  // are one function (SES-125): two near-copies of a form drift, and a Morning row that has
+  // quietly stopped matching the Night row is a calibration bug nobody can see on the page.
+  // `slot` is both the state key and the input-id prefix, so the page and the ledger cannot
+  // disagree about which reading is which — the same rule that made `qid` the DOM id in §9.
+  function readingSlot(slot, label, means){
+    var r = state.reading[slot] || {};
+    return '<div class="readslot"><div class="slotlbl">'+label+'</div>'
+      +'<div class="readgrid">'
+      +'<label>Fable %<input type="number" inputmode="numeric" id="r-'+slot+'-fable" value="'+esc(r.fable)+'"></label>'
+      +'<label>All models %<input type="number" inputmode="numeric" id="r-'+slot+'-all" value="'+esc(r.all)+'"></label>'
+      +'<label>5-hour %<input type="number" inputmode="numeric" id="r-'+slot+'-h5" value="'+esc(r.h5)+'"></label>'
+      +'</div>'
+      +'<div class="slotmeans">'+means+'</div>'
+      +'<button class="savebtn" id="r-save-'+slot+'">Save '+slot+' reading</button>'
+      +(r.at ? '<div class="recorded">&#10003; Recorded '+esc(r.at)+'</div>' : '')
+      +'</div>';
+  }
+
+  // The card-level acknowledgement: the MOST RECENT reading across every slot, whichever that
+  // is. It reads the slots rather than a stored "latest", because a stored latest is a second
+  // copy of the same fact and the two go out of step the first time a cycle forgets to update it.
+  function readingRecordedLine(){
+    var best = null, bestSlot = '';
+    ['night','morning','adhoc'].forEach(function(s){
+      var r = state.reading[s];
+      if (r && r.at && (!best || r.at > best.at)) { best = r; bestSlot = s; }
+    });
+    if (!best) return 'No reading yet — the runner is on its conservative allowance until your first one.';
+    return '&#10003; Your latest reading was recorded — <b>'+esc(best.at)+'</b> ('+esc(bestSlot)
+      +'): Fable <b>'+esc(best.fable)+'%</b> &middot; All models <b>'+esc(best.all)
+      +'%</b> &middot; 5-hour <b>'+esc(best.h5)+'%</b>.';
+  }
+
+  // SES-125 — ONE DECISION CARD, §§5 and 6. Default CLOSED, numbered, and the collapsed row
+  // carries everything John needs to decide whether to open it: number · kind · TICKET ID ·
+  // ticket title · decision state. Arguments, in order:
+  //   num      '5.1'                    — the section-relative card number shown in the head
+  //   id       'item-LOG-128'           — DOM id AND the runner_items key the harvest writes on
+  //   kindCls  'ship' | 'gate' | 'test' — drives the chip colour and the button meanings
+  //   kindTxt  'Ship' | 'Gated'         — the chip's word
+  //   tid      'LOG-128'                — the ID chip, visible while collapsed (John's rule)
+  //   idLine   'LOG-128 (Log · P05 - Enhancements) · behind flag, currently OFF'
+  //   title    the board's ticket title — not a re-worded headline
+  //   techHtml Value case / Before → after / QA evidence / meta / links, i.e. the record
+  //   more     {cant, after, worth, buttons:{…}} read from runner_items.plain_*
+  function card(num, id, kindCls, kindTxt, tid, idLine, title, techHtml, more){
+    var d = state.items[id] || {};
+    var dec = d.decision || '';
+    var showReason = dec==='reverse' || dec==='rework';
+    // SES-124 — `data-awaits` is how the masthead counter (§1) knows this card still needs John.
+    // It is set from STATE, not from the DOM's appearance, so a card that renders collapsed
+    // still counts correctly. Every decidable element carries it; nothing else does.
+    return '<div class="item fold" id="'+id+'"'+(dec?' data-decision="'+dec+'"':' data-awaits="1"')+'>'
+      +'<div class="head" data-toggle="'+id+'"><span class="cardnum">'+num+'</span>'
+      +'<span class="kind '+kindCls+'">'+kindTxt+'</span>'
+      +'<span class="idchip">'+esc(tid)+'</span>'
+      +'<span class="ttl">'+esc(title)+'</span>'
+      +'<span class="st'+(dec?' done':'')+'">'+(dec?(dec.toUpperCase()+' ✓'):'undecided')+'</span>'
+      +'<span class="chev">&#9656;</span></div>'
+      +'<div class="bodyc">'
+      +'<div class="idline">'+idLine+(dec&&d.at?(' &middot; decided '+esc(d.at)):'')+'</div>'
+      +plainBlock(more)
+      +techPanel(id, techHtml)
+      +'<div class="decide">'
+      +'<button class="accept'+(dec==='accept'?' on':'')+'" data-c="accept">Accept</button>'
+      +'<button class="reverse'+(dec==='reverse'?' on':'')+'" data-c="reverse">Reverse</button>'
+      +'<button class="rework'+(dec==='rework'?' on':'')+'" data-c="rework">Rework</button>'
+      +'</div>'
+      +decideMeans(kindCls, more && more.buttons)
+      +'<div class="reason'+(showReason?' show':'')+'">'
+      +'<input type="text" value="'+esc(d.reason)+'" placeholder="One line — then press Save">'
+      +'<div class="hint">Press Enter or tap Save to record the line.</div></div>'
+      +'<div class="verdict">'+(dec?('recorded: '+dec.toUpperCase()+' · '+esc(d.at||'')):'')+'</div>'
+      +thread(id)
+      +askBox(id, 'Ask or tell me anything about this — then press Enter',
+              'Counts the same as the buttons — your line is recorded now and answered on this card next cycle.',
+              'answer appears on this card next cycle')
+      +'</div></div>';
+  }
+
+  // SES-99 — one open row of public.runner_questions. `qid` is the table's stable slug and is
+  // the key the harvest writes back on, so it is the DOM id too: the page and the ledger cannot
+  // drift apart. Two buttons, no text box in the way — the note is optional and appears only
+  // after an answer exists to attach it to.
+  // v7.0.145, directive edab5908 — John: "Your yes/no did not clarify that statement … Perhaps
+  // make a statement next to the button, so it clarifies it." `yesMeans`/`noMeans` are the
+  // consequence of each tap in one line, rendered directly beneath the button that causes it, so
+  // the question never has to be re-parsed to work out which way round it runs. They are
+  // REQUIRED: a question row without them renders the defect in red rather than two bare buttons.
+  // SES-125 — folded, numbered, and the ask box is out of the More-info panel: a question row
+  // has no technical record to hide, so the panel it used to carry existed only to hold the ask
+  // box, and John had to open a button to answer in his own words. The box is now under the
+  // buttons, where the Yes/No is. `opts` is how §12 reuses this row verbatim rather than
+  // growing a near-copy — the spec's word is "formatted exactly like Questions", so §9 and §12
+  // are one function, not two that must be kept in step:
+  //   opts.chip            markup shown before the text in the head (§12's class chip)
+  //   opts.ask{ph,hint,got} the ask box's three strings, which differ in meaning for a claim
+  function question(num, qid, text, ctx, yesMeans, noMeans, opts){
+    var a = state.answers[qid] || {};
+    var ans = a.a || '';
+    opts = opts || {};
+    var ask = opts.ask || { ph:'Ask or answer in your own words — then press Enter',
+                            hint:'Counts the same as the buttons — recorded now, answered here next cycle.',
+                            got:'answer appears here next cycle' };
+    var means = (yesMeans && noMeans)
+      ? '<div class="ynmean"><span>Yes &rarr; '+esc(yesMeans)+'</span><span>No &rarr; '+esc(noMeans)+'</span></div>'
+      : '<div class="ynmean"><span class="missing">This question was published without its '
+        +'Yes/No consequences — a defect in the cycle that asked it. Ask me what it means in the '
+        +'box below rather than guessing.</span></div>';
+    return '<div class="q fold" id="'+qid+'"'+(ans?' data-answer="'+ans+'"':' data-awaits="1"')+'>'
+      +'<div class="head" data-toggle="'+qid+'"><span class="cardnum">'+num+'</span>'
+      +(opts.chip||'')
+      +'<span class="qtext">'+esc(text)+'</span>'
+      +'<span class="st'+(ans?' done':'')+'">'+(ans?(ans.toUpperCase()+' ✓'):(opts.undecidedTxt||'unanswered'))+'</span>'
+      +'<span class="chev">&#9656;</span></div>'
+      +'<div class="bodyc">'
+      +(ctx ? '<p class="qctx">'+esc(ctx)+'</p>' : '')
+      +'<div class="yn">'
+      +'<button class="yes'+(ans==='yes'?' on':'')+'" data-a="yes">Yes</button>'
+      +'<button class="no'+(ans==='no'?' on':'')+'" data-a="no">No</button>'
+      +'</div>'
+      +means
+      +'<div class="qnote'+(ans?' show':'')+'">'
+      +'<input type="text" value="'+esc(a.note)+'" placeholder="Optional — a line only if you want to add one">'
+      +'<div class="hint">Not required. The Yes/No above is already recorded.</div></div>'
+      +'<div class="qverdict">'+(ans?('recorded: '+ans.toUpperCase()+' · '+esc(a.at||'')):'')+'</div>'
+      +thread(qid)
+      +askBox(qid, ask.ph, ask.hint, ask.got)
+      +'</div></div>';
+  }
+
+  // §12 · A VISION CLAIM (SES-125). Spec: "formatted exactly like Questions" — so it IS a
+  // question row, with a class chip in front and the three ask-box strings that fit a claim
+  // (John's own wording REPLACES the claim rather than asking about it, which is a different
+  // transaction from asking a question and has to say so). Always three rows, always default
+  // closed, and a claim reappears every day until it is decided — only silence carries it
+  // forward, exactly as silence never decides anything else on this page.
+  // `vid` MUST be the `vision-<doc>-<claim id>` form: the harvest reads answers by key, and
+  // this is what tells it a row belongs to docs/vision/*.md rather than runner_questions.
+  function visionClaim(num, vid, cls, text, ctx, yesMeans, noMeans){
+    return question(num, vid, text, ctx, yesMeans, noMeans, {
+      chip: '<span class="clschip">'+cls+'</span>',
+      undecidedTxt: 'undecided',
+      ask: { ph:'Or say it in your own words — then press Enter',
+             hint:'Your line replaces the claim, marked as your words — that also resolves it.',
+             got:'the claim is rewritten in your words' }
+    });
+  }
+
+  // SES-126 — the three board-table row helpers (§§8, 11/13, 14). They exist for the same
+  // reason `card()` and `question()` do: a table whose rows are hand-written strings drifts a
+  // cell at a time, and these are the rows a cycle regenerates on EVERY rebuild. Each escapes
+  // its own text — §8 titles and §14 names are ticket prose and visitor labels, i.e. the two
+  // places on this page where the content is not written by a cycle.
+  function queueRow(q, id, epic, cls, status, design, title){
+    return '<tr><td class="num">'+q+'</td><td class="mono">'+esc(id)+'</td>'
+      +'<td class="dim">'+esc(epic)+'</td>'
+      +'<td class="mono dim">'+esc(cls)+'</td><td class="dim">'+esc(status)+'</td>'
+      +'<td class="dim">'+esc(design)+'</td><td class="ttl2">'+title+'</td></tr>';
+  }
+  function classRow(cid, name, n){
+    return '<tr><td><span class="mono dim">'+cid+'</span> &nbsp;'+name+'</td>'
+      +'<td class="num">'+n+'</td></tr>';
+  }
+  function ladderRow(cid, work, rung, streak){
+    return '<tr><td class="mono dim">'+cid+'</td><td>'+work+'</td>'
+      +'<td class="num">'+rung+'</td><td class="num">'+streak+'</td></tr>';
+  }
+  // SES-178 — one Selfbuild milestone row (§15). NO NEW CSS. The ORIGINAL reason no longer holds
+  // and is corrected here rather than left to mislead: CSS added to `#s` used to sit ABOVE the
+  // briefing-state block and push it out of a size-bounded read, which was the live SES-188 defect.
+  // Since v7.0.232 the block is pinned above `#s` in BOTH writers, so stylesheet growth no longer
+  // moves it at all. The rule survives as plain size discipline — the page is read on a phone every
+  // morning and still grows on every rebuild — not as protection for the harvest. This row is built
+  // from `table`, `td.num` and `td.dim`, all of which §8/§11/§13 already ship.
+  function msRow(name, done, total, pct){
+    return '<tr><td>'+esc(name)+'</td><td class="num">'+done+'</td>'
+      +'<td class="num dim">'+total+'</td><td class="num">'+pct+'%</td></tr>';
+  }
+  // SES-181 (b) — one §16 scoreboard row. Deliberately the same shape as msRow() and the same
+  // three classes, so §16 adds no CSS (the size discipline §15's comment above states).
+  // `of` is the window depth and is dimmed for the same reason msRow dims `total`: the rate is
+  // the number John reads, and the denominator is what stops it being read as a count.
+  function svRow(label, n, of, pct){
+    return '<tr><td>'+esc(label)+'</td><td class="num">'+n+'</td>'
+      +'<td class="num dim">'+of+'</td><td class="num">'+pct+'%</td></tr>';
+  }
+  // directive db84b784 — one §15 burn-down row. Third member of the msRow()/svRow() family and the
+  // same three classes, so the block adds no CSS. `note` is dimmed rather than numeric: it carries
+  // the denominator IN WORDS, because the two counts above it have DIFFERENT denominators (a fixed
+  // named scope and a live epic bucket) and a bare `td.num.dim` column would line them up as though
+  // they were the same measurement — which is exactly the confusion the block exists to remove.
+  // BOTH ARGUMENTS ARE esc()'d: the epic name reaches this row from the database, so it is on the
+  // escape side of SES-208's rule, and the builder passes it RAW rather than pre-escaping it.
+  function bdRow(label, n, note){
+    return '<tr><td>'+esc(label)+'</td><td class="num">'+n+'</td>'
+      +'<td class="dim">'+esc(note)+'</td></tr>';
+  }
+  // SES-129 — ONE §7 ROW: what became of one directive, in plain words.
+  //   id8      the directive's short id — John's handle on it, and what the ledger calls it
+  //   when    'Mon DD, HH12:MI AM' CST, the time the RUNNER RECORDED it (see the render below —
+  //            it is deliberately not called "saved")
+  //   line     John's own words, first line of `body`, truncated
+  //   st       the plain-words state string, composed by stateOf() below — never typed per row.
+  //            stateOf() returns NULL for the one state it refuses to describe: a `done` directive
+  //            with no stored outcome, which close_directive() makes impossible and which
+  //            therefore means the function was bypassed. THE DEFECT IS DERIVED FROM THAT NULL,
+  //            never passed as a second argument — two copies of one fact drift, and the copy
+  //            that would drift here is the one that decides whether John sees a problem at all.
+  //            It draws the red line for the same reason a NULL plain_* does (v7.0.145/146): a
+  //            missing verdict must LOOK missing, never look fine.
+  // No `data-awaits` on any row: this card reports what already happened. Nothing here is a
+  // decision John owes, and inflating §1's counter with it is the masthead-disagrees-with-the-page
+  // failure SES-124 built countWaiting() to prevent (same call SES-127 made for §10).
+  function dirRow(id8, when, line, st){
+    var defect = (st == null);
+    return '<tr><td class="mono dim">'+esc(id8)+'</td><td class="dim">'+esc(when)+'</td>'
+      +'<td class="ttl2">'+esc(line)+'</td>'
+      +'<td'+(defect?' class="missing"':'')+'>'+(defect
+        ? 'closed with no outcome recorded &mdash; close_directive() was bypassed'
+        : st)+'</td></tr>';
+  }
+  // THE OUTCOME VOCABULARY, IN ONE PLACE. Composed here rather than per row so three rows cannot
+  // describe the same state three ways — the §9/§12 one-function rule (SES-125) applied to prose.
+  // STORED vs DERIVED is the whole design and must be preserved by anyone editing this:
+  // a CONSUMED directive's verdict is READ from runner_directives.outcome/.outcome_note (it exists
+  // nowhere else — see the migration header on why runner_cycles.item_id cannot supply it), while
+  // every LIVE state below is DERIVED from type+status+expires_at, which are already columns and
+  // cannot go stale. The one that matters is `standing`: SES-111 property (2) says a drain-epic is
+  // NEVER consumed, so it sits at status='queued' forever BY DESIGN — rendering it as "waiting to
+  // be picked up" would tell John the opposite of the truth about the directive currently serving
+  // him. Do not add a stored value for it.
+  function stateOf(type, status, outcome, note, acted8, expires, overrideLive){
+    if (status === 'done') {
+      if (outcome === 'shipped')     return 'shipped &mdash; '+esc(note)+' <span class="dim mono">('+esc(acted8)+')</span>';
+      if (outcome === 'carded')      return 'carded as a question &mdash; '+esc(note);
+      if (outcome === 'superseded')  return 'superseded &mdash; '+esc(note);
+      if (outcome === 'closed_unrecorded')
+        return '<span class="dim">closed before this card existed &mdash; outcome not recorded</span>';
+      return null;   // caller draws the defect line
+    }
+    if (status === 'in_progress') return 'in progress <span class="dim mono">('+esc(acted8)+')</span>';
+    if (status === 'expired')     return '<span class="dim">expired</span>';
+    if (status === 'cancelled')   return '<span class="dim">cancelled</span>';
+    if (type === 'drain-epic')    return 'standing &mdash; worked every cycle until the epic&rsquo;s now bucket is empty';
+    if (type === 'budget_override')
+      return overrideLive ? 'active until <b>'+esc(expires)+'</b>'
+                          : '<span class="dim">expired '+esc(expires)+'</span>';
+    if (status === 'standing') return 'standing decision &mdash; read by every cycle, never picked';
+    return 'waiting &mdash; the next cycle picks it up first';
+  }
+  // SES-127 — ONE §10 ROW. Nine columns, Unblock first (the spec's order: the action comes
+  // before the identifiers, because the section exists to be acted on, not read).
+  //   sid    the runner_skips row id — the key `state.unblocks` is written under, so a tap
+  //          survives the republish and the harvest can find the row it belongs to
+  //   unb    'question' | 'prep' | 'card' | null — which button this row gets
+  //   ref    the card id a 'card' row points at (rendered as its short id, John taps the card
+  //          itself in §5/§6 — the page deliberately does not try to scroll him there)
+  //   isNew  briefed_at IS NULL, i.e. skipped since his last brief
+  //   kick   SES-119 — the ticket's `kickoff_link`, passed ONLY for a needs-desktop row whose
+  //          design_status is already 'designed'. SES-112's CHECK guarantees a 'designed' row has
+  //          one, so this is never a guess. It renders as a second line in the reason cell because
+  //          that is the cell that answers "why is this waiting on me", and for these rows the
+  //          honest answer includes "and the design is already written" — the difference between
+  //          sitting down to work it out and sitting down to paste it. Omit or pass '' otherwise;
+  //          it is the LAST parameter so every existing 12-argument call site is unchanged.
+  // A row carries NO `data-awaits`: a skipped ticket is information, not a decision John owes,
+  // and inflating §1's counter with rows that need no tap is exactly the masthead-disagrees-with
+  // -the-page failure SES-124 built countWaiting() to prevent.
+  function skipRow(sid, id, cls, q, design, status, title, reason, when, unb, ref, isNew, kick){
+    var taken = state.unblocks[sid];
+    var label = unb==='question' ? 'Answer as a question'
+              : unb==='prep'     ? 'Prep our session'
+              : unb==='card'     ? 'Decide on card '+esc(String(ref||'').slice(0,8))
+              : 'No action here yet';
+    var btn = unb==='card'
+      ? '<button class="unblock" disabled>'+label+'</button>'
+      : '<button class="unblock'+(taken?' on':'')+'" data-skip="'+sid+'" data-unb="'+unb+'">'
+        +(taken?'&#10003; Asked for':'')+' '+label+'</button>';
+    return '<tr><td>'+btn+(isNew?' <span class="newchip">new</span>':'')+'</td>'
+      +'<td class="mono">'+esc(id)+'</td><td class="mono dim">'+esc(cls)+'</td>'
+      +'<td class="num">'+esc(q)+'</td><td class="dim">'+esc(design)+'</td>'
+      +'<td class="dim">'+esc(status)+'</td><td class="ttl2">'+esc(title)+'</td>'
+      +'<td class="reason">'+esc(reason)
+        +(kick ? '<span class="kick">Kickoff ready &mdash; '+esc(kick)+'</span>' : '')
+      +'</td><td class="mono dim">'+esc(when)+'</td></tr>';
+  }
+  function useRow(t, ip, loc, name, did, cost){
+    return '<tr><td class="mono">'+esc(t)+'</td><td class="mono">'+esc(ip)+'</td>'
+      +'<td class="dim">'+esc(loc)+'</td><td>'+esc(name)+'</td><td class="dim">'+esc(did)+'</td>'
+      +'<td class="num">'+esc(cost)+'</td></tr>';
+  }
+
+  // SES-143 — §2b's effective values. John's un-harvested tap OUTRANKS the DB's value, exactly as
+  // `state.items` outranks a rebuilt card: he flipped the switch, no cycle has picked it up yet,
+  // and a checkbox that springs back to the old value on the next render reads as a tap that was
+  // thrown away. `undefined` — not falsy — is the test, because `false` is a real answer here and
+  // `scheduler_on:false` must not fall through to the DB's `true`.
+  function settingsNow(){
+    var s = state.settings || {};
+    return {
+      scheduler_on:   s.scheduler_on   === undefined ? !!AUTOMATION.scheduler_on : !!s.scheduler_on,
+      interval_hours: s.interval_hours === undefined ? AUTOMATION.interval_hours  : s.interval_hours,
+      drain_on:       s.drain_on       === undefined ? !!AUTOMATION.drain_on      : !!s.drain_on,
+      drain_epic:     s.drain_epic     === undefined ? AUTOMATION.drain_epic      : s.drain_epic,
+      // SES-147 — same `undefined`-not-falsy test, and here it carries more weight than anywhere
+      // else in this object: `null` is a REAL answer (John cleared the box, meaning "no standing
+      // cap"), so a falsy test would silently fall back to the DB's number and make clearing the
+      // box impossible from the page.
+      daily_max_millions: s.daily_max_millions === undefined
+                            ? AUTOMATION.daily_max_millions : s.daily_max_millions,
+      at:             s.at || ''
+    };
+  }
+
+  // §2b row 3 · DAILY MAX (SES-147). John, 2026-08-23: "Place a <dailymax> open text box of the
+  // millions of tokens allowed during the day."
+  //
+  // ITS OWN FUNCTION so the regression test has a real negative control to strip — the same shape
+  // SES-143's `automationPanel()` call site gives that test.
+  //
+  // TWO NUMBERS, AND THEY ARE NOT THE SAME NUMBER. The BOX is what John stored; "In force now" is
+  // what the next run will actually spend, written by the rebuilding cycle from
+  // public.resolve_day_token_cap(). NEVER compute the second from the first: the box is one of five
+  // rungs, and a budget override for one day or the 48h stale-reading floor both outrank it — so
+  // `box × 1,000,000` is wrong on exactly the days a higher rung fires, which are the days John is
+  // looking at this panel.
+  //
+  // AN EMPTY BOX IS A REAL SETTING AND IS NOT ZERO. null (he cleared it) renders as '' and means
+  // "no standing cap, budget as before SES-147"; rendering it as 0 would say "no tokens allowed
+  // today", a number he never typed.
+  function dailyMaxRow(s){
+    var v = (s.daily_max_millions === null || s.daily_max_millions === undefined)
+              ? '' : esc(s.daily_max_millions);
+    return '<div class="autorow">'
+      +'<div class="autobody"><label class="sw" for="dmx">Daily max '
+      +'<input class="numbox" id="dmx" type="number" inputmode="numeric" min="1" max="1000" value="'
+      + v +'"> million tokens a day</label>'
+      +'<div class="autostat">In force now: <b>'+esc(AUTOMATION.daily_max_effective)+'</b></div>'
+      +'<div class="slotmeans">This is your standing number &mdash; runs keep to it every day, so '
+      +'you do not have to type a directive each night. Two things still outrank it, both on '
+      +'purpose: a budget override you write for one particular day, and the safety floor that '
+      +'applies whenever your meter reading is more than two days old. Clearing the box puts '
+      +'things back exactly as they were before there was a box.</div>'
+      +'</div></div>';
+  }
+
+  // §2b · AUTOMATION. Four rows, per the locked spec (docs/BRIEFING-REDESIGN-0822.md §2b):
+  // scheduler, drain, daily max, status line.
+  //
+  // NO `data-awaits` ANYWHERE IN HERE, and that is deliberate. A switch is a control, not a
+  // decision owed — the same call SES-127 made for §10 and SES-132 for §9.1. Counting it in §1's
+  // "N decisions waiting" is the masthead-disagrees-with-the-page failure countWaiting() exists to
+  // prevent, and it would never reach zero, because a checkbox is always there to be tapped.
+  function automationPanel(){
+    var s = settingsNow();
+    var hist = (AUTOMATION.drain_history || []).map(function(h){
+      return '<div class="autohist">&#10003; '+esc(h)+'</div>'; }).join('');
+    // The drain's status label is ALWAYS shown (spec: "Status label underneath, always").
+    var drainStat = s.drain_on
+      ? '<b>'+esc(AUTOMATION.drain_left)+'</b> of <b>'+esc(AUTOMATION.drain_named)
+        +'</b> tickets left in '+esc(AUTOMATION.drain_epic)
+      : 'No drain running.';
+    // Both off is the one combination that means nothing happens, so it is said in words rather
+    // than left for John to infer from two unchecked boxes (spec, verbatim).
+    var bothOff = (!s.scheduler_on && !s.drain_on)
+      ? '<div class="slotmeans" style="color:var(--brass-deep)"><b>Both switches are off — '
+        +'no runs will start at all until you turn one back on.</b></div>' : '';
+    return '<h2><span class="secnum">2b</span>Automation &mdash; how this runs, and your switches</h2>'
+      +'<div class="budget"><h4>Scheduler &amp; drain</h4>'
+      // --- row 1 · scheduler ---------------------------------------------------------------
+      +'<div class="autorow">'
+      +'<input type="checkbox" id="sch-on"'+(s.scheduler_on?' checked':'')+'>'
+      +'<div class="autobody"><label class="sw" for="sch-on">Scheduler <b>'
+      +(s.scheduler_on?'on':'off')+'</b> &mdash; run a cycle every '
+      +'<input class="numbox" id="sch-n" type="number" inputmode="numeric" min="1" max="24" value="'
+      +esc(s.interval_hours)+'"> hours</label>'
+      +'<div class="slotmeans">The schedule itself fires every hour and always will &mdash; the run '
+      +'itself keeps to your number, and a run that arrives early stops straight away and says '
+      +'&ldquo;paced by your scheduler setting&rdquo;. Unticking this stops every scheduled run. '
+      +'A run you start yourself from the link below is never paced.</div>'
+      +'</div></div>'
+      // --- row 2 · drain ---------------------------------------------------------------------
+      +'<div class="autorow">'
+      +'<input type="checkbox" id="drn-on"'+(s.drain_on?' checked':'')+'>'
+      +'<div class="autobody"><label class="sw" for="drn-on">Complete epic '
+      +'<input class="txtbox" id="drn-epic" value="'+esc(s.drain_epic)+'"> until done.</label>'
+      +'<div class="autostat">'+drainStat+'</div>'
+      +'<div class="slotmeans">Ticking this is you giving the standing order &mdash; the next run '
+      +'records it and works that epic&rsquo;s tickets one per run until they are gone, chaining '
+      +'run after run without waiting for the schedule. Unticking cancels it; nothing already '
+      +'shipped is undone.</div>'
+      + hist
+      +'</div></div>'
+      + bothOff
+      + dailyMaxRow(s)
+      // --- row 4 · status line ---------------------------------------------------------------
+      +'<div class="autostat" style="border-top:1px solid var(--line-soft);margin-top:11px;'
+      +'padding-top:9px">Last run: <b>'+esc(AUTOMATION.last_cycle)+'</b><br>'
+      +'Next scheduled run: <b>'+esc(AUTOMATION.next_fire)+'</b><br>'
+      +'<a href="https://claude.ai/code/routines" style="color:var(--brass-deep);font-weight:700">'
+      +'&#9654; Run a cycle now</a></div>'
+      +(s.at ? '<div class="recorded">&#10003; Your settings were recorded &mdash; '+esc(s.at)
+               +'. The next run picks them up.</div>' : '')
+      +'</div>';
+  }
+
+  // v7.0.197, directive b8d5ea7e — the loud half of the sentinel. A cycle that forgets the seed
+  // now ships a page that SAYS it is incomplete, in the page's existing defect vocabulary (the
+  // same choice as the red line a NULL plain_* summary draws). It names the one call that fixes
+  // it, and it tells John his material is stored rather than gone — because the honest failure
+  // here is "this page is not showing you everything", never "your threads were deleted".
+  function seedBanner(){
+    if (!unseeded) return '';
+    return '<div class="seedwarn"><b>This rebuild was published without its state seed.</b> '
+      +'Your typed threads and your meter readings are stored safely in the ledger — this page '
+      +'just is not showing them. The run that built it skipped '
+      +'<code>SELECT public.briefing_state_seed()</code>; the next correct rebuild restores them.'
+      +'</div>';
+  }
+
+  function render(){
+    // SES-132 — a fresh pass owns a fresh record of which threads it rendered.
+    threadedIds = {};
+    var out =
+    seedBanner() +
+    // ===== §1 · MASTHEAD (SES-124) =========================================================
+    // The decisions-waiting counter is rendered EMPTY here and filled by countWaiting() in
+    // wire(), from `data-awaits` on the elements themselves. Rendering it from a number the
+    // rebuilding cycle typed in would let the masthead and the cards disagree — and the
+    // masthead is the half John reads first.
+    // SES-143 — the "▶ Run a cycle now" link has MOVED off the masthead onto §2b's status line,
+    // on John's explicit instruction in the §2b spec ("SES-102's masthead link lives here now").
+    // Do not reinstate it here: two copies of one control is how the page starts contradicting
+    // itself, and the panel is where the rest of the run controls now live.
+    '<header><div class="db">DB</div><div><h1>Morning Briefing</h1>'
+    +'<div class="sub">DeepBench &middot; Automated Development</div></div>'
+    // v7.0.172, directive 603f44ea — `#lastact` sits directly under the decisions counter ("at
+    // the very top next to the count of decisions", his words) and is rendered EMPTY here for
+    // the same reason `#waiting` is: stampLastAction() fills it from `briefing-state`, never
+    // from a string a cycle typed. A cycle-typed stamp could not be right even in principle —
+    // the page self-publishes on every tap, so his state moves many times between two rebuilds
+    // and no cycle is running to re-type anything.
+    +'<div class="date">Aug 19, 2026 CST<br>v7.0.94<br><b id="waiting"></b>'
+    +'<span class="la" id="lastact"></span></div></header>'
+    +'<div class="wrap">'
+    // ===== §2 · DAILY ACTIVITY (SES-124) ====================================================
+    // Was an unlabeled five-box strip. Three things John asked for, all load-bearing: the DAY
+    // is stated in the heading (this is a CST day — 12:00 AM to 11:59 PM America/Chicago, the
+    // same boundary the budget arithmetic uses, NOT a UTC day); every number says what it
+    // counts; and the tokens box carries the percentage as well as the absolute, because
+    // "~3.9M" means nothing without the ceiling next to it.
+    // Figures below are sample values — regenerate from runner_cycles over the CST day.
+    +'<h2><span class="secnum">2</span>Daily activity — today, 12:00 AM to 11:59 PM CST</h2>'
+    +'<div class="stats">'
+    +'<div class="stat"><b>1</b><span>Shipped today</span></div>'
+    +'<div class="stat"><b>0</b><span>Gated before build</span></div>'
+    +'<div class="stat"><b>0</b><span>Cycles: did not run</span></div>'
+    +'<div class="stat"><b>$0.00</b><span>API spend of $5.00 day</span></div>'
+    +'<div class="stat"><b>~0M<br>0%</b><span>Tokens of 10M daily max</span></div>'
+    +'</div>'
+    +'<p class="strip-def"><b>Gated before build</b> = the run designed the work but a rule said '
+    +'it needs your permission to ship — it&rsquo;s a card below. <b>Did not run</b> = a cycle '
+    +'started, checked the board, and found nothing it was allowed to do.</p>'
+    // ===== §2b · AUTOMATION PANEL (SES-143) =================================================
+    // Directly after Daily activity, per the locked spec. It is §2b and NOT a renumber of §3–§14:
+    // SES-124's rule is that the locked order is EXTENDED, never renumbered, which is how §4.1,
+    // §7.1 and §9.1 already work — renumbering would silently invalidate every cross-reference in
+    // briefing-page.md, runner-cycle.md and the spec itself.
+    + automationPanel()
+    // ===== §3 · TODAY'S FINDINGS (SES-124) ==================================================
+    // The latest cycle's finding, labeled with its CST time, then every earlier cycle of the
+    // same CST day folded into one default-closed card. This section is the ONLY place
+    // narrative prose belongs — John removed the stray paragraphs that used to sit between
+    // sections, so a rebuilding cycle with something to say says it here or not at all.
+    +'<h2><span class="secnum">3</span>Today&rsquo;s findings</h2>'
+    +'<div class="finding"><p><span class="lbl">Latest — 3:29 PM cycle</span>'
+    +'One line to a short paragraph: what this run actually found. Sample value.</p></div>'
+    +fold('fh','3.1','Earlier today — 0 cycles',
+       '<p class="strip-def">One line per earlier cycle of the CST day, newest first — time, '
+      +'outcome, and the single thing worth knowing. Sample value.</p>')
+    // ===== §4 · BUDGET & USAGE (SES-124 touches the frame only) =============================
+    +'<h2><span class="secnum">4</span>Budget &amp; usage</h2>'
+    // Regenerate these three cards from runner_cycles / runner_budget / runner_usage_readings —
+    // spec: docs/runbooks/briefing-page.md (John, 2026-08-20). Figures below are sample values.
+    +'<div class="budget"><h4>API dollars — real money, hard wall</h4>'
+    +'<div class="bar"><span class="dev" style="width:0%"></span><span class="qa" style="width:0%"></span></div>'
+    +'<div class="barlbl">Bar = share of today&rsquo;s $5.00 spent</div>'
+    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>build work $0.00</span>'
+    +'<span><span class="sw" style="background:var(--brass)"></span>QA $0.00</span>'
+    +'<span>= $0.00 of $5.00 today</span><span>$0.00 of $100 this month</span></div></div>'
+    +'<div class="budget"><h4>Subscription tokens — your allowance, runner\'s share<span class="est">all estimated</span></h4>'
+    +'<div class="bar"><span class="dev" style="width:0%"></span><span class="qa" style="width:0%"></span></div>'
+    +'<div class="barlbl">Bar = share of the daily max used</div>'
+    +'<div class="legend"><span><span class="sw" style="background:var(--navy)"></span>build work ~0M</span>'
+    +'<span><span class="sw" style="background:var(--brass)"></span>QA ~0M</span>'
+    +'<span>= ~0M of 10M today (0%)</span></div>'
+    +'<table style="margin-top:10px"><tr><th>Model</th><th>Runner today (est)</th><th>Your weekly meter</th></tr>'
+    +'<tr><td>Fable 5</td><td class="num">0</td><td class="num">—</td></tr>'
+    +'<tr><td>Opus 5</td><td class="num">0</td><td class="num">all models —</td></tr>'
+    +'<tr><td>Sonnet 5</td><td class="num">0</td><td class="num"></td></tr></table>'
+    +'<p class="calib">Guardrails: rest at 85% weekly · 50% share · 10M/day uncalibrated · 3M/day if the reading is over 48h old.</p></div>'
+    // SES-124 — the "what you last gave me" line MOVES here, onto the card that asks for it.
+    // It sat on the tokens card above, one card away from the inputs it was acknowledging, so
+    // the confirmation for John's tap was not where his tap was. Morning/Night rows: SES-128.
+    // SES-128 — TWO SLOTS, NIGHT AND MORNING, because one reading calibrates nothing. John's
+    // meter is spent by his own manual sessions AND the runner, so tokens-per-percent measured
+    // over any window that mixes the two is confidently wrong. A window bracketed by his last
+    // look at night and his first in the morning is runner-only BY CONSTRUCTION — that pair is
+    // the whole mechanism, and public.derive_token_allowance() reads it. Night renders first
+    // because that is the order he types them in.
+    +'<div class="budget"><h4>Today\'s reading — 10 seconds, recalibrates the budget</h4>'
+    +'<p class="recorded">'+readingRecordedLine()+'</p>'
+    +readingSlot('night','Night — your last look before bed',
+                 'Ends the day and opens the runner-only window.')
+    +readingSlot('morning','Morning — your first look of the day',
+                 'Closes the window. The next cycle measures the gap and sets the day’s max.')
+    +'<p class="calib">Only the night&rarr;morning pair recalibrates — while you are asleep the '
+    +'runner is the only thing spending, so the gap between those two numbers is a clean '
+    +'measurement. A number you type at any other time is still recorded and still respected by '
+    +'the rest and staleness walls; it just cannot bracket a window.</p></div>'
+    // v7.0.168, directive bee71cf4 — DAILY OUTPUT, sitting under the reading card and CLOSED by
+    // default, both exactly as John asked. Regenerate the rows from ONE call on every rebuild:
+    //   SELECT * FROM public.daily_reading_output();
+    // Never hand-compute the window here. The function owns the four things a render would get
+    // wrong: the day is an America/Chicago day; a day with ONE reading shows an em dash and not
+    // a zero (a 0 claims the day did no work, which is not the same as having nothing to
+    // measure); a negative all-models delta is a weekly meter RESET inside the window, not
+    // negative work, so it shows the reset word rather than a number; and the token figure
+    // counts only cycles that STARTED inside the window John's two readings bracket, which is
+    // not the whole CST day (measured 2026-08-21: 9 cycles in-window against 12 in the day).
+    // The two numbers on each row measure DIFFERENT THINGS and the headings must keep saying so
+    // — the meter delta includes John's own manual sessions; the token figure is the runner's
+    // estimated spend alone. Rows below are sample values.
+    +fold('dro','4.1','Daily output — first to last reading',
+       '<p class="strip-def">What your meter moved between the <b>first</b> and the <b>last</b> '
+      +'reading you saved that day, in CST — alongside what the runner alone estimates it spent '
+      +'inside that same window. They are different numbers on purpose: the meter counts your own '
+      +'sessions too.</p>'
+      +'<div class="tscroll"><table>'
+      +'<tr><th>Day</th><th>Window (CST)</th><th>Meter &Delta; all models</th>'
+      +'<th>Runner est in window</th><th>Cycles</th></tr>'
+      +'<tr><td class="mono">Aug 21</td><td class="mono">7:59 AM &rarr; 3:39 PM</td>'
+      +'<td class="num">+12%</td><td class="num">~5.3M</td><td class="num">9</td></tr>'
+      +'<tr><td class="mono">Aug 22</td><td class="mono">8:50 AM</td>'
+      +'<td class="dim">— one reading only</td><td class="dim">—</td><td class="dim">—</td></tr>'
+      +'</table></div>'
+      +'<p class="tnote">A day needs two readings to show a figure. One reading is not zero '
+      +'output — it is nothing to measure from, and it renders as a dash so the two never look '
+      +'alike.</p>')
+    // ===== §5 · SHIPPED (SES-125) ===========================================================
+    // Rebuild these from public.runner_items WHERE decision IS NULL — register B18, FROM the DB,
+    // never from the rebuilding cycle's memory of what it filed. Number them 5.1, 5.2, … in the
+    // order they render. Rows below are sample values.
+    +'<h2><span class="secnum">5</span>Shipped — tap a row to open</h2>'
+    +card('5.1','item-ses78a','ship','Ship','SES-78a',
+      'SES-78a (Tooling · P10 - Tooling)',
+      'Runner foundation — six tables and your budget, live',
+      '<p><span class="lbl">Value case</span>The ground the Automated mode stands on: your directives, the $100/month budget, the cycle ledger, the trust ladder, and the before-images that make every overnight change reversible by one tap.</p>'
+      +'<p><span class="lbl">Before → after</span>Before: the runner design existed only on paper. After: all six runner_ tables live in Supabase, budget seeded ($100 month / $3.30 day, fail closed), trust ladder at rung 1, zero public access.</p>'
+      +'<p><span class="lbl">QA evidence</span>5/5 green, including a before-image → restore round-trip (row corrupted on purpose, restored byte-equal) and a live catch: new tables came up publicly readable by default — revoked, verified zero.</p>'
+      +'<div class="meta"><span>cost $0.00 API</span><span>model Fable 5 (manual session)</span><span>push 5de2398</span></div>'
+      +'<p class="links"><a href="https://deepbench-frontend-git-dev-roadmapventures-projects.vercel.app">dev site</a></p>',
+      // Three plain sentences, no jargon, no ticket IDs — read from the row's plain_* columns
+      // (v7.0.146), and since SES-125 they are the card's default body rather than its panel.
+      { cant:  'Nothing the runner does overnight is written down anywhere you can undo it from.',
+        after: 'Every overnight change has a recorded before-state, so one tap puts it back.',
+        worth: 'It is what makes leaving the runner unattended a reasonable thing to do.' })
+    +card('5.2','item-tap-test','test','Test','SES-78b',
+      'SES-78b (Tooling · P10 - Tooling) · tap QA',
+      'Tap test — prove the round trip from your phone',
+      '<p>Press <strong>Accept</strong> — it records instantly. Then press <strong>Rework</strong>, type any line, and press Enter (or the Save hint). Each recording briefly reloads the page — that is the save.</p>',
+      { cant:  'You cannot tell, from your phone, whether a tap on this page actually reached me.',
+        after: 'One tap and one typed line prove the whole round trip in ten seconds.',
+        worth: 'Every other card on this page is worth nothing if the buttons do not record.' })
+    // ===== §6 · GATED BEFORE BUILD (SES-125) ================================================
+    // Same card treatment as §5, numbered 6.1, 6.2, …, `kindCls='gate'` — which is what makes
+    // the buttons say "permission, not a score" (John's B34 ruling, buttonMeanings()). Render
+    // `<p class="empty">None tonight.</p>` in place of the cards when there are none.
+    +'<h2><span class="secnum">6</span>Gated before build — tap a row to open</h2>'
+    +card('6.1','item-sample-gate','gate','Gated','SES-000',
+      'SES-000 (Tooling · P10 - Tooling)',
+      'Sample gated card — replace with the cycle’s real undecided gated items',
+      '<p><span class="lbl">Why gated, exactly</span>The rule that stopped the build, named, with the measurement that shows it applies to this ticket rather than to tickets like it.</p>'
+      +'<p><span class="lbl">What exists</span>Branch and commit if anything was built and parked, and — honestly — what is not done on it.</p>'
+      +'<div class="meta"><span>model Opus 5</span><span>commit —</span></div>',
+      { cant:  'Sample value — what you can’t do today, in a sentence with no jargon in it.',
+        after: 'Sample value — the same sentence from the other side.',
+        worth: 'Sample value — why that is worth something to the platform.' })
+    // SES-124 · REMOVED, on John's explicit instruction: the standalone "Needs your call"
+    // budget-override section. An override is a yes/no with a consequence either way, which is
+    // exactly what §9 already is — so it renders as a §9 question now and stops being a section
+    // that says "nothing here" on almost every rebuild. Do not reinstate it.
+    // ===== §7 · DIRECTIVE QUEUE (moved up to the locked order by SES-124) ===================
+    +'<h2><span class="secnum">7</span>Directive queue — your seed, any time</h2>'
+    +'<div class="directive"><textarea placeholder="Type a directive in plain words, then tap outside the box to save. The next cycle picks it up first.">'+esc(state.directive)+'</textarea>'
+    +'<div class="savebar" id="savebar">'+(readOnly?'read-only view — decisions record for the owner only':'')+'</div></div>'
+    // SES-129 — the acknowledgement line, and the ONE word in it that was chosen rather than
+    // reached for. The spec says "Last directive saved <ts>". THE PAGE CANNOT KNOW WHEN JOHN
+    // TYPED IT: briefing-state's `directive` is a bare string with no timestamp (where `reading`
+    // carries an `at`), so all that exists is runner_directives.created_at — the moment a CYCLE
+    // HARVESTED it, which lags his typing by up to a cycle's cadence, ~3h. "Saved 4:23 PM" for a
+    // line he typed at 2:10 PM is confidently wrong in the one place the page is acknowledging
+    // him, so the word is RECORDED and it names the runner as the actor. The fix (give
+    // `directive` an `at`, the shape `reading` already has) is on SES-129's card, not guessed at
+    // here. Regenerate from the newest runner_directives row; values below are this cycle's real
+    // ones.
+    +'<p class="strip-def">&#10003; Last directive <b>recorded Aug 22, 04:23 PM CST</b> '
+    +'&mdash; not picked up yet; the next cycle takes it first. '
+    +'<span class="dim">(&ldquo;Recorded&rdquo; is when the runner read it off this page, which '
+    +'can be up to one cycle after you typed it &mdash; the page is not told the typing time.)</span></p>'
+    // ===== §7.1 · YOUR LAST 3 DIRECTIVES — WHAT BECAME OF THEM (SES-129) ====================
+    // Default CLOSED (spec). Regenerate every rebuild from public.runner_directives — contract
+    // and the verbatim query: docs/runbooks/briefing-page.md's §7 section. Rows below are this
+    // cycle's REAL rows, not samples.
+    +fold('dirfollow','7.1','Your last 3 directives &mdash; what became of them',
+       '<p class="strip-def">Every directive you have written, newest first, and what the runner '
+      +'did with it. A line still working for you says so &mdash; a standing order and a live '
+      +'budget override are both doing their job while they sit here.</p>'
+      +'<div class="tscroll"><table>'
+      +'<tr><th>Ref</th><th>Recorded (CST)</th><th>Your line</th><th>What became of it</th></tr>'
+      +dirRow('43a9d4ae','Aug 22, 04:23 PM','Up today’s max to 25M tokens',
+         stateOf('budget_override','queued',null,null,'','Aug 23, 12:00 AM',true))
+      +dirRow('b74009ea','Aug 22, 03:28 PM','run out the automation epic tickets until completion in the now bucket',
+         stateOf('drain-epic','queued',null,null,'',null,false))
+      +dirRow('dda69acb','Aug 21, 04:21 PM','i don’t understand what you are trying to get at here - please simply your ask',
+         stateOf('directive','done','closed_unrecorded',null,'68aa532c',null,false))
+      +'</table></div>'
+      +'<p class="strip-def">The 24 directives you wrote before tonight read <span class="dim">'
+      +'&ldquo;outcome not recorded&rdquo;</span> and that is deliberate: what each one shipped '
+      +'was never written down anywhere, and a sentence invented now would read exactly like one '
+      +'you had been given. From tonight the runner cannot close a directive without recording '
+      +'what became of it.</p>')
+    // ===== §8 · THE QUEUE (SES-126) =========================================================
+    // MATRIX ONLY — no prose (John's explicit instruction; this section replaces the struck
+    // "Next 3" line and "Next up — top 5", and with SES-124 having removed those, the page has
+    // carried NO forward view of the queue since v7.0.159. This is what ends that gap).
+    // Regenerate every rebuild from public.backlog_items — the queue number is the DB's OWN
+    // `queue` column (SES-86 phase 2), never a position this render counted out:
+    //
+    //   SELECT b.queue, b.backlog_id, coalesce(e.name,'') AS epic, b.priority_class, b.status,
+    //          coalesce(b.design_status,'—'),
+    //          left(public.backlog_display_title(b.title, b.description), 70)
+    //     FROM public.backlog_items b
+    //     LEFT JOIN public.epics e ON e.id = b.epic_id
+    //    WHERE b.queue IS NOT NULL ORDER BY b.queue LIMIT 12;
+    //
+    // TWO THINGS THAT ARE NOT STYLE. (1) THE TITLE COLUMN IS backlog_display_title(), NOT the raw
+    // `gist` extract AND NOT a straight `title` (SES-119, v7.0.184; John, 2026-08-22: always
+    // ID + title, "he does not memorize IDs"). This line used to read "use the `gist` extract,
+    // NOT `title`", written by SES-126 because for imported tickets `title` held the CLASS STRING
+    // ('P9 - Bug Fixes.'). SES-91 repaired that — measured 2026-08-23, 0 of 562 open numbered
+    // tickets carry a class string — so the workaround now guards a defect that is gone, and the
+    // gist it renders instead is the first 70 chars of the DESCRIPTION, which on this board is
+    // provenance: queue 1 rendered "FOUND LIVE 2026-08-23T03:31Z by cycle b9201486 while
+    // exercising the st". THE SWAP IS WHAT WOULD HAVE SHIPPED WRONG, and the census is why: 46
+    // open numbered tickets carry a bare RETIRED DECLARATION as their title (38 of them literally
+    // `Post-beta`), and TWO OF THEM — LOG-134 and LAV-30 — are in this very top 12, so a swap
+    // renders "`Post-beta`" as their title, strictly worse than what it replaced. The function is
+    // a FALLBACK, not a swap, and it lives in SQL rather than here because a rule each cycle
+    // re-derives is one that gets re-derived differently (the eighth precedent: SES-86 phase 3,
+    // v7.0.146, SES-101, SES-111, SES-127, SES-128, SES-129, SES-143).
+    // (2) The heading states the scope (top N of the numbered
+    // board) because a 12-row window onto 564 tickets that does not say so reads as the whole
+    // board. Rows below are this cycle's real values.
+    // (3) THE EPIC COLUMN RENDERS BLANK, NEVER A DASH (SES-144, v7.0.181; John, 2026-08-23:
+    // "on the queue, add a column epic"). It is `epics.name` resolved through
+    // `backlog_items.epic_id` — an FK, never prose in the ticket body (SES-111's standing
+    // property). A ticket in no epic gets '' and not '—', because this table already spends
+    // the dash on Design status, where it means a real absence: an em-dash here would read as
+    // a value, "epic: —", rather than as "belongs to no epic".
+    +'<h2><span class="secnum">8</span>The queue — top 12 of 562 numbered</h2>'
+    +'<div class="tscroll"><table>'
+    // SES-236 — THE HEADER ROW IS AN ANCHOR NOW, because §8 renders TWO different things. While
+    // the Selfbuild Prime Directive stands (runner_directives a0ef9525 §7b) this table is the
+    // PICK ORDER — what the next cycles will actually take — and its columns are #/Lane/ID/…;
+    // when the directive is not standing it is the P1-P10 board exactly as before. The builder
+    // swaps this line, so a template edit that reflows it fails LOUDLY at exit 2 rather than
+    // publishing board headers over pick-order rows.
+    +'<tr><th>Queue</th><th>ID</th><th>Epic</th><th>Class</th><th>Status</th>'
+    +'<th>Design status</th><th>Title</th></tr>'
+    // Titles below are backlog_display_title() trimmed to ~70 at a WORD boundary with an ellipsis
+    // when cut — the projection is the contract's; fitting the column is this render's. Note that
+    // queueRow() does NOT esc() its title (§8 call sites carry HTML entities by design), which is
+    // the opposite of skipRow() in §10 — pass entities here, raw text there.
+    +queueRow(1,'SES-140','Automation','P10 - Tooling','open','needs-john','The successor fire is refused by the platform &mdash; an agent cannot fire&hellip;')
+    +queueRow(2,'SES-117','Automation','P10 - Tooling','partial','needs-desktop','Structural filing guarantees: title and type can no longer be skipped&hellip;')
+    +queueRow(3,'SES-118','Automation','P10 - Tooling','partial','needs-desktop','Rename backlog status value &lsquo;missing&rsquo; to &lsquo;open&rsquo;')
+    +queueRow(4,'SES-119','Automation','P10 - Tooling','open','—','Briefing and displays show ticket ID + stored title everywhere&hellip;')
+    +queueRow(5,'SES-120','Automation','P10 - Tooling','open','—','Startup-doc modernization: Session-Init rewritten to snapshot pointers&hellip;')
+    +queueRow(6,'SES-121','Automation','P10 - Tooling','open','—','Shrink the .claude/-mutable surface so needs-desktop tickets become rare')
+    +queueRow(7,'SES-84','Automation','P10 - Tooling','partial','—','The vision corpus: nine docs under docs/vision that ground Claude&rsquo;s&hellip;')
+    +queueRow(8,'SES-101','Automation','P10 - Tooling','partial','designed','New automation tickets file themselves into the automation lane&hellip;')
+    +queueRow(9,'SES-131','','P1 - Improves John&rsquo;s Skills','open','—','Research the AI / multi-agent market and FAANG AI job openings&hellip;')
+    +queueRow(10,'AGT-015','','P1 - Improves John&rsquo;s Skills','open','—','Promoted from `FEATURES-NEXT.md` 2026-07-17 (now/next re-check &mdash;&hellip;')
+    +queueRow(11,'LOG-134','','P5 - Enhancements','open','—','**`Post-beta`** (dormant rows render nothing &mdash; invisible, not&hellip;')
+    +queueRow(12,'LAV-30','','P5 - Enhancements','open','—','**`Post-beta`** (receipt copy quality on the Agent Console + CHI&hellip;')
+    +'</table></div>'
+    // SES-236 — the board line §7b names, verbatim: "below them a single line 'P1-P10 board:
+    // suspended by the Prime Directive until Selfbuild completes (N tickets waiting)'". The
+    // builder replaces it; when the directive is NOT standing it says so instead, because a
+    // section that always claimed suspension would be the same staleness class in reverse.
+    +'<p class="tnote">P1-P10 board: sample line &mdash; the builder replaces it.</p>'
+    // SES-99 — the question list. Rebuild these rows from public.runner_questions WHERE
+    // status='open', newest asked first, MAX 5 — spec: docs/runbooks/briefing-page.md. Rows
+    // below are sample values. A question that cannot be asked as yes/no does not belong here;
+    // it belongs on a gated_before_build card with a proposal.
+    +'<h2><span class="secnum">9</span>Questions — tap a row to open</h2>'
+    +question('9.1','q-sample-slug',
+      'Should new automation tickets I create go above your current lane, ahead of ADM-1?',
+      'You wrote &ldquo;keep making them top of queue&rdquo;. I read that as joining the lane rather than jumping your own #1 — Yes flips that reading.',
+      // v7.0.145 — the consequence of each tap, one line, rendered under the button that causes
+      // it. STILL REQUIRED: a row without both renders the defect in red rather than two bare
+      // buttons. They are composed at render time because runner_questions has no column for
+      // them — the same prose-instead-of-column gap v7.0.146 closed for cards, still open here.
+      'a new automation ticket jumps straight to #1, ahead of everything already in your lane.',
+      'it joins the bottom of your lane and waits its turn.')
+    // ===== §9.1 · ANSWERED — YOUR PAST QUESTIONS (SES-132) ==================================
+    // The marker's substitution happens at the bottom of render(), NOT here — see
+    // orphanThreads() for why (§12 renders after this point, so the orphan set is not knowable
+    // yet). A sub-block under §9, exactly like §4.1 and §7.1, so the LOCKED SECTION ORDER is
+    // extended rather than renumbered.
+    +ORPHAN_MARK
+    // ===== §10 · SKIPPED — WAITING ON YOUR INPUT (SES-127) ==================================
+    // THE WHOLE SECTION FOLDS, default CLOSED — shape (b) of SES-124's collapse framework
+    // (`h2.clickable[data-toggle]` over a `.secwrap`), its first real use. Closed by default is
+    // the spec's word and it is right: this is the section that grows without bound, and a list
+    // of blocked work open above the questions would push §§11-14 off the phone.
+    //
+    // THE COUNT CHIP IS "N · M new" AND BOTH HALVES ARE LIVE. M is `briefed_at IS NULL` — see
+    // the migration's property (3): the rebuild stamps briefed_at on the rows it renders, so a
+    // row is NEW exactly once and a missed rebuild can neither age a new row nor freshen an old
+    // one. Stamp AFTER republishing, never before, or a failed publish silently eats the chip.
+    //
+    // Regenerate every rebuild from public.runner_skips. Contract + the verbatim query:
+    // docs/runbooks/briefing-page.md's §10 section. Two things in that query are not style:
+    // it JOINs backlog_items LATERAL-with-LIMIT-1 (backlog_id is NOT unique — CHI-48 occupies
+    // two rows, SES-86 phase 2's own QA found it), and it filters b.status NOT IN
+    // ('done','removed') rather than reading a maintained resolved flag, so a ticket that ships
+    // leaves this section with no write at all.
+    //
+    // THAT DERIVED FILTER PROVED ITSELF AT THIS SHIP, which is worth recording because it is the
+    // kind of design that is only ever tested by time (SES-119, v7.0.184): the six unresolved
+    // runner_skips rows include SES-106 and SES-110 (now `done`) and CHI-89 (now `removed`), and
+    // all three dropped out of this section with NO write from any cycle and no rule anyone had to
+    // remember. Three of six rows retired themselves. Do not "tidy" resolved_at to match.
+    //
+    // SORT: question-unblockable first, then newest skip. That is not cosmetic either — it puts
+    // the rows John can clear with one thumb above the rows that need him at a keyboard.
+    +'<h2 class="clickable" data-toggle="skipsec"><span class="secnum">10</span>'
+    +'Skipped &mdash; waiting on your input <span class="countchip">'+SKIPS.n+' &middot; '
+    +SKIPS.nnew+' new</span> <span class="chev">&#9656;</span></h2>'
+    +'<div class="secwrap" id="skipsec">'
+    // ===== SES-119 · THE SPLIT, AND THE RULE THAT DECIDES IT ================================
+    // John's own cut, 2026-08-22: "needs your decision" vs "needs your desktop" — TWO lists,
+    // "because they trigger different actions (answer vs open an attended session)". One list
+    // mixing them makes him re-sort it by hand every morning, which is the work this section was
+    // built to save. Measured live at this ship: the mixed list held 3 rows, 1 answerable from
+    // his phone and 2 needing a keyboard.
+    //
+    // THE MAPPING IS reason_kind, AND THE DEFAULT IS NOT ARBITRARY:
+    //   needs-desktop, permission-gate            -> Needs your desktop
+    //   needs-john, removal-proposed, gated, other -> Needs your decision
+    // `other` deliberately falls to DECISION, not desktop. The fallback must be the list he can
+    // clear with a thumb; defaulting an unclassified row into "open a session" invents a chore
+    // out of a row nobody classified. Same fail-toward-the-cheaper-action call SES-127 made when
+    // it kept 'claimed-by-peer' out of the vocabulary entirely.
+    //
+    // BOTH LISTS ALWAYS RENDER, even at zero, and that is deliberate: an empty
+    // "Needs your desktop" is the good news that nothing is waiting on him at a keyboard, and a
+    // list that vanishes when empty makes its absence unreadable — he cannot tell "none" from
+    // "the section broke". Same rule §11 applies in reverse for a class with no now-tier tickets.
+    +'<p class="strip-def">Split by what it needs from you. Within each list: what you can '
+    +'unblock with a Yes/No first, then everything else, newest skip on top. Rows added since '
+    +'your last brief carry the NEW chip.</p>'
+    +'<div class="listhead"><span class="n">10.1</span>Needs your decision '
+    +'&mdash; answerable from here</div>'
+    +'<div class="tscroll"><table>'
+    +'<tr><th>Unblock</th><th>ID</th><th>Class</th><th>Queue</th><th>Design status</th>'
+    +'<th>Status</th><th>Title</th><th>Reason skipped</th><th>Skipped</th></tr>'
+    // Rows below are this cycle's REAL runner_skips rows, not samples. Titles come from
+    // public.backlog_display_title() (SES-119) — skipRow() esc()s them, so they are passed RAW,
+    // never as HTML entities.
+    +skipRow('39cd8616-cccd-4968-8ea9-78dd3ffb7fba','SES-140','P10 - Tooling',1,'needs-john',
+       'open','The successor fire is refused by the platform — an agent cannot fire a routine '
+       +'it did not create',
+       'Waiting on your decision on its gated card: the runner cannot fire its own successor, '
+       +'because the platform refuses fire_trigger on a routine an agent did not create. Skipped '
+       +'5 times.','Aug 23','question',null,false)
+    +'</table></div>'
+    +'<div class="listhead"><span class="n">10.2</span>Needs your desktop '
+    +'&mdash; a session you attend</div>'
+    +'<div class="tscroll"><table>'
+    +'<tr><th>Unblock</th><th>ID</th><th>Class</th><th>Queue</th><th>Design status</th>'
+    +'<th>Status</th><th>Title</th><th>Reason skipped</th><th>Skipped</th></tr>'
+    +skipRow('f32e05ce-2a65-462f-a199-deb17127d4be','SES-117','P10 - Tooling',2,'needs-desktop',
+       'partial','Structural filing guarantees: title and type can no longer be skipped or '
+       +'polluted',
+       'The remaining half is on a surface an unattended run may not touch, so it needs a '
+       +'session you attend. Skipped twice.','Aug 23','prep',null,false,
+       'docs/kickoffs/v7.0.178-SES-117-backlog-structural-checks.md')
+    +skipRow('d292f62e-e57c-456d-a57e-8afb12455452','SES-118','P10 - Tooling',3,'needs-desktop',
+       'partial','Rename backlog status value \'missing\' to \'open\'',
+       'The shipped half landed this morning (v7.0.183); what is left is on a surface an '
+       +'unattended run may not touch.','Aug 23','prep',null,true)
+    +'</table></div>'
+    +'<p class="strip-def"><b>Unblock buttons:</b> &ldquo;Answer as a question&rdquo; puts the '
+    +'blocking decision into section 9 as a Yes/No on the next rebuild &mdash; answer it and the '
+    +'ticket rejoins the queue, no session needed. &ldquo;Prep our session&rdquo; tells the next '
+    +'run to package everything (kickoff-ready prompt, branch, context) so the ticket is one '
+    +'paste away when you sit down &mdash; this page can record the ask, but it cannot start a '
+    +'session by itself. A row whose blocker is already a card above says so instead, and you '
+    +'decide it there. A row in <b>10.2</b> marked <i>Kickoff ready</i> already has its design '
+    +'written &mdash; that one is a paste, not a design session.</p>'
+    +'</div>'
+    // ===== §11 · NOW-TIER BY CLASS (SES-126) ================================================
+    // THE ONE THING THAT WILL BE GOT WRONG IF IT IS NOT WRITTEN DOWN: group on the class
+    // DIGIT, never on the `priority_class` string. Measured on the live board this cycle —
+    // grouping by the raw string returns SEVEN rows for six classes, because
+    // 'P9 - Bug Fixes · FLAGGED' (27) is a different string from 'P9 - Bug Fixes' (120), so
+    // John reads 120 bug fixes when the true now-tier figure is 147. Same `· FLAGGED` suffix
+    // trap recompute_backlog_queue() already had to solve; the sort is zero-padded for the
+    // same reason the queue's is numeric — lexically, P10 sorts ahead of P2.
+    //
+    //   SELECT lpad(substring(priority_class from 'P([0-9]+)'),2,'0') AS class_id,
+    //          min(regexp_replace(priority_class,'\s*·.*$','')) AS class_name, count(*)
+    //     FROM public.backlog_items WHERE queue IS NOT NULL AND tier='now'
+    //    GROUP BY 1 ORDER BY 1;
+    //
+    // The footnote's next/later counts are LIVE from the same table, never carried forward from
+    // a previous rebuild. Figures below are this cycle's real values (292 now / 25 next /
+    // 248 later = 565 numbered).
+    +'<h2><span class="secnum">11</span>Now-tier by class</h2>'
+    +'<table><tr><th>Class</th><th>Tickets in now</th></tr>'
+    +classRow('P01','P1 - Improves John&rsquo;s Skills',1)
+    +classRow('P05','P5 - Enhancements',40)
+    +classRow('P06','P6 - Agent Enhancement',14)
+    +classRow('P08','P8 - Determinism Removal',9)
+    +classRow('P09','P9 - Bug Fixes',147)
+    +classRow('P10','P10 - Tooling',81)
+    +'</table>'
+    +'<p class="tnote">Beyond the now bucket: <b>25</b> in next &middot; <b>248</b> in later. '
+    +'A class with no now-tier tickets is left out rather than shown as a zero.</p>'
+    // ===== §12 · VISION CLAIMS (SES-125) ====================================================
+    // ALWAYS THREE ROWS — drawn from docs/vision/*.md, LOW confidence first, then MED, then each
+    // doc's "Open questions for John" (SES-84 phase 2, register B13). A claim reappears every
+    // rebuild until it is decided; only silence carries it forward. Yes ratifies the claim to
+    // HIGH, No deletes it and records it in vision/rejected-paths.md, and a typed line replaces
+    // it in John's words — the corpus edit rides the deciding cycle's ship commit.
+    // The row id MUST start `vision-` so the harvest can tell a claim from a runner_questions
+    // row: both land in briefing-state under `answers`, keyed by this id.
+    +'<h2><span class="secnum">12</span>Vision claims — always 3, tap a row to open</h2>'
+    +'<p class="strip-def">Each claim sets criteria for one of the judgment classes '
+    +'(<b>P1 - Improves John&rsquo;s Skills</b> · <b>P2 - Inventive</b> · '
+    +'<b>P3 - Investor Value</b> · <b>P4 - New Customers</b>) — the chip shows which. A claim '
+    +'keeps coming back every day until you decide it: Yes, No, or your own wording.</p>'
+    +visionClaim('12.1','vision-thesis-C-thesis-30','P4 - New Customers',
+      'DeepBench&rsquo;s nearest defensible market is the mid-market/agency buyer — true?',
+      'They want a working bench of experts with visible reasoning and sellable deliverables, not a build-your-own-agents toolkit. Every future customer-facing feature would be judged against this one buyer. (docs/vision/thesis.md · C-thesis-30 · confidence LOW)',
+      'ratified — it stops appearing and becomes a rule the runner builds by.',
+      'rejected — deleted from the vision docs and recorded as a rejected path.')
+    +visionClaim('12.2','vision-mission-C-mission-29','P1 - Improves John&rsquo;s Skills',
+      'The hiring-facing &ldquo;done&rdquo; state is one screen presentable without a guided tour — true?',
+      'A case-study screen, or this briefing page itself, becomes the named target — so work toward it can be tracked and finished instead of staying open-ended. (docs/vision/current-mission.md · C-mission-29 · confidence LOW)',
+      'ratified — one named screen becomes the finish line.',
+      'rejected — recorded, and &ldquo;done&rdquo; stays undefined until a new claim is written.')
+    +visionClaim('12.3','vision-sample-C-sample-1','P3 - Investor Value',
+      'A feature that can&rsquo;t be demoed in under 2 minutes is not worth building next — true?',
+      'Sample row, here to hold the always-3 rule — the real third card is the next highest-value unratified claim in the vision corpus. (sample)',
+      'ratified as a decision rule.',
+      'rejected and recorded.')
+    // ===== §13 · TRUST LADDER (SES-126 adds the class column) ===============================
+    // Regenerate from public.runner_ladder (six rows — work_class, rung, streak). The CLASS
+    // column is the addition: the ladder's `work_class` is the runner's own vocabulary
+    // ('bug_fix'), and John reads the board in P-classes, so the two are shown side by side and
+    // sorted by ZERO-PADDED class id — the same P01…P10 sort §11 uses, and for the same reason.
+    // The mapping is fixed and lives here so a rebuild does not re-derive it:
+    //   invention → P02 · enhancement → P05 · agent_creation → P07
+    //   determinism_removal → P08 · bug_fix → P09 · tooling → P10
+    // THE NOTE IS NOT DECORATION: runner_ladder has SIX rows and the board has ten classes, so
+    // P6 - Agent Enhancement has no rung at all. Saying so is the honest rendering; a blank row
+    // would read as "rung 0, not yet trusted", which is a different and untrue claim.
+    // Rows below are this cycle's real values.
+    +'<h2><span class="secnum">13</span>Trust ladder</h2><table>'
+    +'<tr><th>Class</th><th>Work class</th><th>Rung</th><th>Streak</th></tr>'
+    +ladderRow('P02','Invention',0,0)
+    +ladderRow('P05','Enhancement',1,0)
+    +ladderRow('P07','Agent creation',1,0)
+    +ladderRow('P08','Determinism removal',1,0)
+    +ladderRow('P09','Bug fix',1,0)
+    +ladderRow('P10','Tooling',5,1)
+    +'</table>'
+    +'<p class="tnote">No ladder row exists for <b>P6 - Agent Enhancement</b> — the ladder tracks '
+    +'six work classes and that is not one of them. <b>SES-122</b> (next bucket) is where rungs '
+    +'start actually unlocking autonomy.</p>'
+    // ===== §14 · WHO USED DEEPBENCH (SES-126) ===============================================
+    // Last 5 PRODUCTION uses. Two filters carry this section and both were measured live:
+    //   (1) request_host = 'deepbench.roadmapventure.com' — the only production host in
+    //       ai_activity_log. The dev URL is John himself (the standing dev-URL=John attribution
+    //       rule) and request_host IS NULL covers 12,212 pre-LOG-134 rows with no host recorded,
+    //       so any looser filter files the runner's own traffic under "who used DeepBench".
+    //   (2) ONE USE = ONE trace_id, not one row. LOG-81's standing rule is that "AI calls" means
+    //       real model calls, never raw log rows; the calls count below is
+    //       count(*) FILTER (WHERE model IS NOT NULL), so a five-call run reads as one use.
+    // Name resolves visitor_labels.user_label → the FIRST CLAUSE of ip_org_cache.user_label →
+    // org. That middle step is not fussiness: one live cache label is a 130-character
+    // provenance paragraph, and unsliced it becomes the Name column.
+    // COST IS '—' AND MUST STAY '—': cost_usd is NULL on every production row today. A NULL
+    // rendered as $0.00 is a claim that the run was free, which is a different thing from not
+    // knowing — same rule as the plain_* red defect line.
+    // The heading says "last 5", not "today", because the most recent production use is Aug 18.
+    +'<h2><span class="secnum">14</span>Who used DeepBench — last 5 production uses</h2>'
+    +'<div class="tscroll"><table>'
+    +'<tr><th>Time (CST)</th><th>IP</th><th>Location</th><th>Name</th><th>What they did</th>'
+    +'<th>Cost</th></tr>'
+    +useRow('Aug 18, 1:02 PM','146.75.136.146','San Jose, California, US','Suchi','Live agent console — 5 AI calls','—')
+    +useRow('Aug 18, 1:01 PM','146.75.136.146','San Jose, California, US','Suchi','Live agent console — 7 AI calls','—')
+    +useRow('Aug 18, 1:00 PM','146.75.136.146','San Jose, California, US','Suchi','Live agent console — 4 AI calls','—')
+    +useRow('Aug 18, 1:00 PM','146.75.136.146','San Jose, California, US','Private Relay egress','Live agent console — 3 AI calls','—')
+    +useRow('Aug 14, 4:56 PM','136.62.184.220','Austin, Texas, US','David','Live agent console — 6 AI calls','—')
+    +'</table></div>'
+    +'<p class="tnote">Cost shows &ldquo;&mdash;&rdquo; because these runs carry no recorded '
+    +'per-call cost &mdash; not because they were free.</p>'
+
+    // ===== §15 · PROJECT — SELFBUILD MILESTONES (SES-178) ====================================
+    // John's Accept on gated card a8eaee1d: build the Project panel as a render of the charter's
+    // CANONICAL progress query, and APPEND it as the next section number at the END of the locked
+    // order — extend the list, never renumber it (the SES-132 / §2b precedent; renumbering would
+    // silently invalidate every §-reference in briefing-page.md, runner-cycle.md and the spec).
+    //
+    // The query is docs/SELFBUILD-CHARTER.md's, verbatim, and the charter says so of itself:
+    // "answers 'how close are we' any time, before SES-178 renders it". The panel RENDERS it; it
+    // does not define a second copy. Figures below are this cycle's real values (v7.0.231).
+    //
+    // THE THING THIS PANEL MUST NOT IMPLY, and the reason the footnote is not optional: an epic's
+    // completion is NOT its drain's completion. A drain retires on the members John NAMED
+    // (runner_drain_scope, SES-142); a ticket filed into the epic AFTER that naming never joins
+    // it. So M1's drain is retired while M1 reads 46.7% here, and that is CORRECT rather than a
+    // gap — the difference is work added since he named the scope. A panel that let a reader
+    // infer "retired = 100%" would make the charter's own finish line unreadable.
+    //
+    // THE KEYSTONE METRICS ARE NAMED ABSENT, NEVER RENDERED AS ZERO. The charter's measurement
+    // table points verifier-catch-rate, John-minutes/week and drift-findings/week at this panel,
+    // and the ticket says "as they come online". A zero here would read as "the verifier caught
+    // nothing", which is a claim about performance rather than about absence — the same rule as
+    // §14's cost showing "—" and a NULL plain_* drawing a red defect line.
+    // UPDATED v7.0.284 (SES-181 (b)): ONE OF THE THREE CAME ONLINE. The catch rate is rendered in
+    // §16 below and this footnote now names the two that remain. This comment and the footnote
+    // were corrected TOGETHER and must stay that way — a comment that still said "none is online"
+    // beside a footnote that says two is the same contradiction one level down, and the next
+    // editor reads the comment first.
+    +'<h2><span class="secnum">15</span>Project — Selfbuild milestones</h2>'
+    +'<table><tr><th>Milestone</th><th>Done</th><th>Total</th><th>%</th></tr>'
+    +msRow('Selfbuild M0 - Backup &amp; Rollback',2,2,'100.0')
+    +msRow('Selfbuild M1 - Consolidation',7,15,'46.7')
+    +msRow('Selfbuild M2 - Truth Infrastructure',2,13,'15.4')
+    +msRow('Selfbuild M3 - Independent Verification',1,18,'5.6')
+    +msRow('Selfbuild M4 - Infrastructure Floor',2,6,'33.3')
+    +msRow('Selfbuild M5 - Closed-Loop Healing',0,5,'0.0')
+    +msRow('Selfbuild M6 - Autonomy Graduation',0,3,'0.0')
+    +msRow('Selfbuild M7 - The Inventor',0,6,'0.0')
+    +'</table>'
+    +'<div class="bar"><div class="dev" style="width:20.6%"></div></div>'
+    +'<p class="barlbl">Overall &mdash; <b>14</b> of <b>68</b> Selfbuild tickets done '
+    +'(<b>20.6%</b>)</p>'
+    +'<p class="tnote">A retired milestone can sit below 100% here, and that is correct rather '
+    +'than a gap: a drain finishes on the members you <b>named</b>, and tickets filed into the '
+    +'epic afterwards never join it &mdash; so this column counts work added since. '
+    +'Verifier catch rate has moved to &sect;16 below, now that the lane produces it. Still not '
+    +'shown, because they do not exist yet rather than because they are zero: John-minutes/week '
+    +'and drift findings/week.</p>'
+    // ----- §15's BURN-DOWN BLOCK (directive db84b784, John 2026-08-28) ----------------------
+    // His words, verbatim: "yes, build the burn-down with the size stamps". The directive names
+    // three contents: per-milestone closed/total M0-M7, the active drain's open-members count
+    // SEPARATE from the epic bucket count, and remaining-work totals by size_stamp.
+    //
+    // NAMED DEVIATION, disclosed rather than buried (the SES-196 convention): this is built INTO
+    // §15 rather than appended as a new §17. The first of his three contents is the table twenty
+    // lines above — §15 has rendered per-milestone closed/total since v7.0.231 — so a new section
+    // would render it a SECOND time, and one fact with two homes is the defect this platform has
+    // already paid for at SES-116, SES-113 and SES-86 phase 3. Nothing is renumbered because
+    // nothing is added to the locked order, which is what John's "extend, never renumber" rule
+    // protects in the first place.
+    //
+    // THE TWO COUNTS ARE SEPARATE BECAUSE THEY ANSWER DIFFERENT QUESTIONS, and collapsing them is
+    // the failure this block exists to end. The drain count is over `runner_drain_scope` — the
+    // members John NAMED, FIXED at naming time (SES-142) — and is the set that actually retires
+    // the drain. The bucket count is the epic's LIVE open tickets and includes everything filed
+    // since he named it. They are 3 and 8 as this ships, and §2b's own comment records the last
+    // time one was shown as the other: the panel told him his standing drain had 17 tickets left
+    // against a live 11. A single "tickets left in the epic" number cannot be both.
+    //
+    // THE ZERO THAT IS A REAL ZERO. `Unstamped` is rendered even at 0, and that is NOT the
+    // "absent must look absent" rule being broken: every remaining ticket genuinely carries a
+    // stamp today, and the count existing-and-being-zero is the signal that db84b784's filing
+    // rule is holding. It goes non-zero the moment a cycle files without one, which is the whole
+    // point of showing it.
+    //
+    // NO NEW CSS — table / td.num / td.dim, exactly as msRow() and svRow(). Same size discipline
+    // msRow()'s comment states. Sample values are this cycle's real ones; the builder splices
+    // over them and dies at exit 2 rather than publishing them if it cannot find the anchor.
+    +'<table><tr><th>Burn-down</th><th>Now</th><th></th></tr>'
+    +bdRow('Drain members still open',3,'of 23 you named for Selfbuild M3 - Independent Verification')
+    +bdRow('Open in that epic right now',8,'of 36 — a different number, and not what retires the drain')
+    +bdRow('Remaining, size S',15,'one cycle each, known fix shape')
+    +bdRow('Remaining, size M',14,'1-2 cycles, or one design choice inside')
+    +bdRow('Remaining, size L',6,'multi-cycle, design-heavy, or discovery risk')
+    +bdRow('Remaining, unstamped',0,'no size stamp recorded at filing')
+    +'</table>'
+    +'<p class="tnote">The first two rows are deliberately different numbers. The drain finishes '
+    +'on the members you <b>named</b> &mdash; that set is fixed, and it is the one that retires '
+    +'your standing order &mdash; while the epic keeps taking new tickets, which never join it. '
+    +'So the drain can reach zero with the epic still holding work, and that is correct. '
+    +'Sizes count every Selfbuild ticket not yet <b>done</b>: S is one cycle, M is one or two, '
+    +'L is multi-cycle or design-heavy.</p>'
+    // ===== §16 · REVIEWER LANE — VERIFIER SCOREBOARD (SES-181 (b)) ==========================
+    // John's directive 58db64ae item (2), verbatim: "SES-181 scoreboard build approved — locked
+    // section extended, never renumbered." So this is APPENDED as the next number, exactly as
+    // §15 was (the SES-132 / §2b precedent); renumbering silently invalidates every §-reference
+    // in briefing-page.md, runner-cycle.md and the spec.
+    //
+    // NO NEW CSS — table / td.num / td.dim / .bar / .dev / .barlbl / .tnote, all of which §8, §13
+    // and §15 already ship. Same size discipline §15's msRow() comment states.
+    //
+    // THE CLAIM THIS PANEL MUST NEVER MAKE, and the reason all three tnote sentences are
+    // mandatory rather than commentary. The charter's keystone bar is "over a rolling 30
+    // deliveries, the verifier's catch rate >= John's baseline Rework+Reverse rate". Read off the
+    // first two rows alone that is "30.0% >= 0.0%, the bar is met", and it is false twice:
+    //   (1) THE TWO RATES COUNT DIFFERENT POPULATIONS. The lane began 2026-08-25; John's tap
+    //       history is 115 decided ship cards going back much further. Like-for-like — a delivery
+    //       carrying BOTH a verdict and a tap of his — the overlap was FIVE at this ship, not
+    //       thirty. Five deliveries is not a rolling thirty and the panel says so in his words.
+    //   (2) A `block` IS A MECHANICAL GATE FAILING (build / regression / hygiene), never
+    //       necessarily a defect John would have reworked. So verifier >= John is NECESSARY for
+    //       the charter's bar and never SUFFICIENT.
+    // Hence the panel reports the comparison and states that the bar is NOT YET ASSERTABLE. That
+    // is the same rule as §14's cost showing "—" and a NULL plain_* drawing a red defect line:
+    // absent must look absent, and "not yet assertable" must not look like a pass.
+    //
+    // Figures below are this cycle's real values (v7.0.284) and the builder splices over them; if
+    // it ever cannot find an anchor it dies at exit 2 rather than publishing them.
+    +'<h2><span class="secnum">16</span>Reviewer lane &mdash; verifier scoreboard</h2>'
+    +'<table><tr><th>Signal</th><th>Count</th><th>Of</th><th>Rate</th></tr>'
+    +svRow('Verifier blocked',9,30,'30.0')
+    +svRow('Your Rework or Reverse',0,30,'0.0')
+    +svRow('Auto-done eligible',13,30,'43.3')
+    +'</table>'
+    +'<div class="bar"><div class="dev" style="width:30.0%"></div></div>'
+    +'<p class="barlbl">Verifier catch rate <b>30.0%</b> &mdash; your Rework/Reverse rate '
+    +'<b>0.0%</b> over the same depth (30).</p>'
+    +'<p class="tnote">The charter\'s bar &mdash; the verifier catching at least as much as you '
+    +'do over 30 deliveries &mdash; is <b>not yet assertable</b>, and this panel does not claim '
+    +'it. The two rows above count different populations: the lane started <b>Aug 25</b> and has '
+    +'graded <b>20</b> tickets, of which <b>5</b> also carry a tap of yours &mdash; on those five '
+    +'it blocked at least once on <b>4</b> and you reworked or reversed <b>0</b>. Five deliveries '
+    +'is not a rolling thirty. And a block is a mechanical gate failing (build, regression, '
+    +'hygiene), not necessarily a defect you would have reworked, so &ldquo;verifier &ge; '
+    +'you&rdquo; is necessary for that bar and never sufficient. A block still does not stop a '
+    +'push &mdash; the lane is verdict-only, on your split of card 10de5fb5.</p>'
+
+    // ===== §17 · THE PRIME DIRECTIVE (SES-236, v7.0.314) ==================================
+    // APPENDED, NEVER A RENUMBER — John, gated card a8eaee1d ("extend the list, never renumber
+    // it"), the same precedent §15 and §16 shipped under.
+    //
+    // WHY IT SITS HERE AND NOT IN A FOLD, measured rather than argued. §7 of directive a0ef9525
+    // says the text renders VERBATIM every rebuild, and the body is ~7.6 KB and grows with each
+    // amendment — which collides with the SES-188 read budget. It does not, and here is the
+    // measurement: `briefing-state` sits at byte 2,624 of this template (1.6%), and doc() emits
+    // the state block FIRST in the body, before #f/#s — that ordering IS SES-188's fix. Every
+    // section renders into #page, which is AFTER the block on both paths. So §17's growth is
+    // provably below the block and costs a harvesting cycle nothing. The guard asserts exactly
+    // that: briefing-state's byte offset in the BUILT page must be unchanged by this section.
+    //
+    // A FOLD WAS REJECTED FOR A SECOND REASON: a folded section is one John can leave closed,
+    // and §7's whole point is that this is standing law he reads, not an appendix.
+    //
+    // NO NEW CSS AND NO NEW CLASS (SES-178's rule, SES-188's reason): every rule added to #s sits
+    // ABOVE the state block. This section is built from h2/.secnum, bare <p>, table/th/td.dim —
+    // all of which §8/§11/§15/§16 already ship.
+    //
+    // THE EDIT THIS FORBIDS: summarising the body to save bytes. VERBATIM is John's explicit
+    // word; §7 makes this row the truth and the page merely its mirror, so a paraphrase here
+    // would make the page a SECOND source that can disagree — the exact failure §7 names.
+    // The builder splices between the two markers below; both are unique literals.
+    +'<h2><span class="secnum">17</span>The Prime Directive</h2>'
+    // §17-BODY-START
+    +'<p class="tnote">Sample &mdash; the builder splices this section from runner_directives.</p>'
+    // §17-BODY-END
+    // SES-124 · REMOVED, on John's explicit instruction: the footer note. It restated the
+    // read-only rule that the savebar already states in place, at the moment it matters, and
+    // then closed the page on housekeeping instead of on his board. The read-only signal is
+    // NOT lost — it lives on `#savebar` above, which is where a failed save reports itself.
+    +'</div>';
+    // SES-132 — §9.1 is filled LAST, once every section has declared the threads it rendered.
+    // The replacement is a FUNCTION so `$&`/`$1` inside John's own prose stay literal.
+    document.getElementById('page').innerHTML =
+      out.replace(ORPHAN_MARK, function(){ return orphanThreads(); });
+    wire();
+  }
+
+  // Full replacement document, rendered from state — the page's own source as a function.
+  //
+  // SES-188 (v7.0.232) — THE ORDER BELOW IS THE FIX, NOT A STYLE CHOICE. This function produces
+  // the document that John's own taps publish, which is the document a cycle usually harvests —
+  // so its layout, not the template's, is what decides whether his decisions can be read back.
+  // It used to emit `#f` and `#s` into <head> with the state after `<body><div id="page"></div>`,
+  // which put the block behind the ENTIRE stylesheet: ~24.3 KB of CSS plus the platform's injected
+  // frame-runtime put it at roughly byte 49,600 of the served page, over John's 40,000 ceiling on
+  // its own and matching the ~49 K offset SES-188 measured live. The state block now goes FIRST in
+  // the body and `#f`/`#s` follow it — which is also exactly how this template itself is laid out,
+  // so the two writers agree instead of one quietly undoing the other.
+  // `<title>` STAYS IN THE HEAD, ~150 bytes in: SES-138 (the publisher scans only the first 8192
+  // bytes for a title) and its regression test both depend on that, and the state block is ~10 KB.
+  // A <link>/<style> in the body is deliberate and proven — it is where this template already
+  // carries them, and that is the file being served today.
+  function doc(){
+    return '<!doctype html>\n<html><head><meta charset="utf-8">'
+      +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+      +'<title>DeepBench Morning Briefing</title>'
+      +'</head><body>'
+      +'<script type="application/json" id="briefing-state">'
+      +JSON.stringify(state).replace(/</g,'\\u003c')
+      +'<\/script>'
+      +document.getElementById('f').outerHTML
+      +document.getElementById('s').outerHTML
+      +'<div id="page"></div>'
+      +'<script id="code">'+document.getElementById('code').textContent+'<\/script>'
+      +'</body></html>';
+  }
+
+  // SES-244 phase A (v7.0.350) — every tap ALSO writes one row to public.briefing_taps, so a tap's
+  // durable record stops being "the page republished itself". Additive: save() below is untouched
+  // and still runs, and phase B (removing the self-publish, repointing the harvest) is a later,
+  // attended session — only after a real tap has been seen landing in the table.
+  // The page holds no credentials: window.claude.use('mcp') runs execute_sql through the VIEWER's
+  // own Supabase connector, so the write is John's, at his service level.
+  function sqlLit(x){ return "'" + String(x == null ? '' : x).replace(/'/g, "''") + "'"; }
+  function writeTap(kind, targetRef, payload){
+    var q = 'INSERT INTO public.briefing_taps (tap_kind, target_ref, payload, page_built) VALUES ('
+      + sqlLit(kind) + ',' + sqlLit(targetRef) + ','
+      + sqlLit(JSON.stringify(payload || {})) + '::jsonb,' + sqlLit(PAGE_BUILT) + ')';
+    // v7.0.352 — EVERY OUTCOME OF THIS WRITE IS RECORDED INTO `state`, not only into the savebar.
+    // Three live taps (Daily max 199 -> 198 -> 197) each self-published correctly and each wrote no
+    // row, and nothing on the page said why: the only report was bar(), which lives in §7 while
+    // John was tapping in §2b. A savebar is not an observation channel — it is off-screen from most
+    // of the page and gone on the next render. Riding `state` means the branch that fired is
+    // readable from the served copy afterwards, by someone who cannot see his screen.
+    // NO save() FROM HERE, deliberately: the handlers already call save() immediately after
+    // writeTap fires, so the stamp rides the NEXT self-publish, which his tapping cadence
+    // guarantees. Publishing from a failure handler is how a failing write becomes a publish loop.
+    try {
+      window.claude.use('mcp').then(function(m){
+        if (!m) {
+          state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind, code: 'mcp_null' };
+          bar('tap saved on page only — database channel unavailable'); return;
+        }
+        // ONE ATTEMPT ONLY, deliberately: under the mcp contract a rejected write is
+        // outcome-UNKNOWN, not proof it did not run, so a second attempt is how one tap becomes two
+        // rows. Every failure branch reaches the savebar — a silent one would let John believe a
+        // tap was durable when it wasn't. (The guard greps this slice for the r-word; the words are
+        // avoided here on purpose, not by accident — do not "clarify" them back in.)
+        m.callTool('Supabase', 'execute_sql', { query: q }).then(function(){
+          state.last_tap_ok = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind };
+        }, function(err){
+          var c = err && err.code;
+          state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind,
+                                   code: (c || 'unknown'),
+                                   msg: String((err && err.message) || '').slice(0, 200) };
+          if (c === 'selection_required') { bar('choose your Supabase connector in the prompt, then tap again'); }
+          else { bar('tap saved on page only — database copy failed (' + (c || 'unknown') + ')'); }
+        });
+      }, function(uerr){
+        // THE BRANCH THAT COULD REPORT NOTHING AT ALL, and the one that best fits what John saw.
+        // use('mcp') was given only a FULFILLED handler, so a REJECTED use() — which is what a
+        // denied or never-answered consent prompt produces — was an unhandled promise rejection:
+        // async, so the outer catch below never sees it, no bar(), no state, total silence, while
+        // the self-publish beside it succeeded. That is exactly the reported symptom. Same copy as
+        // the callTool failure branch on purpose — this is a new branch, not new wording.
+        var uc = (uerr && uerr.code) || 'use_rejected';
+        state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind, code: uc,
+                                 msg: String((uerr && uerr.message) || '').slice(0, 200) };
+        bar('tap saved on page only — database copy failed (' + uc + ')');
+      });
+    } catch (e) {
+      state.last_tap_error = { at: new Date().toISOString().slice(0,16)+'Z', kind: kind, code: 'exception',
+                               msg: String((e && e.message) || '').slice(0, 200) };
+      /* page-only: the existing self-publish still records this tap in phase A */
+    }
+  }
+
+  var saving = false;
+  function save(){
+    if (readOnly || saving) return;
+    saving = true;
+    bar('saving…');
+    try { sessionStorage.setItem('briefing-pending', JSON.stringify(state)); } catch(e) {}
+    window.claude.use('artifact').then(function(a){
+      if (!a) { readOnly = true; saving=false; bar('read-only view'); return; }
+      a.publish(doc()).then(function(){
+        try { sessionStorage.removeItem('briefing-pending'); } catch(e) {}
+        // View reloads to the new version; nothing else to do.
+      }, function(err){
+        saving = false;
+        var c = err && err.code;
+        if (c==='not_writer' || c==='not_granted' || c==='consent_required' ||
+            c==='capability_disabled' || c==='capability_removed') {
+          readOnly = true; bar('read-only view — decisions record for the owner only');
+        } else if (c==='conflict') {
+          bar(''); // shell reloads to the winning version
+        } else if (c==='rate_limited') {
+          bar('too fast — tap again in a moment');
+        } else {
+          bar('save failed ('+(c||'unknown')+') — tap again to retry');
+        }
+      });
+    });
+  }
+
+  function bar(t){ var b=document.getElementById('savebar'); if(b) b.textContent=t; }
+
+  // SES-124 — §1's counter. Counts `data-awaits` elements: every undecided card and unanswered
+  // question, and (from SES-125) every undecided vision row, because they all carry the same
+  // attribute. Singular at 1 — "1 decisions waiting" is the kind of small wrongness that makes
+  // the whole page read as unmaintained. At zero it says so affirmatively rather than "0".
+  function countWaiting(){
+    var n = document.querySelectorAll('[data-awaits]').length;
+    var w = document.getElementById('waiting');
+    if (!w) return;
+    w.textContent = n ? (n + ' decision' + (n===1?'':'s') + ' waiting') : 'Nothing needs you ✓';
+  }
+
+  // v7.0.172, directive 603f44ea — John: "Need a timestamp of the last action on this page at
+  // the very top next to the count of decisions. I can't tell what time my last action was
+  // compared to if the page has refreshed yet."
+  //
+  // THAT IS TWO REQUIREMENTS, and the second is the one a bare timestamp misses: he is asking
+  // whether the run that should have picked his tap up has happened. So the stamp carries his
+  // newest action, this page's own rebuild time, and — only when it is true — the line saying
+  // his action is newer than the page. Derived on every render, exactly like countWaiting().
+  //
+  // NOT COUNTED, and this is the trap: an ask thread holds BOTH John's questions and the
+  // runner's replies, and both carry an `at`. A cycle-written entry's `q` begins '[runner,' —
+  // the live convention on the page, read from its own state when this shipped. Counting them
+  // makes "your last action" report the RUNNER's last action, which is the same
+  // masthead-disagrees-with-the-page failure countWaiting() exists to prevent.
+  function isRunnerEntry(q){ return /^\s*\[runner[,\]]/.test(String(q == null ? '' : q)); }
+
+  // An unparseable or missing stamp is SKIPPED, never rendered — "Invalid Date" in the masthead
+  // is the small wrongness that makes the whole page read as unmaintained.
+  function newest(a, b){
+    if (typeof b !== 'string' || isNaN(Date.parse(b))) return a;
+    return (!a || Date.parse(b) > Date.parse(a)) ? b : a;
+  }
+
+  function lastAction(){
+    var t = null, k, i, list;
+    for (k in state.items)    { if (state.items[k])    t = newest(t, state.items[k].at); }
+    for (k in state.answers)  { if (state.answers[k])  t = newest(t, state.answers[k].at); }
+    for (k in state.unblocks) { if (state.unblocks[k]) t = newest(t, state.unblocks[k].at); }
+    for (k in state.reading)  { if (state.reading[k])  t = newest(t, state.reading[k].at); }
+    for (k in state.asks) {
+      list = state.asks[k] || [];
+      for (i = 0; i < list.length; i++) {
+        if (list[i] && !isRunnerEntry(list[i].q)) { t = newest(t, list[i].at); }
+      }
+    }
+    // The directive box counts as an action, and until this ship it could not: `directive` is a
+    // bare string with no `at` (the limitation SES-129 named on its own card). `directive_at` is
+    // stamped by the blur handler below, so this is true FORWARD ONLY — a directive typed before
+    // this shipped contributes nothing rather than a guessed time.
+    //
+    // SES-143 — a §2b switch is an action too, and for exactly the reason directive 603f44ea gave
+    // for the directive box: flipping the scheduler off is one of the most consequential things
+    // John can do on this page, and a stamp that ignored it would tell him no run had picked up a
+    // tap he had certainly made. `state.settings.at` is stamped by saveSettings().
+    t = newest(t, state.settings && state.settings.at);
+    return newest(t, state.directive_at);
+  }
+
+  // Store UTC, display CST and label it (John, 2026-08-20) — the page's standing times rule.
+  function cst(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleString('en-US', { timeZone:'America/Chicago', month:'short',
+                                       day:'numeric', hour:'numeric', minute:'2-digit' });
+  }
+
+  function stampLastAction(){
+    var el = document.getElementById('lastact');
+    if (!el) return;
+    var mine = lastAction(), built = cst(PAGE_BUILT), h;
+    h = mine ? 'Your last action ' + esc(cst(mine)) + ' CST' : 'No actions recorded yet';
+    h += '<br>Page rebuilt ' + (built ? esc(built) + ' CST' : '&mdash;');
+    // STRICTLY newer: an action inside the same minute as the rebuild is not evidence it was
+    // missed, and `at` is minute-precision on both sides.
+    if (mine && !isNaN(Date.parse(PAGE_BUILT)) && Date.parse(mine) > Date.parse(PAGE_BUILT)) {
+      h += '<span class="stale">Not picked up by a run yet</span>';
+    }
+    el.innerHTML = h;
+  }
+
+  function wire(){
+    countWaiting();
+    stampLastAction();
+    // SES-124 — the collapse framework's one handler, for BOTH shapes: a folding card
+    // (`.item.fold` + `.head[data-toggle]`) and a folding section (`h2.clickable[data-toggle]`
+    // + `.secwrap`). It does NOT publish, for the same reason More info does not: a fold is a
+    // view state, not a decision, and publishing reloads the view — which would shut the thing
+    // John just opened. Nothing about a fold is written to briefing-state.
+    document.querySelectorAll('[data-toggle]').forEach(function(h){
+      h.addEventListener('click', function(e){
+        // A tap on a control inside the head is that control's, never the fold's.
+        if (e.target.closest('button,input,textarea,a')) return;
+        var el = document.getElementById(h.getAttribute('data-toggle'));
+        if (!el) return;
+        var open = el.classList.toggle('open');
+        var ch = h.querySelector('.chev');
+        if (ch) ch.innerHTML = open ? '&#9662;' : '&#9656;';
+      });
+    });
+    // v7.0.145 — More info toggles WITHOUT publishing. Opening a panel is not a decision, and a
+    // publish reloads the view, which would slam the panel shut the instant it opened.
+    document.querySelectorAll('.morebtn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var panel = document.getElementById('more-'+btn.getAttribute('data-more'));
+        if (!panel) return;
+        var nowOpen = !panel.classList.contains('show');
+        panel.classList.toggle('show', nowOpen);
+        btn.classList.toggle('on', nowOpen);
+        // SES-125 — the panel is the technical record now, so the label says which record it is.
+        btn.textContent = nowOpen ? 'Hide the technical record' : 'More info — the technical record';
+      });
+    });
+    // An ask, on the other hand, IS recorded — same publish path as a tap. Append, never replace:
+    // the thread is the log John asked to keep, so a second question is a second entry.
+    document.querySelectorAll('.ask input').forEach(function(inp){
+      var target = inp.getAttribute('data-ask');
+      inp.addEventListener('keydown', function(e){
+        if (e.key !== 'Enter') return;
+        var q = inp.value.trim();
+        if (!q) return;
+        if (!state.asks[target]) { state.asks[target] = []; }
+        state.asks[target].push({ q:q, at:new Date().toISOString().slice(0,16)+'Z' });
+        inp.value = '';
+        // SES-125 — acknowledge in place, before the publish round trip. render() will draw the
+        // same line from state a moment later; this is what John sees the instant he hits Enter.
+        var g = inp.parentElement.querySelector('.got');
+        if (g) g.classList.add('show');
+        writeTap('ask', target, state.asks[target][state.asks[target].length-1]);
+        save(); render();
+      });
+    });
+    // SES-127 — §10's Unblock buttons. Recorded like a tap, not like a fold: it IS a decision
+    // (it tells the next run to do something), so it publishes. Idempotent by construction —
+    // tapping twice records the same intent once, because the harvest is keyed on the skip id
+    // and the state entry is replaced rather than appended. A 'card' row's button is disabled:
+    // its blocker is already a card in §5/§6 and a second way to decide the same thing is how
+    // two half-decisions get made about one ticket.
+    document.querySelectorAll('button.unblock[data-skip]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var sid = btn.getAttribute('data-skip');
+        state.unblocks[sid] = { kind: btn.getAttribute('data-unb'),
+                                at: new Date().toISOString().slice(0,16)+'Z' };
+        writeTap('unblock', sid, state.unblocks[sid]);
+        save(); render();
+      });
+    });
+    document.querySelectorAll('.item').forEach(function(cardEl){
+      var id = cardEl.id;
+      cardEl.querySelectorAll('.decide button').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var c = btn.getAttribute('data-c');
+          var cur = state.items[id] || {};
+          state.items[id] = { decision:c, reason:(c==='accept'?'':(cur.reason||'')),
+                              at:new Date().toISOString().slice(0,16)+'Z' };
+          // Written for ALL THREE buttons, above the branch: reverse/rework deliberately do not
+          // save() yet (they open the reason box first), so a tap write hung off save() would lose
+          // the two decisions John most needs a durable record of. The reason arrives as a second
+          // event from commit() below; the harvest supersedes on (tap_kind, target_ref).
+          writeTap('decision', id, state.items[id]);
+          if (c==='accept') { save(); render(); }
+          else { render(); var inp=document.querySelector('#'+id+' .reason input'); if(inp) inp.focus(); }
+        });
+      });
+      var inp = cardEl.querySelector('.reason input');
+      if (inp) {
+        function commit(){
+          var cur = state.items[id];
+          if (!cur || cur.reason === inp.value) return;
+          cur.reason = inp.value;
+          writeTap('decision', id, state.items[id]);
+          save();
+        }
+        inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ commit(); } });
+        inp.addEventListener('blur', commit);
+      }
+    });
+    // SES-99 — question rows. Same publish path as a card tap: the answer is recorded the
+    // instant the thumb lands, and the note is a strictly optional afterthought.
+    document.querySelectorAll('.q').forEach(function(qEl){
+      var qid = qEl.id;
+      qEl.querySelectorAll('.yn button').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var cur = state.answers[qid] || {};
+          state.answers[qid] = { a:btn.getAttribute('data-a'), note:(cur.note||''),
+                                 at:new Date().toISOString().slice(0,16)+'Z' };
+          writeTap('answer', qid, state.answers[qid]);
+          save(); render();
+        });
+      });
+      var ni = qEl.querySelector('.qnote input');
+      if (ni) {
+        function commitNote(){
+          var cur = state.answers[qid];
+          if (!cur || cur.note === ni.value) return;
+          cur.note = ni.value;
+          writeTap('answer', qid, state.answers[qid]);
+          save();
+        }
+        ni.addEventListener('keydown', function(e){ if(e.key==='Enter'){ commitNote(); } });
+        ni.addEventListener('blur', commitNote);
+      }
+    });
+    // SES-143 — §2b's four controls. Every one of them writes the WHOLE settings object, never a
+    // single key, and that is the point: the harvest reads one row, and a state carrying
+    // `{scheduler_on:false}` alone would leave the next cycle unable to tell "he turned the drain
+    // off" from "he never touched the drain". settingsNow() has already resolved tap-over-DB, so
+    // writing its output back is exactly what he is looking at.
+    function saveSettings(patch){
+      var s = settingsNow();
+      Object.keys(patch).forEach(function(k){ s[k] = patch[k]; });
+      s.at = new Date().toISOString().slice(0,16)+'Z';
+      state.settings = s;
+      // The WHOLE settings object, for the same reason state carries the whole object: a partial
+      // payload would leave the harvest unable to tell "he turned the drain off" from "he never
+      // touched the drain". One target_ref ('automation') because it is one setting surface.
+      writeTap('setting', 'automation', s);
+      save();
+    }
+    var schOn = document.getElementById('sch-on');
+    // A checkbox re-renders (the label reads "on"/"off" and the both-off warning appears), which
+    // the number and text boxes deliberately do NOT — re-rendering mid-typing would steal focus.
+    if (schOn) schOn.addEventListener('change', function(){
+      saveSettings({ scheduler_on: schOn.checked }); render();
+    });
+    var schN = document.getElementById('sch-n');
+    if (schN) {
+      var commitN = function(){
+        var n = parseInt(schN.value, 10);
+        // Out of range is not a setting — it is a typo, and storing it would hand the gate a
+        // number its own CHECK rejects. Put the live value back and record nothing.
+        if (!(n >= 1 && n <= 24)) { schN.value = settingsNow().interval_hours; return; }
+        if (n === settingsNow().interval_hours) return;
+        saveSettings({ interval_hours: n });
+      };
+      schN.addEventListener('keydown', function(e){ if (e.key === 'Enter') { commitN(); } });
+      schN.addEventListener('blur', commitN);
+    }
+    var drnOn = document.getElementById('drn-on');
+    if (drnOn) drnOn.addEventListener('change', function(){
+      saveSettings({ drain_on: drnOn.checked }); render();
+    });
+    // SES-147 — the daily-max box. Commit on Enter or blur, never on keystroke, exactly like
+    // sch-n: re-rendering mid-typing steals focus, and "2" on the way to "25" is a real number
+    // this page would otherwise record.
+    var dmx = document.getElementById('dmx');
+    if (dmx) {
+      var commitDmx = function(){
+        var raw = (dmx.value || '').trim();
+        // AN EMPTY BOX IS A REAL SETTING, not a non-answer: it means "no standing cap, budget as
+        // you did before SES-147". It is stored as null so the harvest can tell it apart from
+        // "he never touched the box", which is `undefined` and absent from state.settings.
+        if (raw === '') {
+          if (settingsNow().daily_max_millions === null) return;
+          saveSettings({ daily_max_millions: null }); return;
+        }
+        var n = parseInt(raw, 10);
+        // Out of range is a typo, not a setting — the column's own CHECK is 1..1000 and storing a
+        // number it rejects would hand the next cycle a harvest that throws. Put the live value
+        // back and record nothing, the same call sch-n makes.
+        if (!(n >= 1 && n <= 1000)) {
+          var live = settingsNow().daily_max_millions;
+          dmx.value = (live === null || live === undefined) ? '' : live;
+          return;
+        }
+        if (n === settingsNow().daily_max_millions) return;
+        saveSettings({ daily_max_millions: n });
+      };
+      dmx.addEventListener('keydown', function(e){ if (e.key === 'Enter') { commitDmx(); } });
+      dmx.addEventListener('blur', commitDmx);
+    }
+    var drnEpic = document.getElementById('drn-epic');
+    if (drnEpic) drnEpic.addEventListener('blur', function(){
+      if (drnEpic.value === settingsNow().drain_epic) return;
+      saveSettings({ drain_epic: drnEpic.value });
+    });
+    var ta = document.querySelector('.directive textarea');
+    if (ta) ta.addEventListener('blur', function(){
+      // v7.0.172, directive 603f44ea — stamp `directive_at` alongside the text. Typing a
+      // directive is the action John is most likely to have taken last, and until now it was
+      // the ONE action the page could not date: `directive` is a bare string where every other
+      // tap carries an `at` (the gap SES-129 named on its card). Additive to briefing-state —
+      // no harvest reads `directive` differently because a sibling key appeared next to it.
+      if (state.directive !== ta.value) {
+        state.directive = ta.value;
+        state.directive_at = new Date().toISOString().slice(0,16)+'Z';
+        writeTap('directive', 'directive', { text: ta.value, at: state.directive_at });
+        save();
+      }
+    });
+    // SES-128 — one handler per slot, wired from the same list the render used, so a slot can
+    // never exist on the page without a handler behind it. Each slot writes only its own key:
+    // saving a morning reading must never disturb the night reading it is measured against.
+    ['night','morning'].forEach(function(slot){
+      var rs = document.getElementById('r-save-'+slot);
+      if (!rs) return;
+      rs.addEventListener('click', function(){
+        var f = document.getElementById('r-'+slot+'-fable').value,
+            a = document.getElementById('r-'+slot+'-all').value,
+            h = document.getElementById('r-'+slot+'-h5').value;
+        if (!f && !a && !h) return;
+        state.reading[slot] = { fable:f, all:a, h5:h,
+                                at:new Date().toISOString().slice(0,16)+'Z' };
+        writeTap('reading', slot, state.reading[slot]);
+        save(); render();
+      });
+    });
+  }
+
+  render();
+})();
+</script>

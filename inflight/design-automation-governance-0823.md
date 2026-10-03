@@ -1,0 +1,1 @@
+design-automation-governance-0823 — attended session with John (v7.0.213): Selfbuild project chartered (docs/SELFBUILD-CHARTER.md) and executed through M0+M1 (9 tickets done, retirement ledger, board revalidation, 19 removal cards pending John). M2 drain live, runner unattended from here. Session in close-out; worktree removal pending.

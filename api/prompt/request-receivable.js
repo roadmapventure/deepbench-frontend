@@ -1,3 +1,61 @@
+// DeepBench v7.0.623 | api/prompt/request-receivable.js | AGT-176 -- A BILLED REFUSAL IS NOT FREE.
+// Both refusal gates below asserted `billed: false`, which the two cost mappers turn into a hard
+// `costUsd: 0`, which lands as a measured 0 in ai_activity_log. Anthropic has billed pre-output
+// refusals in the `bio`, `frontier_llm` and `reasoning_extraction` categories since 2026-09-24, so
+// that asserted 0 under-reports real money. refusalBilled() now decides per category, and a billed
+// refusal leaves costUsd undefined so lib/activity-log.js prices it from the row's own four token
+// columns -- returning NULL, never 0, when the row carries no tokens to price. No historical row is
+// rewritten by this change.
+//
+// DeepBench v7.0.466 | api/prompt/request-receivable.js | SES-348 -- A MODEL CALL RUNS TO THE
+// CALLER'S DEADLINE. postToAnthropicWithRetry() clamped every request's abort signal to the lesser
+// of a 55 s literal and the remaining time (and the parse-failure retry fetch did the
+// same), so HAR-04's threaded deadline was honoured only below 55 s and a caller with a genuinely
+// larger budget got its request hung up on anyway. Measured 2026-09-10: ai_activity_log 41374, a
+// verify-ship verdict, terminal at 51,749 ms -- three minutes later durable_hops ff28e187 recorded
+// the same capability as in_progress with recovery_ledger[0].fault = TimeoutError. A 54-57 s turn
+// was a coin flip. Both fetches now abort at the remaining time the caller actually granted; the
+// MIN_VIABLE_CALL_MS floor is unchanged and is still what refuses a call with no room to finish.
+//
+// DeepBench v7.0.450 | api/prompt/request-receivable.js | LOG-149 -- EVERY CALL THAT REACHED THE API
+// NOW LEAVES A ROW, and a refusal is no longer treated as a parse problem. callModel() was the only
+// place `usage` and `stop_reason` ever exist, and it threw all three "reached the API" failures
+// straight past every logging site: a refusal (HTTP 200, empty content) failed parseModelTurn(), was
+// retried once with the identical body, was refused again, and surfaced as a 422 with nothing logged;
+// a TimeoutError/AbortError and a 4xx/5xx rejection propagated the same way. Measured on the night of
+// 2026-09-09: the two rank-backlog cycles that died on "Anthropic call failed: 400" (21:10Z, 21:13Z)
+// have NO ai_activity_log row at all, while the Console billed for the aborted ceiling runs.
+//
+// Three things changed and nothing else: a refusal throws immediately as a PERMANENT
+// `anthropic-refusal` (§19o -- SES-347 measured the same body refused 5/5, so the retry was a
+// guaranteed second refusal, not a second chance); every sent-call error now carries `modelCall`, the
+// facts a catch needs to write one row; and sendRequest()'s non-precomputed branch, which had no
+// catch whatsoever, writes that row and rethrows unchanged. No capability slug, agent id or intent
+// name is read as a condition anywhere in this change (.claude/rules/capabilities-are-data.md) --
+// every branch keys on a model-response fact or an error name.
+// DeepBench v7.0.428 | api/prompt/request-receivable.js | AGT-63 -- register the 'prioritizer-write'
+// handler (import + one HANDLERS entry; KNOWN_HANDLERS is derived and needs no edit). Nothing else in
+// this file changes: no capability slug, agent id, or intent name appears anywhere in the dispatch
+// path, so the Prioritizer reaches the board the same way every other write capability does.
+// DeepBench v7.0.258 | api/prompt/request-receivable.js | LOG-77 item 2 -- call_facts.output_schema_forced:
+// the constrained-decoding capture §19l names as the one genuinely-missing fact (ARCHITECTURE.md:1813).
+// Read off the body ACTUALLY SENT (callBody.tool_choice?.type === 'tool'), never re-derived from inputs:
+// traits.schema cannot stand in for it, because a can_request_help or web-search intent carries the same
+// schema tool under `tool_choice: auto`. Threaded on BOTH sendRequest() branches (the precomputed_turn
+// path is the live agent route; the self-call path covers api/plan.js and confirmation.js) and omitted
+// when false, the LOG-49 fact-2 posture -- absent means "not forced / unknowable", never "false".
+// SIGNATURE_FIELDS is deliberately NOT extended here: allowlist membership is governed and both prior
+// additions were John's placement calls, so this ships as capture-only (the empty_sections/LOG-109
+// posture) with the promotion carded for him. Guarded by tests/regression/LOG-77-2-output-schema-forced.js.
+// DeepBench v7.0.246 | api/prompt/request-receivable.js | LOG-54 -- call_facts.empty_sections: the
+// signal §19j's open question 1 was blocked on. Records which DECLARED-REQUIRED sections of a
+// structured response arrived empty, derived generically from format_contract.schema (never an
+// intent/agent/capability conditional -- capabilities-are-data). Tri-state and the middle state is
+// load-bearing: key absent = observation does not apply; `[]` = checked, all filled; names = these
+// arrived empty. `[]` is written on purpose, against this file's own omit-when-empty convention,
+// because question 1 needs the denominator and the numerator from one column -- omitting it would
+// make a broken derivation read as perfect compliance. Observability only: no rendering path, no
+// content authored, no user-visible change (§19j "the screen holds no content policy" untouched).
 // DeepBench v7.0.34 | api/prompt/request-receivable.js | LOG-121 -- handler wrapped in
 // withRequestContext(); the request-scoped context is read inside logActivity(), so no logging call
 // site in this file changes
@@ -38,15 +96,40 @@ import { handle as reasoningWriteHandle } from '../_lib/handlers/reasoning-write
 import { handle as patternVocabularyWriteHandle } from '../_lib/handlers/pattern-vocabulary-write.js';
 // FEATURE: LOO-22 -- Eleanor's record-level library verification read handler registration.
 import { handle as libraryLookupHandle } from '../_lib/handlers/library-lookup.js';
+// FEATURE: LOG-143 -- Owen's bench_report_cards write handler registration. This registry is the
+// generic registration mechanism every write handler has used (AA-44, AI-35, LOO-22): it names no
+// capability, and which handler runs is still pure data (traits.handler on the Skill Profile), so
+// ARCHITECTURE.md §19b holds. Registration is not optional -- KNOWN_HANDLERS below is derived from
+// this map and an unregistered slug 501s, so a data-only capability could never reach its store.
+import { handle as reportCardWriteHandle } from '../_lib/handlers/report-card-write.js';
+// FEATURE: AGT-63 -- The Prioritizer's backlog_items write handler registration. Same generic
+// mechanism as every line above it: this registry names no capability and no agent, and which
+// handler runs stays pure data (traits.handler on the Skill Profile), so ARCHITECTURE.md §19b and
+// .claude/rules/capabilities-are-data.md hold. Registration is not optional -- KNOWN_HANDLERS below
+// is derived from this map, so an unregistered slug 501s and pz-classify-intent / pz-rank-intent
+// could never reach the board.
+import { handle as prioritizerWriteHandle } from '../_lib/handlers/prioritizer-write.js';
+// FEATURE: AGT-70 -- The Auditor's audit_findings write handler registration. Same generic
+// mechanism as every line above it: this registry names no capability and no agent, and which
+// handler runs stays pure data (traits.handler on the Skill Profile), so ARCHITECTURE.md 19b and
+// .claude/rules/capabilities-are-data.md hold. Registration is not optional -- KNOWN_HANDLERS below
+// is derived from this map, so an unregistered slug 501s and au-agent-data-intent / au-corpus-intent
+// could never reach the ledger.
+import { handle as auditorWriteHandle } from '../_lib/handlers/auditor-write.js';
 import { logActivity } from '../../lib/activity-log.js';
 // FEATURE: LOG-67 -- merges the fact-half (buildCallFacts) with the config-half signature snapshot
 // carried on the enriched prompt_request.
 import { mergeCallFacts } from './db-assembly.js';
 import { withRequestContext } from '../../lib/request-context.js';
+// FEATURE: SES-334 -- the model-capability fact buildCallBody() asks before forcing a tool choice.
+import { supportsForcedToolChoice, supportsTemperature } from '../../shared/models.js';
 
 export const config = { maxDuration: 60, runtime: 'nodejs' };
 
-const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle };
+// FEATURE: LOG-143 -- 'report-card-write' joins the map; see the import comment above.
+// FEATURE: AGT-63 -- 'prioritizer-write' likewise.
+// FEATURE: AGT-70 -- 'auditor-write' likewise.
+const HANDLERS = { store: storeHandle, 'library-write': libraryWriteHandle, 'reasoning-write': reasoningWriteHandle, 'pattern-vocabulary-write': patternVocabularyWriteHandle, 'library-lookup': libraryLookupHandle, 'report-card-write': reportCardWriteHandle, 'prioritizer-write': prioritizerWriteHandle, 'auditor-write': auditorWriteHandle };
 const KNOWN_HANDLERS = Object.keys(HANDLERS);
 
 // FEATURE: AA-87 -- the two harness-generic delegation tools. Never per-capability data --
@@ -202,7 +285,28 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
   const harnessTools = canRequestHelp ? [REQUEST_HELP_TOOL, DELEGATE_TO_AGENT_TOOL] : [];
   const webSearchTool = enableWebSearch ? [{ type: 'web_search_20250305', name: 'web_search', ...(webSearchMaxUses ? { max_uses: webSearchMaxUses } : {}) }] : [];
   const tools = [...(schemaTool ? [schemaTool] : []), ...harnessTools, ...webSearchTool];
-  const needsAutoChoice = harnessTools.length > 0 || webSearchTool.length > 0;
+  // FEATURE: SES-334 -- the second reason a call takes the auto branch, and it is a MODEL fact, not a
+  // capability one. The first reason (harness tools or web search offered) is about what the turn may
+  // do; this one is about what the model will ACCEPT. `claude-fable-*` rejects tool_choice `tool` and
+  // `any` outright -- measured against the live API, see shared/models.js -- so the forced branch below
+  // returned a hard 400 for every schema-only intent on the governance lane, which is every governance
+  // agent, since their Skill rows all carry claude-fable-5-1. Found by SES-334's first scheduled call.
+  //
+  // WHAT THIS COSTS, STATED RATHER THAN DISCOVERED LATER: on the auto branch the model MAY answer with
+  // text instead of calling the schema tool, and parseModelTurn() throws a missing-tool_use error when
+  // a schema tool was offered (AA-97's boundary is hasSchemaTool=false, which is not this case). That
+  // is a real, if unlikely, failure mode -- and it is strictly better than the certain 400 it replaces.
+  // The refusal stays loud either way; nothing here degrades to a silent free-written answer.
+  const forcedChoiceRejected = !supportsForcedToolChoice(model);
+  // FEATURE: SES-334 -- the same family also REJECTS `temperature` outright ("`temperature` is
+  // deprecated for this model"), so the field is dropped for it rather than sent and refused. This is
+  // resolved ONCE here and read by all four return branches below, because the old form repeated the
+  // same `temperature !== undefined && temperature !== null` test four times and a fifth branch added
+  // later would have silently kept sending it.
+  const temperatureField = (temperature !== undefined && temperature !== null && supportsTemperature(model))
+    ? { temperature }
+    : {};
+  const needsAutoChoice = harnessTools.length > 0 || webSearchTool.length > 0 || forcedChoiceRejected;
 
   // FEATURE: HAR-02c -- the split is "present" when either half carries real text. Both-empty
   // (ai-enrichment's degenerate guard path) takes the fallback exactly like a split-less caller.
@@ -225,13 +329,13 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
     if (hasSplit) {
       return {
         model, max_tokens, ...cachedSystem,
-        ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+        ...temperatureField,
         messages: splitMessages,
       };
     }
     return {
       model, max_tokens, system: systemPrompt,
-      ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+      ...temperatureField,
       messages: conversation_history.length > 0 ? conversation_history : [{ role: 'user', content: 'Please complete the task as instructed.' }],
     };
   }
@@ -247,7 +351,7 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
   if (hasSplit) {
     return {
       model, max_tokens, tools,
-      ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+      ...temperatureField,
       ...cachedSystem,
       tool_choice: needsAutoChoice
         ? { type: 'auto', disable_parallel_tool_use: !enableParallelToolUse } // FEATURE: LOO-28 -- trait-conditional on the auto branch ONLY
@@ -258,7 +362,7 @@ export function buildCallBody({ format_contract, systemPrompt, systemPromptStabl
 
   return {
     model, max_tokens, tools,
-    ...(temperature !== undefined && temperature !== null ? { temperature } : {}),
+    ...temperatureField,
     tool_choice: needsAutoChoice
       ? { type: 'auto', disable_parallel_tool_use: !enableParallelToolUse } // FEATURE: LOO-28 -- trait-conditional on the auto branch ONLY
       : { type: 'tool', name: schemaTool.name, disable_parallel_tool_use: true },
@@ -404,6 +508,10 @@ const MIN_VIABLE_CALL_MS = 8000;
 // callModel(), which defaults it to Date.now() + 55000 when its own caller passes nothing -- see
 // callModel() below). remainingMs is recomputed on every retry attempt, not just once at entry, so a
 // slow transient-error backoff loop can't silently overrun the caller's real budget.
+// FEATURE: SES-348 -- the abort fires at the caller's deadline and nowhere else. The signal used to
+// be clamped to the lesser of a 55 s literal and remainingMs, so a caller that threaded a longer
+// deadline through still had every request hard-aborted at 55 s -- HAR-04's whole point, silently capped.
+// The floor above is the only other bound: below MIN_VIABLE_CALL_MS we don't start the call at all.
 async function postToAnthropicWithRetry(body, headers, deadline) {
   for (let attempt = 0; ; attempt++) {
     const remainingMs = deadline - Date.now();
@@ -413,9 +521,24 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
       throw Object.assign(new Error(`Insufficient time remaining for Anthropic call (${remainingMs}ms left)`),
         { status: 504, failureClass: 'transient', faultCode: 'time-budget-exhausted' });
     }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(55000, remainingMs)),
-    });
+    // FEATURE: LOG-149 -- an ABORT is the one failure on this path that IS billed: the API finished
+    // generating and we hung up (SES-348's 56-57s TimeoutErrors on 2026-09-09 are the measured case),
+    // so its dollars are real and were previously invisible. The attempt counter is stamped HERE
+    // because this loop is the only scope that knows it; callModel()'s wrapper adds the model and the
+    // input estimate, which are the only two facts IT knows. The error object is rethrown unchanged
+    // otherwise -- HAR-17 classifies on `name`, and renaming or re-wrapping it would silently turn a
+    // recoverable transient into a permanent surface.
+    let res;
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(remainingMs),
+      });
+    } catch (e) {
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        e.modelCall = { sent: true, billed: true, fault: e.name, api_retry_count: attempt };
+      }
+      throw e;
+    }
     if (res.ok) return { res, apiRetryCount: attempt };
     if (attempt >= MAX_ANTHROPIC_ATTEMPTS - 1 || !TRANSIENT_ANTHROPIC_STATUS.has(res.status)) {
       const text = await res.text();
@@ -423,12 +546,78 @@ async function postToAnthropicWithRetry(body, headers, deadline) {
       // upstreamStatus carries Anthropic's real status; failureClass is what HAR-17 must gate its
       // one auto-resume on -- never `status`, which is 502 for every upstream failure incl. 400s.
       const { failureClass, faultCode } = classifyAnthropicFailure(res.status, text);
+      // FEATURE: LOG-149 -- modelCall: the facts a downstream catch needs to write ONE ledger row for
+      // a call that reached the API and failed. `sent: true` is the whole discriminator: before this,
+      // a rejected call threw from here and both catch sites (execute.js's runLoop, sendRequest's own
+      // path) returned without ever reaching logActivity() -- the two rank-backlog cycles that died
+      // on "Anthropic call failed: 400" at 21:10Z and 21:13Z on 2026-09-09 have no log row at all.
+      // `billed: false` because a request Anthropic REJECTED is not charged; the row costs 0, which
+      // is a measured fact and not the same thing as an unknown. `model` is absent here on purpose --
+      // postToAnthropicWithRetry() is not told which model it is posting; callModel()'s wrapper adds
+      // it, so this object stays a fact about the HTTP exchange this function actually performed.
       throw Object.assign(new Error(`Anthropic call failed: ${res.status}`), {
         status: 502, upstreamStatus: res.status, failureClass, faultCode, detail: text,
+        modelCall: { sent: true, billed: false, fault: faultCode, upstream_status: res.status, api_retry_count: attempt },
       });
     }
     await new Promise(resolve => setTimeout(resolve, API_RETRY_BACKOFF_MS[attempt]));
   }
+}
+
+// FEATURE: LOG-149 -- a LABELLED input-token floor for a call we aborted. The exact count is
+// unknowable to us on this path: the API never returned a usage block, count_tokens is a second
+// network round trip on a path that just ran out of time (SES-348: the abort fires at the caller's
+// deadline, whatever the calling function's declared ceiling allows -- it is no longer a 55s literal
+// inside a 60s maxDuration), and the exact free source -- streaming's message_start.usage.input_tokens -- is
+// SES-348's design decision, not this ticket's. So we estimate, and every row built from this
+// carries call_facts.tokens_estimated = true so no reader can mistake the floor for a measurement.
+//
+// ~4 chars/token over the serialized prompt-shaping fields only (system/messages/tools -- the parts
+// that actually become input tokens; max_tokens and temperature do not). Deliberately crude and
+// deliberately an UNDER-count for English prose, because a floor that reads low is a known-direction
+// error, while an over-count would put dollars in the ledger the Console never charged.
+export function estimateInputTokens(callBody) {
+  const { system, messages, tools } = callBody || {};
+  return Math.ceil(JSON.stringify({ system, messages, tools }).length / 4);
+}
+
+// FEATURE: LOG-149 -- the §19k fact-half for a failed model call, in ONE place because both failure
+// seams (this file's sendRequest() and api/capabilities/execute.js's runLoop() catch) must write the
+// same key names or the Displayer sees two vocabularies for one event.
+//
+// EVERY KEY IS OMITTED WHEN EMPTY, never written false or null, and that is the §19k contract rather
+// than tidiness: call_facts is the signature base, an absent key means "not a failure", and a
+// `stop_reason: null` on every normal row would fragment the signature of the whole log. Same
+// omit-when-empty shape logAgentTurn()'s tool_calls already uses.
+//
+// FEATURE: AGT-176 -- the refusal categories Anthropic BILLS. Since 2026-09-24 a pre-output refusal
+// in one of these three is charged; every other category is not. This is the whole judgment behind
+// `billed` at both refusal gates, kept as one pure exported function so the rule has exactly one home
+// and a regression test can assert it without reaching the network (pattern:14, pattern:150).
+//
+// FAILS CLOSED TOWARDS "UNBILLED", DELIBERATELY. An absent category -- `null`, `undefined`, or a
+// category Anthropic adds after this ship -- returns false and keeps its measured 0 rather than
+// becoming an unpriceable row. A wrong `true` would hand a row to the pricer that has no tokens to
+// price and publish a NULL where a real measured 0 belongs; a wrong `false` under-reports exactly as
+// this ticket describes and is the louder, more findable failure. Neither is guessed: the set is
+// literal, and adding to it is a ticket with Anthropic's billing change cited, never a widened match.
+export const BILLED_REFUSAL_CATEGORIES = ['bio', 'frontier_llm', 'reasoning_extraction'];
+
+export function refusalBilled(category) {
+  return typeof category === 'string' && BILLED_REFUSAL_CATEGORIES.includes(category);
+}
+
+// ALL FOUR VALUES ARE BOUNDED: an error name, a faultCode from HAR-15's fixed set, Anthropic's
+// stop_reason, and a refusal category. No count, no millisecond, no id -- per
+// .claude/rules/ai-pattern-signature.md these are captured as LOG-109 diagnostic facts and are
+// deliberately NOT added to SIGNATURE_FIELDS; promoting one is Susan's review path, not this ship's.
+export function failureFacts(mc) {
+  return {
+    ...(mc?.stop_reason ? { stop_reason: mc.stop_reason } : {}),
+    ...(mc?.refusal_category ? { refusal_category: mc.refusal_category } : {}),
+    ...(mc?.fault ? { fault: mc.fault } : {}),
+    ...(mc?.tokens_estimated ? { tokens_estimated: true } : {}),
+  };
 }
 
 // FEATURE: HAR-20 -- extracted from callModel()'s inline correction-message construction (was:
@@ -494,8 +683,67 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
 
   const callBody = buildCallBody({ format_contract, systemPrompt, systemPromptStable: system_prompt_stable, systemPromptVolatile: system_prompt_volatile, model, max_tokens, temperature, canRequestHelp, enableWebSearch, webSearchMaxUses, enableParallelToolUse, conversation_history });
 
-  const { res: llmRes, apiRetryCount } = await postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline);
+  // FEATURE: LOG-149 -- the two facts only THIS scope knows (which model was asked, and what the
+  // request body was) are folded onto any error that already says a request was sent. Written as a
+  // decorate-and-rethrow rather than a new error so `name`, `status`, `failureClass` and `faultCode`
+  // all survive byte-identical: HAR-17's one-recovery rule gates on those, and a call starved of time
+  // (time-budget-exhausted -- no request made) correctly picks up NO sent-call facts here, which is
+  // what stops a row being written for a call that never happened.
+  const withModelCallFacts = async (fn) => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e?.modelCall?.sent) {
+        e.modelCall.model = model;
+      } else if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        e.modelCall = { sent: true, billed: true, fault: e.name, api_retry_count: 0, ...(e.modelCall || {}), model };
+      }
+      if (e?.modelCall?.fault === 'TimeoutError' || e?.modelCall?.fault === 'AbortError') {
+        e.modelCall.estimated_input_tokens = estimateInputTokens(callBody);
+        e.modelCall.tokens_estimated = true;
+      }
+      throw e;
+    }
+  };
+
+  const { res: llmRes, apiRetryCount } = await withModelCallFacts(
+    () => postToAnthropicWithRetry(callBody, anthropicHeaders, effectiveDeadline));
   let llmData = await llmRes.json();
+  // FEATURE: LOG-149 -- A REFUSAL IS A FAILURE, NOT A PARSE PROBLEM, and it must be caught HERE,
+  // before parseModelTurn(). Measured 2026-09-09 (SES-347, five runs per cell): a classifier refusal
+  // returns HTTP 200 with stop_reason 'refusal' and ZERO content blocks, so parseModelTurn() threw
+  // "No tool_use block", the block below sent a SECOND copy of the identical body, and that second
+  // request was refused too -- 5/5, deterministic on the same body. Retrying it is not a dice roll
+  // with a second chance, it is a guaranteed second refusal, which is why §19o and
+  // .claude/rules/transient-failure-recovery.md class this permanent and why the throw is here rather
+  // than inside the catch.
+  //
+  // FEATURE: AGT-176 -- WHETHER A REFUSAL IS BILLED IS NOW A PER-CATEGORY FACT, NOT AN ASSERTED 0.
+  // The rule this block used to state -- that a pre-output refusal is charged no input and no output
+  // tokens, so the row must say so with a 0 -- stopped being true on 2026-09-24, when Anthropic began
+  // billing pre-output refusals in the `bio`, `frontier_llm` and `reasoning_extraction` categories.
+  // An asserted 0 on one of those rows is not a measured free call, it is real money missing from the
+  // ledger. refusalBilled() decides from the category alone; every other category (and an absent one)
+  // stays unbilled and keeps its measured 0.
+  //
+  // A BILLED REFUSAL IS PRICED, NEVER ASSERTED. `billed: true` leaves `costUsd` undefined at both
+  // cost mappers (the failure-seam mapper below, `api/capabilities/execute.js:1297`), so lib/activity-log.js prices
+  // the row from its own four token columns and lands NULL -- unknown -- when there are no tokens to
+  // price. That is what keeps this from re-opening the phantom-dollar defect §19v records from
+  // 2026-08-20: nothing here invents a figure, and an unpriceable row reads absent rather than free.
+  // `usage` is carried as the API reported it, unnormalized, because it is evidence about the call
+  // rather than a meter -- and it is also what a billed refusal is priced from.
+  if (llmData.stop_reason === 'refusal') {
+    throw Object.assign(new Error(`Anthropic refused the request (${llmData.stop_details?.category ?? 'uncategorized'})`), {
+      status: 502, upstreamStatus: 200, failureClass: 'permanent', faultCode: 'anthropic-refusal',
+      detail: JSON.stringify(llmData.stop_details ?? null),
+      modelCall: {
+        sent: true, billed: refusalBilled(llmData.stop_details?.category ?? null), model, stop_reason: 'refusal',
+        refusal_category: llmData.stop_details?.category ?? null,
+        usage: llmData.usage ?? null, api_retry_count: apiRetryCount,
+      },
+    });
+  }
   // FEATURE: HAR-02a -- normalize the two cache-token fields to 0 whether or not Anthropic sent
   // them. Until S-HAR-02b/c enable prompt caching they arrive as undefined and stay 0; once
   // caching is live, input_tokens means UNCACHED input only and these two carry the remainder.
@@ -553,7 +801,20 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
         console.error(`[request-receivable] callModel retry skipped: insufficient time remaining (${retryRemainingMs}ms) firstFailure="${parseErr.message}"`);
         throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: `Retry skipped -- insufficient time remaining (${retryRemainingMs}ms left, need ${MIN_VIABLE_CALL_MS}ms)` });
       }
-      const retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(Math.min(55000, retryRemainingMs)) });
+      // FEATURE: LOG-149 -- the parse-failure retry is a SECOND real request and can abort exactly
+      // like the first, so it gets the same sent-call facts. Same decorate-and-rethrow, same
+      // unchanged error identity; api_retry_count is 0 because this is the retry's own first attempt
+      // (it has no internal retry loop of its own).
+      let retryRes;
+      try {
+        retryRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: anthropicHeaders, body: JSON.stringify(retryBody), signal: AbortSignal.timeout(retryRemainingMs) });
+      } catch (e) {
+        if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+          e.modelCall = { sent: true, billed: true, model, fault: e.name, api_retry_count: 0,
+            estimated_input_tokens: estimateInputTokens(retryBody), tokens_estimated: true };
+        }
+        throw e;
+      }
       // FEATURE: AA-157 -- surface the retry's OWN rejection reason (this distinct HTTP call's real
       // status/body), not the ORIGINAL parse error that triggered the retry. Before this fix, every
       // occurrence of this 422 reported parseErr.message as `detail` -- why the FIRST call failed to
@@ -573,6 +834,23 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
         throw Object.assign(new Error('Parse failed and retry also failed'), { status: 422, detail: retryDetail });
       }
       llmData = await retryRes.json();
+      // FEATURE: LOG-149 -- the same refusal gate on the retry's response. A mid-conversation refusal
+      // (the corrective turn tripped a classifier the first turn did not) is the same permanent class
+      // and, per AGT-176, the same per-category `billed` verdict -- not a blanket unbilled 0. Without
+      // this gate it would fall through to parseModelTurn() and surface
+      // as the generic "Parse failed and retry also failed" 422, which names the wrong cause and,
+      // being a 422, HAR-17 classes TRANSIENT -- an auto-resume into a third refused request.
+      if (llmData.stop_reason === 'refusal') {
+        throw Object.assign(new Error(`Anthropic refused the request (${llmData.stop_details?.category ?? 'uncategorized'})`), {
+          status: 502, upstreamStatus: 200, failureClass: 'permanent', faultCode: 'anthropic-refusal',
+          detail: JSON.stringify(llmData.stop_details ?? null),
+          modelCall: {
+            sent: true, billed: refusalBilled(llmData.stop_details?.category ?? null), model, stop_reason: 'refusal',
+            refusal_category: llmData.stop_details?.category ?? null,
+            usage: llmData.usage ?? null, api_retry_count: apiRetryCount,
+          },
+        });
+      }
       // FEATURE: HAR-02a -- the retry merge sums the cache-token fields too, same || 0 guards.
       usage = {
         input_tokens: usage.input_tokens + (llmData.usage?.input_tokens || 0),
@@ -600,7 +878,15 @@ export async function callModel({ systemPrompt, system_prompt_stable = undefined
     }
   }
 
-  return { ...turn, raw_content: llmData.content, usage, retryCount, apiRetryCount };
+  // FEATURE: LOG-77-2 -- `output_schema_forced`, read off the body ACTUALLY SENT rather than
+  // re-derived from the inputs. buildCallBody() emits `tool_choice: { type: 'tool' }` on exactly
+  // the forced branch and `{ type: 'auto' }` whenever harness tools or web search are present
+  // (needsAutoChoice), and omits tool_choice entirely when no tools were offered. So this one
+  // expression is the ground truth for constrained decoding, and `traits.schema` is NOT a
+  // substitute for it: a can_request_help or web-search intent has a schema AND auto choice, so
+  // schema-present would be confidently wrong on exactly the rows that distinguish the pattern.
+  const output_schema_forced = callBody.tool_choice?.type === 'tool';
+  return { ...turn, raw_content: llmData.content, usage, retryCount, apiRetryCount, output_schema_forced };
 }
 
 // FEATURE: AA-44 — patterns_used array built from call shape and guardrails state
@@ -672,6 +958,59 @@ export function extractDelegationProvenanceFacts(toolInput, taskContext) {
   return { delegationTarget: pick(toolInput), taskProvenance: pick(taskContext) };
 }
 
+// FEATURE: LOG-54 -- ARCHITECTURE.md §19j. Records WHICH declared-required sections of a structured
+// response arrived EMPTY, so "she checked and found nothing" stops being indistinguishable from "the
+// field was dropped". Until this, nothing anywhere recorded it: measured live 2026-08-25, 343
+// hyp-hypothesis-test-intent and 437 display-intent rows in ai_activity_log, every one carrying
+// call_facts, and NOT ONE carrying an emptiness fact -- while durable_hops (the ledger §19j's own
+// 2026-07-23 note reached for) holds 64 completed display rows of which only 3 carry the section keys
+// at all, because rows are written only when a call checkpoints. ai_activity_log is the ledger.
+//
+// GENERIC BY CONSTRUCTION, and it has to be: `.claude/rules/capabilities-are-data.md` forbids an
+// agent/capability/intent conditional in this file, so the SCHEMA is what drives the read. Nothing
+// here names a slug; a Q&A schema, a routing schema and a hypothesis schema all work unchanged.
+//
+// `required` ONLY, deliberately: "arrived empty" is a signal only against an obligation. An optional
+// property the contract lets the model omit is contractual behaviour, not a failure mode. Note this
+// is the ORTHOGONAL half of what parseModelTurn() already enforces -- that checks required keys are
+// PRESENT; this records present-but-hollow, which is exactly the case §19j says nothing can see.
+export function isEmptyDeclaredValue(v) {
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string') return v.trim() === '';
+  // 0 and false are CONTENT, never emptiness -- override_warning:false is a real answer.
+  if (typeof v === 'number' || typeof v === 'boolean') return false;
+  if (Array.isArray(v)) return v.length === 0 || v.every(isEmptyDeclaredValue);
+  if (typeof v === 'object') {
+    const keys = Object.keys(v);
+    return keys.length === 0 || keys.every((k) => isEmptyDeclaredValue(v[k]));
+  }
+  return false;
+}
+
+// Returns null when the observation DOES NOT APPLY (no object schema, no declared `required`, or a
+// non-object output -- i.e. a text call), and otherwise the SORTED list of required properties that
+// came back empty -- `[]` included.
+//
+// THE `[]` IS DELIBERATE AND IS THE ONE PLACE THIS FILE BREAKS ITS OWN "omit the key when the fact
+// set is empty" CONVENTION. Do not "tidy" it back. For every other key the empty case carries no
+// information ("no tools called" needs no row). Here the empty case IS the deliverable: §19j
+// question 1 asks whether the content specialist complies RELIABLY, which needs the denominator
+// (calls actually checked) and the numerator (calls with an empty section) out of the same column.
+// Omitting `[]` collapses "checked, all filled" into "never checked", so a silently broken
+// derivation would read as perfect compliance -- failing toward "don't build the reviewer",
+// invisibly. That is the supabase-column-grants lesson (assert BOTH directions) in a second costume.
+// The {} -> NULL contract in mergeCallFacts()/logActivity() is untouched.
+export function extractEmptyDeclaredSections(schema, structuredOutput) {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return null;
+  if (schema.type !== 'object') return null;
+  const required = schema.required;
+  if (!Array.isArray(required) || required.length === 0) return null;
+  if (!structuredOutput || typeof structuredOutput !== 'object' || Array.isArray(structuredOutput)) return null;
+  return required
+    .filter((name) => typeof name === 'string' && isEmptyDeclaredValue(structuredOutput[name]))
+    .sort();
+}
+
 // FEATURE: LOG-37 -- single source of truth for "which tools did this response actually invoke".
 // `usedWebSearch` (the pre-existing HAR-05 boolean feeding patterns_used) is now derived from this
 // same list rather than re-scanning rawContent with a second, drift-prone predicate. Equivalence
@@ -712,6 +1051,15 @@ export function buildCallFacts({
   // fact-half above). Both omitted when empty, same "null not {}" contract as every other key here.
   inputReferencesOtherDeliverable = false,
   selfReportedClaims = null,
+  // FEATURE: LOG-54 -- null means the emptiness observation does not apply to this call (no declared
+  // object schema / no `required` / text output), so the key is omitted. An ARRAY -- including the
+  // empty one -- means the observation was made, and is written. See extractEmptyDeclaredSections().
+  emptySections = null,
+  // FEATURE: LOG-77-2 -- item 2 of the signature capture roadmap: did this call enforce its output
+  // schema by forcing the tool (`tool_choice: { type: 'tool' }`) rather than leaving the model free
+  // to answer in text or reach for a harness tool? Boolean, omitted when false -- absent means "not
+  // forced / unknowable", never "false", exactly the LOG-49 fact-2 posture below.
+  outputSchemaForced = false,
 } = {}) {
   const facts = {};
 
@@ -752,6 +1100,17 @@ export function buildCallFacts({
   if (inputReferencesOtherDeliverable) facts.input_references_other_deliverable = true;
   // FEATURE: LOG-49 -- fact 3: the model's own declared reference-ids, quarantined in this key.
   if (selfReportedClaims && Object.keys(selfReportedClaims).length > 0) facts.self_reported_claims = selfReportedClaims;
+
+  // FEATURE: LOG-54 -- Array.isArray, never a truthiness test: `[]` is a finding ("checked, all
+  // filled"), not an absent fact, and `emptySections && ...` would silently drop exactly the
+  // denominator §19j question 1 needs. Bounded cardinality by construction -- the value is a subset
+  // of one schema's declared `required` list (k=4 for hyp-hypothesis-test-intent, k=7 for
+  // intelligence-review-format, read live 2026-08-25), sorted so identical compliance states
+  // collapse to one signature. Never a count, never free text -- that is the LOG-91 blow-up.
+  if (Array.isArray(emptySections)) facts.empty_sections = emptySections;
+
+  // FEATURE: LOG-77-2 -- omitted when false, same contract as fact 2 above.
+  if (outputSchemaForced) facts.output_schema_forced = true;
 
   return facts;
 }
@@ -843,12 +1202,18 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
   // FEATURE: AA-80 — precomputed_turn lets execute.js's loop skip a duplicate model call when
   // it already has the final turn's parsed output. Every existing caller omits this param and
   // gets the exact original single-call, single-attempt-then-retry-once behavior, unchanged.
-  let parsedResponse, usage, retryCount, rawContent;
+  // FEATURE: LOG-77-2 -- outputSchemaForced is threaded on BOTH branches. The precomputed branch
+  // is the live agent path (runLoop() hands callModel()'s whole turn through as precomputed_turn,
+  // execute.js:1161/1403), and the self-call branch covers api/plan.js and confirmation.js. `=== true`
+  // rather than a truthiness read, so a turn object predating this field (a resumed durable hop
+  // carrying an older shape) stays false rather than undefined.
+  let parsedResponse, usage, retryCount, rawContent, outputSchemaForced;
   if (precomputed_turn) {
     parsedResponse = precomputed_turn.tool_input;
     usage = precomputed_turn.usage;
     retryCount = precomputed_turn.retryCount || 0;
     rawContent = precomputed_turn.raw_content || [];
+    outputSchemaForced = precomputed_turn.output_schema_forced === true;
   } else {
     // FEATURE: HAR-04 -- deadline passed through unchanged; callModel() applies its own
     // Date.now() + 55000 default when this is null (every non-opted-in caller, unaffected).
@@ -858,11 +1223,45 @@ export async function sendRequest({ prompt_request, agent_id, capability_slug, t
     // existing caller) is byte-identical.
     // FEATURE: HAR-27 -- webSearchMaxUses read off the same llm object destructured above;
     // undefined for every capability without the trait (byte-identical).
-    const turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, enableWebSearch, webSearchMaxUses: llm?.web_search_max_uses, conversation_history: [], deadline });
+    // FEATURE: LOG-149 -- this branch had NO catch at all, so any model call it made that the API
+    // refused, aborted or rejected threw straight past STEP 4's logActivity() and left no ledger row
+    // whatsoever. The row is written here, once, and the error is rethrown unchanged so every
+    // existing caller's error handling is byte-identical.
+    //
+    // THE GATE IS `e.modelCall?.sent`, NEVER "an error happened": a config fault (no API key) or a
+    // deadline-starved call carries no sent-call facts and must write NOTHING -- a row for a call
+    // that never reached the API is a phantom dollar with a timestamp on it.
+    const callStart = Date.now();
+    let turn;
+    try {
+      turn = await callModel({ systemPrompt, model, max_tokens, temperature, format_contract, enableWebSearch, webSearchMaxUses: llm?.web_search_max_uses, conversation_history: [], deadline });
+    } catch (e) {
+      if (e?.modelCall?.sent) {
+        const mc = e.modelCall;
+        logActivity({
+          tenantId: tenant_id || 'global',
+          aiType: capability_slug || 'request-receivable',
+          feature: 'request-receivable',
+          model, agentId: agent_id || null, taskId: task_id || null,
+          // The API's own count when it gave one; the labelled estimate when we aborted and it could
+          // not; null when neither exists. Output is NEVER estimated -- unknowable stays NULL.
+          inputTokens: mc.usage?.input_tokens ?? mc.estimated_input_tokens ?? null,
+          outputTokens: mc.usage?.output_tokens ?? null,
+          latencyMs: Date.now() - callStart,
+          traceId: trace_id, spanId: span_id, parentSpanId: parent_span_id,
+          callFacts: mergeCallFacts(failureFacts(mc), prompt_request?.signature_config ?? null),
+          // An unbilled outcome (refusal, rejection) asserts 0; an abort leaves it undefined so
+          // logActivity() prices the estimate as the floor it is.
+          costUsd: mc.billed === false ? 0 : undefined,
+        });
+      }
+      throw e;
+    }
     parsedResponse = turn.tool_input;
     usage = turn.usage;
     retryCount = turn.retryCount;
     rawContent = turn.raw_content || [];
+    outputSchemaForced = turn.output_schema_forced === true;
   }
 
   // FEATURE: HAR-05 -- mechanical pattern detection (ARCHITECTURE.md §19i). Only true when the
@@ -1032,6 +1431,14 @@ Return JSON: { "passed": true|false, "violations": ["list of rule violations, or
     // (parsedResponse), quarantined into its own key by buildCallFacts().
     inputReferencesOtherDeliverable: input_references_other_deliverable,
     selfReportedClaims: extractSelfReportedClaims(parsedResponse),
+    // FEATURE: LOG-54 -- the declared contract and the terminal parsed output are BOTH in scope only
+    // here, which is why this is the seam. It covers both live write paths with one line: the
+    // non-precomputed branch writes below, and on the precomputed path these same facts ride back to
+    // runLoop() as _terminal_log and merge into the surviving agent-turn row (LOG-91), so execute.js
+    // needs no change. Delegating turns carry no schema output and correctly never get the key.
+    emptySections: extractEmptyDeclaredSections(format_contract?.schema, parsedResponse),
+    // FEATURE: LOG-77-2 -- threaded from whichever branch above made (or received) the model call.
+    outputSchemaForced,
   }), prompt_request?.signature_config ?? null);
 
   // FEATURE: AI-41 — ai_type derived from capability_slug (bounded, matches SERVICE_CATALOG slugs

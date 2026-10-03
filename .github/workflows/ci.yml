@@ -1,0 +1,378 @@
+# DeepBench v7.0.631 | .github/workflows/ci.yml | AGT-194 — ONE CONCURRENCY GROUP PER PUSHED SHA,
+# so every sha that lands on dev keeps its own CI conclusion. The whole change is the `group:` key
+# below; `cancel-in-progress: true` is UNCHANGED and load-bearing.
+#
+# THE DEFECT, measured live on `public.ci_run_conclusions` at this ship rather than reasoned about.
+# The group was `ci-${{ github.ref }}`: one group per REF, while 5-7 sessions push `dev` minutes
+# apart. So every dev push shared one group and each new push CANCELLED the last. 82 of 535 rows
+# (15.3%, 2026-08-31 → 2026-09-27) carry a cancelled blocking job — 82 on `Tripwire + regression
+# (blocking)`, 8 on `Build (blocking)` — mean 3.4/day over 24 days, worst day 12. A cancelled
+# blocking job is not a softer red: NO conclusion is ever published for that sha, so the runner's
+# step 4a can only say "could not tell". 16 of 127 `runner_verdicts` rows carrying a `graded_sha`
+# name a sha with no conclusion row at all — all 16 `verdict=block`, 7 provable ancestors of dev HEAD.
+#
+# IT IS NOT ONLY A PEER PROBLEM. Ship `d524d6d0` (AGT-172) had `Tripwire + regression (blocking)`
+# cancelled at 01:53:42Z by its OWN cycle's close-out push 366 seconds later. A cycle was cancelling
+# the grade of its own ship with its own second push.
+#
+# WHY THE GUARD IS `event_name == 'push'` AND NOT A BRANCH TEST, which is the line to read twice.
+# On `pull_request` the suffix evaluates to the EMPTY STRING, so the group stays ref-wide and a
+# force-push still supersedes the run it replaced — that cancellation is wanted, because a PR's
+# superseded commit needs no conclusion of its own. On `push` the sha is appended, so `main` is
+# covered by the same line with no second condition to keep in sync. GitHub's `&&` / `||` yield
+# OPERANDS rather than booleans, so `false || ''` renders as the empty string and the pull_request
+# form is byte-identical to what shipped before this line changed.
+#
+# THE COST, NAMED RATHER THAN BURIED. Superseded dev pushes now RUN the full blocking suite instead
+# of being cancelled: ~3.4 extra blocking completions/day, worst observed day 12. Against a measured
+# peak of 65 pushes/day (≈2.7/hour) and a blocking path of a few minutes, expected overlap stays in
+# low single digits, so an Actions concurrency ceiling would present as a QUEUED run — delayed, never
+# a lost conclusion, which is the direction this ticket exists to buy. The account's plan tier and
+# its job ceiling are a billing read and were NOT verified at this ship.
+#
+# THE FAILURE DIRECTION THIS EDIT MUST NEVER TAKE. A malformed `${{ }}` expression does not fail one
+# job — it makes the WHOLE workflow invalid, so nothing runs and no sha is ever graded again, which
+# is strictly worse than the bug being fixed. So the guard
+# (tests/regression/agt-194-ci-conclusion-per-sha.test.mjs) parses this file with a REAL YAML parser
+# and asserts the job set, the trigger block and the workflow name unchanged — never a grep. Its
+# arms A and B evaluate this expression for two shas: different groups on push, one group on
+# pull_request. Either arm alone would pass a wrong fix.
+#
+# DeepBench v7.0.613 | .github/workflows/ci.yml | AGT-168 slice 1 — THE PRIVATE-INFO SCAN NOW
+# GATES, and the one line to read twice is `--base`. scripts/audit-private-scan.js has detected
+# credentials, personal addresses and home-directory paths in tracked files since v7.0.550, but its
+# only entry point was the whole tree and nothing here ran it. Measured on dev at this ship: 48
+# lines across 46 tracked files already carry a Vercel protection-bypass value — all historical
+# residue under docs/kickoffs/, newest v7.0.85. A step calling the bare form would report those 48
+# on EVERY run and be red forever, and a check that is always red is a check nobody reads. So the
+# step grades THE CHANGE: the added lines of `git diff <base> HEAD`, nothing else.
+#
+# IT IS A STEP IN `checks`, NOT A NEW JOB, and that is deliberate rather than lazy. `checks` is
+# already blocking and already named in `report-conclusion`'s `needs`, so a red gate reaches the
+# anchor with no `needs` edit and no jq-payload edit — and adding a fourth job would have required
+# both (see the `needs` note above that job).
+#
+# `git fetch --depth=1 origin "$BASE_SHA"` IS LOAD-BEARING, not belt-and-braces. actions/checkout@v4
+# carries no `fetch-depth` here, so the runner clones at depth 1 (SES-393) and the base commit is
+# simply absent; without the fetch the script cannot resolve it and exits 2 on every single run.
+#
+# THE EDIT THIS SHIP FORBIDS: dropping `--base` to "also catch the existing ones". That does not
+# catch them, it paints the branch permanently red and the 48 lines stay exactly where they are.
+# Removing them is a ~46-file purge that needs John's own waiver of the 3-file cap, and rotating
+# the live bypass value is his alone; neither is this step's job. This gate is PROPHYLACTIC — it
+# stops the 49th line. Guarded by tests/regression/AGT-168-private-scan-change-scoped.js.
+#
+# DeepBench v7.0.452 | .github/workflows/ci.yml | SES-352 — THIS JOB NOW WRITES THE GREEN ANCHOR,
+# not just the grade. `trg_anchor_green_from_ci` on public.ci_run_conclusions inserts the
+# runner_green_states row the moment the curl below lands an all-success run, stamping
+# migration_watermark_at(concluded_at) — the schema as it stood when CI concluded. Measured before
+# this ship: newest anchor 2026-09-02, newest all-success row 2026-09-10, 63 greens in between with
+# no anchor, because runner-cycle.md step 4a only records one when a cycle is up AND dev's head is
+# green at that minute. `ref` is the one new field and it is LOAD-BEARING: ci.yml runs on pushes to
+# dev AND main, origin/main is NOT an ancestor of origin/dev, and an anchor for a main-only sha
+# would hand the rollback engine `git revert <non-ancestor>..<head>`. The trigger anchors ref='dev'
+# only; a NULL ref — a run still on the pre-ship workflow — anchors nothing. GITHUB_REF_NAME is a
+# default runner variable: no `env:` line, NO NEW SECRET. Guarded by
+# tests/regression/SES-352-green-anchor-from-ci.js.
+#
+# DeepBench v7.0.339 | .github/workflows/ci.yml | SES-255 — CI PUBLISHES ITS OWN GRADE, because
+# nothing an unattended cycle can reach is able to read it. runner-cycle.md step 4a needs this run's
+# conclusion to record the green anchor SES-182's auto-rollback measures every later red against;
+# the engine holds no credential by John's own design, so the cycle must supply it. Measured three
+# times rather than argued: the GitHub REST listing for ONE run on dev returns ~71,000 characters
+# (71,371 then 71,575), over the agent tool-result cap and into the ~/.claude/.../tool-results/ path
+# register B39 forbids an unattended cycle to touch; raw HTTPS to api.github.com is separately
+# refused by the session proxy regardless of credential. No bounded sha -> conclusion read exists on
+# any surface a cycle has, so the direction is inverted and the grader publishes its own grade.
+#
+# THE NEW JOB PROVISIONS NOTHING. It uses the two repository secrets SES-180 (d) already exposes to
+# the regression step, which is what keeps it out of the John-only lane this header names below
+# (adding secrets; branch protection). Its two guards fail in OPPOSITE directions and both are
+# load-bearing — see the block above the job itself.
+#
+# THE EDIT THIS SHIP FORBIDS: dropping a job from `report-conclusion`'s `needs` to "simplify" it.
+# isRunGreen() requires EVERY blocking job to be `success`, so a job absent from `needs` is one whose
+# failure the anchor silently forgets and the run still reads green.
+# tests/regression/SES-255-ci-conclusion-reporting.js computes that set from this file rather than
+# hardcoding it, so a fourth job added without adding it here fails the suite.
+#
+# DeepBench v7.0.304 | .github/workflows/ci.yml | SES-180 (d) — THE REGRESSION STEP IS ACTUALLY
+# CREDENTIALED, and the thing to read twice is that this ship exists because the header below was
+# WRONG. John, attended architect session 2026-08-29, directive 82403dad, after reading this file at
+# e8432f3 with the secrets already added: the v7.0.286 caveat's closing sentence — "adding the
+# secrets later makes the gate stronger with no edit to this file" — is FALSE, and it is corrected
+# in place below rather than left standing as a lie above true code.
+#
+# WHY IT WAS FALSE, and it is a property of GitHub Actions rather than a slip of wording: a
+# repository secret is NEVER auto-exposed to a step. `secrets.*` resolves only where it is written,
+# and the step that runs the suite carried no `env:` block at all. So both repository secrets could
+# be present and correct — and John confirmed live on 2026-08-29 that SUPABASE_URL and
+# SUPABASE_SERVICE_KEY both are — while `node tests/regression/run-all.js` still saw an environment
+# with neither, and the credentialed halves went on declaring themselves not-run forever. The gate
+# would have sat one `env:` block short of the strength this file claimed it already had, and
+# nothing in the run would have said so: a not-run declaration looks identical whether the secret
+# is missing or merely unexposed. THAT is why the sentence had to be corrected and not just
+# out-grown — it described a future that could not arrive on its own.
+#
+# WHAT CHANGED: two keys under a new `env:` on the suite step, and the step's name. Nothing else.
+#
+# THE STEP'S NAME IS PART OF THE FIX, not tidiness. It read "Regression suite (no credentials)",
+# which after this edit would be false in the log of every run on dev and main — and a step whose
+# name misreports its own environment is the same defect as the header sentence, one line further
+# down. NAMED CAVEAT rather than hidden: on a pull_request from a FORK, GitHub resolves both
+# secrets to the empty string by design (that is the safe behaviour and this file must not try to
+# defeat it), so on that one path the name over-promises. The run itself still reports the truth —
+# the credentialed halves declare themselves not-run, loudly and countably, exactly as they did
+# before this ship — so the log is self-correcting where the name cannot be.
+#
+# THE EDIT THIS SHIP FORBIDS, in addition to the two the v7.0.286 header already forbids and which
+# remain in force: reaching for `continue-on-error` when a credentialed half now FAILS. Those halves
+# have never once run in CI, so the first credentialed run is the first time they are graded here,
+# and a genuine failure is the single most valuable thing this ticket can produce. A red run means
+# the platform is broken, not that the gate is. Fix the finding.
+#
+# HOW THIS IS TESTED, and it is deliberately not a claim made from the diff: the CI run on the
+# commit that carries this edit IS the test. The pass is the regression step showing FEWER declared
+# not-run parts than the 23 the v7.0.286 header measured with no credentials at all, and green.
+# A run that still reports 23 means the secrets did not reach the step and this edit did nothing.
+# Guarded by tests/regression/SES-180d-ci-credentialed-regression.js, which reads the shipped
+# workflow rather than restating it.
+#
+# DeepBench v7.0.286 | .github/workflows/ci.yml | SES-180 (c) — THE TWO REPORTING JOBS BECOME REAL
+# GATES. Both halves of the "reporting only" caveat this file shipped with have now been paid for
+# by other tickets, so the caveat was the only thing still making CI a rubber stamp.
+#
+# WHAT CHANGED, AND WHY EACH HALF CAN HONESTLY GATE NOW — measured in a clean clone at this ship,
+# not reasoned about:
+#
+#   regression  The v7.0.219 header's reason for `continue-on-error` was exact and, at the time,
+#               right: "measured 2026-08-24, the suite is 50/50 with credentials and 49/50 without
+#               — CHI-31 fails with SUPABASE_URL/SUPABASE_SERVICE_KEY must be configured. A test
+#               that CANNOT RUN is not a test that FAILED." SES-180 (b) (`v7.0.224`) closed exactly
+#               that gap: `notRun(part, reason)` lets a test DECLARE a part it cannot verify here,
+#               and `run-all.js` exits 1 iff something FAILED, never because a part was declared.
+#               MEASURED THIS SHIP with no credentials in the environment at all:
+#               **87/87 passed, exit 0, 23 parts declared not-run across 18 tests.** The number the
+#               v7.0.219 header said it could not gate on has become a number it can.
+#   tripwire    `scripts/check-session-docs.js` still always exits 0 in its bare form — that is its
+#               contract everywhere it runs and this file must not change it. SES-199 (`v7.0.242`)
+#               added the second invocation instead: `--gate` exits 1 on FLAG findings in the
+#               truth-registry classes (checks 9/10/11) and 0 otherwise, and fails CLOSED when the
+#               registry cannot be read at all. Its own header names wiring that flag in here as
+#               "the follow-up, not this". This is that follow-up. MEASURED THIS SHIP: `--gate`
+#               reports "clear — no FLAG findings in the gating classes (checks 9/10/11). Exit 0",
+#               over a report that still carries 38 FLAGs and 4 WARNs in the NON-gating classes —
+#               which is the point of a named gating set, and the proof this is not a green
+#               achieved by looking at nothing.
+#
+# WHAT THIS STILL DOES NOT DO, and neither is the runner's to do (SES-180's own residue, unchanged):
+#   * Repository secrets (SUPABASE_URL, SUPABASE_SERVICE_KEY). Only John can add them. Until he
+#     does, the credentialed halves stay DECLARED not-run — visible in the log, counted as neither
+#     pass nor fail. That is what makes this gate honest rather than vacuous.
+#     [CORRECTED v7.0.304, SES-180 (d).] This bullet used to end: "and it is also why adding the
+#     secrets later makes the gate stronger with no edit to this file." That was FALSE. A secret
+#     reaches a step only through an `env:` block naming it, and this step had none — so John adding
+#     both secrets (done and verified 2026-08-29) would have changed nothing at all. The sentence is
+#     struck rather than deleted, because a header that quietly drops its own wrong claim teaches
+#     the next reader nothing. The `env:` block that makes it true now lives on the suite step below.
+#   * Branch protection. This workflow now makes a failing check turn the RUN red; "red = no merge,
+#     regardless of author" is a repository setting, not a file. Only John can make it binding.
+#
+# THE TWO EDITS THIS SHIP FORBIDS, because each one silently restores the rubber stamp:
+#   1. Putting `continue-on-error: true` back to quiet a red run. A red run here now means a test
+#      FAILED or a rule statement has drifted from its registry row. Fix the finding, or fix the
+#      snapshot — never the job.
+#   2. Dropping `--gate` back to the bare `node scripts/check-session-docs.js`. The bare form always
+#      exits 0 BY CONTRACT (SES-199's own header: "Default behaviour is UNCHANGED and must stay that
+#      way — no flag, always exit 0"). A gating step running the non-gating invocation is a step
+#      that can never fail, which is precisely the defect SES-199 was filed to close.
+#
+# `if: always()` ON THE PRIVATE-INFO SCAN AND THE REGRESSION STEP IS LOAD-BEARING, not tidiness.
+# Steps stop at the first failure, so without it a red tripwire would hide the scan's and the
+# suite's results entirely and every push after a drift finding would report one problem while
+# concealing however many others. All three checks run, all three report, and any one failing
+# fails the job.
+#
+# ONE RISK NAMED RATHER THAN HIDDEN: this job's `name:` changes from "(reporting only)" to
+# "(blocking)", and GitHub matches required status checks by job NAME. `dev` — where every runner
+# push lands — carries no protection at all (read live from the branches API at this ship:
+# `protected: false`), so nothing about the push path can break. `main` IS protected, and whether
+# its required-checks list names this job is not readable from here; if it does, John re-selects the
+# new name in the branch settings. Said out loud because a silently renamed required check is the
+# exact failure this file's headers exist to prevent.
+#
+# DeepBench v7.0.219 | .github/workflows/ci.yml | SES-180 (M2 Truth Infrastructure) — PARTIAL
+#
+# The first check on this repository that does not live on John's machine.
+#
+# WHY THIS EXISTS. Six of the platform's hard rules are enforced by PreToolUse/PostToolUse hooks
+# in C:/Projects/.claude/ — outside this repo, not git-tracked, present on exactly one machine
+# (CLAUDE.md says so in as many words: "the hooks are a backstop, not a replacement"). The
+# regression suite runs only where credentials happen to exist. So a push from a cloud cycle, a
+# fresh clone, or any other contributor is checked by nothing at all. This workflow is the floor.
+#
+#   BLOCKING   build      `npm ci && npm run build`. Needs no credentials. A src/api/lib change
+#                         that fails the build can no longer reach dev unnoticed.
+
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` rather than `npm install`: it installs exactly the lockfile and fails if
+      # package.json and package-lock.json have drifted, which is itself a check worth having.
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  checks:
+    name: Tripwire + regression (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # `--gate` (SES-199), never the bare form — see the header. Gates on FLAG findings in checks
+      # 9/10/11 only, the truth-registry classes; the size and shape ratchets stay advisory and are
+      # still printed above the gate line. Reads docs/governance/RULES-SNAPSHOT.md and
+      # docs/backlog/BACKLOG-SNAPSHOT.md, both committed, so it needs no credentials here.
+      - name: Session-docs tripwire (gate)
+        run: node scripts/check-session-docs.js --gate
+
+      # AGT-168 — change-scoped, never the whole tree: see the header. `--base` is what keeps this
+      # green over the 48 standing lines while still failing the 49th. Exit 2 (an unresolvable base)
+      # is a failure here BY DESIGN — `on: push` fires only for dev and main, so `github.event.before`
+      # is always a real sha, and a base we cannot resolve means we scanned nothing.
+      - name: Private-info scan (change-scoped gate)
+        if: always()
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          node scripts/audit-private-scan.js --base="$BASE_SHA"
+
+      # `if: always()` so a red tripwire cannot conceal the suite's result — see the header.
+      #
+      # SES-180 (d), v7.0.304: the `env:` block is the whole of this ticket. `secrets.*` resolves
+      # ONLY where it is written — GitHub never auto-exposes a repository secret to a step — so
+      # without these two lines the credentialed halves declare themselves not-run (SES-180 (b))
+      # however correctly the secrets are configured. Do not remove them to "simplify" the step.
+      #
+      # On a pull_request from a fork both resolve to the empty string by GitHub's own design; the
+      # halves then declare not-run exactly as they did before this ship, which is the correct and
+      # safe degradation, not a failure. Named in the header rather than papered over here.
+      - name: Regression suite (credentialed)
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node tests/regression/run-all.js
+
+  # SES-255, v7.0.339 — CI PUBLISHES ITS OWN GRADE, because nothing else can read it.
+  #
+  # runner-cycle.md step 4a requires an unattended cycle to read this run's conclusion and hand it
+  # to scripts/rollback-on-red.js as `--jobs`; the engine holds no credential and fetches nothing,
+  # by John's own SES-182 design. That read has now failed on three consecutive cycles for one
+  # measured reason: the GitHub REST listing for a single run on dev returns ~71,000 characters
+  # (71,371 then 71,575, measured live), which exceeds the agent tool-result cap and overflows into
+  # the ~/.claude/.../tool-results/ path register B39 forbids an unattended cycle to touch. Raw
+  # HTTPS to api.github.com is separately refused by the session proxy. There is no bounded
+  # sha -> conclusion read on any surface a cycle has.
+  #
+  # So the direction is inverted: the grader publishes its own grade to a table the runner already
+  # reads. NO NEW SECRET IS PROVISIONED — both keys below are the repository secrets SES-180 (d)
+  # already exposes to the step above, which is what keeps this out of the John-only lane this
+  # file's header names (adding secrets; branch protection). The engine is untouched and the
+  # conclusion is still PASSED IN.
+  #
+  # THE TWO GUARDS ARE LOAD-BEARING, not defensive habit:
+  #
+  #   `github.event_name == 'push'` — on a pull_request from a FORK both secrets resolve to the
+  #   empty string by GitHub's design (the header says so for the step above), so without this the
+  #   curl fails and paints an innocent contributor's PR red. It also stops same-repo PR runs
+  #   writing rows for PR-branch shas that were never pushed to dev.
+  #
+  #   `always()` — a run whose `checks` job FAILED is the case the anchor most needs recorded, and
+  #   the default `success()` would skip exactly it.
+  #
+  # WHAT THIS JOB CANNOT DO, stated rather than left to be found: it cannot report its own failure.
+  # If it dies, no row is written, the anchor goes STALE, and a later red is measured against an
+  # older commit or none — which is scripts/rollback-on-red.js's own stated fail direction (stale,
+  # never wrong). Same for a cancelled run: `cancel-in-progress` kills this job too. A row whose
+  # conclusions are neither all-success nor any-failure is COULD-NOT-TELL on the reading side and
+  # triggers nothing; that rule lives in step 4a, because a `cancelled` handed in as a red would
+  # let decide() revert on a superseded run.
+  #
+  # `needs` must name EVERY other job in this file. tests/regression/SES-255-ci-conclusion-reporting.js
+  # computes that set from the shipped YAML rather than hardcoding it, so adding a fourth job
+  # without adding it here fails the suite.
+  report-conclusion:
+    name: Report conclusions to the runner ledger
+    needs: [build, checks]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish blocking-job conclusions
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_KEY:-}" ]; then
+            echo "No Supabase credentials in this context -- nothing published."
+            echo "The anchor stays stale, which is the safe direction. Not a failure."
+            exit 0
+          fi
+          # jq composes the body so a job name containing a quote cannot break the JSON.
+          jq -n \
+            --arg sha "${GITHUB_SHA}" \
+            --argjson run_id "${GITHUB_RUN_ID}" \
+            --arg ref "${GITHUB_REF_NAME}" \
+            --arg build "${BUILD_RESULT}" \
+            --arg checks "${CHECKS_RESULT}" \
+            '{commit_sha: $sha, run_id: $run_id, ref: $ref, jobs: [
+               {name: "Build (blocking)", conclusion: $build},
+               {name: "Tripwire + regression (blocking)", conclusion: $checks}
+             ]}' > /tmp/ci-conclusion.json
+          cat /tmp/ci-conclusion.json
+          curl --fail --silent --show-error \
+            -X POST "${SUPABASE_URL}/rest/v1/ci_run_conclusions?on_conflict=commit_sha" \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            --data @/tmp/ci-conclusion.json

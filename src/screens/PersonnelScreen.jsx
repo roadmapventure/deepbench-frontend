@@ -1,3 +1,8 @@
+// DeepBench v7.0.417 | PersonnelScreen.jsx | LOG-143 (b) -- the Profile tab gains the Report Card panel:
+// bench_report_card_rollup read with the anon key, three dimensions shown separately (never blended,
+// never a 0/5 standing in for a gap), the per-dimension unknown count counted from the graded rows, and
+// the Skill row to improve resolved against the Skill Profiles this screen already lists. Zero judged
+// runs is the sentence "No runs judged yet"; groundedness reads `unknown` until LOG-143 (d).
 // DeepBench v6.2.16 | PersonnelScreen.jsx | PE-17 — mobile shell (merged persona header, tab bar) + Profile tab reflow
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -106,6 +111,89 @@ async function fetchCapabilities(agentId) {
     result.push({ ...cap, skillProfiles });
   }
   return result;
+}
+
+// ── FEATURE: LOG-143 (b) — the Report Card panel's data path ─────────────────────────────────
+// `bench_report_card_rollup` (LOG-143 (a), v7.0.415) is the aggregate contract: one row per
+// agent_id carrying runs_judged, the three per-dimension averages that ignore NULLs, unknown_rate,
+// last_judged_at, and lowest_skill (the modal skill_to_improve). It is a security_invoker view
+// with no visitor column, so the anon key already in the browser bundle can read it.
+//
+// It carries NO per-dimension unknown COUNT — verified against information_schema this session —
+// and an average that ignores NULLs cannot be inverted into one, so the counts the panel names
+// ("3 of 12 unknown") are counted from the graded rows themselves. That second read is legal with
+// the same key: `bench_report_cards`' three score columns are inside the 13-column SELECT list
+// anon holds (visitor_id is deliberately outside it, .claude/rules/supabase-column-grants.md), and
+// a column-list grant means every reader must NAME its columns — never select=*, which 403s.
+// No migration, no api/ route: two public reads, both console.error-only on failure so a report
+// card outage can never blank the Personnel File.
+async function fetchReportCard(agentId) {
+  const { data: rollupRows, error: rollupErr } = await supabase
+    .from("bench_report_card_rollup")
+    .select("agent_id,runs_judged,avg_delegation_fit,avg_groundedness,avg_skill_use,unknown_rate,last_judged_at,lowest_skill")
+    .eq("agent_id", agentId);
+  if (rollupErr) throw rollupErr;
+  const rollup = (rollupRows || [])[0] || null;
+  // No rollup row means no judged run for this agent. Returning null (not a zeroed object) is what
+  // makes reportCardLines() render the sentence instead of a 0/5 (`C-rejected-17`/`C-rejected-18`).
+  if (!rollup) return null;
+  const { data: rows, error: rowsErr } = await supabase
+    .from("bench_report_cards")
+    .select("delegation_fit,groundedness,skill_use")
+    .eq("agent_id", agentId)
+    .eq("tenant_id", TENANT_ID);
+  if (rowsErr) throw rowsErr;
+  const unknown_counts = { delegation_fit: 0, groundedness: 0, skill_use: 0 };
+  for (const r of (rows || [])) {
+    for (const k of Object.keys(unknown_counts)) if (r[k] === null || r[k] === undefined) unknown_counts[k] += 1;
+  }
+  return { ...rollup, unknown_counts };
+}
+
+// FEATURE: LOG-143 (b) — pure: the rollup row (plus the unknown counts fetched above) and the
+// agent's own Skill Profiles in, the panel's lines out. Two rules are enforced here rather than in
+// the JSX, which is why they are testable:
+//   • zero judged runs is a SENTENCE, never a number — `empty: true` and no `/5` string is
+//     produced anywhere in the return (`C-rejected-17`/`C-rejected-18`);
+//   • a dimension with no average prints the word `unknown`, and its unknown count is named
+//     beside it. Groundedness is `unknown` on every card until LOG-143 (d) ships the by-id
+//     Library content read (part (a) Blocker B) — the panel says so honestly rather than
+//     rendering a score the platform cannot yet compute.
+// There is deliberately no blended overall score (`C-rejected-27`): three dimensions, separately.
+export function reportCardLines(rollupRow, skills = []) {
+  const runs = Number(rollupRow?.runs_judged) || 0;
+  if (!rollupRow || runs <= 0) {
+    return { empty: true, runsJudged: 0, emptyText: "No runs judged yet", dimensions: [], skillToImproveText: null, lastJudgedAt: null };
+  }
+  const counts = (rollupRow.unknown_counts && typeof rollupRow.unknown_counts === "object") ? rollupRow.unknown_counts : {};
+  const dimensions = [
+    ["delegation_fit", "Delegation fit", "avg_delegation_fit"],
+    ["groundedness",   "Groundedness",   "avg_groundedness"],
+    ["skill_use",      "Skill use",      "avg_skill_use"],
+  ].map(([key, label, avgKey]) => {
+    const raw = rollupRow[avgKey];
+    const avg = (raw === null || raw === undefined || raw === "") ? NaN : Number(raw);
+    const scored = Number.isFinite(avg);
+    const unknownRaw = Number(counts[key]);
+    const unknown = Number.isFinite(unknownRaw) ? unknownRaw : 0;
+    return {
+      key, label, scored,
+      scoreText: scored ? `${avg.toFixed(1)}/5` : "unknown",
+      unknownText: unknown > 0 ? `${unknown} of ${runs} unknown` : null,
+    };
+  });
+  const slug = (typeof rollupRow.lowest_skill === "string" && rollupRow.lowest_skill) ? rollupRow.lowest_skill : null;
+  const named = slug ? (skills.find(s => s && s.slug === slug) || null) : null;
+  return {
+    empty: false,
+    runsJudged: runs,
+    emptyText: null,
+    dimensions,
+    // The slug is what the judge named and what a Skill row is edited by, so it is shown even when
+    // the roster read has not resolved a display name for it — never dropped, never invented.
+    skillToImproveText: slug ? (named?.name ? `${slug} — ${named.name}` : slug) : "none named yet",
+    lastJudgedAt: rollupRow.last_judged_at || null,
+  };
 }
 
 // FEATURE: PE-10 — Add Courses inline sub-view
@@ -320,6 +408,26 @@ function SkillRow({ sp, chip }) {
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
 function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
+  // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
+  // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
+  // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
+  const [reportCard, setReportCard] = useState(null);
+  const [reportCardLoaded, setReportCardLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setReportCardLoaded(false);
+    setReportCard(null);
+    fetchReportCard(agent.id)
+      .then(r => { if (!cancelled) { setReportCard(r); setReportCardLoaded(true); } })
+      // Never block the user (STANDARDS.md Section 5): a failed rollup read leaves the card in its
+      // honest empty state, it does not break the Profile tab.
+      .catch(err => { console.error("FEATURE: LOG-143 — failed to load the Bench Report Card", err); if (!cancelled) setReportCardLoaded(true); });
+    return () => { cancelled = true; };
+  }, [agent.id]);
+  // The Skill Profiles this screen already lists (SK-06's Capabilities card, the same rows the
+  // Configure → Resume tab edits) are what resolves `lowest_skill`'s slug to a name.
+  const reportCardView = reportCardLines(reportCard, capabilities.flatMap(c => c.skillProfiles || []));
+
   const readiness     = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   const rc            = readinessColor;
   const fmt           = fmt$;
@@ -504,6 +612,36 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
             <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6}}>Skill Level</div>
             <SkillBar skill={agent.skill} color={agent.color}/>
           </div>
+        </div>
+
+        {/* FEATURE: LOG-143 (b) — Report Card. Same card + Corners pattern as its siblings above;
+            no new token, no new visual rule. On mobile the enclosing grid is already a single
+            column, so this renders full width below the persona block with no second branch —
+            desktop/mobile parity from one root. */}
+        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
+          <Corners/>
+          <FeatureBadge id="LOG-143" />
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Report Card</div>
+          {!reportCardLoaded ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>Loading…</div>
+            </div>
+          ) : reportCardView.empty ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>{reportCardView.emptyText}</div>
+            </div>
+          ) : (
+            <>
+              {[["Runs judged", String(reportCardView.runsJudged)],
+                ...reportCardView.dimensions.map(d => [d.label, d.unknownText ? `${d.scoreText} · ${d.unknownText}` : d.scoreText]),
+                ["Skill to improve", reportCardView.skillToImproveText]].map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </div>

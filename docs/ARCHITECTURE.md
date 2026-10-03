@@ -1,5 +1,29 @@
 # DeepBench — Architecture North Star
 # Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-OWNERSHIP-01-design — Resource Ownership Brokers (§19e), corrects §19d's agent-naming mistake
+# Amended v7.0.749 | 2026-10-03 | cycle-20261003-1141 (runner) — AGT-291: §19v Operations — the finish line gets its sensor. AGT-240 measured it and nothing watched it: `runner_should_boot()` carried no `finish_due` key, so a board whose batch was finished still answered `nothing_pickable` and the next-project proposal was only ever noticed by a run that happened to be reviewable. Four calls, mine under JOHN-0925 and all reversible: **D1** finished = no locked member `open` or `partial` (`delivered` is BUILT — this reverses AGT-240 D2's "every member done or removed", which left 16 shipped Auditor Enhancements members holding their batch open); **D2** a `paused` project's batch can finish, not `executing` alone; **D3** the sensor is `review_due` — `proposal_due` AND no claim inside 24 hours — reported on EVERY outcome at `(7e)` and read inside `runner_should_boot()`'s `work_to_find` parenthesis as `detail.finish_due`; **D4** `--prepare` CLAIMS a batch for 24 h through a conditional PATCH of `epics.proposal_attempted_at` (so concurrent fires and the ≤ 3 passes one cycle may run can never spend two turns on one batch), and `pickDue()` filters the sensor, never the state. Mirror docs/design/agt-291-finish-sensor.sql; guard tests/regression/agt-291-finish-sensor.test.mjs.
+# Amended v7.0.748 | 2026-10-03 | cycle-20261003-0941 (runner) — AGT-314: §19v Operations — an idle fire finds work instead of refusing. `runner_should_boot()`'s nothing-pickable slot splits a SECOND time, after `AGT-127`'s card branch and after every wall: nothing to build, no card left to rule, and either an open/carried `audit_findings` row or an open/partial ticket in a project named by the new `runner_settings.find_work_lists` (text[], DATA John edits with an UPDATE — pattern:2) answers `work_to_find` with `should_boot = true` and `detail.mode = 'find-work-only'`, and the two counts it decided on travel in `detail.open_findings` / `detail.list_tickets`. Measured before the ship: 8 `nothing_pickable` refusals on 2026-10-02 between 11:41 and 18:51Z while 44 findings were `open` and 133 open/partial tickets sat on `dev-mgr-findings` + `auditor-findings`. Mirror `docs/design/agt-314-find-work-boot.sql`; guard `tests/regression/agt-314-find-work-boot.test.mjs`.
+# Amended v7.0.747 | 2026-10-03 | cycle-20261003-0815 (runner) — AGT-312: §19v Operations — a next-project proposal reaches John only when Victoria agrees. Between The Development Manager's `propose-project` turn and the write, Victoria's `review-proposal` capability (intent `vc-proposal-intent`) reads the proposal as a row of her task file (Rule #1) and answers agree or disagree; `finish_project_batch()` refuses any `p_proposal` without `review.verdict = 'agree'` (checked before the due read, so the refusal is provable live with no writes) and records both agreements on the one `proposal` decision; a disagree writes nothing and the batch stays due. John 2026-10-02, decision 6668e1ac. Mirror docs/design/agt-312-proposal-review.sql; guard tests/regression/agt-312-proposal-review.test.mjs.
+# Amended v7.0.743 | 2026-10-02 | cycle-20261002-1542 (runner) — AGT-309: §19v Operations — the process-break class reaches the scorer (Victoria's Knowledge), the router (the manager's need_source + home, moved only by apply_requirement_verdict() on her pass) and the gate (requirement_gate refuses a move without her decision; agent-row-gate reads a cited John decision as authority). Mirror docs/design/agt-309-process-break-class.sql; guard tests/regression/agt-309-process-break-class.test.mjs.
+# Amended v7.0.741 | 2026-10-02 | cycle-20261002-0742 (runner) — AGT-281: §19v Operations — the requirement gate's door opens on a whole LIST. Victoria rules every open/partial ticket of one project's epics in ONE turn through the sibling Intent `vc-reorganize-intent` on the same `requirement-check` capability (§19b: `scripts/requirement-check.js --prepare-list --project=<slug> [--epic=<uuid>]` assembles through the same `assemblePrompt()` the single-ticket door uses, the intent a MODE CONSTANT and never a flag, with each ticket's `description` cut at 1,500 chars and each candidate need source travelling as a 200-char HEAD, `john:runner_decisions` excluded — a recorded decision is a call already made, not a need); `--apply-list` runs `validateListVerdict()` FIRST and offline — every ticket of the list ruled EXACTLY ONCE, no row ruling a ticket the list did not carry, a `pass` naming one of the candidate keys it was handed — and a refusal sends NOTHING, then a `pass` goes to `apply_requirement_verdict()` and a `not-needed` takes `scripts/ticket-owner.js` step 3b (its own `removal-proposal` decision, a full-row before-image, `status = 'removal proposed'`, never `removed` — SES-113), with ONE `runner_cycles` row per list as the run's whole record. `builder-found-tickets` is in `HELD_LISTS` and exits 1 before any read. Measured before the ship: `need_source` NULL on all 84 open/partial tickets of `dev-mgr-findings` (77) and `auditor-findings` (7), Victoria's `ai_activity_log` rows 0, `runner_cycles notes like 'SCHEDULED-AGENT: victoria%'` 0 — the door AGT-280 built had never been walked through, and walking it one ticket at a time is 84 turns. Playbook and canonical prompt block `docs/runbooks/victoria-reorg.md` (the routine `victoria-reorg`, cron `0 10 * * 2`, is ATTENDED work and does not exist yet, so `ROUTINES["victoria-reorg"].id` is null); `requirement-check` enters `SERVICE_CATALOG`; the standing brief gains `Victoria's lists`. Mirror `docs/design/agt-281-reorganize-intent.sql`; guard `tests/regression/agt-281-victoria-runs.test.mjs`. `AGT-281` stays `partial`.
+# Amended v7.0.740 | 2026-09-29 | cycle-20260929-2320 (runner) — AGT-280 slice 2: §19v Operations — the requirement gate gains its door. `scripts/requirement-check.js` is the ONE client of `apply_requirement_verdict()`: `--prepare --ticket=<ID> --source=<who:table:id>` reads the ticket, checks the `who:table` pair against `runner_settings.need_source_kinds` and asks `need_source_is_traceable()` BEFORE it assembles anything — so an untraceable claim costs no model turn — then hands Victoria the cited row's own columns (minus `embedding`) through the same `assemblePrompt()` the executor calls, the intent off `capabilities.default_intent_slug` and never a `--intent` flag (§19b); `--dry-run` / `--apply` run one `validateVerdict()` first, which holds the rule the function cannot see — a `pass` must echo the `need_source` it was handed BYTE-EQUAL, never a different traceable one — and a refusal sends nothing. The function keeps the write; this file writes no table. A `pass` prints its `reverse_decision()` line, a `not-needed` prints the `audit_findings` handle and NO undo line (append-only, AGT-70, outside `reversible_tables()`). Measured before the ship: `runner_decisions where kind='requirement-check'` 0, `need_score is not null` 0, nothing in `scripts/ shared/ lib/ api/ src/` naming the capability — a gate with no door, refusing 16 filings a fortnight. No SQL and no migration: the four `agt280_*` migrations are slice 1's, unchanged. Guard `tests/regression/agt-280-requirement-check.test.mjs`.
+# Amended v7.0.739 | 2026-09-30 | agt273-slot-ladder-0930 (attended) — AGT-273: §19v Operations — the test slot line narrows with the database's health instead of switching off. `test_slot_acquire()` reads its level and capacity from `test_slot_allowance()`, the one home: green gives `test_slot_capacity`, a level keyed in `runner_settings.test_slot_ladder` gives the lesser of the two (amber 1), red/unsafe/unreadable give 0 — narrowed, never removed (§19o). Capacity stays 1 on John's 2026-09-30 call (the one-lane ruling after outage #3), so ruling 0b6d5414's 1 -> 3 was not written.
+# Amended v7.0.738 | 2026-09-29 | cycle-20260929-2042 (runner) — AGT-253: §19v Operations gains one sentence — a project the runner designs but never builds is marked `projects.design_only`, `ticket_design_only(text)` resolves a ticket to that mark through `epics`, `design_only_stop(uuid,text,text,text,text,text)` replaces step 6's `design_status` write on such a ticket by filing the undecided `gated_before_build` card carrying the kickoff path and ending the cycle there, never step 7, `pick_exclusions()` keeps a ticket with an undecided card out of `prime_directive_queue()` with no new predicate, and `trg_runner_questions_design_only` / `design_only_answer_applies()` apply John's answer as one decision with before-images — `yes` writes `needs-desktop` so the approved build runs in a session he attends, off main per that project's charter, `no` clears it to NULL. Mirror `docs/design/agt-253-design-only-lane.sql`; guard `tests/regression/agt-253-design-only-lane.test.mjs`.
+# Amended v7.0.731 | 2026-09-29 | cycle-20260929-1729 (runner) — AGT-277: §19v Operations gains one sentence — the health check that proves the database is still filing readings runs OUTSIDE it. `scripts/db-health-watch.js` reads `runner_settings.db_health_thresholds.window_minutes` and the newest COMPLETED `db_health_readings` row over PostgREST on GitHub's clock (mirror `docs/design/agt-277-db-health-watch.yml`, every 10 min against the 15-min window, copied to `.github/workflows/` on `main` by John — sessions hold no `workflow` scope and GitHub schedules only from the default branch); 0 fresh, 1 silent (one `audit_findings` row, slug `db-health-silent` — NOT `db-health-tick`'s own `db-health-readings-gap`, which files only on recovery), 2 cannot judge, which is the total-outage alarm and fails closed per §19o. Measured: eight consecutive `job startup timeout` runs of `cron.job` jobid 5 on 2026-09-29 left a 45-minute hole nobody was told about. Guard `tests/regression/agt-277-db-health-watch.test.mjs`. The automatic restart, AGT-237(d), is still not built.
+# Amended v7.0.729 | 2026-09-29 | cycle-20260929-1551 (runner) — AGT-280 slice 1: §19v Operations gains one sentence — a ticket reaches an `executing` project's list only when it cites a need that is real. `backlog_items.need_source` is the text `who:table:id`, `need_score` is 1-5, and the five `who:table` pairs it may cite live in `runner_settings.need_source_kinds` as DATA John edits with an UPDATE (pattern:2); `need_source_is_traceable()` refuses a bad shape, an unlisted pair, and — the whole point — a well-formed citation of a row that does not exist, `requirement_gate` (BEFORE INSERT OR UPDATE OF epic_id) is the refusal and `apply_requirement_verdict()` the one writer (image THEN update on `pass`, a `listed` audit_findings proposal and no ticket at all on `not-needed`). Whether the row EXISTS is a lookup, so no model owns it (pattern:10) — her judgment of whether the source SUPPORTS the claim is the `requirement-check` capability, slice 2, shipping WITH its caller. Mirror `docs/design/agt-280-requirement-gate.sql`; guard `tests/regression/agt-280-requirement-gate.test.mjs`. `AGT-280` stays `partial`.
+# Amended v7.0.714 | 2026-09-29 | cycle-20260929-0725 (runner) — CHI-83: §19n's scope split gains the shipped half — the CHI vocabulary is carried by one guardrails-type Skill row, `chi-vocabulary-guardrail`, on channel-intelligence and hypothesis-evaluation, scoped by `traits.intent_allowlist` to the five intents that write user text. Zero lines of harness change. Mirror `docs/design/chi-83-vocabulary-guardrail.sql`; guard `tests/regression/chi-83-vocabulary-guardrail.test.mjs`.
+# Amended v7.0.689 | 2026-09-28 | lanes-0928 (attended, The Builder) — AGT-265: §19v Operations gains one sentence — four runner lanes build in parallel and their test-suite runs wait in one line for a green database. `runner_should_boot()` refuses `lanes_full` at `runner_settings.max_lanes` live lanes (open runner-stamped cycles, heartbeat inside 20 min); `public.test_slots` + `test_slot_acquire()`/`test_slot_release()` hold the line (`test_slot_capacity`, 10-minute lease), `scripts/test-slot.js` is its one client. Mirror `docs/design/agt-265-lanes-test-slot.sql`.
+# Amended v7.0.688 | 2026-09-28 | cycle-20260928-1420 (runner) — AGT-173 R2: §19v Operations gains one sentence — the reason a ticket is not pickable is the pick predicate's own, rendered by `public.pick_exclusions()` (one CASE per `buildable` clause, firing on `NOT (<clause>)`), which `prime_directive_queue()`'s `buildable` joins as `reasons = '{}'`, the `project_blockers` view joins for the rest, and `scripts/run-project.js`'s `passOverNote()` words for the `assigned` payload's `pass_over_note` — so the queue, the board and the driver cannot disagree about why a row is out. Mirror `docs/design/agt-173-pick-exclusions.sql`; guard `tests/regression/agt-173-card-citations.test.mjs`.
+# Amended v7.0.667 | 2026-09-28 | cycle-20260928-0042 (runner) — AGT-238 slice 2: §19v Operations gains one sentence — how many projects hold an executing slot, and in what order, is The Development Manager's recorded, reversible decision, not a rule in code and not a knob. `project_concurrency_corpus()` is the one deterministic read it decides from (one row per project, LEFT JOINed so an epic-less project shows `epics=0` rather than vanishing: tickets left, blocked counts, leverage marks, close-rate proxy, `proposal_due`); `record_concurrency()` is its one writer — one `kind='concurrency'` decision, then one `runner_before_images` row per CHANGED row THEN the UPDATE, so `reverse_decision()` restores `projects`; `projects.status='executing'` stays the count and `projects.priority` stays the order, so no new column and no `max_concurrent` knob exists to disagree with them. It RAISES on a `proposed` or `planned` slug: starting a project that has never run stays John's words through `start_proposed_project()` (AGT-240). Mirror `docs/design/agt-238-concurrency-corpus.sql`; guard `tests/regression/agt-238-concurrency-corpus.test.mjs`.
+# Amended v7.0.662 | 2026-09-27 | opsflow-0927 (attended, The Builder) — AGT-240: §19v Operations gains one sentence — projects get a finish line. A project's list (its epic, `epics.locked_at`) locks when it starts executing and `epic_lock_guard` refuses a findings-born ticket into it, so what is found meanwhile waits on the findings list as `listed`; when every locked member is `done` or `removed`, The Auditor grades what the batch built and The Development Manager proposes ONE next project (`finish_project_batch()`, a `proposed` project whose tickets are not picked), which only a session on John's words starts (`start_proposed_project()`); `reverse_decision()` restores `projects`.
+# Amended v7.0.661 | 2026-09-27 | opsflow-0927 (attended, The Builder) — AGT-239: §19v Operations gains one sentence — the Auditor checks outcomes first. Every `audit_findings` row carries a `family` (service, blocked, flow, outcome, paperwork, other) set at INSERT from `runner_settings.finding_families`; `db_health_tick()` also files `db-restarted` and `db-pressure-red-repeat`; the per-run review files `audit_flow_checks()` (ships not closed, a verdict gate red for days, wasted cycles, filing outpacing closing) and its manager review ranks service before blocked before the rest and leaves `paperwork` to the weekly review.
+# Amended v7.0.658 | 2026-09-27 | opsflow-0927 (attended, The Builder) — AGT-237: §19v Operations gains one sentence — the runner does not start work into a database outage. `db_health_tick()` (pg_cron, every 5 min) grades the database from its metrics endpoint and a REST probe; `db_health_level()` is the one home both gates read (`runner_should_boot()` refusal 6 `db_pressure`, `drain_chain_gate()` Gate F), fail closed per §19o; register row M6-14. The automatic restart, AGT-237 (d), is not built.
+# Amended v7.0.652 | 2026-09-27 | cycle-20260927-1241 (runner) — AGT-173 R3+R4: §19v's reversibility bullet now says the handle list completes ITSELF at write time. Block 3 of `runner_record_citation_guard()` — the same function and the same trigger pair as the citation and commit-sha refusals, no new trigger and no new column — appends every reversal handle the text does not already name, to `plain_worth` on a `ship` card and to `runner_cycles.notes` (R4) on a cycle that names a ticket, keyed on the `handle_token` `cycle_reversal_handles()` now returns as a seventh column, so a handle already named is never appended twice. Measured at this ship: 77 of 133 handles unlisted across 43 of 59 ship cards over four days, 67 of 172 across 37 of 81 cycles' notes, with the renderer shipped at `v7.0.644` carrying no caller anywhere in the repo. The bullet's closing sentence assigning enforcement to `scripts/verifier.js` is STRUCK as unsound rather than left standing beside the mechanism that replaces it (pattern 94): the verifier runs at step 7a and the card is filed at step 9, the very ordering `AGT-199`'s `state-render-card-missing` finding exists for. Shipped SQL mirrored byte-identical in `docs/design/agt-173-card-citation-guard.sql`; guarded by `tests/regression/agt-173-card-citations.test.mjs` arms F/G/H and 0(g). `AGT-173` stays `partial`: R2's exclusion-reason work needs `prime_directive_queue()`'s `buildable` WHERE extracted into one shared core (pattern 14), its own cycle.
+# Amended v7.0.644 | 2026-09-27 | cycle-20260927-0935 (runner) — AGT-173: §19v's reversibility section gains the citation guard and the reversal-handle renderer. A cycle card (`runner_items`) and a cycle's `notes` are hand-composed SQL at step 9 — nothing in `scripts/`, `api/` or `lib/` writes either — so `trg_runner_items_citations` (the eight card text columns) and `trg_runner_cycles_notes_citations` (`OF notes`) now REFUSE, `BEFORE INSERT OR UPDATE`, any write that NEWLY cites a `backlog_items` row whose `status = 'removed'`, naming every offending id; an id already in the row being updated is grandfathered, so a wrongly-cited row can still be corrected in place. Completeness is RENDERED rather than refused — `cycle_reversal_handles()` hands back every same-ticket reversal handle — because same-ticket handle omissions measure 43 across 28 of 53 ship cards over four days and a refusal on that would brick step 9 for every cycle on the board.
+# Amended v7.0.532 | 2026-09-20 | cycle-20260920-0751 (runner) — SES-423 slice 3: §19v's subscription-tokens bullet no longer says every token figure is an estimate. A cycle row's `est_tokens_dev`/`est_tokens_qa` is measured from `mcp__Claude_Code_Remote__get_session` as a PER-CYCLE DELTA (reading at the row's INSERT subtracted from the reading at close), because that counter is session-cumulative and a drain chain runs many cycles in one session; the meter-derived figures (`tokens_per_pct`, allowances) stay estimates and stay labelled.
+# Amended v7.0.450 | 2026-09-11 | cycle-20260911-1641 (runner) — LOG-149: §19t and §19v now agree with the code about where a dollar figure comes from. §19t said "`ai_activity_log.cost_usd` is legacy (43 rows) — never a spend source" while `scripts/verifier.js` (SES-343) had already been reading that exact column as THE executor cost source, writing `UNKNOWN` on every ship because it was NULL on 628 of 628 September rows carrying a model. The ticket resolves the contradiction toward write-time cost: `lib/activity-log.js` prices each row as it writes it from `shared/models.js`'s `MODEL_PRICING` (the price frozen at the moment of the call), read-time `computeCallCost()` survives for the NULL rows that predate this ship, and `get_ip_stats()` still prices from `public.model_pricing` — the two tables must agree, which `tests/regression/log-149-api-dollars-ledger.test.mjs` part (e) now asserts against every lane model and every model id the log actually saw this month. §19v gains the billing fact that shapes the whole ledger: a call the API refused BEFORE any output is not billed at all, so its row costs $0 rather than a priced figure — pricing it would re-create the phantom-dollar defect §19v already records from 2026-08-20 — while an ABORTED call (the API finished generating, we hung up) IS billed and its row carries a labelled input-side floor, `call_facts.tokens_estimated`, never an unlabelled count. Slice 1 of 2: this ship makes the ledger right at the source; the meters that READ it (the dollar wall, `runner_public_spend`, the `runner_cycles` close-out sums) are slice 2 and still read cycle rows.
+# Amended v7.0.319 | 2026-08-29 | cycle-20260829-1741 (runner) — SES-50: §19i's Layer C governance paragraph stopped presenting LOG-28's question as open. It was resolved 2026-07-22 (AI-35 2b) and the prose was never amended, so a LOCKED section advertised 38-day-stale open work and misled design-log-37 in conversation. The clause now records the resolution AND says explicitly that the wider AI-35 re-verification audit is still partial — both halves matter: a fix that only deleted the sentence would silently retire a live requirement. LOCKED governs the decision, never the status of a citation. The upstream rule that stops the recurrence lives in CLAUDE-DESIGN.md Step 5c (a close-out that resolves an ID greps ARCHITECTURE.md for it in the same commit); guarded by tests/regression/SES-50-resolved-id-citations.js. THE ONE-PASS SWEEP the ticket also scoped found THREE more of the same defect in this file, each verified against a live source before it was touched rather than taken from the sweep's report: (1) line ~1063 called the three editor agents' names "TBD in S-EDITOR-01" — they are Alex Reeves/Riley Torres/Claire Sutton, AG-14/15/16, shipped, and live in src/data/agents.js, which §19 four lines earlier already said; (2) the §19e broker registry blocked a Marcus Webb row on "screen doesn't exist yet" when MarketIntelligenceScreen.jsx has shipped — the ❌ STAYS, because the broker AA-90 is genuinely open and flipping it would have been a fresh error, so only the dead blocking REASON moved; (3) LOG-95 was still "discovery only, needs its own design session" after S-LOG-95 (v6.3.184) and S-LOG-95b (v6.3.186) shipped it. Retired phrasings are recorded HERE and deliberately not quoted inline in the corrected paragraphs — a note that quotes the dead sentence leaves it searchable in the live text and defeats the absence checks; SES-50's guard caught that three times during its own build, and the rule is now written into Step 5c. Three ids that LOOK stale were checked and left alone because they are genuinely open: CHI-15 (removal proposed), AA-92 (open), HAR-14 (open).
+# Amended v7.0.261 | 2026-08-25 | cycle-20260825-0941 (runner) — §19k LOG-65 POC 2: the embedding gold pattern's overturn is folded into the body and the coverage invariant is retired for a dated measurement (LOG-73). The silent break to watch for is a later editor "tidying" that bullet back into a standing invariant — resurrecting "going-forward unmatchable = 0" or the one-gold-row naming sentence, or dropping Susan's discard reason as stale prose; tests/regression/LOG-73-embedding-unclassified-recorded.js asserts the retired phrases ABSENT and the dated measurement plus the reason PRESENT, because either half alone passes vacuously.
+# Amended v7.0.125 | 2026-08-21 | automation-review (attended) — §19v trust-ladder paragraph: gated-card Accept excluded from the ladder (SES-94, John's Accept 2026-08-21T12:51Z; Reverse-on-gated recorded as settled per B35)
 
 > Locked decisions are marked **[LOCKED]**. Do not change without explicit product approval.
 > This document supersedes all prior architecture notes.
@@ -101,6 +125,12 @@ under their governing section. Nothing below this index was edited when it was a
   - 18b — Capability Spectrum Model (superseded 2026-06-15)
 - **§19o.** End-to-End Reliability — Failure Compounding & the Transient-Recovery Constraint [discovery `chi-e2e-design`, 2026-07-28]
 - **§19p.** Hop-Event Span Identity — Identity Travels With the Event [discovery `michelle-patterns`, 2026-07-28]
+- **§19q.** Run Assembly Feed — Content Travels With the Event [discovery `design-list-arch-0802`, 2026-08-02]
+- **§19r.** Deliverable Build View — Watching the Answer Get Built [discovery `design-build-view-0803`, 2026-08-03]
+- **§19s.** Assembly Content Contract — Agent-Narrated Build [design `design-lav-25`, John, 2026-08-04]
+- **§19t.** IP Access Gate — Live-Site Cost Protection [design `design-ip-security`, John, 2026-08-08]
+- **§19u.** The Recruiter — Agent-Built Agents & Persona Intake [discovery `design-agent-readiness`, John, 2026-08-11]
+- **§19v.** The Self-Building Platform — Autonomous Development Governance [discovery `design-selfbuilding-0819`, John, 2026-08-19]
 
 ---
 
@@ -256,6 +286,34 @@ Loop calls Harness once per turn and decides, based on what comes back, whether 
 
 **Industry term:** Agent Loop / ReAct (Yao et al., 2022) — reasoning interleaved with a freely-explored action space, repeated until done. DeepBench's is a real, live instance of the pattern — narrower than full ReAct, but not as narrow as this entry previously claimed. **Corrected 2026-07-20 (`SES-001` stress test):** alongside the two delegation tools (`request_help`, `delegate_to_agent`, gated by `can_request_help`), a third, independently-gated general tool exists — Anthropic's native `web_search` (`enable_web_search` trait, same shape) — live today, not dormant: one real Intent Skill Profile, `ws-news-search-intent`, has it turned on. Its per-turn search count is cappable via the opt-in `web_search_max_uses` trait (positive integer, emitted as `max_uses` on the tool definition; absent = unbounded, today's behavior) — same gate and shape as `enable_web_search` (`HAR-27`). Full history and rationale: `LOO-008` (`FEATURES.md`).
 
+**The gated-tool set, in a form a test can read (`SES-008`, `v7.0.259`).** The paragraph above is
+the one that went stale: `web_search`/`HAR-05` shipped as a real third gated tool and this entry
+described two for an unknown stretch, until an unrelated stress test caught it. Prose cannot be
+diffed against code, so the list also lives here as a table, and
+`tests/regression/SES-008-harness-tool-doc-drift.js` **drives the real `buildCallBody()`** through
+every combination of the parameters this table names and asserts the emitted tool set matches it.
+**Adding or removing a harness tool without editing this table fails that test.** The table names
+the `buildCallBody()` parameter as well as the Skill Profile trait deliberately: the test reads the
+parameter from *here* and calls the real function with it, so the trait→parameter binding is
+asserted rather than hardcoded in the test.
+
+<!-- {{harness-tools}} — machine-read by tests/regression/SES-008-harness-tool-doc-drift.js.
+     Do not reformat the table below without running that test. -->
+
+| Tool | Skill Profile trait | `buildCallBody()` parameter | Defined at |
+|---|---|---|---|
+| `request_help` | `can_request_help` | `canRequestHelp` | `REQUEST_HELP_TOOL`, `api/prompt/request-receivable.js` |
+| `delegate_to_agent` | `can_request_help` | `canRequestHelp` | `DELEGATE_TO_AGENT_TOOL`, `api/prompt/request-receivable.js` |
+| `web_search` | `enable_web_search` | `enableWebSearch` | Anthropic native `web_search_20250305`, emitted inline in `buildCallBody()` |
+
+<!-- {{/harness-tools}} -->
+
+**Two things this table is not.** It is not the schema tool — that one is derived from the caller's
+own `format_contract`, is not a harness tool, and is excluded by the test rather than left to
+coincidence. And `enable_parallel_tool_use` (`LOO-28`) is **not** a row here, because it adds no
+tool; it permits several calls to the tools above in one turn. The test pins that claim too — the
+emitted set must be unchanged when that trait is on.
+
 No agent is named in this mechanism by identity — every resolution happens live, by capability, never hardcoded (Rule #1, §19d/§19e).
 
 Full mechanism detail, not repeated here: §19d (Agent Loop, sniff test, single delegation path), §19e (Resource Ownership Brokers — a distinct, orthogonal concern: *who's allowed to touch a resource*, not *who gets asked*), §19h (Live Agent-Orchestration Visibility — the `_onEvent` mechanism firing at Loop's own dispatch points).
@@ -378,8 +436,6 @@ Two many-to-many joins, three real layers. No separate "Skill Profile" layer abo
 
 Skills are the atomic unit of the platform. Six types are defined today. New Skill types can always be added without changing existing ones.
 
-**Known drift (2026-07-15):** the `skill_types` lookup table itself only has 5 seeded rows — `guardrails` is real and already dispatched on in the harness (`api/prompt/db-assembly.js`'s `SKILL_ORDER`), but was never added to the `skill_types` catalog. Needs a one-row seed to close the gap between code and catalog.
-
 | Skill Type | What it captures | Example Skills |
 |-----------|-----------------|----------------------|
 | **Identity** | Who the agent is — mindset, philosophy, personality, ethics | Philosophy, Autonomy, Skeptic Level, Temporal Stance, Epistemology |
@@ -501,7 +557,7 @@ A Deliverable is an output object produced when any level of the hierarchy execu
 ---
 
 ### DB Architecture — Current State
-**[CORRECTED 2026-07-01, S-APPLE-02a-design; prose corrected again 2026-07-15 — see rewrite note at the top of this section]** `skill_types` (5 rows, missing `guardrails` — see "Known drift" above), `skill_profiles` (the Skill rows — the atomic unit, not a separate "instance" layer), `capabilities` (8 rows), `capability_skill_profiles` (the Skill↔Capability join), and `agent_capability_assignments` (the Capability↔Agent join) are all live in Supabase today and already wired into `api/prompt/db-assembly.js`'s `assemblePrompt()`. What remains gated behind S-INFRA-01 is only the items explicitly listed in Section 4 (per-Skill LLM/BYOK superadmin config) and the `skill_profile_slug` scoping columns on `agent_configs`/`knowledge_entries` (Section 9) that turn the Library into per-division Data Rooms. The two tables below are live now — new Capabilities and Skills can be created against them without waiting for S-INFRA-01.
+**[CORRECTED 2026-07-01, S-APPLE-02a-design; prose corrected again 2026-07-15 — see rewrite note at the top of this section]** `skill_types` (6 rows, `guardrails` included), `skill_profiles` (the Skill rows — the atomic unit, not a separate "instance" layer), `capabilities` (read the live table for the roster; no count is copied here), `capability_skill_profiles` (the Skill↔Capability join), and `agent_capability_assignments` (the Capability↔Agent join) are all live in Supabase today and already wired into `api/prompt/db-assembly.js`'s `assemblePrompt()`. What remains gated behind S-INFRA-01 is only the items explicitly listed in Section 4 (per-Skill LLM/BYOK superadmin config) and the `skill_profile_slug` scoping columns on `agent_configs`/`knowledge_entries` (Section 9) that turn the Library into per-division Data Rooms. The two tables below are live now — new Capabilities and Skills can be created against them without waiting for S-INFRA-01.
 
 **Known gap (2026-07-01):** `assemblePrompt()` loads every `skill_profiles` row attached to a `capability_slug` unconditionally — there is no per-call filter when a Capability has more than one Intent-type Skill (e.g. a capability with both a "routing" intent and an "answer" intent would load both into every call). No existing capability has hit this yet; S-APPLE-02b is the first to need it and must add the filter as part of its own scope.
 
@@ -1023,14 +1079,14 @@ A new `agents` table holds professional card data for all agents. Required becau
 | bio | text | longer professional bio |
 | tenant_id | uuid | multi-tenancy stub |
 
-Seeded with all 9 existing agents + Dan Bingham + 3 editor agents (names TBD in S-EDITOR-01).
+Seeded with all 9 existing agents + Dan Bingham + 3 editor agents (named in `S-EDITOR-01` and shipped: Alex Reeves `ED-01`, Riley Torres `ED-02`, Claire Sutton `ED-03` — `AG-14`/`AG-15`/`AG-16`, all ✅ Done, live in `src/data/agents.js`; the "TBD" here was stale from 2026-07-02 until `SES-50`, `v7.0.319`).
 Full agents.js migration (salary, stats, avatar, flags) is a separate future session (S-BENCH-FULL-MIGRATE).
 
 ---
 
 ## 19b. The Generic Capability Executor [LOCKED S-APPLE-03-design 2026-07-01]
 
-**This is the platform's founding intent, restated precisely: capabilities are data, not code.** A capability is a set of Skill Profiles (Identity, Behavior, Knowledge, Intent, Format) plus rows in `capability_skill_profiles` and `agent_capability_assignments`. Building a new capability should never require writing or deploying a new route — only inserting new Supabase rows. The platform is the container; agents are configurations that live inside it.
+**This is the platform's founding intent, restated precisely: capabilities are data, not code.** A capability is a set of Skill Profiles (Identity, Behavior, Knowledge, Intent, Format, Guardrails) plus rows in `capability_skill_profiles` and `agent_capability_assignments`. Building a new capability should never require writing or deploying a new route — only inserting new Supabase rows. The platform is the container; agents are configurations that live inside it.
 
 **The mechanism:** `api/capabilities/execute.js` — one generic route, called with `{ capability_slug, intent_slug, agent_id, task_context, tenant_id, format_skill_profile_slug, display_agent_id }`. The last two are optional, generalized from `AA-69`'s Work Order format-last pattern (`api/plan.js`) so any capability can have its output shaped by a display agent's Format Skill in the same single call (`AA-77`, `S-APPLE-03a-2`). It runs the same three already-generic pipeline steps every capability needs, in sequence:
 1. `assemblePrompt()` (`db-assembly.js`) — loads the Skill Profiles for `capability_slug`, filtered to `intent_slug`
@@ -1139,7 +1195,7 @@ None of these three files change per capability. `execute.js` itself contains ze
 | Full roster (all 21 agents) — `capabilities`/`skill_profiles`/`agent_capability_assignments` + `agents` table competency fields; **surfacing ranked candidates** for a delegated skill need (never unilaterally selecting — the requesting agent chooses, `S-ARCH-OWNERSHIP-02-design`) | Michelle Manning (PP-01) | `lib/project-manager.js` (`AA-86`) | ✅ Built (`S-ARCH-PM-BROKER-01`) — **but see 2026-07-08 note below: the built broker doesn't yet surface real Skill-level content, only the thin Capability wrapper (`AA-165`)** |
 | Writes to an agent's own personnel file (training stats, skill/situational scores, docs/classes/chunks counts) | The Trainer (Susan Smith, TR-08) | *new* — none exists yet | ❌ Not built |
 | An agent reading its *own* personnel file (self-read only, agent-to-agent — distinct from the human-facing Personnel screen, which is unrestricted UI display) | Each agent, for itself only | *new* — none exists yet | ❌ Not built |
-| **Front-door chat/answer surface specifically** on the Market Intelligence screen (not every HITL moment on it — AI - Hypothesis Test's `override_warning` and Memory Consolidation's commit gate are separate, per-capability `§19d` gates owned by Priya/Elena respectively, clarified `S-ARCH-OWNERSHIP-02-design`) | Marcus Webb (GEO CSO Expert, CI-01) | *new* — screen doesn't exist yet (`S-MARKET-INTEL-01`) | ❌ Not built, blocked on screen |
+| **Front-door chat/answer surface specifically** on the Market Intelligence screen (not every HITL moment on it — AI - Hypothesis Test's `override_warning` and Memory Consolidation's commit gate are separate, per-capability `§19d` gates owned by Priya/Elena respectively, clarified `S-ARCH-OWNERSHIP-02-design`) | Marcus Webb (GEO CSO Expert, CI-01) | *new* — the screen **has shipped** (`S-MARKET-INTEL-01a`–`d`, `MI-01`; `src/screens/MarketIntelligenceScreen.jsx` is live) | ❌ Not built — tracked by `AA-90` (open). **No longer blocked on the screen**; corrected `SES-50`, `v7.0.319`, where the blocking note had outlived the screen it named |
 | Michelle Manning cross-agent `knowledge_entries` (RAG) access | *deferred* | *new* — needs its own gated broker, out of `AA-86`'s scope | ❌ Backlogged (`AA-92`) |
 | `the_reasoning` (opinion/reasoning content) — a **third ownership flavor**, "Content-Owner Access," see `§19f` — gated by `data_room_tag`/`uber_access` like `the_library`, but multi-writer, no single arbitrating owner | Nadia Farouk (CI-03) + the Reasoner (`AG-20`, once built), each self-attributed | `lib/search-harness.js` (`store: 'the_reasoning'` branch) | ✅ Built (`S-ARCH-REASONING-LAYER-01`) — confirmed live 2026-07-16, 22 real rows in active use |
 
@@ -1322,7 +1378,7 @@ Susan Smith — Trainer's role is unchanged and remains Layer C only: she govern
 
 **Schema location, decided this session:** `ai_activity_log` (Layer A) needs new columns/fields for the facts above — no change to its being the one central table. `PATTERN_CATALOG`'s governance fields (citation, maturity, review date) move out of the static `shared/ai-patterns.js` file into a real Supabase table — this metadata is operational and needs editing without a code deploy, the same reasoning already applied to `dev_version_counter`/`feature_id_counter` in this exact codebase. `SERVICE_CATALOG` is unaffected. Layer B's rule *evaluator* is code; whether individual simple rules are data-driven or stay as one-function-per-pattern code is an implementation decision for whichever session builds Layer B, not decided here.
 
-**Governance requirement carried over from the prior model, tightened:** existing `PATTERN_CATALOG` entries were never uniformly checked against this citation requirement — some predate the "verify the real term first" discipline even existing as a written rule. All current entries must be re-verified against real sources under this new schema before the model is considered complete, not grandfathered in. `LOG-28`'s open question (whether Memory Consolidation is a real generic pattern or Elena's own capability-specific mechanism) is the first concrete case this audit must resolve — not a parallel question.
+**Governance requirement carried over from the prior model, tightened:** existing `PATTERN_CATALOG` entries were never uniformly checked against this citation requirement — some predate the "verify the real term first" discipline even existing as a written rule. All current entries must be re-verified against real sources under this new schema before the model is considered complete, not grandfathered in. `LOG-28`'s question (whether Memory Consolidation is a real generic pattern or Elena's own capability-specific mechanism) was the first concrete case this audit took, and it is **RESOLVED — 2026-07-22, `AI-35` `2b`**: confirmed a real, generic, citable pattern, promoted as *Persistent Advice Storage* (Bignold et al. 2021, `arXiv:2102.02441`), **not** Elena's own capability-specific mechanism. See `docs/AI-35-2b-migration-log.md`. **The audit it opened is not finished** — `AI-35` is still `partial`, and the re-verification requirement in the sentence above stands for every entry that has not yet been through it. (Corrected `v7.0.319`, `SES-50` — the clause went 38 days carrying a question that had already been answered, and a session reading it on 2026-07-29 reported that question to John as live beta work. **LOCKED** governs the *decision*, never the *currency of a citation*; the close-out sweep that stops a repeat is `CLAUDE-DESIGN.md` Step 5c.)
 
 **Historical data cannot be retroactively corrected** — this principle from the prior model is unchanged and still governs Layer A/B: nothing recorded pre-rewrite can be assumed true or false after the fact. Pre-existing rows keep their original frozen classification, labeled honestly, forever; only rows logged after the new model ships get the versioned, re-derivable treatment.
 
@@ -1455,6 +1511,37 @@ Three things ship together, and the third is not optional:
 **And there is currently no evidence about how often this happens.** Queried live 2026-07-23: `durable_hops` holds only four *completed* `hyp-hypothesis-test-display-intent` rows in the platform's history (latest 2026-07-08), none with an empty section — rows are only written when a call checkpoints, so most calls leave no row at all. `ai_activity_log` stores metrics only, never payload content. The single observed occurrence is `CHI-65`'s own crash.
 
 **That is itself a gap, not just a fact — tracked as `LOG-54`.** "Decide on real evidence" is only executable if the evidence gets collected; today nothing anywhere records that a section came back empty. `LOG-54` must land before question 1 can be answered on data rather than on another single anecdote.
+
+**`LOG-54` SHIPPED (`v7.0.246`, 2026-08-25) — the signal exists, and question 1 is now answerable by query rather than by anecdote.** `ai_activity_log.call_facts.empty_sections` records, per call, which **declared-required** properties of a structured response arrived empty. Derived in `api/prompt/request-receivable.js` (`extractEmptyDeclaredSections()`, wired into the STEP-4 `buildCallFacts()` assembly), generically from `format_contract.schema` — no intent, agent or capability conditional anywhere in it (`.claude/rules/capabilities-are-data.md`).
+
+**The ledger choice was measured, not assumed, and it reverses this section's own 2026-07-23 guess.** The note above reaches for `durable_hops`; that is the wrong ledger and always was. Read live 2026-08-25: `durable_hops` holds **64** completed `hyp-hypothesis-test-display-intent` rows, of which only **3** carry the section keys at all, because rows are written only when a call checkpoints. `ai_activity_log` holds **343** `hyp-hypothesis-test-intent` and **437** display-intent rows, **every one** with non-null `call_facts`. So the honest restatement of the gap is not "four unobserved calls" but *343 content calls that went unobserved*.
+
+**The value is tri-state, and the middle state is load-bearing:**
+
+| What you see | What it means |
+|---|---|
+| key **absent** | the observation does not apply (no declared object schema, no `required`, or a text call) — or the row predates `v7.0.246` |
+| **`[]`** | checked N required properties, **all filled** — the compliant case |
+| `["complicates", …]` | these required properties arrived empty, sorted |
+
+**Do not "tidy" the `[]` into an omission.** It is a deliberate exception to `buildCallFacts()`'s omit-when-empty convention, because question 1 asks whether she complies *reliably* — which needs the denominator (calls actually checked) and the numerator (calls with an empty section) out of the same column. Omitting `[]` collapses "checked, all filled" into "never checked", so a silently broken derivation would read as **perfect compliance** and fail toward *"don't build the reviewer"*, invisibly. Same assert-both-directions lesson as `.claude/rules/supabase-column-grants.md`. Guarded by `tests/regression/LOG-54-empty-section-signal.js`, whose negative control is a *compliant* call: `complicates.text` carrying her own "no complicating factors were found" with empty citations must report `[]`, never `["complicates"]`.
+
+**What counts as empty** is whole-value and type-driven: `null`/absent, whitespace-only strings, empty arrays/objects, and arrays/objects all of whose members are empty. `0` and `false` are **content** (`override_warning: false` is a real answer). **Accepted under-report, stated rather than hidden:** a section carrying citations but no text (`{text: null, citations: ["c1"]}`) counts as *filled*. Rare, and the conservative direction — it misses a possible failure rather than inventing one.
+
+**Deliberately NOT on `SIGNATURE_FIELDS`** (`lib/pattern-vocabulary.js`): this is a diagnostic fact, not pattern vocabulary — the `LOG-109` posture for `http_status`/`extraction_outcome`. Promoting it to a criteria key is Susan's review path plus a §19k amendment, never a silent allowlist edit; the guard asserts it stays off. Cardinality is bounded by construction — the value is a subset of one schema's declared `required` list (k=4 for `hyp-hypothesis-test-intent`, k=7 for `intelligence-review-format`, read live), sorted so identical compliance states collapse to one signature. Never a count, never free text — that is the `LOG-91` blow-up this avoids.
+
+**Question 1 is still open and this does not answer it** — it makes it answerable. The query is:
+
+```sql
+select feature,
+       count(*) filter (where call_facts ? 'empty_sections')                          as observed,
+       count(*) filter (where jsonb_array_length(call_facts->'empty_sections') > 0)   as with_empties
+  from public.ai_activity_log
+ where call_facts ? 'empty_sections'
+ group by feature;
+```
+
+Nothing here changes what any user sees: it writes one bounded key on rows that already carry `call_facts`, authors no content, and touches no rendering path. "The screen holds no content policy" above is untouched.
 
 **Whichever shape (1) takes, it must pass §19d's sniff test.** A deterministic "if `text` is null, push back" is a hardcoded reflex — the same shape as the "always seek backup" trait already rejected there. It only passes if the reviewing agent judges *this particular* output unfit and states why in a logged reason.
 
@@ -1609,23 +1696,30 @@ is provable from `intent` + config alone (history/backfill), which is why `inten
 Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settled the open
 `criteria`-shape question. Gate **passes**. Full detail: `docs/harvests/LOG-65-poc-anomaly-requirements-0724.md`.
 
-- **One missed requirement found → one new field (`model_modality`, #8).** The intent anchor
+- **One missed requirement found → one new field (`model_modality`, #8) — GUARD ROLE ONLY; the
+  naming role it was introduced with was overturned (historical note below).** The intent anchor
   (`intent` from `feature`) is a real slug **only for the 7,136 `agent-turn` rows**; for router
-  rows the intent is in `call_facts.tool_calls`, and for the 1,346 raw embedding subroutines
+  rows the intent is in `call_facts.tool_calls`, and for the raw embedding subroutines
   (`LOG-59`) there is no intent at all. `model_modality` (source: the existing `ai_activity_log.model`
   column; `text-embedding-* → embedding`, `null → none`, else `generative`) is a **read-time
-  derivation** — no new capture, not stored in `call_facts`. It lets one gold row name the retrieval
-  subroutines (`criteria: {model_modality: embedding}` → "Vector Embedding / Retrieval Subroutine")
-  and structurally forbids any generation pattern from matching a non-generative row (false `rag`
-  dies by assertion, not omission). Guard: `none` assumes null `model` = deterministic — correct only
-  while `model` is logged wherever a model runs.
-  > ⚠️ **Naming role OVERTURNED 2026-07-25 (`S-LOG-66`, John's call → `LOG-73`).** When the embedding
-  > subroutine was actually run through the Pattern Definer (Susan), she **DISCARDED** it — "a
-  > foundational NLP primitive already inside RAG/HyDE, not a distinct behavioral/orchestration
-  > pattern." So there is **no** "Vector Embedding / Retrieval Subroutine" gold pattern; the ~1,352
-  > embedding rows (`LOG-59`) stay **unclassified** (surfaced by `LEFT JOIN`, not dropped). `model_modality`'s
-  > **naming** role is dropped; its **false-generation guard** (the clause above) stands. "Going-forward
-  > unmatchable = 0" (below) no longer holds for embedding rows. §19k amendment + coverage recompute = `LOG-73`.
+  derivation** — no new capture, not stored in `call_facts`. Its one standing role is the
+  **false-generation guard**: it structurally forbids any generation pattern from matching a
+  non-generative row (false `rag` dies by assertion, not omission). Guard: `none` assumes null
+  `model` = deterministic — correct only while `model` is logged wherever a model runs. **The guard
+  is live in the gold data, verified 2026-08-25 (`LOG-73`): of the 33 `pattern_vocabulary` rows, the
+  8 whose `criteria` assert `model_modality` all assert `generative` — none asserts `embedding`.**
+  > **Historical note — the naming role, overturned 2026-07-25 (`S-LOG-66`, John's call); folded
+  > into the body 2026-08-25 (`LOG-73`, `v7.0.261`).** The POC gave `model_modality` a second,
+  > *naming* role: one gold row (`criteria: {model_modality: embedding}`) would have named the
+  > embedding subroutines "Vector Embedding / Retrieval Subroutine". When that subroutine was
+  > actually run through the Pattern Definer, Susan **DISCARDED** it — "a foundational NLP primitive
+  > already inside RAG/HyDE, not a distinct behavioral/orchestration pattern." The reason is kept
+  > verbatim because it is what stops the pattern being re-proposed. **John's call (`LOG-73`):
+  > embedding rows are accepted as unclassified** — Locked constraint 7 below already surfaces them
+  > via `LEFT JOIN` rather than dropping them, and no non-pattern label (subsystem / `feature`) is
+  > invented for them. This is a **standing and growing** honest-unclassified class, not a legacy
+  > one: 5,081 embedding rows at the 2026-08-25 measurement, **3,740 of them written after this
+  > overturn**, the most recent one day before it was taken.
 - **`criteria` uses a BOUNDED three-operator set, not pure `@>`.** Proven live: a real retrieval row
   logs `retrieval_method='mixed'`, so `@>`-equality on `similarity-search` **misses** it; RAG needs
   `retrieved_chunk_ids > 0`. The set is exactly: **`@>`/equality (presence)**, **`in` (enumeration)**,
@@ -1635,10 +1729,20 @@ Ran the full anomaly set (`LOG-42`/`53`/`59`) through the LOG-64 join and settle
   single-sourcing (name/definition/citation, one-edit rename) now that the operator set exists anyway.
 - **The Displayer returns a SET** (primary + supporting), via the one generic operator matcher — proven
   on a rich row returning {Request Routing, Output Guardrails, RAG}, no per-pattern code.
-- **Coverage: going-forward unmatchable = 0.** The 7,157 unmatchable rows are 100% historical; ~6,850
-  recover via `trace_id` sibling or `ai_type`→capability backfill (`LOG-69`), leaving a **permanent
-  floor of ~300 legacy/test rows (182 already blank today), none ever governed-named** — state it, do
-  not silently drop it.
+- **Coverage — a DATED MEASUREMENT, never a standing invariant. Remeasured live 2026-08-25
+  (`LOG-73`); recompute before citing it.** The POC's *"going-forward unmatchable = 0"* is
+  **retired**: it never covered embedding rows (the overturn above), and the platform's own log
+  falsified it within the month — see the growth figure there. Live `public.ai_call_patterns` at
+  2026-08-25: **34,702 rows** — generative 23,075 (15,002 matched / 8,073 unmatched), `none` 6,546
+  (0 matched), embedding 5,081 (0 matched). Overall **15,002 matched (43.2%) / 19,700 unmatched
+  (56.8%)**. Embedding is a **going-forward** unclassified class rather than a historical one. The
+  POC-era backfill arithmetic (7,157 unmatchable, ~6,850 recoverable via `trace_id` sibling or
+  `ai_type`→capability backfill, a ~300-row permanent floor) was a 2026-07-25 snapshot of the
+  generative/`none` set only; `LOG-69` executed that backfill. **What this bullet deliberately does
+  NOT claim:** that generative rows are matchable going forward. 8,073 of them are unmatched live,
+  far above the retired ~300 floor, and this measurement cannot split them into pre/post
+  capture-start — so the invariant is retired wholesale rather than re-asserted for one modality.
+  Diagnosing that generative gap is its own measurement session, named and not folded in here.
 - **Motivation confirmed live:** legacy naming (`buildPatternsUsed` + per-path literals →
   `ai_activity_log.patterns_used`) is still hardcoded and still writing on every new row (including the
   false `rag`); `patterns_used` is deliberately **not** a signature input. Write-path fix `LOG-63`
@@ -1928,7 +2032,7 @@ a separate `ai_services` name (services are services; model use is a flag).
 - **A muted "Up next: …" caption** after the active step (proposed in this session's own mockup as the ghost-drawer compromise, then killed by its verification pass — John's call, 2026-07-28): naming the next step requires predicting a drawer that hasn't arrived, contradicting Decision 1, and the prediction can be flatly wrong (choosing "Store as Info Only" ends the journey — no Draft Forecast ever arrives). Chat's step chip (Decision 3) carries the entire directive job, consistent with §40/`CHI-58`'s "Column 2 shows content, chat shows status."
 - **Keeping intent-dynamic titles** — the single biggest source of the observed confusion; "Forecast" smeared backward onto the Theory step whenever Marcus classified a request as `forecast`.
 
-**Scope split:** the screen-side build is `CHI-82` (`docs/FEATURES.md`). The model-generated vocabulary ("thesis" is Marcus's own live text — verified absent from `MarketIntelligenceScreen.jsx`'s user-facing strings; its sole occurrence in the file is a code comment at L164) can only be fixed by a vocabulary constraint in the CHI intents' instructions in Supabase — `CHI-83`, a separate follow-up, since no screen edit can reach it.
+**Scope split:** the screen-side build is `CHI-82` (`docs/FEATURES.md`). The model-generated vocabulary ("thesis" is Marcus's own live text — verified absent from `MarketIntelligenceScreen.jsx`'s user-facing strings; its sole occurrence in the file is a code comment at L164) can only be fixed by a vocabulary constraint in the CHI intents' instructions in Supabase — `CHI-83`, a separate follow-up, since no screen edit can reach it. **Shipped `v7.0.714` (`CHI-83`):** `skill_profiles.chi-vocabulary-guardrail`, a guardrails-type Skill on both capabilities, allowlisted to the five intents that write user text; `ci-routing-intent` excluded on `AGT-54`'s measurement. Mirror `docs/design/chi-83-vocabulary-guardrail.sql`; guard `tests/regression/chi-83-vocabulary-guardrail.test.mjs`.
 
 Enforceable subset: `.claude/rules/chi-vocabulary.md` (path-scoped to the CHI screen).
 
@@ -2073,8 +2177,10 @@ in scope. Getting this wrong shows the requester's patterns on the delegate's ho
 than blank.
 
 Build ticket: `LOG-95` (Platform-Logging) — thread span identity through the three unwired shapes
-(`execute.js` event/result construction + the drawer's hop-event build sites). Discovery only;
-needs its own design session + Architect Review before coding.
+(`execute.js` event/result construction + the drawer's hop-event build sites). **SHIPPED — designed,
+coded and patched 2026-07-28: `S-LOG-95` (`v6.3.184`) plus `S-LOG-95b` (`v6.3.186`) for a residual
+caught in live QA; ✅ Done.** The discovery-only note this paragraph used to carry was
+written before that session ran and was never amended (corrected `SES-50`, `v7.0.319`).
 
 ## 19q. Run Assembly Feed — Content Travels With the Event [discovery `design-list-arch-0802`, 2026-08-02]
 
@@ -2313,10 +2419,538 @@ Build: `S-LAV-32a` (v7.0.64 — executor carries `capability_phrase`; drawer tri
 
 - `permission`: `blocked` / `trial` (US default — capped by the row's own `spend_limit_usd`, default $5) / `unlimited` (the whitelist). John manages access by editing rows; `user_label` groups one person's several IPs.
 - Non-US country (Vercel's `x-vercel-ip-country`) blocks on first model call, written as `block_reason='geo'`. Crossing the spend cap writes `blocked`/`spend_cap`. Every refusal stamps `blocked_at` and increments `blocked_attempts` — the row IS the block log.
-- **Spend is computed, never stored:** `get_ip_stats(ip)` sums `ai_activity_log` tokens × the `model_pricing` table (per-1k rates + prompt-cache multipliers 1.25×/0.10×, mirroring `computeCallCost()`). `ai_activity_log.cost_usd` is legacy (43 rows) — never a spend source. John's report is the `ip_spend_report` view.
+- **Spend is computed, never stored:** `get_ip_stats(ip)` sums `ai_activity_log` tokens × the `model_pricing` table (per-1k rates + prompt-cache multipliers 1.25×/0.10×, mirroring `computeCallCost()`). `ai_activity_log.cost_usd` is written at log time since `LOG-149` (`v7.0.450`) from `shared/models.js`'s `MODEL_PRICING` — the price frozen at the moment of the call; older rows (and the 43 legacy rows) carry NULL and are priced at read time by `computeCallCost()`, now in `shared/models.js`. `get_ip_stats()` still prices from `model_pricing`; the two tables must agree — guarded by `tests/regression/log-149-api-dollars-ledger.test.mjs`. John's report is the `ip_spend_report` view.
 - Refusals are structured 403s — `{deepbench_gate:true, reason:'spend_cap'|'geo'|'manual', ip, stats?}` — rendered by `AccessGateModal.jsx` via the `gate-intercept.js` fetch wrapper. `spend_cap` always carries `stats` (the popup's three tiles); the model is never called, a refused request costs $0. Browse-safe reads (`OPTIONS`, `GET agent-configs`, `GET load-entries`) pass ungated so a blocked visitor can still browse.
 - **Failure postures, deliberate and asymmetric:** an infra error before the block/allow question is answered fails OPEN (cost protection must never become an outage); once a row says `blocked`, an infra error fails CLOSED (worst case the popup loses its tiles).
 - **QA tooling exemption:** the `x-db-gate-bypass` header matching Vercel env `GATE_BYPASS_SECRET` (all environments; retrieve via `vercel env pull`). Any live test or regression driver either sends it or runs from an `unlimited` IP — otherwise it 403s.
 - The IP derivation is byte-identical to `lib/request-context.js`'s — the gate's key and the log's `caller_ip` MUST stay the same value or spend sums silently miss; change them only together.
 
 Related security posture (`DAT-18`, found this session; **shipped v7.0.78, `S-DAT-18`, 2026-08-08**): `ip_org_cache` accepts no writes from the anon key and `ai_activity_log` is append-only with non-negative token counts enforced — gate state and spend history cannot be edited from a browser. The platform-wide lockdown is done: `anon`/`authenticated` hold zero write privileges on all other tables except `tasks` INSERT+UPDATE (the browser's own work-order path — `DAT-19` tracks rerouting it through a service-key route), and default privileges no longer auto-grant writes on future tables (fail closed — a new browser-written table needs its grant in its own migration). The Vercel `prebuild` stats refresh (`scripts/platform-stats.js`) writes `platform_stats` via the service key. Grant-surface residue: `DAT-20`; read-side policy design: `DAT-9`.
+
+---
+
+## 19u. The Recruiter — Agent-Built Agents & Persona Intake [discovery `design-agent-readiness`, John, 2026-08-11]
+
+**The vision (John's, this session):** one Recruiter agent that builds other agents. Three intake
+modes — **interview** (it asks questions, continuously), **documents** (job descriptions, job
+postings, files from John's drives), and **web research** (best practices for the role being
+designed). Two jobs, one capability at two depths: (1) hire a new agent from a job description;
+(2) the deep case — **replicate John himself**: a standing agent the Recruiter keeps interviewing,
+whose corpus grows from John's knowledge, documents, and reasoning patterns, walking §3's ladder
+L1 → L4. The Recruiter also **works autonomously in study cycles around the clock**, under a spend
+budget, so the replica is measurably smarter each morning.
+
+**This is §3 getting its intake front end, not a new model.** §3 already defines the two persona
+layers (Behavioral → `agent_configs`; Knowledge → `knowledge_entries`), the L1–L4 depth ladder, and
+the three training material types — with Reasoning Pattern material (how John decides, not what he
+concluded) as the highest-value type. The Recruiter is the agent whose job is filling those
+structures. Its own brain is Skills through the generic executor (§19b) — a route or harness
+conditional naming the Recruiter is the failure mode, not the build.
+
+### Decisions locked this session
+
+1. **The Recruiter subsumes "agent builder."** Hiring from a job description and replicating a
+   human are the same capability at two depths — one agent, not two.
+2. **Two-lane learning, keyed off the existing `Trainability` Skill property (§2):**
+   - **Trainable lane** — auto-ingests without John: web research on approved domains,
+     consolidation of its own corpus, self-testing the replica. Every item logged with why.
+   - **Supervised lane** — everything that *is John* (identity, reasoning patterns, anything
+     pulled from his drives): overnight work produces a **proposal queue only**. The locked
+     John-approves-before-ingestion rule (§19c/§19e — Susan Smith, TR-08, performs the write)
+     does not bend at night. Silent ingestion of personal/identity material is banned.
+3. **Study cycles, not a continuous loop.** A worker wakes every few hours, runs a cycle, stops.
+   **No cycle starts without checking a spend budget stored as data — no budget row, no run
+   (fail closed).** Precedent: `HAR-38` tripped a $10 IP cap during ordinary QA; an unbudgeted
+   overnight learner is a bill, not a feature.
+4. **"Smarter" must be measured, not asserted.** Daily eval against **held-out questions only**
+   (never items the replica was just trained on), graded blind (LLM-as-judge). The delta is
+   reported in a morning-briefing Deliverable: what was studied, what was ingested per lane,
+   spend vs. budget, score movement, questions queued for John. §3's L3 ("self-improving") gets
+   a number.
+5. **Every hire is signed.** Creating platform records (a new agent, its Skills, Capabilities,
+   assignments) always carries `requires_human_confirmation` — John signs every hire card.
+6. **Taxonomy writes get an owner (§19e, Exclusive Access-Control flavor).** One new brokered
+   service module owns writes to `skill_profiles`/`capabilities`/`capability_skill_profiles`/
+   `agent_capability_assignments`/`agents`. Generic by construction — nothing in it names the
+   Recruiter; the Recruiter is merely its first authorized caller. Registry row to be added to
+   §19e's table when the broker ships (`HAR-39`).
+
+### Current vs. future state
+
+**Already live (verified this session):** the generic executor (§19b); the upload → extract →
+chunk → embed pipeline into `knowledge_entries` (Teach path, §3); Susan Smith's structural
+ownership of training writes (§19c); the web search harness tool; the `agents` table already
+holding the full personnel record (28 columns). **The gaps, each filed Post-beta in
+`docs/FEATURES-LATER.md`:** the frontend roster still reads code (`src/data/agents.js`
+`AGENTS`/`AVATAR_CFG`/`AGENT_PRONOUNS`) instead of the `agents` table (`AGT-57`); no write tool
+exists for platform records (`HAR-39`); no autonomous worker or budget governor exists — nothing
+in the platform runs unprompted (`HAR-40`); no drive/cloud connectors (`AGT-58`, deferrable — hand
+upload rides the same downstream flow); the Recruiter build itself (`AGT-56`). Dependency:
+`AA-165` — Michelle's broker doesn't surface Skill-level content yet, which caps the quality of
+the Recruiter's bench-overlap reasoning at hire time.
+
+**Prerequisite audit — Skill-type fidelity through Scaffold and Harness (`AGT-59`, John's
+addition, 2026-08-11).** Before any agent autonomously authors Skills, walk each of §2's six
+Skill types (Identity, Behavior, Knowledge, Intent, Format, Guardrails) end-to-end and prove the
+Scaffold (`db-assembly.js` `assemblePrompt()`, `ai-enrichment.js` `enrichPrompt()`) and Harness
+(`request-receivable.js` `sendRequest()`, including guardrail evaluation) each consume that type
+the way §2/§19b say they do — a type the pipeline drops or mis-orders means the Recruiter would
+author Skills that silently do nothing. Known starting points: `SKILL_ORDER`
+(`db-assembly.js:58`) covers all six but falls back to a silent `?? 99` for unrecognized type
+slugs — the `skill_types` catalog now carries its `guardrails` row, so code and catalog agree and
+§2's drift note is retired. The audit must assert on the path taken, not the output — a prompt that
+"looks right" doesn't prove the type was consumed by the intended branch.
+
+### Ruled out / deferred
+
+- **A Recruiter route or screen as the maker experience** — the agent *is* the maker experience;
+  v1 interviews run on existing surfaces. (A dedicated screen is later polish, not architecture.)
+- **A continuous 24/7 loop** — cycles under budget deliver the same outcome without the bill.
+- **Auto-ingesting Supervised-lane material** — banned above, restating for emphasis.
+- **The PM-team build** (outbound email service, human-accountability workflows) — considered
+  this session, **removed from scope by John ("remove the pm team for now")**. Deferred, not
+  rejected; outbound email is explicitly out of the Recruiter's v1.
+
+### Invariants for future build sessions (no files exist yet, so they live here per discovery rules)
+
+- No route, and no conditional in `execute.js`/`request-receivable.js`, may name the Recruiter or
+  any capability slug of its build (`SE-02` discipline extends to it).
+- Supervised-lane content never reaches `knowledge_entries`/`agent_configs` without a recorded
+  human approval; the write itself goes through Susan Smith's path, never a new direct one.
+- An autonomous cycle checks its budget row before spending; absence of the row fails closed.
+- Replica eval scores come from held-out items only — a score computed over trained items is not
+  an eval and must not be reported as one.
+
+---
+
+## 19v. The Self-Building Platform — Autonomous Development Governance [discovery `design-selfbuilding-0819`, John, 2026-08-19]
+
+**The vision (John's, this session):** DeepBench builds itself, 24×7 — three engines: **Execute**
+(works the backlog), **Heal** (detects, root-causes, and fixes its own defects), **Invent**
+(generates new features with limited or no direction — studying the market, the platform's own
+white space, usage/audit data, and §0's investor lens — each with a value case). John judges once
+a day from a briefing, ~10 minutes, from any device: he is the editor and executive, not the
+author. Nothing reaches production without him — dev→main stays his, always. This extends §19u's
+patterns (study cycles, budget-governed autonomy, morning evidence) one level up, to the
+platform's own development.
+
+**Governance modes:** see `docs/GOVERNANCE-MODES.md` (the registry — Manual Design & Build /
+Automated / "Open Workspace", extensible by rows). Automated is **structurally unselectable**
+until the runner (`SES-78`) ships and John approves it: the mode requires a runner stamp in the
+session's inflight file, and until the runner exists the stamp cannot. Every mode shares every
+existing invariant — worktree isolation, branch discipline, atomic counters, full session
+ceremony; the modes differ only in when John's judgment is exercised.
+
+### The priority order (John's, locked this session)
+
+Orders **elective** work; a user blocker preempts the entire list (see The blocker sweep).
+John's **directive queue** outranks everything: a directive row (his idea, his words) is the
+cycle's mission before any list item.
+
+1. **P1 - Improves John's Skills** — features that showcase and grow John's frontier AI /
+   agentic-engineering skill and make him more hireable, especially for FAANG-level AI roles;
+   the platform is his living portfolio (added 2026-08-20, John, `design-runner-gov-0820` —
+   inserted above the original list, every other class pushed down one)
+2. **P2 - Inventive** — new inventive features: white space, competitive differentiation.
+   **Full seven-test definition (rewritten 2026-09-14, John test-by-test in chat, supersedes the
+   one-line bar below as the operative check): `docs/vision/market-map.md` §"What P2 - Inventive
+   means concretely," `C-MAP-28` through `C-MAP-35`** — not-yet-built, real demand, the real
+   competitors (Copilot/ChatGPT/Claude) structurally won't build it (named trap: multi-agent/
+   memory/self-training), durability against a fast-follower, compounding asset, beachhead fit
+   (soft), and intelligence-native (not a coded feature dressed as inventive). Not yet wired into
+   The Researcher's (`GV-02`) own scan logic — still applied by hand.
+   **The bar is hard-to-replicate uniqueness (John, 2026-08-21):** a feature competitors can
+   easily copy — an admin screen, an expected surface, "administrative expectations" — is not
+   P2, however new it is to the platform
+3. **P3 - Investor Value** — new features that add investor / buyout value
+4. **P4 - New Customers** — new features that win new customers. **The bar is buy-pull (John,
+   2026-08-21):** functionality that makes a customer say *"I have to buy this."* Administrative
+   capability (accounts, billing plumbing, admin surfaces) is not P4 even when customers require
+   it — classify it by its actual function (P5/P10)
+5. **P5 - Enhancements** — enhancements to existing features (prioritized by 1–4)
+6. **P6 - Agent Enhancement** — extend existing agents to perform across the platform
+7. **P7 - Agent Creation** — a new agent when functionality requires a competency the bench lacks
+8. **P8 - Determinism Removal** — harness and platform services become model decisions
+9. **P9 - Bug Fixes** — bug fixes, non-blocking (prioritized by 1–8)
+10. **P10 - Tooling** — session / governance / tooling enhancements and cleanups
+
+**Classification authority (John, 2026-08-20, `design-runner-gov-0820` — supersedes the
+"never assigned unattended" carve-out for P1–P4):** John has delegated the business-side read —
+P1–P4 classification, value/usage ranking, competitive and whitespace review — to Claude, who
+assigns and recommends; John governs **after the fact** through the briefing's Accept /
+Reverse / Rework, the same way he governs shipped code. The criteria sources are the vision
+corpus (`SES-84`) and `docs/JOHN-DECISION-PATTERNS.md`; every Reverse/Rework on a strategy
+call feeds back into them (`SES-79`).
+
+**Named form is canonical (John, 2026-08-20, `design-runner-gov-0820`):** a priority class is
+always written with its name — `P10 - Tooling`, never a bare `P9` — in backlog rows, briefing
+cards, notifications, and chat. John should never have to memorize the digits. Cycle-outcome
+language, same decision: `noop` → `did_not_run` (displayed "did not run") and `proposal` →
+`gated_before_build` (displayed "gated before build"), renamed in the `runner_cycles` /
+`runner_items` check constraints and data, not just display.
+
+**Backlog integration (beta retired 2026-08-19, John):** Beta-gate/Post-beta declarations are
+discontinued — `docs/BETA.md` is historical. Every backlog ticket carries a tier
+(`now`/`next`/`later`) as the urgency axis and a priority class `P1`–`P10` from the list above.
+The engine picks now → next → later, and `P1 - Improves John's Skills` → `P10 - Tooling` within
+each; within a class the tie order is **beta-marked first, then newest filed, then oldest**
+(John, 2026-08-20). Former Beta-gate rows belong in tier `now` unless deliberately parked in
+next/later (`SES-80` is the reclassification pass).
+
+**SUPERSEDED 2026-08-21, `SES-83` (d), `v7.0.112` — the table is authority, not the files.**
+Tier and priority class used to *be* which markdown file a ticket lived in
+(`FEATURES.md` = now, `FEATURES-NEXT.md` = next, `FEATURES-LATER.md` = later) plus a bolded
+string inside the Feature cell. They are now the `tier` and `priority_class` columns of
+`public.backlog_items`, and **work selection reads that table via SQL — parsing the markdown
+files for selection is retired.** John's call, typed into the briefing 2026-08-20 (*"Table is
+authority and files are no longer needed and are now smaller, not needing to carry that info"*)
+and Accepted on the `gated_before_build` card at 2026-08-21T00:19Z. The canonical selection query
+lives in `docs/runbooks/runner-cycle.md` step 5, layer (3), quoted verbatim there so it is
+written down exactly once. Rollout: the files were trimmed in cycle 2 (`v7.0.113`, 2026-08-21)
+and the ceremony documentation was retargeted in cycle 3 (`v7.0.114`); new tickets are filed into
+`public.backlog_items`. Of the three markdown files only `docs/FEATURES.md` retains reference
+content — the Feature ID Format, Type Taxonomy, Priority Class legend and a "Where the rows are
+now" pointer — while `FEATURES-NEXT.md` and `FEATURES-LATER.md` are retired stubs, kept rather
+than deleted solely so the ~1,210 `FEATURES*` references across the repo keep resolving.
+`docs/backlog/BACKLOG-SNAPSHOT.md`, regenerated into every ship commit set (`SES-83` (c)),
+is the table's git-history and offline copy.
+
+### Lane routing — what ships unattended vs. what waits for John
+
+**The exposure rule:** *changes what an approved surface looks like, or adds a surface →
+feature flag (a data row, `HAR-41` — never a code constant), **on by default on dev** — John's
+rule of 2026-09-12, verbatim: *"when ever anything is created in dev environment, it is flipped on
+by default. I can then choose later to flip off"* (`feature_flags.enabled` defaults `true`, migration
+`john_dev_flags_default_on`; a row is set `false` only by his word; dev → main stays his sign-off). Only makes an approved
+surface do what it was already supposed to do → ships live.* A flag governs **exposure, never
+correctness** — a bug fix behind an off flag is a fix that did nothing, and it makes the
+regression test vacuous (the `LOO-013` failure shape).
+
+Per priority class (renumbered 2026-08-20 with the P1 insertion): **P1–P4** (new features,
+including P1 - Improves John's Skills) — flagged; a new screen ships its route *and* nav
+entry inert behind the flag. **P5** (enhancements) — flagged; the enhancement lives in a new
+component file, the approved screen gains only an import + one guarded mount; the checkable
+assertion is **zero deleted lines** in existing `src/screens/*` / `src/AppShell.jsx`.
+**P6** (agent enhancement) — no unattended edits to any **active** agent's Skills/Capabilities
+(the moment a row changes, every live run uses it — maximum blast radius, no inert state);
+auto-lane only against agents still `is_active = false` — **except under rule
+`AGENT-ROW-AGREED-TICKET` (`SES-394`, 2026-09-15), where a ticket John has agreed to makes the
+edit build work with a before-image rather than a card.** The blast-radius reasoning is unchanged
+and is why the carve-out is narrow: it turns on *his having agreed to this ticket*, never on a
+trust rung, and the write still lands under one decision handle with its own
+`runner_before_images` row. **P7** (agent creation) — `is_active =
+false` *is* the flag: new agents are born invisible (excluded from the delegation roster,
+`LOO-37`) and unreachable (the `execute.js` gate, `LOO-004`); **John flipping `is_active` is
+signing the hire card**. Seeding those rows for an agent whose ticket he has agreed to is
+likewise build work under the same rule — what stays his is an agent he **has not seen**, and the
+activation itself.
+
+<!-- {{rule:AGENT-ROW-AGREED-TICKET}} · rendered from public.governance_rules — do not hand-edit the quoted lines below. Edit the registry row, then run `node scripts/render-rule-blocks.js --write`. -->
+> **Rule AGENT-ROW-AGREED-TICKET** — Creating an agent's rows (agents / skill_profiles / capabilities / capability_skill_profiles / agent_capability_assignments), and editing an active agent's identity, behavior, knowledge or guardrails rows, is build work under the ticket that names it and takes no approval card, when that ticket carries scope_origin = 'john-named' or an unreversed runner_decisions row names both the ticket and the change; every such row is written with its own runner_before_images row (row_data NULL for an INSERT) under one decision handle.
+> Reserved to John still: any agent-row write no agreed ticket names, and the creation of an agent John has not seen.
+> Flipping agents.is_active on is unchanged and remains John's hire card.
+> John 2026-09-14 (decision 20a06cf3) amended 2026-09-15 (decision 38a1c566); SES-397's manager-applied edits keep their carve-out.
+
+The callable form is `scripts/agent-row-gate.js` — `classifyAgentRowWrite({ action, scopeOrigin,
+decisionNamesTicket, agentKnownToJohn })`, and `node scripts/agent-row-gate.js --ticket=<ID>
+--action=create|edit-active|activate`, which reads the ticket's `scope_origin` live and exits `0`
+on build work, `1` on gated. Pinned by `tests/regression/ses-394-agent-row-gate.test.mjs`. **P8** (determinism removal) — ships live in data and platform-service
+modules; **gated in the four harness files** (`api/capabilities/execute.js`,
+`api/prompt/db-assembly.js` / `ai-enrichment.js` / `request-receivable.js`) — there the engine
+may diagnose, write the diff, and prove it with a full regression run, but it lands as a
+gated-before-build item. **P9** (bug fixes) — ship live; a fix whose correction moves pixels on an approved
+surface is an appearance decision wearing a bug's clothes: flagged or gated. **P10** (tooling) —
+ships live.
+
+**The gated lane (never unattended, no trust rung ever unlocks it):** terminology and canonical
+naming; architecture supersessions and LOCKED-section changes; schema-destructive migrations;
+anything §19e-owned; edits to active agents *other than those rule `AGENT-ROW-AGREED-TICKET`
+releases* (`SES-394` — an agreed ticket's own edit; everything else here is unchanged, and no
+trust rung unlocks any of it); the four harness files; dev→main. **Uncertain
+classification → gated, always.**
+
+### Reversibility — every change undone by one action of John's
+
+- **Code → revert-forward:** a new commit undoing the old one; history is never rewritten, so
+  reversal works after later commits stack on top.
+- **Supabase data → before-image:** every Automated-mode write records the prior row state
+  first; Reverse restores it exactly. **No before-image logged → the write does not happen.**
+- **Flagged work →** the flag simply stays off while the revert lands.
+- **Cards and notes → read back what they cite (`AGT-173`, `v7.0.644`):** a cycle card
+  (`runner_items`) and a cycle's `notes` are composed by hand in SQL at step 9 — `grep -rn
+  runner_items scripts/ api/ lib/` finds no writer, and `decide-gated-card.js:337` only *prints*
+  one — so the only place a guard can sit is the table. `trg_runner_items_citations` (`title`,
+  `value_case`, `before_after`, `qa_evidence`, `plain_cant`, `plain_after`, `plain_worth`,
+  `decision_reason`) and `trg_runner_cycles_notes_citations` (`OF notes`) call
+  `card_removed_citations(p_new, p_old)` `BEFORE INSERT OR UPDATE` and **refuse a write that
+  NEWLY cites a `backlog_items` row whose `status = 'removed'`**, naming every offending id and
+  its status. The join to `backlog_items` is the allowlist, so a token shaped like an id but
+  naming no row cannot match. **`p_old` is the grandfather clause and it is the load-bearing
+  half:** an id already present in the row being updated never refuses, because correcting a
+  wrongly-cited row means quoting the wrong id while you correct it — and that correction is this
+  rule's own remedy. `OLD` is NULL on INSERT, so an insert is judged whole. **Completeness is
+  RENDERED, never refused:** `cycle_reversal_handles(p_cycle_id, p_backlog_id)` returns every
+  same-ticket `runner_decisions` row and every captured migration-down with a `handle_sentence`
+  worded for `plain_worth`, because same-ticket handle omissions measure **43 across 28 of 53
+  ship cards** over the last four days (re-measured at this ship; the Designer read 41 across
+  ~30) and a `BEFORE` trigger enforcing completeness would refuse every ship card on the board.
+  **The handle list COMPLETES ITSELF at write time (`AGT-173` R3+R4, `v7.0.652`) — it is never
+  graded after the fact:** block 3 of the same guard function, in the same trigger pair, appends
+  the handle sentences the text does not already name — to `plain_worth` on a `kind = 'ship'` card
+  carrying both keys, and to `notes` on a cycle row that names a ticket (`item_id`) — and it
+  refuses nothing, ever. Re-measured at this ship: **77 of 133** reversal handles belonging to the
+  last four days' ship cards were unlisted across **43 of 59 cards**, and **67 of 172 across 37 of
+  81** `runner_cycles.notes`, while `cycle_reversal_handles()` had shipped with no caller anywhere
+  in the repo and nothing in `scripts/`, `api/` or `lib/` writes either surface — so the completion
+  sits where the write happens. **Each sentence carries its own `handle_token`** (`left(id, 8)` for
+  a decision, the `up_name` for a captured down) and the token is what the block searches for, so a
+  handle already named is never appended twice, whoever named it. **Insert time is the right
+  moment:** 52 of 54 omitted decision handles already existed when their card was inserted; the two
+  later ones are caught by a later text update and by nothing else. **Block order is load-bearing:**
+  blocks 1–2 grade the writer's own text and refuse, the completion appends last, because 3 of 285
+  `runner_decisions.summary` rows in seven days cite a removed ticket and appending first would
+  refuse a card over its own renderer's words; the appended text then sits in `OLD` and is
+  grandfathered by both clauses on every later write. The bullet's closing sentence assigning
+  enforcement to `scripts/verifier.js` is **struck as unsound** (pattern 94): the verifier runs at
+  step 7a (`docs/runbooks/runner-cycle.md:3022`) and the ship card is filed at step 9 (`:4000`), so
+  at grading time the card does not exist — which is exactly why `AGT-199` shipped the
+  `state-render-card-missing` finding. A key reading a card its cycle has not written yet reports
+  "not measured" on every honest cycle.
+
+  **AGT-173 R2 (`v7.0.688`) — the exclusion reason is the predicate's.** `public.pick_exclusions()`
+  is the ONE home of the pick-exclusion predicate and of the sentence for every clause it fails: one
+  CASE per `buildable` clause, each firing on `NOT (<clause>)` and each reading the setting or the
+  helper function rather than a copy of it. `prime_directive_queue()`'s `buildable` is now that core
+  joined on `reasons = '{}'`, the `project_blockers` view is the same core joined and kept for the
+  rows with reasons (appending only `no priority class`, board hygiene and never a `buildable`
+  clause), and `scripts/run-project.js`'s `passOverNote()` words the `assigned` payload's
+  `pass_over_note` from those same reasons — never from the manager's own `reason` (pattern 10). So
+  the queue, the board and the driver cannot disagree about why a row is out: before this ship the
+  view hand-copied six clauses as literals and carried neither the gate-card clause nor the EL-01
+  fence, which left `AGT-138`, `AGT-141` and `AGT-164` out of the queue with no reason anywhere
+  (18 open/partial tickets in executing projects, 0 in the queue, reasons for 15 → reasons for 18).
+  `drain_epic_next()`'s own copy stands, because a drain pick writes no exclusion reason.
+
+  **AGT-265 (`v7.0.689`) — four lanes, one test line.** Up to `runner_settings.max_lanes` (4) runner
+  routines build in parallel — `runner_should_boot()` counts open `DEEPBENCH-RUNNER-AUTOMATED-%`
+  cycles with a heartbeat inside 20 minutes and refuses `lanes_full` right after `db_pressure` — while
+  their regression suites wait in ONE line, `public.test_slots`, where `test_slot_acquire()` grants a
+  slot while fewer than `test_slot_allowance()`'s capacity are held and the caller is first — the
+  allowance narrows with the database's health instead of switching off (AGT-273): green gives
+  `test_slot_capacity`, a level keyed in `runner_settings.test_slot_ladder` gives the lesser of the
+  two (amber 1), and red, unsafe or an unreadable level give 0 (mirror
+  `docs/design/agt-273-test-slot-health-ladder.sql`, guard
+  `tests/regression/agt-273-test-slot-ladder.test.mjs`) (10-minute lease, beaten every 60 s by `scripts/test-slot.js`, the line's one
+  client, used by `tests/regression/run-all.js` and the verifier's regression gate), and
+  `ticket_matrix.lane_status` shows a built ticket waiting or testing. Mirror
+  `docs/design/agt-265-lanes-test-slot.sql`; guard `tests/regression/agt-265-lanes-test-slot.test.mjs`.
+
+### The blocker sweep & feature-owns-its-bugs
+
+Every cycle sweeps for user blockers (crash, dead control, broken run) **first** — nothing
+elective starts until dev is clean — and **again at the end**: a feature that leaves a blocker
+behind is auto-reverted by its own cycle's sweep before John ever sees it, and that reversal
+counts as a Reverse on the trust ladder. **A feature is not shipped until its own bugs are
+fixed** — filing a ticket for a bug in the thing just built is a QA failure, not a deliverable;
+tickets are legitimate only for pre-existing bugs found in code the feature didn't touch.
+
+### Budget governor & model self-control
+
+**Two tracks (John, 2026-08-20, `design-runner-gov-0820` — supersedes the single dollar
+bucket, and with it the earlier "unspent days roll forward" line):**
+
+- **API dollars — real money, hard walls.** One ledger row (HAR-40's fail-closed pattern):
+  **$100/month, $5/day**, both checked before every cycle — no row, no run. Counts **only true
+  billable API calls**, split `dev` vs `QA` so John sees where the money goes. A cycle's own
+  thinking is never charged here — the retired practice of estimating session tokens at API
+  prices produced phantom dollars that blocked development over money never spent (2026-08-20:
+  $5.50 "spent", true API spend ≈ $0, three cycles rested for nothing). A call the API refused
+  before any output is unbilled and its ledger row costs $0; an aborted call's row carries a
+  labelled input-side floor (`call_facts.tokens_estimated`) — `LOG-149`.
+- **Subscription tokens — John's allowance, governed by calibration.** No API exposes the
+  subscription meters, so John is the sensor: a daily reading (Fable % / all-models % /
+  5-hour %) typed into the briefing converts percentages to tokens (`tokens_per_pct`,
+  calibrated from runner-only overnight windows). Guardrails, derived from a measured month of
+  John's real usage (median working day ~11.6M tokens, p90 ~34M, peak 88M): runner rests at a
+  **weekly all-models reading ≥ 85%** (90% from Thursday 01:00 CT, `SES-414`); plans against a **50% share** of today's calculated
+  availability; initial/uncalibrated allowance **10M tokens/day**; a reading staler than 48h
+  drops it to a **3M/day fallback** — ignoring the page makes the runner more cautious, never
+  less. Meter-derived token figures are estimates, labeled estimated — a cycle row's
+  `est_tokens_*` is a measured per-cycle `get_session` delta since `v7.0.532` (`SES-423`); the runner governs only
+  itself and can never cap John's own sessions.
+Model choice is per session, by task shape, on **cost per outcome, not cost per hour**:
+mechanical work on the cheapest capable tier; design/root-cause/invention scoring on the deep
+tier (4 hours of a mid tier grinding costs more than 30 minutes of the deep tier and produces
+the revert that costs a second night). **Escalation trigger, checkable: one failed attempt at a
+tier (QA red, or root cause not found) → escalate one tier or queue for morning. Never a second
+attempt at the same tier** — "attempts per tier ≤ 1" is auditable in the session log. Every
+kickoff names its model; every briefing item shows cost + model. Two measured walls stand:
+Vercel's 100-deploys/day cap (`SES-33`) and account API caps (`SES-66`); the runner checks
+remaining deploy quota before every push and **yields headroom to John's manual sessions**.
+
+### The trust ladder — autonomy widens earned, measured
+
+Data: one row per work class (invention, enhancement, agent creation, determinism removal, bug
+fix), holding rung + streak. John's briefing answers feed it, **and only from `shipped`
+cards**: **Accept** → streak +1, five consecutive accepts promote one rung. **An Accept on a
+`gated_before_build` card is permission, not a rating, and does not touch the ladder at all**
+(John, 2026-08-21, directive `fb643367`, register B34) — it authorises that one build and
+re-enters the ticket at queue #1 (B23). The ladder measures the runner's *unattended* judgment,
+fed by John's verdict on work already done; a gated card is the opposite transaction, and paying
+the runner for asking permission would tax the one behaviour that must stay free. **Reverse on a
+gated card still demotes — settled by John** (2026-08-21, directive `1d01ea85`, register B35:
+"leave it"; his ruling, no longer an open question). The rule applies forward from the
+2026-08-21T03:53Z harvest; the ladder's history is not re-derived (see B34 for why). **Reverse** → streak 0 and demote one rung immediately
+(one reversal outweighs five accepts by design). **Rework** → neutral (steering, not failure).
+**A sweep auto-revert counts as a Reverse.** A rung buys throughput inside the auto lane — rung
+1 = one item/night in that class at minimum blast radius; rung 2 = two, or the next-larger
+blast radius. **No rung ever unlocks the gated lane** — that boundary moves only in a session
+like this one. Inventions start at the most conservative rung. Silence is never an Accept: an
+unjudged item stays live on dev but its streak does not advance.
+
+**THE DEVELOPMENT MANAGER RULES EVERY UNDECIDED GATE CARD (`AGT-127`, `v7.0.585`).** The authority
+was already his — `MANAGER-AUTHORITY-MATRIX` row 3, *"what a build finds … and gate cards
+(`runner_items.kind = 'gated_before_build'`): the manager's, within John's standing rules and the
+class caps"* — and until this ship he held no capability that could exercise it, so the cards simply
+accumulated: **16 undecided, 2026-09-16 to 2026-09-24**, each one taking its ticket out of both pick
+paths (`SES-424` slice 1). The capability is `decide-gated-card` (Intent `dm-gate-intent`, reusing
+the manager's own identity, behavior, guardrails and knowledge rows), the client is
+`scripts/decide-gated-card.js`, and `public.apply_gate_rulings(p_rulings, p_cycle_id,
+p_session_name)` owns every write, its `runner_before_images` rows and ONE `record_decision` handle,
+exactly as `apply_audit_review()` does. Five rulings: `accept` (card only), `rework` (card + the
+ticket's `scope_rationale` appended, `design_status` cleared), `retired` (card + `status = 'removal
+proposed'`), `needs-desktop` (card + `design_status = 'needs-desktop'`), and `john` — **which writes
+no card at all** and opens a `runner_questions` row `gate-card-<first 8 of the card id>` instead,
+because a card whose subject is one of John's four calls is not the manager's to decide. That open
+question is also the exit `runner_should_boot()` reads: without it, its new `gate_cards_to_rule`
+branch would fire on the same card every hour, forever. **This moves no decision from John to the
+manager; it gives authority he already held a way to act.**
+
+**`AGT-314` SPLITS THAT SLOT A SECOND TIME, AND THE PLACEMENT IS THE WHOLE RULE.** With nothing
+pickable and no card left to rule, the fire is not out of work — it is out of work it has already
+been TOLD about. An open or carried `audit_findings` row is a finding nobody has classed; an
+open/partial ticket in a project named by `runner_settings.find_work_lists` is a ticket nobody has
+ruled. Either one answers `work_to_find`, `should_boot = true`,
+`detail.mode = 'find-work-only'`, and the fire runs the finding intake and then
+`victoria-reorg.md`'s list pass per listed slug — it builds nothing, closes `did_not_run`, and
+says in `last_step` what it found. **The slugs are DATA, never a literal in the function body**
+(pattern:2): emptying the column turns the lists half off with an UPDATE, and the branch falls
+straight back to `nothing_pickable` — which is also the control that proves it is reading the two
+counts rather than booting on an empty board. It sits BELOW `AGT-127`'s branch on purpose, so a
+fire with a card to rule rules it instead of going looking, and below every wall, so going looking
+can never be the thing that boots a fire past one of John's stops (pattern:80). **This creates no
+new authority: it spends an hour that was already being spent on a refusal.** Eight such refusals
+were logged on 2026-10-02 between 11:41 and 18:51Z, with 44 unclassed findings and 133 open or
+partial tickets sitting on the two lists the whole time.
+
+**THE GUARD B ASYMMETRY, SAID OUT LOUD BECAUSE A READER WILL OTHERWISE ASSUME SYMMETRY.** A gate
+ruling is reversible on its **ticket** side and is **not** reversible on its **card** side, and both
+halves are deliberate. `reverse_decision()` restores the ticket's band from the images the function
+wrote; it **refuses the card stamp by name**, because a `kind = 'gated_before_build'` card *"survives
+every reversal"* — it is step 8d's idempotence key and the evidence a gate review happened, and
+`SES-312` makes an unreversed review the precondition for a drain declaration, so erasing it would
+un-name a succession nobody re-decided (`SES-364` Guard B). Measured on a rolled-back probe at this
+ship: `outcome = applied`, `restored = 1`, `refused = 1`, the ticket back at `open` and the card
+still stamped. The consequence a caller must act on rather than discover: **re-gating a ticket is a
+fresh `insert into public.runner_items`, never an undo** — `scripts/decide-gated-card.js --apply`
+prints both lines together for that reason.
+
+### The Invention engine
+
+**What it studies:** market/competitor scan (web research); white space against
+`docs/SCREEN-INVENTORY.md`, the §19-series, and the backlog; usage/audit signals
+(`ai_activity_log`); §0's investor framing. **Scoring:** platform value, pitch strength,
+white-space coverage, build cost. **Volume: one invention per cycle-day at rung 1** — widened
+only by the ladder, never by config. **The R&D gate — mandatory before build spend, for John's
+seeds and self-invented candidates alike:** (a) research, logged; (b) a **POC of the cheapest
+variant, measured** (John's standing rule: never call a feature blocked without measuring the
+cheapest variant); (c) a go/no-go traceable to why — §19d's sniff test applies: the reasoning
+for WHY this feature is logged model reasoning, never a feature mill. POC fails → the briefing
+gets findings, not a broken feature; the seed stays queued with what was learned. John's
+5-minute seed rides the directive queue and gets the same expansion — he describes, the engine
+researches, designs, POCs, builds.
+
+### QA bar (per shipped item)
+
+(a) The deterministic regression suite green (node tests, no AI calls — runs on every ship);
+(b) a **discriminating** self-QA on the new path — *would this test still pass if the change
+did nothing?* If yes, it is not QA; (c) deploy-currency verified before any live evidence
+(`scripts/check-deploy-current.js` — exit 2 is not a pass); (d) the blocker sweep clean.
+**Live AI-call QA is scoped to novel risk** — prove a genuinely new path live once, never once
+per data row — and is charged to the budget, so QA cost is visible per item.
+
+### The daily briefing (John's governance surface)
+
+One Artifact page per day, phone-friendly, shareable. Top line: shipped / gated before build /
+reverted / spend vs. budget. Per shipped item: ID + Type, the value case (who it serves, white space
+covered, how it strengthens §0's pitch), before → after, QA evidence with regression count,
+live dev link (**flagged items link both states — the on-link carries the flag switch as a URL
+parameter**, one tap shows the feature on while other visitors see it off; links included only
+after deploy-currency passes), cost + model, and the three response actions: **Accept /
+Reverse / Rework** (Reverse = auto-revert + row reopened with John's one-line reason; Rework =
+keep the idea, change direction, back into that night's queue). Gated-before-build section: gated items
+with POC findings, promote or kill. Bottom: ladder movements + anything auto-reverted, one line
+each. Answers from the page land in the queue the next cycle reads.
+
+### Operations
+
+24×7 as **cron-started sessions running chained cycles** (`SES-140` FINAL, `v7.0.195`, John
+2026-08-23 — the platform refuses session-spawning, so the chain runs in-session): a scheduled
+cloud task fires on John's clock grid; each firing runs one cycle — pick (directive queue first,
+else the P-list), design, build, QA, ship or file a gated-before-build item — and **while a
+standing drain has claimable work, the session opens its next cycle itself** (a new
+`runner_cycles` row, trigger `chained (drain continuation)`, one ticket per cycle row, full
+ceremony and budget walls re-checked per cycle) instead of ending. The chain ends at
+`runner-cycle.md` tail step (8)'s Gates A/B or at the session's own end — the cron resumes it —
+and every cycle still ends at close-out, never at context exhaustion (the one-feature/3-file
+scope rule guarantees the margin per cycle). **Pushes batch to ship points** — a
+session pushes when there is something to deploy or hand off, never per artifact (the inflight
+marker rides the first push, no solo push). The runner is **cloud-hosted**: John's laptop can
+sleep; today's hooks (`C:/Projects/.claude/`), `.env.local`, and Supabase MCP auth exist only
+on his machine — porting that environment is deliverable #1 of `SES-78`, and until it is done
+nothing runs 24×7. **The runner does not start work into a database outage** (`AGT-237`, `M6-14`):
+every 5 minutes `public.db_health_tick()` grades the database green / amber / red from its own
+metrics and a REST probe, and anything but green across the last 15 minutes — or no fresh reading
+at all — refuses the boot (`db_pressure`), stops the chain (Gate F) and holds a running build at
+its next step boundary (`scripts/db-pressure.js --hold`); it fails closed (§19o). **And the check that
+proves the tick is still running lives outside the database** (`AGT-277`): `db_health_tick()` is pg_cron, inside
+the very instance it measures — on 2026-09-29 it timed out eight times running and left a 45-minute hole in
+`db_health_readings` that nothing reported, because its own `db-health-readings-gap` finding is only filed on
+recovery — so `scripts/db-health-watch.js` probes the newest COMPLETED reading against the live `window_minutes`
+from GitHub Actions every 10 minutes (`docs/design/agt-277-db-health-watch.yml`, which John copies to `main`),
+exits 0 fresh / 1 silent — filing one `db-health-silent` row per outage, a fingerprint the evidence timestamp
+cannot move — and 2 when it cannot judge at all, which is the total-outage alarm and fails closed (§19o). **The Auditor
+checks outcomes first** (`AGT-239`): after every reviewable run, `scripts/audit-run-review.js
+--prepare` files `public.audit_flow_checks()` — ships not closed, a verdict gate red for days,
+wasted cycles, a project filing faster than it closes — beside the database's own service findings,
+and the per-run manager review ranks `service` before `blocked` before the rest, leaving record and
+citation `paperwork` to the weekly review (moved, not removed). **Projects get a finish line**
+(`AGT-240`): a project's list locks when it starts, so what is found meanwhile waits on the findings
+list (`listed`) instead of growing the running project, and when every locked ticket is `done` or
+`removed` The Auditor grades what it built and The Development Manager proposes ONE next project with
+its tickets and why (`finish_project_batch()`, status `proposed`, not picked) — which only a session on
+John's words starts (`start_proposed_project()`). **A proposal reaches John only when Victoria agrees** (`AGT-312`, John 2026-10-02, decision `6668e1ac`): between the manager's `propose-project` turn and the write, her `review-proposal` turn reads the proposal as a row of her task file and answers agree or disagree, `finish_project_batch()` refuses a `p_proposal` without `review.verdict = 'agree'` and records both agreements on its one `proposal` decision, and a disagree writes nothing — the batch stays due and the manager re-proposes once with her reason. Mirror `docs/design/agt-312-proposal-review.sql`; guard `tests/regression/agt-312-proposal-review.test.mjs`. **The finish line is also a SENSOR** (`AGT-291`): `project_batch_state()` grades a batch finished when no member of its locked list is `open` or `partial` — `delivered` is built, and a `paused` project's batch finishes too — and reports `review_due`, that same state AND no claim inside 24 hours, which `runner_should_boot()` ORs into its `work_to_find` branch as `detail.finish_due` and `scripts/propose-project.js --prepare` both filters on and CLAIMS (a conditional PATCH of `epics.proposal_attempted_at`, so two passes cannot spend two turns on one batch); `(7e)` runs that `--prepare` on EVERY outcome. Mirror `docs/design/agt-291-finish-sensor.sql`; guard `tests/regression/agt-291-finish-sensor.test.mjs`. A project whose `projects.accepts_findings` is true (Agent Training, John 2026-09-28) keeps taking approved agent findings while it executes, so `finding_group_epic()` and `epic_lock_guard()` skip that lock for it alone (`AGT-264`). **A ticket reaches an `executing` project's list only with a `need_source`** (`AGT-280`, slices 1-2): the text `who:table:id` naming a row that actually exists, under one of the five `who:table` pairs in `runner_settings.need_source_kinds` — data John edits with an UPDATE, never a constant in code — with `scope_origin='john-named'` excepted exactly as `epic_lock_guard()` excepts it; the refusal is the `requirement_gate` trigger on `epic_project_executing()`, so intake and findings lists keep taking rows, and `apply_requirement_verdict()` is the one writer of `need_source`/`need_score` (before-image then UPDATE on a `pass`, and on a `not-needed` no ticket row at all, only a `listed` `audit_findings` proposal). Whether the cited row exists is a lookup, so no model owns it; her judgment of whether it SUPPORTS the claim is the `requirement-check` capability, and its door is `scripts/requirement-check.js` — the one client of `apply_requirement_verdict()`, which reads the cited row for her, refuses an untraceable claim before any model turn is spent, and refuses a `pass` that does not echo the source it was handed byte for byte. Mirror `docs/design/agt-280-requirement-gate.sql`; guards `tests/regression/agt-280-requirement-gate.test.mjs` and `tests/regression/agt-280-requirement-check.test.mjs`. **`AGT-281` adds the LIST turn beside that one-ticket door**: the sibling Intent `vc-reorganize-intent` on the same capability rules every open/partial ticket of one project's epics in a single turn against the candidate need sources (`--prepare-list` / `--apply-list`, heads not bodies at 200 chars, descriptions cut at 1,500, `john:runner_decisions` excluded and `builder-found-tickets` held), a `pass` going to `apply_requirement_verdict()` and a `not-needed` to `scripts/ticket-owner.js` step 3b's `removal proposed` under its own reversible decision — never `removed`; the playbook and the canonical prompt block for the weekly `victoria-reorg` routine live in `docs/runbooks/victoria-reorg.md`, and the standing brief's `Victoria's lists` group prints each run's own line from the one `runner_cycles` row per list. Mirror `docs/design/agt-281-reorganize-intent.sql`; guard `tests/regression/agt-281-victoria-runs.test.mjs`. **`AGT-309` closes the loop John ruled on 2026-10-02 (decision `874648b6`, rule `JOHN-1002-PROCESS-BREAK-CLASS`)**: the class — an agent breaking the ticket writing and review process so that a less important ticket is developed over a higher-priority one — is a `governance_rules` row and Victoria's inline Knowledge `vc-process-break-class` on `requirement-check`, so her `pass` or `not-needed` is made against it; the manager's review may mark a `root-cause` group `need_source` + `home` (an executing project that `accepts_findings`), which still files to the routed list and prints the `scripts/requirement-check.js --prepare … --home` command; only `apply_requirement_verdict()`'s `pass` with `home_project` moves the ticket, both triggers firing, so a locked list still refuses with AGT-240's sentence and the manager cannot overrule her; `requirement_gate()` refuses any UPDATE of `epic_id` into an executing project without an unreversed `requirement-check` decision on that ticket, so a hand-set source no longer moves a discovered ticket; and `scripts/agent-row-gate.js` reads an unreversed John decision cited as `need_source` as the AGENT-ROW-AGREED-TICKET authority. Mirror `docs/design/agt-309-process-break-class.sql`; guard `tests/regression/agt-309-process-break-class.test.mjs`.
+
+### Vision-drift protection
+
+`docs/JOHN-DECISION-PATTERNS.md` is the criteria source for **every** autonomous choice,
+including what to invent (`SES-79` is the mining pass that grows it from a month of
+proposed→responded pairs). **Anything it doesn't cover fails closed to the gated lane.** The
+risk designed against is not bugs — it is a hundred individually-fine decisions summing to a
+platform that is no longer John's. For inventions specifically: covering white space must never
+mean drifting off §0's pitch — pitch strength is a scoring axis, not a tiebreaker. The
+decision model operates **inside the auto lane only**; it never impersonates John on gated
+calls.
+
+### Invariants for the runner build (`SES-78` is judged against these)
+
+- No Automated session exists without the runner stamp; the stamp cannot exist before John
+  approves the runner.
+- No cycle spends without checking the budget ledger (month + day); absence fails closed.
+- No Supabase write without a before-image; no ship without the QA bar; no cycle end without
+  the blocker sweep.
+- Every briefing claim (shipped / QA / cost) traceable to logged evidence — §19d's sniff test
+  applied to the platform's own development.
+- Enforceable file-scoped subset lives in `.claude/rules/autonomous-surface-changes.md`,
+  `.claude/rules/agent-roster-inert.md`, and the gated-mirror line in
+  `.claude/rules/capabilities-are-data.md`.

@@ -1,3 +1,7 @@
+// DeepBench v7.0.450 | useAIActivity.js | LOG-149 -- the pricing table stops living here. COST_PER_1K_INPUT/COST_PER_1K_OUTPUT, MODEL_ID_NORMALIZE and computeCallCost() all MOVE to shared/models.js and are imported back, because this module is a browser hook and lib/activity-log.js (the single server-side ai_activity_log writer) cannot import it -- which is exactly why two rate tables existed, why both stopped at Sonnet 4.6, and why claude-fable-5-1 and claude-opus-5 (every governance call the platform makes) were unpriced while the Anthropic Console billed real dollars. computeCallCost is RE-EXPORTED from here, so useAgents.js, HarnessTraceConsole.jsx and LiveAgentViewScreen.jsx keep their existing import path unchanged; read-time pricing keeps its job for the pre-LOG-149 rows, which carry NULL cost_usd (the hydrate already prefers a non-NULL one). MODEL_PROVIDER also gains the three runner_model_lanes models so the AI Audit stops labelling every governance row "Unknown provider" (STANDARDS §12) -- deliberately a separate table from the rates, since a model can be priced and unlabelled or labelled and unpriced.
+// DeepBench v7.0.306 | useAIActivity.js | LOG-104 -- hydrateFromSupabase() pages with a UNIQUE sort key. It ordered by created_at DESC alone, and created_at is not unique (320 of 34,812 rows share one with another row, measured live 2026-08-29), so Postgres was free to order a tie group differently between two .range() calls and a row straddling a page boundary could be served twice or never -- silently, with the shortfall landing in Total Calls, Total Cost, By LLM, By Agent and By Service alike. Appending .order('id') makes (created_at, id) a total order, so the window is deterministic. created_at stays FIRST: the row set is consumed newest-first and this only decides ties that previously had no defined answer. The obvious "page it twice and diff" test is deliberately NOT the guard -- the reordering is permitted, not guaranteed, so that test passes while the bug is fully present; tests/regression/LOG-104-deterministic-paging.js asserts the code pairs every .range() with the primary key instead, and its negative control is this file's own pre-change chain
+// DeepBench v7.0.293 | useAIActivity.js | LOG-145 -- fetchPatternClassification() gains the module-level cache its four sibling reads already have (success cached, failure never, in-flight promise shared), so the two mount sites stop re-paying a ~2,194ms anon rollup read and re-shipping 190,808 bytes of log_ids on every SPA navigation between AI Audit and the MI Agents drawer. The log_ids payload itself STAYS and is now pinned as un-removable: all four consumers join server-side classification to client-only facts (pricing, AI-51 pairing, countability, scope/window/latency) and that join is row identity -- the "cutover" to ai_pattern_agent_hop_rollup the ticket imagined is structurally impossible, not deferred (kickoff §2)
+// DeepBench v7.0.152 | useAIActivity.js | LOG-128 -- By Caller stops merging automated traffic into a named org's row: identityForRow()/buildByCaller() take an opts arg, and behind the default-off `log-128-automated-caller-split` flag a no-visitor-id row whose call_source is regression/script/session-test gets its own `ip:<addr>|automated` bucket. NULL and 'ui' sources keep their existing key byte-for-byte; buildBySource() is untouched (it calls identityForRow with two args, and only for 'ui' rows)
 // DeepBench v7.0.45 | useAIActivity.js | LOG-129 -- buildByDevice(): a third cut of the SAME By Platform User row set (Desktop/Mobile/Unknown), a pure aggregate across every caller and source rather than something nested inside them, returned from the hook as `byDevice` beside bySource/byCaller and reconciling with both by construction
 // DeepBench v7.0.43 | useAIActivity.js | LOG-127 -- By Platform User stops over-merging callers: the fourth, host-derived bucket is gone (exactly three -- a known caller's name, Public, Unattributed) and the hardcoded production-host constant with it; identity donation now folds a cookie-less `ui` row only into the ONE visitor seen at its address+host, never regression/script traffic and never a row carrying its own different visitor id
 // DeepBench v7.0.39 | useAIActivity.js | LOG-121 -- By Platform User: buildBySource()/buildByCaller() (two reconciling cuts of one row set) + the known_callers/ip_org_cache read; LOG-124 -- hydrateFromSupabase() stops asking for '*' and reads caller_ip_masked, never the raw address
@@ -22,10 +26,19 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from '../lib/supabase.js';
+import { isAutomatedNoVidRow, automatedBucketIdentity } from '../lib/callerBuckets.js';
+import { useFeatureFlag } from '../lib/featureFlags.js';
 // FEATURE: LOG-36 -- PATTERN_CATALOG is no longer read by anything in this file; it is imported
 // solely to keep the existing re-export alive for AIActivityPanel.jsx's Platform Roadmap section
 // (LOG-56), which renders patterns precisely BECAUSE they have no logs and is out of scope here.
 import { PATTERN_CATALOG, SERVICE_CATALOG, SERVICE_SLUG } from '../../shared/ai-patterns.js';
+// FEATURE: LOG-149 -- the pricing table, the legacy-id normalizer and computeCallCost() all MOVED to
+// shared/models.js so lib/activity-log.js can price a row as it writes it (a browser hook is not
+// importable server-side, which is why two rate tables existed and both stopped at Sonnet 4.6).
+// RE-EXPORTED below, not re-implemented: useAgents.js, HarnessTraceConsole.jsx and
+// LiveAgentViewScreen.jsx all import computeCallCost FROM THIS MODULE and are untouched by the move.
+import { computeCallCost, MODEL_ID_NORMALIZE } from '../../shared/models.js';
+export { computeCallCost };
 export { PATTERN_CATALOG, SERVICE_CATALOG };
 
 // FEATURE: AI-51 — moved from useAgents.js (S-MI-20 origin) so this canonical shared cost/pattern
@@ -246,7 +259,13 @@ export function buildActivitySummary(scopedRows, turnTimestampsByAgent) {
     // paired Set computed above is the equivalent per-row source.
     d.operations++;
     if (isCountableCall({ model: row.model, isPairedDup: paired.has(row.id) })) d.calls++;
-    const rowCost = paired.has(row.id) ? 0 : (row.cost_usd != null
+    // FEATURE: SES-383 -- a `call_source='session'` row is a governance turn run on subscription
+    // tokens: real tokens, zero API dollars. Writing NULL to its cost_usd (scripts/agent-log.js,
+    // plus the backfill) is NOT enough on its own, because the `cost_usd != null` fallback below
+    // would then re-derive a price from those tokens and put it straight back on the screen. The
+    // guard has to sit at the READ too. It precedes the fallback deliberately; every other row
+    // keeps the fallback intact, including the pre-LOG-149 rows that depend on it.
+    const rowCost = (paired.has(row.id) || row.call_source === 'session') ? 0 : (row.cost_usd != null
       ? parseFloat(row.cost_usd)
       // FEATURE: HAR-02a -- cache-token fields priced when present; null on historical rows = +0.
       : computeCallCost(row.model, row.input_tokens, row.output_tokens, row.cache_creation_input_tokens, row.cache_read_input_tokens));
@@ -777,7 +796,7 @@ function buildIdentityIndex(rows, known, orgs) {
 // (a known caller's name / Public / Unattributed -- LOG-127: exactly three, never a fourth split by
 // which host was hit), By Caller answers "which caller is this" and an anonymous group is named by
 // its org, falling back to its blurred address so two of them can never merge on screen.
-function identityForRow(row, idx) {
+function identityForRow(row, idx, opts = {}) {
   const ip = ipKeyOf(row);
   const vid = row?.visitor_id != null ? String(row.visitor_id) : null;
   const host = row?.request_host || null;
@@ -797,6 +816,14 @@ function identityForRow(row, idx) {
       const key = soleLabel ? `name:${soleLabel}` : `visitor:${soleVid}`;
       return { key, name, label: name, ip, org, city };
     }
+  }
+  // FEATURE: LOG-128 -- automated traffic that carries no visitor id gets its own bucket instead of
+  // merging into the org row its address happens to resolve to. Guarded by a default-off flag
+  // (§19v exposure rule) and deliberately narrow: only the closed AUTOMATED_NOVID_SOURCES list
+  // moves, so a NULL call_source (the pre-LOG-121 unknown) and 'ui' both keep their existing key.
+  if (opts.splitAutomated && ip && isAutomatedNoVidRow(row, Boolean(vid))) {
+    const auto = automatedBucketIdentity(ip, org);
+    return { key: auto.key, name: host ? PUBLIC_CALLER : UNATTRIBUTED, label: auto.label, ip, org, city };
   }
   // Unlabelled. A row with neither an address nor a visitor id is a pre-LOG-121 row: there is no
   // fact to attribute it with and none is derivable (§19i -- no backfill), so it says so plainly
@@ -856,12 +883,17 @@ export function buildBySource(rows, known = [], orgs = []) {
 /**
  * FEATURE: LOG-121 -- By Caller: one row per distinct caller, the same rows cut the other way.
  * Returns [{ label, device, org, city, calls, cost, firstSeen, lastSeen, ips[] }].
+ *
+ * FEATURE: LOG-128 -- `opts.splitAutomated` (the default-off flag) gives no-visitor-id automated
+ * traffic its own bucket per address instead of merging it into that address's org row. Omitting
+ * opts reproduces the pre-LOG-128 grouping exactly, which is what makes the flag's off state a
+ * real no-op rather than a differently-shaped default.
  */
-export function buildByCaller(rows, known = [], orgs = []) {
+export function buildByCaller(rows, known = [], orgs = [], opts = {}) {
   const idx = buildIdentityIndex(rows, known, orgs);
   const groups = new Map();
   for (const row of rows || []) {
-    const id = identityForRow(row, idx);
+    const id = identityForRow(row, idx, opts);
     if (!groups.has(id.key)) {
       groups.set(id.key, {
         label: id.label, org: id.org, city: id.city, calls: 0, cost: 0,
@@ -969,27 +1001,22 @@ export const AI_TYPES = {
   hitl_review_rate:   { label:"Human Review Rate",            desc:"% of HITL steps that required an override — tracks agent autonomy over time",                                        model:"TBD",                   location:"Planned",                        phase:2 },
 };
 
-// FEATURE: AA-181 -- real Anthropic per-model input/output rates (verified 2026-07-14
-// against published Claude pricing: Haiku 4.5 $1/$5 per 1M tokens, Sonnet 4.6 $3/$15 per
-// 1M). Split input/output replaces the old single blended rate, which understated Haiku
-// cost 4x and ignored Sonnet's 5x output premium entirely.
-const COST_PER_1K_INPUT = {
-  "claude-haiku-4-5": 0.001,
-  "claude-haiku-4-5-20251001": 0.001,
-  "claude-sonnet-4-5": 0.003,
-  "claude-sonnet-4-6": 0.003,
-  "text-embedding-3-small": 0.00002,
-};
-const COST_PER_1K_OUTPUT = {
-  "claude-haiku-4-5": 0.005,
-  "claude-haiku-4-5-20251001": 0.005,
-  "claude-sonnet-4-5": 0.015,
-  "claude-sonnet-4-6": 0.015,
-  "text-embedding-3-small": 0.00002,
-};
+// FEATURE: AA-181 -- real Anthropic per-model input/output rates.
+// FEATURE: LOG-149 -- COST_PER_1K_INPUT/COST_PER_1K_OUTPUT DELETED from here; the rates are now
+// shared/models.js's MODEL_PRICING, imported at the top of this file. Two tables that both stopped
+// at Sonnet 4.6 is how claude-fable-5-1 and claude-opus-5 -- every governance call on the platform --
+// went unpriced while the Console billed real dollars.
 
 // FEATURE: BUG-20 — add canonical versioned model IDs; keep legacy short-form for historical rows
+// FEATURE: LOG-149 -- the three lane models added (runner_model_lanes 2026-09-11: orchestrator
+// claude-opus-5, judgment claude-fable-5-1, mechanical claude-sonnet-5). Without them the AI Audit
+// labelled every governance row "Unknown provider" (STANDARDS §12) -- a provider label, deliberately
+// separate from MODEL_PRICING: a model can be priced and unlabelled, or labelled and unpriced, and
+// collapsing the two would hide exactly the gap part (e) of the LOG-149 guard exists to find.
 const MODEL_PROVIDER = {
+  "claude-fable-5-1":            "Anthropic",
+  "claude-opus-5":               "Anthropic",
+  "claude-sonnet-5":             "Anthropic",
   "claude-haiku-4-5":            "Anthropic",
   "claude-haiku-4-5-20251001":   "Anthropic",
   "claude-sonnet-4-5":           "Anthropic",
@@ -1011,10 +1038,9 @@ export const isLogHydrated = () => _hydrated;
 const notify = () => _listeners.forEach(fn => fn([..._log]));
 
 // FEATURE: BUG-20 — normalize short-form model IDs to canonical versioned IDs at write time
-const MODEL_ID_NORMALIZE = {
-  'claude-haiku-4-5':  'claude-haiku-4-5-20251001',
-  'claude-sonnet-4-5': 'claude-sonnet-4-6',
-};
+// FEATURE: LOG-149 -- MOVED to shared/models.js and imported at the top of this file, unchanged.
+// Both remaining readers in this module (logAICall()'s resolvedModel below, and the by-model
+// rollup's fold) use the imported binding and behave identically.
 
 // FEATURE: AA-181 -- single source of truth for call cost, used at both write time
 // (logAICall(), for the legacy client-driven AI types) and read time
@@ -1028,16 +1054,11 @@ const MODEL_ID_NORMALIZE = {
 // fields (all historical rows, every caller that omits the params) price byte-identically to
 // before -- the two new terms are exactly 0 when the params are null/undefined/0. Rates stay in
 // the one existing per-model table (COST_PER_1K_INPUT/OUTPUT); no new rates constant.
-export function computeCallCost(model, inputTokens, outputTokens, cacheCreationInputTokens = null, cacheReadInputTokens = null) {
-  const resolvedModel = MODEL_ID_NORMALIZE[model] || model;
-  const inRate = COST_PER_1K_INPUT[resolvedModel] ?? COST_PER_1K_INPUT[model];
-  const outRate = COST_PER_1K_OUTPUT[resolvedModel] ?? COST_PER_1K_OUTPUT[model];
-  if (inRate == null && outRate == null) return null;
-  return ((inputTokens || 0) / 1000) * (inRate || 0)
-    + ((cacheCreationInputTokens || 0) / 1000) * (inRate || 0) * 1.25
-    + ((cacheReadInputTokens || 0) / 1000) * (inRate || 0) * 0.10
-    + ((outputTokens || 0) / 1000) * (outRate || 0);
-}
+// FEATURE: LOG-149 -- MOVED VERBATIM-IN-BEHAVIOUR to shared/models.js (see the import at the top of
+// this file, which also re-exports it so every existing `import { computeCallCost } from
+// './useAIActivity.js'` keeps working). Two differences, both deliberate and both stated in the new
+// home's comment: a call with NO token field at all now prices to null rather than 0 (unknown is not
+// free), and a model that publishes its own cache-read rate uses it instead of the flat 0.10x.
 
 // FEATURE: AI-16 — logAICall Supabase persistence
 // FEATURE: AA-44 — logAICall gains optional patterns_used param
@@ -1110,7 +1131,15 @@ export async function hydrateFromSupabase(tenantId = null) {
       let q = supabase
         .from('ai_activity_log')
         .select('id,ai_type,feature,model,agent_id,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,latency_ms,knowledge_tier,cost_usd,patterns_used,created_at,call_source,caller_ip_masked,device_type,visitor_id,request_host')
+        // FEATURE: LOG-104 -- `created_at` is NOT unique (320 rows share one with another row,
+        // measured live 2026-08-29 across 34,812 rows), so ordering by it alone leaves the page
+        // window UNDEFINED: Postgres may order a tie group differently between two .range() calls,
+        // and a row straddling a boundary can then be served twice or never. `id` is the integer
+        // primary key, so (created_at, id) is a total order and the window is deterministic.
+        // Keep created_at FIRST -- the row set is consumed newest-first; this only decides ties
+        // that previously had no defined answer. Do not drop it back to a single .order().
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .range(from, from + PAGE_SIZE - 1);
       if (tenantId) q = q.eq('tenant_id', tenantId);
       const { data, error } = await q;
@@ -1138,7 +1167,12 @@ export async function hydrateFromSupabase(tenantId = null) {
       tier:      row.knowledge_tier || null,
       location:  row.feature || '—',
       agentId:   row.agent_id || null,
-      cost:      paired.has(row.id) ? 0 : (row.cost_usd != null
+      // FEATURE: SES-383 -- the same guard as buildActivitySummary()'s rowCost, and it has to be in
+      // BOTH places: this one feeds byService/totalCost (the By-Service dollar column and the header
+      // Total Cost), that one feeds byAgent. A session turn is subscription usage -- real tokens, no
+      // API dollars -- so it folds in at 0 rather than being re-priced from its tokens when cost_usd
+      // is NULL. Every other row keeps the computeCallCost fallback.
+      cost:      (paired.has(row.id) || row.call_source === 'session') ? 0 : (row.cost_usd != null
         ? parseFloat(row.cost_usd)
         // FEATURE: HAR-02a -- cache-token fields priced when present; null on historical rows = +0.
         : computeCallCost(row.model, row.input_tokens, row.output_tokens, row.cache_creation_input_tokens, row.cache_read_input_tokens)),
@@ -1218,31 +1252,58 @@ export function usePatternVocabulary() {
 // (patterns whose pattern_vocabulary.criteria matched real logged signatures); Section 2 =
 // ai_pattern_reclassification_count (single total of everything unmatched). The pattern NAME is
 // derived in the view at read time (ARCHITECTURE.md §19k) -- this hook never classifies client-side.
-export async function fetchPatternClassification() {
-  try {
-    const [rollup, recl] = await Promise.all([
+// FEATURE: LOG-145 -- module-level cache, the same shape as fetchPatternVocabulary() above and as
+// the service/capability/caller directories: cache success only, never cache a failure (a later
+// mount may retry), share the in-flight promise so the AI Audit panel and the MI Agents drawer can
+// never run the ~2.2s rollup read twice concurrently. This read had the two mount sites
+// (AIActivityPanel.jsx, MarketIntelligenceScreen.jsx) and was the only per-mount Supabase read in
+// this file with no cache, so every SPA navigation between those two screens re-paid a ~2,194ms
+// anon query and re-shipped the 190,808-byte log_ids array (32,441 ids across 13 patterns,
+// measured 2026-08-28). The refetch bought no freshness: the log this result is re-derived against
+// hydrates ONCE per page load (_log/_hydrated), so re-reading classification per mount could only
+// drift from the cached log it joins.
+//
+// LOG-145's premise was that log_ids could be REPLACED by ai_pattern_agent_hop_rollup (LOG-41).
+// It cannot -- all four consumers join server-side classification to client-only facts, and that
+// join IS row identity: costBySlug needs computeCallCost() + AI-51 duplicate-zeroing (the view's
+// cost_sum is the naive SQL sum LOG-97 exists to correct), the countable total and the
+// reclassification UNION need isCountableCall() per row, and buildAgentPatternRows() needs
+// per-row latency over a scoped/windowed row set the all-time view cannot express. See
+// docs/kickoffs/v7.0.293-LOG-145-ai-audit-log-ids-cutover.md §2; pinned by
+// tests/regression/LOG-145-classification-fetch-cache.js part 4.
+let _pclassCache = null;
+let _pclassPromise = null;
+
+export function fetchPatternClassification() {
+  if (_pclassCache) return Promise.resolve(_pclassCache);
+  if (!_pclassPromise) {
+    _pclassPromise = Promise.all([
       // FEATURE: LOG-97 -- log_ids rides along on this read that already happens (+~1%, no new
       // round trip). It is NOT a second query against ai_call_patterns -- that was the first
       // attempt, and it blew the anon role's 3s statement_timeout.
       supabase.from('ai_pattern_classification_rollup').select('pattern_slug, pattern_name, pattern_description, call_count, cost_sum, log_ids'),
       supabase.from('ai_pattern_reclassification_count').select('reclassification_count').single(),
-    ]);
-    if (rollup.error) throw rollup.error;
-    if (recl.error) throw recl.error;
-    const classified = (rollup.data || []).map(r => ({
-      slug: r.pattern_slug,
-      name: r.pattern_name,
-      desc: r.pattern_description,
-      total: r.call_count,
-      cost: Number(r.cost_sum) || 0,
-      logIds: r.log_ids || [],
-      active: true,
-    }));
-    return { classified, reclassificationCount: recl.data?.reclassification_count ?? 0 };
-  } catch (e) {
-    console.warn('[LOG-38] pattern classification fetch failed; By Pattern section will show empty', e);
-    return { classified: [], reclassificationCount: 0 };
+    ]).then(([rollup, recl]) => {
+      if (rollup.error) throw rollup.error;
+      if (recl.error) throw recl.error;
+      const classified = (rollup.data || []).map(r => ({
+        slug: r.pattern_slug,
+        name: r.pattern_name,
+        desc: r.pattern_description,
+        total: r.call_count,
+        cost: Number(r.cost_sum) || 0,
+        logIds: r.log_ids || [],
+        active: true,
+      }));
+      _pclassCache = { classified, reclassificationCount: recl.data?.reclassification_count ?? 0 };
+      return _pclassCache;
+    }).catch(e => {
+      console.warn('[LOG-38] pattern classification fetch failed; By Pattern section will show empty', e);
+      _pclassPromise = null; // allow a later mount to retry; never cache a failure
+      return { classified: [], reclassificationCount: 0 };
+    });
   }
+  return _pclassPromise;
 }
 
 export function usePatternClassification(log = []) {
@@ -1359,6 +1420,11 @@ export function useAIActivity() {
   // FEATURE: LOG-121 -- the By Platform User drawer's two read-time tables (cached module-level,
   // one Supabase read each per page load, same shape as the two directory reads above).
   const { known: knownCallers, orgs: ipOrgs } = useCallerDirectory();
+  // FEATURE: LOG-128 -- default-off exposure flag (§19v: a data row, never a code constant). Read
+  // unconditionally at the top of the hook, and fail-closed by construction: useFeatureFlag starts
+  // false and stays false until a row says otherwise, so a slow or failed table read renders exactly
+  // today's By Caller rather than a half-applied split.
+  const splitAutomatedCallers = useFeatureFlag("log-128-automated-caller-split");
 
   // Aggregate by type
   const byType = {};
@@ -1524,7 +1590,7 @@ export function useAIActivity() {
   // header tiles are built from, so their totals reconcile with Total Calls / Total Cost as well as
   // with each other. platformUserCount is the distinct-caller count behind the new stat tile.
   const bySource = buildBySource(log, knownCallers, ipOrgs);
-  const byCaller = buildByCaller(log, knownCallers, ipOrgs);
+  const byCaller = buildByCaller(log, knownCallers, ipOrgs, { splitAutomated: splitAutomatedCallers });
   // FEATURE: LOG-129 -- the drawer's third section, from that same `log`: no directory input, because
   // device is a fact already on the row, not an identity to resolve. Same input = reconciles with the
   // two above and with the header tiles, with no extra wiring.

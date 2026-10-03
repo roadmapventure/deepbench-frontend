@@ -57,11 +57,33 @@ tracks rerouting) and `ai_activity_log`'s INSERT.
 
 Two facts every later grants session needs:
 
-- **Default privileges are closed** (`alter default privileges for role postgres … revoke … on tables`):
+- **Default privileges are closed for WRITES only** (`alter default privileges for role postgres … revoke … on tables`):
   a new table gets NO public write grants automatically. Right direction (fail closed), but a new
   table the browser must write presents as silent 401/42501s — grant explicitly in the migration
   that creates it, same pattern as the SELECT fail-closed note above.
+  **Corrected 2026-08-19 (`SES-78a`, found live): SELECT is NOT closed** — the six `runner_`
+  tables came up with auto-granted public SELECT (12 rows, 6 tables × 2 roles), caught by the
+  migration's own QA. A new table whose content shouldn't be publicly readable needs an explicit
+  `REVOKE SELECT … FROM anon, authenticated` in its creating migration, and its QA must assert
+  zero grant rows. Detail: `docs/SES-78a-migration-log.md`.
 - **`information_schema.role_table_grants` does not report PG17 `MAINTAIN`** — `anon`/`authenticated`
   still hold `m` on all 32 tables (`DAT-20`, latent, not DML, unreachable via PostgREST). Read
   `pg_class.relacl` / `pg_default_acl` when the question is "the complete grant surface," not just
   the information_schema views.
+
+
+## Addendum (2026-09-02, `SES-315`): functions default OPEN — `REVOKE … FROM PUBLIC` does not close them
+
+`pg_default_acl` for functions in this project grants EXECUTE to `anon`, `authenticated` and
+`service_role` **by name** the instant a function is created, so a new `runner_*` function is
+callable through the browser's anon key until its migration revokes those roles explicitly.
+`REVOKE ALL ON FUNCTION … FROM PUBLIC` removes only the PUBLIC grant and leaves the named role
+grants standing — the migration reports success and the function stays open. This is the opposite
+direction from the table write-grant default above (closed for writes, SELECT open).
+
+Found live by `SES-315`'s migration (`ses315_ship_decision`, 2026-09-02): its own trailing `DO`
+block asserted `has_function_privilege('anon', …, 'EXECUTE')` false, the first attempt was refused
+and rolled back, and the shipped form revokes `PUBLIC, anon, authenticated` by name before
+granting `service_role`. Every `runner_*` function created before it was created the same way and
+closed the same way (`SES-286a` § 1h, `SES-122a` § 7); a migration that creates a function must
+revoke the three by name and assert both directions, never trust the success flag.

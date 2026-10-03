@@ -1,0 +1,1281 @@
+<!-- DeepBench | SELFBUILD-RETIREMENT-LEDGER.md | SES-170/SES-145/SES-93 consolidation sweep, 2026-08-23 -->
+# Selfbuild Retirement Ledger
+
+**Contract:** every rule, statement, or file removed or rewritten by the Selfbuild project gets
+an entry here: what it said, where it lived, why it was retired, where the content survives
+(if anywhere), and the restore path. Git preserves everything — nothing in this ledger is
+lost, only moved out of the live rulebase. This file exists so removals are *findable with
+reasons*: if you are looking for a rule you remember and can't find it, check here before
+concluding it never existed. Entries are append-only; newest at the bottom of each section.
+
+**And every retirement also re-points the registry, in the same ship that retires the thing:** grep
+`public.governance_rules` — both the `statement` column and the `canonical_doc` column — for the
+retired path, predicate or rule id, and amend or supersede *every* hit before the push, never in a
+follow-up ticket. Writing the entry below is not the whole duty: a live rule still naming something
+that no longer exists is worse than no rule, because the next cycle believes it and goes looking for
+a file that is not there. `AGT-91` (entry 55) is what that omission costs — four live rows, three
+retirements, found by a grep nobody had been required to run.
+
+Restore path for any entry, unless stated otherwise: `git log --follow -- <path>` in
+`deepbench-frontend`, then `git show <commit>:<path>` to recover the exact prior text.
+
+---
+
+## Entries
+
+<!-- Entries appended below by the sweep; one per removal/rewrite. -->
+
+### 1. CLAUDE.md — governance-mode blockquote (rewrite)
+- **Said:** Automated mode "exists only in a session launched by the approved runner (`SES-78`,
+  not yet built), which stamps its identity into the session's inflight file".
+- **Lived:** `CLAUDE.md`, governance-mode blockquote after the router steps.
+- **Why retired:** the runner shipped and went live 2026-08-20 (100+ cycles); the stamp is
+  echoed into `runner_cycles` rows, not the inflight file; chained continuation cycles exist
+  (`SES-140`). The "not yet built" claim was 3 days stale and wrong on the stamp mechanism.
+- **Survives:** rewritten in place (LIVE + `runner_cycles` stamp + SES-140 chaining); full
+  detail in `docs/GOVERNANCE-MODES.md`.
+- **Restore:** git history of `CLAUDE.md` (pre-2026-08-23 sweep commit).
+
+### 2. docs/GOVERNANCE-MODES.md — "## Automated" pre-live body (rewrite)
+- **Said:** "Nothing runs under this mode until a follow-up design session builds the runner
+  against §19v's constraints and John approves it — structurally enforced: the stamp that
+  proves the mode cannot exist before the runner does."
+- **Lived:** `docs/GOVERNANCE-MODES.md`, `## Automated` section body.
+- **Why retired:** contradicted the file's own registry table, which already said LIVE
+  2026-08-20 with the SES-151 clock-grid cadence and SES-140 in-session chaining.
+- **Survives:** rewritten in place with the live description (LIVE 2026-08-20; hourly cron +
+  `scheduler_gate()` per SES-151; in-session chaining per SES-140), consistent with the
+  registry row.
+- **Restore:** git history of `docs/GOVERNANCE-MODES.md`.
+
+### 3a. docs/WORKING-WITH-JOHN.md — BETA/NON-BETA close-out split (rewrite)
+- **Said:** "Every close-out splits its open items into a BETA section and a NON-BETA section
+  (added 2026-07-29, `design-loo-013`) … Never name a ticket ID in chat before its beta status
+  is established … Classify each one yourself against `docs/BETA.md` §1 … read that file, never
+  infer the bar."
+- **Lived:** `docs/WORKING-WITH-JOHN.md`, Lead With the Verdict section, third bullet.
+- **Why retired:** the beta axis was retired 2026-08-19; `docs/BETA.md` is historical. The
+  current prioritization signal is the named P1–P10 priority class.
+- **Survives:** rewritten in place — every close-out ticket carries named P1–P10 class + ID +
+  stored title; the never-name-unclassified principle carries over intact. Inline supersession
+  note added under the bullet.
+- **Restore:** git history of `docs/WORKING-WITH-JOHN.md`.
+
+### 3b. docs/WORKING-WITH-JOHN.md — 2026-08-21 "ID + TITLE" bullet (superseded strike)
+- **Said:** ID + TITLE together on every backlog reference (John, 2026-08-21).
+- **Lived:** Communication Pacing section, immediately before the 2026-08-22 bullet.
+- **Why retired:** subsumed by the 2026-08-22 "ID + TITLE + Type" rule directly below it; two
+  near-duplicate consecutive bullets read as conflicting rules.
+- **Survives:** kept in place with a strikethrough supersession note; the 2026-08-22 bullet is
+  the live rule.
+- **Restore:** git history of `docs/WORKING-WITH-JOHN.md`.
+
+### 4a. docs/FEATURES.md — beta-gate filing instruction (rewrite)
+- **Said:** "When filing any new row, declare `Beta-gate (<bucket>)` or `Post-beta` in the row
+  per that file's [`docs/BETA.md`] maintenance rules."
+- **Lived:** `docs/FEATURES.md` header pointer block.
+- **Why retired:** beta retired 2026-08-19; filing now requires a named P1–P10
+  `priority_class` (register B9) on the `public.backlog_items` row.
+- **Survives:** rewritten in place with the current filing rule.
+- **Restore:** git history of `docs/FEATURES.md`.
+
+### 4b. docs/FEATURES.md — "Done rows are still archived in FEATURES-ARCHIVE.md" (rewrite)
+- **Said:** "`✅ Done` rows are still archived in `docs/FEATURES-ARCHIVE.md`, which this trim
+  did not touch."
+- **Lived:** `docs/FEATURES.md`, closing line of "Where the rows are now".
+- **Why retired:** the archive is frozen since 2026-08-19; done tickets stay in
+  `public.backlog_items` with `status='done'` and are filtered, never moved (`SES-115`
+  keep-and-filter).
+- **Survives:** rewritten in place.
+- **Restore:** git history of `docs/FEATURES.md`.
+
+### 4c. docs/FEATURES.md — P-GATED legend row (marked RETIRED, legend-only)
+- **Said:** `P-GATED` presented as a live class marker for the gated lane.
+- **Lived:** `docs/FEATURES.md`, Priority Class legend table.
+- **Why retired:** the gated lane is a boolean flag on the backlog row now (register B15), not
+  a priority-class value. Row kept for history, prefixed RETIRED.
+- **Survives:** in place, marked retired; the gated-lane semantics live in §19v /
+  GOVERNANCE-MODES.md / runner-cycle.md.
+- **Restore:** git history of `docs/FEATURES.md`.
+
+### 5. docs/BETA-TRIAGE.md — read as a live queue (retirement banner added)
+- **Said:** working-triage language throughout (per-bucket execution queues) with no
+  retirement notice; only a pointer to `docs/BETA.md`.
+- **Lived:** `docs/BETA-TRIAGE.md`, whole file.
+- **Why retired:** beta retired 2026-08-19; the file read as a live queue. Banner added at top
+  mirroring `docs/BETA.md`'s ⛔ RETIRED banner; body untouched.
+- **Survives:** entire file kept as history below the banner.
+- **Restore:** n/a — nothing removed.
+
+### 6a. docs/runbooks/runner-cycle.md — two "45-minute TTL" mentions (rewrite)
+- **Said:** the publish-lease properties bullet and step 0b both cited a "45-minute TTL".
+- **Lived:** `docs/runbooks/runner-cycle.md` (lease properties bullet; step 0b silent-cycle
+  paragraph).
+- **Why retired:** B42 repurposed the `runner_lease` singleton at a **10-minute** TTL over the
+  serial tail; B31's cycle-level 45-minute lease is retired. The 45-minute figures
+  contradicted the SQL and GOVERNANCE-MODES.md.
+- **Survives:** both corrected to 10-minute with (B42) cites.
+- **Restore:** git history of `docs/runbooks/runner-cycle.md`.
+
+### 6b. docs/runbooks/runner-cycle.md — invention Reverse → rejected-paths.md (rewrite)
+- **Said:** step 4b(5): "Reverse kills it and records the rejection in
+  `vision/rejected-paths.md`."
+- **Why retired:** `SES-157`: a rejection is a `vision_claims` row with `status='rejected'`;
+  `vision/rejected-paths.md` is a retired stub, never appended.
+- **Survives:** corrected in place.
+- **Restore:** git history of `docs/runbooks/runner-cycle.md`.
+
+### 6c. docs/runbooks/runner-cycle.md — "no forward view of the queue" window (rewrite)
+- **Said:** step 9: "between `SES-124` and `SES-126` the page carries no forward view of the
+  queue at all", stated as a live condition.
+- **Why retired:** the window closed when `SES-126` shipped (`v7.0.161`) — §8's queue matrix
+  and §11's now-tier census carry the forward view now.
+- **Survives:** corrected in place; the window kept as a parenthetical historical note.
+- **Restore:** git history of `docs/runbooks/runner-cycle.md`.
+
+### 6d. docs/runbooks/runner-cycle.md — "Three different flags" / "Each one is a record_skip()" (rewrite)
+- **Said:** step 5's blocked-prefix intro counted "Three different flags" before a six-row
+  table, and asserted "Each one is a `record_skip()` call" — contradicted two paragraphs later
+  by the `delivered`/`john-paced` no-skip exemptions.
+- **Why retired:** count corrected to five skip flags (sixth row `designed` is not a skip);
+  the record_skip sentence now names the three that record a skip and the two stepped past
+  silently, folding the exemptions into one accurate sentence.
+- **Survives:** rewritten in place; the detailed exemption paragraphs unchanged.
+- **Restore:** git history of `docs/runbooks/runner-cycle.md`.
+
+### 7. docs/RUNNER-GOV-0820-REQUIREMENTS.md — register A2 fixed cron (supersession banner)
+- **Said:** "A2. Schedule (John): fires 12/3/6/9 AM/PM CST (UTC cron `0 2,5,8,11,14,17,20,23
+  * * *`; re-align one hour when DST ends in November)."
+- **Why retired:** superseded by `SES-151` (`v7.0.196`): hourly cron at :40 permanent +
+  `scheduler_gate()` pacing by John's America/Chicago clock grid; DST-proof, no realign ever.
+- **Survives:** strikethrough + dated supersession banner in the file's standard style;
+  original wording preserved below it.
+- **Restore:** n/a — original text kept in place.
+
+### 8a. docs/SES-78-RUNNER-DESIGN.md — phase table "❌ Missing" rows (rewrite)
+- **Said:** 78b/78c/78d rows showed "❌ Missing" while the header banner said all four phases
+  shipped v7.0.97.
+- **Why retired:** internal contradiction; all three shipped v7.0.97 (78d go-live approved
+  2026-08-20).
+- **Survives:** rows flipped to ✅ Done (shipped v7.0.97).
+- **Restore:** git history of `docs/SES-78-RUNNER-DESIGN.md`.
+
+### 8b. docs/SES-78-RUNNER-DESIGN.md — ladder rule without gated-card exception (note added)
+- **Said:** decision 4's cycle anatomy stated the ladder mechanics (Accept = streak+1 /
+  Reverse = demote) with no gated-lane exception, and the runbook cites this file.
+- **Why changed:** gated-lane cards are decided by John on the briefing; the ladder governs
+  build autonomy only and no rung unlocks the gated lane. One-line exception note + pointer to
+  the operative homes (GOVERNANCE-MODES.md / runner-cycle.md) added; nothing removed.
+- **Restore:** n/a — addition only.
+
+### 9a. docs/runbooks/session-hygiene.md — "CLAUDE.md rule 6c / rule 7 / rule 8" citations (rewrite)
+- **Said:** checks 5/5b/5d cited numbered CLAUDE.md rules (6c = In-flight bullet, 7 = worktree
+  cleanup, 8 = bullet removal).
+- **Why retired:** the current CLAUDE.md has no numbered rules — it has named hard rules and a
+  two-step router; the setup/cleanup procedures live in the `session-setup` runbook.
+- **Survives:** repointed in place to CLAUDE.md router step 1 and the session-setup runbook's
+  setup/cleanup steps.
+- **Restore:** git history of `docs/runbooks/session-hygiene.md`.
+
+### 9b. docs/runbooks/session-hygiene.md — duplicate check number "6" (renumber)
+- **Said:** both the STANDARDS.md drift set and the SES-164 runbook header-stamp cap were
+  numbered check 6.
+- **Why changed:** stamp cap renumbered to check 7 with a renumber note. Live pointers to
+  "check 6" meaning the stamp cap fixed: `docs/runbooks/runner-cycle.md` header stamp and two
+  `docs/SESSIONS.md` pointer lines (13265/13375 area). Historical narratives (CLAUDE-STATE
+  prior entry, kickoff `v7.0.210-SES-164-runbook-header-trim.md`, BACKLOG-SNAPSHOT generated
+  row) left as-is — the renumber note in session-hygiene.md disambiguates them.
+- **Restore:** git history.
+
+### 9c. docs/runbooks/session-hygiene.md — "DeepBench-Session-Init.md Step 10c" (rewrite)
+- **Said:** check 1 pointed at Session-Init Step 10c for the close-out trim.
+- **Why retired:** the SES-120 rewrite of DeepBench-Session-Init.md has steps 0–9 and no
+  close-out step; close-out lives in CLAUDE-DESIGN.md.
+- **Survives:** repointed in place.
+- **Restore:** git history.
+
+### 9d. docs/runbooks/session-hygiene.md — CLAUDE-STATE bullet as "authoritative liveness signal" (rewrite)
+- **Said:** check 5 prose treated the CLAUDE-STATE.md "In flight now" bullet as the
+  authoritative liveness signal.
+- **Why retired:** the mechanism moved to inflight marker files (`SES-011`; repo-root
+  `inflight/` since 2026-08-21, register B41) — which is what `scripts/check-session-docs.js`
+  actually reads (fetched `origin/dev` `inflight/` + legacy `.claude/inflight/`, plus 5e's
+  unpushed on-disk markers).
+- **Survives:** rewritten in place to match the script.
+- **Restore:** git history.
+
+### 11a. DeepBench-Session-Init.md — "Michelle avatar | MichelleAvatar.jsx" row (removed)
+- **Said:** Step 6 table row: "Michelle avatar | MichelleAvatar.jsx | Wired to Supabase since
+  S-BENCH-01 (2026-06-19)".
+- **Why retired:** no `MichelleAvatar.jsx` (or any *ichelle* file) exists under `src/` —
+  verified by Glob 2026-08-23. Pointing sessions at a nonexistent file.
+- **Survives:** nowhere (the fact was false); avatar config lives with the roster in
+  `src/data/agents.js`.
+- **Restore:** git history of `DeepBench-Session-Init.md`.
+
+### 11b. DeepBench-Session-Init.md — restated scope sentence (rewrite)
+- **Said:** Step 3: "Initially targeting government procurement intelligence, now generalizing
+  to any business domain."
+- **Why retired:** a restated fact in a pointer doc (the file's own rule: restated facts
+  drift). Replaced with a pointer to `docs/ARCHITECTURE.md` §0.
+- **Restore:** git history.
+
+### 11c. DeepBench-Session-Init.md — start-prompt template without model line (rewrite)
+- **Said:** Step 7.6's Claude Code start-prompt block had no model line.
+- **Why changed:** CLAUDE-DESIGN.md standing rule (2026-07-28): a prompt without a model line
+  is incomplete. Model line added to the template; nothing removed.
+- **Restore:** n/a — addition only.
+
+### 10a. docs/STANDARDS.md — §7 "add to docs/FEATURES.md" (rewrite)
+- **Said:** "If NEW REQUIREMENT: add to `docs/FEATURES.md`."
+- **Why retired:** the FEATURES files are legend-only stubs (v7.0.113); new requirements are
+  filed as `public.backlog_items` rows per `docs/runbooks/session-setup.md` step 3c.
+- **Survives:** repointed in place.
+- **Restore:** git history of `docs/STANDARDS.md`.
+
+### 10b. docs/STANDARDS.md — §1 "commit directly to dev, no feature branches" (rewrite)
+- **Said:** "Branch: commit directly to `dev`. No feature branches."
+- **Why retired:** predates the 2026-07-07 worktree discipline; the live rule is
+  `session/<name>` worktree branches + `git push origin HEAD:dev` (CLAUDE.md hard rules).
+- **Survives:** rewritten in place with a dated correction note.
+- **Restore:** git history of `docs/STANDARDS.md`.
+
+### 10c. docs/STANDARDS.md — versioned/dated H1 header (rewrite)
+- **Said:** "# DeepBench v5.1 — Session Standards & Testing … Last updated: 2026-07-15".
+- **Why retired:** hardcoded version/date in a title is the stale-version-in-prose pattern —
+  the file was current while its header claimed v5.1/July.
+- **Survives:** version-free header; current version lives in CLAUDE-STATE.md; change history
+  in git log.
+- **Restore:** git history of `docs/STANDARDS.md`.
+
+### 12a. CLAUDE-DESIGN.md — freshness-check pointer "see CLAUDE.md" (rewrite)
+- **Said:** "(no separate fetch+`git show` freshness check is needed (retired 2026-07-15 —
+  see `CLAUDE.md`))".
+- **Why retired:** CLAUDE.md no longer carries the bootstrap-check note the pointer aimed at.
+- **Survives:** repointed to `docs/SESSIONS.md` with a note the CLAUDE.md note is gone.
+- **Restore:** git history of `CLAUDE-DESIGN.md`.
+
+### 12b. CLAUDE-DESIGN.md — verbatim version-claim SQL block (removed, pointer left)
+- **Said:** the `UPDATE dev_version_counter … RETURNING major, minor, patch;` block, verbatim.
+- **Why retired:** duplicated `docs/runbooks/session-setup.md` step 3 (one home per fact; the
+  runbook is canonical — a future SQL change would have had to land twice).
+- **Survives:** pointer to session-setup step 3; the SQL itself lives there.
+- **Restore:** git history of `CLAUDE-DESIGN.md`.
+
+### 13a. docs/AUTONOMY-SORT-2026-07-31.md — read as live (retirement banner added)
+- **Said:** SAFE/JOHN autonomy classification of 226 FEATURES.md rows against BETA.md.
+- **Why retired:** superseded 3×: beta axis retired 2026-08-19, FEATURES rows moved to
+  `public.backlog_items` (v7.0.113), live autonomy axes are B27's (auto/gated lane + trust
+  ladder). Zero inbound references found.
+- **Survives:** whole file kept below the banner.
+- **Restore:** n/a — nothing removed.
+
+### 13b. docs/S-PM-07-QA-FINDINGS.md — read as live (historical banner added)
+- **Why:** June-era (2026-06-23), pre-CHI; the screens/pipelines it describes were rebuilt.
+- **Survives:** whole file kept below the banner. **Restore:** n/a.
+
+### 13c. docs/runbooks/HAR-17-23q-regression.md — read as the regression (historical banner added)
+- **Why:** superseded as the CHI regression by `CHI-TRUE-REGRESSION.md`; its FEATURES.md
+  row-refs are stub-dead. Kept as the HAR-17 recovery-census procedure + 2026-07-28 baseline
+  record (its own scope note already said this; the banner makes it unmissable).
+- **Survives:** whole file kept below the banner. **Restore:** n/a.
+
+### 13d. docs/REPO-SNAPSHOT.md — staleness warning added
+- **Why:** generated 2026-06-07, ~2.5 months stale, describes the pre-CHI codebase; fallback
+  use only, prefer live fetch (`SES-120`).
+- **Survives:** whole file kept below the warning. **Restore:** n/a.
+
+### 13e. docs/README.md — full rewrite
+- **Said:** "DeepBench v5.1 — Documentation"; claimed `docs/FEATURES.md` "is the source of
+  truth, not a snapshot of anything else"; listed 6 files; described CLAUDE.md as a "compact
+  briefing".
+- **Why retired:** the backlog is `public.backlog_items`; FEATURES files are stubs; the doc
+  set reorganized around runbooks/, GOVERNANCE-MODES.md, SELFBUILD-CHARTER.md.
+- **Survives:** rewritten as a one-page index (CLAUDE.md router, backlog table + snapshot,
+  runbooks/, GOVERNANCE-MODES.md, SELFBUILD-CHARTER.md, ARCHITECTURE.md, STANDARDS.md,
+  WORKING-WITH-JOHN.md, SESSIONS.md, this ledger). The Google-Drive-retired rule and the
+  John-doesn't-manage-tracking-docs note carried forward.
+- **Restore:** git history of `docs/README.md`.
+
+### 13f. scripts/check-kickoff-doc.js + scripts/check-version-headers.js — DELETED (orphans)
+- **Were:** SES-010 Tier 2 lint scripts — 11-required-section kickoff-doc check
+  (`check-kickoff-doc.js`, `--latest` mode via git log) and version-header/`FEATURE:` tag
+  check on changed .js/.jsx (`check-version-headers.js`).
+- **Why deleted:** orphans — nothing invokes them (no package.json script, no hook, no
+  runbook step; verified by repo-wide grep 2026-08-23 and by the audit run the same night;
+  remaining mentions are comments in sibling scripts and historical SESSIONS/kickoff text).
+- **Survives:** nowhere in the working tree; both fully preserved in git.
+- **Restore:** `git log --follow -- scripts/check-kickoff-doc.js` (likewise
+  `scripts/check-version-headers.js`), then `git show <commit>:<path> > <path>`.
+
+### 14. scripts/export-backlog-snapshot.js — "markdown files remain AUTHORITATIVE" header (rewrite)
+- **Said:** header comment: the markdown backlog files "remain AUTHORITATIVE … until SES-83
+  phases (d) and (e) land and flip authority to the table itself."
+- **Why retired:** they landed (v7.0.113+); the script's own emitted file header already said
+  the table is authoritative — the source comment contradicted its own output.
+- **Survives:** rewritten in place to match reality; the never-hand-edit/`--check` rules kept.
+- **Restore:** git history of `scripts/export-backlog-snapshot.js`.
+
+### 15a. docs/runbooks/CHI-TRUE-REGRESSION.md — Prereq 1 "Check docs/FEATURES.md's AGT-35 row" (rewrite)
+- **Why retired:** the stub holds no rows; repointed to `public.backlog_items` (SQL or
+  BACKLOG-SNAPSHOT.md search). §5's "slugs from its FEATURES row" fixed the same way.
+- **Restore:** git history.
+
+### 15b. docs/runbooks/CHI-TRUE-REGRESSION.md — Prereq 2 "build it in your scratchpad / until then" (rewrite)
+- **Why retired:** `scripts/chi-true-regression.mjs` exists and is committed; the runbook
+  still framed the driver as unbuilt. Now: run the committed script, never rebuild it.
+- **Restore:** git history.
+
+### 15c. CHI-TRUE-REGRESSION prereqs + scripts/chi-true-regression.mjs — HAR-33 gate header (addition)
+- **What:** since 2026-08-08 live API tests need `x-db-gate-bypass` (= `GATE_BYPASS_SECRET`
+  via `vercel env pull`) or an `unlimited` IP row, else 403. Added to the script's `HDRS`
+  (non-fatal loader mirroring `loadBypassSecret()`, warns when absent) and to the runbook's
+  Prereq 3. Syntax-checked (`node --check` OK).
+- **Restore:** n/a — addition only.
+
+### 16. .claude/rules/platform-services-directory.md — "LOG-89 (docs/FEATURES-LATER.md)" (rewrite)
+- **Why retired:** FEATURES-LATER.md is a retired stub holding no rows; LOG-89 is a
+  `public.backlog_items` row. Repointed in place.
+- **Restore:** git history.
+
+### 17. docs/BRIEFING-REDESIGN-0822.md — "chained sessions (SES-141) run regardless" (rewrite)
+- **Why retired:** `SES-140` FINAL superseded the SES-141 session-spawning form; chaining is
+  in-session continuation cycles. Fixed to "chained continuation cycles (`SES-140` FINAL)";
+  semantics of the scheduler/drain toggle unchanged.
+- **Restore:** git history.
+
+### 18. C:/Projects/.claude/settings.local.json — two `cd … && …` permission entries (removed; machine-local)
+- **Were:**
+  `"Bash(cd /mnt/c/Projects/deepbench-frontend && node test-s-migrate-01b.mjs)"` and
+  `"Bash(cd \"C:/Projects/deepbench-frontend\" && rm test-s-apple-03a-2-api.mjs && rm -f /tmp/t.mjs && git status --short)"`.
+- **Why removed:** they pre-approved the exact `cd … && …` compound the CLAUDE.md hard rule
+  and the `block-cd-and.js` hook prohibit. Nothing else in either settings file changed;
+  `C:/Projects/.claude/settings.json` holds only hooks (no permission allowlist — nothing to
+  remove there). JSON validity re-verified after the edit.
+- **Restore:** the exact strings are quoted above (these files are NOT git-tracked — this
+  ledger entry is the only record).
+
+### 19. docs/runbooks/runner-cycle.md step 9 + briefing-page.md regeneration step 2 — the mandatory republish (rewrite)
+- **Said:** the briefing republish is mandatory and **"a cycle must never end without it"** — step 9
+  of `runner-cycle.md`, restated in `briefing-page.md`'s regeneration step 2.
+- **Lived:** both files, in the two homes named above.
+- **Why retired:** John's bridge ruling `27b5d8cb` (attended architect session 2026-08-31, his word
+  verbatim *"b with the bridge"*) **forbids an unattended cycle making the republish**, so the
+  runbook and a standing directive were both law and directly opposed for twenty-six hours, and
+  every cycle after 16:16Z that day reconciled the pair by hand — the one-fact-two-homes defect
+  this platform has already paid for at `SES-116`, `SES-113` and `SES-86` phase 3. `SES-244`
+  (`v7.0.348`) rewrote both homes **in one commit**, because fixing one is exactly how the two
+  files drift.
+- **Survives:** rewritten in place in both files as THE BRIDGE — (b), a briefing that is a pure
+  render of the database, is the durable fix and is what gets built; (a), a standing permission for
+  unattended sessions on the `.claude/` path, is **rejected** and must not be re-proposed as a
+  shortcut; until (b) ships the attended session republishes whenever John is present, and an
+  unattended cycle **builds the page, records the build in its own `runner_cycles.notes`, and stops
+  there**. The tail's `SES-127` `briefed_at` stamp is bound to the same condition: a cycle that did
+  not publish must not stamp it at all.
+- **Filed by:** runner cycle `00b02a29-3e4e-4951-bcd3-fcadd7dded84` (`v7.0.355`), on the *Present*
+  finding of the **Selfbuild M4 gate review** (`runner_items` card `7d3b1fb3`, accepted by John
+  2026-09-01T02:19:39Z, verbatim *"accept m4"*). Both lenses raised it independently: the rewrite
+  landed in both homes and got no entry here, which this ledger's own contract requires for a
+  rewrite. This is that entry — written when the review that found it was accepted, not at the
+  rewrite, and said plainly rather than backdated.
+- **Restore:** `git log --follow -- docs/runbooks/runner-cycle.md` (likewise
+  `docs/runbooks/briefing-page.md`), then `git show <commit>:<path>` at or before `v7.0.347`.
+
+### 20. `public.governance_rules` B3 — backlog queue ordering (superseded)
+<!-- FEATURE: SES-280 — B3's retirement entry. Written in the same commit that inserts M5-02 and
+     flips B3 to `superseded`, per the SELFBUILD-CHARTER transition rule: no commit may exist in
+     which neither ordering is in force. -->
+- **Said:** *"Order the backlog queue by tier (now/next/later), then priority class P1→P10, then
+  beta-first, then newest-to-oldest within class."* (registry `statement`; the register entry it
+  renders is `docs/RUNNER-GOV-0820-REQUIREMENTS.md` **B3**, which words the same rule as *"within a
+  class, tie order beta-marked first → newest filed → oldest"*.)
+- **Lived:** `public.governance_rules` row `B3` (`source_group = 'runner-gov-register'`,
+  `enforcement = 'script'`), canonical home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B3`.
+- **Retired:** 2026-09-01, by `SES-280` (`v7.0.358`), kickoff
+  `docs/kickoffs/v7.0.358-SES-280-m5-governance-rules.md`.
+- **Superseded by:** `M5-02` — *"Order the pickable board by filing lane first: tickets with
+  `filed_at` before 2026-08-21 take the priority lane, tickets filed on or after it enter a review
+  bucket that requires explicit promotion before pick; within a lane, order by tier then priority
+  class P1→P10. Supersedes B3."*
+- **Why retired:** **newest-to-oldest ordering within class is the direct inverse of the
+  pre-2026-08-21 priority lane John set; both cannot be live.** B3 sorts the *newest* filing to the
+  front of a class; M5-02's filing lane sends everything filed before 2026-08-21 to the front of the
+  board and everything filed on or after it into a review bucket that needs explicit promotion. There
+  is no ordering that satisfies both, and B3 is script-enforced, so leaving it live would have left
+  two contradictory sort keys in the same pick path. Beta, B3's other tie-break, was itself retired
+  2026-08-19 — so that clause had already stopped meaning anything.
+- **Survives:** the tier-then-priority-class half of B3 is carried forward verbatim in M5-02's second
+  clause ("within a lane, order by tier then priority class P1→P10"); only the beta and
+  newest-to-oldest tie-breaks are gone. B3's row is **not deleted** — it stays in the registry with
+  `status = 'superseded'` and `superseded_by = 'M5-02'` (register B1's never-delete discipline applies
+  to rules as it does to tickets), and its register entry stays in place in
+  `docs/RUNNER-GOV-0820-REQUIREMENTS.md` under a dated supersession note in that file's usual style.
+- **Not yet true, said plainly:** M5-02 ships with `enforcement = 'script'` **recorded, not
+  executed**. Phase 2 (a follow-up ticket) wires the filing lane into `drain_epic_next()` and
+  `recompute_backlog_queue()`; until it lands, the pick path still sorts the way B3 described. The
+  rule is retired in the registry and in the docs, which is what the transition rule governs; the
+  code change is the second half and is tracked as its own ticket.
+- **Restore:** `git log --follow -- docs/governance/RULES-SNAPSHOT.md`, then
+  `git show <commit>:docs/governance/RULES-SNAPSHOT.md` at or before `v7.0.357` for the row as it
+  stood; the register prose is in the git history of `docs/RUNNER-GOV-0820-REQUIREMENTS.md`. To make
+  it live again: flip the row back to `status = 'live'`, clear `superseded_by`, retire `M5-02` in the
+  same commit, and re-export the snapshot.
+
+<!-- FEATURE: SES-285 — entries 21–33, one per rule the card/tap retirement withdrew: five retired
+     (B13, B16, B23, B28, B29) and eight superseded by M6-01..M6-08 (B7, B12, B14, B17, B24, B27,
+     B34, B35). All thirteen ship in ONE commit with docs/RUNNER-GOV-M6-REQUIREMENTS.md and the
+     registry rows, per the SELFBUILD-CHARTER transition rule. Facts common to all thirteen, stated
+     once here rather than thirteen times below:
+       * Retired 2026-09-01 by SES-285 (v7.0.359), kickoff
+         docs/kickoffs/v7.0.359-SES-285-retire-card-tap-surface.md.
+       * Trigger — John, 2026-09-01, verbatim: "I no longer want to work via cards or taps. And you
+         are supposed to be more self sufficient to update tickets accordingly without me."
+       * Measured at decision time: 45 gated_before_build cards undecided, 42 of them older than 48
+         hours, against 79 ever decided; 33 open tickets at design_status='needs-john'.
+       * NO ROW IS DELETED. Every rule below keeps its governance_rules row at status='retired' or
+         'superseded' (register B1's never-delete discipline), and keeps its register entry in
+         docs/RUNNER-GOV-0820-REQUIREMENTS.md.
+       * Restore path, identical for all thirteen: `git log --follow -- docs/governance/RULES-SNAPSHOT.md`
+         then `git show <commit>:docs/governance/RULES-SNAPSHOT.md` at or before `v7.0.358` for the
+         row as it stood. To make one live again: flip its row back to status='live', clear
+         superseded_by, withdraw its M6 replacement in the SAME commit, and re-export the snapshot. -->
+
+### 21. `public.governance_rules` B7 — unattended removal ban (superseded)
+- **Said:** *"Revalidate ticket premises at every pick and in background for the stale tail; never remove a ticket unattended — route removal proposals to a John Accept/Reverse/Rework card."*
+- **Lived:** row `B7` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B7`.
+- **Superseded by:** `M6-03` — *"A ticket whose premise fails revalidation twice consecutively is removed automatically, reversible inside its window; no removal waits on a human Accept. Supersedes B7."*
+- **Why:** the removal card was a gate with no timer, so a ticket whose premise had demonstrably
+  evaporated stayed on the board competing for picks until John tapped — and the measured tap rate
+  says he mostly did not. The revalidation half of B7 is not the problem and is not withdrawn.
+- **Survives:** the *"revalidate at every pick and in background for the stale tail"* clause is
+  unchanged practice; only the routing of the result changes. `M6-03` additionally hardens it —
+  **twice consecutively**, never on a single failed read — and the 72-hour reversal window (`M6-02`)
+  is what makes an automatic removal safe rather than final.
+
+### 22. `public.governance_rules` B12 — daily invention card (superseded)
+- **Said:** *"Run one invention cycle per day (research, score against vision corpus, R&D gate) and file results as a gated-before-build card for John's Accept."*
+- **Lived:** row `B12` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B12`.
+- **Superseded by:** `M6-04` — *"Invention proposals are admitted or rejected by the enhancement-lane admission test (`SES-283`), never by a card. Supersedes B12."*
+- **Why:** B12 was the single highest-volume producer of the 45-card backlog — one card per day,
+  every day, into a surface with a two-thirds non-response rate. The bar is not lowered by
+  superseding it; it moves into `SES-283`'s admission test, where it is written down, applied
+  identically every time, and can be argued with. A card is not a bar, it is a queue.
+- **Survives:** the daily invention cycle itself, and the scoring against the vision corpus. Only
+  the disposal route changes.
+
+### 23. `public.governance_rules` B13 — DRIP claim cards (retired)
+- **Said:** *"Draft the nine vision-corpus documents as best-inference claims, verified by John via small daily DRIP claim cards rather than a long interview."*
+- **Lived:** row `B13` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B13`.
+- **Why retired, with no replacement:** B13 is a *verification-by-tap* rule end to end — the card is
+  not an implementation detail of it, it is the whole mechanism. With the tap surface withdrawn
+  there is nothing left of B13 to restate, so it is retired rather than superseded. Retiring it does
+  not delete the vision corpus or the best-inference drafting; it removes the claim that John
+  ratifies those drafts one card at a time.
+- **Survives:** nothing of B13 is carried into an `M6` rule. The vision-corpus documents and the
+  drip mechanism live on in `docs/runbooks/briefing-page.md` §12; how a claim is confirmed without a
+  tap is genuinely open and belongs to whoever next works that surface — **stated plainly as a gap,
+  not papered over.**
+
+### 24. `public.governance_rules` B14 — only John's tap ratifies a rule (superseded)
+- **Said:** *"Generate business rules from declared, mined, and learned sources as proposed-rule briefing cards; only John's tap ratifies a rule."*
+- **Lived:** row `B14` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B14`.
+- **Superseded by:** `M6-02` — *"A decision executes immediately and is reversible for 72 hours; silence is assent, never a park. Supersedes B14 and B23's silence-parks-forever."*
+- **Why:** *"only John's tap ratifies"* makes non-response the strongest possible veto, and the
+  measurement says non-response was the normal case. `M6-02` inverts the default without removing
+  his authority: a proposed rule takes effect now and he has 72 hours to reverse it.
+- **Survives:** rule generation from declared, mined and learned sources is untouched — that half of
+  B14 describes where rules come from, not who ratifies them. **What is gone is the veto-by-silence.**
+
+### 25. `public.governance_rules` B16 — Unclassifiable escalation card (retired)
+- **Said:** *"Reserve \"Unclassifiable\" for tickets whose text is too degraded to judge, with a reason note, and surface every one as a briefing card for John's Rework or removal."*
+- **Lived:** row `B16` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B16`.
+- **Why retired, with no replacement:** the surviving half of B16 — reserve the label for genuinely
+  degraded text, and write the reason down — is already carried by register `B9` (nothing enters the
+  board unclassed) and by the `Unclassifiable` class definition itself. What is withdrawn is the
+  escalation: an unreadable ticket is now decided by the cycle under `M6-01`, with its reasoning
+  recorded, exactly like any other decision.
+- **Survives:** the reserve-it-narrowly discipline and the mandatory reason note, in the class
+  definition. Only the card is gone.
+
+### 26. `public.governance_rules` B23 — silence parks a card forever (retired)
+- **Said:** *"Re-enter a gated/proposal card's ticket at queue #1 as a system pin on Accept, timestamped; a later \"move to 1\" outranks it, and silence parks a card forever."*
+- **Lived:** row `B23` (`runner-gov-register`, `enforcement = 'script'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B23`.
+- **Why retired — this is the load-bearing one:** *"silence parks a card forever"* is not a
+  description of the 45-card backlog, **it is the mechanism that manufactured it.** An unanswered
+  card was never a deferral; it was a permanent stall with no timer on it, and 42 of the 45 had been
+  in that state for more than 48 hours. It is retired rather than superseded because `M6-02` is its
+  exact inverse — silence is assent — and the two cannot both be live for a single second.
+- **Survives:** the pin half is unaffected and stays live in register `B5` (John's *"move to N"*
+  directives hold absolute slots). What is gone is the park-on-silence default and the
+  Accept-triggered system pin, which had nothing left to trigger on.
+
+### 27. `public.governance_rules` B24 — never let a card waste a cycle (superseded)
+- **Said:** *"Never let a gated-before-build or removal-proposed card waste a cycle; drop to the next queued ticket and still deliver exactly one build per cycle."*
+- **Lived:** row `B24` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B24`.
+- **Superseded by:** `M6-06` — *"A cycle never ends by asking; wherever it would have escalated to a card, it decides, records the reasoning, and records the reversal handle. Supersedes B24 and B27."*
+- **Why:** B24 was the *mitigation* for a surface that has now been removed — it protected the
+  cycle's throughput from the card, rather than preventing the card. `M6-06` reaches the same
+  outcome one step earlier: there is no card to drop past, because the cycle decides.
+- **Survives:** **"exactly one build per cycle" is not withdrawn** — it is a throughput rule
+  independent of cards and continues to bind through the runbook's own cycle contract.
+
+### 28. `public.governance_rules` B27 — the build-vs-ask matrix (superseded)
+- **Said:** *"Decide build-vs-ask at pick time on two axes (authority/gated, and specification completeness), escalating through build/design-then-build/gated-card/requirements-session outcomes without ever ending the cycle build-less on the middle two."*
+- **Lived:** row `B27` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B27`.
+- **Superseded by:** `M6-06` (statement as quoted in entry 27).
+- **Why:** B27 named *"gated-card"* as a defined outcome for the ambiguous middle of its own matrix
+  — so the cases where a decision was most needed were precisely the ones routed away from being
+  decided. `M6-06` removes that branch and keeps the rest.
+- **Survives:** **the two axes survive as a reasoning tool, not as a routing table.** Authority and
+  specification completeness are still the right questions at pick time; what changes is that every
+  answer now ends in a decision plus its recorded reasoning, never in an escalation.
+
+### 29. `public.governance_rules` B28 — weekly count of John's judgments (retired)
+- **Said:** *"Track on the briefing how many cards needed John's judgment this week vs last, feeding decided cards into rule-mining so repeated question-shapes stop reaching him."*
+- **Lived:** row `B28` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B28`.
+- **Why retired, with no replacement:** B28 measures a quantity that is now structurally zero. Its
+  *goal* — that repeated question-shapes stop reaching John — is achieved outright rather than
+  trended toward, so a week-over-week counter of it would report `0 vs 0` forever, which is a metric
+  that cannot move and therefore cannot inform.
+- **Survives:** **rule-mining from decided items survives and matters more, not less** — the corpus
+  it mines is now the cycle's own recorded reasoning under `M6-01` and `M6-06`, which is a larger
+  and better-attributed corpus than the decided cards ever were.
+
+### 30. `public.governance_rules` B29 — the daily "help me" ticket (retired)
+- **Said:** *"Nominate one \"help me\" ticket per day on the briefing, selected by the automation ordering, carrying John's specific open questions; resolving it re-enters the ticket at queue #1."*
+- **Lived:** row `B29` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B29`.
+- **Why retired, with no replacement:** it is a daily ask, which is the shape John's instruction
+  removed — and it had the same failure mode as the cards, one nomination per day into a surface
+  with a two-thirds non-response rate. Under `M6-01` a cycle that has an open question decides it
+  and records the reasoning instead of nominating it.
+- **Survives:** nothing of the daily nomination. **A genuinely stuck ticket is still visible** —
+  through `M5-10`, amended in this same commit to surface a three-cycle stall with its defer reason
+  in the standing brief. That is the honest successor: visibility without a question attached.
+
+### 31. `public.governance_rules` B17 — an Accept must never evaporate (superseded)
+- **Said:** *"Auto-convert an Accept on a gated-before-build card into a classed, queued backlog ticket — an Accept must never evaporate."*
+- **Lived:** row `B17` (`runner-gov-register`, `enforcement = 'prose'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B17`.
+- **Superseded by:** `M6-05` — *"Every decision a cycle makes files its resulting ticket in the same transaction — a decision must never evaporate. Supersedes B17."*
+- **Why:** B17's promise is exactly right and its scope was too narrow — it covered *Accepts*, which
+  is one kind of decision made by one person on one surface. `M6-05` keeps the promise verbatim
+  (*"must never evaporate"*) and widens it to every decision a cycle makes, in the same transaction
+  as the decision, so no window exists where the decision is recorded and its ticket is not.
+- **Survives:** the promise, its wording, and its enforcement — **strengthened, not weakened.** The
+  measured proof that the window is real: card `04d34757` (the September budget outage that stopped
+  the runner) sat undecided with no ticket behind it at all, so its content lived nowhere but the card.
+
+### 32. `public.governance_rules` B34 — an Accept is permission, not a rating (superseded)
+- **Said:** *"Never count a gated-before-build Accept toward the runner's trust ladder — it authorizes one build, not a rating of unattended judgment."*
+- **Lived:** row `B34` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B34`.
+- **Superseded by:** `M6-07` — *"The trust ladder's inputs are verifier verdicts and post-window reversals, not Accepts; an unreversed decision past its window promotes, a reversal demotes. Supersedes B34 and B35."*
+- **Why:** B34 was *correct* and is superseded only because its subject no longer arrives — with the
+  card surface withdrawn there are no gated Accepts to exclude, so leaving it live would point a
+  live rule at nothing. **Its reasoning is the reasoning `M6-07` is built on**, which is why the
+  supersession is not a reversal of it.
+- **Survives:** the principle in full — permission is not a rating — carried into `M6-07`'s choice of
+  inputs. It also survives *executably*: `public.apply_ladder_decision()` still short-circuits every
+  `kind = 'gated_before_build'` row with the reason *"gated card — permission is not a rating (B34),
+  ladder untouched"*, which is why closing 44 cards in this migration moved the ladder by zero rungs.
+
+### 33. `public.governance_rules` B35 — John's three rulings (superseded)
+- **Said:** *"Apply John's three rulings: a Reverse on a gated card still demotes the ladder; the budget day boundary is midnight America/Chicago; a dead-cycle report must state why it died and what to do next."*
+- **Lived:** row `B35` (`runner-gov-register`, `enforcement = 'reviewer'`), home `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B35`.
+- **Superseded by:** `M6-07` (statement as quoted in entry 32).
+- **Why:** only the **first** of B35's three rulings concerns the card surface, and B35 bundles three
+  unrelated rulings into one row — so superseding the row is the only way the registry can express
+  that one of them has lost its subject. `M6-07` carries the demotion forward in the form that still
+  has a subject: **a reversal demotes.**
+- **Survives — and this is the clause a later reader must not lose:** the other two rulings are
+  **unaffected and still binding**, and neither is an `M6` matter. *The budget day boundary is
+  midnight America/Chicago* — still true, still what `runner_budget` is read against. *A dead-cycle
+  report must state why it died and what to do next* — still true, still the `did_not_run` contract
+  in `docs/runbooks/runner-cycle.md`. Both are restated in that runbook independently of this row.
+  If either is ever in doubt, they are John's rulings and they were never withdrawn; only the routing
+  of the first one through a card was.
+
+## SES-171 — briefing-page.md header trim (2026-08-23, same session)
+
+Trim in the SES-164 shape; full stamp-by-stamp detail in the SES-171 delivery record. Summary entries:
+
+| What | Where it lived | Why retired | Where content survives |
+|---|---|---|---|
+| 29 version stamps, v7.0.99 → v7.0.206 (40,843 bytes, 32.5% of the file) | `docs/runbooks/briefing-page.md` header, lines 1–30 (all but the newest, v7.0.208) | SES-171 header trim, SES-164 shape (session-hygiene stamp-cap check); every stamp probed for stamp-only warnings — none found, all restated in the body sections they correspond to | VERBATIM in `docs/SESSIONS.md` "Appendix — retired `briefing-page.md` header stamps" (29/29 present, 0 missing) + git; body proven sha256-identical across the trim (`20445487a5c91162…`) |
+| "masthead … carries a one-tap '▶ Run a cycle now' link" | briefing-page.md, regeneration step 1 | Superseded by SES-143 (v7.0.182): the link lives on §2b; John's explicit do-not-reinstate for the masthead copy | Rewritten in place as a §2b pointer (SES-102 provenance kept) + git |
+| "Always three rows … **No** deletes it and records it in vision/rejected-paths.md" | briefing-page.md, §12 SHAPE (SES-125 paragraph) | Superseded by SES-157 (v7.0.206): rejection = kept `status='rejected'` row; rejected-paths.md is a retired stub; drip contract's 1–3 rows is current | Rewritten in place to the SES-157 tap table + git |
+| "fires exactly one successor run" / "A wall-stopped cycle fires nothing" | briefing-page.md, regeneration step 6 | Superseded by SES-140 FINAL (v7.0.195): in-session continuation cycles; session-spawning platform-refused | Rewritten in place ("continues nothing"; runner-cycle.md tail step (8) deferral kept) + git |
+
+### 34. `CAP-SESSION-SPLIT-SIGNS` — the 20-minute split trigger (amended)
+<!-- FEATURE: SES-296 — the wall-clock half of this rule is withdrawn in the same commit that lands
+     M6-10, per the SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old
+     split trigger nor the chain rule is in force. -->
+- **Said:** split a session once its kickoff doc exceeds 4 tasks or 3 files, **it runs past 20 minutes**, or compacting starts.
+- **Withdrawn:** the 20-minute clause only. A chained drain (`M6-10`) runs long by design — measured, a chain ships a ticket for 809K tokens against 2.28M for a cold boot, so a wall-clock split forces the exact cost it should avoid.
+- **Survives:** the 4-task / 3-file caps and the compaction trigger, unchanged. `M6-13` states that those caps bind the individual cycle, not the chained session.
+- **Restore:** re-add the clause to the registry row and this file's entry; `git` history of `docs/governance/RULES-SNAPSHOT.md`.
+
+### 35. `B22` — one session, one ticket name (amended)
+<!-- FEATURE: SES-296 — amended alongside M6-10 in the same commit. -->
+- **Said:** rename each cycle's own session to `<TICKET-ID> — <short name>` the moment it picks its work.
+- **Withdrawn:** the implicit one-session-one-ticket assumption. A chained session covers several tickets and cannot carry one ticket's name.
+- **Survives:** the rename discipline itself — a chained session is named for its drain and renamed at each pick, so a reader can still tell what a session is doing at any moment.
+- **Restore:** registry row plus this entry; `git` history.
+
+### 36. `CAP-SCOPE-FILES` — the three-file cap as a flat literal (amended)
+<!-- FEATURE: SES-122 (c) — the replacement lands in the SAME commit as the amendment, per the
+     SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old flat cap nor
+     the class-scoped one is in force. The row stays `live`; only its wording left. -->
+- **Said, verbatim:** *"Modify at most 3 files per session."*
+- **Lived:** row `CAP-SCOPE-FILES` (`standards-caps`, `enforcement = 'prose'`, `status = 'live'`), home `docs/STANDARDS.md#section-2-session-scope-rules` (unchanged).
+- **Replaced by, verbatim:** *"Modify at most 3 files per session, plus the extra files the ticket's class has earned on the trust ladder (`public.class_autonomy(priority_class).extra_files` — one per rung above `runner_settings.cap_relax_rung`; M6, SES-122). The baseline is CLAUDE.md's hard rule; the extra is the class's, read at pick time, never assumed."*
+- **Why:** charter decision 5 — *numeric file/task caps retire **only when** the verifier replaces them* — and the M6 gate's ruling on how. The verifier exists (`SES-181`, and `SES-122` (b) made it read the rung), a verdict now moves the ladder (`M6-07`, `SES-122` (a)), and `class_autonomy()` is the one home for what a rung buys. So the cap comes down exactly as fast as verification proves itself and goes back up when it does not: that is the charter's sequencing invariant satisfied **by construction rather than by a date**.
+- **Survives — and this is the half a later reader must not lose:** the **3 is not gone**. It is the floor, it is still John's `CLAUDE.md` hard rule, and it is what an unclassed ticket, an untracked class or a failed lookup all fall back to (`class_autonomy()` fails closed at zero extras). Nothing was widened for anybody the ladder has not promoted.
+- **Restore:** the row's prior text is in `runner_before_images` — image `1fa15afc-9ac5-419a-b825-a99970c3c66f`, `session_name = 'ses-122c-coding'`, full row as `row_data`. Restore the `statement` from that image, re-export `docs/governance/RULES-SNAPSHOT.md`, and reconcile Section 2 rule 2 in the same commit. Also in `git` history of the snapshot.
+
+### 37. `CAP-SCOPE-TASKS` — the four-task cap as a flat literal (amended)
+<!-- FEATURE: SES-122 (c) — amended in the same commit as entries 36 and 38, same transition rule. -->
+- **Said, verbatim:** *"Include at most 4 tasks per kickoff doc."*
+- **Lived:** row `CAP-SCOPE-TASKS` (`standards-caps`, `enforcement = 'prose'`, `status = 'live'`), home `docs/STANDARDS.md#section-2-session-scope-rules` (unchanged).
+- **Replaced by, verbatim:** *"Include at most 4 tasks per kickoff doc, plus the extra tasks the ticket's class has earned (`class_autonomy(priority_class).extra_tasks`; M6, SES-122)."*
+- **Why:** entry 36's reason, applied to the task half — the two extras are the *same* number (`greatest(0, rung − runner_settings.cap_relax_rung)`), read from the same function, so splitting them across two rules with two different mechanisms would be the second-home defect this project keeps closing.
+- **Survives:** the **4** as the floor, on the same fail-closed terms as entry 36.
+- **Restore:** image `adb56e29-5b89-4c7c-8f9e-46e59bdacb4c` (`session_name = 'ses-122c-coding'`), then re-export the snapshot and reconcile Section 2 rule 3 in the same commit.
+
+### 38. `HR-SCOPE` — the hard-rule scope line, and its canonical home (amended + re-homed)
+<!-- FEATURE: SES-122 (c) — the re-homing is recorded here because it is the one change in this
+     ticket that a reader would otherwise look for in CLAUDE.md's history and never find. -->
+- **Said, verbatim:** *"Keep each session to one feature, at most 3 modified files, and at most 4 tasks."*
+- **Lived:** row `HR-SCOPE` (`claude-md-hard-rules`, `enforcement = 'prose'`, `status = 'live'`), home **`CLAUDE.md#hard-rules`**.
+- **Replaced by, verbatim:** *"Keep each session to one feature, at most 3 modified files, and at most 4 tasks — the baseline; a class's trust-ladder rung above `runner_settings.cap_relax_rung` adds one file and one task per rung (`class_autonomy()`, M6, SES-122), and a reversal takes them back."*
+- **RE-HOMED in the same UPDATE:** `canonical_doc` moved from `CLAUDE.md#hard-rules` to **`docs/STANDARDS.md#section-2-session-scope-rules`**, where the statement now sits as a blockquote under rules 1–3. **Why, and it is the whole reason this entry exists:** a rule's `canonical_doc` must carry its text byte-for-byte, and `CLAUDE.md` is **John's file** — this ticket may cite it and may not edit it. The choice was therefore between a live rule whose home contradicts it and a rule homed where a cycle is allowed to reconcile it; the second is the only one that leaves the registry and its home in agreement. **John's `Scope` hard-rule line in `CLAUDE.md` is untouched, still says "One feature per session. Max 3 files. Max 4 tasks.", and is now cited BY the amended row as the baseline** — the row widens what a promoted class may do on top of his floor, it does not overwrite his sentence.
+- **Survives:** the one-feature cap in full (`CAP-SCOPE-FEATURE`, *"Scope every session to exactly one feature."*, deliberately **not** amended — a rung buys breadth of edit, never a second feature), the 3/4 floor, and John's own line.
+- **Restore:** image `333ff789-be41-4d59-a2ba-35d6b1219d48` (`session_name = 'ses-122c-coding'`) carries both the prior `statement` **and** the prior `canonical_doc`; restoring the row restores the home. Then re-export the snapshot and remove the blockquote from Section 2.
+
+### 39. `apply_ladder_decision()` — the Accept promotion, as a ladder input (retired)
+<!-- FEATURE: SES-315 (a) — the replacement is ALREADY LIVE and predates this entry, so there is no
+     commit in which neither the old input nor the new one is in force (SELFBUILD-CHARTER transition
+     rule): `verdict_ladder_signal()` has moved the ladder off verdicts since `SES-122` (a),
+     `v7.0.397`, and `sweep_decision_windows()` off decision windows since `SES-286a`, `v7.0.394`.
+     This entry records the removal of the SECOND, older input, not the arrival of the first. -->
+- **Did, verbatim from the retired branch:** on a `runner_items` ship card whose `decision = 'accept'`,
+  `apply_ladder_decision()` set `v_streak := v_before.streak + 1`, promoted the work class on
+  `v_streak % 5 = 0` (`v_rung := v_before.rung + 1`), wrote the `runner_ladder` row after its
+  before-image, and returned `applied true` with *"accept on a ship card: streak N -> N+1, rung R ->
+  R' (promoted — every 5th Accept)"*.
+- **Lived:** `public.apply_ladder_decision(uuid, uuid)`, the `IF v_item.decision = 'accept'` arm,
+  shipped by `SES-134` (`v7.0.315`, migration `ses134_ladder_executable`) and last amended by
+  `SES-122` (a). Called from `docs/runbooks/runner-cycle.md` step 2 and the step-9 serial tail.
+- **Why retired:** two reasons, and the second is the one that makes it unsafe rather than merely
+  dead. (1) **Its input no longer exists.** The Accept it counted is a *tap on the ship card*, and
+  that surface was retired by `SES-285`; the branch has been dormant since 2026-08-30 while still
+  live in the database. (2) **`M6-07` gave the ladder two real inputs, and a third would double-count
+  one delivery.** A ship is now graded by its verdict (`verdict_ladder_signal()`: `approve` promotes,
+  `block` resets the streak and never the rung) and by its decision window
+  (`sweep_decision_windows()` promotes on silence, `reverse_decision()` demotes). Leaving the
+  promotion here as well meant one delivery could be counted twice — once by its verdict and once by
+  a tap on the same card — which is a *manufactured* promotion: `SES-107`'s runaway with a second
+  author. Measured before the change: `runner_ladder.tooling` stood at rung 13 with `cap_relax_rung`
+  5 and `auto_done_rung` 3, so a manufactured rung buys real extra files, real extra tasks and the
+  auto-done bar.
+- **Survives — and this is the half a later editor must not lose:** the function is **not** deleted
+  and its `reverse` branch **keeps its demote**. That is not an inconsistency: a Reverse on a legacy
+  card **is** a reversal by John's word, and `M6-07`'s safety measure requires that a reversal always
+  costs a rung. `greatest(v_before.rung - 1, 0)` and `streak := 0` are unchanged, the `B34` gated
+  short-circuit and the `rework` branch are byte-identical, and the retired `accept` arm is **inert
+  rather than absent** — it still stamps `runner_items.ladder_applied_at` (the idempotence guard is
+  structural: an unstamped card is one a re-run or a second harvesting peer can still count) and
+  returns `applied false, 'Accept is not a ladder input since M6-07 (SES-315); the ladder reads
+  verdicts and decisions'`. The promotion arithmetic itself survives with **one** home,
+  `ladder_apply_signal()`, which is what both live inputs drive; the migration asserts that
+  `apply_ladder_decision`'s body no longer contains it at all.
+- **Restore:** `git show 9eb38971:docs/SELFBUILD-RETIREMENT-LEDGER.md` for this file, and for the
+  branch itself the pre-change body is in the recorded SQL of migration
+  `ses122a_verdict_ladder_signals` (`supabase_migrations.schema_migrations`, version
+  `20260902210032`) — the last migration to carry `apply_ladder_decision()` with the promotion in
+  place. Restoring it means re-adding the `accept` arm *and* re-answering reason (2): a restored
+  promotion must be paired with removing one of the two `M6-07` inputs, or the double count comes
+  back with it.
+
+### 40. `SES-154`'s Accept-writes-`done` clause (superseded)
+<!-- FEATURE: SES-320 — the replacement mechanism is ALREADY LIVE and predates this entry, so there
+     is no commit in which neither the old clause nor its replacement is in force (SELFBUILD-CHARTER
+     transition rule): `public.sweep_decision_windows()` has closed a finalised `delivered` ticket
+     since `v7.0.412`, 2026-09-02. This entry records the ledger line the M7 gate review found
+     missing — the M7 kickoff's own §7 folded the retirement note into
+     `docs/RUNNER-GOV-M5-REQUIREMENTS.md`'s M5-14 amendment rather than here, because a ledger entry
+     would have been that session's fifth repo file, and this entry is the deferred write. -->
+- **Said, verbatim** (`runner-cycle.md`'s own `v7.0.205` header stamp): *"ACCEPTANCE-GATED
+  COMPLETION: a runner ship writes `delivered`, and only John's Accept ever writes `done`."*
+  Restated at step 7's close-out bullet: *"THE STATUS YOU WRITE IS `delivered`, NEVER `done`
+  (`SES-154`, `v7.0.205`; spec `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1, John
+  "yes" 2026-08-23)."* And at the step-5 status table's `delivered` row, quoted from the pre-change
+  blob (`git show 816187bd~1:docs/runbooks/runner-cycle.md`): *"`status = 'delivered'` | Built and
+  pushed by a cycle; John's Accept is pending (`SES-154`) | John, on the ship card."*
+- **Lived:** `docs/runbooks/runner-cycle.md` step 5's status table and step 7's close-out bullet —
+  runbook prose, not a `public.governance_rules` row. Spec
+  `docs/design/BRIEFING-COMMENTS-0823-DRAFT.md` decision 1, migration `ses154_delivered_status`.
+- **Superseded by:** `SES-320` (`v7.0.412`, 2026-09-02) — `public.sweep_decision_windows()` gained a
+  third `OUT` column `closed` and now writes `done` on a still-`delivered` ticket whose `kind='ship'`
+  decision it has just finalised, any class, any epic, once the decision's 72-hour reversal window
+  elapses unreversed.
+- **Why:** `SES-285` (2026-09-01) retired the Accept tap the clause depended on, so for eleven days
+  the clause named a mechanism that could not fire — a `delivered` ticket had **no exit at all**,
+  and sixteen rows sat there. A rule nobody can satisfy is not a gate, it is a leak.
+- **Survives — and this is the half a later editor must not lose:** the `delivered` status itself,
+  its exclusion from every pick predicate (migration `ses154_delivered_status`), its silent
+  step-past at step 5, and its **keeping its queue slot** while it waits — all four are `SES-154`'s
+  and all four are untouched. Only the *writer* of `done` changed, from a tap to a decision-window
+  finalisation.
+- **Restore:** re-adding an Accept-driven `done` write to the step-9 harvest is not sufficient and
+  not safe on its own — the `kind = 'ship'` branch must come out of `sweep_decision_windows()` in
+  the same change, because leaving both would close one delivery twice. Also
+  `docs/RUNNER-GOV-M5-REQUIREMENTS.md`'s `M5-14` note (added by `SES-320`) and `git` history of
+  `runner-cycle.md`.
+
+### 41. Step 4b's card route — "file the surviving proposal as a card; John's Accept turns it into a ticket" (superseded)
+<!-- FEATURE: SES-160 — the replacement (`file_invention_proposal()`) is ALREADY LIVE and predates
+     this entry, `v7.0.414`, 2026-09-03, same transition-rule reasoning as entry 40. This is the
+     ledger line for the RUNBOOK PROSE's retirement, distinct from entry 22 (`B12`'s registry-row
+     supersession by `M6-04`, 2026-09-01) — the register rule and the runbook sentence describing
+     its mechanism were retired on two different dates because the register rule's replacement
+     (the enhancement-lane admission test) existed before the runbook sentence's replacement
+     (`file_invention_proposal()`) did. -->
+- **Said, verbatim** (`git show 4736d4de~1:docs/runbooks/runner-cycle.md`, step 4b items 5–6):
+  *"File the surviving proposal as a `gated_before_build` `runner_items` card — ANNOTATED AS
+  WITHDRAWN AND UNRUNNABLE (`SES-289`): the card surface it files into no longer exists.
+  ... No backlog ticket yet: John's Accept turns the card into a queued ticket (B17 — superseded
+  2026-09-01 by `M6-05`; B23 — retired 2026-09-01, no replacement; both `SES-285`). Reverse kills it
+  and records the rejection as a `vision_claims` row with `status='rejected'`."*
+- **Lived:** `docs/runbooks/runner-cycle.md` step 4b items 5–6 (the invention pass's disposal
+  route) — register `B12` names the mechanism generally (entry 22, superseded by `M6-04` on
+  2026-09-01) but the runbook's own procedural sentence survived that supersession, annotated
+  *"withdrawn and unrunnable"* by `SES-289` rather than rewritten, because nothing yet existed to
+  replace it with.
+- **Superseded by:** `SES-160` (`v7.0.414`, 2026-09-03) — `public.file_invention_proposal()` files a
+  `backlog_items` row and its own `record_decision(kind='invention')` in **one transaction**; the
+  proposal's 72-hour reversal window is its ratification. No card, no Accept.
+- **Why:** `SES-289` could only annotate the sentence as withdrawn-and-unrunnable, because `M6-04`
+  (`SES-285`) had removed the card surface the sentence pointed at, but the runbook still needed
+  *some* instruction for what a cycle does with a surviving proposal, and no replacement mechanism
+  existed yet to write instead. `SES-160` is the rewrite `SES-289`'s own note deferred — same
+  two-stage retirement shape as entry 39's `apply_ladder_decision()`, where a rule is superseded on
+  one date and the artifact that embodied it is retired on a later one, once its replacement is
+  actually built.
+- **Survives:** everything upstream of filing — the egress probe, the class-lens research leg, the
+  ladder-and-cap-paced proposal count, the vision-corpus scoring and the R&D gate — is unchanged;
+  only the disposal route (item 5) and its `notes` bookkeeping (item 6) were rewritten.
+- **Restore:** `git show 4736d4de~1:docs/runbooks/runner-cycle.md` for the pre-change step 4b.
+  Restoring the card route also needs the `gated_before_build` card surface itself back, which
+  entry 22 records as retired by `M6-04`/`SES-285` — this file's edit alone cannot revive it.
+
+### 42. `M5-01`'s statement, pre-`SES-321` wording (amended)
+<!-- FEATURE: SES-321 — amended in the SAME commit that lands the pick-path enforcement
+     (migration `ses321_enhancement_passes_fence`), per the SELFBUILD-CHARTER transition rule: no
+     commit may exist in which neither the old fence nor the widened one is in force. Entries
+     34–38 are the precedent that a rule AMENDMENT, not only a retirement or supersession, gets a
+     ledger line. -->
+- **Said, verbatim** (`git show bd8de880~1:docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-01`, the wording
+  standing since `SES-280`, `v7.0.358`): *"A ticket is eligible for unattended development only if
+  its `epic_id` resolves to a `Selfbuild M0`–`M7` epic; unlinked or non-Selfbuild tickets are never
+  picked by a cycle."*
+- **Lived:** row `M5-01` (`selfbuild-m5-register`, `enforcement = 'script'`, `status = 'live'`),
+  home `docs/RUNNER-GOV-M5-REQUIREMENTS.md#M5-01`; also `docs/governance/RULES-SNAPSHOT.md`'s
+  generated copy of the row.
+- **Amended by:** `SES-321`, 2026-09-03 (`v7.0.416`), decision
+  `182655e3-f559-4b46-9457-7d3df8bbf998` — the statement now reads: *"A ticket is eligible for
+  unattended development only if its `epic_id` resolves to a `Selfbuild M0`–`M7` epic, **or an
+  enhancement admitted under `EL-01`**; unlinked or non-Selfbuild tickets are never picked by a
+  cycle **unless admitted as such**."*
+- **Why:** measured while filing `LOG-143` — `prime_directive_queue()`'s `buildable` CTE INNER
+  JOINed `epics` on `name ILIKE 'Selfbuild%'` *before* `EL-01`'s admission clause was ever
+  evaluated, so an unlinked ticket admitted under `EL-01` (claim, rationale and cycles present,
+  under the weekly cap) could never reach the pick path — an admitted enhancement passed the
+  register's own promise and still failed the fence in code. Migration
+  `ses321_enhancement_passes_fence` makes the `buildable` CTE a `LEFT JOIN` on `epics`, with the
+  fence evaluated as `(Selfbuild epic OR admitted enhancement)` in one clause, so the register's
+  promise is now the pick path's actual behaviour.
+- **Survives:** the fence's whole point — an unlinked or non-Selfbuild ticket is still never picked
+  — is unchanged; only the second way of clearing it (`EL-01` admission) was added. Nothing
+  Selfbuild-scoped widened.
+- **Restore:** the before-image under decision `182655e3-f559-4b46-9457-7d3df8bbf998`, or
+  `git show bd8de880~1:docs/RUNNER-GOV-M5-REQUIREMENTS.md` for the row as it stood. To make it live
+  again: restore the `statement` column, re-export `docs/governance/RULES-SNAPSHOT.md`, and revert
+  `prime_directive_queue()`'s `buildable` CTE to an `INNER JOIN` in the same commit.
+
+### 43. Prime Directive `a0ef9525` §§1–6, as EXECUTION AUTHORITY (superseded)
+<!-- FEATURE: SES-340 — the code half lands in the SAME commit as this entry, per the
+     SELFBUILD-CHARTER transition rule: no commit may exist in which neither the old authority nor
+     the new one is in force. The database half (migration `ses340_projects`, and the two directives
+     moving to `superseded`) shipped earlier the same sitting. -->
+- **Said, verbatim** (`runner_directives` `a0ef9525-eff0-4677-aedf-a1a5d7d3a546`, opening and §§1–2;
+  the row is 7,010 characters and stays readable in full at that id): *"THE SELFBUILD PRIME DIRECTIVE
+  — John, attended architect session 2026-08-29 ~15:2xZ, verbatim: 'run it' … §1 MISSION. Complete
+  Selfbuild — every milestone M0-M7, drain retired, gate review passed per
+  docs/SELFBUILD-CHARTER.md — before any other work on this platform. §2 SELECTION, every cycle, in
+  this order and NOTHING ELSE: (a) John's mission directives, oldest first; (b) the declared
+  Selfbuild drain; (c) any buildable Selfbuild-epic ticket M0-M7, oldest first … NO P1-P10 board
+  ticket is picked for any reason until Selfbuild is complete or John revokes this directive."*
+- **Lived:** as a `queued` `runner_directives` row, read as a PREDICATE by
+  `public.prime_directive_queue()` (`prime_standing` = a body-prefix match on this row),
+  `public.drain_chain_gate()` §2e (through that same function), and `scripts/verifier.js`
+  (`PRIME_DIRECTIVE_BODY_PREFIX`, the §2f class widening). Rendered verbatim as §17 of the briefing
+  page (`scripts/build-briefing.mjs`).
+- **Superseded by:** `SES-340`, 2026-09-09 (`v7.0.425`), gate decision
+  `96bbed72-b3d5-4258-86a0-cb0c6e634ab8`, migration `ses340_projects` — execution authority is now
+  `public.projects.status = 'executing'`, resolved per ticket by
+  `public.epic_project_executing(uuid)` through `epics.project_id`. The row is `status='done'`,
+  `outcome='superseded'`.
+- **Why:** John, 2026-09-09: *"I should be able to simply state 'build the Governance Agents
+  project' and away you go."* The directive made the mission a NAME — `e.name ILIKE 'Selfbuild%'` in
+  the pick path — so a second project could only be started by renaming its epics to match, or by
+  editing four function bodies. Starting one is now a single `status` write recorded as a decision,
+  and stopping one is the same write in reverse. The measured cost of the old shape at retirement:
+  no public function body contains `ILIKE 'Selfbuild%'` any longer (pg_proc, zero rows), where four
+  did.
+- **Survives:** everything except the fence. §2's *ORDER* is unchanged and still executes — layer
+  (1a) directives, (1b) the drain, (c) the admitted lane — and `prime_directive_queue()` is still
+  its one home; §2(d) PARKED, §3's near-free parked fire, and the whole selection ceremony in
+  `docs/runbooks/runner-cycle.md` step 5 are untouched. What lapsed is the *name* the fence tested
+  and the *row* that made it standing. The verbatim text stays readable at the directive id, and
+  the briefing's §17 now renders a retirement note in its place rather than dying on a missing row.
+- **NAMED DEVIATION carried by this ship rather than fixed by it**, cheap to close later and
+  deliberately out of `SES-340`'s scope: the pick LANE VALUE is still the string `selfbuild` in
+  `prime_directive_queue()` — `tests/regression/ses-281-m5-pick-enforcement.test.mjs` asserts on it,
+  so renaming it is a test change and a separate ticket. The lane's MEMBERSHIP is fully
+  project-fenced and is guarded by `tests/regression/ses-340-projects-govern.test.mjs`, so what
+  survives is a misleading NAME on a correct fence — the same shape this entry retires one level up,
+  which is why it is written down rather than left to be noticed.
+- **Restore:** reverse decision `96bbed72-b3d5-4258-86a0-cb0c6e634ab8` to put both directive rows
+  back to `queued`, then revert migration `ses340_projects` using the function definitions captured
+  in `runner_migration_downs` (`up_name = 'ses340_projects'`, row
+  `1258a034-5ea7-469f-b8ff-2fb9d3d01bd1`, `prior_ddl.captured` — full prior bodies of
+  `prime_directive_queue()`, `drain_epic_next(uuid)`, `drain_chain_gate(uuid)` and
+  `backlog_done_requires_verdict()`), plus `DROP FUNCTION public.epic_project_executing(uuid)`,
+  `DROP VIEW public.project_progress`, `DROP VIEW public.project_blockers`,
+  `DROP TABLE public.projects` and `ALTER TABLE public.epics DROP COLUMN project_id`. **The `epics`
+  ALTER is a captured REFUSAL, not an omission** — the row records *"the table already exists, so
+  the up ALTERs it — a lossless down for an in-place alteration is not derivable from the object's
+  current state alone"* (the `SES-269` precedent); that half is card-only. The repo half is
+  `git show <this commit>~1:` on `scripts/verifier.js`, `scripts/build-briefing.mjs`,
+  `docs/runbooks/runner-cycle.md` and the three regression files.
+
+### 44. Succession directive `0970abad` — the drain as the thing that admits work (superseded)
+- **Said, verbatim** (`runner_directives` `0970abad-ac14-44d7-9772-49bc7b769892`, opening):
+  *"John, attended architect session 2026-08-29 ~15:0xZ, verbatim: 'run both' (lever 2 of 2).
+  STANDING DRAIN SUCCESSION — PRE-AUTHORIZED DECLARATION: when a Selfbuild milestone's gate review
+  COMPLETES … and that review NAMES the next milestone's scope as a fixed member list (SES-142:
+  named at declaration, never the live bucket), the next milestone's drain-epic directive is
+  declared IMMEDIATELY under this standing authorization … and requires NO separate word from
+  John."*
+- **Lived:** as a `queued` `runner_directives` row; cited by `docs/runbooks/runner-cycle.md`'s
+  standing-prohibition block *"THE ONE DRAIN A CYCLE MAY WRITE"* (the carve-out to
+  `drain_epic_next` property 5), and amended once by `SES-312` (`v7.0.401`) to read *"decided and
+  not reversed"* rather than *"accepted"*.
+- **Superseded by:** the same `SES-340` ship and the same gate decision `96bbed72`. The row is
+  `status='done'`, `outcome='superseded'`.
+- **Why:** the succession existed because a drain was the thing that ADMITTED work — with no drain
+  declared, a cycle had nothing to build and the chain stopped, so the gap between one milestone's
+  gate review and the next drain's declaration was dead runner time this directive removed. Under
+  `projects.status` a drain no longer admits anything: `drain_chain_gate()`'s §2e branch continues
+  on the executing project's own lane when `drain_epic_next()` returns anything but `pick`, so a
+  drain is now an **optional scoping device** — it names a fixed member list and a finish line, and
+  its absence costs the milestone's finish line, never the runner's admission. A pre-authorisation
+  to remove dead time that can no longer occur is a standing grant with nothing left to grant.
+- **Survives:** the *composition* rule the directive taught is the one thing that had no second
+  home, so the runbook paragraph is **marked retired in place and kept verbatim** rather than
+  deleted — a drain's named list is the epic's then-open members plus the tickets filed straight
+  after the preceding gate review (M3: 19 + 4; M4: 4 + 4), already-`done` members deliberately not
+  named. `SES-312`'s decided-and-not-reversed precondition also survives wherever a drain is still
+  declared. Everything the directive explicitly refused to widen — no skipped gate review, no scope
+  beyond what a review named, no lifted hold — is unchanged, because none of it was ever this
+  directive's to grant.
+- **Restore:** as entry 43 — reverse decision `96bbed72-b3d5-4258-86a0-cb0c6e634ab8` (both rows
+  return to `queued` together), and revert `ses340_projects` from the captured downs. The runbook
+  paragraph needs only its *"RETIRED IN PLACE"* note removed; nothing was moved out of it.
+
+### 45. `runner-cycle.md` step 5 layer (3) — the class-sorted board read as the pick mechanism (retired in place)
+- **Said, verbatim (opening):** *"(3) The backlog by class — **read from `public.backlog_items` via
+  SQL, never by parsing the markdown files (`SES-83` (d), `v7.0.112`; John's "table is authority"
+  call, Accepted 2026-08-21T00:19Z).** … Recompute first, then read — two statements, both
+  verbatim"*, followed by the `recompute_backlog_queue()` call and a five-row `ORDER BY queue` read.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 5, layer (3).
+- **Why:** `prime_directive_queue()` reads `backlog_items.queue` itself and already IS layers
+  (1a)/(1b)/(3) in one ordered result — lane `directive`, lane `drain`, lane `selfbuild`, with
+  `SES-281`'s three ticket-ordering keys and a `buildable` CTE that already excludes deferred rows,
+  live claims, `needs-desktop`, an unresolved milestone design gate and a blocking dependency. A
+  cycle that recomputed and re-read the top five was doing the function's job in front of it, which
+  is a second copy of a predicate with one home — `SES-45`'s defect. Layer (3) is now two statements:
+  `classify-ticket` on the queue top **only when its `supports_class IS NULL`**, then
+  `SELECT * FROM public.prime_directive_queue()`, and **the pick is its first row**.
+- **Survives:** the whole passage is **kept verbatim, marked RETIRED IN PLACE** and re-labelled
+  `(3-legacy)`, because it is the only written record of why `queue IS NULL` means out of the
+  standings and why a gated ticket keeps its number — both still true of the column the function
+  reads. Nothing was moved out of it.
+- **Restore:** remove the `(3)` block and the RETIRED IN PLACE note above `(3-legacy)`, and rename
+  `(3-legacy)` back to `(3)`. Repo half: `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 46. `runner-cycle.md` step 5 — the removal-proposed procedural skip (moved into the Prioritizer)
+- **Said, verbatim (opening):** *"**A `removal proposed` ticket NOW HOLDS ITS NUMBER — and is skipped
+  procedurally, right here (`SES-113`, `v7.0.158`, migration
+  `ses113_removal_proposed_keeps_slot`).** John's ruling 2026-08-22, verbatim: **"what if I reject
+  the proposal?"**"* — through *"…the skip above is now **one of three**, read from the same query"*.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 5, immediately under layer (3)'s board read.
+- **Why:** it was a rule a *cycle* applied by hand at selection, and after entry 45 the cycle no
+  longer selects — The Prioritizer does. A rule whose only reader has been replaced is a rule nobody
+  applies.
+- **Survives:** **byte-identical** in `public.skill_profiles` `pz-guardrails`,
+  `guardrails.selection_rules.removal_proposed` (2,035 bytes, round-trip asserted at the write), with
+  a binding `must` clause: *"treat a `removal proposed` ticket as awaiting John's verdict … it keeps
+  its number and its class, and no ruling of yours resolves it"*. Recorded under decision
+  `21402e94-5d7c-4baf-a68b-13262b1ed1c3` (`kind='directive'`, `p_backlog_id='SES-333'`), which is an
+  **addition of John's existing rules**, not new judgment. Also kept verbatim in the runbook under a
+  RETIRED IN PLACE note, because a reader of step 5 still needs to know why the ticket keeps its
+  number.
+- **Restore:** reverse decision `21402e94-5d7c-4baf-a68b-13262b1ed1c3`, then remove the RETIRED IN
+  PLACE note. **THE REVERSE IS CARD-ONLY FOR THE SKILL ROW, MEASURED NOT ASSUMED:**
+  `reverse_decision()`'s `k_allowed` array is `backlog_items`, `runner_directives`,
+  `runner_drain_scope`, `runner_settings`, `governance_rules`, `epics`, `vision_claims` —
+  `skill_profiles` is **not** on it, so a Reverse reports the before-image `refused` rather than
+  restoring it. The before-image is written anyway (`runner_before_images`, `table_name`
+  `skill_profiles`, carrying `decision_id`) and the prior `guardrails` value is recoverable from its
+  `row_data` by hand.
+  **NO LONGER CARD-ONLY — `SES-364` (`v7.0.501`) widened the allowlist to fourteen tables and
+  `skill_profiles` is one of them,** so this entry's Reverse now restores the `guardrails` value
+  itself and nothing has to be copied out of `row_data` by hand. Two things to carry into that
+  reversal: it reports **`restored_unverified 1, restored 0`** (the table has no `updated_at`
+  column, so the written-since guard cannot verify it) and the outcome word is `applied` either way
+  — **assert the row's `guardrails` value, not the outcome**, because the pre-`SES-364` build
+  returned `applied` here while restoring nothing. See `docs/runbooks/runner-cycle.md`'s allowlist
+  clause and `tests/regression/ses-364-reverse-agent-rows.test.mjs`.
+  <!-- FEATURE: SES-364 — the "separate ticket" named here was taken. -->
+  `SES-364` also added two guards that bound the widening, and this entry is their written home —
+  `docs/runbooks/runner-cycle.md` states them in one line each and points here. **Guard A:** an
+  automated cycle may not move `agents.is_active` by restoring a row (still John's hire card, §19v
+  P5 / `.claude/rules/agent-roster-inert.md`, which `AGENT-ROW-AGREED-TICKET` expressly exempts from
+  the write licence it grants) — the row is refused and counted, with the reason naming the card. A
+  **named human** actor (`p_actor_cycle => null`) restores it in full: `p_actor` and `p_reason` are
+  both required and both land on the reversal row, which is the signature. Do not "finish" this by
+  refusing every actor — a hire John wants undone would then have no undo at all. **Guard B:** a
+  `gated_before_build` `runner_items` card is still refused (it is step 8d's idempotence key and
+  `SES-312`'s drain precondition), and so is any card on the acting cycle; both sides of the `kind`
+  are read, because an INSERT image carries `row_data` NULL and knows its kind only from the live
+  row. **Neither guard aborts the reversal: they refuse the row and the decision's other images
+  still restore** — which is also what makes the counts readable.
+
+### 47. `runner-cycle.md` step 5 — the blocked-prefix table and `NULL` is not `auto` (moved into the Prioritizer)
+- **Said, verbatim (openings):** *"**THE BLOCKED PREFIX IS READ AT A GLANCE, NOT RE-DERIVED EVERY
+  CYCLE (`SES-114`, `v7.0.165`).** Five different flags mean *this ticket keeps its number and you
+  step past it*…"* — through the six-row table and *"**A contested claim is still NOT a skip** — it
+  clears itself in 24h"*; and *"**`NULL` is not `auto`.** 545 open rows carry `NULL` and run the full
+  ceremony… no cycle may backfill `auto` onto a row nobody has classified."*
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 5.
+- **Why:** same reason as entry 46 — the reader they were written for no longer makes the pick. The
+  `NULL`-is-not-`auto` rule moves for a second reason of its own: the agent that *classes* tickets is
+  the one positioned to commit exactly that error, and until now the rule lived somewhere it would
+  never read.
+- **Survives:** **byte-identical** in `pz-guardrails` — `guardrails.selection_rules.blocked_prefix`
+  (3,003 bytes) and `guardrails.selection_rules.null_is_not_auto` (213 bytes), round-trip asserted at
+  the write, under the same decision `21402e94-5d7c-4baf-a68b-13262b1ed1c3`. Bound by one `must`
+  (*"step past a ticket carrying any blocked-prefix flag … the flag is who clears it, and none of
+  them is you"*) and one `must_not` (*"backfill `auto` onto a row nobody has classified"*). Both are
+  also kept verbatim in the runbook: the table's *who clears it* column is the only written record of
+  who owns each flag, and the `NULL`/`auto` sentence is what explains the `design_status` column to a
+  reader of step 5. `prime_directive_queue()` independently enforces the table's `needs-desktop` row
+  in SQL, which is unchanged by this move.
+- **Restore:** as entry 46 — the same decision reverses both, with the same card-only caveat for the
+  `skill_profiles` before-image.
+
+### 48. `runner-cycle.md` step 4b items (1)–(4) — the invention pass's research method (moved into The Researcher)
+- **Said, verbatim (openings):** *"1. **Egress probe (precondition C3, measured not assumed):** one
+  live WebSearch…"*; *"2. **Research, with a class lens:** read `public.judgment_class_census` and
+  take the P1-P4 class with fewest ratified, then fewest proposed claims (P1 first on a full tie,
+  register A4) as this pass's lens…"*; *"3. **Generate exactly `allowed` proposals**…"*;
+  *"4. **Score against the vision corpus** and run §19v's R&D gate…"*.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 4b, the numbered pass.
+- **Why:** the method told a ROLE how to judge, not the orchestrator when to act, and since
+  `AGT-64` (`v7.0.429`) that role is an agent with rows. A cycle that ran the method by hand was a
+  second copy of instructions the agent already carries — `SES-45`'s defect, the same one entry 45
+  retired one step later. Step 4b is now four orchestration statements: assemble
+  `research-class-lens` over the `SES-331` path, obey the returned `egress`, file each survivor,
+  commit the returned research doc.
+- **Survives:** in `public.skill_profiles`, as the Skills `research-class-lens` assembles —
+  `rs-knowledge-corpus` (the corpus, the lens rule, the two legs, the `LOG-143` template and the
+  filing contract), `rs-research-intent` (the task shape and the JSON output schema),
+  `rs-behavior` (the scoring frame and the pull-test tiebreaker) and `rs-guardrails` (cite a dated
+  source or drop the finding, honour `allowed`, never re-propose a `VC-REJ-*`). **Also kept
+  verbatim in the runbook**, relabelled `(1-legacy)`–`(4-legacy)` under a RETIRED IN PLACE note, on
+  the entry-45/46/47 precedent and for its reason: the body is the only written record of *what the
+  method is* for the person debugging a pass, and a summary would be the second, drifting copy the
+  move exists to end.
+- **One thing that did NOT move, because it was never method:** the key rename. The Intent returns
+  `priority_class`; `public.file_invention_proposal()` reads `p ->> 'class'`. That mapping is the
+  orchestrator's job at the handoff and is stated in step 4b item 3, guarded by `covers()` in
+  `tests/regression/agt-64-researcher.test.mjs`.
+- **Restore:** remove the four new orchestration statements and rename `(1-legacy)`–`(4-legacy)`
+  back to `1`–`4`. **The Skill rows were seeded by `AGT-64`, not by this ticket, so there is
+  nothing here to reverse on the database side** — this entry retires a runbook passage, not a
+  decision. Repo half: `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 49. `runner-cycle.md` step 6 — the design ceremony (moved into The Designer)
+- **Said, verbatim (opening):** *"Then: read the item's backlog row, the governing
+  `ARCHITECTURE.md` section(s), every `.claude/rules/` file whose paths you will touch, and the real
+  source files. Inventions additionally pass the R&D gate first … Write the kickoff doc
+  (`docs/kickoffs/<version>-<ID>-<name>.md`). Implement within the scope caps (one item, ≤3 files,
+  ≤4 tasks)."* — and, in the step header, *"before designing anything, re-verify the ticket's premise
+  against live code/data"*.
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 6.
+- **Why:** it told a ROLE how to design, not the orchestrator when to act, and since `AGT-65`
+  (`v7.0.431`) that role is an agent with rows. Step 6 is now three orchestration statements:
+  assemble `design-kickoff` with the ticket, the claimed version, the class caps and the worktree;
+  act on `premise = dead` (removal proposed, evidence, recompute, next pick); on `premise = alive`
+  write the returned kickoff and set `kickoff_link` + `design_status = 'designed'` in one write.
+- **Survives:** in `public.skill_profiles`, as the Skills `design-kickoff` assembles —
+  `ds-knowledge-standard` (the design standard by file and section: `CLAUDE-DESIGN.md` Step 4,
+  `STANDARDS.md` §§2/3/4/8/11/12, `ARCHITECTURE.md` §19, `.claude/rules/*`, and this step),
+  `ds-behavior` (revalidate first and measure, name the governing section, cheapest variant, a QA
+  that would fail if the change did nothing) and `ds-guardrails` (never design a dead premise, never
+  exceed one item, never write code). **Also kept verbatim in the runbook**, relabelled
+  `(ceremony-legacy)` under a RETIRED IN PLACE note — on the entry-45/48 precedent, and for one
+  reason of its own: `ds-knowledge-standard` cites *"docs/runbooks/runner-cycle.md step 6"* BY NAME,
+  so a summary here would leave that citation pointing at a paraphrase of itself.
+- **The revalidation moved differently, and this entry says so rather than blurring it:** the
+  *performance* of it moved into the Designer (`ds-identity`'s first act); the *outcome handling* —
+  `status = 'removal proposed'`, the card with the evidence, `recompute_backlog_queue()`, drop to
+  the next queued ticket, never remove unattended — stayed in step 6 and is annotated as amended
+  rather than retired.
+- **Restore:** delete the three orchestration statements and rename `(ceremony-legacy)` back to its
+  unlabelled form. The `ds-*` rows were seeded by `AGT-65`, not by this ticket, so there is nothing
+  to reverse on the database side. Repo half: `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 50. `runner-cycle.md` step 7 — the QA bar as a cycle's own checklist (moved into The Builder)
+- **Said, verbatim (opening):** *"- `npm install && npm run build` green (a `src/`/`api/`/`lib/`
+  change that fails build never ships). - The regression suite green where it applies
+  (`tests/regression/run-all.js`). - A **discriminating** self-QA on the new path — state the test,
+  then ask: would it still pass if the change did nothing? …"*
+- **Lived:** `docs/runbooks/runner-cycle.md`, step 7, the bullets above `7a`.
+- **Why:** the bar is what the thing that BUILDS is held to, and since `AGT-66` (`v7.0.432`) the
+  thing that builds is an agent with rows. Step 7 is now three orchestration statements: assemble
+  `build-ticket` with the kickoff path, worktree, branch, version, cycle id and caps; on
+  `outcome = 'pushed'` read `push_sha` (the ship point) and keep `build` / `regression_summary`
+  verbatim; on `outcome = 'blocked'` ship nothing and never finish it by hand.
+- **Survives:** in `public.skill_profiles` — `bd-knowledge-standards` (the standard by file and
+  section), `bd-behavior` (diagnose before fixing, one task at a time, stop and report a blocker)
+  and `bd-guardrails` (build and regression green before every commit, the migration down captured
+  first, push `HEAD:dev` after fetch and rebase, outputs verbatim, never `main`, never a file the
+  kickoff does not name). **Kept verbatim in the runbook** under a RETIRED IN PLACE note for two
+  reasons: `bd-knowledge-standards` cites *"runner-cycle.md step 6 and 7 — … the QA bar … one ship
+  point"* by name, and an **attended** cycle runs no Builder and still grades its own ship against
+  this bar.
+- **What did NOT move, stated so a later editor does not "finish" this:** the verdict (7a), the
+  close-out status write, the snapshot, the scoreboard stamp, the standing brief, the version-claim
+  proof, the push, the claim release and `record_ship_decision()` all stayed. `bd-guardrails`
+  forbids the Builder writing a status or a verdict in its own words, so moving any of them would
+  hand a write to an agent whose own rules refuse it.
+- **Restore:** delete the three orchestration statements and the RETIRED IN PLACE note. As entry 49,
+  there is no database-side reversal: the `bd-*` rows were seeded by `AGT-66`.
+
+### 51. `runner-cycle.md` — twelve rationale blocks moved to `docs/SESSIONS.md` (history, not instruction)
+- **Said, verbatim:** twelve whole paragraphs, archived byte-for-byte with a `sha256` each. The
+  pre-boot gate's `SES-298`/`SES-302` wording corrections; step 0's five-probe `.claude/`
+  permission-gate evidence table; step 0b's 2026-08-21 measurement of two cycles pronounced dead
+  that came back nine hours later; step 2's `SES-219` named deviation and its "why the reset
+  existed" argument; step 4a-quater's "nothing was backfilled"; step 4a-quinquies' second trap;
+  step 5's blocked-prefix waste measurement and census, its `SES-218` named deviation, and
+  `record_skip()`'s "measured, because this was already failing silently"; step 7a's 26-block
+  measurement; and step 7's "why the standing brief had to become a listed step".
+- **Lived:** `docs/runbooks/runner-cycle.md`, at the steps named above.
+- **Why:** `SES-336`'s test — a sentence that tells the ORCHESTRATOR when to act stays; a sentence
+  that tells a ROLE how to judge belongs in that role's Skills; a sentence that is HISTORY belongs
+  in `docs/SESSIONS.md`. These twelve are history: past measurements, censuses, incident narratives
+  and superseded-wording records. Every cycle pays to read them and none of them changes what a
+  cycle does.
+- **Survives:** `docs/SESSIONS.md`, appendix *"`runner-cycle.md` rationale retired by `SES-336`
+  (v7.0.439, 2026-09-09)"*, entries A–L, **verbatim with a `sha256` per block**. Each left a
+  one-line pointer in the runbook naming the entry, so the fact is still findable from the step it
+  belonged to. Nothing was summarised and nothing was deleted.
+- **THE HONEST LIMIT, MEASURED RATHER THAN JUDGED BY EYE, because the ticket asked for a 40 KB file
+  and this is why it is not one.** Over the tree at `v7.0.438`: the runbook was **363,501 bytes**;
+  the passages the kickoff protects VERBATIM (the standing prohibitions, gates 1b/3/4/4a/8a, the
+  record at 9 and the chain) are **80,959** of them on their own — already twice the target — and of
+  the remaining 259,512, **148,047 bytes are the LAST home of at least one regression-test
+  assertion**. Removing those would leave roughly twenty guards asserting about an archive instead
+  of about the live instruction, which is the vacuous-guard failure `LOO-013` and `SES-158` are both
+  written from. Of the ~111,000 movable bytes, almost all carry a live imperative at sub-paragraph
+  granularity; the twelve blocks here (**11,255 bytes**) are what moved cleanly. **The runbook
+  cannot reach 40 KB — or anything near it — until the roles that would own those rules exist:**
+  step 2's harvest, step 5's selection beyond the pick, and steps 8b / 8b-bis / 8c / 8d's sweeps have
+  no agent yet, so their rules have no reader to move to. That is a scoping finding for the next
+  milestone, not a defect in this one.
+- **Restore:** cut each entry from the `SES-336` appendix in `docs/SESSIONS.md` and paste it over
+  its pointer; the `sha256` printed with each entry proves the paste is the original. Repo half:
+  `git show <this commit>~1:docs/runbooks/runner-cycle.md`.
+
+### 52. "Unwritten law" retired as a permissible state — every operational default now has a registry row and a named home
+- **Said, verbatim — and the point is that nothing said it.** Forty-four numbers, orders and
+  branches that the machine runs on were stated by NO governance rule: the six queue sort keys in
+  `recompute_backlog_queue()`, the three pick lanes in `prime_directive_queue()`, the drain's own
+  three order keys, the filing-lane cut date (three hand-copied literals), the 24-hour claim expiry,
+  the `needs-desktop` block list, the two different "finished" status sets, the design-gate title
+  pattern, the 32-retirement runaway guard, the required-set finish line, the cron minute / hour
+  grid / grid tolerance, the scheduler gate's fail-open literals and its manual-fire and clock-grid
+  tests, the finaliser's `:17` and the re-rank's `10 9 * * *`, the five chain gates, the no-ship
+  ceiling and its 6-hour lookback, the disabled undecided-card ceiling, the five token-cap rungs,
+  the 48-hour reading staleness, the stale floor and uncalibrated default (each duplicated as a
+  COALESCE literal), the weekly rest wall, the standing daily box, the America/Chicago day boundary
+  and the per-cycle-start wall approximation, the auto-done and cap-relax rungs, the 3-file /
+  4-task baseline, the ladder's starting rung, the class-to-work-class map, the invention floor and
+  per-rung pace and its EL-02 precedence, the reversal window, the brief's `OPEN_DECISION_BATCH`,
+  the publish lease's 10-minute TTL, the re-rank's 60-candidate cap, the Prioritizer's own sort
+  order, and the 0.39% cost-per-cycle fallback.
+- **Lived:** as SQL literals inside `recompute_backlog_queue()`, `prime_directive_queue()`,
+  `drain_epic_next()`, `drain_chain_gate()`, `scheduler_gate()`, `resolve_day_token_cap()`,
+  `invention_due()`, `class_autonomy()`, `ladder_work_class()`, `runner_pct_per_cycle()`; as columns
+  of `runner_settings`, `runner_budget` and `runner_ladder`; as constants in
+  `scripts/render-standing-brief.js` and `api/cron/rank-backlog.js`; in `vercel.json` and
+  `cron.job`; in `public.skill_profiles`' `pz-rank-intent` row; and as procedure in
+  `docs/runbooks/runner-cycle.md` steps 3, 5a and 9.
+- **Why:** the retirement ledger, `public.governance_rules` and the gate reviews see only what is
+  WRITTEN as a rule, so none of the three could see any of the above. John caught five of them in
+  one afternoon (2026-08-29, *"file both"*). **What is retired here is not a rule — it is a
+  permissible STATE:** "the machine runs on this number and no row states it" stops being an
+  ordinary condition of the codebase and becomes a named class of defect with a home. A default
+  with no `operational-defaults` row after this entry is a finding for the next audit, by that
+  audit's own terms rather than by anyone noticing.
+- **Survives:** `public.governance_rules`, `source_group = 'operational-defaults'`, rows
+  `OD-01`–`OD-44`, all `status = 'live'`; canonical home
+  `docs/design/2026-09-09-operational-defaults-census.md`, whose anchored entry per row carries the
+  statement byte-for-byte plus where the value physically lives, what pins it, and a keep / amend /
+  retire judgment against the charter's goals. `tests/regression/ses-234-operational-defaults.test.mjs`
+  pins the identity in both directions and, on its live arm, proves every stored-column home is a
+  column that exists. **Nothing operational was changed** — eleven amend / retire proposals are
+  batched in that doc for John, two of them named contradictions (`OD-43`, the Prioritizer sorting
+  class-before-lane while the picker sorts lane-before-class; `OD-35`, `ladder_work_class()`
+  returning NULL for P1 / P3 / P4 / P6 so the class a FAANG-showcase ticket is promoted into can
+  never auto-done).
+- **Two named deviations from the kickoff, both forced by the schema rather than chosen.** (1)
+  `canonical_doc` points at the census doc's own anchor for every row rather than at "the file or
+  table that holds it": truth-tripwire check 10 is GATING at FLAG severity and flags a
+  `canonical_doc` that is not an existing file, so a row homed on `public.runner_settings` or on a
+  function body would redden CI. The real home is named inline in each statement (`canonical: …`)
+  and in the entry's **Lives in** line. (2) `enforcement` carries the CATEGORY, not the pinning
+  test: `governance_rules_enforcement_check` admits only `hook` / `script` / `reviewer` / `prose`.
+  The pinning test is the entry's **Pinned by** line, and `none` there is itself a finding.
+- **Restore:** `delete from public.governance_rules where source_group = 'operational-defaults';`
+  then revert migration `ses234_operational_defaults_source_group` (drop and re-add
+  `governance_rules_source_group_check` without the seventh value), re-run
+  `node scripts/export-governance-snapshot.js`, and delete the census doc and the test. Decision
+  handle: `f6c99ec8-249a-48f6-8e88-4bd5fc57a30f`.
+
+### 53. The Vercel cron that re-ranked the board — retired to the runner's own cycle, because it was the 13th of 12 serverless functions
+- **Said, verbatim (the route's own header):** *"WHY A VERCEL CRON AND NOT THE FINALISER'S PATTERN.
+  `runner-window-finaliser` (`SES-320b`) is a `cron.job` row calling a SQL function on the database's own
+  clock, and it is the better shape — no deploy, no bypass header, no cold start. It cannot be used
+  here: this job has to make an HTTP call to the executor, and a Postgres function cannot. `pg_net` is the
+  extension that would give it one. MEASURED 2026-09-09, not assumed — `select extname from
+  pg_extension` returns pg_cron, pg_stat_statements, pgcrypto, plpgsql, supabase_vault, uuid-ossp, vector.
+  No pg_net."* Plus the schedule's own defence: *"THE SCHEDULE IS 09:10 UTC AND THAT IS 03:10
+  AMERICA/CHICAGO ONLY IN SUMMER … the job's requirement is 'overnight, off the runner's own grid'."*
+- **Lived:** `api/cron/rank-backlog.js` (254 lines, `SES-334`, `v7.0.437`) and `vercel.json`'s `crons`
+  block; the runbook had no step for it at all, which is part of why nothing noticed.
+- **Why retired:** it was **right about Postgres and wrong about the alternatives**, and the bill came due
+  as an outage. Vercel's Hobby plan caps a deployment at **12** serverless functions; every top-level file
+  under `api/` outside an underscore-prefixed directory is one. This route was the **13th** and `MCP-3`'s
+  `api/mcp.js` the **14th**, so from `v7.0.437` Vercel **refused every dev build**: `dev` served
+  `v7.0.434` while ten later commits sat undeployed. Two functions had to go and neither capability could.
+  The re-rank never needed a function — **the runner is already a caller with a clock**, it runs on
+  subscription tokens instead of API dollars, and `docs/runbooks/runner-cycle.md` step 4b already runs the
+  invention pass on exactly that schedule. A plan upgrade was never on the table: John ruled the free tier
+  stays (2026-08-31, `SES-47` "option 1"; `SES-183` part 1 "no cost option"), and money is his call.
+- **Survives:** `scripts/rank-backlog.js` — the same job as a two-pass session script (`--cycle=` prints
+  the Prioritizer's prompt and exits **3**; `--answer=<file>` validates against `pz-rank-intent`'s own
+  stored schema and hands the ranking to `prioritizer-write.js` in-process), invoked by **new runbook step
+  4c**. Nothing about the run changed but the runner: the same `prime_directive_queue()` candidates, the
+  same 60-candidate output-budget cap, the same `assemblePrompt()`, the same handler, and the same
+  `trigger = 'scheduled'` cycle row under the same `SCHEDULED-AGENT: rank-backlog` notes prefix — which
+  is what keeps `tests/regression/ses-334-served-class-block.test.mjs`'s live arm finding these runs. The
+  `pg_net` reasoning survives in this entry: **if pg_net is ever installed, the finaliser's `cron.job`
+  pattern becomes available and this script is the thing to retire into it.** The MCP half of the same
+  ship is not a retirement — `api/mcp.js` moved to `api/_lib/mcp.js` and `/api/mcp` is now a
+  `vercel.json` rewrite onto the executor's function, so the public URL and every behaviour are unchanged.
+- **One thing this ship deliberately did NOT fix, named rather than left to be found.** Two
+  `public.governance_rules` rows now describe a cron that does not exist: **`OD-19`** (the `10 9 * * *`
+  schedule, canonical `vercel.json` `crons[0]`) and **`OD-42`** (the 60-candidate cap, whose *Lives in*
+  names the deleted route). Their statements are pinned **byte-for-byte** to
+  `docs/design/2026-09-09-operational-defaults-census.md` by
+  `tests/regression/ses-234-operational-defaults.test.mjs`, so editing either half alone reddens CI and
+  editing both is a **registry amendment**, which entry 52's own batch says is John's to rule on. Filed
+  here as the finding, not taken as a licence.
+- **Restore:** `git show 5f55eb23:api/cron/rank-backlog.js > api/cron/rank-backlog.js`, then re-add
+  `{"crons": [{"path": "/api/cron/rank-backlog", "schedule": "10 9 * * *"}]}` to `vercel.json` — **and
+  first remove some other function, because `api/` sits at 12/12 and the 13th refuses the whole
+  deployment silently.** `node scripts/check-api-function-count.js --worktree=<path>` is the check.
+
+### 54. `CLAUDE-DESIGN.md` — the hand-composed coding prompt a design session pasted into `Agent`
+- **Said:** the bordered block at `CLAUDE-DESIGN.md` 49-53 — three lines a design session wrote out
+  itself and pasted into the `Agent` tool as the coding sub-agent's whole prompt: the worktree line
+  ("Operate against …/.claude/worktrees/<short-name>/ — never the shared checkout … do not switch it
+  back"), the kickoff-read line ("Read docs/kickoffs/[filename].md and CLAUDE-STATE.md, then execute
+  it"), and `SES-020`'s stop-line ("Stop once your own Node.js test passes, npm run build succeeds,
+  and you've committed and pushed … do NOT run the Manual QA Checklist … do NOT remove this worktree").
+  Step 4.13 and Step 5a both named it as *the full bordered code block*.
+- **Lived:** `CLAUDE-DESIGN.md`, the 2026-07-22 branch-switch block in the Automated Design→Code→Verify
+  Loop rule, and by reference at Step 4 item 13 and Step 5a.
+- **Why retired:** it is a **second assembly** — the exact drift `SES-331` ended by shipping
+  `scripts/agent-prompt.js`, and `SES-336` then moved the unattended design and build onto. This block
+  was the last live instruction still requiring one, so attended sessions kept hand-composing both
+  halves. Measured 2026-09-12: `ai_activity_log` by agent holds **2** Designer and **1** Builder rows,
+  all 2026-09-09 fixtures, across the **12** kickoffs written since; the attended ships `SES-347`,
+  `SES-355` and `SES-368` all carry `kickoff_link IS NULL`; and `session-setup.md` §3e passed no
+  `--kickoff=`, so `SES-376`'s delivery-side cap was inert on every attended run.
+- **Survives:** the prompt is now the **`build-ticket` assembly** — `docs/runbooks/session-setup.md`
+  §3f, the same command `runner-cycle.md` step 7 runs — and **two of the block's own lines survive
+  verbatim, prepended to the rendered prompt rather than folded into it**: the worktree line and the
+  stop-line, which are orientation (*where* to work, where the job ends), not task content. The block
+  itself is **kept verbatim in place** on the `SES-336` precedent, since it is the only written record
+  of what those two lines say. **The one exception:** a session whose ticket edits the governance
+  agents' own Skill rows (self-certification, `AGT-67`) may compose its prompt by hand and says so in
+  its SESSION section.
+- **Restore:** git history of `CLAUDE-DESIGN.md` — but the block is still present in the live file, so
+  there is nothing to recover; what a restore would undo is the retirement notice above it and the
+  §3f pointers at Step 4.13 and Step 5a.
+
+### 55. Four live `governance_rules` rows that named retired homes — re-pointed, not removed
+- **Said:** four rows, all `status = 'live'`, each naming something three earlier retirements had
+  already taken away. Prior text, verbatim from this ship's before-images:
+  - `OD-42` — "The nightly re-rank hands the Prioritizer at most 60 candidates … canonical:
+    `api/cron/rank-backlog.js`'s `MAX_CANDIDATES` and `public.skill_profiles.max_tokens` for
+    `pz-rank-intent`."
+  - `OD-19` — "The Prioritizer's nightly board re-rank is a VERCEL cron at `10 9 * * *` … canonical:
+    `vercel.json` `crons[0]`, with the reasoning in `api/cron/rank-backlog.js`."
+  - `OD-04` — "… the `board` row … is emitted whether the Prime Directive stands or not; canonical:
+    `public.prime_directive_queue()`."
+  - `B10` — "Mine each ticket's filed_at timestamp from git history to support newest/oldest
+    tie-breaking."
+- **Lived:** `public.governance_rules`; the census blockquotes and **Lives in:** lines at
+  `docs/design/2026-09-09-operational-defaults-census.md#OD-04`, `#OD-19`, `#OD-42`; and B10's own
+  home, the bullet at `docs/RUNNER-GOV-0820-REQUIREMENTS.md#B10`. Rendered from the registry into
+  `docs/governance/RULES-SNAPSHOT.md`.
+- **Why retired:** the *referents* were, not the rules. `SES-346` (entry 53) deleted
+  `api/cron/rank-backlog.js` and the `10 9 * * *` Vercel cron and moved the board re-rank onto the
+  runner's own cycle at `runner-cycle.md` step 4c, which orphaned `OD-42`'s and `OD-19`'s canonical
+  homes — `api/cron/` no longer exists and `vercel.json` declares no `crons` key, both measured on
+  this tree. `SES-340` (entries 43/44) replaced the "Prime Directive stands" predicate with
+  `EXISTS (projects WHERE status = 'executing')` and closed directive `a0ef9525` superseded, which
+  left `OD-04` restating a predicate nobody evaluates. `M5-02` superseded B3's newest/oldest
+  tie-break on 2026-09-01 (entry 20), which left `B10` justifying `filed_at` by a sort key that is
+  no longer the reason it is mined. Three retirements, none of which was required to grep the
+  registry — the duty the Contract above now carries.
+- **Survives:** all four rules, in full. Nothing was removed or superseded: each statement was
+  re-pointed at the home that does exist (`scripts/rank-backlog.js`, `runner-cycle.md` step 4c,
+  `public.prime_directive_queue()`, `M5-02`'s filing lane) and each now cites the ledger entry that
+  says what happened to the home it used to name — 53, 53, 43/44 and 20 respectively. The live
+  count of rows naming a retired referent went **4 → 0**, which is the discriminator
+  `tests/regression/agt-91-retired-homes.test.mjs` pins on both arms.
+- **Restore:** `public.reverse_decision('7f25bb78-ff4a-4377-94ca-e174ef23f4dc', '<actor>', '<reason>')`.
+  All four rows were imaged into `public.runner_before_images` under that one decision before any
+  write: `B10` `d425de24-2071-4fa5-a3a9-df59e88ca72e`, `OD-04` `1c0c4ade-7cf9-416c-bdfe-bc172b9e77d3`,
+  `OD-19` `b52c4f5a-b780-4531-9b75-6e748c8a8087`, `OD-42` `bfb4ea71-b58b-4394-bef9-8e955ffb9da4`.
+  `governance_rules` is on `reverse_decision()`'s `k_allowed` list and carries an `updated_at`
+  column, so a reversal restores all four **verified** (`restored`, not `restored_unverified`) —
+  read from `pg_get_functiondef` this session, not recalled. The doc halves are git only:
+  `git log --follow --` the three files above.

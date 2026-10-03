@@ -1,0 +1,1483 @@
+#!/usr/bin/env node
+// DeepBench v7.0.667 | scripts/run-project.js | AGT-238 slice 2 -- CONCURRENCY FROM THE CORPUS. Pass
+// one reads `public.project_concurrency_corpus()` beside the queue and carries it into the state as
+// `concurrency_corpus`; the answer may carry an optional `concurrency` object
+// {execute, pause, order, why}; `concurrencyErrors` checks the same seven refusals the function does
+// against that corpus; and pass two records a non-empty one through `public.record_concurrency()`
+// (one decision, one before-image per CHANGED row) after the leverage block and before the action
+// fork. Absent `concurrency`, every payload and line is byte-identical to before. How many projects
+// execute at once and in what order is the manager's recorded, reversible decision -- never a knob
+// and never a rule in code. Guard: tests/regression/agt-238-concurrency-corpus.test.mjs.
+//
+// DeepBench v7.0.660 | scripts/run-project.js | AGT-238 -- LEVERAGE FIRST. The manager answer may
+// carry an optional `leverage` list of {backlog_id, improves, why}: `leverageErrors` refuses an id the
+// queue did not return or a blank reason, and pass two records a non-empty list through
+// `public.record_leverage()` (one decision, one before-image per row) before the stop/report/assign
+// fork. Absent `leverage`, every payload and line is byte-identical to before. Guard:
+// tests/regression/agt-238-leverage-first.test.mjs.
+//
+// DeepBench v7.0.653 | scripts/run-project.js | AGT-186 -- THIS FILE'S OWN PROVENANCE IS NOT THE
+// PICKED TICKET. The state key that carries it is now `driver_feature`, not `feature`: named
+// `feature`, next to `driver:` and nowhere near `pick` / `pick_row`, it read to a human and to a
+// sub-agent as the ticket this cycle picked, and one record was written asserting a dropped digit
+// in this file on that misreading alone. The pick travels as `state.pick` / `state.pick_row` and
+// only there. The VALUE `AGT-68` is correct and load-bearing -- it is this driver's own provenance
+// ticket, the same id `intentContract()` names when it cannot find the capabilities row and tells
+// the operator which section of docs/design/ga-agents-seed.sql to apply -- so it must NEVER be
+// "corrected" to whatever ticket a cycle happens to hold. Guard: agt-68-devmanager.test.mjs pins
+// the renamed key, the absence of the bare key, and both strings a value change would break.
+//
+// DeepBench v7.0.625 | scripts/run-project.js | AGT-183 -- TWO REFUSALS THAT FIRED ON THE HAPPY
+// PATH. (1) `stateDrift` takes a third reading -- the stored pick's own board row -- so a pick path that
+// moved on because THIS cycle's own `--cycle-id` holds the pick's claim (rule B40 claims at pick time,
+// and the pick lane's filter is holder-blind) is the happy path and not tampering; a peer's claim, a
+// claim past `CLAIM_TTL_HOURS`, an unreadable row, a claim on a third ticket and lane drift all still
+// refuse, and pass two says which pick it acted on (`pick_source`). (2) `answerErrors` admits an
+// off-pick assignment on ONE shape -- a recorded `passed_over` the LISTER's own two lists support --
+// and refuses everything else with today's sentence unchanged. Guard: agt-68-devmanager.test.mjs.
+// DeepBench v7.0.500 | scripts/run-project.js | SES-403 -- THE MANAGER CAN SEE THE SHIPS THAT ARE
+// STUCK, and it gets ONE new instrument and ONE new refusal, not a new action. `regradable_ships()`
+// is read beside `prime_directive_queue()` and carried into the state as `regradable`; if the
+// answer carries `regrades`, every id in it must be one the LISTER returned. Nothing here decides
+// what is re-gradable -- that rule has one home, in the function, and this file reads it verbatim
+// exactly as it reads the pick.
+//
+// DeepBench v7.0.434 | scripts/run-project.js | AGT-68 -- the session's HANDS for The Development
+// Manager. The manager's Skill rows are its judgment; this file is the part that can touch a row.
+//
+// WHY THIS EXISTS. John, 2026-09-09, item 7: "Do we need to create a Developer Manager agent that
+// knows how to orchestrate all these agents to make a project complete? I worry that we are trying
+// to over manage a runner script." The runner runbook plays the manager's role in prose today. This
+// script is deliberately NOT that prose moved into JavaScript: it decides nothing. It reads the
+// instruments the platform already computed, hands them to the agent as `task_context`, and then
+// performs only the ONE row action the agent's answer names and the Skills allow -- the ticket
+// claim. Everything that looks like a decision here is a REFUSAL, never a choice.
+//
+// THE SHAPE IS scripts/verifier.js'S `--judge=session`, ON PURPOSE (AGT-67). A session sub-agent is
+// not a function a script can call, so one management step is TWO INVOCATIONS and an exit code:
+//
+//   pass one   node scripts/run-project.js --project=governance-agents --cycle-id=<uuid>
+//                -> reads the instruments, writes the state JSON, prints the assembled prompt,
+//                   exit 3 = AWAITING THE MANAGER'S ANSWER. Nothing is written to any row.
+//   ...run that prompt as a `devmanager` sub-agent on the orchestrator lane, save its JSON...
+//   pass two   node scripts/run-project.js --project=governance-agents --cycle-id=<uuid> \
+//                --answer=<path>
+//                -> validates the answer against the Intent's OWN stored schema, re-reads the pick
+//                   and the walls LIVE, claims the ticket if and only if everything still agrees,
+//                   and prints the assigned capability's assembled prompt. exit 0/1/2.
+//
+// FIVE THINGS THIS FILE REFUSES TO DO, each because doing it is a defect this project has already
+// paid for once:
+//
+// (1) IT NEVER ASSEMBLES A PROMPT ITSELF (SES-331). `assemblePrompt()` -- the function
+//     api/capabilities/execute.js calls -- and `renderAssembly()` from scripts/agent-prompt.js are
+//     imported. A session that pastes its own system prompt together is a second copy of the
+//     executor's assembly, which is the drift the whole Governance Agents project exists to end.
+//
+// (2) IT NEVER OMITS `intent_slug`. MEASURED DEFECT, not a precaution: api/prompt/db-assembly.js
+//     does NOT fall back to `capabilities.default_intent_slug` when `intent_slug` is null (AA-188) --
+//     it filters EVERY Intent-type Skill out of the assembly. A `run-project` prompt built without
+//     it carries no output contract and no decision procedure while still looking complete. So the
+//     slug is READ OFF THE CAPABILITY ROW and passed explicitly, here and for the handed-over
+//     capability too.
+//
+// (3) IT NEVER RE-DERIVES THE PICK. `dm-guardrails.must` says "use the pick path as computed, never
+//     a re-derived order", and this file is where that would be broken first. `state.pick` is
+//     `runner_should_boot().detail.pick` VERBATIM -- byte-for-byte the object the function returned,
+//     not a reconstruction from `prime_directive_queue()` rows that happens to agree today. Pass two
+//     then re-reads that same function and refuses on any drift (see `stateDrift`), which is what
+//     makes editing the state file between the two passes a refusal rather than an instruction.
+//
+// (4) IT NEVER CLAIMS A TICKET A LIVE PEER HOLDS, AND THE CLAIM IT WRITES IS THE CYCLE'S OWN ID
+//     (SES-378 slice 2). The claim is ONE atomic PATCH carrying the runbook's own guard
+//     (`docs/runbooks/session-setup.md` § 2c, rule B40): the 24h-expiry filter rides in the query
+//     string, so the database -- not this file -- decides. 1 row back = ours, 0 rows = somebody
+//     else's, and there is no check-then-claim pair anywhere in this file. It sets `claimed_by` /
+//     `claimed_at` and NOTHING else: `SES-316` made bumping `updated_at` on a claim the reason a
+//     decision minutes earlier became un-restorable.
+//
+//     `claimed_by` is `--cycle-id` VERBATIM, never a `run-project:<project>:<step>` label. Register
+//     B42 (`docs/runbooks/runner-cycle.md` L354) re-asserts `claimed_by = '<your cycle id>'` before
+//     EVERY irreversible act and reads 0 rows as "do not push, do not claim a counter" -- so a claim
+//     written under a label nobody can re-assert breaks the pushing cycle's own gate. Measured:
+//     `run-project:moat-support:1` sat on `SES-378` AND on `SES-399` at the same moment, held by two
+//     different cycles that the string could not tell apart. Two further consumers read the column
+//     as a cycle id: `scripts/ticket-owner.js:256` (check 6) clears a 24h-old claim whose holder is
+//     not a live cycle, and `tests/regression/_lib/board-state.js:40-43` measured 3 claimed tickets
+//     against 2 live cycles with ZERO matches. Without a cycle id there is no claim at all
+//     (`claimerFor` returns an error and the driver exits `EXIT_CANNOT_RUN` writing nothing).
+//
+// (5) IT NEVER ACTS PAST A WALL. `--dry-run` writes nothing at all, and even without it pass two
+//     re-reads the walls and refuses the claim while any of them stands, whatever the answer says.
+//     A wall reading that could not be TAKEN counts as a wall (`wallReading` fails closed): an
+//     unread instrument is not an absent one.
+//
+// WHAT `--dry-run` MEANS HERE, AND HOW IT DIFFERS FROM scripts/verifier.js'S. There it also means
+// "needs no credentials", because its gates are local subprocesses. Every instrument here is a
+// database read, so credentials are always required and `--dry-run` means exactly one thing: NO
+// WRITE OF ANY KIND. Pass two under `--dry-run` validates, reconciles and prints the next prompt,
+// and reports the claim it did not make.
+//
+// USAGE
+//   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/run-project.js \
+//     --project=governance-agents --cycle-id=<runner_cycles.id> [--step=1] [--max-steps=8] \
+//     [--scratch=<dir>] [--handoff=<path>] [--dry-run] [--json]
+//   ... --answer=<path to the manager's JSON>   (pass two; add --state-file=<path> to override)
+//
+// EXIT CODES -- four states, and collapsing any two of them throws away a distinction:
+//   0  the answer was accepted and acted on (an `assign` claimed and printed the next prompt; a
+//      `report` printed the close-out). The chain may continue.
+//   1  the manager said `stop`: a wall stands and it is named. NOTHING was written. This is an
+//      answer about the project, not a failure of the driver.
+//   2  the driver could not run, or the answer was REFUSED -- schema, identity, state drift, a wall
+//      standing under an `assign`, or the claim lost to a live peer. Nothing was written.
+//   3  AWAITING THE MANAGER'S ANSWER (pass one). The state was written, the prompt was printed, and
+//      no row was touched. It is NOT 2 (the driver ran its half) and NOT 1 (nothing was judged).
+//
+// Env (process.env only -- never hardcoded, never printed):
+//   SUPABASE_URL           Project REST base.
+//   SUPABASE_SERVICE_KEY   Service-role key; the instruments hold no anon grants.
+//
+// Network -- every call is a READ except the one claim PATCH in pass two:
+//   POST /rest/v1/rpc/runner_should_boot        the pick path and the boot wall (STABLE)
+//   POST /rest/v1/rpc/prime_directive_queue     the ordered lanes, for context under the pick
+//   POST /rest/v1/rpc/resolve_day_token_cap     the token wall            (needs --cycle-id)
+//   POST /rest/v1/rpc/scheduler_gate            John's Automation panel   (needs --cycle-id)
+//   GET  /rest/v1/projects | project_progress | project_blockers
+//   GET  /rest/v1/agents | agent_capability_assignments | capabilities    the roster, read LIVE
+//   GET  /rest/v1/backlog_items                 the pick's own board row
+//   GET  /rest/v1/skill_profiles                the Intent's stored traits.schema
+//   GET  /rest/v1/runner_model_lanes            the judgment lane, via resolveJudgmentModel
+//   POST /rest/v1/rpc/judgment_model            the model the handed-over call will RUN on (same)
+//   PATCH /rest/v1/backlog_items                THE ONE WRITE -- `claimed_by` = the --cycle-id
+//                                               VERBATIM (never a `run-project:` label), so register
+//                                               B42 can re-assert it. Skipped under --dry-run.
+//   POST /rest/v1/rpc/record_leverage           AGT-238: only when the answer carries a non-empty
+//                                               `leverage`; needs --cycle-id. Skipped under --dry-run.
+//   POST /rest/v1/rpc/project_concurrency_corpus  AGT-238 slice 2: the concurrency corpus, read beside
+//                                               the queue in pass one. A failed read is FATAL.
+//   POST /rest/v1/rpc/record_concurrency        AGT-238 slice 2: only when the answer carries a
+//                                               non-empty `concurrency`; needs --cycle-id. Skipped
+//                                               under --dry-run.
+//
+// Pure helpers (parseArgs, statePathFor, wallReading, stateDrift, answerErrors, claimQueryFor,
+// claimOutcome, handoffContextFor) are exported so the regression suite drives every branch with no
+// network -- the same seam-proof convention scripts/verifier.js and scripts/check-*.js use. The
+// claim is split into claimQueryFor (what is sent) and claimOutcome (what the row count means) for
+// one reason worth stating: it lets the suite fire BOTH branches of rule B40 without a regression
+// run ever claiming a real board ticket.
+
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { fileURLToPath } from "url";
+// The schema validator is IMPORTED, not restated. `validateAgentVerdict` reads whatever schema it
+// is handed and names the offending key -- it is generic despite the noun in its name, and AGT-67's
+// own guard drives it with a `"true"`-for-`true` mutant. A second copy here would be a second
+// contract to keep in step, which is the drift this project exists to end.
+import { validateAgentVerdict } from "./verifier.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export const DEVMANAGER_AGENT_ID = "devmanager";
+export const RUN_PROJECT_CAPABILITY = "run-project";
+
+// See the exit-code table in the header. Named rather than literal so a caller can import the
+// distinction instead of re-deriving it from a number.
+export const EXIT_OK = 0;
+export const EXIT_STOP = 1;
+export const EXIT_CANNOT_RUN = 2;
+export const EXIT_AWAITING_ANSWER = 3;
+
+// The engine names the Intent's schema allows. `dm-knowledge-platform` states what each one IS: a
+// session sub-agent assembled from Skill rows on subscription tokens, or the capability executor on
+// API dollars. Which one FITS a given ticket is the manager's call; which ones are MECHANICALLY
+// POSSIBLE is a fact about the capability row, and that fact is all this file supplies.
+export const ENGINES = Object.freeze(["session", "executor"]);
+
+// The three answers the Intent's schema allows. Restated here NOT as a second copy of the contract
+// -- the schema is still what `validateAgentVerdict` is driven against -- but because this file
+// BRANCHES on the value, and a branch of the form "stop, else report, else it must be assign" turns
+// any unrecognised action into an assignment. That is the one direction this driver must never fail
+// in, so the set is closed explicitly and an unknown action is refused rather than defaulted.
+export const ACTIONS = Object.freeze(["assign", "stop", "report"]);
+
+// The claim's expiry window, from rule B40 (`docs/runbooks/session-setup.md` § 2c): a claim older
+// than this is a dead session's, not a live peer's. Hours rather than a literal timestamp because
+// the cutoff is computed per call.
+export const CLAIM_TTL_HOURS = 24;
+
+const DEFAULT_TENANT = "global";
+const DEFAULT_MAX_STEPS = 8;
+
+function fail(message) {
+  console.error(`run-project: ${message}`);
+  process.exit(EXIT_CANNOT_RUN);
+}
+
+export function parseArgs(argv) {
+  const out = { json: false, dryRun: false };
+  for (const raw of argv) {
+    if (raw === "--dry-run") { out.dryRun = true; continue; }
+    if (raw === "--json") { out.json = true; continue; }
+    const m = /^--([a-z-]+)(?:=([\s\S]*))?$/.exec(raw);
+    if (!m) return { error: `unrecognized argument "${raw}"` };
+    const [, key, value] = m;
+    switch (key) {
+      case "project": out.project = value; break;
+      case "cycle-id": out.cycleId = value; break;
+      case "step": out.stepRaw = value; break;
+      case "max-steps": out.maxStepsRaw = value; break;
+      case "scratch": out.scratch = value; break;
+      case "answer": out.answer = value; break;
+      case "state-file": out.stateFile = value; break;
+      case "handoff": out.handoff = value; break;
+      case "tenant": out.tenant = value; break;
+      case "trigger": out.trigger = value; break;
+      case "repo": out.repo = value; break;
+      default: return { error: `unrecognized flag "--${key}"` };
+    }
+  }
+  if (!out.project) return { error: "--project=<projects.slug> is required" };
+  const int = (raw, flag, dflt) => {
+    if (raw === undefined) return { value: dflt };
+    if (!/^\d+$/.test(String(raw))) return { error: `--${flag} must be a positive integer` };
+    const n = Number(raw);
+    if (n < 1) return { error: `--${flag} must be a positive integer` };
+    return { value: n };
+  };
+  const step = int(out.stepRaw, "step", 1);
+  if (step.error) return step;
+  out.step = step.value;
+  const maxSteps = int(out.maxStepsRaw, "max-steps", DEFAULT_MAX_STEPS);
+  if (maxSteps.error) return maxSteps;
+  out.maxSteps = maxSteps.value;
+  // A bound that is not checked is a comment. This is the whole of what --max-steps buys: the chain
+  // is one invocation per step, so the only place a runaway can be stopped is at the door.
+  if (out.step > out.maxSteps) {
+    return { error: `--step=${out.step} exceeds --max-steps=${out.maxSteps}; the chain is over, and a further step would be a management loop nobody bounded` };
+  }
+  out.tenant = out.tenant || DEFAULT_TENANT;
+  out.trigger = out.trigger || "supervised";
+  out.scratch = out.scratch || os.tmpdir();
+  return out;
+}
+
+// Where pass one leaves the state for pass two, DERIVED so the two invocations find the same file
+// without a path carried by hand. The dot is deliberately not in the allowed set, for the reason
+// scripts/verifier.js's `judgeContextPathFor` records: once the separators are gone `../../etc` is
+// harmless, and "harmless because of a second rule" is how the first rule stops being checked.
+export function statePathFor(scratchDir, project, step) {
+  const safe = String(project || "").replace(/[^A-Za-z0-9_-]/g, "-");
+  if (!safe) return null;
+  const n = Number.isInteger(step) && step > 0 ? step : 1;
+  return path.join(scratchDir, `run-project-${safe}-${n}.json`);
+}
+
+// THE WALLS, READ AND NEVER RE-DERIVED -- and FAILING CLOSED IN BOTH DIRECTIONS.
+//
+// Each reading is either an answer from the instrument or an `error` saying it could not be taken.
+// An unread instrument counts as a wall STANDING: "we could not tell" and "we are clear" are the
+// same value to a caller that treats a missing reading as absent, and the second one is how a cycle
+// spends past a budget nobody could read. Unknown is not innocent.
+//
+// `resolve_day_token_cap` and `scheduler_gate` both need a cycle id. Without one they are NOT
+// silently skipped -- they are recorded as unread, which is a wall, so a caller who forgot
+// `--cycle-id` is told rather than quietly given a green board.
+export function wallReading({ shouldBoot, dayTokenCap, schedulerGate }) {
+  const standing = [];
+  const push = (name, reason) => standing.push(`${name}: ${reason}`);
+
+  if (!shouldBoot || shouldBoot.error) {
+    push("runner_should_boot()", shouldBoot?.error || "not read");
+  } else if (shouldBoot.should_boot !== true) {
+    push("runner_should_boot()", shouldBoot.reason || "should_boot is not true");
+  }
+
+  if (!dayTokenCap || dayTokenCap.error) {
+    push("resolve_day_token_cap()", dayTokenCap?.error || "not read");
+  } else if (dayTokenCap.rest_wall_hit === true) {
+    // The weekly rest wall is the one reading here that is a STOP rather than a smaller number.
+    // `cap_source` being `stale-floor` narrows the day's allowance and is reported in the state for
+    // the manager to weigh; it is not a wall, and treating it as one would stop the runner every
+    // time John went two days without typing his meter numbers.
+    push("resolve_day_token_cap()", `weekly rest wall hit at rest_pct ${dayTokenCap.rest_pct}`);
+  }
+
+  if (!schedulerGate || schedulerGate.error) {
+    push("scheduler_gate()", schedulerGate?.error || "not read");
+  } else if (schedulerGate.verdict !== "run") {
+    // The runbook's step 1b: `run` carries on, anything else (`paced` / `scheduler-off`) closes the
+    // cycle. The set of non-`run` verdicts is deliberately NOT enumerated here -- a verdict this
+    // file has never heard of must stop the chain, not fall through it.
+    push("scheduler_gate()", `${schedulerGate.verdict}: ${schedulerGate.reason || "no reason given"}`);
+  }
+
+  return { blocked: standing.length > 0, standing };
+}
+
+// THE NEGATIVE CONTROL THAT MAKES THE STATE FILE EVIDENCE RATHER THAN AN INSTRUCTION.
+//
+// Between the two passes the state JSON sits on disk, and it names the ticket pass two is about to
+// claim. Editing one string in it would otherwise be a way to make the driver claim any ticket at
+// all -- with the agent's answer honestly agreeing, because the agent was shown the edited file. So
+// pass two re-reads `runner_should_boot()` and compares: the pick this file acts on is the one the
+// database says is the pick RIGHT NOW, and the stored copy is only evidence that the manager was
+// shown the truth. A board that legitimately moved between the passes lands here too, and stopping
+// is the right answer there as well -- the manager reasoned about a pick that no longer exists.
+// AGT-183: THE ONE READING THAT TELLS THE CYCLE'S OWN CLAIM APART FROM FOREIGN DRIFT.
+//
+// The pick lane filters on `claimed_by IS NULL OR claimed_at < now() - claim_stale_hours`
+// (`docs/design/agt-140-project-priority-pick.sql:295,561`) -- HOLDER-BLIND. Rule B40 has the cycle
+// claim its ticket AT pick time and step 5 runs this driver twice, so between the passes the cycle's
+// OWN claim removes its OWN ticket from the pick path, and the id comparison in `stateDrift` then
+// reads the happy path as tampering. Measured live 2026-09-27 on AGT-183 itself: `claimed_by =
+// dd911b24-4db2-4f49-ba3e-8b331cd3fd83` at 02:55:26Z, while `runner_should_boot().detail.pick` named
+// another ticket minutes later -- so the shipped function refused that cycle's own `--answer` pass.
+//
+// THE READING IS THE STORED PICK'S OWN BOARD ROW, read live in pass two (never from the state file,
+// which stays evidence) and handed in here. Three conditions and NOT ONE MORE: the row is the ticket
+// the state names, its holder is THIS cycle, and the claim is inside rule B40's window. The row's
+// `status` rides along as evidence only -- a `done` stored pick is already refused one gate later by
+// the claim's own `status=neq.done` filter (see `claimQueryFor`), and restating that rule here would
+// be a second copy of it to keep in step.
+//
+// EVERY OTHER SHAPE IS TODAY'S REFUSAL, UNCHANGED: a peer holder, a claim older than
+// `CLAIM_TTL_HOURS`, a claim on some THIRD ticket, and a row this driver could not read -- which
+// arrives as `null` and refuses, because an unread instrument is never a pass (the direction
+// `wallReading` already fails in). Lane drift is checked separately below and is NOT suppressed: a
+// cycle whose own claim holds but whose lane moved is still stopped.
+function ownClaimHolds(stored, ownClaim) {
+  if (!ownClaim || typeof ownClaim !== "object" || Array.isArray(ownClaim)) return false;
+  const cycleId = String(ownClaim.cycleId ?? "").trim();
+  if (!cycleId) return false;
+  if (String(ownClaim.backlog_id ?? "") !== String(stored.backlog_id)) return false;
+  if (String(ownClaim.claimed_by ?? "").trim() !== cycleId) return false;
+  const at = Date.parse(ownClaim.claimed_at ?? "");
+  if (!Number.isFinite(at)) return false;
+  return Date.now() - at <= CLAIM_TTL_HOURS * 3600 * 1000;
+}
+
+export function stateDrift(state, livePick, ownClaim = null) {
+  const drift = [];
+  const stored = state && state.pick;
+  if (!stored && !livePick) return drift;
+  if (!stored) {
+    drift.push(`the state file carries no pick but the pick path now names "${livePick.backlog_id}" -- the state was written against a different board`);
+    return drift;
+  }
+  // AGT-183. Computed once, above both comparisons, because the same claim explains both shapes the
+  // pick path can take when a cycle holds its own ticket: another row promoted into the pick, or --
+  // on a board whose only pickable row was that ticket -- no pick at all.
+  const mine = ownClaimHolds(stored, ownClaim);
+  if (!livePick) {
+    if (!mine) {
+      drift.push(`the state file names pick "${stored.backlog_id}" but the pick path now names none -- nothing is pickable, so there is nothing to assign`);
+    }
+    return drift;
+  }
+  if (String(stored.backlog_id) !== String(livePick.backlog_id) && !mine) {
+    drift.push(`the state file names pick "${stored.backlog_id}" but runner_should_boot() now names "${livePick.backlog_id}" -- the pick is read live and never taken from the file`);
+  }
+  if (stored.lane && livePick.lane && String(stored.lane) !== String(livePick.lane)) {
+    drift.push(`the state file's pick lane is "${stored.lane}" but the pick path's is "${livePick.lane}"`);
+  }
+  return drift;
+}
+
+// THE ANSWER, CHECKED AGAINST THE STATE IT WAS GIVEN. The Intent's own schema (validated
+// separately, through the shipped validator) says the answer is well FORMED; this says it is about
+// THIS project, THIS pick and a capability that actually exists on the live roster.
+//
+// The `assign` branch is the only one that may reach a row, so it is the only one with anything to
+// check. `stop` and `report` are checked in the mirror direction -- they must NOT carry an
+// assignment, because an assignment nobody acts on in a `stop` is a reader's trap, and a future
+// edit that started acting on it would find the check already passed.
+// AGT-183: THE PASS-OVER, AS THE ONE SHAPE AN OFF-PICK ASSIGNMENT CAN LEGITIMATELY TAKE.
+//
+// `answerErrors`' off-pick refusal is right against re-ranking and must stay: a manager naming any
+// other ticket is a finding on the Skill text. But a legitimate pass-over had NO recordable shape, so
+// cycle `c50ee60d` -- which went past AGT-168, already in `project_blockers` as "needs a session John
+// attends" -- was refused with the same sentence as a re-order, and runbook 5(c) then forced it to
+// build a ticket whose work is unavailable.
+//
+// So the off-pick branch is admitted on ONE shape and nothing else: an optional `passed_over` list of
+// `{backlog_id, reason}` (an extra top-level answer key, which the stored Intent contract already
+// accepts -- `regrades` ships that way, SES-403 -- so no Skill row moves here) that RECORDS the rows
+// the manager went past. Five conditions, every one checked against a LIST THE LISTER RETURNED and
+// never against the manager's own opinion of the board:
+//
+//   1. `passed_over` is a non-empty array -- nothing recorded is not a pass-over.
+//   2. it names the pick itself: going past the pick is the only thing being excused.
+//   3. every id it names is in `state.blockers` (`project_blockers`, read verbatim) -- the board says
+//      what is blocked, and a manager that could nominate its own blocked rows would have the
+//      re-ordering power this whole gate exists to withhold.
+//   4. the assignment's id is on `state.queue` (`prime_directive_queue()`, read verbatim) -- a
+//      pass-over may only reach a row the lister already returned.
+//   5. every queue row ORDERED BEFORE it is blocked too. THE DRIVER NEVER SORTS: it walks a prefix of
+//      the lister's own order, so "next admitted row" stays the lister's sentence and not this file's.
+//
+// Absent `passed_over` returns today's refusal BYTE-IDENTICAL (`ses-378-manager-takes-the-pick`
+// pins that string). Any failed condition returns that same refusal PLUS one line naming which
+// condition failed -- a refusal that does not say which of five gates closed is a refusal nobody can
+// answer.
+function passOverErrors(answer, state, a, pick) {
+  const reorder = `the assignment names "${a.backlog_id}" but the pick path names "${pick.backlog_id}" -- the manager may not re-order the board`;
+  const po = answer.passed_over;
+  if (po === undefined || po === null) return [reorder];
+  if (!Array.isArray(po) || po.length === 0) {
+    const what = Array.isArray(po) ? "an empty array" : `${typeof po}, not an array`;
+    return [reorder, `pass-over refused: "passed_over" is ${what} -- a pass-over is a RECORD of the rows the manager went past, and nothing recorded is nothing to check`];
+  }
+  const overIds = po.map(r => String((r && r.backlog_id) ?? ""));
+  if (!overIds.includes(String(pick.backlog_id))) {
+    return [reorder, `pass-over refused: "passed_over" names ${overIds.join(", ") || "nothing"} and not the pick "${pick.backlog_id}" -- going past the PICK is the only thing a pass-over excuses`];
+  }
+  const blocked = (Array.isArray(state?.blockers) ? state.blockers : []).map(b => String(b && b.backlog_id));
+  const notBlocked = overIds.filter(id => !blocked.includes(id));
+  if (notBlocked.length) {
+    return [reorder, `pass-over refused: "passed_over" names ${notBlocked.join(", ")}, which project_blockers does not (it names: ${blocked.join(", ") || "nothing"}) -- the blocked list is the board's, and a manager that nominated its own blocked rows would be re-ordering by another name`];
+  }
+  const queue = Array.isArray(state?.queue) ? state.queue : [];
+  const refs = queue.map(r => String((r && r.ref) ?? ""));
+  const at = refs.indexOf(String(a.backlog_id));
+  if (at < 0) {
+    return [reorder, `pass-over refused: the assignment names "${a.backlog_id}", which prime_directive_queue() did not return (it returned: ${refs.join(", ") || "nothing"}) -- a pass-over may only reach a row the lister already listed`];
+  }
+  const liveAhead = refs.slice(0, at).filter(id => !blocked.includes(id));
+  if (liveAhead.length) {
+    return [reorder, `pass-over refused: ${liveAhead.join(", ")} sit ahead of "${a.backlog_id}" in prime_directive_queue()'s own order and project_blockers does not name them -- a pass-over skips BLOCKED rows only, and skipping a live one is the re-ordering this refuses`];
+  }
+  return null;
+}
+
+// AGT-173 R2 (v7.0.688) -- THE DRIVER WORDS THE PASS-OVER LINE, AND THE REASONS ARE THE BOARD'S.
+//
+// `passOverErrors` above decides whether a pass-over is admissible. What it did NOT do was say, in the
+// `assigned` payload, which rows the manager went past and WHY -- so a reader of the run had the
+// assignment and no trace of the skipped rows, and the only account of "why AGT-168 was skipped" was
+// whatever the manager wrote in `assignment.reason`: a model's sentence about a fact the board already
+// holds (pattern:10 -- when a correct value exists deterministically, no model is put in charge of it).
+//
+// So the note is composed HERE, from `state.blockers` -- `project_blockers`, read verbatim, whose
+// `reasons` are now `public.pick_exclusions()`'s and therefore the same predicate the queue used to
+// leave the row out (AGT-173's one home). The manager's own `reason` on each `passed_over` entry is
+// deliberately NOT read: it is the manager's opinion of the board, and this line is the board's.
+//
+// `null` unless there is something recorded AND it is admissible -- an inadmissible pass-over is
+// refused by `answerErrors` and never reaches an assignment, so a note for one would describe a run
+// that did not happen. `[].concat(b.reasons ?? [])` because `project_blockers.reasons` is a text[] over
+// PostgREST and a single sentence in the driver's own fixtures; both render the same line.
+export function passOverNote(answer, state) {
+  const po = answer ? answer.passed_over : undefined;
+  if (!Array.isArray(po) || po.length === 0) return null;
+  const a = answer.assignment;
+  const pick = state ? state.pick : null;
+  if (!a || typeof a !== "object" || Array.isArray(a) || !pick) return null;
+  if (passOverErrors(answer, state, a, pick)) return null;
+  const blockers = Array.isArray(state?.blockers) ? state.blockers : [];
+  const blocked = po.map(r => {
+    const id = String((r && r.backlog_id) ?? "");
+    const row = blockers.find(b => String(b && b.backlog_id) === id);
+    return `${id}: ${[].concat(row?.reasons ?? []).join("; ")}`;
+  });
+  return `MANAGER PASS-OVER: ${a.backlog_id} over ${pick.backlog_id} (blocked: ${blocked.join(" | ")})`;
+}
+
+// AGT-238 (v7.0.660) -- LEVERAGE FIRST (John 2026-09-27). The manager reads the whole queue and names,
+// in an optional `leverage` list of `{backlog_id, improves, why}`, the tickets whose fix makes other
+// tickets or agents run better; `public.record_leverage()` then writes `leverage_reason`, and both pick
+// homes rank a marked ticket ahead of project priority. THE LIST IS THE LISTER'S: every id must be a
+// ref `prime_directive_queue()` returned (`state.queue`, read verbatim), the same direction `regrades`
+// and the pass-over are checked in. The function re-checks the queue itself -- this is the early,
+// legible half, never the only one. Absent `leverage` returns no lines at all.
+export function leverageErrors(answer, state) {
+  const lev = answer ? answer.leverage : undefined;
+  if (lev === undefined || lev === null) return [];
+  if (!Array.isArray(lev)) {
+    return [`"leverage" is ${typeof lev}, not an array of {backlog_id, improves, why} -- a leverage mark that cannot be checked against the queue is refused`];
+  }
+  const refs = (Array.isArray(state?.queue) ? state.queue : []).map(r => String((r && r.ref) ?? "")).filter(Boolean);
+  const errors = [];
+  lev.forEach((item, i) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      errors.push(`"leverage"[${i}] is not an object {backlog_id, improves, why}`);
+      return;
+    }
+    const id = String(item.backlog_id ?? "").trim();
+    if (!refs.includes(id)) {
+      errors.push(`"leverage"[${i}] names "${id}", which prime_directive_queue() did not return (it returned: ${refs.join(", ") || "nothing"}) -- leverage is marked only on the queue the manager was shown`);
+    }
+    for (const k of ["improves", "why"]) {
+      if (typeof item[k] !== "string" || item[k].trim() === "") {
+        errors.push(`"leverage"[${i}] (${id || "no id"}) carries a blank "${k}" -- a leverage mark says what it makes run better and why`);
+      }
+    }
+  });
+  return errors;
+}
+
+// AGT-238 slice 2 (v7.0.667) -- CONCURRENCY FROM THE CORPUS (John 2026-09-27). How many projects
+// execute at once, and in what order, is the manager's decision from `state.concurrency_corpus`
+// (`public.project_concurrency_corpus()`, read verbatim) -- never a fixed rule and never a knob:
+// `projects.status='executing'` IS the count and `projects.priority` IS the order.
+//
+// THE SAME SEVEN REFUSALS `public.record_concurrency()` MAKES, checked here first so a manager gets a
+// legible line instead of a Postgres exception: no cycle id to author the decision; a blank `why`; an
+// empty `execute`; a slug the corpus did not return; a slug that is `proposed` or `planned` (starting
+// one is John's, through `start_proposed_project()` -- AGT-240); a slug in both lists; and an `order`
+// that is not exactly the `execute` set, once each. The function re-checks all seven itself -- this is
+// the early, legible half, never the only one. Absent `concurrency` returns no lines at all.
+export function concurrencyErrors(answer, state) {
+  const c = answer ? answer.concurrency : undefined;
+  if (c === undefined || c === null) return [];
+  if (typeof c !== "object" || Array.isArray(c)) {
+    return [`"concurrency" is ${Array.isArray(c) ? "an array" : typeof c}, not an object {execute, pause, order, why} -- a concurrency decision that cannot be checked against the corpus is refused`];
+  }
+  const errors = [];
+
+  // (1) A decision has exactly one author. `record_concurrency()` refuses a null cycle id, and the
+  //     state carries this run's own `--cycle-id` (never anything the answer says).
+  if (!String(state?.cycle_id ?? "").trim()) {
+    errors.push('"concurrency" was answered but this run carries no cycle id -- record_concurrency() writes a decision and a decision has exactly one author');
+  }
+
+  const listOf = (key, required) => {
+    const raw = c[key];
+    if (raw === undefined || raw === null) {
+      if (required) errors.push(`"concurrency.${key}" is missing -- it is a JSON array of project slugs`);
+      return [];
+    }
+    if (!Array.isArray(raw)) {
+      errors.push(`"concurrency.${key}" is ${typeof raw}, not an array of project slugs`);
+      return [];
+    }
+    return raw.map(v => String(v ?? "").trim());
+  };
+  const exec = listOf("execute", true);
+  const pause = listOf("pause", false);
+  const order = listOf("order", true);
+
+  // (2) a blank `why`: the corpus is the evidence, and the decision says what in it decided.
+  if (typeof c.why !== "string" || c.why.trim() === "") {
+    errors.push('"concurrency.why" is blank -- a concurrency decision says what in the corpus decided it (tickets left, blocked counts, leverage marks, close rate, the walls)');
+  }
+  // (3) an empty `execute`: a board with nothing executing stops the runner.
+  if (Array.isArray(c.execute) && exec.filter(Boolean).length === 0) {
+    errors.push('"concurrency.execute" is empty -- a concurrency decision names the projects that RUN, and a board with nothing executing stops the runner');
+  }
+
+  // (4) and (5): the list is the LISTER'S. Every slug must be one the corpus returned, and a project
+  //     that has never run is not the manager's to start (AGT-240).
+  const rows = Array.isArray(state?.concurrency_corpus) ? state.concurrency_corpus : [];
+  const status = new Map(rows.map(r => [String((r && r.slug) ?? ""), String((r && r.status) ?? "")]));
+  const slugs = rows.map(r => String((r && r.slug) ?? "")).filter(Boolean);
+  for (const slug of [...exec, ...pause]) {
+    if (!status.has(slug)) {
+      errors.push(`"concurrency" names "${slug}", which project_concurrency_corpus() did not return (it returned: ${slugs.join(", ") || "nothing"}) -- concurrency is decided over the board the corpus showed`);
+    } else if (status.get(slug) === "proposed" || status.get(slug) === "planned") {
+      errors.push(`"concurrency" names "${slug}", which is ${status.get(slug)} -- starting a project that has never run is not the manager's call, it is John's words through start_proposed_project() (AGT-240); this decision moves executing <-> paused only`);
+    }
+  }
+
+  // (6) a project runs or it is paused, never both.
+  const both = exec.filter(slug => pause.includes(slug));
+  if (both.length) {
+    errors.push(`"concurrency" names ${[...new Set(both)].join(", ")} in both "execute" and "pause" -- a project runs or it is paused, never both`);
+  }
+
+  // (7) `order` must name exactly the `execute` set, once each: the order IS projects.priority, so an
+  //     order that is not the executing set would leave a priority nobody decided.
+  if (Array.isArray(c.execute) && Array.isArray(c.order)) {
+    const missing = exec.filter(slug => !order.includes(slug));
+    const extra = order.filter(slug => !exec.includes(slug));
+    const dupes = order.filter((slug, i) => order.indexOf(slug) !== i);
+    if (missing.length || extra.length || dupes.length) {
+      errors.push(`"concurrency.order" (${order.join(", ") || "nothing"}) must name exactly the projects in "concurrency.execute" (${exec.join(", ") || "nothing"}), once each -- the order IS projects.priority`
+        + `${missing.length ? `; missing ${missing.join(", ")}` : ""}${extra.length ? `; not in execute: ${extra.join(", ")}` : ""}${dupes.length ? `; named twice: ${[...new Set(dupes)].join(", ")}` : ""}`);
+    }
+  }
+  return errors;
+}
+
+export function answerErrors(answer, state) {
+  const errors = [];
+  if (!answer || typeof answer !== "object" || Array.isArray(answer)) {
+    return ["the manager's answer must be a JSON object"];
+  }
+  if (answer.project && state?.project && String(answer.project) !== String(state.project)) {
+    errors.push(`the answer is about project "${answer.project}" but this run is managing "${state.project}"`);
+  }
+
+  // FEATURE: SES-403 -- `regrades`, OPTIONAL and checked in the same direction as the assignment.
+  //
+  // It is checked HERE, above the action fork, because a re-grade list is not an assignment: it can
+  // ride on a `report` or a `stop` as easily as on an `assign`, and the two early returns below
+  // would skip it on exactly those. Absent is the ordinary case and says nothing.
+  //
+  // THE LIST IS THE LISTER'S, NOT THE MANAGER'S. `state.regradable` is `public.regradable_ships()`
+  // read verbatim; naming anything else is the same class of move as re-ordering the board, and it
+  // is refused here rather than argued with. `public.record_regrade_assignment()` re-reads the
+  // lister and refuses again on its own -- the driver's check is the early, legible half, never the
+  // only one.
+  if (answer.regrades !== undefined && answer.regrades !== null) {
+    if (!Array.isArray(answer.regrades)) {
+      errors.push(`"regrades" is ${typeof answer.regrades}, not an array of backlog ids -- the manager may not re-grade a ship the lister did not return, and a non-list cannot be checked against the lister at all`);
+    } else {
+      const listed = (Array.isArray(state?.regradable) ? state.regradable : [])
+        .map(r => String(r && r.backlog_id));
+      const unknown = answer.regrades.filter(id => !listed.includes(String(id)));
+      if (unknown.length) {
+        errors.push(`"regrades" names ${unknown.map(String).join(", ")}, which regradable_ships() did not return (it returned: ${listed.join(", ") || "nothing"}) -- the manager may not re-grade a ship the lister did not return`);
+      }
+    }
+  }
+
+  // FEATURE: AGT-238 -- `leverage`, OPTIONAL, checked above the action fork for the reason `regrades`
+  // is: it can ride on any of the three actions. Refusal lines only; nothing is written here.
+  errors.push(...leverageErrors(answer, state));
+
+  // FEATURE: AGT-238 slice 2 -- `concurrency`, OPTIONAL, checked here for the reason `leverage` is:
+  // how many projects execute can ride on any of the three actions. Refusal lines only; nothing is
+  // written here.
+  errors.push(...concurrencyErrors(answer, state));
+
+  const action = answer.action;
+  // An action outside the closed set never reaches the assign branch by falling through it.
+  if (!ACTIONS.includes(action)) {
+    return [...errors, `action "${action}" is not one of ${ACTIONS.join(", ")}; an unrecognised action is refused, never treated as an assignment`];
+  }
+  if (action !== "assign") {
+    if (answer.assignment) {
+      errors.push(`action is "${action}" but an assignment object was returned; a ${action} assigns nothing, and an assignment nobody acts on is a trap for the next reader`);
+    }
+    return errors;
+  }
+  const a = answer.assignment;
+  if (!a || typeof a !== "object" || Array.isArray(a)) {
+    return [...errors, 'action is "assign" but no assignment object was returned'];
+  }
+  const pick = state?.pick;
+  if (!pick) {
+    errors.push('action is "assign" but the state carries no pick, so there is nothing the pick path authorises assigning');
+  } else if (String(a.backlog_id || "") !== String(pick.backlog_id)) {
+    // dm-guardrails.must: "use the pick path as computed, never a re-derived order". This is that
+    // clause with teeth. A manager that names any other ticket is a finding on the Skill text --
+    // UNLESS it recorded a pass-over the lister's own two lists support (AGT-183; see passOverErrors,
+    // which returns today's refusal unchanged whenever `passed_over` is absent).
+    const over = passOverErrors(answer, state, a, pick);
+    if (over) errors.push(...over);
+  }
+  // THE ROSTER IS READ LIVE AND THEREFORE CONTAINS THE MANAGER'S OWN CAPABILITY. That is correct --
+  // filtering it out in the read would be this driver editing the roster on the agent's behalf --
+  // but assigning the management step to itself is a loop, not a handoff, so it is refused HERE,
+  // once, at the only point where an answer becomes a row action.
+  if (a.capability_slug === RUN_PROJECT_CAPABILITY) {
+    errors.push(`the assignment names "${RUN_PROJECT_CAPABILITY}", which is the management step itself -- a manager that assigns the project back to itself has made a loop, not a handoff`);
+  }
+  const roster = Array.isArray(state?.roster) ? state.roster : [];
+  const row = roster.find(r => r.capability_slug === a.capability_slug);
+  if (!row) {
+    errors.push(`capability "${a.capability_slug}" is not on the live governance roster (${roster.map(r => r.capability_slug).join(", ") || "empty"})`);
+  } else if (!ENGINES.includes(a.engine)) {
+    errors.push(`engine "${a.engine}" is not one of ${ENGINES.join(", ")}`);
+  } else if (Array.isArray(row.engines) && !row.engines.includes(a.engine)) {
+    errors.push(`engine "${a.engine}" is not available for capability "${a.capability_slug}" (available: ${row.engines.join(", ")})`);
+  }
+  return errors;
+}
+
+// THE CLAIM, AS ONE QUERY STRING. Exported so the guard is checkable rather than invisible inside
+// one fetch: rule B40's expiry filter is IN the PostgREST query, which makes the PATCH a single
+// server-side `UPDATE ... WHERE`, exactly the atomic form § 2c specifies. There is no SELECT
+// anywhere near it -- a check-then-claim pair is what let cycles `e36d4379` and `4da5a7bd` both
+// build `ADM-1` seventeen seconds apart.
+export function claimQueryFor(backlogId, cutoffIso) {
+  const id = encodeURIComponent(String(backlogId));
+  const cutoff = encodeURIComponent(String(cutoffIso));
+  return `backlog_items?backlog_id=eq.${id}&status=neq.done`
+    + `&or=(claimed_by.is.null,claimed_at.lt.${cutoff})`
+    + `&select=backlog_id,claimed_by,claimed_at`;
+}
+
+// WHO THE CLAIM NAMES -- SES-378 slice 2, and header note (4). The claimer is the CYCLE ID, so that
+// the one thing every later reader does with `claimed_by` -- compare it to a cycle -- can succeed.
+// A `run-project:<project>:<step>` label cannot: two cycles running the same project's step 1 write
+// the identical string, which is not a hypothetical (`run-project:moat-support:1` was live on both
+// `SES-378` and `SES-399`, under two different cycles, on 2026-09-16).
+//
+// AN ABSENT CYCLE ID IS AN ERROR, NOT A FALLBACK. The tempting shape here is "no --cycle-id, so use
+// the old label" -- which is precisely the state that breaks register B42's re-assertion, and it
+// would break it silently, on the path nobody watches. A claim nobody can re-assert is worse than
+// no claim: the ticket looks taken to every peer while its own holder is gated out of pushing.
+export function claimerFor({ cycleId }) {
+  const id = String(cycleId ?? "").trim();
+  if (!id) return { error: "--cycle-id is required to claim: B42 re-asserts claimed_by = '<your cycle id>' before every irreversible act; a claim nobody can re-assert is worse than none" };
+  return { claimer: id };
+}
+
+// WHAT THE ATOMIC CLAIM'S ROW COUNT MEANS -- rule B40's two-line rule, as a function rather than as
+// an `if` buried in the write path. "1 row → it's yours; 0 rows → someone holds it" is the sentence
+// every session in this repo is supposed to obey, and a sentence nothing can drive is a sentence
+// that gets re-implemented slightly differently the sixth time. Exported so the regression suite
+// fires BOTH branches without a regression run ever claiming a real board ticket -- which is the
+// one thing the live arms of that suite must never do.
+export function claimOutcome(rows) {
+  const n = Array.isArray(rows) ? rows.length : 0;
+  if (n === 1) return { ok: true, holder: rows[0]?.claimed_by ?? null, reason: null };
+  if (n === 0) {
+    return { ok: false, holder: null,
+      reason: "0 rows from the atomic claim: a live peer holds this ticket (or it is done). " +
+        'dm-guardrails.must_not: "assign a ticket already claimed by a live peer".' };
+  }
+  // Not reachable through `backlog_id=eq.`, which is unique -- and that is exactly why it is
+  // checked. A claim that matched more than one row means the query lost its identity filter, and
+  // silently taking the first row would turn a broken filter into a successful-looking claim.
+  return { ok: false, holder: null,
+    reason: `${n} rows from a claim that filters on a unique backlog_id -- the identity filter is gone; refusing rather than picking one` };
+}
+
+// WHAT THE NEXT ROLE IS HANDED. The manager may supply its own `task_context` on the assignment;
+// where it does not, the handoff is built from rows this driver already read -- never from anything
+// this file invented about the ticket. `handed_over_by` names the CAPABILITY, not an agent: Rule #1
+// is about an agent's data naming another agent, and a handoff row that carried a name would be
+// exactly that, one hop later.
+export function handoffContextFor({ answer, state }) {
+  const a = (answer && answer.assignment) || {};
+  const supplied = a.task_context;
+  if (supplied && typeof supplied === "object" && !Array.isArray(supplied)) return supplied;
+  return {
+    project: state.project,
+    backlog_id: a.backlog_id,
+    ticket: state.pick_row || null,
+    reason: a.reason || null,
+    step: state.step,
+    cycle_id: state.cycle_id || null,
+    handed_over_by: RUN_PROJECT_CAPABILITY,
+  };
+}
+
+// AGT-232 (v7.0.669) -- A DECLINED HEAD IS RECORDED, SO THE TURN BUYS A ROW. All three shapes a
+// correct read of an unbuildable head can take -- `stop`, `report`, and an `assign` that names some
+// other row and is refused at (c) -- wrote NOTHING at all before this ticket: the cycle paid for a
+// model call and the board kept no trace, so the next cycle re-picked the same head and re-declined
+// it. The ledger is the EXISTING `public.record_skip()` (one overload, ACL `service_role`, measured
+// live this ship): it writes its own `runner_before_images` row first (§19v) and then inserts or
+// increments `runner_skips.skip_count`, which `scripts/build-briefing.mjs` already reads unfiltered
+// into John's briefing §10. No new table, function, column or view -- pattern:17.
+//
+// THE ID IS THE DRIVER'S, NEVER THE MANAGER'S. `p_backlog_id` is `state.pick.backlog_id` -- the pick
+// this driver read for itself at (b) -- and never `answer.assignment.backlog_id`. That is the whole
+// reason this write cannot become a re-ordering device wearing a ledger's clothes: a manager that
+// names another row still has the skip recorded against THE HEAD, so naming a row moves nothing at
+// all. The id it wanted is appended to the reason as prose, where it is evidence and not an
+// instruction (Rule #1, §19d/§19e).
+//
+// `reason_kind` IS FIXED AT `'other'`. `ck_skip_reason_kind` admits it, and `'other'` defaults
+// `unblock_kind` to `'question'`: the five named kinds are the board's own structural reasons, and a
+// head unbuildable for a reason `project_blockers` does not carry is exactly what this records.
+//
+// IT FAILS CLOSED. No pick, `--dry-run`, or no `--cycle-id` returns no skip and a note saying which,
+// and the caller prints that note and leaves its exit code and every existing line alone. A decline
+// is still a decline when it cannot be recorded -- the recording never becomes a second way to
+// refuse, and never a wall that swallows the manager's answer.
+//
+// `declined` SAYS WHETHER THE ANSWER DECLINED THE PICK AT ALL, which `skip: null` cannot: the (c)
+// return is also reached by an ON-pick assignment that is merely malformed (a bad engine, a
+// capability off the roster), and that is not a decline of the head. Without this field the caller
+// would have to re-derive the decline test it just called -- two copies of one rule, §45's defect.
+export function declineSkipFor({ answer, state, cycleId, dryRun } = {}) {
+  const a = answer && typeof answer === "object" && !Array.isArray(answer) ? answer : {};
+  const pickId = String(state?.pick?.backlog_id ?? "").trim();
+  const wanted = String((a.assignment && a.assignment.backlog_id) ?? "").trim();
+
+  let shape = null;
+  if (a.action === "stop" || a.action === "report") {
+    shape = a.action;
+  } else if (a.action === "assign" && pickId && wanted && wanted !== pickId && answerErrors(a, state).length) {
+    // The off-pick `assign` refused at (c): a correct read that the head is unbuildable, said in the
+    // only other vocabulary the contract gives the manager. An ON-pick assign that merely fails a
+    // check is NOT this -- it tried to build the head, so the head was not declined.
+    shape = "off-pick assign";
+  }
+  if (!shape) {
+    return { declined: false, skip: null,
+      note: `the answer does not decline the pick (action "${a.action}"), so there is nothing to record` };
+  }
+  if (!pickId) {
+    return { declined: true, skip: null,
+      note: "the state carries no pick, so there is no head a skip could be recorded against" };
+  }
+  if (dryRun) {
+    return { declined: true, skip: null, note: "this is a --dry-run pass" };
+  }
+  if (!String(cycleId ?? "").trim()) {
+    return { declined: true, skip: null,
+      note: "--cycle-id was not given, and record_skip() writes a decision that has exactly one author" };
+  }
+  let reason = String(a.report ?? "").trim();
+  if (!reason) reason = `the manager answered ${shape} and left the report blank`;
+  if (shape === "off-pick assign") reason = `${reason} -- the answer named ${wanted}, not the pick ${pickId}`;
+  return {
+    declined: true,
+    note: null,
+    skip: {
+      p_cycle_id: String(cycleId).trim(),
+      p_backlog_id: pickId,
+      p_reason_kind: "other",
+      p_reason: reason,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Network. Everything below this line touches the database.
+// ---------------------------------------------------------------------------------------------
+
+function headersFor(key) {
+  return { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` };
+}
+
+async function rest(base, key, pathAndQuery, init = {}) {
+  try {
+    const r = await fetch(`${base}/rest/v1/${pathAndQuery}`, {
+      ...init,
+      headers: { ...headersFor(key), ...(init.headers || {}) },
+    });
+    const text = await r.text();
+    if (!r.ok) return { error: `${init.method || "GET"} ${pathAndQuery} -> ${r.status} ${text.slice(0, 300)}` };
+    return { rows: text ? JSON.parse(text) : [] };
+  } catch (e) {
+    return { error: `${init.method || "GET"} ${pathAndQuery} -> ${e.message}` };
+  }
+}
+
+// Every instrument is called as an RPC POST, including the STABLE ones a GET would also serve. One
+// call shape for all of them means a function that later becomes VOLATILE does not silently start
+// 404ing on a GET this file forgot to convert.
+async function rpc(base, key, name, body = {}) {
+  const r = await rest(base, key, `rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
+  if (r.error) return { error: r.error };
+  const rows = Array.isArray(r.rows) ? r.rows : [r.rows];
+  return { row: rows[0] ?? null, rows };
+}
+
+// AGT-232: THE ONE `record_skip()` CALL SITE, reached from the (c) refusal return and from the (d)
+// `stop`/`report` returns. What it hands back is the `levExtra`/`levLine` shape those returns already
+// carry, for the reason that shape exists: the decline's exit code and every line it printed before
+// this ticket stay byte-identical, and the record arrives as ONE added line and ONE added payload key.
+// A refused RPC is reported on that line and changes NOTHING else -- an unrecordable decline is still
+// the decline the manager made, and a ledger that could swallow an answer would be a wall.
+async function recordDeclineSkip({ base, key, args, answer, state }) {
+  const dec = declineSkipFor({ answer, state, cycleId: args.cycleId, dryRun: args.dryRun });
+  if (!dec.declined) return { extra: {}, line: "" };
+  if (!dec.skip) {
+    console.error(`run-project: the answer declines the pick, but NO skip was recorded -- ${dec.note}.`);
+    return { extra: { skip_recorded: null }, line: `\n  skip: NOT RECORDED -- ${dec.note}` };
+  }
+  const rec = await rpc(base, key, "record_skip", dec.skip);
+  if (rec.error) {
+    console.error(`run-project: record_skip() refused the decline on ${dec.skip.p_backlog_id}: ${rec.error}`);
+    return { extra: { skip_recorded: null }, line: `\n  skip: NOT RECORDED -- record_skip() refused it: ${rec.error}` };
+  }
+  return {
+    extra: { skip_recorded: rec.row ?? null },
+    line: `\n  skip: recorded on ${dec.skip.p_backlog_id} (reason_kind other) as ${rec.row ?? "no id returned"}`
+      + ` -- the ledger row is the only write; the board was not moved`,
+  };
+}
+
+// The Intent's stored contract, read off the row rather than written here. Handed to the sub-agent
+// inside `task_context` (so it reaches the prompt through the executor's own TASK DETAILS renderer,
+// not by this file appending to an assembled prompt) and used to validate the answer in pass two.
+async function intentContract(base, key) {
+  const cap = await rest(base, key, `capabilities?slug=eq.${RUN_PROJECT_CAPABILITY}&select=slug,default_intent_slug&limit=1`);
+  if (cap.error) return { error: `could not read the ${RUN_PROJECT_CAPABILITY} capability row: ${cap.error}` };
+  const capRow = cap.rows[0];
+  if (!capRow) return { error: `no capabilities row for "${RUN_PROJECT_CAPABILITY}" -- apply the AGT-68 section of docs/design/ga-agents-seed.sql` };
+  const intentSlug = capRow.default_intent_slug || null;
+  // See header note (2). A null here is not a default to route around; it is the output contract
+  // and the decision procedure silently missing from the prompt.
+  if (!intentSlug) return { error: `capability "${RUN_PROJECT_CAPABILITY}" declares no default_intent_slug, so the manager's contract cannot be loaded and its prompt would carry no Intent at all` };
+  const sp = await rest(base, key, `skill_profiles?slug=eq.${encodeURIComponent(intentSlug)}&select=slug,traits&limit=1`);
+  if (sp.error) return { error: `could not read the Intent Skill "${intentSlug}": ${sp.error}` };
+  const row = sp.rows[0];
+  if (!row) return { error: `no skill_profiles row for the Intent "${intentSlug}"` };
+  const schema = row.traits && row.traits.schema;
+  if (!schema) return { error: `the Intent "${intentSlug}" carries no traits.schema, so the manager's answer could not be validated` };
+  return { intentSlug, schema };
+}
+
+// THE ROSTER, READ LIVE (Rule #1). `dm-knowledge-platform` ends "WHO DOES WHAT is read off
+// agent_capability_assignments and capabilities live, never held here" -- so this is the read that
+// sentence points at, and the reason no agent id appears in any Skill row.
+async function governanceRoster(base, key, tenant) {
+  const agents = await rest(base, key, "agents?lane=eq.governance&is_active=eq.true&select=id,code,name,role,specialty&order=code");
+  if (agents.error) return { error: `roster: ${agents.error}` };
+  const assigns = await rest(base, key, `agent_capability_assignments?tenant_id=eq.${encodeURIComponent(tenant)}&select=agent_id,capability_slug`);
+  if (assigns.error) return { error: `roster: ${assigns.error}` };
+  const caps = await rest(base, key, `capabilities?tenant_id=eq.${encodeURIComponent(tenant)}&select=slug,name,description,execution_type,default_intent_slug`);
+  if (caps.error) return { error: `roster: ${caps.error}` };
+  const byId = new Map(agents.rows.map(a => [a.id, a]));
+  const bySlug = new Map(caps.rows.map(c => [c.slug, c]));
+  const roster = [];
+  for (const a of assigns.rows) {
+    const agent = byId.get(a.agent_id);
+    const cap = bySlug.get(a.capability_slug);
+    if (!agent || !cap) continue;
+    roster.push({
+      agent_id: agent.id, code: agent.code, name: agent.name, role: agent.role,
+      capability_slug: cap.slug, capability_name: cap.name, capability_description: cap.description,
+      execution_type: cap.execution_type, default_intent_slug: cap.default_intent_slug,
+      // A FACT, NOT A JUDGMENT. An `ai` capability is a set of Skill rows, and those rows can be
+      // assembled for a session sub-agent (subscription tokens) or POSTed to the capability
+      // executor (API dollars) -- both are mechanically available. Which one FITS is the manager's
+      // call, and this file states the menu rather than making it.
+      engines: cap.execution_type === "ai" ? [...ENGINES] : ["executor"],
+    });
+  }
+  roster.sort((x, y) => (x.code || "").localeCompare(y.code || "") || x.capability_slug.localeCompare(y.capability_slug));
+  return { roster };
+}
+
+// One assembly, through the executor's own code, with the intent slug always explicit.
+//
+// AND THE MODEL IT NAMES IS THE ONE THE CALL WILL RUN ON (SES-378 slice 2). `assembly.llm.model` is
+// the Skill rows' STORED answer -- all six governance agents store `claude-fable-5-1` -- and the
+// session that runs this handoff learns its model from the line this function prints. Measured on
+// one live `run-project` call this cycle: this file printed `claude-fable-5-1` while
+// `scripts/agent-prompt.js`, asked the same minute, printed `claude-opus-5` (`# lane: judgment
+// degraded ... (fable_rest)`). Step 5(e) then copies THIS number into `agent-log --model=`, so the
+// stored answer was reaching the activity log as the model of a call that ran on another one.
+//
+// THE LANE READ IS THE SHIPPED ONE (SES-45). `resolveJudgmentModel` is imported from
+// `./agent-prompt.js`, never re-implemented here: a second copy of the degrade rule is the exact
+// drift the Governance Agents project exists to end, and it would drift in the direction of
+// disagreeing about which model a logged call used. It is fenced to the judgment lane by equality
+// inside that function, so a handoff on any other model is left alone.
+//
+// IT FAILS SOFT, AND THAT IS DELIBERATE. `resolveJudgmentModel` returns the assembly's own model
+// with a `warning` when the meter is unreachable. A failed lane read must never block a handoff:
+// the stored model is still a correct model to run on, just possibly an expensive one, and turning
+// a meter outage into a governance outage is the larger defect. The warning is printed, not
+// swallowed.
+async function assembleFor({ agentId, capabilitySlug, intentSlug, taskContext, tenant, base, key }) {
+  const { assemblePrompt } = await import("../api/prompt/db-assembly.js");
+  const { renderAssembly, resolveJudgmentModel } = await import("./agent-prompt.js");
+  const assembly = await assemblePrompt({
+    capability_slug: capabilitySlug,
+    agent_id: agentId,
+    tenant_id: tenant,
+    task_context: taskContext,
+    intent_slug: intentSlug,
+  });
+  const rendered = renderAssembly(assembly);
+  if (!rendered.system_prompt) {
+    throw new Error(`"${capabilitySlug}" assembled zero renderable sections for agent "${agentId}"`);
+  }
+  if (rendered.omitted?.length) {
+    console.error(`run-project: prompt sections omitted (no stored content -- fetched per call by the executor): ${rendered.omitted.join(", ")}`);
+  }
+  const lane = await resolveJudgmentModel(assembly, { supabaseUrl: base, headers: headersFor(key) });
+  if (lane.warning) console.error(`run-project: ${lane.warning}`);
+  const model = lane.model ?? assembly.llm?.model ?? null;
+  const header = `# ${assembly.agent_card?.name ?? agentId} — ${assembly.agent_card?.role ?? ""} · capability ${assembly.capability_slug} · intent ${intentSlug} · model ${model}`;
+  // Only when it actually moved -- the shape scripts/agent-prompt.js L282 prints. A note on every
+  // run is a note nobody reads.
+  const laneLine = lane.from ? `\n# lane: judgment degraded to ${lane.model} (${lane.reason})` : "";
+  return { text: `${header}${laneLine}\n${rendered.system_prompt}`, model };
+}
+
+// The prompt goes to a FILE always and to stdout only when stdout is not carrying the machine
+// payload -- AGT-67's own attended QA finding 3: a large prompt printed ahead of the `--json` line
+// makes that line unparseable, breaking the contract for the one caller that needed it.
+function emitPrompt(promptText, promptPath, json) {
+  try { fs.writeFileSync(promptPath, promptText, "utf8"); }
+  catch (e) { console.error(`run-project: could not write the prompt to ${promptPath}: ${e.message}`); }
+  if (!json) console.log(promptText);
+}
+
+function emit({ code, payload, prose, json }) {
+  if (json) process.stdout.write(JSON.stringify(payload) + "\n");
+  else console.log(prose);
+  process.exit(code);
+}
+
+// Read every instrument once. A single error anywhere is fatal for pass one -- a management step
+// taken against a board this file could only partly see is exactly the "assumption" dm-behavior
+// forbids ("a missing row is a stop, not an assumption").
+async function readInstruments({ base, key, project, cycleId, trigger, tenant }) {
+  const projectRow = await rest(base, key, `projects?slug=eq.${encodeURIComponent(project)}&select=slug,name,status,priority,charter_link,notes&limit=1`);
+  if (projectRow.error) return { error: projectRow.error };
+  if (!projectRow.rows[0]) return { error: `no projects row for slug "${project}"` };
+
+  const progress = await rest(base, key, `project_progress?slug=eq.${encodeURIComponent(project)}&select=*&limit=1`);
+  if (progress.error) return { error: progress.error };
+  const blockers = await rest(base, key, `project_blockers?project=eq.${encodeURIComponent(project)}&select=*`);
+  if (blockers.error) return { error: blockers.error };
+
+  const boot = await rpc(base, key, "runner_should_boot");
+  if (boot.error) return { error: boot.error };
+  const queue = await rpc(base, key, "prime_directive_queue");
+  if (queue.error) return { error: queue.error };
+
+  // FEATURE: SES-403 -- the ships blocked for a cause OUTSIDE themselves, read as an instrument
+  // beside the queue rather than derived here. `public.regradable_ships()` is the one home for that
+  // rule (a delivered ticket whose block's red gates all map to CI jobs that are `success` in the
+  // newest ref='dev' conclusion, concluded after the verdict, with no unreversed ship decision);
+  // this driver reads it and never re-derives it, the same way it reads the pick verbatim.
+  // A FAILED READ IS FATAL FOR PASS ONE, exactly like every other instrument above: a manager shown
+  // an empty re-grade list because the read failed would conclude there is nothing stuck, which is
+  // the assumption dm-behavior forbids ("a missing row is a stop, not an assumption").
+  const regradable = await rpc(base, key, "regradable_ships");
+  if (regradable.error) return { error: regradable.error };
+
+  // FEATURE: AGT-238 slice 2 -- THE CONCURRENCY CORPUS, read as an instrument beside the queue. How
+  // many projects execute at once and in what order is the manager's decision, and this is the
+  // evidence it decides FROM: one row per project (an epic-less project shows epics=0 rather than
+  // vanishing), tickets left, blocked counts, leverage marks and the close rate. The driver never
+  // re-derives it and never ranks it -- `projects.status` IS the count and `projects.priority` IS the
+  // order, and the ORDER BY is the function's own.
+  // A FAILED READ IS FATAL, exactly like every instrument above: a manager shown an empty corpus
+  // would conclude the board is empty, which is the assumption dm-behavior forbids.
+  const corpus = await rpc(base, key, "project_concurrency_corpus");
+  if (corpus.error) return { error: corpus.error };
+
+  // Both of these need a cycle id. Absent one they are recorded as unread -- which `wallReading`
+  // treats as a wall standing, so nobody gets a green board by omitting a flag.
+  const dayCap = cycleId
+    ? (await rpc(base, key, "resolve_day_token_cap", { p_cycle_id: cycleId }))
+    : { error: "not read: --cycle-id was not given, and the day cap is resolved per cycle" };
+  const sched = cycleId
+    ? (await rpc(base, key, "scheduler_gate", { p_cycle_id: cycleId, p_trigger: trigger, p_started: new Date().toISOString() }))
+    : { error: "not read: --cycle-id was not given, and the settings gate is evaluated per cycle" };
+
+  const roster = await governanceRoster(base, key, tenant);
+  if (roster.error) return { error: roster.error };
+
+  // VERBATIM. See header note (3): this is the object the function returned, not a reconstruction.
+  const pick = (boot.row && boot.row.detail && boot.row.detail.pick) || null;
+  let pickRow = null;
+  if (pick && pick.backlog_id) {
+    const b = await rest(base, key,
+      `backlog_items?backlog_id=eq.${encodeURIComponent(pick.backlog_id)}`
+      + "&select=backlog_id,title,status,type,priority_class,supports_class,queue,automation_rank,design_status,kickoff_link,predicted_cycles,milestone,claimed_by,claimed_at,epics(name,projects(slug,name,status))&limit=1");
+    if (b.error) return { error: b.error };
+    pickRow = b.rows[0] || null;
+  }
+  const pickProject = pickRow?.epics?.projects?.slug ?? null;
+
+  return {
+    projectRow: projectRow.rows[0],
+    progress: progress.rows[0] || null,
+    blockers: blockers.rows,
+    shouldBoot: boot.error ? { error: boot.error } : boot.row,
+    dayTokenCap: dayCap.error ? { error: dayCap.error } : dayCap.row,
+    schedulerGate: sched.error ? { error: sched.error } : sched.row,
+    queue: queue.rows,
+    regradable: regradable.rows,   // SES-403
+    concurrencyCorpus: corpus.rows,   // AGT-238 slice 2
+    roster: roster.roster,
+    pick,
+    pickRow,
+    pickProject,
+  };
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.error) fail(args.error);
+
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  // Unlike scripts/verifier.js, --dry-run does NOT relax this: every instrument here is a database
+  // read, so there is no credential-free way to reach a state at all. See the header.
+  const missing = [!base && "SUPABASE_URL", !key && "SUPABASE_SERVICE_KEY"].filter(Boolean);
+  if (missing.length) fail(`missing ${missing.join(", ")}. Every instrument is a database read, so --dry-run does not relax this -- it means "no write", not "no credentials".`);
+
+  const statePath = args.stateFile || statePathFor(args.scratch, args.project, args.step);
+  if (!statePath) fail(`--project="${args.project}" reduces to an empty file name`);
+  const promptPath = statePath.replace(/\.json$/, "") + ".prompt.txt";
+
+  const contract = await intentContract(base, key);
+  if (contract.error) fail(contract.error);
+
+  // ---- PASS TWO: the manager has answered. Validate, reconcile, then at most ONE row action. ----
+  if (args.answer) {
+    let state, answer;
+    try { state = JSON.parse(fs.readFileSync(statePath, "utf8")); }
+    catch (e) {
+      fail(`could not read the state at ${statePath} (${e.message}). Run pass one first, or pass --state-file.`);
+    }
+    try { answer = JSON.parse(fs.readFileSync(args.answer, "utf8")); }
+    catch (e) {
+      fail(`could not read the manager's answer at ${args.answer} (${e.message}). An unreadable answer is the ABSENCE of a decision, never an instruction to proceed.`);
+    }
+
+    // (a) The Intent's own stored contract, through the shipped validator.
+    const valid = validateAgentVerdict(contract.schema, answer);
+    if (!valid.ok) {
+      return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", schema_errors: valid.errors },
+        prose: `run-project: the manager's answer does not satisfy Intent "${contract.intentSlug}"'s schema:\n  - ${valid.errors.join("\n  - ")}\nExiting ${EXIT_CANNOT_RUN} and touching NOTHING -- an answer that fails its own contract is not a decision about the project.` });
+    }
+
+    // (b) The pick, re-read LIVE, and the state compared against it. Header note (3).
+    const liveBoot = await rpc(base, key, "runner_should_boot");
+    if (liveBoot.error) {
+      return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: liveBoot.error },
+        prose: `run-project: could not re-read the pick path (${liveBoot.error}). Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+    }
+    const livePick = (liveBoot.row && liveBoot.row.detail && liveBoot.row.detail.pick) || null;
+    // AGT-183: the stored pick's OWN board row, read LIVE, so `stateDrift` can tell this cycle's own
+    // claim from a board somebody else moved. The id it is read by comes from the state file, which is
+    // exactly what the state file is allowed to be -- a pointer to a row this driver then reads for
+    // itself. The ROW is never taken from the file, and neither is the answer: an unreadable row, a
+    // missing row, or more than one row all arrive at `stateDrift` as `null` and refuse exactly as
+    // today. `cycleId` is this process's own `--cycle-id`, never anything the file carries.
+    let ownClaim = null;
+    const storedPickId = state && state.pick && state.pick.backlog_id;
+    if (storedPickId) {
+      const own = await rest(base, key,
+        `backlog_items?backlog_id=eq.${encodeURIComponent(storedPickId)}`
+        + "&select=backlog_id,status,claimed_by,claimed_at");
+      if (!own.error && Array.isArray(own.rows) && own.rows.length === 1) {
+        ownClaim = { ...own.rows[0], cycleId: args.cycleId };
+      }
+    }
+    const drift = stateDrift(state, livePick, ownClaim);
+    // WHICH PICK THIS PASS IS ACTING ON, derived from the shipped function's own verdict rather than
+    // from a second copy of its rule: the ids disagree and `stateDrift` still returned nothing, which
+    // is only possible when the suppression above fired. Everything downstream already acts on the
+    // STORED pick (`answerErrors` checks the answer against `state.pick`, and the claim targets the
+    // assignment's id) -- what was missing was saying so.
+    const pickSource = (!drift.length && storedPickId && String(storedPickId) !== String(livePick?.backlog_id ?? ""))
+      ? "own-claim"
+      : "live";
+    if (pickSource === "own-claim") {
+      console.error(`run-project: the pick path no longer names ${storedPickId} because THIS cycle (${args.cycleId}) holds its claim`
+        + ` -- claimed_at ${ownClaim.claimed_at}, inside the ${CLAIM_TTL_HOURS}h window. Acting on the stored pick (pick_source=own-claim).`);
+    }
+    if (drift.length) {
+      return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", drift },
+        prose: `run-project: the state at ${statePath} no longer agrees with the pick path:\n  - ${drift.join("\n  - ")}\nExiting ${EXIT_CANNOT_RUN} and touching NOTHING -- the pick is read live, and a state file is evidence, never an instruction.` });
+    }
+
+    // (c) The answer against the state it was given.
+    const errors = answerErrors(answer, state);
+    if (errors.length) {
+      // AGT-232: the skip PRECEDES the refusal return, so a correct read that the head is unbuildable
+      // -- said as an `assign` naming another row -- buys a `runner_skips` row instead of nothing.
+      // `answer_errors` is untouched, which is what keeps the `may not re-order the board` line
+      // byte-identical for `ses-378` and `agt-68`.
+      const dec = await recordDeclineSkip({ base, key, args, answer, state });
+      return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", answer_errors: errors, ...dec.extra },
+        prose: `run-project: the manager's answer was refused:\n  - ${errors.join("\n  - ")}\nExiting ${EXIT_CANNOT_RUN} -- nothing was written.${dec.line}` });
+    }
+
+    // (c2) AGT-238: a non-empty `leverage` is recorded through `public.record_leverage()` -- one
+    //      decision, one before-image per row -- BEFORE the stop/report/assign fork, because it rides
+    //      on any action. Absent `leverage`, nothing here runs and every payload and line below is
+    //      byte-identical to before. `--dry-run` writes nothing, and says so.
+    const lev = Array.isArray(answer.leverage) && answer.leverage.length ? answer.leverage : null;
+    let levExtra = {};
+    let levLine = "";
+    if (lev) {
+      if (args.dryRun) {
+        console.error(`run-project: --dry-run, so the leverage mark on ${lev.map(l => l.backlog_id).join(", ")} was NOT recorded.`);
+        levExtra = { leverage_decision: null };
+        levLine = `\n  leverage: NOT RECORDED (--dry-run) -- ${lev.map(l => l.backlog_id).join(", ")}`;
+      } else {
+        if (!String(args.cycleId ?? "").trim()) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: "--cycle-id is required to record leverage" },
+            prose: `run-project: the answer marks leverage, but --cycle-id was not given -- record_leverage() writes a decision and a decision has exactly one author. Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+        }
+        const rec = await rpc(base, key, "record_leverage", {
+          p_cycle_id: args.cycleId,
+          p_items: lev.map(l => ({ backlog_id: String(l.backlog_id).trim(), improves: String(l.improves).trim(), why: String(l.why).trim() })),
+        });
+        if (rec.error) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", error: rec.error },
+            prose: `run-project: record_leverage() refused the leverage mark: ${rec.error}. Exiting ${EXIT_CANNOT_RUN} -- the function writes all or nothing.` });
+        }
+        levExtra = { leverage_decision: rec.row ?? null };
+        levLine = `\n  leverage: recorded as decision ${rec.row} -- ${lev.map(l => l.backlog_id).join(", ")} now outrank project order`;
+      }
+    }
+
+    // (c3) AGT-238 slice 2: a non-empty `concurrency` is recorded through `public.record_concurrency()`
+    //      -- one decision, one before-image per CHANGED row -- AFTER the leverage block and BEFORE the
+    //      stop/report/assign fork, because it rides on any action. Absent `concurrency`, nothing here
+    //      runs and every payload and line below is byte-identical to before. `--dry-run` writes
+    //      nothing, and says so.
+    const conc = answer.concurrency && typeof answer.concurrency === "object" && !Array.isArray(answer.concurrency)
+      && Array.isArray(answer.concurrency.execute) && answer.concurrency.execute.length
+      ? answer.concurrency
+      : null;
+    let concExtra = {};
+    let concLine = "";
+    if (conc) {
+      const shape = {
+        execute: conc.execute.map(sl => String(sl).trim()),
+        pause: Array.isArray(conc.pause) ? conc.pause.map(sl => String(sl).trim()) : [],
+        order: Array.isArray(conc.order) ? conc.order.map(sl => String(sl).trim()) : [],
+        why: String(conc.why ?? "").trim(),
+      };
+      const said = `${shape.execute.length} executing (${shape.order.join(", ")})${shape.pause.length ? `, pausing ${shape.pause.join(", ")}` : ""}`;
+      if (args.dryRun) {
+        console.error(`run-project: --dry-run, so the concurrency decision (${said}) was NOT recorded.`);
+        concExtra = { concurrency_decision: null };
+        concLine = `\n  concurrency: NOT RECORDED (--dry-run) -- ${said}`;
+      } else {
+        if (!String(args.cycleId ?? "").trim()) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: "--cycle-id is required to record concurrency" },
+            prose: `run-project: the answer decides concurrency, but --cycle-id was not given -- record_concurrency() writes a decision and a decision has exactly one author. Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+        }
+        const recC = await rpc(base, key, "record_concurrency", { p_cycle_id: args.cycleId, p_plan: shape });
+        if (recC.error) {
+          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", error: recC.error },
+            prose: `run-project: record_concurrency() refused the concurrency decision: ${recC.error}. Exiting ${EXIT_CANNOT_RUN} -- the function writes all or nothing.` });
+        }
+        concExtra = { concurrency_decision: recC.row ?? null };
+        concLine = `\n  concurrency: recorded as decision ${recC.row} -- ${said}`;
+      }
+    }
+
+    // (d) A `stop` is an answer, not a failure. Exit 1, write nothing TO THE BOARD -- since AGT-232
+    //     the decline itself is recorded as a `runner_skips` row on the pick (`recordDeclineSkip`,
+    //     one call site, the driver's own id), so the turn buys a row rather than nothing. The exit
+    //     code and every line below are byte-identical; the payload gains `skip_recorded` and the
+    //     prose gains one line, the same way `leverage` and `concurrency` do above.
+    if (answer.action === "stop") {
+      const dec = await recordDeclineSkip({ base, key, args, answer, state });
+      return emit({ code: EXIT_STOP, json: args.json,
+        payload: { ok: true, exitCode: EXIT_STOP, kind: "stop", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra, ...dec.extra },
+        prose: `run-project: STOP.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}${dec.line}` });
+    }
+    if (answer.action === "report") {
+      const dec = await recordDeclineSkip({ base, key, args, answer, state });
+      return emit({ code: EXIT_OK, json: args.json,
+        payload: { ok: true, exitCode: EXIT_OK, kind: "report", recorded: false, report: answer.report ?? null, needs_john: answer.needs_john ?? [], ...levExtra, ...concExtra, ...dec.extra },
+        prose: `run-project: REPORT.\n${answer.report ?? ""}\n${(answer.needs_john || []).map(n => `  needs John: ${n}`).join("\n")}\nNothing was written.${levLine}${concLine}${dec.line}` });
+    }
+
+    // (e) `assign`. The walls are re-read HERE, after the answer, because the answer is not what
+    //     authorises the claim -- the board is. A manager that said `assign` while a wall stands is
+    //     refused rather than obeyed (header note 5).
+    const liveDayCap = args.cycleId
+      ? (await rpc(base, key, "resolve_day_token_cap", { p_cycle_id: args.cycleId }))
+      : { error: "not read: --cycle-id was not given" };
+    const liveSched = args.cycleId
+      ? (await rpc(base, key, "scheduler_gate", { p_cycle_id: args.cycleId, p_trigger: args.trigger, p_started: new Date().toISOString() }))
+      : { error: "not read: --cycle-id was not given" };
+    const walls = wallReading({
+      shouldBoot: liveBoot.row,
+      dayTokenCap: liveDayCap.error ? { error: liveDayCap.error } : liveDayCap.row,
+      schedulerGate: liveSched.error ? { error: liveSched.error } : liveSched.row,
+    });
+    if (walls.blocked) {
+      return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", walls },
+        prose: `run-project: the answer says assign, but a wall stands:\n  - ${walls.standing.join("\n  - ")}\nExiting ${EXIT_CANNOT_RUN} -- no claim, nothing written.` });
+    }
+
+    const target = answer.assignment.backlog_id;
+    let claim = { skipped: true, rows: [] };
+    if (args.dryRun) {
+      console.error(`run-project: --dry-run, so the claim on ${target} was NOT made.`);
+    } else {
+      const cutoff = new Date(Date.now() - CLAIM_TTL_HOURS * 3600 * 1000).toISOString();
+      // Header note (4): the cycle id or nothing. Refused BEFORE the PATCH, so a run without
+      // `--cycle-id` writes no row rather than one no reader can attribute.
+      const named = claimerFor({ cycleId: args.cycleId });
+      if (named.error) {
+        return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+          payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: named.error },
+          prose: `run-project: ${named.error}. Exiting ${EXIT_CANNOT_RUN} -- nothing was written.` });
+      }
+      const claimer = named.claimer;
+      const r = await rest(base, key, claimQueryFor(target, cutoff), {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        // claimed_by / claimed_at and NOTHING else: SES-316. A claim is coordination, not a
+        // judgment write, and stamping `updated_at` here makes the decision this session just
+        // recorded un-restorable one statement later.
+        body: JSON.stringify({ claimed_by: claimer, claimed_at: new Date().toISOString() }),
+      });
+      if (r.error) {
+        return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+          payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: r.error },
+          prose: `run-project: the claim on ${target} failed: ${r.error}. Exiting ${EXIT_CANNOT_RUN}.` });
+      }
+      claim = { skipped: false, rows: r.rows };
+      // Rule B40's own sentence, through the one function that states it (see claimOutcome).
+      const outcome = claimOutcome(r.rows);
+      if (!outcome.ok) {
+        return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+          payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", error: `claim lost on ${target}`, claim_rows: r.rows.length },
+          prose: `run-project: could not claim ${target}. ${outcome.reason} Exiting ${EXIT_CANNOT_RUN} -- nothing else was written.` });
+      }
+    }
+
+    // (f) The handoff: the assigned capability's prompt, assembled the same one way, with its own
+    //     intent slug read off its own capability row (header note 2 again, one hop later).
+    const rosterRow = state.roster.find(r => r.capability_slug === answer.assignment.capability_slug);
+    let next;
+    try {
+      next = await assembleFor({
+        agentId: rosterRow.agent_id,
+        capabilitySlug: rosterRow.capability_slug,
+        intentSlug: rosterRow.default_intent_slug,
+        taskContext: handoffContextFor({ answer, state }),
+        tenant: args.tenant,
+        base, key,
+      });
+    } catch (e) {
+      return emit({ code: EXIT_CANNOT_RUN, json: args.json,
+        payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: e.message, claim },
+        prose: `run-project: claimed ${target}, but could not assemble the "${rosterRow.capability_slug}" prompt: ${e.message}. Exiting ${EXIT_CANNOT_RUN}.` });
+    }
+    const nextPromptPath = statePath.replace(/\.json$/, "") + `.next-${rosterRow.capability_slug}.prompt.txt`;
+    emitPrompt(next.text, nextPromptPath, args.json);
+    return emit({ code: EXIT_OK, json: args.json,
+      payload: {
+        ok: true, exitCode: EXIT_OK, kind: "assigned", dry_run: args.dryRun,
+        backlog_id: target, capability_slug: rosterRow.capability_slug, engine: answer.assignment.engine,
+        // AGT-183: "live" ordinarily; "own-claim" when the pick path had moved on because THIS cycle
+        // holds the stored pick's claim. A reader who cannot see which of the two happened cannot tell
+        // a suppressed self-claim from a drift check that stopped running.
+        pick_source: pickSource,
+        agent_id: rosterRow.agent_id, intent_slug: rosterRow.default_intent_slug, model: next.model,
+        claimed: !args.dryRun, claim_rows: claim.rows.length, prompt_file: nextPromptPath,
+        reason: answer.assignment.reason ?? null,
+        // AGT-173 R2: the rows the manager went past and the BOARD's reason for each, or null when
+        // nothing was recorded. Composed by passOverNote, never by the manager.
+        pass_over_note: passOverNote(answer, state),
+        ...levExtra,   // AGT-238
+        ...concExtra,  // AGT-238 slice 2
+      },
+      prose: `run-project: ASSIGNED ${target} — ${rosterRow.capability_slug} — engine ${answer.assignment.engine}\n`
+        + (pickSource === "own-claim"
+          ? `  pick:   the STORED pick ${storedPickId}, which the pick path no longer names because this cycle holds its claim (pick_source=own-claim)\n`
+          : "")
+        + `  reason: ${answer.assignment.reason ?? "(none given)"}\n`
+        + `  claim:  ${args.dryRun ? "NOT MADE (--dry-run)" : `held as ${claim.rows[0]?.claimed_by}`}\n`
+        + `  prompt: ${nextPromptPath}\n`
+        + `  Run that prompt as a sub-agent on model ${next.model}, then re-run this driver with --step=${args.step + 1}.${levLine}${concLine}` });
+  }
+
+  // ---- PASS ONE: read the board, ask the manager, write nothing. -------------------------------
+  const inst = await readInstruments({ base, key, project: args.project, cycleId: args.cycleId, trigger: args.trigger, tenant: args.tenant });
+  if (inst.error) fail(`instrument unreadable: ${inst.error}. Exiting ${EXIT_CANNOT_RUN} -- a management step taken against a board this driver could only partly see is the assumption dm-behavior forbids.`);
+
+  const walls = wallReading({ shouldBoot: inst.shouldBoot, dayTokenCap: inst.dayTokenCap, schedulerGate: inst.schedulerGate });
+
+  let handoff = null;
+  if (args.handoff) {
+    try { handoff = JSON.parse(fs.readFileSync(args.handoff, "utf8")); }
+    catch (e) { fail(`could not read --handoff=${args.handoff}: ${e.message}`); }
+  }
+
+  const state = {
+    driver: "scripts/run-project.js",
+    driver_feature: "AGT-68",
+    project: args.project,
+    step: args.step,
+    max_steps: args.maxSteps,
+    read_at: new Date().toISOString(),
+    cycle_id: args.cycleId || null,
+    // The engine this process can actually reach right now. `dm-knowledge-platform`: the cloud
+    // cannot spawn a session (SES-140), so "a session exists" is a fact about where the driver is
+    // running and not something the manager can wish into being.
+    engine_available_now: "session",
+    project_row: inst.projectRow,
+    progress: inst.progress,
+    blockers: inst.blockers,
+    walls: {
+      blocked: walls.blocked,
+      standing: walls.standing,
+      runner_should_boot: inst.shouldBoot,
+      resolve_day_token_cap: inst.dayTokenCap,
+      scheduler_gate: inst.schedulerGate,
+    },
+    pick: inst.pick,
+    pick_row: inst.pickRow,
+    pick_project: inst.pickProject,
+    // Named rather than left to be inferred: the pick path is board-wide, and a pick outside the
+    // project this step is managing is a real state the manager has to speak to, not a bug.
+    pick_in_project: inst.pickProject ? inst.pickProject === args.project : null,
+    queue: inst.queue,
+    // AGT-238 slice 2: the concurrency corpus, beside the queue. The manager decides how many
+    // projects execute and in what order FROM this, in `concurrency`, or decides nothing and the
+    // board stands. Read verbatim from `project_concurrency_corpus()` -- never re-sorted here.
+    concurrency_corpus: inst.concurrencyCorpus,
+    // SES-403: the ships the lister says may be graded again, beside the queue. The manager names
+    // ids from THIS list in `regrades` or names none; `answerErrors` refuses anything else.
+    regradable: inst.regradable,
+    roster: inst.roster,
+    last_handoff: handoff,
+    // The Intent's OWN contract, from its row. It reaches the prompt through the executor's TASK
+    // DETAILS renderer -- this file never appends to an assembled prompt.
+    output_contract: contract.schema,
+    intent_slug: contract.intentSlug,
+  };
+
+  try {
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2), "utf8");
+  } catch (e) {
+    fail(`could not write the state to ${statePath}: ${e.message}`);
+  }
+
+  let prompt;
+  try {
+    prompt = await assembleFor({
+      agentId: DEVMANAGER_AGENT_ID,
+      capabilitySlug: RUN_PROJECT_CAPABILITY,
+      intentSlug: contract.intentSlug,
+      taskContext: state,
+      tenant: args.tenant,
+      base, key,
+    });
+  } catch (e) {
+    fail(`could not assemble the ${RUN_PROJECT_CAPABILITY} prompt: ${e.message}`);
+  }
+  emitPrompt(prompt.text, promptPath, args.json);
+
+  return emit({
+    code: EXIT_AWAITING_ANSWER, json: args.json,
+    // NOT `ok: true`. AGT-67's finding 3, inherited deliberately: an exit-3 payload that said `ok`
+    // was seeding the very defect the exit code exists to make visible. Nothing was concluded here.
+    payload: {
+      ok: false, exitCode: EXIT_AWAITING_ANSWER, kind: "awaiting-answer", recorded: false,
+      project: args.project, step: args.step, max_steps: args.maxSteps,
+      walls_blocked: walls.blocked, walls_standing: walls.standing,
+      pick: inst.pick, pick_in_project: state.pick_in_project,
+      roster: inst.roster.map(r => r.capability_slug),
+      state_file: statePath, prompt_file: promptPath,
+      intent_slug: contract.intentSlug, model: prompt.model,
+    },
+    prose: `run-project: AWAITING THE MANAGER'S ANSWER (exit ${EXIT_AWAITING_ANSWER}). Nothing was written.\n`
+      + `  project: ${args.project} (${inst.projectRow.status}), step ${args.step}/${args.maxSteps}\n`
+      + `  pick:    ${inst.pick ? `${inst.pick.backlog_id} — ${inst.pick.title}` : "(none — nothing pickable)"}\n`
+      + `  walls:   ${walls.blocked ? walls.standing.join("; ") : "clear"}\n`
+      + `  state:   ${statePath}\n`
+      + `  prompt:  ${promptPath}\n`
+      + `  Run that prompt as a ${DEVMANAGER_AGENT_ID} sub-agent on model ${prompt.model}, save its JSON, then re-run with --answer=<path>.`,
+  });
+}
+
+// Entry-point guard, the shape scripts/agent-prompt.js records: the regression guard imports the
+// pure helpers from here and must not run the script. Windows argv[1] and import.meta.url can
+// disagree on drive-letter case.
+if (process.argv[1]
+    && path.resolve(fileURLToPath(import.meta.url)).toLowerCase() === path.resolve(process.argv[1]).toLowerCase()) {
+  main().catch(e => fail(e.message));
+}

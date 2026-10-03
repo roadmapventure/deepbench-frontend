@@ -1,0 +1,33 @@
+{
+  "adjudicated_at": "2026-09-13",
+  "adjudicated_by": "SES-344 design (The Designer, claude-fable-5-1, cycle 1bd980f6)",
+  "contract_version": 1,
+  "contract": "SES-337 recording: gates, gate_detail, changed_files, kickoff, diff (DIFF_CAP 400000); no ship report, no cycle notes",
+  "rows": [
+    { "verdict_id": "1d180269-0419-497c-8b76-4fc12ec46d27", "backlog_id": "SES-336", "version": "v7.0.439", "sha": "bc73354ed31f9cb5adee117876827114f82f5b35", "class": "harness", "judgment_quote": "400,000 of 639,956",
+      "quotes": ["TARGET IS NOT MET AND CANNOT BE", "381,000-byte ceiling", "NO PIN WAS BROKEN AND NO TEST WAS REPOINTED"],
+      "absent": ["the supervised dry-run listing every step's one-line action (kickoff section 6)"] },
+    { "verdict_id": "a8971bb9-4abe-4612-8236-1e6b517fde7d", "backlog_id": "AGT-68", "version": "v7.0.434", "sha": "2126f7783e713261b90ba1755c0096c55fce285f", "class": "elsewhere",
+      "quotes": ["the manager named SES-329", "ai_activity_log id 39604", "5 skill_profiles across five types, 5 links"],
+      "absent": ["run-all.js summary line", "gate per-test line for agt-68-devmanager.test.mjs"] },
+    { "verdict_id": "a28a217f-d28c-4ce1-a9e6-915bdecbec44", "backlog_id": "AGT-66", "version": "v7.0.432", "sha": "e3ac47cec25b88c7555875844d9fc28fd6d43cc3", "class": "elsewhere",
+      "quotes": ["no Format Skill", "regression suite: 186/186 passed", "5be94585d82a77685431579f6a2f50651d825b0d", "agent_capability_assignments 1, skill_profiles 5"],
+      "absent": ["gate per-test line for agt-66-builder.test.mjs"] },
+    { "verdict_id": "3319f488-daf2-475e-b8b2-f1ad6e1d2c6f", "backlog_id": "AGT-65", "version": "v7.0.431", "sha": "a176cc64e06f726d53079b59b4b380d5de7cadd9", "class": "elsewhere",
+      "quotes": ["returned premise dead, kickoff_path null", "grep -n signle docs/STANDARDS.md", "ai_activity_log 39445 and 39446", "2026-09-09 amendment"],
+      "absent": ["gate per-test line for agt-65-designer.test.mjs"] },
+    { "verdict_id": "24ad747b-2fcd-44c4-a8a4-79de2573763b", "backlog_id": "AGT-64", "version": "v7.0.429", "sha": "870ee2d0c919bdbb68e7ca6b714319e775b57719", "class": "elsewhere",
+      "quotes": ["agt-64-researcher.test.mjs PASS on both", "enable_web_search true and web_search_max_uses 8", "ai_activity_log id 39378", "findings: 14 -- 8 market", "LF export of this exact tree: 186/186 passed"],
+      "absent": [] },
+    { "verdict_id": "54758ce9-533f-46d2-984a-242c3ae616b9", "backlog_id": "SES-341", "version": "v7.0.430", "sha": "95468f1ad9ae8c3334bb166f854942b4bc111522", "class": "elsewhere",
+      "quotes": ["5eb84f7a-8c2a-470c-a4af-e3ba18cfdf2c", "2 before-images", "six sections, both markers present, nothing omitted", "175/185 on this CRLF worktree"],
+      "absent": ["runner_before_images row ids", "an LF run-all summary", "whether ses-341 part (c) ran under credentials in the gate"] },
+    { "verdict_id": "a0ad16a5-5751-4cd0-abfa-869b0ff7baa1", "backlog_id": "AGT-63", "version": "v7.0.428", "sha": "05478a4a24f04c764e43689de96135d2ac14424c", "class": "elsewhere",
+      "quotes": ["AGT-015 is a finding on the Skill text", "0 CRITICAL, 12 pre-existing WARNING", "capability_skill_profiles 14", "175/184, the nine known Windows CRLF false-reds"],
+      "absent": ["scripts/agent-log.js ids for the three classify runs"] },
+    { "verdict_id": "6288cb03-f341-4e8c-b72d-683119a2e51f", "backlog_id": "SES-321", "version": "v7.0.416", "sha": "bd8de8801a5c84cd06cb0016fd6852c3af03840e", "class": "absent",
+      "quotes": [],
+      "absent": ["Migration ses321_enhancement_passes_fence SQL, or pg_get_functiondef('prime_directive_queue') after apply, showing the LEFT JOIN and the (Selfbuild OR admitted) predicate", "Output of the rolled-back fixture run (ZFIX-SES321): prime_directive_queue() result with the claim present (served) and with enhancement_claim blanked (not served)", "pg_proc overload count for prime_directive_queue() and the grant-assertion DO block output (EXECUTE revoked from PUBLIC/anon/authenticated, held by service_role)", "drain_chain_gate() and runner_should_boot() bodies or a cited grep showing neither restates the epic fence", "runner_decisions row 182655e3-f559-4b46-9457-7d3df8bbf998 with the M5-01 before-image, or the governance_rules UPDATE output", "run-all.js output for tests/regression/ses-321-enhancement-fence.test.mjs with creds, showing which arms ran versus notRun"],
+      "note": "migration ses321_enhancement_passes_fence exists live (20260903172820); the ship commit body is one line and cycle 839f1ce5 notes are empty -- the delivery cites nothing checkable, so the block stands" }
+  ]
+}

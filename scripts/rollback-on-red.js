@@ -1,0 +1,1558 @@
+#!/usr/bin/env node
+// DeepBench v7.0.627 | scripts/rollback-on-red.js | SES-182 slices 1-4 + SES-373 + SES-287 slices 1-2 + AGT-180 + AGT-184
+//
+// -- AGT-184 (v7.0.627): AN UNMOVED WATERMARK IS NOT PROOF OF A CODE-ONLY RANGE ------------
+//
+// WHAT WAS BROKEN, and it was the one direction the header below says must never be wrong.
+// rangeIsCodeOnly() compares two watermarks and NOTHING ELSE, so a cycle that touched a schema
+// object WITHOUT leaving a migration row behind reads as pure text: the watermark never moved,
+// decide() falls through to its last `return`, and the engine proposes reverting the code while the
+// schema change stands. Measured live 2026-09-27 on this very platform: runner_migration_downs held
+// 74 rows, 73 matched a migration by name, and ONE -- `agt138_researcher_route`, captured `refused`
+// 2026-09-26 -- matched none, because AGT-138 wrote `public.finding_routes` over PostgREST and never
+// applied a migration. Any red range holding that cycle answered `revert-and-card`, "code-only".
+//
+// THE SECOND WITNESS, and why it is the ledger rather than a wider watermark read. A down is only
+// ever captured BECAUSE a migration was about to be applied (§19v: no before-image logged -> the
+// write does not happen), so a captured down whose `up_name` matches no migration in the range is a
+// schema write with no watermark behind it. That is a fact read from the database on both sides --
+// the same standard the watermark itself is held to -- and it needs no new capture, no commit-message
+// scan and no diff.
+//
+// THREE PROPERTIES, each of which is how it gets rebuilt wrong:
+//   * IT KEYS ON THE ABSENCE OF A LEDGER ROW, never on a down existing. A cycle that captured a down
+//     for a migration that DID land is the ordinary schema case and still reaches the watermark
+//     branch above -- the QA triple pins exactly that difference.
+//   * A NON-ARRAY `cycleDowns` IS UNKNOWN, NOT EMPTY, and cards -- schemaPlanFor()'s reading of an
+//     absent `--migrations` and rangeIsCodeOnly()'s reading of an unknown watermark, applied here.
+//   * THE GATE SITS IMMEDIATELY BEFORE THE CODE-ONLY `return` and touches nothing above it.
+//     rangeIsCodeOnly(), TRIGGER_SOURCES, isRunGreen(), the SES-287 span gate and the schema-plan
+//     branch are byte-identical: a range whose watermark MOVED was already carded or already asked
+//     schemaPlanFor(), so this clause has only the one fall-through left to close.
+//
+// An omitted `cycleDowns` defaults to `[]`, so every pre-AGT-184 caller's answer is unchanged.
+// WHAT IS NOT COVERED, said here rather than left to be discovered: a cycle that captures NO down at
+// all leaves no signal in this ledger, and the writer-side half -- a cycle with no SQL path must stop
+// rather than write DML over PostgREST -- is John's to approve (`bd-guardrails`, filed by AGT-184).
+// Guarded by tests/regression/agt-184-ledger-orphan.test.mjs.
+//
+// -- SES-287 slice 2 (v7.0.525): THE REVERT CARD SETTLES ITS OWN OUTCOME --------------------
+// Slice 1 closed the range gate and made the REVERT_AND_CARD card say PLANNED instead of claiming
+// the act. It left the AFFIRMATIVE half open, and that gap is not cosmetic: buildIncidentCard()
+// returns that card with NO `decision` key at all, and main() stamps one only inside the CARD_ONLY
+// branch -- so the moment a range IS supplied and the cycle declines the plan, the card sits
+// `decision NULL` for ever. Live card 000cb93c (2026-09-15) is that card; a human retired it by hand.
+//
+// WHAT THIS SHIP ADDS, AND WHERE THE LINE STILL IS. The engine still does not perform the revert and
+// still cannot observe whether one ran: THE CYCLE decides that behind its push gates. What it gains
+// is a way to RECORD the answer the cycle brings back -- `--settle --card-id=<uuid>
+// --outcome=declined|executed [--reason=<text>]` with `--cycle-id` -- which records a
+// `kind = 'rollback'` decision under the cycle id passed in, images the card row under that decision
+// id, and PATCHes the card into the past tense. That is the same ledger-writer half the header
+// already claims for CARD_ONLY, held to the same three limits: `p_backlog_id` NULL,
+// `p_ladder_work_class` NULL, and nothing acted on the world.
+//
+// 'retired' FOR BOTH OUTCOMES, and this is the decision most likely to be helpfully "fixed" later.
+// An executed revert is NOT an `accept`: accept is the one value `trg_runner_items_accept_clears_flag`
+// keys on and it reads as John's approval, which no unattended cycle has. `retired` is SES-300's
+// *withdrawn as an ask -- a record, never an open question*, and that is true of both outcomes. WHICH
+// outcome it was lives in the prose (title / before_after / plain_after, rewritten in the past tense)
+// and in the decision row's summary. The enum carries the ask's status, never the verdict.
+//
+// FAIL DIRECTION, inherited from SES-373 rather than re-argued: no decision -> NO STAMP -> exit 2
+// (*could not run*, never a pass), card untouched. A stamped card with no decision row behind it is
+// the SES-373 defect wearing a value rather than closing it. And a card that ALREADY carries a
+// decision is refused rather than overwritten -- settling twice orphans the first decision's
+// before-image, and a row whose restore path points at the wrong prior state is worse than no stamp.
+//
+// Guarded by tests/regression/ses-287b-revert-settled.test.mjs.
+//
+// -- SES-287 slice 1 (v7.0.507): ONE CYCLE'S COMMITS, OR NO REVERT AT ALL -------------------
+// Two of SES-287's three defects are closed here. The third -- the stale green anchor -- was closed
+// by SES-352 (v7.0.452), which made runner_green_states a trigger-maintained projection of CI's own
+// record; readGreenAnchor() below already reads the newest concluded green and is NOT touched.
+//
+// (2) NOTHING MEASURED HOW MANY CYCLES A REVERT RANGE SPANNED. decide() returned REVERT_AND_CARD
+// with revertPlanFor(anchor, head) over whatever sat between the two, and the live incident
+// (docs/SESSIONS.md:1296) is what that costs: the engine proposed reverting de6e08e8..95cf5fee --
+// SIX COMMITS FROM FOUR CYCLES -- attributing all of it to the last pusher. Register B37 forbids
+// exactly that: A SUCCESSOR NEVER ADJUDICATES A PREDECESSOR. rangeCycleSpan() measures it and the
+// gate sits immediately after the anchor check, BEFORE the watermark branch, so it covers BOTH
+// revert returns rather than one of them.
+//
+// THE RANGE IS PASSED IN, never derived, for the same reason --migrations is: decide() is pure and
+// this file never runs git (see the boundary below). The cycle reads `git rev-list <anchor>..<head>`
+// and hands the shas over as --range-shas. AN ABSENT LIST IS "NOT SUPPLIED", NEVER "AN EMPTY
+// RANGE" -- identical to schemaPlanFor()'s reading of an absent --migrations, and it fails closed
+// to card-only, which is byte-identical to what the engine does on dev today.
+//
+// (3) THE CARD CLAIMED THE PLAN AS THE ACT. buildIncidentCard() titled a REVERT_AND_CARD outcome
+// "was reverted to the last green state" and said "dev is back at green ... by revert-forward",
+// when this engine never runs git and never pushes: the CYCLE executes the plan behind its push
+// gates and MAY DECLINE. That incident's card had to be rewritten by hand. The local `reverted` is
+// now `plannedRevert` and every sentence on that branch names the revert as PENDING. The card-only
+// branch's prose is unchanged, byte for byte -- it was already honest.
+//
+// LEFT FOR SLICE 2, said here rather than left to be discovered: the runbook step-4a edit that
+// actually passes --range-shas (docs/runbooks/runner-cycle.md is at the SES-336 byte ceiling and a
+// step edit must remove bytes first), and the AFFIRMATIVE half of defect 3 -- recording a revert
+// the cycle DID execute. Until then an omitted --range-shas cards instead of reverting.
+//
+// -- SES-373 (v7.0.458): A CARD-ONLY OUTCOME RECORDS ITSELF ---------------------------------
+// Until this ship the CARD_ONLY branch filed its incident card with `decision NULL`, and ses-285
+// assertion 6 reads that column as "a human is being waited on" (M6-01). That reading was wrong
+// about these cards and right about the column: a held rollback IS the whole of the action taken,
+// so there was never an ask for anybody to answer. Five live cards stood undecided for a defect the
+// engine could not name. It names it now: on CARD_ONLY the engine records a `kind = 'rollback'`
+// `runner_decisions` row UNDER THE CYCLE ID PASSED IN, then files the card `decision = 'retired'`
+// naming that row.
+//
+// WHY THIS IS NOT THE BOUNDARY MOVING, which is the objection to answer rather than dodge. The
+// header's boundary below names two things the script never does: it never pushes and it never
+// applies DDL. Both are ACTING ON THE WORLD. Recording the outcome decide() already reached, in the
+// decision ledger, attributed to the `--cycle-id` handed in, is the LEDGER WRITER half this header
+// already claims -- exactly as it already writes the before-images, the card and the green pointer
+// under that same id. Three things hold the line: `p_backlog_id` is NULL, `p_ladder_work_class` is
+// NULL (finalising a hold moves no rung), and **nothing is recorded for REVERT_AND_CARD**. That
+// branch's action is executed by the CYCLE behind its push gates, so its record belongs to the cycle
+// at the moment it pushes -- the revert branch is byte-identical in behaviour here except the
+// pk_value fix, and its card is still filed undecided ON PURPOSE. Do not "finish" it here.
+//
+// FAIL DIRECTION: no decision -> NO CARD -> exit 2 (*could not run*, never a pass). A card with no
+// decision is the defect SES-373 closes, not a lesser evil, so filing one anyway is the retired
+// form. Guarded by tests/regression/ses-373-card-only-self-decides.test.mjs.
+//
+// FEATURE: SES-182 -- auto-rollback on red. Slice 1 of the kickoff v7.0.324 design: record the
+// rolling "last green state", and on an attributable CI red decide between reverting a CODE-ONLY
+// range and carding everything else. John authorised the build 2026-08-30 (card 2c136c5b, Q2
+// "BUILD NOW"); Q1 is settled and enforced here -- see THE VERIFIER IS NOT A TRIGGER below.
+//
+// -- SLICE 4 (v7.0.335): THE DATA-RESTORE PLAN -- CLASSIFY EVERY TOUCHED ROW, APPLY NOTHING ---
+// Slice 1's card said "N before-image(s) ... REPORTED, not replayed", which is true and useless:
+// it names that something was touched and says nothing about whether it could be put back.
+// public.plan_data_restore() answers the second question in the database (see readRestorePlan);
+// summarizeRestorePlan() renders it. THE APPLY LANE IS NOT BUILT AND IS NOT THIS CYCLE'S TO BUILD --
+// it is on the ship card as John's question, and unanswered defaults to list-only. Two grounds that
+// must never merge: `refused`-for-staleness is CHECKED AND IT MOVED, `unverifiable` is CANNOT CHECK.
+//
+// -- SLICE 2 (v7.0.333): A RANGE WITH MIGRATIONS IS NO LONGER AUTOMATICALLY CARD-ONLY ------
+// Slice 1 carded EVERY moved-watermark range, by construction, because no down existed to apply.
+// `public.capture_migration_down()` now derives one at apply time from the objects' live prior
+// state, so this engine can ask a real question: does EVERY migration in the red range carry a
+// stored `auto-downable` down? `schemaPlanFor()` answers it and emits the ordered plan.
+//
+// THREE PROPERTIES OF THAT ANSWER, each of which is how it gets rebuilt wrong:
+//   * ONE MISSING MEMBER CARDS THE WHOLE RANGE. There is no partial schema rollback -- a schema
+//     half-undone is a state no green anchor describes, and the design's own fail-direction reads
+//     "a red range containing ANY migration the actuator cannot match to a stored, classified down
+//     -> no automatic schema action at all". `steps` is returned EMPTY on a miss so a caller
+//     cannot apply a subset even by accident, and the card names every blocking member.
+//   * THE PLAN IS NEWEST-FIRST. Downs applied oldest-first re-create what a later down expected
+//     gone. The order is reversed here rather than left to the caller.
+//   * AN ABSENT OR EMPTY `--migrations` LIST IS NOT AN EMPTY RANGE. It resolves to "not
+//     reversible, the list was not supplied" -- unknown is not innocent, the same reading
+//     `rangeIsCodeOnly` gives an unknown watermark. That is also what keeps every slice-1 caller's
+//     behaviour byte-identical: no list, same card-only outcome as before.
+//
+// THE MIGRATION LIST IS PASSED IN, never fetched -- `supabase_migrations` is not exposed through
+// PostgREST and `runner_secrets` holds no credential for it. The cycle calls
+// `public.migrations_in_range(green_watermark, current_watermark)` through the connector and hands
+// the rows here, exactly as it hands in the CI conclusion.
+//
+// AND THE ENGINE STILL APPLIES NO DDL. It emits `schema_plan`; the cycle runs it through
+// `apply_migration` behind the gates named below. Extending "it never pushes" to "it never applies
+// DDL either" is the same boundary, not an exception carved into it.
+//
+// -- WHAT THIS SCRIPT IS, AND THE TWO THINGS IT DELIBERATELY IS NOT ------------------------
+// It is a DECISION ENGINE plus a ledger writer. It is not a daemon (the runner's own blocker
+// sweeps at runbook steps 4 and 8 invoke it, so the cadence is cycle cadence), and it is NOT a
+// pusher.
+//
+// IT NEVER RUNS git AND NEVER PUSHES, and that is a named deviation from the kickoff's wording
+// rather than a gap. The kickoff says the actuator performs revert-forward; the push in this
+// platform is gated by machinery that lives in the CYCLE, not in a script -- the ticket-claim
+// re-assertion (runbook step 0), the issued-version proof (SES-153) and the fetch/rebase/retry
+// ladder (B42). A script with independent push authority would route around all three, which is
+// the SES-019 shape (never reach the same effect through a path the gate does not watch). So the
+// engine emits `revert_plan` -- the exact sha range and command -- and the cycle executes it
+// through the push gates it already passes. Same boundary heal-engine.js and tripwire-to-backlog.js
+// keep, and the same reason ids are passed IN to those: the script never mints its own authority.
+//
+// THE CI CONCLUSION IS PASSED IN, never fetched. Measured at this ship: `public.runner_secrets`
+// holds ANTHROPIC_API_KEY, SCRATCH_SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL,
+// VERCEL_AUTOMATION_BYPASS_SECRET and VERCEL_TOKEN -- and no GitHub credential of any kind. The
+// cycle reads CI through its own GitHub tooling and hands the conclusion here. A script that
+// invented a credential path would be the only thing in the platform holding one.
+//
+// -- THE VERIFIER IS NOT A TRIGGER (John, 2026-08-30, card 2c136c5b, Q1) -------------------
+// His ruling, recorded verbatim on the card: auto-revert triggers on CI-red and deploy-red ONLY
+// (facts); a verifier BLOCK freezes the ship and cards him (judgment). His reason is a
+// measurement, not a preference -- the lane's first 15 recorded blocks were all false (SES-213),
+// so revert power waits for an earned track record, which is M6's graduation subject. THE EDIT
+// THIS SHIP FORBIDS: adding a verdict/block trigger to decide(). `verifier` is rejected by
+// TRIGGER_SOURCES with that reason named, and the guard pins it.
+//
+// -- WHY THE WATERMARK, AND NOT A COMMIT-MESSAGE SCAN -------------------------------------
+// "Is there a migration in this range?" cannot be answered from the diff: migrations in this
+// platform exist only in the database -- the repo has no .sql files -- so a file-based test would
+// report EVERY range code-only, which is the one direction that must never be wrong (it would
+// auto-revert a schema change believing it was text). A commit-message scan is no better: it
+// trusts prose a cycle wrote about itself.
+//
+// The green pointer therefore stores `migration_watermark` -- the latest applied migration version
+// at green time -- and the test is whether it MOVED. That is a fact read from the database on both
+// sides, it needs no down-capture ledger (which is slice 2), and it fails closed by construction:
+// an unknown watermark on either side is treated exactly as a moved one.
+//
+// -- FAIL DIRECTIONS, each chosen so the wrong answer is recoverable ------------------------
+//   green run                    -> record the pointer. A sweep that cannot read CI records
+//                                   nothing, so the pointer goes STALE, never wrong.
+//   red, not attributable to an  -> NO ACTION AT ALL. An attended push, or a sha no cycle claims,
+//   unattended cycle                is not this machine's to undo. The machine yields to humans.
+//   red, no green anchor         -> card only. There is nothing to roll back TO.
+//   red, watermark moved/unknown -> card only, reason named. An un-rolled-back migration plus a
+//                                   loud card is recoverable; a wrong down applied to production
+//                                   is not.
+//   red, code-only, attributable -> revert plan + card. The one automatic path.
+//
+// -- NAMED DEFERRALS (slice 3, and they are deferrals rather than omissions) ----------------
+//   * GRANT/ACL migrations. `capture_migration_down()` classifies them `refused` deliberately, so
+//     a range containing one cards rather than rolling back. Re-applying an exploded ACL correctly
+//     is `.claude/rules/supabase-column-grants.md`'s entire subject matter and a wrong one is a
+//     live exposure -- refused-and-loud is recoverable, guessed-and-applied is not.
+//   * DEPLOY-SERVING-RED as a second trigger. John's Q1 answer names it a valid trigger; the
+//     deploy probe is a different read (the Vercel bypass header, runbook step 4) and it earns
+//     its own slice. TRIGGER_SOURCES admits it as a value NOW so the vocabulary cannot drift,
+//     and decide() treats it exactly like ci-red once a caller passes it.
+//   * DATA RESTORE. The kickoff's slice-1 line reads "revert-forward + before-image restore +
+//     card". This engine REPORTS the before-images in the reverted range on the card -- count and
+//     tables -- and does not replay them. Replaying rows needs per-table pk resolution and an
+//     insert/update/delete discrimination that a wrong guess writes into production; it is a
+//     slice with its own QA, not a bullet inside this one. Stated on the card rather than left to
+//     be discovered.
+
+import crypto from "crypto";
+import { pathToFileURL } from "url";
+
+// The kinds of evidence that may fire a rollback. `verifier` is deliberately ABSENT -- see the
+// header. Kept as data rather than an if-chain so the guard can assert the set itself.
+export const TRIGGER_SOURCES = ["ci-red", "deploy-red"];
+
+// verifier.js's fail-closed rule, applied one storey out: `skipped` is not `green`. A run is green
+// only if every job it reports actually concluded success.
+export const GREEN_CONCLUSION = "success";
+
+export const GREEN_STATE_RETENTION = 50;
+
+// The two values `ck_runner_migration_downs_classification` admits (read from pg_get_constraintdef
+// at this ship). Kept as data so the guard asserts the vocabulary rather than restating it.
+export const DOWN_CLASSIFICATIONS = { AUTO: "auto-downable", REFUSED: "refused" };
+
+export const ACTIONS = {
+  RECORD_GREEN: "record-green",
+  REVERT_AND_CARD: "revert-and-card",
+  CARD_ONLY: "card-only",
+  NONE: "none",
+};
+
+// SES-373. `runner_decisions.kind` carries no CHECK constraint (read from pg_catalog at this ship),
+// so the vocabulary lives here as data the guard can assert rather than in a literal inside a body.
+// `rollback` was already an admissible-and-unused kind; the backfill that closed the five standing
+// cards used `rollback-backfill`, mirroring the existing `ship-backfill` precedent.
+export const ROLLBACK_DECISION_KIND = "rollback";
+
+// `runner_items_decision_check` admits exactly accept | reverse | rework | retired. `retired` is
+// SES-300's *withdrawn as an ask; a record, never an open question*, and card c580d0fa is the live
+// precedent on this exact card shape. NOT `accept` -- that reads as an approval nobody gave, and it
+// is the one value `trg_runner_items_accept_clears_flag` keys on. NOT `reverse` (means undo) and NOT
+// `rework` (means John asked for another pass; SES-300 measured the cost of overloading it).
+export const CARD_ONLY_DECISION = "retired";
+
+// Deliberately NOT ses-285's "Closed by SES-285 (v7.0.359)" marker: that test's assertion 7 selects
+// on its own prefix and then demands a backlog_id that RESOLVES, which an incident card carries none
+// of by design (SES-116 -- backlog_id is a JOIN KEY).
+export const CARD_ONLY_REASON_PREFIX = "Recorded by rollback-on-red (SES-373):";
+
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ---------------------------------------------------------------------------
+// Pure half -- facts in, a decision out. No network, no disk, no process.exit,
+// so every clause below is testable without a live run.
+// ---------------------------------------------------------------------------
+
+// Green iff there is at least one job AND every job concluded success. The empty run is NOT green:
+// "nothing reported" is the shape a cancelled or still-queued run has, and reading it as green is
+// how a pointer gets set to a commit CI never graded.
+export function isRunGreen(jobs) {
+  if (!Array.isArray(jobs) || jobs.length === 0) return false;
+  return jobs.every((j) => (j?.conclusion ?? null) === GREEN_CONCLUSION);
+}
+
+// A range is code-only iff the migration watermark is KNOWN on both sides and unchanged. Any
+// unknown is treated as moved -- unknown is not innocent (verifier.js's own phrasing for a diff
+// git cannot read).
+export function rangeIsCodeOnly(greenWatermark, currentWatermark) {
+  if (greenWatermark === null || greenWatermark === undefined || greenWatermark === "") return false;
+  if (currentWatermark === null || currentWatermark === undefined || currentWatermark === "") return false;
+  return String(greenWatermark) === String(currentWatermark);
+}
+
+// Attribution is positive-only: a sha is this machine's to undo iff a runner_cycles row claims it
+// as its own push. An attended session's push and a sha nobody claims are the SAME answer here --
+// not mine -- and that is deliberate. Slice 1 cannot tell them apart, and the kickoff's own
+// negative control ("an unattributable red produces no action") wants the fail-closed reading.
+export function attributionOf(headSha, cycles) {
+  if (!headSha || !Array.isArray(cycles)) return null;
+  const head = String(headSha);
+  const hit = cycles.find((c) => {
+    const sha = c?.push_sha ? String(c.push_sha) : "";
+    if (!sha) return false;
+    return sha === head || head.startsWith(sha) || sha.startsWith(head);
+  });
+  return hit ? { cycleId: hit.id ?? null, version: hit.version ?? null, sha: hit.push_sha } : null;
+}
+
+// SES-287. How many CYCLES does the red range span, and does anything in it belong to nobody?
+//
+// Register B37: a successor never adjudicates a predecessor. A revert of anchor..head undoes every
+// commit in between, so a range spanning four cycles undoes three cycles' work and blames the last
+// pusher for it -- which is what the live incident at docs/SESSIONS.md:1296 proposed. This measures
+// the span so decide() can refuse it; it decides nothing itself.
+//
+// THREE PROPERTIES, each of which is how it gets rebuilt wrong:
+//   * AN ABSENT LIST IS NOT AN EMPTY RANGE. `known:false` with a "not supplied" reason, exactly as
+//     schemaPlanFor() reads an absent --migrations and rangeIsCodeOnly() reads an unknown
+//     watermark. Unknown is not innocent. A list that is not an array, or is empty, is unknown --
+//     a red range by definition contains at least the head commit, so an empty one is a caller
+//     that did not measure rather than a range that holds nothing.
+//   * THE MATCH RULE IS attributionOf()'s, CALLED, NOT RESTATED. runner_cycles.push_sha is written
+//     abbreviated by some cycles, so the prefix comparison is load-bearing -- and a second copy of
+//     it would be free to drift from the one the attribution itself is made with, which is the one
+//     comparison this gate's answer is checked against.
+//   * A SHA NO CYCLE CLAIMS IS COLLECTED, NEVER IGNORED. `unclaimed` is how an attended push
+//     sitting inside the range becomes visible; dropping it would let a one-cycle answer be
+//     reported for a range that also carries a human's commit.
+export function rangeCycleSpan(rangeShas, cycles) {
+  if (!Array.isArray(rangeShas) || rangeShas.length === 0) {
+    return {
+      known: false,
+      cycleIds: [],
+      unclaimed: [],
+      reason:
+        "the commit range for this red was not supplied, so how many cycles it spans is unknown -- " +
+        "unknown is not innocent, exactly as it is not for the migration watermark or the migration list.",
+    };
+  }
+
+  const cycleIds = [];
+  const unclaimed = [];
+  for (const sha of rangeShas) {
+    const hit = attributionOf(sha, cycles);
+    if (!hit || !hit.cycleId) {
+      unclaimed.push(String(sha ?? "(empty sha)"));
+      continue;
+    }
+    if (!cycleIds.includes(hit.cycleId)) cycleIds.push(hit.cycleId);
+  }
+
+  const parts = [
+    `the range holds ${rangeShas.length} commit(s) across ${cycleIds.length} runner cycle(s)` +
+      (cycleIds.length > 0 ? ` (${cycleIds.join(", ")})` : ""),
+  ];
+  if (unclaimed.length > 0) {
+    parts.push(`${unclaimed.length} commit(s) in it are claimed by no cycle at all (${unclaimed.join(", ")})`);
+  }
+
+  return { known: true, cycleIds, unclaimed, reason: `${parts.join("; ")}.` };
+}
+
+// Is the SCHEMA half of a red range reversible, and if not, which member stopped it?
+//
+// The answer is all-or-nothing on purpose. `steps` comes back EMPTY whenever anything is missing,
+// so no caller can apply a subset even by accident -- a schema half-undone is a state no green
+// anchor describes. `missing` names every blocking member so the card can say which, rather than
+// telling John a range "could not be rolled back" and leaving him to find out why.
+//
+// Newest-first, because downs applied oldest-first re-create what a later down expected gone.
+export function schemaPlanFor(migrations, downs) {
+  if (!Array.isArray(migrations) || migrations.length === 0) {
+    return {
+      reversible: false,
+      reason:
+        "the migration list for this range was not supplied, so what landed in it is unknown -- " +
+        "unknown is not innocent, exactly as it is not for the watermark itself.",
+      steps: [],
+      missing: [],
+    };
+  }
+
+  const byName = new Map();
+  for (const d of Array.isArray(downs) ? downs : []) {
+    if (d?.up_name) byName.set(String(d.up_name), d);
+  }
+
+  const missing = [];
+  const steps = [];
+  const newestFirst = [...migrations].sort((a, b) =>
+    String(b?.version ?? "").localeCompare(String(a?.version ?? ""))
+  );
+
+  for (const m of newestFirst) {
+    const name = String(m?.name ?? "");
+    const version = m?.version ?? null;
+    const row = name ? byName.get(name) : null;
+    if (!row) {
+      missing.push({ version, name: name || "(unnamed migration)", why: "no down was captured for it" });
+      continue;
+    }
+    if (row.classification !== DOWN_CLASSIFICATIONS.AUTO) {
+      missing.push({ version, name, why: `it was classified '${row.classification}' at capture time` });
+      continue;
+    }
+    const sql = typeof row.down_sql === "string" ? row.down_sql.trim() : "";
+    if (!sql) {
+      missing.push({ version, name, why: "its captured down is blank" });
+      continue;
+    }
+    steps.push({ version, name, down_sql: sql });
+  }
+
+  if (missing.length > 0) {
+    return {
+      reversible: false,
+      reason:
+        `${missing.length} of ${migrations.length} migration(s) in the range have no usable down ` +
+        `(${missing.map((m) => `${m.name}: ${m.why}`).join("; ")}). No partial schema rollback is ever attempted.`,
+      steps: [],
+      missing,
+    };
+  }
+
+  return {
+    reversible: true,
+    reason:
+      `all ${steps.length} migration(s) in the range carry a captured auto-downable down; ` +
+      `they are applied newest-first.`,
+    steps,
+    missing: [],
+  };
+}
+
+// AGT-184. Which downs did the attributed cycle capture that NO migration in this range accounts
+// for? Pure, and it decides nothing -- decide() does, one branch below.
+//
+// `known:false` for a non-array `cycleDowns` is the same fail-closed reading schemaPlanFor() gives an
+// absent `--migrations`: not supplied is UNKNOWN, and unknown is not innocent. An EMPTY array is a
+// real answer ("this cycle captured nothing"), which is why the two are distinguished here rather
+// than collapsed -- collapsing them would make every legacy caller's silence read as a schema write.
+//
+// The match is by NAME, because `up_name` is the ledger's join key and the only column the two sides
+// share: runner_migration_downs carries no version, and a version is assigned by the migrator at
+// apply time -- which for an orphan never happened.
+export function ledgerOrphansIn(cycleDowns, migrations) {
+  if (!Array.isArray(cycleDowns)) return { orphans: [], known: false };
+
+  const landed = new Set(
+    (Array.isArray(migrations) ? migrations : [])
+      .map((m) => String(m?.name ?? ""))
+      .filter(Boolean)
+  );
+
+  const orphans = [];
+  for (const d of cycleDowns) {
+    const name = String(d?.up_name ?? "");
+    if (!name) continue;
+    if (!landed.has(name) && !orphans.includes(name)) orphans.push(name);
+  }
+  return { orphans, known: true };
+}
+
+// The whole rule, in one place, returning a named reason for every branch. A branch that returned
+// a bare action would put the "why" on the card's author instead of in the engine, which is how
+// two homes for one rule start.
+export function decide(facts = {}) {
+  const {
+    trigger = "ci-red",
+    jobs = [],
+    headSha = null,
+    greenAnchor = null,
+    currentWatermark = null,
+    cycles = [],
+    migrations = [],
+    downs = [],
+    rangeShas = null,
+    // AGT-184. The downs the ATTRIBUTED cycle captured, read by up_name. Defaulted to [] so every
+    // pre-AGT-184 caller answers exactly as it did; a non-array is unknown and cards.
+    cycleDowns = [],
+  } = facts;
+
+  if (!TRIGGER_SOURCES.includes(trigger)) {
+    return {
+      action: ACTIONS.NONE,
+      reason:
+        `trigger '${trigger}' is not a rollback trigger (admitted: ${TRIGGER_SOURCES.join(", ")}). ` +
+        `A verifier block freezes the ship and cards John -- it never auto-reverts (John, 2026-08-30, Q1).`,
+    };
+  }
+
+  if (isRunGreen(jobs)) {
+    return {
+      action: ACTIONS.RECORD_GREEN,
+      reason: `all ${jobs.length} blocking job(s) concluded ${GREEN_CONCLUSION} -- this commit becomes the green anchor.`,
+    };
+  }
+
+  const failed = jobs
+    .filter((j) => (j?.conclusion ?? null) !== GREEN_CONCLUSION)
+    .map((j) => `${j?.name ?? "(unnamed job)"}=${j?.conclusion ?? "no conclusion"}`);
+  const redDetail = jobs.length === 0 ? "the run reported no jobs" : failed.join(", ");
+
+  const attribution = attributionOf(headSha, cycles);
+  if (!attribution) {
+    return {
+      action: ACTIONS.NONE,
+      reason:
+        `${trigger} (${redDetail}) but ${headSha ? `sha ${headSha}` : "the head sha"} is not claimed by any ` +
+        `runner cycle -- an attended push or an unattributable one is not this machine's to undo.`,
+      redDetail,
+    };
+  }
+
+  if (!greenAnchor || !greenAnchor.commit_sha) {
+    return {
+      action: ACTIONS.CARD_ONLY,
+      reason: `${trigger} (${redDetail}) on unattended push ${headSha}, but no green state has ever been recorded -- there is nothing to roll back to.`,
+      attribution,
+      redDetail,
+    };
+  }
+
+  // SES-287, and it sits HERE -- after the anchor check, before the watermark branch -- so it gates
+  // BOTH revert returns below rather than whichever one a later edit remembers. Register B37: a
+  // successor never adjudicates a predecessor, so the one range this machine may undo is the one
+  // that holds the attributed cycle's own commits and nothing else.
+  const rangeSpan = rangeCycleSpan(rangeShas, cycles);
+  const oneCycle =
+    rangeSpan.known === true &&
+    rangeSpan.unclaimed.length === 0 &&
+    rangeSpan.cycleIds.length === 1 &&
+    rangeSpan.cycleIds[0] === attribution.cycleId;
+
+  if (!oneCycle) {
+    return {
+      action: ACTIONS.CARD_ONLY,
+      reason:
+        `${trigger} (${redDetail}) on unattended push ${headSha}. NO revert is planned: ` +
+        `${rangeSpan.reason} A revert of ${greenAnchor.commit_sha}..${headSha} would undo every commit ` +
+        `in that range, so anything beyond cycle ${attribution.cycleId}'s own work would be a successor ` +
+        `adjudicating a predecessor (register B37) and blaming the last pusher for it.`,
+      attribution,
+      greenAnchor,
+      redDetail,
+      rangeSpan,
+    };
+  }
+
+  if (!rangeIsCodeOnly(greenAnchor.migration_watermark, currentWatermark)) {
+    // Slice 2: the watermark moving no longer ENDS the question, it asks a second one -- does every
+    // migration in the range carry a captured, auto-downable down? A miss still cards, and it now
+    // names which member missed instead of pointing at an unbuilt slice.
+    const schemaPlan = schemaPlanFor(migrations, downs);
+    const watermarkMove =
+      `The migration watermark ${describeWatermark(greenAnchor.migration_watermark)} -> ` +
+      `${describeWatermark(currentWatermark)}, so the range is not code-only`;
+
+    if (!schemaPlan.reversible) {
+      return {
+        action: ACTIONS.CARD_ONLY,
+        reason:
+          `${trigger} (${redDetail}) on unattended push ${headSha}. ${watermarkMove}: ` +
+          `NO automatic schema action is taken and no revert is planned. ${schemaPlan.reason}`,
+        attribution,
+        greenAnchor,
+        redDetail,
+        schemaPlan,
+      };
+    }
+
+    return {
+      action: ACTIONS.REVERT_AND_CARD,
+      reason:
+        `${trigger} (${redDetail}) on unattended push ${headSha}. ${watermarkMove} -- but ` +
+        `${schemaPlan.reason} The code reverts forward and the schema downs apply after it.`,
+      attribution,
+      greenAnchor,
+      redDetail,
+      revertPlan: revertPlanFor(greenAnchor.commit_sha, headSha),
+      schemaPlan,
+      rangeSpan,
+    };
+  }
+
+  // AGT-184, and it sits HERE -- the last gate before the one `return` that calls a range code-only.
+  // The watermark is unchanged, which is necessary and NOT sufficient: a cycle that touched a schema
+  // object without landing a migration moves no watermark at all, and reverting its code would leave
+  // that change standing. The ledger is the second witness.
+  const ledger = ledgerOrphansIn(cycleDowns, migrations);
+  if (!ledger.known || ledger.orphans.length > 0) {
+    const why =
+      ledger.orphans.length > 0
+        ? `the attributed cycle captured a migration down for ${ledger.orphans.length} name(s) that no ` +
+          `migration in this range carries (${ledger.orphans.join(", ")})`
+        : "the downs captured by the attributed cycle were not supplied, so whether one of them names a " +
+          "migration this range never landed is UNKNOWN -- unknown is not innocent, exactly as it is " +
+          "not for the watermark itself";
+    return {
+      action: ACTIONS.CARD_ONLY,
+      reason:
+        `${trigger} (${redDetail}) on unattended push ${headSha}. The migration watermark is unchanged at ` +
+        `${describeWatermark(currentWatermark)}, but ${why}. A down is only ever captured BECAUSE a ` +
+        `migration was about to be applied, so an unchanged watermark beside one is a schema write with no ` +
+        `watermark behind it -- not a code-only range. NO revert is planned: reverting the code would ` +
+        `leave that schema change standing, which is the one direction this engine must never get wrong.`,
+      attribution,
+      greenAnchor,
+      redDetail,
+      rangeSpan,
+      ledger,
+    };
+  }
+
+  return {
+    action: ACTIONS.REVERT_AND_CARD,
+    reason:
+      `${trigger} (${redDetail}) on unattended push ${headSha}; the migration watermark is unchanged at ` +
+      `${describeWatermark(currentWatermark)}, so the range is code-only and reversible by revert-forward.`,
+    attribution,
+    greenAnchor,
+    redDetail,
+    revertPlan: revertPlanFor(greenAnchor.commit_sha, headSha),
+    rangeSpan,
+    ledger,
+  };
+}
+
+function describeWatermark(w) {
+  return w === null || w === undefined || w === "" ? "(unknown)" : String(w);
+}
+
+// Revert-forward, never history rewrite: a new commit that undoes the range, so every existing
+// checkout stays valid. The cycle runs this behind its own push gates.
+export function revertPlanFor(greenSha, headSha) {
+  return {
+    from: greenSha,
+    to: headSha,
+    strategy: "revert-forward",
+    command: `git revert --no-edit --no-commit ${greenSha}..${headSha} && git commit -m "revert to green ${greenSha}"`,
+  };
+}
+
+// The incident card. It is filed as `gated_before_build` and that is a DECISION, not a fudge --
+// see the kickoff's "the collision the design did not settle". runner_items_kind_check admits
+// exactly 'ship' and 'gated_before_build' (read from pg_get_constraintdef at this ship), and
+// build-briefing.mjs renders §5 from `ship`/`test` and §6 from `gated_before_build` and NOTHING
+// else -- so a new `incident` kind would file a card that renders on no surface John reads, which
+// is the one outcome an incident card must never have. §6 already asks the two questions this card
+// asks: Accept = the rollback was right, Reverse = put it back.
+//
+// backlog_id stays NULL and the human reference goes in display_ref -- SES-116: backlog_id is a
+// JOIN KEY and composing a reference into it silently broke 63 of 80 card->ticket joins.
+// SES-287 DEFECT 3. The local below was called `reverted` and every sentence keyed on it was written
+// in the past tense -- "was reverted to the last green state", "dev is back at green ... by
+// revert-forward", "I put dev back to the last state that passed". THIS ENGINE NEVER RUNS git AND
+// NEVER PUSHES (the boundary at the top of this file): REVERT_AND_CARD emits a PLAN, and the cycle
+// executes it behind its push gates and may decline. So the card was asserting an execution that had
+// not happened, and on the live incident it had to be rewritten by hand. It is `plannedRevert` now
+// and the prose says PLANNED. The card-only branch is untouched, byte for byte -- it was already
+// honest, and rewording it would be a second edit wearing this one's justification.
+//
+// THE AFFIRMATIVE HALF IS SLICE 2's: recording a revert the cycle DID execute. Until it exists there
+// is no branch here that may speak in the past tense, which is why none does.
+export function buildIncidentCard(decision, ctx = {}) {
+  const { cycleId = null, headSha = null, beforeImages = [], trigger = "ci-red", restorePlan = null } = ctx;
+  const plannedRevert = decision.action === ACTIONS.REVERT_AND_CARD;
+  const shortSha = headSha ? String(headSha).slice(0, 7) : "(unknown sha)";
+
+  // SES-182 slice 4. Slice 1's sentence -- "N before-image(s) across M table(s) ... REPORTED, not
+  // replayed" -- was true and useless: it said something was touched and nothing about whether it
+  // could be put back. The plan answers the second question. It still replays nothing, and
+  // summarizeRestorePlan() says so verbatim on every branch.
+  const dataRecord = summarizeRestorePlan(restorePlan, beforeImages.length);
+
+  // The schema record (slice 2). Absent on a code-only range, and that is the honest rendering:
+  // there was no schema question to answer. Present otherwise, saying either what will be downed or
+  // exactly which member blocked the range -- never "could not be rolled back" with no reason.
+  const plan = decision.schemaPlan ?? null;
+  const schemaRecord = !plan
+    ? "Schema: the migration watermark did not move in this range, so no schema action was in question."
+    : plan.reversible
+      ? `Schema: ${plan.steps.length} captured down(s) apply newest-first -- ` +
+        `${plan.steps.map((s) => `${s.name} (${s.version ?? "no version"})`).join(", ")}.`
+      : `Schema: NO automatic schema action. ${plan.reason}`;
+
+  return {
+    kind: "gated_before_build",
+    backlog_id: null,
+    display_ref: `SES-182 incident - ${trigger} on ${shortSha}`,
+    cycle_id: cycleId,
+    title: plannedRevert
+      ? `Auto-rollback: ${trigger} on ${shortSha} was NOT reverted automatically; a revert to the last green state is PLANNED for the cycle to execute`
+      : `Auto-rollback held: ${trigger} on ${shortSha} was NOT reverted, and here is exactly why`,
+    value_case: decision.reason,
+    before_after: plannedRevert
+      ? `Before and after: dev still serves ${shortSha}. Nothing has been reverted yet -- this plan runs behind the cycle's push gates and may be declined.`
+      : `Before and after: dev still serves ${shortSha}. Nothing was reverted -- the reason above names why, and this card is the whole of the action taken.`,
+    qa_evidence: [
+      `Trigger: ${trigger}. Red detail: ${decision.redDetail ?? "(none recorded)"}.`,
+      `Attribution: cycle ${decision.attribution?.cycleId ?? "(none)"}${decision.attribution?.version ? ` (${decision.attribution.version})` : ""}.`,
+      `Green anchor: ${decision.greenAnchor?.commit_sha ?? "(none recorded)"}${decision.greenAnchor?.migration_watermark ? ` @ watermark ${decision.greenAnchor.migration_watermark}` : ""}.`,
+      // SES-287: what the B37 gate actually measured, on the card rather than only in the reason.
+      `Range span: ${decision.rangeSpan?.reason ?? "(not measured)"}`,
+      dataRecord,
+      schemaRecord,
+      plannedRevert
+        ? `Revert plan (PROPOSED, NOT RUN -- this engine never runs git): ${decision.revertPlan?.command}`
+        : "Revert plan: none -- see the reason.",
+    ].join("\n"),
+    plain_cant: plannedRevert
+      ? "A push of mine went red on dev, and undoing it is not something I am allowed to do by myself."
+      : "A push of mine went red on dev and I could not safely undo it on my own.",
+    plain_after: plannedRevert
+      ? "I worked out exactly how to put dev back to the last state that passed and wrote that plan down here. It has not been run yet -- the cycle runs it behind its own checks, and may decide not to."
+      : "I left dev exactly as it is and brought you the evidence instead of guessing.",
+    plain_worth: plannedRevert
+      ? "Accept if the plan is the right call and should be run. Reverse means leave dev exactly where it is."
+      : "Accept if the call was right. Reverse puts the change back and undoes my rollback.",
+  };
+}
+
+export function signatureOf(trigger, headSha) {
+  return crypto.createHash("sha256").update(`rollback|${trigger}|${headSha}`).digest("hex").slice(0, 12);
+}
+
+// SES-373. The `rpc/record_decision` body for a card-only hold. PURE -- built and asserted without a
+// network, which is the only way the attribution rule below is testable at all.
+//
+// IT THROWS ON A MISSING CYCLE ID RATHER THAN PASSING NULL THROUGH. `record_decision()` RAISES
+// unless exactly one of cycle_id / session_name is set (`ck_decision_attribution`), so the database
+// would refuse it anyway -- but refusing here means the caller is stopped before the first write of
+// the sequence, and the message says which half is missing instead of surfacing a constraint name.
+// Attribution is not optional: an unattributed decision is a value with nobody behind it.
+// `trigger` and `headSha` are ADDITIONAL optional ctx fields the kickoff's named signature
+// (`{ cycleId, version }`) does not list, and they are here because the summary it specifies
+// interpolates both and `decide()` returns neither: the trigger is nowhere on the decision object at
+// all, and parsing it back out of `decision.reason` would be trusting prose the engine wrote about
+// itself -- the exact reading this file's own header rejects for the watermark. Purely additive: a
+// call written `{ cycleId, version }` still works, and headSha falls back to the attributed push sha.
+// `version` is accepted and deliberately unused -- the version belongs on the card and the commit,
+// and duplicating it inside the reasoning text would be a second home for it.
+export function rollbackDecisionArgs(decision, ctx = {}) {
+  const { cycleId = null, trigger = "ci-red", headSha = null } = ctx;
+  if (!cycleId) {
+    throw new Error(
+      "rollbackDecisionArgs: cycleId is required -- record_decision() raises unless exactly one of " +
+        "cycle_id / session_name is set (ck_decision_attribution), and an unattended cycle sets the cycle."
+    );
+  }
+  const shortSha = headSha
+    ? String(headSha).slice(0, 7)
+    : String(decision?.attribution?.sha ?? "").slice(0, 7) || "(unknown sha)";
+  return {
+    p_cycle_id: cycleId,
+    p_session_name: null,
+    p_kind: ROLLBACK_DECISION_KIND,
+    // An incident is not a board ticket (SES-116), and finalising a hold moves no rung -- so both
+    // the join key and the ladder class are NULL, and record_decision() finalises without touching
+    // either. That is half of what keeps this inside the ledger-writer boundary.
+    p_backlog_id: null,
+    p_summary: `Auto-rollback held: ${trigger} on ${shortSha} was not reverted (card-only)`,
+    p_reasoning:
+      `${decision?.reason ?? "(no reason recorded)"} Held, not asked: this record is the decision ` +
+      `(M6-01) and carries the 72-hour reversal handle (M6-02); no rung moves ` +
+      `(ladder_work_class NULL). pattern:0`,
+    p_ladder_work_class: null,
+  };
+}
+
+// AGT-180. THE HOLD, HANDED BACK AS DATA FOR THE CYCLE TO WRITE. Pure: it composes, it never calls.
+//
+// WHAT WAS ACTUALLY BROKEN, measured this cycle rather than recalled. The card-only assessment above
+// already runs on dev and the harness permits it -- but the `runner_decisions` kind='rollback' write
+// sits past `if (!APPLY)`, and `--apply` has been denied twice in this chain under TWO DIFFERENT
+// reasons ([Blind Apply], then [Modify Shared Resources]). So 34 CI reds on dev since 2026-09-26
+// produced 0 holds: the assessment was never the missing half, the WRITE was.
+//
+// THE FIX IS NOT A RE-SPELLED `--apply`, and this paragraph is here so no later reader "simplifies"
+// it into one. Issuing the same writes under a different flag name, or from another interpreter, is
+// SES-019's forbidden move -- routing around a hook deny with a different tool -- and it stays
+// forbidden however safe this particular instance looks. What moves is not the command but the
+// WRITER: this function emits the statement, and THE CYCLE performs it with the same Supabase tool
+// every other record_decision() on this platform already goes through. That leaves the engine as the
+// read-only assessor its own header claims to be, on every path, rather than one with an exception.
+//
+// `args` IS `rollbackDecisionArgs()` VERBATIM -- one home for the payload, never a second composer.
+// The `sql` below is a RENDERING of that object and nothing else, which is why the three NULL
+// members are asserted rather than assumed: if a later edit gave one of them a value, a hand-rolled
+// `=> null` would silently drop it and the two halves would disagree about what was decided. The
+// emitted statement is one INSERT of a new row, so it needs no before-image (§19v: a new row has no
+// prior state); that is also why it is a bare `select` and not the runbook's DO block, which exists
+// to hold a decision and the UPDATE it images inside one `now()`.
+//
+// DOLLAR QUOTING, AND WHY IT REFUSES RATHER THAN ESCAPES. The reasoning text carries decide()'s own
+// prose, which contains apostrophes on every branch; doubling them by hand is the classic way to
+// emit a statement that runs and means something else. `$hold$` is a tag chosen to be absent from
+// anything this engine composes -- and if it ever is not, this THROWS instead of producing a
+// statement whose quoting silently ends early. A refusal the caller can read beats a write nobody
+// audited.
+export const HOLD_SQL_TAG = "$hold$";
+
+export function holdWriteFor(decision, ctx = {}) {
+  const args = rollbackDecisionArgs(decision, ctx);
+
+  for (const name of ["p_session_name", "p_backlog_id", "p_ladder_work_class"]) {
+    if (args[name] !== null) {
+      throw new Error(
+        `holdWriteFor: ${name} is ${JSON.stringify(args[name])}, but the statement below renders it as ` +
+          `a literal NULL -- emitting it anyway would mean the args and the sql describe different ` +
+          `decisions. Render it properly or stop calling this.`
+      );
+    }
+  }
+
+  const lit = (name) => {
+    const text = String(args[name]);
+    if (text.includes(HOLD_SQL_TAG)) {
+      throw new Error(
+        `holdWriteFor: ${name} contains the literal ${HOLD_SQL_TAG}, which is the dollar-quote tag this ` +
+          `statement is delimited with -- emitting it would end the quoting early and change what the ` +
+          `statement says. Refusing to compose it.`
+      );
+    }
+    return `${HOLD_SQL_TAG}${text}${HOLD_SQL_TAG}`;
+  };
+
+  const sql =
+    `select public.record_decision(` +
+    `p_cycle_id => ${lit("p_cycle_id")}::uuid, ` +
+    `p_session_name => null, ` +
+    `p_kind => ${lit("p_kind")}, ` +
+    `p_backlog_id => null, ` +
+    `p_summary => ${lit("p_summary")}, ` +
+    `p_reasoning => ${lit("p_reasoning")}, ` +
+    `p_ladder_work_class => null);`;
+
+  return { args, sql };
+}
+
+// SES-373. A COPY of the card, decided. Pure and non-mutating: the caller keeps the undecided card
+// it built, which is what lets the guard assert the revert branch is NOT stamped from the same
+// builder output.
+//
+// It throws on a falsy decision id for the same reason rollbackDecisionArgs does: `decision =
+// 'retired'` with nothing behind it is the defect this ticket closes wearing a value. The reason text
+// NAMES the uuid because that text plus `runner_before_images.decision_id` IS the link -- there is no
+// decision_id column on runner_items, exactly as for every other decided row on the board today.
+export function stampCardOnly(card, decisionId, now = new Date()) {
+  if (!decisionId) {
+    throw new Error(
+      "stampCardOnly: a decision id is required -- filing 'retired' with no decision row behind it " +
+        "is the SES-373 defect wearing a value rather than closing it."
+    );
+  }
+  return {
+    ...card,
+    decision: CARD_ONLY_DECISION,
+    decision_reason:
+      `${CARD_ONLY_REASON_PREFIX} a card-only hold is a decision, not an ask. Decision ${decisionId} ` +
+      `(runner_decisions, kind ${ROLLBACK_DECISION_KIND}) is its record and its 72-hour reversal ` +
+      `handle; nothing waits on a human (M6-01). '${CARD_ONLY_DECISION}' = withdrawn as an ask ` +
+      `(SES-300), never 'accept' -- accept would read as an approval nobody gave.`,
+    decided_at: now.toISOString(),
+  };
+}
+
+// SES-287 slice 2. The two outcomes a cycle may bring back from its push gates, as DATA so the guard
+// asserts the vocabulary rather than restating it -- exactly as TRIGGER_SOURCES and
+// DOWN_CLASSIFICATIONS are. There is no third: a revert either ran or it did not, and "unknown" is
+// not an outcome to record, it is a settle call that should not have been made yet.
+export const REVERT_OUTCOMES = { DECLINED: "declined", EXECUTED: "executed" };
+export const REVERT_OUTCOME_VALUES = [REVERT_OUTCOMES.DECLINED, REVERT_OUTCOMES.EXECUTED];
+
+// BOTH outcomes file this value -- see the header. It is deliberately the same constant
+// CARD_ONLY_DECISION carries, and it is written separately rather than aliased because the two
+// clauses answer different questions and a later change to one must not silently move the other.
+export const REVERT_OUTCOME_DECISION = "retired";
+
+// Not CARD_ONLY_REASON_PREFIX, and not ses-285's close marker: assertion 7 there selects on its own
+// prefix and then demands a backlog_id that RESOLVES, which an incident card carries none of by
+// design (SES-116 -- backlog_id is a JOIN KEY).
+export const REVERT_OUTCOME_REASON_PREFIX = "Recorded by rollback-on-red (SES-287):";
+
+function assertRevertOutcome(fnName, outcome) {
+  if (!REVERT_OUTCOME_VALUES.includes(outcome)) {
+    throw new Error(
+      `${fnName}: outcome '${outcome}' is not one a cycle can report (admitted: ` +
+        `${REVERT_OUTCOME_VALUES.join(", ")}). A revert ran behind the push gates or it did not; ` +
+        "anything else is a guess about dev being written down as a fact about dev."
+    );
+  }
+}
+
+// The plan's sha range, for the prose. Absent rather than invented: a settle call whose card carries
+// no readable plan says so, which is recoverable, where a made-up range is not.
+function revertRangeOf(decision) {
+  const from = decision?.revertPlan?.from ?? null;
+  const to = decision?.revertPlan?.to ?? null;
+  return from && to ? `${from}..${to}` : "(the plan's sha range was not recorded on the card)";
+}
+
+// The short sha the card was filed under, read back off display_ref -- which buildIncidentCard()
+// composes as `SES-182 incident - <trigger> on <shortSha>`. Used only when the settle call did not
+// pass --sha, and a miss renders "(unknown sha)" rather than a blank.
+function cardShortSha(card) {
+  const hit = /\bon ([0-9a-f]{4,40})\b/i.exec(String(card?.display_ref ?? ""));
+  return hit ? hit[1] : "(unknown sha)";
+}
+
+// SES-287 slice 2. The `rpc/record_decision` body for the outcome of a planned revert. PURE, and it
+// throws on a missing cycle id for exactly rollbackDecisionArgs()'s reason: `record_decision()`
+// RAISES unless exactly one of cycle_id / session_name is set (`ck_decision_attribution`), and
+// refusing here stops the caller BEFORE the first write of the sequence instead of surfacing a
+// constraint name. An unattributed decision is a value with nobody behind it.
+//
+// `p_backlog_id` and `p_ladder_work_class` are both NULL, and that is not tidiness: an incident is
+// not a board ticket (SES-116) and recording what a cycle already did moves no rung. Those two NULLs
+// are half of what keeps this inside the ledger-writer boundary the header claims.
+export function revertOutcomeDecisionArgs(decision, ctx = {}) {
+  const { cycleId = null, trigger = "ci-red", headSha = null, outcome = null, reason = null } = ctx;
+  if (!cycleId) {
+    throw new Error(
+      "revertOutcomeDecisionArgs: cycleId is required -- record_decision() raises unless exactly one " +
+        "of cycle_id / session_name is set (ck_decision_attribution), and an unattended cycle sets the cycle."
+    );
+  }
+  assertRevertOutcome("revertOutcomeDecisionArgs", outcome);
+
+  const ran = outcome === REVERT_OUTCOMES.EXECUTED;
+  const shortSha = headSha
+    ? String(headSha).slice(0, 7)
+    : String(decision?.revertPlan?.to ?? decision?.attribution?.sha ?? "").slice(0, 7) || "(unknown sha)";
+  const range = revertRangeOf(decision);
+
+  return {
+    p_cycle_id: cycleId,
+    p_session_name: null,
+    p_kind: ROLLBACK_DECISION_KIND,
+    p_backlog_id: null,
+    p_summary: ran
+      ? `Auto-rollback executed: ${trigger} on ${shortSha} -- the planned revert of ${range} was run by the cycle`
+      : `Auto-rollback declined: ${trigger} on ${shortSha} -- the planned revert of ${range} was NOT run`,
+    p_reasoning:
+      `${decision?.reason ?? "(no reason recorded)"} The plan covered ${range}; the cycle ` +
+      `${ran ? "EXECUTED it behind its own push gates" : "DECLINED it and left dev exactly as it was"} ` +
+      `and reported the outcome back. This record IS that outcome and carries the 72-hour reversal ` +
+      `handle (M6-02); no rung moves (ladder_work_class NULL).` +
+      `${reason ? ` Cycle's stated reason: ${reason}` : ""} pattern:0`,
+    p_ladder_work_class: null,
+  };
+}
+
+// SES-287 slice 2. A COPY of the card, settled. Pure and non-mutating, for stampCardOnly()'s reason:
+// the caller keeps the undecided card it built, so a guard can hold the two side by side and prove
+// the stamp is what changed.
+//
+// IT REWRITES THE THREE TENSE-BEARING FIELDS AND NOTHING ELSE. title, before_after and plain_after
+// are the three places slice 1 had to write "PLANNED" because no branch was allowed to speak in the
+// past tense yet. Now that the cycle reports back, this is the one place that may -- and it says
+// which outcome happened in words, because the enum below cannot (both outcomes file 'retired').
+// value_case, qa_evidence and the revert plan on the card are LEFT ALONE: they record what was
+// decided and proposed at filing time, which the outcome does not change.
+export function stampRevertOutcome(card, decisionId, outcome, ctx = {}) {
+  if (!decisionId) {
+    throw new Error(
+      "stampRevertOutcome: a decision id is required -- filing 'retired' with no decision row behind " +
+        "it is the SES-373 defect wearing a value rather than closing it."
+    );
+  }
+  assertRevertOutcome("stampRevertOutcome", outcome);
+
+  const { trigger = "ci-red", headSha = null, reason = null, now = new Date() } = ctx;
+  const ran = outcome === REVERT_OUTCOMES.EXECUTED;
+  const shortSha = headSha ? String(headSha).slice(0, 7) : cardShortSha(card);
+
+  return {
+    ...card,
+    decision: REVERT_OUTCOME_DECISION,
+    decision_reason:
+      `${REVERT_OUTCOME_REASON_PREFIX} the cycle ${ran ? "ran" : "did not run"} the revert this card ` +
+      `proposed, and reported it back. Decision ${decisionId} (runner_decisions, kind ` +
+      `${ROLLBACK_DECISION_KIND}) is its record and its 72-hour reversal handle; nothing waits on a ` +
+      `human (M6-01). '${REVERT_OUTCOME_DECISION}' = withdrawn as an ask (SES-300) and it is filed for ` +
+      `BOTH outcomes -- never 'accept', which is the value trg_runner_items_accept_clears_flag keys on ` +
+      `and reads as an approval nobody gave. Which outcome it was is in the title above.` +
+      `${reason ? ` Cycle's stated reason: ${reason}` : ""}`,
+    decided_at: now.toISOString(),
+    title: ran
+      ? `Auto-rollback: ${trigger} on ${shortSha} was reverted to the last green state -- the cycle ran the revert`
+      : `Auto-rollback: ${trigger} on ${shortSha} was NOT reverted -- the cycle declined the revert, and dev still serves ${shortSha}`,
+    before_after: ran
+      ? `Before and after: dev served ${shortSha}; the cycle ran the revert behind its push gates and dev now ` +
+        `serves the revert-forward commit that undoes it. Nothing was rewritten, so every existing checkout stays valid.`
+      : `Before and after: dev still serves ${shortSha}. The revert was never run -- the cycle declined it behind ` +
+        `its push gates -- so nothing about dev changed, and the reason above is the whole of the record.`,
+    plain_after: ran
+      ? "I put dev back to the last state that passed, by adding a change that undoes the bad one rather than erasing anything."
+      : "I worked out exactly how to put dev back to the last state that passed, and then decided not to run it. Dev is " +
+        "exactly where it was, and this card is the record of that call.",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Supabase REST -- the impure half
+// ---------------------------------------------------------------------------
+
+function restHeaders(key, extra = {}) {
+  return { apikey: key, Authorization: `Bearer ${key}`, ...extra };
+}
+
+async function rest(base, key, path, init = {}) {
+  let res;
+  try {
+    res = await fetch(`${base}/rest/v1/${path}`, { ...init, headers: restHeaders(key, init.headers ?? {}) });
+  } catch (e) {
+    return { error: e.message };
+  }
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch { /* best effort */ }
+    return { error: `HTTP ${res.status}: ${body}` };
+  }
+  if (init.method && init.method !== "GET" && !(init.headers?.Prefer ?? "").includes("return=representation")) {
+    return { rows: [] };
+  }
+  try {
+    return { rows: await res.json() };
+  } catch (e) {
+    return { error: `unparseable JSON: ${e.message}` };
+  }
+}
+
+export async function readGreenAnchor(base, key) {
+  const r = await rest(base, key, "runner_green_states?select=commit_sha,migration_watermark,observed_at,version&order=observed_at.desc&limit=1");
+  if (r.error) return { error: `could not read the green anchor: ${r.error}` };
+  return { anchor: r.rows[0] ?? null };
+}
+
+export async function readPushingCycles(base, key) {
+  const r = await rest(base, key, "runner_cycles?select=id,push_sha,version&push_sha=not.is.null&order=started_at.desc&limit=200");
+  if (r.error) return { error: `could not read pushing cycles: ${r.error}` };
+  return { cycles: r.rows };
+}
+
+// The captured downs for the migrations the CYCLE named. Keyed on up_name, which is
+// runner_migration_downs' own unique key -- a name with no row simply comes back absent, which
+// schemaPlanFor() reads as "no down was captured for it" rather than as an error.
+export async function readMigrationDowns(base, key, names) {
+  const wanted = [...new Set((Array.isArray(names) ? names : []).map(String).filter(Boolean))];
+  if (wanted.length === 0) return { downs: [] };
+  const list = wanted.map((n) => `"${n.replace(/"/g, '\\"')}"`).join(",");
+  const r = await rest(
+    base,
+    key,
+    `runner_migration_downs?select=up_name,down_sql,classification&up_name=in.(${encodeURIComponent(list)})`
+  );
+  if (r.error) return { error: `could not read the captured migration downs: ${r.error}` };
+  return { downs: r.rows };
+}
+
+// AGT-184. The downs THIS cycle captured, whatever they were named -- the other direction from
+// readMigrationDowns(), which starts from the migrations the cycle NAMED and can therefore never see
+// a down whose migration never landed. Keyed on captured_by_cycle, which capture_migration_down()
+// writes itself.
+//
+// No cycle id is NOT an error and NOT unknown: an unattributable red reaches ACTIONS.NONE long
+// before this fact is consulted, so `{downs: []}` is the honest answer. A REST failure IS an error
+// and main() fail(2)s on it -- reading "no orphans" out of a failed read is the false green.
+export async function readDownsCapturedBy(base, key, cycleId) {
+  if (!cycleId) return { downs: [] };
+  const r = await rest(
+    base,
+    key,
+    `runner_migration_downs?select=up_name,captured_at&captured_by_cycle=eq.${encodeURIComponent(cycleId)}`
+  );
+  if (r.error) return { error: `could not read the downs captured by cycle ${cycleId}: ${r.error}` };
+  return { downs: r.rows };
+}
+
+export async function readBeforeImages(base, key, cycleId) {
+  if (!cycleId) return { images: [] };
+  const r = await rest(base, key, `runner_before_images?select=table_name,pk_value&cycle_id=eq.${encodeURIComponent(cycleId)}`);
+  if (r.error) return { error: `could not read before-images: ${r.error}` };
+  return { images: r.rows };
+}
+
+// SES-182 slice 4. The row-level twin of readCapturedDowns: the ENGINE ASKS, THE DATABASE DECIDES.
+// The classification cannot be done out here -- SQL NULL and the jsonb scalar 'null' are
+// indistinguishable through a PostgREST read, and the primary key of an arbitrary table is a
+// catalog question -- so this is one RPC call, exactly like every other read in this file.
+//
+// A plan that could not be fetched is UNKNOWN, never "nothing to restore": the caller renders the
+// slice-1 sentence unchanged rather than a reassuring one, the same fail-closed direction
+// `--migrations` takes when it is omitted on a red.
+export async function readRestorePlan(base, key, cycleId) {
+  if (!cycleId) return { plan: null };
+  const r = await rest(base, key, "rpc/plan_data_restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ p_cycle_id: cycleId }),
+  });
+  if (r.error) return { error: `could not read the data-restore plan: ${r.error}` };
+  return { plan: r.rows };
+}
+
+// Pure, exported, and bounded -- the summarizeGateOutput() shape, and kept pure for the same
+// reason: a summarizer buried inside the fetch is observable only through a real incident, which
+// is how a defect survives 26 rows.
+//
+// THE TWO REFUSAL GROUNDS IT MUST NEVER MERGE: 'refused' with a stale reason means CHECKED AND IT
+// MOVED; 'unverifiable' means CANNOT CHECK. Collapsing them into "not restorable" throws away the
+// distinction John decides on, and is the edit this function forbids.
+export const RESTORE_CLASSES = ["restorable", "unverifiable", "refused"];
+export const RESTORE_REASON_CAP = 3;
+
+export function summarizeRestorePlan(plan, imageCount = 0) {
+  if (!Array.isArray(plan)) {
+    return imageCount === 0
+      ? "No before-images were written in the reverted range, so no data was changed by it."
+      : `${imageCount} before-image(s) were written in this range. The restore plan could not be read, ` +
+        `so what could be put back is UNKNOWN -- nothing is replayed either way.`;
+  }
+  if (plan.length === 0) {
+    return "No before-images were written in the reverted range, so no data was changed by it.";
+  }
+  const by = (c) => plan.filter((p) => p.classification === c);
+  const restorable = by("restorable");
+  const unverifiable = by("unverifiable");
+  const refused = by("refused");
+
+  // Named grounds, commonest first, capped -- a 476-row plan must not put 476 sentences on a card.
+  const grounds = [...refused, ...unverifiable].reduce((m, p) => {
+    const g = String(p.reason ?? "unstated").split(" -- ")[0];
+    m.set(g, (m.get(g) ?? 0) + 1);
+    return m;
+  }, new Map());
+  const named = [...grounds.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, RESTORE_REASON_CAP)
+    .map(([g, n]) => `${n}x ${g}`)
+    .join("; ");
+  const more = grounds.size > RESTORE_REASON_CAP ? ` (+${grounds.size - RESTORE_REASON_CAP} further ground(s))` : "";
+
+  return (
+    `Data: ${plan.length} distinct row(s) were touched in this range. ` +
+    `${restorable.length} could be put back (${restorable.filter((p) => p.action === "delete").length} by delete, ` +
+    `${restorable.filter((p) => p.action === "upsert").length} by restore); ` +
+    `${unverifiable.length} cannot be verified as untouched since; ${refused.length} are refused. ` +
+    (named ? `Grounds: ${named}${more}. ` : "") +
+    `NOTHING IS REPLAYED -- this is the plan only, and applying it is not a power this runner holds.`
+  );
+}
+
+// §19v: no before-image logged -> the write does not happen. row_data = NULL encodes "this row did
+// not exist before", so a Reverse of a filing is a DELETE of that pk -- the INSERT convention
+// SES-89 introduced and runbook step 8b writes down.
+// SES-373 threads `decisionId` through: `runner_before_images.decision_id` is an FK to
+// runner_decisions and IS the link between a decision and the rows it touched. NULL on every caller
+// that has no decision to name (recordGreenState), exactly as before.
+async function insertBeforeImage(base, key, cycleId, tableName, pkValue, decisionId = null) {
+  const r = await rest(base, key, "runner_before_images", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({
+      cycle_id: cycleId,
+      table_name: tableName,
+      pk_value: pkValue,
+      row_data: null,
+      decision_id: decisionId,
+    }),
+  });
+  return r.error ? { error: `before-image insert failed: ${r.error}` } : { ok: true };
+}
+
+// SES-373. POST rpc/record_decision and hand back the uuid it minted.
+//
+// PostgREST returns a scalar-returning function's value as the BARE JSON SCALAR, not as a row -- so
+// the body is a JSON string, and `rows[0]` or `rows.id` would both read `undefined` and sail on with
+// an id of nothing. A non-uuid answer is therefore an ERROR here rather than a value: the whole point
+// of this call is to produce something the card can name.
+export async function recordRollbackDecision(base, key, args) {
+  const r = await rest(base, key, "rpc/record_decision", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify(args),
+  });
+  if (r.error) return { error: `record_decision failed: ${r.error}` };
+  const raw = r.rows;
+  const id = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : raw?.id ?? null;
+  if (typeof id !== "string" || !UUID_SHAPE.test(id)) {
+    return {
+      error:
+        `record_decision returned ${JSON.stringify(raw)}, which is not a uuid -- refusing to file a ` +
+        `card naming a decision that may not exist.`,
+    };
+  }
+  return { id };
+}
+
+export async function recordGreenState(base, key, row) {
+  const img = await insertBeforeImage(base, key, row.observed_by_cycle, "runner_green_states", row.commit_sha);
+  if (img.error) return img;
+  const r = await rest(base, key, "runner_green_states?on_conflict=commit_sha", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(row),
+  });
+  return r.error ? { error: `green state upsert failed: ${r.error}` } : { ok: true, row: r.rows[0] ?? null };
+}
+
+// SES-373 fixed the pk_value, and it is a correctness fix on BOTH branches rather than a tidy-up.
+// The image used to address the row by `card.display_ref`; runbook step 7b's measured note says
+// pk_value is the row's PRIMARY KEY, because reverse_decision() addresses a row by its pk and
+// REFUSES one it cannot cast to a uuid. A display_ref pk_value could never be reversed at all. So the
+// id is minted here, imaged, and POSTed with the card -- runner_items.id defaults to
+// gen_random_uuid() and accepts a client-supplied uuid (read from the catalog at this ship).
+export async function fileIncidentCard(base, key, card, decisionId = null) {
+  const id = card.id ?? crypto.randomUUID();
+  const img = await insertBeforeImage(base, key, card.cycle_id, "runner_items", id, decisionId);
+  if (img.error) return img;
+  const r = await rest(base, key, "runner_items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ ...card, id }),
+  });
+  return r.error ? { error: `incident card insert failed: ${r.error}` } : { ok: true, id: r.rows[0]?.id ?? id };
+}
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
+const ARGV = process.argv.slice(2);
+const JSON_OUT = ARGV.includes("--json");
+const APPLY = ARGV.includes("--apply");
+const SETTLE = ARGV.includes("--settle");
+
+function argValue(name, fallback) {
+  const hit = ARGV.find((a) => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : fallback;
+}
+
+// SES-287 slice 2. A settle call names a CARD, not a decision object: the decide() run that produced
+// the card happened in an earlier invocation and the cycle has been away at its push gates since.
+// This reads back the two facts the decision row needs. value_case IS decide()'s own reason (one
+// home, and SES-182's guard asserts that equality), and the sha range is read out of the
+// `--no-commit <from>..<to>` that fileIncidentCard() wrote from revertPlanFor(). That is the engine
+// reading back its OWN structured composition, not prose a cycle wrote about itself -- and a line
+// that does not match degrades to "not recorded" rather than inventing a range.
+const PLAN_RANGE_SHAPE = /--no-commit ([0-9a-f]{4,40})\.\.([0-9a-f]{4,40})/;
+
+function decisionFromCard(row) {
+  const hit = PLAN_RANGE_SHAPE.exec(String(row?.qa_evidence ?? ""));
+  return {
+    reason: row?.value_case ?? "(no reason was recorded on the card)",
+    revertPlan: hit ? { from: hit[1], to: hit[2], strategy: "revert-forward" } : null,
+    attribution: { cycleId: row?.cycle_id ?? null },
+  };
+}
+
+function fail(code, message) {
+  if (JSON_OUT) console.log(JSON.stringify({ ok: false, exitCode: code, error: message }));
+  else console.error(message);
+  process.exit(code);
+}
+
+function finish(code, payload, prose) {
+  if (JSON_OUT) console.log(JSON.stringify({ ok: true, exitCode: code, ...payload }));
+  else console.log(prose);
+  process.exit(code);
+}
+
+async function main() {
+  const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const key = process.env.SUPABASE_SERVICE_KEY ?? "";
+  if (!base || !key) fail(2, "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set (exit 2 = could not run, never a pass).");
+
+  const trigger = argValue("trigger", "ci-red");
+  const headSha = argValue("sha", null);
+  const cycleId = argValue("cycle-id", null);
+  const runId = argValue("run-id", null);
+  const version = argValue("version", null);
+  const currentWatermark = argValue("watermark", null);
+  const jobsRaw = argValue("jobs", null);
+  const migrationsRaw = argValue("migrations", null);
+  const rangeShasRaw = argValue("range-shas", null);
+
+  // -- SES-287 slice 2: --settle. The cycle is back from its push gates with what it actually did. --
+  //
+  // It sits ABOVE the --sha requirement because a settle call needs no head sha: the card already
+  // carries the sha it was filed under, and demanding one again would invite a caller to pass a
+  // different one and quietly re-label the incident.
+  //
+  // THE ORDER IS SES-373's AND IT IS LOAD-BEARING: record the decision, image the row, then patch it.
+  // A decision that will not record ends the call at exit 2 with the card untouched -- a stamped card
+  // with no decision row behind it is the SES-373 defect wearing a value. The before-image sits
+  // between them for §19v's reason: no before-image logged -> the write does not happen, and
+  // reverse_decision() addresses the row by the pk this image names.
+  if (SETTLE) {
+    const cardId = argValue("card-id", null);
+    const outcome = argValue("outcome", null);
+    const settleReason = argValue("reason", null);
+
+    if (!cardId) fail(2, "--settle requires --card-id=<uuid>: the incident card whose outcome is being recorded.");
+    if (!cycleId) {
+      fail(2, "--settle requires --cycle-id=<uuid> -- record_decision() raises unless exactly one of " +
+        "cycle_id / session_name is set (ck_decision_attribution), and it stamps the before-image too.");
+    }
+    if (!REVERT_OUTCOME_VALUES.includes(outcome)) {
+      fail(2, `--outcome must be one of ${REVERT_OUTCOME_VALUES.join(" | ")}; got ` +
+        `${outcome === null ? "(omitted)" : `'${outcome}'`}. A revert ran behind the push gates or it did not.`);
+    }
+
+    const read = await rest(base, key, `runner_items?id=eq.${encodeURIComponent(cardId)}&select=*`);
+    if (read.error) fail(2, `could not read incident card ${cardId}: ${read.error}`);
+    const row = Array.isArray(read.rows) ? read.rows[0] : null;
+    if (!row) fail(2, `no runner_items row with id ${cardId} -- refusing to settle a card that does not exist.`);
+    if (row.decision) {
+      fail(2, `card ${cardId} already carries decision '${row.decision}' -- refusing to overwrite a settled ` +
+        "outcome, which would orphan the first decision's before-image and leave the restore path pointing " +
+        "at a state that is no longer the prior one.");
+    }
+
+    const settled = decisionFromCard(row);
+    const dec = await recordRollbackDecision(
+      base,
+      key,
+      revertOutcomeDecisionArgs(settled, { cycleId, version, trigger, headSha, outcome, reason: settleReason })
+    );
+    if (dec.error) {
+      fail(2, "the revert outcome could not be recorded, so the card was left exactly as it was (a stamped " +
+        "card with no decision row behind it is the SES-373 defect wearing a value, not a lesser evil): " + dec.error);
+    }
+
+    const img = await insertBeforeImage(base, key, cycleId, "runner_items", cardId, dec.id);
+    if (img.error) fail(2, img.error);
+
+    const stamped = stampRevertOutcome(row, dec.id, outcome, { trigger, headSha, reason: settleReason });
+    const patched = await rest(base, key, `runner_items?id=eq.${encodeURIComponent(cardId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        decision: stamped.decision,
+        decision_reason: stamped.decision_reason,
+        decided_at: stamped.decided_at,
+        title: stamped.title,
+        before_after: stamped.before_after,
+        plain_after: stamped.plain_after,
+      }),
+    });
+    if (patched.error) fail(2, `the card patch failed after decision ${dec.id} was already recorded: ${patched.error}`);
+
+    finish(
+      0,
+      { settled: true, cardId, decisionId: dec.id, outcome, card: stamped },
+      `settled ${outcome}: card ${cardId}\n${stamped.title}\n` +
+        `decision ${dec.id} (runner_decisions, kind ${ROLLBACK_DECISION_KIND}; reversible for 72h)`
+    );
+  }
+
+  if (!headSha) fail(2, "--sha=<head sha> is required.");
+  let jobs;
+  try {
+    jobs = jobsRaw ? JSON.parse(jobsRaw) : [];
+  } catch (e) {
+    fail(2, `--jobs must be a JSON array of {name, conclusion}: ${e.message}`);
+  }
+  // Slice 2. Omitted is NOT "no migrations landed" -- it is "the list was not supplied", which
+  // schemaPlanFor() fails closed on. Read it with public.migrations_in_range(green, current).
+  let migrations;
+  try {
+    migrations = migrationsRaw ? JSON.parse(migrationsRaw) : [];
+  } catch (e) {
+    fail(2, `--migrations must be a JSON array of {version, name}: ${e.message}`);
+  }
+  // SES-287. The shas between the green anchor and the head, read by the CYCLE with
+  // `git rev-list <anchor>..<head>` and handed in -- this engine never runs git. Omitted is NOT "a
+  // range of one" and NOT "an empty range": it is "the list was not supplied", which
+  // rangeCycleSpan() fails closed on, exactly as schemaPlanFor() does for --migrations. Null rather
+  // than [] so an omission and a supplied-but-empty list read identically here and are both unknown.
+  let rangeShas = null;
+  try {
+    rangeShas = rangeShasRaw ? JSON.parse(rangeShasRaw) : null;
+  } catch (e) {
+    fail(2, `--range-shas must be a JSON array of commit shas: ${e.message}`);
+  }
+
+  const anchorRes = await readGreenAnchor(base, key);
+  if (anchorRes.error) fail(2, anchorRes.error);
+  const cyclesRes = await readPushingCycles(base, key);
+  if (cyclesRes.error) fail(2, cyclesRes.error);
+  // AGT-184. The attribution is needed HERE, one read early, because the ledger fact below is scoped
+  // to the attributed cycle -- decide() recomputes it from the same cycles list and must agree, which
+  // is why attributionOf() is CALLED rather than a second comparison written out (rangeCycleSpan()'s
+  // own reason: runner_cycles.push_sha is abbreviated by some cycles and the prefix match is
+  // load-bearing). No attribution -> no cycle -> {downs: []}, and decide() reaches ACTIONS.NONE anyway.
+  const attributed = attributionOf(headSha, cyclesRes.cycles);
+  const downsRes = await readMigrationDowns(base, key, migrations.map((m) => m?.name));
+  if (downsRes.error) fail(2, downsRes.error);
+  const cycleDownsRes = await readDownsCapturedBy(base, key, attributed?.cycleId ?? null);
+  if (cycleDownsRes.error) fail(2, cycleDownsRes.error);
+
+  const decision = decide({
+    trigger,
+    jobs,
+    headSha,
+    greenAnchor: anchorRes.anchor,
+    currentWatermark,
+    cycles: cyclesRes.cycles,
+    migrations,
+    downs: downsRes.downs,
+    // AGT-184 sits ABOVE `rangeShas` on purpose: SES-287 assertion 7 grades `rangeShas` as the LAST
+    // key in this call (`/rangeShas,?\s*\n?\s*\}\);/`), which is how it proves the flag is threaded
+    // through rather than parsed and dropped. A new key appended after it reads as that defect.
+    cycleDowns: cycleDownsRes.downs,
+    rangeShas,
+  });
+
+  if (!APPLY) {
+    // AGT-180. THE DRY RUN NOW HANDS THE HOLD BACK INSTEAD OF DROPPING IT. Every value below is
+    // ADDITIVE: `applied` is still false, the exit code is still 0, the `decision` object is
+    // byte-identical, and there is NO new flag -- a caller that reads neither key sees exactly the
+    // run it saw before this ship. A permitted `--apply` still writes the row itself further down,
+    // untouched, so after this ship BOTH paths record the hold.
+    //
+    // WHY THE ENGINE STOPS AT THE STATEMENT. `--apply` is denied in this chain, and the one move
+    // that is never available is re-spelling it: the same writes under another flag or from another
+    // interpreter is SES-019's forbidden route around a hook deny. So the write is handed to the
+    // CYCLE, which performs it with the Supabase tool it already uses for every other decision.
+    // Nothing here executes it, and nothing here should ever be edited to.
+    //
+    // ONLY `card-only` IS DUE A HOLD, and the other three actions say so rather than going quiet.
+    // `revert-and-card` deliberately records nothing at this point (its decision belongs to the
+    // cycle at the moment it executes the plan behind its push gates -- SES-373's own carve-out, and
+    // the ses-373 guard asserts that card stays undecided); `record-green` and `none` decided
+    // nothing to hold. A missing --cycle-id is the OTHER absent half, named separately: attribution
+    // is not optional (`ck_decision_attribution`), and an unattributed hold is a value with nobody
+    // behind it.
+    let hold = null;
+    let holdSql = null;
+    let holdReason = null;
+    if (decision.action !== ACTIONS.CARD_ONLY) {
+      holdReason =
+        `no hold is due: the assessment reached '${decision.action}', and only '${ACTIONS.CARD_ONLY}' ` +
+        `records one. '${ACTIONS.REVERT_AND_CARD}' is recorded by the cycle when it executes the plan; ` +
+        `'${ACTIONS.RECORD_GREEN}' and '${ACTIONS.NONE}' hold nothing.`;
+    } else if (!cycleId) {
+      holdReason =
+        `a hold IS due ('${ACTIONS.CARD_ONLY}') but its attribution is absent: pass --cycle-id=<uuid>. ` +
+        `record_decision() raises unless exactly one of cycle_id / session_name is set ` +
+        `(ck_decision_attribution), and an unattended cycle sets the cycle.`;
+    } else {
+      // A statement that cannot be composed is NOT a wall, on the same reading readRestorePlan() gets
+      // above: this path's whole job is to REPORT, and turning a reportable assessment into exit 2
+      // would lose the assessment as well as the hold. The refusal is named in holdReason instead.
+      try {
+        const write = holdWriteFor(decision, { cycleId, version, trigger, headSha });
+        hold = write.args;
+        holdSql = write.sql;
+      } catch (e) {
+        holdReason = `a hold IS due ('${ACTIONS.CARD_ONLY}') but no statement could be composed for it: ${e.message}`;
+      }
+    }
+
+    finish(
+      0,
+      { decision, applied: false, hold, holdSql, holdReason },
+      `${decision.action}: ${decision.reason}\n(dry run -- pass --apply to write)` +
+        (holdSql
+          ? `\nHOLD NOT WRITTEN -- run this through your Supabase tool: ${holdSql}`
+          : `\nno hold statement emitted: ${holdReason}`)
+    );
+  }
+  if (!cycleId) fail(2, "--cycle-id is required with --apply (it stamps every before-image).");
+
+  if (decision.action === ACTIONS.RECORD_GREEN) {
+    const res = await recordGreenState(base, key, {
+      commit_sha: headSha,
+      ci_run_id: runId,
+      migration_watermark: currentWatermark,
+      version,
+      observed_by_cycle: cycleId,
+    });
+    if (res.error) fail(2, res.error);
+    finish(0, { decision, applied: true }, `${decision.action}: ${decision.reason}`);
+  }
+
+  if (decision.action === ACTIONS.NONE) {
+    finish(0, { decision, applied: false }, `${decision.action}: ${decision.reason}`);
+  }
+
+  const attributedCycle = decision.attribution?.cycleId ?? null;
+  const imgRes = await readBeforeImages(base, key, attributedCycle);
+  if (imgRes.error) fail(2, imgRes.error);
+
+  // A plan that cannot be read is NOT a wall: the card falls back to the count-only sentence and
+  // says the restore picture is unknown. Refusing to card at all because the plan failed would
+  // trade a complete card for no card, on the one path where John most needs one.
+  const planRes = await readRestorePlan(base, key, attributedCycle);
+  if (planRes.error) console.error(planRes.error);
+
+  let card = buildIncidentCard(decision, {
+    cycleId,
+    headSha,
+    beforeImages: imgRes.images,
+    restorePlan: planRes.plan ?? null,
+    trigger,
+  });
+
+  // SES-373. A CARD-ONLY HOLD IS THE WHOLE OF THE ACTION TAKEN, so it is filed DECIDED, under a
+  // decision row recorded first. REVERT_AND_CARD deliberately records nothing here -- see the header.
+  let decisionId = null;
+  if (decision.action === ACTIONS.CARD_ONLY) {
+    const dec = await recordRollbackDecision(
+      base,
+      key,
+      rollbackDecisionArgs(decision, { cycleId, version, trigger, headSha })
+    );
+    // Exit 2 is *could not run*, never a pass (step 4a already says how it is noted).
+    if (dec.error) fail(2, "card-only decision could not be recorded, so no card was filed (a card " +
+      "with no decision is the defect SES-373 closes, not a lesser evil): " + dec.error);
+    card = stampCardOnly(card, dec.id);
+    decisionId = dec.id;
+  }
+
+  const filed = await fileIncidentCard(base, key, card, decisionId);
+  if (filed.error) fail(2, filed.error);
+
+  finish(
+    0,
+    {
+      decision,
+      applied: true,
+      cardId: filed.id,
+      decisionId,
+      revertPlan: decision.revertPlan ?? null,
+      schemaPlan: decision.schemaPlan ?? null,
+    },
+    `${decision.action}: ${decision.reason}\ncard ${filed.id}` +
+      (decisionId ? `\ndecision ${decisionId} (runner_decisions, kind ${ROLLBACK_DECISION_KIND}; reversible for 72h)` : "") +
+      (decision.revertPlan ? `\nrun this behind the cycle's push gates:\n  ${decision.revertPlan.command}` : "") +
+      (decision.schemaPlan?.reversible
+        ? `\nthen apply these downs newest-first, through apply_migration, behind the same gates:\n` +
+          decision.schemaPlan.steps.map((s) => `  -- ${s.name} (${s.version ?? "no version"})`).join("\n")
+        : "")
+  );
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((e) => fail(2, `rollback-on-red crashed: ${e.stack ?? e.message}`));
+}

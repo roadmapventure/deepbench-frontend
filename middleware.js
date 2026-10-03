@@ -13,6 +13,16 @@
 // and costs $0. It is NOT an api/ route and does not count against the Vercel Hobby
 // 12-serverless-function limit (api/ stays 12/12).
 //
+// THAT PARENTHESIS IS NOW GUARDED, BECAUSE IT WENT FALSE WITHOUT ANYONE EDITING IT (SES-346,
+// v7.0.446). SES-334's cron route made api/ 13 and MCP-3's api/mcp.js made it 14, and Vercel
+// answered by REFUSING EVERY DEV BUILD in silence: pushes succeeded, CI stayed green, and dev served
+// v7.0.434 for hours while ten later commits sat undeployed. The count is asserted every cycle by
+// tests/regression/ses-346-twelve-functions.test.mjs and on demand by
+// scripts/check-api-function-count.js. If a 13th function ever looks necessary, the fix is to make
+// something else stop being one -- the MCP transport now rides the executor's function through a
+// vercel.json rewrite -- never to move THIS file into api/, which would cost a function AND put the
+// gate behind the very routes it exists to run in front of.
+//
 // EVERYTHING KEYS OFF ip_org_cache -- one row per unique caller IP, already written by
 // lib/ip-org-resolver.js on the logging path. There is deliberately no separate whitelist table
 // and no environment-variable allowlist: John manages access by editing rows.

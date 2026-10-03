@@ -1,0 +1,765 @@
+<!-- DeepBench v7.0.448 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | SES-368 — M5-16, the weekly pace gate, joins the register (sixteen rows now; `tests/regression/ses-280-m5-governance-rules.test.mjs` quantifies over M5-01..M5-16). John's rule of 2026-09-11 in his words, encoded whole-days-at-100% at his instruction, enforced by `public.runner_should_boot()` as the refusal `weekly_pace` (migration `ses368_weekly_pace_gate`). Row inserted, snapshot re-exported, this file reconciled — in that order, one commit. -->
+<!-- DeepBench v7.0.412 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | SES-320 — M5-14 gains a dated note NAMING THE MECHANISM that performs it, and the rule STATEMENT is untouched: no registry row edit, no re-export of docs/governance/RULES-SNAPSHOT.md, so the byte-for-byte registry↔doc equality tests/regression/ses-280-m5-governance-rules.test.mjs pins is unaffected. What the rule lacked was an executor for “closes on verifier pass once its reversal window elapses”: sweep_decision_windows finalised the decision and never touched backlog_items, so from SES-285 (which retired the Accept tap) to this ship a `delivered` ticket had NO exit and sixteen rows sat there. Migration ses320_delivered_exit makes the sweep write `done` on a still-`delivered` ticket whose kind=ship decision it has just finalised — any class, any epic — returning the count as a third OUT column `closed`. The timing distinction M5-14 draws is preserved exactly (original / gate-review may still auto-done at ship through 7a’s rung; discovered / john-named reach done only on verdict PLUS window), and a block finalises nothing because record_ship_decision refuses a non-approve verdict. THE SES-154 RETIREMENT LIVES HERE RATHER THAN IN docs/SELFBUILD-RETIREMENT-LEDGER.md, deliberately and on the kickoff’s own §7 instruction — the ledger entry would have been this session’s fifth repo file, so it folds into the same note; it names what SURVIVES (the `delivered` status, its pick-predicate exclusion, its silent step-past, its kept queue slot) and a restore path that must remove the sweep’s ship branch in the same change, because leaving both would close one delivery twice. -->
+<!-- DeepBench v7.0.390 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | close-out of session design-m5-fixes-0902 (attended, Fable 5.1 design, Opus 5 coding agents) — the SES-184 gate record gains its completion amendment: SES-308 (v7.0.389) and SES-309 (v7.0.390) are done with live QA, so M5 is complete against the 9-ticket required set. Doc-only plus the backlog snapshot re-export; the status writes, before-images and scoreboard stamps are in Supabase. No rule STATEMENT changed. -->
+<!-- DeepBench v7.0.388 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | M5 gate review (session design-m5-gate-review-0902, attended, Fable 5.1) — the SES-184 gate record gains one amendment: John's "yes, file the two tickets" adds SES-308 and SES-309 to the M5 required set (9 tickets, 16 cycles) and supersedes the "M5 COMPLETE" paragraph. Doc-only plus the backlog snapshot re-export; the rows, drain-scope entries and before-images are in Supabase. No rule STATEMENT changed, so the ses-280 registry↔doc equality guard is untouched. -->
+<!-- DeepBench v7.0.358 | docs/RUNNER-GOV-M5-REQUIREMENTS.md | SES-280 — the M5 prioritization and auto-close rule set (M5-01..M5-15) gets its canonical home. FEATURE: SES-280 — Phase 1 (encode) of the two-phase split: this file and the fifteen public.governance_rules rows it renders land together, and B3 is superseded by M5-02 in the same commit per the SELFBUILD-CHARTER transition rule ("leaves no commit where neither is in force"). Phase 2 — script enforcement in drain_epic_next() / recompute_backlog_queue() — is a follow-up ticket; every rule below records the enforcement it is INTENDED to have, and the `script` ones are not executable yet. -->
+# Selfbuild M5 — Prioritization and Auto-Close Requirements Register
+
+> **The registry is authoritative.** Each rule below is one row in `public.governance_rules`
+> (`source_group = 'selfbuild-m5-register'`, `status = 'live'`). **This file is that row's canonical
+> home, and each statement here is byte-for-byte the row's `statement` column** — never a paraphrase
+> and never a second wording. `docs/governance/RULES-SNAPSHOT.md` is the third, *generated* copy;
+> it is written only by `node scripts/export-governance-snapshot.js` and never by hand. When a rule
+> changes: **edit the row, re-export the snapshot, then reconcile this file** — in that order, in one
+> commit.
+>
+> **Provenance.** John approved this rule set conversationally on 2026-09-01 after an extended
+> accounting review of the drain, in his words: *"Lets use my rules and put them in place along with
+> the rules you have written up. These are the rules that protect the original scope of project self
+> build."* and *"Let's get the rules executing in the system first, then let's review what is/is not
+> working after rules are encoded."* Encoded by `SES-280` (`v7.0.358`), kickoff
+> `docs/kickoffs/v7.0.358-SES-280-m5-governance-rules.md`.
+
+## What the numbers were when these rules were written
+
+Every rule below answers a measured defect, not a hypothetical. The measurements are from the
+2026-09-01 accounting review, over the week beginning at the 2026-08-28 07:00Z weekly reset:
+
+- **191,703,000 tokens across 140 cycles.** 138,703,000 (72.4%) shipped 55 tickets;
+  **53,000,000 (27.6%) shipped nothing.**
+- The **69 non-shipping cycles touched only 12 distinct tickets** — about **5.75 cycles per stuck
+  ticket**. Cost is concentrated in re-picking the same small set, not spread thinly.
+- An average completed Selfbuild ticket costs **1,663,212 tokens**, across 80 `done`/`delivered` rows.
+- **4 of 71 shipped cycles this week carry no `item_id`**, and 6 more carry an `item_id` matching no
+  `backlog_items` row — so per-ticket cost queries silently drop them. Separately, **23 `done`
+  Selfbuild tickets carry a null `session_ref`.**
+- `Selfbuild M5`'s own design gate `SES-184` sat at `design_status = 'needs-john'` while M5 already
+  held **10 open member tickets**, two of them (`SES-276`, `SES-277`) filed the same day by a runner
+  cycle — against a charter that says members are filed at the gate, "never speculatively".
+
+Three structural defects sit behind those numbers, and the fifteen rules are grouped against them:
+**no scope fence** (M5-01), **a rolling-wave rule that is prose only** (M5-02, M5-09), and
+**ticket↔cycle attribution that leaks** (M5-11, M5-13).
+
+## Phase split — what is and is not executable today
+
+This register is **Phase 1: encode**. The rows exist, this file is their home, and B3 is retired in
+the same commit. **Phase 2 wires the `script` rules into the pick path** (`drain_epic_next()`,
+`recompute_backlog_queue()`) and is a separate ticket. Said plainly so no reader mistakes a recorded
+intent for a live gate: **a rule marked `script` below is not yet enforced by any script.** The
+`prose` and `reviewer` rules bind a reader from the moment they are live.
+
+**Deliberately not in this register:** the enhancement-lane rules (admission test, weekly enhancement
+cap, promotion path). They wait on John's decision about the cap percentage, raised 2026-09-01 and
+unanswered; filing them half-decided would cost a second amendment cycle under the charter's
+transition rule. **Resolved 2026-09-02 (`SES-283`, v7.0.379):** John set the cap — verbatim *"20% is
+fine"* — and the three rules now live in their own register, `docs/RUNNER-GOV-ENHANCEMENT-LANE.md`
+(`EL-01`..`EL-03`, `source_group = 'enhancement-lane-register'`), enforced in the same two pick homes
+as `M5-01`/`M5-02`/`M5-09`.
+
+---
+
+## The rules
+
+### <a id="M5-01"></a>M5-01 — the scope fence (`script`)
+
+> A ticket is eligible for unattended development only if its `epic_id` resolves to a `Selfbuild M0`–`M7` epic, or an enhancement admitted under EL-01; unlinked or non-Selfbuild tickets are never picked by a cycle unless admitted as such.
+
+Drain eligibility is currently a directive-named list (`runner_drain_scope`) — a name, not a
+structural property, so nothing prevents non-Selfbuild work entering the unattended lane. This makes
+eligibility a property of the ticket's own `epic_id`, which cannot be widened by naming.
+
+**Amended `SES-321`, 2026-09-03 (`v7.0.416`), decision `182655e3-f559-4b46-9457-7d3df8bbf998`.**
+Measured while filing `LOG-143`: `prime_directive_queue()`'s `buildable` CTE INNER JOINed `epics` on
+`name ILIKE 'Selfbuild%'` before the `EL-01` admission clause was ever evaluated, so an unlinked
+ticket admitted under `EL-01` — claim, rationale and cycles present, under the weekly cap — could
+never reach the pick path, reproduced live on a rolled-back fixture (served after the fix, not
+served once its claim was blanked). Admission is the scope argument for an enhancement, exactly as
+`docs/RUNNER-GOV-ENHANCEMENT-LANE.md`'s `EL-01` already said, so this rule's fence now reads it: the
+epic link and `EL-01` admission are two ways to clear the same gate, never two separate ones.
+Migration `ses321_enhancement_passes_fence` makes `prime_directive_queue()`'s `buildable` CTE a
+`LEFT JOIN` on `epics` with the fence evaluated as `(Selfbuild epic OR admitted enhancement)` in one
+condition, so the enhancement half is never discarded before it is read. `drain_chain_gate()` and
+`runner_should_boot()` were read and left untouched: both inherit the fence through
+`prime_directive_queue()`/`drain_epic_next()` rather than restating it. `drain_epic_next()`'s own
+named-drain-scope fence is a separate predicate on a different concept (a directive's fixed named
+member list) and is out of this migration's scope.
+
+### <a id="M5-02"></a>M5-02 — the filing lane, and B3's retirement (`script`)
+
+> Order the pickable board by filing lane first: tickets with `filed_at` before 2026-08-21 take the priority lane, tickets filed on or after it enter a review bucket that requires explicit promotion before pick; within a lane, order by tier then priority class P1→P10. Supersedes B3.
+
+**This is the rule that retires B3**, whose live ordering ended *"then newest-to-oldest within
+class"* — the exact inverse of the priority lane John set. Both could not be live, so B3's
+supersession ships in this same commit (charter transition rule: a rule changes only via a shipped
+ticket whose own commit lands the replacement and retires the old rule, leaving no commit where
+neither is in force). Retirement entry: `docs/SELFBUILD-RETIREMENT-LEDGER.md`.
+
+### <a id="M5-03"></a>M5-03 — the matrix carries what the picker selects on (`prose`)
+
+> The per-ticket governance matrix mandated by FILE-MATRIX additionally carries `epic_id`, `filed_at` and `scope_rationale`: M5-01 and M5-02 select on the first two, and `scope_rationale` (why the ticket belongs in its epic's chartered scope, naming the charter goal it advances) is the review bucket's promotion criterion — a ticket filed on or after 2026-08-21 with no scope rationale is not promoted out of the bucket and is never picked. FILE-MATRIX's fail-LOUD tripwire covers the added fields.
+
+A selector the picker reads but the matrix does not carry is a field nobody can audit after the fact.
+The two new columns are exactly the two M5-01 and M5-02 select on, and they inherit FILE-MATRIX's
+existing fail-LOUD behaviour rather than getting a second, quieter one.
+
+**Extended 2026-09-02 (`SES-295`, v7.0.377), John 2026-09-01 verbatim: _"on tickets created after 8/21, are you stating why they have been added to original scope?"_** Measured answer then: no — 11 of the 13 open post-cut M5 tickets carried provenance ("named by the M4 gate review", "found live by cycle X") but no *justification*. `scope_rationale` joined the matrix in `SES-295`'s first half (`v7.0.361`); this half makes it bite. **Three things shipped together:** (1) every open Selfbuild ticket filed on or after 2026-08-21 — 24 rows — now carries a rationale naming the charter goal it advances (before-images `session_name = 'design-ses-295-0902'`), so nothing is stranded by (2); (2) the rationale is **the promotion criterion `M5-02` always said the review bucket needed and never had**: `drain_epic_next()` and `prime_directive_queue()` exclude a post-cut Selfbuild ticket with no rationale (migration `ses295_scope_rationale_promotion`, the same anchored-replace pattern as `SES-305`), and the drain census reports "N awaiting scope rationale (…)" so the rejection is never a silent empty; (3) `FILE-MATRIX`'s statement names the field, and the canonical filing `INSERT` in `docs/runbooks/session-setup.md` carries it. **Deliberately not fail-closed at the database:** FILE-MATRIX chose fail-LOUD so the runner's own filing path can never park mid-drain on a NOT NULL; the pick-time exclusion is the enforcement, and `SES-279`'s tripwire is the alarm. Pre-cut tickets (filed before 2026-08-21) are untouched — the priority lane never needed a promotion.
+
+### <a id="M5-04"></a>M5-04 — answer from the matrix, never by re-deriving (`prose`)
+
+> Answer every question about incomplete tickets from `public.ticket_matrix` in its stored columns, never by re-deriving the figures per question. Every such answer shows, at minimum: priority order (`queue`), `backlog_id`, title, `epic`, `milestone`, `milestone_required`, `priority_class`, `filed_at` as the created date, `status`, `scope_rationale`, `predicted_cycles`, `predicted_tokens`, `predicted_pct_of_week`, and the blocked/defer flags. A milestone's required set is the stored `milestone_required` flag, set at its gate decision and never re-judged per question.
+
+Re-deriving per question is how two answers to the same question disagree. It is also what the
+accounting review had to do — and the re-derivation is where the missing `item_id` rows silently
+dropped out of the totals.
+
+**Amended 2026-09-01 (`SES-294`, v7.0.360), John verbatim: _"Include in the matrix, and make this
+permanent - epic, date created, priority order."_** The column list above is now part of the rule
+rather than a convention each answer re-chooses, which is what let `epic` and the filing date drop
+out of earlier answers. **`filed_at` is the created date, never `created_at`** — `created_at` records
+when a row was bulk-loaded into Supabase during the board migration, so ordering or reporting by it
+misdates most of the board; `filed_at` is mined from git history (`B10`) and is also what `M5-02`'s
+priority lane selects on.
+
+**Extended 2026-09-01 (`SES-295`, v7.0.361), John verbatim: _"add that column from here on out to the matrix as well"_** — `scope_rationale` joins the mandated list. It records *why* a ticket belongs in its epic's chartered scope (which charter goal it advances), as distinct from `scope_origin`, which records only *where the ticket came from*. Measured when the column was added: 11 of the 13 open post-2026-08-21 `Selfbuild M5` tickets carried no scope reasoning at all, so `M5-02`'s review bucket had no criterion to review against.
+
+**Bug found and fixed in the same change — `ticket_matrix` was serving the wrong date.** The view read `b.created_at AS filed_at`, so every answer that sourced the filing date from the matrix was actually reporting the board-migration bulk-load timestamp under the name `filed_at`. Worst live case: `AA-01` reported 2026-08-20 for a ticket genuinely filed 2026-06-13, a 68-day error. Impact was contained — across the 32 open Selfbuild tickets 5 dates differed and **zero** changed lane under `M5-02` — but `SES-281` was about to wire the pick path to that column, which would have made the mislabel decision-bearing. The view now selects `b.filed_at`.
+
+**Extended 2026-09-02 (`SES-304`, v7.0.374), John verbatim: _"create a new Milestone field, and appropriately label each ticket to their correct milestone"_ and _"add to the list of columns in the matrix … the new milestone field"_** — `milestone` and `milestone_required` join the mandated list, and the last sentence of the rule is new. The defect it answers is in `docs/M5-HANDOFF-2026-09-02.md` goal 2: *"what is needed for M5"* was asked six times on 2026-09-01/02 and answered six ways, because the required set was never stored and so was re-judged on every asking — this rule's own prohibition, violated for an evening. Two columns on `backlog_items` now hold what was being re-derived: **`milestone`** (`M0`…`M7`) is the milestone a ticket *serves*, and **`milestone_required`** is whether the ticket is in that milestone's required set as ruled at its gate. **`epic_id` keeps its job as the pick lane** (`M5-01`, `M5-02`, `M5-09` all select on it) and is deliberately *not* what `milestone` reports on: the seven M5-epic tickets the `SES-184` gate record names as serving other milestones carry `milestone` = `M2`/`M4`/`M6`/`M7` while their epic stays M5, so nothing reopens the accepted M4 and nothing loses pickability — moving their epics is John's call and is one `UPDATE` if he makes it. Backfilled for every Selfbuild ticket from its epic; the M5 required set is exactly the eight tickets the gate record names. Five tickets that carried **no epic at all** (`SES-290`, `SES-291`, `SES-292`, `SES-293`, `SES-279` — three of them John's own instructions) were invisible in every milestone view and unpickable under `M5-01`; they now sit in M2 (`SES-292` in M5, `milestone_required = false`). Every changed row has a before-image (`session_name = 'design-m5-milestone-0902'`).
+
+**Bug found and fixed in the same change — the matrix never carried `priority_class`.** This rule has mandated `priority_class` in every answer since `SES-280` (v7.0.358), and `public.ticket_matrix` had no such column, so no answer that obeyed *"from the matrix"* could also obey the column list. The view now carries it, appended with the two new columns so every existing positional reader is unaffected.
+
+### <a id="M5-05"></a>M5-05 — a new rule declares its own metadata (`reviewer`)
+
+> Every new governance rule declares `canonical_doc`, `enforcement` and `status`, sets `superseded_by` on any rule it replaces, and is checked against the live rule set for duplication before it ships.
+
+The registry's value is that no rule is homeless, no rule is silently duplicated, and no replacement
+leaves its predecessor live. **This rule applies to its own filing**: all fifteen rows below were
+checked against the live rule set for a duplicate `statement` before insert, and that check is pinned
+by assertion 4 of `tests/regression/ses-280-m5-governance-rules.test.mjs`.
+
+### <a id="M5-06"></a>M5-06 — the weekly wall, not just the daily ceiling (`script`)
+
+> Never start a ticket whose predicted cost exceeds the remaining weekly usage headroom; B32's daily ceiling does not bound the weekly wall.
+
+B32 bounds a **day**. Nothing bounded the **week**, which is the wall that actually stops work — and
+at 1,663,212 tokens for an average completed ticket, a single start can consume the remaining weekly
+headroom and strand itself mid-build.
+
+**Annotated 2026-09-14 (`SES-390`, `v7.0.483`) — the wall grades *two* meters now, and the statement
+above did not need to change to say so.** The subscription carries a per-model Fable meter alongside
+the all-models one, and the judgment lane runs on `claude-fable-5-1`: when Fable is spent, every
+judgment call in a cycle fails while a gate reading `all_models_pct` alone happily boots it. Measured
+2026-09-13 11:12 CT: all models 53, Fable 83 — the gate saw 53 and answered `pickable`. So
+`public.runner_should_boot()` now grades `detail.gated_pct` = `GREATEST(all_models_pct, fable_pct)`
+against the one `runner_budget.weekly_rest_pct`, and `detail.gated_meter` names which meter that
+number came from (a tie reads as `all_models`). **What did not move: the headroom arithmetic.**
+`detail.weekly_headroom_pct` is still `100 − all_models_pct`, because `runner_pct_per_cycle()` is
+calibrated from all-models deltas and pricing a ticket against the Fable meter would compare two
+different units. One wall, two meters, one set of units for cost.
+
+### <a id="M5-07"></a>M5-07 — cheapest-first within a lane (`script`)
+
+> Within the same lane and priority class, break queue ties by lowest `predicted_cycles` first.
+
+With 27.6% of the week's tokens producing nothing, tie-breaking toward the cheapest remaining ticket
+converts the same headroom into more shipped tickets. It changes only ties — never a lane, never a
+class.
+
+### <a id="M5-08"></a>M5-08 — blocked work is not remaining work (`script`)
+
+> A ticket with `blocked_by` set is never picked and never counts toward a drain's remaining-work total.
+
+Two failures, one clause: a blocked ticket must not be picked, and it must not inflate the
+remaining-work number a drain reports — an inflated remainder makes a finished drain look unfinished
+and keeps it running.
+
+### <a id="M5-09"></a>M5-09 — the rolling wave, enforced (`script`)
+
+> No milestone member ticket is pickable while that milestone's design-gate ticket is unresolved (`status <> 'done'`).
+
+The charter already says members are filed at the gate and never speculatively — as prose, with
+nothing enforcing it. Measured: M5's own gate `SES-184` sat unresolved while M5 held 10 open
+members, two of them filed that same day by a cycle.
+
+**Amended by `SES-285` (`v7.0.359`) — see the amendment note at the foot of this file.** The
+original wording made the gate unresolved when its ticket carried `design_status = 'needs-john'`
+*or* was not `done`. `M6-01` retires `needs-john` as a blocking state outright, so that half of the
+clause now names a state no ticket can be in. **What the rule tests is unchanged in substance:** a
+milestone gate blocks its members while the gate ticket is not `done`, which is the condition that
+was always doing the work.
+
+### <a id="M5-10"></a>M5-10 — three cycles, then it stops (`script`)
+
+> A ticket that has consumed three cycles without shipping is auto-deferred with `defer_status = 'stuck'`, recorded with its defer reason and surfaced in the standing brief, never silently re-picked.
+
+This is the single largest measured leak: 69 non-shipping cycles across **12** tickets, ~5.75 cycles
+each. Three is the point past which the evidence says another attempt is not the answer, and the
+record is what makes the stall visible instead of silently expensive.
+
+**Amended by `SES-285` (`v7.0.359`).** The original wording deferred the ticket *"and carded for
+John"*. The card surface is retired (`M6-01`, `M6-06`), and a card was in any case the wrong
+instrument here: the stall needs to be **visible**, not **decided**, and 42 of the 45 stalled cards
+prove a card is not a visibility mechanism. The defer reason plus the standing brief
+(`docs/runbooks/standing-brief.md`, regenerated at every ship) is the surface that is actually read.
+
+**Executing in part since `SES-305` (`v7.0.375`, 2026-09-02) — the half that stops the re-pick.** Measured before the change: no pick or gate function read `defer_status`, and the column's own CHECK admitted only `no` / `maybe` / `yes` — so this rule could be neither *written* (`'stuck'` was rejected) nor *enforced* (a deferred ticket kept its queue number and stayed pickable; `SES-237` sat deferred at queue 280, and `SES-82`, deferred by John the same morning, was still `runner_should_boot()`'s live pick). `SES-305` makes deferral real in the three homes, following the `blocked_by` / `M5-08` pattern: `recompute_backlog_queue()` gives a `yes`/`stuck` ticket no queue number (`B4`: a null queue is unpickable), `drain_epic_next()` excludes it explicitly in the pick predicate and reports it as its own census bucket ("N deferred (…)") so the rejection is never a silent empty, and `prime_directive_queue()` excludes it in the `buildable` CTE so the two homes cannot drift; `drain_chain_gate()` and `runner_should_boot()` read those two and inherit it. The CHECK now admits `'stuck'`, with `defer_reason` mandatory for `yes` and `stuck` alike. **Deferral is a queue-recompute event** (`B4`'s list, extended): whoever writes `defer_status` runs `recompute_backlog_queue()`, exactly as a status write does. `FILE-MATRIX`'s `no / maybe / yes` is unchanged — those are the *filing-time* values; `stuck` is written only by the platform, never at filing. **Still recorded-only: the writer half** — "three cycles without shipping → `stuck`". It cannot execute yet because a `failed` cycle carries no `backlog_item_id` (6 of 6 on 2026-09-02; `SES-282` typed only shipped and gated cycles), so there is nothing to count; the ticket that gives a failed cycle its ticket at *pick* time rather than at ship time is the prerequisite, and `M6-11` already says a rule-filtered skip never counts toward the stuck count.
+
+### <a id="M5-11"></a>M5-11 — auto-close needs a complete cost row (`script`)
+
+> Auto-close requires build green, regression green, hygiene no-new-flags, and a complete cost row: every cycle that worked the ticket carries its `item_id`, and `ticket_cost` resolves for it.
+
+`runner_cycles.item_id` is free text with no FK. This week 4 of 71 shipped cycles carry none and 6
+more carry an id matching no ticket, so their cost is invisible to every per-ticket query. A ticket
+that cannot be costed has not finished being accounted for, whatever its build says.
+
+### <a id="M5-12"></a>M5-12 — a healing ticket proves the failure stopped (`reviewer`)
+
+> A Selfbuild M5 healing ticket holds at `partial` until the failure it claims to fix is observed non-recurring for 72 hours; only then may it write `done`.
+
+M5 is the closed-loop *healing* epic: its tickets claim a recurring failure has stopped. That claim is
+an observation over time, not a green build, and 72 hours is the window that spans a full scheduler
+cadence rather than a single quiet afternoon.
+
+**Instrumented 2026-09-02 (`SES-303`, v7.0.382).** "Observed non-recurring for 72 hours" was a
+judgment with no instrument. It now has one: every ship stamps `public.platform_scoreboard` (five
+standing numbers — no-ship cycles and their tokens this weekly window, shipped cycles, tokens per
+shipped cycle, cycles per shipped ticket, worst silence between fires; migration
+`ses303_platform_scoreboard`), and `public.ticket_outcome` reads, for each shipped ticket, the row
+stamped at its ship as *before* and the newest row at least 72 hours later as *after* — exactly this
+rule's window — grading the ticket's claim (`enhancement_claim`, "metric: down|up") as `held`,
+`did_not_hold`, `unmeasurable` or `pending`, with all five deltas beside it so a regression nobody
+claimed still shows. John chose this shape (verbatim *"b"*) over per-ticket claims: one stored
+series, zero ceremony per ticket, the same answer on every asking. **Stated so it is not assumed:**
+attended ships write no `runner_cycles` row (`M5-11`/`M5-13`'s gap), so the cycle-derived numbers
+move only with unattended fires; an attended ship still stamps the row (session-setup step 4) so its
+before/after distance is real. The series starts 2026-09-02; nothing before it is measurable and no
+row is backdated.
+
+### <a id="M5-13"></a>M5-13 — attribution is written, not warned about (`script`)
+
+> A ship writes `session_ref` and `item_id` in the same transaction as the status change; a ship with either field null is rejected, not warned.
+
+23 `done` Selfbuild tickets carry a null `session_ref` today, which is what a warning produces. Writing
+both fields in the same transaction as the status change is the only form that cannot drift, because
+there is no window in which the status is set and the attribution is not.
+
+### <a id="M5-14"></a>M5-14 — auto-close does not reach John's own work (`reviewer`)
+
+> Auto-close never applies to a ticket whose `scope_origin` is not `original` or `gate-review`; `discovered` and `john-named` work closes on verifier pass once its reversal window elapses.
+
+Auto-close is a delegation of *John's* judgment, and he delegated it for the work the platform scoped
+itself. Work he named, or that a cycle discovered mid-build, does not take the same fast path.
+
+**Amended by `SES-285` (`v7.0.359`).** The original wording ended *"closes only on John's Accept"*,
+which is the tap this project retired. **The distinction the rule draws survives intact, and it is a
+distinction in timing, not in whether the rule still bites:** `original` and `gate-review` work
+auto-closes at ship, while `discovered` and `john-named` work closes only after its verifier verdict
+*and* the elapse of its 72-hour reversal window (`M6-02`). So John's own work still cannot be closed
+by the mechanism that scoped it, and it still cannot be closed on the day it ships — it is closed by
+a verdict plus his opportunity to reverse, rather than by his tap.
+
+<!-- FEATURE: SES-320 — the register names the mechanism that performs this rule; the rule statement is unchanged. -->
+**Mechanism named 2026-09-02 (`SES-320`, `v7.0.412`, migration `ses320_delivered_exit`). THE RULE
+STATEMENT ABOVE IS UNCHANGED — no registry row edit, and no re-export of
+`docs/governance/RULES-SNAPSHOT.md`.** What this rule lacked was the thing that performs *"closes on
+verifier pass once its reversal window elapses"*: `public.sweep_decision_windows()` finalised the
+decision and never touched `backlog_items`, so between `SES-285` (which retired the Accept tap) and
+this ship a `delivered` ticket had **no exit at all** and sixteen rows sat there. The sweep now
+writes `done` on a ticket still `delivered` whose `kind='ship'` decision it has just finalised — any
+class, any epic — and returns the count as a third column, `closed`. **The timing distinction this
+rule draws is preserved exactly:** `original` / `gate-review` work may still auto-`done` at ship
+through step 7a's rung, while `discovered` / `john-named` work reaches `done` only through its
+verdict *plus* the elapse of the window. A block never finalises, because `record_ship_decision()`
+refuses a non-`approve` verdict and so records nothing for the sweep to close.
+
+**And the `SES-154` clause *"only John's Accept writes `done`"* is RETIRED here rather than in
+`docs/SELFBUILD-RETIREMENT-LEDGER.md`** — deliberately, on the `SES-320` kickoff's own instruction
+(§7: the ledger entry folds into this note if it would be this session's fifth repo file, and it
+would have been). **Retired by:** `SES-320`, 2026-09-02, `v7.0.412`. **Superseded by:** a verifier
+verdict plus a reversal window — the sweep's finalisation, which is the mechanism this same note
+names above. **Why, and it is not merely that the tap went away:** `SES-285` retired the surface the
+clause depended on, so for eleven days the clause named a mechanism that could not fire and the only
+consequence was tickets accumulating in a state with no exit — a rule nobody can satisfy is not a
+gate, it is a leak. **What SURVIVES the retirement, and a later editor must not read this as
+permission to remove it:** the `delivered` status itself, its exclusion from every pick predicate
+(migration `ses154_delivered_status`), its silent step-past at step 5, and its **keeping its queue
+slot** while it waits — all four are `SES-154`'s and all four are untouched. **Restore path:**
+re-adding an Accept-driven `done` write to the step-9 harvest is not sufficient and not safe on its
+own — the `kind = 'ship'` branch must come out of `sweep_decision_windows()` in the same change,
+because leaving both would close one delivery twice.
+
+### <a id="M5-15"></a>M5-15 — staleness has two consequences, and each has exactly one home (`script`)
+
+> Staleness of the freshest `runner_usage_readings` row has two consequences and each has exactly one home: past `runner_settings.meter_stale_hours` (default 2, John's number, `SES-389`) `public.runner_should_boot()` refuses the boot as `meter_stale`, naming `reading_taken_at` and the threshold; past 48h `public.resolve_day_token_cap()` RUNG 2 lowers the ceiling to `stale-floor`, which a standing daily max may not override. No other gate carries a staleness threshold or a cap.
+
+**Amended 2026-09-14 (`SES-389`, `v7.0.482`, migration `ses389_meter_stale_gate`).**
+<!-- FEATURE: SES-389 — the rule STATEMENT changed, so the row and this blockquote move in one
+     commit or check 9/10/11 reads a live rule against stale doc text. -->
+**The third rewrite, and it is not a reversal of the second — it is the distinction the second one
+was missing.** `SES-302` was right that *the cap* has one home and that a second copy of it here
+disagreed with `resolve_day_token_cap()` on live data. What it then did was drop the consequence
+*and* the threshold together, leaving the age **printed and not graded** — and the bill arrived:
+**between 2026-09-12 18:42Z and 2026-09-13 09:41Z, 22 cycles shipped against one reading written
+17:45Z on the 12th**, each one answering *"is there weekly headroom"* from a number up to 22 hours
+old. A 22-hour-old meter is not a measurement of now; it is a measurement of yesterday wearing
+today's label. So there are **two** consequences, not one, and they were never the same question:
+*may this fire start at all* (the reading's currency — this gate, `meter_stale_hours`, default 2)
+and *what may it spend* (the ceiling — RUNG 2, 48h, `stale-floor`). The 2026-09-01 defect was **one
+consequence with two homes at two thresholds**; this is two different consequences with one home
+each, which is why the two numbers may legitimately differ. Default 2 is John's: the reader writes
+every 30 minutes, so 2h is four missed readings — a signal, not a blip. It is a `runner_settings`
+column rather than a literal precisely so moving it is not a migration. **The refusal `SES-280`
+shipped at 24h and `SES-298` withdrew is NOT what came back:** that one made a number only John
+could type into a precondition for autonomy (`M6-01`), and the reason it is safe now is that the
+reader is being automated (`SES-388` / `SES-392`) — the refusal names `reading_taken_at` and the
+threshold in its `detail` so a parked runner says exactly which reading it is waiting past.
+
+**Rewritten twice on 2026-09-01/02, and the second rewrite is the instructive one.** `SES-280`
+shipped this as a *refusal* at 24h; within the hour it live-blocked the drain, because the only way
+to refresh that reading is John typing it (`SES-82` is unbuilt) — a number only he can produce
+turned into a precondition for autonomy, which `M6-01` forbids. `SES-298` changed the consequence
+from refusal to degradation. **`SES-302` found that even that was still wrong**: the platform had
+owned this mechanism the whole time in `resolve_day_token_cap()` RUNG 2 — same fallback value, but
+at **48h**, with the spec-verbatim comment *"The box does NOT defeat it"*. So the rule had become a
+second home at a different threshold, and with the reading at 35.4h the two returned **opposite
+answers on the same fact** (resolver 196M via the standing box; the gate 3M). The rule now
+*describes* RUNG 2 rather than competing with it, and `runner_should_boot()` carries neither a cap
+nor a staleness verdict. **The lesson worth more than the rule: a rule about a mechanism was written
+twice without reading the function that implements it.**
+
+M5-06 bounds a start against remaining weekly headroom, and that bound is only as good as the reading
+it is computed from. A stale reading makes the headroom check pass on numbers that no longer describe
+the week — so the *consequence* belongs on the reading's age, not on the arithmetic.
+
+**Amended 2026-09-01 (`SES-298`, `v7.0.365`), and the amendment is the whole point of the rule.**
+This shipped worded as a refusal, and within the hour it was live-blocking the drain on a 32.66h-old
+reading. The only way to refresh that reading is John typing it — `SES-82`, the programmatic read,
+is unbuilt — so the refusal made **a number only John can produce into a precondition for autonomous
+work**, which is exactly what `M6-01` forbids, written by the same session that retired the card
+surface. It also ignored a mechanism the platform already had: `runner_budget.stale_fallback_tokens`
+(3,000,000) exists so a cycle can run under a smaller ceiling when the meter is old. Staleness is
+still graded and still reported (`detail.reading_stale`, `detail.reading_age_hours`) — only the
+consequence changed, from `should_boot = false` to `reason = 'pickable_degraded'` with
+`detail.token_cap` carrying the fallback.
+
+
+### <a id="M5-16"></a>M5-16 — the weekly pace gate: a cycle fires only below the day-of-week share (`script`)
+
+> A cycle fires only while the freshest `runner_usage_readings` row's `all_models_pct` is below the day-of-week share of the subscription week: day index × 100/7, whole days, where the week starts Friday 01:00 `America/Chicago` and day 1 is the first 24 hours. `public.runner_should_boot()` applies it as the refusal `weekly_pace`, after `weekly_wall` (which grades the same number) and before `no_budget_row`. Fable past its own share is NOT a refusal (`SES-395`): `public.judgment_model()` degrades the judgment lane to the orchestrator model and the gate reports it as `detail.judgment_model` / `detail.judgment_reason`.
+
+**Added 2026-09-11 (`SES-368`, `v7.0.448`), and it is John's rule in John's words.** Verbatim: *"One
+thing i want you to verify before every automated ticket is ran is only fire if usage is below the
+daily limit. Where daily limit is where the 'weekly all models %' is divided by 7 days, each week
+restarts at 1am central on Fridays."* And on granularity, when the first draft interpolated by the
+hour: *"right now you are too detailed, by looking at hourly usage - let's just do daily at 100%, so
+the next fire will take place."* So: whole days, the full share, no hourly curve.
+
+**Why a pace and not only a wall.** The runner shares John's subscription. `M5-06`'s rest wall
+(`weekly_rest_pct`, 85%) stops the runner near the end of the allowance, but nothing stopped it from
+spending most of the week's allowance in its first two days and leaving John's own attended sessions
+starved for the remaining five. The pace makes the runner's share of the week track the calendar.
+
+**Mechanism, measured at the ship rather than described.** `public.runner_should_boot()`'s `week`
+CTE finds the most recent Friday 01:00 `America/Chicago` at or before `now()` (00:30 on a Friday is
+still day 7 of the prior week), `week_day_index` = whole days elapsed + 1 clamped to 1..7,
+`pace_limit_pct` = index × 100/7 (day 1 = 14.29, day 2 = 28.57, day 7 = 100). The refusal fires when
+the freshest reading's `all_models_pct` is **at or above** the limit — NULL-safe like the wall, so a
+missing reading falls through to `no_budget_row` rather than blaming the pace. Precedence:
+`scheduler_off`, `meter_stale` (`SES-389`), `weekly_wall`, **`weekly_pace`**, `no_budget_row`,
+`nothing_pickable`, `unaffordable`. Fixtures inside a rolled-back DO block on day 1: reading 20 → `weekly_pace`; 14.28 →
+`pickable`; 14.29 → `weekly_pace`; 90 → `weekly_wall` (the wall still wins). Live board at 6% →
+`pickable`. The calendar was checked at fixed instants across the Friday boundary, the day-1/day-2
+boundary and the November DST end.
+
+**What this rule is not.** It is not a cap (`M5-15`: the ceiling has one home,
+`resolve_day_token_cap()`), the staleness threshold it grades against is not its own — it is
+`meter_stale`'s, at `runner_settings.meter_stale_hours` (`M5-15`, `SES-389`), and it sits *above*
+the pace in the ladder, so the pace never grades a reading the gate has already called out of date.
+The
+5-hour session meter is not consulted.
+
+**Amendment — `SES-395`, 2026-09-14 (`v7.0.486`, migration `ses395_judgment_lane_fallback`): the
+pace grades `all_models_pct` again, and Fable's own share became a LANE, not a refusal.** `SES-390`
+had the wall and the pace grade `GREATEST(all_models_pct, fable_pct)`, on the reasoning that the
+judgment lane runs on Fable and carries its own weekly cap. That is true about the *lane* and wrong
+about the *cycle*: measured 2026-09-14 11:42 CT, the first continuation under `SES-390` refused
+`weekly_wall` on `gated_meter = 'fable'` at 93 vs 85 while all-models read 59 — i.e. a whole cycle,
+orchestrator and mechanical lanes included, parked because one delegated lane was spent. John,
+2026-09-14, verbatim: *"The self governance meter should also see if Fable is past its daily limit,
+drop down to Opus."* So the consequence moved to where it belongs. `public.judgment_model()` grades
+the freshest `fable_pct` against the same rest wall and the same day-of-week share and answers
+`fable_rest` / `fable_pace` / `lane` with the `runner_model_lanes` model id to use — the
+`orchestrator` lane's for either Fable reason, the `judgment` lane's otherwise, and `lane` on a NULL
+`fable_pct`, because a meter nobody read cannot degrade anything. `scripts/agent-prompt.js` prints
+that model, so the model a session spawns a sub-agent on is the one in force rather than the one
+stored. `detail.gated_pct` and `detail.gated_meter` are KEPT as keys (`all_models` by construction)
+so no existing reader of the payload breaks. Measured at the ship inside a rolled-back `DO` block,
+one variable each, every assertion on the REASON: Fable 30 → `claude-fable-5-1` / `lane`; Fable 70
+(above the day-4 share 57.14, below the wall 85) → `claude-opus-5` / `fable_pace`; Fable 90 with
+all-models 20 → `claude-opus-5` / `fable_rest` **and the gate answering `pickable`**, which is the
+seam — `SES-390`'s gate answered `weekly_wall` on those same inputs; Fable NULL → `claude-fable-5-1`
+/ `lane`. Zero fixture residue on re-read (0 rows with `source = 'ses395-qa'`, 41 readings).
+<!-- FEATURE: SES-398 --> **`SES-398`, 2026-09-15 (`v7.0.489`, migration
+`ses398_judgment_reads_week_fable`):** `judgment_model()` now grades the newest reading since the
+week's Friday 01:00 `America/Chicago` start that carries a Fable number rather than the newest reading,
+because the routine's own meter self-read (`source = 'routine-self-read'`) writes `fable_pct` NULL
+whenever its call carried no Fable window — measured inside a rolled-back `DO` block with every
+same-week Fable number nulled, Fable 90 an hour ago under a NULL-Fable newest row answers
+`claude-opus-5` / `fable_rest` / 90 (the prior form answered `claude-fable-5-1` / `lane`), and a Fable
+95 from before the reset answers `lane` under both forms, with 0 rows of `source = 'ses398-qa'` left.
+---
+
+## Amendment note — `SES-285`, 2026-09-01 (`v7.0.359`)
+
+<!-- FEATURE: SES-285 — this note exists because the registry row is authoritative and this file is
+     its byte-for-byte home. Three statements moved in the row; they move here in the same commit,
+     or the truth tripwire (check 9 / check 12) reads a live rule against stale doc text. -->
+
+Three rules in this register — `M5-09`, `M5-10`, `M5-14` — were written hours before `SES-285` and
+encoded the very dependency it removed: they named `design_status = 'needs-john'`, *"carded for
+John"*, and *"John's Accept"* as live mechanisms. `SES-285` retired that surface, so those clauses
+named things that no longer exist.
+
+**They are amended, not retired.** Each keeps its id, its `status = 'live'`, and its place in this
+register; only the clause naming the withdrawn surface was rewritten, and each section above carries
+its own amendment paragraph saying exactly what changed and what did not. Registry rows and the
+statements above were rewritten in the same commit, and `docs/governance/RULES-SNAPSHOT.md` was
+re-exported from the rows — never hand-edited.
+
+Because the amendment changed no rule's *effect*, there is **no retirement-ledger entry** for these
+three; the ledger's contract covers removals and rewrites of withdrawn content, and entries 21–33
+there cover the thirteen rules `SES-285` actually withdrew. `M5-12`'s 72-hour observation window and
+`M6-02`'s 72-hour reversal window are deliberately the same span, for the same reason: it covers a
+full scheduler cadence rather than one quiet afternoon.
+
+---
+
+## Amendment note — `SES-281`, 2026-09-01 (`v7.0.363`)
+
+<!-- FEATURE: SES-281 — Phase 2. The `script` rules stop being recorded and start executing. No
+     rule STATEMENT changes here, so the byte-for-byte registry↔doc equality that
+     tests/regression/ses-280-m5-governance-rules.test.mjs pins is untouched; only this note is
+     added. -->
+
+**Four rules moved from recorded to executing.** The Phase-split section above says plainly that *"a
+rule marked `script` below is not yet enforced by any script."* For `M5-01`, `M5-02`, `M5-07` and
+`M5-09` that sentence is now **out of date**: migration `ses281_m5_pick_enforcement` wired all four
+into `public.drain_epic_next(uuid)` **and** `public.prime_directive_queue()`, which are the two
+functions the chain gate and the briefing page read. `M5-06` and `M5-15` remain recorded-only; they
+answer *should a session run at all*, which is a pre-boot question and belongs to `SES-297`.
+
+What each one is, in the pick path:
+
+- **`M5-01` — the scope fence is structural.** The pick joins `public.epics` and requires
+  `name ILIKE 'Selfbuild%'`. Before this, drain eligibility was a name in `runner_drain_scope`, and
+  a mis-scoped directive could hand non-Selfbuild work to an unattended cycle. Eligibility is now a
+  property of the ticket's own `epic_id`, which naming cannot widen.
+- **`M5-02` — the filing lane replaces bare queue order.** `drain_epic_next` ordered by
+  `b.queue` and nothing else. It now orders by **filing lane first** (`filed_at < 2026-08-21` is the
+  priority lane; on or after it is the review bucket), then `queue`, then `M5-07`. **`filed_at`,
+  never `created_at`** — `created_at` is the board-migration bulk-load stamp and misdates most of the
+  board by up to 68 days (`SES-295`). A NULL `filed_at` falls to the review bucket; zero rows carry
+  one today. This is the clause that retires **B3**, whose ordering ended *"newest-to-oldest within
+  class"* — the exact inverse of the lane John set.
+- **`M5-07` — cheapest-first tiebreak.** `predicted_cycles` ascending, **nulls last**, as the last ranking key before the
+  filed_at date and the backlog_id/id tiebreaks. It changes only ties: never a lane, never a class.
+- **`M5-09` — the rolling wave, enforced.** A member is unpickable while its milestone's own design
+  gate is unresolved (`status <> 'done'`). **A gate ticket never blocks itself** (`g.id <> b.id`) —
+  without that exclusion the milestone deadlocks permanently behind the one ticket that could open
+  it.
+
+**Named deviation from the `SES-281` kickoff doc, measured rather than assumed.** The kickoff
+identified a gate as the epic member with `scope_origin = 'original'` **and** a title matching
+`'M% design gate%'`. Live, only `SES-183` (M4) and `SES-184` (M5) carry `scope_origin = 'original'`;
+`SES-185` (M6) and `SES-186` (M7) carry `'pre-existing'`. Requiring `'original'` would have silently
+disabled `M5-09` for M6 and M7 — every milestone that has not started, which is the only place the
+rolling wave still has work to do. The shipped predicate is the **title pattern alone**, written
+`'M_ design gate%'` (`_` is LIKE's single-character wildcard), which matches exactly the four real
+gates and no ordinary member.
+
+**What `c_flagged` now holds: `ARRAY['needs-desktop']`, and nothing else.** Each of `drain_epic_next`,
+`drain_chain_gate` and `prime_directive_queue`'s `buildable` CTE once spelled that array out for
+itself. **Since `AGT-88` (v7.0.580) the value has one home, `public.pick_blocking_flags()`, and since
+`AGT-109` (v7.0.584) all three consumers read it: `drain_chain_gate`'s `c_flagged`,
+`prime_directive_queue`'s `buildable` CTE and `drain_epic_next`'s own `c_flagged` (registry `OD-09`).** Two entries left:
+
+- `'needs-john'` was retired outright by `M6-01` (`SES-285`, `v7.0.359`); no ticket can be in it.
+- `'john-paced'` was **the human gate that migration missed** — it matched on the string
+  `'needs-john'` rather than on the concept. Seven open tickets still carried it, four of them in
+  Selfbuild epics. "Paced by John" is exactly the blocking-on-a-human-decision `M6-01` forbids, so
+  this migration recorded a `runner_before_images` row per ticket
+  (`session_name = 'design-drain-enforcement-0901'`) and converted all seven to `'needs-decision'`.
+
+`'needs-desktop'` **stays blocking, and that is deliberate**: it records a physical constraint (work
+needing a machine John has), never a judgment call. Three open tickets carry it and were not touched.
+
+**Measured on the live board immediately after the migration** — the evidence, not the intent:
+`drain_epic_next` returns `SES-184`, M5's own gate, and `prime_directive_queue`'s drain lane returns
+the same ticket, so the two agree. Every other M5 member, and every M6 and M7 member, is now held
+behind its unresolved gate; `M1`/`M2`/`M3` have no gate ticket and are unaffected. In the selfbuild
+lane, `SES-43` (queue 251, filed pre-cut) now sorts **ahead of** `SES-288` (queue 4, filed post-cut)
+— a live lane inversion that bare queue order could not produce, and the one
+`tests/regression/ses-281-m5-pick-enforcement.test.mjs` grades over PostgREST.
+
+---
+
+## Related registers and files
+
+| Where | What it holds |
+|---|---|
+| `public.governance_rules` | **Authoritative.** The fifteen rows this file renders, plus every other live rule. |
+| `docs/governance/RULES-SNAPSHOT.md` | Generated repo-side copy of the whole registry. Never hand-edited. |
+| `docs/RUNNER-GOV-0820-REQUIREMENTS.md` | The 2026-08-20 governance register (A1–A6, B1–B42). B3 lives there, superseded. |
+| `docs/RUNNER-GOV-M6-REQUIREMENTS.md` | The M6 autonomy register (`M6-01`–`M6-08`), which withdrew thirteen 0820 rules and amended the three rules noted above. |
+| `docs/SELFBUILD-RETIREMENT-LEDGER.md` | B3's retirement entry, with the reason and the restore path. |
+| `docs/SELFBUILD-CHARTER.md` | The rolling-wave rule, the transition rule and the storage rule these fifteen answer to. |
+
+---
+
+## Amendment note — `AGT-140`, 2026-09-26 (`v7.0.604`)
+
+<!-- FEATURE: AGT-140 — `projects.priority` becomes the FIRST ordering key in both pick homes. No
+     rule STATEMENT in this register changes, so the byte-for-byte registry↔doc equality that
+     tests/regression/ses-280-m5-governance-rules.test.mjs pins is untouched; only this note is
+     added. M5-02 and M5-07 are amended in EFFECT — they keep their ids, their `status = 'live'`
+     and every word of their text, and they now decide WITHIN a project rather than across the
+     board. -->
+
+**The inversion, measured live 2026-09-26 and not recalled.** John set three projects `executing`
+at once on 2026-09-25 — `auditor-enhancements` (priority 1), `dev-manager-capabilities` (2),
+`agent-training` (3). Neither of the platform's two pick homes read `projects.priority` at all, so
+the first key that could tell two executing projects apart was `M5-02`'s filing lane, and after it
+the queue number. The `selfbuild` lane therefore served
+
+| pos | ref | project | priority | queue | cycles |
+|---|---|---|---|---|---|
+| 1 | `AGT-141` | `agent-training` | 3 | 25 | 1 |
+| 2 | `AGT-132` | `dev-manager-capabilities` | 2 | 30 | 2 |
+| 3 | `AGT-138` | `agent-training` | 3 | 33 | 2 |
+
+and `runner_should_boot()` handed `AGT-141` to the next cycle: a one-cycle ticket in the THIRD
+project ahead of an open buildable ticket in the SECOND. Nothing errored and nothing emptied — the
+runner would simply have kept building the lower-priority project, indefinitely and silently.
+
+**D1 — project priority is the first key.** The pick order is now **four** keys, in this order:
+
+1. the owning project's `projects.priority` (this amendment);
+2. `M5-02`'s filing lane — pre-cut first, post-cut into the review bucket;
+3. the queue number;
+4. `M5-07`'s cheapest-first tiebreak on `predicted_cycles`, nulls last.
+
+Keys 2–4 are **unchanged in text and unchanged in effect within a project**. What changed is their
+scope: they decide the order among a project's own tickets, and no longer decide it across
+projects. `AGT-141` still precedes `AGT-138` inside `agent-training` on exactly the old grounds.
+
+**D2 — an admitted enhancement from a non-executing project sorts last.** A row that clears
+`prime_directive_queue()`'s fence through the `EL-01` admission half rather than through an
+executing epic carries **NULL** for key 1 and sorts `NULLS LAST`. Last, never first: keyed to `0` it
+would outrank every chartered ticket on the board.
+
+**Both pick homes, one migration.** `agt140_project_priority_pick` (`v7.0.604`) changed
+`public.prime_directive_queue()` — a `LEFT JOIN public.projects` in its `buildable` CTE, a
+`sort_project` key in `picks`, and `ORDER BY lane_ord, sort_key, sort_project NULLS LAST, sort_lane,
+sort_queue, sort_cycles NULLS LAST` in `ranked` — and `public.drain_epic_next(uuid)`, whose pick
+gained `JOIN public.projects pj` and now reads `ORDER BY pj.priority, CASE WHEN b.filed_at <
+c_lane_cut THEN 0 ELSE 1 END, b.queue, b.predicted_cycles NULLS LAST`. Neither signature changed,
+and the migration's own trailing `DO` block asserts exactly one `pg_proc` row per name before it
+will commit (`.claude/rules/supabase-function-signature.md`). The prior definitions are captured in
+`public.runner_migration_downs` under `up_name = 'agt140_project_priority_pick'`
+(`auto-downable`, 2 objects, 0 refusals).
+
+**Before and after, same claims held, read from the live functions:**
+
+| | pos 1 | pos 2 | pos 3 | `runner_should_boot()` |
+|---|---|---|---|---|
+| before | `AGT-141` (p3) | `AGT-132` (p2) | `AGT-138` (p3) | `AGT-141` |
+| after | `AGT-132` (p2) | `AGT-141` (p3) | `AGT-138` (p3) | `AGT-132` |
+
+**One consequence for the runbook, recorded here because it is a governance fact and not a typo.**
+`docs/runbooks/runner-cycle.md` said *"exactly one row is `executing` at a time, and that row IS the
+execution authority"*. Three execute by John's word of 2026-09-25, so it now says every `executing`
+row is an execution authority, **ranked by `priority`**. `tests/regression/ses-340-projects-govern.test.mjs`
+clause (a) was retargeted with it — from *exactly one executing project* to *at least one*, with the
+zero case still a finding — and its clause (b) now asserts that every served project is in the
+executing set rather than that it is the single one.
+
+---
+
+## Amendment note — `AGT-238`, 2026-09-27 (`v7.0.660`)
+
+<!-- FEATURE: AGT-238 slice 1 — LEVERAGE FIRST, and TICKETS ONLY FROM FINDINGS. No rule STATEMENT in
+     this register changes; M5-02 and M5-07 keep their ids, status and text and now decide within a
+     leverage group and a project. -->
+
+**Why.** Measured live 2026-09-27: the `selfbuild` lane's positions 1–10 were all
+`auditor-enhancements` findings tickets and `AGT-237` — the fix that stops the runner working into a
+database outage — sat at position 58 of 59, because nothing on the board could say that one ticket
+makes the others run better. And 9 non-John tickets had been filed since 2026-09-26 12:00 with no
+finding behind them, though only The Development Manager files tickets.
+
+- **D1 — leverage is its own column.** `backlog_items.leverage_reason` (text, NULL or non-blank):
+  what the ticket makes run better and why, written only by `public.record_leverage()`.
+  `supports_class` (a P-class) and `automation_rank` (John's C4 steps) answer other questions.
+- **D2 — the pick order is now five keys**, in both pick homes: leverage first (marked before
+  unmarked), then the owning project's `priority` (`AGT-140`), then `M5-02`'s filing lane, the queue
+  number, and `M5-07`'s `predicted_cycles` nulls last. `prime_directive_queue()` carries it as
+  `sort_leverage` ahead of `sort_project`; `drain_epic_next(uuid)`'s pick as
+  `CASE WHEN b.leverage_reason IS NOT NULL THEN 0 ELSE 1 END` ahead of `pj.priority`.
+- **D3 — the manager marks leverage in its existing `run-project` answer** (no new model call): an
+  optional `leverage` list of `{backlog_id, improves, why}`, every id a ref the queue returned;
+  `scripts/run-project.js` records it through `record_leverage()` — one decision, one before-image
+  per row, reversible.
+- **D4 — a ticket with no `audit_findings` row is refused at commit** (deferred constraint trigger
+  `backlog_requires_finding`) unless its `scope_origin` is `john-named` or `enhancement`, or its
+  `source_file` matches a pattern in `runner_settings.ticket_filing_exempt_sources` (the mechanical
+  filers `heal-engine`, `tripwire-to-backlog`, `audit-ledger`, `model-assignment`, and regression
+  fixtures). An attended session filing John's own tickets is not blocked.
+
+Migration `agt238_leverage_first` (`v7.0.660`); its down is captured in
+`public.runner_migration_downs` under that `up_name`, and the mirror is
+`docs/design/agt-238-leverage-first.sql`.
+
+---
+
+## Amendment note — `AGT-238` slice 2, 2026-09-28 (`v7.0.667`)
+
+<!-- FEATURE: AGT-238 slice 2 item (d) — CONCURRENCY FROM THE CORPUS. No rule STATEMENT in this
+     register changes; M5-02 and M5-07 keep their ids, status and text. What changes is who decides
+     how many projects hold an executing slot, and on what evidence. -->
+
+**Why.** Measured live 2026-09-28: **5** projects were `executing` at priority 1–5 and the fifth,
+`trainer-authored-agents`, had **0 epics** — so `epic_project_executing()` admitted nothing from it
+and `prime_directive_queue()` could never return one of its rows. Five slots, four of them pickable,
+and **0** `runner_decisions` rows of kind `concurrency`: nothing on the board recorded why that
+number, or why that order. It was not a rule anybody had written down; it was the residue of whoever
+last edited `projects`.
+
+- **D1 — the corpus is ONE deterministic read**, `public.project_concurrency_corpus()`: one row per
+  project (`slug, status, priority, epics, locked, finished, open_tickets, partial_tickets, blocked,
+  leverage_tickets, done_7d, done_30d, proposal_due`), `ORDER BY (status='executing') DESC, priority`.
+  It LEFT JOINs `epics` and `backlog_items`, so an epic-less project shows `epics=0` rather than
+  vanishing — that reading is the corpus's own first piece of evidence. No model call computes the
+  evidence. `done_7d`/`done_30d` are a close-rate proxy from `updated_at` on a `done` row, labelled
+  as such wherever shown, because `backlog_items` has no closed-at column.
+- **D2 — the count and the order already have a home.** `projects.status='executing'` IS the count
+  (`epic_project_executing()` gates every pick on it) and `projects.priority` IS the order
+  (`prime_directive_queue()`'s `sort_project`, `drain_epic_next()`'s `pj.priority`). No new column
+  and no `max_concurrent` knob: a second home for a number the board already carries would disagree
+  with it silently.
+- **D3 — the slice-1 boundary is STRUCTURAL, not prose.** `public.record_concurrency()` RAISES on a
+  slug that is `proposed` or `planned`, naming `AGT-240` and `start_proposed_project()`: this
+  function moves `executing` ⇄ `paused` only. Starting a project that has never run stays John's
+  words. Its other six refusals: a null cycle id, a blank `why`, an empty `execute`, a slug the
+  corpus did not return, a slug in both `execute` and `pause`, and an `order` that is not exactly the
+  `execute` set, once each.
+- **D4 — the manager decides it in its existing `run-project` answer** (no new model call): an
+  optional `concurrency` object `{execute, pause, order, why}` on `skill_profiles.dm-run-intent`,
+  mirroring `leverage`. `scripts/run-project.js` reads the corpus beside the queue as
+  `state.concurrency_corpus`, checks the same seven refusals in the exported pure helper
+  `concurrencyErrors()`, and records a non-empty decision through `record_concurrency()` — one
+  decision, one before-image per CHANGED row, so `reverse_decision()` puts every row back
+  (`projects` is already in `reversible_tables()`; no schema change was needed for reversibility).
+- **D5 — the new test's anon arm is `notRun`, never FAIL.** `VITE_SUPABASE_ANON_KEY` is absent in the
+  runner environment; both functions' `anon`/`authenticated` denial is asserted instead in the
+  migration's own trailing DO block, in the same transaction that created them. The same credential
+  gap standing in `agt-240-project-finish-line`'s arm D is filed as a finding, not fixed here.
+- **D6 — the mechanism ships unexercised, by design.** The Builder is not the manager: the first real
+  `concurrency` row is the next manager turn's. `trainer-authored-agents` executing with 0 epics is
+  filed as a finding and is that turn's first piece of evidence.
+
+Migration `agt238_concurrency_corpus` (`v7.0.667`); its down is captured in
+`public.runner_migration_downs` under that `up_name` (auto-downable, both functions), and the mirror
+is `docs/design/agt-238-concurrency-corpus.sql`. The `dm-run-intent` row's undo is its own
+`agent-row` decision's `reverse_decision()`, because the capture has no `row` kind. Guarded by
+`tests/regression/agt-238-concurrency-corpus.test.mjs`.
+
+---
+
+## The M5 gate decision — `SES-184`, decided 2026-09-02 (`v7.0.370`)
+
+<!-- FEATURE: SES-184 — the M5 design gate, decided rather than asked. M6-01: no cycle blocks on a
+     human decision; it decides with recorded reasoning. This section IS that record. Reversible
+     under M6-02's 72h window. -->
+
+**Decided by attended session `design-m5-gate-0902`, not by a card.** The card surface was retired
+by `SES-285`; `M6-01` requires the decision be made and its reasoning recorded, which is this
+section. It is reversible for 72 hours under `M6-02`.
+
+### What M5 promises, and which ticket carries each promise
+
+`SES-184`'s own scope names three pillars. Measured against the board, one had no member at all:
+
+| Pillar | Carried by | State at the gate |
+|---|---|---|
+| **1. Outcome telemetry** — did shipped work change the metric it claimed? | `SES-303` | **Had no ticket until 2026-09-02.** A board-wide search found nothing covering it, so M5 could not have completed as chartered no matter how the existing list was worked. Filed at this gate, `scope_origin = original`. **Shipped 2026-09-02 (v7.0.382), Shape B by John's call** — the platform scoreboard and `public.ticket_outcome`; see the note under `M5-12`. |
+| **2. Heal-engine v2** — fix-confirmation and recurrence re-filing | `SES-276`, proven by `SES-277` | Both filed at the M4 gate review, both blocked on this gate. **Proven 2026-09-02 (`SES-277`, v7.0.384):** the seeded-failure drill walked detect → file → dedup → confirm → recur on live Supabase, **and it failed once** — v2 printed `confirmed_fixed` and never wrote it, because its nothing-new-to-file exit skipped the verdict write; fixed in the same commit. Record: `docs/harvests/SES-277-drill-2026-09-02.md`. |
+| **3. Usage/budget instrumentation** | `SES-82`, `SES-161` (`SES-104` done) | Named in `SES-184`'s own text as absorbed |
+
+**Plus one enabler, ruled into the required set:** `SES-282` — `runner_cycles.item_id` has no
+foreign key, so a shipped change cannot be attributed to the ticket that claimed it. Pillar 1 cannot
+measure what it cannot attribute, so `SES-282` is required *for* M5 rather than merely adjacent.
+
+**And one detection member, ruled in:** `SES-269` (silent cron days). The charter's goal 4 is that
+"production failures are **detected**, ticketed, fixed, and confirmed-fixed by the loop itself" —
+runner silence is such a failure. Ruled in on evidence, not theory: on 2026-09-01 the cron went
+silent for **13.4 hours** and nothing noticed, the second such hole after 2026-08-27, which is the
+incident `SES-269` was filed from.
+
+### M5's required set — 8 tickets, 16 cycles
+
+`SES-184` (this gate) · `SES-82` · `SES-161` · `SES-282` · `SES-303` · `SES-276` · `SES-277` · `SES-269`
+
+**M5 is complete when those close.** Completion is a property of that set, not of the epic label.
+
+**Superseded 2026-09-02 12:35 CST by the gate-review amendment below (v7.0.388): two required members were added, so M5 is complete when `SES-308` and `SES-309` also close.** ~~M5 COMPLETE~~ — 2026-09-02, v7.0.385. All 7 then-required tickets are `done`: `SES-184` (gate, v7.0.370)
+· `SES-161` (v7.0.376, the runner cycle John fired by hand) · `SES-282` (v7.0.371) · `SES-303`
+(v7.0.382, Shape B) · `SES-276` (v7.0.372) · `SES-277` (v7.0.384, the drill — which caught and fixed
+v2's unpersisted verdicts) · `SES-269` (ruled done by John, verbatim *"yes"*, session
+`design-m5-close-0902`). **The `SES-269` ruling, recorded here rather than carded:** the number the
+ticket exists for — hours of runner silence — is stamped at every ship
+(`platform_scoreboard.cron_silence_hours`) and measured by `scripts/check-cycle-cadence.js`; its
+undischarged remainder (a standing alarm routine in John's account, and the briefing line barred for
+unattended cycles by `27b5d8cb`) is re-ruled out of M5, because whether an alarm routine runs is the
+same question as whether the hourly runner runs — the M6 gate, `SES-185` — and notifications do not
+reach John today (`SES-123`). Reversible under `M6-02`. Stored form: the seven rows read
+`milestone_required = true` and `status = 'done'`; `select … from public.ticket_matrix where milestone
+= 'M5' and milestone_required and status <> 'done'` returns **zero rows**. The M5 drain directive
+(`238aa9ca`) keeps its open non-required members (`SES-292`, and the deferred `DAT-25`, `SES-123`,
+`SES-82`); completion is a property of the required set, as this record said it would be.
+
+**Stored 2026-09-02 (`SES-304`, v7.0.374).** The set above is no longer only prose: those eight rows carry `backlog_items.milestone_required = true` and `milestone = 'M5'`, so *"what is left for M5"* is `select … from public.ticket_matrix where milestone = 'M5' and milestone_required and status <> 'done'` — the same answer on every asking (`M5-04`). Amending the set means amending the flag, with a before-image, in the same change as the amendment note here.
+
+**Amended 2026-09-02 09:51 CST (John, verbatim _"yes"_, session `design-m5-milestone-0902`, v7.0.375) — `SES-82` leaves the required set. The set is now 7 tickets, 14 cycles:** `SES-184` · `SES-161` · `SES-282` · `SES-303` · `SES-276` · `SES-277` · `SES-269`. `SES-82` "Replace the briefing's manual usage-meter reading with a programmatic read" needs Anthropic to ship a usage API (their open issues #78476, #91279, #33978); nothing on this side can close it, so a required set that carried it could never read complete. It stays on the board, `tier = later`, `defer_status = 'yes'` with that reason, for the day the API exists. Reversible under `M6-02`. **Measured while making the change, and the reason `SES-305` exists:** no pick or gate function reads `defer_status`, and the column's CHECK does not admit `M5-10`'s `'stuck'` — so on 2026-09-02 `SES-82` was still `runner_should_boot()`'s live pick (queue 589, priority lane by `filed_at`) after being deferred. Deferral was decorative; `SES-305` makes it real.
+
+**Amended 2026-09-02 12:35 CST (John, verbatim _"yes, file the two tickets"_, session `design-m5-gate-review-0902`, v7.0.388) — the M5 milestone gate review adds two members to the required set, so the "M5 COMPLETE" paragraph above is superseded. The set is now 9 tickets, 16 cycles:** `SES-184` · `SES-161` · `SES-282` · `SES-303` · `SES-276` · `SES-277` · `SES-269` · `SES-308` · `SES-309`. The review ran per `docs/runbooks/gate-review.md` — PM lens and Chief Architect lens, fresh context, Fable 5 — and both returned **PASS with named gaps**: the seven tickets are `done`, but the charter claim they stood for (goal 4, *"confirmed-fixed by the loop itself"*, and M5 pillar 1, *"did shipped work change the metric it claimed"*) is not yet true in production. Two gaps are M5's own promise and were filed as required members rather than carried into M6: `SES-308` "The runner never records a confirmed fix" (`P9 - Bug Fixes`) — `scripts/heal-engine.js` persists a confirmation only under `--apply` and exits 0 from its nothing-new-to-file branch, while `runner-cycle.md` step 8b re-runs with `--apply` only on exit 1, so every unattended cycle discards the confirmation it computed (every `runner_heal_signatures` write to date is the supervised drill's); and `SES-309` "Outcome telemetry cannot grade chartered work" (`P10 - Tooling`) — `public.ticket_outcome` reads its claim from `enhancement_claim`, which zero Selfbuild tickets carry, so every chartered ship resolves `unmeasurable`. Both rows: `scope_origin = 'gate-review'`, `milestone = 'M5'`, `milestone_required = true`, named into drain `238aa9ca`'s scope, before-images under `session_name = 'design-m5-gate-review-0902'`. The review's other findings (the M6-02 reversal window has no mechanism while `SES-286` is open; the M5 drain cannot retire while its three deferred members count as open in the retirement predicate; CI reds are unclassifiable to the heal engine; four of seven required ships carry no verifier verdict) belong to the M6 gate `SES-185` and were not filed here. Reversible under `M6-02`.
+
+**M5 COMPLETE against the 9-ticket set — 2026-09-02 13:16 CST, session `design-m5-fixes-0902` (attended; John: *"we are not running the drain … can you make those two tickets run?"*).** Both gate-review members shipped through the design→code→verify loop in one session, each with its own kickoff, an Opus 5 coding agent, and the design session's live QA: `SES-308` (`v7.0.389`, push `ee0d9cc4`) — the heal engine's dry run now exits 1 when a fix-confirmation verdict is pending and `--apply` needs no `--backlog-ids` when there is nothing to file (the coding agent found and removed a top-of-`main()` gate that would have made the remedy exit 2); QA seeded a `watching` signature with a 30-day-old sighting and measured dry run **exit 1 → `--apply --cycle-id` (no ids) exit 0 → row `confirmed_fixed` → dry run exit 0**, QA cycle `30800000-…-000000000308`. `SES-309` (`v7.0.390`, push `85431c9f`) — `public.outcome_claim_is_valid()` + `ck_backlog_outcome_claim` give the claim one validated home; `ticket_outcome` reads `unclaimed` for a NULL claim and `unmeasurable` for a declared `none:`; the filing template carries the claim; the four M5 rows with ship stamps carry honest `none:` claims. QA measured held / unclaimed / unmeasurable on a rolled-back fixture and the constraint rejecting `bogus: up`. Stored form: `select … from public.ticket_matrix where milestone = 'M5' and milestone_required and status <> 'done'` returns **zero rows** over the nine. CI green on both pushes. The M5 drain directive (`238aa9ca`) still holds its three deferred non-required members (`SES-82`, `SES-123`, `DAT-25`) and `SES-292`; completion is a property of the required set, as this record said. The charter claim the review measured — a confirmed fix recorded by the loop itself, and a declared outcome per chartered ship — now has its unattended path built; the first unattended cycle to write a `confirmed_fixed` row is the remaining evidence, and it needs a real ticketed failure to go quiet, which the M6 gate's CI-classification question governs.
+
+### Seven tickets carry the M5 epic and do not serve M5
+
+Ruled here so the milestone's definition of done is not silently inflated by 11 cycles of unrelated
+work. **They are not cancelled and not deprioritised — they serve a different milestone**, and the
+re-homing is deliberately left to John rather than executed here, because moving seven tickets
+across four milestones on the same night he asked for caution about ticket churn would be the
+churn he objected to.
+
+| Ticket | Serves | Why not M5 |
+|---|---|---|
+| `SES-295` scope rationale + backfill | M2 — Truth Infrastructure | A field every ticket must carry and that must be auditable. Not outcome telemetry. |
+| `SES-284` B30 status ruling | M2 — Truth Infrastructure | Registry hygiene: a rule that may have expired without a ledger entry. |
+| `SES-283` the enhancement lane | M7 — The Inventor | Governs how *new* features are admitted; M7 is where the platform originates them. |
+| `SES-247` chain gate hands back the partial | M6 — Autonomy Graduation | Drain execution mechanics. |
+| `SES-260` `.env.local` privileged keys | M4 — Infrastructure Floor | M4's own text: "secrets off one machine." |
+| `DAT-25` offsite backup mirror behind | M4 — Infrastructure Floor | M4's own text: "backups/PITR." |
+| `SES-123` routines notifications | M4 — Infrastructure Floor | M4's own text: "notification reliability." |
+
+**The M4 three reopen M4 if moved**, which is the honest consequence and the reason this is John's
+call rather than a bookkeeping edit: a milestone whose gate was accepted does not silently reacquire
+members. If he prefers, they stay where they are and M5 simply carries them without owing them.
+
+### What this gate deliberately does not decide
+
+The **M6 budget review** (`SES-185`) and anything about retiring the runner routine. Tonight's
+13.4-hour cron silence is real and is `SES-269`'s subject, but whether the routine survives is an
+M6 question and belongs to that gate.

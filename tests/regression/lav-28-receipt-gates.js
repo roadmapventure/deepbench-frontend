@@ -1,3 +1,15 @@
+// DeepBench v7.0.237 | tests/regression/lav-28-receipt-gates.js | LAV-30 (partial) — gate 6 stops
+// reporting the platform's own EARLY-CREDIT frames as missing receipts. `api/capabilities/execute.js`
+// emits six `delegation_complete` frames; two of them (`:853` request_help self-credit, `:999`
+// delegate_to_agent originator self-credit) hardcode `account: null` and document it as deliberate —
+// they fire BEFORE the nested dispatch resolves, so no completed result exists to account for.
+// Measured on this file immediately before the change: those frames came back as
+// "completion carries no account" AND consumed the SCHEMA_LESS_INTENT_COUNT coverage budget, so a
+// real regression could hide behind them. `isEarlyCreditFrame()` matches the emitter's full
+// structural signature (`fromAgentId`/`fromCapabilitySlug`/`from_span_id` all null on a
+// `delegation_complete`) — NEVER `account == null`, which would exempt every failure gate 6 exists
+// to catch. Gates 1-5 are byte-identical; the number-truth policy half of LAV-30 is John's call and
+// is deliberately untouched. Kickoff: docs/kickoffs/v7.0.237-LAV-30-early-credit-presence-exemption.md
 // DeepBench v7.0.63 | tests/regression/lav-28-receipt-gates.js | LAV-28c
 //
 // The §19s receipt contract's CONTENT/CONTEXT QA, persisted (STANDARDS.md Section 4's SES-009a
@@ -30,6 +42,10 @@
 // MUTATION (SES-69, stated so it can be re-run): delete `"retrieved"` from ACT_VERBS and the
 // act-shape group must FAIL — its clean fixture receipt stops finding any act verb. Delete the
 // 5-gram loop's `deliverable` argument and the firewall group must FAIL.
+// LAV-30 adds two, both run and restored at v7.0.237: replace `isEarlyCreditFrame`'s body with
+// `(f.account ?? null) === null` and group 2's gate-6 case must FAIL (an exempt-everything
+// predicate lets a genuine accountless completion through); replace it with `false` and group 4's
+// positive fixture must FAIL (the change doing nothing must be visible).
 
 import assert from "node:assert";
 import fs from "node:fs";
@@ -92,6 +108,33 @@ export function hopSpanOf(frame) {
 // An execution's own declared work, indexed by the span that ran it. `prompt_assembled` is the one
 // frame that declares both together; a delegation START names the same slug but the REQUESTER's
 // span, so indexing it would file delegated work under the asker.
+// ── LAV-30 · the early-credit exemption (gate 6 only) ─────────────────────────
+// `api/capabilities/execute.js` emits SIX `delegation_complete` frames. Four of them credit a
+// completed nested call and harvest `account` from its result, so a null account there is a real
+// missing receipt. TWO of them — the `request_help` + `delegationRequired` self-credit
+// (`S-LOO-015`, execute.js:853) and the `delegate_to_agent` originator self-credit
+// (`LOO-011`/`LOO-014`, execute.js:999) — hardcode `account: null` and say in their own LAV-28
+// comments that it is deliberate: they fire BEFORE the nested dispatch resolves, so there is no
+// completed result to account for. Gate 6 read those two as defects ("completion carries no
+// account") and, worse, spent the `SCHEMA_LESS_INTENT_COUNT` coverage budget on them.
+//
+// THE SIGNATURE IS STRUCTURAL, AND THAT IS THE WHOLE POINT. A self-credit has no counterpart, so
+// those two sites — and only those two — pass `fromAgentId: null, fromCapabilitySlug: null,
+// from_span_id: null` as literals; all four genuine completion sites carry a real `fromAgentId`
+// and a real `from_span_id`. Read from the emitter, not inferred from a capture.
+//
+// NEVER WIDEN THIS TO `account == null`. That predicate exempts every failure gate 6 exists to
+// catch and leaves a vacuous gate behind (the LOO-013 lesson this file already carries: assert on
+// the path taken, not merely on a green result). A frame with a real `fromAgentId` and no account
+// is still a defect and must still fail — the negative control in group 4 is that assertion.
+export function isEarlyCreditFrame(f) {
+  return !!f
+    && f.type === "delegation_complete"
+    && (f.fromAgentId ?? null) === null
+    && (f.fromCapabilitySlug ?? null) === null
+    && (f.from_span_id ?? null) === null;
+}
+
 export function declaredWorkBySpan(frames) {
   const bySpan = new Map();
   for (const f of frames || []) {
@@ -156,6 +199,7 @@ export function receiptsOf(frames) {
       const span = hopSpanOf(f);
       accounts.push({
         frame: f, span, text: str(f.account),
+        earlyCredit: isEarlyCreditFrame(f),
         intent: bySpan.get(span) ?? null,
         hop: `${f.type} ${f.fromAgentId ?? "?"}→${f.toAgentId ?? "?"} (${bySpan.get(span) ?? "unknown intent"})`,
       });
@@ -250,6 +294,10 @@ export function gatePresence({ accounts, askLines }) {
   const missingIntents = new Set();
   for (const a of accounts) {
     if (a.text) continue;
+    // LAV-30: an early-credit self-credit frame is structurally accountless, not missing a
+    // receipt — and it must not consume the coverage budget below either, or a real regression
+    // hides behind frames the platform never had an account for.
+    if (a.earlyCredit) continue;
     missingIntents.add(a.intent ?? "unknown intent");
     offenders.push(`completion carries no account — ${a.hop}`);
   }
@@ -428,6 +476,65 @@ export default async function run() {
   assert.strictEqual(wordsOf(null), 0);
   assert.strictEqual(wordsOf("   "), 0);
   assert.strictEqual(wordsOf("Upgrade cycles by country"), 4);
+
+  // ── group 4: LAV-30 · the early-credit exemption, asserted BOTH ways ────────
+  // Field shape copied from the emitter (api/capabilities/execute.js:999), not from a capture.
+  const earlyCredit = (over = {}) => ({
+    type: "delegation_complete", fromAgentId: null, fromCapabilitySlug: null, toAgentId: "requester",
+    toIntentSlug: "ci-answer-intent", viaTool: "delegate_to_agent", task: null, ask_line: null,
+    account: null, from_span_id: null, to_span_id: "SPAN-A", ...over,
+  });
+  const withEarly = (over) => {
+    const frames = cleanFrames();
+    frames.splice(1, 0, earlyCredit(over));
+    return frames;
+  };
+  // (a) THE EXEMPTION. Would this pass if the change did nothing? No — measured on this file
+  //     immediately before the change, gate 6 reported "completion carries no account —
+  //     delegation_complete ?→requester (ci-answer-intent)" on exactly these frames.
+  for (const r of runGates(withEarly(), CLEAN_DELIVERABLE)) {
+    assert.ok(r.pass,
+      `a structurally-null early-credit account must trip nothing — ${r.name}: ${r.offenders.join(" | ")}`);
+  }
+  // (b) THE NEGATIVE CONTROL, and the reason the predicate is structural rather than
+  //     `account == null`: the same accountless frame WITH a real counterpart is a real missing
+  //     receipt and must still fail presence. If this ever passes, gate 6 has gone vacuous.
+  const realMiss = runGates(
+    withEarly({ fromAgentId: "requester", fromCapabilitySlug: "ci-answer", from_span_id: "SPAN-A" }),
+    CLEAN_DELIVERABLE);
+  assert.ok(!byName(realMiss, 6).pass,
+    "a completion with a real fromAgentId and no account must still fail presence");
+  assert.ok(byName(realMiss, 6).offenders.some(o => o.includes("carries no account")),
+    "and it must still be NAMED as an offender, not merely counted");
+  // (c) PARTIAL-SIGNATURE CONTROL — the triple is matched in FULL. A predicate loosened to any
+  //     one null field exempts frames the emitter never declared accountless.
+  const halfSignature = runGates(
+    withEarly({ fromAgentId: null, fromCapabilitySlug: "ci-answer", from_span_id: "SPAN-A" }),
+    CLEAN_DELIVERABLE);
+  assert.ok(!byName(halfSignature, 6).pass,
+    "a frame matching only part of the early-credit signature must still fail presence");
+
+  // (d) THE COVERAGE BUDGET counts genuine gaps only — otherwise a real regression hides behind
+  //     frames the platform never had an account for, and the exempt ones can also push a healthy
+  //     run over the line. Both arms, one variable: the number of GENUINE gaps.
+  const budgetRun = (genuineGaps) => {
+    const frames = cleanFrames();
+    for (let i = 0; i < genuineGaps; i += 1) {
+      frames.push({ type: "prompt_assembled", agentId: "x", toIntentSlug: `gap-${i}`, span_id: `SPAN-G${i}` });
+      frames.push(earlyCredit({
+        fromAgentId: "requester", fromCapabilitySlug: "ci-answer", from_span_id: "SPAN-A", to_span_id: `SPAN-G${i}`,
+      }));
+    }
+    frames.push({ type: "prompt_assembled", agentId: "x", toIntentSlug: "early-only", span_id: "SPAN-EC" });
+    frames.push(earlyCredit({ to_span_id: "SPAN-EC" }));
+    return byName(runGates(frames, CLEAN_DELIVERABLE), 6);
+  };
+  const overBudget = budgetRun(SCHEMA_LESS_INTENT_COUNT + 1);
+  assert.ok(overBudget.offenders.some(o => o.startsWith(`${SCHEMA_LESS_INTENT_COUNT + 1} distinct intents`)),
+    `${SCHEMA_LESS_INTENT_COUNT + 1} genuine gaps must report a coverage regression counting ${
+      SCHEMA_LESS_INTENT_COUNT + 1}, never the early-credit frame as a ${SCHEMA_LESS_INTENT_COUNT + 2}th`);
+  assert.ok(!budgetRun(SCHEMA_LESS_INTENT_COUNT).offenders.some(o => o.includes("coverage regressed")),
+    `${SCHEMA_LESS_INTENT_COUNT} genuine gaps plus an early credit must NOT trip the budget line`);
 }
 
 // A capture path turns this into mode 1; otherwise it is the fixture suite (and run-all.js's

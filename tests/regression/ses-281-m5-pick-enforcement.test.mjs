@@ -1,0 +1,709 @@
+// DeepBench v7.0.567 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-89 -- the
+// stored-queue oracle below reads `filed_at` ALONE, mirroring recompute_backlog_queue() after the
+// agt89_filing_lane_filed_at_only migration dropped its `coalesce(filed_at, created_at)`; a NULL
+// filed_at sorts to the tail, as laneOf() has always had it. A TRIPWIRE in the live arm goes red
+// the first time an open row carries a NULL filed_at, so the tail is never where one lands
+// unremarked. Both carry their own negative controls.
+//
+// DeepBench v7.0.497 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-401 -- the
+// empty-lane clause is now one shared discrimination (`_lib/board-state.js`) over four states, and
+// it joins live cycles on `runner_cycles.item_id`. SES-386's block below joined `claimed_by` (text,
+// a session label) against a set of cycle uuids, so it matched nothing and never once fired: every
+// empty lane -- including a DRAINED board, the project finishing -- reached the assert and went red.
+// `starved` still fails, with the same words. See the block at the empty-lane branch below.
+//
+// DeepBench v7.0.487 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-386 -- the live
+// arm's first clause (`lane.length > 0`) becomes a B42 PROPERTY rather than a flat requirement. An
+// empty selfbuild lane has two causes: nothing buildable (the finding it always was, still a FAIL
+// with the same words) or every admitted candidate held by a LIVE parallel cycle's atomic claim,
+// which under register B42 is the design working. The second is declared, never skipped, and the
+// liveness of the holding cycle is what tells them apart -- a claim held by an ENDED cycle is stale
+// and still fails.
+//
+// DeepBench v7.0.448 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-368 -- the register
+// grew to sixteen anchored sections (M5-16, the weekly pace gate); EXPECTED_M5_SECTIONS is the one
+// place this file holds the count, in step with ses-280's M5_IDS.
+// DeepBench v7.0.363 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | SES-281
+//
+// FEATURE: SES-281 -- Phase 2 of SES-280. Guards that M5-01 (structural epic fence), M5-02 (the
+// filing lane, superseding B3), M5-07 (cheapest-first tiebreak) and M5-09 (a milestone's design
+// gate blocks its own members) are EXECUTING in the pick path -- public.drain_epic_next(uuid) and
+// public.prime_directive_queue() -- rather than merely recorded in the registry, which is all
+// tests/regression/ses-280-m5-governance-rules.test.mjs can grade.
+//
+// TWO ARMS, AND THE SPLIT IS THE POINT.
+//   * The DOC arm always runs. It reads the SES-281 amendment note in
+//     docs/RUNNER-GOV-M5-REQUIREMENTS.md -- the canonical home for what the pick path now does and
+//     what c_flagged now holds -- so the suite has real coverage in an unattended cloud cycle where
+//     no credentials exist. The rule is READ OUT OF THE DOC, never restated here (John, 2026-08-23:
+//     "you should never be throwing away tests"; the SES-275 / SES-218 / SES-196 precedent). A test
+//     that copies the thing it guards passes forever while the shipped thing rots.
+//   * The LIVE arm runs only with SUPABASE_URL + SUPABASE_SERVICE_KEY and is DECLARED not-run
+//     otherwise (SES-180 notRun()), never silently skipped. It calls public.prime_directive_queue()
+//     over PostgREST and grades the ORDER and MEMBERSHIP of what comes back.
+//
+// WHY prime_directive_queue AND NOT drain_epic_next. drain_epic_next has SIDE EFFECTS: it retires a
+// fully-done drain directive and writes a runner_before_images row while doing it. A permanent
+// regression test must never be able to close John's standing directive as a side effect of running
+// (the same refusal SES-196 / SES-218 / SES-275 each recorded). prime_directive_queue is declared
+// STABLE and writes nothing, and it is not a proxy: SES-281 gave both functions the SAME three
+// ordering keys in the same precedence and the SAME M5-09 gate predicate, precisely so the page and
+// the gate cannot disagree. The agreement itself is measured on the ship card, below.
+//
+// EVERY DOC CLAUSE IS PAIRED WITH A NEGATIVE CONTROL -- the same text with the one thing that should
+// matter removed. "Would this still pass if the change did nothing?" must answer "no" for each.
+// There is also a meta-assertion (aVacuousMutationFailsItsOwnControl), the SES-158 lesson: a control
+// that changes nothing proves nothing, and only checking the control itself catches it.
+//
+// THE LIVE ARM REFUSES TO GRADE A BOARD THAT CANNOT SHOW THE RULE. Two of its checks are
+// conditional on the board actually containing the situation the rule governs (both filing lanes
+// populated; an epic with an unresolved gate and a non-gate member). Where the situation is absent
+// the arm DECLARES that part not-run instead of passing vacuously -- an ordering assertion over rows
+// that all sit in one lane is exactly the green-that-proves-nothing this suite keeps catching.
+//
+// DRY-RUN RESULT, measured against the UNCHANGED functions before migration
+// ses281_m5_pick_enforcement was applied (STANDARDS.md Section 4): drain_epic_next's pick was
+// `ORDER BY b.queue LIMIT 1` with c_flagged = ARRAY['needs-john','needs-desktop','john-paced'], and
+// 7 open tickets carried 'john-paced'. So on unchanged state the live arm FAILS on lane order (the
+// selfbuild lane came back in bare queue order, SES-288 at queue 4 first), FAILS the gate
+// membership check (M5's members were served while SES-184 sat open), and FAILS the zero-john-paced
+// and before-image counts; the doc arm fails outright because the amendment note did not exist.
+//
+// WHAT THIS FILE DOES NOT COVER, declared rather than implied -- see the notRun() at the foot: the
+// function BODIES ship as a Supabase migration and live in the database, not this repo, and this
+// suite reaches Supabase only over PostgREST, which cannot read pg_get_functiondef.
+
+import assert from "assert";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { selfRun, notRun } from "./_lib/self-run.js";
+import { readBoardState, isDeclarable } from "./_lib/board-state.js";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const CANONICAL_REL = "docs/RUNNER-GOV-M5-REQUIREMENTS.md";
+const CANONICAL = path.join(ROOT, CANONICAL_REL);
+
+const NOTE_START = "## Amendment note — `SES-281`";
+const NOTE_END = "## Related registers and files";
+
+// The filing-lane cut M5-02 selects on. Held here only so the live arm can BUCKET rows it read from
+// the database; the ordering itself is never recomputed -- see monotonicity below.
+export const LANE_CUT = Date.parse("2026-08-21T00:00:00Z");
+
+// ---------------------------------------------------------------------------
+// Pure readers
+// ---------------------------------------------------------------------------
+
+// Slice a bounded block out of a markdown file. Returns "" when absent -- itself a finding rather
+// than a crash, since a checker that throws on a missing section reports nothing useful.
+export function extractBlock(md, start, end) {
+  const a = md.indexOf(start);
+  if (a < 0) return "";
+  const b = md.indexOf(end, a);
+  return b < 0 ? md.slice(a) : md.slice(a, b);
+}
+
+// Markdown is hard-wrapped, so a load-bearing phrase can straddle a line break and a literal match
+// fails for a reason that has nothing to do with the rule. Normalising runs of whitespace to one
+// space makes every clause reflow-proof (the SES-194 lesson).
+export const norm = s => s.replace(/\s+/g, " ");
+
+export const amendmentNote = md => norm(extractBlock(md, NOTE_START, NOTE_END));
+
+// ---------------------------------------------------------------------------
+// The doc clauses. A clause earns its place only if REMOVING it would change what a cycle does.
+// ---------------------------------------------------------------------------
+
+export const CLAUSES = [
+  {
+    id: "four-script-rules-are-now-executing",
+    detail:
+      "the note must name all four rules that moved from recorded to executing, the migration that " +
+      "moved them, and BOTH functions -- the Phase-split section above still says a `script` rule " +
+      "is enforced by nothing, and a reader who stops there draws the wrong conclusion about the " +
+      "live picker",
+    test: s =>
+      /M5-01/.test(s) && /M5-02/.test(s) && /M5-07/.test(s) && /M5-09/.test(s) &&
+      /ses281_m5_pick_enforcement/.test(s) &&
+      /drain_epic_next/.test(s) && /prime_directive_queue/.test(s),
+    breaks: s => s.replace(/prime_directive_queue/g, "some other function"),
+  },
+  {
+    id: "m5-06-and-m5-15-stay-recorded-only",
+    detail:
+      "the note must say M5-06 and M5-15 are NOT wired here and belong to SES-297 -- without it the " +
+      "next reader takes 'the script rules now execute' as covering all of them and skips the " +
+      "pre-boot check that actually answers 'should a session run at all'",
+    test: s => /M5-06/.test(s) && /M5-15/.test(s) && /SES-297/.test(s) && /pre-boot/i.test(s),
+    breaks: s => s.replace(/SES-297/g, "nobody in particular"),
+  },
+  {
+    id: "filing-lane-selects-filed-at-never-created-at",
+    detail:
+      "the note must carry the lane cut date, the priority-lane/review-bucket split, `filed_at` " +
+      "with an explicit NEVER `created_at`, the 68-day misdating that makes created_at wrong, and " +
+      "B3's retirement -- an editor who reaches for created_at reintroduces the exact bug SES-295 " +
+      "fixed, on the column the picker now decides with",
+    test: s =>
+      /2026-08-21/.test(s) &&
+      /priority lane/i.test(s) &&
+      /review bucket/i.test(s) &&
+      /filed_at/.test(s) &&
+      /never\W+`?created_at/i.test(s) &&
+      /68[- ]day/.test(s) &&
+      /\bB3\b/.test(s),
+    breaks: s => s.replace(/never\W+`?created_at`?/i, "or created_at"),
+  },
+  {
+    id: "tiebreak-is-nulls-last-and-only-breaks-ties",
+    detail:
+      "the note must state M5-07 as predicted_cycles ascending with NULLS LAST and say it changes " +
+      "only ties -- nulls first would silently send every unestimated ticket to the front of its " +
+      "lane, and a tiebreak believed to reorder classes is a licence to reorder classes",
+    test: s =>
+      /predicted_cycles/.test(s) && /nulls last/i.test(s) && /only ties/i.test(s),
+    breaks: s => s.replace(/nulls last/i, "nulls first"),
+  },
+  {
+    id: "a-gate-never-blocks-itself",
+    detail:
+      "the note must carry the self-exclusion (`g.id <> b.id`) AND the consequence of dropping it " +
+      "-- a permanent deadlock in which the only ticket that could open the milestone sits behind " +
+      "the gate it would open. This is the single edit that would brick M5, M6 and M7 at once",
+    test: s =>
+      /g\.id\s*<>\s*b\.id/.test(s) && /deadlock/i.test(s) && /never blocks itself/i.test(s),
+    breaks: s => s.replace(/g\.id\s*<>\s*b\.id/, "g.id = b.id"),
+  },
+  {
+    id: "gate-is-identified-by-title-not-scope-origin",
+    detail:
+      "the note must record the NAMED DEVIATION from the kickoff: scope_origin='original' was " +
+      "measured and does NOT hold for SES-185 (M6) or SES-186 (M7), so requiring it would disable " +
+      "M5-09 exactly where the rolling wave still has work. The shipped predicate is the title " +
+      "pattern 'M_ design gate%' alone",
+    test: s =>
+      /scope_origin/.test(s) &&
+      /pre-existing/.test(s) &&
+      /SES-185/.test(s) && /SES-186/.test(s) &&
+      /M_ design gate%/.test(s) &&
+      /deviation/i.test(s),
+    breaks: s => s.replace(/scope_origin/g, "some unrelated column"),
+  },
+  {
+    id: "c-flagged-holds-needs-desktop-and-only-that",
+    detail:
+      "the note must state c_flagged's new contents, say WHY each of the two removals happened " +
+      "(needs-john retired by M6-01; john-paced converted here, 7 rows, before-images under this " +
+      "session name), and say needs-desktop STAYS because it is a physical constraint rather than " +
+      "a judgment call -- an editor who reads the removals as 'flags are being dropped' drops that " +
+      "one too and hands an unattended cycle work it cannot physically do",
+    test: s =>
+      /ARRAY\['needs-desktop'\]/.test(s) &&
+      /needs-john/.test(s) && /M6-01/.test(s) &&
+      /john-paced/.test(s) && /\bseven\b|\b7\b/i.test(s) &&
+      /runner_before_images/.test(s) &&
+      /design-drain-enforcement-0901/.test(s) &&
+      /needs-decision/.test(s) &&
+      /physical constraint/i.test(s),
+    breaks: s => s.replace(/physical constraint/i, "another judgment call"),
+  },
+  {
+    id: "measured-live-not-reasoned",
+    detail:
+      "the note must carry the live measurement rather than the intent: SES-184 returned as the " +
+      "pick, the two functions AGREEING on it, and the SES-43-ahead-of-SES-288 lane inversion. " +
+      "Without the evidence this is an opinion about a predicate instead of a result anyone can " +
+      "re-verify -- and the inversion is the exact property the live arm below grades",
+    test: s =>
+      /SES-184/.test(s) &&
+      /agree/i.test(s) &&
+      /SES-43/.test(s) && /SES-288/.test(s) &&
+      /inversion/i.test(s),
+    breaks: s => s.replace(/SES-43/g, "some ticket"),
+  },
+];
+
+function readDoc() {
+  return fs.readFileSync(CANONICAL, "utf8");
+}
+
+function theShippedNoteIsClean() {
+  const s = amendmentNote(readDoc());
+  assert.ok(
+    s.length > 0,
+    `the SES-281 amendment note is missing from ${CANONICAL_REL} -- the four script rules are ` +
+      "executing in the database with nothing in the repo saying so",
+  );
+  for (const c of CLAUSES) {
+    assert.ok(c.test(s), `${CANONICAL_REL} lost clause "${c.id}": ${c.detail}`);
+  }
+}
+
+// FILE-LEVEL NEGATIVE CONTROL: an absent note must be reported as a finding, not crash. This is the
+// arm that fails on the pre-change doc, where the note does not exist at all.
+function aMissingNoteIsFlagged() {
+  assert.strictEqual(
+    extractBlock("# a register with no amendment notes", NOTE_START, NOTE_END),
+    "",
+    "a missing SES-281 note must return '' so the caller reports it",
+  );
+}
+
+function everyClauseHasTeeth() {
+  const block = amendmentNote(readDoc());
+  for (const c of CLAUSES) {
+    const mutated = c.breaks(block);
+    assert.notStrictEqual(
+      mutated,
+      block,
+      `control for "${c.id}" changed NOTHING -- it cannot prove the clause has teeth (the SES-158 failure)`,
+    );
+    assert.ok(
+      !c.test(mutated),
+      `clause "${c.id}" still passes after its own control removed the thing it checks -- the check is vacuous`,
+    );
+  }
+}
+
+// META-ASSERTION: prove the control-checking above can itself fail, so a future no-op `breaks`
+// cannot sail through everyClauseHasTeeth's first assert unexercised.
+function aVacuousMutationFailsItsOwnControl() {
+  const s = amendmentNote(readDoc());
+  assert.throws(
+    () => {
+      const mutated = s;
+      assert.notStrictEqual(mutated, s, "control changed NOTHING");
+    },
+    /control changed NOTHING/,
+    "the vacuous-control detector must itself fail on a no-op mutation",
+  );
+}
+
+// SES-368: sixteen since M5-16 (v7.0.448). Held in one constant so the next rule is a one-line change.
+const EXPECTED_M5_SECTIONS = 16;
+
+// The SES-280 register test requires this file to carry exactly EXPECTED_M5_SECTIONS anchored rule sections and
+// each rule's statement to match its registry row byte-for-byte. An amendment note that rewrote a
+// statement, or introduced an extra `### <a id="M5-nn">` heading, would break that test rather
+// than this one -- which is the wrong place for the failure to surface. Assert it here too, where
+// the edit was made.
+function theAmendmentDidNotDisturbTheAnchoredRuleSections() {
+  const lf = readDoc().replace(/\r\n/g, "\n");
+  const anchors = [...lf.matchAll(/^###\s+<a id="(M5-\d\d)"><\/a>/gm)].map(m => m[1]);
+  assert.strictEqual(
+    anchors.length,
+    EXPECTED_M5_SECTIONS,
+    `${CANONICAL_REL} carries ${anchors.length} anchored M5 rule sections, expected ${EXPECTED_M5_SECTIONS} -- the ` +
+      "SES-281 amendment note must ADD prose, never a rule heading (ses-280 grades this too)",
+  );
+  assert.strictEqual(new Set(anchors).size, EXPECTED_M5_SECTIONS, "two M5 rule sections share an anchor id");
+}
+
+// ---------------------------------------------------------------------------
+// Arm 2 -- live Supabase over PostgREST. Read-only and side-effect free.
+// ---------------------------------------------------------------------------
+
+const GATE_TITLE = /^M. design gate/i;   // the shipped predicate's `M_ design gate%`, as a regex
+const FINISHED_GATE = "done";
+
+async function pg(url, key, pathAndQuery, init) {
+  const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
+    ...init,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!res.ok) throw new Error(`${pathAndQuery} returned HTTP ${res.status} ${res.statusText}`);
+  const body = await res.json();
+  if (!Array.isArray(body)) throw new Error(`${pathAndQuery} returned a non-array payload`);
+  return body;
+}
+
+const laneOf = filedAt => (filedAt && Date.parse(filedAt) < LANE_CUT ? 0 : 1);
+
+async function theLivePickPathObeysTheFourRules() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) {
+    notRun(
+      "the live arm: prime_directive_queue()'s lane order, the M5-09 gate membership, the " +
+        "zero-open-john-paced count and the seven conversion before-images",
+      "SUPABASE_URL and/or SUPABASE_SERVICE_KEY are absent. The doc arm above still graded all " +
+        "eight clauses of the SES-281 amendment note against the committed register. Canonical " +
+        "invocation: STANDARDS.md Section 2 rule 5.",
+    );
+    return;
+  }
+
+  const items = await pg(
+    url, key,
+    "backlog_items?select=backlog_id,title,status,design_status,queue,filed_at,predicted_cycles,epic_id,leverage_reason&limit=2000",
+  );
+  // AGT-140 (v7.0.604): `project_id` joins the epics projection, and `projects` joins the read,
+  // because the lane's FIRST ordering key is now the owning project's `priority`. Without them the
+  // oracle below grades a four-key order with three keys and reports the AGT-140 inversion as
+  // correct.
+  const epics = await pg(url, key, "epics?select=id,name,project_id&limit=500");
+  const projects = await pg(url, key, "projects?select=id,priority,status&limit=200");
+  const rows = await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" });
+
+  assert.ok(items.length > 100, `backlog_items returned ${items.length} rows -- refusing to grade a truncated read`);
+  assert.ok(rows.length > 0, "prime_directive_queue() returned nothing at all -- not even the board row");
+
+  const epicName = new Map(epics.map(e => [e.id, e.name ?? ""]));
+  // AGT-140: the epic -> project -> priority chain the pick path now orders on.
+  const projectOfEpic = new Map(epics.map(e => [e.id, e.project_id]));
+  const projectById = new Map(projects.map(p => [p.id, p]));
+  const byRef = new Map(items.map(i => [i.backlog_id, i]));
+  // SES-340: `prime_standing` is now `EXISTS (projects WHERE status='executing')` and lane (c)'s
+  // fence is `epic_project_executing()`. The LANE VALUE stays `selfbuild` -- a named deviation
+  // recorded in docs/SELFBUILD-RETIREMENT-LEDGER.md -- so this filter is unchanged on purpose.
+  const lane = rows.filter(r => r.lane === "selfbuild");
+
+  // FEATURE: SES-386 -- AN EMPTY LANE HAS TWO CAUSES AND ONLY ONE OF THEM IS A DEFECT.
+  //
+  // The old clause failed outright on an empty lane. But register B42 (`docs/RUNNER-GOV-0820-
+  // REQUIREMENTS.md#B42`, John verbatim 2026-08-21: "what if i want to run 100 automated routines at
+  // once? should not be an issue") makes PARALLEL cycles the design, and parallel cycles coordinate
+  // by ATOMIC CLAIMS: a ticket another live cycle holds is correctly withheld from this lane. So a
+  // suite run from inside a cycle -- which is every scheduled run -- could fail here for the single
+  // reason that the platform was working. A contested claim is not a skip, and a lane emptied by
+  // claims is not an empty board.
+  //
+  // FEATURE: SES-401 -- AND THE THIRD CAUSE IS THE BOARD BEING FINISHED. SES-386's block, which
+  // stood here, was DEAD CODE from the day it shipped: it tested `liveCycles.map(c => c.id)` (uuid)
+  // for membership of `backlog_items.claimed_by`, which is `text` holding a session label such as
+  // `run-project:moat-support:1`. Measured live 2026-09-15: 3 claimed tickets, 2 live cycles, ZERO
+  // matches, and `runner_cycles` has no `session_name` column to join on either. So the `held`
+  // branch never once fired and every empty lane reached the assert. The discrimination now lives in
+  // tests/regression/_lib/board-state.js -- ONE home for all five guards that carried this clause --
+  // and it joins `runner_cycles.item_id`, which is the key that actually matches.
+  //
+  // THE TEETH ARE THAT `starved` STILL FAILS, in the words below, unchanged. A lane emptied while
+  // unheld in-scope work remains means no project is executing or the fence broke, and that was
+  // always the finding. Only `held` (a live cycle holds the candidates) and `drained` (the executing
+  // project has no open queued work left) are declared.
+  if (lane.length === 0) {
+    const board = await readBoardState(pg, url, key);
+    assert.ok(
+      isDeclarable(board.state),
+      // The OLD WORDS, kept verbatim: with nothing held by a live cycle and work still on the
+      // board, an empty lane means exactly what it always meant and this is still the finding it
+      // always was.
+      "the selfbuild lane came back empty -- either no project is executing or every " +
+        "in-scope ticket is unbuildable; both are findings, not a pass",
+    );
+    notRun(
+      `the live lane arms (M5-02/M5-07/M5-09) -- board state '${board.state}'`,
+      `${board.reason} SAID IN FULL: this returns, so the three ` +
+        "clauses that follow the lane arms -- M6-01's zero open 'john-paced', the 'needs-desktop " +
+        "survived' control, and SES-299's stored-queue ordering -- did not run either. Re-run when " +
+        "the lane serves again, or read the order off prime_directive_queue() by hand.",
+    );
+    return;
+  }
+
+  // --- AGT-140 + M5-02 + M5-07: the order the DATABASE returned is monotonic in
+  // (project priority, filing lane, queue, cycles).
+  // Deliberately NOT a re-sort of the rows in JS: this asserts a property OF the returned order,
+  // so a second implementation of the ordering cannot quietly agree with itself (SES-45).
+  //
+  // AGT-140 (v7.0.604) RETARGETS THIS CLAUSE, and the retarget was forced by live evidence rather
+  // than chosen. With three projects `executing` at once (John, 2026-09-25) the three-key oracle
+  // below GRADED THE INVERSION AS CORRECT: on 2026-09-26 the lane served AGT-141 (agent-training,
+  // project priority 3, queue 25) ahead of AGT-132 (dev-manager-capabilities, priority 2, queue 30)
+  // and this clause passed, because queue 25 < 30 and nothing here had ever heard of a project.
+  // M5-02 and M5-07 are UNCHANGED -- the filing lane, the queue and the cheapest-cycles tiebreak
+  // still decide, in that order, WITHIN a project. Project priority simply goes ahead of them.
+  //
+  // D2, read off the same row the function reads: a ticket whose owning project is not `executing`
+  // carries NO priority key and sorts LAST. MAX, never 0 -- with 0 an admitted enhancement from a
+  // paused project would outrank every chartered ticket on the board.
+  //
+  // AGT-238 (v7.0.660): a LEADING `lev` key -- leverage_reason ? 0 : 1. A ticket The Development
+  // Manager marked as leverage precedes project priority; everything after it is unchanged.
+  const key4 = ref => {
+    const it = byRef.get(ref);
+    assert.ok(it, `prime_directive_queue returned ${ref}, which is not in backlog_items`);
+    const proj = projectById.get(projectOfEpic.get(it.epic_id));
+    const prio = proj && proj.status === "executing" ? proj.priority : Number.MAX_SAFE_INTEGER;
+    const lev = it.leverage_reason ? 0 : 1;
+    return [lev, prio, laneOf(it.filed_at), it.queue, it.predicted_cycles ?? Number.MAX_SAFE_INTEGER];
+  };
+  const lexLte = (a, b) => {
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] < b[i]) return true;
+      if (a[i] > b[i]) return false;
+    }
+    return true;
+  };
+  let inversionsAgainstBareQueue = 0;
+  for (let i = 1; i < lane.length; i++) {
+    const a = key4(lane[i - 1].ref);
+    const b = key4(lane[i].ref);
+    const ordered = lexLte(a, b);
+    assert.ok(
+      ordered,
+      `the selfbuild lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
+        `[leverage ${a[0]}, priority ${a[1]}, lane ${a[2]}, queue ${a[3]}, cycles ${a[4]}] precedes ${lane[i].ref} ` +
+        `[leverage ${b[0]}, priority ${b[1]}, lane ${b[2]}, queue ${b[3]}, cycles ${b[4]}]. The pick path orders by ` +
+        "leverage FIRST (AGT-238), then project priority (AGT-140), then filing lane, queue, cycles",
+    );
+    if (a[3] > b[3]) inversionsAgainstBareQueue++;
+  }
+
+  // NON-VACUITY for the lane rule: monotonicity is satisfied trivially by bare queue order when
+  // every pickable ticket sits in the same filing lane. Only claim the lane rule was OBSERVED when
+  // the board could actually show it.
+  const lanesPresent = new Set(lane.map(r => laneOf(byRef.get(r.ref).filed_at)));
+  if (lanesPresent.size < 2) {
+    notRun(
+      "M5-02's lane precedence as an OBSERVED property",
+      `every pickable Selfbuild ticket currently sits in filing lane ${[...lanesPresent][0]}, so a ` +
+        "correctly-ordered result is indistinguishable from bare queue order. The monotonicity " +
+        "check above still ran and still holds; it just cannot discriminate on today's board.",
+    );
+  } else {
+    assert.ok(
+      inversionsAgainstBareQueue > 0,
+      "both filing lanes are populated, yet the returned order never puts a higher queue number " +
+        "before a lower one -- that is bare queue order, which is what M5-02 replaced",
+    );
+  }
+
+  // --- M5-09: a milestone's members are absent while its gate is unresolved; the gate itself is not.
+  const gatesByEpic = new Map();
+  for (const it of items) {
+    if (it.epic_id && GATE_TITLE.test(it.title ?? "")) {
+      const list = gatesByEpic.get(it.epic_id) ?? [];
+      list.push(it);
+      gatesByEpic.set(it.epic_id, list);
+    }
+  }
+  const unresolvedGateEpics = new Set(
+    [...gatesByEpic.entries()]
+      .filter(([, gs]) => gs.some(g => g.status !== FINISHED_GATE))
+      .map(([id]) => id),
+  );
+
+  for (const r of lane) {
+    const it = byRef.get(r.ref);
+    if (!unresolvedGateEpics.has(it.epic_id)) continue;
+    assert.ok(
+      GATE_TITLE.test(it.title ?? ""),
+      `${r.ref} is served in the selfbuild lane while ${epicName.get(it.epic_id)}'s own design gate ` +
+        "is unresolved, and it is not that gate -- M5-09 says a member is unpickable until the gate " +
+        "is done",
+    );
+  }
+
+  // ASSERT ON WHICH BRANCH FIRED, not merely that a set was empty (the LOO-013 lesson). A pass here
+  // is only meaningful if some member was actually WITHHELD by the gate clause.
+  const withheld = items.filter(
+    it =>
+      unresolvedGateEpics.has(it.epic_id) &&
+      !GATE_TITLE.test(it.title ?? "") &&
+      ["open", "partial"].includes(it.status) &&
+      it.queue !== null &&
+      !lane.some(r => r.ref === it.backlog_id),
+  );
+  const servedGates = lane.filter(r => GATE_TITLE.test(byRef.get(r.ref).title ?? ""));
+  if (unresolvedGateEpics.size === 0) {
+    notRun(
+      "M5-09's gate block as an OBSERVED property",
+      "no milestone currently has an unresolved design-gate ticket, so nothing can be withheld by " +
+        "the gate clause and an empty withholding is not evidence of anything.",
+    );
+  } else {
+    assert.ok(
+      withheld.length > 0,
+      `${unresolvedGateEpics.size} milestone(s) have an unresolved design gate, yet no queued ` +
+        "member of any of them was withheld from the lane -- the M5-09 clause did not fire",
+    );
+    assert.ok(
+      servedGates.length > 0,
+      "every gate ticket was withheld along with its members -- the `g.id <> b.id` self-exclusion " +
+        "is gone and the milestones that need a gate answered are now deadlocked behind it",
+    );
+  }
+
+  // --- M6-01's missed human gate: nothing open still carries 'john-paced'.
+  const openPaced = items.filter(
+    it => it.design_status === "john-paced" && !["done", "delivered", "removed"].includes(it.status),
+  );
+  assert.strictEqual(
+    openPaced.length,
+    0,
+    `${openPaced.length} open ticket(s) still carry design_status='john-paced' ` +
+      `(${openPaced.map(i => i.backlog_id).join(", ")}). "Paced by John" is the ` +
+      "blocking-on-a-human-decision M6-01 forbids; SES-281 converted them to 'needs-decision'",
+  );
+
+  // ...and 'needs-desktop' was NOT swept along with it. Without this the conversion above could be
+  // satisfied by a blanket wipe of every design_status flag, which is the opposite of the rule.
+  const openDesktop = items.filter(
+    it => it.design_status === "needs-desktop" && !["done", "delivered", "removed"].includes(it.status),
+  );
+  assert.ok(
+    openDesktop.length > 0,
+    "no open ticket carries design_status='needs-desktop' any more -- SES-281 converts john-paced " +
+      "ONLY; needs-desktop records a physical constraint and stays blocking",
+  );
+
+  // --- SES-299: the STORED queue obeys M5-02 too, not just the pick predicate.
+  // SES-280 retired B3 in the registry and SES-281 changed drain_epic_next, but
+  // recompute_backlog_queue() kept running B3's `coalesce(filed_at, created_at) DESC` tail --
+  // so the queue every reader sees was ordered by the retired rule while the drain picked by the
+  // live one. Found by John asking why SES-82, the oldest M5 ticket and the only one in his
+  // priority lane, sat at queue 290: BECAUSE it was oldest. Two homes, one rule, and the visible
+  // home was wrong. This asserts the invariant on the LIVE board rather than reading the function
+  // body, which PostgREST cannot do.
+  const ordered = await pg(
+    url, key,
+    "backlog_items?select=backlog_id,queue,filed_at,created_at,tier,priority_class," +
+      "automation_rank,pinned_position,predicted_cycles&queue=not.is.null" +
+      "&pinned_position=is.null&automation_rank=is.null&limit=2000",
+  );
+  const LANE_CUT = Date.parse("2026-08-21T00:00:00Z");
+  const bucket = r => `${r.tier}|${r.priority_class}`;
+  // AGT-89 (v7.0.567): `filed_at` ALONE, never `?? created_at`. This oracle used to mirror the
+  // `coalesce(filed_at, created_at)` that recompute_backlog_queue() carried; the migration dropped
+  // it, because coalesce(NULL, created_at) resolves to a real date and therefore PROMOTED an
+  // unfiled ticket into the priority lane -- the exact opposite of what the comment beside it
+  // claimed. A NULL filed_at now sorts to the TAIL, which is what laneOf() at the top of this file
+  // has always said and what M5-02 says. The two are now the same rule, written once each.
+  const isPre = r => !!r.filed_at && Date.parse(r.filed_at) < LANE_CUT;
+
+  // NEGATIVE CONTROL for that oracle, before it grades anything: it must answer for the NULL the
+  // same way the function does. Under the old `?? created_at` form the first of these three was
+  // TRUE -- a pre-cut created_at bought an unfiled ticket the priority lane -- so this block fails
+  // on the pre-change oracle and is not satisfiable by an oracle that does nothing.
+  assert.strictEqual(
+    isPre({ filed_at: null, created_at: "2026-06-01T00:00:00Z" }), false,
+    "the lane oracle still falls back to created_at: an unfiled ticket with a pre-cut created_at " +
+      "is being read into the PRIORITY lane, which is the promotion AGT-89 removed",
+  );
+  assert.strictEqual(
+    isPre({ filed_at: "2026-06-01T00:00:00Z", created_at: "2026-09-01T00:00:00Z" }), true,
+    "the lane oracle no longer reads a real pre-cut filed_at as the priority lane",
+  );
+  assert.strictEqual(
+    isPre({ filed_at: null, created_at: "2026-06-01T00:00:00Z" }), laneOf(null) === 0,
+    "the stored-queue oracle and laneOf() disagree about a NULL filed_at -- the two homes of " +
+      "M5-02 inside this one file have drifted apart",
+  );
+  const inversions = [];
+  for (const a of ordered) {
+    for (const b of ordered) {
+      if (a.backlog_id === b.backlog_id) continue;
+      if (bucket(a) !== bucket(b)) continue;
+      // a is pre-cut, b is post-cut, same bucket, neither pinned nor automation-ranked:
+      // a MUST hold the earlier slot. This is exactly what B3's DESC tail got backwards.
+      if (isPre(a) && !isPre(b) && a.queue > b.queue) {
+        inversions.push(`${a.backlog_id}(q${a.queue}, pre) after ${b.backlog_id}(q${b.queue}, post)`);
+      }
+    }
+  }
+  assert.deepStrictEqual(
+    inversions.slice(0, 5), [],
+    `M5-02 is not in recompute_backlog_queue(): ${inversions.length} unpinned, un-ranked ticket ` +
+      `pairs in the same tier+class bucket put a pre-2026-08-21 ticket AFTER a post-cut one. ` +
+      `First few: ${inversions.slice(0, 5).join("; ")}. That is B3's retired newest-first ordering ` +
+      "still running in the stored queue",
+  );
+
+  // --- AGT-89 TRIPWIRE: zero open rows may carry a NULL filed_at.
+  // Dropping the coalesce made the board HONEST about an unfiled ticket (it falls to the tail)
+  // rather than silently flattering it into the priority lane -- but the tail is still not a
+  // decision anyone made. Measured 2026-09-24, immediately before this shipped: 572 open rows, 0
+  // of them unfiled, so the change is latent today and this assertion is what keeps it latent.
+  // The first row filed without a filed_at turns the queue's oldest-first key into a NULL, and
+  // this goes red naming it instead of letting it sit in the tail unremarked.
+  const unfiled = rows => rows.filter(r => r.filed_at === null || r.filed_at === undefined);
+  const openRows = await pg(
+    url, key,
+    "backlog_items?select=backlog_id,status,filed_at,created_at,queue" +
+      "&status=not.in.(done,removed)&limit=2000",
+  );
+  assert.ok(
+    openRows.length > 0,
+    "the open board came back empty, so the NULL-filed_at tripwire graded nothing -- that is a " +
+      "finding about the read, not a pass",
+  );
+  assert.deepStrictEqual(
+    unfiled(openRows).map(r => `${r.backlog_id}(${r.status})`), [],
+    `${unfiled(openRows).length} of ${openRows.length} open backlog rows carry a NULL filed_at. ` +
+      "Since AGT-89 recompute_backlog_queue() orders on bare filed_at, so each of these sorts to " +
+      "the TAIL of its tier+class bucket by default rather than by anyone's ruling. Give the row " +
+      "a filed_at, or decide in the open that the tail is where an unfiled ticket belongs",
+  );
+
+  // NEGATIVE CONTROL for the tripwire: the same detector over the same shape of row with the one
+  // thing that should matter present. A filter that answered [] for every input would pass the
+  // assertion above on any board, today's included, and prove nothing (the SES-158 lesson).
+  assert.deepStrictEqual(
+    unfiled([
+      { backlog_id: "SYNTH-FILED", status: "open", filed_at: "2026-06-01T00:00:00Z" },
+      { backlog_id: "SYNTH-UNFILED", status: "open", filed_at: null, created_at: "2026-06-01T00:00:00Z" },
+    ]).map(r => r.backlog_id),
+    ["SYNTH-UNFILED"],
+    "the NULL-filed_at detector does not catch a seeded unfiled row, so its green above graded " +
+      "nothing -- a control that changes nothing proves nothing",
+  );
+
+  // --- The conversion is reversible from the ledger, not from memory.
+  // Filter on the CAPTURED design_status, not on the session name alone. The session that ran
+  // this migration also writes before-images for its own ticket close-outs, so a bare session
+  // count grades unrelated activity and goes red on a correct board -- found live 2026-09-01,
+  // when SES-281's own close-out image made this a 8-vs-7 failure with nothing actually wrong.
+  const allImages = await pg(
+    url, key,
+    "runner_before_images?select=pk_value,table_name,row_data&session_name=eq.design-drain-enforcement-0901&limit=100",
+  );
+  const images = allImages.filter(i => i?.row_data?.design_status === "john-paced");
+  assert.strictEqual(
+    images.length,
+    7,
+    `runner_before_images holds ${images.length} before-images capturing design_status='john-paced' ` +
+      `for session design-drain-enforcement-0901 (out of ${allImages.length} total for that session), ` +
+      "expected 7 -- one per converted ticket. Fewer means the conversion is not reversible for " +
+      "every row it touched",
+  );
+  assert.ok(
+    images.every(i => i.table_name === "backlog_items"),
+    "a before-image for this conversion names a table other than backlog_items",
+  );
+}
+
+async function run() {
+  theShippedNoteIsClean();
+  aMissingNoteIsFlagged();
+  everyClauseHasTeeth();
+  aVacuousMutationFailsItsOwnControl();
+  theAmendmentDidNotDisturbTheAnchoredRuleSections();
+  await theLivePickPathObeysTheFourRules();
+
+  notRun(
+    "the shipped bodies of drain_epic_next(uuid), prime_directive_queue() and drain_chain_gate(uuid), " +
+      "and drain_epic_next's own return value",
+    "the bodies ship as migration ses281_m5_pick_enforcement and live in the database, not this " +
+      "repo; this suite reaches Supabase only over PostgREST, which cannot read pg_get_functiondef. " +
+      "drain_epic_next is reachable only by INVOKING it, and invoking it can RETIRE a live drain " +
+      "directive and write a runner_before_images row -- a permanent test must not be able to close " +
+      "John's standing directive. Evidence recorded on the ship card, measured this session: with " +
+      "comments stripped, none of the three bodies contains 'needs-john' or 'john-paced' and all " +
+      "three contain 'needs-desktop'; exactly one overload of each of the three exists in pg_proc; " +
+      "drain_epic_next returned pick=SES-184 while prime_directive_queue's drain lane returned " +
+      "SES-184 too (the agreement property); and on a ROLLED-BACK fixture epic the lane, tiebreak " +
+      "and gate arms each fired -- a pre-cut ticket at queue 900 was served ahead of a post-cut " +
+      "ticket at queue 1, three same-queue tickets came back cheapest-first with the null-cycles " +
+      "one last, an open gate withheld every member of its epic, and that gate itself stayed served.",
+  );
+}
+
+selfRun(import.meta.url, run);
+export default run;

@@ -1,3 +1,35 @@
+// DeepBench v7.0.722 | useAgents.js | AGT-006 — useAgents() stops returning the static AGENTS
+// array and reads public.agents, which is now the authoritative roster store. The Designer's
+// recorded reversible decisions (JOHN-0925-DESIGNER-DECIDES), not John's: D1 public.agents is
+// authoritative for every field it holds, and agents.js keeps only what the table lacks (quip,
+// color, benchGroups, the doc/class/chunk counts) until AGT-57 retires the other; D2 where both
+// hold a value the TABLE stands — which is why nadia's role now reads "Data Analyst" on the Bench,
+// matching her prompt identity card (api/prompt/db-assembly.js), instead of the array's "Data
+// Expert"; D3 the array filled the table's blanks ONCE, in docs/design/agt-006-agents-table-seed.sql
+// — 19 of the 24 product rows, each with its own runner_before_images row under one agent-row
+// decision, is_active untouched; D4 the hook renders AGENTS first and overlays the table on
+// arrival, so the Bench never blanks while the fetch is in flight and a failed fetch leaves the
+// array standing. Five Bench strings now read the table's value; every number stays identical.
+// mergeRoster() is exported pure and pinned by tests/regression/agt-006-agents-table-authoritative.test.mjs.
+// DeepBench v7.0.306 | useAgents.js | LOG-104 — useAgentActivitySummary()'s fetchAll() pages with a
+// defined order. It had NO .order() at all across ~17 .range() pages over ~16.4k rows, so the order
+// was whatever the planner chose and could differ between pages: rows silently skipped or
+// duplicated, feeding the whole CHI Agents drawer (Calls, Avg Cost, byKind, pattern rows). This is
+// the worse of LOG-104's two sites — the other, useAIActivity.js, at least had a non-unique key.
+// .order('id') is a total order because id is the integer primary key. buildActivitySummary()
+// aggregates and is order-independent, so this changes WHICH rows arrive, never how they read.
+// Not manifesting on the load QA'd 2026-07-29 — every agent's rows matched SQL exactly — but that
+// was the planner happening to be stable, which is not a guarantee and is why this is a fix rather
+// than a cleanup. Guarded by tests/regression/LOG-104-deterministic-paging.js.
+// DeepBench v7.0.154 | useAgents.js | LOG-70 — useAgentActivitySummary() stops selecting the frozen
+// legacy `patterns_used` column. LOG-112 (v6.3.218) removed the only read of it on this path
+// (buildActivitySummary()'s byPattern bucket); this hook is that function's other caller, so the
+// column has been fetched-and-discarded on every page of every agent-activity query since. Proven
+// dead against 400 live rows (305 carrying a non-empty value, 8 agents): the summary is
+// deep-equal with and without it, while dropping latency_ms changes it — the negative control that
+// makes the comparison discriminating. Payload-only change; no surface reads it, nothing renders
+// differently. Second of LOG-70's two named consumers (src/aiPatterns.js) is NOT done — it is a
+// design question, carded for John.
 // DeepBench v6.3.50 | useAgents.js | CHI-10 — the "p75 latency buckets" line below is now p90; the
 // actual computation lives in useAIActivity.js (moved there by LOG-21) and is only re-exported
 // here — see that file's CHI-10 comment for the real change. Left as a pointer, not rewritten in
@@ -18,10 +50,9 @@
 // DeepBench v6.0.43 | useAgents.js | S-MI-18b — useAgentActivitySummary() gains optional scope filter
 // FEATURE: SH-03 — Agent roster hook
 // src/hooks/useAgents.js — v5.0.0
-// Returns the agent roster. Swap internals for Supabase query when auth arrives.
 // All components use this hook — never import AGENTS directly from data/agents.js.
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { AGENTS } from "../data/agents.js";
 import { supabase } from '../lib/supabase.js';
 import { computeCallCost, pairedAgentTurnIds, CAPABILITY_WRAPPER_TYPES, PAIR_WINDOW_MS, percentile, classifyRow, buildActivitySummary } from './useAIActivity.js';
@@ -159,10 +190,25 @@ export function useAgentActivitySummary(agentIds, scope, tenantId = 'global', re
           // FEATURE: AI-51 — 'id' added so pairedAgentTurnIds() can key its Set by real per-row
           // id instead of every row sharing `undefined` (which would falsely pair every row in
           // the batch as soon as any single agent-turn row paired).
-          .select('id,agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at,patterns_used')
+          // FEATURE: LOG-70 -- 'patterns_used' dropped. LOG-112 (v6.3.218) rewrote
+          // buildActivitySummary()'s per-agent pattern breakdown to stop reading the frozen legacy
+          // field, and this hook is that function's only other caller -- so from that ship onward
+          // the column was fetched on every page of every agent-activity query and read by
+          // nothing. It is the last consumer named in LOG-70. Do not re-add it: pattern names are
+          // derived at read time by the Log Displayer (.claude/rules/ai-pattern-signature.md,
+          // ARCHITECTURE.md §19k/§19l), and LOG-112's own guard test does not cover src/hooks,
+          // which is exactly how this line survived that session.
+          .select('id,agent_id,ai_type,feature,model,latency_ms,cost_usd,input_tokens,output_tokens,created_at')
           .eq('tenant_id', tenantId)
           .in('agent_id', agentIds)
           .gte('created_at', recencyCutoffIso(RECENCY_WINDOW_DAYS))
+          // FEATURE: LOG-104 -- this paged fetch had NO .order() at all, so the order across its
+          // ~17 .range() pages was whatever the planner chose, and could differ between pages:
+          // rows silently skipped or duplicated, feeding the whole CHI Agents drawer (Calls,
+          // Avg Cost, byKind, pattern rows). `id` is the integer primary key, so ordering by it
+          // is a total order and the window is deterministic. buildActivitySummary() aggregates
+          // and is order-independent, so this changes which rows arrive, never how they read.
+          .order('id', { ascending: false })
           .range(from, from + PAGE_SIZE - 1);
         if (error || !data) return null;
         rows.push(...data);
@@ -229,10 +275,40 @@ export function useDataSources() {
   return rows;
 }
 
+// FEATURE: AGT-006 — the table's column names, keyed by the AGENTS field each one overlays. The
+// key is the array's field; the value is the public.agents column. D1: the table is authoritative
+// for every field it holds, so every pair here is an overlay, and agents.js keeps only what the
+// table lacks (quip, color, benchGroups, docs/classes/chunks, hiredOn, trainable*) until AGT-57.
+export const ROSTER_TABLE_FIELDS = { name: "name", role: "role", code: "code", specialty: "specialty", arch: "architecture", skill: "skill_score", situational: "situational_awareness", salary: "salary", value: "yearly_value", hourly: "hourly_rate", reportHrs: "report_hours", reportCost: "report_cost", revenueModel: "revenue_model", trainer: "trainer_org" };
+const ROSTER_SELECT = "id,is_active," + Object.values(ROSTER_TABLE_FIELDS).join(",");
+
+// D2: where both hold a value the TABLE stands — so a non-null table column always wins, and a
+// NULL one leaves the array's value in place. Pure and exported so the regression suite can assert
+// the merge without a network call.
+export function mergeRoster(codeAgents, tableRows) {
+  const byId = new Map((tableRows || []).map(r => [r.id, r]));
+  return codeAgents.map(a => {
+    const t = byId.get(a.id);
+    if (!t) return a;
+    const out = { ...a, is_active: t.is_active ?? true };
+    for (const [k, col] of Object.entries(ROSTER_TABLE_FIELDS)) {
+      if (t[col] !== null && t[col] !== undefined) out[k] = t[col];
+    }
+    return out;
+  });
+}
+
 export function useAgents() {
-  // TODO: replace with Supabase query when Phase 0 complete + Clerk auth arrives
-  // const { data, isLoading } = useQuery(['agents', TENANT_ID], () =>
-  //   supabase.from('agents').select('*').eq('tenant_id', TENANT_ID)
-  // );
-  return useMemo(() => AGENTS, []);
+  // D4: AGENTS renders first, the table overlays it on arrival — the Bench never waits on the
+  // fetch, and an error or an empty payload leaves the array's values standing.
+  const [agents, setAgents] = useState(AGENTS);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from('agents').select(ROSTER_SELECT).eq('lane', 'product').then(({ data, error }) => {
+      if (cancelled || error || !data) return;
+      setAgents(mergeRoster(AGENTS, data));
+    });
+    return () => { cancelled = true; };
+  }, []);
+  return agents;
 }

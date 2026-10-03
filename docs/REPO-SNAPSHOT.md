@@ -1,4 +1,12 @@
 # DeepBench — Repository Snapshot
+
+> ## ⚠️ GENERATED 2026-06-07 — ~2.5 MONTHS STALE. Describes the PRE-CHI codebase.
+>
+> Fallback use only: prefer reading files live (filesystem MCP, or raw GitHub fetch per
+> `DeepBench-Session-Init.md` Step 8 / `SES-120`). Components, routes, and pipelines listed
+> below predate the CHI redesign and much of the current `api/`/`lib/` surface — treat every
+> entry as a hint to verify, never as a fact. *(Warning added 2026-08-23, Selfbuild sweep.)*
+
 > **Status: Generated 2026-06-07. Full content below.**
 > Source: Claude Code read from local repos across 4 projects.
 

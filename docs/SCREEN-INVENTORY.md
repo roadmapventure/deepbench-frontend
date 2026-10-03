@@ -54,6 +54,18 @@ More dashboards expected here over time as new work-types are built — this lis
 | Teach | `/bench/:agentId/teach` | `TeachScreen.jsx` | — | Always a child of Personnel File — one level deeper than Add Agent/Personnel File, not a sibling of them. |
 | Test My Team | `/bench/test` | `TestTeamScreen.jsx` | — | **Placement uncertain** — likely a NIGP-era leftover not yet fully incorporated into DeepBench's own model. Sits directly under Bench (not nested) for now; revisit later. |
 
+### Super Admin (new Product Focus Area, John, 2026-08-19 — name is his, `design-ses-78b-0819`)
+| Screen | Route | Component | Status |
+|---|---|---|---|
+| Super Admin | `/admin` *(proposed — confirmed at `ADM-1` design)* | not built yet | ❌ Missing, tracked as `ADM-1` (`docs/FEATURES.md`) |
+
+Screen code: **`ADM`** — claimed 2026-08-19 (`design-ses-78b-0819`, row `ADM-1`). The platform's
+admin console: v1 is the read-only home for the §19v runner's evidence (briefing cards, cycle
+history, spend, trust ladder); future user-admin features nest here. Reached via hamburger →
+Admin, **dev instance only** (hostname-gated off production). Decision actions are explicitly
+NOT this screen until real auth ships (§10 is a hardcoded `CURRENT_USER`) — they live on the
+owner-authenticated briefing Artifact (`SES-78b`) and migrate here when Clerk lands.
+
 ### Platform — overlay panels, not routes
 | Screen | Component | Reached via |
 |---|---|---|

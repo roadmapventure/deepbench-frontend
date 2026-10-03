@@ -14,4 +14,8 @@ The fix for a gap is a generic trait/field read, never a conditional or a hand-r
 parallel route. No agent's data ever names another agent — cross-agent needs route
 through `request_help`, reasoned live (Rule #1).
 
-Rationale: `docs/ARCHITECTURE.md` §19b, §19d, §19e.
+The mirror also holds (§19v): *removing* determinism from these four files is gated — an
+Automated-mode session may diagnose and draft the diff, but it lands as a proposal for John,
+never an unattended ship.
+
+Rationale: `docs/ARCHITECTURE.md` §19b, §19d, §19e, §19v.
