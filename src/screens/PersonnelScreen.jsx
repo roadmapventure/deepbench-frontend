@@ -1,3 +1,4 @@
+// DeepBench v7.0.764 | PersonnelScreen.jsx | AGT-337 slice 3 -- an agent with no quip shows no empty quotation marks
 // DeepBench v7.0.757 | PersonnelScreen.jsx | AGT-334 — badge actions + Connect popup
 // DeepBench v7.0.758 | PersonnelScreen.jsx | AGT-339 -- a private agent's Personnel file gains the Activity
 // tab: connections, where they came from, the knowledge delivered and the training's own cost, read with
@@ -496,9 +497,11 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
             <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
             {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
           </div>
+          {agent.quip && (
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
             "{agent.quip}"
           </div>
+          )}
         </div>
         )}
 
@@ -1808,9 +1811,11 @@ export default function PersonnelScreen() {
                   <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
                   {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
                 </div>
+                {agent.quip && (
                 <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
                   "{agent.quip}"
                 </div>
+                )}
                 <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => setConnectOpen(true)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   <div>
