@@ -1,3 +1,4 @@
+// DeepBench v7.0.757 | PersonnelScreen.jsx | AGT-334 — badge actions + Connect popup
 // DeepBench v7.0.758 | PersonnelScreen.jsx | AGT-339 -- a private agent's Personnel file gains the Activity
 // tab: connections, where they came from, the knowledge delivered and the training's own cost, read with
 // the browser key through src/lib/personnelActivity.js (no address column). Additions only.
@@ -20,6 +21,7 @@ import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, J
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
 import { isPrivateAgent } from "../data/agents.js";
+import ConnectAgentPopup from "../components/ConnectAgentPopup.jsx";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { supabase } from "../lib/supabase.js";
@@ -409,10 +411,28 @@ function SkillRow({ sp, chip }) {
   );
 }
 
+// FEATURE: AGT-334 — the ID Badge / persona actions. One component, two mounts (desktop card, mobile
+// persona block). "+ Add Training" on trainable agents (the Training tab, the Roster button's
+// destination); "Connect <first name> to AI" on private agents only (isPrivateAgent reads the agent's
+// own row — Rule #1). Styles: STYLE-GUIDE §7 Primary CTA and Secondary/ghost, sized for the card.
+function BadgeActions({ agent, onAddTraining, onConnect, style }) {
+  const firstName = agent.name.split(" ")[0];
+  return (
+    <div style={style}>
+      {agent.trainable && (
+        <button onClick={onAddTraining} style={{background:`linear-gradient(135deg, ${T.brass}, ${T.brassDeep})`,border:"none",color:T.navy,padding:"6px 12px",fontFamily:display,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Training</button>
+      )}
+      {isPrivateAgent(agent) && (
+        <button onClick={onConnect} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"5px 12px",fontFamily:body,fontSize:12,cursor:"pointer"}}>{`Connect ${firstName} to AI`}</button>
+      )}
+    </div>
+  );
+}
+
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect }) {
   // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
   // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
   // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
@@ -464,6 +484,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
         {!isMobile && (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
+          <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
           <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence</div>
           <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
             <AgentAvatar who={agent.id} size={92} ring={true} />
@@ -1655,6 +1676,7 @@ export default function PersonnelScreen() {
   const agent       = agents.find(a => a.id === agentId) || agents[0];
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
+  const [connectOpen, setConnectOpen] = useState(searchParams.get("connect") === "1");
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
@@ -1789,6 +1811,7 @@ export default function PersonnelScreen() {
                 <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
                   "{agent.quip}"
                 </div>
+                <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => setConnectOpen(true)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   <div>
                     <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
@@ -1876,7 +1899,7 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => setConnectOpen(true)}/>}
             {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
@@ -1890,6 +1913,8 @@ export default function PersonnelScreen() {
               />
             )}
             {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
+            {/* FEATURE: AGT-334 — the Connect popup; address built once here, AGT-338 adds a team address beside it */}
+            {connectOpen && isPrivateAgent(agent) && <ConnectAgentPopup agent={agent} address={`${window.location.origin}/api/mcp/${agent.id}`} onClose={() => setConnectOpen(false)}/>}
             {activeTab === "activity" && showActivity && <ActivityTab agent={agent} entries={entries}/>}
           </div>
 
