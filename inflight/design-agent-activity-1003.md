@@ -13,7 +13,8 @@ Layout John approved 2026-10-03 (direct "yes" to the mock as shown):
    - TRAINING — lessons taught, last taught, and model calls / tokens / cost spent teaching inside DeepBench.
 4. Footer line: tokens, model, decisions and reasoning from the connected AI tool are not shown because DeepBench never receives them.
 5. Times in US Central.
+6. TRAINING card gains one line, approved by John 2026-10-03 ("yes, add the line"): "AI patterns used in DeepBench: RAG, embeddings (1 call)" — read from `ai_activity_log.patterns_used` on the agent's in-DeepBench rows; connections through the agent's address carry no pattern (no model runs on our side) until `AGT-340` ships.
 
 Measured this session (Brittany, 2026-10-03): 13 MCP connections, all counted by `call_facts.target_agent_id` (the bundle logs under the holder); every connection came from Google or Microsoft data-centre addresses, so an IP is the AI tool's server and never a person. The browser's public key can already read every column the tab needs (`ai_activity_log` column grant incl. `call_facts`, `caller_ip_masked`; `ip_org_cache` org/city/region), the same way the Profile tab's Report Card reads — no new `api/` route and no migration. That corrects `AGT-339`'s filed description, which said the read must ride an existing API route.
 
-Blocked on: `AGT-332` is not on `origin/dev` yet (`isPrivateAgent` absent, checked 2026-10-03), so the kickoff cannot anchor on it until `ux-ui-1003` ships. Open with John: whether to add an "AI patterns used" line.
+Blocked on: `AGT-332` is not on `origin/dev` yet (`isPrivateAgent` absent, checked 2026-10-03), so the kickoff cannot anchor on it until `ux-ui-1003` ships.
