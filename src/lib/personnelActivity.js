@@ -1,3 +1,5 @@
+// DeepBench v7.0.769 | personnelActivity.js | AGT-350 -- the Connected from card is a four-column
+// table (Network, Type, Count, Last); its blanket "AI tool's servers" note is gone.
 // DeepBench v7.0.758 | personnelActivity.js | AGT-339 -- the read and the view behind a private
 // agent's Activity tab (Personnel file): who connected, from which network, what knowledge was
 // handed over, and what the training itself cost. Plain JS, no framework: the supabase client is a
@@ -60,6 +62,20 @@ export function formatCentral(iso) {
   return `${p.month} ${p.day}, ${p.year}, ${p.hour}:${p.minute} ${p.dayPeriod} CT`;
 }
 
+// FEATURE: AGT-350 -- the network owners that are data centres. Type is exact, case-sensitive
+// membership of this list -- never a prefix, substring or pattern match.
+export const DATA_CENTRE_OWNERS = ["Akamai Technologies, Inc.", "Amazon.com, Inc.", "Cloudflare, Inc.", "Fastly, Inc.", "Google LLC", "Iron Mountain Data Center", "Microsoft Corporation"];
+export const networkType = owner => (owner == null ? NONE : DATA_CENTRE_OWNERS.includes(owner) ? "AI tool server" : "Home or office");
+
+// FEATURE: AGT-350 -- "2:44 PM", or "Oct 3, 2:44 PM" with the date. No year, no CT.
+export function formatCentralShort(iso, withDate) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return NONE;
+  const p = Object.fromEntries(centralParts.formatToParts(d).map(x => [x.type, x.value]));
+  const clock = `${p.hour}:${p.minute} ${p.dayPeriod}`;
+  return withDate ? `${p.month} ${p.day}, ${clock}` : clock;
+}
+
 const time = iso => new Date(iso).getTime();
 const latest = list => list.reduce((best, iso) => (best == null || time(iso) > time(best) ? iso : best), null);
 const earliest = list => list.reduce((best, iso) => (best == null || time(iso) < time(best) ? iso : best), null);
@@ -97,22 +113,25 @@ export function activityView({ agentId, rows = [], orgs = [], entries = [] }) {
   for (const r of connections) {
     const o = r.caller_ip_masked ? orgByAddress.get(r.caller_ip_masked) : null;
     let key = "Unknown network";
+    let owner = null;
     if (o && o.org) {
       const place = [o.city, o.region].filter(Boolean).join(", ");
       const name = String(o.org).replace(/^AS\d+\s+/, "");
       key = place ? `${name} · ${place}` : name;
+      owner = name;
     }
-    const g = groups.get(key) || { key, count: 0, last: null };
+    const g = groups.get(key) || { key, owner, count: 0, last: null };
     g.count += 1;
     if (r.created_at && (g.last == null || time(r.created_at) > time(g.last))) g.last = r.created_at;
     groups.set(key, g);
   }
+  // FEATURE: AGT-350 -- four columns; Last carries its date only when the connections span days.
   const fromCard = {
     title: "Connected from",
+    columns: ["Network", "Type", "Count", "Last"],
     rows: empty ? [] : [...groups.values()]
       .sort((a, b) => b.count - a.count || time(b.last) - time(a.last))
-      .map(g => [g.key, `${g.count} · last ${formatCentral(g.last)}`]),
-    note: "These are the AI tool's servers, not the person's location.",
+      .map(g => [g.key, networkType(g.owner), String(g.count), formatCentralShort(g.last, days.size > 1)]),
   };
 
   // Card 3 -- Knowledge delivered, as the newest connection recorded it.

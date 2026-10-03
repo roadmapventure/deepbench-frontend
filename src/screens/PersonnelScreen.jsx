@@ -1,3 +1,4 @@
+// DeepBench v7.0.769 | PersonnelScreen.jsx | AGT-350 -- the Activity tab's Connected from card is a four-column table
 // DeepBench v7.0.764 | PersonnelScreen.jsx | AGT-337 slice 3 -- an agent with no quip shows no empty quotation marks
 // DeepBench v7.0.757 | PersonnelScreen.jsx | AGT-334 — badge actions + Connect popup
 // DeepBench v7.0.758 | PersonnelScreen.jsx | AGT-339 -- a private agent's Personnel file gains the Activity
@@ -1620,6 +1621,7 @@ function PlaybookTab({ agent, showToast }) {
 // activityView(); this component only lays the cards out, each one the Report Card's card.
 // ── Tab: Activity ─────────────────────────────────────────────────────────────
 function ActivityTab({ agent, entries }) {
+  const isMobile = useIsMobile();
   // null = still loading, so a card shows Loading… rather than flashing "No connections yet".
   const [activity, setActivity] = useState(null);
   const [activityLoaded, setActivityLoaded] = useState(false);
@@ -1642,6 +1644,7 @@ function ActivityTab({ agent, entries }) {
         <div key={card.title} style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
           <Corners/>
           {i === 0 && <FeatureBadge id="AGT-339" />}
+          {card.columns && <FeatureBadge id="AGT-350" />}
           <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>{card.title}</div>
           {!activityLoaded ? (
             <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
@@ -1653,7 +1656,23 @@ function ActivityTab({ agent, entries }) {
             </div>
           ) : (
             <>
-              {card.rows.map(([k,v])=>(
+              {card.columns ? (
+                // FEATURE: AGT-350 — a table: header row first, four cells per row. On a phone the
+                // network name takes its own line and Type, Count, Last sit on the line under it.
+                <div style={{display:"grid",fontSize:11,gridTemplateColumns:isMobile ? "minmax(0,1fr) auto auto" : "minmax(0,1fr) auto auto auto"}}>
+                  {[card.columns, ...card.rows].map((cells, r) => cells.map((cell, c) => (
+                    <div key={`${r}-${c}`} style={{
+                      padding:"4px 0",
+                      borderBottom:`1px solid ${T.lineSoft}`,
+                      ...(r === 0 || c === 0 ? {color:T.mutedDeep} : {fontFamily:mono,fontSize:10.5,color:T.ink}),
+                      ...(c >= 1 ? {whiteSpace:"nowrap"} : {}),
+                      ...(c >= 2 ? {textAlign:"right",paddingLeft:14} : {}),
+                      ...(c === 1 && !isMobile ? {paddingLeft:14} : {}),
+                      ...(c === 0 && isMobile ? {gridColumn:"1 / -1",borderBottom:"none",paddingBottom:0} : {}),
+                    }}>{cell}</div>
+                  )))}
+                </div>
+              ) : card.rows.map(([k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
                   <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
                   <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
