@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { selfRun } from "./_lib/self-run.js";
-import { ACTIVITY_COLUMNS, activityView } from "../../src/lib/personnelActivity.js";
+import { ACTIVITY_COLUMNS, activityView, formatCentral } from "../../src/lib/personnelActivity.js";
 
 const A = { agent_id: "priv", call_source: "mcp", call_facts: { target_agent_id: "priv" }, latency_ms: null,
   created_at: "2026-10-04T04:30:00Z", caller_ip_masked: "xxx.xx.1.1" };
@@ -49,6 +49,11 @@ export default async function run() {
   assert.deepEqual(keys(c4), ["Lessons taught", "Last taught", "Model calls", "Tokens", "Cost"]);
   const v4 = values(c4);
   assert.deepEqual([v4[0], v4[2], v4[3], v4[4]], ["2", "2", "3,443", "$0.0144"]);
+  // Last taught -- the latest ACTIVE lesson, in the screen-mapped shape (PersonnelScreen.jsx maps the
+  // API's created_at to createdAt). The disabled entry is the newest of the three, so a build that
+  // ignores status reads 12:00 PM instead.
+  assert.equal(v4[1], formatCentral("2026-10-03T16:05:00Z"), "Last taught is the latest active lesson");
+  assert.equal(v4[1], "Oct 3, 2026, 11:05 AM CT");
   assert.equal(c4.note, "AI patterns used in DeepBench: RAG, Embeddings (1 call)");
 
   // No address, masked or otherwise, reaches the view.
