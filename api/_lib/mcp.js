@@ -1,3 +1,11 @@
+// DeepBench v7.0.756 | api/_lib/mcp.js | AGT-333 -- every agent has its own MCP address.
+// `/api/mcp/<agent id>` is a second vercel.json rewrite onto this same handler carrying
+// `agent=<id>`; addressedAgentId() reads that one query value and visibleRows() -- still the ONE
+// visibility function -- narrows to the rows that agent holds, AFTER the lane rule. So an agent's
+// address shows at most what the same caller already sees for that agent on `/api/mcp`, an unknown
+// id shows nothing, and `/api/mcp` itself (no `agent` value) lists and accepts exactly what it did.
+// The comparison is the row's own `agent_id` against the request's value, never a literal (§19b).
+//
 // DeepBench v7.0.684 | api/_lib/mcp.js | AGT-163 -- an MCP key's NAME becomes the caller's visitor_id.
 // Every `call_source = 'mcp'` row in `ai_activity_log` carried `visitor_id NULL` (all 32, measured
 // 2026-09-28) while the web path attributes 3,518 of 4,283. IP capture already works over the wire
@@ -258,9 +266,39 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
  * lane, and equally a row whose lane is null or a value this code has never heard of -- needs the
  * key. Written as "is it product?" rather than "is it governance?" on purpose: a lane added to the
  * database tomorrow is hidden by default, which is the direction a mistake should fail in.
+ *
+ * FEATURE: AGT-333 -- THE PER-AGENT ADDRESS NARROWS HERE, AFTER THE LANE RULE, never instead of it.
+ * `agentId` is what addressedAgentId() read from the request: `undefined` / `null` is the admin
+ * address (`/api/mcp`) and changes nothing -- every caller that passes no `agentId` gets exactly the
+ * rows it got before this ticket. Any other value keeps only the rows whose own `agent_id` equals
+ * it, so an address can only ever SUBTRACT from what the lane rule already allowed: a governance
+ * agent's address is empty without the key, and an id no row carries (unknown, or '') is empty for
+ * everyone. The row's column against the request's value -- no agent is named in this file.
+ *
+ * The request's value is bound to `addressed` and written on the LEFT of the comparison because
+ * agt-162 and agt-163's static guards flag ANY `agent_id ===` in this file, literal or not. The
+ * comparison is the same one either way round; this spelling keeps those two guards meaningful.
  */
-export function visibleRows(rows, { governanceUnlocked }) {
-  return rows.filter(r => r.lane === 'product' || governanceUnlocked === true);
+export function visibleRows(rows, { governanceUnlocked, agentId: addressed }) {
+  const scoped = addressed !== undefined && addressed !== null;
+  return rows.filter(
+    r => (r.lane === 'product' || governanceUnlocked === true) && (!scoped || addressed === r.agent_id),
+  );
+}
+
+/**
+ * FEATURE: AGT-333 -- WHICH AGENT THIS REQUEST ADDRESSED, read once from the rewrite's query value.
+ * Pure.
+ *
+ * `null` means the admin address: `/api/mcp` rewrites with `transport=mcp` and no `agent`, so the
+ * key is absent and nothing is narrowed. `/api/mcp/<id>` rewrites with `agent=<id>`, returned
+ * trimmed. ANYTHING ELSE FAILS CLOSED TO '' -- an empty value, or the array a repeated `agent`
+ * parameter arrives as -- because '' matches no row, whereas answering `null` there would turn a
+ * malformed agent address into the admin address.
+ */
+export function addressedAgentId(query) {
+  if (!query || query.agent === undefined) return null;
+  return typeof query.agent === 'string' ? query.agent.trim() : '';
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -853,7 +891,7 @@ async function handler(req, res) {
         // AGT-163: one resolution, three consumers -- the lane gate, the deterministic handler's
         // own lane rule, and the attribution written on the call's audit row.
         const { name, governanceUnlocked } = resolveCallerKey(req.headers[GOVERNANCE_KEY_HEADER], keys);
-        return { rows: visibleRows(all, { governanceUnlocked }), governanceUnlocked, callerKeyName: name };
+        return { rows: visibleRows(all, { governanceUnlocked, agentId: addressedAgentId(req.query) }), governanceUnlocked, callerKeyName: name };
       })();
     }
     return scopePromise;
