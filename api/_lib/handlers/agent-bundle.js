@@ -1,8 +1,12 @@
+// DeepBench v7.0.759 | api/_lib/handlers/agent-bundle.js | AGT-342 -- the taught items and the
+// agent's own records come from the one shared reader, lib/read-taught.js, framed there.
+//
 // DeepBench v7.0.761 | api/_lib/handlers/agent-bundle.js | AGT-336 slice 2 -- the bundle asks the one
 // visibility check (shared/agent-visibility.js). bundleTargetReadable() is the single target
 // decision: row exists, is active, product lane or the governance key, and canSeeAgent() for the
 // viewer on handler_context.viewer (absent today, so nothing changes yet). An agent hidden from the
 // viewer reads as "Unknown agent", the same message as a missing one.
+//
 // DeepBench v7.0.682 | api/_lib/handlers/agent-bundle.js | AGT-162 -- one DeepBench agent's whole
 // knowledge bundle, handed to an outside model with NO model call on DeepBench's side.
 //
@@ -40,6 +44,7 @@ import { assemblePrompt } from '../../prompt/db-assembly.js';
 import { queryContent } from '../../../lib/search-harness.js';
 import { logActivity } from '../../../lib/activity-log.js';
 import { canSeeAgent, AGENT_ACCESS_COLUMNS } from '../../../shared/agent-visibility.js';
+import { readTaught } from '../../../lib/read-taught.js';
 
 // The four sections that describe THIS call rather than the agent. A bundle is the agent's standing
 // scaffold, so the per-call task/voice tail is dropped: assemblePrompt() is handed an empty
@@ -126,12 +131,16 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
       fetch_instruction: s.fetch_instruction,
     }));
 
-  // The Teach screen's own corpus (api/load-entries.js -> lib/knowledge-write.js), oldest first so
-  // the calling model reads it in the order it was taught.
-  const knowledge_entries = await sbSelect(
-    `knowledge_entries?agent_id=eq.${encodeURIComponent(t)}&tenant_id=eq.${encodeURIComponent(tenant)}` +
-      '&status=eq.active&select=id,title,category,content,teaching_note,source,created_at&order=created_at.asc',
-  );
+  // AGT-342: what the agent was taught, through the one shared reader (lib/read-taught.js) -- the
+  // trainer's items and the agent's own records, each handed over ONCE under its own framing.
+  // `knowledge_entries` stays an array with one entry per active row, but as an index of the two.
+  const kn = await readTaught({ agentId: t, tenantId: tenant });
+  const taught = { framing: kn.framing.taught, items: kn.taught };
+  const records = { framing: kn.framing.records, items: kn.records };
+  const knowledge_entries = [
+    ...taught.items.map(i => ({ id: i.id, title: i.title, chars: i.chars, kind: 'taught' })),
+    ...records.items.map(i => ({ id: i.id, title: i.title, chars: i.chars, kind: 'record' })),
+  ];
 
   // Eleanor Voss's query-free brokered catalog read -- no embedding, no model, and reached through
   // the ONE public broker by its generic `store` field (`the_library_catalog`, AA-162), never by
@@ -167,12 +176,15 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
       guardrails: guardrails.length,
       sections: sections.length,
       knowledge_entries: knowledge_entries.length,
+      taught: taught.items.length,
+      taught_always: taught.items.filter(i => i.always).length,
+      records: records.items.length,
       library_records: library.records,
       library_tier: library.tier,
     },
   });
 
-  return { agent, role_prompts, guardrails, output_formats, sections, knowledge_entries, library, no_inference: true };
+  return { agent, role_prompts, guardrails, output_formats, sections, taught, records, knowledge_entries, library, no_inference: true };
 }
 
 export default handle;
