@@ -1,3 +1,11 @@
+// DeepBench v7.0.761 | useAgents.js | AGT-336 slice 2 — the Bench asks the one visibility check
+// (shared/agent-visibility.js). The roster read adds owner_id / sharing / shared_with; a table-only
+// row saved sharing = 'private' gets benchGroups ["private"], so it shows under the Bench's Private
+// (isPrivateAgent(), AGT-332) instead of All; buildRoster() takes an optional viewer and drops the
+// rows that viewer may not see, plus the AGENTS entry of a dropped row. No caller passes a viewer
+// today, so nothing is hidden yet. mergeRoster() is NOT edited. The Designer's recorded reversible
+// calls (JOHN-0925): the filter sits inside buildRoster(); Private follows sharing for table-only
+// rows only. Pinned by tests/regression/agt-336-bench-private-and-bundle.test.mjs.
 // DeepBench v7.0.753 | useAgents.js | AGT-335 — a public.agents row with no AGENTS entry reaches
 // the Bench. mergeRoster() is `codeAgents.map(...)`, so a row the array does not hold was dropped
 // and an agent created at run time had no card without a deploy. mergeRoster() is NOT edited (it
@@ -64,7 +72,8 @@
 // All components use this hook — never import AGENTS directly from data/agents.js.
 
 import { useState, useEffect } from "react";
-import { AGENTS } from "../data/agents.js";
+import { AGENTS, BENCH_PRIVATE } from "../data/agents.js";
+import { visibleAgents, AGENT_ACCESS_COLUMNS, SHARING } from "../../shared/agent-visibility.js";
 import { T } from "../tokens.js";
 import { supabase } from '../lib/supabase.js';
 import { computeCallCost, pairedAgentTurnIds, CAPABILITY_WRAPPER_TYPES, PAIR_WINDOW_MS, percentile, classifyRow, buildActivitySummary } from './useAIActivity.js';
@@ -292,7 +301,7 @@ export function useDataSources() {
 // for every field it holds, so every pair here is an overlay, and agents.js keeps only what the
 // table lacks (quip, color, benchGroups, docs/classes/chunks, hiredOn, trainable*) until AGT-57.
 export const ROSTER_TABLE_FIELDS = { name: "name", role: "role", code: "code", specialty: "specialty", arch: "architecture", skill: "skill_score", situational: "situational_awareness", salary: "salary", value: "yearly_value", hourly: "hourly_rate", reportHrs: "report_hours", reportCost: "report_cost", revenueModel: "revenue_model", trainer: "trainer_org" };
-const ROSTER_SELECT = "id,is_active,agent_origin,created_at," + Object.values(ROSTER_TABLE_FIELDS).join(",");
+export const ROSTER_SELECT = "id,is_active,agent_origin,created_at," + AGENT_ACCESS_COLUMNS + "," + Object.values(ROSTER_TABLE_FIELDS).join(",");
 
 // D2: where both hold a value the TABLE stands — so a non-null table column always wins, and a
 // NULL one leaves the array's value in place. Pure and exported so the regression suite can assert
@@ -329,7 +338,7 @@ export function tableOnlyAgent(t) {
     docs: 0, classes: 0, chunks: 0,
     quip: "",
     color: T.brass,
-    benchGroups: [],
+    benchGroups: t.sharing === SHARING.PRIVATE ? [BENCH_PRIVATE.id] : [],
     trainable: t.agent_origin === "customer",
     is_active: t.is_active ?? true,
     tableOnly: true,
@@ -343,11 +352,16 @@ export function tableOnlyAgent(t) {
 
 // FEATURE: AGT-335 — the roster the Bench renders: mergeRoster()'s overlay first (D4: AGENTS leads,
 // in its own order), then every table row no AGENTS entry holds, sorted by name. Pure.
-export function buildRoster(codeAgents, tableRows) {
+// FEATURE: AGT-336 — rows the viewer may not see are dropped first, and a dropped row takes its
+// AGENTS entry with it. A null viewer (no login exists — every caller today) drops nothing.
+export function buildRoster(codeAgents, tableRows, viewer = null) {
+  const rows = visibleAgents(tableRows, viewer);
+  const seen = new Set(rows.map(r => r.id));
+  const hidden = new Set((tableRows || []).filter(r => !seen.has(r.id)).map(r => r.id));
   const held = new Set(codeAgents.map(a => a.id));
-  const extra = (tableRows || []).filter(r => !held.has(r.id)).map(tableOnlyAgent);
+  const extra = rows.filter(r => !held.has(r.id)).map(tableOnlyAgent);
   extra.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  return [...mergeRoster(codeAgents, tableRows), ...extra];
+  return [...mergeRoster(codeAgents.filter(a => !hidden.has(a.id)), rows), ...extra];
 }
 
 // FEATURE: AGT-335 — the last roster the fetch built. A screen that mounts the hook after the Bench

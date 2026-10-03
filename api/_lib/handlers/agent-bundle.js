@@ -1,3 +1,8 @@
+// DeepBench v7.0.761 | api/_lib/handlers/agent-bundle.js | AGT-336 slice 2 -- the bundle asks the one
+// visibility check (shared/agent-visibility.js). bundleTargetReadable() is the single target
+// decision: row exists, is active, product lane or the governance key, and canSeeAgent() for the
+// viewer on handler_context.viewer (absent today, so nothing changes yet). An agent hidden from the
+// viewer reads as "Unknown agent", the same message as a missing one.
 // DeepBench v7.0.682 | api/_lib/handlers/agent-bundle.js | AGT-162 -- one DeepBench agent's whole
 // knowledge bundle, handed to an outside model with NO model call on DeepBench's side.
 //
@@ -34,6 +39,7 @@
 import { assemblePrompt } from '../../prompt/db-assembly.js';
 import { queryContent } from '../../../lib/search-harness.js';
 import { logActivity } from '../../../lib/activity-log.js';
+import { canSeeAgent, AGENT_ACCESS_COLUMNS } from '../../../shared/agent-visibility.js';
 
 // The four sections that describe THIS call rather than the agent. A bundle is the agent's standing
 // scaffold, so the per-call task/voice tail is dropped: assemblePrompt() is handed an empty
@@ -53,6 +59,15 @@ async function sbSelect(pathAndQuery) {
   return rows;
 }
 
+// AGT-336: the one answer to "may this call read this agent's bundle". Pure. The row exists, is
+// active, sits on the product lane (or the call holds the governance key), and the viewer may see
+// it (shared/agent-visibility.js). No viewer arrives today, and a null viewer sees everything.
+export function bundleTargetReadable(agentRow, handler_context) {
+  if (!agentRow || agentRow.is_active !== true) return false;
+  if (agentRow.lane !== 'product' && handler_context?.governance_unlocked !== true) return false;
+  return canSeeAgent(agentRow, handler_context?.viewer ?? null);
+}
+
 /**
  * @param agent_id         the HOLDER of the capability (Dan) -- who executed, for the audit row.
  * @param tenant_id        the capability row's tenant.
@@ -69,16 +84,13 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
   }
 
   const agentRows = await sbSelect(
-    `agents?id=eq.${encodeURIComponent(t)}&select=id,name,role,specialty,bio,lane,is_active,data_room_access&limit=1`,
+    `agents?id=eq.${encodeURIComponent(t)}&select=id,name,role,specialty,bio,lane,is_active,data_room_access,${AGENT_ACCESS_COLUMNS}&limit=1`,
   );
   const agentRow = agentRows[0];
-  // ONE MESSAGE FOR THREE FACTS -- absent, retired, and governance-lane-without-the-key. See the
-  // header: distinguishing them would publish the inventory this tool deliberately does not publish.
-  if (
-    !agentRow ||
-    agentRow.is_active !== true ||
-    (agentRow.lane !== 'product' && handler_context?.governance_unlocked !== true)
-  ) {
+  // ONE MESSAGE FOR FOUR FACTS -- absent, retired, governance-lane-without-the-key, and hidden from
+  // the viewer. See the header: distinguishing them would publish the inventory this tool
+  // deliberately does not publish.
+  if (!bundleTargetReadable(agentRow, handler_context)) {
     throw new Error(`Unknown agent: ${t}`);
   }
 
