@@ -1,5 +1,6 @@
 # DeepBench — Architecture North Star
 # Version: v6.0.0 | Last updated: 2026-07-02 | Session: S-ARCH-OWNERSHIP-01-design — Resource Ownership Brokers (§19e), corrects §19d's agent-naming mistake
+# Amended v7.0.767 | 2026-10-03 | design-user-agents-1003 (attended, The Builder) — AGT-337: §19u records John's ruling of 2026-10-03 (decision a828b44f-11f3-4570-a35a-18b28b2d7382). Decision 5 gains an exemption: a private agent a user creates is not a hire, carries no hire card and goes live on creation; an agent on the shared bench still needs John's signature. Decision 6 gains a note: `lib/private-agent-create.js` (v7.0.762) is a narrow precursor that `HAR-39`'s broker absorbs. The ruling is John's; the wording is the session's. No wording was retired. Guard tests/regression/agt-337-hire-exemption.test.mjs.
 # Amended v7.0.749 | 2026-10-03 | cycle-20261003-1141 (runner) — AGT-291: §19v Operations — the finish line gets its sensor. AGT-240 measured it and nothing watched it: `runner_should_boot()` carried no `finish_due` key, so a board whose batch was finished still answered `nothing_pickable` and the next-project proposal was only ever noticed by a run that happened to be reviewable. Four calls, mine under JOHN-0925 and all reversible: **D1** finished = no locked member `open` or `partial` (`delivered` is BUILT — this reverses AGT-240 D2's "every member done or removed", which left 16 shipped Auditor Enhancements members holding their batch open); **D2** a `paused` project's batch can finish, not `executing` alone; **D3** the sensor is `review_due` — `proposal_due` AND no claim inside 24 hours — reported on EVERY outcome at `(7e)` and read inside `runner_should_boot()`'s `work_to_find` parenthesis as `detail.finish_due`; **D4** `--prepare` CLAIMS a batch for 24 h through a conditional PATCH of `epics.proposal_attempted_at` (so concurrent fires and the ≤ 3 passes one cycle may run can never spend two turns on one batch), and `pickDue()` filters the sensor, never the state. Mirror docs/design/agt-291-finish-sensor.sql; guard tests/regression/agt-291-finish-sensor.test.mjs.
 # Amended v7.0.748 | 2026-10-03 | cycle-20261003-0941 (runner) — AGT-314: §19v Operations — an idle fire finds work instead of refusing. `runner_should_boot()`'s nothing-pickable slot splits a SECOND time, after `AGT-127`'s card branch and after every wall: nothing to build, no card left to rule, and either an open/carried `audit_findings` row or an open/partial ticket in a project named by the new `runner_settings.find_work_lists` (text[], DATA John edits with an UPDATE — pattern:2) answers `work_to_find` with `should_boot = true` and `detail.mode = 'find-work-only'`, and the two counts it decided on travel in `detail.open_findings` / `detail.list_tickets`. Measured before the ship: 8 `nothing_pickable` refusals on 2026-10-02 between 11:41 and 18:51Z while 44 findings were `open` and 133 open/partial tickets sat on `dev-mgr-findings` + `auditor-findings`. Mirror `docs/design/agt-314-find-work-boot.sql`; guard `tests/regression/agt-314-find-work-boot.test.mjs`.
 # Amended v7.0.747 | 2026-10-03 | cycle-20261003-0815 (runner) — AGT-312: §19v Operations — a next-project proposal reaches John only when Victoria agrees. Between The Development Manager's `propose-project` turn and the write, Victoria's `review-proposal` capability (intent `vc-proposal-intent`) reads the proposal as a row of her task file (Rule #1) and answers agree or disagree; `finish_project_batch()` refuses any `p_proposal` without `review.verdict = 'agree'` (checked before the due read, so the refusal is provable live with no writes) and records both agreements on the one `proposal` decision; a disagree writes nothing and the batch stays due. John 2026-10-02, decision 6668e1ac. Mirror docs/design/agt-312-proposal-review.sql; guard tests/regression/agt-312-proposal-review.test.mjs.
@@ -2469,11 +2470,26 @@ conditional naming the Recruiter is the failure mode, not the build.
    a number.
 5. **Every hire is signed.** Creating platform records (a new agent, its Skills, Capabilities,
    assignments) always carries `requires_human_confirmation` — John signs every hire card.
+   **Exemption — a private agent a user creates (John, 2026-10-03, decision
+   `a828b44f-11f3-4570-a35a-18b28b2d7382`, `AGT-337`).** An agent a user creates for themselves
+   with `agents.sharing = 'private'` is not a hire: it carries no hire card and no
+   `requires_human_confirmation`, and it goes live on creation (`is_active = true`). The
+   exemption holds because nobody else is offered the agent: the delegation roster reads only
+   agents open to everyone (`.claude/rules/agent-roster-inert.md`, Private carve-out). An agent
+   on the shared bench (`sharing = 'public'`) is a hire, and John signs it. Sharing with named
+   users (`sharing = 'users'`) is not ruled here.
 6. **Taxonomy writes get an owner (§19e, Exclusive Access-Control flavor).** One new brokered
    service module owns writes to `skill_profiles`/`capabilities`/`capability_skill_profiles`/
    `agent_capability_assignments`/`agents`. Generic by construction — nothing in it names the
    Recruiter; the Recruiter is merely its first authorized caller. Registry row to be added to
    §19e's table when the broker ships (`HAR-39`).
+   **Narrow precursor (`AGT-337`, v7.0.762; John, 2026-10-03, same decision).**
+   `lib/private-agent-create.js` writes roster rows today without waiting for the broker, for
+   one case only: a blank private agent — its `agents` row, its own knowledge capability
+   (`capabilities`, `agent_capability_assignments`) and its team rows (`teams`, `agent_teams`).
+   It is reached through one action on `api/agent-configs.js`, names no agent, and changes no
+   existing agent's rows. It is not the broker and earns no §19e registry row; when `HAR-39`
+   ships, the broker absorbs these writes.
 
 ### Current vs. future state
 
