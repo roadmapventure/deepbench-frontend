@@ -1,4 +1,4 @@
-// DeepBench v7.0.700 | tests/regression/agt-164-brittany.test.mjs | AGT-164
+// DeepBench v7.0.752 | tests/regression/agt-164-brittany.test.mjs | AGT-164 (AGT-332 slice 1: the benchGroups pin follows her to ["private"])
 //
 // FEATURE: AGT-164 -- Brittany (MK-07), the outside tester's BLANK marketing agent. Two things
 // landed together and this file pins both: her `public.agents` row, applied verbatim from
@@ -16,7 +16,7 @@
 // splicing an `INSERT INTO public.agent_configs` in and catching it.
 //
 // STATIC (always run):
-//   (a) AGENTS has `brittany` -- code MK-07, trainable true, benchGroups exactly ["platform"] (no
+//   (a) AGENTS has `brittany` -- code MK-07, trainable true, benchGroups exactly ["private"] (no
 //       "mi": the Channel Intelligence screen reads "mi"), a five-key AVATAR_CFG entry, and
 //       AGENT_PRONOUNS she/her/her.
 //   (b) the seed carries exactly ONE `INSERT INTO public.agents`, and that statement carries
@@ -86,14 +86,21 @@ function seedSpecialty(seed) {
 // --- (a) roster entry -------------------------------------------------------------------------
 async function partA_roster() {
   const results = [];
-  const { AGENTS, AVATAR_CFG, AGENT_PRONOUNS } = await import("../../src/data/agents.js");
+  const { AGENTS, AVATAR_CFG, AGENT_PRONOUNS, BENCH_FILTERS, BENCH_PRIVATE, isPrivateAgent } = await import("../../src/data/agents.js");
   const entry = AGENTS.find(a => a.id === SELF_ID);
   assert.ok(entry, `AGENTS has no '${SELF_ID}' entry`);
   assert.strictEqual(entry.code, CODE, `AGENTS.${SELF_ID}.code is ${entry.code}, expected ${CODE}`);
   assert.strictEqual(entry.trainable, true, `AGENTS.${SELF_ID}.trainable is ${entry.trainable} -- the tester trains her`);
-  assert.deepStrictEqual(entry.benchGroups, ["platform"], `AGENTS.${SELF_ID}.benchGroups is not exactly ["platform"]`);
+  assert.deepStrictEqual(entry.benchGroups, ["private"], `AGENTS.${SELF_ID}.benchGroups is not exactly ["private"] (AGT-332: Private only)`);
   assert.ok(!entry.benchGroups.includes("mi"), `AGENTS.${SELF_ID} is in the "mi" bench group`);
-  results.push(`agents-brittany-${CODE}-trainable-platform-only`);
+  // FEATURE: AGT-332 -- Private is a benchGroups VALUE read off the agent's own entry, never an id check.
+  assert.deepStrictEqual(BENCH_PRIVATE, { id: "private", label: "Private" }, `BENCH_PRIVATE is not { id: "private", label: "Private" }`);
+  assert.ok(!BENCH_FILTERS.some(f => f.id === "private"), `BENCH_FILTERS lists "private" -- like "all" it is positioned, not a plain group`);
+  assert.strictEqual(isPrivateAgent(entry), true, `isPrivateAgent(${SELF_ID}) is not true`);
+  assert.strictEqual(isPrivateAgent(AGENTS.find(a => a.id === "nathan")), false, `isPrivateAgent(nathan) is not false -- the move bled past ${SELF_ID}`);
+  assert.strictEqual(AGENTS.filter(isPrivateAgent).length, 1, `expected exactly 1 private agent at this ship, found ${AGENTS.filter(isPrivateAgent).length}`);
+  assert.strictEqual(isPrivateAgent({}), false, `isPrivateAgent({}) is not false -- no benchGroups is not private`);
+  results.push(`agents-brittany-${CODE}-trainable-private-only`);
 
   const avatar = AVATAR_CFG[SELF_ID];
   assert.ok(avatar, `AVATAR_CFG has no '${SELF_ID}'`);
