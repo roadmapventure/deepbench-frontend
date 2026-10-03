@@ -17,6 +17,12 @@ paths:
   agents (`GV-01`..`GV-06`) shipped `true` for this reason. The rule above is unchanged for every
   **product** agent, which is the population it was written about. Both review lenses concurred;
   the mechanism was already in code and only this prose was stale.
+- **Private carve-out (`AGT-337`, John 2026-10-03, decision `a828b44f`):** an agent a user creates
+  with `agents.sharing = 'private'` lands `is_active = true` with no hire card, because the roster
+  never offers it: `lib/project-manager.js` passes its rows through `visibleAgents()`
+  (`shared/agent-visibility.js`) as a viewer with no identity, which keeps `sharing = 'public'`
+  only (`tests/regression/agt-337-broker-fence.test.mjs`). Making an agent `public` puts it in
+  the roster, so that step is still John's hire card.
 - Automated-mode sessions never edit an active agent's rows and never create an agent's rows,
   EXCEPT under rule `AGENT-ROW-AGREED-TICKET` (§19v P6/P7): a ticket with
   `scope_origin = 'john-named'`, or named by an unreversed `runner_decisions` row, makes that write
