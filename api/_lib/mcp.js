@@ -1,3 +1,12 @@
+// DeepBench v7.0.754 | api/_lib/mcp.js | AGT-336 -- the tool list asks the one "who may see this
+// agent" check. public.agents now carries an owner and a sharing level (owner_id, sharing,
+// shared_with), and shared/agent-visibility.js is the single place that reads them. The agents read
+// below names those columns through AGENT_ACCESS_COLUMNS, and assembleCapabilityRows() passes its
+// agents through visibleAgents() before it picks a holder -- so a capability whose only holder the
+// viewer may not see is dropped the same way a capability with no active holder already is. NOTHING
+// IS ENFORCED YET: nobody signs in, no caller passes a viewer, and a null viewer sees everything, so
+// the list is byte-for-byte what it was. visibleRows() is untouched by this ticket.
+//
 // DeepBench v7.0.756 | api/_lib/mcp.js | AGT-333 -- every agent has its own MCP address.
 // `/api/mcp/<agent id>` is a second vercel.json rewrite onto this same handler carrying
 // `agent=<id>`; addressedAgentId() reads that one query value and visibleRows() -- still the ONE
@@ -126,6 +135,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { runCapability } from '../capabilities/execute.js';
 import { handle as agentBundleHandle } from './handlers/agent-bundle.js';
 import { withRequestContext, getRequestContext, runWithCallSource } from '../../lib/request-context.js';
+import { visibleAgents, AGENT_ACCESS_COLUMNS } from '../../shared/agent-visibility.js';
 
 // package.json is read through createRequire rather than an import attribute so the Vercel builder
 // traces it as a plain dependency. A failure here costs the server its version string and nothing
@@ -195,7 +205,7 @@ export async function fetchCapabilityRows() {
   const [capabilities, assignments, agents, intents] = await Promise.all([
     sbSelect('capabilities?select=slug,name,description,execution_type,default_intent_slug,tenant_id'),
     sbSelect('agent_capability_assignments?select=agent_id,capability_slug'),
-    sbSelect('agents?select=id,name,role,lane,is_active'),
+    sbSelect(`agents?select=id,name,role,lane,is_active,${AGENT_ACCESS_COLUMNS}`),
     sbSelect('skill_profiles?skill_type_slug=eq.intent&select=slug,traits'),
   ]);
   return assembleCapabilityRows({ capabilities, assignments, agents, intents });
@@ -208,8 +218,8 @@ export async function fetchCapabilityRows() {
  * in execute.js throws for exactly that case, so listing it would advertise a tool that cannot run.
  * That is the same is_active gate the executor applies, read from the same column.
  */
-export function assembleCapabilityRows({ capabilities = [], assignments = [], agents = [], intents = [] }) {
-  const agentById = new Map(agents.map(a => [a.id, a]));
+export function assembleCapabilityRows({ capabilities = [], assignments = [], agents = [], intents = [], viewer = null }) {
+  const agentById = new Map(visibleAgents(agents, viewer).map(a => [a.id, a]));
   const intentBySlug = new Map(intents.map(s => [s.slug, s]));
 
   const holderBySlug = new Map();
