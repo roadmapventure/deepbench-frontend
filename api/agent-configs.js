@@ -1,8 +1,12 @@
+// DeepBench v7.0.762 | api/agent-configs.js | AGT-337 slice 1 -- POST carries a body `action`:
+// `create_private_agent` saves a blank private agent through lib/private-agent-create.js
+// (ARCHITECTURE.md §19u decision 6). Every other request takes the path it took before.
 // DeepBench v7.0.34 | api/agent-configs.js | LOG-121 -- handler wrapped in withRequestContext(); the
 // request-scoped context is read inside logActivity(), so no logging call site in this file changes.
 // This route reaches no logActivity() call today -- wrapping it is inert now and means a logging
 // site added here later cannot silently lose attribution.
 import { withRequestContext } from "../lib/request-context.js";
+import { createPrivateAgent, readCreateInput } from "../lib/private-agent-create.js";
 
 async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -43,6 +47,16 @@ async function handler(req, res) {
 
     // ── POST ─────────────────────────────────────────────────────────────────
     if (req.method === "POST") {
+      if (req.body?.action === "create_private_agent") {
+        const input = readCreateInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(201).json(await createPrivateAgent(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
       const {
         agent_id,
         tenant_id = "global",
