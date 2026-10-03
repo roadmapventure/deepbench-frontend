@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.662 | runbooks/auditor-routine.md | AGT-240 § Per-run review ends with the Finish line block (propose-project.js prepare → Auditor → merge → manager → dry-run → apply); AGT-239 step 4 passes --weekly (paperwork is ruled here, not per run); the per-run review files the flow checks first; AGT-129 --task-file, delivered_at fix; AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
+<!-- DeepBench v7.0.747 | runbooks/auditor-routine.md | AGT-312 § Per-run review, Finish line: Victoria's review-proposal turn goes between the manager's --dry-run and --apply, and both doors now take --agreement; AGT-240 § Per-run review ends with the Finish line block (propose-project.js prepare → Auditor → merge → manager → dry-run → apply); AGT-239 step 4 passes --weekly (paperwork is ruled here, not per run); the per-run review files the flow checks first; AGT-129 --task-file, delivered_at fix; AGT-102 s1 adds the routine-prompt drift check (step 0, step 1, step 3); AGT-86 slice 8c — the Auditor's playbook: the routine holds a copy of the prompt block; this file is the source; runner-cycle.md step 4d points here -->
 # The Auditor routine — playbook and canonical prompt
 
 ## What this is
@@ -172,12 +172,19 @@ node scripts/propose-project.js --review=$S/finish-review.json --context=$S/fini
 node scripts/agent-prompt.js --agent=devmanager --capability=propose-project --task-file=$S/propose.json > $S/propose.prompt.md
 node scripts/agent-prompt.js --agent=devmanager --capability=propose-project --task-file=$S/propose.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
 ```
-Sub-agent on the printed model → `$S/proposal.json` (`{slug, name, charter, reason, tickets, summary_for_john, patterns_applied}`: ONE project, one ticket per root cause citing its `finding_ids`); log it: `node scripts/agent-log.js --agent=devmanager --capability=propose-project --model=<printed> --ai-type=propose-project --feature=propose-project:dm-propose-intent:depth1 […]`. Then:
+Sub-agent on the printed model → `$S/proposal.json` (`{slug, name, charter, reason, tickets, summary_for_john, patterns_applied}`: ONE project, one ticket per root cause citing its `finding_ids`); log it: `node scripts/agent-log.js --agent=devmanager --capability=propose-project --model=<printed> --ai-type=propose-project --feature=propose-project:dm-propose-intent:depth1 […]`. Then the manager's answer is checked and put to Victoria — she reviews it before it is proposed, and it is written for John only when both agree it needs his attention (`AGT-312`, John 2026-10-02, decision `6668e1ac`):
 ```
 node scripts/propose-project.js --dry-run=$S/proposal.json --context=$S/propose.json
-node scripts/propose-project.js --apply=$S/proposal.json --context=$S/propose.json --cycle-id=<the cycle id>
+node scripts/propose-project.js --for-review=$S/proposal.json --context=$S/propose.json --out=$S/review.json
+node scripts/agent-prompt.js --agent=victoria --capability=review-proposal --task-file=$S/review.json > $S/review.prompt.md
+node scripts/agent-prompt.js --agent=victoria --capability=review-proposal --task-file=$S/review.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
 ```
-A `--dry-run` refusal → re-run the manager ONCE with the refusal lines appended; a second refusal → no `--apply`, the summary quotes the refusals, and the batch stays due for the next run. `--apply` is `public.finish_project_batch()`: ONE `proposal` decision, before-images first — the finished project goes `done` (`paused` when perpetual), the proposed project and its tickets are written `proposed` (not picked), its findings `ticketed`. Nothing here starts it: `start_proposed_project()` takes a session name and John's words, and the standing brief's *Proposed projects* group carries that line to him.
+A `--dry-run` refusal → re-run the manager ONCE with the refusal lines appended; a second refusal → no review turn, no `--apply`, the summary quotes the refusals, and the batch stays due for the next run. Sub-agent on the printed model → `$S/review-answer.json` (`{verdict, reason, account}`); log it: `node scripts/agent-log.js --agent=victoria --capability=review-proposal --model=<printed> --ai-type=review-proposal --feature=review-proposal:vc-proposal-intent:depth1 […]`. Then:
+```
+node scripts/propose-project.js --dry-run=$S/proposal.json --context=$S/propose.json --agreement=$S/review-answer.json
+node scripts/propose-project.js --apply=$S/proposal.json --context=$S/propose.json --agreement=$S/review-answer.json --cycle-id=<the cycle id>
+```
+A `disagree` → nothing is sent; re-run the manager ONCE with her reason appended, then her turn again on the new answer; a second `disagree` → no `--apply`, the summary quotes her reason, and the batch stays due for the next run. `--apply` is `public.finish_project_batch()`: it refuses any proposal without an agreed review, then ONE `proposal` decision carrying both agreements (the manager's reason, then `Review: agree -- <her reason>`), before-images first — the finished project goes `done` (`paused` when perpetual), the proposed project and its tickets are written `proposed` (not picked), its findings `ticketed`. Nothing here starts it: `start_proposed_project()` takes a session name and John's words, and the standing brief's *Proposed projects* group carries that line to him.
 
 ## On demand
 

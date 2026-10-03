@@ -38,7 +38,7 @@ const CYCLE = "fe346b72-3e94-41e6-999c-572150456327";
 const LOCK_SENTENCE = "AGT-240: epic Auditor Enhancements is locked; the finding waits on the findings list";
 const FUNCS = [
   ["project_batch_state", {}],
-  ["finish_project_batch", { p_cycle_id: CYCLE, p_session_name: null, p_epic: EPIC_AE, p_proposal: {} }],
+  ["finish_project_batch", { p_cycle_id: CYCLE, p_session_name: null, p_epic: EPIC_AE, p_proposal: { review: { verdict: "agree", reason: "probe", account: "probe" } } }],
   ["start_proposed_project", { p_slug: "nope", p_john_words: "x", p_session_name: "agt240-test" }],
   ["apply_finish_line_backfill", { p_cycle_id: CYCLE, p_session_name: null, p_cut: CUT }],
 ];

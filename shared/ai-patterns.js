@@ -1,3 +1,4 @@
+// DeepBench v7.0.747 | shared/ai-patterns.js | AGT-312 -- `review-proposal` enters the catalog with Victoria's capability row (migration agt312_proposal_review): scripts/agent-log.js refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per proposal-review turn that docs/runbooks/auditor-routine.md prescribes verbatim would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.741 | shared/ai-patterns.js | AGT-281 -- `requirement-check` enters the catalog beside the audit-run-review row whose shape it copies: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per list turn that docs/runbooks/victoria-reorg.md prescribes verbatim would be refused. Measured at this ship: the capability and its two intents are live and this file named it 0 times. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.680 | shared/ai-patterns.js | AGT-136 -- `design-ruling` enters the catalog with the Designer's capability row: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per ruling run would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.662 | shared/ai-patterns.js | AGT-240 -- `audit-finish-review` and `propose-project` enter the catalog with their capability rows: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
@@ -321,6 +322,15 @@ export const SERVICE_CATALOG = [
   // manager's proposal, validated against dm-propose-intent's schema and then by finish_project_batch().
   { slug: 'audit-finish-review',     name: 'Audit Finish Review (The Auditor)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
   { slug: 'propose-project',         name: 'Propose Project (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+
+  // AGT-312 -- the third turn of that finish, between the manager's proposal and the write: John
+  // 2026-10-02 (decision 6668e1ac) asked that Victoria review it too and that both agree before it
+  // reaches him. 'Structured Output' because her answer is validated against vc-proposal-intent's
+  // {verdict, reason, account} schema (and again by finish_project_batch(), which refuses anything
+  // but `agree`), and 'LLM-as-Judge / Verifier' because the turn IS the judgment on whether the
+  // proposal needs his attention. Mandatory, not decorative: agent-log.js refuses any --ai-type
+  // this array does not carry (SES-338).
+  { slug: 'review-proposal',         name: 'Review Proposal (Head of Product Strategy)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // run-project: 'Structured Output' because the manager's answer is validated against
   // dm-run-intent's schema before scripts/run-project.js will act on it, and 'Orchestrator-Workers'
