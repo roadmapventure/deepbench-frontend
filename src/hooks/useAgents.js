@@ -1,3 +1,14 @@
+// DeepBench v7.0.753 | useAgents.js | AGT-335 — a public.agents row with no AGENTS entry reaches
+// the Bench. mergeRoster() is `codeAgents.map(...)`, so a row the array does not hold was dropped
+// and an agent created at run time had no card without a deploy. mergeRoster() is NOT edited (it
+// stays the overlay, AGT-006 D1-D4 intact); buildRoster() calls it and appends one
+// tableOnlyAgent() entry per unmatched row, sorted by name. The Designer's recorded reversible
+// calls (JOHN-0925): absent text reads "—", absent numbers 0, quip "" — nothing invented;
+// benchGroups [] (under "All" only, AGT-332 owns Private); trainable follows agent_origin =
+// 'customer'; inactive rows are appended too, is_active carried and never set (§19u). The hook
+// keeps the last built roster at module level so a second screen mounting the hook (Bench ->
+// Personnel) opens on the same roster instead of the bare array. Pinned by
+// tests/regression/agt-335-table-only-agents.test.mjs.
 // DeepBench v7.0.722 | useAgents.js | AGT-006 — useAgents() stops returning the static AGENTS
 // array and reads public.agents, which is now the authoritative roster store. The Designer's
 // recorded reversible decisions (JOHN-0925-DESIGNER-DECIDES), not John's: D1 public.agents is
@@ -54,6 +65,7 @@
 
 import { useState, useEffect } from "react";
 import { AGENTS } from "../data/agents.js";
+import { T } from "../tokens.js";
 import { supabase } from '../lib/supabase.js';
 import { computeCallCost, pairedAgentTurnIds, CAPABILITY_WRAPPER_TYPES, PAIR_WINDOW_MS, percentile, classifyRow, buildActivitySummary } from './useAIActivity.js';
 // FEATURE: LOG-21 -- re-export the same imported bindings (not a second copy) so any existing
@@ -280,7 +292,7 @@ export function useDataSources() {
 // for every field it holds, so every pair here is an overlay, and agents.js keeps only what the
 // table lacks (quip, color, benchGroups, docs/classes/chunks, hiredOn, trainable*) until AGT-57.
 export const ROSTER_TABLE_FIELDS = { name: "name", role: "role", code: "code", specialty: "specialty", arch: "architecture", skill: "skill_score", situational: "situational_awareness", salary: "salary", value: "yearly_value", hourly: "hourly_rate", reportHrs: "report_hours", reportCost: "report_cost", revenueModel: "revenue_model", trainer: "trainer_org" };
-const ROSTER_SELECT = "id,is_active," + Object.values(ROSTER_TABLE_FIELDS).join(",");
+const ROSTER_SELECT = "id,is_active,agent_origin,created_at," + Object.values(ROSTER_TABLE_FIELDS).join(",");
 
 // D2: where both hold a value the TABLE stands — so a non-null table column always wins, and a
 // NULL one leaves the array's value in place. Pure and exported so the regression suite can assert
@@ -298,15 +310,60 @@ export function mergeRoster(codeAgents, tableRows) {
   });
 }
 
+// FEATURE: AGT-335 — one roster entry from one table row that AGENTS does not hold. Pure. Text the
+// row lacks reads "—", numbers read 0, the quip is empty: nothing is invented for an agent the
+// repo has never seen. is_active is carried from the row, never set here.
+const ABSENT = "—";
+const TABLE_ONLY_NUMBERS = ["skill", "situational", "salary", "value", "hourly", "reportHrs", "reportCost"];
+export function tableOnlyAgent(t) {
+  const out = {
+    id: t.id,
+    name: t.name,
+    role: t.role ?? ABSENT,
+    code: t.code ?? ABSENT,
+    specialty: t.specialty ?? ABSENT,
+    arch: t.architecture ?? ABSENT,
+    trainer: t.trainer_org ?? ABSENT,
+    trainableBy: t.trainer_org ?? ABSENT,
+    revenueModel: t.revenue_model ?? ABSENT,
+    docs: 0, classes: 0, chunks: 0,
+    quip: "",
+    color: T.brass,
+    benchGroups: [],
+    trainable: t.agent_origin === "customer",
+    is_active: t.is_active ?? true,
+    tableOnly: true,
+    hiredOn: t.created_at
+      ? new Date(t.created_at).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "America/Chicago" })
+      : ABSENT,
+  };
+  for (const k of TABLE_ONLY_NUMBERS) out[k] = t[ROSTER_TABLE_FIELDS[k]] ?? 0;
+  return out;
+}
+
+// FEATURE: AGT-335 — the roster the Bench renders: mergeRoster()'s overlay first (D4: AGENTS leads,
+// in its own order), then every table row no AGENTS entry holds, sorted by name. Pure.
+export function buildRoster(codeAgents, tableRows) {
+  const held = new Set(codeAgents.map(a => a.id));
+  const extra = (tableRows || []).filter(r => !held.has(r.id)).map(tableOnlyAgent);
+  extra.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return [...mergeRoster(codeAgents, tableRows), ...extra];
+}
+
+// FEATURE: AGT-335 — the last roster the fetch built. A screen that mounts the hook after the Bench
+// did starts from it, so a table-only agent's Personnel file opens on that agent, not agents[0].
+let rosterCache = null;
+
 export function useAgents() {
   // D4: AGENTS renders first, the table overlays it on arrival — the Bench never waits on the
   // fetch, and an error or an empty payload leaves the array's values standing.
-  const [agents, setAgents] = useState(AGENTS);
+  const [agents, setAgents] = useState(rosterCache || AGENTS);
   useEffect(() => {
     let cancelled = false;
     supabase.from('agents').select(ROSTER_SELECT).eq('lane', 'product').then(({ data, error }) => {
       if (cancelled || error || !data) return;
-      setAgents(mergeRoster(AGENTS, data));
+      rosterCache = buildRoster(AGENTS, data);
+      setAgents(rosterCache);
     });
     return () => { cancelled = true; };
   }, []);
