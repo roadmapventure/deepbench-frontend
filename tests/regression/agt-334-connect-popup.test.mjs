@@ -18,6 +18,10 @@
 //   d  PersonnelScreen imports the popup and isPrivateAgent, reads ?connect=1, builds the address
 //      exactly once, carries each button label exactly once and mounts BadgeActions exactly twice
 //      (desktop card, mobile persona block). Control: one mount line removed MUST fail.
+//   e  (slice 2, kickoff docs/kickoffs/v7.0.760-AGT-334-connect-redirect.md §5 task 3) /connect is
+//      the redirect: src/screens/ConnectScreen.jsx carries the <Navigate ... replace /> element and
+//      no CopyBlock, and the popup holds the tree's one CopyBlock. Control: the screen text with a
+//      CopyBlock function appended MUST fail the no-CopyBlock check.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -28,6 +32,7 @@ import { selfRun } from "./_lib/self-run.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const POPUP = path.join(ROOT, "src", "components", "ConnectAgentPopup.jsx");
 const PERSONNEL = path.join(ROOT, "src", "screens", "PersonnelScreen.jsx");
+const CONNECT_SCREEN = path.join(ROOT, "src", "screens", "ConnectScreen.jsx");
 
 const EXPECTED_COPY = [
   "Connect <first name> to your favorite AI tool",
@@ -137,6 +142,16 @@ async function run() {
   const oneMount = lines.filter((_, i) => i !== firstMount).join("\n");
   assert.deepEqual(personnelFailures(oneMount), ["<BadgeActions mounted 1 times, want 2"],
     "CONTROL: PersonnelScreen with one <BadgeActions line removed must fail the mount count, and only that");
+
+  // (e) /connect redirects into the popup, and the popup owns the one CopyBlock -- both directions
+  const connect = fs.readFileSync(CONNECT_SCREEN, "utf8");
+  const noCopyBlock = text => !text.includes("function CopyBlock");
+  assert.ok(connect.includes('<Navigate to="/bench/brittany?connect=1" replace />'),
+    "src/screens/ConnectScreen.jsx must redirect /connect to /bench/brittany?connect=1 with replace");
+  assert.ok(noCopyBlock(connect), "src/screens/ConnectScreen.jsx must not carry a CopyBlock -- the popup's is the only one");
+  assert.equal(count(popup, "function CopyBlock({ text }) {"), 1, "the popup must define CopyBlock exactly once");
+  assert.equal(noCopyBlock(connect + "\nfunction CopyBlock() {}"), false,
+    "CONTROL: the screen text with a CopyBlock appended must fail the no-CopyBlock check");
 }
 
 selfRun(import.meta.url, run);
