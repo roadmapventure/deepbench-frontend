@@ -1,3 +1,4 @@
+// DeepBench v7.0.755 | agt-69-governance-section.test.mjs | AGT-332 slice 2 -- check (b)'s nav pin reads [priv, all, ...]
 // DeepBench v7.0.485 | tests/regression/agt-69-governance-section.test.mjs | AGT-70 -- THE ROSTER
 // MAY GROW. Arms (e) and (f) asserted the literal 6, which is not the truth either of them means:
 // the section is the LIVE is_active lane='governance' set, and (e) already proves that by set
@@ -204,8 +205,8 @@ function checkB_rosterMount() {
   assert.strictEqual(countOccurrences(code, "<GovernanceSection />"), 0,
     `${ROSTER_REL} must not carry the AGT-69 unconditional mount any more -- John moved the section under the filter`);
   // The entry is LAST ("last on the list") and flag-gated; the label is the component's constant.
-  assert.ok(code.includes("return [all, ...groups, ...productTeamEntry];"),
-    `${ROSTER_REL} must append the Product Team entry AFTER the BENCH_FILTERS groups`);
+  assert.ok(code.includes("return [priv, all, ...groups, ...productTeamEntry];"),
+    `${ROSTER_REL} must append the Product Team entry AFTER the BENCH_FILTERS groups (AGT-332: Private, then All, lead the nav)`);
   assert.ok(code.includes("const productTeamEntry = productTeam.on"),
     `${ROSTER_REL} must gate the Product Team entry on the flag (productTeam.on)`);
   assert.ok(code.includes("label: PRODUCT_TEAM_LABEL"),

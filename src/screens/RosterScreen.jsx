@@ -1,3 +1,4 @@
+// DeepBench v7.0.755 | RosterScreen.jsx | AGT-332 slice 2 — "Private" filter first and selected; All excludes private
 // DeepBench v7.0.460 | RosterScreen.jsx | AGT-80 — the governance agents are the last left-hand filter,
 // "Product Team" (John, 2026-09-12): the nav gains one flag-gated entry with the live count after the
 // BENCH_FILTERS groups; under it the grid area shows the read-only Governance cards in place of the
@@ -22,7 +23,7 @@ import { useAgents } from "../hooks/useAgents.js";
 import { useAgentUsageCounts } from "../hooks/useAgents.js";
 import { CURRENT_USER } from "../config.js";
 import { AI_PAT } from "../aiPatterns.js";
-import { BENCH_FILTERS } from "../data/agents.js";
+import { BENCH_FILTERS, BENCH_PRIVATE, isPrivateAgent } from "../data/agents.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import GovernanceSection, { PRODUCT_TEAM_FILTER, PRODUCT_TEAM_LABEL, useProductTeam } from "../components/GovernanceSection.jsx"; // FEATURE: AGT-69 / AGT-80 — flag read inside the component
 
@@ -174,7 +175,7 @@ export default function RosterScreen() {
   // FEATURE: RO-13 — platform's single responsive breakpoint source, see STYLE-GUIDE.md §22
   const isMobile = useIsMobile();
 
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState(BENCH_PRIVATE.id);
   // FEATURE: AGT-80 — the Product Team filter: flag + rows from the component's own hook
   const productTeam = useProductTeam();
   const isProductTeam = activeFilter === PRODUCT_TEAM_FILTER;
@@ -191,7 +192,10 @@ export default function RosterScreen() {
   // FEATURE: RO-10 — nav item count badges always reflect group membership
   // in the full roster, not the currently filtered subset.
   const navItems = useMemo(() => {
-    const all = { id: "all", label: "All", count: agents.length };
+    // FEATURE: AGT-332 — Private FIRST (John's order), from BENCH_PRIVATE; "All" = every non-private
+    // agent, so the count and the grid read one predicate (Rule #1: a row value, never an id).
+    const priv = { id: BENCH_PRIVATE.id, label: BENCH_PRIVATE.label, count: agents.filter(isPrivateAgent).length };
+    const all = { id: "all", label: "All", count: agents.filter(a => !isPrivateAgent(a)).length };
     const groups = BENCH_FILTERS.map(f => ({
       id: f.id,
       label: f.label,
@@ -202,13 +206,13 @@ export default function RosterScreen() {
     const productTeamEntry = productTeam.on
       ? [{ id: PRODUCT_TEAM_FILTER, label: PRODUCT_TEAM_LABEL, count: productTeam.rows ? productTeam.rows.length : 0 }]
       : [];
-    return [all, ...groups, ...productTeamEntry];
+    return [priv, all, ...groups, ...productTeamEntry];
   }, [agents, productTeam.on, productTeam.rows]);
 
   // FEATURE: RO-10 — filtering happens on the already-sorted array, so
   // RO-09's sort order is preserved within the filtered subset.
   const filteredAgents = useMemo(() => {
-    if (activeFilter === "all") return sortedAgents;
+    if (activeFilter === "all") return sortedAgents.filter(a => !isPrivateAgent(a));
     return sortedAgents.filter(a => a.benchGroups.includes(activeFilter));
   }, [sortedAgents, activeFilter]);
 
