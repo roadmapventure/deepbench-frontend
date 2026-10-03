@@ -2598,26 +2598,23 @@ over one; only walls and blockers end a cycle build-less).** Exactly ONE build p
 never more. A gated card's later Accept re-enters that ticket at queue #1 (register B23 —
 tap-order stacking, recompute renumbers beneath).
 
-**FILING THE CARD ALSO WRITES THE TICKET'S `design_status` — same act, not a later one
-(`SES-114`, `v7.0.165`).** The card is the *ask*; the row is the *state*, and until this ticket
-only the ask existed, which is why the next cycle had to rediscover the block from prose. So in
-the same breath as the `runner_items` insert, **before-image first** (§19v):
+**FILING THE CARD, WRITING THE TICKET'S `design_status` AND RECORDING THE SKIP ARE ONE CALL,
+never hand-typed statements bound by this prose (`SES-114`, `AGT-308`, `v7.0.746`).** The card is
+the *ask*, the row is the *state*, the skip row is what reaches §10 of the briefing. A cycle that
+classified `AGT-281` gated at 10:02Z wrote neither and filed the card at 10:39Z — the ticket sat at
+queue #1 throughout. One call writes all three, before-images first (§19v):
 
 ```sql
--- 'needs-desktop' = the remaining work is on a surface an unattended cycle may not touch.
---   SINCE SES-315 (M6-01, v7.0.404) THAT IS THE ONLY VALUE THIS STATEMENT MAY WRITE.
--- 'needs-john' is RETIRED as a blocking state by M6-01: no cycle blocks on a human decision --
---   it decides, records the reasoning and carries the reversal handle (step 7b) instead of
---   flagging the ticket and dropping it. drain_chain_gate()'s c_flagged has been
---   ARRAY['needs-desktop'] alone since SES-281, so writing 'needs-john' now parks a ticket
---   that nothing is waiting to un-park. Legacy rows keep theirs; step 5's table reads them.
--- ('john-paced' also exists — John ratifying on-page cards, SES-166 — but it is NEVER yours
---  to write here: no gated card carries it, and assigning it is John's call. Step 5's table.)
-UPDATE public.backlog_items
-   SET design_status = 'needs-desktop', updated_at = now()
- WHERE backlog_id = '<TICKET-ID>'
-RETURNING backlog_id, design_status;
+SELECT * FROM public.gate_before_build('<your cycle id>', '<TICKET-ID>', '<plain_cant>', '<plain_after>', '<plain_worth>', '<one sentence: why it is gated and what unblocks it>');
 ```
+
+`needs-desktop` is the ONLY value it writes (`SES-315`/M6-01 retired `needs-john`; `john-paced` is
+John's call, never yours). The `34865f07` rule governs the card's WORDING — where the work waits,
+never an approval he owes — and never whether you call it: a ticket you classified gated with NO
+call is the `AGT-308` bug itself. A design-only ticket is step 6's `design_only_stop()`, not this.
+It validates before it writes (no ticket, a blank text, a second call on an undecided card — each
+its own refusal) and calls NO `recompute_backlog_queue()`: the ticket keeps its queue slot, and the
+undecided card is what `pick_exclusions()` reads to keep it out of `prime_directive_queue()`.
 
 Two boundaries. **Never write `removal proposed` here** — that is a `status`, `SES-113` owns it,
 and duplicating it into `design_status` gives one fact two homes. And **never clear the flag
