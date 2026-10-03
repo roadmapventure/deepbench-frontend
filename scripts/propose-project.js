@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// DeepBench v7.0.747 | scripts/propose-project.js | AGT-312 -- A PROPOSAL REACHES JOHN ONLY WHEN
-// BOTH THE MANAGER AND VICTORIA AGREE. AGT-240 -- PROJECTS GET A FINISH LINE.
+// DeepBench v7.0.749 | scripts/propose-project.js | AGT-291 -- THE FINISH LINE GETS ITS SENSOR.
+// AGT-312 -- A PROPOSAL REACHES JOHN ONLY WHEN BOTH THE MANAGER AND VICTORIA AGREE. AGT-240 --
+// PROJECTS GET A FINISH LINE.
 //
 // John, verbatim 2026-10-02 (decision 6668e1ac): "add one extra item, before it get's proposed,
 // victoria has to review it too, and both the dev mgr and victoria agree it needs to be brought to
@@ -16,17 +17,24 @@
 //
 // This file is the driver of that finish, as a client of public.finish_project_batch(). It decides
 // nothing itself (pattern:9): WHETHER a batch is finished is public.project_batch_state()'s
-// `proposal_due` (an executing project, a locked list, every member done or removed, not yet
-// finished); WHAT to propose is two model turns, run by the caller on the models agent-prompt.js
+// `proposal_due` (an executing or paused project, a locked list, no locked member open or partial
+// (AGT-291), not yet finished) and whether it is still worth a turn is its `review_due` -- that
+// same state AND no claim inside 24 hours (AGT-291 D3/D4);
+// WHAT to propose is two model turns, run by the caller on the models agent-prompt.js
 // prints; the WRITE, its before-images and its one `proposal` decision are the function's (§19b, §19v).
 // Rule #1 (§19d/§19e): the Auditor's review reaches the manager only as a row of the task file,
 // `functionality_review`, never agent to agent.
 //
 // Six doors, two validators:
 //   --prepare --out=<path>
-//       asks rpc/project_batch_state for the batches due a proposal and writes the FIRST (by slug) as
-//       the task context: epic_id, project, epic, members, findings (the findings list: open, carried
-//       and listed), projects. Exit 3 when none is due -- no Auditor turn, no manager turn, no cost.
+//       asks rpc/project_batch_state for the batches whose sensor is up (`review_due`), CLAIMS them in
+//       order and writes the FIRST ONE IT CLAIMED (by slug) as the task context: epic_id, project,
+//       epic, members, findings (the findings list: open, carried and listed), projects. The claim is
+//       a conditional PATCH of epics.proposal_attempted_at (AGT-291 D4): a batch another pass took
+//       inside 24 hours comes back `[]` and is skipped, so two concurrent fires -- and the <= 3
+//       passes one cycle may run -- can never spend two turns on the same batch (pattern:138: races
+//       are fixed with claims, not one-run locks). Exit 3 when nothing is `review_due` and when every
+//       due batch is already held -- no Auditor turn, no manager turn, no cost.
 //   --review=<auditor answer.json> --context=<prepare.json> --out=<path>
 //       checks the Auditor's {areas, account} (audit-finish-review / au-finish-intent) and merges it
 //       into the context as `functionality_review` -- the manager's task file. No network.
@@ -60,6 +68,18 @@ import { pathToFileURL } from "url";
 // --- pure half (imported by tests/regression/agt-240-project-finish-line.test.mjs; no network) ------
 
 export const NOTHING_DUE = "no project batch is due a proposal — no Auditor or manager turn, no cost (AGT-240)";
+// AGT-291 D4: the claim window. A batch attempted inside it is HELD and skipped; one older than it
+// is claimable again, so a pass that died between the claim and the proposal cannot strand a batch.
+export const CLAIM_HOURS = 24;
+export const ALL_HELD = "every batch whose list is finished was claimed inside the last 24 hours — no Auditor or manager turn, no cost (AGT-291)";
+
+// The claim, as a query rather than as prose: the PATCH only matches a row that is unclaimed or
+// stale, so the DATABASE decides who got it and `[]` means another pass holds it.
+export function claimQuery(epicId, nowMs = Date.now()) {
+  const cut = new Date(nowMs - CLAIM_HOURS * 3600e3).toISOString();
+  return `epics?id=eq.${encodeURIComponent(String(epicId))}` +
+    `&or=(proposal_attempted_at.is.null,proposal_attempted_at.lt.${encodeURIComponent(cut)})`;
+}
 export const WAITING_STATUSES = Object.freeze(["open", "carried", "listed"]);
 export const TARGET_STATUSES = Object.freeze(["planned", "paused", "done"]);
 export const AREA_STATES = Object.freeze(["working", "broken", "missing"]);
@@ -170,10 +190,13 @@ export function validateAgreement(review) {
   return { ok: refusals.length === 0, refusals };
 }
 
-// The due batches, first by slug then epic name -- one proposal per run.
+// The batches whose SENSOR is up, first by slug then epic name -- one proposal per run. AGT-291 D3:
+// `review_due`, never `proposal_due`. The two differ by the claim alone: a batch claimed inside 24
+// hours stays `proposal_due` (it IS finished, and every reader still sees that) and drops out of
+// `review_due`, so a second pass this cycle does not re-prepare the batch the first one took.
 export function pickDue(rows) {
   return (Array.isArray(rows) ? rows : [])
-    .filter(r => r && r.proposal_due === true)
+    .filter(r => r && r.review_due === true)
     .sort((a, b) => String(a.slug).localeCompare(String(b.slug)) || String(a.epic_name).localeCompare(String(b.epic_name)));
 }
 
@@ -252,11 +275,11 @@ function creds() {
   return { base, key };
 }
 
-async function rest(base, key, method, q, body) {
+async function rest(base, key, method, q, body, headers = {}) {
   fetched = true;
   const res = await fetch(`${base}/rest/v1/${q}`, {
     method,
-    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text().catch(() => "");
@@ -274,15 +297,29 @@ async function prepare(args) {
   };
   const due = pickDue(await call("POST", "rpc/project_batch_state", {}));
   if (due.length === 0) die(3, NOTHING_DUE);
-  const d = due[0];
+  // AGT-291 D4: CLAIM, in order, and take the first batch this pass actually got. The guard is in
+  // the query, so the claim is atomic -- never read-then-write (CLAUDE.md: atomic counters).
+  const stamp = new Date().toISOString();
+  const held = [];
+  let d = null;
+  for (const row of due) {
+    const r = await rest(base, key, "PATCH", claimQuery(row.epic_id), { proposal_attempted_at: stamp },
+      { Prefer: "return=representation" });
+    if (!r.ok) die(1, `propose-project: PATCH ${claimQuery(row.epic_id)} -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
+    if (Array.isArray(r.json) && r.json.length > 0) { d = row; break; }
+    held.push(`${row.slug}/${row.epic_name}`);
+  }
+  if (d === null) die(3, `${ALL_HELD} Held: ${held.join(", ")}.`);
   const [project] = await call("GET", `projects?slug=eq.${encodeURIComponent(d.slug)}&select=slug,name,charter,status,perpetual`);
   const members = await call("GET", `backlog_items?epic_id=eq.${d.epic_id}&select=backlog_id,title,status,priority_class&order=backlog_id`);
   const findings = await call("GET", `audit_findings?status=in.(${WAITING_STATUSES.join(",")})&select=id,status,kind,check_slug,locations,governing_fact,proposed_resolution,found_by,finding_type,family&order=created_at,id`);
   const projects = await call("GET", "projects?select=slug,name,status,perpetual&order=slug");
   const ctx = buildContext({ due: d, project, members, findings, projects });
   writeJson(args.out, ctx);
-  console.log(`propose-project --prepare: ${d.slug} batch ${d.epic_name} is due (${d.members} members, 0 left); `
-    + `${ctx.findings.length} waiting finding(s), ${due.length - 1} other due batch(es) -> ${args.out}`);
+  console.log(`propose-project --prepare: ${d.slug} batch ${d.epic_name} is due and CLAIMED until `
+    + `${new Date(Date.parse(stamp) + CLAIM_HOURS * 3600e3).toISOString()} (${d.members} members, 0 left); `
+    + `${ctx.findings.length} waiting finding(s), ${due.length - 1} other due batch(es), `
+    + `${held.length} already held -> ${args.out}`);
   process.exitCode = 0;
 }
 

@@ -33,12 +33,17 @@ const REVIEW = pathToFileURL(path.join(ROOT, "scripts", "audit-review.js")).href
 const BRIEF = pathToFileURL(path.join(ROOT, "scripts", "render-standing-brief.js")).href;
 
 const EPIC_AE = "6c8a8325-205c-4e08-b0b2-64c939582cc6";
+// AGT-291: the not-due target moved. Auditor Enhancements is now FINISHED -- paused, locked, 16
+// members and none open or partial -- so it is `proposal_due` and the refusal below would no
+// longer fire on it. This is the Moat batch: a `planned` project with an unlocked list, which no
+// definition of finished can reach.
+const EPIC_NOT_DUE = "eeda31e6-7149-4afe-824a-ccf4fb1d571d";
 const CUT = "2026-09-24T05:00:00Z";
 const CYCLE = "fe346b72-3e94-41e6-999c-572150456327";
 const LOCK_SENTENCE = "AGT-240: epic Auditor Enhancements is locked; the finding waits on the findings list";
 const FUNCS = [
   ["project_batch_state", {}],
-  ["finish_project_batch", { p_cycle_id: CYCLE, p_session_name: null, p_epic: EPIC_AE, p_proposal: { review: { verdict: "agree", reason: "probe", account: "probe" } } }],
+  ["finish_project_batch", { p_cycle_id: CYCLE, p_session_name: null, p_epic: EPIC_NOT_DUE, p_proposal: { review: { verdict: "agree", reason: "probe", account: "probe" } } }],
   ["start_proposed_project", { p_slug: "nope", p_john_words: "x", p_session_name: "agt240-test" }],
   ["apply_finish_line_backfill", { p_cycle_id: CYCLE, p_session_name: null, p_cut: CUT }],
 ];
@@ -108,8 +113,9 @@ async function run() {
     assert.equal(validateReviewAnswer({ areas: [{ area: "a", state: "working", evidence: "e" }] }).ok, true);
     assert.deepEqual(validateReviewAnswer({ areas: [{ area: "a", state: "fine", evidence: "e" }] }).refusals,
       ["area 1 needs area, evidence and a state of working, broken or missing"]);
-    assert.deepEqual(pickDue([{ slug: "b", proposal_due: true }, { slug: "a", proposal_due: false }, { slug: "a2", proposal_due: true }]).map(r => r.slug),
-      ["a2", "b"], "only due batches, first by slug");
+    // AGT-291: the picker reads the SENSOR (`review_due`), not the plain state (`proposal_due`).
+    assert.deepEqual(pickDue([{ slug: "b", review_due: true }, { slug: "a", review_due: false }, { slug: "a2", review_due: true }]).map(r => r.slug),
+      ["a2", "b"], "only batches whose sensor is up, first by slug");
   });
 
   // --- B. the audit-review.js mirror, pure -------------------------------------------------------------
@@ -193,7 +199,8 @@ async function run() {
 
       const fin = await req(url, key, "rpc/finish_project_batch", { method: "POST", body: FUNCS[1][1] });
       assert.equal(fin.status, 400, describe(fin));
-      assert.match(String(fin.json?.message), /^finish_project_batch: epic 6c8a8325-205c-4e08-b0b2-64c939582cc6 is not due a proposal/);
+      assert.match(String(fin.json?.message),
+        new RegExp(`^finish_project_batch: epic ${EPIC_NOT_DUE} is not due a proposal`));
 
       const f = await req(url, key, "audit_findings?found_by=like.auditor*&select=id&limit=1");
       assert.equal(f.status, 200, describe(f));

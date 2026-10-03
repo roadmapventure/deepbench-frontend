@@ -180,7 +180,7 @@ for repeatedly.**
    so a queued **directive** row alone is not pickable. **`AGT-127` splits this slot:** an undecided
    `gated_before_build` card no open `gate-card-…` question names answers `gate_cards_to_rule`:
    `should_boot=true`, `detail.mode='rule-cards-only'`, `detail.gate_cards_to_rule=<n>`, placed
-   HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged. **`AGT-314` splits it again:** zero cards and open/carried `audit_findings`, or an open/partial ticket in a `runner_settings.find_work_lists` project: `work_to_find`, `detail.mode='find-work-only'` — the fire runs `(7f)` with `--prepare --weekly`, then `victoria-reorg.md` (c) step 2 per list slug with `--cycle-id=<id>` (0 tickets: skip), builds nothing, closes `did_not_run`, `last_step` `find-work: <lines>`. Nothing to review: this line, unchanged.
+   HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged. **`AGT-314` splits it again:** zero cards and open/carried `audit_findings`, or an open/partial ticket in a `runner_settings.find_work_lists` project, or a batch `review_due` in `project_batch_state()` (`AGT-291`, `detail.finish_due`): `work_to_find`, `detail.mode='find-work-only'` — the fire runs `(7f)` with `--prepare --weekly`, then `victoria-reorg.md` (c) step 2 per list slug with `--cycle-id=<id>` (0 tickets: skip), then `(7e)`'s finish line, builds nothing, closes `did_not_run`, `last_step` `find-work: <lines>`. Nothing to review: this line, unchanged.
 9. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.
@@ -4369,11 +4369,10 @@ means only that it could not run, never that the cycle is in trouble. **A promot
 node scripts/staff-watch.js --promote --apply --cycle-id=<your cycle id>
 ```
 
-**(7e) THE AUDITOR REVIEWS THIS RUN (`AGT-137`).** Only shipped, gated_before_build, reverted, failed; else exit 3 — nothing to review, no cost. `node scripts/audit-run-review.js --prepare --cycle-id=<your cycle id> --out=$S/run.json`; `auditor-routine.md` § Per-run review.
+**(7e) THE AUDITOR REVIEWS THIS RUN (`AGT-137`).** Only shipped, gated_before_build, reverted, failed; else exit 3 — nothing to review, no cost. `node scripts/audit-run-review.js --prepare --cycle-id=<your cycle id> --out=$S/run.json`; `auditor-routine.md` § Per-run review. **Finish line, EVERY outcome (`AGT-291`):** `node scripts/propose-project.js --prepare --out=$S/finish.json`; exit 3 = nothing `review_due`; exit 0 → `auditor-routine.md` *Finish line* to its end, then again, <= 3 passes.
 
 **(7f) THE DEVELOPMENT MANAGER REVIEWS THE FINDINGS (`AGT-133`; `JOHN-0925-REVIEW-CADENCE`).**
-`(7e)` writes findings and nothing read them: 28 rows sat `open` with `ruling` NULL on the day this
-step shipped. Same gate as `(7e)` — **shipped, gated_before_build, reverted, failed and nothing
+Same gate as `(7e)` — **shipped, gated_before_build, reverted, failed and nothing
 else**; on any other outcome this step does not run. `W` is this ISO week (`isoWeek()`, exported by
 `scripts/audit-ledger.js`), `$S` your scratchpad.
 
@@ -4416,12 +4415,11 @@ review. Keep `--apply`'s `Decision <id> — reversible until …` line and its t
 
 **THIS STEP NEVER GATES THE CHAIN.** A refusal, an exit 3, a missing credential or an unmapped
 source is a line in `notes` — **never `gate_failed`**, never a `did_not_run`, never a reason `(8)`
-does not run. The review reads a week's findings; the chain ships tickets. A cycle that let an
+does not run. A cycle that let an
 unread finding stop its own drain would have inverted both.
 
 **AND THIS STEP FILES THE TICKETS — the cycle does not (`JOHN-0925-FINDINGS-STANDARD`).** Only The
-Development Manager files, for every source. `--apply` is the one filing path for a finding, and it
-claims its ids the same atomic way every other filing site does.
+Development Manager files, for every source.
 
 
 **(7g) THE DESIGNER RULES (`AGT-136`; `JOHN-0925-DESIGNER-DECIDES`).** `node scripts/design-ruling.js

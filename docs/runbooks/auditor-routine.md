@@ -157,7 +157,7 @@ node scripts/audit-run-review.js --ingest=$S/run-review.json --cycle-id=<the cyc
 ```
 (An attended run passes `--session-name=<N>` INSTEAD of `--cycle-id`; never both — `runner_before_images.ck_before_image_attribution` refuses it and the script exits 2 before it reads anything. Every filed row carries `found_by auditor:run-review:<the cycle id>` and the finding's own `finding_type`, defaulting to `defect`; the append is `audit-ledger.js`'s one intake, before-image first.)
 
-*Finish line* (`AGT-240`). A project's list locks when it starts; what is found meanwhile waits on the findings list (`listed`). When every ticket in a locked list is `done` or `removed`, the batch is finished and proposes the next project — asked after every reviewable run, and a weekly run may call the same block:
+*Finish line* (`AGT-240`). A project's list locks when it starts; what is found meanwhile waits on the findings list (`listed`). When no ticket in a locked list is `open` or `partial` (`delivered` is built, AGT-291), the batch is finished and proposes the next project — asked after every reviewable run, and a weekly run may call the same block:
 ```
 node scripts/propose-project.js --prepare --out=$S/finish.json; echo "prepare exit $?"
 ```

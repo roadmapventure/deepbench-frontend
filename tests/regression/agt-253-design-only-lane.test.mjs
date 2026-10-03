@@ -51,8 +51,9 @@ const CEILING = 381000;
 // AGT-314 (v7.0.748) re-pinned it: a SECOND home for one number is exactly what the comment above
 // warns about, and a later editing ship has to move both or this arm goes red on a change that has
 // nothing to do with AGT-253's clause. Moving it is the narrowest fix; collapsing the two homes
-// into one is tracked separately rather than done inline here (pattern:96).
-const BYTES_AT_SHIP = 380944;
+// into one is tracked separately rather than done inline here (pattern:96). AGT-291 (v7.0.749)
+// re-pinned it again, for the same reason and in the same commit as the runbook edit.
+const BYTES_AT_SHIP = 380985;
 // Clause (c), step 6. The two function names are what make it load-bearing: a clause that named
 // neither would leave a cycle with nothing to call.
 const CLAUSE_C = "**Design-only project (`AGT-253`): when `public.ticket_design_only('<ID>')` is true, " +
@@ -194,7 +195,8 @@ async function run() {
     assert.strictEqual(bytes, BYTES_AT_SHIP,
       `${CYCLE_REL} measures ${bytes} B, expected ${BYTES_AT_SHIP}. AGT-253's own ship freed 259 B ` +
       "before adding its 263 B clause to land on 380949; AGT-314 then freed 452 B and added a 455 B " +
-      "clause to land on 380944 -- a drift here means the byte wall moved without BOTH pins moving " +
+      "clause to land on 380944; AGT-291 freed 295 B of retired (7f) prose and added 334 B of finish-line " +
+      "clause to land on 380985 -- a drift here means the byte wall moved without BOTH pins moving " +
       "with it (ses-413d's BYTES_AT_SHIP is the other one)");
     assert.ok(bytes <= CEILING,
       `${CYCLE_REL} is ${bytes} B against SES-336's ${CEILING} B ceiling -- this edit had to free bytes before adding any`);

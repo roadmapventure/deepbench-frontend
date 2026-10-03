@@ -30,9 +30,11 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PROPOSE = pathToFileURL(path.join(ROOT, "scripts", "propose-project.js")).href;
 
-// The same epic agt-240 arm D calls: an executing project whose list is locked but NOT finished, so
-// it is never due a proposal. Nothing here depends on that -- only that it is not due.
-const EPIC_AE = "6c8a8325-205c-4e08-b0b2-64c939582cc6";
+// The same epic agt-240 arm D calls: a `planned` project whose list is not even locked, so it is
+// never due a proposal. Nothing here depends on that -- only that it is not due. AGT-291 moved it
+// off Auditor Enhancements, which is now finished (paused, locked, no member open or partial) and
+// therefore due.
+const EPIC_NOT_DUE = "eeda31e6-7149-4afe-824a-ccf4fb1d571d";
 const CYCLE = "fe346b72-3e94-41e6-999c-572150456327";
 
 const M1 = "proposal needs a review with verdict, reason and account (John 2026-10-02, decision 6668e1ac)";
@@ -125,7 +127,7 @@ async function run() {
       };
       // agt-240's FUNCS[1] body, minus and plus the review -- the only difference between the two calls.
       const call = p_proposal => req(url, key, "rpc/finish_project_batch", { method: "POST",
-        body: { p_cycle_id: CYCLE, p_session_name: null, p_epic: EPIC_AE, p_proposal } });
+        body: { p_cycle_id: CYCLE, p_session_name: null, p_epic: EPIC_NOT_DUE, p_proposal } });
 
       const none = await call({});
       assert.equal(none.status, 400, describe(none));
@@ -138,7 +140,7 @@ async function run() {
       const agreed = await call({ review: { verdict: "agree", reason: "x", account: "x" } });
       assert.equal(agreed.status, 400, describe(agreed));
       assert.match(String(agreed.json?.message),
-        new RegExp(`^finish_project_batch: epic ${EPIC_AE} is not due a proposal`),
+        new RegExp(`^finish_project_batch: epic ${EPIC_NOT_DUE} is not due a proposal`),
         "an agreed review reaches the due check -- so the refusal above was the review's and nothing else's");
 
       const no = await call({ review: { verdict: "disagree", reason: "x", account: "x" } });

@@ -650,7 +650,11 @@ export function expectedReason(f) {
   // (a fire with a card to rule rules it rather than going looking) and above nothing_pickable. Both
   // halves are ORed and both are graded, so a gate that read only the findings, a gate that read
   // only the lists, and a gate that answered work_to_find on an empty board all disagree here.
-  if (f.pickableCount === 0 && (f.openFindings > 0 || f.listTickets > 0)) return FIND_WORK_REASON;
+  // AGT-291: and a THIRD half -- a batch whose list is finished and whose proposal has not been
+  // attempted inside 24 hours (`review_due`). Same position, same OR: a finished batch is work
+  // that EXISTS to be found. A gate that read only the first two disagrees here the moment a
+  // batch finishes with nothing pickable and no card to rule.
+  if (f.pickableCount === 0 && (f.openFindings > 0 || f.listTickets > 0 || f.finishDue > 0)) return FIND_WORK_REASON;
   if (f.pickableCount === 0) return "nothing_pickable";
   if (f.cheapestPctOfWeek !== null && f.cheapestPctOfWeek > f.weeklyHeadroomPct) return "unaffordable";
   // SES-302 still holds for the CAP: no token_cap branch, no pickable_degraded. The age is graded
@@ -765,6 +769,18 @@ async function theLiveGateObeysItsOwnLadder() {
   const listTickets = listCandidates.filter(
     b => listSlugs.has(slugOfProject.get(projectOfEpic.get(b.epic_id)))).length;
 
+  // AGT-291: the finish-line count, read from the ONE function that measures the finish line
+  // (public.project_batch_state()) rather than re-derived from projects/epics/backlog_items here.
+  // LEFT and FRESH are that function's definition; a second copy in this file would be free to
+  // disagree with it, and the thing this arm grades is whether the GATE reads the sensor.
+  const batches = asArray(
+    await pg(url, key, "rpc/project_batch_state", { method: "POST", body: "{}" }),
+    "rpc/project_batch_state");
+  // The COLUMN is graded by the detail pair below (own-property finish_due, then the number), not
+  // here: this file keeps its own red on the count it already measures, and the dedicated guard
+  // tests/regression/agt-291-finish-sensor.test.mjs is the one that names an unapplied migration.
+  const finishDue = batches.filter(b => b.review_due === true).length;
+
   // AGT-237: the database's level, read from its one home over the same rpc a cycle's step 7 uses
   // (scripts/db-pressure.js). Never re-derived from db_health_readings here: the window arithmetic is
   // the function's, and a second copy in this file would be free to disagree with it.
@@ -829,6 +845,7 @@ async function theLiveGateObeysItsOwnLadder() {
     gateCardsToRule,
     openFindings,
     listTickets,
+    finishDue,
     dbLevel: db.level,
     liveLanes,
     maxLanes: settings[0]?.max_lanes == null ? null : Number(settings[0].max_lanes),
@@ -864,6 +881,15 @@ async function theLiveGateObeysItsOwnLadder() {
   assert.strictEqual(Number(d.list_tickets), listTickets,
     `detail.list_tickets=${d.list_tickets} but ${listTickets} open/partial ticket(s) sit in a project ` +
     `whose slug is in runner_settings.find_work_lists (${JSON.stringify(findWorkLists)})`);
+  // AGT-291: the third count, on EVERY verdict for the same reason the other two are -- a
+  // work_to_find refusal a reader cannot attribute to one of the three halves cannot be audited.
+  assert.ok(Object.prototype.hasOwnProperty.call(d, "finish_due"),
+    "detail must always carry finish_due -- without it a reader cannot tell 'there is nothing at " +
+    "all' from 'a project batch is finished and nobody has proposed the next one'");
+  assert.strictEqual(Number(d.finish_due), finishDue,
+    `detail.finish_due=${d.finish_due} but project_batch_state() holds ${finishDue} review_due ` +
+    "batch(es). review_due, never proposal_due: a batch claimed inside 24 hours is finished but is " +
+    "not work to go and find, so counting proposal_due here would re-boot the fire every hour");
   if (v.reason === FIND_WORK_REASON) {
     assert.strictEqual(Number(d.pickable_count), 0,
       "work_to_find may only be reached with pickable_count = 0; it is refusal 6's second twin, " +

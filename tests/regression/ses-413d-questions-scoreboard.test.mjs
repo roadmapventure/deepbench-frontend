@@ -253,7 +253,7 @@ export const RUNBOOK_CEILING = 381000;
 // bar and 35 B under SES-336's ceiling -- REPORTED, not absorbed. No header stamp (ses-424c pins
 // stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c, re-pinned and the card re-rendered in the
 // same commit as the runbook edit.
-export const BYTES_AT_SHIP = 380944;   // 380949 -> 380944 (AGT-314's R8 clause, paid for by two retired paragraphs)
+export const BYTES_AT_SHIP = 380985;   // 380944 -> 380985 (AGT-291: 334 B of (7e) finish line + two R8 clauses, 295 B of it paid for by three retired (7f) sentences; agt-253's pin moved in the same commit)
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
