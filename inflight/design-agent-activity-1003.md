@@ -17,4 +17,4 @@ Layout John approved 2026-10-03 (direct "yes" to the mock as shown):
 
 Measured this session (Brittany, 2026-10-03): 13 MCP connections, all counted by `call_facts.target_agent_id` (the bundle logs under the holder); every connection came from Google or Microsoft data-centre addresses, so an IP is the AI tool's server and never a person. The browser's public key can already read every column the tab needs (`ai_activity_log` column grant incl. `call_facts`, `caller_ip_masked`; `ip_org_cache` org/city/region), the same way the Profile tab's Report Card reads — no new `api/` route and no migration. That corrects `AGT-339`'s filed description, which said the read must ride an existing API route.
 
-Blocked on: `AGT-332` is not on `origin/dev` yet (`isPrivateAgent` absent, checked 2026-10-03), so the kickoff cannot anchor on it until `ux-ui-1003` ships.
+Unblocked 2026-10-03: `AGT-332` slice 1 (`v7.0.752`, `isPrivateAgent`) reached `origin/dev`. Kickoff: `docs/kickoffs/v7.0.758-AGT-339-private-agent-activity-tab.md` (supervised cycle `616791a9`).
