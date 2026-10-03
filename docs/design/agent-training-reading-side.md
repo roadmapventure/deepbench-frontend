@@ -48,6 +48,18 @@ characters and 5 are over (bob 216,720 ×2 and 14,788; priya 35,531; robyn 14,78
    text becomes editable and an edit refreshes its embedding. Resume and Playbook stay separate;
    making them consistent is later work. The layout comes to John as a mock-up before build.
 
+8. **The Training tab layout is approved** (John, 2026-10-03: "yes, that layout works — build it";
+   mock `docs/design/agt-344-training-tab-mock.html`). Stays: the navy strip, one card per item with
+   the date column, the Active / Edit / Delete buttons, add-or-edit replacing the list. Changes:
+   (a) two add buttons side by side, "+ Type a note" and "+ Upload a file", where "+ Add Courses"
+   is; (b) the note form is a title and the text only — no category, jurisdiction, priority or flag
+   pickers — with a live "N of 12,000 characters · always given" line; (c) each card carries a
+   NOTE or FILE chip, an ALWAYS GIVEN or LOOKED UP BY SEARCH chip, and its character count;
+   (d) the strip counts become Taught items / Always given / Looked up; (e) Edit opens the item's
+   text; (f) the Teach screen opens this same form. The upload form keeps its current fields.
+9. **Release:** John releases everything to production together when the work is done; no narrow
+   release.
+
 ## 4. The model
 
 One reader, one answer to "what was this agent taught", called by every path.
