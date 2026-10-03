@@ -1,3 +1,6 @@
+// DeepBench v7.0.758 | PersonnelScreen.jsx | AGT-339 -- a private agent's Personnel file gains the Activity
+// tab: connections, where they came from, the knowledge delivered and the training's own cost, read with
+// the browser key through src/lib/personnelActivity.js (no address column). Additions only.
 // DeepBench v7.0.417 | PersonnelScreen.jsx | LOG-143 (b) -- the Profile tab gains the Report Card panel:
 // bench_report_card_rollup read with the anon key, three dimensions shown separately (never blended,
 // never a 0/5 standing in for a gap), the per-dimension unknown count counted from the graded rows, and
@@ -16,6 +19,8 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
+import { isPrivateAgent } from "../data/agents.js";
+import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { supabase } from "../lib/supabase.js";
 
@@ -1587,6 +1592,59 @@ function PlaybookTab({ agent, showToast }) {
   );
 }
 
+// FEATURE: AGT-339 — Activity tab (private agents only). Every word and number on it comes from
+// activityView(); this component only lays the cards out, each one the Report Card's card.
+// ── Tab: Activity ─────────────────────────────────────────────────────────────
+function ActivityTab({ agent, entries }) {
+  // null = still loading, so a card shows Loading… rather than flashing "No connections yet".
+  const [activity, setActivity] = useState(null);
+  const [activityLoaded, setActivityLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setActivityLoaded(false);
+    setActivity(null);
+    fetchAgentActivity(supabase, agent.id)
+      .then(r => { if (!cancelled) { setActivity(r); setActivityLoaded(true); } })
+      // Never block the user: a failed read leaves the cards in their honest empty state.
+      .catch(err => { console.error("FEATURE: AGT-339 — failed to load the agent's activity", err); if (!cancelled) setActivityLoaded(true); });
+    return () => { cancelled = true; };
+  }, [agent.id]);
+  const view = activityView({ agentId: agent.id, rows: activity?.rows || [], orgs: activity?.orgs || [], entries });
+  const noteStyle = {fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"};
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {view.cards.map((card, i) => (
+        <div key={card.title} style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
+          <Corners/>
+          {i === 0 && <FeatureBadge id="AGT-339" />}
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>{card.title}</div>
+          {!activityLoaded ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={noteStyle}>Loading…</div>
+            </div>
+          ) : card.emptyText ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={noteStyle}>{card.emptyText}</div>
+            </div>
+          ) : (
+            <>
+              {card.rows.map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
+                </div>
+              ))}
+              {card.note && <div style={{...noteStyle,marginTop:8}}>{card.note}</div>}
+            </>
+          )}
+        </div>
+      ))}
+      <div style={noteStyle}>Tokens, model, decisions and reasoning from the connected AI tool are not shown because DeepBench never receives them.</div>
+    </div>
+  );
+}
+
 // FEATURE: PE-07 — Left-sidebar nav replaces horizontal tab bar
 // ── Personnel Screen ──────────────────────────────────────────────────────────
 export default function PersonnelScreen() {
@@ -1649,6 +1707,12 @@ export default function PersonnelScreen() {
       { id:"playbook", label:"Playbook", icon:"⬟" },
     ]},
   ];
+
+  // FEATURE: AGT-339 — the Activity tab exists only on a private agent's file (isPrivateAgent reads
+  // the roster's bench group, never an agent id). A deep link to it on any other agent falls back.
+  const showActivity = isPrivateAgent(agent);
+  if (showActivity) NAV_GROUPS[0].tabs.push({ id:"activity", label:"Activity", icon:"◉" });
+  useEffect(() => { if (activeTab === "activity" && !showActivity) setActiveTab("profile"); }, [activeTab, showActivity]);
 
   // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
@@ -1826,6 +1890,7 @@ export default function PersonnelScreen() {
               />
             )}
             {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
+            {activeTab === "activity" && showActivity && <ActivityTab agent={agent} entries={entries}/>}
           </div>
 
         </div>
