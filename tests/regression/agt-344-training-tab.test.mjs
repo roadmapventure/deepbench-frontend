@@ -1,4 +1,4 @@
-// DeepBench v7.0.770 | tests/regression/agt-344-training-tab.test.mjs | AGT-344 -- the facts behind the
+// DeepBench v7.0.772 | tests/regression/agt-344-training-tab.test.mjs | AGT-344 -- the facts behind the
 // Training tab as the single home for what an agent was taught. Pure: no network, no model, no esbuild.
 //
 // Each arm discriminates a wrong build: counting every row as taught gives 5 not 4 (H is the agent's
@@ -6,6 +6,8 @@
 // limit); a `<` limit reads 12,000 characters as looked up; a character count on a NOTE card is not
 // null; and the screen source must hold the two add buttons, the note save and the deep link, and
 // must no longer hold the single upload-only button, the made-up id or the strip's three color literals.
+// Arm (f), slice 2: /bench/:agentId/teach is a redirect that carries the id in the URL into that tab's
+// upload form; the old upload-only page, or a redirect that drops the id, fails it.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -75,6 +77,33 @@ export default async function run() {
     assert.equal(src.includes(gone), false, `PersonnelScreen.jsx no longer holds ${gone}`);
   }
   assert.equal((src.match(/#[0-9a-fA-F]{6}\b/g) || []).length, 10, "color literals in PersonnelScreen.jsx");
+
+  // (f) -- SOURCE: the Teach link is a redirect into the Training tab's add form.
+  const teach = readFileSync(new URL("../../src/screens/TeachScreen.jsx", import.meta.url), "utf8");
+  for (const held of ['import { Navigate, useParams } from "react-router-dom";', "const { agentId } = useParams();", "replace />"]) {
+    assert.equal(teach.includes(held), true, `TeachScreen.jsx holds ${held}`);
+  }
+  for (const gone of ["/api/extract", "/api/brief", "/api/load-entries", "AppShell", "useState"]) {
+    assert.equal(teach.includes(gone), false, `TeachScreen.jsx no longer holds ${gone}`);
+  }
+  const target = src => { const m = src.match(/<Navigate to=\{`([^`]+)`\}/); return m ? m[1].replace("${encodeURIComponent(agentId)}", encodeURIComponent("bob")) : null; };
+  assert.equal(target(teach), "/bench/bob?tab=training&add=file");
+  const landed = new URL(target(teach), "http://x");
+  assert.equal(landed.pathname, "/bench/bob");
+  assert.equal(landed.searchParams.get("tab"), "training");
+  assert.equal(landed.searchParams.get("add"), "file");
+  // CONTROL: a redirect that drops the id from the URL is caught.
+  assert.notEqual(target(teach.replace("${encodeURIComponent(agentId)}", "brittany")), "/bench/bob?tab=training&add=file");
+  // The two sides agree: the landing screen reads the same two parameters.
+  for (const held of ['useState(searchParams.get("tab")', 'useState(initialAdd === "file")']) {
+    assert.equal(src.includes(held), true, `PersonnelScreen.jsx holds ${held}`);
+  }
+  // Unchanged neighbours: the route and the one in-app link.
+  const main = readFileSync(new URL("../../src/main.jsx", import.meta.url), "utf8");
+  assert.match(main, /<Route\s+path="\/bench\/:agentId\/teach"\s+element=\{<TeachScreen\s*\/>\}\s*\/>/);
+  assert.match(main, /import\s+TeachScreen\s+from\s+"\.\/screens\/TeachScreen\.jsx";/);
+  const testTeam = readFileSync(new URL("../../src/screens/TestTeamScreen.jsx", import.meta.url), "utf8");
+  assert.equal(testTeam.includes("/bench/${a1?.trainable ? results._a1 : results._a2}/teach"), true, "TestTeamScreen.jsx still links to /teach");
 }
 
 selfRun(import.meta.url, run);

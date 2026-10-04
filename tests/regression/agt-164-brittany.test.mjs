@@ -4,7 +4,7 @@
 // landed together and this file pins both: her `public.agents` row, applied verbatim from
 // docs/design/agt-164-brittany-seed.sql under rule AGENT-ROW-AGREED-TICKET with its own
 // runner_before_images row, and her entry in src/data/agents.js. The roster entry IS her Teach
-// access (useAgents.js returns the static AGENTS; TeachScreen.jsx resolves :agentId against it),
+// access (useAgents.js returns the static AGENTS; PersonnelScreen.jsx resolves :agentId against it),
 // so nothing under api/ changes.
 //
 // WHAT "BLANK" MEANS, AND WHY IT IS READ RATHER THAN ASSUMED: she ships with NO agent_configs,
