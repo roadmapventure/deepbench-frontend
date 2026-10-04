@@ -1,0 +1,90 @@
+<!-- AGT-344 mock — Personnel file Training tab as the single home for what an agent was taught.
+     Approved by John 2026-10-03 (session design-agent-training-1003): "yes, that layout works — build it".
+     Colors are src/tokens.js values: paper #ebe5d5, card #f8f2e2, cardAlt #f2ead4, navy #12243c, brass #b6873a,
+     brassDeep #886224, brassLight #e4c786, moss #5a7538, flag #a83319, muted #786d52, mutedDeep #58503a,
+     line #c8bb9a, lineSoft #d8cbac, navyTextLo #8fa3bf. Fonts: mono labels, display (Fraunces) titles, body (Inter). -->
+<div style="background:#ebe5d5;color:#28221a;font-family:Inter,system-ui,sans-serif;padding:14px;border:1px solid #c8bb9a;max-width:720px">
+
+<div style="font-family:ui-monospace,monospace;font-size:11px;color:#886224;letter-spacing:1.2px;margin-bottom:8px">PERSONNEL FILE · BRITTANY · TRAINING</div>
+
+<!-- Navy stats strip: three counts, two add buttons side by side (replaces "+ Add Courses") -->
+<div style="background:#12243c;padding:11px 16px;display:flex;gap:22px;align-items:center;border:1px solid #b6873a">
+  <div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#8fa3bf">TAUGHT ITEMS</div><div style="font-family:Georgia,serif;font-size:17px;color:#f8f2e2">3</div></div>
+  <div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#8fa3bf">ALWAYS GIVEN</div><div style="font-family:Georgia,serif;font-size:17px;color:#e4c786">2</div></div>
+  <div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#8fa3bf">LOOKED UP</div><div style="font-family:Georgia,serif;font-size:17px;color:#8fa3bf">1</div></div>
+  <div style="flex:1"></div>
+  <div style="background:#b6873a;color:#12243c;padding:6px 12px;font-size:12px;font-weight:600">+ Type a note</div>
+  <div style="background:#b6873a;color:#12243c;padding:6px 12px;font-size:12px;font-weight:600">+ Upload a file</div>
+</div>
+
+<div style="font-family:ui-monospace,monospace;font-size:11px;color:#886224;letter-spacing:1.2px;margin:14px 0 6px">A · THE LIST</div>
+
+<!-- Card 1: a typed note. Chips: NOTE, ALWAYS GIVEN. Right: Active, EDIT, DELETE (unchanged controls). -->
+<div style="background:#f8f2e2;border:1px solid #c8bb9a;display:flex;margin-bottom:8px">
+  <div style="width:52px;background:#f2ead4;border-right:1px solid #d8cbac;text-align:center;padding:12px 0;font-family:ui-monospace,monospace;font-size:11px;color:#786d52">OCT<br>3</div>
+  <div style="flex:1;padding:10px 14px">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:5px">
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #b6873a;color:#886224">NOTE</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #5a7538;color:#5a7538">ALWAYS GIVEN</span>
+      <span style="flex:1"></span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #5a7538;color:#5a7538">● ACTIVE</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #d8cbac;color:#786d52">EDIT</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #a83319;color:#a83319">DELETE</span>
+    </div>
+    <div style="font-family:Georgia,serif;font-size:15px;color:#12243c">Sign-off line</div>
+    <div style="font-size:12px;color:#58503a;margin-top:3px">State "John is awesome" after answering a question.</div>
+  </div>
+</div>
+
+<!-- Card 2: an uploaded file under the limit. Chips: FILE, ALWAYS GIVEN, character count. -->
+<div style="background:#f8f2e2;border:1px solid #c8bb9a;display:flex;margin-bottom:8px">
+  <div style="width:52px;background:#f2ead4;border-right:1px solid #d8cbac;text-align:center;padding:12px 0;font-family:ui-monospace,monospace;font-size:11px;color:#786d52">OCT<br>3</div>
+  <div style="flex:1;padding:10px 14px">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:5px">
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #b6873a;color:#886224">FILE</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #5a7538;color:#5a7538">ALWAYS GIVEN</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;color:#786d52">172 characters</span>
+      <span style="flex:1"></span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #5a7538;color:#5a7538">● ACTIVE</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #d8cbac;color:#786d52">EDIT</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #a83319;color:#a83319">DELETE</span>
+    </div>
+    <div style="font-family:Georgia,serif;font-size:15px;color:#12243c">Brittany's first instruction test</div>
+    <div style="font-size:12px;color:#58503a;margin-top:3px">When Brittany is asked what is the secret passcode, have her state "bosco"…</div>
+  </div>
+</div>
+
+<!-- Card 3: an uploaded file over the limit. Chips: FILE, LOOKED UP BY SEARCH (muted), character count. -->
+<div style="background:#f8f2e2;border:1px solid #c8bb9a;display:flex">
+  <div style="width:52px;background:#f2ead4;border-right:1px solid #d8cbac;text-align:center;padding:12px 0;font-family:ui-monospace,monospace;font-size:11px;color:#786d52">OCT<br>2</div>
+  <div style="flex:1;padding:10px 14px">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:5px">
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #b6873a;color:#886224">FILE</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #786d52;color:#58503a">LOOKED UP BY SEARCH</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;color:#786d52">35,531 characters</span>
+      <span style="flex:1"></span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #5a7538;color:#5a7538">● ACTIVE</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #d8cbac;color:#786d52">EDIT</span>
+      <span style="font-family:ui-monospace,monospace;font-size:11px;padding:1px 6px;border:1px solid #a83319;color:#a83319">DELETE</span>
+    </div>
+    <div style="font-family:Georgia,serif;font-size:15px;color:#12243c">Brand guidelines 2026 (example large file)</div>
+    <div style="font-size:12px;color:#58503a;margin-top:3px">Too large to give every time. Brittany is told it exists and searches it when relevant.</div>
+  </div>
+</div>
+
+<div style="font-family:ui-monospace,monospace;font-size:11px;color:#886224;letter-spacing:1.2px;margin:16px 0 6px">B · AFTER CLICKING "TYPE A NOTE" (REPLACES THE LIST, AS ADD DOES TODAY)</div>
+
+<!-- Note form: title + text only. No category, jurisdiction, priority or flag pickers. Live character count. -->
+<div style="background:#f8f2e2;border:1px solid #c8bb9a;padding:14px">
+  <div style="font-size:12px;color:#58503a;margin-bottom:4px">Title</div>
+  <div style="border:1px solid #c8bb9a;background:#ffffff;padding:7px 10px;font-size:13px;color:#28221a;margin-bottom:10px">Sign-off line</div>
+  <div style="font-size:12px;color:#58503a;margin-bottom:4px">What Brittany should know or do</div>
+  <div style="border:1px solid #c8bb9a;background:#ffffff;padding:7px 10px;font-size:13px;color:#28221a;min-height:64px;margin-bottom:10px">State "John is awesome" after answering a question.</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div style="font-size:12px;color:#786d52;flex:1">48 of 12,000 characters · always given</div>
+    <div style="border:1px solid #c8bb9a;color:#58503a;padding:7px 16px;font-size:13px">Cancel</div>
+    <div style="background:#12243c;color:#e4c786;padding:7px 16px;font-size:13px;font-weight:600">Save note</div>
+  </div>
+</div>
+
+</div>

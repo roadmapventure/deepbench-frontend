@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.776 | docs/runbooks/mcp-server.md | AGT-338 slice 4 -- the address kinds and the own-knowledge rule (last section); tool counts removed. Stamps held at 5: v7.0.444's moved to docs/SESSIONS.md. agt-196-private-scan-allowlist.test.mjs pins lines 119 and 165: above them, never add or remove a line. -->
 <!-- DeepBench v7.0.684 | docs/runbooks/mcp-server.md | AGT-163 -- the key no longer only unlocks, it
      ATTRIBUTES. Every `runner_secrets` row named `MCP_*` is an MCP key; the matched row's NAME becomes the
      call's `ai_activity_log.visitor_id`, which is what makes an outside caller identifiable in the AI Audit
@@ -18,12 +19,11 @@
      as a separate open defect -->
 <!-- DeepBench v7.0.445 | docs/runbooks/mcp-server.md | SES-339 -- "Verify a foreign repository" added
      below; per-tool input contracts noted under "What is and is not exposed" -->
-<!-- DeepBench v7.0.444 | docs/runbooks/mcp-server.md | MCP-3 -- the DeepBench MCP server -->
 
 # The DeepBench MCP server
 
 `POST /api/mcp` — JSON-RPC 2.0 over the MCP **Streamable HTTP** transport, implemented in
-`api/_lib/mcp.js` with no SDK and no new dependency. **The URL is a `vercel.json` rewrite onto
+`api/_lib/mcp.js` with no SDK and no new dependency. The same handler answers /api/mcp/<address> (last section). **The URL is a `vercel.json` rewrite onto
 `/api/capabilities/execute?transport=mcp`, not a route of its own (`SES-346`, `v7.0.446`):** the
 Hobby plan caps a deployment at 12 serverless functions and this file was the 13th, which refused
 every dev build for eight versions. Nothing a client sees changed — same URL, same methods, same
@@ -51,8 +51,8 @@ test does.
 ## What is and is not exposed
 
 One MCP tool per row in `capabilities` that has an **active** holder in
-`agent_capability_assignments` — 18 product-lane tools without the key, 25 with it (measured
-2026-09-09). The tool **name is the capability slug**, verbatim; the title is the capability's
+`agent_capability_assignments`, on the admin address; a team or agent address lists fewer (last section).
+No count is stored here: tools/list is the count. The tool **name is the capability slug**, verbatim; the title is the capability's
 `name`; the description is its `description` plus the holder's name, role and lane. Input schema is
 always `{ task_context: object (required), intent_slug?: string }`; `intent_slug` defaults to the
 capability's own `capabilities.default_intent_slug`, which the route must resolve because the
@@ -74,7 +74,7 @@ the list publishes them inside `inputSchema.properties.task_context`, and `tools
 are never refused; they are serialized into the prompt like any other. Today the table has exactly
 one entry, `verify-ship`, below.
 
-Every `tools/call` runs the one generic executor (`runCapability`), so it logs an agent turn with
+A `tools/call` on an `ai` capability runs the one generic executor (`runCapability`); a `deterministic` one runs the handler its Intent names in `traits.handler`, with no model call. Either way the row carries
 `call_source = 'mcp'` and `screen_origin = 'mcp'`. That pair is the only evidence an outside client
 ever used DeepBench; `api/_lib/mcp.js` writes no `ai_activity_log` row of its own.
 
@@ -106,7 +106,7 @@ custom headers:
 }
 ```
 
-Drop the `x-deepbench-mcp-key` line to get the product-lane 18 only. Drop `x-db-gate-bypass` if the
+Drop the `x-deepbench-mcp-key` line to get the product-lane tools only. Drop `x-db-gate-bypass` if the
 machine's IP already holds an `unlimited` row.
 
 ## Checking it by hand
@@ -291,3 +291,27 @@ the refusal was hiding, not part of `SES-347`; it needs its own ticket (raise th
 stream the response, or resume the checkpoint the recovery block already wrote).
 
 Regression cover: `tests/regression/ses-339-verify-over-mcp.test.mjs`.
+
+## Three kinds of address (`AGT-333`, `AGT-338`)
+
+An address stands for a set of agents. `vercel.json` rewrites `/api/mcp/:agent` onto the same handler, and `resolveAddress()` in `api/_lib/mcp.js` turns the segment into the set.
+
+| Address | The set |
+|---|---|
+| `/api/mcp` | every agent: the admin address |
+| `/api/mcp/<64 lowercase hex>` | the members of the team whose `teams.address` it is, read from `agent_teams` on every request, so an agent added later appears with no reconnect |
+| `/api/mcp/<agent id>` | that one agent |
+
+The lane rule runs first on every address, so an address only subtracts. On a team or agent address `initialize` adds `Agents available on this connection: <names>.` to its instructions.
+
+**A wrong address is empty, never wider.** Hex no team holds, or an id no agent holds, lists no tools; `initialize` says `No agent is available at this address.`; a `tools/call` is `-32602`, `Unknown tool: <name>`. A failed `teams` read is an error on `tools/list`, never an empty list.
+
+**`teams.address` is the team's secret.** The browser's key cannot read the column. One route returns it: `GET /api/agent-configs?agent_id=<id>&teams=1` answers `{ teams: [{ name, address }] }`, which `src/components/ConnectAgentPopup.jsx` offers beside the agent's own address. Nobody signs in yet: whoever holds an address sees what it lists.
+
+**The own-knowledge rule.** An agent's knowledge tool (handler `agent-bundle`) returns only its holder's knowledge. `task_context.agent_id` may be left out or repeat the holder's id; any other id is a tool error, `Unknown agent: <id>`. The exception is a capability whose Intent row carries `traits.any_agent = true` (today `agent-bundle-any-intent`): it requires `task_context.agent_id`, reads any agent, and is listed on the admin address only.
+
+**How a created agent gets its tool.** `POST /api/agent-configs` with `action: "create_private_agent"` runs `lib/private-agent-create.js`: an `agents` row (private, active, product lane), a `deterministic` capability `<id>-knowledge` on the Intent `agent-bundle-intent`, its assignment, and for a named team the `agent_teams` row (and the `teams` row when the team is new). No deploy: `/api/mcp/<id>` lists the tool at once.
+
+**Who may see an agent.** The tool list passes every agent through `visibleAgents()` in `shared/agent-visibility.js`, which reads `agents.owner_id`, `sharing` and `shared_with`. No caller passes a viewer yet, so it hides nothing today.
+
+Regression cover: `tests/regression/agt-338-*.test.mjs`.

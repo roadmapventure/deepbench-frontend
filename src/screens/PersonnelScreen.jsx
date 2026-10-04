@@ -1,3 +1,10 @@
+// DeepBench v7.0.770 | PersonnelScreen.jsx | AGT-344 -- Training tab single home
+// DeepBench v7.0.769 | PersonnelScreen.jsx | AGT-350 -- the Activity tab's Connected from card is a four-column table
+// DeepBench v7.0.764 | PersonnelScreen.jsx | AGT-337 slice 3 -- an agent with no quip shows no empty quotation marks
+// DeepBench v7.0.757 | PersonnelScreen.jsx | AGT-334 — badge actions + Connect popup
+// DeepBench v7.0.758 | PersonnelScreen.jsx | AGT-339 -- a private agent's Personnel file gains the Activity
+// tab: connections, where they came from, the knowledge delivered and the training's own cost, read with
+// the browser key through src/lib/personnelActivity.js (no address column). Additions only.
 // DeepBench v7.0.417 | PersonnelScreen.jsx | LOG-143 (b) -- the Profile tab gains the Report Card panel:
 // bench_report_card_rollup read with the anon key, three dimensions shown separately (never blended,
 // never a 0/5 standing in for a gap), the per-dimension unknown count counted from the graded rows, and
@@ -16,8 +23,12 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
+import { isPrivateAgent } from "../data/agents.js";
+import ConnectAgentPopup from "../components/ConnectAgentPopup.jsx";
+import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { supabase } from "../lib/supabase.js";
+import { toEntry, taughtCounts, cardFacts, countLine } from "../lib/taughtItems.js";
 
 // FEATURE: PE-03 — Training tab live wiring
 async function apiGetEntries(agent_id) {
@@ -49,7 +60,11 @@ async function apiUpdateEntry(id, fields) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, tenant_id: TENANT_ID, ...fields }),
   });
-  if (!res.ok) throw new Error("Failed to update entry");
+  // FEATURE: AGT-344 — a refused edit says why, in the server's own words
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to update entry");
+  }
   return (await res.json()).entry;
 }
 
@@ -404,10 +419,28 @@ function SkillRow({ sp, chip }) {
   );
 }
 
+// FEATURE: AGT-334 — the ID Badge / persona actions. One component, two mounts (desktop card, mobile
+// persona block). "+ Add Training" on trainable agents (the Training tab, the Roster button's
+// destination); "Connect <first name> to AI" on private agents only (isPrivateAgent reads the agent's
+// own row — Rule #1). Styles: STYLE-GUIDE §7 Primary CTA and Secondary/ghost, sized for the card.
+function BadgeActions({ agent, onAddTraining, onConnect, style }) {
+  const firstName = agent.name.split(" ")[0];
+  return (
+    <div style={style}>
+      {agent.trainable && (
+        <button onClick={onAddTraining} style={{background:`linear-gradient(135deg, ${T.brass}, ${T.brassDeep})`,border:"none",color:T.navy,padding:"6px 12px",fontFamily:display,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Training</button>
+      )}
+      {isPrivateAgent(agent) && (
+        <button onClick={onConnect} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"5px 12px",fontFamily:body,fontSize:12,cursor:"pointer"}}>{`Connect ${firstName} to AI`}</button>
+      )}
+    </div>
+  );
+}
+
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect }) {
   // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
   // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
   // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
@@ -459,6 +492,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
         {!isMobile && (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
+          <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
           <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence</div>
           <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
             <AgentAvatar who={agent.id} size={92} ring={true} />
@@ -470,9 +504,11 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
             <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
             {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
           </div>
+          {agent.quip && (
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
             "{agent.quip}"
           </div>
+          )}
         </div>
         )}
 
@@ -708,6 +744,40 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile }) {
   );
 }
 
+// FEATURE: AGT-344 — the note form's label and field, shared with the file edit form's text box
+const noteLabelStyle = { fontFamily: body, fontSize: 12, color: T.mutedDeep, marginBottom: 4 };
+const noteFieldStyle = { display: "block", width: "100%", boxSizing: "border-box", border: `1px solid ${T.line}`, background: T.white, padding: "7px 10px", fontFamily: body, fontSize: 13, color: T.ink, outline: "none" };
+
+// FEATURE: AGT-344 — Type a note: title + text, for add and for edit
+function NoteForm({ firstName, form, setForm, saving, onCancel, onSave }) {
+  const blocked = !form.title.trim() || !form.text.trim() || saving;
+  return (
+    <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: 14 }}>
+      <div style={noteLabelStyle}>Title</div>
+      <input
+        value={form.title}
+        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+        style={{ ...noteFieldStyle, marginBottom: 10 }}
+      />
+      <div style={noteLabelStyle}>What {firstName} should know or do</div>
+      <textarea
+        value={form.text}
+        onChange={e => setForm(f => ({ ...f, text: e.target.value }))}
+        style={{ ...noteFieldStyle, minHeight: 64, resize: "vertical", marginBottom: 10 }}
+      />
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ fontFamily: body, fontSize: 12, color: T.muted, flex: 1 }}>{countLine(form.text)}</div>
+        <button onClick={onCancel} style={{ background: "transparent", border: `1px solid ${T.line}`, color: T.mutedDeep, padding: "7px 16px", fontFamily: body, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+        <button
+          onClick={onSave}
+          disabled={blocked}
+          style={{ background: T.navy, border: `1px solid ${T.navy}`, color: T.brassLight, padding: "7px 16px", fontFamily: body, fontSize: 13, fontWeight: 600, cursor: blocked ? "not-allowed" : "pointer", opacity: blocked ? .5 : 1 }}
+        >Save note</button>
+      </div>
+    </div>
+  );
+}
+
 // FEATURE: PE-10 — Add Courses inline sub-view
 function AddCourseView({ agent, existingEntry = null, addState, setAddState, addProgress, setAddProgress,
   addFile, setAddFile, addExtracted, setAddExtracted, addWordCount, setAddWordCount,
@@ -771,28 +841,23 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
   const handleSave = async () => {
     if (!addForm.title) { showToast("Title is required", "⚠"); return; }
     if (!existingEntry && !addExtracted) { showToast("Title and document are required", "⚠"); return; }
+    // FEATURE: AGT-344 — the file's text is editable; it is never saved blank
+    const editText = addForm.content || "";
+    if (existingEntry && !editText.trim()) { showToast("Text is required", "⚠"); return; }
     setAddState("saving");
     try {
       if (existingEntry) {
-        // FEATURE: PE-11 — Edit mode: PATCH metadata only, no re-vectorization
-        await apiUpdateEntry(existingEntry.id, {
+        // FEATURE: PE-11 — Edit mode: PATCH metadata; AGT-344 — the text goes only when it changed
+        const fields = {
           title:          addForm.title,
           category:       addForm.category,
           jurisdiction:   addForm.jurisdiction,
           teaching_note:  addForm.teaching_note || null,
           triggers:       addForm.triggers,
           priority:       addForm.priority,
-        });
-        const mergedEntry = {
-          ...existingEntry,
-          title:         addForm.title,
-          category:      addForm.category,
-          jurisdiction:  addForm.jurisdiction,
-          fieldNotes:    addForm.teaching_note || "",
-          triggers:      addForm.triggers,
-          priority:      addForm.priority,
         };
-        onSaved(mergedEntry);
+        if (editText !== existingEntry.content) fields.content = editText;
+        await apiUpdateEntry(existingEntry.id, fields);
       } else {
         // Existing add flow — unchanged
         const res = await fetch("/api/load-entries", {
@@ -808,22 +873,9 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
         });
         const data = await res.json();
         if (!res.ok) { showToast(data.error || "Save failed", "⚠"); setAddState("ready"); return; }
-        const newEntry = {
-          id:            Date.now(),
-          title:         addForm.title,
-          category:      addForm.category,
-          jurisdiction:  addForm.jurisdiction,
-          priority:      addForm.priority,
-          triggers:      addForm.triggers,
-          status:        addForm.status,
-          fieldNotes:    addForm.teaching_note || "",
-          learnedSummary: "",
-          createdAt:     new Date().toISOString(),
-          isDemo:        false,
-          chunks:        0,
-        };
-        onSaved(newEntry);
       }
+      // FEATURE: AGT-344 — every save ends in a reload: the list shows the saved rows, real ids and all
+      await onSaved();
     } catch (err) {
       showToast("Network error: " + err.message, "⚠");
       setAddState("ready");
@@ -859,6 +911,18 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
                 <div style={{ fontFamily: display, fontSize: 14, fontWeight: 600, color: T.navy }}>Previously indexed document</div>
                 <div style={{ fontFamily: body, fontSize: 11.5, color: T.moss, marginTop: 2 }}>✓ Vectorized and indexed in RAG</div>
               </div>
+            </div>
+          )}
+          {/* FEATURE: AGT-344 — the file's text, editable */}
+          {existingEntry && (
+            <div style={{ marginTop: 10 }}>
+              <div style={noteLabelStyle}>What {agent.name.split(" ")[0]} should know or do</div>
+              <textarea
+                value={addForm.content || ""}
+                onChange={e => setAddForm(f => ({ ...f, content: e.target.value }))}
+                style={{ ...noteFieldStyle, minHeight: 64, resize: "vertical", marginBottom: 6 }}
+              />
+              <div style={{ fontFamily: body, fontSize: 12, color: T.muted }}>{countLine(addForm.content || "")}</div>
             </div>
           )}
           {!existingEntry && addState === "idle" && (
@@ -1103,13 +1167,47 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
 
 // FEATURE: PE-03 — Training tab live wiring
 // ── Tab: Training ─────────────────────────────────────────────────────────────
-function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, navigate }) {
+function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEntries, showToast, navigate }) {
   const [expandedIds, setExpandedIds] = useState({});
   const toggleEntry = (id) => setExpandedIds(p=>({...p,[id]:!p[id]}));
   const pronouns = AGENT_PRONOUNS[agent.id] || { subject:"they" };
+  const firstName = agent.name.split(" ")[0];
+
+  // FEATURE: AGT-344 — the note form (add: id null; edit: the entry's id); a deep link opens either form
+  const [noteForm,   setNoteForm]   = useState(initialAdd === "note" ? { id: null, title: "", text: "" } : null);
+  const [noteSaving, setNoteSaving] = useState(false);
+
+  const saveNote = async () => {
+    const { id, title, text } = noteForm;
+    setNoteSaving(true);
+    try {
+      if (id) {
+        await apiUpdateEntry(id, { title, content: text });
+      } else {
+        const res = await fetch("/api/load-entries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, content: text, kind: "note", agent_id: agent.id, tenant_id: TENANT_ID }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Save failed");
+        }
+      }
+    } catch (err) {
+      // Refused: say why, keep the form
+      showToast(err.message, "⚠");
+      setNoteSaving(false);
+      return;
+    }
+    await reload();
+    setNoteSaving(false);
+    setNoteForm(null);
+    showToast(id ? "Updated ✦" : "Note saved ✦");
+  };
 
   // FEATURE: PE-10 — Add Courses inline sub-view state
-  const [showAddView,    setShowAddView]    = useState(false);
+  const [showAddView,    setShowAddView]    = useState(initialAdd === "file");
   const [addState,       setAddState]       = useState("idle");
   const [addProgress,    setAddProgress]    = useState(0);
   const [addFile,        setAddFile]        = useState(null);
@@ -1126,6 +1224,11 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
   const [editingEntry, setEditingEntry] = useState(null);
 
   const handleEditClick = (entry) => {
+    // FEATURE: AGT-344 — a note edits in the note form; a file keeps the course form
+    if (entry.kind === "note") {
+      setNoteForm({ id: entry.id, title: str(entry.title), text: str(entry.content) });
+      return;
+    }
     setEditingEntry(entry);
     setAddState("ready");
     setAddForm({
@@ -1136,6 +1239,7 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
       triggers:     Array.isArray(entry.triggers) ? entry.triggers : [],
       status:       entry.status || "active",
       teaching_note: str(entry.fieldNotes),
+      content:      str(entry.content),
     });
     setAddFile(null);
     setAddExtracted("");
@@ -1144,6 +1248,7 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
   };
 
   const resetAddView = () => {
+    setNoteForm(null);
     setShowAddView(false);
     setEditingEntry(null);
     setAddState("idle");
@@ -1201,6 +1306,9 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
 
   const active   = entries.filter(e=>e.status==="active");
   const disabled = entries.filter(e=>e.status==="disabled");
+  // FEATURE: AGT-344 — the strip's three counts; one form open at a time
+  const counts   = taughtCounts(entries);
+  const formOpen = showAddView || editingEntry || noteForm;
 
   // FEATURE: PE-03 — loading state while entries fetch
   if (loadingEntries) return (
@@ -1216,44 +1324,75 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
 
       {/* Navy stats strip — FEATURE: PE-03 */}
       <div style={{background:T.navy,padding:"11px 18px",display:"flex",gap:22,alignItems:"center",border:`1px solid rgba(182,135,58,.3)`}}>
-        {[["Documents",agent.docs,T.card],["Class Hrs",agent.classes,T.brassLight],["Chunks",agent.chunks,"#8fa3bf"],["~Tokens",agent.chunks>0?Math.round(agent.chunks*0.74/1000)+"K":"0","#8fa3bf"]].map(([k,v,c])=>(
+        {/* FEATURE: AGT-344 — what was taught, and how much of it is given on every run */}
+        {[["Taught items",counts.taught,T.card],["Always given",counts.always,T.brassLight],["Looked up",counts.lookedUp,T.navyTextLo]].map(([k,v,c])=>(
           <div key={k}>
-            <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",textTransform:"uppercase",letterSpacing:1.2,marginBottom:2}}>{k}</div>
+            <div style={{fontFamily:mono,fontSize:8,color:T.navyTextLo,textTransform:"uppercase",letterSpacing:1.2,marginBottom:2}}>{k}</div>
             <div style={{fontFamily:display,fontSize:17,fontWeight:600,color:c}}>{v||"0"}</div>
           </div>
         ))}
         <div style={{flex:1}}/>
-        {/* Stats strip button — context-aware: Add / Cancel Add / Cancel Edit */}
+        {/* Stats strip buttons — context-aware: Type a note + Upload a file / Cancel */}
         {/* FEATURE: PE-03 */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button
-            onClick={() => {
-              if (showAddView || editingEntry) resetAddView();
-              else setShowAddView(true);
-            }}
-            style={{
-              background: (showAddView || editingEntry) ? "transparent" : T.brass,
-              border: `1px solid ${T.brass}`,
-              color: (showAddView || editingEntry) ? T.brassLight : T.navy,
-              padding: "6px 14px",
-              fontFamily: body,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              letterSpacing: .3,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {!(showAddView || editingEntry) && (
-              <>{/* FEATURE: AI-28 — KNOWLEDGE_TRAINING pattern label */}
-              <AiBadge style={{ color: T.navy, background: "rgba(18,36,60,0.12)", border: "1px solid rgba(18,36,60,0.2)" }} label={AI_PAT.KNOWLEDGE_TRAINING}/></>
-            )}
-            {(showAddView || editingEntry) ? "✕ Cancel" : "+ Add Courses"}
-          </button>
+          {formOpen ? (
+            <button
+              onClick={resetAddView}
+              style={{
+                background: "transparent",
+                border: `1px solid ${T.brass}`,
+                color: T.brassLight,
+                padding: "6px 14px",
+                fontFamily: body,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                letterSpacing: .3,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              ✕ Cancel
+            </button>
+          ) : (
+            [["+ Type a note", () => setNoteForm({ id: null, title: "", text: "" })], ["+ Upload a file", () => setShowAddView(true)]].map(([label, open]) => (
+              <button
+                key={label}
+                onClick={open}
+                style={{
+                  background: T.brass,
+                  border: `1px solid ${T.brass}`,
+                  color: T.navy,
+                  padding: "6px 12px",
+                  fontFamily: body,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  letterSpacing: .3,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {label}
+              </button>
+            ))
+          )}
         </div>
       </div>
+
+      {/* FEATURE: AGT-344 — the note form replaces the list, as the course form does */}
+      {noteForm && (
+        <NoteForm
+          firstName={firstName}
+          form={noteForm}
+          setForm={setNoteForm}
+          saving={noteSaving}
+          onCancel={resetAddView}
+          onSave={saveNote}
+        />
+      )}
 
       {/* FEATURE: PE-10/PE-11 — Inline add-course / edit-course sub-view */}
       {(showAddView || editingEntry) && (
@@ -1276,22 +1415,18 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
           setAddForm={setAddForm}
           addFileRef={addFileRef}
           onCancel={resetAddView}
-          onSaved={(savedEntry) => {
-            if (editingEntry) {
-              // FEATURE: PE-11 — update entry in list
-              setEntries(prev => prev.map(e => e.id === savedEntry.id ? savedEntry : e));
-              showToast("Updated ✦");
-            } else {
-              setEntries(prev => [savedEntry, ...prev]);
-              showToast("Document indexed ✦");
-            }
+          onSaved={async () => {
+            // FEATURE: AGT-344 — the list is re-read from the server after every save
+            const wasEdit = !!editingEntry;
+            await reload();
+            showToast(wasEdit ? "Updated ✦" : "Document indexed ✦");
             resetAddView();
           }}
           showToast={showToast}
         />
       )}
 
-      {!showAddView && !editingEntry && (<>
+      {!formOpen && (<>
 
       {/* How it works */}
       <div style={{background:T.cardAlt,border:`1px dashed ${T.lineSoft}`,padding:"9px 13px"}}>
@@ -1323,6 +1458,9 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
         const isExpanded = expandedIds[e.id];
         const runId = formatRunId(e.createdAt);
         const dateCol = formatDateCol(e.createdAt);
+        // FEATURE: AGT-344 — a taught item's card states its kind and its reach
+        const facts = e.taught ? cardFacts(e, firstName) : null;
+        const chip = { fontFamily: mono, fontSize: 8.5, padding: "1px 6px" };
         return (
           <div key={e.id} style={{background:T.card,border:`1px solid ${T.line}`,marginBottom:10,overflow:"hidden",display:"flex"}}>
 
@@ -1338,8 +1476,14 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
 
               {/* Header row: chips left, action buttons right */}
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                {facts ? (<>
+                  <span style={{...chip,border:`1px solid ${T.brass}`,color:T.brassDeep}}>{facts.kind}</span>
+                  <span style={{...chip,border:`1px solid ${e.always?T.moss:T.muted}`,color:e.always?T.moss:T.mutedDeep}}>{facts.reach}</span>
+                  {facts.count!==null&&<span style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{facts.count}</span>}
+                </>) : (<>
                 <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category||"INTERNAL"}</span>
                 {e.jurisdiction&&<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
+                </>)}
                 <div style={{flex:1}}/>
                 {/* Toggle button */}
                 <button
@@ -1382,15 +1526,21 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
               </div>
 
               {/* Run ID row */}
-              {runId && (
+              {!facts && runId && (
                 <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:6}}>
                   Run {runId}
                 </div>
               )}
 
               {/* Title */}
-              <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:5,lineHeight:1.25}}>{e.title}</div>
+              <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:facts?0:5,lineHeight:1.25}}>{e.title}</div>
 
+              {/* FEATURE: AGT-344 — a taught card ends with its one line */}
+              {facts && (
+                <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,marginTop:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{facts.line}</div>
+              )}
+
+              {!facts && (<>
               {/* Trigger chips */}
               {e.triggers?.length > 0 && (
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
@@ -1421,6 +1571,7 @@ function TrainingTab({ agent, entries, setEntries, loadingEntries, showToast, na
                   <AiBadge style={{marginBottom:5,display:"inline-block"}} label={AI_PAT.KNOWLEDGE_TRAINING}/> {e.learnedSummary}
                 </div>
               )}
+              </>)}
             </div>
           </div>
         );
@@ -1587,6 +1738,77 @@ function PlaybookTab({ agent, showToast }) {
   );
 }
 
+// FEATURE: AGT-339 — Activity tab (private agents only). Every word and number on it comes from
+// activityView(); this component only lays the cards out, each one the Report Card's card.
+// ── Tab: Activity ─────────────────────────────────────────────────────────────
+function ActivityTab({ agent, entries }) {
+  const isMobile = useIsMobile();
+  // null = still loading, so a card shows Loading… rather than flashing "No connections yet".
+  const [activity, setActivity] = useState(null);
+  const [activityLoaded, setActivityLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setActivityLoaded(false);
+    setActivity(null);
+    fetchAgentActivity(supabase, agent.id)
+      .then(r => { if (!cancelled) { setActivity(r); setActivityLoaded(true); } })
+      // Never block the user: a failed read leaves the cards in their honest empty state.
+      .catch(err => { console.error("FEATURE: AGT-339 — failed to load the agent's activity", err); if (!cancelled) setActivityLoaded(true); });
+    return () => { cancelled = true; };
+  }, [agent.id]);
+  const view = activityView({ agentId: agent.id, rows: activity?.rows || [], orgs: activity?.orgs || [], entries });
+  const noteStyle = {fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"};
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {view.cards.map((card, i) => (
+        <div key={card.title} style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
+          <Corners/>
+          {i === 0 && <FeatureBadge id="AGT-339" />}
+          {card.columns && <FeatureBadge id="AGT-350" />}
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>{card.title}</div>
+          {!activityLoaded ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={noteStyle}>Loading…</div>
+            </div>
+          ) : card.emptyText ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={noteStyle}>{card.emptyText}</div>
+            </div>
+          ) : (
+            <>
+              {card.columns ? (
+                // FEATURE: AGT-350 — a table: header row first, four cells per row. On a phone the
+                // network name takes its own line and Type, Count, Last sit on the line under it.
+                <div style={{display:"grid",fontSize:11,gridTemplateColumns:isMobile ? "minmax(0,1fr) auto auto" : "minmax(0,1fr) auto auto auto"}}>
+                  {[card.columns, ...card.rows].map((cells, r) => cells.map((cell, c) => (
+                    <div key={`${r}-${c}`} style={{
+                      padding:"4px 0",
+                      borderBottom:`1px solid ${T.lineSoft}`,
+                      ...(r === 0 || c === 0 ? {color:T.mutedDeep} : {fontFamily:mono,fontSize:10.5,color:T.ink}),
+                      ...(c >= 1 ? {whiteSpace:"nowrap"} : {}),
+                      ...(c >= 2 ? {textAlign:"right",paddingLeft:14} : {}),
+                      ...(c === 1 && !isMobile ? {paddingLeft:14} : {}),
+                      ...(c === 0 && isMobile ? {gridColumn:"1 / -1",borderBottom:"none",paddingBottom:0} : {}),
+                    }}>{cell}</div>
+                  )))}
+                </div>
+              ) : card.rows.map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
+                </div>
+              ))}
+              {card.note && <div style={{...noteStyle,marginTop:8}}>{card.note}</div>}
+            </>
+          )}
+        </div>
+      ))}
+      <div style={noteStyle}>Tokens, model, decisions and reasoning from the connected AI tool are not shown because DeepBench never receives them.</div>
+    </div>
+  );
+}
+
 // FEATURE: PE-07 — Left-sidebar nav replaces horizontal tab bar
 // ── Personnel Screen ──────────────────────────────────────────────────────────
 export default function PersonnelScreen() {
@@ -1597,6 +1819,7 @@ export default function PersonnelScreen() {
   const agent       = agents.find(a => a.id === agentId) || agents[0];
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
+  const [connectOpen, setConnectOpen] = useState(searchParams.get("connect") === "1");
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
@@ -1620,22 +1843,16 @@ export default function PersonnelScreen() {
     setLoadingEntries(true);
     setEntries([]);
     apiGetEntries(agentId)
-      .then(raw => setEntries(raw.map(e => ({
-        id:            e.id,
-        title:         e.title,
-        category:      e.category,
-        jurisdiction:  e.jurisdiction,
-        priority:      e.priority,
-        triggers:      e.triggers || [],
-        status:        e.status,
-        fieldNotes:    e.teaching_note || "",
-        learnedSummary: e.content || "",
-        createdAt:     e.created_at || "",
-        isDemo:        false,
-      }))))
+      .then(raw => setEntries(raw.map(toEntry)))
       .catch(() => showToast("Could not load training entries", "⚠"))
       .finally(() => setLoadingEntries(false));
   }, [agentId]);
+
+  // FEATURE: AGT-344 — re-read the list after a save, so every item shown is a saved row
+  const reloadEntries = async () => {
+    try { setEntries((await apiGetEntries(agentId)).map(toEntry)); }
+    catch { showToast("Could not load training entries", "⚠"); }
+  };
 
   const layers    = computeLayers(agent, entries);
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
@@ -1649,6 +1866,12 @@ export default function PersonnelScreen() {
       { id:"playbook", label:"Playbook", icon:"⬟" },
     ]},
   ];
+
+  // FEATURE: AGT-339 — the Activity tab exists only on a private agent's file (isPrivateAgent reads
+  // the roster's bench group, never an agent id). A deep link to it on any other agent falls back.
+  const showActivity = isPrivateAgent(agent);
+  if (showActivity) NAV_GROUPS[0].tabs.push({ id:"activity", label:"Activity", icon:"◉" });
+  useEffect(() => { if (activeTab === "activity" && !showActivity) setActiveTab("profile"); }, [activeTab, showActivity]);
 
   // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
@@ -1722,9 +1945,12 @@ export default function PersonnelScreen() {
                   <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
                   {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
                 </div>
+                {agent.quip && (
                 <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
                   "{agent.quip}"
                 </div>
+                )}
+                <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => setConnectOpen(true)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   <div>
                     <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
@@ -1812,7 +2038,7 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => setConnectOpen(true)}/>}
             {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
@@ -1820,12 +2046,17 @@ export default function PersonnelScreen() {
                 agent={agent}
                 entries={entries}
                 setEntries={setEntries}
+                reload={reloadEntries}
+                initialAdd={searchParams.get("add")}
                 loadingEntries={loadingEntries}
                 showToast={showToast}
                 navigate={navigate}
               />
             )}
             {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
+            {/* FEATURE: AGT-334 — the Connect popup; address built once here, AGT-338 adds a team address beside it */}
+            {connectOpen && isPrivateAgent(agent) && <ConnectAgentPopup agent={agent} address={`${window.location.origin}/api/mcp/${agent.id}`} onClose={() => setConnectOpen(false)}/>}
+            {activeTab === "activity" && showActivity && <ActivityTab agent={agent} entries={entries}/>}
           </div>
 
         </div>

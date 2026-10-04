@@ -5,6 +5,17 @@
 
 ---
 
+## design-user-agents-1003 (v7.0.753–v7.0.776, 2026-10-03, attended, Designer and Builder runs on Opus 5) — `AGT-335` done, `AGT-336` delivered, `AGT-337` delivered, `AGT-338` done — **a user can create a private agent from the Bench, put it in a team, and connect either address.**
+
+John, 2026-10-03: the Bench "Your New Agent" card goes live; teams ("Add my new agent to my team") with one MCP address per team; everything stubbed for account management, nothing enforced. Rulings: decisions `a828b44f` (private user-created agents are exempt from §19u's signed hire), `067cc2ad` (five screen details), `5560dcd9` (an agent's tool gives out only its own knowledge), `a27a7cbe` (Connect popup team wording).
+
+- **What shipped.** `AGT-335` table-only agents reach the Bench (`buildRoster()`, neutral portrait). `AGT-336` migration `agt336_agent_sharing` (owner, sharing, `teams`, `agent_teams`, address hidden from the anon key) and the one visibility check `shared/agent-visibility.js`. `AGT-337` the save (`lib/private-agent-create.js`, action `create_private_agent`), the broker fence, the create screen, the §19u exemption. `AGT-338` `resolveAddress()` (admin / team / one agent), the own-knowledge rule (`traits.any_agent` on `agent-bundle-any-intent`), the popup, the runbook.
+- **Verdicts.** Approve: `AGT-335`, `AGT-337` slice 3, all four `AGT-338` slices. Block: both `AGT-336` slices and `AGT-337` slices 1, 2, 4 — each on tests outside the delivery that read live board, decision or findings rows written during the run (`ses-331`, `agt-103`, `ses-353`, `agt-160`) or that the baseline had not verified. Not re-run for a green.
+- **Found live, fixed in-session.** A knowledge tool on a team or single-agent address returned any agent's bundle when handed its id; the tool list was fenced, the handler's target was not. Proven closed on dev, 12 of 12 calls.
+- **Two things the next session should know.** (1) The dev site is behind Vercel login in the session browser; a scratchpad vite config that proxies `/api` to the dev URL with the automation header gives a real browser flow against dev. (2) One credentialed suite takes about 12 minutes on the test line, and a verifier run needs two (baseline, then the gate), so grade stacked builds in batches under the two-hour background limit.
+- **Left open on the Development Manager's findings list:** a blank agent's readiness score reads 52; procurement header, mock ledger and dash chips on a created agent; Brittany reads `public` in the table while the Bench shows her Private; the new columns are anon-readable until `DAT-29`; a failed save can leave its new team behind; direct-link flash of `agents[0]`; three components still read `AGENTS` directly (`AGT-57`).
+- Retired runbook stamp, kept here per the rotation rule: `<!-- DeepBench v7.0.444 | docs/runbooks/mcp-server.md | MCP-3 -- the DeepBench MCP server -->`.
+
 ## session/cycle-20260929-0025 (v7.0.701, 2026-09-29, unattended cycle `9491a17b-22cb-49b6-b706-d24f61d26ea7`, `trigger = chained (drain continuation)`, lane 2 — Opus 5 throughout, judgment lane degraded to Opus by `judgment_model()` on `fable_pace`) — `AGT-245` — **shipped, verdict block: the first delivered ticket was re-graded for real, and the ledger holds that verdict.**
 
 ### What slice 4 actually did

@@ -1,3 +1,7 @@
+// DeepBench v7.0.756 | tests/regression/mcp-3-server.test.mjs | AGT-333 -- NEW PART (g): the per-agent
+// address. `/api/mcp/<agent id>` is a second vercel.json rewrite carrying `agent=<id>`, and
+// visibleRows() narrows to that agent AFTER the lane rule, so an address never shows more than the
+// same caller already sees on `/api/mcp`. `/api/mcp` itself carries no `agent` and is unchanged.
 // DeepBench v7.0.446 | tests/regression/mcp-3-server.test.mjs | SES-346 -- the server moved to
 // api/_lib/mcp.js and `/api/mcp` is now a vercel.json rewrite onto the executor's function, so the
 // imports here point at api/_lib/ and NEW PART (f) drives the delegation seam through the real
@@ -9,7 +13,7 @@
 // the JSON-RPC subset answers correctly, and the governance lane does not leak to a caller without
 // the key. Both are asserted here, each with a control that fails when the guard is removed.
 //
-// FIVE PARTS:
+// SEVEN PARTS:
 //   (a) UNIT -- the dispatcher answers `initialize` (version negotiation both directions), `ping`,
 //       `tools/list` from a fixture capability set, returns null for a notification (the 202
 //       contract), and rejects an unknown method with -32601.
@@ -30,6 +34,19 @@
 //       `classify-ticket` appears. Plus the discriminating half the unit arm cannot give: an
 //       ai_activity_log row with call_source = 'mcp' exists, which can only have been written by a
 //       tools/call that actually reached runCapability().
+//   (f) SES-346 -- the transport rides the executor's function (see the block above part (f)).
+//   (g) AGT-333 -- the per-agent address. visibleRows() with an `agentId` returns that agent's rows
+//       and nothing else (g1), never widens past the lane rule (g2), and fails CLOSED on an unknown
+//       or empty id (g3, g4); addressedAgentId() reads the rewrite's `agent` query value and answers
+//       null on the admin address (g5); the dispatcher lists and calls only the addressed agent's
+//       tools, refusing a sibling's with the same message an absent tool gets (g6); vercel.json
+//       carries the `/api/mcp/:agent` rewrite between `/api/mcp` and the generic rule (g7). Every
+//       narrowing assertion has a no-`agentId` control proving the admin address is unchanged.
+//
+// DRY-RUN for part (g) against the unchanged tree (measured 2026-10-03): the file fails at import --
+// `addressedAgentId` is not exported by api/_lib/mcp.js -- so every part is red pre-change. The
+// discriminator underneath that: the unchanged visibleRows() ignores `agentId` and returns 3 product
+// slugs where (g1) requires exactly 2.
 //
 // DRY-RUN against the unchanged tree (measured 2026-09-09, before the MCP server existed -- the file was
 // then api/mcp.js, moved to api/_lib/ by SES-346): parts (a), (b), (c) and (e) fail at import --
@@ -47,6 +64,7 @@ import {
   dispatchJsonRpc,
   assembleCapabilityRows,
   visibleRows,
+  addressedAgentId,
   toTool,
   toToolResult,
   keysMatch,
@@ -70,6 +88,7 @@ const FIXTURE = {
     { slug: "fx-governance-secret", name: "Fixture Governance Capability", description: "A governance-lane fixture.", execution_type: "ai", default_intent_slug: "fx-intent", tenant_id: "global" },
     { slug: "fx-unknown-lane", name: "Fixture Unknown Lane", description: "Holder carries a lane this code has never heard of.", execution_type: "ai", default_intent_slug: null, tenant_id: "global" },
     { slug: "fx-no-holder", name: "Fixture Without A Holder", description: "Assigned only to an inactive agent.", execution_type: "ai", default_intent_slug: null, tenant_id: "global" },
+    { slug: "fx-product-second", name: "Fixture Second Product", description: "Held by a second product agent.", execution_type: "ai", default_intent_slug: null, tenant_id: "global" },
   ],
   assignments: [
     { agent_id: "fx-prod-agent", capability_slug: "fx-product-open" },
@@ -77,12 +96,14 @@ const FIXTURE = {
     { agent_id: "fx-gov-agent", capability_slug: "fx-governance-secret" },
     { agent_id: "fx-odd-agent", capability_slug: "fx-unknown-lane" },
     { agent_id: "fx-retired-agent", capability_slug: "fx-no-holder" },
+    { agent_id: "fx-prod-agent-2", capability_slug: "fx-product-second" },
   ],
   agents: [
     { id: "fx-prod-agent", name: "Fixture Product Agent", role: "Fixture Role", lane: "product", is_active: true },
     { id: "fx-gov-agent", name: "Fixture Governance Agent", role: "Governance Fixture", lane: "governance", is_active: true },
     { id: "fx-odd-agent", name: "Fixture Odd Agent", role: "Odd", lane: null, is_active: true },
     { id: "fx-retired-agent", name: "Fixture Retired Agent", role: "Retired", lane: "product", is_active: false },
+    { id: "fx-prod-agent-2", name: "Fixture Second Agent", role: "Second", lane: "product", is_active: true },
   ],
   intents: [
     { slug: "fx-intent", traits: { schema: { type: "object", required: ["verdict"], properties: { verdict: { type: "string" } } } } },
@@ -92,8 +113,9 @@ const FIXTURE = {
 const FIXTURE_ROWS = assembleCapabilityRows(FIXTURE);
 
 /** Builds the deps object dispatchJsonRpc() takes, with the executor replaced by a spy. */
-function depsFor({ governanceUnlocked }) {
-  const rows = visibleRows(FIXTURE_ROWS, { governanceUnlocked });
+function depsFor({ governanceUnlocked, agentId }) {
+  // AGT-333: `agentId` is passed straight through. Omitted, it is `undefined` -- the admin address.
+  const rows = visibleRows(FIXTURE_ROWS, { governanceUnlocked, agentId });
   const calls = [];
   return {
     calls,
@@ -494,6 +516,110 @@ async function partF_transportDelegation() {
   return results;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Part (g) -- AGT-333: the per-agent address
+//
+// `/api/mcp/<agent id>` reaches the same handler as `/api/mcp` with one extra query value, and the
+// ONE visibility function narrows to that agent after the lane rule. WOULD THIS PASS IF THE FILTER
+// DID NOTHING? No: (g1) requires exactly 2 slugs where an `agentId`-blind visibleRows() returns 3,
+// and its control requires the 3 when no `agentId` is given -- so a filter that narrowed the admin
+// address too fails here as surely as one that never narrowed at all.
+// ---------------------------------------------------------------------------------------------
+async function partG_perAgentAddress() {
+  const results = [];
+  const slugs = opts => visibleRows(FIXTURE_ROWS, opts).map(r => r.slug);
+  const ALL_PRODUCT = ["fx-product-open", "fx-product-plain", "fx-product-second"];
+  const ONE_AGENT = ["fx-product-open", "fx-product-plain"];
+
+  // (g1) THE DISCRIMINATOR, and its control.
+  assert.deepStrictEqual(slugs({ governanceUnlocked: false, agentId: "fx-prod-agent" }), ONE_AGENT,
+    "an agent's address must list exactly that agent's tools -- a second product agent's tool leaked, or the filter did nothing");
+  assert.deepStrictEqual(slugs({ governanceUnlocked: false }), ALL_PRODUCT,
+    "control: with NO agentId (the admin address /api/mcp) every product tool must still be listed");
+  assert.deepStrictEqual(slugs({ governanceUnlocked: false, agentId: undefined }), ALL_PRODUCT,
+    "control: an explicit agentId of undefined is the admin address too");
+  assert.deepStrictEqual(slugs({ governanceUnlocked: false, agentId: null }), ALL_PRODUCT,
+    "control: an agentId of null (what addressedAgentId() answers on /api/mcp) is the admin address");
+  assert.strictEqual(slugs({ governanceUnlocked: true }).length, FIXTURE_ROWS.length,
+    "control: with the key and no agentId the admin address still lists every row");
+  results.push("g1-agent-address-lists-only-that-agent");
+
+  // (g2) NO WIDENING: the address runs AFTER the lane rule, never instead of it.
+  assert.deepStrictEqual(slugs({ governanceUnlocked: false, agentId: "fx-gov-agent" }), [],
+    "a governance agent's address must show NOTHING without the key -- the address must never widen past the lane rule");
+  assert.deepStrictEqual(slugs({ governanceUnlocked: true, agentId: "fx-gov-agent" }), ["fx-governance-secret"],
+    "with the key a governance agent's address must show that agent's tools and only those");
+  results.push("g2-address-never-widens-past-the-lane-rule");
+
+  // (g3) An unknown id fails CLOSED -- zero, never everything.
+  assert.deepStrictEqual(slugs({ governanceUnlocked: false, agentId: "fx-nobody" }), [],
+    "an unknown agent id must list nothing without the key");
+  assert.deepStrictEqual(slugs({ governanceUnlocked: true, agentId: "fx-nobody" }), [],
+    "an unknown agent id must list nothing WITH the key either");
+  results.push("g3-unknown-agent-id-lists-nothing");
+
+  // (g4) The empty string is an address that names nobody, not "no address".
+  assert.deepStrictEqual(slugs({ governanceUnlocked: false, agentId: "" }), [],
+    "an empty agentId must list nothing -- it must never be read as the admin address");
+  assert.deepStrictEqual(slugs({ governanceUnlocked: true, agentId: "" }), [],
+    "an empty agentId must list nothing with the key either");
+  results.push("g4-empty-agent-id-fails-closed");
+
+  // (g5) addressedAgentId(): the rewrite's query value, read once.
+  assert.strictEqual(addressedAgentId(undefined), null, "no query object at all is the admin address");
+  assert.strictEqual(addressedAgentId({}), null, "an empty query is the admin address");
+  assert.strictEqual(addressedAgentId({ transport: "mcp" }), null,
+    "the /api/mcp rewrite's own query ({ transport: 'mcp' }) is the admin address -- this is the line that keeps /api/mcp unchanged");
+  assert.strictEqual(addressedAgentId({ agent: "brittany" }), "brittany");
+  assert.strictEqual(addressedAgentId({ agent: " brittany " }), "brittany", "the id is trimmed");
+  assert.strictEqual(addressedAgentId({ agent: "" }), "", "an empty agent value is an address naming nobody, never null");
+  assert.strictEqual(addressedAgentId({ agent: ["a", "b"] }), "",
+    "a repeated agent value arrives as an array; it must fail closed to '' rather than pick one or widen to null");
+  results.push("g5-addressed-agent-id-reads-the-query");
+
+  // (g6) Through the dispatcher: list and call agree, and a sibling's tool is refused like an absent one.
+  const scoped = depsFor({ governanceUnlocked: false, agentId: "fx-prod-agent" });
+  const scopedNames = (await dispatchJsonRpc(rpc("tools/list"), scoped.deps)).result.tools.map(t => t.name);
+  assert.deepStrictEqual(scopedNames, ONE_AGENT,
+    `tools/list on an agent's address must be exactly that agent's tools, got ${JSON.stringify(scopedNames)}`);
+  let siblingErr = null;
+  try { await scoped.deps.callTool({ name: "fx-product-second", args: { task_context: {} } }); }
+  catch (e) { siblingErr = e; }
+  let absentErr = null;
+  try { await scoped.deps.callTool({ name: "fx-does-not-exist", args: { task_context: {} } }); }
+  catch (e) { absentErr = e; }
+  assert.ok(siblingErr && absentErr, "another agent's tool and an absent tool must both be refused on an agent's address");
+  assert.strictEqual(siblingErr.message.replace("fx-product-second", "X"), absentErr.message.replace("fx-does-not-exist", "X"),
+    `another agent's tool must be refused exactly like an absent one (no inventory oracle): "${siblingErr.message}" vs "${absentErr.message}"`);
+  assert.strictEqual(scoped.calls.length, 0, "a refused tools/call on an agent's address must never reach the executor");
+  // CONTROL: the identical call on the admin address reaches the executor.
+  const admin = depsFor({ governanceUnlocked: false });
+  const adminNames = (await dispatchJsonRpc(rpc("tools/list"), admin.deps)).result.tools.map(t => t.name);
+  assert.deepStrictEqual(adminNames, ALL_PRODUCT,
+    `control: tools/list on the admin address must still be every product tool, got ${JSON.stringify(adminNames)}`);
+  await admin.deps.callTool({ name: "fx-product-second", args: { task_context: {} } });
+  assert.strictEqual(admin.calls.length, 1, "control: the same call with no agentId must reach the executor");
+  results.push("g6-dispatcher-lists-and-calls-only-the-addressed-agent");
+
+  // (g7) vercel.json: the rewrite exists, carries the id, and sits between the two rules it must.
+  const rewrites = JSON.parse(read("vercel.json")).rewrites || [];
+  const idx = source => rewrites.findIndex(r => r && r.source === source);
+  const adminIdx = idx("/api/mcp");
+  const agentIdx = idx("/api/mcp/:agent");
+  const genericIdx = idx("/api/(.*)");
+  assert.notStrictEqual(agentIdx, -1, "vercel.json has no `/api/mcp/:agent` rewrite -- an agent's address would 404");
+  assert.strictEqual(rewrites[agentIdx].destination, "/api/capabilities/execute?transport=mcp&agent=:agent",
+    `the /api/mcp/:agent rewrite points at ${JSON.stringify(rewrites[agentIdx].destination)}`);
+  assert.ok(adminIdx !== -1 && agentIdx > adminIdx, "the /api/mcp/:agent rewrite must come after the /api/mcp rewrite");
+  assert.ok(genericIdx !== -1 && agentIdx < genericIdx,
+    "the /api/mcp/:agent rewrite must come BEFORE the generic /api/(.*) rule, which would otherwise swallow it");
+  assert.strictEqual(rewrites[adminIdx].destination, "/api/capabilities/execute?transport=mcp",
+    "the admin address's own rewrite must carry NO agent value");
+  results.push("g7-vercel-rewrite-for-the-agent-address");
+
+  return results;
+}
+
 async function run() {
   const results = [];
   results.push(...(await partA_dispatcher()));
@@ -501,6 +627,7 @@ async function run() {
   results.push(...partC_resultShaping());
   results.push(...partD_static());
   results.push(...(await partF_transportDelegation()));
+  results.push(...(await partG_perAgentAddress()));
   results.push(...(await partE_live()));
   return results;
 }
