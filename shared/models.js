@@ -1,3 +1,4 @@
+// DeepBench v7.0.778 | shared/models.js | AGT-304 slice 3 -- the JS price table now carries all 23 public.model_pricing rows (14 added) so lib/activity-log.js stops writing cost_usd NULL, under model-watch decision fc1db2f0; §19t's two halves agree again.
 // DeepBench v7.0.450 | shared/models.js | LOG-149 -- THE ONE PRICING TABLE. Before this, per-1K
 // rates lived in TWO places that both stopped at Sonnet 4.6: src/hooks/useAIActivity.js's
 // COST_PER_1K_INPUT/OUTPUT (a browser module lib/ and api/ cannot import) and public.model_pricing
@@ -99,6 +100,21 @@ export const MODEL_PRICING = Object.freeze({
   "claude-haiku-4-5-20251001": { input_per_1k: 0.001,   output_per_1k: 0.005 },
   "claude-haiku-4-5":          { input_per_1k: 0.001,   output_per_1k: 0.005 },   // legacy short-form rows
   "text-embedding-3-small":    { input_per_1k: 0.00002, output_per_1k: 0.00002 },
+  // AGT-304 slice 3 (v7.0.778): the 14 rows public.model_pricing gained under model-watch decision fc1db2f0, at its rates.
+  "claude-opus-4-8":           { input_per_1k: 0.005,   output_per_1k: 0.025 },
+  "claude-opus-4-7":           { input_per_1k: 0.005,   output_per_1k: 0.025 },
+  "claude-opus-4-6":           { input_per_1k: 0.005,   output_per_1k: 0.025 },
+  "claude-opus-4-5-20251101":  { input_per_1k: 0.005,   output_per_1k: 0.025 },
+  "claude-opus-4-1-20250805":  { input_per_1k: 0.015,   output_per_1k: 0.075 },
+  "claude-opus-4-20250514":    { input_per_1k: 0.015,   output_per_1k: 0.075 },
+  "claude-sonnet-5-5":         { input_per_1k: 0.002,   output_per_1k: 0.010 },
+  "claude-sonnet-4-5-20250929": { input_per_1k: 0.003,   output_per_1k: 0.015 },
+  "claude-sonnet-4-20250514":  { input_per_1k: 0.003,   output_per_1k: 0.015 },
+  "claude-3-5-haiku-20241022": { input_per_1k: 0.0008,  output_per_1k: 0.004 },
+  "claude-fable-5":            { input_per_1k: 0.010,   output_per_1k: 0.050 },
+  "claude-mythos-5":           { input_per_1k: 0.010,   output_per_1k: 0.050 },
+  "claude-mythos-5-1":         { input_per_1k: 0.010,   output_per_1k: 0.050 },
+  "claude-mythos-preview":     { input_per_1k: 0.025,   output_per_1k: 0.125 },
 });
 
 // FEATURE: LOG-149 -- MOVED from src/hooks/useAIActivity.js (BUG-20), unchanged. It lives here now
