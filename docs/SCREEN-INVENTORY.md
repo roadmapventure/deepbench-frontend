@@ -51,7 +51,7 @@ More dashboards expected here over time as new work-types are built — this lis
 | Agent Roster | `/bench` | `RosterScreen.jsx` | Add Agent, Personnel File | "Bench" is the Product Focus Area/nav-tab name (locked, `RO-12`); "Agent Roster" is this specific screen's name (the on-screen headline) — both correct, different levels. |
 | Add Agent | `/bench/new` | `BenchNewScreen.jsx` | — | Always a child of Agent Roster. |
 | Personnel File | `/bench/:agentId` | `PersonnelScreen.jsx` | Teach | Always a child of Agent Roster. |
-| Teach | `/bench/:agentId/teach` | `TeachScreen.jsx` | — | Always a child of Personnel File — one level deeper than Add Agent/Personnel File, not a sibling of them. |
+| Teach | `/bench/:agentId/teach` | `TeachScreen.jsx` | — | Always a child of Personnel File — one level deeper than Add Agent/Personnel File, not a sibling of them. **Since v7.0.772 (`AGT-344`) the route is a redirect:** `TeachScreen.jsx` sends `/bench/:agentId/teach` to the Personnel File's Training tab with the upload form open (`?tab=training&add=file`); the Training tab is the single home for what an agent was taught. |
 | Test My Team | `/bench/test` | `TestTeamScreen.jsx` | — | **Placement uncertain** — likely a NIGP-era leftover not yet fully incorporated into DeepBench's own model. Sits directly under Bench (not nested) for now; revisit later. |
 
 ### Super Admin (new Product Focus Area, John, 2026-08-19 — name is his, `design-ses-78b-0819`)
