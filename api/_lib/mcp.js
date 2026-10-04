@@ -1,3 +1,9 @@
+// DeepBench v7.0.771 | api/_lib/mcp.js | AGT-338 slice 2 -- the own-knowledge rule. A capability
+// whose Intent row carries `traits.any_agent = true` assembles with `any_agent: true`; visibleRows()
+// drops such a row from every non-admin address, and runDeterministic() hands the fact to the
+// handler, which otherwise reads only the holder's own knowledge. A generic trait read -- no id or
+// slug is named here. No model call added.
+//
 // DeepBench v7.0.766 | api/_lib/mcp.js | AGT-338 -- a team has one MCP address. The segment after
 // `/api/mcp/` is now resolved to a SET of agents by resolveAddress(): no segment is every agent (the
 // admin address), 64 lowercase hex is a team's address and names that team's members, and anything
@@ -265,6 +271,7 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
       // Only an object is usable as an input contract; anything else is dropped rather than half-read.
       input_schema: inputSchema && typeof inputSchema === 'object' && !Array.isArray(inputSchema) ? inputSchema : null,
       default_intent_slug: c.default_intent_slug || null,
+      any_agent: !!(intent && intent.traits && intent.traits.any_agent === true),
       tenant_id: c.tenant_id || 'global',
       agent_id: holder.id,
       agent_name: holder.name || holder.id,
@@ -304,11 +311,17 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
  * existing callers and is read as the one-member set, so both spellings run the same membership
  * test and there is still one rule. The set can only SUBTRACT, exactly as before: the lane rule is
  * applied to every team member, so a governance agent on a team is listed only with the key.
+ *
+ * FEATURE: AGT-338 -- THE OWN-KNOWLEDGE RULE (slice 2). A row whose Intent carries the any-agent
+ * fact (`any_agent: true`, read from `traits.any_agent` in assembleCapabilityRows()) is a tool that
+ * can read ANY agent's knowledge, so it is listed on the admin address only: on every set -- a team,
+ * one agent, even its own holder's address -- it is dropped, and because `tools/call` runs this same
+ * function it is `Unknown tool` there too. The row's own fact, never a slug.
  */
 export function visibleRows(rows, { governanceUnlocked, agentId: addressed, agentIds }) {
   const set = agentIds !== undefined && agentIds !== null ? agentIds : (addressed !== undefined && addressed !== null ? [addressed] : null);
   return rows.filter(
-    r => (r.lane === 'product' || governanceUnlocked === true) && (!set || set.includes(r.agent_id)),
+    r => (r.lane === 'product' || governanceUnlocked === true) && (!set || (set.includes(r.agent_id) && r.any_agent !== true)),
   );
 }
 
@@ -841,7 +854,7 @@ export async function runDeterministic({ row, taskContext, governanceUnlocked, c
         agent_id: row.agent_id,
         tenant_id: row.tenant_id,
         content: taskContext,
-        handler_context: { governance_unlocked: governanceUnlocked === true },
+        handler_context: { governance_unlocked: governanceUnlocked === true, any_agent: row.any_agent === true },
       }),
     mcpAttribution(ctx, callerKeyName),
   );

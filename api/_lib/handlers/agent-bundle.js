@@ -1,3 +1,9 @@
+// DeepBench v7.0.771 | api/_lib/handlers/agent-bundle.js | AGT-338 slice 2 -- THE OWN-KNOWLEDGE
+// RULE. An agent's knowledge tool gives out only that agent's own knowledge: bundleTarget() makes
+// the target the capability's HOLDER, and another agent's id through it is refused as "Unknown
+// agent" before any read. Only a call whose Intent row carries `traits.any_agent = true` (handed in
+// by mcp.js as handler_context.any_agent) may name the agent it wants. No model call added.
+//
 // DeepBench v7.0.759 | api/_lib/handlers/agent-bundle.js | AGT-342 -- the taught items and the
 // agent's own records come from the one shared reader, lib/read-taught.js, framed there.
 //
@@ -28,12 +34,17 @@
 // `the_library`), and role prompts / guardrails are `agent_configs` rows. A bundle built from
 // assemblePrompt() alone would silently omit all three for exactly the agents that have nothing else.
 //
-// §19c, AND WHY THIS IS NOT A CROSS-AGENT READ. The target id comes from the CALLER, and the
-// requester IS the target: every read below is that agent's own row (`requestingAgentId: t`), the
-// same posture api/plan.js and lib/agent-run.js take for the agent they are running. No Skill row of
-// Dan's names any agent (§19d/§19e Rule #1). The Library is reached only through Eleanor Voss's
-// broker, so an agent with no data-room credential gets `denied-no-access` REPORTED rather than a
-// Library invented for it.
+// §19c, AND WHY THIS IS NOT A CROSS-AGENT READ. THE RULE (AGT-338 slice 2): a knowledge tool gives
+// out only its HOLDER's own knowledge, on every address. bundleTarget() decides the target before
+// any read: with no any-agent fact on the call the target is the holder -- named or not -- and any
+// other id is refused with the same "Unknown agent" a missing agent gets. Only a capability whose
+// Intent row carries `traits.any_agent = true` may take its target from the CALLER, and mcp.js lists
+// that capability on the admin address alone. Either way the requester IS the target: every read
+// below is that agent's own row (`requestingAgentId: t`), the same posture api/plan.js and
+// lib/agent-run.js take for the agent they are running. No Skill row names any agent (§19d/§19e
+// Rule #1), and nothing here compares against a literal id or slug (§19b). The Library is reached
+// only through Eleanor Voss's broker, so an agent with no data-room credential gets
+// `denied-no-access` REPORTED rather than a Library invented for it.
 //
 // THE LANE RULE IS THE TARGET'S, and it is the same predicate visibleRows() applies to the tool
 // list: product lane is open to anyone past the HAR-33 gate, everything else needs the governance
@@ -73,20 +84,34 @@ export function bundleTargetReadable(agentRow, handler_context) {
   return canSeeAgent(agentRow, handler_context?.viewer ?? null);
 }
 
+// AGT-338 slice 2: the one answer to "whose bundle does this call read". Pure, and decided before
+// any read. No any-agent fact = own knowledge only: the target is the holder, and another id reads
+// as "Unknown agent" -- the same message a missing agent gets, so the tool publishes no inventory.
+export function bundleTarget({ agent_id, content, handler_context }) {
+  const asked = content && content.agent_id;
+  const named = typeof asked === 'string' && asked.trim() !== '';
+  if (handler_context?.any_agent === true) {
+    if (!named) throw new Error('agent_bundle requires task_context.agent_id -- the id of the agent whose bundle you want');
+    return asked;
+  }
+  if (!named) return agent_id;
+  if (asked !== agent_id) throw new Error(`Unknown agent: ${asked}`);
+  return asked;
+}
+
 /**
  * @param agent_id         the HOLDER of the capability (Dan) -- who executed, for the audit row.
  * @param tenant_id        the capability row's tenant.
- * @param content          the CALLER's task_context. `content.agent_id` is the TARGET agent.
- * @param handler_context  { governance_unlocked } -- the MCP key's scope, decided in mcp.js.
+ * @param content          the CALLER's task_context. The TARGET is the holder; `content.agent_id`
+ *                         may only repeat the holder's own id, unless handler_context.any_agent is
+ *                         true -- then it is required and names the target (bundleTarget()).
+ * @param handler_context  { governance_unlocked, any_agent } -- the MCP key's scope and the Intent
+ *                         row's any-agent fact, both decided in mcp.js.
  */
 export async function handle({ agent_id, tenant_id, content, handler_context }) {
   const startTime = Date.now();
   const tenant = tenant_id || 'global';
-  const t = content && content.agent_id;
-
-  if (typeof t !== 'string' || !t.trim()) {
-    throw new Error('agent_bundle requires task_context.agent_id -- the id of the agent whose bundle you want');
-  }
+  const t = bundleTarget({ agent_id, content, handler_context });
 
   const agentRows = await sbSelect(
     `agents?id=eq.${encodeURIComponent(t)}&select=id,name,role,specialty,bio,lane,is_active,data_room_access,${AGENT_ACCESS_COLUMNS}&limit=1`,
