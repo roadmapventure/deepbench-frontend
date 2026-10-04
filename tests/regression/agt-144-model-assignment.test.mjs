@@ -1,3 +1,4 @@
+// DeepBench v7.0.777 | tests/regression/agt-144-model-assignment.test.mjs | AGT-304 slice 2 -- re-pin: devmanager's closed capability set moved 4 -> 5 (propose-project) under AGT-240 v7.0.662, migration agt240_project_finish_line, ship decision 33b801dd; nothing weakened.
 // DeepBench v7.0.590 | tests/regression/agt-144-model-assignment.test.mjs | AGT-144 -- The
 // Development Manager gains the Model Assignment capability: 3 Skills, 1 capability, 9 links, 1
 // assignment, 5 new dm-guardrails prohibitions, and two SQL functions that own every write
@@ -141,14 +142,14 @@ async function run() {
     "the stored contract's action enum is the function's k_actions, in its order");
   const held = await pg(url, key, "agent_capability_assignments?agent_id=eq.devmanager&select=capability_slug");
   assert.deepEqual(held.map(h => h.capability_slug).sort(),
-    ["decide-gated-card", "model-assignment", "review-audit-worklist", "run-project"],
-    "devmanager holds exactly four capabilities");
+    ["decide-gated-card", "model-assignment", "propose-project", "review-audit-worklist", "run-project"],
+    "devmanager holds exactly five capabilities -- the fifth, propose-project, is AGT-240 v7.0.662 (migration agt240_project_finish_line, ship decision 33b801dd)");
   const guard = await pg(url, key, "skill_profiles?slug=eq.dm-guardrails&select=guardrails");
   const mustNot = guard[0].guardrails.must_not;
   for (const s of FIVE) assert.ok(mustNot.includes(s), `dm-guardrails.must_not carries "${s}"`);
   assert.ok(mustNot.includes("name another agent in its own rows"),
     "the six standing prohibitions were KEPT -- the five are appended, never a replacement");
-  console.log(`  (a) ${CAPABILITY} -> ${INTENT}; 9 links; types intent/intent/knowledge; devmanager holds 4; must_not ${mustNot.length} incl. the five -- PASS`);
+  console.log(`  (a) ${CAPABILITY} -> ${INTENT}; 9 links; types intent/intent/knowledge; devmanager holds 5; must_not ${mustNot.length} incl. the five -- PASS`);
 
   // ---- (b) 2 trials refused naming 3, the row byte-equal, no decision written -------------
   const mechPath = "model_assignments?job_kind=eq.lane&job_key=eq.mechanical&select=*";

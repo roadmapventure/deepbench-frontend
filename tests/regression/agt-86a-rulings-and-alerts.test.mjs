@@ -1,3 +1,4 @@
+// DeepBench v7.0.777 | tests/regression/agt-86a-rulings-and-alerts.test.mjs | AGT-304 slice 2 -- re-pin: the probe row gained the two columns that became NOT NULL after this test was pinned, finding_type under AGT-131 v7.0.591 and family under AGT-239 D1 v7.0.661, so arm V reaches the CHECK under test instead of stopping at 23502; nothing weakened.
 // DeepBench v7.0.542 | tests/regression/agt-86a-rulings-and-alerts.test.mjs | AGT-86 slice 1a
 //
 // FEATURE: AGT-86 slice 1a -- the manager can rule on an audit finding, and John's five calls have
@@ -83,7 +84,8 @@ async function run() {
   await arm("V vocabulary", async () => {
     // found_by is NOT NULL on audit_findings, and NOT NULL is checked BEFORE the CHECKs -- without it
     // every POST here would stop at 23502 and never reach the constraint under test.
-    const base = { ...PROBE, locations: [{}], confidence: "high", governing_fact: "qa", proposed_resolution: "qa", found_by: SESSION_TAG };
+    // finding_type (AGT-131 v7.0.591) and family (AGT-239 D1 v7.0.661) are NOT NULL too -- same reason.
+    const base = { ...PROBE, locations: [{}], confidence: "high", governing_fact: "qa", proposed_resolution: "qa", found_by: SESSION_TAG, finding_type: "defect", family: "other" };
     const full = await call(url, key, "POST", "audit_findings", { ...base, kind: "other", status: "ticketed", john_call: "money", check_slug: "x" });
     assert.equal(full.code, "23505",
       `every new value must clear its CHECK and stop only at the unique index (23505); got ${describe(full)}`);

@@ -1,3 +1,4 @@
+// DeepBench v7.0.777 | tests/regression/agt-86g-auditor-checklist.test.mjs | AGT-304 slice 2 -- re-pin: the Auditor's closed capability set moved 6 -> 8 (audit-run-review under AGT-135 v7.0.603, audit-finish-review under AGT-240 v7.0.662, ship decision 33b801dd); nothing weakened.
 // DeepBench v7.0.551 | tests/regression/agt-86g-auditor-checklist.test.mjs | AGT-86 slice 7
 //
 // FEATURE: AGT-86 slice 7 -- The Auditor's Skill rows carry the approved checklist (23 named checks in
@@ -54,7 +55,7 @@ const JOBS = {
   "audit-config-review": ["au-config-intent", "config-disagrees"],
   "audit-advisor": ["au-advisor-intent", "advisor-feature-replaces-handbuilt"],
 };
-const ALL_ASSIGNMENTS = ["audit-advisor", "audit-agent-data", "audit-board-health", "audit-config-review", "audit-governance-corpus", "audit-run-review", "audit-work-quality"];
+const ALL_ASSIGNMENTS = ["audit-advisor", "audit-agent-data", "audit-board-health", "audit-config-review", "audit-finish-review", "audit-governance-corpus", "audit-run-review", "audit-work-quality"];
 
 const GUARDRAILS = {
   must: [
@@ -125,7 +126,7 @@ async function run() {
   // --- C. rows ------------------------------------------------------------------------------------
   await arm("C rows", async () => {
     const assigns = await get(`agent_capability_assignments?agent_id=eq.${AGENT}&select=capability_slug,tenant_id`);
-    assert.deepEqual(assigns.map(a => a.capability_slug).sort(), ALL_ASSIGNMENTS, "the Auditor holds six capabilities");
+    assert.deepEqual(assigns.map(a => a.capability_slug).sort(), ALL_ASSIGNMENTS, "the Auditor holds eight capabilities -- audit-run-review AGT-135 v7.0.603, audit-finish-review AGT-240 v7.0.662 (ship 33b801dd)");
     assert.ok(assigns.every(a => a.tenant_id === "global"));
     const [lane] = await get("runner_model_lanes?lane=eq.judgment&select=model_id");
     for (const [cap, [intent]] of Object.entries(JOBS)) {
