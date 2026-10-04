@@ -1,3 +1,6 @@
+// DeepBench v7.0.773 | ConnectAgentPopup.jsx | AGT-338 slice 3 -- the popup offers the team address:
+// under the agent's own copy box, one block per team the agent is on (read from /api/agent-configs),
+// and one line under the ask sentence. Spec: docs/kickoffs/v7.0.773-AGT-338-connect-popup-team-address.md.
 // DeepBench v7.0.757 | ConnectAgentPopup.jsx | AGT-334 — Connect <first name> to AI
 // The Connect popup a private agent's Personnel file opens (the badge button, or ?connect=1).
 // It names no agent: the first name and the address arrive as props (ARCHITECTURE §19e Rule #1),
@@ -61,6 +64,9 @@ export const CONNECT_SHARED = {
     "Then turn off your agent's connector, start a new session and ask the session (the AI tool's generic model) the same question. The answer is the model's own general knowledge.",
     "The difference is what your training brought.",
   ],
+  teamLead: "Or connect your whole team at once.",
+  teamBody: "Paste this URL instead and every agent in <team name> is available, including agents you add later.",
+  teamStep: "With a team connection, name the agent you want in your question.",
 };
 
 const h2Style = { fontFamily: display, fontSize: 20, fontWeight: 700, color: T.navy, margin: "32px 0 8px" };
@@ -92,12 +98,24 @@ function CopyBlock({ text }) {
 
 export default function ConnectAgentPopup({ agent, address, onClose }) {
   const [toolId, setToolId] = useState(CONNECT_TOOLS[0].id);
+  const [teams, setTeams] = useState([]);
 
   useEffect(() => {
     const onKey = e => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // FEATURE: AGT-338 -- the teams this agent is on. No team, a slow or a failed read: no block.
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/agent-configs?agent_id=${encodeURIComponent(agent.id)}&teams=1`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (live && d && Array.isArray(d.teams)) setTeams(d.teams); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [agent.id]);
+  const base = address.slice(0, address.lastIndexOf("/") + 1); // origin + /api/mcp/
 
   const fill = s => s.split("<first name>").join(agent.name.split(" ")[0]);
   const tool = CONNECT_TOOLS.find(t => t.id === toolId) || CONNECT_TOOLS[0];
@@ -172,11 +190,20 @@ export default function ConnectAgentPopup({ agent, address, onClose }) {
                 <li key={i} style={liStyle}>
                   {fill(s.text)}
                   {s.copy && <CopyBlock text={address} />}
+                  {s.copy && teams.map(t => (
+                    <div key={t.address}>
+                      <p style={{ ...pStyle, margin: "16px 0 0" }}>
+                        <strong>{CONNECT_SHARED.teamLead}</strong>{" "}{CONNECT_SHARED.teamBody.split("<team name>").join(t.name)}
+                      </p>
+                      <CopyBlock text={base + t.address} />
+                    </div>
+                  ))}
                 </li>
               )
           ))}
         </ol>
         <p style={pStyle}>{fill(tool.step2)}</p>
+        <p style={pStyle}>{CONNECT_SHARED.teamStep}</p>
         {tool.step3Heading === null ? (
           <p style={pStyle}>{fill(tool.step3[0])}</p>
         ) : (
