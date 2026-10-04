@@ -1,3 +1,36 @@
+// DeepBench v7.0.771 | api/_lib/mcp.js | AGT-338 slice 2 -- the own-knowledge rule. A capability
+// whose Intent row carries `traits.any_agent = true` assembles with `any_agent: true`; visibleRows()
+// drops such a row from every non-admin address, and runDeterministic() hands the fact to the
+// handler, which otherwise reads only the holder's own knowledge. A generic trait read -- no id or
+// slug is named here. No model call added.
+//
+// DeepBench v7.0.766 | api/_lib/mcp.js | AGT-338 -- a team has one MCP address. The segment after
+// `/api/mcp/` is now resolved to a SET of agents by resolveAddress(): no segment is every agent (the
+// admin address), 64 lowercase hex is a team's address and names that team's members, and anything
+// else is one agent id exactly as AGT-333 shipped it. visibleRows() -- still the ONE visibility
+// function -- narrows to that set AFTER the lane rule, so a team address lists one tool per member
+// and an agent added to the team later appears on the same connection with no reconnect. On any
+// non-admin address `initialize` names the agents available (connectionInstructions()).
+// `teams.address` is the team's secret: it is used only as a filter value and is never selected,
+// logged or returned. A failed team read is an error, never an empty list. No model call added.
+//
+// DeepBench v7.0.754 | api/_lib/mcp.js | AGT-336 -- the tool list asks the one "who may see this
+// agent" check. public.agents now carries an owner and a sharing level (owner_id, sharing,
+// shared_with), and shared/agent-visibility.js is the single place that reads them. The agents read
+// below names those columns through AGENT_ACCESS_COLUMNS, and assembleCapabilityRows() passes its
+// agents through visibleAgents() before it picks a holder -- so a capability whose only holder the
+// viewer may not see is dropped the same way a capability with no active holder already is. NOTHING
+// IS ENFORCED YET: nobody signs in, no caller passes a viewer, and a null viewer sees everything, so
+// the list is byte-for-byte what it was. visibleRows() is untouched by this ticket.
+//
+// DeepBench v7.0.756 | api/_lib/mcp.js | AGT-333 -- every agent has its own MCP address.
+// `/api/mcp/<agent id>` is a second vercel.json rewrite onto this same handler carrying
+// `agent=<id>`; addressedAgentId() reads that one query value and visibleRows() -- still the ONE
+// visibility function -- narrows to the rows that agent holds, AFTER the lane rule. So an agent's
+// address shows at most what the same caller already sees for that agent on `/api/mcp`, an unknown
+// id shows nothing, and `/api/mcp` itself (no `agent` value) lists and accepts exactly what it did.
+// The comparison is the row's own `agent_id` against the request's value, never a literal (§19b).
+//
 // DeepBench v7.0.684 | api/_lib/mcp.js | AGT-163 -- an MCP key's NAME becomes the caller's visitor_id.
 // Every `call_source = 'mcp'` row in `ai_activity_log` carried `visitor_id NULL` (all 32, measured
 // 2026-09-28) while the web path attributes 3,518 of 4,283. IP capture already works over the wire
@@ -118,6 +151,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { runCapability } from '../capabilities/execute.js';
 import { handle as agentBundleHandle } from './handlers/agent-bundle.js';
 import { withRequestContext, getRequestContext, runWithCallSource } from '../../lib/request-context.js';
+import { visibleAgents, AGENT_ACCESS_COLUMNS } from '../../shared/agent-visibility.js';
 
 // package.json is read through createRequire rather than an import attribute so the Vercel builder
 // traces it as a plain dependency. A failure here costs the server its version string and nothing
@@ -187,7 +221,7 @@ export async function fetchCapabilityRows() {
   const [capabilities, assignments, agents, intents] = await Promise.all([
     sbSelect('capabilities?select=slug,name,description,execution_type,default_intent_slug,tenant_id'),
     sbSelect('agent_capability_assignments?select=agent_id,capability_slug'),
-    sbSelect('agents?select=id,name,role,lane,is_active'),
+    sbSelect(`agents?select=id,name,role,lane,is_active,${AGENT_ACCESS_COLUMNS}`),
     sbSelect('skill_profiles?skill_type_slug=eq.intent&select=slug,traits'),
   ]);
   return assembleCapabilityRows({ capabilities, assignments, agents, intents });
@@ -200,8 +234,8 @@ export async function fetchCapabilityRows() {
  * in execute.js throws for exactly that case, so listing it would advertise a tool that cannot run.
  * That is the same is_active gate the executor applies, read from the same column.
  */
-export function assembleCapabilityRows({ capabilities = [], assignments = [], agents = [], intents = [] }) {
-  const agentById = new Map(agents.map(a => [a.id, a]));
+export function assembleCapabilityRows({ capabilities = [], assignments = [], agents = [], intents = [], viewer = null }) {
+  const agentById = new Map(visibleAgents(agents, viewer).map(a => [a.id, a]));
   const intentBySlug = new Map(intents.map(s => [s.slug, s]));
 
   const holderBySlug = new Map();
@@ -237,6 +271,7 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
       // Only an object is usable as an input contract; anything else is dropped rather than half-read.
       input_schema: inputSchema && typeof inputSchema === 'object' && !Array.isArray(inputSchema) ? inputSchema : null,
       default_intent_slug: c.default_intent_slug || null,
+      any_agent: !!(intent && intent.traits && intent.traits.any_agent === true),
       tenant_id: c.tenant_id || 'global',
       agent_id: holder.id,
       agent_name: holder.name || holder.id,
@@ -258,9 +293,102 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
  * lane, and equally a row whose lane is null or a value this code has never heard of -- needs the
  * key. Written as "is it product?" rather than "is it governance?" on purpose: a lane added to the
  * database tomorrow is hidden by default, which is the direction a mistake should fail in.
+ *
+ * FEATURE: AGT-333 -- THE PER-AGENT ADDRESS NARROWS HERE, AFTER THE LANE RULE, never instead of it.
+ * `agentId` is what addressedAgentId() read from the request: `undefined` / `null` is the admin
+ * address (`/api/mcp`) and changes nothing -- every caller that passes no `agentId` gets exactly the
+ * rows it got before this ticket. Any other value keeps only the rows whose own `agent_id` equals
+ * it, so an address can only ever SUBTRACT from what the lane rule already allowed: a governance
+ * agent's address is empty without the key, and an id no row carries (unknown, or '') is empty for
+ * everyone. The row's column against the request's value -- no agent is named in this file.
+ *
+ * The request's value is bound to `addressed` because agt-162 and agt-163's static guards flag ANY
+ * identity comparison on an agent id in this file, literal or not.
+ *
+ * FEATURE: AGT-338 -- AN ADDRESS IS A SET OF AGENTS. `agentIds` is what resolveAddress() returned:
+ * `null` / `undefined` is every agent (the admin address), otherwise an array of ids -- a team's
+ * members, one agent, or nobody (`[]`, which lists nothing for everyone). `agentId` stays for the
+ * existing callers and is read as the one-member set, so both spellings run the same membership
+ * test and there is still one rule. The set can only SUBTRACT, exactly as before: the lane rule is
+ * applied to every team member, so a governance agent on a team is listed only with the key.
+ *
+ * FEATURE: AGT-338 -- THE OWN-KNOWLEDGE RULE (slice 2). A row whose Intent carries the any-agent
+ * fact (`any_agent: true`, read from `traits.any_agent` in assembleCapabilityRows()) is a tool that
+ * can read ANY agent's knowledge, so it is listed on the admin address only: on every set -- a team,
+ * one agent, even its own holder's address -- it is dropped, and because `tools/call` runs this same
+ * function it is `Unknown tool` there too. The row's own fact, never a slug.
  */
-export function visibleRows(rows, { governanceUnlocked }) {
-  return rows.filter(r => r.lane === 'product' || governanceUnlocked === true);
+export function visibleRows(rows, { governanceUnlocked, agentId: addressed, agentIds }) {
+  const set = agentIds !== undefined && agentIds !== null ? agentIds : (addressed !== undefined && addressed !== null ? [addressed] : null);
+  return rows.filter(
+    r => (r.lane === 'product' || governanceUnlocked === true) && (!set || (set.includes(r.agent_id) && r.any_agent !== true)),
+  );
+}
+
+/**
+ * FEATURE: AGT-333 -- WHICH AGENT THIS REQUEST ADDRESSED, read once from the rewrite's query value.
+ * Pure.
+ *
+ * `null` means the admin address: `/api/mcp` rewrites with `transport=mcp` and no `agent`, so the
+ * key is absent and nothing is narrowed. `/api/mcp/<id>` rewrites with `agent=<id>`, returned
+ * trimmed. ANYTHING ELSE FAILS CLOSED TO '' -- an empty value, or the array a repeated `agent`
+ * parameter arrives as -- because '' matches no row, whereas answering `null` there would turn a
+ * malformed agent address into the admin address.
+ */
+export function addressedAgentId(query) {
+  if (!query || query.agent === undefined) return null;
+  return typeof query.agent === 'string' ? query.agent.trim() : '';
+}
+
+// FEATURE: AGT-338 -- the shape of a team's address: `teams.address` defaults to 64 lowercase hex.
+// The longest agent id is 40 characters, so the two cannot be confused.
+const TEAM_ADDRESS_SHAPE = /^[0-9a-f]{64}$/;
+
+/**
+ * FEATURE: AGT-338 -- the agents on the team that holds this address. An address no team holds is
+ * the empty list. `address` is used only as the filter value: it is never selected, logged or
+ * returned. A failed read throws (sbSelect), and the caller lets it.
+ */
+async function readTeamAgentIds(address) {
+  const teams = await sbSelect(`teams?address=eq.${address}&select=id&limit=1`);
+  if (!teams.length) return [];
+  const members = await sbSelect(`agent_teams?team_id=eq.${teams[0].id}&select=agent_id`);
+  return members.map(m => m.agent_id);
+}
+
+/**
+ * FEATURE: AGT-338 -- THE ONE ADDRESS RESOLVER. An address is a set of agents: `null` is every
+ * agent (the admin address), otherwise an array of ids for visibleRows()'s `agentIds`.
+ *
+ * No segment -> `null`. A malformed one ('' from addressedAgentId()) -> `[]`, never `null`, so a
+ * broken address can never become the admin address. 64 lowercase hex -> that team's members, read
+ * live on every request, which is why an agent added later appears on the same connection. Anything
+ * else -> that one agent id, exactly as AGT-333 shipped it. A failed team read throws: answering
+ * `[]` there would tell a tester her team is empty when the database is down.
+ *
+ * `readTeam` is injected so the unit arm can prove WHICH branch asked the team reader.
+ */
+export async function resolveAddress(query, readTeam = readTeamAgentIds) {
+  const segment = addressedAgentId(query);
+  if (segment === null) return null;
+  if (segment === '') return [];
+  if (TEAM_ADDRESS_SHAPE.test(segment)) return await readTeam(segment);
+  return [segment];
+}
+
+/**
+ * FEATURE: AGT-338 -- WHO IS AVAILABLE ON THIS CONNECTION, for `initialize`. Pure.
+ *
+ * The admin address (`scoped` false) answers the base text byte for byte. Any other address names
+ * each distinct agent once, in row order, from the same rows tools/list will show -- so the roster
+ * sentence and the tool list cannot disagree. The names are the rows' own `agent_name`; none is
+ * written in this file.
+ */
+export function connectionInstructions(rows, scoped) {
+  if (!scoped) return SERVER_INSTRUCTIONS;
+  const names = [...new Set(rows.map(r => r.agent_name))];
+  if (!names.length) return SERVER_INSTRUCTIONS + ' No agent is available at this address.';
+  return SERVER_INSTRUCTIONS + ' Agents available on this connection: ' + names.join(', ') + '. When the user names one, call that agent\'s tool.';
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -610,7 +738,7 @@ export async function dispatchJsonRpc(message, deps = {}) {
           protocolVersion: negotiateProtocolVersion(params && params.protocolVersion),
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
-          instructions: SERVER_INSTRUCTIONS,
+          instructions: deps.instructions ? await deps.instructions() : SERVER_INSTRUCTIONS,
         });
 
       case 'ping':
@@ -726,7 +854,7 @@ export async function runDeterministic({ row, taskContext, governanceUnlocked, c
         agent_id: row.agent_id,
         tenant_id: row.tenant_id,
         content: taskContext,
-        handler_context: { governance_unlocked: governanceUnlocked === true },
+        handler_context: { governance_unlocked: governanceUnlocked === true, any_agent: row.any_agent === true },
       }),
     mcpAttribution(ctx, callerKeyName),
   );
@@ -849,11 +977,13 @@ async function handler(req, res) {
   const visible = async () => {
     if (!scopePromise) {
       scopePromise = (async () => {
-        const [all, keys] = await Promise.all([fetchCapabilityRows(), readMcpKeys()]);
+        const [all, keys, agentIds] = await Promise.all([fetchCapabilityRows(), readMcpKeys(), resolveAddress(req.query)]);
         // AGT-163: one resolution, three consumers -- the lane gate, the deterministic handler's
         // own lane rule, and the attribution written on the call's audit row.
         const { name, governanceUnlocked } = resolveCallerKey(req.headers[GOVERNANCE_KEY_HEADER], keys);
-        return { rows: visibleRows(all, { governanceUnlocked }), governanceUnlocked, callerKeyName: name };
+        // AGT-338: `scoped` is "this is not the admin address" -- it decides only whether
+        // `initialize` names the agents on the connection.
+        return { rows: visibleRows(all, { governanceUnlocked, agentIds }), governanceUnlocked, callerKeyName: name, scoped: agentIds !== null };
       })();
     }
     return scopePromise;
@@ -864,6 +994,18 @@ async function handler(req, res) {
     callTool: async ({ name, args }) => {
       const { rows, governanceUnlocked, callerKeyName } = await visible();
       return callToolThroughExecutor({ name, args, rows, governanceUnlocked, callerKeyName });
+    },
+    // AGT-338: the admin address reads nothing and answers what it always did. On any other address
+    // the roster comes from the same visible() the list and the call use; if that read fails the
+    // handshake still completes with the base text, and tools/list reports the failure itself.
+    instructions: async () => {
+      if (addressedAgentId(req.query) === null) return SERVER_INSTRUCTIONS;
+      try {
+        const v = await visible();
+        return connectionInstructions(v.rows, v.scoped);
+      } catch {
+        return SERVER_INSTRUCTIONS;
+      }
     },
   });
 

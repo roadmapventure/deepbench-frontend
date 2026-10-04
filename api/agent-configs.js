@@ -1,8 +1,31 @@
+// DeepBench v7.0.773 | api/agent-configs.js | AGT-338 slice 3 -- GET with `teams=1` answers the name
+// and address of each team the agent is on (readAgentTeams()), so the Connect popup can offer the
+// team address. Every other request takes the path it took before.
+// DeepBench v7.0.762 | api/agent-configs.js | AGT-337 slice 1 -- POST carries a body `action`:
+// `create_private_agent` saves a blank private agent through lib/private-agent-create.js
+// (ARCHITECTURE.md §19u decision 6). Every other request takes the path it took before.
 // DeepBench v7.0.34 | api/agent-configs.js | LOG-121 -- handler wrapped in withRequestContext(); the
 // request-scoped context is read inside logActivity(), so no logging call site in this file changes.
 // This route reaches no logActivity() call today -- wrapping it is inert now and means a logging
 // site added here later cannot silently lose attribution.
 import { withRequestContext } from "../lib/request-context.js";
+import { createPrivateAgent, readCreateInput } from "../lib/private-agent-create.js";
+
+// FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
+// service-key read: the browser's key cannot read `teams.address` (a column grant). With no
+// logins, whoever can open the agent's Personnel file can read it. An address that is not 64
+// lowercase hex is not offered. A failed read throws, and the handler answers its existing 500.
+export async function readAgentTeams(agentId, { supabaseUrl, supabaseKey, fetchImpl = fetch }) {
+  const r = await fetchImpl(
+    `${supabaseUrl}/rest/v1/agent_teams?agent_id=eq.${encodeURIComponent(agentId)}&select=teams(name,address)`,
+    { method: "GET", headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } });
+  if (!r.ok) throw new Error(`Reading agent_teams failed: HTTP ${r.status}`);
+  const rows = await r.json();
+  return (Array.isArray(rows) ? rows : [])
+    .map(row => row && row.teams)
+    .filter(t => t && typeof t.name === "string" && /^[0-9a-f]{64}$/.test(t.address))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -26,8 +49,9 @@ async function handler(req, res) {
 
     // ── GET ──────────────────────────────────────────────────────────────────
     if (req.method === "GET") {
-      const { tenant_id = "global", agent_id, type } = req.query;
+      const { tenant_id = "global", agent_id, type, teams } = req.query;
       if (!agent_id) return res.status(400).json({ error: "agent_id required" });
+      if (teams === "1") return res.status(200).json({ teams: await readAgentTeams(agent_id, { supabaseUrl, supabaseKey }) });
 
       let url = `${supabaseUrl}/rest/v1/agent_configs?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&order=created_at.asc`;
       if (type) url += `&type=eq.${encodeURIComponent(type)}`;
@@ -43,6 +67,16 @@ async function handler(req, res) {
 
     // ── POST ─────────────────────────────────────────────────────────────────
     if (req.method === "POST") {
+      if (req.body?.action === "create_private_agent") {
+        const input = readCreateInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(201).json(await createPrivateAgent(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
       const {
         agent_id,
         tenant_id = "global",

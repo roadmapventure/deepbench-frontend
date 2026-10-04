@@ -1,3 +1,6 @@
+// DeepBench v7.0.768 | api/load-entries.js | AGT-343
+// FEATURE: AGT-343 -- every entry this route returns says its kind (note or file), and a PATCH that
+// supplies a title or content re-embeds the item when its text changed (lib/knowledge-write.js).
 // DeepBench v7.0.34 | api/load-entries.js | LOG-121 -- handler wrapped in withRequestContext(); the
 // request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v5.3.13 | load-entries.js | SH-11 — merged POST (ingest) handler; ingest.js retired to stay within Vercel Hobby 12-function limit
@@ -8,7 +11,7 @@
 // FEATURE: AG-27 — POST handler extracted to lib/knowledge-write.js's embedAndUpsertEntry(),
 // shared with writeLibrary()'s insert operation. GET/PATCH/DELETE untouched.
 
-import { embedAndUpsertEntry } from '../lib/knowledge-write.js';
+import { embedAndUpsertEntry, entryKind, reembedOnEdit } from '../lib/knowledge-write.js';
 import { withRequestContext } from '../lib/request-context.js';
 
 async function handler(req, res) {
@@ -35,7 +38,7 @@ async function handler(req, res) {
     if (req.method === "POST") {
       try {
         const saved = await embedAndUpsertEntry(req.body);
-        return res.status(200).json({ success: true, entry: saved });
+        return res.status(200).json({ success: true, entry: { ...saved, kind: entryKind(saved) } });
       } catch (err) {
         // Preserves the pre-extraction status code: 400 for the one client-input validation
         // error, 500 for everything else (config/embedding/upsert failures) — Category M.
@@ -68,6 +71,7 @@ async function handler(req, res) {
         id:            e.id,
         title:         e.title,
         category:      e.category,
+        kind:          entryKind(e),
         jurisdiction:  e.jurisdiction,
         priority:      e.priority,
         triggers:      e.triggers || [],
@@ -90,7 +94,7 @@ async function handler(req, res) {
 
     // ── PATCH — toggle status or update metadata fields ───────────────────────
     if (req.method === "PATCH") {
-      const { id, tenant_id = "global", status, title, category, jurisdiction, teaching_note, triggers, priority } = req.body;
+      const { id, tenant_id = "global", status, title, content, category, jurisdiction, teaching_note, triggers, priority } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
 
       const patch = {};
@@ -100,7 +104,17 @@ async function handler(req, res) {
         }
         patch.status = status;
       }
+      let embedding = null;
+      if (title !== undefined || content !== undefined) {
+        try {
+          embedding = await reembedOnEdit({ id, tenant_id, title, content });
+        } catch (err) {
+          return res.status(err.status || 500).json({ error: err.message });
+        }
+      }
       if (title        !== undefined) patch.title        = title;
+      if (content      !== undefined) patch.content      = content;
+      if (embedding)                  patch.embedding    = embedding;
       if (category     !== undefined) patch.category     = category;
       if (jurisdiction !== undefined) patch.jurisdiction = jurisdiction;
       if (teaching_note!== undefined) patch.teaching_note= teaching_note;
@@ -120,7 +134,8 @@ async function handler(req, res) {
         return res.status(500).json({ error: "Supabase patch failed: " + err.slice(0, 200) });
       }
       const updated = await r.json();
-      return res.status(200).json({ entry: Array.isArray(updated) ? updated[0] : updated });
+      const entry = Array.isArray(updated) ? updated[0] : updated;
+      return res.status(200).json({ entry: entry ? { ...entry, kind: entryKind(entry) } : entry });
     }
 
     // ── DELETE ────────────────────────────────────────────────────────────────

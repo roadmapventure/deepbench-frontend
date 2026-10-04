@@ -1,3 +1,4 @@
+// DeepBench v7.0.753 | SharedUI.jsx | AGT-335 -- AgentAvatar draws a neutral default portrait (data-avatar="default": a plain head and shoulders, tokens only) for an id AVATAR_CFG does not hold, instead of borrowing another agent's face; every known id renders byte-identically. Approved by John 2026-10-03
 // DeepBench v6.3.200 | SharedUI.jsx | S-CHI-88a -- DecisionFooter gains an opt-in, default-off `compact` variant (one ellipsized prompt line, content-sized secondary + flexed primary side by side, >=30px touch floor) for CHI-88's pinned mobile footer slot; all desktop callers byte-identical
 // DeepBench v6.3.199 | SharedUI.jsx | LOG-107a -- ScrollFadeHint gains an opt-in, default-off `depth` variant (soft navy edge) so the fade reads as depth over a background it would otherwise match
 // DeepBench v6.3.188 | SharedUI.jsx | LOG-98 -- honest loading state: rolling tile counters + shimmer skeletons, no false zeros/empty states
@@ -264,8 +265,24 @@ export const AiStatusDot = ({ message, style }) => {
 
 // FEATURE: RO-04 — Illustrated SVG portrait per agent; used on Roster and Work screens
 export function AgentAvatar({ who, size = 68, ring = true }) {
-  const c = AVATAR_CFG[who] || AVATAR_CFG.chloe;
+  const c = AVATAR_CFG[who];
   const uid = `av-${who}-${Math.random().toString(36).slice(2,7)}`;
+  // FEATURE: AGT-335 -- an id with no AVATAR_CFG entry (a table-only agent, created at run time)
+  // gets a neutral portrait of its own: same 72x72 frame, no face, no hair, tokens only.
+  if (!c) {
+    return (
+      <svg data-avatar="default" width={size} height={size} viewBox="0 0 72 72" style={{display:"block",flexShrink:0}}>
+        <defs><clipPath id={`clip-${uid}`}><circle cx="36" cy="36" r="34"/></clipPath></defs>
+        <circle cx="36" cy="36" r="35" fill={T.paperDeep} stroke={ring?T.muted:"none"} strokeWidth={ring?1.5:0}/>
+        <g clipPath={`url(#clip-${uid})`}>
+          <rect x="0" y="0" width="72" height="72" fill={T.paperDeep}/>
+          <circle cx="36" cy="30" r="12" fill={T.muted}/>
+          <path d="M 10 72 Q 14 50 36 50 Q 58 50 62 72 Z" fill={T.muted}/>
+        </g>
+        {ring&&<circle cx="36" cy="36" r="34.5" fill="none" stroke={T.muted} strokeWidth="0.5" strokeDasharray="0.5 2" opacity="0.5"/>}
+      </svg>
+    );
+  }
   return (
     <svg width={size} height={size} viewBox="0 0 72 72" style={{display:"block",flexShrink:0}}>
       <defs><clipPath id={`clip-${uid}`}><circle cx="36" cy="36" r="34"/></clipPath></defs>
