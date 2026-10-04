@@ -1,3 +1,11 @@
+// DeepBench v7.0.774 | api/prompt/db-assembly.js | DAT-004 -- what a trainer taught an agent is now
+// in every prompt assembled for that agent. assemblePrompt() reads the agent's own taught rows
+// through the one shared reader (lib/read-taught.js) and adds one stable section, `taught`, at
+// order 3.5 (after behavior, before guardrails and intent): each item of 12,000 characters or fewer
+// whole under the taught framing, each longer one named by title, the agent's own records not at
+// all. A caller that already hands taught items over itself passes include_taught: false and no
+// read happens. A failed read warns and assembles without the section. An agent with no
+// user-taught row assembles byte-identical to before.
 // DeepBench v7.0.721 | api/prompt/db-assembly.js | AGT-020 -- the fired intent's link level now
 // reaches the model as a line of its own: `Execution depth: L<n> <name> -- <directive>`, appended to
 // the intent section's content. `capability_skill_profiles.level` was selected at three sites here
@@ -58,6 +66,7 @@
 // FEATURE: AA-03 patch + AA-43 — Reads agent competency data, returns fully assembled Prompt Request
 
 import { withRequestContext } from '../../lib/request-context.js';
+import { readTaught } from '../../lib/read-taught.js';
 
 export const config = { maxDuration: 30, runtime: "nodejs" };
 
@@ -525,6 +534,27 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   return { sections, formatContract: injectAccountField(formatContract), synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices, enableParallelToolUse: enableParallelToolUse && !delegationRequired };
 }
 
+// FEATURE: DAT-004 -- the one renderer of the `taught` section. Pure: takes what lib/read-taught.js's
+// shapeTaught() returns and gives back a section, or null when the agent has no user-taught item (so
+// nothing is pushed and the assembly is byte-identical to before). An item flagged `always` (12,000
+// characters or fewer) is rendered whole under its title; a longer one is only named, under
+// TAUGHT_TOO_LONG. The agent's own records are never read here. No id, lane or slug branch.
+export const TAUGHT_TOO_LONG =
+  'The trainer also taught the items named below. Each is too long to include here, so only its title is given:';
+
+export function buildTaughtSection(shaped) {
+  const items = Array.isArray(shaped?.taught) ? shaped.taught : [];
+  if (!items.length) return null;
+  const parts = [shaped.framing.taught];
+  for (const i of items.filter(x => x.always)) parts.push(`--- ${i.title || 'Untitled'} ---\n${i.text}`);
+  const long = items.filter(x => !x.always);
+  if (long.length) parts.push(`${TAUGHT_TOO_LONG}\n${long.map(x => `- ${x.title || 'Untitled'}`).join('\n')}`);
+  return {
+    slug: 'taught', label: 'WHAT THIS AGENT WAS TAUGHT', skill_profile_slug: null, type: 'stored',
+    content: parts.join('\n\n'), fetch_instruction: null, required: true, order: 3.5, prompt_phase: 'stable',
+  };
+}
+
 // FEATURE: SES-341 -- the ONE renderer for an inline Knowledge Skill's text, exported so
 // api/prompt/ai-enrichment.js's fetchSection() renders the executor's copy from the SAME function
 // buildSections() already used to fill `content`. A second copy in the enrichment file would be
@@ -597,7 +627,7 @@ export function mergeCallFacts(factHalf, configHalf) {
   return Object.keys(merged).length ? merged : null;
 }
 
-export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null, intent_slug = null, retrieval_scope = null }) {
+export async function assemblePrompt({ capability_slug, agent_id, tenant_id, task_context = {}, runtime_context = null, enrichment_capability_slug = null, intent_slug = null, retrieval_scope = null, include_taught = true }) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl) throw new Error("SUPABASE_URL not configured");
@@ -771,6 +801,17 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   }
 
   const { sections, formatContract, synthesis, llm, canRequestHelp, enableWebSearch, delegationRequired, requiresHumanConfirmation, critiqueCapabilitySlug, critiqueIntentSlug, intentTechnicalServices, enableParallelToolUse } = buildSections(skillProfiles, agent_id, agentConfigs, agentRow, intent_slug, retrieval_scope);
+
+  // FEATURE: DAT-004 -- the agent's own taught items, read through the one shared reader and added
+  // as one stable section. include_taught is a request-level argument (the bundle handler passes
+  // false: it hands the same items over itself). A failed read warns and assembles without the
+  // section, the same way every other read in this function degrades on a non-ok response.
+  if (agent_id && include_taught) {
+    try {
+      const taughtSection = buildTaughtSection(await readTaught({ agentId: agent_id, tenantId: tenant_id }));
+      if (taughtSection) { sections.push(taughtSection); sections.sort((a, b) => (a.order || 0) - (b.order || 0)); }
+    } catch (e) { console.warn('[db-assembly] taught read failed:', e.message); }
+  }
 
   // FEATURE: AA-62 + AA-67 — CURRENT TASK section: goal + deliverable_type always present when goal
   // exists. Renamed from "WORK ORDER" (AA-136) -- this label is generic assemblePrompt() output used

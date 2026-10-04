@@ -1,3 +1,8 @@
+// DeepBench v7.0.774 | api/_lib/handlers/agent-bundle.js | DAT-004 -- assemblePrompt() now adds the
+// agent's taught items as a section of its own. The bundle already hands those items over (`taught`,
+// below), so its one assemblePrompt() call passes include_taught: false: no second read, and no
+// short item in the bundle twice.
+//
 // DeepBench v7.0.771 | api/_lib/handlers/agent-bundle.js | AGT-338 slice 2 -- THE OWN-KNOWLEDGE
 // RULE. An agent's knowledge tool gives out only that agent's own knowledge: bundleTarget() makes
 // the target the capability's HOLDER, and another agent's id through it is refused as "Unknown
@@ -143,7 +148,8 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
 
   // No capability_slug: assemblePrompt() loads every capability assigned to the agent, which is
   // exactly "everything this agent knows how to do" -- the bundle's subject.
-  const assembled = await assemblePrompt({ agent_id: t, tenant_id: tenant, task_context: {} });
+  // FEATURE: DAT-004 -- include_taught: false; the taught items are handed over once, by `taught` below.
+  const assembled = await assemblePrompt({ agent_id: t, tenant_id: tenant, task_context: {}, include_taught: false });
   const sections = (assembled.sections || [])
     .filter(s => !PER_CALL_SLUGS.includes(s.slug))
     // Projected field by field, never spread: `order`/`prompt_phase`/`required` are assembly
