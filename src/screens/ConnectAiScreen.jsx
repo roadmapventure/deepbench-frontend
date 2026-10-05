@@ -1,7 +1,8 @@
 // DeepBench v7.0.788 | ConnectAiScreen.jsx | AGT-384 — the Connect to AI page (/bench/connect)
 // The Connect popup's content as its own page (John, 2026-10-05). A "Which agent?" picker lists the
 // viewer's Private Agents, then any teams they are on; once one is picked the Claude / ChatGPT / Grok
-// steps (ConnectSteps) fill in with that name and address. The pick lives in the address
+// steps (ConnectSteps) fill in with that name and address; the page title stays "Connect to AI",
+// so the picked name shows once, in the steps' own title. The pick lives in the address
 // (?agent=<id>), so the Bench home card opens the page with nothing picked and a Personnel File's
 // Connect button opens it with that agent already picked. With no Private Agents the page says so
 // and points to Add a player. It names no agent: the list is the roster's own private rows, and
@@ -15,7 +16,7 @@ import { AppShell } from "../AppShell.jsx";
 import { useAgents } from "../hooks/useAgents.js";
 import { isPrivateAgent } from "../data/agents.js";
 import { BenchNav, BenchNavChips } from "../components/BenchNav.jsx";
-import ConnectSteps, { CONNECT_SHARED, h2Style, pStyle } from "../components/ConnectAgentPopup.jsx";
+import ConnectSteps, { h2Style, pStyle } from "../components/ConnectAgentPopup.jsx";
 
 // The page title: the Bench masthead's type.
 const TITLE = { fontFamily:display, fontSize:30, fontWeight:500, color:T.navy, letterSpacing:"-.5px", lineHeight:1, marginBottom:6 };
@@ -57,9 +58,6 @@ export default function ConnectAiScreen() {
   const pickedTeam  = teams.find(t => t.address === pickedId) || null;
   const origin      = window.location.origin;
 
-  // The title names the pick the way the steps do: an agent's first name, a team's whole name.
-  const pickedName = pickedAgent ? pickedAgent.name.split(" ")[0] : pickedTeam ? pickedTeam.name : null;
-  const fill = s => s.split("<first name>").join(pickedName);
   const pick = value => setSearchParams({ agent: value });
 
   return (
@@ -77,7 +75,8 @@ export default function ConnectAiScreen() {
               </>
             ) : (
               <>
-                <div style={TITLE}>{pickedAgent || pickedTeam ? fill(CONNECT_SHARED.title) : "Connect to AI"}</div>
+                {/* Always the page's own title: the steps below carry the one title that names the pick. */}
+                <div style={TITLE}>Connect to AI</div>
 
                 <h2 style={h2Style}>Which agent?</h2>
                 {privateAgents.map(a => (

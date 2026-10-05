@@ -192,6 +192,8 @@ const E_WANTS = [
   ['<BenchNav current="Connect to AI"', 1],
   ['<BenchNavChips current="Connect to AI"', 1],
   ["CONNECT_SHARED.teachingHeading", 0],
+  // The page title is always "Connect to AI"; the steps carry the one "Connect <first name> ..." title.
+  ["CONNECT_SHARED.title", 0],
 ];
 
 function armE() {
