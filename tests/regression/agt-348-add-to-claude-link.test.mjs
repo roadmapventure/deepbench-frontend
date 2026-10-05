@@ -1,3 +1,8 @@
+// DeepBench v7.0.786 | tests/regression/agt-348-add-to-claude-link.test.mjs | AGT-348 slice 4 -- the
+// ChatGPT tab gets an "Open ChatGPT Plugins" button (openLink, https://chatgpt.com/plugins; John measured
+// that ChatGPT has no link to the create form and no pre-fill, so it only opens Plugins), rendered above
+// the step-1 heading. New arm d. Red on the slice-3 tree: no openLink. Approved by John 2026-10-05 ("ok").
+// Spec: docs/kickoffs/v7.0.786-AGT-348-chatgpt-connect-steps.md.
 // DeepBench v7.0.785 | tests/regression/agt-348-add-to-claude-link.test.mjs | AGT-348 slice 3 -- the
 // link uses the shape John measured working 2026-10-05: claude.ai/customize/connectors with params
 // modal, connectorName, connectorUrl in exactly that order and nothing else. /settings/connectors?...
@@ -56,6 +61,13 @@ const IMPORT_LINE = 'import { claudeAddLink } from "../lib/connectLinks.js";';
 const AGENT_LINK = "claudeAddLink(fill(tool.quickAdd.name), address)";
 const TEAM_LINK_RE = /claudeAddLink\([^)]*,\s*base \+ t\.address\)/;
 const HEX_RE = /#[0-9a-fA-F]{6}\b/;
+// v7.0.786 (slice 4): the ChatGPT tab's Open Plugins button.
+const OPEN_LINK_COPY = [
+  'href: "https://chatgpt.com/plugins"',
+  'label: "Open ChatGPT Plugins"',
+  "note: \"Opens ChatGPT's Plugins page in a new tab. Then follow the steps below.\"",
+];
+const OPEN_LINK_RENDER = "<QuickAddLink href={tool.openLink.href}";
 
 const count = (text, needle) => text.split(needle).length - 1;
 const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -72,6 +84,18 @@ function paramFailures(href, name, url) {
   }
   const keys = [...u.searchParams.keys()];
   if (JSON.stringify(keys) !== JSON.stringify(PARAM_ORDER)) out.push(`params ${keys.join(",")}`);
+  return out;
+}
+
+// Every arm-d failure, by name; [] is green.
+function openLinkFailures(popup) {
+  const out = [];
+  if (count(popup, "openLink:") !== 1) out.push(`openLink: ${count(popup, "openLink:")} times, want 1`);
+  else if (popup.indexOf("openLink:") < popup.indexOf('id: "chatgpt"')) out.push('openLink: before id: "chatgpt"');
+  for (const s of OPEN_LINK_COPY) if (count(popup, s) !== 1) out.push(`${s} ${count(popup, s)} times, want 1`);
+  const iRender = popup.indexOf(OPEN_LINK_RENDER);
+  if (iRender < 0) out.push("no openLink render");
+  else if (iRender > popup.indexOf("{tool.step1Heading}")) out.push("openLink renders after the step-1 heading");
   return out;
 }
 
@@ -116,6 +140,12 @@ async function run() {
   assert.ok(iAgent < popup.indexOf("{tool.step1Heading}"), "the agent's link must render above the step-1 heading");
   assert.ok(TEAM_LINK_RE.test(popup), "each team block must build its link from base + t.address");
   assert.ok(!HEX_RE.test(popup), "the popup must carry no literal hex colour -- tokens only");
+
+  // (d) v7.0.786: the ChatGPT tab's Open Plugins button, both directions
+  assert.deepEqual(openLinkFailures(popup), [], 'the ChatGPT tool must carry one openLink (chatgpt.com/plugins, label, note), rendered above the step-1 heading');
+  const noOpenLink = popup.split("openLink:").join("");
+  assert.notEqual(noOpenLink, popup, "CONTROL: an openLink: key must be found to be removed");
+  assert.ok(openLinkFailures(noOpenLink).length > 0, "CONTROL: the popup with openLink: removed must fail arm d");
 
   // (c) the import, and Rule #1 on the new file
   assert.ok(popup.includes(IMPORT_LINE), `the popup must import claudeAddLink: ${IMPORT_LINE}`);

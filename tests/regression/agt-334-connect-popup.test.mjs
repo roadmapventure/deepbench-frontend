@@ -1,3 +1,8 @@
+// DeepBench v7.0.786 | tests/regression/agt-334-connect-popup.test.mjs | AGT-348 slice 4 -- John
+// approved (2026-10-05, "ok") the ChatGPT tab's new step 1: heading "On chatgpt.com, on a computer ..."
+// and seven steps matching today's Plugins screen (Add ▾ → Create custom MCP server). EXPECTED_COPY
+// carries the eight new strings in place of the old heading and seven old steps; three old steps are
+// asserted absent. Red on the slice-3 tree. Spec: docs/kickoffs/v7.0.786-AGT-348-chatgpt-connect-steps.md.
 // DeepBench v7.0.757 | tests/regression/agt-334-connect-popup.test.mjs | AGT-334 slice 1 -- the
 // Personnel file's badge buttons ("+ Add Training", "Connect <first name> to AI") and the Connect popup.
 //
@@ -49,13 +54,14 @@ const EXPECTED_COPY = [
   'In a Claude session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
   "You can turn off your agent by the same path: + → Connectors → switch off.",
   'id: "chatgpt"', 'label: "ChatGPT"',
-  "Once in a ChatGPT session:",
-  "On the very left hand nav of the app, click the plugins icon.",
-  'On the top right "Add" button, click the drop down arrow.',
-  'Click "Create MCP app"',
-  "Paste URL as Connection",
-  'Change Authentication to "No Authentication"',
-  'Click "Create"',
+  "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
+  'Open Plugins: the button above, or "Plugins" in the left sidebar',
+  'Top right: "Add" ▾ → "Create custom MCP server"',
+  'Name: one you will recognize, i.e. "<first name> from DeepBench"',
+  'Connection → "Server URL": paste this URL',
+  'Authentication: change "OAuth" to "No Authentication"',
+  'Tick "I understand and want to continue"',
+  'Click "Create as a plugin"',
   'In a ChatGPT session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
   "You can turn your agent off by:",
   "Clicking on plugins on the left hand nav",
@@ -67,6 +73,13 @@ const EXPECTED_COPY = [
   "Ask a question that only your agent knows. Your agent answers from what you taught them.",
   "Then turn off your agent's connector, start a new session and ask the session (the AI tool's generic model) the same question. The answer is the model's own general knowledge.",
   "The difference is what your training brought.",
+];
+
+// v7.0.786 (AGT-348 slice 4): the slice-1 ChatGPT steps John's new copy replaced must be gone.
+const RETIRED_CHATGPT_COPY = [
+  'Click "Create MCP app"',
+  "Paste URL as Connection",
+  "On the very left hand nav of the app, click the plugins icon.",
 ];
 
 const POPUP_MECHANICS = ["hModalPopIn", 'aria-label="Close"', '"Escape"', "CONNECT_TOOLS[0].id"];
@@ -113,6 +126,8 @@ async function run() {
   const popup = fs.readFileSync(POPUP, "utf8");
   const missing = EXPECTED_COPY.filter(s => !popup.includes(s));
   assert.deepEqual(missing, [], `the popup must carry every copy string verbatim; missing: ${JSON.stringify(missing)}`);
+  const retired = RETIRED_CHATGPT_COPY.filter(s => popup.includes(s));
+  assert.deepEqual(retired, [], `the retired ChatGPT step-1 copy must be gone; still present: ${JSON.stringify(retired)}`);
   const missingMech = POPUP_MECHANICS.filter(s => !popup.includes(s));
   assert.deepEqual(missingMech, [], `the popup must carry its shell mechanics; missing: ${JSON.stringify(missingMech)}`);
   const iClaude = popup.indexOf('id: "claude"');

@@ -1,3 +1,6 @@
+// DeepBench v7.0.786 | ConnectAgentPopup.jsx | AGT-348 slice 4 -- the ChatGPT tab gets an "Open ChatGPT
+// Plugins" button (chatgpt.com/plugins) above step 1, and John's approved (2026-10-05) step-1 copy matching
+// today's Plugins screen. Spec: docs/kickoffs/v7.0.786-AGT-348-chatgpt-connect-steps.md.
 // DeepBench v7.0.785 | ConnectAgentPopup.jsx | AGT-348 slice 3 -- no change here; the Add-to-Claude link
 // now targets claude.ai/customize/connectors (src/lib/connectLinks.js). Spec: docs/kickoffs/v7.0.785-AGT-348-claude-link-customize.md.
 // DeepBench v7.0.784 | ConnectAgentPopup.jsx | AGT-348 slice 2 -- the Add-to-Claude note now says
@@ -50,15 +53,15 @@ export const CONNECT_TOOLS = [
   },
   {
     id: "chatgpt", label: "ChatGPT", subtitle: "ChatGPT",
-    step1Heading: "Once in a ChatGPT session:",
+    step1Heading: "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
     step1: [
-      "On the very left hand nav of the app, click the plugins icon.",
-      'On the top right "Add" button, click the drop down arrow.',
-      'Click "Create MCP app"',
-      'Choose a name you will recognize to activate your agent, i.e. "<first name> from DeepBench"',
-      { text: "Paste URL as Connection", copy: true },
-      'Change Authentication to "No Authentication"',
-      'Click "Create"',
+      'Open Plugins: the button above, or "Plugins" in the left sidebar',
+      'Top right: "Add" ▾ → "Create custom MCP server"',
+      'Name: one you will recognize, i.e. "<first name> from DeepBench"',
+      { text: 'Connection → "Server URL": paste this URL', copy: true },
+      'Authentication: change "OAuth" to "No Authentication"',
+      'Tick "I understand and want to continue"',
+      'Click "Create as a plugin"',
     ],
     step2: 'In a ChatGPT session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
     step3Heading: "You can turn your agent off by:",
@@ -67,6 +70,13 @@ export const CONNECT_TOOLS = [
       'Under "Installed", click the Agent name you created',
       'Change "Connected" to "Disconnect"',
     ],
+    // FEATURE: AGT-348 -- ChatGPT has no link to the create form or any pre-fill (measured by John,
+    // 2026-10-05); this only opens Plugins.
+    openLink: {
+      href: "https://chatgpt.com/plugins",
+      label: "Open ChatGPT Plugins",
+      note: "Opens ChatGPT's Plugins page in a new tab. Then follow the steps below.",
+    },
   },
 ];
 
@@ -212,6 +222,12 @@ export default function ConnectAgentPopup({ agent, address, onClose }) {
             <QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} />
             <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.quickAdd.note}</p>
             <p style={pStyle}>{tool.quickAdd.fallback}</p>
+          </>
+        )}
+        {tool.openLink && (
+          <>
+            <QuickAddLink href={tool.openLink.href} label={tool.openLink.label} />
+            <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.openLink.note}</p>
           </>
         )}
         <p style={pStyle}>{tool.step1Heading}</p>
