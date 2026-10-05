@@ -1780,7 +1780,7 @@ function ActivityTab({ agent, entries }) {
               {card.columns ? (
                 // FEATURE: AGT-350 — a table: header row first, four cells per row. On a phone the
                 // network name takes its own line and Type, Count, Last sit on the line under it.
-                <div style={{display:"grid",fontSize:11,gridTemplateColumns:isMobile ? "minmax(0,1fr) auto auto" : "minmax(0,1fr) auto auto auto"}}>
+                <div style={{display:"grid",fontSize:11,gridTemplateColumns:isMobile ? "minmax(0,1fr) auto auto" : "auto auto auto auto",justifyContent:isMobile ? "stretch" : "start"}}>
                   {[card.columns, ...card.rows].map((cells, r) => cells.map((cell, c) => (
                     <div key={`${r}-${c}`} style={{
                       padding:"4px 0",
@@ -1794,9 +1794,9 @@ function ActivityTab({ agent, entries }) {
                   )))}
                 </div>
               ) : card.rows.map(([k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
-                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
-                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
+                <div key={k} style={{display:"flex",gap:24,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0,minWidth:isMobile ? 0 : 170}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink}}>{v}</span>
                 </div>
               ))}
               {card.note && <div style={{...noteStyle,marginTop:8}}>{card.note}</div>}
