@@ -1,3 +1,5 @@
+// DeepBench v7.0.785 | ConnectAgentPopup.jsx | AGT-348 slice 3 -- no change here; the Add-to-Claude link
+// now targets claude.ai/customize/connectors (src/lib/connectLinks.js). Spec: docs/kickoffs/v7.0.785-AGT-348-claude-link-customize.md.
 // DeepBench v7.0.784 | ConnectAgentPopup.jsx | AGT-348 slice 2 -- the Add-to-Claude note now says
 // "click Continue" (claude.ai's dialog button). Spec: docs/kickoffs/v7.0.784-AGT-348-claude-link-direct.md.
 // DeepBench v7.0.779 | ConnectAgentPopup.jsx | AGT-348 -- the Claude pill gets a pre-filled
