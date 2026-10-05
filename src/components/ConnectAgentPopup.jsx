@@ -1,3 +1,7 @@
+// DeepBench v7.0.779 | ConnectAgentPopup.jsx | AGT-348 -- the Claude pill gets a pre-filled
+// Add-to-Claude link (claude.ai's Add custom connector dialog) above the eight manual
+// steps, which stay as the fallback; each team block gets its own. Spec:
+// docs/kickoffs/v7.0.779-AGT-348-add-to-claude-link.md.
 // DeepBench v7.0.773 | ConnectAgentPopup.jsx | AGT-338 slice 3 -- the popup offers the team address:
 // under the agent's own copy box, one block per team the agent is on (read from /api/agent-configs),
 // and one line under the ask sentence. Spec: docs/kickoffs/v7.0.773-AGT-338-connect-popup-team-address.md.
@@ -11,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { T, display, body, mono } from "../tokens.js";
 import { Corners } from "./SharedUI.jsx";
+import { claudeAddLink } from "../lib/connectLinks.js";
 
 // FEATURE: AGT-334 — John's copy (2026-10-03), verbatim. "<first name>" is filled at render.
 // A step1 entry { text, copy: true } renders its text, then the CopyBlock holding `address`.
@@ -31,6 +36,13 @@ export const CONNECT_TOOLS = [
     step2: 'In a Claude session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
     step3Heading: null,
     step3: ["You can turn off your agent by the same path: + → Connectors → switch off."],
+    // FEATURE: AGT-348 -- the one-click link, above step 1. Claude only: ChatGPT has no such link.
+    quickAdd: {
+      label: "Add <first name> to Claude",
+      name: "<first name> from DeepBench",
+      note: "Opens Claude's Add connector window with the name and URL already filled in. Check them, then click Add.",
+      fallback: "If the fields come up empty, or you'd rather set it up by hand:",
+    },
   },
   {
     id: "chatgpt", label: "ChatGPT", subtitle: "ChatGPT",
@@ -93,6 +105,16 @@ function CopyBlock({ text }) {
         border: `1px solid ${T.brass}`, padding: "8px 16px", cursor: "pointer",
       }}>{copied ? "Copied" : "Copy"}</button>
     </div>
+  );
+}
+
+// FEATURE: AGT-348 -- a link styled as CopyBlock's button; opens claude.ai in a new tab.
+function QuickAddLink({ href, label }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{
+      display: "inline-block", fontFamily: body, fontSize: 14, fontWeight: 600, color: T.navy,
+      background: T.brassLight, border: `1px solid ${T.brass}`, padding: "10px 18px", textDecoration: "none",
+    }}>{label}</a>
   );
 }
 
@@ -181,6 +203,13 @@ export default function ConnectAgentPopup({ agent, address, onClose }) {
 
         {/* The selected tool's steps — only these swap with the pill */}
         <h2 style={h2Style}>{tool.subtitle}</h2>
+        {tool.quickAdd && (
+          <>
+            <QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} />
+            <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.quickAdd.note}</p>
+            <p style={pStyle}>{tool.quickAdd.fallback}</p>
+          </>
+        )}
         <p style={pStyle}>{tool.step1Heading}</p>
         <ol style={olStyle}>
           {tool.step1.map((s, i) => (
@@ -196,6 +225,7 @@ export default function ConnectAgentPopup({ agent, address, onClose }) {
                         <strong>{CONNECT_SHARED.teamLead}</strong>{" "}{CONNECT_SHARED.teamBody.split("<team name>").join(t.name)}
                       </p>
                       <CopyBlock text={base + t.address} />
+                      {tool.quickAdd && <div style={{ marginTop: 8 }}><QuickAddLink href={claudeAddLink(`${t.name} from DeepBench`, base + t.address)} label={`Add ${t.name} to Claude`} /></div>}
                     </div>
                   ))}
                 </li>
