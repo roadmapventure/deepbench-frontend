@@ -1,3 +1,5 @@
+// DeepBench v7.0.784 | ConnectAgentPopup.jsx | AGT-348 slice 2 -- the Add-to-Claude note now says
+// "click Continue" (claude.ai's dialog button). Spec: docs/kickoffs/v7.0.784-AGT-348-claude-link-direct.md.
 // DeepBench v7.0.779 | ConnectAgentPopup.jsx | AGT-348 -- the Claude pill gets a pre-filled
 // Add-to-Claude link (claude.ai's Add custom connector dialog) above the eight manual
 // steps, which stay as the fallback; each team block gets its own. Spec:
@@ -40,7 +42,7 @@ export const CONNECT_TOOLS = [
     quickAdd: {
       label: "Add <first name> to Claude",
       name: "<first name> from DeepBench",
-      note: "Opens Claude's Add connector window with the name and URL already filled in. Check them, then click Add.",
+      note: "Opens Claude's Add connector window with the name and URL already filled in. Check them, then click Continue.",
       fallback: "If the fields come up empty, or you'd rather set it up by hand:",
     },
   },
