@@ -1,3 +1,4 @@
+// DeepBench v7.0.788 | PersonnelScreen.jsx | AGT-384 -- the badge's Connect button opens the Connect to AI page (/bench/connect?agent=<id>); the popup mount is gone and ?connect=1 redirects to the page
 // DeepBench v7.0.770 | PersonnelScreen.jsx | AGT-344 -- Training tab single home
 // DeepBench v7.0.769 | PersonnelScreen.jsx | AGT-350 -- the Activity tab's Connected from card is a four-column table
 // DeepBench v7.0.764 | PersonnelScreen.jsx | AGT-337 slice 3 -- an agent with no quip shows no empty quotation marks
@@ -13,7 +14,7 @@
 // DeepBench v6.2.16 | PersonnelScreen.jsx | PE-17 — mobile shell (merged persona header, tab bar) + Profile tab reflow
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
@@ -24,7 +25,6 @@ import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, J
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
 import { isPrivateAgent } from "../data/agents.js";
-import ConnectAgentPopup from "../components/ConnectAgentPopup.jsx";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { supabase } from "../lib/supabase.js";
@@ -1819,7 +1819,6 @@ export default function PersonnelScreen() {
   const agent       = agents.find(a => a.id === agentId) || agents[0];
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
-  const [connectOpen, setConnectOpen] = useState(searchParams.get("connect") === "1");
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
@@ -1875,6 +1874,11 @@ export default function PersonnelScreen() {
 
   // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
+
+  // FEATURE: AGT-384 — the old ?connect=1 link (and /connect, which lands on it) opens the Connect to
+  // AI page with this file's agent picked. The ROUTE's id, never agent.id: before the roster loads
+  // the fallback above would send a table-only agent's link to the wrong agent. Below every hook.
+  if (searchParams.get("connect") === "1") return <Navigate to={`/bench/connect?agent=${agentId}`} replace />;
 
   return (
     <AppShell toast={toast}>
@@ -1950,7 +1954,7 @@ export default function PersonnelScreen() {
                   "{agent.quip}"
                 </div>
                 )}
-                <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => setConnectOpen(true)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
+                <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   <div>
                     <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
@@ -2038,7 +2042,7 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => setConnectOpen(true)}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)}/>}
             {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
@@ -2054,8 +2058,6 @@ export default function PersonnelScreen() {
               />
             )}
             {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
-            {/* FEATURE: AGT-334 — the Connect popup; address built once here, AGT-338 adds a team address beside it */}
-            {connectOpen && isPrivateAgent(agent) && <ConnectAgentPopup agent={agent} address={`${window.location.origin}/api/mcp/${agent.id}`} onClose={() => setConnectOpen(false)}/>}
             {activeTab === "activity" && showActivity && <ActivityTab agent={agent} entries={entries}/>}
           </div>
 

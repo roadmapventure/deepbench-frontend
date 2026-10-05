@@ -1,3 +1,4 @@
+// DeepBench v7.0.788 | BenchNewScreen.jsx | AGT-384 -- the shared Bench nav sits beside the form (breadcrumb "Bench Home › Add a player"); a created agent lands on the roster under Private Agents
 // DeepBench v7.0.764 | BenchNewScreen.jsx | AGT-337 slice 3 -- the create screen
 // src/screens/BenchNewScreen.jsx
 // /bench/new: type a name, press the create button, land on the Bench with the new agent's card.
@@ -10,6 +11,7 @@ import { T, display, body, mono } from "../tokens.js";
 import { AppShell } from "../AppShell.jsx";
 import { supabase } from "../lib/supabase.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
+import { BenchNav, BenchNavChips } from "../components/BenchNav.jsx"; // FEATURE: AGT-384 — the shared Bench nav
 
 // The radio value that stands for the last row; a team's own id is every other value.
 const NEW_TEAM_CHOICE = "new-team";
@@ -71,7 +73,7 @@ export default function BenchNewScreen() {
     setFailed(false);
     try {
       const res = await fetch("/api/agent-configs", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action: "create_private_agent", name: trimmedName, team }) });
-      if (res.status === 201) { navigate("/bench"); return; }
+      if (res.status === 201) { navigate("/bench/roster?filter=private"); return; }
     } catch {
       // a rejected fetch is the same failure as a non-201
     }
@@ -91,7 +93,11 @@ export default function BenchNewScreen() {
 
   return (
     <AppShell headerProps={{ backLabel:"The Bench", onBack:()=>navigate("/bench") }}>
+      {/* FEATURE: AGT-384 — the Bench nav beside the form (desktop sidebar; breadcrumb + chips on mobile) */}
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+      <BenchNav current="Add a player"/>
       <div style={{flex:1,overflowY:"auto",background:T.paperDeep}}>
+        <BenchNavChips current="Add a player"/>
         <div style={{maxWidth:860,margin:"0 auto",padding:"40px 28px"}}>
 
           {/* Header */}
@@ -181,6 +187,7 @@ export default function BenchNewScreen() {
             )}
           </form>
         </div>
+      </div>
       </div>
     </AppShell>
   );

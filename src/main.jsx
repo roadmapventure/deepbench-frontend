@@ -1,3 +1,4 @@
+// DeepBench v7.0.788 | main.jsx | AGT-384 — /bench is Bench home (RosterScreen home); three routes added: /bench/roster, /bench/connect (ConnectAiScreen), /bench/test-ai (TestAiScreen).
 // DeepBench v7.0.104 | main.jsx | ADM-1 minimal v1 — /admin route added, mounts AdminScreen (hostname-gated dev-only via IS_ADMIN_HOST; a non-dev host visit redirects to /). Nav entry added in AppShell.
 // DeepBench v7.0.4 | main.jsx | LAV-1e — homepage flip: / serves LiveAgentViewScreen (transitional), Channel Intelligence moves to /channel-intelligence, /live-agent-view kept. WelcomeSplash untouched.
 // DeepBench v7.0.1 | main.jsx | LAV-1b — one route added: /live-agent-view (Live Agent View). No other change.
@@ -24,6 +25,8 @@ import PersonnelScreen        from "./screens/PersonnelScreen.jsx";
 import TeachScreen            from "./screens/TeachScreen.jsx";
 import TestTeamScreen         from "./screens/TestTeamScreen.jsx";
 import BenchNewScreen         from "./screens/BenchNewScreen.jsx";
+import ConnectAiScreen        from "./screens/ConnectAiScreen.jsx";      // FEATURE: AGT-384
+import TestAiScreen           from "./screens/TestAiScreen.jsx";         // FEATURE: AGT-384
 import MarketIntelligenceScreen from "./screens/MarketIntelligenceScreen.jsx";
 import LiveAgentViewScreen      from "./screens/LiveAgentViewScreen.jsx"; // FEATURE: LAV-1b
 import AdminScreen              from "./screens/AdminScreen.jsx";           // FEATURE: ADM-1 v1
@@ -49,7 +52,12 @@ createRoot(document.getElementById("root")).render(
               <Route path="/work/:taskId"              element={<TaskInstructionsScreen />} />
               <Route path="/work/:taskId/analyze"      element={<AnalyzerScreen />} />
               <Route path="/work/:taskId/fetch"        element={<FetchScreen />} />
-              <Route path="/bench"                     element={<RosterScreen />} />
+              {/* FEATURE: AGT-384 — /bench is Bench home; the roster, Connect to AI and Test AI get
+                  their own addresses, declared above /bench/:agentId. /bench/test is still Test My Team. */}
+              <Route path="/bench"                     element={<RosterScreen home />} />
+              <Route path="/bench/roster"              element={<RosterScreen />} />
+              <Route path="/bench/connect"             element={<ConnectAiScreen />} />
+              <Route path="/bench/test-ai"             element={<TestAiScreen />} />
               <Route path="/bench/new"                 element={<BenchNewScreen />} />
               <Route path="/bench/test"                element={<TestTeamScreen />} />
               <Route path="/bench/:agentId"            element={<PersonnelScreen />} />

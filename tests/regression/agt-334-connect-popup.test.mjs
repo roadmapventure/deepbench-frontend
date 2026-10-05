@@ -1,3 +1,11 @@
+// DeepBench v7.0.788 | tests/regression/agt-334-connect-popup.test.mjs | AGT-384 -- the popup is
+// retired: its steps are the ConnectSteps component (same file, same copy) on the Connect to AI page,
+// /bench/connect. Arm (a) keeps every EXPECTED_COPY string and the pill order but its one mechanic
+// is now the first-pill default (CONNECT_TOOLS[0].id) -- the modal animation, the close label and
+// the Escape key are gone (pinned absent by agt-384 arm d). Arm (d): PersonnelScreen no longer
+// imports the popup or builds an address; it carries the ?connect=1 redirect line to the page once,
+// each button label once and <BadgeActions twice. Arms (b), (c), (e) are unchanged. Red on the
+// pre-v7.0.788 tree: arm (d) finds the popup import and no redirect line.
 // DeepBench v7.0.787 | tests/regression/agt-334-connect-popup.test.mjs | AGT-348 slice 5 -- the
 // Connect popup gets a third pill, Grok (John measured grok.com 2026-10-05). EXPECTED_COPY carries the
 // Grok tool's id, label, step-1 heading, five steps, step 2 and step 3 verbatim; id: "chatgpt" must
@@ -95,7 +103,8 @@ const RETIRED_CHATGPT_COPY = [
   "On the very left hand nav of the app, click the plugins icon.",
 ];
 
-const POPUP_MECHANICS = ["hModalPopIn", 'aria-label="Close"', '"Escape"', "CONNECT_TOOLS[0].id"];
+// AGT-384: the modal shell is gone; the one mechanic left is the first-pill default.
+const POPUP_MECHANICS = ["CONNECT_TOOLS[0].id"];
 
 const FORBIDDEN = [
   /x-deepbench-mcp-key/i,
@@ -114,8 +123,9 @@ const count = (text, needle) => text.split(needle).length - 1;
 
 const POPUP_IMPORT = 'import ConnectAgentPopup from "../components/ConnectAgentPopup.jsx";';
 const AGENTS_IMPORT_RE = /import\s*\{[^}]*\bisPrivateAgent\b[^}]*\}\s*from\s*"\.\.\/data\/agents\.js";/;
-const CONNECT_PARAM = 'searchParams.get("connect") === "1"';
-const ADDRESS = "/api/mcp/${agent.id}";
+// AGT-384: ?connect=1 is honoured as a redirect to the Connect to AI page, keyed on the ROUTE's id.
+const CONNECT_REDIRECT = 'if (searchParams.get("connect") === "1") return <Navigate to={`/bench/connect?agent=${agentId}`} replace />;';
+const ADDRESS = "/api/mcp/";
 const ADD_TRAINING = ">+ Add Training<";
 const CONNECT_LABEL = "Connect ${firstName} to AI";
 const MOUNT = "<BadgeActions ";
@@ -123,10 +133,10 @@ const MOUNT = "<BadgeActions ";
 // Every arm-d failure, by name; [] is green.
 function personnelFailures(text) {
   const out = [];
-  if (!text.includes(POPUP_IMPORT)) out.push("ConnectAgentPopup import line");
+  if (text.includes(POPUP_IMPORT)) out.push("ConnectAgentPopup import line still present");
   if (!AGENTS_IMPORT_RE.test(text)) out.push("isPrivateAgent in the ../data/agents.js import");
-  if (!text.includes(CONNECT_PARAM)) out.push("the connect search param");
-  if (count(text, ADDRESS) !== 1) out.push(`address built ${count(text, ADDRESS)} times, want 1`);
+  if (count(text, CONNECT_REDIRECT) !== 1) out.push(`the ?connect=1 redirect line ${count(text, CONNECT_REDIRECT)} times, want 1`);
+  if (count(text, ADDRESS) !== 0) out.push(`address built ${count(text, ADDRESS)} times, want 0`);
   if (count(text, ADD_TRAINING) !== 1) out.push(`"+ Add Training" label ${count(text, ADD_TRAINING)} times, want 1`);
   if (count(text, CONNECT_LABEL) !== 1) out.push(`Connect label ${count(text, CONNECT_LABEL)} times, want 1`);
   if (count(text, MOUNT) !== 2) out.push(`<BadgeActions mounted ${count(text, MOUNT)} times, want 2`);
@@ -168,7 +178,9 @@ async function run() {
 
   // (d) PersonnelScreen, both directions
   const personnel = fs.readFileSync(PERSONNEL, "utf8");
-  assert.deepEqual(personnelFailures(personnel), [], "PersonnelScreen must import the popup, read ?connect=1, build the address once and mount BadgeActions twice");
+  assert.deepEqual(personnelFailures(personnel), [], "PersonnelScreen must not import the popup or build an address, must redirect ?connect=1 to the Connect to AI page and mount BadgeActions twice");
+  assert.deepEqual(personnelFailures(personnel.replace(CONNECT_REDIRECT, "")), ["the ?connect=1 redirect line 0 times, want 1"],
+    "CONTROL: PersonnelScreen without the redirect line must fail the redirect check, and only that");
   const lines = personnel.split("\n");
   const firstMount = lines.findIndex(l => l.includes(MOUNT));
   assert.ok(firstMount >= 0, "CONTROL: a <BadgeActions line must be found to be removed");

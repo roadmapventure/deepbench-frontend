@@ -1,3 +1,12 @@
+// DeepBench v7.0.788 | ConnectAgentPopup.jsx | AGT-384 -- the popup is retired; this file is now the
+// steps component, ConnectSteps, rendered by the Connect to AI page (src/screens/ConnectAiScreen.jsx,
+// /bench/connect). The overlay, the card, the dismiss button and its key handler are deleted; the
+// title, the pills and the per-tool steps are unchanged. "Teaching your agent" and "Comparison test"
+// are no longer rendered here: their copy stays in CONNECT_SHARED and the Test AI page
+// (src/screens/TestAiScreen.jsx) renders it. The steps end with one line linking to Test AI. A team
+// picked on the page arrives as { id, name, team: true }: its whole name fills the copy and no
+// team block is read for it. The file keeps its name because two other tests pin this path; the
+// rename to ConnectSteps.jsx is a follow-up. Spec: docs/kickoffs/v7.0.788-AGT-384-bench-home.md.
 // DeepBench v7.0.787 | ConnectAgentPopup.jsx | AGT-348 slice 5 -- a third pill, Grok: an "Open Grok
 // Connectors" button (grok.com/connectors) and John's step copy measured on grok.com 2026-10-05.
 // Spec: docs/kickoffs/v7.0.787-AGT-348-grok-connect-tab.md.
@@ -23,8 +32,8 @@
 // card, ✕ and Escape; CopyBlock = ConnectScreen.jsx's (slice 2 deletes the original).
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
-import { Corners } from "./SharedUI.jsx";
 import { claudeAddLink } from "../lib/connectLinks.js";
 
 // FEATURE: AGT-334 — John's copy (2026-10-03), verbatim. "<first name>" is filled at render.
@@ -117,12 +126,14 @@ export const CONNECT_SHARED = {
   teamLead: "Or connect your whole team at once.",
   teamBody: "Paste this URL instead and every agent in <team name> is available, including agents you add later.",
   teamStep: "With a team connection, name the agent you want in your question.",
+  nextTest: "Connected? Next: Test AI →",
 };
 
-const h2Style = { fontFamily: display, fontSize: 20, fontWeight: 700, color: T.navy, margin: "32px 0 8px" };
-const pStyle = { fontFamily: body, fontSize: 14, color: T.ink, lineHeight: 1.65, margin: "0 0 8px" };
-const olStyle = { fontFamily: body, fontSize: 14, color: T.ink, lineHeight: 1.65, paddingLeft: 22, margin: 0 };
-const liStyle = { marginBottom: 16 };
+// FEATURE: AGT-384 -- exported: the Connect to AI and Test AI pages set their text in the same styles.
+export const h2Style = { fontFamily: display, fontSize: 20, fontWeight: 700, color: T.navy, margin: "32px 0 8px" };
+export const pStyle = { fontFamily: body, fontSize: 14, color: T.ink, lineHeight: 1.65, margin: "0 0 8px" };
+export const olStyle = { fontFamily: body, fontSize: 14, color: T.ink, lineHeight: 1.65, paddingLeft: 22, margin: 0 };
+export const liStyle = { marginBottom: 16 };
 
 function CopyBlock({ text }) {
   const [copied, setCopied] = useState(false);
@@ -156,18 +167,16 @@ function QuickAddLink({ href, label }) {
   );
 }
 
-export default function ConnectAgentPopup({ agent, address, onClose }) {
+// FEATURE: AGT-384 -- the steps for one picked agent (or one picked team), on the Connect to AI page.
+export default function ConnectSteps({ agent, address }) {
+  const navigate = useNavigate();
   const [toolId, setToolId] = useState(CONNECT_TOOLS[0].id);
   const [teams, setTeams] = useState([]);
 
-  useEffect(() => {
-    const onKey = e => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   // FEATURE: AGT-338 -- the teams this agent is on. No team, a slow or a failed read: no block.
+  // FEATURE: AGT-384 -- a picked team has no teams of its own to offer.
   useEffect(() => {
+    if (agent.team) return;
     let live = true;
     fetch(`/api/agent-configs?agent_id=${encodeURIComponent(agent.id)}&teams=1`)
       .then(r => (r.ok ? r.json() : null))
@@ -177,127 +186,90 @@ export default function ConnectAgentPopup({ agent, address, onClose }) {
   }, [agent.id]);
   const base = address.slice(0, address.lastIndexOf("/") + 1); // origin + /api/mcp/
 
-  const fill = s => s.split("<first name>").join(agent.name.split(" ")[0]);
+  const first = agent.team ? agent.name : agent.name.split(" ")[0];
+  const fill = s => s.split("<first name>").join(first);
   const tool = CONNECT_TOOLS.find(t => t.id === toolId) || CONNECT_TOOLS[0];
 
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 3000,
-        background: `${T.navyDeep}73`,
-        animation: "hModalFadeIn 0.18s ease",
-      }}
-    >
-      <div
-        style={{
-          position: "fixed", top: "50%", left: "50%",
-          transform: "translate(-50%,-50%)",
-          animation: "hModalPopIn 0.22s ease",
-          width: "calc(100% - 32px)", maxWidth: 640,
-          maxHeight: "calc(100% - 32px)", overflowY: "auto",
-          background: T.paperDeep, border: `1px solid ${T.line}`,
-          padding: "28px 32px",
-        }}
-      >
-        <Corners />
-        {/* Dismiss — ✕ */}
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          style={{
-            position: "absolute", top: 10, right: 12,
-            background: "transparent", border: "none", cursor: "pointer",
-            fontFamily: body, fontSize: 18, lineHeight: 1, color: T.muted, padding: 4,
-          }}
-        >
-          ✕
-        </button>
-
-        {/* Title */}
-        <div style={{ fontFamily: display, fontSize: 21, fontWeight: 600, color: T.navy, lineHeight: 1.25 }}>
-          {fill(CONNECT_SHARED.title)}
-        </div>
-
-        {/* Tool pills */}
-        <div style={{ display: "flex", gap: 6, marginTop: 14, borderBottom: `1px solid ${T.line}` }}>
-          {CONNECT_TOOLS.map(t => {
-            const isActive = t.id === tool.id;
-            return (
-              <button key={t.id} onClick={() => setToolId(t.id)} style={{
-                padding: "8px 14px",
-                fontFamily: body, fontSize: 12,
-                fontWeight: isActive ? 600 : 400,
-                color: isActive ? T.navy : T.mutedDeep,
-                background: isActive ? `${T.brass}24` : "transparent",
-                border: "none",
-                borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
-                cursor: "pointer",
-              }}>
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* The selected tool's steps — only these swap with the pill */}
-        <h2 style={h2Style}>{tool.subtitle}</h2>
-        {tool.quickAdd && (
-          <>
-            <QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} />
-            <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.quickAdd.note}</p>
-            <p style={pStyle}>{tool.quickAdd.fallback}</p>
-          </>
-        )}
-        {tool.openLink && (
-          <>
-            <QuickAddLink href={tool.openLink.href} label={tool.openLink.label} />
-            <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.openLink.note}</p>
-          </>
-        )}
-        <p style={pStyle}>{tool.step1Heading}</p>
-        <ol style={olStyle}>
-          {tool.step1.map((s, i) => (
-            typeof s === "string"
-              ? <li key={i} style={liStyle}>{fill(s)}</li>
-              : (
-                <li key={i} style={liStyle}>
-                  {fill(s.text)}
-                  {s.copy && <CopyBlock text={address} />}
-                  {s.copy && teams.map(t => (
-                    <div key={t.address}>
-                      <p style={{ ...pStyle, margin: "16px 0 0" }}>
-                        <strong>{CONNECT_SHARED.teamLead}</strong>{" "}{CONNECT_SHARED.teamBody.split("<team name>").join(t.name)}
-                      </p>
-                      <CopyBlock text={base + t.address} />
-                      {tool.quickAdd && <div style={{ marginTop: 8 }}><QuickAddLink href={claudeAddLink(`${t.name} from DeepBench`, base + t.address)} label={`Add ${t.name} to Claude`} /></div>}
-                    </div>
-                  ))}
-                </li>
-              )
-          ))}
-        </ol>
-        <p style={pStyle}>{fill(tool.step2)}</p>
-        <p style={pStyle}>{CONNECT_SHARED.teamStep}</p>
-        {tool.step3Heading === null ? (
-          <p style={pStyle}>{fill(tool.step3[0])}</p>
-        ) : (
-          <>
-            <p style={pStyle}>{tool.step3Heading}</p>
-            <ol style={olStyle}>
-              {tool.step3.map((s, i) => <li key={i} style={liStyle}>{fill(s)}</li>)}
-            </ol>
-          </>
-        )}
-
-        {/* Shared */}
-        <h2 style={h2Style}>{CONNECT_SHARED.teachingHeading}</h2>
-        <p style={pStyle}>{CONNECT_SHARED.teachingBody}</p>
-
-        <h2 style={h2Style}>{CONNECT_SHARED.comparisonHeading}</h2>
-        <ol style={olStyle}>
-          {CONNECT_SHARED.comparisonSteps.map((s, i) => <li key={i} style={liStyle}>{s}</li>)}
-        </ol>
+    <div>
+      {/* Title */}
+      <div style={{ fontFamily: display, fontSize: 21, fontWeight: 600, color: T.navy, lineHeight: 1.25 }}>
+        {fill(CONNECT_SHARED.title)}
       </div>
+
+      {/* Tool pills */}
+      <div style={{ display: "flex", gap: 6, marginTop: 14, borderBottom: `1px solid ${T.line}` }}>
+        {CONNECT_TOOLS.map(t => {
+          const isActive = t.id === tool.id;
+          return (
+            <button key={t.id} onClick={() => setToolId(t.id)} style={{
+              padding: "8px 14px",
+              fontFamily: body, fontSize: 12,
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? T.navy : T.mutedDeep,
+              background: isActive ? `${T.brass}24` : "transparent",
+              border: "none",
+              borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+              cursor: "pointer",
+            }}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* The selected tool's steps — only these swap with the pill */}
+      <h2 style={h2Style}>{tool.subtitle}</h2>
+      {tool.quickAdd && (
+        <>
+          <QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} />
+          <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.quickAdd.note}</p>
+          <p style={pStyle}>{tool.quickAdd.fallback}</p>
+        </>
+      )}
+      {tool.openLink && (
+        <>
+          <QuickAddLink href={tool.openLink.href} label={tool.openLink.label} />
+          <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.openLink.note}</p>
+        </>
+      )}
+      <p style={pStyle}>{tool.step1Heading}</p>
+      <ol style={olStyle}>
+        {tool.step1.map((s, i) => (
+          typeof s === "string"
+            ? <li key={i} style={liStyle}>{fill(s)}</li>
+            : (
+              <li key={i} style={liStyle}>
+                {fill(s.text)}
+                {s.copy && <CopyBlock text={address} />}
+                {s.copy && teams.map(t => (
+                  <div key={t.address}>
+                    <p style={{ ...pStyle, margin: "16px 0 0" }}>
+                      <strong>{CONNECT_SHARED.teamLead}</strong>{" "}{CONNECT_SHARED.teamBody.split("<team name>").join(t.name)}
+                    </p>
+                    <CopyBlock text={base + t.address} />
+                    {tool.quickAdd && <div style={{ marginTop: 8 }}><QuickAddLink href={claudeAddLink(`${t.name} from DeepBench`, base + t.address)} label={`Add ${t.name} to Claude`} /></div>}
+                  </div>
+                ))}
+              </li>
+            )
+        ))}
+      </ol>
+      <p style={pStyle}>{fill(tool.step2)}</p>
+      <p style={pStyle}>{CONNECT_SHARED.teamStep}</p>
+      {tool.step3Heading === null ? (
+        <p style={pStyle}>{fill(tool.step3[0])}</p>
+      ) : (
+        <>
+          <p style={pStyle}>{tool.step3Heading}</p>
+          <ol style={olStyle}>
+            {tool.step3.map((s, i) => <li key={i} style={liStyle}>{fill(s)}</li>)}
+          </ol>
+        </>
+      )}
+
+      {/* FEATURE: AGT-384 -- the testing wording lives on its own page now; one line points there */}
+      <p style={{ ...pStyle, marginTop: 24 }}><a href="/bench/test-ai" onClick={e => { e.preventDefault(); navigate("/bench/test-ai"); }} style={{ color: T.brassDeep, fontWeight: 600, textDecoration: "none" }}>{CONNECT_SHARED.nextTest}</a></p>
     </div>
   );
 }
