@@ -1,3 +1,4 @@
+// DeepBench v7.0.782 | tests/regression/agt-226-kickoff-anchors.test.mjs | AGT-304 slice 5 -- the anchors of a kickoff are graded at the tree it shipped on, and a commit this checkout cannot reach is NOT RUN.
 // DeepBench v7.0.670 | tests/regression/agt-226-kickoff-anchors.test.mjs | AGT-226 -- a kickoff
 // DECLARES the exact literals its build will act on, and `--check-kickoff` RESOLVES them against
 // the tree the build is about to start from.
@@ -68,7 +69,7 @@ import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
-import { selfRun } from "./_lib/self-run.js";
+import { selfRun, notRun } from "./_lib/self-run.js";
 import { ANCHOR_CLAUSE, anchorBlockLines, kickoffAnchorFinding } from "../../scripts/verifier.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -81,6 +82,11 @@ const NO_LANES_KICKOFF = "docs/kickoffs/v7.0.448-SES-368-weekly-pace-gate.md";
 // file lists: the tree at a merged commit does not move under a later session.
 const AGT_147_PARENT = "fe2a3479";
 const AGT_147_FILE = "docs/runbooks/runner-cycle.md";
+
+// The v7.0.670 build commit -- the tree THIS ticket's own kickoff shipped on, which is where its
+// anchor counts are true. Grading them at HEAD measures later sessions' edits, not this ship.
+const AGT_226_SHIP = "837a8a5a";
+const SHALLOW = rev => `commit ${rev} is unreachable in this checkout (a shallow clone; CI clones at depth 1, SES-393)`;
 
 // AGT-147's three section-4 literals, each declared (as that kickoff declared them) as one file of
 // runner-cycle.md. Their presence in THIS file is deliberate and harmless: arm (A) resolves them at
@@ -122,6 +128,11 @@ function gitResolve(rev = null, { excludes = true } = {}) {
   };
 }
 
+// AGT-304 slice 5: a commit this checkout cannot see is UNKNOWN, never a failure. CI clones at
+// depth 1 (SES-393), so the two fixed commits below are absent there and the arms that need them
+// declare themselves NOT RUN rather than crashing on a null resolver.
+const reachable = rev => spawnSync("git", ["-C", ROOT, "cat-file", "-e", `${rev}^{commit}`]).status === 0;
+
 function anchorsDoc(lines) {
   return `# fixture\n\n\`\`\`${ANCHOR_CLAUSE}\n${lines.join("\n")}\n\`\`\`\n`;
 }
@@ -142,6 +153,10 @@ function runVerifier(kickoffPath, { json = true, env = envWithoutCredentials() }
 
 export default async function run() {
   // == (A) the failure that happened, replayed at fe2a3479 =======================================
+  if (!reachable(AGT_147_PARENT)) {
+    notRun("arm (A) at the commit AGT-147's build started from",
+      SHALLOW(AGT_147_PARENT) + "; the HEAD half below still ran");
+  } else {
   const at147 = gitResolve(AGT_147_PARENT);
 
   // Every anchor measured on its own first, so the arm states each literal's real fate rather than
@@ -193,6 +208,7 @@ export default async function run() {
     `got: ${block147.reason}`);
   assert.strictEqual(out147.graded, 1,
     `the note must say how many anchors were graded before the refusal (1 of 3 here). got ${out147.graded}`);
+  }
 
   // At HEAD all three are gone from the file AGT-147 named, so all three refuse. Only the verdict
   // is asserted: this test file itself now holds these literals, so the counts at HEAD move with it.
@@ -216,14 +232,19 @@ export default async function run() {
     ["scripts/verifier.js", "docs/STANDARDS.md", "CLAUDE-DESIGN.md"],
     `${OWN_KICKOFF}'s anchors name verifier.js, STANDARDS.md and CLAUDE-DESIGN.md in that order`);
 
+  const atShip = reachable(AGT_226_SHIP) ? gitResolve(AGT_226_SHIP) : null;
+  if (!atShip) {
+    notRun("arms (B) and (E) at the tree this ticket shipped on",
+      SHALLOW(AGT_226_SHIP) + "; the parse, mutation-text, (C), (D) and (F) arms still ran");
+  } else {
   const ownOut = {};
-  assert.strictEqual(kickoffAnchorFinding(ownText, atHead, ownOut), null,
+  assert.strictEqual(kickoffAnchorFinding(ownText, atShip, ownOut), null,
     "this ticket's own kickoff must resolve clean against the tree it shipped on -- the ticket " +
     "that makes kickoffs declare their anchors cannot be the ticket whose anchors do not resolve");
   assert.strictEqual(ownOut.graded, 3, `all three anchors graded. got ${ownOut.graded}`);
   assert.ok(/anchors graded \(AGT-226\)/.test(ownOut.note), `the green's note says so. got ${ownOut.note}`);
 
-  const thirdFiles = atHead(own[2].literal).files.slice().sort();
+  const thirdFiles = atShip(own[2].literal).files.slice().sort();
   assert.deepStrictEqual(thirdFiles,
     ["CLAUDE-DESIGN.md", "docs/STANDARDS.md", "tests/regression/ses-359-lane-declaration.test.mjs"],
     `the SES-359 lane wording lives in exactly three tracked files. A fourth home is a real change: ` +
@@ -232,7 +253,7 @@ export default async function run() {
   // AGT-169's defect, as a mutation: declare 2 where the tree holds 3.
   const mutated = ownText.replace(own[2].raw, own[2].raw.replace(/\|\s*3\s*\|/, "| 2 |"));
   assert.notStrictEqual(mutated, ownText, "the mutation must actually change the kickoff text");
-  const mutFinding = kickoffAnchorFinding(mutated, atHead);
+  const mutFinding = kickoffAnchorFinding(mutated, atShip);
   assert.ok(mutFinding, "declaring 2 files where the tree holds 3 must REFUSE -- the count is the " +
     "half of an anchor that goes wrong silently, and AGT-169 shipped 5 files against a kickoff " +
     "naming 2 for exactly this reason");
@@ -243,6 +264,7 @@ export default async function run() {
     assert.ok(mutFinding.reason.includes(f),
       `the refusal must list EVERY file found, so the Designer can re-declare without re-running ` +
       `the grep. ${f} is missing from: ${mutFinding.reason}`);
+  }
   }
 
   // == (C) fail-open, in three directions ========================================================
@@ -295,15 +317,10 @@ export default async function run() {
     "and its green carries the not-graded note");
 
   // == (D) the seam: the branch runs ahead of the credential check ===============================
-  const ownRun = runVerifier(OWN_KICKOFF);
-  assert.strictEqual(ownRun.status, 0,
-    `--check-kickoff on ${OWN_KICKOFF} must exit 0 with NO credentials in the child env. A 2 means ` +
-    `the credential check ran first and nothing was measured. got ${ownRun.status}: ${ownRun.output.trim()}`);
-  const ownPayload = JSON.parse(ownRun.output.trim());
-  assert.strictEqual(ownPayload.anchors_graded, 3,
-    `the seam must grade all three anchors without credentials -- this clause needs git, never the ` +
-    `board. got: ${ownRun.output.trim()}`);
-  assert.strictEqual(ownPayload.anchors_declared, 3);
+  const greenCount = atHead(CHECKLIST_LINE).files.length;
+  assert.ok(greenCount >= 1,
+    `the seam's green fixture is measured at HEAD, so the checklist line must live in at least one ` +
+    `tracked file. got ${greenCount}`);
 
   // A fixture whose literal is assembled at runtime, so this source file cannot hold it and the
   // grep is guaranteed to find nothing -- the `files.length === 0` branch, end to end.
@@ -311,11 +328,20 @@ export default async function run() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agt226-"));
   const fixture = path.join(tmpDir, "fixture-kickoff.md");
   let fixtureRun;
+  let ownRun;
   try {
     fs.writeFileSync(fixture,
       `# fixture\n\n- **Lanes:** \`session\` | \`executor\` none ($0) | \`none\`.\n\n` +
       `\`\`\`${ANCHOR_CLAUSE}\nscripts/verifier.js | 1 | ${absent}\n\`\`\`\n`);
     fixtureRun = runVerifier(fixture);
+
+    // The green half of the same seam, on a fixture whose ONE anchor count is measured at HEAD --
+    // never on this ticket's own kickoff, whose counts are true at the tree it shipped on (AGT-304
+    // slice 5). Same Lanes line, so the only thing under test is the anchors branch.
+    fs.writeFileSync(fixture,
+      `# fixture\n\n- **Lanes:** \`session\` | \`executor\` none ($0) | \`none\`.\n\n` +
+      `\`\`\`${ANCHOR_CLAUSE}\ndocs/STANDARDS.md | ${greenCount} | ${CHECKLIST_LINE}\n\`\`\`\n`);
+    ownRun = runVerifier(fixture);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -337,6 +363,15 @@ export default async function run() {
   assert.ok(fixturePayload.reason.includes("AGT-226") && fixturePayload.reason.includes(absent),
     `the reason names the ticket and the anchor line. got: ${fixturePayload.reason}`);
 
+  assert.strictEqual(ownRun.status, 0,
+    `--check-kickoff on a one-anchor fixture must exit 0 with NO credentials in the child env. A 2 ` +
+    `means the credential check ran first and nothing was measured. got ${ownRun.status}: ${ownRun.output.trim()}`);
+  const ownPayload = JSON.parse(ownRun.output.trim());
+  assert.strictEqual(ownPayload.anchors_graded, 1,
+    `the seam must grade the anchor without credentials -- this clause needs git, never the ` +
+    `board. got: ${ownRun.output.trim()}`);
+  assert.strictEqual(ownPayload.anchors_declared, 1);
+
   // == (E) the exclusions are load-bearing =======================================================
   const tracked = spawnSync("git", ["-C", ROOT, "ls-files", "--error-unmatch", OWN_KICKOFF],
     { encoding: "utf8" });
@@ -344,10 +379,11 @@ export default async function run() {
     `${OWN_KICKOFF} must be COMMITTED for this arm to mean anything -- runbook step 6 commits the ` +
     `kickoff before the build runs, which is the whole reason the excludes exist`);
 
-  const bare = gitResolve(null, { excludes: false });
   let extrasSeen = 0;
+  if (atShip) {
+  const bare = gitResolve(AGT_226_SHIP, { excludes: false });
   for (const a of own) {
-    const withExcludes = atHead(a.literal).files.slice().sort();
+    const withExcludes = atShip(a.literal).files.slice().sort();
     const without = bare(a.literal).files.slice().sort();
     assert.deepStrictEqual(withExcludes.length, a.declared,
       `anchor \`${a.path}\` must resolve to its declared ${a.declared} file(s) WITH the excludes -- ` +
@@ -369,6 +405,7 @@ export default async function run() {
   }
   assert.ok(extrasSeen >= own.length,
     `the excludes must remove at least one file per anchor. got ${extrasSeen} across ${own.length}`);
+  }
 
   // == (F) one wording, two homes, asserted as bytes =============================================
   const seen = [];

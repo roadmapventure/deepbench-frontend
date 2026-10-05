@@ -1,3 +1,4 @@
+// DeepBench v7.0.782 | tests/regression/agt-135-john-rulings.test.mjs | AGT-304 slice 5 -- C3 pins the kinds this ship wrote (rule, agent-row); settle-ship's later ticket-status row is not one of them.
 // DeepBench v7.0.603 | tests/regression/agt-135-john-rulings.test.mjs | AGT-135
 //
 // FEATURE: AGT-135 -- John's rulings of 2026-09-25 stop living in an attended session's memory
@@ -235,8 +236,8 @@ async function run() {
   );
 
   // C3 -- the ledger: two unreversed decisions, 7 NULL-row_data images and 3 full-row images.
-  const decisions = await get("runner_decisions?backlog_id=eq.AGT-135&select=id,kind,reversed_at,cycle_id");
-  assert.equal(decisions.length, 2, `AGT-135 must hold exactly two decisions; got ${decisions.length}`);
+  const decisions = await get("runner_decisions?backlog_id=eq.AGT-135&kind=in.(rule,agent-row)&select=id,kind,reversed_at,cycle_id");
+  assert.equal(decisions.length, 2, `AGT-135 must hold exactly two decisions of the kinds this ship wrote (rule, agent-row); got ${decisions.length}`);
   assert.deepEqual(decisions.map(d => d.kind).sort(), ["agent-row", "rule"], "the two decision kinds");
   assert.deepEqual(decisions.map(d => d.reversed_at), [null, null], "both decisions must be unreversed");
   for (const d of decisions) {
