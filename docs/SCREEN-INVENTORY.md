@@ -49,7 +49,7 @@ More dashboards expected here over time as new work-types are built — this lis
 | Screen | Route | Component | Children | Notes |
 |---|---|---|---|---|
 | Bench Home | `/bench` | `RosterScreen.jsx` (`home`) | Agent Roster, Connect to AI, Test AI, Add Agent | Since v7.0.788 (`AGT-384`) Bench opens here: masthead, stats bar, four next-step cards. Shares `BenchNav.jsx` (breadcrumb + filters) with the screens below. |
-| Connect to AI | `/bench/connect` | `ConnectAiScreen.jsx` | — | `AGT-384`: the former Connect popup as a page with a Which-agent picker (`?agent=`); `/connect` and `?connect=1` redirect here. |
+| Connect to AI | `/bench/connect` | `ConnectAiScreen.jsx` | — | `AGT-384`: the former Connect popup as a page; `/connect` and `?connect=1` redirect here. Since v7.0.789 (`AGT-385`) it is agent cards (`?agent=`), then a tool tab (none pre-selected), then closed FAQ drawers. |
 | Test AI | `/bench/test-ai` | `TestAiScreen.jsx` | — | `AGT-384`: informational — Teaching your agent + Comparison test. Not Test My Team (`/bench/test`). |
 | Agent Roster | `/bench/roster` (was `/bench` until v7.0.788) | `RosterScreen.jsx` | Add Agent, Personnel File | "Bench" is the Product Focus Area/nav-tab name (locked, `RO-12`); "Agent Roster" is this specific screen's name (the on-screen headline) — both correct, different levels. |
 | Add Agent | `/bench/new` | `BenchNewScreen.jsx` | — | Always a child of Agent Roster. |
