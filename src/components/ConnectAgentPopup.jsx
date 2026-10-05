@@ -2,7 +2,9 @@
 // three tabs with no tab picked; a picked tab shows its link first (Claude: the one-click add link and its note;
 // ChatGPT / Grok: the open link, then the steps, shown open), then John's question drawers, all
 // closed. The link is a text link now, not a button. Copy: docs/harvests/AGT-385.md, verbatim.
-// Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
+// Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md. Round 2 (John, 2026-10-05; harvest
+// "Round 2"): Claude's first line is a plain lead-in then the link; the turn-off text moves to its own
+// drawer, second in order, on every tab; the talk sentence asks for the agent by name.
 // DeepBench v7.0.788 | ConnectAgentPopup.jsx | AGT-384 -- the popup is retired; this file is now the
 // steps component, ConnectSteps, rendered by the Connect to AI page (src/screens/ConnectAiScreen.jsx,
 // /bench/connect). The overlay, the card, the dismiss button and its key handler are deleted; the
@@ -56,13 +58,15 @@ export const CONNECT_TOOLS = [
       "Keep other defaults",
       "Save",
     ],
-    step2: "In a Claude session, simply ask for your agent to answer a question.",
+    step2: "In a Claude session, simply ask for your agent by name to answer a question.",
     step3Heading: null,
     step3: ["You can turn off your agent by the same path: + → Connectors → switch off."],
     // FEATURE: AGT-348 -- the one-click link, above step 1. Claude only: ChatGPT has no such link.
     // FEATURE: AGT-385 -- John's link and note lines; the fallback is the manual drawer's title.
+    // Round 2: the lead-in is plain text; only the label after the colon is the link.
     quickAdd: {
-      label: "1. Click to add <first name> to Claude",
+      lead: "For Claude, simply click: ",
+      label: "add <first name> to Claude",
       name: "<first name> from DeepBench",
       note: "2. Make sure the Connector window has the name and URL already filled in. Click Continue.",
       fallback: "I can't get the connection link to work",
@@ -80,7 +84,7 @@ export const CONNECT_TOOLS = [
       'Tick "I understand and want to continue"',
       'Click "Create as a plugin"',
     ],
-    step2: "In a ChatGPT session, simply ask for your agent to answer a question.",
+    step2: "In a ChatGPT session, simply ask for your agent by name to answer a question.",
     step3Heading: "You can turn your agent off by:",
     step3: [
       "Clicking on plugins on the left hand nav",
@@ -104,7 +108,7 @@ export const CONNECT_TOOLS = [
       { text: 'Server URL: paste this URL', copy: true },
       'Click "Add Connector"',
     ],
-    step2: "In a Grok chat, simply ask for your agent to answer a question.",
+    step2: "In a Grok chat, simply ask for your agent by name to answer a question.",
     step3Heading: null,
     step3: ['You can turn your agent off from a Grok chat: "+" → "Connectors" → switch it off.'],
     // FEATURE: AGT-348 -- grok.com/connectors measured by John 2026-10-05; Grok's create form has no
@@ -133,6 +137,7 @@ export const CONNECT_SHARED = {
   followSteps: "2. Follow these steps:",
   faqHeading: "FAQ",
   expectTitle: "What to expect after connection",
+  disconnectTitle: "How to disconnect my agent",
   talkTitle: "How do I talk to my agent?",
   testTitle: "How do I test my agent?",
   expectBody: 'Once connected, your first <tool> session will ask your permission. Simply click "Always Allow".',
@@ -227,11 +232,15 @@ function TalkBody({ tool, fill, agent }) {
   );
 }
 
-// What happens once connected: the first-session sentence, then the tool's turn-off text.
-function ExpectBody({ tool, fill }) {
+// What happens once connected: the first-session sentence only (round 2).
+function ExpectBody({ tool }) {
+  return <p style={pStyle}>{CONNECT_SHARED.expectBody.split("<tool>").join(tool.label)}</p>;
+}
+
+// How to disconnect: the tool's own turn-off text (round 2: moved out of the expect drawer).
+function DisconnectBody({ tool, fill }) {
   return (
     <>
-      <p style={pStyle}>{CONNECT_SHARED.expectBody.split("<tool>").join(tool.label)}</p>
       {tool.step3Heading === null ? (
         <p style={pStyle}>{fill(tool.step3[0])}</p>
       ) : (
@@ -300,7 +309,7 @@ export default function ConnectSteps({ agent, address }) {
         <div style={{ marginTop: 16 }}>
           {tool.quickAdd && (
             <>
-              <QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} />
+              <p style={pStyle}>{tool.quickAdd.lead}<QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} /></p>
               <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.quickAdd.note}</p>
             </>
           )}
@@ -314,7 +323,8 @@ export default function ConnectSteps({ agent, address }) {
 
           {/* John's questions, every drawer closed; the manual steps last, Claude only */}
           <h2 style={h2Style}>{CONNECT_SHARED.faqHeading}</h2>
-          <Drawer title={CONNECT_SHARED.expectTitle}><ExpectBody tool={tool} fill={fill} /></Drawer>
+          <Drawer title={CONNECT_SHARED.expectTitle}><ExpectBody tool={tool} /></Drawer>
+          <Drawer title={CONNECT_SHARED.disconnectTitle}><DisconnectBody tool={tool} fill={fill} /></Drawer>
           <Drawer title={CONNECT_SHARED.talkTitle}><TalkBody tool={tool} fill={fill} agent={agent} /></Drawer>
           <Drawer title={CONNECT_SHARED.testTitle}>
             <p style={pStyle}><strong>{CONNECT_SHARED.comparisonHeading}</strong></p>

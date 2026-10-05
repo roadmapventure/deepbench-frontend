@@ -1,3 +1,7 @@
+// DeepBench v7.0.789 | tests/regression/agt-385-connect-cards-faq.test.mjs | AGT-385 round 2 -- arm (b)
+// also pins John's three changes (docs/harvests/AGT-385.md "Round 2"): the plain "For Claude, simply
+// click: " lead-in before an "add <first name> to Claude" link, a fifth drawer "How to disconnect my
+// agent" second in order, and "by name" in the three talk sentences. Red on the round-1 tree (d3edb27a).
 // DeepBench v7.0.789 | tests/regression/agt-385-connect-cards-faq.test.mjs | AGT-385 -- the Connect to AI
 // page: agent cards instead of radio rows, "Select your AI tool" with no tab pre-picked, the one-click /
 // open link first, and the question drawers under one heading.
@@ -69,8 +73,14 @@ function armA() {
 
 // ── (b) the steps: link first, then the question drawers ───────────────────────────────────────
 const APPROVED_COPY = [
-  "1. Click to add <first name> to Claude",
+  // Round 2 (John, 2026-10-05): plain lead-in text, then a link of only the words after the colon.
+  "For Claude, simply click: ",
+  "add <first name> to Claude",
   "2. Make sure the Connector window has the name and URL already filled in. Click Continue.",
+  "How to disconnect my agent",
+  "In a Claude session, simply ask for your agent by name to answer a question.",
+  "In a ChatGPT session, simply ask for your agent by name to answer a question.",
+  "In a Grok chat, simply ask for your agent by name to answer a question.",
   "1. Click to open ChatGPT Plugins",
   "1. Click to open Grok Connectors",
   "2. Follow these steps:",
@@ -82,16 +92,19 @@ const APPROVED_COPY = [
   "I can't get the connection link to work",
   'Once connected, your first <tool> session will ask your permission. Simply click "Always Allow".',
 ];
-const DRAWER_ORDER = ["expectTitle}", "talkTitle}", "testTitle}", "quickAdd.fallback}"];
+const DRAWER_ORDER = ["expectTitle}", "disconnectTitle}", "talkTitle}", "testTitle}", "quickAdd.fallback}"];
 const B_WANTS = [
   ...APPROVED_COPY.map(s => [s, 1]),
+  // Round 2: the old link wording is gone, and the lead-in sits outside the link, right before it.
+  ["Click to add <first name> to Claude", 0],
+  ["{tool.quickAdd.lead}<QuickAddLink ", 1],
   ["useState(null)", 1],
   ["useState(CONNECT_TOOLS[0].id)", 0],
   ["nextTest", 0],
   ["{tool.subtitle}", 0],
   ["<details", 1],
   ["<details open", 0],
-  ["<Drawer title=", 4],
+  ["<Drawer title=", 5],
 ];
 
 function bFailures(src) {
@@ -107,16 +120,20 @@ function bFailures(src) {
 function armB() {
   const src = read(STEPS_REL); // RAW: a retired mechanic named in a comment is still in the file
   assert.deepEqual(bFailures(src), [],
-    `(b) ${STEPS_REL} must carry John's link, note and drawer copy once each, pre-pick no tab, drop the tool-name heading and the Test AI line, and mount four closed drawers in order`);
+    `(b) ${STEPS_REL} must carry John's link, note and drawer copy once each, pre-pick no tab, drop the tool-name heading and the Test AI line, and mount five closed drawers in order`);
   const prePicked = src.replace("useState(null)", "useState(CONNECT_TOOLS[0].id)");
   assert.notEqual(prePicked, src, "(b) CONTROL: the no-tab state must be found to be reverted");
   assert.deepEqual(bFailures(prePicked), ["`useState(null)` 0 times, want 1", "`useState(CONNECT_TOOLS[0].id)` 1 times, want 0"],
     "(b) CONTROL: a pre-picked first tab must fail both state needles, and only those");
   const opened = src.replace("<details", "<details open");
   assert.deepEqual(bFailures(opened), ["`<details open` 1 times, want 0"], "(b) CONTROL: a drawer opened by default must fail, and only that");
-  const swapped = src.replace("expectTitle}", "@@E@@").replace("talkTitle}", "expectTitle}").replace("@@E@@", "talkTitle}");
+  const swapped = src.replace("expectTitle}", "@@E@@").replace("disconnectTitle}", "expectTitle}").replace("@@E@@", "disconnectTitle}");
   assert.notEqual(swapped, src, "(b) CONTROL: the first two drawer mounts must be found to be swapped");
-  assert.deepEqual(bFailures(swapped), ["expectTitle} is not before talkTitle}"], "(b) CONTROL: drawers out of John's order must fail, and only that");
+  assert.deepEqual(bFailures(swapped), ["expectTitle} is not before disconnectTitle}"], "(b) CONTROL: drawers out of John's order must fail, and only that");
+  const oldTalk = src.replace("ask for your agent by name to answer", "ask for your agent to answer");
+  assert.notEqual(oldTalk, src, "(b) CONTROL: a by-name sentence must be found to be reverted");
+  assert.deepEqual(bFailures(oldTalk), ["`In a Claude session, simply ask for your agent by name to answer a question.` 0 times, want 1"],
+    "(b) CONTROL: the Claude talk sentence without \"by name\" must fail, and only that");
 }
 
 // ── (c) the Test AI page is untouched ──────────────────────────────────────────────────────────

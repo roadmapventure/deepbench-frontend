@@ -1,6 +1,7 @@
 // DeepBench v7.0.789 | tests/regression/agt-334-connect-popup.test.mjs | AGT-385 -- EXPECTED_COPY's
 // title is now "Select your AI tool" and the Claude / ChatGPT step-2 sentences drop 'Your first time,
 // click "Always Allow".' (drawer 1 says it now); the one mechanic is useState(null) -- no tab pre-picked.
+// Round 2: the three step-2 sentences say "ask for your agent by name" (John, 2026-10-05).
 // Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
 // DeepBench v7.0.788 | tests/regression/agt-334-connect-popup.test.mjs | AGT-384 -- the popup is
 // retired: its steps are the ConnectSteps component (same file, same copy) on the Connect to AI page,
@@ -68,7 +69,7 @@ const EXPECTED_COPY = [
   "No sign-in",
   "Keep other defaults",
   "Save",
-  "In a Claude session, simply ask for your agent to answer a question.",
+  "In a Claude session, simply ask for your agent by name to answer a question.",
   "You can turn off your agent by the same path: + → Connectors → switch off.",
   'id: "chatgpt"', 'label: "ChatGPT"',
   "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
@@ -79,7 +80,7 @@ const EXPECTED_COPY = [
   'Authentication: change "OAuth" to "No Authentication"',
   'Tick "I understand and want to continue"',
   'Click "Create as a plugin"',
-  "In a ChatGPT session, simply ask for your agent to answer a question.",
+  "In a ChatGPT session, simply ask for your agent by name to answer a question.",
   "You can turn your agent off by:",
   "Clicking on plugins on the left hand nav",
   'Under "Installed", click the Agent name you created',
@@ -90,7 +91,7 @@ const EXPECTED_COPY = [
   'Top right: "New Connector", then click "Custom"',
   "Server URL: paste this URL",
   'Click "Add Connector"',
-  "In a Grok chat, simply ask for your agent to answer a question.",
+  "In a Grok chat, simply ask for your agent by name to answer a question.",
   'You can turn your agent off from a Grok chat: "+" → "Connectors" → switch it off.',
   "Teaching your agent",
   "Your agent starts blank: no role prompt, no guardrails, no library access. They know only what you give them. Go back to their personnel page to update their skillsets.",

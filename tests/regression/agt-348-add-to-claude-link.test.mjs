@@ -2,6 +2,7 @@
 // strings and the ChatGPT / Grok open-link labels are John's approved copy; the open links carry no
 // note: (one shared "2. Follow these steps:" line). The link-above-the-steps checks measure against the
 // first <Step1List mount, since the list now lives in its own component above ConnectSteps.
+// Round 2: quickAdd gains lead "For Claude, simply click: " and its label is "add <first name> to Claude".
 // Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
 // DeepBench v7.0.787 | tests/regression/agt-348-add-to-claude-link.test.mjs | AGT-348 slice 5 -- the
 // Grok tab gets an "Open Grok Connectors" button (openLink, https://grok.com/connectors; measured by John
@@ -63,7 +64,9 @@ const PARAM_ORDER = ["modal", "connectorName", "connectorUrl"];
 const QUICK_ADD_COPY = [
   // key-qualified: John's step-1 copy already quotes the bare "<first name> from DeepBench"
   // v7.0.789 (AGT-385): John's approved link, note and manual-drawer title.
-  'label: "1. Click to add <first name> to Claude"',
+  // Round 2: plain lead-in text, then a link of only the words after the colon.
+  'lead: "For Claude, simply click: "',
+  'label: "add <first name> to Claude"',
   'name: "<first name> from DeepBench"',
   'note: "2. Make sure the Connector window has the name and URL already filled in. Click Continue."',
   "fallback: \"I can't get the connection link to work\"",
