@@ -1,3 +1,4 @@
+// DeepBench v7.0.781 | tests/regression/ses-378h-lane-refusal-kind.test.mjs | AGT-304 slice 4 -- RECORDED_KINDS admits the trigger-written gap finding (CHECK widened by agt136_gap_attribution).
 // DeepBench v7.0.520 | tests/regression/ses-378h-lane-refusal-kind.test.mjs | SES-378 slice 8
 //
 // FEATURE: the lane refusal gets its own name. `--check-kickoff` exits 1 for TWO causes
@@ -36,7 +37,7 @@
 //     collapse would promote a cap refusal as a lane refusal. No detail may name a ticket or carry
 //     a uuid, which is exactly what `d52d37a0`'s free text did.
 //
-// (d) LIVE: every `runner_staff_findings.kind` is one `KINDS` admits. Declares itself NOT RUN
+// (d) LIVE: every `runner_staff_findings.kind` is one `RECORDED_KINDS` admits (KINDS plus the trigger-written `gap finding`, AGT-304 slice 4). Declares itself NOT RUN
 //     without credentials rather than passing.
 //
 // (e) THE SES-158 NEGATIVE CONTROL. A runbook copy with the `kickoff-no-lanes` branch stripped must
@@ -52,7 +53,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { parseSteps, RUNBOOK_REL } from "../../scripts/render-cycle-card.js";
-import { fingerprintFor, KINDS, TABLE } from "../../scripts/staff-watch.js";
+import { fingerprintFor, KINDS, RECORDED_KINDS, TABLE } from "../../scripts/staff-watch.js";
 import { kickoffLaneFinding } from "../../scripts/verifier.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -324,7 +325,7 @@ export default async function run() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      `SES-378h (d): every public.${TABLE}.kind is one of scripts/staff-watch.js KINDS -- the `
+      `SES-378h (d): every public.${TABLE}.kind is one of scripts/staff-watch.js RECORDED_KINDS -- the `
       + `evidence that no cycle is still inventing a kind for an unnamed cause`,
       "SUPABASE_URL / SUPABASE_SERVICE_KEY not set; export them from public.runner_secrets by name "
       + "(docs/runbooks/session-setup.md step 1b) and re-run: "
@@ -339,15 +340,15 @@ export default async function run() {
     { headers: { apikey: key, Authorization: `Bearer ${key}` } });
   if (!r.ok) assert.fail(`PostgREST ${r.status} on ${TABLE}: ${await r.text()}`);
   const rows = await r.json();
-  const strays = rows.filter(row => !KINDS.includes(row.kind));
+  const strays = rows.filter(row => !RECORDED_KINDS.includes(row.kind));
   assert.strictEqual(
     strays.length, 0,
-    `public.${TABLE} holds ${strays.length} row(s) whose kind is outside KINDS `
+    `public.${TABLE} holds ${strays.length} row(s) whose kind is outside RECORDED_KINDS `
     + `(${JSON.stringify(strays.map(s => ({ id: s.id, kind: s.kind })))}). A kind the vocabulary does `
     + `not admit is a finding nothing groups with, so it can never reach the promotion bar.`,
   );
 
-  console.log(`  [SES-378h] ${pure}; live: ${rows.length} ${TABLE} row(s), every kind inside KINDS `
+  console.log(`  [SES-378h] ${pure}; live: ${rows.length} ${TABLE} row(s), every kind inside RECORDED_KINDS `
     + `(${[...new Set(rows.map(x => x.kind))].join(" | ") || "none recorded"})`);
 }
 
