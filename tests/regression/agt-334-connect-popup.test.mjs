@@ -1,3 +1,8 @@
+// DeepBench v7.0.787 | tests/regression/agt-334-connect-popup.test.mjs | AGT-348 slice 5 -- the
+// Connect popup gets a third pill, Grok (John measured grok.com 2026-10-05). EXPECTED_COPY carries the
+// Grok tool's id, label, step-1 heading, five steps, step 2 and step 3 verbatim; id: "chatgpt" must
+// precede id: "grok". Red on the slice-4 tree: no Grok tool. Spec:
+// docs/kickoffs/v7.0.787-AGT-348-grok-connect-tab.md.
 // DeepBench v7.0.786 | tests/regression/agt-334-connect-popup.test.mjs | AGT-348 slice 4 -- John
 // approved (2026-10-05, "ok") the ChatGPT tab's new step 1: heading "On chatgpt.com, on a computer ..."
 // and seven steps matching today's Plugins screen (Add ▾ → Create custom MCP server). EXPECTED_COPY
@@ -67,6 +72,14 @@ const EXPECTED_COPY = [
   "Clicking on plugins on the left hand nav",
   'Under "Installed", click the Agent name you created',
   'Change "Connected" to "Disconnect"',
+  'id: "grok"', 'label: "Grok"',
+  "On grok.com:",
+  'Open Connectors: the button above, or in a Grok chat click "+" → "Connectors" → "Add connector"',
+  'Top right: "New Connector", then click "Custom"',
+  "Server URL: paste this URL",
+  'Click "Add Connector"',
+  "In a Grok chat, simply ask for your agent to answer a question.",
+  'You can turn your agent off from a Grok chat: "+" → "Connectors" → switch it off.',
   "Teaching your agent",
   "Your agent starts blank: no role prompt, no guardrails, no library access. They know only what you give them. Go back to their personnel page to update their skillsets.",
   "Comparison test",
@@ -133,6 +146,11 @@ async function run() {
   const iClaude = popup.indexOf('id: "claude"');
   const iChatgpt = popup.indexOf('id: "chatgpt"');
   assert.ok(iClaude >= 0 && iChatgpt > iClaude, 'id: "claude" must precede id: "chatgpt" -- the popup opens on the first tool');
+  const iGrok = popup.indexOf('id: "grok"');
+  assert.ok(iGrok > iChatgpt, 'id: "chatgpt" must precede id: "grok" -- pill order is Claude, ChatGPT, Grok');
+  // Grok's Name step is ChatGPT's string verbatim, so it must appear once per tool -- twice.
+  assert.equal(count(popup, 'Name: one you will recognize, i.e. "<first name> from DeepBench"'), 2,
+    "the Name step must appear on both the ChatGPT and the Grok tool");
 
   // (b) Rule #1, both directions
   const { AGENTS } = await import("../../src/data/agents.js");

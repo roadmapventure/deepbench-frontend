@@ -1,3 +1,6 @@
+// DeepBench v7.0.787 | ConnectAgentPopup.jsx | AGT-348 slice 5 -- a third pill, Grok: an "Open Grok
+// Connectors" button (grok.com/connectors) and John's step copy measured on grok.com 2026-10-05.
+// Spec: docs/kickoffs/v7.0.787-AGT-348-grok-connect-tab.md.
 // DeepBench v7.0.786 | ConnectAgentPopup.jsx | AGT-348 slice 4 -- the ChatGPT tab gets an "Open ChatGPT
 // Plugins" button (chatgpt.com/plugins) above step 1, and John's approved (2026-10-05) step-1 copy matching
 // today's Plugins screen. Spec: docs/kickoffs/v7.0.786-AGT-348-chatgpt-connect-steps.md.
@@ -76,6 +79,27 @@ export const CONNECT_TOOLS = [
       href: "https://chatgpt.com/plugins",
       label: "Open ChatGPT Plugins",
       note: "Opens ChatGPT's Plugins page in a new tab. Then follow the steps below.",
+    },
+  },
+  {
+    id: "grok", label: "Grok", subtitle: "Grok",
+    step1Heading: "On grok.com:",
+    step1: [
+      'Open Connectors: the button above, or in a Grok chat click "+" → "Connectors" → "Add connector"',
+      'Top right: "New Connector", then click "Custom"',
+      'Name: one you will recognize, i.e. "<first name> from DeepBench"',
+      { text: 'Server URL: paste this URL', copy: true },
+      'Click "Add Connector"',
+    ],
+    step2: "In a Grok chat, simply ask for your agent to answer a question.",
+    step3Heading: null,
+    step3: ['You can turn your agent off from a Grok chat: "+" → "Connectors" → switch it off.'],
+    // FEATURE: AGT-348 -- grok.com/connectors measured by John 2026-10-05; Grok's create form has no
+    // address of its own, so there is nothing to pre-fill. This only opens the Connectors page.
+    openLink: {
+      href: "https://grok.com/connectors",
+      label: "Open Grok Connectors",
+      note: "Opens Grok's Connectors page in a new tab. Then follow the steps below.",
     },
   },
 ];

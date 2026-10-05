@@ -1,3 +1,9 @@
+// DeepBench v7.0.787 | tests/regression/agt-348-add-to-claude-link.test.mjs | AGT-348 slice 5 -- the
+// Grok tab gets an "Open Grok Connectors" button (openLink, https://grok.com/connectors; measured by John
+// 2026-10-05 -- Grok's create form has no address of its own, so it only opens Connectors). Arm d now
+// wants openLink: exactly twice, one after id: "chatgpt" and one after id: "grok", and the Grok href,
+// label and note each exactly once. Red on the slice-4 tree: one openLink, no Grok strings.
+// Spec: docs/kickoffs/v7.0.787-AGT-348-grok-connect-tab.md.
 // DeepBench v7.0.786 | tests/regression/agt-348-add-to-claude-link.test.mjs | AGT-348 slice 4 -- the
 // ChatGPT tab gets an "Open ChatGPT Plugins" button (openLink, https://chatgpt.com/plugins; John measured
 // that ChatGPT has no link to the create form and no pre-fill, so it only opens Plugins), rendered above
@@ -67,6 +73,12 @@ const OPEN_LINK_COPY = [
   'label: "Open ChatGPT Plugins"',
   "note: \"Opens ChatGPT's Plugins page in a new tab. Then follow the steps below.\"",
 ];
+// v7.0.787 (slice 5): the Grok tab's Open Connectors button.
+const GROK_OPEN_LINK_COPY = [
+  'href: "https://grok.com/connectors"',
+  'label: "Open Grok Connectors"',
+  "note: \"Opens Grok's Connectors page in a new tab. Then follow the steps below.\"",
+];
 const OPEN_LINK_RENDER = "<QuickAddLink href={tool.openLink.href}";
 
 const count = (text, needle) => text.split(needle).length - 1;
@@ -90,9 +102,16 @@ function paramFailures(href, name, url) {
 // Every arm-d failure, by name; [] is green.
 function openLinkFailures(popup) {
   const out = [];
-  if (count(popup, "openLink:") !== 1) out.push(`openLink: ${count(popup, "openLink:")} times, want 1`);
-  else if (popup.indexOf("openLink:") < popup.indexOf('id: "chatgpt"')) out.push('openLink: before id: "chatgpt"');
-  for (const s of OPEN_LINK_COPY) if (count(popup, s) !== 1) out.push(`${s} ${count(popup, s)} times, want 1`);
+  if (count(popup, "openLink:") !== 2) out.push(`openLink: ${count(popup, "openLink:")} times, want 2`);
+  else {
+    const iChatgpt = popup.indexOf('id: "chatgpt"');
+    const iGrok = popup.indexOf('id: "grok"');
+    const first = popup.indexOf("openLink:");
+    const second = popup.indexOf("openLink:", first + 1);
+    if (iChatgpt < 0 || first < iChatgpt || (iGrok >= 0 && first > iGrok)) out.push('first openLink: not on id: "chatgpt"');
+    if (iGrok < 0 || second < iGrok) out.push('second openLink: not after id: "grok"');
+  }
+  for (const s of [...OPEN_LINK_COPY, ...GROK_OPEN_LINK_COPY]) if (count(popup, s) !== 1) out.push(`${s} ${count(popup, s)} times, want 1`);
   const iRender = popup.indexOf(OPEN_LINK_RENDER);
   if (iRender < 0) out.push("no openLink render");
   else if (iRender > popup.indexOf("{tool.step1Heading}")) out.push("openLink renders after the step-1 heading");
@@ -141,8 +160,8 @@ async function run() {
   assert.ok(TEAM_LINK_RE.test(popup), "each team block must build its link from base + t.address");
   assert.ok(!HEX_RE.test(popup), "the popup must carry no literal hex colour -- tokens only");
 
-  // (d) v7.0.786: the ChatGPT tab's Open Plugins button, both directions
-  assert.deepEqual(openLinkFailures(popup), [], 'the ChatGPT tool must carry one openLink (chatgpt.com/plugins, label, note), rendered above the step-1 heading');
+  // (d) v7.0.786/v7.0.787: the ChatGPT and Grok tabs' open buttons, both directions
+  assert.deepEqual(openLinkFailures(popup), [], 'the ChatGPT and Grok tools must each carry one openLink (chatgpt.com/plugins, grok.com/connectors, label, note), rendered above the step-1 heading');
   const noOpenLink = popup.split("openLink:").join("");
   assert.notEqual(noOpenLink, popup, "CONTROL: an openLink: key must be found to be removed");
   assert.ok(openLinkFailures(noOpenLink).length > 0, "CONTROL: the popup with openLink: removed must fail arm d");
