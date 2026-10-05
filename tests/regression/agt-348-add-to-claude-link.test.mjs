@@ -1,3 +1,8 @@
+// DeepBench v7.0.789 | tests/regression/agt-348-add-to-claude-link.test.mjs | AGT-385 -- the quickAdd
+// strings and the ChatGPT / Grok open-link labels are John's approved copy; the open links carry no
+// note: (one shared "2. Follow these steps:" line). The link-above-the-steps checks measure against the
+// first <Step1List mount, since the list now lives in its own component above ConnectSteps.
+// Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
 // DeepBench v7.0.787 | tests/regression/agt-348-add-to-claude-link.test.mjs | AGT-348 slice 5 -- the
 // Grok tab gets an "Open Grok Connectors" button (openLink, https://grok.com/connectors; measured by John
 // 2026-10-05 -- Grok's create form has no address of its own, so it only opens Connectors). Arm d now
@@ -57,10 +62,11 @@ const SLICE2_PAGE = "https://claude.ai/settings/connectors";
 const PARAM_ORDER = ["modal", "connectorName", "connectorUrl"];
 const QUICK_ADD_COPY = [
   // key-qualified: John's step-1 copy already quotes the bare "<first name> from DeepBench"
-  'label: "Add <first name> to Claude"',
+  // v7.0.789 (AGT-385): John's approved link, note and manual-drawer title.
+  'label: "1. Click to add <first name> to Claude"',
   'name: "<first name> from DeepBench"',
-  "note: \"Opens Claude's Add connector window with the name and URL already filled in. Check them, then click Continue.\"",
-  "fallback: \"If the fields come up empty, or you'd rather set it up by hand:\"",
+  'note: "2. Make sure the Connector window has the name and URL already filled in. Click Continue."',
+  "fallback: \"I can't get the connection link to work\"",
 ];
 const OLD_NOTE = "Check them, then click Add.";
 const IMPORT_LINE = 'import { claudeAddLink } from "../lib/connectLinks.js";';
@@ -68,18 +74,20 @@ const AGENT_LINK = "claudeAddLink(fill(tool.quickAdd.name), address)";
 const TEAM_LINK_RE = /claudeAddLink\([^)]*,\s*base \+ t\.address\)/;
 const HEX_RE = /#[0-9a-fA-F]{6}\b/;
 // v7.0.786 (slice 4): the ChatGPT tab's Open Plugins button.
+// v7.0.789 (AGT-385): href + John's link label only; the note left ("2. Follow these steps:" is shared).
 const OPEN_LINK_COPY = [
   'href: "https://chatgpt.com/plugins"',
-  'label: "Open ChatGPT Plugins"',
-  "note: \"Opens ChatGPT's Plugins page in a new tab. Then follow the steps below.\"",
+  'label: "1. Click to open ChatGPT Plugins"',
 ];
 // v7.0.787 (slice 5): the Grok tab's Open Connectors button.
 const GROK_OPEN_LINK_COPY = [
   'href: "https://grok.com/connectors"',
-  'label: "Open Grok Connectors"',
-  "note: \"Opens Grok's Connectors page in a new tab. Then follow the steps below.\"",
+  'label: "1. Click to open Grok Connectors"',
 ];
 const OPEN_LINK_RENDER = "<QuickAddLink href={tool.openLink.href}";
+// v7.0.789 (AGT-385): the step-1 list is its own component (Step1List), defined above ConnectSteps, so
+// "renders above the steps" is measured against the list's first mount inside ConnectSteps.
+const STEPS_MOUNT = "<Step1List ";
 
 const count = (text, needle) => text.split(needle).length - 1;
 const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -114,7 +122,7 @@ function openLinkFailures(popup) {
   for (const s of [...OPEN_LINK_COPY, ...GROK_OPEN_LINK_COPY]) if (count(popup, s) !== 1) out.push(`${s} ${count(popup, s)} times, want 1`);
   const iRender = popup.indexOf(OPEN_LINK_RENDER);
   if (iRender < 0) out.push("no openLink render");
-  else if (iRender > popup.indexOf("{tool.step1Heading}")) out.push("openLink renders after the step-1 heading");
+  else if (popup.indexOf(STEPS_MOUNT) < 0 || iRender > popup.indexOf(STEPS_MOUNT)) out.push("openLink renders after the step-1 list");
   return out;
 }
 
@@ -156,7 +164,7 @@ async function run() {
   assert.ok(popup.includes('rel="noopener noreferrer"'), 'the link must carry rel="noopener noreferrer"');
   const iAgent = popup.indexOf(AGENT_LINK);
   assert.ok(iAgent >= 0, `the agent's link must be built as ${AGENT_LINK}`);
-  assert.ok(iAgent < popup.indexOf("{tool.step1Heading}"), "the agent's link must render above the step-1 heading");
+  assert.ok(popup.indexOf(STEPS_MOUNT) >= 0 && iAgent < popup.indexOf(STEPS_MOUNT), "the agent's link must render above the step-1 list");
   assert.ok(TEAM_LINK_RE.test(popup), "each team block must build its link from base + t.address");
   assert.ok(!HEX_RE.test(popup), "the popup must carry no literal hex colour -- tokens only");
 

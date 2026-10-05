@@ -1,3 +1,7 @@
+// DeepBench v7.0.789 | tests/regression/agt-384-bench-home.test.mjs | AGT-385 -- arm d: the steps no
+// longer end on a Test AI line and render the comparison test (in a closed drawer); arm e: the page
+// heads its picker "Choose an agent" (cards), with no "(team)" suffix and no "Pick an agent" line.
+// Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
 // DeepBench v7.0.788 | tests/regression/agt-384-bench-home.test.mjs | AGT-384 -- Bench home, the
 // Connect to AI page, the Test AI page and the left nav the five Bench pages share.
 //
@@ -156,11 +160,12 @@ const D_WANTS = [
   ["onClose", 0],
   ['"Escape"', 0],
   ["teachingHeading}</h2>", 0],
-  ["comparisonSteps.map", 0],
+  // v7.0.789 (AGT-385): the Test AI line leaves; the comparison test renders in its own closed drawer.
+  ["comparisonSteps.map", 1],
   [STEPS_EXPORT, 1],
-  ['nextTest: "Connected? Next: Test AI →"', 1],
-  ["{CONNECT_SHARED.nextTest}", 1],
-  ['navigate("/bench/test-ai")', 1],
+  ["nextTest:", 0],
+  ["{CONNECT_SHARED.nextTest}", 0],
+  ['navigate("/bench/test-ai")', 0],
   ["if (agent.team) return;", 1],
   ["export const h2Style", 1],
   ["export const pStyle", 1],
@@ -171,7 +176,7 @@ const D_WANTS = [
 function armD() {
   const src = read(STEPS_REL); // RAW: a retired mechanic named in a comment is still in the file
   assert.deepEqual(failures(src, D_WANTS), [],
-    `(d) ${STEPS_REL} must carry no modal shell, close control or teaching/comparison render, and must export ConnectSteps ending on the Test AI line`);
+    `(d) ${STEPS_REL} must carry no modal shell, close control or teaching render, must export ConnectSteps, and must render the comparison test (in its drawer) instead of a Test AI line`);
   const withShell = src.replace(STEPS_EXPORT, `// onClose\n${STEPS_EXPORT}`);
   assert.notEqual(withShell, src, "(d) CONTROL: the export line must be found");
   assert.deepEqual(failures(withShell, D_WANTS), ["`onClose` 1 times, want 0"], "(d) CONTROL: a returned onClose must fail, and only that");
@@ -179,14 +184,15 @@ function armD() {
 
 // ── (e) the Connect to AI page ───────────────────────────────────────────────────────────────
 const E_WANTS = [
-  [">Which agent?<", 1],
+  // v7.0.789 (AGT-385): "Choose an agent" cards; no "(team)" suffix, no "Pick an agent" line.
+  [">Choose an agent<", 1],
   ['searchParams.get("agent")', 1],
   ["/api/mcp/${", 1],
   ["<ConnectSteps ", 2],
   ["useAgents().filter(isPrivateAgent)", 1],
   ["&teams=1", 1],
-  ["(team)", 1],
-  [">Pick an agent to see the steps.<", 1],
+  ["(team)", 0],
+  [">Pick an agent to see the steps.<", 0],
   [">You have no private agents yet.<", 1],
   [">Add a player →<", 1],
   ['<BenchNav current="Connect to AI"', 1],
@@ -201,9 +207,9 @@ function armE() {
   const code = stripComments(read(CONNECT_REL));
   assert.deepEqual(failures(code, E_WANTS), [],
     `(e) ${CONNECT_REL} must carry the picker, the ?agent= read, one agent address build and the steps`);
-  const noPicker = code.replace(">Which agent?<", "><");
+  const noPicker = code.replace(">Choose an agent<", "><");
   assert.notEqual(noPicker, code, "(e) CONTROL: the picker heading must be found to be removed");
-  assert.deepEqual(failures(noPicker, E_WANTS), ["`>Which agent?<` 0 times, want 1"], "(e) CONTROL: the page without its picker heading must fail, and only that");
+  assert.deepEqual(failures(noPicker, E_WANTS), ["`>Choose an agent<` 0 times, want 1"], "(e) CONTROL: the page without its picker heading must fail, and only that");
 }
 
 // ── (f) the Test AI page ─────────────────────────────────────────────────────────────────────

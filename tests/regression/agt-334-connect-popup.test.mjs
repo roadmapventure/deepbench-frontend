@@ -1,3 +1,7 @@
+// DeepBench v7.0.789 | tests/regression/agt-334-connect-popup.test.mjs | AGT-385 -- EXPECTED_COPY's
+// title is now "Select your AI tool" and the Claude / ChatGPT step-2 sentences drop 'Your first time,
+// click "Always Allow".' (drawer 1 says it now); the one mechanic is useState(null) -- no tab pre-picked.
+// Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
 // DeepBench v7.0.788 | tests/regression/agt-334-connect-popup.test.mjs | AGT-384 -- the popup is
 // retired: its steps are the ConnectSteps component (same file, same copy) on the Connect to AI page,
 // /bench/connect. Arm (a) keeps every EXPECTED_COPY string and the pill order but its one mechanic
@@ -53,7 +57,7 @@ const PERSONNEL = path.join(ROOT, "src", "screens", "PersonnelScreen.jsx");
 const CONNECT_SCREEN = path.join(ROOT, "src", "screens", "ConnectScreen.jsx");
 
 const EXPECTED_COPY = [
-  "Connect <first name> to your favorite AI tool",
+  "Select your AI tool",
   'id: "claude"', 'label: "Claude"',
   "Once in a Claude session:",
   'Click the plus "+"',
@@ -64,7 +68,7 @@ const EXPECTED_COPY = [
   "No sign-in",
   "Keep other defaults",
   "Save",
-  'In a Claude session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
+  "In a Claude session, simply ask for your agent to answer a question.",
   "You can turn off your agent by the same path: + → Connectors → switch off.",
   'id: "chatgpt"', 'label: "ChatGPT"',
   "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
@@ -75,7 +79,7 @@ const EXPECTED_COPY = [
   'Authentication: change "OAuth" to "No Authentication"',
   'Tick "I understand and want to continue"',
   'Click "Create as a plugin"',
-  'In a ChatGPT session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
+  "In a ChatGPT session, simply ask for your agent to answer a question.",
   "You can turn your agent off by:",
   "Clicking on plugins on the left hand nav",
   'Under "Installed", click the Agent name you created',
@@ -103,8 +107,8 @@ const RETIRED_CHATGPT_COPY = [
   "On the very left hand nav of the app, click the plugins icon.",
 ];
 
-// AGT-384: the modal shell is gone; the one mechanic left is the first-pill default.
-const POPUP_MECHANICS = ["CONNECT_TOOLS[0].id"];
+// AGT-384: the modal shell is gone. AGT-385: no tab is pre-picked -- the one mechanic is the empty start.
+const POPUP_MECHANICS = ["useState(null)"];
 
 const FORBIDDEN = [
   /x-deepbench-mcp-key/i,

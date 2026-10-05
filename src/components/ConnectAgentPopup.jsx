@@ -1,3 +1,8 @@
+// DeepBench v7.0.789 | ConnectAgentPopup.jsx | AGT-385 -- the steps open on the tool heading and the
+// three tabs with no tab picked; a picked tab shows its link first (Claude: the one-click add link and its note;
+// ChatGPT / Grok: the open link, then the steps, shown open), then John's question drawers, all
+// closed. The link is a text link now, not a button. Copy: docs/harvests/AGT-385.md, verbatim.
+// Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
 // DeepBench v7.0.788 | ConnectAgentPopup.jsx | AGT-384 -- the popup is retired; this file is now the
 // steps component, ConnectSteps, rendered by the Connect to AI page (src/screens/ConnectAiScreen.jsx,
 // /bench/connect). The overlay, the card, the dismiss button and its key handler are deleted; the
@@ -32,7 +37,6 @@
 // card, ✕ and Escape; CopyBlock = ConnectScreen.jsx's (slice 2 deletes the original).
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { T, display, body, mono } from "../tokens.js";
 import { claudeAddLink } from "../lib/connectLinks.js";
 
@@ -52,15 +56,16 @@ export const CONNECT_TOOLS = [
       "Keep other defaults",
       "Save",
     ],
-    step2: 'In a Claude session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
+    step2: "In a Claude session, simply ask for your agent to answer a question.",
     step3Heading: null,
     step3: ["You can turn off your agent by the same path: + → Connectors → switch off."],
     // FEATURE: AGT-348 -- the one-click link, above step 1. Claude only: ChatGPT has no such link.
+    // FEATURE: AGT-385 -- John's link and note lines; the fallback is the manual drawer's title.
     quickAdd: {
-      label: "Add <first name> to Claude",
+      label: "1. Click to add <first name> to Claude",
       name: "<first name> from DeepBench",
-      note: "Opens Claude's Add connector window with the name and URL already filled in. Check them, then click Continue.",
-      fallback: "If the fields come up empty, or you'd rather set it up by hand:",
+      note: "2. Make sure the Connector window has the name and URL already filled in. Click Continue.",
+      fallback: "I can't get the connection link to work",
     },
   },
   {
@@ -75,7 +80,7 @@ export const CONNECT_TOOLS = [
       'Tick "I understand and want to continue"',
       'Click "Create as a plugin"',
     ],
-    step2: 'In a ChatGPT session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
+    step2: "In a ChatGPT session, simply ask for your agent to answer a question.",
     step3Heading: "You can turn your agent off by:",
     step3: [
       "Clicking on plugins on the left hand nav",
@@ -86,8 +91,7 @@ export const CONNECT_TOOLS = [
     // 2026-10-05); this only opens Plugins.
     openLink: {
       href: "https://chatgpt.com/plugins",
-      label: "Open ChatGPT Plugins",
-      note: "Opens ChatGPT's Plugins page in a new tab. Then follow the steps below.",
+      label: "1. Click to open ChatGPT Plugins",
     },
   },
   {
@@ -107,14 +111,13 @@ export const CONNECT_TOOLS = [
     // address of its own, so there is nothing to pre-fill. This only opens the Connectors page.
     openLink: {
       href: "https://grok.com/connectors",
-      label: "Open Grok Connectors",
-      note: "Opens Grok's Connectors page in a new tab. Then follow the steps below.",
+      label: "1. Click to open Grok Connectors",
     },
   },
 ];
 
 export const CONNECT_SHARED = {
-  title: "Connect <first name> to your favorite AI tool",
+  title: "Select your AI tool",
   teachingHeading: "Teaching your agent",
   teachingBody: "Your agent starts blank: no role prompt, no guardrails, no library access. They know only what you give them. Go back to their personnel page to update their skillsets.",
   comparisonHeading: "Comparison test",
@@ -126,7 +129,13 @@ export const CONNECT_SHARED = {
   teamLead: "Or connect your whole team at once.",
   teamBody: "Paste this URL instead and every agent in <team name> is available, including agents you add later.",
   teamStep: "With a team connection, name the agent you want in your question.",
-  nextTest: "Connected? Next: Test AI →",
+  // FEATURE: AGT-385 -- the link-first layout and the question drawers (John, 2026-10-05).
+  followSteps: "2. Follow these steps:",
+  faqHeading: "FAQ",
+  expectTitle: "What to expect after connection",
+  talkTitle: "How do I talk to my agent?",
+  testTitle: "How do I test my agent?",
+  expectBody: 'Once connected, your first <tool> session will ask your permission. Simply click "Always Allow".',
 };
 
 // FEATURE: AGT-384 -- exported: the Connect to AI and Test AI pages set their text in the same styles.
@@ -157,82 +166,31 @@ function CopyBlock({ text }) {
   );
 }
 
-// FEATURE: AGT-348 -- a link styled as CopyBlock's button; opens claude.ai in a new tab.
+// FEATURE: AGT-348 -- the one-click / open link; opens the AI tool in a new tab.
+// FEATURE: AGT-385 -- a text link (the page's link look), not a button.
 function QuickAddLink({ href, label }) {
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" style={{
-      display: "inline-block", fontFamily: body, fontSize: 14, fontWeight: 600, color: T.navy,
-      background: T.brassLight, border: `1px solid ${T.brass}`, padding: "10px 18px", textDecoration: "none",
+      fontFamily: body, fontSize: 14, fontWeight: 600, color: T.brassDeep, textDecoration: "none",
     }}>{label}</a>
   );
 }
 
-// FEATURE: AGT-384 -- the steps for one picked agent (or one picked team), on the Connect to AI page.
-export default function ConnectSteps({ agent, address }) {
-  const navigate = useNavigate();
-  const [toolId, setToolId] = useState(CONNECT_TOOLS[0].id);
-  const [teams, setTeams] = useState([]);
-
-  // FEATURE: AGT-338 -- the teams this agent is on. No team, a slow or a failed read: no block.
-  // FEATURE: AGT-384 -- a picked team has no teams of its own to offer.
-  useEffect(() => {
-    if (agent.team) return;
-    let live = true;
-    fetch(`/api/agent-configs?agent_id=${encodeURIComponent(agent.id)}&teams=1`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (live && d && Array.isArray(d.teams)) setTeams(d.teams); })
-      .catch(() => {});
-    return () => { live = false; };
-  }, [agent.id]);
-  const base = address.slice(0, address.lastIndexOf("/") + 1); // origin + /api/mcp/
-
-  const first = agent.team ? agent.name : agent.name.split(" ")[0];
-  const fill = s => s.split("<first name>").join(first);
-  const tool = CONNECT_TOOLS.find(t => t.id === toolId) || CONNECT_TOOLS[0];
-
+// FEATURE: AGT-385 -- one question drawer: native, closed by default, no state.
+function Drawer({ title, children }) {
   return (
-    <div>
-      {/* Title */}
-      <div style={{ fontFamily: display, fontSize: 21, fontWeight: 600, color: T.navy, lineHeight: 1.25 }}>
-        {fill(CONNECT_SHARED.title)}
-      </div>
+    <details style={{ borderTop: `1px solid ${T.line}`, padding: "10px 0" }}>
+      <summary style={{ ...pStyle, fontWeight: 600, cursor: "pointer", margin: 0 }}>{title}</summary>
+      <div style={{ paddingTop: 8 }}>{children}</div>
+    </details>
+  );
+}
 
-      {/* Tool pills */}
-      <div style={{ display: "flex", gap: 6, marginTop: 14, borderBottom: `1px solid ${T.line}` }}>
-        {CONNECT_TOOLS.map(t => {
-          const isActive = t.id === tool.id;
-          return (
-            <button key={t.id} onClick={() => setToolId(t.id)} style={{
-              padding: "8px 14px",
-              fontFamily: body, fontSize: 12,
-              fontWeight: isActive ? 600 : 400,
-              color: isActive ? T.navy : T.mutedDeep,
-              background: isActive ? `${T.brass}24` : "transparent",
-              border: "none",
-              borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
-              cursor: "pointer",
-            }}>
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* The selected tool's steps — only these swap with the pill */}
-      <h2 style={h2Style}>{tool.subtitle}</h2>
-      {tool.quickAdd && (
-        <>
-          <QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} />
-          <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.quickAdd.note}</p>
-          <p style={pStyle}>{tool.quickAdd.fallback}</p>
-        </>
-      )}
-      {tool.openLink && (
-        <>
-          <QuickAddLink href={tool.openLink.href} label={tool.openLink.label} />
-          <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.openLink.note}</p>
-        </>
-      )}
+// FEATURE: AGT-385 -- the three drawer bodies, in this order (agt-338 pins the text order).
+// The step-1 list: the tool's heading and list, both copy boxes, the team blocks and the team link.
+function Step1List({ tool, fill, address, base, teams }) {
+  return (
+    <>
       <p style={pStyle}>{tool.step1Heading}</p>
       <ol style={olStyle}>
         {tool.step1.map((s, i) => (
@@ -255,8 +213,25 @@ export default function ConnectSteps({ agent, address }) {
             )
         ))}
       </ol>
+    </>
+  );
+}
+
+// How the user talks to the agent; a picked team adds the name-the-agent line.
+function TalkBody({ tool, fill, agent }) {
+  return (
+    <>
       <p style={pStyle}>{fill(tool.step2)}</p>
-      <p style={pStyle}>{CONNECT_SHARED.teamStep}</p>
+      {agent.team && <p style={pStyle}>{CONNECT_SHARED.teamStep}</p>}
+    </>
+  );
+}
+
+// What happens once connected: the first-session sentence, then the tool's turn-off text.
+function ExpectBody({ tool, fill }) {
+  return (
+    <>
+      <p style={pStyle}>{CONNECT_SHARED.expectBody.split("<tool>").join(tool.label)}</p>
       {tool.step3Heading === null ? (
         <p style={pStyle}>{fill(tool.step3[0])}</p>
       ) : (
@@ -267,9 +242,89 @@ export default function ConnectSteps({ agent, address }) {
           </ol>
         </>
       )}
+    </>
+  );
+}
 
-      {/* FEATURE: AGT-384 -- the testing wording lives on its own page now; one line points there */}
-      <p style={{ ...pStyle, marginTop: 24 }}><a href="/bench/test-ai" onClick={e => { e.preventDefault(); navigate("/bench/test-ai"); }} style={{ color: T.brassDeep, fontWeight: 600, textDecoration: "none" }}>{CONNECT_SHARED.nextTest}</a></p>
+// FEATURE: AGT-384 -- the steps for one picked agent (or one picked team), on the Connect to AI page.
+// FEATURE: AGT-385 -- no tab is picked until the user clicks one; nothing shows below the tabs before.
+export default function ConnectSteps({ agent, address }) {
+  const [toolId, setToolId] = useState(null);
+  const [teams, setTeams] = useState([]);
+
+  // FEATURE: AGT-338 -- the teams this agent is on. No team, a slow or a failed read: no block.
+  // FEATURE: AGT-384 -- a picked team has no teams of its own to offer.
+  useEffect(() => {
+    if (agent.team) return;
+    let live = true;
+    fetch(`/api/agent-configs?agent_id=${encodeURIComponent(agent.id)}&teams=1`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (live && d && Array.isArray(d.teams)) setTeams(d.teams); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [agent.id]);
+  const base = address.slice(0, address.lastIndexOf("/") + 1); // origin + /api/mcp/
+
+  const first = agent.team ? agent.name : agent.name.split(" ")[0];
+  const fill = s => s.split("<first name>").join(first);
+  const tool = CONNECT_TOOLS.find(t => t.id === toolId) || null;
+
+  return (
+    <div>
+      {/* Title */}
+      <h2 style={h2Style}>{CONNECT_SHARED.title}</h2>
+
+      {/* Tool pills */}
+      <div style={{ display: "flex", gap: 6, marginTop: 14, borderBottom: `1px solid ${T.line}` }}>
+        {CONNECT_TOOLS.map(t => {
+          const isActive = t.id === toolId;
+          return (
+            <button key={t.id} onClick={() => setToolId(t.id)} style={{
+              padding: "8px 14px",
+              fontFamily: body, fontSize: 12,
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? T.navy : T.mutedDeep,
+              background: isActive ? `${T.brass}24` : "transparent",
+              border: "none",
+              borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+              cursor: "pointer",
+            }}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* The picked tool's link first, then the drawers -- nothing until a tab is clicked */}
+      {tool && (
+        <div style={{ marginTop: 16 }}>
+          {tool.quickAdd && (
+            <>
+              <QuickAddLink href={claudeAddLink(fill(tool.quickAdd.name), address)} label={fill(tool.quickAdd.label)} />
+              <p style={{ ...pStyle, margin: "8px 0 16px" }}>{tool.quickAdd.note}</p>
+            </>
+          )}
+          {tool.openLink && (
+            <>
+              <QuickAddLink href={tool.openLink.href} label={tool.openLink.label} />
+              <p style={{ ...pStyle, margin: "8px 0 16px" }}>{CONNECT_SHARED.followSteps}</p>
+              <Step1List tool={tool} fill={fill} address={address} base={base} teams={teams} />
+            </>
+          )}
+
+          {/* John's questions, every drawer closed; the manual steps last, Claude only */}
+          <h2 style={h2Style}>{CONNECT_SHARED.faqHeading}</h2>
+          <Drawer title={CONNECT_SHARED.expectTitle}><ExpectBody tool={tool} fill={fill} /></Drawer>
+          <Drawer title={CONNECT_SHARED.talkTitle}><TalkBody tool={tool} fill={fill} agent={agent} /></Drawer>
+          <Drawer title={CONNECT_SHARED.testTitle}>
+            <p style={pStyle}><strong>{CONNECT_SHARED.comparisonHeading}</strong></p>
+            <ol style={olStyle}>
+              {CONNECT_SHARED.comparisonSteps.map((s, i) => <li key={i} style={liStyle}>{s}</li>)}
+            </ol>
+          </Drawer>
+          {tool.quickAdd && <Drawer title={tool.quickAdd.fallback}><Step1List tool={tool} fill={fill} address={address} base={base} teams={teams} /></Drawer>}
+        </div>
+      )}
     </div>
   );
 }
