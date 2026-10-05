@@ -48,7 +48,10 @@ More dashboards expected here over time as new work-types are built — this lis
 ### Bench
 | Screen | Route | Component | Children | Notes |
 |---|---|---|---|---|
-| Agent Roster | `/bench` | `RosterScreen.jsx` | Add Agent, Personnel File | "Bench" is the Product Focus Area/nav-tab name (locked, `RO-12`); "Agent Roster" is this specific screen's name (the on-screen headline) — both correct, different levels. |
+| Bench Home | `/bench` | `RosterScreen.jsx` (`home`) | Agent Roster, Connect to AI, Test AI, Add Agent | Since v7.0.788 (`AGT-384`) Bench opens here: masthead, stats bar, four next-step cards. Shares `BenchNav.jsx` (breadcrumb + filters) with the screens below. |
+| Connect to AI | `/bench/connect` | `ConnectAiScreen.jsx` | — | `AGT-384`: the former Connect popup as a page with a Which-agent picker (`?agent=`); `/connect` and `?connect=1` redirect here. |
+| Test AI | `/bench/test-ai` | `TestAiScreen.jsx` | — | `AGT-384`: informational — Teaching your agent + Comparison test. Not Test My Team (`/bench/test`). |
+| Agent Roster | `/bench/roster` (was `/bench` until v7.0.788) | `RosterScreen.jsx` | Add Agent, Personnel File | "Bench" is the Product Focus Area/nav-tab name (locked, `RO-12`); "Agent Roster" is this specific screen's name (the on-screen headline) — both correct, different levels. |
 | Add Agent | `/bench/new` | `BenchNewScreen.jsx` | — | Always a child of Agent Roster. |
 | Personnel File | `/bench/:agentId` | `PersonnelScreen.jsx` | Teach | Always a child of Agent Roster. |
 | Teach | `/bench/:agentId/teach` | `TeachScreen.jsx` | — | Always a child of Personnel File — one level deeper than Add Agent/Personnel File, not a sibling of them. **Since v7.0.772 (`AGT-344`) the route is a redirect:** `TeachScreen.jsx` sends `/bench/:agentId/teach` to the Personnel File's Training tab with the upload form open (`?tab=training&add=file`); the Training tab is the single home for what an agent was taught. |

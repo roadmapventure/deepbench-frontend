@@ -5,6 +5,12 @@
 
 ---
 
+## session/bench-update-1005 (v7.0.788, 2026-10-05, attended, supervised cycle `54ed7ecc-7578-4b86-825e-a7a707125b26` — Designer on the judgment lane, Builder on the orchestrator lane) — `AGT-384` — **Bench opens on a home page; Connect to AI and Test AI are pages; one left nav with a breadcrumb.**
+
+- **What shipped.** `/bench` is Bench home (masthead, stats bar totalling the whole bench, four cards); the roster moved to `/bench/roster?filter=<id>`; the Connect popup became `/bench/connect` with a Which-agent picker (`?agent=`), and `?connect=1` and `/connect` redirect there; Teaching and Comparison moved to `/bench/test-ai`; `BenchNav.jsx` gives all five Bench pages the same nav (breadcrumb, All, Private Agents, groups). Approved copy and John's ten requirements: `docs/harvests/AGT-384.md`.
+- **One build, by John's word.** The three-file / four-task cap was waived for this ticket only (ruling `1f8d7302`); 14 files, 6 tasks, pushes `673c45c7` and `d48ab2db` (QA fix: the Connect page showed its title twice).
+- **Numbers.** Baseline on the unchanged tree: 344/384, 40 red. Verdict `cdc52aba` APPROVE on `d48ab2db`: 39 standing, 0 newly red. Preview QA passed on every page, desktop and phone width; the picker's team rows could not be exercised locally (no `/api` under vite) and rest on the tests. Status `delivered`; it reaches users with the single private-agents release to main.
+
 ## session/cycle-20261005-1041 (v7.0.783, 2026-10-05, unattended cycle `df82f9fa-60be-4b95-8868-708627f35389`, `trigger = scheduled`, lane 3 — Opus 5 orchestrating, Designer on the judgment lane Fable 5.1) — `AGT-304` slice 6 — **three more standing reds re-pinned to the facts they meant; dev's regression delta is 0 newly red.**
 
 - **What shipped.** Three regression suites, 4 tasks, inside the 3/4 caps `class_autonomy('P9 - Bug Fixes')` returned (bug_fix, rung 4, +0/+0). `agt-82-jerry-maguire` re-pinned to the two recorded rows that moved it (directive `684365e7` turned Jerry active; agent-row decision `54a37934` added the twelfth assignment). `ses-423b-stall-signal` had its `v7.0.535`-is-line-1 pin retired to the `SES-164` step-2 form its green sibling `ses-424c` already uses, and its `cycle-heartbeat.js >= 2` count re-pinned to the filename's one home. `agt-238-concurrency-corpus` had `trainer.epics === 0` replaced by per-project equality against `projects?select=slug,epics(count)`, with `notRun` only when no 0-epic project exists.
