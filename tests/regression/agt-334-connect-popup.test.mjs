@@ -1,3 +1,5 @@
+// DeepBench v7.0.790 | tests/regression/agt-334-connect-popup.test.mjs | AGT-386 -- CONNECT_LABEL is
+// ">Connect to AI<": the badge button names no agent.
 // DeepBench v7.0.789 | tests/regression/agt-334-connect-popup.test.mjs | AGT-385 -- EXPECTED_COPY's
 // title is now "Select your AI tool" and the Claude / ChatGPT step-2 sentences drop 'Your first time,
 // click "Always Allow".' (drawer 1 says it now); the one mechanic is useState(null) -- no tab pre-picked.
@@ -132,7 +134,7 @@ const AGENTS_IMPORT_RE = /import\s*\{[^}]*\bisPrivateAgent\b[^}]*\}\s*from\s*"\.
 const CONNECT_REDIRECT = 'if (searchParams.get("connect") === "1") return <Navigate to={`/bench/connect?agent=${agentId}`} replace />;';
 const ADDRESS = "/api/mcp/";
 const ADD_TRAINING = ">+ Add Training<";
-const CONNECT_LABEL = "Connect ${firstName} to AI";
+const CONNECT_LABEL = ">Connect to AI<"; // AGT-386: the button reads "Connect to AI", no first name
 const MOUNT = "<BadgeActions ";
 
 // Every arm-d failure, by name; [] is green.

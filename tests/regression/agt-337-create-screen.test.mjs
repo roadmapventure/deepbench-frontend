@@ -1,3 +1,4 @@
+// DeepBench v7.0.790 | tests/regression/agt-337-create-screen.test.mjs | AGT-386 -- the six team strings move PRESENT -> ABSENT
 // DeepBench v7.0.764 | tests/regression/agt-337-create-screen.test.mjs | AGT-337 slice 3 -- the create screen
 //
 // FEATURE: AGT-337 -- /bench/new is the create screen John approved: type a name, press the create
@@ -37,23 +38,25 @@ const PRESENT = [
   `Name your new agent`,
   `Your agent starts blank. You teach it everything it knows.`,
   `Agent name`,
-  `Add my new agent to my team`,
-  `New team`,
-  `placeholder="Team name"`,
-  `>Team name<`,
-  `Enter a team name`,
   `Create agent`,
   `Creating…`,
   `Cancel`,
   `Couldn’t create your agent. Try again.`,
   `action: "create_private_agent"`,
   `fetch("/api/agent-configs"`,
-  `.from("teams").select("id,name")`,
   `navigate("/bench")`,
   `maxLength={60}`,
 ];
 
+// AGT-386: the team block left the create screen for the Personnel file's badge, so its six strings
+// moved PRESENT -> ABSENT.
 const ABSENT = [
+  `Add my new agent to my team`,
+  `New team`,
+  `placeholder="Team name"`,
+  `>Team name<`,
+  `Enter a team name`,
+  `.from("teams").select("id,name")`,
   `Coming Soon`,
   `DOMAINS`,
   `Your Domain`,

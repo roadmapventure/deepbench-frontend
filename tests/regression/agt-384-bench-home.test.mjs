@@ -1,3 +1,5 @@
+// DeepBench v7.0.790 | tests/regression/agt-384-bench-home.test.mjs | AGT-386 -- arm h: a created
+// agent lands on its own Personnel file (`/bench/<id>`), and the roster landing is gone.
 // DeepBench v7.0.789 | tests/regression/agt-384-bench-home.test.mjs | AGT-385 -- arm d: the steps no
 // longer end on a Test AI line and render the comparison test (in a closed drawer); arm e: the page
 // heads its picker "Choose an agent" (cards), with no "(team)" suffix and no "Pick an agent" line.
@@ -257,9 +259,10 @@ function armG() {
 }
 
 // ── (h) the create screen ────────────────────────────────────────────────────────────────────
-const LANDING = 'if (res.status === 201) { navigate("/bench/roster?filter=private"); return; }';
+// AGT-386: a created agent lands on its own Personnel file, no longer on the roster.
+const LANDING = "if (res.status === 201) { const out = await res.json(); navigate(`/bench/${out.agent.id}`); return; }";
 const H_WANTS = [
-  ['navigate("/bench/roster?filter=private")', 1],
+  ['navigate("/bench/roster?filter=private")', 0],
   [LANDING, 1],
   ['<BenchNav current="Add a player"', 1],
   ['<BenchNavChips current="Add a player"', 1],
@@ -269,10 +272,10 @@ const H_WANTS = [
 function armH() {
   const src = read(NEW_REL); // RAW
   assert.deepEqual(failures(src, H_WANTS), [],
-    `(h) ${NEW_REL} must land a created agent on the roster under Private Agents, show the nav, and keep Cancel and back on Bench home`);
-  const oldLanding = src.replace(LANDING, 'if (res.status === 201) { navigate("/bench"); return; }');
+    `(h) ${NEW_REL} must land a created agent on its own Personnel file, show the nav, and keep Cancel and back on Bench home`);
+  const oldLanding = src.replace(LANDING, 'if (res.status === 201) { navigate("/bench/roster?filter=private"); return; }');
   assert.notEqual(oldLanding, src, "(h) CONTROL: the landing line must be found to be reverted");
-  assert.equal(failures(oldLanding, H_WANTS).length, 3, "(h) CONTROL: landing on Bench home must fail the landing needles and the /bench count");
+  assert.equal(failures(oldLanding, H_WANTS).length, 2, "(h) CONTROL: landing on the roster must fail the landing needle and the roster count");
 }
 
 // ── (i) the routes ───────────────────────────────────────────────────────────────────────────

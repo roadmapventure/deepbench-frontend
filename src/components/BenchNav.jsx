@@ -1,3 +1,4 @@
+// DeepBench v7.0.790 | BenchNav.jsx | AGT-386 — Breadcrumb is exported, so the Personnel file's own left nav opens with it
 // DeepBench v7.0.788 | BenchNav.jsx | AGT-384 — the left nav the five Bench pages share
 // (Bench home, the roster, Connect to AI, Test AI, Add a player). Top to bottom: the breadcrumb in
 // faint text with a faint rule under it, then All, Private Agents, the BENCH_FILTERS groups and the
@@ -48,7 +49,7 @@ export function useBenchNavItems() {
 }
 
 // FEATURE: AGT-384 — the breadcrumb: where the user is, and the way back to Bench home.
-function Breadcrumb({ current }) {
+export function Breadcrumb({ current }) {
   const navigate = useNavigate();
   return (
     <div style={{fontFamily:mono,fontSize:9,color:T.muted,letterSpacing:1,padding:"10px 14px",borderBottom:`1px solid ${T.lineSoft}`}}>

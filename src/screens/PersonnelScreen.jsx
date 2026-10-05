@@ -1,3 +1,4 @@
+// DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 -- a private agent's badge gains a team picker (one team per agent, saved through add_agent_to_team); the Connect button names no agent; the desktop left nav opens with the Bench breadcrumb; an id not yet in the roster shows Loading… and an unknown or archived id redirects to /bench (no other agent's file flashes); a Delete Agent link under every tab archives a private agent after a confirm popup
 // DeepBench v7.0.788 | PersonnelScreen.jsx | AGT-384 -- the badge's Connect button opens the Connect to AI page (/bench/connect?agent=<id>); the popup mount is gone and ?connect=1 redirects to the page
 // DeepBench v7.0.770 | PersonnelScreen.jsx | AGT-344 -- Training tab single home
 // DeepBench v7.0.769 | PersonnelScreen.jsx | AGT-350 -- the Activity tab's Connected from card is a four-column table
@@ -19,7 +20,8 @@ import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell } from "../AppShell.jsx";
 import { Corners, SkillBar, Toast, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
-import { useAgents } from "../hooks/useAgents.js";
+import { useRoster, forgetAgent } from "../hooks/useAgents.js"; // FEATURE: AGT-386 — settled read + cache forget
+import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 — the Bench breadcrumb
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
@@ -419,19 +421,131 @@ function SkillRow({ sp, chip }) {
   );
 }
 
+// FEATURE: AGT-386 — the team picker on a private agent's badge. The button reads the agent's team
+// (or the add prompt when it has none) and toggles a drawer: one radio per team, then "New team"
+// with a name field; with no teams yet, just the name field. A pick saves through the
+// add_agent_to_team action, which puts the agent on that one team and takes it off any other. The
+// teams list is the browser-key read BenchNewScreen used (id, name — never address); the agent's
+// current team is the route's `teams=1` read. Errors on either read leave the defaults.
+const TEAM_GHOST = {background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"5px 12px",fontFamily:body,fontSize:12,cursor:"pointer"};
+const TEAM_FIELD_LABEL = { fontFamily:mono, fontSize:9, color:T.brassDeep, textTransform:"uppercase", letterSpacing:1.3, fontWeight:600, marginBottom:4 };
+const TEAM_ROW = { fontFamily:body, fontSize:12, color:T.mutedDeep, display:"flex", alignItems:"center", gap:6, cursor:"pointer", marginBottom:8 };
+
+function TeamPicker({ agent }) {
+  const isMobile = useIsMobile();
+  const [open, setOpen]           = useState(false);
+  const [teams, setTeams]         = useState([]);
+  const [current, setCurrent]     = useState(null);
+  const [teamName, setTeamName]   = useState("");
+  const [newPicked, setNewPicked] = useState(false);
+  const [error, setError]         = useState(null);
+  const [saving, setSaving]       = useState(false);
+  const inFlight = useRef(false);
+
+  useEffect(() => {
+    let live = true;
+    setCurrent(null);
+    Promise.resolve(supabase.from("teams").select("id,name").order("name"))
+      .then(({ data, error: e }) => { if (live && !e && Array.isArray(data)) setTeams(data); })
+      .catch(() => {});
+    fetch(`/api/agent-configs?agent_id=${encodeURIComponent(agent.id)}&teams=1`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(json => { if (live && json && Array.isArray(json.teams)) setCurrent(json.teams[0]?.name ?? null); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [agent.id]);
+
+  async function save(team) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/agent-configs", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action: "add_agent_to_team", agent_id: agent.id, team }) });
+      if (res.status === 200) {
+        const out = await res.json();
+        setCurrent(out.team.name);
+        setTeams(ts => (ts.some(t => t.id === out.team.id) ? ts : [...ts, { id: out.team.id, name: out.team.name }].sort((a, b) => a.name.localeCompare(b.name))));
+        setTeamName("");
+        setNewPicked(false);
+        setOpen(false);
+        return;
+      }
+      setError("Couldn’t save the team. Try again.");
+    } catch {
+      setError("Couldn’t save the team. Try again.");
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
+  }
+
+  function saveTyped(fromEnter) {
+    const typed = teamName.trim();
+    if (typed) { save({ name: typed }); return; }
+    if (fromEnter) setError("Enter a team name");
+  }
+
+  const input = (
+    <input
+      type="text"
+      value={teamName}
+      placeholder="Team name"
+      maxLength={60}
+      disabled={saving}
+      onChange={e => { setTeamName(e.target.value); setError(null); setNewPicked(true); }}
+      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); saveTyped(true); } }}
+      onBlur={() => saveTyped(false)}
+      style={{ width:"100%", boxSizing:"border-box", background:T.cardAlt, border:`1px solid ${T.line}`, padding:"6px 10px", color:T.ink, fontFamily:body, outline:"none", fontSize: isMobile ? 16 : 13 }}
+    />
+  );
+
+  return (
+    <div style={{position:"relative",display:"inline-block"}}>
+      <button onClick={() => setOpen(o => !o)} style={TEAM_GHOST}>{current || "Add to a team"}</button>
+      {open && (
+        <div style={{position:"absolute",top:"100%",left:0,marginTop:4,background:T.card,border:`1px solid ${T.line}`,padding:10,textAlign:"left",minWidth:180,zIndex:2}}>
+          {teams.length > 0 ? (
+            <>
+              {teams.map(t => (
+                <label key={t.id} style={TEAM_ROW}>
+                  <input type="radio" name={`team-${agent.id}`} checked={!newPicked && current === t.name} disabled={saving} onChange={() => { setNewPicked(false); save({ id: t.id }); }} style={{accentColor:T.brass}}/>
+                  {t.name}
+                </label>
+              ))}
+              <label style={TEAM_ROW}>
+                <input type="radio" name={`team-${agent.id}`} checked={newPicked} disabled={saving} onChange={() => setNewPicked(true)} style={{accentColor:T.brass}}/>
+                New team
+              </label>
+              <div style={{marginLeft:22}}>{input}</div>
+            </>
+          ) : (
+            <>
+              <div style={TEAM_FIELD_LABEL}>Team name</div>
+              {input}
+            </>
+          )}
+          {error && <div style={{fontFamily:body,fontSize:12,color:T.flag,marginTop:6}}>{error}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // FEATURE: AGT-334 — the ID Badge / persona actions. One component, two mounts (desktop card, mobile
 // persona block). "+ Add Training" on trainable agents (the Training tab, the Roster button's
-// destination); "Connect <first name> to AI" on private agents only (isPrivateAgent reads the agent's
-// own row — Rule #1). Styles: STYLE-GUIDE §7 Primary CTA and Secondary/ghost, sized for the card.
+// destination); on private agents only (isPrivateAgent reads the agent's own row — Rule #1), the
+// team picker (AGT-386) and the Connect to AI button, which names no agent (AGT-386). Styles:
+// STYLE-GUIDE §7 Primary CTA and Secondary/ghost, sized for the card.
 function BadgeActions({ agent, onAddTraining, onConnect, style }) {
-  const firstName = agent.name.split(" ")[0];
   return (
     <div style={style}>
       {agent.trainable && (
         <button onClick={onAddTraining} style={{background:`linear-gradient(135deg, ${T.brass}, ${T.brassDeep})`,border:"none",color:T.navy,padding:"6px 12px",fontFamily:display,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Training</button>
       )}
+      {isPrivateAgent(agent) && <TeamPicker agent={agent}/>}
       {isPrivateAgent(agent) && (
-        <button onClick={onConnect} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"5px 12px",fontFamily:body,fontSize:12,cursor:"pointer"}}>{`Connect ${firstName} to AI`}</button>
+        <button onClick={onConnect} style={TEAM_GHOST}>Connect to AI</button>
       )}
     </div>
   );
@@ -1815,14 +1929,20 @@ export default function PersonnelScreen() {
   const { agentId } = useParams();
   const navigate    = useNavigate();
   const [searchParams] = useSearchParams();
-  const agents      = useAgents();
-  const agent       = agents.find(a => a.id === agentId) || agents[0];
+  // FEATURE: AGT-386 — no fallback to another agent: an id the roster does not hold (yet) is
+  // "Loading…" until the read settles, then a redirect to /bench (guards below every hook).
+  const { agents, settled } = useRoster();
+  const agent       = agents.find(a => a.id === agentId);
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
   const [capabilities, setCapabilities] = useState([]);
+  // FEATURE: AGT-386 — the Delete Agent confirm popup
+  const [removeOpen, setRemoveOpen]     = useState(false);
+  const [removing, setRemoving]         = useState(false);
+  const [removeFailed, setRemoveFailed] = useState(false);
 
   const showToast = (msg, icon="✓") => {
     setToast({msg,icon});
@@ -1853,9 +1973,6 @@ export default function PersonnelScreen() {
     catch { showToast("Could not load training entries", "⚠"); }
   };
 
-  const layers    = computeLayers(agent, entries);
-  const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
-
   // FEATURE: PE-07 — Left-sidebar nav replaces horizontal tab bar
   const NAV_GROUPS = [
     { id:"overview",  label:"OVERVIEW",  tabs:[{ id:"profile",  label:"Profile",  icon:"◈" }] },
@@ -1875,10 +1992,38 @@ export default function PersonnelScreen() {
   // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
 
+  // FEATURE: AGT-386 — Escape closes the confirm popup (same as Cancel)
+  useEffect(() => {
+    if (!removeOpen) return;
+    const onKey = e => { if (e.key === "Escape" && !removing) { setRemoveOpen(false); setRemoveFailed(false); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [removeOpen, removing]);
+
+  const cancelRemove = () => { if (removing) return; setRemoveOpen(false); setRemoveFailed(false); };
+  async function confirmRemove() {
+    setRemoving(true);
+    setRemoveFailed(false);
+    try {
+      const res = await fetch("/api/agent-configs", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action: "archive_private_agent", agent_id: agent.id }) });
+      if (res.status === 200) { forgetAgent(agent.id); navigate("/bench/roster?filter=private"); return; }
+    } catch {
+      // a rejected fetch is the same failure as a non-200
+    }
+    setRemoving(false);
+    setRemoveFailed(true);
+  }
+
   // FEATURE: AGT-384 — the old ?connect=1 link (and /connect, which lands on it) opens the Connect to
   // AI page with this file's agent picked. The ROUTE's id, never agent.id: before the roster loads
   // the fallback above would send a table-only agent's link to the wrong agent. Below every hook.
   if (searchParams.get("connect") === "1") return <Navigate to={`/bench/connect?agent=${agentId}`} replace />;
+  // FEATURE: AGT-386 — no wrong-agent flash: wait for the roster read, then leave for an unknown id.
+  if (!agent && !settled) return <AppShell toast={toast}><div style={{flex:1,padding:"40px 24px",fontFamily:mono,fontSize:10,color:T.muted,letterSpacing:1.3,textTransform:"uppercase"}}>Loading…</div></AppShell>;
+  if (!agent) return <Navigate to="/bench" replace />;
+
+  const layers    = computeLayers(agent, entries);
+  const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
 
   return (
     <AppShell toast={toast}>
@@ -1888,6 +2033,8 @@ export default function PersonnelScreen() {
         {/* FEATURE: PE-17 — desktop-only; mobile renders a merged persona header + horizontal tab bar instead */}
         {!isMobile && (
         <div style={{ width:180, flexShrink:0, background:T.card, borderRight:`1px solid ${T.line}`, display:"flex", flexDirection:"column", overflowY:"auto" }}>
+          {/* FEATURE: AGT-386 — the Bench breadcrumb, above the identity strip */}
+          <Breadcrumb current={agent.name}/>
 
           {/* Agent identity strip */}
           {/* FEATURE: PE-07 */}
@@ -2059,10 +2206,28 @@ export default function PersonnelScreen() {
             )}
             {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
             {activeTab === "activity" && showActivity && <ActivityTab agent={agent} entries={entries}/>}
+            {/* FEATURE: AGT-386 — Delete Agent: private agents only, every tab, desktop and mobile */}
+            {isPrivateAgent(agent) && (<div style={{textAlign:"right",marginTop:32}}><button onClick={() => setRemoveOpen(true)} style={{background:"none",border:"none",padding:0,fontFamily:body,fontSize:11,color:T.muted,textDecoration:"underline",cursor:"pointer"}}>Delete Agent</button></div>)}
           </div>
 
         </div>
       </div>
+
+      {/* FEATURE: AGT-386 — the Delete Agent confirm popup. Yes archives (is_active false, nothing deleted). */}
+      {removeOpen && (
+        <div onClick={cancelRemove} style={{position:"fixed",inset:0,zIndex:2000,background:`${T.navy}B8`,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{background:T.paperDeep,border:`1px solid ${T.line}`,padding:"24px 28px",maxWidth:420,width:"100%"}}>
+            <div style={{fontFamily:display,fontSize:16,color:T.navy}}>Are you sure you want to remove {agent.name}?</div>
+            {removeFailed && !removing && (
+              <div style={{fontFamily:body,fontSize:12,color:T.flag,marginTop:10}}>Couldn’t remove {agent.name}. Try again.</div>
+            )}
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+              <button onClick={confirmRemove} disabled={removing} style={{background:T.navy,color:T.card,border:"none",padding:"8px 20px",fontFamily:display,fontSize:13,fontWeight:700,cursor:"pointer"}}>Yes</button>
+              <button onClick={cancelRemove} disabled={removing} style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"10px 20px",cursor:"pointer",fontFamily:body,fontSize:13}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
