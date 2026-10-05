@@ -22,6 +22,9 @@ export default function TestAiScreen() {
             <div style={{fontFamily:display,fontSize:30,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,paddingBottom:14}}>Test AI</div>
             <div style={{height:2,background:T.brass,marginBottom:20}}/>
 
+            <h2 style={h2Style}>Talking to your agent</h2>
+            <p style={pStyle}>In your AI session, simply call your agent by name, or ask the session to send a message or ask your agent a question.</p>
+
             <h2 style={h2Style}>{CONNECT_SHARED.teachingHeading}</h2>
             <p style={pStyle}>{CONNECT_SHARED.teachingBody}</p>
 
