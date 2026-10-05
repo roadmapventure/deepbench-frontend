@@ -1,5 +1,6 @@
 -- DeepBench v7.0.749 | docs/design/agt-291-finish-sensor.sql | AGT-291 -- THE FINISH LINE GETS ITS
 -- SENSOR.
+-- Applied v7.0.780 | 2026-10-05 | cycle 7c5a7775-72bd-426a-af36-fb9ab9a5ccba: down re-captured, ACL asserted (AGT-291 remainder).
 --
 -- AGT-240 gave projects a finish line and `project_batch_state().proposal_due` measures it. Nothing
 -- WATCHES it: `runner_should_boot()` has no `finish_due` key (read live 2026-10-03), so a board whose
@@ -35,7 +36,7 @@
 --      the sentinel P0291 -- so the probe proves both directions without leaving a row behind and the
 --      migration still commits. A mismatch raises for real and aborts the whole migration.
 --
--- Down: public.capture_migration_down('ba7c3c09-97f2-4f03-9bee-d92523901897', 'agt291_finish_sensor',
+-- Down: public.capture_migration_down('7c5a7775-72bd-426a-af36-fb9ab9a5ccba', 'agt291_finish_sensor',
 --   '[{"kind":"function","identity":"public.project_batch_state()"},
 --     {"kind":"function","identity":"public.runner_should_boot()"}]'::jsonb)
 -- plus `alter table public.epics drop column if exists proposal_attempted_at;` -- a column the capture
@@ -50,7 +51,7 @@
 -- restore; the migration stops here rather than changing a function it cannot put back.
 
 SELECT public.capture_migration_down(
-  'ba7c3c09-97f2-4f03-9bee-d92523901897',
+  '7c5a7775-72bd-426a-af36-fb9ab9a5ccba',
   'agt291_finish_sensor',
   '[{"kind":"function","identity":"public.project_batch_state()"},
     {"kind":"function","identity":"public.runner_should_boot()"}]'::jsonb) AS captured;
@@ -439,6 +440,15 @@ begin
                     'an empty result to every caller', n_pbs, n_rsb;
   end if;
 
+  -- .claude/rules/supabase-column-grants.md (SES-315): the REVOKE is asserted both ways, never trusted.
+  if has_function_privilege('anon', 'public.project_batch_state()', 'execute')
+     or has_function_privilege('authenticated', 'public.project_batch_state()', 'execute')
+     or not has_function_privilege('service_role', 'public.project_batch_state()', 'execute')
+     or has_function_privilege('anon', 'public.runner_should_boot()', 'execute')
+     or has_function_privilege('authenticated', 'public.runner_should_boot()', 'execute')
+     or not has_function_privilege('service_role', 'public.runner_should_boot()', 'execute') then
+    raise exception 'AGT-291: a public role can execute project_batch_state() or runner_should_boot(), or service_role cannot';
+  end if;
   -- THE OMITTED-PARAMETER PATH, which here is the only path: both must answer a real caller.
   select * into v from public.runner_should_boot();
   if v.reason is null then
