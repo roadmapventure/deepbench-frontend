@@ -1,3 +1,4 @@
+// DeepBench v7.0.791 | ConnectAgentPopup.jsx | AGT-388 -- ToolTabs and FaqDrawers exported for Test AI; ConnectSteps renders the same bytes.
 // DeepBench v7.0.789 | ConnectAgentPopup.jsx | AGT-385 -- the steps open on the tool heading and the
 // three tabs with no tab picked; a picked tab shows its link first (Claude: the one-click add link and its note;
 // ChatGPT / Grok: the open link, then the steps, shown open), then John's question drawers, all
@@ -267,6 +268,52 @@ function DisconnectBody({ tool, fill }) {
   );
 }
 
+// FEATURE: AGT-388 -- the title and the tool pills, moved out of ConnectSteps so the Test AI page shows
+// the same tabs. Stateless: the page that mounts it holds the picked tool.
+export function ToolTabs({ toolId, onPick }) {
+  return (
+    <>
+      {/* Title */}
+      <h2 style={h2Style}>{CONNECT_SHARED.title}</h2>
+
+      {/* Tool pills */}
+      <div style={{ display: "flex", gap: 6, marginTop: 14, borderBottom: `1px solid ${T.line}` }}>
+        {CONNECT_TOOLS.map(t => {
+          const isActive = t.id === toolId;
+          return (
+            <button key={t.id} onClick={() => onPick(t.id)} style={{
+              padding: "8px 14px",
+              fontFamily: body, fontSize: 12,
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? T.navy : T.mutedDeep,
+              background: isActive ? `${T.brass}24` : "transparent",
+              border: "none",
+              borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
+              cursor: "pointer",
+            }}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// FEATURE: AGT-388 -- the three question drawers for one picked tool, moved out of ConnectSteps.
+// The mount lines keep their Connect indentation so the move stays byte-identical.
+export function FaqDrawers({ toolId, fill = s => s, agent = {} }) {
+  const tool = CONNECT_TOOLS.find(t => t.id === toolId) || null;
+  if (!tool) return null;
+  return (
+    <>
+          <Drawer title={CONNECT_SHARED.expectTitle}><ExpectBody tool={tool} /></Drawer>
+          <Drawer title={CONNECT_SHARED.disconnectTitle}><DisconnectBody tool={tool} fill={fill} /></Drawer>
+          <Drawer title={CONNECT_SHARED.talkTitle}><TalkBody tool={tool} fill={fill} agent={agent} /></Drawer>
+    </>
+  );
+}
+
 // FEATURE: AGT-384 -- the steps for one picked agent (or one picked team), on the Connect to AI page.
 // FEATURE: AGT-385 -- no tab is picked until the user clicks one; nothing shows below the tabs before.
 export default function ConnectSteps({ agent, address }) {
@@ -292,29 +339,7 @@ export default function ConnectSteps({ agent, address }) {
 
   return (
     <div>
-      {/* Title */}
-      <h2 style={h2Style}>{CONNECT_SHARED.title}</h2>
-
-      {/* Tool pills */}
-      <div style={{ display: "flex", gap: 6, marginTop: 14, borderBottom: `1px solid ${T.line}` }}>
-        {CONNECT_TOOLS.map(t => {
-          const isActive = t.id === toolId;
-          return (
-            <button key={t.id} onClick={() => setToolId(t.id)} style={{
-              padding: "8px 14px",
-              fontFamily: body, fontSize: 12,
-              fontWeight: isActive ? 600 : 400,
-              color: isActive ? T.navy : T.mutedDeep,
-              background: isActive ? `${T.brass}24` : "transparent",
-              border: "none",
-              borderBottom: isActive ? `2px solid ${T.brass}` : "2px solid transparent",
-              cursor: "pointer",
-            }}>
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <ToolTabs toolId={toolId} onPick={setToolId} />
 
       {/* The picked tool's link first, then the drawers -- nothing until a tab is clicked */}
       {tool && (
@@ -339,9 +364,7 @@ export default function ConnectSteps({ agent, address }) {
 
           {/* John's questions, every drawer closed; the manual steps last, Claude only */}
           <h2 style={h2Style}>{CONNECT_SHARED.faqHeading}</h2>
-          <Drawer title={CONNECT_SHARED.expectTitle}><ExpectBody tool={tool} /></Drawer>
-          <Drawer title={CONNECT_SHARED.disconnectTitle}><DisconnectBody tool={tool} fill={fill} /></Drawer>
-          <Drawer title={CONNECT_SHARED.talkTitle}><TalkBody tool={tool} fill={fill} agent={agent} /></Drawer>
+          <FaqDrawers toolId={toolId} fill={fill} agent={agent} />
           <Drawer title={CONNECT_SHARED.testTitle}>
             <p style={pStyle}><strong>{CONNECT_SHARED.comparisonHeading}</strong></p>
             <ol style={olStyle}>
