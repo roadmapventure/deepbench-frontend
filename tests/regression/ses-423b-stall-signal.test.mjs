@@ -1,3 +1,4 @@
+// DeepBench v7.0.783 | tests/regression/ses-423b-stall-signal.test.mjs | AGT-304 slice 6 -- the v7.0.535 stamp is graded the way ses-424c grades it (GONE from the header, its one fact in the BODY, SES-164 step 2), and the heartbeat script is pinned to step 7's --task key, not a >=2 mention count the prose lost at v7.0.641 (AGT-171).
 // DeepBench v7.0.532 | tests/regression/ses-423b-stall-signal.test.mjs | SES-423 slices 2-3
 //
 // SLICE 3 (v7.0.532) AMENDED THIS FILE: the reading is a DELTA. get_session counts the whole
@@ -184,8 +185,11 @@ function everyClauseHasTeeth(md) {
 function theStampWasMovedNotDeleted(md) {
   const stamps = md.split("\n").filter(l => l.startsWith("<!-- DeepBench v"));
   assert.strictEqual(stamps.length, 5, `session-hygiene check 7 caps the runbook at 5 header stamps; got ${stamps.length}`);
-  assert.ok(stamps[0].startsWith("<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md | SES-424 slice 3"),
-    "this ship's own stamp must be the first line of the runbook");
+  assert.ok(!stamps.some(l => l.startsWith("<!-- DeepBench v7.0.535 | runbooks/runner-cycle.md")),
+    "v7.0.535 (SES-424 slice 3) was rotated out by v7.0.650 (AGT-185): a stamp retires once its facts " +
+    "are in the BODY (SES-164 step 2)");
+  assert.ok(md.split("\n").slice(5).join("\n").includes("ses-424c-gate-card-census.test.mjs"),
+    "the fact v7.0.535 alone named -- its guard's filename -- must be in the BODY");
   assert.ok(!md.includes("<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md"),
     "v7.0.517 is the stamp SES-424 slice 3 rotated out; it must no longer be in the runbook");
   assert.ok(read("docs/SESSIONS.md").includes("<!-- DeepBench v7.0.517 | runbooks/runner-cycle.md | SES-378 slice 7"),
@@ -338,8 +342,9 @@ async function theScriptIsImportableAndReferenced(md) {
     "0 rows back from a PATCH is a FAILURE, not an empty success -- PostgREST answers 200 with [] for " +
     "a cycle id that names no row");
   assert.ok(mod.landed([{ id: "x" }]), "one row back is the landing");
-  assert.ok((md.split("cycle-heartbeat.js").length - 1) >= 2,
-    "the runbook must name the script in step 7's task AND in the prose that says when to run it");
+  assert.ok(md.includes('"heartbeat":"node scripts/cycle-heartbeat.js --cycle=<cid>'),
+    "the runbook names the script in step 7's --task; the cadence prose names the task's heartbeat key " +
+    "(CLAUSES the-builder-turn-says-when-to-beat; v7.0.641 AGT-171 took the filename out of the prose)");
 }
 
 async function run() {

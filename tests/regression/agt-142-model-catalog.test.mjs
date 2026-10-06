@@ -1,3 +1,4 @@
+// DeepBench v7.0.778 | tests/regression/agt-142-model-catalog.test.mjs | AGT-304 slice 3 -- re-pin: model_catalog is pinned by the six seeded ids, not by a row count, because AGT-146's model-watch routine grows the catalog by design (decision 7be76617; 20 rows live 2026-10-04); nothing weakened.
 // DeepBench v7.0.588 | tests/regression/agt-142-model-catalog.test.mjs | AGT-142 (P10 - Tooling)
 //
 // FEATURE: AGT-142 -- one table names the model for every job type. public.model_catalog lists the
@@ -66,7 +67,9 @@ async function live() {
 
   // (b)
   const catalog = await get("model_catalog?select=model_id,family,released_on,retire_not_before&order=model_id");
-  assert.strictEqual(catalog.length, 6, `model_catalog holds ${catalog.length} rows, expected 6`);
+  const SEEDED = ["claude-fable-5-1", "claude-haiku-4-5-20251001", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-4-6", "claude-sonnet-5"];
+  const missing = SEEDED.filter(id => !catalog.some(r => r.model_id === id));
+  assert.deepStrictEqual(missing, [], `model_catalog lacks seeded row(s) ${missing.join(", ")} -- AGT-146's routine grows the catalog: pin by id, never by count`);
   const o55 = catalog.find(r => r.model_id === "claude-opus-5-5");
   assert.ok(o55, "model_catalog has no claude-opus-5-5 row");
   assert.strictEqual(o55.released_on, "2026-09-22");
@@ -116,7 +119,8 @@ async function live() {
     }
     results.push("d-anon-refused-both-tables");
   }
-  assert.strictEqual((await get("model_catalog?select=model_id")).length, 6, "service key must read 6 catalog rows");
+  const svcIds = (await get("model_catalog?select=model_id")).map(r => r.model_id);
+  for (const id of SEEDED) assert.ok(svcIds.includes(id), `service key must read seeded catalog row ${id}`);
   assert.strictEqual((await get("model_assignments?select=job_key")).length, 5, "service key must read 5 assignment rows");
   results.push("d-service-reads-6-and-5");
 

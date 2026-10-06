@@ -1,3 +1,4 @@
+// DeepBench v7.0.788 | agents.js | AGT-384 — BENCH_PRIVATE.label "Private" → "Private Agents" (John, 2026-10-05); the id stays "private", so isPrivateAgent() and every benchGroups value are unchanged.
 // DeepBench v7.0.752 | agents.js | AGT-332 slice 1 — BENCH_PRIVATE + isPrivateAgent(); brittany benchGroups ["platform"] → ["private"]
 // DeepBench v7.0.700 | agents.js | AGT-164 — AGENTS entry `brittany` (Brittany, MK-07, Marketing Agent, lane `product`, is_active=false in `public.agents` — the outside tester's blank agent; the hire is John's) with benchGroups ["platform"] (not "mi"), plus AVATAR_CFG and AGENT_PRONOUNS she/her/her. Blank by design: no agent_configs, capability, Skill, knowledge or Library row exists for her and data_room_access is `[]` — everything she knows arrives on her Teach screen, and this roster entry IS that access (useAgents.js returns this static array; TeachScreen.jsx resolves the id against it). Money and training numbers are all 0. Applied with docs/design/agt-164-brittany-seed.sql, pinned by tests/regression/agt-164-brittany.test.mjs. The header keeps the newest five stamps: the v7.0.433 AGT-67 line retires here, and every claim in it is restated above — that entry is off the AGENTS array on the v7.0.485 AGT-70 terms, and the OFF_BENCH_AGENT_IDS list it named was deleted by the v7.0.456 AGT-69 line.
 // DeepBench v7.0.581 | agents.js | AGT-120 — AGENTS entry `nathan` (Nathan Laan, MK-06, Product Marketing Manager, lane `product`, is_active=false in `public.agents` — tryout; the hire is John's) with benchGroups ["platform"] (not "mi", so the Channel Intelligence screen does not list him), plus AVATAR_CFG and AGENT_PRONOUNS he/him/his. The broker roster never sees him while inactive (lib/project-manager.js fences is_active=eq.true&lane=eq.product).
@@ -301,9 +302,9 @@ export const BENCH_FILTERS = [
 ];
 
 // FEATURE: AGT-332 — the Private group: agents an outside user created for themselves. Like "all" it is
-// not in BENCH_FILTERS (slice 2 places it FIRST in the nav); membership is a benchGroups value, so no
+// not in BENCH_FILTERS (AGT-384: the nav lists it second, under All, labelled "Private Agents"); membership is a benchGroups value, so no
 // screen ever checks an agent id (Rule #1). AGT-334 reads isPrivateAgent() to decide the Connect button.
-export const BENCH_PRIVATE = { id: "private", label: "Private" };
+export const BENCH_PRIVATE = { id: "private", label: "Private Agents" };
 export const isPrivateAgent = a => Array.isArray(a?.benchGroups) && a.benchGroups.includes(BENCH_PRIVATE.id);
 
 // FEATURE: RO-04 — Avatar config for illustrated SVG portraits

@@ -1,3 +1,4 @@
+// DeepBench v7.0.782 | tests/regression/agt-176b-cost-basis.test.mjs | AGT-304 slice 5 -- the three AGT-204 qa figures are pinned BY ID, not by "every cycle with qa cost today".
 // DeepBench v7.0.626 | tests/regression/agt-176b-cost-basis.test.mjs | AGT-176 (part c) --
 // THE CLOSE-OUT RESOLVES ITS OWN COST, AND THIS FILE IS WHAT STOPS IT RESOLVING WRONG.
 //
@@ -207,9 +208,9 @@ async function run() {
 
     // Nothing was backfilled. The three real `qa` figures are the discriminating half: a migration that
     // rewrote or defaulted the column away loses them, and no count assertion would notice.
-    const qa = await supabaseRows("runner_cycles?select=id,api_cost_qa_usd&api_cost_qa_usd=gt.0&order=api_cost_qa_usd.asc");
+    const qa = await supabaseRows("runner_cycles?select=id,api_cost_qa_usd&id=in.(56357816-51f0-43d6-9f17-1059e74d7a76,04a3ac3b-3d09-4f0b-8fb1-abcaf5866ebb,611599f8-364d-4bec-b4f7-d7a0c6b667e3)&order=api_cost_qa_usd.asc");
     assert.deepStrictEqual(qa.map(r => Number(r.api_cost_qa_usd)), [1.2537, 2.2656, 3.5144],
-      `the three measured \`api_cost_qa_usd\` figures must read back byte-identical — AGT-204 backfills NOTHING, so these survive the migration unchanged; got ${JSON.stringify(qa)}`);
+      `the three measured \`api_cost_qa_usd\` figures must read back byte-identical — AGT-204 backfills NOTHING, so these survive the migration unchanged (pinned BY ID, AGT-304 slice 5: later cycles measure their own qa cost); got ${JSON.stringify(qa)}`);
     const total = await supabaseCount("runner_cycles?select=id");
     assert.ok(total >= 729, `cycle history never shrinks: ${total} rows, and 729 were present when AGT-204 shipped`);
     console.log(`      (F) both cost columns nullable, defaults still 0, 3 measured qa figures intact, ${total} cycle rows`);

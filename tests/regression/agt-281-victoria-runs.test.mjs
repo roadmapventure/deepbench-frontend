@@ -1,3 +1,4 @@
+// DeepBench v7.0.778 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-304 slice 3 -- re-pin arm F twice: requirement-check now binds a third Intent, vc-process-break-class (AGT-309 v7.0.743, agent-row decision 54d80a6a), and the AGT-281 agent-row decision is pinned by id e2c0d503 rather than newest-first, which SES-114's act 9ee2fe9b now wins; nothing weakened.
 // DeepBench v7.0.741 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-281 -- THE LIST TURN:
 // the door AGT-280 slice 2 built rules one ticket at a time, and this is the guard on the one that
 // rules a whole list.
@@ -491,13 +492,13 @@ async function run() {
         "capability_skill_profiles?capability_slug=eq.requirement-check&select=skill_profile_slug,level,display_order,is_required&order=display_order.asc");
       assert.ok(bind.ok, `the bindings must read; got ${describe(bind)}`);
       const slugs = (bind.json ?? []).map(b => b.skill_profile_slug);
-      assert.deepEqual(slugs, ["vc-requirement-intent", "vc-reorganize-intent"],
-        "BOTH DIRECTIONS: the new intent is bound AND the AGT-280 one still is -- a migration that " +
+      assert.deepEqual(slugs, ["vc-requirement-intent", "vc-reorganize-intent", "vc-process-break-class"],
+        "BOTH DIRECTIONS: the new intent is bound AND the AGT-280 one still is; the third, vc-process-break-class, is AGT-309 v7.0.743 (agent-row decision 54d80a6a) -- a migration that " +
         `replaced rather than joined would read as a pass on the new row alone; got ${JSON.stringify(slugs)}`);
       assert.equal(bind.json[1].level, 3, "same depth as its sibling");
 
       const dec = await req(url, key,
-        "runner_decisions?kind=eq.agent-row&backlog_id=eq.AGT-281&select=id,summary&order=decided_at.desc&limit=1");
+        "runner_decisions?id=eq.e2c0d503-9514-4bf9-aa06-68c2ef4af4ac&kind=eq.agent-row&backlog_id=eq.AGT-281&select=id,summary");
       assert.ok(dec.ok && (dec.json ?? []).length === 1,
         `ONE agent-row decision for AGT-281 -- the migration's whole down; got ${describe(dec)}`);
       const imgs = await req(url, key,

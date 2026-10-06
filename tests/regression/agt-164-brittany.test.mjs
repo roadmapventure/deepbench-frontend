@@ -1,3 +1,4 @@
+// DeepBench v7.0.788 | tests/regression/agt-164-brittany.test.mjs | AGT-384 -- the BENCH_PRIVATE pin follows the label to "Private Agents" (one assertion; nothing else here changes)
 // DeepBench v7.0.752 | tests/regression/agt-164-brittany.test.mjs | AGT-164 (AGT-332 slice 1: the benchGroups pin follows her to ["private"])
 //
 // FEATURE: AGT-164 -- Brittany (MK-07), the outside tester's BLANK marketing agent. Two things
@@ -94,7 +95,8 @@ async function partA_roster() {
   assert.deepStrictEqual(entry.benchGroups, ["private"], `AGENTS.${SELF_ID}.benchGroups is not exactly ["private"] (AGT-332: Private only)`);
   assert.ok(!entry.benchGroups.includes("mi"), `AGENTS.${SELF_ID} is in the "mi" bench group`);
   // FEATURE: AGT-332 -- Private is a benchGroups VALUE read off the agent's own entry, never an id check.
-  assert.deepStrictEqual(BENCH_PRIVATE, { id: "private", label: "Private" }, `BENCH_PRIVATE is not { id: "private", label: "Private" }`);
+  // AGT-384: the label reads "Private Agents" (John, 2026-10-05); the id is unchanged.
+  assert.deepStrictEqual(BENCH_PRIVATE, { id: "private", label: "Private Agents" }, `BENCH_PRIVATE is not { id: "private", label: "Private Agents" }`);
   assert.ok(!BENCH_FILTERS.some(f => f.id === "private"), `BENCH_FILTERS lists "private" -- like "all" it is positioned, not a plain group`);
   assert.strictEqual(isPrivateAgent(entry), true, `isPrivateAgent(${SELF_ID}) is not true`);
   assert.strictEqual(isPrivateAgent(AGENTS.find(a => a.id === "nathan")), false, `isPrivateAgent(nathan) is not false -- the move bled past ${SELF_ID}`);

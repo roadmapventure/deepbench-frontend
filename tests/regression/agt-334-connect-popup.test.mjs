@@ -1,3 +1,28 @@
+// DeepBench v7.0.790 | tests/regression/agt-334-connect-popup.test.mjs | AGT-386 -- CONNECT_LABEL is
+// ">Connect to AI<": the badge button names no agent.
+// DeepBench v7.0.789 | tests/regression/agt-334-connect-popup.test.mjs | AGT-385 -- EXPECTED_COPY's
+// title is now "Select your AI tool" and the Claude / ChatGPT step-2 sentences drop 'Your first time,
+// click "Always Allow".' (drawer 1 says it now); the one mechanic is useState(null) -- no tab pre-picked.
+// Round 2: the three step-2 sentences say "ask for your agent by name" (John, 2026-10-05).
+// Spec: docs/kickoffs/v7.0.789-AGT-385-connect-cards-faq.md.
+// DeepBench v7.0.788 | tests/regression/agt-334-connect-popup.test.mjs | AGT-384 -- the popup is
+// retired: its steps are the ConnectSteps component (same file, same copy) on the Connect to AI page,
+// /bench/connect. Arm (a) keeps every EXPECTED_COPY string and the pill order but its one mechanic
+// is now the first-pill default (CONNECT_TOOLS[0].id) -- the modal animation, the close label and
+// the Escape key are gone (pinned absent by agt-384 arm d). Arm (d): PersonnelScreen no longer
+// imports the popup or builds an address; it carries the ?connect=1 redirect line to the page once,
+// each button label once and <BadgeActions twice. Arms (b), (c), (e) are unchanged. Red on the
+// pre-v7.0.788 tree: arm (d) finds the popup import and no redirect line.
+// DeepBench v7.0.787 | tests/regression/agt-334-connect-popup.test.mjs | AGT-348 slice 5 -- the
+// Connect popup gets a third pill, Grok (John measured grok.com 2026-10-05). EXPECTED_COPY carries the
+// Grok tool's id, label, step-1 heading, five steps, step 2 and step 3 verbatim; id: "chatgpt" must
+// precede id: "grok". Red on the slice-4 tree: no Grok tool. Spec:
+// docs/kickoffs/v7.0.787-AGT-348-grok-connect-tab.md.
+// DeepBench v7.0.786 | tests/regression/agt-334-connect-popup.test.mjs | AGT-348 slice 4 -- John
+// approved (2026-10-05, "ok") the ChatGPT tab's new step 1: heading "On chatgpt.com, on a computer ..."
+// and seven steps matching today's Plugins screen (Add ▾ → Create custom MCP server). EXPECTED_COPY
+// carries the eight new strings in place of the old heading and seven old steps; three old steps are
+// asserted absent. Red on the slice-3 tree. Spec: docs/kickoffs/v7.0.786-AGT-348-chatgpt-connect-steps.md.
 // DeepBench v7.0.757 | tests/regression/agt-334-connect-popup.test.mjs | AGT-334 slice 1 -- the
 // Personnel file's badge buttons ("+ Add Training", "Connect <first name> to AI") and the Connect popup.
 //
@@ -35,7 +60,7 @@ const PERSONNEL = path.join(ROOT, "src", "screens", "PersonnelScreen.jsx");
 const CONNECT_SCREEN = path.join(ROOT, "src", "screens", "ConnectScreen.jsx");
 
 const EXPECTED_COPY = [
-  "Connect <first name> to your favorite AI tool",
+  "Select your AI tool",
   'id: "claude"', 'label: "Claude"',
   "Once in a Claude session:",
   'Click the plus "+"',
@@ -46,21 +71,30 @@ const EXPECTED_COPY = [
   "No sign-in",
   "Keep other defaults",
   "Save",
-  'In a Claude session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
+  "In a Claude session, simply ask for your agent by name to answer a question.",
   "You can turn off your agent by the same path: + → Connectors → switch off.",
   'id: "chatgpt"', 'label: "ChatGPT"',
-  "Once in a ChatGPT session:",
-  "On the very left hand nav of the app, click the plugins icon.",
-  'On the top right "Add" button, click the drop down arrow.',
-  'Click "Create MCP app"',
-  "Paste URL as Connection",
-  'Change Authentication to "No Authentication"',
-  'Click "Create"',
-  'In a ChatGPT session, simply ask for your agent to answer a question. Your first time, click "Always Allow".',
+  "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
+  'Open Plugins: the button above, or "Plugins" in the left sidebar', // now in the FAQ drawer (fallbackLines)
+  'Top right: click "Add" ▾ (the dropdown arrow) → "Create custom MCP server"',
+  'Name: create the agent\'s name you will call in a session, i.e. "<first name> from DeepBench"',
+  'Connection → "Server URL": paste this URL',
+  'Authentication: change "OAuth" to "No Authentication"',
+  'Tick "I understand and want to continue"',
+  'Click "Create as a plugin"',
+  "In a ChatGPT session, simply ask for your agent by name to answer a question.",
   "You can turn your agent off by:",
   "Clicking on plugins on the left hand nav",
   'Under "Installed", click the Agent name you created',
   'Change "Connected" to "Disconnect"',
+  'id: "grok"', 'label: "Grok"',
+  "On grok.com:",
+  'Open Connectors: the button above, or in a Grok chat click "+" → "Connectors" → "Add connector"',
+  'Top right: "New Connector", then click "Custom"',
+  "Server URL: paste this URL",
+  'Click "Add Connector"',
+  "In a Grok chat, simply ask for your agent by name to answer a question.",
+  'You can turn your agent off from a Grok chat: "+" → "Connectors" → switch it off.',
   "Teaching your agent",
   "Your agent starts blank: no role prompt, no guardrails, no library access. They know only what you give them. Go back to their personnel page to update their skillsets.",
   "Comparison test",
@@ -69,7 +103,15 @@ const EXPECTED_COPY = [
   "The difference is what your training brought.",
 ];
 
-const POPUP_MECHANICS = ["hModalPopIn", 'aria-label="Close"', '"Escape"', "CONNECT_TOOLS[0].id"];
+// v7.0.786 (AGT-348 slice 4): the slice-1 ChatGPT steps John's new copy replaced must be gone.
+const RETIRED_CHATGPT_COPY = [
+  'Click "Create MCP app"',
+  "Paste URL as Connection",
+  "On the very left hand nav of the app, click the plugins icon.",
+];
+
+// AGT-384: the modal shell is gone. AGT-385: no tab is pre-picked -- the one mechanic is the empty start.
+const POPUP_MECHANICS = ["useState(null)"];
 
 const FORBIDDEN = [
   /x-deepbench-mcp-key/i,
@@ -88,19 +130,20 @@ const count = (text, needle) => text.split(needle).length - 1;
 
 const POPUP_IMPORT = 'import ConnectAgentPopup from "../components/ConnectAgentPopup.jsx";';
 const AGENTS_IMPORT_RE = /import\s*\{[^}]*\bisPrivateAgent\b[^}]*\}\s*from\s*"\.\.\/data\/agents\.js";/;
-const CONNECT_PARAM = 'searchParams.get("connect") === "1"';
-const ADDRESS = "/api/mcp/${agent.id}";
+// AGT-384: ?connect=1 is honoured as a redirect to the Connect to AI page, keyed on the ROUTE's id.
+const CONNECT_REDIRECT = 'if (searchParams.get("connect") === "1") return <Navigate to={`/bench/connect?agent=${agentId}`} replace />;';
+const ADDRESS = "/api/mcp/";
 const ADD_TRAINING = ">+ Add Training<";
-const CONNECT_LABEL = "Connect ${firstName} to AI";
+const CONNECT_LABEL = ">Connect to AI<"; // AGT-386: the button reads "Connect to AI", no first name
 const MOUNT = "<BadgeActions ";
 
 // Every arm-d failure, by name; [] is green.
 function personnelFailures(text) {
   const out = [];
-  if (!text.includes(POPUP_IMPORT)) out.push("ConnectAgentPopup import line");
+  if (text.includes(POPUP_IMPORT)) out.push("ConnectAgentPopup import line still present");
   if (!AGENTS_IMPORT_RE.test(text)) out.push("isPrivateAgent in the ../data/agents.js import");
-  if (!text.includes(CONNECT_PARAM)) out.push("the connect search param");
-  if (count(text, ADDRESS) !== 1) out.push(`address built ${count(text, ADDRESS)} times, want 1`);
+  if (count(text, CONNECT_REDIRECT) !== 1) out.push(`the ?connect=1 redirect line ${count(text, CONNECT_REDIRECT)} times, want 1`);
+  if (count(text, ADDRESS) !== 0) out.push(`address built ${count(text, ADDRESS)} times, want 0`);
   if (count(text, ADD_TRAINING) !== 1) out.push(`"+ Add Training" label ${count(text, ADD_TRAINING)} times, want 1`);
   if (count(text, CONNECT_LABEL) !== 1) out.push(`Connect label ${count(text, CONNECT_LABEL)} times, want 1`);
   if (count(text, MOUNT) !== 2) out.push(`<BadgeActions mounted ${count(text, MOUNT)} times, want 2`);
@@ -113,11 +156,20 @@ async function run() {
   const popup = fs.readFileSync(POPUP, "utf8");
   const missing = EXPECTED_COPY.filter(s => !popup.includes(s));
   assert.deepEqual(missing, [], `the popup must carry every copy string verbatim; missing: ${JSON.stringify(missing)}`);
+  const retired = RETIRED_CHATGPT_COPY.filter(s => popup.includes(s));
+  assert.deepEqual(retired, [], `the retired ChatGPT step-1 copy must be gone; still present: ${JSON.stringify(retired)}`);
   const missingMech = POPUP_MECHANICS.filter(s => !popup.includes(s));
   assert.deepEqual(missingMech, [], `the popup must carry its shell mechanics; missing: ${JSON.stringify(missingMech)}`);
   const iClaude = popup.indexOf('id: "claude"');
   const iChatgpt = popup.indexOf('id: "chatgpt"');
   assert.ok(iClaude >= 0 && iChatgpt > iClaude, 'id: "claude" must precede id: "chatgpt" -- the popup opens on the first tool');
+  const iGrok = popup.indexOf('id: "grok"');
+  assert.ok(iGrok > iChatgpt, 'id: "chatgpt" must precede id: "grok" -- pill order is Claude, ChatGPT, Grok');
+  // Both ChatGPT and Grok carry the new Name wording (John, 2026-10-05); the old string is gone.
+  assert.equal(count(popup, 'Name: create the agent\'s name you will call in a session, i.e. "<first name> from DeepBench"'), 2,
+    "the new Name step must appear on both the ChatGPT and the Grok tool");
+  assert.equal(count(popup, 'Name: one you will recognize, i.e. "<first name> from DeepBench"'), 0,
+    "the old Name step must be gone from both tools");
 
   // (b) Rule #1, both directions
   const { AGENTS } = await import("../../src/data/agents.js");
@@ -135,7 +187,9 @@ async function run() {
 
   // (d) PersonnelScreen, both directions
   const personnel = fs.readFileSync(PERSONNEL, "utf8");
-  assert.deepEqual(personnelFailures(personnel), [], "PersonnelScreen must import the popup, read ?connect=1, build the address once and mount BadgeActions twice");
+  assert.deepEqual(personnelFailures(personnel), [], "PersonnelScreen must not import the popup or build an address, must redirect ?connect=1 to the Connect to AI page and mount BadgeActions twice");
+  assert.deepEqual(personnelFailures(personnel.replace(CONNECT_REDIRECT, "")), ["the ?connect=1 redirect line 0 times, want 1"],
+    "CONTROL: PersonnelScreen without the redirect line must fail the redirect check, and only that");
   const lines = personnel.split("\n");
   const firstMount = lines.findIndex(l => l.includes(MOUNT));
   assert.ok(firstMount >= 0, "CONTROL: a <BadgeActions line must be found to be removed");

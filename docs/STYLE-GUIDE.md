@@ -273,6 +273,10 @@ style={{
   opacity: 0.5,
 }}
 ```
+A secondary/ghost button that is switched off keeps its own transparent background and takes only `color: T.muted`, `opacity: 0.5`, `cursor: "not-allowed"` (the Personnel badge's "Add to a team", John 2026-10-05, `AGT-386`).
+
+### Quiet link (Locked 2026-10-05, `AGT-386`, John: "not prominent")
+A destructive action John wants out of the way is a text link, not the Destructive button above: `fontFamily: body, fontSize: 11, color: T.muted, textDecoration: "underline", background/border none`, right-aligned at the foot of the page. Used for "Delete Agent" on a private agent's Personnel page; it opens a confirm popup ("Are you sure you want to remove <name>?", Yes / Cancel) and the action archives the record rather than deleting it.
 
 ---
 
@@ -331,6 +335,8 @@ style={{
 ---
 
 ## 10. Left Sidebar Nav Pattern (Personnel File)
+
+**Bench nav + breadcrumb locked 2026-10-05 (`AGT-384`, John):** every Bench page (Bench home, roster, Connect to AI, Test AI, Add a player) renders this nav from `src/components/BenchNav.jsx`. Top to bottom: a faint breadcrumb (`mono` 9px `T.muted`, `T.lineSoft` rule under it) reading `Bench Home` or `Bench Home › <where>`, with `Bench Home` clickable; then All; then Private Agents; then the groups. On mobile the breadcrumb is a line above the chip row. No filter is highlighted on Bench home. Home cards: `T.card` + brass `Corners`, icon in a 64px brass-ringed circle, two-by-two on desktop, one column on mobile.
 
 **Second usage locked 2026-07-07 (`S-BENCH-FILTER-01`):** `RosterScreen.jsx` (`/bench`) reuses this exact pattern for its category filter nav (All/Market Intel/Platform Wide/Spend Analysis/Special Interests), at the same `180px` width. Confirms this is a reusable screen-level pattern, not Personnel-File-specific — any future screen needing a left filter/tab rail should reuse these same style objects rather than inventing a variant.
 
