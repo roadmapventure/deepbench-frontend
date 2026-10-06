@@ -1,3 +1,4 @@
+// DeepBench v7.0.792 | tests/regression/agt-337-create-private-agent.test.mjs | AGT-390 -- the save writes the knowledge AND Teach capabilities in one write and both assignments in one write; the new agent's address lists both tools; cleanup removes both slugs
 // DeepBench v7.0.762 | tests/regression/agt-337-create-private-agent.test.mjs | AGT-337 slice 1
 //
 // FEATURE: AGT-337 -- a user names a new agent and it is saved blank, private and live
@@ -145,8 +146,10 @@ async function partCreate(mod) {
     assert.deepStrictEqual(f.calls, THREE_WRITES, `(c) no team: the calls are ${JSON.stringify(f.calls)}`);
     assert.deepStrictEqual(out, { agent: { id: "zoe-k3x9ab", name: "Zoe" }, team: null }, "(c) no team: the result is not { agent: { id, name }, team: null }");
     assert.deepStrictEqual(f.sent[0].body, agentRow({ id: "zoe-k3x9ab", name: "Zoe" }), "(c) the agents write is not agentRow()");
-    assert.deepStrictEqual(f.sent[2].body, { agent_id: "zoe-k3x9ab", capability_slug: "zoe-k3x9ab-knowledge", tenant_id: "global" },
-      "(c) the assignment does not join the new agent to its own knowledge capability");
+    assert.deepStrictEqual(f.sent[2].body, [
+      { agent_id: "zoe-k3x9ab", capability_slug: "zoe-k3x9ab-knowledge", tenant_id: "global" },
+      { agent_id: "zoe-k3x9ab", capability_slug: "zoe-k3x9ab-teach", tenant_id: "global" },
+    ], "(c) the assignments do not join the new agent to its own knowledge and Teach capabilities");
     assert.strictEqual(f.sent[0].headers.apikey, "fake-key", "(c) the write does not carry the service key it was handed");
     assert.strictEqual(s.seen.length, 1, `(c) no team: the activity log was called ${s.seen.length} times, not once`);
     assert.strictEqual(s.seen[0].aiType, "deterministic", "(c) the activity row is not `deterministic`");
@@ -225,7 +228,7 @@ async function partCreate(mod) {
     assert.strictEqual(agentPosts.length, 2, `(c) a 409 led to ${agentPosts.length} agents writes, not two`);
     assert.notStrictEqual(agentPosts[0].body.id, agentPosts[1].body.id, "(c) the retry reused the colliding id");
     assert.strictEqual(out.agent.id, "zoe-bbbbbb", "(c) the result does not carry the id that was actually saved");
-    assert.strictEqual(f.sent[2].body.slug, "zoe-bbbbbb-knowledge", "(c) the capability was not written under the retried id");
+    assert.deepStrictEqual(f.sent[2].body.map(c => c.slug), ["zoe-bbbbbb-knowledge", "zoe-bbbbbb-teach"], "(c) the capabilities were not written under the retried id");
     results.push("id-collision-retried-once");
   }
 
@@ -287,12 +290,12 @@ async function partLive(mod) {
     assert.deepStrictEqual(agents[0], agentRow({ id, name: "Agt337 Fixture" }), "(e) the saved agents row is not agentRow()");
     results.push("live-agent-row-saved");
 
-    // THE DISCRIMINATOR: the agent's own MCP address lists exactly one tool.
+    // THE DISCRIMINATOR: the agent's own MCP address lists exactly its two tools (AGT-390: Knowledge and Teach).
     const { visibleRows, fetchCapabilityRows } = await import("../../api/_lib/mcp.js");
     const tools = visibleRows(await fetchCapabilityRows(), { governanceUnlocked: false, agentId: id });
-    assert.strictEqual(tools.length, 1, `(e) the new agent's MCP address lists ${tools.length} tools, not exactly 1`);
-    assert.strictEqual(tools[0].slug, id + "-knowledge", `(e) the one tool is '${tools[0].slug}', not the agent's knowledge capability`);
-    assert.strictEqual(tools[0].handler, "agent-bundle", `(e) the one tool's handler is '${tools[0].handler}', not 'agent-bundle'`);
+    assert.strictEqual(tools.length, 2, `(e) the new agent's MCP address lists ${tools.length} tools, not exactly 2`);
+    assert.deepStrictEqual(tools.map(t => t.slug), [id + "-knowledge", id + "-teach"], `(e) the tools are '${tools.map(t => t.slug).join(", ")}', not the agent's knowledge and Teach capabilities`);
+    assert.deepStrictEqual(tools.map(t => t.handler), ["agent-bundle", "agent-teach"], `(e) the tools' handlers are '${tools.map(t => t.handler).join(", ")}', not 'agent-bundle, agent-teach'`);
     results.push("live-mcp-address-lists-one-tool");
 
     const memberships = await get(`agent_teams?agent_id=eq.${encodeURIComponent(id)}&select=agent_id,team_id`);
@@ -301,7 +304,7 @@ async function partLive(mod) {
   } finally {
     if (id) {
       await del(`agent_capability_assignments?agent_id=eq.${encodeURIComponent(id)}`);
-      await del(`capabilities?slug=eq.${encodeURIComponent(id + "-knowledge")}`);
+      await del(`capabilities?slug=in.(${encodeURIComponent(id + "-knowledge")},${encodeURIComponent(id + "-teach")})`);
       await del(`agents?id=eq.${encodeURIComponent(id)}`);
     }
     if (teamId) await del(`teams?id=eq.${encodeURIComponent(teamId)}`);

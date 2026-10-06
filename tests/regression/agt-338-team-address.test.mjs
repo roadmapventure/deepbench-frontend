@@ -1,3 +1,4 @@
+// DeepBench v7.0.792 | tests/regression/agt-338-team-address.test.mjs | AGT-390 -- the team address lists each member's Knowledge and Teach tools (four); cleanup removes and checks both slugs
 // DeepBench v7.0.766 | tests/regression/agt-338-team-address.test.mjs | AGT-338 slice 1
 //
 // FEATURE: AGT-338 -- a team has one MCP address. A tester connects her team's address once and sees
@@ -171,16 +172,16 @@ async function partLive() {
     results.push("live-address-resolves-to-the-two-members");
 
     const tools = visibleRows(await fetchCapabilityRows(), { governanceUnlocked: false, agentIds });
-    assert.strictEqual(tools.length, 2, `(d) the team address lists ${tools.length} tools, not exactly 2`);
-    assert.deepStrictEqual(slugs(tools).sort(), members.map(id => id + "-knowledge"),
-      "(d) the two tools are not the two members' knowledge capabilities");
+    assert.strictEqual(tools.length, 4, `(d) the team address lists ${tools.length} tools, not exactly 4`);
+    assert.deepStrictEqual(slugs(tools).sort(), members.flatMap(id => [id + "-knowledge", id + "-teach"]),
+      "(d) the four tools are not the two members' knowledge and Teach capabilities");
     assert.ok(connectionInstructions(tools, true).endsWith("Agt338 One, Agt338 Two. When the user names one, call that agent's tool."),
       "(d) the connection's instructions do not end by naming the two fixture agents");
     results.push("live-team-address-lists-two-tools");
   } finally {
     for (const id of ids) {
       await del(`agent_capability_assignments?agent_id=eq.${encodeURIComponent(id)}`);
-      await del(`capabilities?slug=eq.${encodeURIComponent(id + "-knowledge")}`);
+      await del(`capabilities?slug=in.(${encodeURIComponent(id + "-knowledge")},${encodeURIComponent(id + "-teach")})`);
       await del(`agents?id=eq.${encodeURIComponent(id)}`);
     }
     if (teamId) await del(`teams?id=eq.${encodeURIComponent(teamId)}`);
@@ -188,7 +189,7 @@ async function partLive() {
   for (const id of ids) {
     const left = await get(`agents?id=eq.${encodeURIComponent(id)}&select=id`);
     assert.strictEqual(left.length, 0, `(d) ${left.length} fixture agents rows remain after cleanup`);
-    const caps = await get(`capabilities?slug=eq.${encodeURIComponent(id + "-knowledge")}&select=slug`);
+    const caps = await get(`capabilities?slug=in.(${encodeURIComponent(id + "-knowledge")},${encodeURIComponent(id + "-teach")})&select=slug`);
     assert.strictEqual(caps.length, 0, `(d) ${caps.length} fixture capabilities rows remain after cleanup`);
     const held = await get(`agent_capability_assignments?agent_id=eq.${encodeURIComponent(id)}&select=agent_id`);
     assert.strictEqual(held.length, 0, `(d) ${held.length} fixture assignment rows remain after cleanup`);
