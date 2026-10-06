@@ -80,13 +80,12 @@ const HEX_RE = /#[0-9a-fA-F]{6}\b/;
 // v7.0.789 (AGT-385): href + John's link label only; the note left ("2. Follow these steps:" is shared).
 const OPEN_LINK_COPY = [
   'href: "https://chatgpt.com/plugins"',
-  'lead: "1. Click to open: "',
   'label: "ChatGPT Plugins"',
 ];
 // v7.0.787 (slice 5): the Grok tab's Open Connectors button.
 const GROK_OPEN_LINK_COPY = [
   'href: "https://grok.com/connectors"',
-  'label: "1. Click to open Grok Connectors"',
+  'label: "Grok Connectors"',
 ];
 const OPEN_LINK_RENDER = "<QuickAddLink href={tool.openLink.href}";
 // v7.0.789 (AGT-385): the step-1 list is its own component (Step1List), defined above ConnectSteps, so
@@ -124,6 +123,8 @@ function openLinkFailures(popup) {
     if (iGrok < 0 || second < iGrok) out.push('second openLink: not after id: "grok"');
   }
   for (const s of [...OPEN_LINK_COPY, ...GROK_OPEN_LINK_COPY]) if (count(popup, s) !== 1) out.push(`${s} ${count(popup, s)} times, want 1`);
+  // ChatGPT and Grok share the lead-in (John, 2026-10-05): once per tool.
+  if (count(popup, 'lead: "1. Click to open: "') !== 2) out.push(`lead 1. Click to open: ${count(popup, 'lead: "1. Click to open: "')} times, want 2`);
   const iRender = popup.indexOf(OPEN_LINK_RENDER);
   if (iRender < 0) out.push("no openLink render");
   else if (popup.indexOf(STEPS_MOUNT) < 0 || iRender > popup.indexOf(STEPS_MOUNT)) out.push("openLink renders after the step-1 list");

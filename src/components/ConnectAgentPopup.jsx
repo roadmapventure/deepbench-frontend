@@ -77,7 +77,7 @@ export const CONNECT_TOOLS = [
     step1Heading: "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
     step1: [
       'Top right: click "Add" ▾ (the dropdown arrow) → "Create custom MCP server"',
-      'Name: create the agent's name you will call in a session, i.e. "<first name> from DeepBench"',
+      `Name: create the agent's name you will call in a session, i.e. "<first name> from DeepBench"`,
       { text: 'Connection → "Server URL": paste this URL', copy: true },
       'Authentication: change "OAuth" to "No Authentication"',
       'Tick "I understand and want to continue"',
@@ -109,9 +109,8 @@ export const CONNECT_TOOLS = [
     id: "grok", label: "Grok", subtitle: "Grok",
     step1Heading: "On grok.com:",
     step1: [
-      'Open Connectors: the button above, or in a Grok chat click "+" → "Connectors" → "Add connector"',
       'Top right: "New Connector", then click "Custom"',
-      'Name: one you will recognize, i.e. "<first name> from DeepBench"',
+      `Name: create the agent's name you will call in a session, i.e. "<first name> from DeepBench"`,
       { text: 'Server URL: paste this URL', copy: true },
       'Click "Add Connector"',
     ],
@@ -122,7 +121,13 @@ export const CONNECT_TOOLS = [
     // address of its own, so there is nothing to pre-fill. This only opens the Connectors page.
     openLink: {
       href: "https://grok.com/connectors",
-      label: "1. Click to open Grok Connectors",
+      lead: "1. Click to open: ",
+      label: "Grok Connectors",
+      followSteps: false,
+      fallbackLines: [
+        'Open Connectors: the button above, or in a Grok chat click "+" → "Connectors" → "Add connector"',
+        "Then follow the steps above.",
+      ],
     },
   },
 ];

@@ -77,7 +77,7 @@ const EXPECTED_COPY = [
   "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
   'Open Plugins: the button above, or "Plugins" in the left sidebar', // now in the FAQ drawer (fallbackLines)
   'Top right: click "Add" ▾ (the dropdown arrow) → "Create custom MCP server"',
-  'Name: create the agent's name you will call in a session, i.e. "<first name> from DeepBench"',
+  'Name: create the agent\'s name you will call in a session, i.e. "<first name> from DeepBench"',
   'Connection → "Server URL": paste this URL',
   'Authentication: change "OAuth" to "No Authentication"',
   'Tick "I understand and want to continue"',
@@ -165,9 +165,11 @@ async function run() {
   assert.ok(iClaude >= 0 && iChatgpt > iClaude, 'id: "claude" must precede id: "chatgpt" -- the popup opens on the first tool');
   const iGrok = popup.indexOf('id: "grok"');
   assert.ok(iGrok > iChatgpt, 'id: "chatgpt" must precede id: "grok" -- pill order is Claude, ChatGPT, Grok');
-  // ChatGPT's Name step has its own wording now (John, 2026-10-05); the old string is Grok's alone.
-  assert.equal(count(popup, 'Name: one you will recognize, i.e. "<first name> from DeepBench"'), 1,
-    "the old Name step must remain on the Grok tool only");
+  // Both ChatGPT and Grok carry the new Name wording (John, 2026-10-05); the old string is gone.
+  assert.equal(count(popup, 'Name: create the agent\'s name you will call in a session, i.e. "<first name> from DeepBench"'), 2,
+    "the new Name step must appear on both the ChatGPT and the Grok tool");
+  assert.equal(count(popup, 'Name: one you will recognize, i.e. "<first name> from DeepBench"'), 0,
+    "the old Name step must be gone from both tools");
 
   // (b) Rule #1, both directions
   const { AGENTS } = await import("../../src/data/agents.js");

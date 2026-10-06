@@ -81,10 +81,8 @@ const APPROVED_COPY = [
   "In a Claude session, simply ask for your agent by name to answer a question.",
   "In a ChatGPT session, simply ask for your agent by name to answer a question.",
   "In a Grok chat, simply ask for your agent by name to answer a question.",
-  "1. Click to open: ",
   "ChatGPT Plugins",
-  "Then follow the steps above.",
-  "1. Click to open Grok Connectors",
+  "Grok Connectors",
   "2. Follow these steps:",
   "Select your AI tool",
   "FAQ",
@@ -99,6 +97,9 @@ const B_WANTS = [
   ...APPROVED_COPY.map(s => [s, 1]),
   // Round 2: the old link wording is gone, and the lead-in sits outside the link, right before it.
   ["Click to add <first name> to Claude", 0],
+  // ChatGPT and Grok share the link lead-in and the drawer's closing line (John, 2026-10-05).
+  ["1. Click to open: ", 2],
+  ["Then follow the steps above.", 2],
   ["{tool.quickAdd.lead}<QuickAddLink ", 1],
   ["useState(null)", 1],
   ["useState(CONNECT_TOOLS[0].id)", 0],
