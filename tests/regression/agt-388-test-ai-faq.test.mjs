@@ -1,3 +1,8 @@
+// DeepBench v7.0.791 | tests/regression/agt-388-test-ai-faq.test.mjs | AGT-388 round 2 -- on the Test AI page
+// ONLY, "Select your AI tool" is drawn in the body paragraph style (pStyle), not the h2 (John, harvest
+// "Round 2"). Arm (a) pins the plainTitle prop on Test AI's mount; arm (b) pins ToolTabs drawing the
+// title with pStyle when plainTitle is set and with the unchanged h2 line otherwise, and ConnectSteps
+// passing no plainTitle. Red on the round-1 tree (aa6eec8a): no `plainTitle` anywhere.
 // DeepBench v7.0.791 | tests/regression/agt-388-test-ai-faq.test.mjs | AGT-388 -- the Test AI page gets an
 // FAQ under "Comparison test": the Connect page's "Select your AI tool" tabs and, once a tool is picked, the
 // Connect page's three question drawers (what to expect, how to disconnect, how to talk), all closed.
@@ -61,7 +66,7 @@ const A_WANTS = [
   ['import { ToolTabs, FaqDrawers } from "../components/ConnectAgentPopup.jsx";', 1],
   ["useState(null)", 1],
   ["{CONNECT_SHARED.faqHeading}</h2>", 1],
-  ["<ToolTabs toolId={toolId} onPick={setToolId} />", 1],
+  ["<ToolTabs toolId={toolId} onPick={setToolId} plainTitle />", 1],
   [FAQ_MOUNT, 1],
   ["CONNECT_TOOLS", 0],
   ["<Drawer", 0],
@@ -79,6 +84,10 @@ function armA() {
     `(a) ${TEST_AI_REL} must import ToolTabs and FaqDrawers on their own line, hold the picked tool, and mount the FAQ h2, the tabs and the drawers once each under the comparison list -- with no per-tool data, drawer, team, test or link copy of its own`);
   const noDrawers = code.replace(FAQ_MOUNT, "");
   assert.notEqual(noDrawers, code, "(a) CONTROL: the drawers mount must be found to be removed");
+  const h2Title = code.replace("onPick={setToolId} plainTitle />", "onPick={setToolId} />");
+  assert.notEqual(h2Title, code, "(a) CONTROL: the plainTitle prop must be found to be removed");
+  assert.deepEqual(aFailures(h2Title), ["`<ToolTabs toolId={toolId} onPick={setToolId} plainTitle />` 0 times, want 1"],
+    "(a) CONTROL: Test AI drawing the title as an h2 (no plainTitle) must fail, and only that");
   assert.deepEqual(aFailures(noDrawers), ["`<FaqDrawers toolId={toolId} />` 0 times, want 1", "missing <FaqDrawers "],
     "(a) CONTROL: a page without the drawers must fail on that mount, and only that");
   const comparisonH2 = "<h2 style={h2Style}>{CONNECT_SHARED.comparisonHeading}</h2>";
@@ -89,8 +98,15 @@ function armA() {
 }
 
 // ── (b) the shared pieces in ConnectAgentPopup.jsx ───────────────────────────────────────────────
+// The title block inside ToolTabs: body text under plainTitle, else Connect's own h2 line, byte-identical.
+const TITLE_H2 = "      <h2 style={h2Style}>{CONNECT_SHARED.title}</h2>\n";
+const TITLE_TERNARY = "      {plainTitle ? <p style={pStyle}>{CONNECT_SHARED.title}</p> : (\n" + TITLE_H2 + "      )}\n";
 const B_WANTS = [
-  ["export function ToolTabs({ toolId, onPick })", 1],
+  ["export function ToolTabs({ toolId, onPick, plainTitle = false })", 1],
+  // Round 2: plainTitle draws the title as body text; without it the Connect h2 line, unchanged.
+  [TITLE_TERNARY, 1],
+  [TITLE_H2, 1],
+  ["<ToolTabs toolId={toolId} onPick={setToolId} plainTitle", 0],
   ["export function FaqDrawers({ toolId, fill = s => s, agent = {} })", 1],
   ["<ToolTabs toolId={toolId} onPick={setToolId} />", 1],
   ["<FaqDrawers toolId={toolId} fill={fill} agent={agent} />", 1],
@@ -106,6 +122,16 @@ function armB() {
     `(b) ${STEPS_REL} must export ToolTabs and FaqDrawers after the drawer bodies, mount both in ConnectSteps, keep five drawer mounts and keep the team line in the talk drawer`);
   const sixth = src.replace("<Drawer title=", "<Drawer title={CONNECT_SHARED.faqHeading}></Drawer>\n<Drawer title=");
   assert.deepEqual(bFailures(sixth), ["`<Drawer title=` 6 times, want 5"], "(b) CONTROL: a sixth drawer mount must fail, and only that");
+  const swapped = src.replace("{plainTitle ? <p style={pStyle}>", "{!plainTitle ? <p style={pStyle}>");
+  assert.notEqual(swapped, src, "(b) CONTROL: the plainTitle branch must be found to be inverted");
+  assert.deepEqual(bFailures(swapped), [`\`${TITLE_TERNARY}\` 0 times, want 1`],
+    "(b) CONTROL: body text on Connect (the branches inverted) must fail, and only that");
+  const connectPlain = src.replace("<ToolTabs toolId={toolId} onPick={setToolId} />", "<ToolTabs toolId={toolId} onPick={setToolId} plainTitle />");
+  assert.notEqual(connectPlain, src, "(b) CONTROL: ConnectSteps' mount must be found to pass plainTitle");
+  assert.deepEqual(bFailures(connectPlain), [
+    "`<ToolTabs toolId={toolId} onPick={setToolId} plainTitle` 1 times, want 0",
+    "`<ToolTabs toolId={toolId} onPick={setToolId} />` 0 times, want 1",
+  ],"(b) CONTROL: the Connect page passing plainTitle must fail, and only that");
 }
 
 // ── (c) the copy Test AI shows with no first name to fill ────────────────────────────────────────

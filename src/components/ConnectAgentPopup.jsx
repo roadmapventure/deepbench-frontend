@@ -270,11 +270,15 @@ function DisconnectBody({ tool, fill }) {
 
 // FEATURE: AGT-388 -- the title and the tool pills, moved out of ConnectSteps so the Test AI page shows
 // the same tabs. Stateless: the page that mounts it holds the picked tool.
-export function ToolTabs({ toolId, onPick }) {
+// Round 2 (John, harvest "Round 2"): plainTitle draws the title as body text (Test AI only); without it
+// the Connect page's h2 line renders unchanged.
+export function ToolTabs({ toolId, onPick, plainTitle = false }) {
   return (
     <>
       {/* Title */}
+      {plainTitle ? <p style={pStyle}>{CONNECT_SHARED.title}</p> : (
       <h2 style={h2Style}>{CONNECT_SHARED.title}</h2>
+      )}
 
       {/* Tool pills */}
       <div style={{ display: "flex", gap: 6, marginTop: 14, borderBottom: `1px solid ${T.line}` }}>

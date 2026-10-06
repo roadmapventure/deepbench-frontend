@@ -1,3 +1,4 @@
+// DeepBench v7.0.791 | TestAiScreen.jsx | AGT-388 round 2 -- "Select your AI tool" as instruction text (ToolTabs plainTitle).
 // DeepBench v7.0.791 | TestAiScreen.jsx | AGT-388 -- FAQ under Comparison test: pick a tool, three closed drawers from the Connect page.
 // DeepBench v7.0.788 | TestAiScreen.jsx | AGT-384 — the Test AI page (/bench/test-ai)
 // Informational only (John, 2026-10-05): how to teach an agent and how to see what the training
@@ -38,7 +39,7 @@ export default function TestAiScreen() {
             </ol>
 
             <h2 style={h2Style}>{CONNECT_SHARED.faqHeading}</h2>
-            <ToolTabs toolId={toolId} onPick={setToolId} />
+            <ToolTabs toolId={toolId} onPick={setToolId} plainTitle />
             {toolId && <div style={{ marginTop: 16 }}><FaqDrawers toolId={toolId} /></div>}
           </div>
         </div>
