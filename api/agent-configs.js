@@ -1,3 +1,7 @@
+// DeepBench v7.0.792 | api/agent-configs.js | AGT-390 -- the plain POST (a role prompt, an output format
+// or a guardrail saved on the Resume or Playbook tab) is lib/knowledge-write.js's insertAgentConfig(),
+// shared with the MCP Teach tool, and every row it writes carries origin `deepbench`. Same messages,
+// same statuses. No model call, so no logAICall().
 // DeepBench v7.0.790 | api/agent-configs.js | AGT-386 -- two more POST body actions on the same route:
 // `add_agent_to_team` (one private agent onto one team) and `archive_private_agent` (is_active false,
 // nothing deleted), both through lib/private-agent-create.js. No model call, so no logAICall().
@@ -12,6 +16,7 @@
 // This route reaches no logActivity() call today -- wrapping it is inert now and means a logging
 // site added here later cannot silently lose attribution.
 import { withRequestContext } from "../lib/request-context.js";
+import { insertAgentConfig } from "../lib/knowledge-write.js";
 import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput } from "../lib/private-agent-create.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
@@ -102,46 +107,13 @@ async function handler(req, res) {
         }
       }
 
-      const {
-        agent_id,
-        tenant_id = "global",
-        type,
-        name,
-        text,
-        is_default = false,
-        is_user_selectable = false,
-      } = req.body;
-
-      if (!agent_id || !type || !name || !text) {
-        return res.status(400).json({ error: "agent_id, type, name, text required" });
+      // FEATURE: AGT-390 -- one insert, shared with the MCP Teach tool; DeepBench's own write.
+      try {
+        const config = await insertAgentConfig({ ...req.body, origin: "deepbench", origin_caller: null });
+        return res.status(201).json({ config });
+      } catch (error) {
+        return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
       }
-      const validTypes = ["role_prompt", "output_format", "guardrail"];
-      if (!validTypes.includes(type)) {
-        return res.status(400).json({ error: `type must be one of: ${validTypes.join(", ")}` });
-      }
-
-      // Clear existing defaults for this agent+type if this row is being set as default
-      if (is_default) {
-        await fetch(
-          `${supabaseUrl}/rest/v1/agent_configs?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&type=eq.${encodeURIComponent(type)}`,
-          { method: "PATCH", headers: { ...headers, "Prefer": "return=minimal" }, body: JSON.stringify({ is_default: false }) }
-        );
-      }
-
-      const insertRes = await fetch(
-        `${supabaseUrl}/rest/v1/agent_configs`,
-        {
-          method: "POST",
-          headers: { ...headers, "Prefer": "return=representation" },
-          body: JSON.stringify({ agent_id, tenant_id, type, name, text, is_default, is_user_selectable, updated_at: new Date().toISOString() }),
-        }
-      );
-      if (!insertRes.ok) {
-        const err = await insertRes.text();
-        return res.status(500).json({ error: "Supabase insert failed: " + err.slice(0, 200) });
-      }
-      const saved = await insertRes.json();
-      return res.status(201).json({ config: Array.isArray(saved) ? saved[0] : saved });
     }
 
     // ── PATCH ────────────────────────────────────────────────────────────────

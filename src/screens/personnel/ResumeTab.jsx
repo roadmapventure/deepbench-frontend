@@ -1,3 +1,4 @@
+// DeepBench v7.0.792 | ResumeTab.jsx | AGT-390 -- originTag(): where a row was taught and when (DeepBench, or MCP and the caller's key name), shown under a ConfigCard's header
 // DeepBench v5.2.5 | ResumeTab.jsx | AI-28 badge label sweep — PROMPT_ASSEMBLY
 // FEATURE: PE-02 — Resume tab
 // src/screens/personnel/ResumeTab.jsx — v5.0.0
@@ -29,6 +30,15 @@ async function apiPatchConfig(id, fields) {
 async function apiDeleteConfig(id) {
   const res = await fetch("/api/agent-configs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, tenant_id: TENANT_ID }) });
   if (!res.ok) throw new Error("Failed to delete");
+}
+
+// FEATURE: AGT-390 — "<who> · learned <date>" for a row that records its origin; null when it does not.
+// The date is created_at in US Central.
+export function originTag(row) {
+  if (!row || !row.origin) return null;
+  const who = row.origin === "mcp" ? (row.origin_caller ? `MCP · ${row.origin_caller}` : "MCP") : "DeepBench";
+  const date = new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return `${who} · learned ${date}`;
 }
 
 // ── ConfigCard ────────────────────────────────────────────────────────────────
@@ -65,6 +75,8 @@ export function ConfigCard({ config, onSetDefault, onToggleSelectable, onEdit, o
         <button onClick={() => setEditingId(isEditing ? null : config.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, background: "transparent", border: `1px solid ${T.lineSoft}`, padding: "1px 8px", cursor: "pointer", textTransform: "uppercase", letterSpacing: .5 }}>{isEditing ? "Close" : "Edit"}</button>
         {!config.is_default && <button onClick={() => onDelete(config.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.flag, background: "transparent", border: `1px solid ${T.flag}30`, padding: "1px 8px", cursor: "pointer", textTransform: "uppercase", letterSpacing: .5 }}>Delete</button>}
       </div>
+      {/* FEATURE: AGT-390 — where and when this was taught */}
+      {originTag(config) && <div style={{ padding: "4px 12px 0", fontFamily: mono, fontSize: 8.5, color: T.muted }}>{originTag(config)}</div>}
       {isEditing ? (
         <div style={{ padding: "10px 12px" }}>
           <input value={editName} onChange={e => setEditName(e.target.value)} style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "6px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
