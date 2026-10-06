@@ -76,9 +76,8 @@ export const CONNECT_TOOLS = [
     id: "chatgpt", label: "ChatGPT", subtitle: "ChatGPT",
     step1Heading: "On chatgpt.com, on a computer (the ChatGPT phone app can't add these):",
     step1: [
-      'Open Plugins: the button above, or "Plugins" in the left sidebar',
-      'Top right: "Add" ▾ → "Create custom MCP server"',
-      'Name: one you will recognize, i.e. "<first name> from DeepBench"',
+      'Top right: click "Add" ▾ (the dropdown arrow) → "Create custom MCP server"',
+      'Name: create the agent's name you will call in a session, i.e. "<first name> from DeepBench"',
       { text: 'Connection → "Server URL": paste this URL', copy: true },
       'Authentication: change "OAuth" to "No Authentication"',
       'Tick "I understand and want to continue"',
@@ -95,7 +94,15 @@ export const CONNECT_TOOLS = [
     // 2026-10-05); this only opens Plugins.
     openLink: {
       href: "https://chatgpt.com/plugins",
-      label: "1. Click to open ChatGPT Plugins",
+      lead: "1. Click to open: ",
+      label: "ChatGPT Plugins",
+      followSteps: false,
+      // The first-step line that used to open the list, now the body of the "connection link"
+      // question drawer (titled by Claude's quickAdd.fallback -- one title, both tabs).
+      fallbackLines: [
+        'Open Plugins: the button above, or "Plugins" in the left sidebar',
+        "Then follow the steps above.",
+      ],
     },
   },
   {
@@ -315,8 +322,12 @@ export default function ConnectSteps({ agent, address }) {
           )}
           {tool.openLink && (
             <>
-              <QuickAddLink href={tool.openLink.href} label={tool.openLink.label} />
-              <p style={{ ...pStyle, margin: "8px 0 16px" }}>{CONNECT_SHARED.followSteps}</p>
+              {tool.openLink.lead
+                ? <p style={pStyle}>{tool.openLink.lead}<QuickAddLink href={tool.openLink.href} label={tool.openLink.label} /></p>
+                : <QuickAddLink href={tool.openLink.href} label={tool.openLink.label} />}
+              {tool.openLink.followSteps === false
+                ? <div style={{ height: 8 }} />
+                : <p style={{ ...pStyle, margin: "8px 0 16px" }}>{CONNECT_SHARED.followSteps}</p>}
               <Step1List tool={tool} fill={fill} address={address} base={base} teams={teams} />
             </>
           )}
@@ -332,7 +343,13 @@ export default function ConnectSteps({ agent, address }) {
               {CONNECT_SHARED.comparisonSteps.map((s, i) => <li key={i} style={liStyle}>{s}</li>)}
             </ol>
           </Drawer>
-          {tool.quickAdd && <Drawer title={tool.quickAdd.fallback}><Step1List tool={tool} fill={fill} address={address} base={base} teams={teams} /></Drawer>}
+          {(tool.quickAdd || tool.openLink?.fallbackLines) && (
+            <Drawer title={CONNECT_TOOLS[0].quickAdd.fallback}>
+              {tool.quickAdd
+                ? <Step1List tool={tool} fill={fill} address={address} base={base} teams={teams} />
+                : tool.openLink.fallbackLines.map((l, i) => <p key={i} style={pStyle}>{l}</p>)}
+            </Drawer>
+          )}
         </div>
       )}
     </div>

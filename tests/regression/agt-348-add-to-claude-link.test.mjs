@@ -80,7 +80,8 @@ const HEX_RE = /#[0-9a-fA-F]{6}\b/;
 // v7.0.789 (AGT-385): href + John's link label only; the note left ("2. Follow these steps:" is shared).
 const OPEN_LINK_COPY = [
   'href: "https://chatgpt.com/plugins"',
-  'label: "1. Click to open ChatGPT Plugins"',
+  'lead: "1. Click to open: "',
+  'label: "ChatGPT Plugins"',
 ];
 // v7.0.787 (slice 5): the Grok tab's Open Connectors button.
 const GROK_OPEN_LINK_COPY = [
