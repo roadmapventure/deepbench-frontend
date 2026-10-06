@@ -9,7 +9,7 @@
 
 ## Last 3 sessions
 
-- v7.0.794, 2026-10-06, runner cycle `fe7448f5`, **scheduled**, model claude-opus-5 — **`AGT-304`**.
+- v7.0.794, 2026-10-06, runner cycle `fe7448f5`, **scheduled**, model claude-opus-5 — **`AGT-304` — AGT-304 slice 7 (P9 - Bug Fixes) — two more standing regression reds re-pinned to the rows they actually grade**. Two more of those suites now pass on their own terms, and the ship gate now grades a delivery against just the tests its own files touch, so the pile matters less and a real break shows up sharper. Every project ships through this gate. Each red it no longer has to make an exception for is one less way a real break gets waved through — and AGT-304 closes for good when the count reaches zero. Reversible until the decision window closes: ticket-status decision fc1e4a35-ab9d-4e62-9fde-571a85628a76.
 - v7.0.793, 2026-10-05, runner cycle `8e54ea9a`, **supervised**, model claude-opus-5 — **`AGT-391`**.
 - v7.0.792, 2026-10-05, runner cycle `c98d7deb`, **supervised**, model claude-opus-5 — **`AGT-390`**.
 
