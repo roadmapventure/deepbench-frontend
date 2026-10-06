@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.781 | scripts/staff-watch.js | AGT-304 slice 4 -- RECORDED_KINDS admits the trigger-written gap finding (CHECK widened by agt136_gap_attribution).
 // DeepBench v7.0.634 | scripts/staff-watch.js | AGT-198 -- A STAFF FINDING REACHES THE MANAGER
 // NAMING ITS SUBJECT, AND NEITHER FINGERPRINT MOVES. `ledgerFindingFor()` set every
 // `locations[].text` to `--detail` verbatim, so a check's own LABEL was the whole body the manager
@@ -156,15 +157,22 @@ import { createHash } from "crypto";
 import { fileURLToPath } from "url";
 import { ingestFindings, isoWeek } from "./audit-ledger.js";
 
-// The ticket's own four values, verbatim, and the same list the table's CHECK constraint carries.
-// Kept here so a bad `--kind` is refused BEFORE a row is attempted rather than surfacing as a 23514
-// the caller has to decode.
+// The ticket's own four values, verbatim: the kinds the CLI may write. The table's CHECK carries
+// these four AND the trigger-written fifth below. Kept here so a bad `--kind` is refused BEFORE a
+// row is attempted rather than surfacing as a 23514 the caller has to decode.
 export const KINDS = [
   "over-cap refusal",
   "kickoff lacked a fact",
   "verdict block attributable to the kickoff",
   "assignment mismatch",
 ];
+
+// AGT-304 slice 4 (v7.0.781): the CHECK carries a FIFTH value, `gap finding`, written only by the
+// AFTER INSERT trigger audit_findings_gap_to_designer() (migration agt136_gap_attribution, 2026-09-28).
+// It has no CLI caller by construction, so it is NOT in KINDS (parseArgs keeps refusing it); readers
+// that ask "may the table hold this kind?" check RECORDED_KINDS, never KINDS.
+export const TRIGGER_KINDS = ["gap finding"];
+export const RECORDED_KINDS = [...KINDS, ...TRIGGER_KINDS];
 
 export const TABLE = "runner_staff_findings";
 export const PROMOTION_BAR = 3;

@@ -1,3 +1,6 @@
+// DeepBench v7.0.790 | api/agent-configs.js | AGT-386 -- two more POST body actions on the same route:
+// `add_agent_to_team` (one private agent onto one team) and `archive_private_agent` (is_active false,
+// nothing deleted), both through lib/private-agent-create.js. No model call, so no logAICall().
 // DeepBench v7.0.773 | api/agent-configs.js | AGT-338 slice 3 -- GET with `teams=1` answers the name
 // and address of each team the agent is on (readAgentTeams()), so the Connect popup can offer the
 // team address. Every other request takes the path it took before.
@@ -9,7 +12,7 @@
 // This route reaches no logActivity() call today -- wrapping it is inert now and means a logging
 // site added here later cannot silently lose attribution.
 import { withRequestContext } from "../lib/request-context.js";
-import { createPrivateAgent, readCreateInput } from "../lib/private-agent-create.js";
+import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput } from "../lib/private-agent-create.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
 // service-key read: the browser's key cannot read `teams.address` (a column grant). With no
@@ -72,6 +75,28 @@ async function handler(req, res) {
         if (input.error) return res.status(400).json({ error: input.error });
         try {
           return res.status(201).json(await createPrivateAgent(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-386 -- put one private agent on one team (lib/private-agent-create.js).
+      if (req.body?.action === "add_agent_to_team") {
+        const input = readAddToTeamInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await addAgentToTeam(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-386 -- archive one private agent: is_active false, nothing deleted.
+      if (req.body?.action === "archive_private_agent") {
+        const input = readAgentIdInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await archivePrivateAgent(input, { supabaseUrl, supabaseKey }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }

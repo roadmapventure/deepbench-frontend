@@ -1,3 +1,9 @@
+// DeepBench v7.0.790 | useAgents.js | AGT-386 -- an archived private agent (sharing 'private',
+// is_active false) leaves the roster: buildRoster() fences it out with isArchivedPrivate(), so every
+// useAgents() caller stops offering it. This narrows AGT-335's call "inactive rows are appended too":
+// archived PRIVATE rows are now excluded; an inactive non-private row is still appended. useRoster()
+// returns { agents, settled } so the Personnel file can tell "still loading" from "not there";
+// useAgents() is useRoster().agents. forgetAgent(id) drops one agent from the cached roster.
 // DeepBench v7.0.761 | useAgents.js | AGT-336 slice 2 — the Bench asks the one visibility check
 // (shared/agent-visibility.js). The roster read adds owner_id / sharing / shared_with; a table-only
 // row saved sharing = 'private' gets benchGroups ["private"], so it shows under the Bench's Private
@@ -354,8 +360,11 @@ export function tableOnlyAgent(t) {
 // in its own order), then every table row no AGENTS entry holds, sorted by name. Pure.
 // FEATURE: AGT-336 — rows the viewer may not see are dropped first, and a dropped row takes its
 // AGENTS entry with it. A null viewer (no login exists — every caller today) drops nothing.
+// FEATURE: AGT-386 — an archived private agent: its own row says private and inactive.
+export const isArchivedPrivate = row => row?.sharing === SHARING.PRIVATE && row?.is_active === false;
+
 export function buildRoster(codeAgents, tableRows, viewer = null) {
-  const rows = visibleAgents(tableRows, viewer);
+  const rows = visibleAgents(tableRows, viewer).filter(r => !isArchivedPrivate(r));
   const seen = new Set(rows.map(r => r.id));
   const hidden = new Set((tableRows || []).filter(r => !seen.has(r.id)).map(r => r.id));
   const held = new Set(codeAgents.map(a => a.id));
@@ -368,18 +377,30 @@ export function buildRoster(codeAgents, tableRows, viewer = null) {
 // did starts from it, so a table-only agent's Personnel file opens on that agent, not agents[0].
 let rosterCache = null;
 
-export function useAgents() {
+// FEATURE: AGT-386 — drop one agent from the cached roster (after it is archived), so the next
+// screen to mount the hook does not open on it before the fetch lands.
+export function forgetAgent(id) { if (rosterCache) rosterCache = rosterCache.filter(a => a.id !== id); }
+
+// FEATURE: AGT-386 — the roster plus `settled`: true once the read has answered (data, error or a
+// rejection), so a screen can tell "still loading" from "not there".
+export function useRoster() {
   // D4: AGENTS renders first, the table overlays it on arrival — the Bench never waits on the
   // fetch, and an error or an empty payload leaves the array's values standing.
   const [agents, setAgents] = useState(rosterCache || AGENTS);
+  const [settled, setSettled] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    supabase.from('agents').select(ROSTER_SELECT).eq('lane', 'product').then(({ data, error }) => {
-      if (cancelled || error || !data) return;
-      rosterCache = buildRoster(AGENTS, data);
-      setAgents(rosterCache);
-    });
+    Promise.resolve(supabase.from('agents').select(ROSTER_SELECT).eq('lane', 'product')).then(({ data, error }) => {
+      if (cancelled) return;
+      if (!error && data) {
+        rosterCache = buildRoster(AGENTS, data);
+        setAgents(rosterCache);
+      }
+      setSettled(true);
+    }, () => { if (!cancelled) setSettled(true); });
     return () => { cancelled = true; };
   }, []);
-  return agents;
+  return { agents, settled };
 }
+
+export function useAgents() { return useRoster().agents; }

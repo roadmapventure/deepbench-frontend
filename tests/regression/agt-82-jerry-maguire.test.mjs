@@ -1,3 +1,4 @@
+// DeepBench v7.0.783 | tests/regression/agt-82-jerry-maguire.test.mjs | AGT-304 slice 6 -- jerry's row is re-pinned to the directive John moved it by: is_active=true (684365e7, final 2026-09-24) with 12 assignments (the seeded 11 + career-linkedin-alerts, agent-row 54a37934, AGT-154).
 // DeepBench v7.0.560 | tests/regression/agt-82-jerry-maguire.test.mjs | AGT-82
 //
 // FEATURE: AGT-82 -- Jerry Maguire (JM-01), John's private career agent. Three things landed
@@ -20,7 +21,7 @@
 //       id excluded): ids from live agents?select=id when creds are present, else AGENTS from
 //       src/data/agents.js. Mutation control: a copy with a real id spliced into a jm- row is caught.
 // LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY, else NOT RUN):
-//   agents?id=eq.jerry -> [{lane:'personal', is_active:false}]; 11 agent_capability_assignments;
+//   agents?id=eq.jerry -> [{lane:'personal', is_active:true}] (684365e7); 12 (54a37934) agent_capability_assignments;
 //   career_records refused to the anon key (status >= 400) AND answered to the service key (200) --
 //   both halves or fail. The anon half needs a REAL anon key (VITE_SUPABASE_ANON_KEY or
 //   SUPABASE_ANON_KEY): it is proven real first by an anon read of agents answering 200, because
@@ -196,15 +197,15 @@ async function partE_live() {
 
   const aRes = await fetch(`${base}/rest/v1/agents?id=eq.${SELF_ID}&select=lane,is_active`, { headers: svc });
   if (!aRes.ok) assert.fail(`agents?id=eq.${SELF_ID} failed: HTTP ${aRes.status} ${await aRes.text()}`);
-  assert.deepStrictEqual(await aRes.json(), [{ lane: "personal", is_active: false }],
-    `agents row '${SELF_ID}' is not exactly [{lane:'personal', is_active:false}]`);
-  results.push("live-jerry-personal-inactive");
+  assert.deepStrictEqual(await aRes.json(), [{ lane: "personal", is_active: true }],
+    `agents row '${SELF_ID}' is not exactly [{lane:'personal', is_active:true}] -- directive 684365e7 (2026-09-24, final): John hired Jerry, "turn him on"`);
+  results.push("live-jerry-personal-active");
 
   const cRes = await fetch(`${base}/rest/v1/agent_capability_assignments?agent_id=eq.${SELF_ID}&select=capability_slug`, { headers: svc });
   if (!cRes.ok) assert.fail(`agent_capability_assignments read failed: HTTP ${cRes.status} ${await cRes.text()}`);
   const assignments = await cRes.json();
-  assert.strictEqual(assignments.length, 11, `expected 11 assignments for '${SELF_ID}', got ${assignments.length}`);
-  results.push("live-jerry-eleven-assignments");
+  assert.strictEqual(assignments.length, 12, `expected 12 assignments for '${SELF_ID}' (the seeded 11 + career-linkedin-alerts, agent-row 54a37934, AGT-154), got ${assignments.length}`);
+  results.push("live-jerry-twelve-assignments");
 
   // Service half: the table exists and the platform can read it.
   const sRes = await fetch(`${base}/rest/v1/career_records?select=id&limit=1`, { headers: svc });

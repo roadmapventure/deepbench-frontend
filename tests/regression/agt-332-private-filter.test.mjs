@@ -1,3 +1,9 @@
+// DeepBench v7.0.788 | tests/regression/agt-332-private-filter.test.mjs | AGT-384 -- the nav moved to
+// src/components/BenchNav.jsx and reads All, Private Agents, the groups, Product Team (John,
+// 2026-10-05: "move All above Private"); the Bench opens on its home page, so no filter is held in
+// state -- the roster reads it from the address and falls back to Private. The nav needles are now
+// read from BenchNav.jsx; `return [priv, all` and `useState(BENCH_PRIVATE.id)` must be gone. Red on
+// the pre-v7.0.788 tree: BenchNav.jsx is absent. The DATA arm is unchanged.
 // DeepBench v7.0.755 | tests/regression/agt-332-private-filter.test.mjs | AGT-332 slice 2 -- the Bench "Private" filter
 //
 // FEATURE: AGT-332 -- the Bench nav reads Private, All, the BENCH_FILTERS groups, Product Team
@@ -26,6 +32,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 
 const ROSTER_REL = "src/screens/RosterScreen.jsx";
+const NAV_REL = "src/components/BenchNav.jsx";
 
 function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -35,32 +42,52 @@ function countOccurrences(haystack, needle) {
   return haystack.split(needle).length - 1;
 }
 
-const PRESENT_ONCE = [
-  `import { BENCH_FILTERS, BENCH_PRIVATE, isPrivateAgent } from "../data/agents.js";`,
-  `useState(BENCH_PRIVATE.id)`,
-  `return [priv, all, ...groups, ...productTeamEntry];`,
-  `count: agents.filter(isPrivateAgent).length`,
-  `count: agents.filter(a => !isPrivateAgent(a)).length`,
-  `if (activeFilter === "all") return sortedAgents.filter(a => !isPrivateAgent(a));`,
-];
-
-const ABSENT = [
-  `useState("all")`,
-  `count: agents.length`,
-  `return [all, ...groups`,
+// AGT-384: the nav (order, both counts, the three-name import) lives in BenchNav.jsx; the roster
+// keeps the grid filter and reads the active filter from the address, Private when none is given.
+const STATIC = [
+  {
+    rel: NAV_REL,
+    presentOnce: [
+      `import { BENCH_FILTERS, BENCH_PRIVATE, isPrivateAgent } from "../data/agents.js";`,
+      `return [all, priv, ...groups, ...productTeamEntry];`,
+      `count: agents.filter(isPrivateAgent).length`,
+      `count: agents.filter(a => !isPrivateAgent(a)).length`,
+    ],
+    absent: [
+      `return [priv, all`,
+      `count: agents.length`,
+      `return [all, ...groups`,
+    ],
+  },
+  {
+    rel: ROSTER_REL,
+    presentOnce: [
+      `import { BENCH_PRIVATE, isPrivateAgent } from "../data/agents.js";`,
+      `const activeFilter = home ? null : (searchParams.get("filter") || BENCH_PRIVATE.id);`,
+      `if (activeFilter === "all") return sortedAgents.filter(a => !isPrivateAgent(a));`,
+    ],
+    absent: [
+      `useState("all")`,
+      `useState(BENCH_PRIVATE.id)`,
+      `return [priv, all`,
+      `count: agents.length`,
+    ],
+  },
 ];
 
 function checkStatic() {
-  const code = stripComments(read(ROSTER_REL));
-  for (const needle of PRESENT_ONCE) {
-    const n = countOccurrences(code, needle);
-    assert.strictEqual(n, 1, `${ROSTER_REL} must carry EXACTLY one \`${needle}\` (found ${n})`);
+  for (const { rel, presentOnce, absent } of STATIC) {
+    const code = stripComments(read(rel));
+    for (const needle of presentOnce) {
+      const n = countOccurrences(code, needle);
+      assert.strictEqual(n, 1, `${rel} must carry EXACTLY one \`${needle}\` (found ${n})`);
+    }
+    for (const needle of absent) {
+      const n = countOccurrences(code, needle);
+      assert.strictEqual(n, 0, `${rel} must no longer carry \`${needle}\` (found ${n})`);
+    }
+    console.log(`  static: ${presentOnce.length} needles present exactly once, ${absent.length} absent in ${rel}`);
   }
-  for (const needle of ABSENT) {
-    const n = countOccurrences(code, needle);
-    assert.strictEqual(n, 0, `${ROSTER_REL} must no longer carry \`${needle}\` (found ${n})`);
-  }
-  console.log(`  static: ${PRESENT_ONCE.length} needles present exactly once, ${ABSENT.length} absent in ${ROSTER_REL}`);
 }
 
 async function checkData() {

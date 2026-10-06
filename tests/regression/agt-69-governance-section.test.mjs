@@ -1,3 +1,7 @@
+// DeepBench v7.0.788 | agt-69-governance-section.test.mjs | AGT-384 -- the Bench nav moved to
+// src/components/BenchNav.jsx, so check (b) reads the nav pins there: the order ([all, priv, ...],
+// Product Team still LAST), the flag gate, the label constant and the useProductTeam import. The
+// mount, the hidden hire-able bench and the no-flag-slug rule stay on RosterScreen.jsx.
 // DeepBench v7.0.755 | agt-69-governance-section.test.mjs | AGT-332 slice 2 -- check (b)'s nav pin reads [priv, all, ...]
 // DeepBench v7.0.485 | tests/regression/agt-69-governance-section.test.mjs | AGT-70 -- THE ROSTER
 // MAY GROW. Arms (e) and (f) asserted the literal 6, which is not the truth either of them means:
@@ -68,6 +72,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const SRC_DIR = "src";
 const COMPONENT_REL = "src/components/GovernanceSection.jsx";
 const ROSTER_REL = "src/screens/RosterScreen.jsx";
+const NAV_REL = "src/components/BenchNav.jsx";
 const BROKER_REL = "lib/project-manager.js";
 const WORK_ORDER_REL = "src/screens/CreateWorkOrderScreen.jsx";
 
@@ -194,10 +199,16 @@ function checkA_listDeletedFromSrc() {
 // (b) RED pre-change -- one import, one mount, and the screen gains nothing else.
 function checkB_rosterMount() {
   const code = stripComments(read(ROSTER_REL));
-  // AGT-80: one import line (default + the filter id, label and hook), one mount, under the filter.
-  const importLine = `import GovernanceSection, { PRODUCT_TEAM_FILTER, PRODUCT_TEAM_LABEL, useProductTeam } from "../components/GovernanceSection.jsx"`;
+  // AGT-80: one import line, one mount, under the filter. AGT-384: the screen imports the default
+  // and the filter id; the label and the hook are read by the nav (BenchNav.jsx), pinned below.
+  const importLine = `import GovernanceSection, { PRODUCT_TEAM_FILTER } from "../components/GovernanceSection.jsx"`;
   assert.strictEqual(countOccurrences(code, importLine), 1,
     `${ROSTER_REL} must carry EXACTLY one \`${importLine}\` (found ${countOccurrences(code, importLine)})`);
+  assert.ok(exists(NAV_REL), `${NAV_REL} does not exist -- the Bench nav (and its Product Team entry) lives there`);
+  const nav = stripComments(read(NAV_REL));
+  const navImport = `import { PRODUCT_TEAM_FILTER, PRODUCT_TEAM_LABEL, useProductTeam } from "./GovernanceSection.jsx"`;
+  assert.strictEqual(countOccurrences(nav, navImport), 1,
+    `${NAV_REL} must carry EXACTLY one \`${navImport}\` (found ${countOccurrences(nav, navImport)})`);
   const mount = "{isProductTeam && <GovernanceSection rows={productTeam.rows} embedded />}";
   assert.strictEqual(countOccurrences(code, mount), 1,
     `${ROSTER_REL} must mount the section EXACTLY once, under the Product Team filter (found ` +
@@ -205,19 +216,21 @@ function checkB_rosterMount() {
   assert.strictEqual(countOccurrences(code, "<GovernanceSection />"), 0,
     `${ROSTER_REL} must not carry the AGT-69 unconditional mount any more -- John moved the section under the filter`);
   // The entry is LAST ("last on the list") and flag-gated; the label is the component's constant.
-  assert.ok(code.includes("return [priv, all, ...groups, ...productTeamEntry];"),
-    `${ROSTER_REL} must append the Product Team entry AFTER the BENCH_FILTERS groups (AGT-332: Private, then All, lead the nav)`);
-  assert.ok(code.includes("const productTeamEntry = productTeam.on"),
-    `${ROSTER_REL} must gate the Product Team entry on the flag (productTeam.on)`);
-  assert.ok(code.includes("label: PRODUCT_TEAM_LABEL"),
-    `${ROSTER_REL} must label the entry from PRODUCT_TEAM_LABEL, never a second string`);
+  assert.ok(nav.includes("return [all, priv, ...groups, ...productTeamEntry];"),
+    `${NAV_REL} must append the Product Team entry AFTER the BENCH_FILTERS groups (AGT-384: All, then Private Agents, lead the nav)`);
+  assert.ok(!nav.includes("return [priv, all") && !code.includes("return [priv, all"),
+    `the AGT-332 order (Private above All) must be gone from ${NAV_REL} and ${ROSTER_REL}`);
+  assert.ok(nav.includes("const productTeamEntry = productTeam.on"),
+    `${NAV_REL} must gate the Product Team entry on the flag (productTeam.on)`);
+  assert.ok(nav.includes("label: PRODUCT_TEAM_LABEL"),
+    `${NAV_REL} must label the entry from PRODUCT_TEAM_LABEL, never a second string`);
   // The hire-able bench is not mounted under the filter.
   assert.ok(code.includes("{!isProductTeam && (<>"),
     `${ROSTER_REL} must hide the stats strip, agent grid and vacancy card under the Product Team filter`);
   // The flag read lives INSIDE the component. A flag read on the screen would be the second line
   // of change the rule forbids, and would also put the slug in two places.
-  assert.ok(!code.includes(FLAG_SLUG),
-    `${ROSTER_REL} must not name the flag slug -- the flag is read inside GovernanceSection.jsx`);
+  assert.ok(!code.includes(FLAG_SLUG) && !nav.includes(FLAG_SLUG),
+    `${ROSTER_REL} and ${NAV_REL} must not name the flag slug -- the flag is read inside GovernanceSection.jsx`);
 }
 
 // (c) RED pre-change -- the component's own contract, and what it must NOT have borrowed.

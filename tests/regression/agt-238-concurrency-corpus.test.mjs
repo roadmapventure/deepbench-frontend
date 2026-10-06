@@ -1,3 +1,4 @@
+// DeepBench v7.0.783 | tests/regression/agt-238-concurrency-corpus.test.mjs | AGT-304 slice 6 -- arm C pins every corpus epic count to public.epics' own live count instead of one project's shipping-day 0, and the epic-less LEFT JOIN proof grades today's zero-epic projects or declares itself NOT RUN when the board holds none.
 // DeepBench v7.0.667 | tests/regression/agt-238-concurrency-corpus.test.mjs | AGT-238 slice 2 --
 // CONCURRENCY FROM THE CORPUS.
 //
@@ -187,12 +188,32 @@ async function armC(url, key) {
   assert.strictEqual(execFlags.lastIndexOf(true) < execFlags.indexOf(false) || !execFlags.includes(false), true,
     `the corpus does not put every executing project ahead of every other one: ${JSON.stringify(corpus.json.map(r => `${r.slug}:${r.status}`))}`);
 
-  const trainer = corpus.json.find(r => r.slug === "trainer-authored-agents");
-  assert.ok(trainer, "trainer-authored-agents is absent from the corpus -- the LEFT JOIN is the whole point: an executing project with no epics must show itself");
-  assert.strictEqual(trainer.epics, 0,
-    `trainer-authored-agents reads epics=${trainer.epics} -- it held an executing slot with 0 epics when this shipped, and that reading IS the corpus's first piece of evidence`);
+  // Every corpus epic count is pinned to the LIVE table it reports, not to the number it read on
+  // the shipping day (AGT-304 slice 6): public.epics moved under the old literal 0.
+  const live = await call(url, key, "projects?select=slug,epics(count)");
+  assert.ok(live.ok && Array.isArray(live.json), `projects?select=slug,epics(count) failed: ${live.status} ${live.text.slice(0, 200)}`);
+  const liveEpics = new Map(live.json.map(p => [p.slug, p.epics?.[0]?.count ?? 0]));
+  for (const r of corpus.json) {
+    assert.strictEqual(r.epics, liveEpics.get(r.slug),
+      `${r.slug} reads epics=${r.epics} in the corpus but public.epics holds ${liveEpics.get(r.slug)} row(s) (AGT-304 slice 6: the live table's count)`);
+  }
+  assert.ok(corpus.json.some(r => r.slug === "trainer-authored-agents"),
+    "trainer-authored-agents is absent from the corpus");
+  // The behavioural half: an epic-less project must still show itself, at 0. Which project that is
+  // is the board's business, not this file's -- and with no epic-less project the board cannot
+  // discriminate a LEFT JOIN from an inner one at all, so the arm declares itself NOT RUN.
+  const zero = [...liveEpics].filter(([, n]) => n === 0).map(([slug]) => slug);
+  if (zero.length === 0) {
+    notRun("arm C's behavioural LEFT JOIN proof (an epic-less project at epics=0)",
+      `no project holds 0 epics today (${liveEpics.size} projects); arm (A) and its inner-join mutation still ran`);
+  } else {
+    for (const slug of zero) {
+      assert.strictEqual(corpus.json.find(r => r.slug === slug)?.epics, 0,
+        `${slug} holds 0 epics and must be in the corpus at epics=0 -- the LEFT JOIN is the whole point`);
+    }
+  }
   const executing = corpus.json.filter(r => r.status === "executing");
-  console.log(`  [AGT-238] arm C: ${corpus.json.length} corpus row(s) for ${projects.json.length} project(s), executing first (${executing.map(r => `${r.slug}:p${r.priority}/e${r.epics}`).join(", ")}); trainer-authored-agents present at epics=0.`);
+  console.log(`  [AGT-238] arm C: ${corpus.json.length} corpus row(s) for ${projects.json.length} project(s), executing first (${executing.map(r => `${r.slug}:p${r.priority}/e${r.epics}`).join(", ")}); epic-less present at epics=0: ${zero.join(", ") || "none today"}.`);
 }
 
 async function armD(url, key) {
