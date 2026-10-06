@@ -1,3 +1,4 @@
+// DeepBench v7.0.794 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-304 slice 7 -- arm D's finding_group_epic probe reads the auditor route out of finding_routes and grades the answer by the function's own rule over that project's live status, both branches exact, instead of pinning one slug's lock refusal.
 // DeepBench v7.0.662 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-240
 // FEATURE: AGT-240 -- PROJECTS GET A FINISH LINE. Kickoff:
 // docs/kickoffs/v7.0.662-AGT-240-project-finish-line.md §5 task 7 and §6.
@@ -207,8 +208,19 @@ async function run() {
       if (f.json.length) {
         const g = await req(url, key, "rpc/finding_group_epic", { method: "POST",
           body: { p_group: { kind: "root-cause", project: "general", finding_ids: [f.json[0].id] } } });
-        assert.equal(g.status, 400, describe(g));
-        assert.equal(g.json?.message, "apply_audit_review: project auditor-enhancements is executing -- its list is locked; use kind list (AGT-240)");
+        const route = (await req(url, key, "finding_routes?source=eq.auditor&finding_type=eq.*&select=project_slug")).json?.[0]?.project_slug;
+        assert.ok(route, "finding_routes must carry the auditor row (AGT-103's home as a row)");
+        const rp = (await req(url, key, `projects?slug=eq.${route}&select=slug,status,accepts_findings,epics(id,locked_at)`)).json?.[0];
+        assert.ok(rp, `the auditor route names project ${route}, which projects does not hold`);
+        if (["executing", "proposed", "done"].includes(rp.status) && !rp.accepts_findings) {
+          assert.equal(g.status, 400, describe(g));
+          assert.equal(g.json?.message, `apply_audit_review: project ${route} is ${rp.status} -- its list is locked; use kind list (AGT-240)`);
+        } else {
+          assert.equal(g.status, 200, describe(g));
+          const open = rp.epics.filter(e => e.locked_at === null || rp.accepts_findings).map(e => e.id);
+          assert.ok(open.includes(g.json), `an auditor finding resolves to ${route}'s one admissible epic (${open.join(", ") || "none"}); got ${describe(g)}`);
+        }
+        console.log(`    [AGT-240 D] auditor route -> ${route} (${rp.status}, accepts_findings ${rp.accepts_findings}): ${g.status === 400 ? "lock refusal" : "epic " + g.json}`);
       }
 
       if (anon) {
