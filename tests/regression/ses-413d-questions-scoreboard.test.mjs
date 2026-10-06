@@ -1,3 +1,6 @@
+// DeepBench v7.0.793 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-391 -- BYTES_AT_SHIP re-pinned 380985 -> 380843
+// (runner-cycle.md step 7 lost its full-suite baseline capture to the related set).
+//
 // DeepBench v7.0.523 | tests/regression/ses-413d-questions-scoreboard.test.mjs | SES-413 slice 4 --
 // the weekly question count is a GRADED column on the platform scoreboard, not just a printed line.
 //
@@ -253,7 +256,7 @@ export const RUNBOOK_CEILING = 381000;
 // bar and 35 B under SES-336's ceiling -- REPORTED, not absorbed. No header stamp (ses-424c pins
 // stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c, re-pinned and the card re-rendered in the
 // same commit as the runbook edit.
-export const BYTES_AT_SHIP = 380985;   // 380944 -> 380985 (AGT-291: 334 B of (7e) finish line + two R8 clauses, 295 B of it paid for by three retired (7f) sentences; agt-253's pin moved in the same commit)
+export const BYTES_AT_SHIP = 380843;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
