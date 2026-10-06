@@ -1,3 +1,4 @@
+// DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 -- a private agent's badge gains a team picker (one team per agent, saved through add_agent_to_team); the Connect button names no agent; the desktop left nav opens with the Bench breadcrumb; an id not yet in the roster shows Loading… and an unknown or archived id redirects to /bench (no other agent's file flashes); a Delete Agent link under every tab archives a private agent after a confirm popup
@@ -20,7 +21,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
-import { AppShell } from "../AppShell.jsx";
+import { AppShell, IS_ADMIN_HOST } from "../AppShell.jsx";
+import { useFeatureFlag } from "../lib/featureFlags.js"; // FEATURE: AGT-397 — the layout switch's flag
+import FutureViewTab, { LayoutSwitch, resolveLayout, LAYOUT_FLAG, LAYOUT_KEY } from "./personnel/FutureViewTab.jsx"; // FEATURE: AGT-397
 import { Corners, SkillBar, Toast, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
 import { useRoster, forgetAgent } from "../hooks/useAgents.js"; // FEATURE: AGT-386 — settled read + cache forget
 import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 — the Bench breadcrumb
@@ -554,10 +557,134 @@ function BadgeActions({ agent, onAddTraining, onConnect, style }) {
   );
 }
 
-// FEATURE: PE-01 — Profile tab
-// FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
-// ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect }) {
+// FEATURE: AGT-397 — the Profile tab's cards, each defined once here so the Current arrangement
+// (ProfileTab) and the Proposed arrangement's Future View render the same component, never a copy.
+
+// Compensation card
+function CompensationCard({ agent }) {
+  const fmt = fmt$;
+  return (
+        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 18px",position:"relative"}}>
+          <Corners/>
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8}}>Compensation · FY2026 · The Ledger</div>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <div>
+              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Salary Equiv.</div>
+              <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.navy}}>{agent.salary===0?"Free":fmt(agent.salary)}</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Yearly Value</div>
+              <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.moss}}>{agent.value===0?"Demo":fmt(agent.value)}</div>
+            </div>
+          </div>
+          {[["Hourly rate","$"+agent.hourly],["Hours / report",agent.reportHrs+"h"],["Cost / report",agent.reportCost===0?"Free":"$"+agent.reportCost],["Revenue model",agent.revenueModel||"—"]].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+              <span style={{color:T.mutedDeep}}>{k}</span>
+              <span style={{fontFamily:mono,fontSize:10.5,color:T.ink}}>{v}</span>
+            </div>
+          ))}
+          <div style={{marginTop:7,fontFamily:body,fontSize:10,color:T.muted,fontStyle:"italic"}}><strong style={{fontStyle:"normal"}}>Mock data.</strong> Live billing in v5.</div>
+        </div>
+  );
+}
+
+// Readiness score
+function ReadinessCard({ layers, readiness }) {
+  const rc = readinessColor;
+  return (
+        <div style={{background:T.navy,padding:"14px 18px",position:"relative",border:`1px solid rgba(182,135,58,.3)`}}>
+          <Corners color={T.brass}/>
+          <div style={{fontFamily:mono,fontSize:8.5,color:T.brassLight,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:7}}>Agent Readiness Score</div>
+          <div style={{display:"flex",alignItems:"flex-end",gap:12,marginBottom:9}}>
+            <div style={{fontFamily:display,fontSize:44,fontWeight:700,color:rc(readiness),lineHeight:1}}>{readiness}</div>
+            <div style={{paddingBottom:4}}>
+              <div style={{fontFamily:mono,fontSize:10,color:rc(readiness),fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>{readinessLabel(readiness)}</div>
+              <div style={{fontFamily:body,fontSize:10,color:"#8fa3bf",marginTop:1}}>weighted composite · 5 layers</div>
+            </div>
+          </div>
+          <div style={{height:6,background:"rgba(255,255,255,.1)",marginBottom:12}}>
+            <div style={{height:"100%",width:`${readiness}%`,background:rc(readiness)}}/>
+          </div>
+          {layers.map(l=>(
+            <div key={l.num} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+              <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",width:14,flexShrink:0}}>{l.num}</div>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                  <span style={{fontFamily:body,fontSize:10,color:"#f8f2e2"}}>{l.label}</span>
+                  <span style={{fontFamily:mono,fontSize:9,color:rc(l.s),fontWeight:700}}>{l.s}</span>
+                </div>
+                <div style={{height:3,background:"rgba(255,255,255,.08)"}}>
+                  <div style={{height:"100%",width:`${l.s}%`,background:rc(l.s)}}/>
+                </div>
+              </div>
+              <div style={{fontFamily:mono,fontSize:7.5,color:"#8fa3bf",width:50,flexShrink:0,textAlign:"right",fontStyle:"italic"}}>{l.tab}</div>
+            </div>
+          ))}
+        </div>
+  );
+}
+
+// Intelligence config
+function IntelConfigCard({ agent, layers, isMobile }) {
+  const rc = readinessColor;
+  return (
+        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
+          <Corners/>
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:4}}>Intelligence Configuration</div>
+          <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:10}}>How {agent.name.split(" ")[0]}'s prompt is assembled</div>
+          {/* FEATURE: PE-17 — mobile: 3-col wrap grid instead of a squeezed flex row */}
+          <div style={{...(isMobile ? {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6} : {display:"flex",alignItems:"stretch"}),marginBottom:10}}>
+            {layers.map((l,i)=>(
+              <div key={l.num} style={{flex:1,textAlign:"center",padding:"8px 4px",background:`${rc(l.s)}12`,border:`1px solid ${rc(l.s)}35`,borderRight:i<layers.length-1?"none":undefined}}>
+                <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:rc(l.s),marginBottom:2}}>{l.num}</div>
+                <div style={{fontFamily:body,fontSize:8.5,color:T.navy,lineHeight:1.2,marginBottom:3}}>{l.label}</div>
+                <div style={{fontFamily:mono,fontSize:8,color:rc(l.s),fontWeight:700}}>{l.s}/100</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5,fontStyle:"italic"}}>Configure each layer in Resume, Training, and Playbook tabs.</div>
+        </div>
+  );
+}
+
+// Quick stats — FEATURE: AGT-397 — one component; show = "all" (Current), "documents" (Proposed
+// Profile), "parked" (Future View: Skill + Reports Run, Situational Awareness, Skill Level)
+function QuickStatsCard({ agent, show = "all" }) {
+  return (
+        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
+          <Corners/>
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Quick Stats</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+            {[["Skill",`${agent.skill}/100`,skillLabel(agent.skill),"#886224"],["Documents",agent.docs||"—","training docs",T.navy],["Reports Run","—","mock data",T.moss]].filter(([l]) => show === "all" || (show === "documents" ? l === "Documents" : l !== "Documents")).map(([l,v,s,c])=>(
+              <div key={l}>
+                <div style={{fontFamily:body,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>{l}</div>
+                <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,lineHeight:1}}>{v}</div>
+                <div style={{fontFamily:mono,fontSize:8.5,color:T.muted,marginTop:1}}>{s}</div>
+              </div>
+            ))}
+          </div>
+          {show !== "documents" && (<>
+          <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:10,marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600}}>Situational Awareness</div>
+              <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:agent.situational>=30?T.brass:T.muted}}>{agent.situational}%</div>
+            </div>
+            <div style={{height:4,background:`${T.lineSoft}`,borderRadius:2}}>
+              <div style={{height:"100%",width:`${agent.situational}%`,background:agent.situational>=30?T.brass:T.muted,borderRadius:2}}/>
+            </div>
+          </div>
+          <div>
+            <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6}}>Skill Level</div>
+            <SkillBar skill={agent.skill} color={agent.color}/>
+          </div>
+          </>)}
+        </div>
+  );
+}
+
+// FEATURE: LOG-143 (b) — Report Card. Same card + Corners pattern as its siblings;
+// no new token, no new visual rule.
+function ReportCardPanel({ agent, capabilities }) {
   // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
   // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
   // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
@@ -578,9 +705,37 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
   // Configure → Resume tab edits) are what resolves `lowest_skill`'s slug to a name.
   const reportCardView = reportCardLines(reportCard, capabilities.flatMap(c => c.skillProfiles || []));
 
-  const readiness     = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
-  const rc            = readinessColor;
-  const fmt           = fmt$;
+  return (
+        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
+          <Corners/>
+          <FeatureBadge id="LOG-143" />
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Report Card</div>
+          {!reportCardLoaded ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>Loading…</div>
+            </div>
+          ) : reportCardView.empty ? (
+            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
+              <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>{reportCardView.emptyText}</div>
+            </div>
+          ) : (
+            <>
+              {[["Runs judged", String(reportCardView.runsJudged)],
+                ...reportCardView.dimensions.map(d => [d.label, d.unknownText ? `${d.scoreText} · ${d.unknownText}` : d.scoreText]),
+                ["Skill to improve", reportCardView.skillToImproveText]].map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+  );
+}
+
+// ── Active Work Assignments ──
+function WorkAssignments({ agent }) {
   const agentTasks    = AGENT_TASKS[agent.id]     || [];
   const agentCompleted= AGENT_COMPLETED[agent.id] || [];
 
@@ -597,6 +752,123 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
     "Normal":{color:T.muted,      bg:"rgba(18,36,60,.06)",   border:T.lineSoft},
     "Low":   {color:T.muted,      bg:"rgba(120,109,82,.08)", border:T.line},
   };
+
+  return (
+    <div style={{marginTop:18}}>
+      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Assignments</div>
+      {agentTasks.length===0 ? (
+        <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
+          <div style={{fontFamily:display,fontSize:14,color:T.muted,fontStyle:"italic"}}>No active assignments for {agent.name.split(" ")[0]} right now.</div>
+        </div>
+      ) : agentTasks.map(t=>{
+        const s=STATUS_S[t.status]||STATUS_S["pending"];
+        const p=PRIORITY_S[t.priority]||PRIORITY_S["Normal"];
+        return(
+          <div key={t.id} style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",marginBottom:10,position:"relative",transition:"border-color .15s"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.line}>
+            <div style={{padding:"13px 16px",display:"flex",alignItems:"flex-start",gap:12}}>
+              <AgentAvatar who={agent.id} size={36} ring={true} />
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:4,lineHeight:1.2}}>{t.title}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                  <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>{t.type}</span>
+                  <span style={{color:T.lineSoft}}>·</span>
+                  <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>Due {t.due}</span>
+                </div>
+                <div style={{fontSize:12,color:T.mutedDeep,fontStyle:"italic",lineHeight:1.5}}>{t.preview}</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
+                <span style={{fontFamily:mono,fontSize:8,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",padding:"2px 8px",background:s.bg,color:s.color,border:`1px solid ${s.border}`}}>{s.label}</span>
+                <span style={{fontFamily:mono,fontSize:8,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",padding:"2px 8px",background:p.bg,color:p.color,border:`1px solid ${p.border}`}}>{t.priority}</span>
+              </div>
+            </div>
+            {t.status==="needs-review"&&(
+              <div style={{borderTop:`1px solid ${T.line}`,padding:"9px 16px",background:T.cardAlt,display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontFamily:mono,fontSize:8.5,color:T.moss,fontWeight:700}}>● Ready for your review</span>
+                <div style={{flex:1}}/>
+                <button style={{background:T.moss,color:"#fff",border:"none",padding:"6px 14px",fontFamily:body,fontSize:11,fontWeight:700,cursor:"pointer"}}>Review & Approve</button>
+                <button style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"6px 12px",fontFamily:body,fontSize:11,cursor:"pointer"}}>Request Changes</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.muted,letterSpacing:2,textTransform:"uppercase",marginTop:16,marginBottom:8}}>Recently Completed</div>
+      {agentCompleted.length===0 ? (
+        <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"18px",textAlign:"center"}}>
+          <div style={{fontFamily:display,fontSize:13,color:T.muted,fontStyle:"italic"}}>No completed projects yet</div>
+        </div>
+      ) : agentCompleted.map(t=>(
+        <div key={t.id} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",display:"flex",alignItems:"center",gap:12,marginBottom:6,opacity:.85}}>
+          <span style={{fontFamily:mono,fontSize:10,color:T.moss}}>✓</span>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{t.title}</div>
+            <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginTop:2}}>{t.type} · Completed {t.completedOn}</div>
+          </div>
+          <button style={{background:"transparent",border:`1px solid ${T.line}`,color:T.muted,padding:"3px 10px",fontFamily:mono,fontSize:8,letterSpacing:.5,textTransform:"uppercase",cursor:"pointer"}}>View</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Stat badges — FEATURE: AGT-397 — the page header's Situational Awareness / Readiness / Skill trio;
+// mobile = the persona block's grid, desktop = the page header's divided row
+function StatBadges({ agent, readiness, isMobile }) {
+  if (isMobile) return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
+                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
+                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                </div>
+  );
+  return (
+                <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                  </div>
+                  <div style={{width:1,height:30,background:T.lineSoft}}/>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
+                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                  <div style={{width:1,height:30,background:T.lineSoft}}/>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
+                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                </div>
+  );
+}
+
+// FEATURE: PE-01 — Profile tab
+// FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
+// ── Tab: Profile ──────────────────────────────────────────────────────────────
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current" }) {
+  const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
+  // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
+  // rest moves to the Future View tab
+  const proposed  = arrangement === "proposed";
 
   return (
     <>
@@ -663,200 +935,26 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           )}
         </div>
 
-        {/* Compensation card */}
-        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 18px",position:"relative"}}>
-          <Corners/>
-          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8}}>Compensation · FY2026 · The Ledger</div>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-            <div>
-              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Salary Equiv.</div>
-              <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.navy}}>{agent.salary===0?"Free":fmt(agent.salary)}</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Yearly Value</div>
-              <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.moss}}>{agent.value===0?"Demo":fmt(agent.value)}</div>
-            </div>
-          </div>
-          {[["Hourly rate","$"+agent.hourly],["Hours / report",agent.reportHrs+"h"],["Cost / report",agent.reportCost===0?"Free":"$"+agent.reportCost],["Revenue model",agent.revenueModel||"—"]].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
-              <span style={{color:T.mutedDeep}}>{k}</span>
-              <span style={{fontFamily:mono,fontSize:10.5,color:T.ink}}>{v}</span>
-            </div>
-          ))}
-          <div style={{marginTop:7,fontFamily:body,fontSize:10,color:T.muted,fontStyle:"italic"}}><strong style={{fontStyle:"normal"}}>Mock data.</strong> Live billing in v5.</div>
-        </div>
+        {!proposed && <CompensationCard agent={agent}/>}
       </div>
 
       {/* ── Right column: Readiness + Intel Config + Quick Stats ── */}
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
-        {/* Readiness score */}
-        <div style={{background:T.navy,padding:"14px 18px",position:"relative",border:`1px solid rgba(182,135,58,.3)`}}>
-          <Corners color={T.brass}/>
-          <div style={{fontFamily:mono,fontSize:8.5,color:T.brassLight,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:7}}>Agent Readiness Score</div>
-          <div style={{display:"flex",alignItems:"flex-end",gap:12,marginBottom:9}}>
-            <div style={{fontFamily:display,fontSize:44,fontWeight:700,color:rc(readiness),lineHeight:1}}>{readiness}</div>
-            <div style={{paddingBottom:4}}>
-              <div style={{fontFamily:mono,fontSize:10,color:rc(readiness),fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>{readinessLabel(readiness)}</div>
-              <div style={{fontFamily:body,fontSize:10,color:"#8fa3bf",marginTop:1}}>weighted composite · 5 layers</div>
-            </div>
-          </div>
-          <div style={{height:6,background:"rgba(255,255,255,.1)",marginBottom:12}}>
-            <div style={{height:"100%",width:`${readiness}%`,background:rc(readiness)}}/>
-          </div>
-          {layers.map(l=>(
-            <div key={l.num} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-              <div style={{fontFamily:mono,fontSize:8,color:"#8fa3bf",width:14,flexShrink:0}}>{l.num}</div>
-              <div style={{flex:1}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                  <span style={{fontFamily:body,fontSize:10,color:"#f8f2e2"}}>{l.label}</span>
-                  <span style={{fontFamily:mono,fontSize:9,color:rc(l.s),fontWeight:700}}>{l.s}</span>
-                </div>
-                <div style={{height:3,background:"rgba(255,255,255,.08)"}}>
-                  <div style={{height:"100%",width:`${l.s}%`,background:rc(l.s)}}/>
-                </div>
-              </div>
-              <div style={{fontFamily:mono,fontSize:7.5,color:"#8fa3bf",width:50,flexShrink:0,textAlign:"right",fontStyle:"italic"}}>{l.tab}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Intelligence config */}
-        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
-          <Corners/>
-          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:4}}>Intelligence Configuration</div>
-          <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:10}}>How {agent.name.split(" ")[0]}'s prompt is assembled</div>
-          {/* FEATURE: PE-17 — mobile: 3-col wrap grid instead of a squeezed flex row */}
-          <div style={{...(isMobile ? {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6} : {display:"flex",alignItems:"stretch"}),marginBottom:10}}>
-            {layers.map((l,i)=>(
-              <div key={l.num} style={{flex:1,textAlign:"center",padding:"8px 4px",background:`${rc(l.s)}12`,border:`1px solid ${rc(l.s)}35`,borderRight:i<layers.length-1?"none":undefined}}>
-                <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:rc(l.s),marginBottom:2}}>{l.num}</div>
-                <div style={{fontFamily:body,fontSize:8.5,color:T.navy,lineHeight:1.2,marginBottom:3}}>{l.label}</div>
-                <div style={{fontFamily:mono,fontSize:8,color:rc(l.s),fontWeight:700}}>{l.s}/100</div>
-              </div>
-            ))}
-          </div>
-          <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5,fontStyle:"italic"}}>Configure each layer in Resume, Training, and Playbook tabs.</div>
-        </div>
-
-        {/* Quick stats */}
-        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
-          <Corners/>
-          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Quick Stats</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
-            {[["Skill",`${agent.skill}/100`,skillLabel(agent.skill),"#886224"],["Documents",agent.docs||"—","training docs",T.navy],["Reports Run","—","mock data",T.moss]].map(([l,v,s,c])=>(
-              <div key={l}>
-                <div style={{fontFamily:body,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>{l}</div>
-                <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,lineHeight:1}}>{v}</div>
-                <div style={{fontFamily:mono,fontSize:8.5,color:T.muted,marginTop:1}}>{s}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:10,marginBottom:8}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600}}>Situational Awareness</div>
-              <div style={{fontFamily:display,fontSize:15,fontWeight:600,color:agent.situational>=30?T.brass:T.muted}}>{agent.situational}%</div>
-            </div>
-            <div style={{height:4,background:`${T.lineSoft}`,borderRadius:2}}>
-              <div style={{height:"100%",width:`${agent.situational}%`,background:agent.situational>=30?T.brass:T.muted,borderRadius:2}}/>
-            </div>
-          </div>
-          <div>
-            <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6}}>Skill Level</div>
-            <SkillBar skill={agent.skill} color={agent.color}/>
-          </div>
-        </div>
-
-        {/* FEATURE: LOG-143 (b) — Report Card. Same card + Corners pattern as its siblings above;
-            no new token, no new visual rule. On mobile the enclosing grid is already a single
-            column, so this renders full width below the persona block with no second branch —
-            desktop/mobile parity from one root. */}
-        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
-          <Corners/>
-          <FeatureBadge id="LOG-143" />
-          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Report Card</div>
-          {!reportCardLoaded ? (
-            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
-              <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>Loading…</div>
-            </div>
-          ) : reportCardView.empty ? (
-            <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
-              <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>{reportCardView.emptyText}</div>
-            </div>
-          ) : (
-            <>
-              {[["Runs judged", String(reportCardView.runsJudged)],
-                ...reportCardView.dimensions.map(d => [d.label, d.unknownText ? `${d.scoreText} · ${d.unknownText}` : d.scoreText]),
-                ["Skill to improve", reportCardView.skillToImproveText]].map(([k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
-                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
-                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
+        {proposed ? (
+          <QuickStatsCard agent={agent} show="documents"/>
+        ) : (
+          <>
+            <ReadinessCard layers={layers} readiness={readiness}/>
+            <IntelConfigCard agent={agent} layers={layers} isMobile={isMobile}/>
+            <QuickStatsCard agent={agent}/>
+            <ReportCardPanel agent={agent} capabilities={capabilities}/>
+          </>
+        )}
       </div>
     </div>
 
-    {/* ── Active Work Assignments ── */}
-    <div style={{marginTop:18}}>
-      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Assignments</div>
-      {agentTasks.length===0 ? (
-        <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
-          <div style={{fontFamily:display,fontSize:14,color:T.muted,fontStyle:"italic"}}>No active assignments for {agent.name.split(" ")[0]} right now.</div>
-        </div>
-      ) : agentTasks.map(t=>{
-        const s=STATUS_S[t.status]||STATUS_S["pending"];
-        const p=PRIORITY_S[t.priority]||PRIORITY_S["Normal"];
-        return(
-          <div key={t.id} style={{background:T.card,border:`1.5px solid ${T.line}`,overflow:"hidden",marginBottom:10,position:"relative",transition:"border-color .15s"}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=T.line}>
-            <div style={{padding:"13px 16px",display:"flex",alignItems:"flex-start",gap:12}}>
-              <AgentAvatar who={agent.id} size={36} ring={true} />
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontFamily:display,fontSize:14,fontWeight:600,color:T.navy,marginBottom:4,lineHeight:1.2}}>{t.title}</div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
-                  <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>{t.type}</span>
-                  <span style={{color:T.lineSoft}}>·</span>
-                  <span style={{fontFamily:mono,fontSize:8,color:T.muted}}>Due {t.due}</span>
-                </div>
-                <div style={{fontSize:12,color:T.mutedDeep,fontStyle:"italic",lineHeight:1.5}}>{t.preview}</div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
-                <span style={{fontFamily:mono,fontSize:8,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",padding:"2px 8px",background:s.bg,color:s.color,border:`1px solid ${s.border}`}}>{s.label}</span>
-                <span style={{fontFamily:mono,fontSize:8,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",padding:"2px 8px",background:p.bg,color:p.color,border:`1px solid ${p.border}`}}>{t.priority}</span>
-              </div>
-            </div>
-            {t.status==="needs-review"&&(
-              <div style={{borderTop:`1px solid ${T.line}`,padding:"9px 16px",background:T.cardAlt,display:"flex",gap:8,alignItems:"center"}}>
-                <span style={{fontFamily:mono,fontSize:8.5,color:T.moss,fontWeight:700}}>● Ready for your review</span>
-                <div style={{flex:1}}/>
-                <button style={{background:T.moss,color:"#fff",border:"none",padding:"6px 14px",fontFamily:body,fontSize:11,fontWeight:700,cursor:"pointer"}}>Review & Approve</button>
-                <button style={{background:"transparent",border:`1px solid ${T.line}`,color:T.mutedDeep,padding:"6px 12px",fontFamily:body,fontSize:11,cursor:"pointer"}}>Request Changes</button>
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.muted,letterSpacing:2,textTransform:"uppercase",marginTop:16,marginBottom:8}}>Recently Completed</div>
-      {agentCompleted.length===0 ? (
-        <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"18px",textAlign:"center"}}>
-          <div style={{fontFamily:display,fontSize:13,color:T.muted,fontStyle:"italic"}}>No completed projects yet</div>
-        </div>
-      ) : agentCompleted.map(t=>(
-        <div key={t.id} style={{background:T.card,border:`1px solid ${T.line}`,padding:"10px 16px",display:"flex",alignItems:"center",gap:12,marginBottom:6,opacity:.85}}>
-          <span style={{fontFamily:mono,fontSize:10,color:T.moss}}>✓</span>
-          <div style={{flex:1}}>
-            <div style={{fontFamily:display,fontSize:13,fontWeight:600,color:T.navy}}>{t.title}</div>
-            <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginTop:2}}>{t.type} · Completed {t.completedOn}</div>
-          </div>
-          <button style={{background:"transparent",border:`1px solid ${T.line}`,color:T.muted,padding:"3px 10px",fontFamily:mono,fontSize:8,letterSpacing:.5,textTransform:"uppercase",cursor:"pointer"}}>View</button>
-        </div>
-      ))}
-    </div>
+    {!proposed && <WorkAssignments agent={agent}/>}
     </>
   );
 }
@@ -1974,6 +2072,12 @@ export default function PersonnelScreen() {
   const [removeOpen, setRemoveOpen]     = useState(false);
   const [removing, setRemoving]         = useState(false);
   const [removeFailed, setRemoveFailed] = useState(false);
+  // FEATURE: AGT-397 — the Current / Proposed layout switch: dev host + flag on; the choice is kept per
+  // browser (a blocked storage read or write falls back to Current, never breaks the page)
+  const flagOn = useFeatureFlag(LAYOUT_FLAG);
+  const [stored, setStored] = useState(() => { try { return localStorage.getItem(LAYOUT_KEY); } catch { return null; } });
+  const { switchShown, arrangement } = resolveLayout({ hostOk: IS_ADMIN_HOST, flagOn, stored });
+  const setLayout = v => { try { localStorage.setItem(LAYOUT_KEY, v); } catch { /* storage blocked: the choice lasts this visit */ } setStored(v); };
 
   const showToast = (msg, icon="✓") => {
     setToast({msg,icon});
@@ -2020,6 +2124,10 @@ export default function PersonnelScreen() {
   const showActivity = isPrivateAgent(agent);
   if (showActivity) NAV_GROUPS[0].tabs.push({ id:"activity", label:"Activity", icon:"◉" });
   useEffect(() => { if (activeTab === "activity" && !showActivity) setActiveTab("profile"); }, [activeTab, showActivity]);
+  // FEATURE: AGT-397 — the COMING group and its Future View tab exist only under Proposed; a deep link
+  // to it under Current falls back to Profile
+  if (arrangement === "proposed") NAV_GROUPS.push({ id:"coming", label:"COMING", tabs:[{ id:"future", label:"Future View", icon:"◇" }] });
+  useEffect(() => { if (activeTab === "future" && arrangement !== "proposed") setActiveTab("profile"); }, [activeTab, arrangement]);
 
   // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
@@ -2065,6 +2173,8 @@ export default function PersonnelScreen() {
         {/* FEATURE: PE-17 — desktop-only; mobile renders a merged persona header + horizontal tab bar instead */}
         {!isMobile && (
         <div style={{ width:180, flexShrink:0, background:T.card, borderRight:`1px solid ${T.line}`, display:"flex", flexDirection:"column", overflowY:"auto" }}>
+          {/* FEATURE: AGT-397 — the layout switch, above the breadcrumb */}
+          {switchShown && <LayoutSwitch arrangement={arrangement} onChange={setLayout}/>}
           {/* FEATURE: AGT-386 — the Bench breadcrumb, above the identity strip */}
           <Breadcrumb current={agent.name}/>
 
@@ -2134,25 +2244,11 @@ export default function PersonnelScreen() {
                 </div>
                 )}
                 <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                  <div>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
-                  </div>
-                  <div>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
-                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
-                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
-                </div>
+                {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
               </div>
+
+              {/* FEATURE: AGT-397 — the layout switch, mirrored on mobile above the tab bar */}
+              {switchShown && <LayoutSwitch arrangement={arrangement} onChange={setLayout}/>}
 
               {/* Mobile tab bar — FEATURE: PE-17 — reuses RO-13's horizontal chip pattern (STYLE-GUIDE.md §27); persists across all 4 tabs */}
               <div style={{display:"flex",overflowX:"auto",gap:6,padding:"8px 12px",background:T.cardAlt,borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
@@ -2193,27 +2289,8 @@ export default function PersonnelScreen() {
                     Tenure · {agent.hiredOn} · {skillLabel(agent.skill)}-level agent
                   </div>
                 </div>
-                {/* Stat badges */}
-                <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
-                  </div>
-                  <div style={{width:1,height:30,background:T.lineSoft}}/>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
-                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
-                  <div style={{width:1,height:30,background:T.lineSoft}}/>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
-                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
-                </div>
+                {/* Stat badges — FEATURE: AGT-397 — Current arrangement only */}
+                {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={false}/>}
               </div>
             </div>
           )}
@@ -2221,7 +2298,31 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement}/>}
+            {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
+            {activeTab === "future" && arrangement === "proposed" && (
+              <FutureViewTab isMobile={isMobile} groups={[
+                { id:"subscription", items:[], placeholders:[
+                  { label:"Active status", line:"Not yet read from the agent row" },
+                  { label:"Teach control", line:"Not yet read from the agent row" },
+                  { label:"Answer mode",   line:"Not yet read from the agent row" },
+                ]},
+                { id:"billing", items:[<CompensationCard key="comp" agent={agent}/>], placeholders:[] },
+                { id:"readiness", items:[
+                  <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
+                  <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile}/>,
+                  <QuickStatsCard key="stats" agent={agent} show="parked"/>,
+                  <ReportCardPanel key="rc" agent={agent} capabilities={capabilities}/>,
+                ], placeholders:[] },
+                { id:"library", items:[], placeholders:[
+                  { label:"Library catalog",  line:"Hidden from AI clients until the Library opens to this agent" },
+                  { label:"Library records",  line:"Hidden from AI clients until the Library opens to this agent" },
+                  { label:"Library tier",     line:"Hidden from AI clients until the Library opens to this agent" },
+                  { label:"Data-room access", line:"Hidden from AI clients until the Library opens to this agent" },
+                ]},
+                { id:"work", items:[<WorkAssignments key="work" agent={agent}/>], placeholders:[] },
+              ]}/>
+            )}
             {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
