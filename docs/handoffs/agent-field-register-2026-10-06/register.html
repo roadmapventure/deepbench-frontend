@@ -1,0 +1,547 @@
+<title>Agent Field Register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
+<style>
+/* Layout: one wide register table, sticky header + filter row, first two columns frozen; the yellow columns are John's, the blue column is Claude's, the thread column is the shared discussion. */
+:root{
+  --bg:#F4F6F8; --surface:#FFFFFF; --sunk:#EDF0F3; --head:#E4E9EF; --ink:#18202C; --muted:#5A6576; --line:#D8DEE5;
+  --accent:#1F5E8C; --accent-soft:#E3EEF7; --yours:#FFF6DA; --yours-head:#F3E2A6; --yours-line:#E7C766; --dirty:#FFE9A8;
+  --yes:#2E7D4F; --yes-bg:#E2F2E8; --part:#A0620B; --part-bg:#FBEEDB; --no:#6B7383; --no-bg:#EEF1F4; --flag:#B3261E; --flag-bg:#FBE4E2;
+  --serif:"Newsreader", Georgia, "Times New Roman", serif; --sans:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme:dark; --bg:#12161C; --surface:#1A2029; --sunk:#151A21; --head:#222A35; --ink:#E6EAF0; --muted:#98A3B3; --line:#2C3542;
+  --accent:#7DB4DE; --accent-soft:#1D2D3D; --yours:#2B2718; --yours-head:#3A3420; --yours-line:#8A7430; --dirty:#4A3F17;
+  --yes:#79C99A; --yes-bg:#183024; --part:#E0A857; --part-bg:#33281A; --no:#98A3B3; --no-bg:#1E2530; --flag:#F08A83; --flag-bg:#3A1E1C; }}
+:root[data-theme="dark"]{
+  color-scheme:dark; --bg:#12161C; --surface:#1A2029; --sunk:#151A21; --head:#222A35; --ink:#E6EAF0; --muted:#98A3B3; --line:#2C3542;
+  --accent:#7DB4DE; --accent-soft:#1D2D3D; --yours:#2B2718; --yours-head:#3A3420; --yours-line:#8A7430; --dirty:#4A3F17;
+  --yes:#79C99A; --yes-bg:#183024; --part:#E0A857; --part-bg:#33281A; --no:#98A3B3; --no-bg:#1E2530; --flag:#F08A83; --flag-bg:#3A1E1C; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 var(--sans);padding-inline:16px;padding-block:0}
+/* the page is exactly one screen tall: the table takes what the controls leave, so its own vertical and horizontal scrollbars are always in view */
+.wrap{display:flex;flex-direction:column;gap:8px;padding-block:10px 12px;height:100%;min-height:560px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 20px}
+h1{font:600 24px/1.15 var(--serif);margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;max-width:90ch}
+.status{font:500 12px var(--mono);color:var(--muted)}
+.status.err{color:var(--flag)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tally{display:flex;flex-wrap:wrap;gap:6px}
+.tally button,.colbtn{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:5px 9px;cursor:pointer;display:inline-flex;gap:6px;align-items:baseline}
+.tally button b{font:600 14px var(--mono);font-variant-numeric:tabular-nums}
+.tally button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.bar input[type=search]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 7px;flex:1 1 220px;max-width:100%}
+.btn{font:500 13px var(--sans);border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.savebar{display:flex;gap:10px;align-items:center;margin-left:auto}
+.savebar .n{font:500 12px var(--mono);color:var(--muted)}
+.cols{position:relative}
+.colmenu,.fpop{position:fixed;z-index:60;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgb(0 0 0 / .16);display:flex;flex-direction:column}
+.colmenu{width:min(260px,calc(100vw - 32px));max-height:min(520px,75vh)}
+.fpop{min-width:220px;max-width:min(340px,calc(100vw - 32px));max-height:min(380px,60vh);font:400 12.5px var(--sans)}
+.colmenu .acts,.fpop .acts{display:flex;gap:14px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.colmenu .acts button,.fpop .acts button{font:500 12px var(--sans);background:none;border:0;padding:0;color:var(--accent);cursor:pointer}
+.colmenu .clist,.fpop .list{overflow:auto;padding:4px 0}
+.colmenu label,.fpop label{display:flex;gap:8px;align-items:center;padding:4px 12px;cursor:pointer}
+.colmenu label:hover,.fpop label:hover{background:var(--sunk)}
+.colmenu label.y{background:var(--yours)}
+.fpop label .v{min-width:0;overflow-wrap:anywhere}
+.fpop label .n{margin-left:auto;font:500 11px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.fpop .only{font:500 11px var(--sans);background:none;border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--accent);cursor:pointer;visibility:hidden}
+.fpop label:hover .only,.fpop .only:focus-visible{visibility:visible}
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:auto;flex:1 1 auto;min-height:260px}
+.wrap>header,.wrap>.bar,.wrap>.legend,.wrap>.notice,.wrap>.status{flex:none}
+h1{font-size:20px}
+.sub{font-size:12px}
+thead th[draggable=true]{cursor:grab}
+thead th.dragging{opacity:.45}
+thead th.dropt{box-shadow:inset 3px 0 0 var(--accent)}
+.colmenu .crow{display:flex;align-items:center;gap:4px;padding-right:8px}
+.colmenu .crow label{flex:1 1 auto;min-width:0}
+.colmenu .mv{font:500 12px var(--mono);background:none;border:1px solid var(--line);border-radius:4px;color:var(--accent);cursor:pointer;padding:0 6px;line-height:20px}
+.colmenu .mv:disabled{opacity:.35;cursor:default}
+.colmenu .fixed{flex:1 1 auto;padding:4px 12px;color:var(--muted)}
+table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:left}
+thead{position:sticky;top:0;z-index:3}
+thead th{background:var(--head);font:600 11px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none}
+thead th.yours{background:var(--yours-head);color:var(--ink)}
+thead th.cl{background:var(--accent-soft);color:var(--ink)}
+thead th .arrow{font-family:var(--mono);margin-left:4px}
+thead th .arrow.idle{opacity:.4}
+thead th:hover .arrow.idle{opacity:.9}
+.frow th{background:var(--head);padding:4px 5px;cursor:default;text-transform:none;letter-spacing:0;font:400 12px var(--sans)}
+.frow input{font:inherit;width:100%;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:3px 4px}
+.frow input.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.frow .fbtn{font:inherit;width:100%;display:flex;justify-content:space-between;align-items:center;gap:4px;text-align:left;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:3px 4px;cursor:pointer}
+.frow .fbtn .fl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.frow .fbtn .caret{color:var(--muted);flex:none}
+.frow .fbtn.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+td.text{white-space:normal}
+td.key{font:500 12px var(--mono);white-space:nowrap}
+tbody tr:hover td{background:var(--sunk)}
+tbody tr:hover td.yours{background:var(--yours)}
+td.yours{background:var(--yours);padding:3px}
+td.yours textarea,td.yours select{font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:4px;padding:4px 5px;width:100%}
+td.yours textarea{resize:vertical;min-height:52px;display:block}
+td.yours textarea:hover,td.yours select:hover{border-color:var(--yours-line)}
+td.yours textarea:focus,td.yours select:focus{background:var(--surface);border-color:var(--accent)}
+tr.dirty td.yours{background:var(--dirty)}
+tr.dirty td.frz-first{box-shadow:inset 3px 0 0 var(--yours-line)}
+td.cl{background:color-mix(in srgb, var(--accent-soft) 55%, var(--surface))}
+td.yours select.rv-Complete{color:var(--yes);background:var(--yes-bg);font-weight:600}
+td.yours select.rv-Hold{color:var(--part);background:var(--part-bg);font-weight:600}
+details.dec summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:4px;padding:4px 5px;border:1px solid transparent;border-radius:4px;min-height:28px;align-items:center}
+details.dec summary::-webkit-details-marker{display:none}
+details.dec summary:hover{border-color:var(--yours-line)}
+details.dec[open] summary{border-color:var(--accent);background:var(--surface)}
+details.dec .declist{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:4px;margin-top:3px;padding:3px 0}
+details.dec .declist label{display:flex;gap:8px;align-items:center;padding:3px 8px;cursor:pointer;font-size:12.5px;white-space:nowrap}
+details.dec .declist label:hover{background:var(--sunk)}
+.chip{font:500 11px var(--sans);padding:1px 7px;border-radius:10px;white-space:nowrap;display:inline-block}
+.c-yes{color:var(--yes);background:var(--yes-bg)} .c-part{color:var(--part);background:var(--part-bg)} .c-no{color:var(--no);background:var(--no-bg)} .c-flag{color:var(--flag);background:var(--flag-bg)}
+.w-xs{width:90px;min-width:90px}.w-s{width:130px;min-width:130px}.w-m{width:190px;min-width:190px}.w-l{width:280px;min-width:280px}.w-xl{width:360px;min-width:360px}
+.frz{position:sticky;z-index:2}
+td.frz:not(.yours){background:var(--surface)}
+thead th.frz{z-index:5;background:var(--head)}
+.frz-last{box-shadow:inset -1px 0 0 var(--line),4px 0 6px -4px rgb(0 0 0 / .18)}
+.thread{display:flex;flex-direction:column;gap:6px;min-width:0}
+.msg{border-left:3px solid var(--line);padding:2px 0 2px 8px;font-size:12px;white-space:normal}
+.msg.john{border-color:var(--yours-line)} .msg.claude{border-color:var(--accent)}
+.msg .who{font:500 11px var(--mono);color:var(--muted);display:block}
+.thread textarea{font:inherit;width:100%;min-height:40px;border:1px solid var(--line);border-radius:4px;padding:4px 5px;background:var(--surface);color:var(--ink);resize:vertical}
+.thread .post{align-self:flex-start;font:500 12px var(--sans);border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;padding:2px 8px;cursor:pointer}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);padding:24px}
+.notice{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--flag);border-radius:6px;padding:10px 14px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;color:var(--muted);font-size:12px}
+.legend span b{color:var(--ink);font-weight:600}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Agent Field Register</h1>
+      <p class="sub">One row per field a DeepBench agent carries, plus the Personnel-page labels that look like fields. Measured 2026-10-05 against <code>api/_lib/mcp.js</code>, <code>api/_lib/handlers/agent-bundle.js</code> and the live database. The yellow columns are yours; the blue column is Claude's; the Discussion column is for both of us, and saves as you post.</p>
+    </div>
+    <span class="status" id="status" role="status">Connecting…</span>
+  </header>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <div class="legend">
+    <span><b>Shipped to AI client</b> = part of a handover answer</span>
+    <span><b>Personnel page</b> = shown on the agent's Personnel page</span>
+    <span><b>Edited where</b> = the DeepBench screen or tool that saves it; AGT-390's Teach tool is the AI-client path</span>
+  </div>
+
+  <div class="bar">
+    <div class="tally" id="tally" aria-label="Quick filters"></div>
+    <div class="savebar"><span class="n" id="dirtyN"></span><button class="btn" id="saveAll" type="button" disabled>Save changes</button></div>
+  </div>
+
+  <div class="bar">
+    <input id="q" type="search" placeholder="Search every column" aria-label="Search">
+    <button class="colbtn" id="clearF" type="button" hidden>Clear column filters</button>
+    <div class="cols"><button class="colbtn" id="colBtn" type="button" aria-expanded="false">Columns</button><div class="colmenu" id="colMenu" hidden></div></div>
+    <button class="btn ghost" id="addBtn" type="button" disabled>Add a field</button>
+  </div>
+
+  <div class="tablebox" id="tablebox">
+    <table>
+      <thead><tr id="thead"></tr><tr id="tfilter" class="frow"></tr></thead>
+      <tbody id="tbody"><tr><td class="empty">Loading the register…</td></tr></tbody>
+    </table>
+  </div>
+  <span class="status" id="count"></span>
+</div>
+
+<script>
+(function(){
+// key, header, width, shown by default, kind
+const COLS = [
+  ["field","Field","w-s",true,"key"],
+  ["group","Group","w-s",true,"text"],
+  ["filter","View","w-m",true,"tabs"],
+  ["holds","What it holds","w-l",true,"text"],
+  ["source","Where it lives","w-m",false,"mono"],
+  ["edited_where","Edited where","w-l",true,"text"],
+  ["personnel","Personnel page","w-s",true,"tri"],
+  ["personnel_detail","Personnel detail","w-m",false,"text"],
+  ["shipped","Shipped to AI client","w-s",true,"tri"],
+  ["ai_update","AI client can update","w-s",true,"tri"],
+  ["updated","Updated","w-s",true,"updchip"],
+  ["updated_note","Updated: evidence","w-l",false,"text"],
+  ["flag","Flag","w-m",true,"flag"],
+  ["suspect","Suspect","w-m",true,"suspect"],
+  ["reviewed","Reviewed","w-xs",true,"yours-review"],
+  ["john_decision","Your decision","w-s",true,"yours-decision"],
+  ["john_note","Your note","w-l",true,"yours-text"],
+  ["claude_note","Claude's note","w-l",true,"claude"],
+  ["discussion","Discussion","w-xl",true,"thread"],
+];
+const DECISIONS = ["Keep as is","Add to AI client","AI Client can update","AI Client can't update","System should update","Add to Personnel page","Move to Future View","Add an editor","Hide from AI client","Make it real data","Remove from page","Discuss"];
+const REVIEWED = ["Complete","Hold"];
+const FILTER_ORDER = ["Profile (home)","Resume","Training","Playbook","Activity","All tabs (header)","Not on page"];
+const FILTERS = {group:"select", reviewed:"select", updated:"select", suspect:"select", filter:"tags", personnel:"select", shipped:"select", ai_update:"select", flag:"select", john_decision:"tags", edited_where:"tags", holds:"text"};
+// "Edited where" is free text, so it is sorted into a fixed set of tags; a row can carry several
+const EW_ORDER = ["Teach screen","Teach tool (AI client)","Personnel Resume tab","Personnel formats panel","Playbook tab","Create-agent screen","Set at creation","Skill rows","John's call","Derived","Fixed","No editor found","Not editable","Nothing sets it yet","None today","Other"];
+function ewTags(s){
+  s = String(s || ""); const t = [];
+  if (/teach screen/i.test(s)) t.push("Teach screen");
+  if (/teach tool|AI client via|AGT-390/i.test(s)) t.push("Teach tool (AI client)");
+  if (/resume tab/i.test(s)) t.push("Personnel Resume tab");
+  if (/formats panel/i.test(s)) t.push("Personnel formats panel");
+  if (/playbook/i.test(s)) t.push("Playbook tab");
+  if (/create-agent/i.test(s)) t.push("Create-agent screen");
+  if (/set at creation/i.test(s)) t.push("Set at creation");
+  if (/skill rows/i.test(s)) t.push("Skill rows");
+  if (/john/i.test(s)) t.push("John's call");
+  if (/derived|automatically|follows/i.test(s)) t.push("Derived");
+  if (/^fixed$/i.test(s.trim()) || /, fixed/i.test(s)) t.push("Fixed");
+  if (/no editor found|editor confirmed/i.test(s)) t.push("No editor found");
+  if (/not editable|agent writes/i.test(s)) t.push("Not editable");
+  if (/nothing sets it/i.test(s)) t.push("Nothing sets it yet");
+  if (/none today/i.test(s)) t.push("None today");
+  return t.length ? [...new Set(t)] : ["Other"];
+}
+const TRI = {"Yes":"c-yes","Partly":"c-part","Indirect":"c-part","Label":"c-part","No":"c-no"};
+
+let db = null, rows = [], quick = "", sortKey = "field", sortDir = 1, unsub = null;
+const colF = {}; const dirty = new Map(); const drafts = new Map();
+const MULTI = k => FILTERS[k] === "select" || FILTERS[k] === "tags";
+const active = k => MULTI(k) ? !!(colF[k] && colF[k].size) : !!colF[k];
+let shown = new Set(COLS.filter(c => c[3]).map(c => c[0]));
+try { const s = JSON.parse(localStorage.getItem("afr-cols-v1") || "null"); if (Array.isArray(s) && s.length) shown = new Set(s); } catch(_){}
+shown.add("field");
+// a column added after you last opened the page appears by default; columns you hid on purpose stay hidden
+try {
+  const known = JSON.parse(localStorage.getItem("afr-known-v1") || "null") || COLS.map(c => c[0]).filter(k => k !== "ai_update");
+  for (const c of COLS) if (!known.includes(c[0]) && c[3]) shown.add(c[0]);
+  localStorage.setItem("afr-known-v1", JSON.stringify(COLS.map(c => c[0])));
+} catch(_){}
+// column order: saved in this browser; unknown or new columns are appended so an old saved order never hides one
+const colByKey = new Map(COLS.map(c => [c[0], c]));
+let order = COLS.map(c => c[0]);
+try { const s = JSON.parse(localStorage.getItem("afr-order-v1") || "null"); if (Array.isArray(s)){ const keep = s.filter(k => colByKey.has(k)); const all = COLS.map(c => c[0]); all.forEach((k, i) => { if (keep.includes(k)) return; const prev = all.slice(0, i).reverse().find(p => keep.includes(p)); keep.splice(prev ? keep.indexOf(prev) + 1 : 0, 0, k); }); order = keep; } } catch(_){}
+const visibleCols = () => order.filter(k => shown.has(k)).map(k => colByKey.get(k));
+function saveOrder(){ try { localStorage.setItem("afr-order-v1", JSON.stringify(order)); } catch(_){} }
+function moveCol(key, toKey){
+  const from = order.indexOf(key), to = order.indexOf(toKey); if (from < 0 || to < 0 || from === to) return;
+  order.splice(from, 1); order.splice(to, 0, key); saveOrder(); buildColMenu(); render();
+}
+function nudgeCol(key, d){
+  const i = order.indexOf(key), j = i + d; if (i < 0 || j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]]; saveOrder(); buildColMenu(); render();
+}
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function setStatus(t, err){ const s=$("status"); s.textContent=t; s.classList.toggle("err", !!err); }
+function notice(html){ const n=$("notice"); n.innerHTML=html; n.hidden=!html; }
+const val = (r, k) => dirty.has(r.id) && k in dirty.get(r.id) ? dirty.get(r.id)[k] : r[k];
+// a decision is a list of choices; older rows saved a single string, which reads as a list of one
+const decOf = v => Array.isArray(v) ? v.filter(Boolean) : (v ? [String(v)] : []);
+const decArr = r => decOf(val(r, "john_decision"));
+const edited = r => !!(decArr(r).length || val(r,"john_note") || val(r,"reviewed"));
+const discussed = r => Array.isArray(r.discussion) && r.discussion.length > 0;
+// sorting: Yes/Partly/Indirect/Label/No and Complete/Hold sort in that order, not alphabetically;
+// View sorts by the page's own tab order (Profile, Resume, Training, Playbook, Activity, header, not on page)
+const RANKS = {personnel:["Yes","Partly","Indirect","Label","No"], shipped:["Yes","Partly","Indirect","Label","No"], ai_update:["Yes","Partly","Indirect","Label","No"], reviewed:["Complete","Hold"], updated:["User","System","Never: set once","Never: placeholder","Never: hardcoded","Not built"], suspect:["Duplicate"]};
+function sortKeyOf(r, k){
+  if (k === "filter"){ const t = rowTags(r, "filter"); const i = Math.min(...t.map(x => { const n = FILTER_ORDER.indexOf(x); return n < 0 ? 99 : n; })); return String(i).padStart(2, "0") + "|" + t.join(","); }
+  if (RANKS[k]){ const i = RANKS[k].indexOf(String(val(r, k) ?? "")); return String(i < 0 ? 99 : i).padStart(2, "0") + "|"; }
+  if (k === "john_decision") return decArr(r).join(",") || "~";
+  return String(val(r, k) ?? "");
+}
+// the checklist values a row carries for column k
+function rowTags(r, k){
+  if (k === "john_decision"){ const d = decArr(r); return d.length ? d : ["(blank)"]; }
+  if (k === "edited_where") return ewTags(r.edited_where);
+  if (k === "filter"){ const f = Array.isArray(r.filter) ? r.filter.filter(Boolean) : (r.filter ? [String(r.filter)] : []); return f.length ? f : ["(blank)"]; }
+  const v = String(val(r, k) ?? ""); return [v === "" ? "(blank)" : v];
+}
+
+function filtered(){
+  const q = $("q").value.trim().toLowerCase();
+  const out = rows.filter(r => {
+    if (quick === "shipped" && r.shipped !== "Yes") return false;
+    if (quick === "everupd" && !(r.updated === "User" || r.updated === "System")) return false;
+    if (quick === "neverupd" && !String(r.updated || "").startsWith("Never")) return false;
+    if (quick === "suspectrows" && r.suspect !== "Duplicate") return false;
+    if (quick === "revdone" && val(r,"reviewed") !== "Complete") return false;
+    if (quick === "revhold" && val(r,"reviewed") !== "Hold") return false;
+    if (quick === "revnone" && val(r,"reviewed")) return false;
+    if (quick === "aiupd" && r.ai_update !== "Yes") return false;
+    if (quick === "personnelrows" && !/^p\d/.test(r.id)) return false;
+    if (quick === "noeditor" && !(r.shipped === "Yes" && /no editor/i.test(r.edited_where || ""))) return false;
+    if (quick === "labels" && r.group !== "Personnel label") return false;
+    if (quick === "undecided" && decArr(r).length) return false;
+    if (quick === "decided" && !decArr(r).length) return false;
+    if (quick === "toai" && !decArr(r).includes("Add to AI client")) return false;
+    if (quick === "decnoai" && !decArr(r).includes("AI Client can't update")) return false;
+    if (quick === "decsys" && !decArr(r).includes("System should update")) return false;
+    if (quick === "decupd" && !decArr(r).includes("AI Client can update")) return false;
+    if (quick === "topersonnel" && !decArr(r).includes("Add to Personnel page")) return false;
+    if (quick === "future" && !decArr(r).includes("Move to Future View")) return false;
+    if (quick === "discussed" && !discussed(r)) return false;
+    if (quick === "mine" && !edited(r)) return false;
+    for (const k of Object.keys(colF)){
+      if (!active(k)) continue;
+      if (FILTERS[k] === "text"){ if (!String(r[k] ?? "").toLowerCase().includes(colF[k].toLowerCase())) return false; continue; }
+      if (!rowTags(r, k).some(v => !colF[k].has(v))) return false;
+    }
+    if (q){
+      const hay = COLS.map(c => c[0] === "discussion" ? (r.discussion || []).map(m => m.text).join(" ") : String(val(r, c[0]) ?? "")).join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  return out.sort((a, b) => sortKeyOf(a, sortKey).localeCompare(sortKeyOf(b, sortKey), undefined, {numeric:true}) * sortDir || String(a.field).localeCompare(String(b.field)));
+}
+function renderTally(){
+  const t = [["", "All", rows.length],
+    ["shipped", "Shipped to AI client", rows.filter(r => r.shipped === "Yes").length],
+    ["everupd", "Ever updated (user or system)", rows.filter(r => r.updated === "User" || r.updated === "System").length],
+    ["neverupd", "Never updated", rows.filter(r => String(r.updated || "").startsWith("Never")).length],
+    ["suspectrows", "Suspect duplicates", rows.filter(r => r.suspect === "Duplicate").length],
+    ["revdone", "Reviewed: Complete", rows.filter(r => val(r,"reviewed") === "Complete").length],
+    ["revhold", "Reviewed: Hold", rows.filter(r => val(r,"reviewed") === "Hold").length],
+    ["revnone", "Not yet reviewed", rows.filter(r => !val(r,"reviewed")).length],
+    ["aiupd", "AI client can update", rows.filter(r => r.ai_update === "Yes").length],
+    ["personnelrows", "Personnel page elements", rows.filter(r => /^p\d/.test(r.id)).length],
+    ["noeditor", "Shipped, no editor", rows.filter(r => r.shipped === "Yes" && /no editor/i.test(r.edited_where || "")).length],
+    ["labels", "Personnel labels", rows.filter(r => r.group === "Personnel label").length],
+    ["undecided", "Awaiting your decision", rows.filter(r => !decArr(r).length).length],
+    ["decided", "Decided", rows.filter(r => decArr(r).length).length],
+    ["toai", "Add to AI client", rows.filter(r => decArr(r).includes("Add to AI client")).length],
+    ["decnoai", "Decided: AI Client can't update", rows.filter(r => decArr(r).includes("AI Client can't update")).length],
+    ["decsys", "Decided: System should update", rows.filter(r => decArr(r).includes("System should update")).length],
+    ["decupd", "Decided: AI Client can update", rows.filter(r => decArr(r).includes("AI Client can update")).length],
+    ["topersonnel", "Add to Personnel page", rows.filter(r => decArr(r).includes("Add to Personnel page")).length],
+    ["future", "Future View", rows.filter(r => decArr(r).includes("Move to Future View")).length],
+    ["discussed", "Has discussion", rows.filter(discussed).length],
+    ["mine", "Edited by you", rows.filter(edited).length]];
+  $("tally").innerHTML = t.map(([k, l, n]) => `<button type="button" data-q="${k}" aria-pressed="${quick === k}"><b>${n}</b>${esc(l)}</button>`).join("");
+}
+function options(k){
+  if (k === "john_decision") return DECISIONS.concat(rows.some(r => !decArr(r).length) ? ["(blank)"] : []);
+  if (k === "filter"){ const present = new Set(rows.flatMap(r => rowTags(r, "filter"))); return FILTER_ORDER.concat(["(blank)"]).filter(t => present.has(t)); }
+  if (k === "edited_where"){ const present = new Set(rows.flatMap(r => ewTags(r.edited_where))); return EW_ORDER.filter(t => present.has(t)); }
+  const vals = [...new Set(rows.map(r => String(r[k] ?? "")))];
+  const blank = vals.includes("");
+  const order = k === "shipped" || k === "personnel" || k === "ai_update" ? ["Yes","Partly","Indirect","Label","No"] : k === "reviewed" ? REVIEWED : k === "updated" ? RANKS.updated : k === "suspect" ? RANKS.suspect : null;
+  const out = vals.filter(Boolean).sort(order ? (a,b) => (order.indexOf(a)+1||99)-(order.indexOf(b)+1||99) || a.localeCompare(b) : (a,b) => a.localeCompare(b));
+  return out.concat(blank ? ["(blank)"] : []);
+}
+function fLabel(k){
+  const ex = colF[k], all = options(k);
+  if (!ex || !ex.size) return "All";
+  const keep = all.filter(v => !ex.has(v));
+  if (!keep.length) return "None";
+  if (keep.length === 1) return keep[0];
+  if (ex.size === 1) return "All but " + [...ex][0];
+  return keep.length + " of " + all.length;
+}
+function updateClear(){ const n = Object.keys(colF).filter(active).length; $("clearF").hidden = !n; $("clearF").textContent = `Clear column filters (${n})`; }
+function renderFilterRow(){
+  const cols = visibleCols();
+  $("tfilter").innerHTML = cols.map(([k, h, w]) => {
+    const on = active(k) ? "on" : "";
+    if (!FILTERS[k]) return `<th class="${w}"></th>`;
+    if (FILTERS[k] === "text") return `<th class="${w}"><input type="search" id="cf-${k}" data-f="${k}" class="${on}" value="${esc(colF[k] || "")}" placeholder="contains…" aria-label="Filter ${esc(h)}"></th>`;
+    return `<th class="${w}"><button type="button" class="fbtn ${on}" id="cf-${k}" data-mf="${k}" aria-haspopup="dialog" aria-expanded="${popKey === k}" aria-label="Filter ${esc(h)}: ${esc(fLabel(k))}"><span class="fl">${esc(fLabel(k))}</span><span class="caret" aria-hidden="true">▾</span></button></th>`;
+  }).join("");
+  updateClear();
+}
+let pop = null, popKey = null;
+function closePop(){ if (pop){ pop.remove(); pop = null; } const b = popKey && $("cf-" + popKey); if (b) b.setAttribute("aria-expanded","false"); popKey = null; }
+function openPop(btn){
+  closePop();
+  const k = btn.dataset.mf, all = options(k), ex = colF[k] || new Set();
+  const h = (COLS.find(c => c[0] === k) || [k,k])[1];
+  const counts = {}; for (const r of rows) for (const v of new Set(rowTags(r, k))) counts[v] = (counts[v]||0)+1;
+  popKey = k; pop = document.createElement("div"); pop.className = "fpop"; pop.setAttribute("role","dialog"); pop.setAttribute("aria-label","Filter " + h);
+  pop.innerHTML = `<div class="acts"><button type="button" data-act="all">Select all</button><button type="button" data-act="none">Clear all</button></div><div class="list">${all.map((v,i) => `<label><input type="checkbox" id="fp-${k}-${i}" data-v="${esc(v)}" ${ex.has(v) ? "" : "checked"}><span class="v">${esc(v)}</span><span class="n">${counts[v]||0}</span><button type="button" class="only" data-only="${esc(v)}" aria-label="Show only ${esc(v)}">only</button></label>`).join("")}</div>`;
+  document.body.appendChild(pop);
+  const rc = btn.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(rc.left, innerWidth - pop.offsetWidth - 8)) + "px";
+  let top = rc.bottom + 4; if (top + pop.offsetHeight > innerHeight - 8) top = Math.max(8, rc.top - pop.offsetHeight - 4);
+  pop.style.top = top + "px"; btn.setAttribute("aria-expanded","true");
+  pop.addEventListener("change", ev => { const v = ev.target.dataset.v; if (v === undefined) return; const s = colF[k] instanceof Set ? colF[k] : (colF[k] = new Set()); if (ev.target.checked) s.delete(v); else s.add(v); applyPop(); });
+  pop.addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; ev.preventDefault();
+    if (b.dataset.act === "all") colF[k] = new Set(); else if (b.dataset.act === "none") colF[k] = new Set(all); else if (b.dataset.only !== undefined) colF[k] = new Set(all.filter(v => v !== b.dataset.only));
+    pop.querySelectorAll("input[data-v]").forEach(i => { i.checked = !colF[k].has(i.dataset.v); }); applyPop(); });
+}
+function applyPop(){ const k = popKey; if (!k) return; const b = $("cf-" + k); if (b){ const l = fLabel(k); b.querySelector(".fl").textContent = l; b.classList.toggle("on", active(k)); } updateClear(); render(true); }
+
+function renderHead(){
+  $("thead").innerHTML = visibleCols().map(([k, h, w, , kind]) =>
+    `<th class="${w} ${kind.startsWith("yours") ? "yours" : ""} ${kind === "claude" ? "cl" : ""}" data-sort="${k}" data-key="${k}" draggable="true" title="Click to sort. Drag to move this column." scope="col">${esc(h)}${sortKey === k ? `<span class="arrow">${sortDir > 0 ? "↑" : "↓"}</span>` : `<span class="arrow idle" aria-hidden="true">⇅</span>`}</th>`).join("");
+}
+function chip(v){ return v ? `<span class="chip ${TRI[v] || "c-no"}">${esc(v)}</span>` : ""; }
+function cell(r, [k, , w, , kind]){
+  const v = val(r, k);
+  if (kind === "key") return `<td class="key ${w}">${esc(v)}</td>`;
+  if (kind === "mono") return `<td class="${w} muted" style="font:11px var(--mono);white-space:normal">${esc(v)}</td>`;
+  if (kind === "tri") return `<td class="${w}">${chip(v)}</td>`;
+  if (kind === "updchip") return `<td class="${w}" title="${esc(r.updated_note || "")}">${v ? `<span class="chip ${v === "User" || v === "System" ? "c-yes" : v === "Not built" ? "c-part" : "c-no"}">${esc(v)}</span>` : ""}</td>`;
+  if (kind === "suspect") return `<td class="${w} text">${v ? `<span class="chip c-flag">${esc(v)}</span> <span class="muted">${esc(r.suspect_why || "")}</span>` : ""}</td>`;
+  if (kind === "tabs"){ const f = rowTags(r, "filter").filter(x => x !== "(blank)"); return `<td class="${w}">${f.map(x => `<span class="chip ${x === "Not on page" ? "c-no" : "c-part"}">${esc(x)}</span>`).join(" ")}</td>`; }
+  if (kind === "flag") return `<td class="${w} text">${v ? `<span class="chip c-flag">${esc(v)}</span>` : ""}</td>`;
+  if (kind === "yours-decision"){
+    const sel = decOf(v);
+    const sum = sel.length ? sel.map(o => `<span class="chip c-yes">${esc(o)}</span>`).join(" ") : `<span class="muted">Choose…</span>`;
+    return `<td class="yours ${w}"><details class="dec" data-id="${esc(r.id)}"${openDec.has(r.id) ? " open" : ""}><summary aria-label="Your decisions for ${esc(r.field)}">${sum}</summary><div class="declist">${DECISIONS.map((o, i) => `<label><input type="checkbox" id="dec-${esc(r.id)}-${i}" data-dec="${esc(r.id)}" value="${esc(o)}" ${sel.includes(o) ? "checked" : ""}>${esc(o)}</label>`).join("")}</div></details></td>`;
+  }
+  if (kind === "yours-review") return `<td class="yours ${w}"><select class="rv rv-${esc(v || "none")}" data-id="${esc(r.id)}" data-k="${k}" aria-label="Reviewed status for ${esc(r.field)}"><option value="">—</option>${REVIEWED.map(o => `<option ${v === o ? "selected" : ""}>${o}</option>`).join("")}</select></td>`;
+  if (kind === "yours-text") return `<td class="yours ${w}"><textarea data-id="${esc(r.id)}" data-k="${k}" aria-label="Your note for ${esc(r.field)}">${esc(v || "")}</textarea></td>`;
+  if (kind === "claude") return `<td class="${w} cl text">${esc(v)}</td>`;
+  if (kind === "thread"){
+    const msgs = (r.discussion || []).map(m => `<div class="msg ${m.by === "Claude" ? "claude" : "john"}"><span class="who">${esc(m.by)} · ${esc((m.at || "").slice(0,16).replace("T"," "))}</span>${esc(m.text)}</div>`).join("");
+    const d = drafts.get(r.id) || "";
+    return `<td class="${w}"><div class="thread">${msgs}<textarea data-draft="${esc(r.id)}" placeholder="Add to the discussion…" aria-label="Discussion note for ${esc(r.field)}">${esc(d)}</textarea><button type="button" class="post" data-post="${esc(r.id)}" ${db ? "" : "disabled"}>Post</button></div></td>`;
+  }
+  return `<td class="${w} text">${esc(v)}</td>`;
+}
+function render(keepFilterRow){
+  renderTally(); renderHead(); if (!keepFilterRow) renderFilterRow();
+  const list = filtered(), cols = visibleCols();
+  $("tbody").innerHTML = list.length ? list.map(r => `<tr class="${dirty.has(r.id) ? "dirty" : ""}" data-id="${esc(r.id)}">${cols.map(c => cell(r, c)).join("")}</tr>`).join("")
+    : `<tr><td class="empty" colspan="${cols.length}">${rows.length ? "No fields match these filters." : "The register is empty. Claude seeds it after publishing; if this stays empty, reload."}</td></tr>`;
+  $("count").textContent = rows.length ? `Showing ${list.length} of ${rows.length} fields` : "";
+  freeze(); updateSaveBar();
+}
+function freeze(){
+  const heads = [...$("thead").children]; if (heads.length < 2) return;
+  const lefts = []; let left = 0;
+  for (let i = 0; i < 2; i++){ lefts.push(left); left += heads[i].getBoundingClientRect().width; }
+  document.querySelectorAll("#tablebox tr").forEach(tr => { const cells = tr.children; if (cells.length < 2) return;
+    for (let i = 0; i < 2; i++){ const c = cells[i]; c.classList.add("frz"); c.classList.toggle("frz-first", i === 0); c.classList.toggle("frz-last", i === 1); c.style.left = lefts[i] + "px"; } });
+}
+function updateSaveBar(){ $("saveAll").disabled = dirty.size === 0 || !db; $("dirtyN").textContent = dirty.size ? `${dirty.size} unsaved ${dirty.size === 1 ? "row" : "rows"}` : ""; }
+const openDec = new Set();
+function onEdit(ev){
+  const el = ev.target;
+  if (el.dataset && el.dataset.draft !== undefined){ drafts.set(el.dataset.draft, el.value); return; }
+  if (el.dataset && el.dataset.dec !== undefined){
+    const r = rows.find(x => x.id === el.dataset.dec); if (!r) return;
+    const picked = DECISIONS.filter((o, i) => { const b = document.getElementById("dec-" + r.id + "-" + i); return b && b.checked; });
+    const d = dirty.get(r.id) || {}; d.john_decision = picked;
+    const same = Object.entries(d).every(([k, v]) => k === "john_decision" ? JSON.stringify(decOf(r.john_decision)) === JSON.stringify(v) : (r[k] || "") === v);
+    if (same) dirty.delete(r.id); else dirty.set(r.id, d);
+    const tr = el.closest("tr"); tr.classList.toggle("dirty", !same);
+    const det = el.closest("details"); det.querySelector("summary").innerHTML = picked.length ? picked.map(o => `<span class="chip c-yes">${esc(o)}</span>`).join(" ") : `<span class="muted">Choose…</span>`;
+    det.open = false;   // a pick closes the list; click the cell again to add another
+    updateSaveBar(); return;
+  }
+  if (!el.dataset || !el.dataset.k) return;
+  const r = rows.find(x => x.id === el.dataset.id); if (!r) return;
+  if (el.classList.contains("rv")) el.className = "rv rv-" + (el.value || "none");
+  const d = dirty.get(r.id) || {}; d[el.dataset.k] = el.value;
+  const same = Object.entries(d).every(([k, v]) => k === "john_decision" ? JSON.stringify(decOf(r.john_decision)) === JSON.stringify(v) : (r[k] || "") === v);
+  if (same) dirty.delete(r.id); else dirty.set(r.id, d);
+  el.closest("tr").classList.toggle("dirty", !same); updateSaveBar();
+}
+async function saveAll(){
+  if (!db) return; $("saveAll").disabled = true; notice(""); let ok = 0;
+  for (const [id, d] of [...dirty]){
+    const r = rows.find(x => x.id === id); if (!r){ dirty.delete(id); continue; }
+    const patch = {}; for (const [k, v] of Object.entries(d)) patch[k] = k === "john_decision" ? decOf(v) : v.trim();
+    patch.john_updated_at = new Date().toISOString();
+    $("dirtyN").textContent = `Saving ${ok + 1} of ${dirty.size + ok}…`;
+    try { await db.doc("fields/" + id).update(patch); Object.assign(r, patch); dirty.delete(id); ok++; }
+    catch(e){ notice(explain(e)); break; }
+  }
+  render(); if (ok) setStatus(`Saved ${ok} ${ok === 1 ? "row" : "rows"} at ${new Date().toLocaleTimeString()}`);
+}
+async function post(id){
+  const r = rows.find(x => x.id === id); const text = (drafts.get(id) || "").trim(); if (!r || !text || !db) return;
+  const msg = { by: "John", at: new Date().toISOString(), text };
+  const next = (r.discussion || []).concat([msg]);
+  try { await db.doc("fields/" + id).update({ discussion: next }); r.discussion = next; drafts.delete(id); render(true); }
+  catch(e){ notice(explain(e)); }
+}
+async function addField(){
+  if (!db) return; $("addBtn").disabled = true;
+  try {
+    const n = rows.filter(r => r.id.startsWith("john-")).length + 1;
+    const id = "john-" + String(n).padStart(2, "0");
+    const body = { field: "new field " + n, group: "Added by John", filter: [], holds: "", source: "", edited_where: "", personnel: "", personnel_detail: "", shipped: "", flag: "", john_decision: ["Discuss"], john_note: "", claude_note: "", discussion: [], added_by: "John", added_at: new Date().toISOString() };
+    await db.doc("fields/" + id).set(body);
+    quick = ""; $("q").value = ""; closePop(); for (const k in colF) delete colF[k]; render();
+  } catch(e){ notice(explain(e)); }
+  $("addBtn").disabled = false;
+}
+function explain(e){
+  switch(e && e.code){
+    case "invalid_argument": return "This view can't write to the register. Open it signed in as yourself; if you are, the row may have been removed — reload.";
+    case "quota_exceeded": return "The register's store is full: " + esc(e.message);
+    case "resource_exhausted": return "Too many saves at once. Wait a moment and try again.";
+    case "revoked": case "not_granted": case "capability_disabled": case "capability_removed": return "This view lost access to the register's store. Open the page in claude.ai or the Claude app, signed in.";
+    default: return "Something failed saving (" + esc((e && e.code) || "unknown") + "): " + esc(e && e.message);
+  }
+}
+function buildColMenu(){
+  const top = $("colMenu").querySelector(".clist"), keepScroll = top ? top.scrollTop : 0;
+  $("colMenu").innerHTML = `<div class="acts"><button type="button" data-cact="all">Show all</button><button type="button" data-cact="default">Default</button><button type="button" data-cact="order">Reset order</button></div><div class="clist">` + order.map((k, i) => {
+    const [, h, , , kind] = colByKey.get(k);
+    const mv = `<button type="button" class="mv" data-mv="${k}" data-d="-1" aria-label="Move ${esc(h)} up" ${i === 0 ? "disabled" : ""}>↑</button><button type="button" class="mv" data-mv="${k}" data-d="1" aria-label="Move ${esc(h)} down" ${i === order.length - 1 ? "disabled" : ""}>↓</button>`;
+    const lab = k === "field" ? `<span class="fixed">${esc(h)} (always shown)</span>` : `<label class="${kind.startsWith("yours") ? "y" : ""}"><input type="checkbox" id="col-${k}" data-col="${k}" ${shown.has(k) ? "checked" : ""}>${esc(h)}</label>`;
+    return `<div class="crow">${lab}${mv}</div>`;
+  }).join("") + `</div>`;
+  const nl = $("colMenu").querySelector(".clist"); if (nl) nl.scrollTop = keepScroll;
+}
+
+$("tbody").addEventListener("toggle", ev => { const d = ev.target; if (d.dataset && d.dataset.id && d.classList.contains("dec")){ if (d.open) openDec.add(d.dataset.id); else openDec.delete(d.dataset.id); } }, true);
+$("tbody").addEventListener("input", onEdit);
+$("tbody").addEventListener("change", onEdit);
+$("tbody").addEventListener("click", ev => { const b = ev.target.closest("[data-post]"); if (b) post(b.dataset.post); });
+$("thead").addEventListener("click", ev => { const th = ev.target.closest("th"); if (!th) return; const k = th.dataset.sort; if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; } render(); });
+// drag a column header onto another to move it; the column menu has up/down buttons for the same job
+let dragKey = null;
+$("thead").addEventListener("dragstart", ev => { const th = ev.target.closest("th"); if (!th || !th.dataset.key) return; dragKey = th.dataset.key; th.classList.add("dragging"); try { ev.dataTransfer.setData("text/plain", dragKey); ev.dataTransfer.effectAllowed = "move"; } catch(_){} });
+$("thead").addEventListener("dragover", ev => { if (!dragKey) return; const th = ev.target.closest("th"); if (!th || !th.dataset.key) return; ev.preventDefault(); $("thead").querySelectorAll("th.dropt").forEach(x => { if (x !== th) x.classList.remove("dropt"); }); if (th.dataset.key !== dragKey) th.classList.add("dropt"); });
+$("thead").addEventListener("drop", ev => { if (!dragKey) return; const th = ev.target.closest("th"); ev.preventDefault(); const from = dragKey; dragKey = null; if (th && th.dataset.key && th.dataset.key !== from) moveCol(from, th.dataset.key); else render(); });
+$("thead").addEventListener("dragend", () => { dragKey = null; $("thead").querySelectorAll("th.dragging,th.dropt").forEach(x => x.classList.remove("dragging", "dropt")); });
+$("tally").addEventListener("click", ev => { const b = ev.target.closest("button"); if (b){ quick = b.dataset.q; render(); } });
+$("q").addEventListener("input", () => render(true));
+$("tfilter").addEventListener("input", ev => { const k = ev.target.dataset.f; if (!k) return; colF[k] = ev.target.value; ev.target.classList.toggle("on", !!ev.target.value); updateClear(); render(true); });
+$("tfilter").addEventListener("click", ev => { const b = ev.target.closest("[data-mf]"); if (!b) return; if (popKey === b.dataset.mf) closePop(); else openPop(b); });
+$("clearF").addEventListener("click", () => { closePop(); for (const k in colF) delete colF[k]; render(); });
+$("saveAll").addEventListener("click", saveAll);
+$("addBtn").addEventListener("click", addField);
+$("colBtn").addEventListener("click", () => { const m = $("colMenu"), b = $("colBtn"); if (!m.hidden){ m.hidden = true; b.setAttribute("aria-expanded","false"); return; } if (pop) closePop(); m.hidden = false;
+  const rc = b.getBoundingClientRect(); m.style.left = Math.max(8, Math.min(rc.left, innerWidth - m.offsetWidth - 8)) + "px"; let top = rc.bottom + 4; if (top + m.offsetHeight > innerHeight - 8) top = Math.max(8, innerHeight - m.offsetHeight - 8); m.style.top = top + "px"; b.setAttribute("aria-expanded","true"); });
+$("colMenu").addEventListener("click", ev => {
+  const m = ev.target.closest("[data-mv]"); if (m){ nudgeCol(m.dataset.mv, Number(m.dataset.d)); return; }
+  const o = ev.target.closest("[data-cact=order]"); if (o){ order = COLS.map(c => c[0]); saveOrder(); buildColMenu(); render(); return; }
+  const a = ev.target.closest("[data-cact]"); if (!a) return; shown = a.dataset.cact === "all" ? new Set(COLS.map(c => c[0])) : new Set(COLS.filter(c => c[3]).map(c => c[0])); for (const k of Object.keys(colF)) if (!shown.has(k)) delete colF[k]; try { localStorage.setItem("afr-cols-v1", JSON.stringify([...shown])); } catch(_){} $("colMenu").querySelectorAll("input[data-col]").forEach(i => { i.checked = shown.has(i.dataset.col); }); render(); });
+$("colMenu").addEventListener("change", ev => { const k = ev.target.dataset.col; if (!k) return; if (ev.target.checked) shown.add(k); else { shown.delete(k); delete colF[k]; if (popKey === k) closePop(); } try { localStorage.setItem("afr-cols-v1", JSON.stringify([...shown])); } catch(_){} render(); });
+document.addEventListener("click", ev => { document.querySelectorAll("details.dec[open]").forEach(d => { if (!d.contains(ev.target)) d.open = false; });
+  if (!ev.target.closest(".cols")){ $("colMenu").hidden = true; $("colBtn").setAttribute("aria-expanded","false"); } if (pop && !pop.contains(ev.target) && !ev.target.closest("[data-mf]")) closePop(); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && pop){ const k = popKey; closePop(); const b = $("cf-" + k); if (b) b.focus(); } });
+$("tablebox").addEventListener("scroll", () => { if (pop) closePop(); });
+window.addEventListener("resize", () => { if (pop) closePop(); $("colMenu").hidden = true; $("colBtn").setAttribute("aria-expanded","false"); });
+window.addEventListener("beforeunload", ev => { if (dirty.size){ ev.preventDefault(); ev.returnValue = ""; } });
+buildColMenu(); renderHead(); renderFilterRow(); render();
+
+(async () => {
+  db = window.claude && window.claude.use ? await window.claude.use("db") : null;
+  if (!db){ setStatus("Read-only: not signed in", true); notice("This view can't reach the register's store. Open the page in claude.ai or the Claude app, signed in as yourself, to see and edit the rows."); return; }
+  setStatus("Loading…");
+  unsub = db.collection("fields").onSnapshot(snap => {
+    const incoming = snap.docs.filter(d => d.exists).map(d => ({ id: d.id, ...d.data() }));
+    // keep unsaved edits: a dirty row's own fields stay as typed
+    rows = incoming;
+    $("addBtn").disabled = false;
+    setStatus(`${rows.length} fields · live${snap.metadata.fromCache ? " (syncing)" : ""}`);
+    render(true);
+  }, e => { setStatus("Store unavailable", true); notice(explain(e)); });
+})();
+})();
+</script>
