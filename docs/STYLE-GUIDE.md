@@ -273,6 +273,10 @@ style={{
   opacity: 0.5,
 }}
 ```
+A secondary/ghost button that is switched off keeps its own transparent background and takes only `color: T.muted`, `opacity: 0.5`, `cursor: "not-allowed"` (the Personnel badge's "Add to a team", John 2026-10-05, `AGT-386`).
+
+### Quiet link (Locked 2026-10-05, `AGT-386`, John: "not prominent")
+A destructive action John wants out of the way is a text link, not the Destructive button above: `fontFamily: body, fontSize: 11, color: T.muted, textDecoration: "underline", background/border none`, right-aligned at the foot of the page. Used for "Delete Agent" on a private agent's Personnel page; it opens a confirm popup ("Are you sure you want to remove <name>?", Yes / Cancel) and the action archives the record rather than deleting it.
 
 ---
 

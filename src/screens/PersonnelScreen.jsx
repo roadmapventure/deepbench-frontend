@@ -1,3 +1,4 @@
+// DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 -- a private agent's badge gains a team picker (one team per agent, saved through add_agent_to_team); the Connect button names no agent; the desktop left nav opens with the Bench breadcrumb; an id not yet in the roster shows Loading… and an unknown or archived id redirects to /bench (no other agent's file flashes); a Delete Agent link under every tab archives a private agent after a confirm popup
 // DeepBench v7.0.788 | PersonnelScreen.jsx | AGT-384 -- the badge's Connect button opens the Connect to AI page (/bench/connect?agent=<id>); the popup mount is gone and ?connect=1 redirects to the page
 // DeepBench v7.0.770 | PersonnelScreen.jsx | AGT-344 -- Training tab single home
@@ -502,7 +503,8 @@ function TeamPicker({ agent }) {
 
   return (
     <div style={{position:"relative",display:"inline-block"}}>
-      <button onClick={() => setOpen(o => !o)} style={TEAM_GHOST}>{current || "Add to a team"}</button>
+      {/* AGT-386 round 2 (John, 2026-10-05): the button stays but is switched off and grayed out until the team drawer is redesigned. */}
+      <button disabled title="Coming soon" onClick={() => setOpen(o => !o)} style={{...TEAM_GHOST, color:T.muted, opacity:0.5, cursor:"not-allowed"}}>{current || "Add to a team"}</button>
       {open && (
         <div style={{position:"absolute",top:"100%",left:0,marginTop:4,background:T.card,border:`1px solid ${T.line}`,padding:10,textAlign:"left",minWidth:180,zIndex:2}}>
           {teams.length > 0 ? (

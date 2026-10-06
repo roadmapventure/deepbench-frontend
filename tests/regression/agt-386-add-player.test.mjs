@@ -236,6 +236,8 @@ const J_WANTS = [
   ["Are you sure you want to remove {agent.name}?", 1],
   ['action: "archive_private_agent"', 1],
   ["forgetAgent(agent.id)", 1],
+  // Round 2 (John, 2026-10-05): the Add to a team button stays but is disabled and grayed out.
+  ['<button disabled title="Coming soon" onClick={() => setOpen(o => !o)} style={{...TEAM_GHOST, color:T.muted, opacity:0.5, cursor:"not-allowed"}}>', 1],
 ];
 function armJ() {
   const src = read(PERSONNEL_REL); // RAW
@@ -247,6 +249,7 @@ function armJ() {
   // CONTROL: the old fallback and the old label must fail.
   const old = src.replace("agents.find(a => a.id === agentId);", "agents.find(a => a.id === agentId) || agents[0];").replace(">Connect to AI<", ">{`Connect ${firstName} to AI`}<");
   assert.ok(failures(old, J_WANTS).length >= 3, "(j) CONTROL: the old fallback and label must fail");
+  assert.strictEqual(failures(src.replace('<button disabled title="Coming soon"', "<button"), J_WANTS).length, 1, "(j) CONTROL: an enabled Add to a team button must fail");
   return ["j-personnel-needles"];
 }
 
