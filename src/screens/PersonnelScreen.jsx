@@ -1,3 +1,4 @@
+// DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 -- a private agent's badge gains a team picker (one team per agent, saved through add_agent_to_team); the Connect button names no agent; the desktop left nav opens with the Bench breadcrumb; an id not yet in the roster shows Loading… and an unknown or archived id redirects to /bench (no other agent's file flashes); a Delete Agent link under every tab archives a private agent after a confirm popup
 // DeepBench v7.0.788 | PersonnelScreen.jsx | AGT-384 -- the badge's Connect button opens the Connect to AI page (/bench/connect?agent=<id>); the popup mount is gone and ?connect=1 redirects to the page
@@ -26,7 +27,7 @@ import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 —
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
-import ResumeTab, { ConfigCard, AddConfigForm } from "./personnel/ResumeTab.jsx";
+import ResumeTab, { ConfigCard, AddConfigForm, originTag } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -1596,6 +1597,8 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
                   <span style={{...chip,border:`1px solid ${T.brass}`,color:T.brassDeep}}>{facts.kind}</span>
                   <span style={{...chip,border:`1px solid ${e.always?T.moss:T.muted}`,color:e.always?T.moss:T.mutedDeep}}>{facts.reach}</span>
                   {facts.count!==null&&<span style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{facts.count}</span>}
+                  {/* FEATURE: AGT-390 — where and when it was taught */}
+                  {originTag(e)&&<span style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{originTag(e)}</span>}
                 </>) : (<>
                 <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category||"INTERNAL"}</span>
                 {e.jurisdiction&&<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
@@ -1712,6 +1715,7 @@ function PlaybookTab({ agent, showToast }) {
   const [alwaysId,      setAlwaysId]      = useState(null);
   const [neverText,     setNeverText]     = useState("");
   const [neverId,       setNeverId]       = useState(null);
+  const [mcpGuardrails, setMcpGuardrails] = useState([]); // FEATURE: AGT-390 — guardrails taught over MCP
 
   useEffect(() => {
     Promise.all([
@@ -1719,8 +1723,10 @@ function PlaybookTab({ agent, showToast }) {
       apiGetConfigs(agent.id, "guardrail"),
     ]).then(([formats, guardrails]) => {
       setFormatConfigs(formats);
-      const always = guardrails.find(r => r.name === "always");
-      const never  = guardrails.find(r => r.name === "never");
+      // FEATURE: AGT-390 — the boxes edit the DeepBench-written row; rows taught over MCP list under them
+      const always = guardrails.find(r => r.name === "always" && r.origin !== "mcp");
+      const never  = guardrails.find(r => r.name === "never" && r.origin !== "mcp");
+      setMcpGuardrails(guardrails.filter(r => r.origin === "mcp"));
       if (always) { setAlwaysText(always.text); setAlwaysId(always.id); }
       if (never)  { setNeverText(never.text);   setNeverId(never.id); }
     }).catch(() => showToast("Could not load playbook configs", "⚠"))
@@ -1762,6 +1768,27 @@ function PlaybookTab({ agent, showToast }) {
     });
     setShowAdd(false);
   };
+
+  // FEATURE: AGT-390 — delete one guardrail taught over MCP
+  const deleteMcpGuardrail = async (id) => {
+    if (!window.confirm("Delete this guardrail permanently?")) return;
+    try {
+      await apiDeleteConfig(id);
+      setMcpGuardrails(prev => prev.filter(r => r.id !== id));
+      showToast("Deleted ✦");
+    } catch { showToast("Delete failed", "⚠"); }
+  };
+
+  // FEATURE: AGT-390 — the MCP-taught guardrails of one side, under its box
+  const mcpRows = (side) => mcpGuardrails.filter(r => r.name === side).map(r => (
+    <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 6, padding: "7px 10px", border: `1px solid ${T.lineSoft}`, background: T.cardAlt }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.text}</div>
+        <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginTop: 3 }}>{originTag(r)}</div>
+      </div>
+      <button onClick={() => deleteMcpGuardrail(r.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.flag, background: "transparent", border: `1px solid ${T.flag}30`, padding: "1px 8px", cursor: "pointer", textTransform: "uppercase", letterSpacing: .5 }}>Delete</button>
+    </div>
+  ));
 
   const saveGuardrail = async (name, text, id, setId) => {
     try {
@@ -1830,6 +1857,7 @@ function PlaybookTab({ agent, showToast }) {
                   placeholder={`Always cite the specific class code when referencing commodity risk…`}
                   style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.moss}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                 />
+                {mcpRows("always")}
               </div>
               <div>
                 <div style={{ fontFamily: display, fontSize: 13, fontWeight: 600, color: T.navy, marginBottom: 6 }}>
@@ -1843,6 +1871,7 @@ function PlaybookTab({ agent, showToast }) {
                   placeholder={`Never name a vendor as fraudulent without documented evidence…`}
                   style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.flag}`, padding: "10px 12px", fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.7, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                 />
+                {mcpRows("never")}
               </div>
               <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, fontStyle: "italic", marginTop: 8 }}>
                 Autosaved on blur · applied to all prompts
@@ -1964,14 +1993,15 @@ export default function PersonnelScreen() {
     setLoadingEntries(true);
     setEntries([]);
     apiGetEntries(agentId)
-      .then(raw => setEntries(raw.map(toEntry)))
+      // FEATURE: AGT-390 — each entry keeps where and when it was taught
+      .then(raw => setEntries(raw.map(r => ({ ...toEntry(r), origin: r.origin, origin_caller: r.origin_caller, created_at: r.created_at }))))
       .catch(() => showToast("Could not load training entries", "⚠"))
       .finally(() => setLoadingEntries(false));
   }, [agentId]);
 
   // FEATURE: AGT-344 — re-read the list after a save, so every item shown is a saved row
   const reloadEntries = async () => {
-    try { setEntries((await apiGetEntries(agentId)).map(toEntry)); }
+    try { setEntries((await apiGetEntries(agentId)).map(r => ({ ...toEntry(r), origin: r.origin, origin_caller: r.origin_caller, created_at: r.created_at }))); }
     catch { showToast("Could not load training entries", "⚠"); }
   };
 

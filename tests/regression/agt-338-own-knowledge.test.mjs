@@ -1,3 +1,4 @@
+// DeepBench v7.0.792 | tests/regression/agt-338-own-knowledge.test.mjs | AGT-390 -- a fixture agent's own address lists its Knowledge and Teach tools; cleanup removes and checks both slugs
 // DeepBench v7.0.771 | tests/regression/agt-338-own-knowledge.test.mjs | AGT-338 slice 2
 //
 // FEATURE: AGT-338 -- THE OWN-KNOWLEDGE RULE. An agent's knowledge tool gives out only that agent's
@@ -176,7 +177,7 @@ async function partLive() {
     results.push("live-one-any-agent-capability");
 
     const scoped = visibleRows(all, { governanceUnlocked: false, agentIds: [id1] });
-    assert.strictEqual(scoped.length, 1, `(e) the first fixture agent's address lists ${scoped.length} tools, not exactly 1`);
+    assert.strictEqual(scoped.length, 2, `(e) the first fixture agent's address lists ${scoped.length} tools, not exactly 2 (Knowledge and Teach)`);
     const ask = (task_context, rows = scoped, name = id1 + "-knowledge") =>
       callToolThroughExecutor({ name, args: { task_context }, rows });
     const text = r => r && r.content && r.content[0] && r.content[0].text;
@@ -210,14 +211,14 @@ async function partLive() {
   } finally {
     for (const id of ids) {
       await del(`agent_capability_assignments?agent_id=eq.${encodeURIComponent(id)}`);
-      await del(`capabilities?slug=eq.${encodeURIComponent(id + "-knowledge")}`);
+      await del(`capabilities?slug=in.(${encodeURIComponent(id + "-knowledge")},${encodeURIComponent(id + "-teach")})`);
       await del(`agents?id=eq.${encodeURIComponent(id)}`);
     }
   }
   for (const id of ids) {
     const left = await get(`agents?id=eq.${encodeURIComponent(id)}&select=id`);
     assert.strictEqual(left.length, 0, `(e) ${left.length} fixture agents rows remain after cleanup`);
-    const caps = await get(`capabilities?slug=eq.${encodeURIComponent(id + "-knowledge")}&select=slug`);
+    const caps = await get(`capabilities?slug=in.(${encodeURIComponent(id + "-knowledge")},${encodeURIComponent(id + "-teach")})&select=slug`);
     assert.strictEqual(caps.length, 0, `(e) ${caps.length} fixture capabilities rows remain after cleanup`);
     const held = await get(`agent_capability_assignments?agent_id=eq.${encodeURIComponent(id)}&select=agent_id`);
     assert.strictEqual(held.length, 0, `(e) ${held.length} fixture assignment rows remain after cleanup`);

@@ -312,6 +312,8 @@ The lane rule runs first on every address, so an address only subtracts. On a te
 
 **How a created agent gets its tool.** `POST /api/agent-configs` with `action: "create_private_agent"` runs `lib/private-agent-create.js`: an `agents` row (private, active, product lane), a `deterministic` capability `<id>-knowledge` on the Intent `agent-bundle-intent`, its assignment, and for a named team the `agent_teams` row (and the `teams` row when the team is new). No deploy: `/api/mcp/<id>` lists the tool at once.
 
+**The Teach tool (AGT-390, v7.0.792).** Every customer agent with a knowledge tool also holds <id>-teach ("Teach <name>", handler agent-teach), listed wherever its holder is listed. task_context needs kind (taught | role_prompt | output_format | guardrail), title and content; a guardrail also needs side (always | never); teaching_note is optional. It writes to the holder only: a taught item to knowledge_entries (source user), a rule to agent_configs (is_default false), each with origin mcp and origin_caller set to the key name. No model runs. Undo on DeepBench: switch off on the Training tab, or Delete on Resume or Playbook.
+
 **Who may see an agent.** The tool list passes every agent through `visibleAgents()` in `shared/agent-visibility.js`, which reads `agents.owner_id`, `sharing` and `shared_with`. No caller passes a viewer yet, so it hides nothing today.
 
 Regression cover: `tests/regression/agt-338-*.test.mjs`.

@@ -1,3 +1,6 @@
+// DeepBench v7.0.792 | api/load-entries.js | AGT-390 -- GET selects and returns each entry's origin and
+// origin_caller (where it was taught: DeepBench or an MCP client, and that client's key name); POST is a
+// DeepBench write, saved with origin `deepbench` whatever the body says.
 // DeepBench v7.0.768 | api/load-entries.js | AGT-343
 // FEATURE: AGT-343 -- every entry this route returns says its kind (note or file), and a PATCH that
 // supplies a title or content re-embeds the item when its text changed (lib/knowledge-write.js).
@@ -37,7 +40,7 @@ async function handler(req, res) {
     // ── POST — embed and upsert a new knowledge entry ─────────────────────────
     if (req.method === "POST") {
       try {
-        const saved = await embedAndUpsertEntry(req.body);
+        const saved = await embedAndUpsertEntry({ ...req.body, origin: "deepbench", origin_caller: null });
         return res.status(200).json({ success: true, entry: { ...saved, kind: entryKind(saved) } });
       } catch (err) {
         // Preserves the pre-extraction status code: 400 for the one client-input validation
@@ -57,7 +60,7 @@ async function handler(req, res) {
         : "";
 
       const fetchRes = await fetch(
-        `${supabaseUrl}/rest/v1/knowledge_entries?tenant_id=eq.${encodeURIComponent(tenant_id)}${agentFilter}&select=id,title,category,jurisdiction,priority,triggers,content,status,tenant_id,agent_id,teaching_note,source,steps_taken,created_at&order=created_at.desc`,
+        `${supabaseUrl}/rest/v1/knowledge_entries?tenant_id=eq.${encodeURIComponent(tenant_id)}${agentFilter}&select=id,title,category,jurisdiction,priority,triggers,content,status,tenant_id,agent_id,teaching_note,source,steps_taken,created_at,origin,origin_caller&order=created_at.desc`,
         { method: "GET", headers }
       );
 
@@ -82,6 +85,8 @@ async function handler(req, res) {
         source_type:   e.source || "user",
         steps_taken:   e.steps_taken || null,
         created_at:    e.created_at || null,
+        origin:        e.origin || null,
+        origin_caller: e.origin_caller || null,
         content:       e.content || "",
         isDemo:        false,
         source:        e.created_at

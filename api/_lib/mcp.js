@@ -1,3 +1,8 @@
+// DeepBench v7.0.792 | api/_lib/mcp.js | AGT-390 -- a second deterministic handler, `agent-teach`, is
+// registered by NAME (the Intent row `agent-teach-intent` declares it), and runDeterministic() hands
+// every handler the matched MCP key's NAME as handler_context.caller_key_name, so a taught row records
+// which caller taught it. The key's value still never leaves keysMatch(). No slug conditional added.
+//
 // DeepBench v7.0.771 | api/_lib/mcp.js | AGT-338 slice 2 -- the own-knowledge rule. A capability
 // whose Intent row carries `traits.any_agent = true` assembles with `any_agent: true`; visibleRows()
 // drops such a row from every non-admin address, and runDeterministic() hands the fact to the
@@ -150,6 +155,7 @@ import { createRequire } from 'node:module';
 import { timingSafeEqual } from 'node:crypto';
 import { runCapability } from '../capabilities/execute.js';
 import { handle as agentBundleHandle } from './handlers/agent-bundle.js';
+import { handle as agentTeachHandle } from './handlers/agent-teach.js';
 import { withRequestContext, getRequestContext, runWithCallSource } from '../../lib/request-context.js';
 import { visibleAgents, AGENT_ACCESS_COLUMNS } from '../../shared/agent-visibility.js';
 
@@ -828,7 +834,7 @@ async function runThroughExecutor({ row, intentSlug, taskContext, callerKeyName 
  * task_context, while request-receivable.js's handlers receive the MODEL's structured output after a
  * turn. Same signature, different provenance; merging them is filed residue, not this ticket.
  */
-export const DETERMINISTIC_HANDLERS = Object.freeze({ 'agent-bundle': agentBundleHandle });
+export const DETERMINISTIC_HANDLERS = Object.freeze({ 'agent-bundle': agentBundleHandle, 'agent-teach': agentTeachHandle });
 
 /**
  * The deterministic twin of runThroughExecutor(). It establishes the SAME attribution -- call_source
@@ -854,7 +860,12 @@ export async function runDeterministic({ row, taskContext, governanceUnlocked, c
         agent_id: row.agent_id,
         tenant_id: row.tenant_id,
         content: taskContext,
-        handler_context: { governance_unlocked: governanceUnlocked === true, any_agent: row.any_agent === true },
+        handler_context: {
+          governance_unlocked: governanceUnlocked === true,
+          any_agent: row.any_agent === true,
+          // FEATURE: AGT-390 -- the matched key's NAME (null for a keyless caller), never its value.
+          caller_key_name: callerKeyName || null,
+        },
       }),
     mcpAttribution(ctx, callerKeyName),
   );
