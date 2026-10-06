@@ -1,15 +1,15 @@
 # DeepBench — Current State
 > Updated at the close of every session. **Keep this file short.** The three sections below are **generated** from `runner_cycles` by `scripts/render-claude-state.js` — do not hand-edit them; edit the row or the renderer. Standing judgment context (board census, drain state, automation-lane rules, scheduler settings, standing filing rules) lives in [`docs/runbooks/standing-brief.md`](docs/runbooks/standing-brief.md), whose derivable facts are **generated from the tables at every ship** by `scripts/render-standing-brief.js` and whose judgment prose beneath that block is hand-maintained. Read `docs/SESSIONS.md` only when you need version history or root-cause context from a past session, never by default.
 
-**Version in dev:** v7.0.790 (runner cycle `cc5c5d76`, 2026-10-05, **supervised**, model claude-opus-5, push `8b24a077f38515acd3ba6a6de086f152ca1c9fcf` — `AGT-386`)
+**Version in dev:** v7.0.791 (runner cycle `70eeaff5`, 2026-10-05, **supervised**, model claude-opus-5, push `7321b7e5e6b6cb656068f8be9de8d7a21985005f` — `AGT-388`)
 
-**Prior:** v7.0.789 (runner cycle `a5f43828`, 2026-10-05, **supervised**, model claude-opus-5 — `AGT-385`)
+**Prior:** v7.0.790 (runner cycle `cc5c5d76`, 2026-10-05, **supervised**, model claude-opus-5 — `AGT-386`)
 
 **Standing brief:** the standing context every session reads at start — board census, drain state, automation-lane rules, scheduler settings and the standing filing rules — lives in [`docs/runbooks/standing-brief.md`](docs/runbooks/standing-brief.md). Its derivable facts are **generated**, rendered from the tables by `scripts/render-standing-brief.js` at every ship (`runner-cycle.md` step 7); the judgment prose beneath that block is hand-maintained, and where the two disagree about a number the generated block is the one that is right.
 
 ## Last 3 sessions
 
-- (no version claimed), 2026-10-05, runner cycle `70eeaff5`, **supervised**, model claude-opus-5 — **`AGT-388`**.
+- v7.0.791, 2026-10-05, runner cycle `70eeaff5`, **supervised**, model claude-opus-5 — **`AGT-388`**.
 - v7.0.790, 2026-10-05, runner cycle `cc5c5d76`, **supervised**, model claude-opus-5 — **`AGT-386`**.
 - v7.0.789, 2026-10-05, runner cycle `a5f43828`, **supervised**, model claude-opus-5 — **`AGT-385`**.
 

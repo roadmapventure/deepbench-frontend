@@ -13,7 +13,7 @@ identified, where the table had no point-in-time recovery path independent of Su
 backups. Every runner ship point regenerates this file and commits it if changed, so
 `git log` on this path is a durable history of the table's state across sessions.
 
-**Tickets:** 1252 · **Payload sha256:** `8a69ba958969f89f930b998b16540788202773ddc58c5ef3916572b2b7b986e6`
+**Tickets:** 1252 · **Payload sha256:** `42a06cd62d0702d45848d7853adfe3044a7c868fc6bc17bfe69194c0fe675574`
 
 Cell escaping (applied in this order so it is mechanically invertible): a literal backslash
 `\` becomes `\\`, a literal pipe `|` becomes `\|`, and a literal newline becomes the
@@ -1318,7 +1318,7 @@ nearly every run and destroy the byte-identical guarantee above.
 
 | # | ID | Type | Priority class | Title | Status | Session | Harvest | Description | Epic | Design status | Kickoff | History residue |
 |---|----|------|----------------|-------|--------|---------|---------|-------------|------|---------------|---------|-----------------|
-| 16795413 | AGT-388 | Enhancement | P4 - New Customers | Test AI page gets a FAQ under the Comparison test: pick Claude, ChatGPT or Grok, then three closed drawers | open | test-faq-1005 2026-10-05 | docs/harvests/AGT-388.md | **P4 - New Customers.** Under "Comparison test" the Test AI page (AGT-384) adds a FAQ with "Select your AI tool" (Claude / ChatGPT / Grok, none pre-selected) and, once a tool is clicked, three closed drawers with the wording the Connect page has: What to expect after connection, How to disconnect my agent, How do I talk to my agent? No agent picker and no agent name. How do I test my agent? and I can't get the connection link to work stay on the Connect page only. John's request and approved answer: docs/harvests/AGT-388.md. Round 2 (John, same day): on Test AI only, "Select your AI tool" is body text, not the bold heading; see the harvest. | MCP Server and Access | designed | docs/kickoffs/v7.0.791-AGT-388-test-ai-faq.md |  |
+| 16795413 | AGT-388 | Enhancement | P4 - New Customers | Test AI page gets a FAQ under the Comparison test: pick Claude, ChatGPT or Grok, then three closed drawers | delivered | test-faq-1005 2026-10-05 | docs/harvests/AGT-388.md | **P4 - New Customers.** Under "Comparison test" the Test AI page (AGT-384) adds a FAQ with "Select your AI tool" (Claude / ChatGPT / Grok, none pre-selected) and, once a tool is clicked, three closed drawers with the wording the Connect page has: What to expect after connection, How to disconnect my agent, How do I talk to my agent? No agent picker and no agent name. How do I test my agent? and I can't get the connection link to work stay on the Connect page only. John's request and approved answer: docs/harvests/AGT-388.md. Round 2 (John, same day): on Test AI only, "Select your AI tool" is body text, not the bold heading; see the harvest. | MCP Server and Access | designed | docs/kickoffs/v7.0.791-AGT-388-test-ai-faq.md |  |
 
 ## tier `now` — `session-test-line-1003` (1 ticket)
 
