@@ -1,3 +1,4 @@
+// DeepBench v7.0.810 | PersonnelScreen.jsx | AGT-413 -- Capabilities card: every Skill under its fixed type header with all fields shown, Skill Type editable, Capability name and description editable; AGT-402 -- the ID badge heading is the agent's team name and a Times used row reads usage_count; Documents on Future Controls counts the agent's active taught items; Future Controls gains Access, Voice, Rating and Teaching origin cards with sample values.
 // DeepBench v7.0.808 | PersonnelScreen.jsx | AGT-409 -- the Skill editor: on the Capabilities card each Skill expands in place to SkillEditorRow (personnel/SkillEditor.jsx) and saves through update_skill.
 // DeepBench v7.0.809 | PersonnelScreen.jsx | AGT-412 -- the agent quote shows one pair of quote marks (plainQuip); before that AGT-411 --Future Controls' Intelligence Configuration footer names the Profile and Training pages; before that AGT-410 --Future Controls: the Teach control card moves into a new Training group; before that AGT-408 --phone width checked on every tab; the Training stats strip's two buttons drop under the stats; before that AGT-407 --the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
@@ -33,7 +34,8 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
-import SkillEditorRow from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 — the Skill editor
+import { SkillEditorRow, CapabilityHeader, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
+import { TeamHeading, UsageCountRow } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -913,7 +915,7 @@ const CURRENT_VIEW_RETIRED = true;
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange }) {
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
   // rest moves to the Future View tab
@@ -926,7 +928,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
           <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
-          <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence</div>
+          <TeamHeading agentId={agent.id}/>
           <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
             <AgentAvatar who={agent.id} size={92} ring={true} />
           </div>
@@ -942,6 +944,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
             {!proposed && <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>}
             {!proposed && agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
           </div>
+          {proposed && <UsageCountRow agentId={agent.id}/>}
           {agent.quip && (
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
             "{plainQuip(agent.quip)}"
@@ -968,19 +971,34 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
                 knowledge:{ bg: "rgba(18,36,60,.07)",   color: T.mutedDeep, border: T.lineSoft,            label: "KNOWLEDGE"},
                 behavior: { bg: "rgba(120,109,82,.08)", color: T.mutedDeep, border: T.lineSoft,            label: "BEHAVIOR" },
                 identity: { bg: "rgba(168,51,25,.06)",  color: T.flag,      border: "rgba(168,51,25,.2)",  label: "IDENTITY" },
+                guardrails:{ bg: "rgba(168,51,25,.06)", color: T.flag,      border: "rgba(168,51,25,.2)",  label: "GUARDRAILS" },
               };
               return (
                 <div key={cap.slug} style={{ marginBottom: 12 }}>
-                  <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{cap.name}</div>
-                  {cap.description && (
-                    <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>{cap.description}</div>
-                  )}
-                  {cap.skillProfiles.map(sp => {
+                  {/* FEATURE: AGT-413 — Proposed: editable capability name and description; Current keeps the plain heading */}
+                  {proposed ? <CapabilityHeader cap={cap} showToast={showToast} onSaved={onCapabilityChange} /> : (<>
+                    <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{cap.name}</div>
+                    {cap.description && (
+                      <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>{cap.description}</div>
+                    )}
+                  </>)}
+                  {/* FEATURE: AGT-399 / AGT-409 / AGT-413 — Proposed: every Skill under its fixed type header, fields always shown, editable in place */}
+                  {proposed ? (
+                    cap.skillProfiles.length === 0
+                      ? <div style={{ fontFamily: body, fontSize: 10.5, color: T.muted, fontStyle: "italic", padding: "4px 0" }}>No Skills attached to this capability.</div>
+                      : SKILL_TYPES.map(([typeSlug, typeLabel]) => {
+                          const group = cap.skillProfiles.filter(sp => (sp.skill_type_slug || "intent") === typeSlug);
+                          if (group.length === 0) return null;
+                          return (
+                            <div key={typeSlug} style={{ marginTop: 8 }}>
+                              <div style={{ fontFamily: mono, fontSize: 8.5, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.4, fontWeight: 700, borderBottom: `1px solid ${T.line}`, paddingBottom: 3 }}>{typeLabel}</div>
+                              {group.map(sp => <SkillEditorRow key={sp.slug} sp={sp} chip={TYPE_CHIP[typeSlug] || TYPE_CHIP.intent} showToast={showToast} onSaved={onSkillChange} />)}
+                            </div>
+                          );
+                        })
+                  ) : cap.skillProfiles.map(sp => {
                     const chip = TYPE_CHIP[sp.skill_type_slug] || TYPE_CHIP.intent;
-                    // FEATURE: AGT-409 — Proposed: each Skill expands in place to its editor; Current keeps the hover row
-                    return proposed
-                      ? <SkillEditorRow key={sp.slug} sp={sp} chip={chip} showToast={showToast} />
-                      : <SkillRow key={sp.slug} sp={sp} chip={chip} />;
+                    return <SkillRow key={sp.slug} sp={sp} chip={chip} />;
                   })}
                 </div>
               );
@@ -2140,6 +2158,9 @@ export default function PersonnelScreen() {
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
   const [capabilities, setCapabilities] = useState([]);
+  // FEATURE: AGT-413 — a saved Skill (matched by slug, it may sit on several capabilities) or capability replaces its row
+  const patchSkill = (sk) => setCapabilities(cs => cs.map(c => ({ ...c, skillProfiles: c.skillProfiles.map(s => (s.slug === sk.slug ? { ...s, ...sk, level: s.level } : s)) })));
+  const patchCapability = (cap) => setCapabilities(cs => cs.map(c => (c.slug === cap.slug ? { ...c, ...cap, skillProfiles: c.skillProfiles } : c)));
   // FEATURE: AGT-386 — the Delete Agent confirm popup
   const [removeOpen, setRemoveOpen]     = useState(false);
   const [removing, setRemoving]         = useState(false);
@@ -2316,7 +2337,7 @@ export default function PersonnelScreen() {
               {/* Mobile persona block — FEATURE: PE-17 — merges the old page header + ProfileTab's ID Badge card into one persistent block, above the tab bar, on every tab */}
               <div style={{background:T.card,padding:"16px 18px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0,textAlign:"center"}}>
                 <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:12,color:T.brassDeep,cursor:"pointer",textAlign:"left",marginBottom:12}}>← Agent Roster</div>
-                <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence · {agent.code}</div>
+                <TeamHeading agentId={agent.id} suffix={agent.code}/>
                 <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
                   <AgentAvatar who={agent.id} size={56} ring={true} />
                 </div>
@@ -2339,6 +2360,7 @@ export default function PersonnelScreen() {
                   "{plainQuip(agent.quip)}"
                 </div>
                 )}
+                {proposed && <UsageCountRow agentId={agent.id}/>}
                 <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
                 {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
               </div>
@@ -2400,7 +2422,7 @@ export default function PersonnelScreen() {
             {/* AGT-406 — Proposed, desktop: every tab's content takes at most half the browser width, left-aligned */}
             <div style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[
@@ -2411,17 +2433,26 @@ export default function PersonnelScreen() {
                 // AGT-410 — the Teach control card moved here from Configurations
                 { id:"training", items:[], placeholders:[
                   { label:"Teach control", line:"Not yet read from the agent row", rows:[["Who can teach","Owner only"],["Lessons waiting","0"],["Last taught","Oct 3, 2026"],["Review first","Required"]] },
+                  // AGT-413 — teaching origin and date, moved to Future Controls by John's register ruling
+                  { label:"Teaching origin and date", line:"Not yet read from the taught items", rows:[["Taught from","DeepBench"],["Taught over MCP","3 lessons"],["First taught","Sep 29, 2026"],["Last taught","Oct 3, 2026"]] },
                 ]},
                 { id:"billing", items:[<CompensationCard key="comp" agent={agent} tight/>], placeholders:[] },
                 { id:"readiness", items:[
                   <StatBadges key="trio" agent={agent} readiness={readiness} isMobile={isMobile}/>,
                   <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
                   <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile} proposed/>,
-                  <QuickStatsCard key="stats" agent={agent} show="all"/>,
+                  // AGT-402 — Documents is the agent's real count of active taught items, not the roster's constant
+                  <QuickStatsCard key="stats" agent={{ ...agent, docs: taughtCounts(entries).always + taughtCounts(entries).lookedUp }} show="all"/>,
                   <ReportCardPanel key="rc" agent={agent} capabilities={capabilities} tight sample/>,
                   <SkillLadderCard key="ladder" agent={agent} tight/>,
-                ], placeholders:[] },
+                ], placeholders:[
+                  // AGT-413 — rating, moved to Future Controls by John's register ruling
+                  { label:"Rating", line:"Not yet read from the agent row", rows:[["Average","4.6 of 5"],["Ratings","38"],["Last rated","Oct 5, 2026"],["Who can rate","People who used it"]] },
+                ] },
                 { id:"library", items:[], placeholders:[
+                  // AGT-413 — the Access card moved here (read-only for now) and the fixed Voice text, each with sample values
+                  { label:"Access", line:"Editing sharing and visibility arrives with sign-in", rows:[["Owner","Jordan Lee"],["Sharing","Named people"],["Shared with","Dana Ruiz, Sam Okafor"],["Visibility","Visible to the people it is shared with"],["Lane","Product"],["Uber access","Off"]] },
+                  { label:"Voice", line:"One fixed text for every agent today; a per-agent Voice needs its own storage first", rows:[["Applies to","Every agent"],["Position","Last section of every prompt"],["Speaks as","\"you\" or \"I\", never \"the user\""],["Edited per agent","Not yet"]] },
                   { label:"Library catalog",  line:"Hidden from AI clients until the Library opens to this agent", rows:[["Collections","4"],["Documents","128"],["Last updated","Sep 28, 2026"]] },
                   { label:"Library records",  line:"Hidden from AI clients until the Library opens to this agent", rows:[["Records","1,240"],["Kinds","Contracts, bids, notices"],["Newest","Oct 1, 2026"]] },
                   { label:"Library tier",     line:"Hidden from AI clients until the Library opens to this agent", rows:[["Tier","Standard"],["Storage used","2.1 of 10 GB"],["Kept for","12 months"]] },

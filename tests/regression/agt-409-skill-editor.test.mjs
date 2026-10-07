@@ -4,7 +4,7 @@
 //
 // PURE (always run):
 //   (a) readSkillInput() is CALLED: a valid body is trimmed; a missing/malformed skill_id, an unknown or
-//       read-only field (slug, skill_type_slug, execution_type, api_key_source), a blank name, bad JSON,
+//       read-only field (slug, execution_type, api_key_source), a blank name, bad JSON,
 //       a traits array, temperature 3, max_tokens 0 and max_tokens 1.5 are each refused by name. CONTROL:
 //       temperature 0 and max_tokens 1 are accepted. A field absent from the body is absent from `fields`.
 // FAKE fetch (always run):
@@ -60,7 +60,10 @@ export default async function run() {
   };
   assert.equal(readSkillInput({ name: "x" }).error, "skill_id required");
   assert.equal(readSkillInput({ skill_id: "not-a-uuid", name: "x" }).error, "skill_id required");
-  for (const key of ["slug", "skill_type_slug", "execution_type", "api_key_source", "id", "tenant_id_x", "created_at"]) refused({ [key]: "x" }, `${key} cannot be edited`);
+  for (const key of ["slug", "execution_type", "api_key_source", "id", "tenant_id_x", "created_at"]) refused({ [key]: "x" }, `${key} cannot be edited`);
+  // AGT-413: the type is editable, but only to one of the six.
+  assert.equal(readSkillInput({ skill_id: ID, skill_type_slug: "format" }).fields.skill_type_slug, "format");
+  refused({ skill_type_slug: "banana" }, "skill_type_slug must be one of");
   refused({ name: "   " }, "Enter a skill name");
   refused({ traits: "{nope" }, "traits must be valid JSON");
   refused({ traits: [1] }, "traits must be a JSON object");
@@ -95,7 +98,8 @@ export default async function run() {
   assert.equal(count(route, '"update_skill"'), 1, 'the route holds "update_skill" once');
   const screen = read("src/screens/PersonnelScreen.jsx");
   assert.equal(count(screen, "<SkillEditorRow"), 1, "PersonnelScreen mounts SkillEditorRow once");
-  assert.ok(/proposed\s*\n?\s*\?\s*<SkillEditorRow/.test(screen), "SkillEditorRow is mounted only under `proposed`");
+  const at = screen.indexOf("<SkillEditorRow");
+  assert.ok(screen.slice(Math.max(0, at - 1400), at).includes("{proposed ? ("), "SkillEditorRow is mounted only under `proposed`");
 
   // ── (d) skillBody, called ──────────────────────────────────────────────────
   const src = read("src/screens/personnel/SkillEditor.jsx");
