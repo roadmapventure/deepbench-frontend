@@ -1,3 +1,4 @@
+// DeepBench v7.0.818 | PersonnelScreen.jsx | AGT-402 -- Future Controls Training section gains a sample Your trainee badge card (the badge means you can train this agent; John moved it to Future Controls).
 // DeepBench v7.0.816 | PersonnelScreen.jsx | AGT-416 -- Future Controls Access group opens with the Access levels sample card (where it can be used, which model, what an AI client receives, who can teach, what stays protected).
 // DeepBench v7.0.815 | PersonnelScreen.jsx | AGT-415 -- Future Controls gains a sample Skill score card (the typed 0-100 score John moved there; the Profile level bar is the editor).
 // DeepBench v7.0.814 | PersonnelScreen.jsx | AGT-415 -- the Skill Ladder is a five-section bar in the Profile top card (the user clicks a level; it saves agents.skill_score), and Future Controls gains a sample Promotion by accomplishments card.
@@ -2452,6 +2453,8 @@ export default function PersonnelScreen() {
                 // AGT-410 — the Teach control card moved here from Configurations
                 { id:"training", items:[], placeholders:[
                   { label:"Teach control", line:"Not yet read from the agent row", rows:[["Who can teach","Owner only"],["Lessons waiting","0"],["Last taught","Oct 3, 2026"],["Review first","Required"]] },
+                  // AGT-402 — the YOUR TRAINEE badge, moved to Future Controls by John (it means "you can train this agent", not the skill level)
+                  { label:"Your trainee badge", line:"Not yet read from who created the agent", rows:[["Badge","YOUR TRAINEE"],["Shown when","You created this agent, so you can train it"],["Set by","The system, from who created the agent"],["Changes when","The agent passes to a different owner"]] },
                   // AGT-413 — teaching origin and date, moved to Future Controls by John's register ruling
                   { label:"Teaching origin and date", line:"Not yet read from the taught items", rows:[["Taught from","DeepBench"],["Taught over MCP","3 lessons"],["First taught","Sep 29, 2026"],["Last taught","Oct 3, 2026"]] },
                 ]},

@@ -57,6 +57,7 @@ export default async function run() {
   const screen = read("src/screens/PersonnelScreen.jsx");
   assert.equal(count(screen, "<AccessLevelsCard"), 1, "PersonnelScreen mounts the card once");
   assert.ok(/id:"library", items:\[<AccessLevelsCard key="levels"\/>\]/.test(screen), "it sits in the Future Controls Access (library) group");
+  assert.ok(/label:"Your trainee badge",[^\n]*rows:\[\[/.test(screen), "Future Controls shows the Your trainee badge card with sample rows");
   assert.ok(!/fetch\(|supabase/.test(card), "the card reads and writes nothing");
 }
 
