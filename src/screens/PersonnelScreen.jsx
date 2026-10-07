@@ -1,3 +1,4 @@
+// DeepBench v7.0.796 | PersonnelScreen.jsx | AGT-397 slice 2 + AGT-392 -- the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -30,7 +31,7 @@ import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 —
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
-import ResumeTab, { ConfigCard, AddConfigForm, originTag } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag
+import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -2061,7 +2062,10 @@ export default function PersonnelScreen() {
   // FEATURE: AGT-386 — no fallback to another agent: an id the roster does not hold (yet) is
   // "Loading…" until the read settles, then a redirect to /bench (guards below every hook).
   const { agents, settled } = useRoster();
-  const agent       = agents.find(a => a.id === agentId);
+  // FEATURE: AGT-392 — an Identity save patches this page's agent locally (Designer call 3)
+  const [identityPatch, setIdentityPatch] = useState(null);
+  const found       = agents.find(a => a.id === agentId);
+  const agent       = found && identityPatch?.id === agentId ? { ...found, ...identityPatch } : found;
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const [entries, setEntries]     = useState([]);
@@ -2302,17 +2306,19 @@ export default function PersonnelScreen() {
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[
-                { id:"subscription", items:[], placeholders:[
+                { id:"subscription", items:[<VitalsCard key="vitals" agent={agent}/>], placeholders:[
                   { label:"Active status", line:"Not yet read from the agent row" },
                   { label:"Teach control", line:"Not yet read from the agent row" },
                   { label:"Answer mode",   line:"Not yet read from the agent row" },
                 ]},
                 { id:"billing", items:[<CompensationCard key="comp" agent={agent}/>], placeholders:[] },
                 { id:"readiness", items:[
+                  <StatBadges key="trio" agent={agent} readiness={readiness} isMobile={isMobile}/>,
                   <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
                   <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile}/>,
                   <QuickStatsCard key="stats" agent={agent} show="parked"/>,
                   <ReportCardPanel key="rc" agent={agent} capabilities={capabilities}/>,
+                  <SkillLadderCard key="ladder" agent={agent}/>,
                 ], placeholders:[] },
                 { id:"library", items:[], placeholders:[
                   { label:"Library catalog",  line:"Hidden from AI clients until the Library opens to this agent" },
@@ -2323,7 +2329,7 @@ export default function PersonnelScreen() {
                 { id:"work", items:[<WorkAssignments key="work" agent={agent}/>], placeholders:[] },
               ]}/>
             )}
-            {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
+            {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
               <TrainingTab

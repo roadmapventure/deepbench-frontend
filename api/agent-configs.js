@@ -1,3 +1,7 @@
+// DeepBench v7.0.796 | api/agent-configs.js | AGT-392 -- the Identity editor: GET with `identity=1`
+// answers one agent's identity row (readAgentIdentity()); POST action `update_identity` saves its name,
+// role, specialty and bio (updateAgentIdentity(), origin deepbench), for any agent id, 404 when absent.
+// No model call, so no logAICall().
 // DeepBench v7.0.792 | api/agent-configs.js | AGT-390 -- the plain POST (a role prompt, an output format
 // or a guardrail saved on the Resume or Playbook tab) is lib/knowledge-write.js's insertAgentConfig(),
 // shared with the MCP Teach tool, and every row it writes carries origin `deepbench`. Same messages,
@@ -17,7 +21,7 @@
 // site added here later cannot silently lose attribution.
 import { withRequestContext } from "../lib/request-context.js";
 import { insertAgentConfig } from "../lib/knowledge-write.js";
-import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput } from "../lib/private-agent-create.js";
+import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput, readIdentityInput, updateAgentIdentity, readAgentIdentity } from "../lib/private-agent-create.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
 // service-key read: the browser's key cannot read `teams.address` (a column grant). With no
@@ -57,9 +61,17 @@ async function handler(req, res) {
 
     // ── GET ──────────────────────────────────────────────────────────────────
     if (req.method === "GET") {
-      const { tenant_id = "global", agent_id, type, teams } = req.query;
+      const { tenant_id = "global", agent_id, type, teams, identity } = req.query;
       if (!agent_id) return res.status(400).json({ error: "agent_id required" });
       if (teams === "1") return res.status(200).json({ teams: await readAgentTeams(agent_id, { supabaseUrl, supabaseKey }) });
+      // FEATURE: AGT-392 -- the Identity editor's read: one agent's identity row, 404 when absent.
+      if (identity === "1") {
+        try {
+          return res.status(200).json({ identity: await readAgentIdentity(agent_id, { supabaseUrl, supabaseKey }) });
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
 
       let url = `${supabaseUrl}/rest/v1/agent_configs?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&order=created_at.asc`;
       if (type) url += `&type=eq.${encodeURIComponent(type)}`;
@@ -102,6 +114,17 @@ async function handler(req, res) {
         if (input.error) return res.status(400).json({ error: input.error });
         try {
           return res.status(200).json(await archivePrivateAgent(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-392 -- the Identity editor's save: name, role, specialty, bio; DeepBench's own write.
+      if (req.body?.action === "update_identity") {
+        const input = readIdentityInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await updateAgentIdentity(input, { supabaseUrl, supabaseKey }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }

@@ -1,3 +1,7 @@
+// DeepBench v7.0.796 | tests/regression/agt-397-future-view.test.mjs | AGT-397 slice 2 -- (e) the Resume
+// tab's Vitals and Skill Ladder cards are exported from ResumeTab.jsx and relocated (never redrawn) into
+// the Future View: Vitals under Subscription and status; the stat trio and the Ladder under Readiness
+// and levels. The <StatBadges count goes 2 -> 3 (the two header sites + the trio).
 // DeepBench v7.0.795 | tests/regression/agt-397-future-view.test.mjs | AGT-397 slice 1 -- the
 // Personnel File's Future View behind a Current / Proposed layout switch.
 //
@@ -23,6 +27,7 @@ import { selfRun } from "./_lib/self-run.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PERSONNEL_REL = "src/screens/PersonnelScreen.jsx";
 const FUTURE_REL = "src/screens/personnel/FutureViewTab.jsx";
+const RESUME_REL = "src/screens/personnel/ResumeTab.jsx";
 
 const HEADINGS = [
   "Compensation · FY2026 · The Ledger",
@@ -118,7 +123,7 @@ export default async function run() {
     assert.ok(p.includes(needle), `${PERSONNEL_REL} must contain ${needle}`);
   }
   assert.equal(count(p, "<LayoutSwitch"), 2, "the switch mounts twice: desktop sidebar and mobile, above the tab bar");
-  assert.equal(count(p, "<StatBadges"), 2, "StatBadges: the two header sites (desktop page header, mobile persona block), nowhere else");
+  assert.equal(count(p, "<StatBadges"), 3, "StatBadges: the two header sites (desktop page header, mobile persona block) and the Future View trio, nowhere else");
   assert.equal(count(p, "<FutureViewTab"), 1, "one Future View mount");
   for (const h of HEADINGS) {
     assert.equal(count(p, `>${h}<`), 1, `heading '${h}' must render exactly once -- moved, not copied`);
@@ -134,6 +139,20 @@ export default async function run() {
     assert.ok(!fRaw.includes(h), `${FUTURE_REL} must not hold the heading '${h}'`);
   }
   assert.equal(hexCount(fRaw), 0, `${FUTURE_REL} carries no hex literal`);
+
+  // ── (e) slice 2: Vitals + Skill Ladder relocated, never redrawn ───────────
+  const rRaw = read(RESUME_REL);
+  for (const needle of ["export function VitalsCard(", "export function SkillLadderCard("]) {
+    assert.equal(count(rRaw, needle), 1, `${RESUME_REL} must contain ${needle} exactly once`);
+  }
+  for (const h of ["Resume · Vitals", "Skill Ladder"]) {
+    assert.equal(count(rRaw, `>${h}<`), 1, `${RESUME_REL}: heading '${h}' renders exactly once -- the card is the export`);
+    assert.equal(count(pRaw, `>${h}<`), 0, `${PERSONNEL_REL} must not redraw '${h}'`);
+  }
+  assert.ok(pRaw.includes("{ id:\"subscription\", items:[<VitalsCard"), "Vitals is the Subscription and status group's item");
+  assert.equal(count(pRaw, "<SkillLadderCard"), 1, "one Skill Ladder mount, in Readiness and levels");
+  assert.equal(count(pRaw, "<StatBadges key=\"trio\""), 1, "the stat trio mounts once in Readiness and levels");
+  assert.ok(pRaw.includes("onIdentitySaved="), "ResumeTab is handed onIdentitySaved");
 }
 
 selfRun(import.meta.url, run);
