@@ -1,4 +1,4 @@
-// DeepBench v7.0.802 | FutureViewTab.jsx | AGT-405 -- one column, SampleTag and sample rows on placeholder cards; before that AGT-403 --Future Controls: renamed and reordered groups, larger section titles, a faint line between sections; before that AGT-397 slice 1 --the Personnel File's Future View and its
+// DeepBench v7.0.806 | FutureViewTab.jsx | AGT-410 -- a Training group between Configurations and Work Performed; before that AGT-405 --one column, SampleTag and sample rows on placeholder cards; before that AGT-403 --Future Controls: renamed and reordered groups, larger section titles, a faint line between sections; before that AGT-397 slice 1 --the Personnel File's Future View and its
 // Current / Proposed layout switch. This file authors no card: it lays out, group by group, the cards
 // PersonnelScreen.jsx hands it, plus an empty box for each field that has no home yet. No data read.
 import { T, display, body, mono } from "../../tokens.js";
@@ -12,6 +12,7 @@ export const FUTURE_GROUPS = [
   { id: "readiness", label: "Readiness and Levels", line: "Arrives when levels are graded from real runs" },
   { id: "billing", label: "Billing", line: "Arrives with live billing" },
   { id: "subscription", label: "Configurations", line: "Arrives with subscription management" },
+  { id: "training", label: "Training", line: "Arrives with training controls" },
   { id: "work", label: "Work Performed", line: "Arrives with Work Orders on private agents" },
   { id: "library", label: "Access", line: "Arrives with data-room access" },
 ];

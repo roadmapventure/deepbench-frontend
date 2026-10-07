@@ -47,6 +47,7 @@ const EXPECTED_GROUPS = [
   { id: "readiness", label: "Readiness and Levels", line: "Arrives when levels are graded from real runs" },
   { id: "billing", label: "Billing", line: "Arrives with live billing" },
   { id: "subscription", label: "Configurations", line: "Arrives with subscription management" },
+  { id: "training", label: "Training", line: "Arrives with training controls" },
   { id: "work", label: "Work Performed", line: "Arrives with Work Orders on private agents" },
   { id: "library", label: "Access", line: "Arrives with data-room access" },
 ];
