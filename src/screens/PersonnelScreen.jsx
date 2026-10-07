@@ -1,4 +1,4 @@
-// DeepBench v7.0.803 | PersonnelScreen.jsx | AGT-406 -- Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.804 | PersonnelScreen.jsx | AGT-407 -- the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -900,6 +900,9 @@ function InlineText({ value, field, agent, onSaved, showToast, style }) {
   );
   return <div onClick={() => { setDraft(value); setEditing(true); }} title="Click to edit" style={{ ...style, cursor:"text", opacity: saving ? .6 : 1 }}>{value}</div>;
 }
+
+// AGT-407 — true = the Proposed view is the only view; false = the Current / Proposed switch is back
+const CURRENT_VIEW_RETIRED = true;
 
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
@@ -2134,7 +2137,12 @@ export default function PersonnelScreen() {
   // browser (a blocked storage read or write falls back to Current, never breaks the page)
   const flagOn = useFeatureFlag(LAYOUT_FLAG);
   const [stored, setStored] = useState(() => { try { return localStorage.getItem(LAYOUT_KEY); } catch { return null; } });
-  const { switchShown, arrangement } = resolveLayout({ hostOk: IS_ADMIN_HOST, flagOn, stored });
+  // AGT-407 — the Proposed view is the page now: the Current view is retired, not deleted. Every Current
+  // branch below (arrangement === "current", the OVERVIEW/CONFIGURE tab list, the two-column Profile) is
+  // still here and works; set CURRENT_VIEW_RETIRED to false to bring the Current / Proposed switch back.
+  const { switchShown, arrangement } = CURRENT_VIEW_RETIRED
+    ? { switchShown: false, arrangement: "proposed" }
+    : resolveLayout({ hostOk: IS_ADMIN_HOST, flagOn, stored });
   const setLayout = v => { try { localStorage.setItem(LAYOUT_KEY, v); } catch { /* storage blocked: the choice lasts this visit */ } setStored(v); };
 
   const showToast = (msg, icon="✓") => {
