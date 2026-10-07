@@ -1,3 +1,4 @@
+// DeepBench v7.0.797 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-304 slice 8 -- the reconciliation counts runner_questions over the 7 days ending at the newest row's OWN taken_at, not the run's clock, so a snapshot is graded as of the moment it was taken and does not redden as its window ages out.
 // DeepBench v7.0.793 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-391 -- BYTES_AT_SHIP re-pinned 380985 -> 380843
 // (runner-cycle.md step 7 lost its full-suite baseline capture to the related set).
 //
@@ -41,7 +42,7 @@
 //     this ship rather than asserted from a file this test can read.
 //
 // (4) `0` IS NOT `NULL`, WHICH IS THE WHOLE DISCRIMINATOR WHILE THE COUNT IS ZERO. Live at this
-//     ship `runner_questions` holds 40 rows, 17 open, and ZERO asked in the trailing 7 days -- so
+//     ship `runner_questions` holds 40 rows, 17 open, and ZERO asked in the 7 days ending at the row's taken_at -- so
 //     the honest value of the new column is 0. A column that was added but never computed reads
 //     NULL, and NULL grades as `unmeasurable` forever on `ticket_outcome` rather than as a met
 //     target. The live arm below therefore refuses a NULL on any row taken AFTER the migration
@@ -418,7 +419,7 @@ export default async function run() {
       + "SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node tests/regression/run-all.js. "
       + "Measured at this ship instead: the validator returned true / false / false in that order "
       + "(and true for the control 'hygiene_flags: down'); runner_questions held 40 rows, 17 open "
-      + "and 0 asked in the trailing 7 days, so the honest value of the column is 0; the rolled-back "
+      + "and 0 asked in the 7 days ending at the row's taken_at, so the honest value of the column is 0; the rolled-back "
       + "probe printed `PROBE before=0 after=1` with zero residue (40 / 52 re-read after), which is "
       + "what proves 0 is a measurement and not a NULL.",
     );
@@ -464,8 +465,10 @@ export default async function run() {
   assert.ok(Object.prototype.hasOwnProperty.call(row, COLUMN),
     `the newest scoreboard row must PROJECT \`${COLUMN}\`; got keys ${Object.keys(row).join(", ")}`);
 
+  const asOf = Date.parse(row.taken_at);
+  assert.ok(Number.isFinite(asOf), `the newest row's taken_at did not parse: ${row.taken_at}`);
   const asked = await get(
-    `runner_questions?select=qid&asked_at=gte.${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}&limit=1000`);
+    `runner_questions?select=qid&asked_at=gte.${new Date(asOf - 7 * 24 * 60 * 60 * 1000).toISOString()}&asked_at=lte.${new Date(asOf).toISOString()}&limit=1000`);
   const expected = asked.length;
 
   if (row[COLUMN] === null) {
@@ -476,18 +479,18 @@ export default async function run() {
       + `prevent, and it is invisible while the honest count is 0. Expected ${expected}.`);
     console.log(`  [SES-413d] ${pure}; live: validator true/false/false (+ control true); newest row `
       + `${row.taken_at} predates the ship floor and reads NULL by design (never measured, not zero); `
-      + `${expected} question(s) asked in the trailing 7 days`);
+      + `${expected} question(s) asked in the 7 days ending at the row's taken_at`);
   } else {
     assert.ok(Number.isInteger(row[COLUMN]) && row[COLUMN] >= 0,
       `\`${COLUMN}\` must be a non-negative integer; got ${JSON.stringify(row[COLUMN])}`);
     assert.strictEqual(row[COLUMN], expected,
       `\`${COLUMN}\` on the newest row reads ${row[COLUMN]} but runner_questions holds ${expected} row(s) `
-      + "asked in the trailing 7 days. The two are the same measurement taken twice; a disagreement "
+      + "asked in the 7 days ending at the row's taken_at. The two are the same measurement taken twice; a disagreement "
       + "means the function counted the wrong table, the wrong window, or a filtered subset of statuses "
       + "(every row asked counts, whatever its status).");
     console.log(`  [SES-413d] ${pure}; live: validator true/false/false (+ control true); newest row `
       + `${row.taken_at} (${row.trigger}) reads ${row[COLUMN]}, reconciled against ${expected} `
-      + "question(s) asked in the trailing 7 days -- a measured value, not a NULL");
+      + "question(s) asked in the 7 days ending at the row's taken_at -- a measured value, not a NULL");
   }
 
   // -- the anon key cannot read the board at all -------------------------------------------------
