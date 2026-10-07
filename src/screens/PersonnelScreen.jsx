@@ -1,3 +1,4 @@
+// DeepBench v7.0.816 | PersonnelScreen.jsx | AGT-416 -- Future Controls Access group opens with the Access levels sample card (where it can be used, which model, what an AI client receives, who can teach, what stays protected).
 // DeepBench v7.0.815 | PersonnelScreen.jsx | AGT-415 -- Future Controls gains a sample Skill score card (the typed 0-100 score John moved there; the Profile level bar is the editor).
 // DeepBench v7.0.814 | PersonnelScreen.jsx | AGT-415 -- the Skill Ladder is a five-section bar in the Profile top card (the user clicks a level; it saves agents.skill_score), and Future Controls gains a sample Promotion by accomplishments card.
 // DeepBench v7.0.813 | PersonnelScreen.jsx | AGT-402 -- the team picker announces a saved team (db-team-changed) so the badge heading follows without a reload.
@@ -31,7 +32,7 @@ import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell, IS_ADMIN_HOST } from "../AppShell.jsx";
 import { useFeatureFlag } from "../lib/featureFlags.js"; // FEATURE: AGT-397 — the layout switch's flag
-import FutureViewTab, { SampleTag, LayoutSwitch, resolveLayout, LAYOUT_FLAG, LAYOUT_KEY } from "./personnel/FutureViewTab.jsx"; // FEATURE: AGT-397
+import FutureViewTab, { AccessLevelsCard, SampleTag, LayoutSwitch, resolveLayout, LAYOUT_FLAG, LAYOUT_KEY } from "./personnel/FutureViewTab.jsx"; // FEATURE: AGT-397
 import { Corners, SkillBar, Toast, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
 import { useRoster, forgetAgent } from "../hooks/useAgents.js"; // FEATURE: AGT-386 — settled read + cache forget
 import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 — the Bench breadcrumb
@@ -2471,7 +2472,7 @@ export default function PersonnelScreen() {
                   // AGT-415 — the ladder's other half: the agent promotes itself from what it has done (the user still sets the level on Profile)
                   { label:"Promotion by accomplishments", line:"Arrives when levels are graded from real runs; the level you set on Profile stays until then", rows:[["Current level","Proficient"],["Next level","Expert, at 75"],["Progress to it","18 of 25 graded reports passed"],["Last promoted","Sep 30, 2026, to Proficient"],["Promoted by","The agent, from its record"]] },
                 ] },
-                { id:"library", items:[], placeholders:[
+                { id:"library", items:[<AccessLevelsCard key="levels"/>], placeholders:[
                   // AGT-413 — the Access card moved here (read-only for now) and the fixed Voice text, each with sample values
                   { label:"Access", line:"Editing sharing and visibility arrives with sign-in", rows:[["Owner","Jordan Lee"],["Sharing","Named people"],["Shared with","Dana Ruiz, Sam Okafor"],["Visibility","Visible to the people it is shared with"],["Lane","Product"],["Uber access","Off"]] },
                   { label:"Voice", line:"One fixed text for every agent today; a per-agent Voice needs its own storage first", rows:[["Applies to","Every agent"],["Position","Last section of every prompt"],["Speaks as","\"you\" or \"I\", never \"the user\""],["Edited per agent","Not yet"]] },
