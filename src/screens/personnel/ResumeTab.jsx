@@ -1,3 +1,4 @@
+// DeepBench v7.0.817 | src/screens/personnel/ResumeTab.jsx | AGT-416 -- Resume Vitals: the trainer-admin line is now "Updated from AI clients" (can its knowledge be updated outside DeepBench); the Access levels group asks the same question.
 // DeepBench v7.0.802 | ResumeTab.jsx | AGT-405 -- Biography drops the Badge row, Skill Ladder takes tight; before that AGT-404 --Identity card is Biography (Specialty, then Exec Summary), name and role move to the badge via saveIdentityFields; before that AGT-403 --part="prompts" renders only the Role prompts card, VitalsCard takes tight; before that AGT-397 slice 2 + AGT-392 --VitalsCard / SkillLadderCard exported for the Future View; the Proposed arrangement's left column is the Identity editor; identityTag() beside an untouched originTag()
 // DeepBench v7.0.792 | ResumeTab.jsx | AGT-390 -- originTag(): where a row was taught and when (DeepBench, or MCP and the caller's key name), shown under a ConfigCard's header
 // DeepBench v5.2.5 | ResumeTab.jsx | AI-28 badge label sweep — PROMPT_ASSEMBLY
@@ -57,7 +58,7 @@ export function VitalsCard({ agent, tight = false }) {
         <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "13px 15px", position: "relative" }}>
           <Corners />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 9 }}>Resume · Vitals</div>
-          {[["Architecture",agent.arch],["Specialty",agent.specialty],["Trainer",agent.trainableBy],["Update Cadence","Quarterly"],["Update Rights",agent.trainableBy+" admin"],["Visibility","Configurable"]].map(([k,v]) => (
+          {[["Architecture",agent.arch],["Specialty",agent.specialty],["Trainer",agent.trainableBy],["Update Cadence","Quarterly"],["Updated from AI clients","Owner only (sample)"],["Visibility","Configurable"]].map(([k,v]) => (
             <div key={k} style={{ display: "flex", justifyContent: tight ? "flex-start" : "space-between", gap: tight ? 12 : undefined, padding: "5px 0", borderBottom: `1px solid ${T.lineSoft}`, fontSize: 11 }}>
               <span style={{ color: T.muted, fontWeight: 500, ...(tight ? { minWidth: 110, flexShrink: 0 } : null) }}>{k}</span>
               <span style={{ fontFamily: mono, fontSize: 10.5, color: T.ink, textAlign: tight ? "left" : "right", maxWidth: 130 }}>{v}</span>

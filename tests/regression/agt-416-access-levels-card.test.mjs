@@ -49,6 +49,10 @@ export default async function run() {
   const protectedLabels = ACCESS_ALWAYS_PROTECTED.map(p => p[0]).join(" | ");
   for (const needle of ["Library stays inside DeepBench", "Skill text can be held back", "admin grant comes first"]) assert.ok(protectedLabels.includes(needle), `always-protected list has "${needle}"`);
 
+  assert.ok(ACCESS_LEVEL_GROUPS.some(g => g.title === "Can its knowledge be updated from an AI client"), "the update-from-an-AI-client group uses John's own question");
+  const resume = read("src/screens/personnel/ResumeTab.jsx");
+  assert.ok(!resume.includes("Update Rights") && resume.includes("Updated from AI clients"), "Resume Vitals says Updated from AI clients, not the old Update Rights label");
+
   // ── (c) ────────────────────────────────────────────────────────────────────
   const screen = read("src/screens/PersonnelScreen.jsx");
   assert.equal(count(screen, "<AccessLevelsCard"), 1, "PersonnelScreen mounts the card once");

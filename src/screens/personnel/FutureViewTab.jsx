@@ -1,3 +1,4 @@
+// DeepBench v7.0.817 | src/screens/personnel/FutureViewTab.jsx | AGT-416 -- the teach group is "Can its knowledge be updated from an AI client".
 // DeepBench v7.0.816 | src/screens/personnel/FutureViewTab.jsx | AGT-416 -- AccessLevelsCard: the sample Access levels card (where it can be used, which model, what an AI client receives, who can teach, always protected).
 // DeepBench v7.0.806 | FutureViewTab.jsx | AGT-410 -- a Training group between Configurations and Work Performed; before that AGT-405 --one column, SampleTag and sample rows on placeholder cards; before that AGT-403 --Future Controls: renamed and reordered groups, larger section titles, a faint line between sections; before that AGT-397 slice 1 --the Personnel File's Future View and its
 // Current / Proposed layout switch. This file authors no card: it lays out, group by group, the cards
@@ -123,8 +124,8 @@ export const ACCESS_LEVEL_GROUPS = [
     ["sections", "Selected scaffold sections", "You choose which sections ship (for example Role and Guardrails) and hold back the rest."],
     ["answer", "Answer only", "DeepBench's own model does the reasoning and the AI client gets just the answer. The scaffold never leaves DeepBench."],
   ] },
-  { title: "Who can teach it from an AI client", chosen: "owner", options: [
-    ["nobody", "Nobody", "Teaching happens only inside DeepBench."],
+  { title: "Can its knowledge be updated from an AI client", chosen: "owner", options: [
+    ["nobody", "Nobody", "Its knowledge is updated only inside DeepBench."],
     ["owner", "Owner only", "Only the owner's AI clients can teach it."],
     ["named", "Selected AI clients", "The owner picks which AI clients may teach it."],
     ["anyone", "Anyone holding the connection", "How it works today, because nobody signs in over the connection yet."],
