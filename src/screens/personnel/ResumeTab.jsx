@@ -1,4 +1,4 @@
-// DeepBench v7.0.801 | ResumeTab.jsx | AGT-404 -- Identity card is Biography (Specialty, then Exec Summary), name and role move to the badge via saveIdentityFields; before that AGT-403 --part="prompts" renders only the Role prompts card, VitalsCard takes tight; before that AGT-397 slice 2 + AGT-392 --VitalsCard / SkillLadderCard exported for the Future View; the Proposed arrangement's left column is the Identity editor; identityTag() beside an untouched originTag()
+// DeepBench v7.0.802 | ResumeTab.jsx | AGT-405 -- Biography drops the Badge row, Skill Ladder takes tight; before that AGT-404 --Identity card is Biography (Specialty, then Exec Summary), name and role move to the badge via saveIdentityFields; before that AGT-403 --part="prompts" renders only the Role prompts card, VitalsCard takes tight; before that AGT-397 slice 2 + AGT-392 --VitalsCard / SkillLadderCard exported for the Future View; the Proposed arrangement's left column is the Identity editor; identityTag() beside an untouched originTag()
 // DeepBench v7.0.792 | ResumeTab.jsx | AGT-390 -- originTag(): where a row was taught and when (DeepBench, or MCP and the caller's key name), shown under a ConfigCard's header
 // DeepBench v5.2.5 | ResumeTab.jsx | AI-28 badge label sweep — PROMPT_ASSEMBLY
 // FEATURE: PE-02 — Resume tab
@@ -68,7 +68,7 @@ export function VitalsCard({ agent, tight = false }) {
 }
 
 // FEATURE: AGT-397 — the Resume tab's Skill Ladder card, exported for the Future View.
-export function SkillLadderCard({ agent }) {
+export function SkillLadderCard({ agent, tight = false }) {
   const SKILL_LEVELS = [["Trainee","0–30"],["Developing","30–55"],["Proficient","55–75"],["Expert","75–90"],["Principal","90–100"]];
   const activeLevel = agent.skill<30?"Trainee":agent.skill<55?"Developing":agent.skill<75?"Proficient":agent.skill<90?"Expert":"Principal";
   return (
@@ -78,8 +78,8 @@ export function SkillLadderCard({ agent }) {
           {SKILL_LEVELS.map(([label, range]) => {
             const isActive = label === activeLevel;
             return (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 8px", marginBottom: 2, background: isActive ? "rgba(90,117,56,.15)" : "transparent", border: isActive ? "1px solid rgba(90,117,56,.4)" : "1px solid transparent" }}>
-                <span style={{ fontFamily: body, fontSize: 11.5, fontWeight: isActive ? 700 : 400, color: isActive ? T.moss : T.mutedDeep }}>{isActive ? "▸ " : " "}{label}</span>
+              <div key={label} style={{ display: "flex", justifyContent: tight ? "flex-start" : "space-between", gap: tight ? 12 : undefined, padding: "5px 8px", marginBottom: 2, background: isActive ? "rgba(90,117,56,.15)" : "transparent", border: isActive ? "1px solid rgba(90,117,56,.4)" : "1px solid transparent" }}>
+                <span style={{ fontFamily: body, fontSize: 11.5, fontWeight: isActive ? 700 : 400, color: isActive ? T.moss : T.mutedDeep, ...(tight ? { minWidth: 110 } : null) }}>{isActive ? "▸ " : " "}{label}</span>
                 <span style={{ fontFamily: mono, fontSize: 10.5, color: isActive ? T.moss : T.muted }}>{range}</span>
               </div>
             );
@@ -136,8 +136,6 @@ export function IdentityEditor({ agent, onSaved, showToast }) {
     <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "13px 15px", position: "relative" }}>
       <Corners />
       <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 9 }}>Biography</div>
-      <div style={IDENTITY_LABEL}>Badge</div>
-      <div style={{ fontFamily: mono, fontSize: 10.5, color: T.ink, marginBottom: 8 }}>{agent.code || "—"}</div>
       <div style={IDENTITY_LABEL}>Specialty</div>
       <input value={specialty} onChange={e => setSpecialty(e.target.value)} style={IDENTITY_INPUT} />
       <div style={IDENTITY_LABEL}>Exec Summary</div>

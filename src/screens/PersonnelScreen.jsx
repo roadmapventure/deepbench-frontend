@@ -1,4 +1,4 @@
-// DeepBench v7.0.801 | PersonnelScreen.jsx | AGT-404 -- Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.802 | PersonnelScreen.jsx | AGT-405 -- Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -24,7 +24,7 @@ import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
 import { AppShell, IS_ADMIN_HOST } from "../AppShell.jsx";
 import { useFeatureFlag } from "../lib/featureFlags.js"; // FEATURE: AGT-397 — the layout switch's flag
-import FutureViewTab, { LayoutSwitch, resolveLayout, LAYOUT_FLAG, LAYOUT_KEY } from "./personnel/FutureViewTab.jsx"; // FEATURE: AGT-397
+import FutureViewTab, { SampleTag, LayoutSwitch, resolveLayout, LAYOUT_FLAG, LAYOUT_KEY } from "./personnel/FutureViewTab.jsx"; // FEATURE: AGT-397
 import { Corners, SkillBar, Toast, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
 import { useRoster, forgetAgent } from "../hooks/useAgents.js"; // FEATURE: AGT-386 — settled read + cache forget
 import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 — the Bench breadcrumb
@@ -685,7 +685,7 @@ function QuickStatsCard({ agent, show = "all" }) {
 
 // FEATURE: LOG-143 (b) — Report Card. Same card + Corners pattern as its siblings;
 // no new token, no new visual rule.
-function ReportCardPanel({ agent, capabilities, tight = false }) {
+function ReportCardPanel({ agent, capabilities, tight = false, sample = false }) {
   // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
   // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
   // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
@@ -710,11 +710,22 @@ function ReportCardPanel({ agent, capabilities, tight = false }) {
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
           <Corners/>
           <FeatureBadge id="LOG-143" />
-          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Report Card</div>
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}><span>Report Card</span>{sample && reportCardLoaded && reportCardView.empty && <SampleTag/>}</div>
           {!reportCardLoaded ? (
             <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
               <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>Loading…</div>
             </div>
+          ) : reportCardView.empty && sample ? (
+            <>
+              {/* AGT-405 — an agent with no judged runs shows a labeled sample, so the card's purpose reads */}
+              {[["Runs judged","12"],["Accuracy","4.2 / 5"],["Completeness","3.9 / 5"],["Tone","4.5 / 5"],["Skill to improve","Citing sources"]].map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"flex-start",gap:12,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0,minWidth:110}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink}}>{v}</span>
+                </div>
+              ))}
+              <div style={{marginTop:7,fontFamily:body,fontSize:10,color:T.muted,fontStyle:"italic"}}>{reportCardView.emptyText}</div>
+            </>
           ) : reportCardView.empty ? (
             <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
               <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>{reportCardView.emptyText}</div>
@@ -736,9 +747,13 @@ function ReportCardPanel({ agent, capabilities, tight = false }) {
 }
 
 // ── Active Work Assignments ──
-function WorkAssignments({ agent }) {
-  const agentTasks    = AGENT_TASKS[agent.id]     || [];
-  const agentCompleted= AGENT_COMPLETED[agent.id] || [];
+function WorkAssignments({ agent, sample = false }) {
+  const realTasks     = AGENT_TASKS[agent.id]     || [];
+  const realCompleted = AGENT_COMPLETED[agent.id] || [];
+  // AGT-405 — Future Controls: an agent with no work yet shows one labeled sample of each, so the section's purpose reads
+  const useSample     = sample && realTasks.length === 0 && realCompleted.length === 0;
+  const agentTasks    = useSample ? [{ id:"sample-1", title:"Review the Q4 janitorial bids", type:"Bid review", due:"Oct 14", preview:"Compares three bids against the scope and flags price gaps.", status:"in-progress", priority:"Normal" }] : realTasks;
+  const agentCompleted= useSample ? [{ id:"sample-2", title:"Summary of September contract renewals", type:"Report", completedOn:"Sep 30" }] : realCompleted;
 
   const STATUS_S = {
     "needs-review":   {bg:"rgba(90,117,56,.12)",  color:T.moss,       border:"rgba(90,117,56,.3)",   label:"Needs Review"},
@@ -756,7 +771,7 @@ function WorkAssignments({ agent }) {
 
   return (
     <div style={{marginTop:18}}>
-      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Assignments</div>
+      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}><span>Active Work Assignments</span>{useSample && <SampleTag/>}</div>
       {agentTasks.length===0 ? (
         <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
           <div style={{fontFamily:display,fontSize:14,color:T.muted,fontStyle:"italic"}}>No active assignments for {agent.name.split(" ")[0]} right now.</div>
@@ -2369,9 +2384,9 @@ export default function PersonnelScreen() {
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[
                 { id:"subscription", items:[<VitalsCard key="vitals" agent={agent} tight/>], placeholders:[
-                  { label:"Active status", line:"Not yet read from the agent row" },
-                  { label:"Teach control", line:"Not yet read from the agent row" },
-                  { label:"Answer mode",   line:"Not yet read from the agent row" },
+                  { label:"Active status", line:"Not yet read from the agent row", rows:[["Status","Active"],["Since","Sep 2026"],["Last run","2 hours ago"],["Available to","Your team"]] },
+                  { label:"Teach control", line:"Not yet read from the agent row", rows:[["Who can teach","Owner only"],["Lessons waiting","0"],["Last taught","Oct 3, 2026"],["Review first","Required"]] },
+                  { label:"Answer mode",   line:"Not yet read from the agent row", rows:[["Style","Cite sources"],["Length","Concise"],["When unsure","Ask a question"],["Language","English"]] },
                 ]},
                 { id:"billing", items:[<CompensationCard key="comp" agent={agent} tight/>], placeholders:[] },
                 { id:"readiness", items:[
@@ -2379,16 +2394,16 @@ export default function PersonnelScreen() {
                   <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
                   <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile}/>,
                   <QuickStatsCard key="stats" agent={agent} show="all"/>,
-                  <ReportCardPanel key="rc" agent={agent} capabilities={capabilities} tight/>,
-                  <SkillLadderCard key="ladder" agent={agent}/>,
+                  <ReportCardPanel key="rc" agent={agent} capabilities={capabilities} tight sample/>,
+                  <SkillLadderCard key="ladder" agent={agent} tight/>,
                 ], placeholders:[] },
                 { id:"library", items:[], placeholders:[
-                  { label:"Library catalog",  line:"Hidden from AI clients until the Library opens to this agent" },
-                  { label:"Library records",  line:"Hidden from AI clients until the Library opens to this agent" },
-                  { label:"Library tier",     line:"Hidden from AI clients until the Library opens to this agent" },
-                  { label:"Data-room access", line:"Hidden from AI clients until the Library opens to this agent" },
+                  { label:"Library catalog",  line:"Hidden from AI clients until the Library opens to this agent", rows:[["Collections","4"],["Documents","128"],["Last updated","Sep 28, 2026"]] },
+                  { label:"Library records",  line:"Hidden from AI clients until the Library opens to this agent", rows:[["Records","1,240"],["Kinds","Contracts, bids, notices"],["Newest","Oct 1, 2026"]] },
+                  { label:"Library tier",     line:"Hidden from AI clients until the Library opens to this agent", rows:[["Tier","Standard"],["Storage used","2.1 of 10 GB"],["Kept for","12 months"]] },
+                  { label:"Data-room access", line:"Hidden from AI clients until the Library opens to this agent", rows:[["Rooms shared","2"],["Who can open","Owner + 3 guests"],["Downloads","Off"]] },
                 ]},
-                { id:"work", items:[<WorkAssignments key="work" agent={agent}/>], placeholders:[] },
+                { id:"work", items:[<WorkAssignments key="work" agent={agent} sample/>], placeholders:[] },
               ]}/>
             )}
             {activeTab === "resume"   && !proposed && <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} onIdentitySaved={setIdentityPatch}/>}
