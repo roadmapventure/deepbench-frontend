@@ -1,3 +1,4 @@
+// DeepBench v7.0.813 | src/screens/personnel/AgentFacts.jsx | AGT-402 -- useTeamName listens for db-team-changed from the team picker.
 // DeepBench v7.0.810 | src/screens/personnel/AgentFacts.jsx | AGT-402 / AGT-413 -- two real facts the Profile ID badge
 // used to fake or leave out: the agent's TEAM NAME (was the constant "Bureau of Procurement Intelligence") and its
 // USAGE COUNT (agents.usage_count, read-only, system-updated). A failed read leaves the line out; it never shows a
@@ -16,7 +17,10 @@ export function useTeamName(agentId) {
       .then(r => (r.ok ? r.json() : null))
       .then(json => { if (live && json && Array.isArray(json.teams)) setName(json.teams[0]?.name ?? null); })
       .catch(() => {});
-    return () => { live = false; };
+    // The team picker (AGT-386) announces a save, so the heading follows without a reload.
+    const onChanged = (e) => { if (live && e.detail && e.detail.agentId === agentId) setName(e.detail.name ?? null); };
+    window.addEventListener("db-team-changed", onChanged);
+    return () => { live = false; window.removeEventListener("db-team-changed", onChanged); };
   }, [agentId]);
   return name;
 }

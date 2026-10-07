@@ -83,6 +83,7 @@ export default async function run() {
   assert.equal(count(screen, "<CapabilityHeader"), 1);
   assert.ok(count(screen, "<TeamHeading") === 2 && count(screen, "<UsageCountRow") === 2, "desktop and phone badges both read the team and usage count");
   assert.ok(!screen.includes("Bureau of Procurement Intelligence"), "the constant bureau heading is gone");
+  assert.ok(screen.includes("db-team-changed") && read("src/screens/personnel/AgentFacts.jsx").includes("addEventListener(\"db-team-changed\""), "the heading follows a team picked in the team picker");
   assert.ok(screen.includes("taughtCounts(entries).always + taughtCounts(entries).lookedUp"), "Documents counts the active taught items");
   for (const label of ["Access", "Voice", "Rating", "Teaching origin and date"]) {
     const m = screen.match(new RegExp(`label:"${label}",[^\\n]*rows:\\[\\[`));

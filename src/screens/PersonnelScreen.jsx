@@ -1,3 +1,4 @@
+// DeepBench v7.0.813 | PersonnelScreen.jsx | AGT-402 -- the team picker announces a saved team (db-team-changed) so the badge heading follows without a reload.
 // DeepBench v7.0.812 | PersonnelScreen.jsx | AGT-414 -- each capability gets an Add Skill form (name, type, optional text) and each Skill a Remove (unlinks from that capability only).
 // DeepBench v7.0.811 | PersonnelScreen.jsx | AGT-402 -- Documents shows a real count including 0 (was a dash for 0).
 // DeepBench v7.0.810 | PersonnelScreen.jsx | AGT-413 -- Capabilities card: every Skill under its fixed type header with all fields shown, Skill Type editable, Capability name and description editable; AGT-402 -- the ID badge heading is the agent's team name and a Times used row reads usage_count; Documents on Future Controls counts the agent's active taught items; Future Controls gains Access, Voice, Rating and Teaching origin cards with sample values.
@@ -477,6 +478,8 @@ function TeamPicker({ agent }) {
       if (res.status === 200) {
         const out = await res.json();
         setCurrent(out.team.name);
+        // FEATURE: AGT-402 — tell the badge heading (AgentFacts useTeamName) the team changed, so it follows without a reload
+        window.dispatchEvent(new CustomEvent("db-team-changed", { detail: { agentId: agent.id, name: out.team.name } }));
         setTeams(ts => (ts.some(t => t.id === out.team.id) ? ts : [...ts, { id: out.team.id, name: out.team.name }].sort((a, b) => a.name.localeCompare(b.name))));
         setTeamName("");
         setNewPicked(false);
