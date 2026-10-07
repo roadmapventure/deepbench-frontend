@@ -1,4 +1,4 @@
-// DeepBench v7.0.806 | PersonnelScreen.jsx | AGT-410 -- Future Controls: the Teach control card moves into a new Training group; before that AGT-408 --phone width checked on every tab; the Training stats strip's two buttons drop under the stats; before that AGT-407 --the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.807 | PersonnelScreen.jsx | AGT-411 -- Future Controls' Intelligence Configuration footer names the Profile and Training pages; before that AGT-410 --Future Controls: the Teach control card moves into a new Training group; before that AGT-408 --phone width checked on every tab; the Training stats strip's two buttons drop under the stats; before that AGT-407 --the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -626,7 +626,7 @@ function ReadinessCard({ layers, readiness }) {
 }
 
 // Intelligence config
-function IntelConfigCard({ agent, layers, isMobile }) {
+function IntelConfigCard({ agent, layers, isMobile, proposed = false }) {
   const rc = readinessColor;
   return (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
@@ -643,7 +643,7 @@ function IntelConfigCard({ agent, layers, isMobile }) {
               </div>
             ))}
           </div>
-          <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5,fontStyle:"italic"}}>Configure each layer in Resume, Training, and Playbook tabs.</div>
+          <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5,fontStyle:"italic"}}>{proposed ? "Configure each layer on the Profile and Training pages." : "Configure each layer in Resume, Training, and Playbook tabs."}</div>
         </div>
   );
 }
@@ -2407,7 +2407,7 @@ export default function PersonnelScreen() {
                 { id:"readiness", items:[
                   <StatBadges key="trio" agent={agent} readiness={readiness} isMobile={isMobile}/>,
                   <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
-                  <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile}/>,
+                  <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile} proposed/>,
                   <QuickStatsCard key="stats" agent={agent} show="all"/>,
                   <ReportCardPanel key="rc" agent={agent} capabilities={capabilities} tight sample/>,
                   <SkillLadderCard key="ladder" agent={agent} tight/>,
