@@ -1,3 +1,4 @@
+// DeepBench v7.0.814 | PersonnelScreen.jsx | AGT-415 -- the Skill Ladder is a five-section bar in the Profile top card (the user clicks a level; it saves agents.skill_score), and Future Controls gains a sample Promotion by accomplishments card.
 // DeepBench v7.0.813 | PersonnelScreen.jsx | AGT-402 -- the team picker announces a saved team (db-team-changed) so the badge heading follows without a reload.
 // DeepBench v7.0.812 | PersonnelScreen.jsx | AGT-414 -- each capability gets an Add Skill form (name, type, optional text) and each Skill a Remove (unlinks from that capability only).
 // DeepBench v7.0.811 | PersonnelScreen.jsx | AGT-402 -- Documents shows a real count including 0 (was a dash for 0).
@@ -38,7 +39,7 @@ import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, J
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
 import { SkillEditorRow, CapabilityHeader, AddSkillForm, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
-import { TeamHeading, UsageCountRow } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
+import { TeamHeading, UsageCountRow, SkillLevelBar } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -920,7 +921,7 @@ const CURRENT_VIEW_RETIRED = true;
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved, onLevelSaved }) {
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
   // rest moves to the Future View tab
@@ -950,6 +951,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
             {!proposed && agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
           </div>
           {proposed && <UsageCountRow agentId={agent.id}/>}
+          {proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}
           {agent.quip && (
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
             "{plainQuip(agent.quip)}"
@@ -2157,8 +2159,12 @@ export default function PersonnelScreen() {
   const { agents, settled } = useRoster();
   // FEATURE: AGT-392 — an Identity save patches this page's agent locally (Designer call 3)
   const [identityPatch, setIdentityPatch] = useState(null);
+  // FEATURE: AGT-415 — a saved Skill Ladder level patches this page's agent locally (the roster read is cached)
+  const [levelPatch, setLevelPatch] = useState(null);
   const found       = agents.find(a => a.id === agentId);
-  const agent       = found && identityPatch?.id === agentId ? { ...found, ...identityPatch } : found;
+  const patched     = found && identityPatch?.id === agentId ? { ...found, ...identityPatch } : found;
+  const agent       = patched && levelPatch?.id === agentId ? { ...patched, skill: levelPatch.skill } : patched;
+  const onLevelSaved = (score) => setLevelPatch({ id: agentId, skill: score });
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const [entries, setEntries]     = useState([]);
@@ -2371,6 +2377,7 @@ export default function PersonnelScreen() {
                 </div>
                 )}
                 {proposed && <UsageCountRow agentId={agent.id}/>}
+                {proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}
                 <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
                 {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
               </div>
@@ -2432,7 +2439,7 @@ export default function PersonnelScreen() {
             {/* AGT-406 — Proposed, desktop: every tab's content takes at most half the browser width, left-aligned */}
             <div style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[
@@ -2458,6 +2465,8 @@ export default function PersonnelScreen() {
                 ], placeholders:[
                   // AGT-413 — rating, moved to Future Controls by John's register ruling
                   { label:"Rating", line:"Not yet read from the agent row", rows:[["Average","4.6 of 5"],["Ratings","38"],["Last rated","Oct 5, 2026"],["Who can rate","People who used it"]] },
+                  // AGT-415 — the ladder's other half: the agent promotes itself from what it has done (the user still sets the level on Profile)
+                  { label:"Promotion by accomplishments", line:"Arrives when levels are graded from real runs; the level you set on Profile stays until then", rows:[["Current level","Proficient"],["Next level","Expert, at 75"],["Progress to it","18 of 25 graded reports passed"],["Last promoted","Sep 30, 2026, to Proficient"],["Promoted by","The agent, from its record"]] },
                 ] },
                 { id:"library", items:[], placeholders:[
                   // AGT-413 — the Access card moved here (read-only for now) and the fixed Voice text, each with sample values

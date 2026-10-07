@@ -1,3 +1,4 @@
+// DeepBench v7.0.814 | src/screens/personnel/AgentFacts.jsx | AGT-415 -- SkillLevelBar: the Skill Ladder as a five-section horizontal bar in the Profile top card; a click saves the level's starting score through update_skill_level.
 // DeepBench v7.0.813 | src/screens/personnel/AgentFacts.jsx | AGT-402 -- useTeamName listens for db-team-changed from the team picker.
 // DeepBench v7.0.810 | src/screens/personnel/AgentFacts.jsx | AGT-402 / AGT-413 -- two real facts the Profile ID badge
 // used to fake or leave out: the agent's TEAM NAME (was the constant "Bureau of Procurement Intelligence") and its
@@ -50,6 +51,48 @@ export function UsageCountRow({ agentId }) {
     <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 10, fontSize: 11 }}>
       <span style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, textTransform: "uppercase", letterSpacing: 1 }}>Times used</span>
       <span style={{ fontFamily: mono, fontSize: 10.5, color: T.ink }}>{count}</span>
+    </div>
+  );
+}
+
+// ── AGT-415 — the Skill Ladder as a five-section horizontal bar in the Profile top card. The user clicks a
+// section; the chosen one is highlighted and its starting score is saved to agents.skill_score (the column the
+// ladder already reads). Same bands and starting scores as lib/skill-write.js SKILL_LEVELS.
+export const LEVELS = [["trainee", "Trainee", 0], ["developing", "Developing", 30], ["proficient", "Proficient", 55], ["expert", "Expert", 75], ["principal", "Principal", 90]];
+export const levelOf = (score) => (score < 30 ? "trainee" : score < 55 ? "developing" : score < 75 ? "proficient" : score < 90 ? "expert" : "principal");
+
+export function SkillLevelBar({ agent, onSaved, showToast }) {
+  const [saving, setSaving] = useState(false);
+  const current = levelOf(Number.isFinite(agent.skill) ? agent.skill : 0);
+
+  const choose = async (slug, score) => {
+    if (saving || slug === current) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/agent-configs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_skill_level", agent_id: agent.id, level: slug }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to save");
+      onSaved && onSaved(score);
+      showToast && showToast("Level saved ✦");
+    } catch (e) { showToast && showToast("Save failed: " + e.message, "⚠"); }
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ margin: "0 0 12px" }}>
+      <div style={{ fontFamily: mono, fontSize: 8, color: T.muted, textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 4 }}>Skill level</div>
+      <div style={{ display: "flex", border: `1px solid ${T.line}` }}>
+        {LEVELS.map(([slug, label, score], i) => {
+          const active = slug === current;
+          return (
+            <button key={slug} onClick={() => choose(slug, score)} disabled={saving} aria-pressed={active} title={`Set level to ${label}`}
+              style={{ flex: 1, padding: "6px 2px", fontFamily: body, fontSize: 10, fontWeight: active ? 700 : 500, cursor: saving ? "default" : "pointer", border: "none", borderLeft: i === 0 ? "none" : `1px solid ${T.line}`,
+                background: active ? T.moss : "transparent", color: active ? "#fff" : T.mutedDeep }}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

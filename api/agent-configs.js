@@ -1,3 +1,4 @@
+// DeepBench v7.0.814 | api/agent-configs.js | AGT-415 -- POST action `update_skill_level` sets agents.skill_score to the starting score of one of five levels (lib/skill-write.js updateSkillLevel()). No model call, so no logAICall().
 // DeepBench v7.0.812 | api/agent-configs.js | AGT-414 -- POST actions `add_skill_to_capability` (creates one skill_profiles row and links it to a capability at level 1) and `remove_skill_from_capability` (deletes the link only, never the Skill), both in lib/skill-write.js. No model call, so no logAICall().
 // DeepBench v7.0.810 | api/agent-configs.js | AGT-413 -- POST action `update_capability` saves a capability's name and description (lib/skill-write.js updateCapability()); slug is read-only. update_skill now also takes skill_type_slug. No model call, so no logAICall().
 // DeepBench v7.0.808 | api/agent-configs.js | AGT-409 -- the Skill editor's save: POST action `update_skill` writes the allowlisted skill_profiles columns of one skill id (lib/skill-write.js updateSkill()); bad fields are a 400, an absent skill a 404. No model call, so no logAICall().
@@ -25,7 +26,7 @@
 import { withRequestContext } from "../lib/request-context.js";
 import { insertAgentConfig } from "../lib/knowledge-write.js";
 import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput, readIdentityInput, updateAgentIdentity, readAgentIdentity } from "../lib/private-agent-create.js";
-import { readSkillInput, updateSkill, readCapabilityInput, updateCapability, readAddSkillInput, addSkillToCapability, readRemoveSkillInput, removeSkillFromCapability } from "../lib/skill-write.js";
+import { readSkillInput, updateSkill, readCapabilityInput, updateCapability, readAddSkillInput, addSkillToCapability, readRemoveSkillInput, removeSkillFromCapability, readSkillLevelInput, updateSkillLevel } from "../lib/skill-write.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
 // service-key read: the browser's key cannot read `teams.address` (a column grant). With no
@@ -151,6 +152,17 @@ async function handler(req, res) {
         if (input.error) return res.status(400).json({ error: input.error });
         try {
           return res.status(200).json(await updateCapability(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-415 -- the Skill Ladder's save: one of five levels -> that level's starting skill_score.
+      if (req.body?.action === "update_skill_level") {
+        const input = readSkillLevelInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await updateSkillLevel(input, { supabaseUrl, supabaseKey }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }
