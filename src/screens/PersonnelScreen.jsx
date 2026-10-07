@@ -1,5 +1,5 @@
 // DeepBench v7.0.808 | PersonnelScreen.jsx | AGT-409 -- the Skill editor: on the Capabilities card each Skill expands in place to SkillEditorRow (personnel/SkillEditor.jsx) and saves through update_skill.
-// DeepBench v7.0.807 | PersonnelScreen.jsx | AGT-411 -- Future Controls' Intelligence Configuration footer names the Profile and Training pages; before that AGT-410 --Future Controls: the Teach control card moves into a new Training group; before that AGT-408 --phone width checked on every tab; the Training stats strip's two buttons drop under the stats; before that AGT-407 --the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.809 | PersonnelScreen.jsx | AGT-412 -- the agent quote shows one pair of quote marks (plainQuip); before that AGT-411 --Future Controls' Intelligence Configuration footer names the Profile and Training pages; before that AGT-410 --Future Controls: the Teach control card moves into a new Training group; before that AGT-408 --phone width checked on every tab; the Training stats strip's two buttons drop under the stats; before that AGT-407 --the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -903,6 +903,10 @@ function InlineText({ value, field, agent, onSaved, showToast, style }) {
   return <div onClick={() => { setDraft(value); setEditing(true); }} title="Click to edit" style={{ ...style, cursor:"text", opacity: saving ? .6 : 1 }}>{value}</div>;
 }
 
+// AGT-412 — a quip is stored with its own quote marks for the built-in agents and without for a created one;
+// strip any surrounding pair so the page can wrap it in exactly one
+const plainQuip = q => String(q).replace(/^["“”]+|["“”]+$/g, "");
+
 // AGT-407 — true = the Proposed view is the only view; false = the Current / Proposed switch is back
 const CURRENT_VIEW_RETIRED = true;
 
@@ -940,7 +944,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           </div>
           {agent.quip && (
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
-            "{agent.quip}"
+            "{plainQuip(agent.quip)}"
           </div>
           )}
         </div>
@@ -2332,7 +2336,7 @@ export default function PersonnelScreen() {
                 )}
                 {agent.quip && (
                 <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
-                  "{agent.quip}"
+                  "{plainQuip(agent.quip)}"
                 </div>
                 )}
                 <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>

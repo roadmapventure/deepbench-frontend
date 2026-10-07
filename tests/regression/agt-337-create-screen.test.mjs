@@ -70,7 +70,7 @@ const ABSENT = [
 const HEX_LITERAL = /#[0-9a-fA-F]{3,8}\b/;
 
 const QUIP_GUARD = `{agent.quip && (`;
-const QUIP_QUOTED = `"{agent.quip}"`;
+const QUIP_QUOTED = `"{plainQuip(agent.quip)}"`; // AGT-412 -- one pair, whatever the stored quip holds
 
 function checkScreenPresent() {
   const src = read(SCREEN_REL);
