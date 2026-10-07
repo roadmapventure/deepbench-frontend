@@ -1,4 +1,4 @@
-// DeepBench v7.0.800 | PersonnelScreen.jsx | AGT-403 -- Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.801 | PersonnelScreen.jsx | AGT-404 -- Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -31,7 +31,7 @@ import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 —
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
-import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
+import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -862,6 +862,30 @@ function StatBadges({ agent, readiness, isMobile }) {
   );
 }
 
+// AGT-404 — a line of text that looks as it always did and edits in place on click; it saves on blur or
+// Enter (Escape cancels), through the same single identity save as the Biography card
+function InlineText({ value, field, agent, onSaved, showToast, style }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState(value);
+  const [saving, setSaving]   = useState(false);
+  const cancelled = useRef(false);
+  const commit = async () => {
+    setEditing(false);
+    const next = draft.trim();
+    if (cancelled.current || !next || next === value) { cancelled.current = false; setDraft(value); return; }
+    setSaving(true);
+    try { const saved = await saveIdentityFields(agent, { [field]: next }); onSaved && onSaved(saved); showToast("Saved ✦"); }
+    catch (e) { setDraft(value); showToast("Save failed: " + e.message, "⚠"); }
+    setSaving(false);
+  };
+  if (editing) return (
+    <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") { cancelled.current = true; e.currentTarget.blur(); } }}
+      style={{ ...style, width:"100%", boxSizing:"border-box", textAlign:"center", background:T.cardAlt, border:`1px solid ${T.lineSoft}`, outline:"none", padding:"2px 6px" }}/>
+  );
+  return <div onClick={() => { setDraft(value); setEditing(true); }} title="Click to edit" style={{ ...style, cursor:"text", opacity: saving ? .6 : 1 }}>{value}</div>;
+}
+
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
@@ -882,8 +906,12 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
             <AgentAvatar who={agent.id} size={92} ring={true} />
           </div>
-          <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
-          <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:proposed?2:10}}>{agent.role}</div>
+          {proposed
+            ? <InlineText value={agent.name} field="name" agent={agent} onSaved={onIdentitySaved} showToast={showToast} style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}/>
+            : <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>}
+          {proposed
+            ? <InlineText value={agent.role} field="role" agent={agent} onSaved={onIdentitySaved} showToast={showToast} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:2}}/>
+            : <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role}</div>}
           {proposed && <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
             <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}}>{agent.code}</span>
@@ -935,15 +963,14 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
   );
 
   // AGT-403 — Proposed: one column, top to bottom — badge, Identity, Capabilities, Role prompts,
-  // Playbook, Documents (Resume and Playbook are sections here, not tabs)
+  // Playbook (Resume and Playbook are sections here, not tabs; Quick Stats moved to Future Controls)
   if (proposed) return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {idBadge}
       <IdentityEditor agent={agent} onSaved={onIdentitySaved} showToast={showToast}/>
       {capsCard}
       <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} part="prompts"/>
-      <PlaybookTab agent={agent} showToast={showToast}/>
-      <QuickStatsCard agent={agent} show="documents"/>
+      <PlaybookTab agent={agent} showToast={showToast} plain/>
     </div>
   );
 
@@ -1813,7 +1840,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
 
 // FEATURE: PE-04 — Playbook tab live wiring
 // ── Tab: Playbook ─────────────────────────────────────────────────────────────
-function PlaybookTab({ agent, showToast }) {
+function PlaybookTab({ agent, showToast, plain = false }) {
   const firstName = agent.name.split(" ")[0];
   const pronouns  = AGENT_PRONOUNS[agent.id] || { possessive: "their" };
   const canEdit   = agent.trainable;
@@ -1920,7 +1947,7 @@ function PlaybookTab({ agent, showToast }) {
       {/* Output formats */}
       <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
         <Corners />
-        <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>Layer 04 · Output Structure</div>
+        <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>{plain ? "Output Structure" : "Layer 04 · Output Structure"}</div>
         <div style={{ fontFamily: display, fontSize: 16, fontWeight: 600, color: T.navy, marginBottom: 6 }}>How does {firstName} format {pronouns.possessive} responses?</div>
         <div style={{ fontFamily: body, fontSize: 12, color: T.mutedDeep, lineHeight: 1.5, marginBottom: 13, padding: "9px 13px", background: T.cardAlt, borderLeft: `3px solid ${T.brassDeep}` }}>
           Final block sent to the LLM. Set one as <strong>Default</strong> for automatic use. Toggle <strong>User Selectable</strong> to let users choose in the analysis UI.
@@ -1949,7 +1976,7 @@ function PlaybookTab({ agent, showToast }) {
       {/* Guardrails */}
       <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
         <Corners color={T.flag} />
-        <div style={{ fontFamily: mono, fontSize: 9, color: T.flag, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>Layer 05 · Guardrails</div>
+        <div style={{ fontFamily: mono, fontSize: 9, color: T.flag, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>{plain ? "Guardrails" : "Layer 05 · Guardrails"}</div>
         <div style={{ fontFamily: body, fontSize: 12, color: T.mutedDeep, lineHeight: 1.5, marginBottom: 18, padding: "9px 13px", background: `${T.flag}07`, borderLeft: `3px solid ${T.flag}` }}>
           Applied to every prompt regardless of which Role or Format is active. Protects against legal overreach and unsupported claims.
         </div>
@@ -2259,8 +2286,14 @@ export default function PersonnelScreen() {
                 <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
                   <AgentAvatar who={agent.id} size={56} ring={true} />
                 </div>
+                {proposed ? (<>
+                  <InlineText value={agent.name} field="name" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}/>
+                  <InlineText value={agent.role} field="role" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:2}}/>
+                  <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>
+                </>) : (<>
                 <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
                 <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role} · tenure {agent.hiredOn}</div>
+                </>)}
                 {!proposed && (
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
                   <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
@@ -2345,7 +2378,7 @@ export default function PersonnelScreen() {
                   <StatBadges key="trio" agent={agent} readiness={readiness} isMobile={isMobile}/>,
                   <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
                   <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile}/>,
-                  <QuickStatsCard key="stats" agent={agent} show="parked"/>,
+                  <QuickStatsCard key="stats" agent={agent} show="all"/>,
                   <ReportCardPanel key="rc" agent={agent} capabilities={capabilities} tight/>,
                   <SkillLadderCard key="ladder" agent={agent}/>,
                 ], placeholders:[] },

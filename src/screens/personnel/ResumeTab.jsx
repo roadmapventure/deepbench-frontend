@@ -1,4 +1,4 @@
-// DeepBench v7.0.800 | ResumeTab.jsx | AGT-403 -- part="prompts" renders only the Role prompts card, VitalsCard takes tight; before that AGT-397 slice 2 + AGT-392 --VitalsCard / SkillLadderCard exported for the Future View; the Proposed arrangement's left column is the Identity editor; identityTag() beside an untouched originTag()
+// DeepBench v7.0.801 | ResumeTab.jsx | AGT-404 -- Identity card is Biography (Specialty, then Exec Summary), name and role move to the badge via saveIdentityFields; before that AGT-403 --part="prompts" renders only the Role prompts card, VitalsCard takes tight; before that AGT-397 slice 2 + AGT-392 --VitalsCard / SkillLadderCard exported for the Future View; the Proposed arrangement's left column is the Identity editor; identityTag() beside an untouched originTag()
 // DeepBench v7.0.792 | ResumeTab.jsx | AGT-390 -- originTag(): where a row was taught and when (DeepBench, or MCP and the caller's key name), shown under a ConfigCard's header
 // DeepBench v5.2.5 | ResumeTab.jsx | AI-28 badge label sweep — PROMPT_ASSEMBLY
 // FEATURE: PE-02 — Resume tab
@@ -93,15 +93,26 @@ export function SkillLadderCard({ agent }) {
 const IDENTITY_INPUT = { width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "6px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", marginBottom: 8, boxSizing: "border-box" };
 const IDENTITY_LABEL = { fontFamily: mono, fontSize: 9, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 };
 
+// AGT-404 — one save for every identity edit (this card's Specialty / Exec Summary and the badge card's
+// in-place Name / Role): reads the saved row, overlays the changed fields, posts all four, so neither
+// card can overwrite the other's field with a stale value.
+export async function saveIdentityFields(agent, fields) {
+  const cur = await fetch(`/api/agent-configs?tenant_id=${TENANT_ID}&agent_id=${agent.id}&identity=1`)
+    .then(res => { if (!res.ok) throw new Error("Failed to load identity"); return res.json(); })
+    .then(data => data.identity);
+  const res = await fetch("/api/agent-configs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_identity", tenant_id: TENANT_ID, agent_id: agent.id, name: cur.name, role: cur.role, specialty: cur.specialty, bio: cur.bio, ...fields }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to save");
+  return data.agent;
+}
+
 export function IdentityEditor({ agent, onSaved, showToast }) {
   const [row,       setRow]       = useState(null);
-  const [name,      setName]      = useState(agent.name || "");
-  const [role,      setRole]      = useState(agent.role || "");
   const [specialty, setSpecialty] = useState(agent.specialty || "");
   const [bio,       setBio]       = useState(agent.bio || "");
   const [saving,    setSaving]    = useState(false);
 
-  const fill = (r) => { setRow(r); setName(r.name || ""); setRole(r.role || ""); setSpecialty(r.specialty || ""); setBio(r.bio || ""); };
+  const fill = (r) => { setRow(r); setSpecialty(r.specialty || ""); setBio(r.bio || ""); };
 
   useEffect(() => {
     fetch(`/api/agent-configs?tenant_id=${TENANT_ID}&agent_id=${agent.id}&identity=1`)
@@ -113,11 +124,9 @@ export function IdentityEditor({ agent, onSaved, showToast }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/agent-configs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_identity", tenant_id: TENANT_ID, agent_id: agent.id, name, role, specialty, bio }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to save");
-      fill(data.agent);
-      onSaved && onSaved(data.agent);
+      const saved = await saveIdentityFields(agent, { specialty, bio });
+      fill(saved);
+      onSaved && onSaved(saved);
       showToast("Saved ✦");
     } catch (e) { showToast("Save failed: " + e.message, "⚠"); }
     setSaving(false);
@@ -126,23 +135,13 @@ export function IdentityEditor({ agent, onSaved, showToast }) {
   return (
     <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "13px 15px", position: "relative" }}>
       <Corners />
-      <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 9 }}>Identity</div>
+      <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 9 }}>Biography</div>
       <div style={IDENTITY_LABEL}>Badge</div>
       <div style={{ fontFamily: mono, fontSize: 10.5, color: T.ink, marginBottom: 8 }}>{agent.code || "—"}</div>
-      <div style={IDENTITY_LABEL}>Agent name</div>
-      <input value={name} onChange={e => setName(e.target.value)} style={IDENTITY_INPUT} />
-      <div style={IDENTITY_LABEL}>Role</div>
-      <input value={role} onChange={e => setRole(e.target.value)} style={IDENTITY_INPUT} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <div>
-          <div style={IDENTITY_LABEL}>Specialty</div>
-          <input value={specialty} onChange={e => setSpecialty(e.target.value)} style={IDENTITY_INPUT} />
-        </div>
-        <div>
-          <div style={IDENTITY_LABEL}>Bio</div>
-          <textarea value={bio} onChange={e => setBio(e.target.value)} rows={4} style={{ ...IDENTITY_INPUT, resize: "vertical" }} />
-        </div>
-      </div>
+      <div style={IDENTITY_LABEL}>Specialty</div>
+      <input value={specialty} onChange={e => setSpecialty(e.target.value)} style={IDENTITY_INPUT} />
+      <div style={IDENTITY_LABEL}>Exec Summary</div>
+      <textarea value={bio} onChange={e => setBio(e.target.value)} rows={4} style={{ ...IDENTITY_INPUT, resize: "vertical" }} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 7 }}>
         <button onClick={handleSave} disabled={saving} style={{ fontFamily: mono, fontSize: 9, color: T.moss, background: "transparent", border: `1px solid ${T.moss}`, padding: "4px 11px", cursor: "pointer", fontWeight: 700, textTransform: "uppercase" }}>{saving ? "Saving…" : "Save"}</button>
       </div>
@@ -333,7 +332,7 @@ export default function ResumeTab({ agent, showToast, arrangement = "current", o
       {/* Right: Role prompts (Layer 01) */}
       <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
         <Corners />
-        <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>Layer 01 · Role & Behavior</div>
+        <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>{promptsOnly ? "Role & Behavior" : "Layer 01 · Role & Behavior"}</div>
         <div style={{ fontFamily: display, fontSize: 16, fontWeight: 600, color: T.navy, marginBottom: 6 }}>How does {agent.name.split(" ")[0]} introduce themselves to Claude?</div>
         <div style={{ fontFamily: body, fontSize: 12, color: T.mutedDeep, lineHeight: 1.5, marginBottom: 13, padding: "9px 13px", background: T.cardAlt, borderLeft: `3px solid ${T.brassDeep}` }}>
           The role prompt is the first layer of the system prompt. It defines the agent's identity, expertise, and communication style. Set one as <strong>Default</strong> for automatic use; toggle <strong>User Selectable</strong> to expose it in the analysis dropdown.
