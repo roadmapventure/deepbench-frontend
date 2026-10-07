@@ -1,3 +1,4 @@
+// DeepBench v7.0.808 | api/agent-configs.js | AGT-409 -- the Skill editor's save: POST action `update_skill` writes the allowlisted skill_profiles columns of one skill id (lib/skill-write.js updateSkill()); bad fields are a 400, an absent skill a 404. No model call, so no logAICall().
 // DeepBench v7.0.796 | api/agent-configs.js | AGT-392 -- the Identity editor: GET with `identity=1`
 // answers one agent's identity row (readAgentIdentity()); POST action `update_identity` saves its name,
 // role, specialty and bio (updateAgentIdentity(), origin deepbench), for any agent id, 404 when absent.
@@ -22,6 +23,7 @@
 import { withRequestContext } from "../lib/request-context.js";
 import { insertAgentConfig } from "../lib/knowledge-write.js";
 import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput, readIdentityInput, updateAgentIdentity, readAgentIdentity } from "../lib/private-agent-create.js";
+import { readSkillInput, updateSkill } from "../lib/skill-write.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
 // service-key read: the browser's key cannot read `teams.address` (a column grant). With no
@@ -125,6 +127,17 @@ async function handler(req, res) {
         if (input.error) return res.status(400).json({ error: input.error });
         try {
           return res.status(200).json(await updateAgentIdentity(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-409 -- the Skill editor's save: allowlisted skill_profiles columns for one skill id.
+      if (req.body?.action === "update_skill") {
+        const input = readSkillInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await updateSkill(input, { supabaseUrl, supabaseKey }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }
