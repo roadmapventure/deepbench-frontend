@@ -1,4 +1,4 @@
-// DeepBench v7.0.804 | PersonnelScreen.jsx | AGT-407 -- the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.805 | PersonnelScreen.jsx | AGT-408 -- phone width checked on every tab; the Training stats strip's two buttons drop under the stats; before that AGT-407 --the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -1441,6 +1441,7 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
 // FEATURE: PE-03 — Training tab live wiring
 // ── Tab: Training ─────────────────────────────────────────────────────────────
 function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEntries, showToast, navigate }) {
+  const isMobile = useIsMobile(); // AGT-408 — the stats strip's buttons drop under the stats at phone width
   const [expandedIds, setExpandedIds] = useState({});
   const toggleEntry = (id) => setExpandedIds(p=>({...p,[id]:!p[id]}));
   const pronouns = AGENT_PRONOUNS[agent.id] || { subject:"they" };
@@ -1596,7 +1597,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
       <FeatureBadge id="PE-03" />
 
       {/* Navy stats strip — FEATURE: PE-03 */}
-      <div style={{background:T.navy,padding:"11px 18px",display:"flex",gap:22,alignItems:"center",border:`1px solid rgba(182,135,58,.3)`}}>
+      <div style={{background:T.navy,padding:"11px 18px",display:"flex",gap:isMobile?12:22,alignItems:"center",flexWrap:isMobile?"wrap":"nowrap",border:`1px solid rgba(182,135,58,.3)`}}>
         {/* FEATURE: AGT-344 — what was taught, and how much of it is given on every run */}
         {[["Taught items",counts.taught,T.card],["Always given",counts.always,T.brassLight],["Looked up",counts.lookedUp,T.navyTextLo]].map(([k,v,c])=>(
           <div key={k}>
@@ -1607,7 +1608,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
         <div style={{flex:1}}/>
         {/* Stats strip buttons — context-aware: Type a note + Upload a file / Cancel */}
         {/* FEATURE: PE-03 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, ...(isMobile ? { flexBasis: "100%" } : null) }}>
           {formOpen ? (
             <button
               onClick={resetAddView}
@@ -1646,6 +1647,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
+                  ...(isMobile ? { flex: 1, justifyContent: "center" } : null),
                 }}
               >
                 {label}
