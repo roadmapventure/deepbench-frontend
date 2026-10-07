@@ -1,4 +1,4 @@
-// DeepBench v7.0.796 | PersonnelScreen.jsx | AGT-397 slice 2 + AGT-392 -- the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.800 | PersonnelScreen.jsx | AGT-403 -- Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
 // DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
@@ -31,7 +31,7 @@ import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 —
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
-import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
+import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -562,25 +562,25 @@ function BadgeActions({ agent, onAddTraining, onConnect, style }) {
 // (ProfileTab) and the Proposed arrangement's Future View render the same component, never a copy.
 
 // Compensation card
-function CompensationCard({ agent }) {
+function CompensationCard({ agent, tight = false }) {
   const fmt = fmt$;
   return (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 18px",position:"relative"}}>
           <Corners/>
           <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8}}>Compensation · FY2026 · The Ledger</div>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:tight?"flex-start":"space-between",gap:tight?28:undefined,marginBottom:8}}>
             <div>
               <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Salary Equiv.</div>
               <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.navy}}>{agent.salary===0?"Free":fmt(agent.salary)}</div>
             </div>
-            <div style={{textAlign:"right"}}>
+            <div style={{textAlign:tight?"left":"right"}}>
               <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Yearly Value</div>
               <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.moss}}>{agent.value===0?"Demo":fmt(agent.value)}</div>
             </div>
           </div>
           {[["Hourly rate","$"+agent.hourly],["Hours / report",agent.reportHrs+"h"],["Cost / report",agent.reportCost===0?"Free":"$"+agent.reportCost],["Revenue model",agent.revenueModel||"—"]].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
-              <span style={{color:T.mutedDeep}}>{k}</span>
+            <div key={k} style={{display:"flex",justifyContent:tight?"flex-start":"space-between",gap:tight?12:undefined,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+              <span style={{color:T.mutedDeep,...(tight?{minWidth:110,flexShrink:0}:null)}}>{k}</span>
               <span style={{fontFamily:mono,fontSize:10.5,color:T.ink}}>{v}</span>
             </div>
           ))}
@@ -685,7 +685,7 @@ function QuickStatsCard({ agent, show = "all" }) {
 
 // FEATURE: LOG-143 (b) — Report Card. Same card + Corners pattern as its siblings;
 // no new token, no new visual rule.
-function ReportCardPanel({ agent, capabilities }) {
+function ReportCardPanel({ agent, capabilities, tight = false }) {
   // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
   // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
   // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
@@ -724,9 +724,9 @@ function ReportCardPanel({ agent, capabilities }) {
               {[["Runs judged", String(reportCardView.runsJudged)],
                 ...reportCardView.dimensions.map(d => [d.label, d.unknownText ? `${d.scoreText} · ${d.unknownText}` : d.scoreText]),
                 ["Skill to improve", reportCardView.skillToImproveText]].map(([k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
-                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
-                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
+                <div key={k} style={{display:"flex",justifyContent:tight?"flex-start":"space-between",gap:tight?12:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0,...(tight?{minWidth:110}:null)}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:tight?"left":"right"}}>{v}</span>
                 </div>
               ))}
             </>
@@ -865,21 +865,16 @@ function StatBadges({ agent, readiness, isMobile }) {
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current" }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved }) {
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
   // rest moves to the Future View tab
   const proposed  = arrangement === "proposed";
 
-  return (
-    <>
-    <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",gap:18,alignItems:"start"}}>
-
-      {/* ── Left column: ID Badge + Compensation ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-
-        {/* ID Badge card — FEATURE: PE-17 — redundant with the mobile persona block, desktop-only */}
-        {!isMobile && (
+  // AGT-403 — the ID badge and Capabilities cards are defined once so Current (two columns) and
+  // Proposed (one column, in John's order) place the same cards
+  /* ID Badge card — FEATURE: PE-17 — redundant with the mobile persona block, desktop-only */
+  const idBadge = !isMobile && (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
           <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
@@ -888,11 +883,12 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
             <AgentAvatar who={agent.id} size={92} ring={true} />
           </div>
           <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
-          <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role}</div>
+          <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:proposed?2:10}}>{agent.role}</div>
+          {proposed && <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
             <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}}>{agent.code}</span>
-            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
-            {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
+            {!proposed && <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>}
+            {!proposed && agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
           </div>
           {agent.quip && (
           <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
@@ -900,9 +896,10 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           </div>
           )}
         </div>
-        )}
+  );
 
-        {/* FEATURE: SK-06 — Capabilities card */}
+  /* FEATURE: SK-06 — Capabilities card */
+  const capsCard = (
         <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", position: "relative" }}>
           <Corners />
           <FeatureBadge id="SK-06" />
@@ -935,27 +932,42 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
             })
           )}
         </div>
+  );
 
-        {!proposed && <CompensationCard agent={agent}/>}
+  // AGT-403 — Proposed: one column, top to bottom — badge, Identity, Capabilities, Role prompts,
+  // Playbook, Documents (Resume and Playbook are sections here, not tabs)
+  if (proposed) return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {idBadge}
+      <IdentityEditor agent={agent} onSaved={onIdentitySaved} showToast={showToast}/>
+      {capsCard}
+      <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} part="prompts"/>
+      <PlaybookTab agent={agent} showToast={showToast}/>
+      <QuickStatsCard agent={agent} show="documents"/>
+    </div>
+  );
+
+  return (
+    <>
+    <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",gap:18,alignItems:"start"}}>
+
+      {/* ── Left column: ID Badge + Compensation ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {idBadge}
+        {capsCard}
+        <CompensationCard agent={agent}/>
       </div>
 
       {/* ── Right column: Readiness + Intel Config + Quick Stats ── */}
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
-
-        {proposed ? (
-          <QuickStatsCard agent={agent} show="documents"/>
-        ) : (
-          <>
-            <ReadinessCard layers={layers} readiness={readiness}/>
-            <IntelConfigCard agent={agent} layers={layers} isMobile={isMobile}/>
-            <QuickStatsCard agent={agent}/>
-            <ReportCardPanel agent={agent} capabilities={capabilities}/>
-          </>
-        )}
+        <ReadinessCard layers={layers} readiness={readiness}/>
+        <IntelConfigCard agent={agent} layers={layers} isMobile={isMobile}/>
+        <QuickStatsCard agent={agent}/>
+        <ReportCardPanel agent={agent} capabilities={capabilities}/>
       </div>
     </div>
 
-    {!proposed && <WorkAssignments agent={agent}/>}
+    <WorkAssignments agent={agent}/>
     </>
   );
 }
@@ -2114,7 +2126,14 @@ export default function PersonnelScreen() {
   };
 
   // FEATURE: PE-07 — Left-sidebar nav replaces horizontal tab bar
-  const NAV_GROUPS = [
+  // AGT-403 — Proposed: one CONFIGURE group, Profile then Training; Resume and Playbook are sections of Profile
+  const proposed = arrangement === "proposed";
+  const NAV_GROUPS = proposed ? [
+    { id:"configure", label:"CONFIGURE", tabs:[
+      { id:"profile",  label:"Profile",  icon:"◈" },
+      { id:"training", label:"Training", icon:"◎" },
+    ]},
+  ] : [
     { id:"overview",  label:"OVERVIEW",  tabs:[{ id:"profile",  label:"Profile",  icon:"◈" }] },
     { id:"configure", label:"CONFIGURE", tabs:[
       { id:"resume",   label:"Resume",   icon:"▣" },
@@ -2130,8 +2149,10 @@ export default function PersonnelScreen() {
   useEffect(() => { if (activeTab === "activity" && !showActivity) setActiveTab("profile"); }, [activeTab, showActivity]);
   // FEATURE: AGT-397 — the COMING group and its Future View tab exist only under Proposed; a deep link
   // to it under Current falls back to Profile
-  if (arrangement === "proposed") NAV_GROUPS.push({ id:"coming", label:"COMING", tabs:[{ id:"future", label:"Future View", icon:"◇" }] });
+  if (proposed) NAV_GROUPS.push({ id:"coming", label:"COMING SOON", tabs:[{ id:"future", label:"Future Controls", icon:"◇" }] });
   useEffect(() => { if (activeTab === "future" && arrangement !== "proposed") setActiveTab("profile"); }, [activeTab, arrangement]);
+  // AGT-403 — a deep link to the Resume or Playbook tab under Proposed lands on Profile, where both now live
+  useEffect(() => { if ((activeTab === "resume" || activeTab === "playbook") && proposed) setActiveTab("profile"); }, [activeTab, proposed]);
 
   // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
@@ -2190,12 +2211,14 @@ export default function PersonnelScreen() {
             </div>
             <div style={{ fontFamily:display, fontSize:13, fontWeight:600, color:T.navy, lineHeight:1.2 }}>{agent.name}</div>
             <div style={{ fontFamily:mono, fontSize:8, color:T.muted, marginTop:2 }}>{agent.code}</div>
+            {!proposed && (
             <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>
               <span style={{ fontFamily:mono, fontSize:8, padding:"1px 6px", background:"rgba(90,117,56,.1)", color:T.moss, border:`1px solid rgba(90,117,56,.3)`, fontWeight:700 }}>● ACTIVE</span>
               {agent.trainable && (
                 <span style={{ fontFamily:mono, fontSize:8, padding:"1px 6px", background:`${agent.color}18`, color:agent.color, border:`1px solid ${agent.color}40`, fontWeight:700 }}>YOUR TRAINEE</span>
               )}
             </div>
+            )}
           </div>
 
           {/* Nav groups */}
@@ -2238,10 +2261,12 @@ export default function PersonnelScreen() {
                 </div>
                 <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
                 <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role} · tenure {agent.hiredOn}</div>
+                {!proposed && (
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
                   <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
                   {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
                 </div>
+                )}
                 {agent.quip && (
                 <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
                   "{agent.quip}"
@@ -2280,18 +2305,22 @@ export default function PersonnelScreen() {
             /* Page header — desktop only */
             <div style={{background:T.cardAlt,padding:"16px 24px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
               {/* Breadcrumb — FEATURE: PE-09 */}
+              {!proposed && (
               <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:4}}>
                 Personnel File · {agent.code} · {agent.trainableBy} Bench · {activeLabel}
               </div>
+              )}
               {/* Title row */}
               <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
                 <div>
                   <div style={{fontFamily:display,fontSize:26,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:4}}>
                     The personnel file of {agent.name}.
                   </div>
+                  {!proposed && (
                   <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep}}>
                     Tenure · {agent.hiredOn} · {skillLabel(agent.skill)}-level agent
                   </div>
+                  )}
                 </div>
                 {/* Stat badges — FEATURE: AGT-397 — Current arrangement only */}
                 {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={false}/>}
@@ -2302,22 +2331,22 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[
-                { id:"subscription", items:[<VitalsCard key="vitals" agent={agent}/>], placeholders:[
+                { id:"subscription", items:[<VitalsCard key="vitals" agent={agent} tight/>], placeholders:[
                   { label:"Active status", line:"Not yet read from the agent row" },
                   { label:"Teach control", line:"Not yet read from the agent row" },
                   { label:"Answer mode",   line:"Not yet read from the agent row" },
                 ]},
-                { id:"billing", items:[<CompensationCard key="comp" agent={agent}/>], placeholders:[] },
+                { id:"billing", items:[<CompensationCard key="comp" agent={agent} tight/>], placeholders:[] },
                 { id:"readiness", items:[
                   <StatBadges key="trio" agent={agent} readiness={readiness} isMobile={isMobile}/>,
                   <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
                   <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile}/>,
                   <QuickStatsCard key="stats" agent={agent} show="parked"/>,
-                  <ReportCardPanel key="rc" agent={agent} capabilities={capabilities}/>,
+                  <ReportCardPanel key="rc" agent={agent} capabilities={capabilities} tight/>,
                   <SkillLadderCard key="ladder" agent={agent}/>,
                 ], placeholders:[] },
                 { id:"library", items:[], placeholders:[
@@ -2329,7 +2358,7 @@ export default function PersonnelScreen() {
                 { id:"work", items:[<WorkAssignments key="work" agent={agent}/>], placeholders:[] },
               ]}/>
             )}
-            {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} onIdentitySaved={setIdentityPatch}/>}
+            {activeTab === "resume"   && !proposed && <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
               <TrainingTab
@@ -2343,7 +2372,7 @@ export default function PersonnelScreen() {
                 navigate={navigate}
               />
             )}
-            {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
+            {activeTab === "playbook" && !proposed && <PlaybookTab agent={agent} showToast={showToast}/>}
             {activeTab === "activity" && showActivity && <ActivityTab agent={agent} entries={entries}/>}
             {/* FEATURE: AGT-386 — Delete Agent: private agents only, every tab, desktop and mobile */}
             {isPrivateAgent(agent) && (<div style={{textAlign:"right",marginTop:32}}><button onClick={() => setRemoveOpen(true)} style={{background:"none",border:"none",padding:0,fontFamily:body,fontSize:11,color:T.muted,textDecoration:"underline",cursor:"pointer"}}>Delete Agent</button></div>)}

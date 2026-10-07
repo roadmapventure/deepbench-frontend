@@ -1,18 +1,19 @@
-// DeepBench v7.0.795 | FutureViewTab.jsx | AGT-397 slice 1 -- the Personnel File's Future View and its
+// DeepBench v7.0.800 | FutureViewTab.jsx | AGT-403 -- Future Controls: renamed and reordered groups, larger section titles, a faint line between sections; before that AGT-397 slice 1 --the Personnel File's Future View and its
 // Current / Proposed layout switch. This file authors no card: it lays out, group by group, the cards
 // PersonnelScreen.jsx hands it, plus an empty box for each field that has no home yet. No data read.
-import { T, body, mono } from "../../tokens.js";
+import { T, display, body, mono } from "../../tokens.js";
 import { Corners } from "../../components/SharedUI.jsx";
 
 export const LAYOUT_FLAG = "agt-397-layout-switch";
 export const LAYOUT_KEY = "agt397-layout";
 
+// AGT-403 — Future Controls order and names (the Training section is held back until John defines it)
 export const FUTURE_GROUPS = [
-  { id: "subscription", label: "Subscription and status", line: "Arrives with subscription management" },
+  { id: "readiness", label: "Readiness and Levels", line: "Arrives when levels are graded from real runs" },
   { id: "billing", label: "Billing", line: "Arrives with live billing" },
-  { id: "readiness", label: "Readiness and levels", line: "Arrives when levels are graded from real runs" },
-  { id: "library", label: "Library", line: "Arrives with data-room access" },
-  { id: "work", label: "Work", line: "Arrives with Work Orders on private agents" },
+  { id: "subscription", label: "Configurations", line: "Arrives with subscription management" },
+  { id: "work", label: "Work Performed", line: "Arrives with Work Orders on private agents" },
+  { id: "library", label: "Access", line: "Arrives with data-room access" },
 ];
 
 // The switch shows only on a dev host with the flag on; Proposed only when it also was the stored choice.
@@ -64,14 +65,14 @@ function Placeholder({ label, line }) {
 
 export default function FutureViewTab({ groups, isMobile }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {FUTURE_GROUPS.map(g => {
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {FUTURE_GROUPS.map((g, gi) => {
         const given = (groups || []).find(x => x.id === g.id) || {};
         const items = given.items || [];
         const placeholders = given.placeholders || [];
         return (
-          <div key={g.id}>
-            <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.brassDeep, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>{g.label}</div>
+          <div key={g.id} style={gi === 0 ? undefined : { borderTop: `1px solid ${T.lineSoft}`, marginTop: 24, paddingTop: 24 }}>
+            <div style={{ fontFamily: display, fontSize: 19, fontWeight: 600, color: T.navy, marginBottom: 4 }}>{g.label}</div>
             <div style={{ fontFamily: body, fontSize: 11, fontStyle: "italic", color: T.mutedDeep, marginBottom: 10 }}>{g.line}</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 18, alignItems: "start" }}>
               {items.map((node, i) => <div key={`i${i}`}>{node}</div>)}

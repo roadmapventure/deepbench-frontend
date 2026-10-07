@@ -1,4 +1,4 @@
-// DeepBench v7.0.796 | ResumeTab.jsx | AGT-397 slice 2 + AGT-392 -- VitalsCard / SkillLadderCard exported for the Future View; the Proposed arrangement's left column is the Identity editor; identityTag() beside an untouched originTag()
+// DeepBench v7.0.800 | ResumeTab.jsx | AGT-403 -- part="prompts" renders only the Role prompts card, VitalsCard takes tight; before that AGT-397 slice 2 + AGT-392 --VitalsCard / SkillLadderCard exported for the Future View; the Proposed arrangement's left column is the Identity editor; identityTag() beside an untouched originTag()
 // DeepBench v7.0.792 | ResumeTab.jsx | AGT-390 -- originTag(): where a row was taught and when (DeepBench, or MCP and the caller's key name), shown under a ConfigCard's header
 // DeepBench v5.2.5 | ResumeTab.jsx | AI-28 badge label sweep — PROMPT_ASSEMBLY
 // FEATURE: PE-02 — Resume tab
@@ -52,15 +52,15 @@ export function identityTag(row) {
 }
 
 // FEATURE: AGT-397 — the Resume tab's Vitals card, exported so the Future View relocates it (never a copy).
-export function VitalsCard({ agent }) {
+export function VitalsCard({ agent, tight = false }) {
   return (
         <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "13px 15px", position: "relative" }}>
           <Corners />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.8, fontWeight: 600, marginBottom: 9 }}>Resume · Vitals</div>
           {[["Architecture",agent.arch],["Specialty",agent.specialty],["Trainer",agent.trainableBy],["Update Cadence","Quarterly"],["Update Rights",agent.trainableBy+" admin"],["Visibility","Configurable"]].map(([k,v]) => (
-            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${T.lineSoft}`, fontSize: 11 }}>
-              <span style={{ color: T.muted, fontWeight: 500 }}>{k}</span>
-              <span style={{ fontFamily: mono, fontSize: 10.5, color: T.ink, textAlign: "right", maxWidth: 130 }}>{v}</span>
+            <div key={k} style={{ display: "flex", justifyContent: tight ? "flex-start" : "space-between", gap: tight ? 12 : undefined, padding: "5px 0", borderBottom: `1px solid ${T.lineSoft}`, fontSize: 11 }}>
+              <span style={{ color: T.muted, fontWeight: 500, ...(tight ? { minWidth: 110, flexShrink: 0 } : null) }}>{k}</span>
+              <span style={{ fontFamily: mono, fontSize: 10.5, color: T.ink, textAlign: tight ? "left" : "right", maxWidth: 130 }}>{v}</span>
             </div>
           ))}
         </div>
@@ -259,7 +259,10 @@ export function AddConfigForm({ agentId, type = "role_prompt", onSaved, onCancel
 }
 
 // ── ResumeTab ─────────────────────────────────────────────────────────────────
-export default function ResumeTab({ agent, showToast, arrangement = "current", onIdentitySaved }) {
+// AGT-403 — part="prompts" (Proposed Profile): only the Role prompts card, one column; the Identity editor
+// is placed separately by the Profile
+export default function ResumeTab({ agent, showToast, arrangement = "current", onIdentitySaved, part }) {
+  const promptsOnly = part === "prompts";
   const [configs,   setConfigs]   = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -316,14 +319,16 @@ export default function ResumeTab({ agent, showToast, arrangement = "current", o
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 18, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: promptsOnly ? "1fr" : "240px 1fr", gap: 18, alignItems: "start" }}>
 
       {/* Left: Vitals + Skill Ladder (Current); the Identity editor (Proposed) — FEATURE: AGT-397 / AGT-392 */}
+      {!promptsOnly && (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {arrangement === "proposed"
           ? <IdentityEditor agent={agent} onSaved={onIdentitySaved} showToast={showToast} />
           : <><VitalsCard agent={agent} />{/* FEATURE: PE-02 */}<SkillLadderCard agent={agent} /></>}
       </div>
+      )}
 
       {/* Right: Role prompts (Layer 01) */}
       <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>

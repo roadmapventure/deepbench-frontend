@@ -43,11 +43,12 @@ const COMPONENTS = [
   "ReportCardPanel", "WorkAssignments", "StatBadges",
 ];
 const EXPECTED_GROUPS = [
-  { id: "subscription", label: "Subscription and status", line: "Arrives with subscription management" },
+  // AGT-403 — John renamed and reordered the groups (Training held back until he defines it)
+  { id: "readiness", label: "Readiness and Levels", line: "Arrives when levels are graded from real runs" },
   { id: "billing", label: "Billing", line: "Arrives with live billing" },
-  { id: "readiness", label: "Readiness and levels", line: "Arrives when levels are graded from real runs" },
-  { id: "library", label: "Library", line: "Arrives with data-room access" },
-  { id: "work", label: "Work", line: "Arrives with Work Orders on private agents" },
+  { id: "subscription", label: "Configurations", line: "Arrives with subscription management" },
+  { id: "work", label: "Work Performed", line: "Arrives with Work Orders on private agents" },
+  { id: "library", label: "Access", line: "Arrives with data-room access" },
 ];
 
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -117,8 +118,8 @@ export default async function run() {
     "IS_ADMIN_HOST",
     "useFeatureFlag(LAYOUT_FLAG)",
     "localStorage.getItem(LAYOUT_KEY)",
-    'id:"coming", label:"COMING"',
-    'id:"future", label:"Future View"',
+    'id:"coming", label:"COMING SOON"',
+    'id:"future", label:"Future Controls"',
   ]) {
     assert.ok(p.includes(needle), `${PERSONNEL_REL} must contain ${needle}`);
   }
