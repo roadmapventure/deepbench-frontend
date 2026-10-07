@@ -1,3 +1,4 @@
+// DeepBench v7.0.815 | PersonnelScreen.jsx | AGT-415 -- Future Controls gains a sample Skill score card (the typed 0-100 score John moved there; the Profile level bar is the editor).
 // DeepBench v7.0.814 | PersonnelScreen.jsx | AGT-415 -- the Skill Ladder is a five-section bar in the Profile top card (the user clicks a level; it saves agents.skill_score), and Future Controls gains a sample Promotion by accomplishments card.
 // DeepBench v7.0.813 | PersonnelScreen.jsx | AGT-402 -- the team picker announces a saved team (db-team-changed) so the badge heading follows without a reload.
 // DeepBench v7.0.812 | PersonnelScreen.jsx | AGT-414 -- each capability gets an Add Skill form (name, type, optional text) and each Skill a Remove (unlinks from that capability only).
@@ -2465,6 +2466,8 @@ export default function PersonnelScreen() {
                 ], placeholders:[
                   // AGT-413 — rating, moved to Future Controls by John's register ruling
                   { label:"Rating", line:"Not yet read from the agent row", rows:[["Average","4.6 of 5"],["Ratings","38"],["Last rated","Oct 5, 2026"],["Who can rate","People who used it"]] },
+                  // AGT-415 — the typed 0-100 skill score, moved to Future Controls by John (the level bar on Profile is the editor today)
+                  { label:"Skill score", line:"Typing a score arrives later; set the level with the bar on Profile", rows:[["Score","62 of 100"],["Level it falls in","Proficient (55 to 75)"],["Set by","You, Oct 6, 2026"],["Next level at","75"]] },
                   // AGT-415 — the ladder's other half: the agent promotes itself from what it has done (the user still sets the level on Profile)
                   { label:"Promotion by accomplishments", line:"Arrives when levels are graded from real runs; the level you set on Profile stays until then", rows:[["Current level","Proficient"],["Next level","Expert, at 75"],["Progress to it","18 of 25 graded reports passed"],["Last promoted","Sep 30, 2026, to Proficient"],["Promoted by","The agent, from its record"]] },
                 ] },

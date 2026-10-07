@@ -71,6 +71,8 @@ export default async function run() {
   assert.equal(count(screen, "<SkillLevelBar"), 2, "desktop badge and phone persona block both mount the bar");
   assert.equal(count(screen, "{proposed && <SkillLevelBar"), 2, "both only under `proposed`");
   assert.ok(/label:"Promotion by accomplishments",[^\n]*rows:\[\[/.test(screen), "Future Controls shows the Promotion card with sample rows");
+  assert.ok(/label:"Skill score",[^
+]*rows:[[/.test(screen), "Future Controls shows the typed Skill score card with sample rows");
   assert.ok(screen.includes("<SkillLadderCard"), "the Skill Ladder card stays on Future Controls");
 
   // ── (e) LIVE ───────────────────────────────────────────────────────────────
