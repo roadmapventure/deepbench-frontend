@@ -1,3 +1,4 @@
+// DeepBench v7.0.812 | PersonnelScreen.jsx | AGT-414 -- each capability gets an Add Skill form (name, type, optional text) and each Skill a Remove (unlinks from that capability only).
 // DeepBench v7.0.811 | PersonnelScreen.jsx | AGT-402 -- Documents shows a real count including 0 (was a dash for 0).
 // DeepBench v7.0.810 | PersonnelScreen.jsx | AGT-413 -- Capabilities card: every Skill under its fixed type header with all fields shown, Skill Type editable, Capability name and description editable; AGT-402 -- the ID badge heading is the agent's team name and a Times used row reads usage_count; Documents on Future Controls counts the agent's active taught items; Future Controls gains Access, Voice, Rating and Teaching origin cards with sample values.
 // DeepBench v7.0.808 | PersonnelScreen.jsx | AGT-409 -- the Skill editor: on the Capabilities card each Skill expands in place to SkillEditorRow (personnel/SkillEditor.jsx) and saves through update_skill.
@@ -35,7 +36,7 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
-import { SkillEditorRow, CapabilityHeader, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
+import { SkillEditorRow, CapabilityHeader, AddSkillForm, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
 import { TeamHeading, UsageCountRow } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
@@ -916,7 +917,7 @@ const CURRENT_VIEW_RETIRED = true;
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved }) {
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
   // rest moves to the Future View tab
@@ -993,7 +994,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
                           return (
                             <div key={typeSlug} style={{ marginTop: 8 }}>
                               <div style={{ fontFamily: mono, fontSize: 8.5, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.4, fontWeight: 700, borderBottom: `1px solid ${T.line}`, paddingBottom: 3 }}>{typeLabel}</div>
-                              {group.map(sp => <SkillEditorRow key={sp.slug} sp={sp} chip={TYPE_CHIP[typeSlug] || TYPE_CHIP.intent} showToast={showToast} onSaved={onSkillChange} />)}
+                              {group.map(sp => <SkillEditorRow key={sp.slug} sp={sp} chip={TYPE_CHIP[typeSlug] || TYPE_CHIP.intent} showToast={showToast} onSaved={onSkillChange} capSlug={cap.slug} onRemoved={onSkillRemoved} />)}
                             </div>
                           );
                         })
@@ -1001,6 +1002,8 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
                     const chip = TYPE_CHIP[sp.skill_type_slug] || TYPE_CHIP.intent;
                     return <SkillRow key={sp.slug} sp={sp} chip={chip} />;
                   })}
+                  {/* FEATURE: AGT-414 — Proposed: type in a new Skill and attach it to this capability */}
+                  {proposed && <AddSkillForm capSlug={cap.slug} showToast={showToast} onAdded={onSkillAdded} />}
                 </div>
               );
             })
@@ -2161,6 +2164,9 @@ export default function PersonnelScreen() {
   const [capabilities, setCapabilities] = useState([]);
   // FEATURE: AGT-413 — a saved Skill (matched by slug, it may sit on several capabilities) or capability replaces its row
   const patchSkill = (sk) => setCapabilities(cs => cs.map(c => ({ ...c, skillProfiles: c.skillProfiles.map(s => (s.slug === sk.slug ? { ...s, ...sk, level: s.level } : s)) })));
+  // FEATURE: AGT-414 — a new Skill joins one capability; a removed one leaves that capability only
+  const addSkillTo = (capSlug, skill) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: [...c.skillProfiles, skill] } : c)));
+  const removeSkillFrom = (capSlug, skillSlug) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: c.skillProfiles.filter(s => s.slug !== skillSlug) } : c)));
   const patchCapability = (cap) => setCapabilities(cs => cs.map(c => (c.slug === cap.slug ? { ...c, ...cap, skillProfiles: c.skillProfiles } : c)));
   // FEATURE: AGT-386 — the Delete Agent confirm popup
   const [removeOpen, setRemoveOpen]     = useState(false);
@@ -2423,7 +2429,7 @@ export default function PersonnelScreen() {
             {/* AGT-406 — Proposed, desktop: every tab's content takes at most half the browser width, left-aligned */}
             <div style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[

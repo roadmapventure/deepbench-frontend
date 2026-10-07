@@ -1,3 +1,6 @@
+// DeepBench v7.0.812 | src/screens/personnel/SkillEditor.jsx | AGT-414 -- AddSkillForm: an Add Skill button inside each
+// capability (name, type, optional description / objective / method) saved through `add_skill_to_capability`;
+// each Skill row gains Remove, which unlinks it from this capability only (`remove_skill_from_capability`).
 // DeepBench v7.0.810 | src/screens/personnel/SkillEditor.jsx | AGT-413 -- the Skills view and the two editors: every
 // Skill row always shows its fields read-only (AGT-399), its Edit button opens the form and the form gains a
 // Type dropdown over the six types (the six section headers themselves are fixed); CapabilityHeader edits a
@@ -76,6 +79,14 @@ export async function saveCapability(capabilityId, fields) {
   return (await post({ action: "update_capability", capability_id: capabilityId, name: fields.name, description: fields.description })).capability;
 }
 
+export async function addSkill(capabilitySlug, fields) {
+  return (await post({ action: "add_skill_to_capability", capability_slug: capabilitySlug, ...fields })).skill;
+}
+
+export async function removeSkill(capabilitySlug, skillSlug) {
+  await post({ action: "remove_skill_from_capability", capability_slug: capabilitySlug, skill_slug: skillSlug });
+}
+
 const stampNow = () => `Edited by DeepBench · ${new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}`;
 
 // One read-only line of a Skill; an empty field says so, so a missing field is visible, not hidden.
@@ -91,8 +102,9 @@ function Line({ label, children }) {
 function Empty() { return <span style={{ color: T.muted, fontStyle: "italic" }}>—</span>; }
 const jsonLine = (v) => (v === null || v === undefined || (typeof v === "object" && Object.keys(v).length === 0) ? <Empty /> : <span style={{ fontFamily: mono, fontSize: 10 }}>{JSON.stringify(v)}</span>);
 
-export function SkillEditorRow({ sp, chip, showToast, onSaved }) {
+export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemoved }) {
   const [open,   setOpen]   = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [form,   setForm]   = useState(() => toForm(sp));
   const [saving, setSaving] = useState(false);
   const [stamp,  setStamp]  = useState(null);
@@ -114,6 +126,16 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved }) {
 
   const cancel = () => { setForm(toForm(sp)); setOpen(false); };
 
+  const handleRemove = async () => {
+    setSaving(true);
+    try {
+      await removeSkill(capSlug, sp.slug);
+      onRemoved && onRemoved(capSlug, sp.slug);
+      showToast && showToast("Removed from this capability");
+    } catch (e) { showToast && showToast("Remove failed: " + e.message, "⚠"); setConfirmRemove(false); }
+    setSaving(false);
+  };
+
   return (
     <div style={{ borderBottom: `1px solid ${T.lineSoft}`, padding: "4px 0 6px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
@@ -121,7 +143,15 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved }) {
         <span style={{ fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", padding: "1px 5px", background: chip.bg, color: chip.color, border: `1px solid ${chip.border}`, flexShrink: 0 }}>{chip.label}</span>
         <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, color: T.brassDeep, background: "rgba(182,135,58,.1)", border: "1px solid rgba(182,135,58,.25)", padding: "1px 5px", flexShrink: 0 }}>L{sp.level}</span>
         <button onClick={() => (open ? cancel() : setOpen(true))} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, flexShrink: 0 }}>{open ? "Close" : "Edit"}</button>
+        {capSlug && !open && !confirmRemove && <button onClick={() => setConfirmRemove(true)} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, flexShrink: 0, color: T.flag }}>Remove</button>}
       </div>
+      {confirmRemove && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontFamily: body, fontSize: 10.5, color: T.mutedDeep }}>
+          <span style={{ flex: 1 }}>Remove “{sp.name}” from this capability? The Skill itself is kept.</span>
+          <button onClick={() => setConfirmRemove(false)} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5 }}>Keep</button>
+          <button onClick={handleRemove} disabled={saving} style={{ ...SAVE, padding: "1px 8px", fontSize: 8.5, color: T.flag, border: `1px solid ${T.flag}` }}>{saving ? "Removing…" : "Remove"}</button>
+        </div>
+      )}
       {!open && (
         <div style={{ paddingBottom: 2 }}>
           <Line label="Description">{sp.description || <Empty />}</Line>
@@ -186,6 +216,51 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// "+ Add Skill" inside a capability: name and type are required, the rest is optional and every other field is
+// edited afterwards in the Skill's own form. The new Skill joins the capability at level 1.
+export function AddSkillForm({ capSlug, showToast, onAdded }) {
+  const blank = { name: "", skill_type_slug: "intent", description: "", objective: "", method: "" };
+  const [open,   setOpen]   = useState(false);
+  const [form,   setForm]   = useState(blank);
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleAdd = async () => {
+    setSaving(true);
+    try {
+      const skill = await addSkill(capSlug, form);
+      onAdded && onAdded(capSlug, skill);
+      setForm(blank);
+      setOpen(false);
+      showToast && showToast("Skill added ✦");
+    } catch (e) { showToast && showToast("Add failed: " + e.message, "⚠"); }
+    setSaving(false);
+  };
+
+  if (!open) return <button onClick={() => setOpen(true)} style={{ ...GHOST, marginTop: 8 }}>+ Add Skill</button>;
+  return (
+    <div style={{ marginTop: 8, padding: "8px 0 4px", borderTop: `1px dashed ${T.lineSoft}` }}>
+      <div style={{ fontFamily: mono, fontSize: 8.5, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, marginBottom: 6 }}>New Skill</div>
+      <div style={LABEL}>Name</div>
+      <input value={form.name} onChange={e => set("name", e.target.value)} style={INPUT} />
+      <div style={LABEL}>Type</div>
+      <select value={form.skill_type_slug} onChange={e => set("skill_type_slug", e.target.value)} style={INPUT}>
+        {SKILL_TYPES.map(([slug, label]) => <option key={slug} value={slug}>{label}</option>)}
+      </select>
+      <div style={LABEL}>Description (optional)</div>
+      <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={2} style={{ ...INPUT, resize: "vertical" }} />
+      <div style={LABEL}>Objective (optional)</div>
+      <textarea value={form.objective} onChange={e => set("objective", e.target.value)} rows={2} style={{ ...INPUT, resize: "vertical" }} />
+      <div style={LABEL}>Method (optional)</div>
+      <textarea value={form.method} onChange={e => set("method", e.target.value)} rows={3} style={{ ...INPUT, resize: "vertical" }} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 7 }}>
+        <button onClick={() => { setForm(blank); setOpen(false); }} style={GHOST}>Cancel</button>
+        <button onClick={handleAdd} disabled={saving} style={SAVE}>{saving ? "Adding…" : "Add Skill"}</button>
+      </div>
     </div>
   );
 }
