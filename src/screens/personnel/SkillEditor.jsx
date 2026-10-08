@@ -32,6 +32,8 @@ const TEXT_FIELDS = [
   ["output_desc", "Output description", "area", 3], ["notes", "Notes", "area", 2],
 ];
 const JSON_FIELDS = [["traits", "Traits (JSON)"], ["guardrails", "Guardrails (JSON)"]];
+// Fields an AI client never receives (the "Dim what stays in DeepBench" switch); the model settings row is marked in the form directly.
+const UNSENT_FIELDS = ["name", "description", "tone", "confidence", "output_desc", "notes"];
 const MODEL_FIELDS = [["llm_model", "Model"], ["llm_provider", "Provider"]];
 
 const show = (v) => (v === null || v === undefined ? "" : String(v));
@@ -90,9 +92,9 @@ export async function removeSkill(capabilitySlug, skillSlug) {
 const stampNow = () => `Edited by DeepBench · ${new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}`;
 
 // One read-only line of a Skill; an empty field says so, so a missing field is visible, not hidden.
-function Line({ label, children }) {
+function Line({ label, children, unsent }) {
   return (
-    <div style={{ display: "flex", gap: 10, padding: "2px 0", fontSize: 10.5, lineHeight: 1.45 }}>
+    <div data-sent={unsent ? "no" : undefined} style={{ display: "flex", gap: 10, padding: "2px 0", fontSize: 10.5, lineHeight: 1.45 }}>
       <span style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, textTransform: "uppercase", letterSpacing: .8, minWidth: 82, flexShrink: 0, paddingTop: 1 }}>{label}</span>
       <span style={{ fontFamily: body, color: T.mutedDeep, flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{children}</span>
     </div>
@@ -139,7 +141,7 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
   return (
     <div style={{ borderBottom: `1px solid ${T.lineSoft}`, padding: "4px 0 6px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
-        <div style={{ fontFamily: body, fontSize: 11.5, fontWeight: 600, color: T.navy, flex: 1 }}>{sp.name}</div>
+        <div data-sent="no" style={{ fontFamily: body, fontSize: 11.5, fontWeight: 600, color: T.navy, flex: 1 }}>{sp.name}</div>
         <span style={{ fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", padding: "1px 5px", background: chip.bg, color: chip.color, border: `1px solid ${chip.border}`, flexShrink: 0 }}>{chip.label}</span>
         <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, color: T.brassDeep, background: "rgba(182,135,58,.1)", border: "1px solid rgba(182,135,58,.25)", padding: "1px 5px", flexShrink: 0 }}>L{sp.level}</span>
         <button onClick={() => (open ? cancel() : setOpen(true))} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, flexShrink: 0 }}>{open ? "Close" : "Edit"}</button>
@@ -154,17 +156,17 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
       )}
       {!open && (
         <div style={{ paddingBottom: 2 }}>
-          <Line label="Description">{sp.description || <Empty />}</Line>
+          <Line unsent label="Description">{sp.description || <Empty />}</Line>
           <Line label="Objective">{sp.objective || <Empty />}</Line>
           <Line label="Method">{sp.method || <Empty />}</Line>
-          <Line label="Tone">{sp.tone || <Empty />}</Line>
-          <Line label="Confidence">{sp.confidence || <Empty />}</Line>
-          <Line label="Output">{sp.output_desc || <Empty />}</Line>
-          <Line label="Notes">{sp.notes || <Empty />}</Line>
+          <Line unsent label="Tone">{sp.tone || <Empty />}</Line>
+          <Line unsent label="Confidence">{sp.confidence || <Empty />}</Line>
+          <Line unsent label="Output">{sp.output_desc || <Empty />}</Line>
+          <Line unsent label="Notes">{sp.notes || <Empty />}</Line>
           <Line label="Guardrails">{jsonLine(sp.guardrails)}</Line>
           <Line label="Traits">{jsonLine(sp.traits)}</Line>
-          <Line label="Model">{[sp.llm_model, sp.llm_provider, sp.temperature !== null && sp.temperature !== undefined ? `temp ${sp.temperature}` : null, sp.max_tokens ? `${sp.max_tokens} tokens` : null].filter(Boolean).join(" · ") || <Empty />}</Line>
-          <Line label="Key source">{sp.api_key_source || <Empty />}</Line>
+          <Line unsent label="Model">{[sp.llm_model, sp.llm_provider, sp.temperature !== null && sp.temperature !== undefined ? `temp ${sp.temperature}` : null, sp.max_tokens ? `${sp.max_tokens} tokens` : null].filter(Boolean).join(" · ") || <Empty />}</Line>
+          <Line unsent label="Key source">{sp.api_key_source || <Empty />}</Line>
         </div>
       )}
       {stamp && !open && <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted }}>{stamp}</div>}
@@ -181,7 +183,7 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
             <div style={{ fontFamily: body, fontSize: 10, color: T.brassDeep, fontStyle: "italic", margin: "-4px 0 8px" }}>Changing the type moves this Skill everywhere it is used.</div>
           )}
           {TEXT_FIELDS.map(([k, label, kind, rows]) => (
-            <div key={k}>
+            <div key={k} data-sent={UNSENT_FIELDS.includes(k) ? "no" : undefined}>
               <div style={LABEL}>{label}</div>
               {kind === "line"
                 ? <input value={form[k]} onChange={e => set(k, e.target.value)} style={INPUT} />
@@ -194,7 +196,7 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
               <textarea value={form[k]} onChange={e => set(k, e.target.value)} rows={5} style={{ ...INPUT, resize: "vertical", fontFamily: mono, fontSize: 11 }} />
             </div>
           ))}
-          <div style={{ display: "flex", gap: 8 }}>
+          <div data-sent="no" style={{ display: "flex", gap: 8 }}>
             {MODEL_FIELDS.map(([k, label]) => (
               <div key={k} style={{ flex: 2 }}>
                 <div style={LABEL}>{label}</div>

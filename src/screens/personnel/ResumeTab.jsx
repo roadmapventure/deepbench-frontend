@@ -144,7 +144,7 @@ export function IdentityEditor({ agent, onSaved, showToast }) {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 7 }}>
         <button onClick={handleSave} disabled={saving} style={{ fontFamily: mono, fontSize: 9, color: T.moss, background: "transparent", border: `1px solid ${T.moss}`, padding: "4px 11px", cursor: "pointer", fontWeight: 700, textTransform: "uppercase" }}>{saving ? "Saving…" : "Save"}</button>
       </div>
-      {identityTag(row) && <div style={{ paddingTop: 6, fontFamily: mono, fontSize: 8.5, color: T.muted }}>{identityTag(row)}</div>}
+      {identityTag(row) && <div data-sent="no" style={{ paddingTop: 6, fontFamily: mono, fontSize: 8.5, color: T.muted }}>{identityTag(row)}</div>}
     </div>
   );
 }
@@ -172,10 +172,10 @@ export function ConfigCard({ config, onSetDefault, onToggleSelectable, onEdit, o
       <div style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${config.is_default ? T.moss + "30" : T.lineSoft}`, flexWrap: "wrap" }}>
         <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: config.is_default ? T.moss : T.ink, flex: 1, minWidth: 120 }}>{config.name}</div>
         {config.is_default
-          ? <span style={{ fontFamily: mono, fontSize: 8.5, padding: "1px 7px", background: `${T.moss}15`, color: T.moss, border: `1px solid ${T.moss}`, fontWeight: 700 }}>● DEFAULT</span>
-          : <button onClick={() => onSetDefault(config.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.brass, background: "transparent", border: `1px solid ${T.brass}`, padding: "1px 8px", cursor: "pointer", fontWeight: 700 }}>Set Default</button>
+          ? <span data-sent="no" style={{ fontFamily: mono, fontSize: 8.5, padding: "1px 7px", background: `${T.moss}15`, color: T.moss, border: `1px solid ${T.moss}`, fontWeight: 700 }}>● DEFAULT</span>
+          : <button data-sent="no" onClick={() => onSetDefault(config.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.brass, background: "transparent", border: `1px solid ${T.brass}`, padding: "1px 8px", cursor: "pointer", fontWeight: 700 }}>Set Default</button>
         }
-        <button onClick={() => onToggleSelectable(config.id, !config.is_user_selectable)}
+        <button data-sent="no" onClick={() => onToggleSelectable(config.id, !config.is_user_selectable)}
           title="When on, users can choose this in the analysis UI"
           style={{ fontFamily: mono, fontSize: 8.5, padding: "1px 8px", cursor: "pointer", border: `1px solid ${config.is_user_selectable ? T.brass : T.lineSoft}`, background: config.is_user_selectable ? `${T.brass}15` : "transparent", color: config.is_user_selectable ? T.brassDeep : T.muted, letterSpacing: .3 }}>
           {config.is_user_selectable ? "◎ User Selectable" : "○ Admin Only"}
@@ -184,7 +184,7 @@ export function ConfigCard({ config, onSetDefault, onToggleSelectable, onEdit, o
         {!config.is_default && <button onClick={() => onDelete(config.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.flag, background: "transparent", border: `1px solid ${T.flag}30`, padding: "1px 8px", cursor: "pointer", textTransform: "uppercase", letterSpacing: .5 }}>Delete</button>}
       </div>
       {/* FEATURE: AGT-390 — where and when this was taught */}
-      {originTag(config) && <div style={{ padding: "4px 12px 0", fontFamily: mono, fontSize: 8.5, color: T.muted }}>{originTag(config)}</div>}
+      {originTag(config) && <div data-sent="no" style={{ padding: "4px 12px 0", fontFamily: mono, fontSize: 8.5, color: T.muted }}>{originTag(config)}</div>}
       {isEditing ? (
         <div style={{ padding: "10px 12px" }}>
           <input value={editName} onChange={e => setEditName(e.target.value)} style={{ width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "6px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />

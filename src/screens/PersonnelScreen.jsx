@@ -921,6 +921,24 @@ const plainQuip = q => String(q).replace(/^["“”]+|["“”]+$/g, "");
 // AGT-407 — true = the Proposed view is the only view; false = the Current / Proposed switch is back
 const CURRENT_VIEW_RETIRED = true;
 
+// FEATURE: sent-lens -- "Dim what stays in DeepBench": a per-browser switch on the Profile and Training tabs of a private
+// agent. Elements an AI client never receives carry data-sent="no"; with the switch on they fade so the sent fields stand
+// out. Off is the page as it was.
+const SENT_LENS_KEY = "deepbench-sent-lens";
+const SENT_LENS_CSS = '.sent-lens [data-sent="no"]{opacity:.38;transition:opacity .15s}';
+function SentLensToggle({ on, onChange }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:14,padding:"8px 12px",background:T.card,border:`1px solid ${T.line}`}}>
+      <button role="switch" aria-checked={on} aria-label="Dim what is not sent to AI clients" onClick={() => onChange(!on)}
+        style={{width:34,height:18,borderRadius:9,border:`1px solid ${on ? T.moss : T.line}`,background:on ? T.moss : T.cardAlt,position:"relative",cursor:"pointer",padding:0,flexShrink:0}}>
+        <span style={{position:"absolute",top:1,left:on ? 17 : 1,width:14,height:14,borderRadius:7,background:on ? "#fff" : T.muted,transition:"left .15s"}}/>
+      </button>
+      <span style={{fontFamily:body,fontSize:12,fontWeight:600,color:T.navy}}>Dim what stays in DeepBench</span>
+      <span style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",flex:"1 1 200px"}}>{on ? "Dimmed fields are not sent to a connected AI client." : "Off: the page as it is today."}</span>
+    </div>
+  );
+}
+
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
@@ -937,7 +955,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
           <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
-          <TeamHeading agentId={agent.id}/>
+          <div data-sent="no"><TeamHeading agentId={agent.id}/></div>
           <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
             <AgentAvatar who={agent.id} size={92} ring={true} />
           </div>
@@ -947,16 +965,16 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           {proposed
             ? <InlineText value={agent.role} field="role" agent={agent} onSaved={onIdentitySaved} showToast={showToast} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:2}}/>
             : <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role}</div>}
-          {proposed && <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>}
+          {proposed && <div data-sent="no" style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
-            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}}>{agent.code}</span>
+            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}} data-sent="no">{agent.code}</span>
             {!proposed && <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>}
             {!proposed && agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
           </div>
-          {proposed && <UsageCountRow agentId={agent.id}/>}
-          {proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}
+          <div data-sent="no">{proposed && <UsageCountRow agentId={agent.id}/>}</div>
+          <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
           {agent.quip && (
-          <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
+          <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
             "{plainQuip(agent.quip)}"
           </div>
           )}
@@ -1779,7 +1797,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
           <div key={e.id} style={{background:T.card,border:`1px solid ${T.line}`,marginBottom:10,overflow:"hidden",display:"flex"}}>
 
             {/* Left date/timeline column */}
-            <div style={{width:56,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0 10px",borderRight:`1px solid ${T.lineSoft}`,background:T.cardAlt,gap:2}}>
+            <div data-sent="no" style={{width:56,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0 10px",borderRight:`1px solid ${T.lineSoft}`,background:T.cardAlt,gap:2}}>
               <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:.8,fontWeight:600,lineHeight:1}}>{dateCol.month}</div>
               {dateCol.day && <div style={{fontFamily:mono,fontSize:9,color:T.muted,lineHeight:1}}>{dateCol.day},</div>}
               <div style={{marginTop:6,fontSize:14,color:T.moss,lineHeight:1}}>●</div>
@@ -1792,17 +1810,17 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
                 {facts ? (<>
                   <span style={{...chip,border:`1px solid ${T.brass}`,color:T.brassDeep}}>{facts.kind}</span>
-                  <span style={{...chip,border:`1px solid ${e.always?T.moss:T.muted}`,color:e.always?T.moss:T.mutedDeep}}>{facts.reach}</span>
-                  {facts.count!==null&&<span style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{facts.count}</span>}
+                  <span data-sent="no" style={{...chip,border:`1px solid ${e.always?T.moss:T.muted}`,color:e.always?T.moss:T.mutedDeep}}>{facts.reach}</span>
+                  {facts.count!==null&&<span data-sent="no" style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{facts.count}</span>}
                   {/* FEATURE: AGT-390 — where and when it was taught */}
-                  {originTag(e)&&<span style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{originTag(e)}</span>}
+                  {originTag(e)&&<span data-sent="no" style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{originTag(e)}</span>}
                 </>) : (<>
-                <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category||"INTERNAL"}</span>
-                {e.jurisdiction&&<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
+                <span data-sent="no" style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category||"INTERNAL"}</span>
+                {e.jurisdiction&&<span data-sent="no" style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
                 </>)}
                 <div style={{flex:1}}/>
                 {/* Toggle button */}
-                <button
+                <button data-sent="no"
                   onClick={() => toggleStatus(e.id, e.status)}
                   style={{
                     fontFamily:mono, fontSize:9, fontWeight:700,
@@ -1843,7 +1861,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
 
               {/* Run ID row */}
               {!facts && runId && (
-                <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:6}}>
+                <div data-sent="no" style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:6}}>
                   Run {runId}
                 </div>
               )}
@@ -1859,7 +1877,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               {!facts && (<>
               {/* Trigger chips */}
               {e.triggers?.length > 0 && (
-                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
+                <div data-sent="no" style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
                   {e.triggers.includes("all")
                     ? <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ ALL FLAGS</span>
                     : e.triggers.map(t=><span key={t} style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ {t.toUpperCase().replace(/-/g," ")}</span>)
@@ -1868,7 +1886,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               )}
 
               {/* Priority */}
-              <div style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:5}}>Priority {e.priority}/100</div>
+              <div data-sent="no" style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:5}}>Priority {e.priority}/100</div>
 
               {/* Field notes */}
               {e.fieldNotes && (
@@ -1878,11 +1896,11 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               )}
 
               {/* What X Learned expandable */}
-              <button onClick={()=>toggleEntry(e.id)} style={{marginTop:4,fontFamily:mono,fontSize:9,color:T.brassDeep,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 8px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",display:"flex",alignItems:"center",gap:4}}>
+              <button data-sent="no" onClick={()=>toggleEntry(e.id)} style={{marginTop:4,fontFamily:mono,fontSize:9,color:T.brassDeep,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 8px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",display:"flex",alignItems:"center",gap:4}}>
                 {isExpanded?"▲":"▸"} + What {agent.name.split(" ")[0]} Learned
               </button>
               {isExpanded && e.learnedSummary && (
-                <div style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
+                <div data-sent="no" style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
                   {/* FEATURE: AI-28 — KNOWLEDGE_TRAINING pattern label */}
                   <AiBadge style={{marginBottom:5,display:"inline-block"}} label={AI_PAT.KNOWLEDGE_TRAINING}/> {e.learnedSummary}
                 </div>
@@ -1981,7 +1999,7 @@ function PlaybookTab({ agent, showToast, plain = false }) {
     <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 6, padding: "7px 10px", border: `1px solid ${T.lineSoft}`, background: T.cardAlt }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.text}</div>
-        <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginTop: 3 }}>{originTag(r)}</div>
+        <div data-sent="no" style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginTop: 3 }}>{originTag(r)}</div>
       </div>
       <button onClick={() => deleteMcpGuardrail(r.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.flag, background: "transparent", border: `1px solid ${T.flag}30`, padding: "1px 8px", cursor: "pointer", textTransform: "uppercase", letterSpacing: .5 }}>Delete</button>
     </div>
@@ -2170,6 +2188,8 @@ export default function PersonnelScreen() {
   const onLevelSaved = (score) => setLevelPatch({ id: agentId, skill: score });
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
+  const [sentLens, setSentLensState] = useState(() => { try { return localStorage.getItem(SENT_LENS_KEY) === "1"; } catch { return false; } });
+  const setSentLens = (v) => { setSentLensState(v); try { localStorage.setItem(SENT_LENS_KEY, v ? "1" : "0"); } catch { /* private window */ } };
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
@@ -2356,14 +2376,14 @@ export default function PersonnelScreen() {
               {/* Mobile persona block — FEATURE: PE-17 — merges the old page header + ProfileTab's ID Badge card into one persistent block, above the tab bar, on every tab */}
               <div style={{background:T.card,padding:"16px 18px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0,textAlign:"center"}}>
                 <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:12,color:T.brassDeep,cursor:"pointer",textAlign:"left",marginBottom:12}}>← Agent Roster</div>
-                <TeamHeading agentId={agent.id} suffix={agent.code}/>
+                <div data-sent="no"><TeamHeading agentId={agent.id} suffix={agent.code}/></div>
                 <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
                   <AgentAvatar who={agent.id} size={56} ring={true} />
                 </div>
                 {proposed ? (<>
                   <InlineText value={agent.name} field="name" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}/>
                   <InlineText value={agent.role} field="role" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:2}}/>
-                  <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>
+                  <div data-sent="no" style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>
                 </>) : (<>
                 <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
                 <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role} · tenure {agent.hiredOn}</div>
@@ -2375,12 +2395,12 @@ export default function PersonnelScreen() {
                 </div>
                 )}
                 {agent.quip && (
-                <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
+                <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
                   "{plainQuip(agent.quip)}"
                 </div>
                 )}
-                {proposed && <UsageCountRow agentId={agent.id}/>}
-                {proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}
+                <div data-sent="no">{proposed && <UsageCountRow agentId={agent.id}/>}</div>
+                <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
                 <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
                 {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
               </div>
@@ -2440,7 +2460,9 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* AGT-406 — Proposed, desktop: every tab's content takes at most half the browser width, left-aligned */}
-            <div style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
+            <div className={sentLens && isPrivateAgent(agent) ? "sent-lens" : undefined} style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
+            <style>{SENT_LENS_CSS}</style>
+            {(activeTab === "profile" || activeTab === "training") && isPrivateAgent(agent) && <SentLensToggle on={sentLens} onChange={setSentLens}/>}
             {/* FEATURE: PE-08 */}
             {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
