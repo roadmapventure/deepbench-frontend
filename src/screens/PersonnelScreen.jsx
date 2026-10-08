@@ -42,7 +42,7 @@ import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, J
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
 import { SkillEditorRow, CapabilityHeader, AddSkillForm, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
-import { TeamHeading, UsageCountRow, SkillLevelBar } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
+import { TeamHeading, UsageCountRow, SkillLevelBar, ConnectionStatus, isConnectionCapability } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -557,7 +557,7 @@ function TeamPicker({ agent }) {
 // destination); on private agents only (isPrivateAgent reads the agent's own row — Rule #1), the
 // team picker (AGT-386) and the Connect to AI button, which names no agent (AGT-386). Styles:
 // STYLE-GUIDE §7 Primary CTA and Secondary/ghost, sized for the card.
-function BadgeActions({ agent, onAddTraining, onConnect, style }) {
+function BadgeActions({ agent, onAddTraining, onConnect, style, capabilities = [], align = "right" }) {
   return (
     <div style={style}>
       {agent.trainable && (
@@ -567,6 +567,7 @@ function BadgeActions({ agent, onAddTraining, onConnect, style }) {
       {isPrivateAgent(agent) && (
         <button onClick={onConnect} style={TEAM_GHOST}>Connect to AI</button>
       )}
+      {isPrivateAgent(agent) && <ConnectionStatus agentId={agent.id} capabilities={capabilities.filter(isConnectionCapability)} align={align}/>}
     </div>
   );
 }
@@ -954,7 +955,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
   const idBadge = !isMobile && (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
           <Corners color={agent.color}/>
-          <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
+          <BadgeActions agent={agent} capabilities={capabilities} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
           <div data-sent="no"><TeamHeading agentId={agent.id}/></div>
           <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
             <AgentAvatar who={agent.id} size={92} ring={true} />
@@ -987,12 +988,12 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           <Corners />
           <FeatureBadge id="SK-06" />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 10 }}>Capabilities</div>
-          {capabilities.length === 0 ? (
+          {capabilities.filter(c => !isConnectionCapability(c)).length === 0 ? (
             <div style={{ border: `1px dashed ${T.lineSoft}`, padding: "16px 12px", textAlign: "center" }}>
               <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>No capabilities assigned.</div>
             </div>
           ) : (
-            capabilities.map(cap => {
+            capabilities.filter(c => !isConnectionCapability(c)).map(cap => {
               const TYPE_CHIP = {
                 intent:   { bg: "rgba(182,135,58,.1)",  color: T.brassDeep, border: "rgba(182,135,58,.3)", label: "INTENT"   },
                 format:   { bg: "rgba(90,117,56,.08)",  color: T.moss,      border: "rgba(90,117,56,.25)", label: "FORMAT"   },
@@ -2401,7 +2402,7 @@ export default function PersonnelScreen() {
                 )}
                 <div data-sent="no">{proposed && <UsageCountRow agentId={agent.id}/>}</div>
                 <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
-                <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
+                <BadgeActions agent={agent} capabilities={capabilities} align="center" onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:10}}/>
                 {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
               </div>
 

@@ -96,3 +96,46 @@ export function SkillLevelBar({ agent, onSaved, showToast }) {
     </div>
   );
 }
+
+// FEATURE: connection-status -- the two capabilities every private agent gets at creation are connection
+// settings, not abilities: one hands an AI client the agent (Intent agent-bundle-intent), one lets an AI client
+// teach it (agent-teach-intent). They are recognised by their Intent (data), shown read-only under the Connect to
+// AI button, and kept out of the Capabilities card.
+export const CONNECTION_LABELS = { "agent-bundle-intent": "Connect to AI client", "agent-teach-intent": "AI client teaches agent" };
+export const isConnectionCapability = (cap) => !!(cap && CONNECTION_LABELS[cap.default_intent_slug]);
+
+const lastUsedLabel = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+
+// Connected = at least one MCP call has been made for this agent (the same test as the Activity tab). A failed read
+// leaves the status line out; it never claims "not connected" on an error.
+export function ConnectionStatus({ agentId, capabilities = [], align = "right" }) {
+  const [last, setLast] = useState(undefined); // undefined: loading or failed, null: never, string: last call
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setLast(undefined);
+    Promise.resolve(supabase.from("ai_activity_log").select("created_at").eq("call_source", "mcp").eq("call_facts->>target_agent_id", agentId).order("created_at", { ascending: false }).limit(1))
+      .then(({ data, error }) => { if (live && !error && Array.isArray(data)) setLast(data[0] ? data[0].created_at : null); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [agentId]);
+  const held = new Set(capabilities.map(c => c.default_intent_slug));
+  const text = { fontFamily: mono, fontSize: 9, lineHeight: 1.5, textAlign: align };
+  return (
+    <div style={{ width: "100%", textAlign: align, position: "relative" }}>
+      {last !== undefined && (
+        <div style={{ ...text, color: last ? T.moss : T.muted, fontWeight: 700 }}>{last ? "● Connected" : "○ Not connected yet"}</div>
+      )}
+      {last && <div style={{ ...text, color: T.muted }}>Last used {lastUsedLabel(last)}</div>}
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...text, background: "none", border: "none", padding: 0, color: T.brassDeep, cursor: "pointer", textDecoration: "underline" }}>Configuration {open ? "▴" : "▾"}</button>
+      {open && (
+        <div style={{ marginTop: 4, padding: "6px 8px", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, textAlign: "left" }}>
+          {Object.entries(CONNECTION_LABELS).map(([intent, label]) => (
+            <div key={intent} style={{ fontFamily: body, fontSize: 10.5, color: held.has(intent) ? T.ink : T.muted, padding: "1px 0", whiteSpace: "nowrap" }}>{held.has(intent) ? "●" : "○"} {label}</div>
+          ))}
+          <div style={{ fontFamily: body, fontSize: 9.5, color: T.muted, fontStyle: "italic", marginTop: 3, whiteSpace: "normal" }}>Set up when the agent was created. Not editable.</div>
+        </div>
+      )}
+    </div>
+  );
+}
