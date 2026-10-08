@@ -20,7 +20,7 @@ function fake({ failLink = false, noAgent = false } = {}) {
     const u = String(url), m = init.method;
     sent.push({ m, u: u.split("/rest/v1/")[1], body: init.body ? JSON.parse(init.body) : undefined });
     const ok = (b) => ({ ok: true, status: 200, json: async () => b, text: async () => "" });
-    if (m === "GET") return ok(noAgent ? [] : [{ id: "zoe-k3x9ab" }]);
+    if (m === "GET") return ok(noAgent || u.includes("sharing=eq.private") ? [] : [{ id: "zoe-k3x9ab" }]); // a customer agent with sharing "public" (Brittany) must pass
     if (u.includes("capabilities") && m === "POST") return ok([{ id: "uuid-1", slug: JSON.parse(init.body).slug, name: "Bid review", description: null, execution_type: "deterministic" }]);
     if (u.includes("agent_capability_assignments")) return failLink ? { ok: false, status: 500, text: async () => "boom", json: async () => ({}) } : ok([]);
     return ok([]);
@@ -66,7 +66,7 @@ globalThis.fetch = async (url, init = {}) => {
   calls.push({ m, u: u.split("/rest/v1/")[1] });
   const ok = b => ({ ok: true, status: 200, json: async () => b, text: async () => "" });
   if (u.includes("/agents?id=eq.zoe-k3x9ab&select=id,name,lane")) return ok([{ id: "zoe-k3x9ab", name: "Zoe", lane: "product", is_active: true, sharing: "private", owner_id: null }]);
-  if (u.includes("/agents?id=eq.zoe-k3x9ab&sharing=eq.private")) return ok([{ id: "zoe-k3x9ab" }]);
+  if (u.includes("/agents?id=eq.zoe-k3x9ab&agent_origin=eq.customer")) return ok([{ id: "zoe-k3x9ab" }]);
   if (u.includes("select=id,name,role,specialty,bio") && m === "GET") return ok([{ id: "zoe-k3x9ab", name: "Zoe", role: "Analyst", specialty: "old", bio: "old bio" }]);
   if (u.includes("/agents?id=eq.zoe-k3x9ab&select=id,name&limit=1")) return ok([{ id: "zoe-k3x9ab", name: "Zoe" }]);
   if (m === "PATCH" && u.includes("agents?")) return ok([{ id: "zoe-k3x9ab", name: "Zoe", role: "Analyst", specialty: JSON.parse(init.body).specialty, bio: JSON.parse(init.body).bio, identity_updated_at: "2026-10-08T00:00:00Z" }]);
