@@ -320,7 +320,7 @@ export function CapabilityHeader({ cap, showToast, onSaved }) {
 export default SkillEditorRow;
 
 // "+ Add Capability" on a private agent's Capabilities card: a name and an optional description. The new capability
-// appears empty, and its own "+ Add Skill" button follows. It is a group of Skills, not a tool an AI client can call.
+// appears empty, and its own "+ Add Skill" button follows. It is a tool the agent's AI client sees (agent-capability-intent).
 export function AddCapabilityForm({ agentId, showToast, onAdded }) {
   const blank = { name: "", description: "" };
   const [open,   setOpen]   = useState(false);

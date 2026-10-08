@@ -149,7 +149,9 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
   // No capability_slug: assemblePrompt() loads every capability assigned to the agent, which is
   // exactly "everything this agent knows how to do" -- the bundle's subject.
   // FEATURE: DAT-004 -- include_taught: false; the taught items are handed over once, by `taught` below.
-  const assembled = await assemblePrompt({ agent_id: t, tenant_id: tenant, task_context: {}, include_taught: false });
+  // add-capability: a user-made capability's tool passes its own slug, so `sections` hold that capability's Skills only.
+  const scopedTo = handler_context?.capability_slug || null;
+  const assembled = await assemblePrompt({ agent_id: t, tenant_id: tenant, task_context: {}, include_taught: false, ...(scopedTo ? { capability_slug: scopedTo } : {}) });
   const sections = (assembled.sections || [])
     .filter(s => !PER_CALL_SLUGS.includes(s.slug))
     // Projected field by field, never spread: `order`/`prompt_phase`/`required` are assembly

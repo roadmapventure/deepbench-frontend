@@ -147,7 +147,7 @@ async function handler(req, res) {
       }
 
       // FEATURE: AGT-413 -- the Capability editor's save: name and description of one capability id.
-      // FEATURE: add-capability -- a Skill group on a private agent; never an MCP tool (execution_type "group").
+      // FEATURE: add-capability -- a capability on a private agent, listed to AI clients as a no-model tool (agent-capability-intent).
       if (req.body?.action === "add_capability") {
         const input = readAddCapabilityInput(req.body);
         if (input.error) return res.status(400).json({ error: input.error });
