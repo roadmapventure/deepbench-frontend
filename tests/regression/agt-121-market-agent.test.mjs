@@ -1,3 +1,4 @@
+// DeepBench v7.0.822 | tests/regression/agt-121-market-agent.test.mjs | AGT-304 slice 13 -- part (d) expects what resolveJudgmentModel()'s rule yields, never the lane by assumption (AGT-217)
 // DeepBench v7.0.583 | tests/regression/agt-121-market-agent.test.mjs | AGT-121
 //
 // FEATURE: AGT-121 -- the call path for a product-lane marketing agent (first one: Nathan Laan, product
@@ -262,8 +263,12 @@ async function partD() {
   console.log(`  [AGT-121] render: model=${out.model} since=${out.since} records_loaded=${out.records_loaded} napkin_entries=${out.napkin_entries} prompt_bytes=${out.prompt_bytes} (judgment lane ${judgment}, in force ${inForce})`);
   assert.strictEqual(out.napkin_entries, 2, `--render reported ${out.napkin_entries} Napkin entries, expected 2`);
   assert.ok(out.prompt_bytes > 20000, `--render prompt is ${out.prompt_bytes} bytes, expected > 20000`);
-  const expected = inForce && inForce !== judgment ? inForce : judgment;
-  assert.strictEqual(out.model, expected, `--render printed model ${out.model}, the judgment lane runs ${expected}`);
+  const cap = await getJson("capabilities?select=default_intent_slug&slug=eq.pmm-why-deepbench");
+  const own = (await getJson(`skill_profiles?select=llm_model&slug=eq.${cap[0]?.default_intent_slug}`))[0]?.llm_model;
+  assert.ok(own, "pmm-why-deepbench's default Intent row carries no llm_model");
+  // resolveJudgmentModel()'s rule (agent-prompt.js:167): a capability whose own Intent model is NOT the lane's is never degraded.
+  const expected = own !== judgment ? own : (inForce && inForce !== judgment ? inForce : judgment);
+  assert.strictEqual(out.model, expected, `--render printed model ${out.model}; the rule expects ${expected} (own Intent model ${own}, judgment lane ${judgment}, in force ${inForce})`);
   assert.ok(r.stderr.includes(`# model: ${out.model}`), "--render did not print `# model: <id>` on stderr");
   results.push("render-napkin-entries-bytes-and-judgment-model");
 
