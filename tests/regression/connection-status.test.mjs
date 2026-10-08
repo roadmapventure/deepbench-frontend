@@ -8,11 +8,11 @@ const facts = read("src/screens/personnel/AgentFacts.jsx");
 const screen = read("src/screens/PersonnelScreen.jsx");
 const count = (s, t) => s.split(t).length - 1;
 
-assert.ok(facts.includes('"agent-bundle-intent": "Connect to AI client"'), "bundle intent label");
-assert.ok(facts.includes('"agent-teach-intent": "AI client teaches agent"'), "teach intent label");
+assert.ok(facts.includes('["agent-bundle-intent", "agent-teach-intent"]'), "the two connection Intents are named in data");
+assert.ok(!facts.includes("Configuration"), "no Configuration link");
+assert.ok(facts.includes("<UsageCountRow agentId={agentId} align={align} />"), "Times used sits under Last used");
 assert.ok(facts.includes('.eq("call_source", "mcp")') && facts.includes('call_facts->>target_agent_id'), "connected = an MCP call for this agent");
 assert.equal(count(screen, "<ConnectionStatus"), 1, "one mount, inside BadgeActions (private agents only)");
 assert.ok(screen.includes("{isPrivateAgent(agent) && <ConnectionStatus"), "private agents only");
-assert.equal(count(screen, "<BadgeActions agent={agent} capabilities={capabilities}"), 2, "both BadgeActions mounts pass the capabilities");
 assert.equal(count(screen, "!isConnectionCapability(c)"), 2, "the Capabilities card hides them (empty test and list)");
 console.log("ok connection-status");

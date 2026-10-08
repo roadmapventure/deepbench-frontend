@@ -81,7 +81,7 @@ export default async function run() {
   const screen = read("src/screens/PersonnelScreen.jsx");
   assert.ok(screen.includes("SKILL_TYPES.map("), "Skills are grouped under the six fixed type headers");
   assert.equal(count(screen, "<CapabilityHeader"), 1);
-  assert.ok(count(screen, "<TeamHeading") === 2 && count(screen, "<UsageCountRow") === 2, "desktop and phone badges both read the team and usage count");
+  assert.ok(count(screen, "<TeamHeading") === 2 && count(screen, "<ConnectionStatus") === 1 && read("src/screens/personnel/AgentFacts.jsx").includes("<UsageCountRow"), "the team heading is on both badges; Times used sits under Last used inside ConnectionStatus");
   assert.ok(!screen.includes("Bureau of Procurement Intelligence"), "the constant bureau heading is gone");
   assert.ok(screen.includes("db-team-changed") && read("src/screens/personnel/AgentFacts.jsx").includes("addEventListener(\"db-team-changed\""), "the heading follows a team picked in the team picker");
   assert.ok(screen.includes("taughtCounts(entries).always + taughtCounts(entries).lookedUp"), "Documents counts the active taught items");
