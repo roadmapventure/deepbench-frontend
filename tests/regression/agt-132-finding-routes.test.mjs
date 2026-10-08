@@ -1,3 +1,4 @@
+// DeepBench v7.0.823 | tests/regression/agt-132-finding-routes.test.mjs | AGT-304 slice 14 -- arm B's route pin follows its one home (_lib/finding-routes.js, decision ccab94da)
 // DeepBench v7.0.662 | tests/regression/agt-132-finding-routes.test.mjs | AGT-240 -- arm C retargeted:
 // the Dev Manager Capabilities pick and the Auditor route now expect finding_group_epic()'s LOCK
 // refusal while their project is executing/proposed/done (a locked list), byte-for-byte the
@@ -78,6 +79,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 // implementation agreeing with itself proves nothing). Importing a test module does not run it --
 // selfRun only fires for the entry module.
 import { chainRuleFromPrompt, indexOfExact } from "./ses-378d-manager-skill-rows.test.mjs";
+import { LIVE_ROUTES } from "./_lib/finding-routes.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = path.join(ROOT, "scripts", "audit-review.js");
@@ -131,18 +133,7 @@ const ROUTES = [
 // -- precedence 30 / project_slug NULL, the same staff-watch shape, so the Development Manager picks.
 // Without the row finding_group_epic() RAISEd `unmapped source` on every one of the 578 unreviewed
 // open tickets and the whole review stopped. Third home: agt-159-backlog-review.test.mjs.
-const LIVE_ROUTES = [
-  { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
-  { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
-  { precedence: 30, source: "agent", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "backlog-review", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "session", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "staff-watch", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "ticket-owner", finding_type: "*", project_slug: null },
-];
+// AGT-304 slice 14: eleven rows since decision ccab94da; the pin's one home is _lib/finding-routes.js.
 
 async function req(url, key, q, { method = "GET", body } = {}) {
   const res = await fetch(`${url}/rest/v1/${q}`, {
@@ -266,7 +257,7 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, LIVE_ROUTES, "the ten routing rows, exactly");
+    assert.deepEqual(r.json, LIVE_ROUTES, "the eleven routing rows, exactly -- one home, _lib/finding-routes.js");
     assert.ok(!r.json.some(x => x.source === "*" && x.finding_type === "*"),
       "there is deliberately no catch-all row: an unmapped source must stop the review");
     // The precedence ORDER is the invariant a new row must not disturb: security outranks everything.
