@@ -1,3 +1,4 @@
+// DeepBench v7.0.819 | tests/regression/agt-138-researcher-routine.test.mjs | AGT-304 slice 11 -- route pin follows decision ccab94da
 // DeepBench v7.0.608 | tests/regression/agt-138-researcher-routine.test.mjs | AGT-138 -- THE
 // RESEARCHER LEFT THE BUILDER CYCLE FOR ITS OWN WEEKLY ROUTINE, and this file is the guard on all
 // five halves of that move: the playbook exists and is the prompt's source, step 4b is a pointer
@@ -41,6 +42,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { MANAGER_PROJECT } from "./_lib/finding-routes.js";
 import { ROUTINES, extractBlock, comparePrompt } from "../../scripts/check-routine-prompt.js";
 import { routeGroup } from "../../scripts/audit-review.js";
 import { BYTES_AT_SHIP, RUNBOOK_CEILING } from "./ses-413d-questions-scoreboard.test.mjs";
@@ -267,8 +269,8 @@ export default async function run() {
       const mine = routes.filter(r => r.source === "researcher");
       assert.equal(mine.length, 1, `exactly one researcher route; got ${JSON.stringify(mine)}`);
       assert.equal(mine[0].finding_type, "*", "the researcher route covers every finding_type");
-      assert.equal(mine[0].project_slug, null,
-        "project_slug is NULL: the Development Manager picks the project, as for staff-watch and " +
+      assert.equal(mine[0].project_slug, MANAGER_PROJECT,
+        "the Development Manager files it under its capture project (decision ccab94da), as for staff-watch and " +
         "ticket-owner -- project creation is John's");
       assert.equal(Number(mine[0].precedence), 30, "the researcher route sits in the manager-picks tier");
       assert.ok(!routes.some(r => r.source === "*" && r.finding_type === "*"),
@@ -279,7 +281,7 @@ export default async function run() {
       const group = { kind: "root-cause", finding_ids: ["rs"] };
       const hit = routeGroup(group, wl, routes);
       assert.equal(hit.source, "researcher");
-      assert.equal(hit.project_slug, null, "a researcher proposal routes to the manager's own pick");
+      assert.equal(hit.project_slug, MANAGER_PROJECT, "a researcher proposal routes to the manager's capture project");
       assert.throws(() => routeGroup(group, wl, routes.filter(r => r.source !== "researcher")),
         /finding rs has unmapped source researcher — add a finding_routes row; project creation is John's/,
         "control: without the row, the SAME call throws -- which is what every researcher finding " +
