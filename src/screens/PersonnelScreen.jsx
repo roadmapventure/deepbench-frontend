@@ -41,7 +41,7 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
-import { SkillEditorRow, CapabilityHeader, AddSkillForm, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
+import { SkillEditorRow, CapabilityHeader, AddSkillForm, AddCapabilityForm, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
 import { TeamHeading, SkillLevelBar, ConnectionStatus, isConnectionCapability } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
@@ -943,7 +943,7 @@ function SentLensToggle({ on, onChange }) {
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved, onLevelSaved }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved, onCapabilityAdded, onLevelSaved }) {
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
   // rest moves to the Future View tab
@@ -990,7 +990,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 10 }}>Capabilities</div>
           {capabilities.filter(c => !isConnectionCapability(c)).length === 0 ? (
             <div style={{ border: `1px dashed ${T.lineSoft}`, padding: "16px 12px", textAlign: "center" }}>
-              <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>No capabilities assigned.</div>
+              <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>{proposed && isPrivateAgent(agent) ? "No capabilities yet. Add one, then add Skills inside it." : "No capabilities assigned."}</div>
             </div>
           ) : (
             capabilities.filter(c => !isConnectionCapability(c)).map(cap => {
@@ -1035,6 +1035,8 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
               );
             })
           )}
+          {/* FEATURE: add-capability -- a private agent's user adds a capability, then Skills inside it */}
+          {proposed && isPrivateAgent(agent) && <AddCapabilityForm agentId={agent.id} showToast={showToast} onAdded={onCapabilityAdded} />}
         </div>
   );
 
@@ -2198,6 +2200,7 @@ export default function PersonnelScreen() {
   // FEATURE: AGT-413 — a saved Skill (matched by slug, it may sit on several capabilities) or capability replaces its row
   const patchSkill = (sk) => setCapabilities(cs => cs.map(c => ({ ...c, skillProfiles: c.skillProfiles.map(s => (s.slug === sk.slug ? { ...s, ...sk, level: s.level } : s)) })));
   // FEATURE: AGT-414 — a new Skill joins one capability; a removed one leaves that capability only
+  const addCapabilityTo = (cap) => setCapabilities(cs => [...cs, cap]);
   const addSkillTo = (capSlug, skill) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: [...c.skillProfiles, skill] } : c)));
   const removeSkillFrom = (capSlug, skillSlug) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: c.skillProfiles.filter(s => s.slug !== skillSlug) } : c)));
   const patchCapability = (cap) => setCapabilities(cs => cs.map(c => (c.slug === cap.slug ? { ...c, ...cap, skillProfiles: c.skillProfiles } : c)));
@@ -2465,7 +2468,7 @@ export default function PersonnelScreen() {
             <style>{SENT_LENS_CSS}</style>
             {(activeTab === "profile" || activeTab === "training") && isPrivateAgent(agent) && <SentLensToggle on={sentLens} onChange={setSentLens}/>}
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onCapabilityAdded={addCapabilityTo} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[

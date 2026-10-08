@@ -26,7 +26,7 @@
 import { withRequestContext } from "../lib/request-context.js";
 import { insertAgentConfig } from "../lib/knowledge-write.js";
 import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput, readIdentityInput, updateAgentIdentity, readAgentIdentity } from "../lib/private-agent-create.js";
-import { readSkillInput, updateSkill, readCapabilityInput, updateCapability, readAddSkillInput, addSkillToCapability, readRemoveSkillInput, removeSkillFromCapability, readSkillLevelInput, updateSkillLevel } from "../lib/skill-write.js";
+import { readSkillInput, updateSkill, readCapabilityInput, updateCapability, readAddSkillInput, addSkillToCapability, readRemoveSkillInput, removeSkillFromCapability, readSkillLevelInput, updateSkillLevel, readAddCapabilityInput, addCapabilityToAgent } from "../lib/skill-write.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
 // service-key read: the browser's key cannot read `teams.address` (a column grant). With no
@@ -147,6 +147,16 @@ async function handler(req, res) {
       }
 
       // FEATURE: AGT-413 -- the Capability editor's save: name and description of one capability id.
+      // FEATURE: add-capability -- a Skill group on a private agent; never an MCP tool (execution_type "group").
+      if (req.body?.action === "add_capability") {
+        const input = readAddCapabilityInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await addCapabilityToAgent(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
       if (req.body?.action === "update_capability") {
         const input = readCapabilityInput(req.body);
         if (input.error) return res.status(400).json({ error: input.error });

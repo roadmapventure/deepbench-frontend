@@ -253,6 +253,8 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
 
   const rows = [];
   for (const c of capabilities) {
+    // A "group" is a set of Skills a user built on Personnel, never a tool (add-capability).
+    if (c.execution_type === 'group') continue;
     const holder = holderBySlug.get(c.slug);
     if (!holder) continue;
     const intent = c.default_intent_slug ? intentBySlug.get(c.default_intent_slug) : null;

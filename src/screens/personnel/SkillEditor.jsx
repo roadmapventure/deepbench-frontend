@@ -81,6 +81,10 @@ export async function saveCapability(capabilityId, fields) {
   return (await post({ action: "update_capability", capability_id: capabilityId, name: fields.name, description: fields.description })).capability;
 }
 
+export async function addCapability(agentId, fields) {
+  return (await post({ action: "add_capability", agent_id: agentId, ...fields })).capability;
+}
+
 export async function addSkill(capabilitySlug, fields) {
   return (await post({ action: "add_skill_to_capability", capability_slug: capabilitySlug, ...fields })).skill;
 }
@@ -314,3 +318,40 @@ export function CapabilityHeader({ cap, showToast, onSaved }) {
 }
 
 export default SkillEditorRow;
+
+// "+ Add Capability" on a private agent's Capabilities card: a name and an optional description. The new capability
+// appears empty, and its own "+ Add Skill" button follows. It is a group of Skills, not a tool an AI client can call.
+export function AddCapabilityForm({ agentId, showToast, onAdded }) {
+  const blank = { name: "", description: "" };
+  const [open,   setOpen]   = useState(false);
+  const [form,   setForm]   = useState(blank);
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleAdd = async () => {
+    setSaving(true);
+    try {
+      const cap = await addCapability(agentId, form);
+      onAdded && onAdded(cap);
+      setForm(blank);
+      setOpen(false);
+      showToast && showToast("Capability added ✦");
+    } catch (e) { showToast && showToast("Add failed: " + e.message, "⚠"); }
+    setSaving(false);
+  };
+
+  if (!open) return <button onClick={() => setOpen(true)} style={{ ...GHOST, marginTop: 4 }}>+ Add Capability</button>;
+  return (
+    <div style={{ marginTop: 8, padding: "8px 0 4px", borderTop: `1px dashed ${T.lineSoft}` }}>
+      <div style={{ fontFamily: mono, fontSize: 8.5, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, marginBottom: 6 }}>New Capability</div>
+      <div style={LABEL}>Name</div>
+      <input id="new-capability-name" value={form.name} onChange={e => set("name", e.target.value)} style={INPUT} />
+      <div style={LABEL}>Description (optional)</div>
+      <textarea id="new-capability-description" value={form.description} onChange={e => set("description", e.target.value)} rows={2} style={{ ...INPUT, resize: "vertical" }} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 7 }}>
+        <button onClick={() => { setForm(blank); setOpen(false); }} style={GHOST}>Cancel</button>
+        <button onClick={handleAdd} disabled={saving} style={SAVE}>{saving ? "Adding…" : "Add Capability"}</button>
+      </div>
+    </div>
+  );
+}
