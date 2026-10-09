@@ -1499,7 +1499,13 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
 
 // FEATURE: PE-03 — Training tab live wiring
 // ── Tab: Training ─────────────────────────────────────────────────────────────
+// Typing a note is hidden from end users for beta (John): Skills and capabilities are where a person teaches an agent. It stays in the
+// code and still shows on the admin address; set this to false to give it back to everyone. Existing notes, including the ones an AI
+// tool saves with "remember this", still list, edit, switch off and delete.
+const NOTE_ADD_HIDDEN = true;
+
 function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEntries, showToast, navigate }) {
+  const canTypeNote = !NOTE_ADD_HIDDEN || IS_ADMIN_HOST;
   const isMobile = useIsMobile(); // AGT-408 — the stats strip's buttons drop under the stats at phone width
   const [expandedIds, setExpandedIds] = useState({});
   const toggleEntry = (id) => setExpandedIds(p=>({...p,[id]:!p[id]}));
@@ -1507,7 +1513,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
   const firstName = agent.name.split(" ")[0];
 
   // FEATURE: AGT-344 — the note form (add: id null; edit: the entry's id); a deep link opens either form
-  const [noteForm,   setNoteForm]   = useState(initialAdd === "note" ? { id: null, title: "", text: "" } : null);
+  const [noteForm,   setNoteForm]   = useState(initialAdd === "note" && canTypeNote ? { id: null, title: "", text: "" } : null);
   const [noteSaving, setNoteSaving] = useState(false);
 
   const saveNote = async () => {
@@ -1689,7 +1695,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               ✕ Cancel
             </button>
           ) : (
-            [["+ Type a note", () => setNoteForm({ id: null, title: "", text: "" })], ["+ Upload a file", () => setShowAddView(true)]].map(([label, open]) => (
+            [...(canTypeNote ? [["+ Type a note", () => setNoteForm({ id: null, title: "", text: "" })]] : []), ["+ Upload a file", () => setShowAddView(true)]].map(([label, open]) => (
               <button
                 key={label}
                 onClick={open}
