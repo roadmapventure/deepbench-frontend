@@ -220,7 +220,7 @@ const ARMS = {
     // Refusals -- each writes nothing.
     const refusals = [
       [{ kind: "guardrail", title: "x", content: "y" }, ctx, "A guardrail needs side: always or never"],
-      [{ kind: "bogus", title: "x", content: "y" }, ctx, "kind must be one of: taught, role_prompt, output_format, guardrail"],
+      [{ kind: "bogus", title: "x", content: "y" }, ctx, "kind must be one of: taught, role_prompt, output_format, guardrail, specialty, bio, capability, skill"],
       [{ kind: "taught", title: "x", content: "y", agent_id: "someone-else" }, ctx, "Unknown agent: someone-else"],
       [{ kind: "taught", title: "x", content: "y", agent_id: "someone-else" }, { ...ctx, any_agent: true }, "Unknown agent: someone-else"],
     ];

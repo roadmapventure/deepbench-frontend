@@ -1,3 +1,4 @@
+// DeepBench v7.0.819 | tests/regression/agt-134-upkeep-rulings.test.mjs | AGT-304 slice 11 -- route pin follows decision ccab94da
 // DeepBench v7.0.609 | tests/regression/agt-134-upkeep-rulings.test.mjs | AGT-134 -- A RULING ON THE
 // MANAGER'S OWN UPKEEP CANNOT COME OUT EMPTY. The routine-prompt drift finding
 // fab9d5a6-aa94-431e-a6e0-6af6e4a2e25a (fingerprint 33e539b3646db01b) had been re-detected on every
@@ -48,6 +49,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { LIVE_ROUTES, MANAGER_PROJECT } from "./_lib/finding-routes.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = path.join(ROOT, "scripts", "audit-review.js");
@@ -77,18 +79,7 @@ const SECTION = "## How a drift finding is closed";
 // -- precedence 30 / project_slug NULL, the same staff-watch shape, so the Development Manager picks.
 // Without the row finding_group_epic() RAISEd `unmapped source` on every one of the 578 unreviewed
 // open tickets and the whole review stopped. Third home: agt-159-backlog-review.test.mjs.
-const ROUTES = [
-  { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
-  { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
-  { precedence: 30, source: "agent", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "backlog-review", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "session", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "staff-watch", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "ticket-owner", finding_type: "*", project_slug: null },
-];
+const ROUTES = LIVE_ROUTES; // one home: _lib/finding-routes.js (AGT-304 slice 11)
 
 // The paragraph AGT-134 appended to dm-audit-review-intent.method, under decision
 // 736279b4-9f93-48d1-a573-3e582dc66923 with one full-row before-image, so a Reverse removes it.
@@ -219,11 +210,11 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, ROUTES, "the ten routing rows, exactly");
+    assert.deepEqual(r.json, ROUTES, "the eleven routing rows, exactly (_lib/finding-routes.js)");
     for (const src of ["check-routine-prompt", "runner"]) {
       const row = r.json.find(x => x.source === src);
       assert.ok(row, `AGT-134's ${src} route is live`);
-      assert.equal(row.project_slug, null, `${src} is a manager pick -- AGT-134 created no project`);
+      assert.equal(row.project_slug, MANAGER_PROJECT, `${src} files under the manager's capture project (decision ccab94da) -- AGT-134 created no project`);
       assert.equal(row.finding_type, "*");
     }
 

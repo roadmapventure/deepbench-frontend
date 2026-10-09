@@ -306,7 +306,7 @@ export function useDataSources() {
 // key is the array's field; the value is the public.agents column. D1: the table is authoritative
 // for every field it holds, so every pair here is an overlay, and agents.js keeps only what the
 // table lacks (quip, color, benchGroups, docs/classes/chunks, hiredOn, trainable*) until AGT-57.
-export const ROSTER_TABLE_FIELDS = { name: "name", role: "role", code: "code", specialty: "specialty", arch: "architecture", skill: "skill_score", situational: "situational_awareness", salary: "salary", value: "yearly_value", hourly: "hourly_rate", reportHrs: "report_hours", reportCost: "report_cost", revenueModel: "revenue_model", trainer: "trainer_org" };
+export const ROSTER_TABLE_FIELDS = { name: "name", role: "role", code: "code", quip: "quip", specialty: "specialty", arch: "architecture", skill: "skill_score", situational: "situational_awareness", salary: "salary", value: "yearly_value", hourly: "hourly_rate", reportHrs: "report_hours", reportCost: "report_cost", revenueModel: "revenue_model", trainer: "trainer_org" };
 export const ROSTER_SELECT = "id,is_active,agent_origin,created_at," + AGENT_ACCESS_COLUMNS + "," + Object.values(ROSTER_TABLE_FIELDS).join(",");
 
 // D2: where both hold a value the TABLE stands — so a non-null table column always wins, and a
@@ -342,7 +342,7 @@ export function tableOnlyAgent(t) {
     trainableBy: t.trainer_org ?? ABSENT,
     revenueModel: t.revenue_model ?? ABSENT,
     docs: 0, classes: 0, chunks: 0,
-    quip: "",
+    quip: t.quip ?? "",
     color: T.brass,
     benchGroups: t.sharing === SHARING.PRIVATE ? [BENCH_PRIVATE.id] : [],
     trainable: t.agent_origin === "customer",

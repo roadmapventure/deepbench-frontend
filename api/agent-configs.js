@@ -1,3 +1,11 @@
+// DeepBench v7.0.814 | api/agent-configs.js | AGT-415 -- POST action `update_skill_level` sets agents.skill_score to the starting score of one of five levels (lib/skill-write.js updateSkillLevel()). No model call, so no logAICall().
+// DeepBench v7.0.812 | api/agent-configs.js | AGT-414 -- POST actions `add_skill_to_capability` (creates one skill_profiles row and links it to a capability at level 1) and `remove_skill_from_capability` (deletes the link only, never the Skill), both in lib/skill-write.js. No model call, so no logAICall().
+// DeepBench v7.0.810 | api/agent-configs.js | AGT-413 -- POST action `update_capability` saves a capability's name and description (lib/skill-write.js updateCapability()); slug is read-only. update_skill now also takes skill_type_slug. No model call, so no logAICall().
+// DeepBench v7.0.808 | api/agent-configs.js | AGT-409 -- the Skill editor's save: POST action `update_skill` writes the allowlisted skill_profiles columns of one skill id (lib/skill-write.js updateSkill()); bad fields are a 400, an absent skill a 404. No model call, so no logAICall().
+// DeepBench v7.0.796 | api/agent-configs.js | AGT-392 -- the Identity editor: GET with `identity=1`
+// answers one agent's identity row (readAgentIdentity()); POST action `update_identity` saves its name,
+// role, specialty and bio (updateAgentIdentity(), origin deepbench), for any agent id, 404 when absent.
+// No model call, so no logAICall().
 // DeepBench v7.0.792 | api/agent-configs.js | AGT-390 -- the plain POST (a role prompt, an output format
 // or a guardrail saved on the Resume or Playbook tab) is lib/knowledge-write.js's insertAgentConfig(),
 // shared with the MCP Teach tool, and every row it writes carries origin `deepbench`. Same messages,
@@ -17,7 +25,8 @@
 // site added here later cannot silently lose attribution.
 import { withRequestContext } from "../lib/request-context.js";
 import { insertAgentConfig } from "../lib/knowledge-write.js";
-import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput } from "../lib/private-agent-create.js";
+import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput, readIdentityInput, updateAgentIdentity, readAgentIdentity } from "../lib/private-agent-create.js";
+import { readSkillInput, updateSkill, readCapabilityInput, updateCapability, readAddSkillInput, addSkillToCapability, readRemoveSkillInput, removeSkillFromCapability, readSkillLevelInput, updateSkillLevel, readAddCapabilityInput, addCapabilityToAgent, readDeleteCapabilityInput, deleteCapability, actorFromRequest } from "../lib/skill-write.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
 // service-key read: the browser's key cannot read `teams.address` (a column grant). With no
@@ -57,9 +66,17 @@ async function handler(req, res) {
 
     // ── GET ──────────────────────────────────────────────────────────────────
     if (req.method === "GET") {
-      const { tenant_id = "global", agent_id, type, teams } = req.query;
+      const { tenant_id = "global", agent_id, type, teams, identity } = req.query;
       if (!agent_id) return res.status(400).json({ error: "agent_id required" });
       if (teams === "1") return res.status(200).json({ teams: await readAgentTeams(agent_id, { supabaseUrl, supabaseKey }) });
+      // FEATURE: AGT-392 -- the Identity editor's read: one agent's identity row, 404 when absent.
+      if (identity === "1") {
+        try {
+          return res.status(200).json({ identity: await readAgentIdentity(agent_id, { supabaseUrl, supabaseKey }) });
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
 
       let url = `${supabaseUrl}/rest/v1/agent_configs?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&order=created_at.asc`;
       if (type) url += `&type=eq.${encodeURIComponent(type)}`;
@@ -102,6 +119,90 @@ async function handler(req, res) {
         if (input.error) return res.status(400).json({ error: input.error });
         try {
           return res.status(200).json(await archivePrivateAgent(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-392 -- the Identity editor's save: name, role, specialty, bio; DeepBench's own write.
+      if (req.body?.action === "update_identity") {
+        const input = readIdentityInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await updateAgentIdentity(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-409 -- the Skill editor's save: allowlisted skill_profiles columns for one skill id.
+      if (req.body?.action === "update_skill") {
+        const input = readSkillInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await updateSkill(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-413 -- the Capability editor's save: name and description of one capability id.
+      // FEATURE: add-capability -- a capability on a private agent, listed to AI clients as a no-model tool (agent-capability-intent).
+      if (req.body?.action === "add_capability") {
+        const input = readAddCapabilityInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await addCapabilityToAgent(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+      // FEATURE: delete -- a capability a user added; its Skills stay.
+      if (req.body?.action === "delete_capability") {
+        const input = readDeleteCapabilityInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await deleteCapability(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+      if (req.body?.action === "update_capability") {
+        const input = readCapabilityInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await updateCapability(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-415 -- the Skill Ladder's save: one of five levels -> that level's starting skill_score.
+      if (req.body?.action === "update_skill_level") {
+        const input = readSkillLevelInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await updateSkillLevel(input, { supabaseUrl, supabaseKey }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+
+      // FEATURE: AGT-414 -- add a Skill to a capability / remove one from it (the link only).
+      if (req.body?.action === "add_skill_to_capability") {
+        const input = readAddSkillInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await addSkillToCapability(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+      if (req.body?.action === "remove_skill_from_capability") {
+        const input = readRemoveSkillInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await removeSkillFromCapability(input, { supabaseUrl, supabaseKey }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }

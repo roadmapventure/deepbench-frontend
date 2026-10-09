@@ -1,3 +1,4 @@
+// DeepBench v7.0.822 | shared/models.js | AGT-304 slice 13 -- claude-haiku-5-5 priced: model-watch 2026-10-08 wrote the 24th public.model_pricing row; LOG-149 (e) named the gap.
 // DeepBench v7.0.778 | shared/models.js | AGT-304 slice 3 -- the JS price table now carries all 23 public.model_pricing rows (14 added) so lib/activity-log.js stops writing cost_usd NULL, under model-watch decision fc1db2f0; §19t's two halves agree again.
 // DeepBench v7.0.450 | shared/models.js | LOG-149 -- THE ONE PRICING TABLE. Before this, per-1K
 // rates lived in TWO places that both stopped at Sonnet 4.6: src/hooks/useAIActivity.js's
@@ -115,6 +116,8 @@ export const MODEL_PRICING = Object.freeze({
   "claude-mythos-5":           { input_per_1k: 0.010,   output_per_1k: 0.050 },
   "claude-mythos-5-1":         { input_per_1k: 0.010,   output_per_1k: 0.050 },
   "claude-mythos-preview":     { input_per_1k: 0.025,   output_per_1k: 0.125 },
+  // AGT-304 slice 13 (v7.0.822): the 24th public.model_pricing row (model-watch release 2026-10-08), at its rates.
+  "claude-haiku-5-5":          { input_per_1k: 0.0001,  output_per_1k: 0.0005 },
 });
 
 // FEATURE: LOG-149 -- MOVED from src/hooks/useAIActivity.js (BUG-20), unchanged. It lives here now

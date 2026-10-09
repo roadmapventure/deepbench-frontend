@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.793 | tests/regression/run-all.js | AGT-391 -- `--only=<csv>` / `--only-from=<file>`
+// run a SELECTIVE set, by basename: the build's related set (scripts/related-tests.js). Checked FIRST
+// in main(), before any slot is taken: an empty set, or a name not in DIR, prints `run-all: --only
+// names <k> file(s) not in <DIR>: <names>. Nothing was run.` and exits 2 -- a run that did not
+// happen, never a green over fewer files than asked for. A selective run says so on its first line
+// (`SELECTIVE RUN: k of N files ...`) and its summary counts k. The full suite runs weekly (the
+// Auditor routine) and before a production release (docs/runbooks/release-to-main.md).
+//
 // DeepBench v7.0.689 | tests/regression/run-all.js | AGT-265 -- the suite waits in ONE line for a
 // green database. Right after the transport watch, takeTestSlot() (scripts/test-slot.js, through
 // self-run.js so SES-215's relocated control still resolves) queues for public.test_slots: no slot
@@ -113,6 +121,26 @@ function arg(name, fallback) {
 
 const DIR = arg("dir", __dirname);
 
+function listTests() {
+  return fs.readdirSync(DIR)
+    .filter(f => (f.endsWith(".js") || f.endsWith(".mjs")) && f !== "run-all.js" && !f.startsWith("_"))
+    .sort();
+}
+
+// AGT-391: the selective set, or null when neither flag was passed. An unreadable --only-from file
+// is an EMPTY set, which main() refuses -- never a silent fall-back to the full suite.
+function readOnly() {
+  const csv = arg("only", null);
+  const from = arg("only-from", null);
+  if (csv === null && from === null) return null;
+  let raw = csv ?? "";
+  if (from !== null) {
+    try { raw = `${raw},${fs.readFileSync(from, "utf8")}`; } catch { /* empty: refused below */ }
+  }
+  return [...new Set(raw.split(/[,\r\n]+/).map(s => s.trim()).filter(Boolean).map(s => path.basename(s)))];
+}
+const ONLY = readOnly();
+
 // SES-215. A shallow copy is the whole snapshot: process.env is a flat string map whose values are
 // strings, so there is nothing deeper to clone.
 //
@@ -137,6 +165,17 @@ function restoreEnv(before) {
 }
 
 async function main() {
+  // AGT-391: FIRST, before the hint repair, the transport watch and the slot -- nothing runs.
+  if (ONLY !== null) {
+    const all = listTests();
+    const missing = ONLY.length ? ONLY.filter(n => !all.includes(n)) : [];
+    if (!ONLY.length || missing.length) {
+      const names = ONLY.length ? missing.join(", ") : "(an empty set)";
+      console.log(`run-all: --only names ${missing.length} file(s) not in ${DIR}: ${names}. Nothing was run.`);
+      process.exit(2);
+    }
+  }
+
   // SES-207 (v7.0.300): tests that predate notRun() announce a skipped half with a plain
   // console.log carrying `--env-file=` -- the form that hard-errors wherever .env.local is absent,
   // which is every unattended cloud cycle. Those lines never reach renderNotRun(), so the repair
@@ -171,9 +210,11 @@ async function main() {
 }
 
 async function runSuite(transport) {
-  const files = fs.readdirSync(DIR)
-    .filter(f => (f.endsWith(".js") || f.endsWith(".mjs")) && f !== "run-all.js" && !f.startsWith("_"))
-    .sort();
+  const all = listTests();
+  const files = ONLY === null ? all : all.filter(f => ONLY.includes(f));
+  if (ONLY !== null) {
+    console.log(`SELECTIVE RUN: ${files.length} of ${all.length} files (--only; the full suite runs weekly and before a production release, AGT-391)`);
+  }
 
   if (files.length === 0) {
     console.log("regression suite: no test files found in " + DIR);

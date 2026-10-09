@@ -278,6 +278,8 @@ export function assembleCapabilityRows({ capabilities = [], assignments = [], ag
       input_schema: inputSchema && typeof inputSchema === 'object' && !Array.isArray(inputSchema) ? inputSchema : null,
       default_intent_slug: c.default_intent_slug || null,
       any_agent: !!(intent && intent.traits && intent.traits.any_agent === true),
+      // add-capability: an Intent that sets `scope_capability` hands the caller ONE capability's Skills, not the agent's whole scaffold.
+      scope_capability: !!(intent && intent.traits && intent.traits.scope_capability === true),
       tenant_id: c.tenant_id || 'global',
       agent_id: holder.id,
       agent_name: holder.name || holder.id,
@@ -863,6 +865,8 @@ export async function runDeterministic({ row, taskContext, governanceUnlocked, c
         handler_context: {
           governance_unlocked: governanceUnlocked === true,
           any_agent: row.any_agent === true,
+          // add-capability: the called capability's slug, only for a scoped Intent (agent-bundle.js reads it).
+          capability_slug: row.scope_capability === true ? row.slug : null,
           // FEATURE: AGT-390 -- the matched key's NAME (null for a keyless caller), never its value.
           caller_key_name: callerKeyName || null,
         },

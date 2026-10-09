@@ -1,3 +1,4 @@
+// DeepBench v7.0.794 | tests/regression/agt-68-devmanager.test.mjs | AGT-304 slice 7 -- the assignment pin names all FIVE capabilities the manager's rows carry (model-assignment, propose-project added), and both driver answers carry the patterns_applied the live Intent requires.
 // DeepBench v7.0.625 | tests/regression/agt-68-devmanager.test.mjs | AGT-183 -- header note (8): the
 // own-claim arm and the pass-over arm, each pinning the EXACT refusal sentence it used to return and
 // carrying its own controls (peer holder, stale claim, no claim row, third ticket, lane drift; no
@@ -544,8 +545,9 @@ export default async function run() {
   // capability appearing on the manager without a ticket naming it reddens this line, which is the
   // property (AGENT-ROW-AGREED-TICKET). Its own rows and links are asserted in
   // tests/regression/agt-127-decide-gated-card.test.mjs.
+  // AGT-304 slice 7 (v7.0.794): FOURTH model-assignment (AGT-144, row 2026-09-25; agt-144 pins "devmanager holds 5") and FIFTH propose-project (AGT-240, row 2026-09-27, the finish line's proposal turn). Still a CLOSED set.
   assert.deepEqual(assigns.map(a => a.capability_slug).sort(),
-    ["decide-gated-card", "review-audit-worklist", RUN_PROJECT_CAPABILITY].sort());
+    ["decide-gated-card", "model-assignment", "propose-project", "review-audit-worklist", RUN_PROJECT_CAPABILITY].sort());
   const cap = (await rest(`capabilities?slug=eq.${RUN_PROJECT_CAPABILITY}&select=slug,execution_type,default_intent_slug`))[0];
   assert.equal(cap.execution_type, "ai");
   assert.equal(cap.default_intent_slug, INTENT_SLUG,
@@ -731,7 +733,8 @@ export default async function run() {
     const answerFile = path.join(scratch, "answer.json");
     const capOnRoster = stateOnDisk.roster.find(r => r.capability_slug !== RUN_PROJECT_CAPABILITY);
     fs.writeFileSync(answerFile, JSON.stringify({
-      project: PROJECT, action: "assign", report: "one step", needs_john: [],
+    // SES-424 slice 5 made patterns_applied REQUIRED (line 171's GOOD_ANSWER was re-pinned; these two driver answers were not) -- AGT-304 slice 7
+      project: PROJECT, action: "assign", report: "one step", needs_john: [], patterns_applied: [],
       assignment: { backlog_id: "SES-000000", capability_slug: capOnRoster.capability_slug, engine: "session", reason: "the mutated state said so" },
     }), "utf8");
     const refused = runDriver([`--cycle-id=${cycleRow.id}`, `--state-file=${mutatedState}`, `--answer=${answerFile}`]);
@@ -761,7 +764,7 @@ export default async function run() {
     }
     const goodAnswerFile = path.join(scratch, "good-answer.json");
     fs.writeFileSync(goodAnswerFile, JSON.stringify({
-      project: PROJECT, action: "assign", report: "one step", needs_john: [],
+      project: PROJECT, action: "assign", report: "one step", needs_john: [], patterns_applied: [],
       assignment: { backlog_id: livePick.backlog_id, capability_slug: capOnRoster.capability_slug, engine: "session", reason: "top of the pick path" },
     }), "utf8");
     const accepted = runDriver([`--cycle-id=${cycleRow.id}`, `--state-file=${emitted.state_file}`, `--answer=${goodAnswerFile}`]);

@@ -24,10 +24,43 @@ import { logActivity } from '../../../lib/activity-log.js';
 import { embedAndUpsertEntry, insertAgentConfig } from '../../../lib/knowledge-write.js';
 import { AGENT_ACCESS_COLUMNS } from '../../../shared/agent-visibility.js';
 import { bundleTarget, bundleTargetReadable } from './agent-bundle.js';
+import { addCapabilityToAgent, addSkillToCapability, SKILL_TYPES } from '../../../lib/skill-write.js';
+import { readAgentIdentity, updateAgentIdentity } from '../../../lib/private-agent-create.js';
 
-const KINDS = Object.freeze(['taught', 'role_prompt', 'output_format', 'guardrail']);
+// FEATURE: AGT-393 + add-capability -- specialty and bio replace the agent's own; capability and skill build new
+// ones. Name and role are edited on DeepBench only.
+const KINDS = Object.freeze(['taught', 'role_prompt', 'output_format', 'guardrail', 'specialty', 'bio', 'capability', 'skill']);
+const IDENTITY_MAX = Object.freeze({ specialty: 200, bio: 2000 });
 const SIDES = Object.freeze(['always', 'never']);
 const TAB_FOR = Object.freeze({ role_prompt: 'Resume', output_format: 'Playbook', guardrail: 'Playbook' });
+
+function restDeps() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_KEY not configured');
+  return { supabaseUrl, supabaseKey };
+}
+
+// The capability a skill is being added to, named by slug or by name, among the capabilities THIS agent holds.
+// Only a capability whose Intent is scoped to its own Skills (traits.scope_capability, i.e. one added on Personnel) takes
+// Skills; the agent's Knowledge and Teach capabilities are refused like an unknown name.
+async function findHeldCapability(agentId, ref, { supabaseUrl, supabaseKey }) {
+  const get = async path => {
+    const res = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/rest/v1/${path}`, { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } });
+    if (!res.ok) throw new Error(`Supabase read failed: HTTP ${res.status}`);
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  };
+  const held = await get(`agent_capability_assignments?agent_id=eq.${encodeURIComponent(agentId)}&select=capability_slug`);
+  if (held.length === 0) return null;
+  const slugs = held.map(h => `"${h.capability_slug}"`).join(',');
+  const caps = await get(`capabilities?slug=in.(${encodeURIComponent(slugs)})&select=slug,name,default_intent_slug`);
+  const intentSlugs = [...new Set(caps.map(c => c.default_intent_slug).filter(Boolean))].map(s => `"${s}"`).join(',');
+  const intents = intentSlugs ? await get(`skill_profiles?slug=in.(${encodeURIComponent(intentSlugs)})&select=slug,traits`) : [];
+  const scoped = new Set(intents.filter(i => i.traits && i.traits.scope_capability === true).map(i => i.slug));
+  const want = String(ref ?? '').trim().toLowerCase();
+  return caps.find(c => scoped.has(c.default_intent_slug) && (c.slug.toLowerCase() === want || String(c.name).trim().toLowerCase() === want)) || null;
+}
 
 async function readAgent(id) {
   const url = process.env.SUPABASE_URL;
@@ -65,7 +98,37 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
   const origin_caller = handler_context?.caller_key_name || null;
   const title = input.title;
   let saved;
-  if (kind === 'taught') {
+  let extra = {};
+  if (kind === 'specialty' || kind === 'bio') {
+    const value = String(input.content ?? '').trim();
+    if (!value) throw new Error(`content required: the new ${kind}`);
+    if (value.length > IDENTITY_MAX[kind]) throw new Error(`${kind} is at most ${IDENTITY_MAX[kind]} characters`);
+    const deps = restDeps();
+    const cur = await readAgentIdentity(t, deps);
+    const next = await updateAgentIdentity(
+      { agentId: t, name: cur.name, role: cur.role, specialty: kind === 'specialty' ? value : cur.specialty, bio: kind === 'bio' ? value : cur.bio },
+      { ...deps, origin: 'mcp', originCaller: origin_caller });
+    saved = { id: t, created_at: next.agent?.identity_updated_at ?? null };
+  } else if (kind === 'capability') {
+    const name = String(title ?? '').trim();
+    if (!name) throw new Error('title required: the capability name');
+    const made = await addCapabilityToAgent({ agentId: t, fields: { name, ...(String(input.content ?? '').trim() ? { description: String(input.content).trim() } : {}) } }, { ...restDeps(), actor: { type: 'ai_client', id: origin_caller } });
+    saved = { id: made.capability.slug, created_at: made.capability.created_at ?? null };
+  } else if (kind === 'skill') {
+    const name = String(title ?? '').trim();
+    if (!name) throw new Error('title required: the skill name');
+    const type = input.skill_type || 'identity';
+    if (!SKILL_TYPES.includes(type)) throw new Error(`skill_type must be one of: ${SKILL_TYPES.join(', ')}`);
+    const deps = { ...restDeps(), actor: { type: 'ai_client', id: origin_caller } };
+    const cap = await findHeldCapability(t, input.capability, deps);
+    if (!cap) throw new Error('capability must name a capability this agent holds (its slug or name); add one first with kind capability');
+    const fields = { name, skill_type_slug: type };
+    if (String(input.content ?? '').trim()) fields.method = String(input.content).trim();
+    if (String(input.objective ?? '').trim()) fields.objective = String(input.objective).trim();
+    const made = await addSkillToCapability({ capabilitySlug: cap.slug, fields }, deps);
+    saved = { id: made.skill.slug, created_at: made.skill.created_at ?? null };
+    extra = { capability: cap.slug };
+  } else if (kind === 'taught') {
     saved = await embedAndUpsertEntry({
       title,
       content: input.content,
@@ -104,7 +167,11 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
   const name = agentRow.name || t;
   const undo = kind === 'taught'
     ? `Switch it off on ${name}'s Training tab on DeepBench.`
-    : `Delete it on ${name}'s ${TAB_FOR[kind]} tab on DeepBench.`;
+    : kind === 'specialty' || kind === 'bio'
+      ? `Change it on ${name}'s Profile page (Biography card) on DeepBench.`
+      : kind === 'capability' || kind === 'skill'
+        ? `Edit or remove it on ${name}'s Profile page (Capabilities card) on DeepBench.`
+        : `Delete it on ${name}'s ${TAB_FOR[kind]} tab on DeepBench.`;
 
   return {
     saved: {
@@ -114,6 +181,7 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
       origin: 'mcp',
       origin_caller,
       created_at: saved?.created_at ?? null,
+      ...extra,
     },
     undo,
     no_inference: true,

@@ -1,3 +1,4 @@
+// DeepBench v7.0.821 | tests/regression/agt-264-accepts-findings.test.mjs | AGT-304 slice 12 -- route pin follows decision ccab94da
 // DeepBench v7.0.692 | tests/regression/agt-264-accepts-findings.test.mjs | AGT-264 -- AGENT TRAINING
 // ACCEPTS FINDINGS WHILE IT EXECUTES.
 //
@@ -71,6 +72,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { LIVE_ROUTES } from "./_lib/finding-routes.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = path.join(ROOT, "scripts", "audit-review.js");
@@ -220,8 +222,8 @@ async function run() {
     assert.ok(r.ok, describe(r));
     const session = r.json.filter(x => x.source === "session");
     assert.equal(session.length, 1, `exactly one \`session\` route; got ${JSON.stringify(session)}`);
-    assert.deepEqual(session[0], { precedence: 30, source: "session", finding_type: "*", project_slug: null },
-      "the session row is precedence 30 / `*` / NULL -- the staff-watch shape, so the manager picks");
+    assert.deepEqual(session[0], LIVE_ROUTES.find(x => x.source === "session"),
+      "the session row matches its one home: precedence 30 / `*` / the manager's capture project (decision ccab94da)");
     assert.equal(r.json.filter(x => x.source === "*" && x.finding_type === "*").length, 0,
       "still no (*,*) catch-all -- an unmapped source must keep STOPPING the review");
     assert.equal(r.json[0].precedence, 10, "security still holds the lowest precedence");
