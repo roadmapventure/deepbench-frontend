@@ -12,6 +12,13 @@ assert.ok(screen.includes("Short items, about five pages or less, are always giv
 assert.ok(screen.includes("When you connect an AI tool, it gets every item you have added, in full."));
 assert.ok(screen.includes("Switch an item off at any time and your agent stops using it."));
 assert.ok(!screen.includes("Documents are stored in vector format"), "the old jargon is gone");
+// the little lesson: closed until clicked, and every statement in it is true of the code
+assert.ok(screen.includes("const [lessonOpen, setLessonOpen] = useState(false);") && screen.includes("A little lesson: how AI finds things"));
+assert.ok(screen.includes("turns its words into a long list of numbers") && screen.includes("finds the right topics by meaning, not just by matching words") && screen.includes("A connected AI tool skips the search and receives every item in full."));
+const writer = read("lib/knowledge-write.js"), rag = read("lib/rag.js");
+assert.ok(writer.includes("text-embedding-3-small") && writer.includes("embedding,"), "an item is embedded when it is saved");
+assert.ok(rag.includes("rpc/match_knowledge") && rag.includes("query_embedding"), "a question is embedded the same way and matched by similarity");
+assert.ok(!read("api/_lib/handlers/agent-bundle.js").includes("queryRAG"), "the AI-tool handover does no search");
 // "about five pages": the always-given limit is 12,000 characters (about 2,000 words)
 assert.equal(ALWAYS_MAX_CHARS, 12000);
 // "an AI tool gets every item in full": a 200,000-character item still arrives whole

@@ -1506,6 +1506,7 @@ const NOTE_ADD_HIDDEN = true;
 
 function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEntries, showToast, navigate }) {
   const canTypeNote = !NOTE_ADD_HIDDEN || IS_ADMIN_HOST;
+  const [lessonOpen, setLessonOpen] = useState(false); // the "little lesson" under How training works, closed until clicked
   const isMobile = useIsMobile(); // AGT-408 — the stats strip's buttons drop under the stats at phone width
   const [expandedIds, setExpandedIds] = useState({});
   const toggleEntry = (id) => setExpandedIds(p=>({...p,[id]:!p[id]}));
@@ -1775,7 +1776,16 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
           <div style={{marginBottom:4}}>Everything you add here is something your agent can use.</div>
           <div style={{marginBottom:4}}>Short items, about five pages or less, are always given to the agent in full. Longer ones are looked up when they match the question.</div>
           <div style={{marginBottom:4}}>When you connect an AI tool, it gets every item you have added, in full. So keep each item short, and split a long document into several.</div>
-          <div>Switch an item off at any time and your agent stops using it.</div>
+          <div style={{marginBottom:6}}>Switch an item off at any time and your agent stops using it.</div>
+          <button onClick={() => setLessonOpen(o => !o)} aria-expanded={lessonOpen} style={{background:"transparent",border:"none",padding:0,cursor:"pointer",fontFamily:body,fontSize:11.5,fontWeight:600,color:T.brassDeep}}>{lessonOpen ? "▾" : "▸"} A little lesson: how AI finds things</button>
+          {lessonOpen && (
+            <div style={{marginTop:6,paddingLeft:14,borderLeft:`2px solid ${T.lineSoft}`}}>
+              <div style={{marginBottom:4}}>When you save an item, DeepBench turns its words into a long list of numbers. This is called an <strong>embedding</strong>, or a <strong>vector</strong>. The numbers capture what the text means.</div>
+              <div style={{marginBottom:4}}>Items that mean similar things end up close together, like neighbours on a map. When your agent gets a question, DeepBench turns the question into numbers the same way and looks at the items nearby. It finds the right topics by meaning, not just by matching words.</div>
+              <div style={{marginBottom:4}}>That is why a question about "late payments" can find your item about "overdue invoices".</div>
+              <div>A connected AI tool skips the search and receives every item in full.</div>
+            </div>
+          )}
         </div>
       </div>
 
