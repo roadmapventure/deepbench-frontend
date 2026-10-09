@@ -1764,8 +1764,13 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
 
       {/* How it works */}
       <div style={{background:T.cardAlt,border:`1px dashed ${T.lineSoft}`,padding:"9px 13px"}}>
-        <div style={{fontFamily:mono,fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.3,fontWeight:600,marginBottom:3}}>How Background Knowledge Works · Layer 02</div>
-        <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,lineHeight:1.5}}>Documents are stored in vector format. Before each analysis, the system queries this library and injects the most relevant rules, statutes, and standards as Layer 02 of the prompt.</div>
+        <div style={{fontFamily:mono,fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.3,fontWeight:600,marginBottom:3}}>How training works</div>
+        <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,lineHeight:1.55}}>
+          <div style={{marginBottom:4}}>Everything you add here is something your agent can use.</div>
+          <div style={{marginBottom:4}}>Short items, about five pages or less, are always given to the agent in full. Longer ones are looked up when they match the question.</div>
+          <div style={{marginBottom:4}}>When you connect an AI tool, it gets every item you have added, in full. So keep each item short, and split a long document into several.</div>
+          <div>Switch an item off at any time and your agent stops using it.</div>
+        </div>
       </div>
 
       {/* Export + count header */}
