@@ -925,6 +925,9 @@ const CURRENT_VIEW_RETIRED = true;
 // FEATURE: sent-lens -- "Dim what stays in DeepBench": a per-browser switch on the Profile and Training tabs of a private
 // agent. Elements an AI client never receives carry data-sent="no"; with the switch on they fade so the sent fields stand
 // out. Off is the page as it was.
+// Hidden for now (John): the switch, the dimming and every data-sent="no" mark stay in the code, so setting this to false brings the
+// whole feature back. While hidden, a browser that had it switched on is not dimmed either.
+const SENT_LENS_HIDDEN = true;
 const SENT_LENS_KEY = "deepbench-sent-lens";
 const SENT_LENS_CSS = '.sent-lens [data-sent="no"]{opacity:.38;transition:opacity .15s}';
 function SentLensToggle({ on, onChange }) {
@@ -2461,9 +2464,9 @@ export default function PersonnelScreen() {
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
             {/* AGT-406 — Proposed, desktop: every tab's content takes at most half the browser width, left-aligned */}
-            <div className={sentLens && isPrivateAgent(agent) ? "sent-lens" : undefined} style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
+            <div className={!SENT_LENS_HIDDEN && sentLens && isPrivateAgent(agent) ? "sent-lens" : undefined} style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
             <style>{SENT_LENS_CSS}</style>
-            {(activeTab === "profile" || activeTab === "training") && isPrivateAgent(agent) && <SentLensToggle on={sentLens} onChange={setSentLens}/>}
+            {!SENT_LENS_HIDDEN && (activeTab === "profile" || activeTab === "training") && isPrivateAgent(agent) && <SentLensToggle on={sentLens} onChange={setSentLens}/>}
             {/* FEATURE: PE-08 */}
             {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onCapabilityAdded={addCapabilityTo} onCapabilityDeleted={removeCapabilityFrom} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
