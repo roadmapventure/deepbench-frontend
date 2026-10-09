@@ -181,9 +181,11 @@ function delFake(intentTraits) {
   assert.ok(scr.includes("No Skills yet. Add one to tell this capability what to do."));
   assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilityDrawer count="), 1);
   // the card explains itself: capability, Skills, and why to fill them in
-  assert.ok(sk.includes("export function CapabilitiesGuide") && sk.includes("How your agent gets good at things") && sk.includes("Skills</strong> are what make it good at that"));
-  assert.ok(sk.includes("useState(skillCount === 0)"), "open while the agent has no Skills, closed once it has some");
-  assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilitiesGuide canAdd={isPrivateAgent(agent)}"), 1);
+  assert.ok(sk.includes("export function CapabilitiesGuide") && sk.includes("Skills</strong> are what make it good at that"));
+  assert.ok(sk.includes("export function CapabilitiesGuide({ canAdd }) {\n  const [open, setOpen] = useState(false);"), "the guide is closed by default");
+  assert.ok(sk.includes("… more") && sk.includes(">less</button>"), "plain text with a '… more' link that opens it and a 'less' link that closes it");
+  assert.ok(!sk.includes("Start with one or two sentences") && !sk.includes("Press Connect to AI and try it"), "the removed steps are gone");
+  assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilitiesGuide canAdd={isPrivateAgent(agent)} />"), 1);
 }
 
 console.log("ok add-capability");

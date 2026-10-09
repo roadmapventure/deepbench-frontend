@@ -988,7 +988,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           <Corners />
           <FeatureBadge id="SK-06" />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 10 }}>Capabilities</div>
-          {proposed && <CapabilitiesGuide canAdd={isPrivateAgent(agent)} skillCount={capabilities.reduce((n, c) => n + c.skillProfiles.length, 0)} />}
+          {proposed && <CapabilitiesGuide canAdd={isPrivateAgent(agent)} />}
           {capabilities.filter(c => !isConnectionCapability(c)).length === 0 ? (
             <div style={{ border: `1px dashed ${T.lineSoft}`, padding: "16px 12px", textAlign: "center" }}>
               <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>{proposed && isPrivateAgent(agent) ? "No capabilities yet. Add one, then add Skills inside it." : "No capabilities assigned."}</div>

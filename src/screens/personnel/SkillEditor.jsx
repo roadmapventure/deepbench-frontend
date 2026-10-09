@@ -393,30 +393,30 @@ export function CapabilityDrawer({ count, children, defaultOpen = false }) {
 }
 
 // FEATURE: capabilities-guide -- plain-language purpose of the card, in DeepBench's own vocabulary (ARCHITECTURE.md §2: a Skill is the
-// atomic unit; a Capability is a grouped set of Skills; an agent with no Skills still works, only generically). Open while the agent
-// has no Skills (the moment someone needs it), a one-line "How this works" otherwise.
-export function CapabilitiesGuide({ canAdd, skillCount }) {
-  const [open, setOpen] = useState(skillCount === 0);
+// atomic unit; a Capability is a grouped set of Skills; an agent with no Skills still works, only generically). Plain text, not a card:
+// closed it is one line ending in "… more"; click it to read the rest, click "less" to close it again.
+export function CapabilitiesGuide({ canAdd }) {
+  const [open, setOpen] = useState(false);
+  const text = { margin: "0 0 8px", fontFamily: body, fontSize: 12, lineHeight: 1.55, color: T.mutedDeep };
+  const link = { background: "transparent", border: "none", padding: 0, cursor: "pointer", fontFamily: body, fontSize: 12, fontWeight: 600, color: T.brassDeep };
   return (
-    <div style={{ marginBottom: 12, background: T.cardAlt, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.brass}` }}>
-      <button onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", fontFamily: body, fontSize: 12.5, fontWeight: 600, color: T.navy }}>
-        <span aria-hidden="true" style={{ fontFamily: mono, fontSize: 10, color: T.brassDeep }}>{open ? "▾" : "▸"}</span>
-        How your agent gets good at things
-      </button>
+    <div style={{ marginBottom: 12 }}>
+      <p style={text}>
+        A <strong>capability</strong> is something you want your agent to be able to do, like reviewing bids or drafting vendor notes.
+        {!open && <> <button onClick={() => setOpen(true)} aria-expanded={false} style={link}>… more</button></>}
+      </p>
       {open && (
-        <div style={{ padding: "0 12px 12px 30px", fontFamily: body, fontSize: 12, lineHeight: 1.55, color: T.mutedDeep }}>
-          <p style={{ margin: "0 0 8px" }}>A <strong>capability</strong> is something you want your agent to be able to do, like reviewing bids or drafting vendor notes.</p>
-          <p style={{ margin: "0 0 8px" }}><strong>Skills</strong> are what make it good at that. Each Skill teaches the agent one thing: who it is, how it thinks, what it knows, what to do, how to lay out an answer, or what it must never do. Put the Skills together and you have the capability.</p>
-          <p style={{ margin: "0 0 8px" }}>The more Skills you give a capability, the better your agent gets at it. An agent with no Skills still works, but only in a general way. Your Skills are what make it yours.</p>
+        <>
+          <p style={text}><strong>Skills</strong> are what make it good at that. Each Skill teaches the agent one thing: who it is, how it thinks, what it knows, what to do, how to lay out an answer, or what it must never do. Put the Skills together and you have the capability.</p>
+          <p style={text}>The more Skills you give a capability, the better your agent gets at it. An agent with no Skills still works, but only in a general way. Your Skills are what make it yours.</p>
           {canAdd && (
-            <ol style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+            <ol style={{ ...text, paddingLeft: 18 }}>
               <li>Add a capability and give it a name.</li>
-              <li>Open it and add a Skill. Start with one or two sentences.</li>
-              <li>Press Connect to AI and try it in your AI tool.</li>
+              <li>Open it and add a Skill.</li>
             </ol>
           )}
-          <p style={{ margin: 0, color: T.moss, fontWeight: 600 }}>You don't need to get it perfect. Add a little now and improve it as you go.</p>
-        </div>
+          <p style={{ ...text, color: T.moss, fontWeight: 600 }}>You don't need to get it perfect. Add a little now and improve it as you go. <button onClick={() => setOpen(false)} aria-expanded={true} style={link}>less</button></p>
+        </>
       )}
     </div>
   );
