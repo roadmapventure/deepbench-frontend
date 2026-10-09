@@ -41,7 +41,7 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
-import { SkillEditorRow, CapabilityHeader, AddSkillForm, AddCapabilityForm, CapabilityDrawer, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
+import { SkillEditorRow, CapabilityHeader, AddSkillForm, AddCapabilityForm, CapabilityDrawer, CapabilitiesGuide, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
 import { TeamHeading, SkillLevelBar, ConnectionStatus, isConnectionCapability } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
@@ -988,6 +988,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           <Corners />
           <FeatureBadge id="SK-06" />
           <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 10 }}>Capabilities</div>
+          {proposed && <CapabilitiesGuide canAdd={isPrivateAgent(agent)} skillCount={capabilities.reduce((n, c) => n + c.skillProfiles.length, 0)} />}
           {capabilities.filter(c => !isConnectionCapability(c)).length === 0 ? (
             <div style={{ border: `1px dashed ${T.lineSoft}`, padding: "16px 12px", textAlign: "center" }}>
               <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>{proposed && isPrivateAgent(agent) ? "No capabilities yet. Add one, then add Skills inside it." : "No capabilities assigned."}</div>

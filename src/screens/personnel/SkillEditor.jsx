@@ -32,9 +32,7 @@ const TEXT_FIELDS = [
   ["output_desc", "Output description", "area", 3], ["notes", "Notes", "area", 2],
 ];
 const JSON_FIELDS = [["traits", "Traits (JSON)"], ["guardrails", "Guardrails (JSON)"]];
-// Skill text fields an AI client never receives (the "Dim what stays in DeepBench" switch). None: every text field is sent now
-// (agent-bundle.js SKILL_FIELDS). Only the model settings, and the read-only key source, stay on DeepBench; both are marked directly.
-const UNSENT_FIELDS = [];
+// Model settings are not shown or edited on Personnel; toForm() still carries the saved values so a Skill save sends them back unchanged.
 const MODEL_FIELDS = [["llm_model", "Model"], ["llm_provider", "Provider"]];
 
 const show = (v) => (v === null || v === undefined ? "" : String(v));
@@ -98,27 +96,10 @@ export async function deleteCapability(capabilityId) {
   await post({ action: "delete_capability", capability_id: capabilityId });
 }
 
-// FEATURE: author-tags -- "Created: AI client · Oct 8, 2026, 3:12 PM" and, once someone edits it later, "Last edited: ...".
-// The id behind the tag (an AI client's key name, a routine's id) is stored and not shown. A row from before tags shows nothing.
-const WHO = { owner: "Owner", routine: "Routine", end_user: "End user", ai_client: "AI client" };
-const when = iso => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
-export function authorLines(row) {
-  if (!row || !row.created_by_type) return [];
-  const lines = [`Created: ${WHO[row.created_by_type] || row.created_by_type} · ${when(row.created_at)}`];
-  const edited = row.updated_by_type && row.updated_at && new Date(row.updated_at) - new Date(row.created_at) > 5000;
-  if (edited) lines.push(`Last edited: ${WHO[row.updated_by_type] || row.updated_by_type} · ${when(row.updated_at)}`);
-  return lines;
-}
-function AuthorTag({ row }) {
-  const lines = authorLines(row);
-  if (lines.length === 0) return null;
-  return <div style={{ marginTop: 2 }}>{lines.map(l => <div key={l} style={{ fontFamily: mono, fontSize: 8.5, color: T.muted }}>{l}</div>)}</div>;
-}
-
 // One read-only line of a Skill; an empty field says so, so a missing field is visible, not hidden.
-function Line({ label, children, unsent }) {
+function Line({ label, children }) {
   return (
-    <div data-sent={unsent ? "no" : undefined} style={{ display: "flex", gap: 10, padding: "2px 0", fontSize: 10.5, lineHeight: 1.45 }}>
+    <div style={{ display: "flex", gap: 10, padding: "2px 0", fontSize: 10.5, lineHeight: 1.45 }}>
       <span style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, textTransform: "uppercase", letterSpacing: .8, minWidth: 82, flexShrink: 0, paddingTop: 1 }}>{label}</span>
       <span style={{ fontFamily: body, color: T.mutedDeep, flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{children}</span>
     </div>
@@ -187,15 +168,12 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
           <Line label="Notes">{sp.notes || <Empty />}</Line>
           <Line label="Guardrails">{jsonLine(sp.guardrails)}</Line>
           <Line label="Traits">{jsonLine(sp.traits)}</Line>
-          <Line unsent label="Model">{[sp.llm_model, sp.llm_provider, sp.temperature !== null && sp.temperature !== undefined ? `temp ${sp.temperature}` : null, sp.max_tokens ? `${sp.max_tokens} tokens` : null].filter(Boolean).join(" · ") || <Empty />}</Line>
-          <Line unsent label="Key source">{sp.api_key_source || <Empty />}</Line>
         </div>
       )}
-      {!open && <AuthorTag row={sp} />}
       {open && (
         <div style={{ padding: "6px 0 10px" }}>
           <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginBottom: 8 }}>
-            {sp.slug} · execution {sp.execution_type || "—"} · key source {sp.api_key_source || "—"} (read-only)
+            {sp.slug} · execution {sp.execution_type || "—"} (read-only)
           </div>
           <div style={LABEL}>Type</div>
           <select value={form.skill_type_slug} onChange={e => set("skill_type_slug", e.target.value)} style={INPUT}>
@@ -205,7 +183,7 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
             <div style={{ fontFamily: body, fontSize: 10, color: T.brassDeep, fontStyle: "italic", margin: "-4px 0 8px" }}>Changing the type moves this Skill everywhere it is used.</div>
           )}
           {TEXT_FIELDS.map(([k, label, kind, rows]) => (
-            <div key={k} data-sent={UNSENT_FIELDS.includes(k) ? "no" : undefined}>
+            <div key={k}>
               <div style={LABEL}>{label}</div>
               {kind === "line"
                 ? <input value={form[k]} onChange={e => set(k, e.target.value)} style={INPUT} />
@@ -218,22 +196,6 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
               <textarea value={form[k]} onChange={e => set(k, e.target.value)} rows={5} style={{ ...INPUT, resize: "vertical", fontFamily: mono, fontSize: 11 }} />
             </div>
           ))}
-          <div data-sent="no" style={{ display: "flex", gap: 8 }}>
-            {MODEL_FIELDS.map(([k, label]) => (
-              <div key={k} style={{ flex: 2 }}>
-                <div style={LABEL}>{label}</div>
-                <input value={form[k]} onChange={e => set(k, e.target.value)} style={INPUT} />
-              </div>
-            ))}
-            <div style={{ flex: 1 }}>
-              <div style={LABEL}>Temperature</div>
-              <input type="number" min="0" max="2" step="0.1" value={form.temperature} onChange={e => set("temperature", e.target.value)} style={INPUT} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={LABEL}>Max tokens</div>
-              <input type="number" min="1" max="200000" step="1" value={form.max_tokens} onChange={e => set("max_tokens", e.target.value)} style={INPUT} />
-            </div>
-          </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 4 }}>
             <button onClick={cancel} style={GHOST}>Cancel</button>
             <button onClick={handleSave} disabled={saving} style={SAVE}>{saving ? "Saving…" : "Save"}</button>
@@ -335,7 +297,6 @@ export function CapabilityHeader({ cap, showToast, onSaved, onDeleted }) {
         </div>
       )}
       {!open && cap.description && <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{cap.description}</div>}
-      {!open && <AuthorTag row={cap} />}
       {open && (
         <div style={{ paddingTop: 6 }}>
           <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginBottom: 8 }}>{cap.slug} (read-only — this is the AI client's tool name)</div>
@@ -404,6 +365,36 @@ export function CapabilityDrawer({ count, children }) {
       </button>
       {/* Skills are children of the capability: indented under it, with a guide line down the left edge */}
       {open && <div style={{ marginLeft: 6, paddingLeft: 14, borderLeft: `2px solid ${T.line}` }}>{children}</div>}
+    </div>
+  );
+}
+
+// FEATURE: capabilities-guide -- plain-language purpose of the card, in DeepBench's own vocabulary (ARCHITECTURE.md §2: a Skill is the
+// atomic unit; a Capability is a grouped set of Skills; an agent with no Skills still works, only generically). Open while the agent
+// has no Skills (the moment someone needs it), a one-line "How this works" otherwise.
+export function CapabilitiesGuide({ canAdd, skillCount }) {
+  const [open, setOpen] = useState(skillCount === 0);
+  return (
+    <div style={{ marginBottom: 12, background: T.cardAlt, border: `1px solid ${T.lineSoft}`, borderLeft: `3px solid ${T.brass}` }}>
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", fontFamily: body, fontSize: 12.5, fontWeight: 600, color: T.navy }}>
+        <span aria-hidden="true" style={{ fontFamily: mono, fontSize: 10, color: T.brassDeep }}>{open ? "▾" : "▸"}</span>
+        How your agent gets good at things
+      </button>
+      {open && (
+        <div style={{ padding: "0 12px 12px 30px", fontFamily: body, fontSize: 12, lineHeight: 1.55, color: T.mutedDeep }}>
+          <p style={{ margin: "0 0 8px" }}>A <strong>capability</strong> is something you want your agent to be able to do, like reviewing bids or drafting vendor notes.</p>
+          <p style={{ margin: "0 0 8px" }}><strong>Skills</strong> are what make it good at that. Each Skill teaches the agent one thing: who it is, how it thinks, what it knows, what to do, how to lay out an answer, or what it must never do. Put the Skills together and you have the capability.</p>
+          <p style={{ margin: "0 0 8px" }}>The more Skills you give a capability, the better your agent gets at it. An agent with no Skills still works, but only in a general way. Your Skills are what make it yours.</p>
+          {canAdd && (
+            <ol style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+              <li>Add a capability and give it a name.</li>
+              <li>Open it and add a Skill. Start with one or two sentences.</li>
+              <li>Press Connect to AI and try it in your AI tool.</li>
+            </ol>
+          )}
+          <p style={{ margin: 0, color: T.moss, fontWeight: 600 }}>You don't need to get it perfect. Add a little now and improve it as you go.</p>
+        </div>
+      )}
     </div>
   );
 }

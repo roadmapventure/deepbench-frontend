@@ -162,19 +162,21 @@ function delFake(intentTraits) {
   assert.deepEqual(scoped.map(c => c.slug), ["zoe-x-abc123"], "a scoped call lists that one capability");
 }
 
-// ── the page: tag lines show the type and the time, never the id ─────────────────────────────────────────────────
+// ── the page ────────────────────────────────────────────────────────────────────────────────────────────────────
 {
   const sk = read("src/screens/personnel/SkillEditor.jsx");
-  assert.ok(sk.includes("Created: ") && sk.includes("Last edited: "));
-  const tag = sk.slice(sk.indexOf("export function authorLines"), sk.indexOf("function AuthorTag"));
-  assert.ok(!tag.includes("created_by_id") && !tag.includes("updated_by_id"), "the stored id is not rendered");
+  // author tags are recorded in the database only: the page never prints them
+  assert.ok(!sk.includes("Created: ") && !sk.includes("Last edited: ") && !sk.includes("AuthorTag"), "no created / last edited line on the page");
+  // model and key source are not shown on a Skill (read view or form); the saved values still ride along in toForm()
+  assert.ok(!sk.includes('label="Model"') && !sk.includes('label="Key source"') && !sk.includes("key source") && !sk.includes("Temperature") && !sk.includes("Max tokens"), "no model or key source on a Skill");
+  assert.ok(sk.includes("for (const [k] of MODEL_FIELDS) f[k] = show(sp[k]);"), "a Skill save sends the stored model settings back unchanged");
   assert.ok(sk.includes('"delete_capability"') && sk.includes("Its Skills are kept"));
-  // the "Dim what stays in DeepBench" switch matches what is sent: only the model settings and the key source are dimmed
-  assert.deepEqual([...sk.matchAll(/<Line unsent label="([^"]+)"/g)].map(m => m[1]), ["Model", "Key source"]);
-  assert.ok(sk.includes("const UNSENT_FIELDS = [];"));
-  // each capability has a Skills drawer, closed until opened
   assert.ok(sk.includes("export function CapabilityDrawer") && sk.includes("useState(false)") && sk.includes("borderLeft: `2px solid ${T.line}`") && sk.includes("paddingLeft: 14"), "the drawer indents its Skills under the capability");
   assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilityDrawer count="), 1);
+  // the card explains itself: capability, Skills, and why to fill them in
+  assert.ok(sk.includes("export function CapabilitiesGuide") && sk.includes("How your agent gets good at things") && sk.includes("Skills</strong> are what make it good at that"));
+  assert.ok(sk.includes("useState(skillCount === 0)"), "open while the agent has no Skills, closed once it has some");
+  assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilitiesGuide canAdd={isPrivateAgent(agent)}"), 1);
 }
 
 console.log("ok add-capability");
