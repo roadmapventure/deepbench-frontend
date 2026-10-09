@@ -101,7 +101,7 @@ export async function saveIdentityFields(agent, fields) {
   const cur = await fetch(`/api/agent-configs?tenant_id=${TENANT_ID}&agent_id=${agent.id}&identity=1`)
     .then(res => { if (!res.ok) throw new Error("Failed to load identity"); return res.json(); })
     .then(data => data.identity);
-  const res = await fetch("/api/agent-configs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_identity", tenant_id: TENANT_ID, agent_id: agent.id, name: cur.name, role: cur.role, specialty: cur.specialty, bio: cur.bio, ...fields }) });
+  const res = await fetch("/api/agent-configs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_identity", tenant_id: TENANT_ID, agent_id: agent.id, name: cur.name, role: cur.role, specialty: cur.specialty, bio: cur.bio, quip: cur.quip ?? null, ...fields }) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Failed to save");
   return data.agent;

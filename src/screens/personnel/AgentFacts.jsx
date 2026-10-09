@@ -130,3 +130,27 @@ export function ConnectionStatus({ agentId, align = "right" }) {
     </div>
   );
 }
+
+// FEATURE: profile-guide -- friendly, resume-shaped instructions under the badge card, open until the person closes it (their choice is
+// remembered in this browser; a private window just shows it open again). Plain text, not a card.
+const PROFILE_GUIDE_KEY = "deepbench-profile-guide-closed";
+export function ProfileGuide() {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(PROFILE_GUIDE_KEY) !== "1"; } catch { return true; } });
+  const set = (v) => { setOpen(v); try { localStorage.setItem(PROFILE_GUIDE_KEY, v ? "0" : "1"); } catch { /* private window */ } };
+  const text = { margin: "0 0 6px", fontFamily: body, fontSize: 12, lineHeight: 1.55, color: T.mutedDeep };
+  const link = { background: "transparent", border: "none", padding: 0, cursor: "pointer", fontFamily: body, fontSize: 12, fontWeight: 600, color: T.brassDeep };
+  if (!open) return <div style={{ margin: "2px 0" }}><button onClick={() => set(true)} aria-expanded={false} style={link}>▸ Show the fill-it-out tips</button></div>;
+  return (
+    <div style={{ margin: "2px 0 4px" }}>
+      <p style={{ ...text, fontWeight: 700, color: T.navy, fontSize: 13 }}>Fill this out like your own resume</p>
+      <p style={text}>Think of your agent as a new hire and this page as their resume. Imagine it's you, and fill it out as if the agent <em>is</em> you. You can't get it wrong, and you can change anything, any time.</p>
+      <ul style={{ ...text, paddingLeft: 18, margin: "0 0 6px" }}>
+        <li><strong>Name, role and quote:</strong> who they are, the title on their door, and their motto.</li>
+        <li><strong>Biography:</strong> the short pitch. What would you say about them in an elevator?</li>
+        <li><strong>Capabilities:</strong> the jobs they can do. Each one is a role your agent plays and the business value it brings, like "Reviews vendor bids" or "Answers customer questions".</li>
+        <li><strong>Skills:</strong> what they know to make each job happen. How they think, what they have learned, the rules they follow. It's the experience section of the resume.</li>
+      </ul>
+      <p style={{ ...text, color: T.moss, fontWeight: 600 }}>Start small: one job and two or three skills make a great first draft. <button onClick={() => set(false)} aria-expanded={true} style={link}>Hide tips</button></p>
+    </div>
+  );
+}

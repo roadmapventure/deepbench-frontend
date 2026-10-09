@@ -42,7 +42,7 @@ import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, J
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
 import { SkillEditorRow, CapabilityHeader, AddSkillForm, AddCapabilityForm, CapabilityDrawer, CapabilitiesGuide, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
-import { TeamHeading, SkillLevelBar, ConnectionStatus, isConnectionCapability } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
+import { TeamHeading, SkillLevelBar, ProfileGuide, ConnectionStatus, isConnectionCapability } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -893,7 +893,7 @@ function StatBadges({ agent, readiness, isMobile }) {
 
 // AGT-404 — a line of text that looks as it always did and edits in place on click; it saves on blur or
 // Enter (Escape cancels), through the same single identity save as the Biography card
-function InlineText({ value, field, agent, onSaved, showToast, style }) {
+function InlineText({ value, field, agent, onSaved, showToast, style, quote = false, placeholder = "" }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(value);
   const [saving, setSaving]   = useState(false);
@@ -912,7 +912,7 @@ function InlineText({ value, field, agent, onSaved, showToast, style }) {
       onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") { cancelled.current = true; e.currentTarget.blur(); } }}
       style={{ ...style, width:"100%", boxSizing:"border-box", textAlign:"center", background:T.cardAlt, border:`1px solid ${T.lineSoft}`, outline:"none", padding:"2px 6px" }}/>
   );
-  return <div onClick={() => { setDraft(value); setEditing(true); }} title="Click to edit" style={{ ...style, cursor:"text", opacity: saving ? .6 : 1 }}>{value}</div>;
+  return <div onClick={() => { setDraft(value); setEditing(true); }} title="Click to edit" style={{ ...style, cursor:"text", opacity: saving ? .6 : 1 }}>{value ? (quote ? `"${value}"` : value) : <span style={{ opacity:.6 }}>{placeholder}</span>}</div>;
 }
 
 // AGT-412 — a quip is stored with its own quote marks for the built-in agents and without for a created one;
@@ -977,7 +977,13 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
           </div>
           
           <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
-          {agent.quip && (
+          {/* Proposed: the quote edits in place like the name and role; an empty one shows a prompt */}
+          {proposed && (
+            <div data-sent="no" style={{background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
+              <InlineText value={plainQuip(agent.quip || "")} field="quip" quote placeholder="Add a quote" agent={agent} onSaved={onIdentitySaved} showToast={showToast} style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep}}/>
+            </div>
+          )}
+          {!proposed && agent.quip && (
           <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
             "{plainQuip(agent.quip)}"
           </div>
@@ -1044,6 +1050,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
   if (proposed) return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {idBadge}
+      <ProfileGuide/>
       <IdentityEditor agent={agent} onSaved={onIdentitySaved} showToast={showToast}/>
       {capsCard}
       <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} part="prompts"/>
@@ -2419,7 +2426,12 @@ export default function PersonnelScreen() {
                   {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
                 </div>
                 )}
-                {agent.quip && (
+                {proposed && (
+                <div data-sent="no" style={{background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
+                  <InlineText value={plainQuip(agent.quip || "")} field="quip" quote placeholder="Add a quote" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep}}/>
+                </div>
+                )}
+                {!proposed && agent.quip && (
                 <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
                   "{plainQuip(agent.quip)}"
                 </div>

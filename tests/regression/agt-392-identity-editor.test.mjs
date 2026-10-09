@@ -31,7 +31,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 const count = (hay, needle) => hay.split(needle).length - 1;
 
-const COLS = "id,name,role,specialty,bio,code,identity_origin,identity_origin_caller,identity_updated_at";
+const COLS = "id,name,role,specialty,bio,quip,code,identity_origin,identity_origin_caller,identity_updated_at";
 const LIVE_ID = "testjohn-w50rvr";
 const LIVE_NAME = "testjohn agt392";
 
