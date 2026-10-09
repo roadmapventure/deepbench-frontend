@@ -32,8 +32,9 @@ const TEXT_FIELDS = [
   ["output_desc", "Output description", "area", 3], ["notes", "Notes", "area", 2],
 ];
 const JSON_FIELDS = [["traits", "Traits (JSON)"], ["guardrails", "Guardrails (JSON)"]];
-// Fields an AI client never receives (the "Dim what stays in DeepBench" switch); the model settings row is marked in the form directly.
-const UNSENT_FIELDS = ["name", "description", "tone", "confidence", "output_desc", "notes"];
+// Skill text fields an AI client never receives (the "Dim what stays in DeepBench" switch). None: every text field is sent now
+// (agent-bundle.js SKILL_FIELDS). Only the model settings, and the read-only key source, stay on DeepBench; both are marked directly.
+const UNSENT_FIELDS = [];
 const MODEL_FIELDS = [["llm_model", "Model"], ["llm_provider", "Provider"]];
 
 const show = (v) => (v === null || v === undefined ? "" : String(v));
@@ -162,7 +163,7 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
   return (
     <div style={{ borderBottom: `1px solid ${T.lineSoft}`, padding: "4px 0 6px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
-        <div data-sent="no" style={{ fontFamily: body, fontSize: 11.5, fontWeight: 600, color: T.navy, flex: 1 }}>{sp.name}</div>
+        <div style={{ fontFamily: body, fontSize: 11.5, fontWeight: 600, color: T.navy, flex: 1 }}>{sp.name}</div>
         <span style={{ fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", padding: "1px 5px", background: chip.bg, color: chip.color, border: `1px solid ${chip.border}`, flexShrink: 0 }}>{chip.label}</span>
         <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, color: T.brassDeep, background: "rgba(182,135,58,.1)", border: "1px solid rgba(182,135,58,.25)", padding: "1px 5px", flexShrink: 0 }}>L{sp.level}</span>
         <button onClick={() => (open ? cancel() : setOpen(true))} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, flexShrink: 0 }}>{open ? "Close" : "Edit"}</button>
@@ -177,13 +178,13 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
       )}
       {!open && (
         <div style={{ paddingBottom: 2 }}>
-          <Line unsent label="Description">{sp.description || <Empty />}</Line>
+          <Line label="Description">{sp.description || <Empty />}</Line>
           <Line label="Objective">{sp.objective || <Empty />}</Line>
           <Line label="Method">{sp.method || <Empty />}</Line>
-          <Line unsent label="Tone">{sp.tone || <Empty />}</Line>
-          <Line unsent label="Confidence">{sp.confidence || <Empty />}</Line>
-          <Line unsent label="Output">{sp.output_desc || <Empty />}</Line>
-          <Line unsent label="Notes">{sp.notes || <Empty />}</Line>
+          <Line label="Tone">{sp.tone || <Empty />}</Line>
+          <Line label="Confidence">{sp.confidence || <Empty />}</Line>
+          <Line label="Output">{sp.output_desc || <Empty />}</Line>
+          <Line label="Notes">{sp.notes || <Empty />}</Line>
           <Line label="Guardrails">{jsonLine(sp.guardrails)}</Line>
           <Line label="Traits">{jsonLine(sp.traits)}</Line>
           <Line unsent label="Model">{[sp.llm_model, sp.llm_provider, sp.temperature !== null && sp.temperature !== undefined ? `temp ${sp.temperature}` : null, sp.max_tokens ? `${sp.max_tokens} tokens` : null].filter(Boolean).join(" · ") || <Empty />}</Line>

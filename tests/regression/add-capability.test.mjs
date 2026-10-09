@@ -169,6 +169,9 @@ function delFake(intentTraits) {
   const tag = sk.slice(sk.indexOf("export function authorLines"), sk.indexOf("function AuthorTag"));
   assert.ok(!tag.includes("created_by_id") && !tag.includes("updated_by_id"), "the stored id is not rendered");
   assert.ok(sk.includes('"delete_capability"') && sk.includes("Its Skills are kept"));
+  // the "Dim what stays in DeepBench" switch matches what is sent: only the model settings and the key source are dimmed
+  assert.deepEqual([...sk.matchAll(/<Line unsent label="([^"]+)"/g)].map(m => m[1]), ["Model", "Key source"]);
+  assert.ok(sk.includes("const UNSENT_FIELDS = [];"));
 }
 
 console.log("ok add-capability");
