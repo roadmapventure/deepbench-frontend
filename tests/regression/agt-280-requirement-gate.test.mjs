@@ -1,3 +1,4 @@
+// DeepBench v7.0.826 | tests/regression/agt-280-requirement-gate.test.mjs | AGT-433 slice 1 -- need_score 0 = PARKED: CHECK and writer 0-5.
 // DeepBench v7.0.729 | tests/regression/agt-280-requirement-gate.test.mjs | AGT-280 slice 1 --
 // THE REQUIREMENT GATE: a ticket reaches an EXECUTING project's list only when it cites a need
 // source that names a row that actually exists.
@@ -13,7 +14,7 @@
 // the `discovered` 14 are the AGT-141 class this gate stops.
 //
 // THE CHANGE. Migration `agt280_requirement_gate` (down captured FIRST over the three created
-// functions) adds `backlog_items.need_source text` + `need_score smallint` (CHECK 1-5) and
+// functions) adds `backlog_items.need_source text` + `need_score smallint` (CHECK 0-5, AGT-433) and
 // `runner_settings.need_source_kinds text[]`, seeded on id = 1 with the FIVE `who:table` pairs
 // John's words, Nathan's market records and Jerry's shared needs live in. A `need_source` is the
 // text `who:table:id`. `need_source_is_traceable()` parses it, refuses anything whose `who:table`
@@ -28,7 +29,7 @@
 // `requirement-check` capability, which ships in slice 2 WITH its caller.
 //
 // ARMS.
-//   A  THE DISCRIMINATOR, live over PostgREST: the trigger itself, six cases, on a canonical
+//   A  THE DISCRIMINATOR, live over PostgREST: the trigger itself, ten cases, on a canonical
 //      deterministic pick (pattern:127) of an epic whose project is `executing` and whose lock
 //      `epic_lock_guard()` already lets a `discovered` row through -- so what fires here is
 //      AGT-280's gate and never AGT-240's lock. Pre-change case (i) SUCCEEDS; that success IS the
@@ -39,7 +40,7 @@
 //      Its WRITE halves are declared notRun and were measured at the ship -- see the notRun text.
 //   C  §6.1 live: the two columns read back 200, and the seeded array holds exactly 5 entries.
 //
-// RESIDUE. Arm A's three REFUSED cases write nothing by construction. Its three ACCEPTED cases
+// RESIDUE. Arm A's six REFUSED cases write nothing by construction. Its four ACCEPTED cases
 // insert one fixture row and DELETE it immediately, and the arm re-reads `backlog_items`' exact
 // count at the end and asserts it is unmoved -- the AGT-264 arm E pattern. Every fixture row
 // carries an explicit `epic_id` (so `backlog_home_intake()` returns early and no `Intake — ZAGT`
@@ -207,10 +208,30 @@ async function run() {
           assert.equal(row.epic_id, epicId, `${why}: the row must land on the epic it named`);
           assert.equal(row.need_source, extra.need_source ?? null,
             `${why}: the row must carry the need_source it was given`);
+          assert.equal(row.need_score, extra.need_score ?? null,
+            `${why}: the row must read back the need_score it was given -- 0 is a score, not an absence`);
         } finally {
           const del = await req(url, key, `backlog_items?backlog_id=eq.${FIXTURE_PREFIX}-${n}`, { method: "DELETE" });
           assert.ok(del.ok, `${why}: the fixture row must be deleted again; got ${describe(del)}`);
         }
+      };
+
+      // refusedScore(n, s): AGT-433's band, from the TABLE's side. The source is traceable and
+      // `discovered` is legal here, so the only thing left to refuse the row is the score itself:
+      // 6 and -1 trip `ck_backlog_need_score` (23514), and 2.5 never reaches a constraint at all --
+      // PostgREST casts the body first and `'2.5'::smallint` is 22P02, which is why the whole-number
+      // case asserts "not accepted" rather than a constraint name it cannot produce.
+      const refusedScore = async (n, s) => {
+        const why = `(AGT-433) need_score ${s} must not land on a ticket`;
+        const r = await req(url, key, "backlog_items", { method: "POST", body: ticket(n, EPIC, { need_source: GOOD, need_score: s }) });
+        if (r.ok) {
+          await req(url, key, `backlog_items?backlog_id=eq.${FIXTURE_PREFIX}-${n}`, { method: "DELETE" });
+          assert.fail(`${why}: the insert SUCCEEDED -- the CHECK took a score outside 0-5`);
+        }
+        assert.ok(s === 2.5 || r.text.includes("ck_backlog_need_score"),
+          `${why}: it must be ck_backlog_need_score that refused it (not another guard); got ${describe(r)}`);
+        const left = await req(url, key, `backlog_items?select=id&backlog_id=eq.${FIXTURE_PREFIX}-${n}`);
+        assert.deepEqual(left.json, [], `${why}: a refused insert must leave no row`);
       };
 
       // (i) THE GAP ITSELF. No source at all, `discovered`, into an executing project's epic.
@@ -239,8 +260,16 @@ async function run() {
       await accepted(6, INTAKE_EPIC, {},
         "(vi) the same source-less discovered row into the backlog-intake epic");
 
+      // (vii) AGT-433's DISCRIMINATOR. A ticket John has judged valid but EARLY is a 0, and 0 is a
+      //       score the table has to keep -- on the unchanged tree this case is 23514
+      //       `ck_backlog_need_score` and this arm exits 1 here. The band's two ends and the
+      //       whole-number rule follow it, so widening the floor cannot quietly open the ceiling.
+      await accepted(7, EPIC, { need_source: GOOD, need_score: 0 },
+        "(vii) AGT-433: a PARKED ticket scored 0 lands and reads back 0");
+      for (const [n, s] of [[8, 6], [9, -1], [10, 2.5]]) await refusedScore(n, s);
+
       assert.equal(await count(url, key, "backlog_items?select=id"), before,
-        "ZERO RESIDUE: backlog_items' exact count must re-read unmoved after all six cases");
+        "ZERO RESIDUE: backlog_items' exact count must re-read unmoved after all ten cases");
       console.log(`    [AGT-280 arm A] epic ${EPIC_NAME} (${EPIC}), market_records ${MKT}, ` +
         `backlog_items ${before} before and after`);
     });
@@ -291,6 +320,22 @@ async function run() {
         `a pass verdict on an UNTRACEABLE need_source must raise before it writes; got ${describe(untraceable)}`);
       assert.ok(untraceable.text.includes("AGT-280:"),
         `and must refuse in AGT-280's own words; got ${describe(untraceable)}`);
+
+      // AGT-433: the WRITER's band, the other half of (vii). Both of its score guards raise with
+      // errcode check_violation after the ticket lookup and the traceability check but BEFORE
+      // record_decision(), so all three of these refusals write nothing -- which is the only reason
+      // they are safe to assert here. The ticket named is a real one read live, because the writer
+      // refuses an unknown backlog_id earlier and would then never reach the score.
+      const any = (await req(url, key, "backlog_items?select=backlog_id&order=backlog_id.asc&limit=1")).json[0].backlog_id;
+      for (const s of [6, -1, 2.5]) {
+        const r = await rpc(url, key, "apply_requirement_verdict", {
+          p_cycle: null, p_session: "agt-280-test",
+          p: { verdict: "pass", backlog_id: any, need_source: GOOD, need_score: s, reason: "probe" },
+        });
+        assert.ok(!r.ok, `a pass verdict scoring ${s} must raise before it writes; got ${describe(r)}`);
+        assert.ok(r.text.includes("0-5"),
+          `and must refuse in the writer's own 0-5 words (AGT-433 widened both guards); got ${describe(r)}`);
+      }
     });
   }
 
@@ -313,12 +358,13 @@ async function run() {
     }
 
     // The score's CHECK, asserted over the live table rather than by writing to it: no row may
-    // carry a need_score outside 1-5, in either direction.
-    for (const q of ["need_score=gt.5", "need_score=lt.1"]) {
+    // carry a need_score outside 0-5, in either direction (AGT-433 moved the floor to 0, so a row
+    // reading -1 or 6 is the only thing this can still catch -- a 0 is now legal and expected).
+    for (const q of ["need_score=gt.5", "need_score=lt.0"]) {
       const r = await req(url, key, `backlog_items?select=backlog_id,need_score&${q}`);
       assert.ok(r.ok, `${q} must read; got ${describe(r)}`);
       assert.deepEqual(r.json, [],
-        `the CHECK (need_score BETWEEN 1 AND 5) must hold over every live row; ${q} returned ${r.text.slice(0, 200)}`);
+        `the CHECK (need_score BETWEEN 0 AND 5) must hold over every live row; ${q} returned ${r.text.slice(0, 200)}`);
     }
   });
 
