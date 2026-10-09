@@ -1,3 +1,4 @@
+// DeepBench v7.0.839 | tests/regression/agt-135-john-rulings.test.mjs | AGT-448 -- ds-guardrails counts re-pinned 7/6 -> 8/7 (the cap-case stop).
 // DeepBench v7.0.782 | tests/regression/agt-135-john-rulings.test.mjs | AGT-304 slice 5 -- C3 pins the kinds this ship wrote (rule, agent-row); settle-ship's later ticket-status row is not one of them.
 // DeepBench v7.0.603 | tests/regression/agt-135-john-rulings.test.mjs | AGT-135
 //
@@ -228,8 +229,8 @@ async function run() {
   // ds-guardrails's must_not half is the other side of the same ruling, and a jsonb_set that
   // landed only one of the two would otherwise pass C2 above.
   const [ds] = await get("skill_profiles?slug=eq.ds-guardrails&select=guardrails");
-  assert.equal(ds.guardrails.must.length, 7, "ds-guardrails.must must hold 7 entries after AGT-135");
-  assert.equal(ds.guardrails.must_not.length, 6, "ds-guardrails.must_not must hold 6 entries after AGT-135");
+  assert.equal(ds.guardrails.must.length, 8, "ds-guardrails.must must hold 8 entries after AGT-448");
+  assert.equal(ds.guardrails.must_not.length, 7, "ds-guardrails.must_not must hold 7 entries after AGT-448");
   assert.ok(
     ds.guardrails.must_not.some(s => s.startsWith("escalate a feature or functionality question to John")),
     "ds-guardrails.must_not must carry the escalation ban"

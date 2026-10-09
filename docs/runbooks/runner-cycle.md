@@ -2716,10 +2716,10 @@ SELECT * FROM public.class_autonomy('<PRIORITY CLASS>');
 
 Write the answer into this cycle's `notes` as `files N (+k) / tasks M (+k)` — `N`/`M` the baseline
 3 and 4, each `k` the returned `extra_files` / `extra_tasks`. Step 7 grades the ship against those
-numbers. Four things not to get wrong, all of them consequences of where the grant lives:
+numbers. Four things not to get wrong:
 
 - **It is a fact about the class, never about the epic or the ticket.** The same class earns the
-  same widening on any epic — the same shape step 7a's auto-done bar has.
+  same widening on any epic.
 - **Never re-derive the arithmetic yourself.** That comparison has one home and it is the SQL
   function; its thresholds are stored columns, not literals (`SES-146`).
 - **It fails closed.** No class on the board, a class the ladder does not track, a failed RPC —
@@ -2728,8 +2728,10 @@ numbers. Four things not to get wrong, all of them consequences of where the gra
 - **The one-feature cap is not on the ladder at all.** A rung buys breadth of edit, never a second
   feature — so a widened cap is never a licence to fold a second ticket into this cycle.
 
-**A cap case is the Development Manager's to rule, never the cycle's to slice:** it calls
-`public.rule_capped_ticket()` once; split → build the drain's first part, waive → build it whole.
+**A cap case is the Development Manager's to rule, never the cycle's to slice:** the Designer
+answers `alive`, `kickoff_markdown` null, case in `harvest_markdown`; you call
+`public.rule_capped_ticket()` once; split → build the drain's first part, waive → re-assemble
+with `"cap_waived":"<id>"`, build it whole.
 
 **6. Full ceremony — no shortcuts, you earn no exemption.** **STEP ONE OF ANY BUILD IS
 PICK-TIME PREMISE REVALIDATION (`SES-87` — the revalidation flow, register B7, `v7.0.139`):**

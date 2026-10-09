@@ -1,3 +1,4 @@
+// DeepBench v7.0.839 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-448 -- BYTES_AT_SHIP re-pinned 380952 -> 380977 (step 5a's cap-case paragraph names the Designer's case and cap_waived).
 // DeepBench v7.0.838 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-447 -- BYTES_AT_SHIP re-pinned 380843 -> 380952 (step 5a's cap-case paragraph).
 // DeepBench v7.0.797 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-304 slice 8 -- the reconciliation counts runner_questions over the 7 days ending at the newest row's OWN taken_at, not the run's clock, so a snapshot is graded as of the moment it was taken and does not redden as its window ages out.
 // DeepBench v7.0.793 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-391 -- BYTES_AT_SHIP re-pinned 380985 -> 380843
@@ -258,7 +259,7 @@ export const RUNBOOK_CEILING = 381000;
 // bar and 35 B under SES-336's ceiling -- REPORTED, not absorbed. No header stamp (ses-424c pins
 // stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c, re-pinned and the card re-rendered in the
 // same commit as the runbook edit.
-export const BYTES_AT_SHIP = 380952;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
+export const BYTES_AT_SHIP = 380977;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.
