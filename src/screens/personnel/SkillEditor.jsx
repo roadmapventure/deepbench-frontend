@@ -402,7 +402,8 @@ export function CapabilityDrawer({ count, children }) {
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
         <span>Skills ({count})</span>
       </button>
-      {open && <div>{children}</div>}
+      {/* Skills are children of the capability: indented under it, with a guide line down the left edge */}
+      {open && <div style={{ marginLeft: 6, paddingLeft: 14, borderLeft: `2px solid ${T.line}` }}>{children}</div>}
     </div>
   );
 }

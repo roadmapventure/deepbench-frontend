@@ -173,7 +173,7 @@ function delFake(intentTraits) {
   assert.deepEqual([...sk.matchAll(/<Line unsent label="([^"]+)"/g)].map(m => m[1]), ["Model", "Key source"]);
   assert.ok(sk.includes("const UNSENT_FIELDS = [];"));
   // each capability has a Skills drawer, closed until opened
-  assert.ok(sk.includes("export function CapabilityDrawer") && sk.includes("useState(false)") && sk.includes("{open && <div>{children}</div>}"));
+  assert.ok(sk.includes("export function CapabilityDrawer") && sk.includes("useState(false)") && sk.includes("borderLeft: `2px solid ${T.line}`") && sk.includes("paddingLeft: 14"), "the drawer indents its Skills under the capability");
   assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilityDrawer count="), 1);
 }
 
