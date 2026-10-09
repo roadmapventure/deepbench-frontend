@@ -2726,8 +2726,10 @@ numbers. Four things not to get wrong, all of them consequences of where the gra
   all return zero extras, so a lookup that goes wrong NARROWS your cap and can never widen it. A
   blank rung reads NULL, not 0; rung 0 is a real rung (`invention` sits at it).
 - **The one-feature cap is not on the ladder at all.** A rung buys breadth of edit, never a second
-  feature — so a widened cap is never a licence to fold a second ticket into this cycle (register
-  B22's rename discipline is the reader-facing half of the same boundary).
+  feature — so a widened cap is never a licence to fold a second ticket into this cycle.
+
+**A cap case is the Development Manager's to rule, never the cycle's to slice:** it calls
+`public.rule_capped_ticket()` once; split → build the drain's first part, waive → build it whole.
 
 **6. Full ceremony — no shortcuts, you earn no exemption.** **STEP ONE OF ANY BUILD IS
 PICK-TIME PREMISE REVALIDATION (`SES-87` — the revalidation flow, register B7, `v7.0.139`):**
