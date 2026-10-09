@@ -1,3 +1,15 @@
+// DeepBench v7.0.829 | api/prompt/db-assembly.js | AGT-434 slice 1 -- north star pinned ONCE per
+// agent (agent_skill_pins); directive 3c1cc23d. A Skill every call of an agent must carry is pinned
+// once at AGENT level and read here, instead of being linked to every one of that agent's
+// capabilities: `deepbench-north-star` held 48 `capability_skill_profiles` links over 11 agents, and
+// the agent-wide path below (no capability_slug) pushes every assigned capability's links with no
+// slug check -- so Jerry's prompt carried the same north star 12 times and Nathan's 11 (measured
+// live 2026-10-09). assemblePrompt() now reads `agent_skill_pins` AFTER the signature snapshot
+// (a pin is agent configuration, and the §19k signature is agent-agnostic --
+// .claude/rules/ai-pattern-signature.md) and merges through the new pure mergePinnedSkills(), which
+// SKIPS a pin whose slug is already loaded -- so a pin can never be the reason a Skill renders
+// twice, and an agent with no pin row assembles byte-identical. A failed pins read warns and
+// assembles without the pin (pattern:105: telemetry/config reads never break the product path).
 // DeepBench v7.0.774 | api/prompt/db-assembly.js | DAT-004 -- what a trainer taught an agent is now
 // in every prompt assembled for that agent. assemblePrompt() reads the agent's own taught rows
 // through the one shared reader (lib/read-taught.js) and adds one stable section, `taught`, at
@@ -555,6 +567,52 @@ export function buildTaughtSection(shaped) {
   };
 }
 
+// FEATURE: AGT-434 -- the ONE merge of an agent's pinned Skills into the set assemblePrompt() loaded
+// from capabilities. PURE on purpose: no fetch, no env, no clock, so arm A of
+// tests/regression/agt-434-agent-skill-pins.test.mjs grades the rule itself rather than a round trip.
+// THE RULE, and each clause is a measured case:
+//   * a pin whose slug is ALREADY in the loaded set is skipped -- during the window where the 48
+//     interim capability links still exist, the pin must not add a second copy of the north star
+//     (the duplicates in the agent-wide path are the links' own doing and end with their reversal);
+//   * two pin rows naming one slug add it ONCE -- the added set is checked as well as the loaded one,
+//     so a duplicate pin row (the unique key makes one per tenant/agent/slug, but a tenant other
+//     than the caller's could still arrive in a widened read) cannot double a section;
+//   * pinned rows go FIRST (`[...added, ...skillProfiles]`): buildSections() emits one section per
+//     row in array order and all Knowledge rows share one `order`, so array position is what puts
+//     the pinned Skill first among BACKGROUND KNOWLEDGE -- matching the display_order 0 the interim
+//     links carried;
+//   * nothing added returns the SAME array, so an agent with no pin row assembles byte-identical.
+// `pinned: true` marks the row's provenance for a later reader (agent-bundle.js / PersonnelScreen,
+// AGT-434 slice 2 -- §19w: nothing is sent that is not visible); `source_capability_slug: null` is
+// the honest answer to "which capability brought this in" -- none did, the agent did.
+// Names no agent, no capability and no slug (.claude/rules/capabilities-are-data.md): every pin row
+// any tenant holds is treated the same way.
+export function mergePinnedSkills(skillProfiles, pins) {
+  const loaded = Array.isArray(skillProfiles) ? skillProfiles : [];
+  const rows = Array.isArray(pins) ? pins : [];
+  if (!rows.length) return loaded;
+
+  const have = new Set(loaded.map(sp => sp?.slug).filter(Boolean));
+  const added = [];
+  for (const pin of rows) {
+    const profile = pin?.skill_profiles;
+    const slug = profile?.slug;
+    if (!slug || have.has(slug)) continue;
+    have.add(slug);
+    added.push({
+      ...profile,
+      pinned: true,
+      source_capability_slug: null,
+      level: null,
+      skill_level: null,
+      is_required: true,
+      display_order: pin.display_order,
+    });
+  }
+  if (!added.length) return loaded;
+  return [...added, ...loaded];
+}
+
 // FEATURE: SES-341 -- the ONE renderer for an inline Knowledge Skill's text, exported so
 // api/prompt/ai-enrichment.js's fetchSection() renders the executor's copy from the SAME function
 // buildSections() already used to fill `content`. A second copy in the enrichment file would be
@@ -765,6 +823,23 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   // capability's own config only (agent-agnostic), never the enrichment capability's skills. Taken
   // after the fired-intent filter above so it inherits the correct intent scoping for free.
   const signatureConfig = buildSignatureConfig(skillProfiles, { capability_slug, execution_type: executionType });
+
+  // FEATURE: AGT-434 -- the agent's PINNED Skills, read once, AFTER the signature snapshot above.
+  // The order is the ticket's: the §19k runtime signature is the primary capability's own config and
+  // is agent-agnostic (.claude/rules/ai-pattern-signature.md -- never an agent-specific input), and a
+  // pin is agent configuration, so a pinned Skill must NOT enter `assembled_skill_slugs`. Moving this
+  // block one line up would put it there and change every pinned agent's signature.
+  // One read, on `agent_id` alone, so the capability path and the agent-wide path both get it; the
+  // merge skips a slug already loaded, so neither path can render a pinned Skill twice. A failed read
+  // warns and assembles without the pin rather than failing the call.
+  if (agent_id) {
+    const pinR = await fetch(
+      `${supabaseUrl}/rest/v1/agent_skill_pins?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=display_order,skill_profiles(*)&order=display_order.asc`,
+      { headers }
+    );
+    if (pinR.ok) skillProfiles = mergePinnedSkills(skillProfiles, await pinR.json() || []);
+    else console.warn('[db-assembly] pins read failed:', pinR.status);
+  }
 
   // FEATURE: BUG-17 — load enrichment capability skill profiles (e.g. dan-ai-enrichment)
   // These profiles contribute technical_services triggers (reflect, synthesis) with Dan's authored prompts.
