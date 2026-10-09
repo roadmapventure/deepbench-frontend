@@ -1506,6 +1506,27 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
 
 // FEATURE: PE-03 — Training tab live wiring
 // ── Tab: Training ─────────────────────────────────────────────────────────────
+// One line of text that ends in an ellipsis when it does not fit. When it is cut off, "… more" opens the whole text and "less" closes it.
+// (A taught item's text on its Training card: it used to be cut off with nothing to click.)
+export function ExpandableLine({ text, style }) {
+  const ref = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [clipped, setClipped] = useState(false);
+  useEffect(() => {
+    const measure = () => { const el = ref.current; if (el && !open) setClipped(el.scrollWidth > el.clientWidth + 1); };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [text, open]);
+  const link = { background: "transparent", border: "none", padding: 0, cursor: "pointer", fontFamily: body, fontSize: 12, fontWeight: 600, color: T.brassDeep };
+  return (
+    <div style={style}>
+      <div ref={ref} style={open ? { whiteSpace: "pre-wrap", wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{text}</div>
+      {(clipped || open) && <button onClick={() => setOpen(o => !o)} aria-expanded={open} style={link}>{open ? "less" : "… more"}</button>}
+    </div>
+  );
+}
+
 // Typing a note is hidden from end users for beta (John): Skills and capabilities are where a person teaches an agent. It stays in the
 // code and still shows on the admin address; set this to false to give it back to everyone. Existing notes, including the ones an AI
 // tool saves with "remember this", still list, edit, switch off and delete.
@@ -1901,7 +1922,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
 
               {/* FEATURE: AGT-344 — a taught card ends with its one line */}
               {facts && (
-                <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,marginTop:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{facts.line}</div>
+                <ExpandableLine text={facts.line} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,marginTop:3}}/>
               )}
 
               {!facts && (<>
