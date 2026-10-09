@@ -171,7 +171,14 @@ function delFake(intentTraits) {
   assert.ok(!sk.includes('label="Model"') && !sk.includes('label="Key source"') && !sk.includes("key source") && !sk.includes("Temperature") && !sk.includes("Max tokens"), "no model or key source on a Skill");
   assert.ok(sk.includes("for (const [k] of MODEL_FIELDS) f[k] = show(sp[k]);"), "a Skill save sends the stored model settings back unchanged");
   assert.ok(sk.includes('"delete_capability"') && sk.includes("Its Skills are kept"));
-  assert.ok(sk.includes("export function CapabilityDrawer") && sk.includes("useState(false)") && sk.includes("borderLeft: `2px solid ${T.line}`") && sk.includes("paddingLeft: 14"), "the drawer indents its Skills under the capability");
+  assert.ok(sk.includes("export function CapabilityDrawer") && sk.includes("defaultOpen = false") && sk.includes("borderLeft: `3px solid ${T.brass}`") && sk.includes("paddingLeft: 14"), "the drawer indents its Skills under the capability on a brass rail");
+  // the approved layout: each Skill is its own closed drawer; empty fields fold into one line; "No Skills yet" shows on a closed empty capability
+  assert.ok(sk.includes("defaultExpanded = false") && sk.includes("useState(defaultExpanded)") && sk.includes("aria-expanded={expanded}"), "a Skill is a drawer, closed by default");
+  assert.ok(sk.includes("Hide empty fields") && sk.includes("empty field"), "empty fields fold into one line");
+  assert.ok(sk.includes("No Skills yet</span>"), "a closed empty capability says so");
+  const scr = read("src/screens/PersonnelScreen.jsx");
+  assert.ok(scr.includes("padding: \"12px 14px\", background: T.cardAlt, border: `1px solid ${T.line}`"), "each capability is its own card inside the Capabilities card");
+  assert.ok(scr.includes("No Skills yet. Add one to tell this capability what to do."));
   assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilityDrawer count="), 1);
   // the card explains itself: capability, Skills, and why to fill them in
   assert.ok(sk.includes("export function CapabilitiesGuide") && sk.includes("How your agent gets good at things") && sk.includes("Skills</strong> are what make it good at that"));

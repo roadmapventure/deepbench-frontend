@@ -10,7 +10,7 @@
 // DeepBench user may edit, saved through POST /api/agent-configs `update_skill`. skill_profiles has no
 // "edited by" column, so the stamp below is for this page view only (see the ticket's open design question).
 import { useState } from "react";
-import { T, body, mono } from "../../tokens.js";
+import { T, display, body, mono } from "../../tokens.js";
 import { TENANT_ID } from "../../config.js";
 
 const INPUT = { width: "100%", background: T.cardAlt, border: `1px solid ${T.lineSoft}`, padding: "6px 10px", fontFamily: body, fontSize: 12, color: T.ink, outline: "none", marginBottom: 8, boxSizing: "border-box" };
@@ -107,9 +107,13 @@ function Line({ label, children }) {
 }
 // A component, not a module-level element: the regression harness compiles this file with classic JSX and no React in scope, so top-level JSX would throw at import.
 function Empty() { return <span style={{ color: T.muted, fontStyle: "italic" }}>—</span>; }
+// Empty = nothing there, or only empty lists such as the default {"must":[],"must_not":[]}.
+const jsonEmpty = (v) => v === null || v === undefined || (typeof v === "object" && Object.values(v).every(x => (Array.isArray(x) ? x.length === 0 : x === null || x === undefined)));
 const jsonLine = (v) => (v === null || v === undefined || (typeof v === "object" && Object.keys(v).length === 0) ? <Empty /> : <span style={{ fontFamily: mono, fontSize: 10 }}>{JSON.stringify(v)}</span>);
 
-export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemoved }) {
+export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemoved, defaultExpanded = false }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [showEmpty, setShowEmpty] = useState(false);
   const [open,   setOpen]   = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [form,   setForm]   = useState(() => toForm(sp));
@@ -141,12 +145,30 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
     setSaving(false);
   };
 
+  // The Skill is a drawer: closed it shows its name, type, level and a one-line summary; open it shows its Fields
+  // (filled ones first, empty ones folded into one line) with Edit and Remove inside.
+  const rows = [
+    ["Description", sp.description || null], ["Objective", sp.objective || null], ["Method", sp.method || null],
+    ["Tone", sp.tone || null], ["Confidence", sp.confidence || null], ["Output", sp.output_desc || null], ["Notes", sp.notes || null],
+    ["Guardrails", jsonEmpty(sp.guardrails) ? null : jsonLine(sp.guardrails)], ["Traits", jsonEmpty(sp.traits) ? null : jsonLine(sp.traits)],
+  ];
+  const filledRows = rows.filter(([, v]) => v !== null);
+  const emptyRows = rows.filter(([, v]) => v === null);
+  const summary = [sp.description, sp.objective, sp.method].find(Boolean) || "";
+
   return (
-    <div style={{ borderBottom: `1px solid ${T.lineSoft}`, padding: "4px 0 6px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
-        <div style={{ fontFamily: body, fontSize: 11.5, fontWeight: 600, color: T.navy, flex: 1 }}>{sp.name}</div>
+    <div style={{ border: `1px solid ${T.lineSoft}`, background: T.card }}>
+      <button onClick={() => setExpanded(x => !x)} aria-expanded={expanded}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", fontFamily: body, color: T.ink }}>
+        <span aria-hidden="true" style={{ fontFamily: mono, fontSize: 10, color: T.brassDeep }}>{expanded ? "▾" : "▸"}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.navy }}>{sp.name}</span>
         <span style={{ fontFamily: mono, fontSize: 7.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", padding: "1px 5px", background: chip.bg, color: chip.color, border: `1px solid ${chip.border}`, flexShrink: 0 }}>{chip.label}</span>
         <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, color: T.brassDeep, background: "rgba(182,135,58,.1)", border: "1px solid rgba(182,135,58,.25)", padding: "1px 5px", flexShrink: 0 }}>L{sp.level}</span>
+        {!expanded && <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{summary}</span>}
+      </button>
+      {expanded && (
+      <div style={{ padding: "2px 12px 10px 26px", borderTop: `1px solid ${T.lineSoft}` }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, padding: "6px 0 2px" }}>
         <button onClick={() => (open ? cancel() : setOpen(true))} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, flexShrink: 0 }}>{open ? "Close" : "Edit"}</button>
         {capSlug && !open && !confirmRemove && <button onClick={() => setConfirmRemove(true)} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, flexShrink: 0, color: T.flag }}>Remove</button>}
       </div>
@@ -159,15 +181,13 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
       )}
       {!open && (
         <div style={{ paddingBottom: 2 }}>
-          <Line label="Description">{sp.description || <Empty />}</Line>
-          <Line label="Objective">{sp.objective || <Empty />}</Line>
-          <Line label="Method">{sp.method || <Empty />}</Line>
-          <Line label="Tone">{sp.tone || <Empty />}</Line>
-          <Line label="Confidence">{sp.confidence || <Empty />}</Line>
-          <Line label="Output">{sp.output_desc || <Empty />}</Line>
-          <Line label="Notes">{sp.notes || <Empty />}</Line>
-          <Line label="Guardrails">{jsonLine(sp.guardrails)}</Line>
-          <Line label="Traits">{jsonLine(sp.traits)}</Line>
+          {filledRows.map(([label, v]) => <Line key={label} label={label}>{v}</Line>)}
+          {emptyRows.length > 0 && (
+            <button onClick={() => setShowEmpty(x => !x)} style={{ background: "transparent", border: "none", padding: "6px 0", cursor: "pointer", textAlign: "left", fontFamily: mono, fontSize: 9, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: T.brassDeep }}>
+              {showEmpty ? "▾ Hide empty fields" : `▸ ${emptyRows.length} empty field${emptyRows.length === 1 ? "" : "s"}: ${emptyRows.map(([l]) => l).join(", ")}`}
+            </button>
+          )}
+          {showEmpty && emptyRows.map(([label]) => <Line key={label} label={label}><Empty /></Line>)}
         </div>
       )}
       {open && (
@@ -202,6 +222,8 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
           </div>
         </div>
       )}
+      </div>
+      )}
     </div>
   );
 }
@@ -227,7 +249,7 @@ export function AddSkillForm({ capSlug, showToast, onAdded }) {
     setSaving(false);
   };
 
-  if (!open) return <button onClick={() => setOpen(true)} style={{ ...GHOST, marginTop: 8 }}>+ Add Skill</button>;
+  if (!open) return <button onClick={() => setOpen(true)} style={{ ...GHOST, marginTop: 4, alignSelf: "flex-start" }}>+ Add Skill</button>;
   return (
     <div style={{ marginTop: 8, padding: "8px 0 4px", borderTop: `1px dashed ${T.lineSoft}` }}>
       <div style={{ fontFamily: mono, fontSize: 8.5, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, marginBottom: 6 }}>New Skill</div>
@@ -285,7 +307,7 @@ export function CapabilityHeader({ cap, showToast, onSaved, onDeleted }) {
   return (
     <div style={{ marginBottom: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, flex: 1 }}>{cap.name}</div>
+        <div style={{ fontFamily: display, fontSize: 17, fontWeight: 600, color: T.navy, flex: 1, minWidth: 0 }}>{cap.name}</div>
         <button onClick={() => (open ? cancel() : setOpen(true))} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5 }}>{open ? "Close" : "Edit"}</button>
         {isUserMade && !open && !confirmDelete && <button onClick={() => setConfirmDelete(true)} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, color: T.flag }}>Delete</button>}
       </div>
@@ -354,17 +376,18 @@ export function AddCapabilityForm({ agentId, showToast, onAdded }) {
 }
 
 // A capability's Skills live in a drawer: closed until the user opens it, so a long list of capabilities stays scannable.
-export function CapabilityDrawer({ count, children }) {
-  const [open, setOpen] = useState(false);
+export function CapabilityDrawer({ count, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${T.lineSoft}` }}>
       <button onClick={() => setOpen(o => !o)} aria-expanded={open}
         style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, textAlign: "left" }}>
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
         <span>Skills ({count})</span>
+        {count === 0 && !open && <span style={{ fontFamily: body, fontSize: 10, letterSpacing: 0, textTransform: "none", fontWeight: 500, fontStyle: "italic", color: T.muted }}>No Skills yet</span>}
       </button>
-      {/* Skills are children of the capability: indented under it, with a guide line down the left edge */}
-      {open && <div style={{ marginLeft: 6, paddingLeft: 14, borderLeft: `2px solid ${T.line}` }}>{children}</div>}
+      {/* Skills are children of the capability: indented under it on a brass rail */}
+      {open && <div style={{ marginLeft: 6, paddingLeft: 14, borderLeft: `3px solid ${T.brass}`, display: "flex", flexDirection: "column", gap: 6, paddingBottom: 4 }}>{children}</div>}
     </div>
   );
 }

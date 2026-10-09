@@ -79,7 +79,8 @@ export default async function run() {
 
   // ── (d) ────────────────────────────────────────────────────────────────────
   const screen = read("src/screens/PersonnelScreen.jsx");
-  assert.ok(screen.includes("SKILL_TYPES.map("), "Skills are grouped under the six fixed type headers");
+  // John approved the Skill-drawer layout (no type header rows): Skills are listed in the six types' order and each carries its type as a chip.
+  assert.ok(screen.includes("SKILL_TYPES.flatMap("), "Skills are ordered by the six fixed types, the type shown as a chip on each Skill");
   assert.equal(count(screen, "<CapabilityHeader"), 1);
   assert.ok(count(screen, "<TeamHeading") === 2 && count(screen, "<ConnectionStatus") === 1 && read("src/screens/personnel/AgentFacts.jsx").includes("<UsageCountRow"), "the team heading is on both badges; Times used sits under Last used inside ConnectionStatus");
   assert.ok(!screen.includes("Bureau of Procurement Intelligence"), "the constant bureau heading is gone");

@@ -1004,7 +1004,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
                 guardrails:{ bg: "rgba(168,51,25,.06)", color: T.flag,      border: "rgba(168,51,25,.2)",  label: "GUARDRAILS" },
               };
               return (
-                <div key={cap.slug} style={{ marginBottom: 12 }}>
+                <div key={cap.slug} style={proposed ? { marginBottom: 12, padding: "12px 14px", background: T.cardAlt, border: `1px solid ${T.line}` } : { marginBottom: 12 }}>
                   {/* FEATURE: AGT-413 — Proposed: editable capability name and description; Current keeps the plain heading */}
                   {proposed ? <CapabilityHeader cap={cap} showToast={showToast} onSaved={onCapabilityChange} onDeleted={onCapabilityDeleted} /> : (<>
                     <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{cap.name}</div>
@@ -1016,17 +1016,10 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
                   {proposed ? (
                     <CapabilityDrawer count={cap.skillProfiles.length}>
                     {cap.skillProfiles.length === 0
-                      ? <div style={{ fontFamily: body, fontSize: 10.5, color: T.muted, fontStyle: "italic", padding: "4px 0" }}>No Skills attached to this capability.</div>
-                      : SKILL_TYPES.map(([typeSlug, typeLabel]) => {
-                          const group = cap.skillProfiles.filter(sp => (sp.skill_type_slug || "intent") === typeSlug);
-                          if (group.length === 0) return null;
-                          return (
-                            <div key={typeSlug} style={{ marginTop: 8 }}>
-                              <div style={{ fontFamily: mono, fontSize: 8.5, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.4, fontWeight: 700, borderBottom: `1px solid ${T.line}`, paddingBottom: 3 }}>{typeLabel}</div>
-                              {group.map(sp => <SkillEditorRow key={sp.slug} sp={sp} chip={TYPE_CHIP[typeSlug] || TYPE_CHIP.intent} showToast={showToast} onSaved={onSkillChange} capSlug={cap.slug} onRemoved={onSkillRemoved} />)}
-                            </div>
-                          );
-                        })}
+                      ? <div style={{ border: `1px dashed ${T.line}`, padding: "10px 12px", fontFamily: body, fontSize: 11.5, color: T.muted, fontStyle: "italic" }}>No Skills yet. Add one to tell this capability what to do.</div>
+                      : SKILL_TYPES.flatMap(([typeSlug]) => cap.skillProfiles
+                          .filter(sp => (sp.skill_type_slug || "intent") === typeSlug)
+                          .map(sp => <SkillEditorRow key={sp.slug} sp={sp} chip={TYPE_CHIP[typeSlug] || TYPE_CHIP.intent} showToast={showToast} onSaved={onSkillChange} capSlug={cap.slug} onRemoved={onSkillRemoved} />))}
                     {/* FEATURE: AGT-414 — type in a new Skill and attach it to this capability */}
                     <AddSkillForm capSlug={cap.slug} showToast={showToast} onAdded={onSkillAdded} />
                     </CapabilityDrawer>
