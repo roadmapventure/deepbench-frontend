@@ -1,3 +1,4 @@
+// DeepBench v7.0.834 | agt-384-bench-home.test.mjs | mobile -- (g) pins the Agent Roster link in its new place (right of the name row).
 // DeepBench v7.0.790 | tests/regression/agt-384-bench-home.test.mjs | AGT-386 -- arm h: a created
 // agent lands on its own Personnel file (`/bench/<id>`), and the roster landing is gone.
 // DeepBench v7.0.789 | tests/regression/agt-384-bench-home.test.mjs | AGT-385 -- arm d: the steps no
@@ -246,7 +247,7 @@ const G_WANTS = [
   ["/api/mcp/", 0],
   ["connectOpen", 0],
   ['if (searchParams.get("connect") === "1") return <Navigate to={`/bench/connect?agent=${agentId}`} replace />;', 1],
-  ['navigate("/bench")} style={{fontFamily:body,fontSize:12,color:T.brassDeep,cursor:"pointer",textAlign:"left",marginBottom:12}}>← Agent Roster<', 1],
+  ['navigate("/bench")} style={{fontFamily:body,fontSize:11,color:T.brassDeep,cursor:"pointer",flexShrink:0,alignSelf:"flex-start",whiteSpace:"nowrap"}}>← Agent Roster<', 1],
 ];
 
 function armG() {
