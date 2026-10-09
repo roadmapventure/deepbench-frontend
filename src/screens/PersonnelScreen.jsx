@@ -1,3 +1,4 @@
+// DeepBench v7.0.832 | PersonnelScreen.jsx | mobile -- Personnel persona block compacts to avatar left, name + title right, quote underneath (~15% of the screen); the rest of the card sits behind a Details dropdown, default closed.
 // DeepBench v7.0.818 | PersonnelScreen.jsx | AGT-402 -- Future Controls Training section gains a sample Your trainee badge card (the badge means you can train this agent; John moved it to Future Controls).
 // DeepBench v7.0.816 | PersonnelScreen.jsx | AGT-416 -- Future Controls Access group opens with the Access levels sample card (where it can be used, which model, what an AI client receives, who can teach, what stays protected).
 // DeepBench v7.0.815 | PersonnelScreen.jsx | AGT-415 -- Future Controls gains a sample Skill score card (the typed 0-100 score John moved there; the Profile level bar is the editor).
@@ -2239,6 +2240,7 @@ export default function PersonnelScreen() {
   const onLevelSaved = (score) => setLevelPatch({ id: agentId, skill: score });
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false); // mobile persona block — rest of the card, default closed
   const [sentLens, setSentLensState] = useState(() => { try { return localStorage.getItem(SENT_LENS_KEY) === "1"; } catch { return false; } });
   const setSentLens = (v) => { setSentLensState(v); try { localStorage.setItem(SENT_LENS_KEY, v ? "1" : "0"); } catch { /* private window */ } };
   const [entries, setEntries]     = useState([]);
@@ -2427,40 +2429,49 @@ export default function PersonnelScreen() {
           {isMobile ? (
             <>
               {/* Mobile persona block — FEATURE: PE-17 — merges the old page header + ProfileTab's ID Badge card into one persistent block, above the tab bar, on every tab */}
-              <div style={{background:T.card,padding:"16px 18px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0,textAlign:"center"}}>
-                <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:12,color:T.brassDeep,cursor:"pointer",textAlign:"left",marginBottom:12}}>← Agent Roster</div>
-                <div data-sent="no"><TeamHeading agentId={agent.id} suffix={agent.code}/></div>
-                <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
-                  <AgentAvatar who={agent.id} size={56} ring={true} />
+              <div style={{background:T.card,padding:"8px 14px 8px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
+                <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:11,color:T.brassDeep,cursor:"pointer",marginBottom:6}}>← Agent Roster</div>
+                {/* Compact header: avatar left, name + title right, quote underneath */}
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <AgentAvatar who={agent.id} size={40} ring={true} />
+                  <div style={{minWidth:0,flex:1}}>
+                    {proposed ? (<>
+                      <InlineText value={agent.name} field="name" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontSize:17,fontWeight:600,color:T.navy,lineHeight:1.15}}/>
+                      <InlineText value={agent.role} field="role" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:body,fontSize:11,color:T.mutedDeep,fontStyle:"italic"}}/>
+                    </>) : (<>
+                      <div style={{fontFamily:display,fontSize:17,fontWeight:600,color:T.navy,lineHeight:1.15}}>{agent.name}</div>
+                      <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,fontStyle:"italic"}}>{agent.role}</div>
+                    </>)}
+                  </div>
                 </div>
-                {proposed ? (<>
-                  <InlineText value={agent.name} field="name" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}/>
-                  <InlineText value={agent.role} field="role" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:2}}/>
-                  <div data-sent="no" style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>
-                </>) : (<>
-                <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
-                <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role} · tenure {agent.hiredOn}</div>
-                </>)}
-                {!proposed && (
-                <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
-                  <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
-                  {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
-                </div>
-                )}
                 {proposed && (
-                <div data-sent="no" style={{background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
-                  <InlineText value={plainQuip(agent.quip || "")} field="quip" quote placeholder="Add a quote" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep}}/>
+                <div data-sent="no" style={{marginTop:6,lineHeight:1.4}}>
+                  <InlineText value={plainQuip(agent.quip || "")} field="quip" quote placeholder="Add a quote" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontStyle:"italic",fontSize:11,color:T.mutedDeep}}/>
                 </div>
                 )}
                 {!proposed && agent.quip && (
-                <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
+                <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:11,color:T.mutedDeep,marginTop:6,lineHeight:1.4}}>
                   "{plainQuip(agent.quip)}"
                 </div>
                 )}
-                
-                <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
-                <BadgeActions agent={agent} align="center" onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:10}}/>
-                {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
+                <button onClick={() => setMobileDetailsOpen(o => !o)} aria-expanded={mobileDetailsOpen} style={{marginTop:6,padding:"2px 0",background:"transparent",border:"none",cursor:"pointer",fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",color:T.brassDeep}}>
+                  {mobileDetailsOpen ? "▾ Hide details" : "▸ Details"}
+                </button>
+                {mobileDetailsOpen && (
+                <div style={{textAlign:"center",paddingTop:8,maxHeight:"45vh",overflowY:"auto"}}>
+                  <div data-sent="no"><TeamHeading agentId={agent.id} suffix={agent.code}/></div>
+                  <div data-sent="no" style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>
+                  {!proposed && (
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
+                    <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
+                    {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
+                  </div>
+                  )}
+                  <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
+                  <BadgeActions agent={agent} align="center" onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:10}}/>
+                  {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
+                </div>
+                )}
               </div>
 
               {/* FEATURE: AGT-397 — the layout switch, mirrored on mobile above the tab bar */}
