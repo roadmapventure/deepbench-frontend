@@ -590,8 +590,9 @@ separate ticket.** *Seen in:* for the news-fetch status wipe, "John chose option
 owner-token model"; on `MI-62` he chose copy-only, "deferring the behavior change as a separate, bigger,
 unscoped option."
 
-**66. Cut a proposed build down to the minimum immediately-useful slice actually asked for.** *Seen in:*
-Claude's mobile Spend Analyzer mock covered 3 screens; John narrowed it across several rounds — "could we
+**66. Cut a proposed build down to the minimum immediately-useful slice actually asked for.** Cut what was
+not asked for; never cut what was asked to fit the file or task cap: a result the cap cannot hold goes to
+the Development Manager under pattern:172. *Seen in:* Claude's mobile Spend Analyzer mock covered 3 screens; John narrowed it across several rounds — "could we
 just do the analysis dashboard, and the add file - column layout?" — to 2 pages, upload-only.
 
 **67. Every proposed cap, knob, or extra element must justify itself against a bound that already exists.**
@@ -616,9 +617,29 @@ helps me prioritize - i consider fixes for it as a single entitiy."
 can see. *Seen in:* Claude added `SES-36` to `BETA.md` §2b; John directed its removal — "developer tooling,
 invisible to a reviewer, so it does not belong on the beta board."
 
-**72. The 3-file cap is John's to waive, never Claude's — ask when splitting would lose real value.** *Seen
-in:* the `dispatch_latency_ms` column needed a fourth file; "John approved 4 files over the 3-file cap
-rather than lose the measurement," and the same waiver recurs in `HAR-15`, `SH-23`, `LOG-36`, `LOG-67`.
+**72. The 3-file cap is John's to waive, never Claude's — ask when splitting would lose real value.**
+*Applies to:* auditor.
+Superseded 2026-10-09 by pattern:172; kept for the Auditor alone, to read earlier decisions that cite it.
+*Seen in:* the `dispatch_latency_ms` column needed a fourth file; "John approved 4 files over the 3-file
+cap rather than lose the measurement," and the same waiver recurs in `HAR-15`, `SH-23`, `LOG-36`, `LOG-67`.
+
+**172. When the file or task cap would force a split, the Designer sends the Development Manager a case
+and only the Development Manager splits or waives.**
+*Applies to:* designer, manager.
+The waiver is for ONE build and is the Development Manager's alone, never the Designer's or a cycle's;
+John is the escalation. The case lists the parts in build order, what each delivers alone, what stays
+broken, red or unused if only the first ships, and which part must complete before the next, and
+recommends neither. SPLIT only if (a) the first part leaves nothing broken and adds no new failing test
+or user-visible behavior change, (b) the parts are declared as a drain in the same ruling
+(public.rule_capped_ticket(), rule DRAIN-CAP-SPLIT: ordered by blocked_by, each inheriting the parent's
+need_score and priority_class, nothing else starting until the drain retires, the parent partial until
+the last part ships), and (c) the first part is a real step toward the asked result. Otherwise WAIVE for
+that one build and record a ticket-scope decision with the reason. A first part that merely leaves the
+result unfinished is not by itself a reason to waive. *Seen in:* John, 2026-10-09 (session
+cap-split-rule-1009, audit_findings 627376b1): "the dev manager is supposed to be asked to come in and
+give advice, especially to override and let the ticket be built in one build and not split because of
+the 3 file rule." On splits: "they are run in succession until the original goal/funcitonality is
+complete."
 
 ---
 

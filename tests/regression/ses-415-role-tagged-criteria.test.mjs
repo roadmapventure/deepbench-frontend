@@ -1,3 +1,4 @@
+// DeepBench v7.0.837 | tests/regression/ses-415-role-tagged-criteria.test.mjs | AGT-446 -- criterion 172 appended; total 172, the 162-171 count bounded.
 // DeepBench v7.0.515 | tests/regression/ses-415-role-tagged-criteria.test.mjs | SES-415 — EVERY
 // DECISION PATTERN CARRIES THE ROLE THAT MUST APPLY IT, AND THE TAG'S ONE HOME IS THE MD.
 //
@@ -66,7 +67,7 @@ const GATE = path.join(REPO, "scripts", "check-decision-pattern-quotes.js");
 
 const FIRST_NEW = 162;
 const LAST_NEW = 171;
-const EXPECTED_TOTAL = 171;
+const EXPECTED_TOTAL = 172;
 
 const read = rel => fs.readFileSync(path.join(REPO, rel), "utf8").replace(/\r\n/g, "\n");
 
@@ -239,7 +240,7 @@ function theRealFileCarriesTheTenNewCriteriaAndATagOnEveryRow() {
 
   // Nothing above 161 may be tagged only by inheritance, and nothing at or below it may have been
   // retexted: the 161 older rows are tagged by their section's default line alone.
-  const newRows = rows.filter(r => r.pattern_no >= FIRST_NEW);
+  const newRows = rows.filter(r => r.pattern_no >= FIRST_NEW && r.pattern_no <= LAST_NEW);
   assert.strictEqual(newRows.length, LAST_NEW - FIRST_NEW + 1, "exactly ten criteria were appended by this pass");
 }
 

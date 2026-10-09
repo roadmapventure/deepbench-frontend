@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.837 | scripts/render-role-patterns.js | AGT-446 -- an UPDATE keeps the row's own model columns; only an INSERT inherits from siblings.
 // DeepBench v7.0.536 | scripts/render-role-patterns.js | SES-424 slice 4 (SES-416 build item 1) --
 // each governance agent is assembled with the decision criteria TAGGED FOR ITS ROLE, as an inline
 // Knowledge row rendered from docs/JOHN-DECISION-PATTERNS.md and pinned by sha.
@@ -324,7 +325,8 @@ async function cmdWriteRows() {
         // The imported function is the ONE inherit rule (never a second copy of it here); only the
         // set it grades is chosen here, and its message names run-project for its own subject, so
         // the capability actually being seeded is restated below.
-        modelConfig = inheritedModelConfig(kin);
+        const own = (await rest(base, key, `skill_profiles?select=${INHERITED_MODEL_COLUMNS.join(",")}&slug=eq.${row.slug}&limit=1`))[0];
+        modelConfig = own ? Object.fromEntries(INHERITED_MODEL_COLUMNS.map(c => [c, own[c]])) : inheritedModelConfig(kin);
       } catch (e) {
         throw new Error(`${meta.capability}: cannot inherit the model config for ${row.slug} from its ${kin.length} ${SKILL_TYPE_SLUG} sibling(s) (${kin.map(s => s.slug).join(", ") || "none"}) — ${e.message}`);
       }
