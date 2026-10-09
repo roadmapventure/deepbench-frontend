@@ -31,7 +31,6 @@ import { readAgentIdentity, updateAgentIdentity } from '../../../lib/private-age
 // ones. Name and role are edited on DeepBench only.
 const KINDS = Object.freeze(['taught', 'role_prompt', 'output_format', 'guardrail', 'specialty', 'bio', 'capability', 'skill']);
 const IDENTITY_MAX = Object.freeze({ specialty: 200, bio: 2000 });
-const CONNECTION_INTENTS = Object.freeze(['agent-bundle-intent', 'agent-teach-intent']);
 const SIDES = Object.freeze(['always', 'never']);
 const TAB_FOR = Object.freeze({ role_prompt: 'Resume', output_format: 'Playbook', guardrail: 'Playbook' });
 
@@ -43,7 +42,8 @@ function restDeps() {
 }
 
 // The capability a skill is being added to, named by slug or by name, among the capabilities THIS agent holds.
-// The agent's two connection capabilities are not Skill groups and are refused like an unknown name.
+// Only a capability whose Intent is scoped to its own Skills (traits.scope_capability, i.e. one added on Personnel) takes
+// Skills; the agent's Knowledge and Teach capabilities are refused like an unknown name.
 async function findHeldCapability(agentId, ref, { supabaseUrl, supabaseKey }) {
   const get = async path => {
     const res = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/rest/v1/${path}`, { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } });
@@ -55,8 +55,11 @@ async function findHeldCapability(agentId, ref, { supabaseUrl, supabaseKey }) {
   if (held.length === 0) return null;
   const slugs = held.map(h => `"${h.capability_slug}"`).join(',');
   const caps = await get(`capabilities?slug=in.(${encodeURIComponent(slugs)})&select=slug,name,default_intent_slug`);
+  const intentSlugs = [...new Set(caps.map(c => c.default_intent_slug).filter(Boolean))].map(s => `"${s}"`).join(',');
+  const intents = intentSlugs ? await get(`skill_profiles?slug=in.(${encodeURIComponent(intentSlugs)})&select=slug,traits`) : [];
+  const scoped = new Set(intents.filter(i => i.traits && i.traits.scope_capability === true).map(i => i.slug));
   const want = String(ref ?? '').trim().toLowerCase();
-  return caps.find(c => !CONNECTION_INTENTS.includes(c.default_intent_slug) && (c.slug.toLowerCase() === want || String(c.name).trim().toLowerCase() === want)) || null;
+  return caps.find(c => scoped.has(c.default_intent_slug) && (c.slug.toLowerCase() === want || String(c.name).trim().toLowerCase() === want)) || null;
 }
 
 async function readAgent(id) {
@@ -109,14 +112,14 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
   } else if (kind === 'capability') {
     const name = String(title ?? '').trim();
     if (!name) throw new Error('title required: the capability name');
-    const made = await addCapabilityToAgent({ agentId: t, fields: { name, ...(String(input.content ?? '').trim() ? { description: String(input.content).trim() } : {}) } }, restDeps());
+    const made = await addCapabilityToAgent({ agentId: t, fields: { name, ...(String(input.content ?? '').trim() ? { description: String(input.content).trim() } : {}) } }, { ...restDeps(), actor: { type: 'ai_client', id: origin_caller } });
     saved = { id: made.capability.slug, created_at: made.capability.created_at ?? null };
   } else if (kind === 'skill') {
     const name = String(title ?? '').trim();
     if (!name) throw new Error('title required: the skill name');
     const type = input.skill_type || 'identity';
     if (!SKILL_TYPES.includes(type)) throw new Error(`skill_type must be one of: ${SKILL_TYPES.join(', ')}`);
-    const deps = restDeps();
+    const deps = { ...restDeps(), actor: { type: 'ai_client', id: origin_caller } };
     const cap = await findHeldCapability(t, input.capability, deps);
     if (!cap) throw new Error('capability must name a capability this agent holds (its slug or name); add one first with kind capability');
     const fields = { name, skill_type_slug: type };

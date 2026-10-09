@@ -100,9 +100,23 @@ export default async function run() {
   // ── (c) ────────────────────────────────────────────────────────────────────
   const rm = fake(() => ({ status: 200, json: [{ id: "link-1" }] }));
   await removeSkillFromCapability({ capabilitySlug: "zoe-knowledge", skillSlug: "tone-abc123" }, deps(rm));
-  assert.equal(rm.sent.length, 1);
+  assert.deepEqual(rm.sent.map(s => `${s.method} ${s.table}`), ["DELETE capability_skill_profiles", "GET skill_profiles"], "an untagged (platform) Skill is only ever unlinked");
   assert.deepEqual([rm.sent[0].method, rm.sent[0].table], ["DELETE", "capability_skill_profiles"]);
   assert.ok(rm.sent[0].url.includes("capability_slug=eq.zoe-knowledge") && rm.sent[0].url.includes("skill_profile_slug=eq.tone-abc123"));
+  // A Skill made on DeepBench (it has an author tag) is deleted for good once no capability holds it; one still held elsewhere is not.
+  const fakeDel = (othersHold) => fake(({ method, table }) => {
+    if (table === "capability_skill_profiles" && method === "DELETE") return { status: 200, json: [{ id: "link-1" }] };
+    if (table === "skill_profiles" && method === "GET") return { status: 200, json: [{ id: "uuid-9", created_by_type: "end_user" }] };
+    if (table === "capability_skill_profiles" && method === "GET") return { status: 200, json: othersHold ? [{ id: "link-2" }] : [] };
+    if (table === "skill_profiles" && method === "DELETE") return { status: 204, json: [] };
+    return null;
+  });
+  const gone = fakeDel(false);
+  assert.equal((await removeSkillFromCapability({ capabilitySlug: "zoe-knowledge", skillSlug: "tone-abc123" }, deps(gone))).deleted, true);
+  assert.deepEqual(gone.sent.at(-1).method + " " + gone.sent.at(-1).table, "DELETE skill_profiles");
+  const kept = fakeDel(true);
+  assert.equal((await removeSkillFromCapability({ capabilitySlug: "zoe-knowledge", skillSlug: "tone-abc123" }, deps(kept))).deleted, false);
+  assert.ok(!kept.sent.some(s => s.method === "DELETE" && s.table === "skill_profiles"), "a Skill another capability still holds is never deleted");
   const rm0 = fake(() => ({ status: 200, json: [] }));
   await assert.rejects(removeSkillFromCapability({ capabilitySlug: "zoe-knowledge", skillSlug: "nope" }, deps(rm0)), e => e.status === 404);
 

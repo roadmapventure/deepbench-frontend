@@ -67,6 +67,10 @@ import { readTaught } from '../../../lib/read-taught.js';
 // task_context, and these render empty or templated regardless.
 const PER_CALL_SLUGS = Object.freeze(['current-task', 'task-details', 'prior-conversation', 'voice']);
 
+// Every Skill field an AI client receives: all of them except the model settings (model, provider, temperature,
+// max tokens), which only configure DeepBench's own model. Projected one by one, never spread.
+const SKILL_FIELDS = ['slug', 'name', 'skill_type_slug', 'description', 'objective', 'method', 'tone', 'confidence', 'output_desc', 'notes', 'traits', 'guardrails'];
+
 async function sbSelect(pathAndQuery) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
@@ -102,6 +106,27 @@ export function bundleTarget({ agent_id, content, handler_context }) {
   if (!named) return agent_id;
   if (asked !== agent_id) throw new Error(`Unknown agent: ${asked}`);
   return asked;
+}
+
+export async function readCapabilitySkills(agentId, tenant, onlySlug = null) {
+  const held = await sbSelect(`agent_capability_assignments?agent_id=eq.${encodeURIComponent(agentId)}&tenant_id=eq.${encodeURIComponent(tenant)}&select=capability_slug`);
+  const slugs = held.map(h => h.capability_slug).filter(s => !onlySlug || s === onlySlug);
+  if (slugs.length === 0) return [];
+  const list = encodeURIComponent(slugs.map(s => `"${s}"`).join(','));
+  const caps = await sbSelect(`capabilities?slug=in.(${list})&select=slug,name,description`);
+  const links = await sbSelect(`capability_skill_profiles?capability_slug=in.(${list})&select=capability_slug,level,display_order,skill_profiles(${SKILL_FIELDS.join(',')})&order=display_order.asc`);
+  const byCapability = new Map();
+  for (const l of links) {
+    if (!l.skill_profiles) continue;
+    byCapability.set(l.capability_slug, [...(byCapability.get(l.capability_slug) || []), l]);
+  }
+  return caps
+    .map(c => ({
+      slug: c.slug,
+      name: c.name,
+      description: c.description,
+      skills: (byCapability.get(c.slug) || []).map(l => Object.fromEntries([['level', l.level], ...SKILL_FIELDS.map(f => [f, l.skill_profiles[f] ?? null])])),
+    }));
 }
 
 /**
@@ -167,6 +192,10 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
   // AGT-342: what the agent was taught, through the one shared reader (lib/read-taught.js) -- the
   // trainer's items and the agent's own records, each handed over ONCE under its own framing.
   // `knowledge_entries` stays an array with one entry per active row, but as an index of the two.
+  // Every capability the agent holds with every one of its Skills (all six types), so nothing a user typed on Personnel
+  // stays behind. A scoped call (a user-made capability's own tool) lists that one capability.
+  const capabilities = await readCapabilitySkills(t, tenant, scopedTo);
+
   const kn = await readTaught({ agentId: t, tenantId: tenant });
   const taught = { framing: kn.framing.taught, items: kn.taught };
   const records = { framing: kn.framing.records, items: kn.records };
@@ -217,7 +246,7 @@ export async function handle({ agent_id, tenant_id, content, handler_context }) 
     },
   });
 
-  return { agent, role_prompts, guardrails, output_formats, sections, taught, records, knowledge_entries, library, no_inference: true };
+  return { agent, role_prompts, guardrails, output_formats, sections, capabilities, taught, records, knowledge_entries, library, no_inference: true };
 }
 
 export default handle;

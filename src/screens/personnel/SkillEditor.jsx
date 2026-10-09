@@ -90,10 +90,29 @@ export async function addSkill(capabilitySlug, fields) {
 }
 
 export async function removeSkill(capabilitySlug, skillSlug) {
-  await post({ action: "remove_skill_from_capability", capability_slug: capabilitySlug, skill_slug: skillSlug });
+  return post({ action: "remove_skill_from_capability", capability_slug: capabilitySlug, skill_slug: skillSlug });
 }
 
-const stampNow = () => `Edited by DeepBench · ${new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}`;
+export async function deleteCapability(capabilityId) {
+  await post({ action: "delete_capability", capability_id: capabilityId });
+}
+
+// FEATURE: author-tags -- "Created: AI client · Oct 8, 2026, 3:12 PM" and, once someone edits it later, "Last edited: ...".
+// The id behind the tag (an AI client's key name, a routine's id) is stored and not shown. A row from before tags shows nothing.
+const WHO = { owner: "Owner", routine: "Routine", end_user: "End user", ai_client: "AI client" };
+const when = iso => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
+export function authorLines(row) {
+  if (!row || !row.created_by_type) return [];
+  const lines = [`Created: ${WHO[row.created_by_type] || row.created_by_type} · ${when(row.created_at)}`];
+  const edited = row.updated_by_type && row.updated_at && new Date(row.updated_at) - new Date(row.created_at) > 5000;
+  if (edited) lines.push(`Last edited: ${WHO[row.updated_by_type] || row.updated_by_type} · ${when(row.updated_at)}`);
+  return lines;
+}
+function AuthorTag({ row }) {
+  const lines = authorLines(row);
+  if (lines.length === 0) return null;
+  return <div style={{ marginTop: 2 }}>{lines.map(l => <div key={l} style={{ fontFamily: mono, fontSize: 8.5, color: T.muted }}>{l}</div>)}</div>;
+}
 
 // One read-only line of a Skill; an empty field says so, so a missing field is visible, not hidden.
 function Line({ label, children, unsent }) {
@@ -113,7 +132,6 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [form,   setForm]   = useState(() => toForm(sp));
   const [saving, setSaving] = useState(false);
-  const [stamp,  setStamp]  = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
@@ -123,7 +141,6 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
       const next = { ...sp, ...saved };
       onSaved && onSaved(next);
       setForm(toForm(next));
-      setStamp(stampNow());
       setOpen(false);
       showToast && showToast("Saved ✦");
     } catch (e) { showToast && showToast("Save failed: " + e.message, "⚠"); }
@@ -135,9 +152,9 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
   const handleRemove = async () => {
     setSaving(true);
     try {
-      await removeSkill(capSlug, sp.slug);
+      const out = await removeSkill(capSlug, sp.slug);
       onRemoved && onRemoved(capSlug, sp.slug);
-      showToast && showToast("Removed from this capability");
+      showToast && showToast(out && out.deleted ? "Skill deleted" : "Removed from this capability");
     } catch (e) { showToast && showToast("Remove failed: " + e.message, "⚠"); setConfirmRemove(false); }
     setSaving(false);
   };
@@ -153,7 +170,7 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
       </div>
       {confirmRemove && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontFamily: body, fontSize: 10.5, color: T.mutedDeep }}>
-          <span style={{ flex: 1 }}>Remove “{sp.name}” from this capability? The Skill itself is kept.</span>
+          <span style={{ flex: 1 }}>Remove “{sp.name}” from this capability? If no other capability uses it and it was made on DeepBench, it is deleted for good; otherwise it is only taken out of this capability.</span>
           <button onClick={() => setConfirmRemove(false)} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5 }}>Keep</button>
           <button onClick={handleRemove} disabled={saving} style={{ ...SAVE, padding: "1px 8px", fontSize: 8.5, color: T.flag, border: `1px solid ${T.flag}` }}>{saving ? "Removing…" : "Remove"}</button>
         </div>
@@ -173,7 +190,7 @@ export function SkillEditorRow({ sp, chip, showToast, onSaved, capSlug, onRemove
           <Line unsent label="Key source">{sp.api_key_source || <Empty />}</Line>
         </div>
       )}
-      {stamp && !open && <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted }}>{stamp}</div>}
+      {!open && <AuthorTag row={sp} />}
       {open && (
         <div style={{ padding: "6px 0 10px" }}>
           <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginBottom: 8 }}>
@@ -272,19 +289,29 @@ export function AddSkillForm({ capSlug, showToast, onAdded }) {
 }
 
 // A capability's name and description, editable in place. The slug is shown and never editable.
-export function CapabilityHeader({ cap, showToast, onSaved }) {
+export function CapabilityHeader({ cap, showToast, onSaved, onDeleted }) {
+  const isUserMade = cap.default_intent_slug === "agent-capability-intent";
   const [open,   setOpen]   = useState(false);
   const [name,   setName]   = useState(cap.name || "");
   const [desc,   setDesc]   = useState(cap.description || "");
   const [saving, setSaving] = useState(false);
-  const [stamp,  setStamp]  = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleDelete = async () => {
+    setSaving(true);
+    try {
+      await deleteCapability(cap.id);
+      onDeleted && onDeleted(cap.slug);
+      showToast && showToast("Capability deleted");
+    } catch (e) { showToast && showToast("Delete failed: " + e.message, "⚠"); setConfirmDelete(false); }
+    setSaving(false);
+  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const saved = await saveCapability(cap.id, { name, description: desc });
       onSaved && onSaved({ ...cap, ...saved });
-      setStamp(stampNow());
       setOpen(false);
       showToast && showToast("Saved ✦");
     } catch (e) { showToast && showToast("Save failed: " + e.message, "⚠"); }
@@ -297,9 +324,17 @@ export function CapabilityHeader({ cap, showToast, onSaved }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, flex: 1 }}>{cap.name}</div>
         <button onClick={() => (open ? cancel() : setOpen(true))} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5 }}>{open ? "Close" : "Edit"}</button>
+        {isUserMade && !open && !confirmDelete && <button onClick={() => setConfirmDelete(true)} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5, color: T.flag }}>Delete</button>}
       </div>
+      {confirmDelete && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontFamily: body, fontSize: 10.5, color: T.mutedDeep }}>
+          <span style={{ flex: 1 }}>Delete “{cap.name}”? The AI client loses this tool. Its Skills are kept.</span>
+          <button onClick={() => setConfirmDelete(false)} style={{ ...GHOST, padding: "1px 8px", fontSize: 8.5 }}>Keep</button>
+          <button onClick={handleDelete} disabled={saving} style={{ ...SAVE, padding: "1px 8px", fontSize: 8.5, color: T.flag, border: `1px solid ${T.flag}` }}>{saving ? "Deleting…" : "Delete"}</button>
+        </div>
+      )}
       {!open && cap.description && <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{cap.description}</div>}
-      {!open && stamp && <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginTop: 2 }}>{stamp}</div>}
+      {!open && <AuthorTag row={cap} />}
       {open && (
         <div style={{ paddingTop: 6 }}>
           <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginBottom: 8 }}>{cap.slug} (read-only — this is the AI client's tool name)</div>

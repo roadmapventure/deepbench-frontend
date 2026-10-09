@@ -26,7 +26,7 @@
 import { withRequestContext } from "../lib/request-context.js";
 import { insertAgentConfig } from "../lib/knowledge-write.js";
 import { createPrivateAgent, readCreateInput, addAgentToTeam, readAddToTeamInput, archivePrivateAgent, readAgentIdInput, readIdentityInput, updateAgentIdentity, readAgentIdentity } from "../lib/private-agent-create.js";
-import { readSkillInput, updateSkill, readCapabilityInput, updateCapability, readAddSkillInput, addSkillToCapability, readRemoveSkillInput, removeSkillFromCapability, readSkillLevelInput, updateSkillLevel, readAddCapabilityInput, addCapabilityToAgent } from "../lib/skill-write.js";
+import { readSkillInput, updateSkill, readCapabilityInput, updateCapability, readAddSkillInput, addSkillToCapability, readRemoveSkillInput, removeSkillFromCapability, readSkillLevelInput, updateSkillLevel, readAddCapabilityInput, addCapabilityToAgent, readDeleteCapabilityInput, deleteCapability, actorFromRequest } from "../lib/skill-write.js";
 
 // FEATURE: AGT-338 -- the teams an agent is on, by name, each with its address. This is a
 // service-key read: the browser's key cannot read `teams.address` (a column grant). With no
@@ -140,7 +140,7 @@ async function handler(req, res) {
         const input = readSkillInput(req.body);
         if (input.error) return res.status(400).json({ error: input.error });
         try {
-          return res.status(200).json(await updateSkill(input, { supabaseUrl, supabaseKey }));
+          return res.status(200).json(await updateSkill(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }
@@ -152,7 +152,17 @@ async function handler(req, res) {
         const input = readAddCapabilityInput(req.body);
         if (input.error) return res.status(400).json({ error: input.error });
         try {
-          return res.status(200).json(await addCapabilityToAgent(input, { supabaseUrl, supabaseKey }));
+          return res.status(200).json(await addCapabilityToAgent(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
+        } catch (error) {
+          return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
+        }
+      }
+      // FEATURE: delete -- a capability a user added; its Skills stay.
+      if (req.body?.action === "delete_capability") {
+        const input = readDeleteCapabilityInput(req.body);
+        if (input.error) return res.status(400).json({ error: input.error });
+        try {
+          return res.status(200).json(await deleteCapability(input, { supabaseUrl, supabaseKey }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }
@@ -161,7 +171,7 @@ async function handler(req, res) {
         const input = readCapabilityInput(req.body);
         if (input.error) return res.status(400).json({ error: input.error });
         try {
-          return res.status(200).json(await updateCapability(input, { supabaseUrl, supabaseKey }));
+          return res.status(200).json(await updateCapability(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }
@@ -183,7 +193,7 @@ async function handler(req, res) {
         const input = readAddSkillInput(req.body);
         if (input.error) return res.status(400).json({ error: input.error });
         try {
-          return res.status(200).json(await addSkillToCapability(input, { supabaseUrl, supabaseKey }));
+          return res.status(200).json(await addSkillToCapability(input, { supabaseUrl, supabaseKey, actor: actorFromRequest(req) }));
         } catch (error) {
           return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
         }

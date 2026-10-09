@@ -943,7 +943,7 @@ function SentLensToggle({ on, onChange }) {
 // FEATURE: PE-01 — Profile tab
 // FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved, onCapabilityAdded, onLevelSaved }) {
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved, onCapabilityAdded, onCapabilityDeleted, onLevelSaved }) {
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
   // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
   // rest moves to the Future View tab
@@ -1005,7 +1005,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
               return (
                 <div key={cap.slug} style={{ marginBottom: 12 }}>
                   {/* FEATURE: AGT-413 — Proposed: editable capability name and description; Current keeps the plain heading */}
-                  {proposed ? <CapabilityHeader cap={cap} showToast={showToast} onSaved={onCapabilityChange} /> : (<>
+                  {proposed ? <CapabilityHeader cap={cap} showToast={showToast} onSaved={onCapabilityChange} onDeleted={onCapabilityDeleted} /> : (<>
                     <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{cap.name}</div>
                     {cap.description && (
                       <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>{cap.description}</div>
@@ -2200,6 +2200,7 @@ export default function PersonnelScreen() {
   // FEATURE: AGT-413 — a saved Skill (matched by slug, it may sit on several capabilities) or capability replaces its row
   const patchSkill = (sk) => setCapabilities(cs => cs.map(c => ({ ...c, skillProfiles: c.skillProfiles.map(s => (s.slug === sk.slug ? { ...s, ...sk, level: s.level } : s)) })));
   // FEATURE: AGT-414 — a new Skill joins one capability; a removed one leaves that capability only
+  const removeCapabilityFrom = (slug) => setCapabilities(cs => cs.filter(c => c.slug !== slug));
   const addCapabilityTo = (cap) => setCapabilities(cs => [...cs, cap]);
   const addSkillTo = (capSlug, skill) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: [...c.skillProfiles, skill] } : c)));
   const removeSkillFrom = (capSlug, skillSlug) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: c.skillProfiles.filter(s => s.slug !== skillSlug) } : c)));
@@ -2468,7 +2469,7 @@ export default function PersonnelScreen() {
             <style>{SENT_LENS_CSS}</style>
             {(activeTab === "profile" || activeTab === "training") && isPrivateAgent(agent) && <SentLensToggle on={sentLens} onChange={setSentLens}/>}
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onCapabilityAdded={addCapabilityTo} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onCapabilityAdded={addCapabilityTo} onCapabilityDeleted={removeCapabilityFrom} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
             {activeTab === "future" && arrangement === "proposed" && (
               <FutureViewTab isMobile={isMobile} groups={[

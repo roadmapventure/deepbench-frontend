@@ -4,7 +4,7 @@
 // assembleCapabilityRows() listing it as a scoped tool; the Teach tool's capability / skill / specialty / bio kinds. STATIC: the route action and the Personnel mount.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { readAddCapabilityInput, addCapabilityToAgent } from "../../lib/skill-write.js";
+import { readAddCapabilityInput, addCapabilityToAgent, actorFromRequest, authorCols, updateSkill, deleteCapability, readDeleteCapabilityInput } from "../../lib/skill-write.js";
 import { assembleCapabilityRows } from "../../api/_lib/mcp.js";
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const count = (s, t) => s.split(t).length - 1;
@@ -71,6 +71,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes("/agents?id=eq.zoe-k3x9ab&select=id,name&limit=1")) return ok([{ id: "zoe-k3x9ab", name: "Zoe" }]);
   if (m === "PATCH" && u.includes("agents?")) return ok([{ id: "zoe-k3x9ab", name: "Zoe", role: "Analyst", specialty: JSON.parse(init.body).specialty, bio: JSON.parse(init.body).bio, identity_updated_at: "2026-10-08T00:00:00Z" }]);
   if (u.includes("agent_capability_assignments?agent_id=eq.zoe-k3x9ab&select=capability_slug")) return ok([{ capability_slug: "zoe-k3x9ab-knowledge" }, { capability_slug: "zoe-k3x9ab-bid-review-abc123" }]);
+  if (u.includes("skill_profiles?slug=in")) return ok([{ slug: "agent-capability-intent", traits: { scope_capability: true } }, { slug: "agent-bundle-intent", traits: {} }]);
   if (u.includes("capabilities?slug=in")) return ok([{ slug: "zoe-k3x9ab-knowledge", name: "Zoe's Knowledge", default_intent_slug: "agent-bundle-intent" }, { slug: "zoe-k3x9ab-bid-review-abc123", name: "Bid review", default_intent_slug: "agent-capability-intent" }]);
   if (u.includes("capabilities?select=*") && m === "POST") return ok([{ id: "u1", slug: JSON.parse(init.body).slug, name: JSON.parse(init.body).name }]);
   if (u.includes("skill_profiles?select=*") && m === "POST") return ok([{ id: "s1", slug: JSON.parse(init.body).slug, ...JSON.parse(init.body) }]);
@@ -89,4 +90,85 @@ await assert.rejects(handle({ ...base, content: { kind: "skill", capability: "Bi
 const sp = await handle({ ...base, content: { kind: "specialty", title: "-", content: "City bid review" } });
 assert.equal(sp.saved.kind, "specialty");
 await assert.rejects(handle({ ...base, content: { kind: "bio", title: "-", content: "x".repeat(2001) } }), /at most 2000/);
+
+// ── author tags: who made / last edited it, stored with a type and an id ──────────────────────────────────────────
+assert.equal(actorFromRequest({ headers: { host: "localhost:5173" } }).type, "owner");
+assert.equal(actorFromRequest({ headers: { host: "deepbench-frontend-git-dev-roadmapventures-projects.vercel.app" } }).type, "owner");
+assert.equal(actorFromRequest({ headers: { host: "app.deepbench.example" } }).type, "end_user");
+assert.deepEqual(authorCols(null), {}, "no actor, no tag (callers that predate tags are unchanged)");
+assert.deepEqual(Object.keys(authorCols({ type: "ai_client", id: "claude-desktop" }, { created: true })).sort(), ["created_by_id", "created_by_type", "updated_at", "updated_by_id", "updated_by_type"]);
+assert.deepEqual(Object.keys(authorCols({ type: "end_user", id: null })).sort(), ["updated_at", "updated_by_id", "updated_by_type"], "an edit writes only the last-edited columns");
+assert.deepEqual(authorCols({ type: "robot" }), {}, "an unknown author type is never written");
+{
+  const f = fake();
+  await addCapabilityToAgent({ agentId: "zoe-k3x9ab", fields: { name: "Bid review" } }, { ...f.deps, actor: { type: "end_user", id: null } });
+  assert.equal(f.sent[1].body.created_by_type, "end_user");
+  assert.equal(f.sent[1].body.updated_by_type, "end_user");
+  const sent = []; const fetchImpl = async (url, init) => { sent.push({ u: String(url), body: init.body ? JSON.parse(init.body) : null }); return { ok: true, status: 200, json: async () => [{ id: "s1" }], text: async () => "" }; };
+  await updateSkill({ skillId: "s1", fields: { tone: "plain" } }, { supabaseUrl: "https://x.test", supabaseKey: "k", fetchImpl, actor: { type: "owner", id: null } });
+  assert.deepEqual(Object.keys(sent[0].body).sort(), ["tone", "updated_at", "updated_by_id", "updated_by_type"]);
+  await updateSkill({ skillId: "s1", fields: { tone: "plain" } }, { supabaseUrl: "https://x.test", supabaseKey: "k", fetchImpl });
+  assert.deepEqual(sent[1].body, { tone: "plain" }, "with no actor the body is exactly what was given");
+}
+// the AI client's tag carries its key NAME
+assert.ok(cap.saved.origin_caller === "claude-desktop");
+assert.ok(calls.some(c => c.m === "POST" && c.u.startsWith("capabilities?select=*")), "the capability write ran");
+
+// ── delete a capability: only one whose Intent is scoped to its own Skills; its Skills stay ──────────────────────
+assert.deepEqual(readDeleteCapabilityInput({ action: "delete_capability", capability_id: "11111111-1111-1111-1111-111111111111" }), { capabilityId: "11111111-1111-1111-1111-111111111111" });
+assert.ok(readDeleteCapabilityInput({ capability_id: "nope" }).error);
+function delFake(intentTraits) {
+  const sent = [];
+  const fetchImpl = async (url, init) => {
+    const u = String(url).split("/rest/v1/")[1], m = init.method;
+    sent.push(m + " " + u.split("?")[0]);
+    const ok = b => ({ ok: true, status: 200, json: async () => b, text: async () => "" });
+    if (u.startsWith("capabilities?id=eq") && m === "GET") return ok([{ id: "11111111-1111-1111-1111-111111111111", slug: "zoe-x-abc123", default_intent_slug: "some-intent" }]);
+    if (u.startsWith("skill_profiles?slug=eq.some-intent")) return ok([{ traits: intentTraits }]);
+    return ok([]);
+  };
+  return { sent, deps: { supabaseUrl: "https://x.test", supabaseKey: "k", fetchImpl } };
+}
+{
+  const d = delFake({ scope_capability: true });
+  assert.deepEqual(await deleteCapability({ capabilityId: "11111111-1111-1111-1111-111111111111" }, d.deps), { deleted: "zoe-x-abc123" });
+  assert.deepEqual(d.sent.filter(x => x.startsWith("DELETE")), ["DELETE capability_skill_profiles", "DELETE agent_capability_assignments", "DELETE capabilities"], "links, assignment, then the capability; skill_profiles is never touched");
+  const refused = delFake({ handler: "agent-bundle" });
+  await assert.rejects(deleteCapability({ capabilityId: "11111111-1111-1111-1111-111111111111" }, refused.deps), e => e.status === 403);
+  assert.ok(!refused.sent.some(x => x.startsWith("DELETE")), "a Knowledge / Teach / platform capability deletes nothing");
+}
+
+// ── what an AI client receives: every Skill field except the model settings ──────────────────────────────────────
+{
+  const { readCapabilitySkills } = await import("../../api/_lib/handlers/agent-bundle.js");
+  const seen = [];
+  globalThis.fetch = async (url) => {
+    const u = String(url); seen.push(u.split("/rest/v1/")[1]);
+    const ok = b => ({ ok: true, status: 200, json: async () => b });
+    if (u.includes("agent_capability_assignments")) return ok([{ capability_slug: "zoe-knowledge" }, { capability_slug: "zoe-x-abc123" }]);
+    if (u.includes("/capabilities?")) return ok([{ slug: "zoe-knowledge", name: "Zoe's Knowledge", description: "d" }, { slug: "zoe-x-abc123", name: "Bid review", description: "r" }].filter(c => decodeURIComponent(u).includes(`"${c.slug}"`)));
+    if (u.includes("capability_skill_profiles")) return ok([{ capability_slug: "zoe-x-abc123", level: 1, display_order: 1, skill_profiles: { slug: "s1", name: "Claim check", skill_type_slug: "intent", description: "d", objective: "o", method: "m", tone: "t", confidence: "c", output_desc: "od", notes: "n", traits: { a: 1 }, guardrails: ["g"], llm_model: "SECRET-MODEL", temperature: 0.2 } }]);
+    return ok([]);
+  };
+  const out = await readCapabilitySkills("zoe-k3x9ab", "global");
+  assert.deepEqual(out.map(c => c.slug), ["zoe-knowledge", "zoe-x-abc123"]);
+  assert.deepEqual(out[0].skills, [], "the Knowledge capability carries no Skills");
+  const sk = out[1].skills[0];
+  for (const f of ["name", "skill_type_slug", "description", "objective", "method", "tone", "confidence", "output_desc", "notes", "traits", "guardrails"]) assert.ok(sk[f] !== undefined && sk[f] !== null, `${f} reaches the AI client`);
+  assert.ok(!("llm_model" in sk) && !("temperature" in sk) && !JSON.stringify(out).includes("SECRET-MODEL"), "model settings never do");
+  assert.equal(sk.skill_type_slug, "intent", "an Intent Skill is included too (the prompt builder skips it; this list does not)");
+  assert.ok(seen.some(x => x.includes("skill_profiles(slug,name,skill_type_slug,description,objective,method,tone,confidence,output_desc,notes,traits,guardrails)")), "the read names its columns");
+  const scoped = await readCapabilitySkills("zoe-k3x9ab", "global", "zoe-x-abc123");
+  assert.deepEqual(scoped.map(c => c.slug), ["zoe-x-abc123"], "a scoped call lists that one capability");
+}
+
+// ── the page: tag lines show the type and the time, never the id ─────────────────────────────────────────────────
+{
+  const sk = read("src/screens/personnel/SkillEditor.jsx");
+  assert.ok(sk.includes("Created: ") && sk.includes("Last edited: "));
+  const tag = sk.slice(sk.indexOf("export function authorLines"), sk.indexOf("function AuthorTag"));
+  assert.ok(!tag.includes("created_by_id") && !tag.includes("updated_by_id"), "the stored id is not rendered");
+  assert.ok(sk.includes('"delete_capability"') && sk.includes("Its Skills are kept"));
+}
+
 console.log("ok add-capability");
