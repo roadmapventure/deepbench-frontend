@@ -41,7 +41,7 @@ import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
 import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
-import { SkillEditorRow, CapabilityHeader, AddSkillForm, AddCapabilityForm, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
+import { SkillEditorRow, CapabilityHeader, AddSkillForm, AddCapabilityForm, CapabilityDrawer, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
 import { TeamHeading, SkillLevelBar, ConnectionStatus, isConnectionCapability } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
@@ -1013,7 +1013,8 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
                   </>)}
                   {/* FEATURE: AGT-399 / AGT-409 / AGT-413 — Proposed: every Skill under its fixed type header, fields always shown, editable in place */}
                   {proposed ? (
-                    cap.skillProfiles.length === 0
+                    <CapabilityDrawer count={cap.skillProfiles.length}>
+                    {cap.skillProfiles.length === 0
                       ? <div style={{ fontFamily: body, fontSize: 10.5, color: T.muted, fontStyle: "italic", padding: "4px 0" }}>No Skills attached to this capability.</div>
                       : SKILL_TYPES.map(([typeSlug, typeLabel]) => {
                           const group = cap.skillProfiles.filter(sp => (sp.skill_type_slug || "intent") === typeSlug);
@@ -1024,13 +1025,14 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
                               {group.map(sp => <SkillEditorRow key={sp.slug} sp={sp} chip={TYPE_CHIP[typeSlug] || TYPE_CHIP.intent} showToast={showToast} onSaved={onSkillChange} capSlug={cap.slug} onRemoved={onSkillRemoved} />)}
                             </div>
                           );
-                        })
+                        })}
+                    {/* FEATURE: AGT-414 — type in a new Skill and attach it to this capability */}
+                    <AddSkillForm capSlug={cap.slug} showToast={showToast} onAdded={onSkillAdded} />
+                    </CapabilityDrawer>
                   ) : cap.skillProfiles.map(sp => {
                     const chip = TYPE_CHIP[sp.skill_type_slug] || TYPE_CHIP.intent;
                     return <SkillRow key={sp.slug} sp={sp} chip={chip} />;
                   })}
-                  {/* FEATURE: AGT-414 — Proposed: type in a new Skill and attach it to this capability */}
-                  {proposed && <AddSkillForm capSlug={cap.slug} showToast={showToast} onAdded={onSkillAdded} />}
                 </div>
               );
             })

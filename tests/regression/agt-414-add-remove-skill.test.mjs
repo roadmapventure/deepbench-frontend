@@ -126,7 +126,9 @@ export default async function run() {
   assert.equal(count(route, '"remove_skill_from_capability"'), 1);
   const screen = read("src/screens/PersonnelScreen.jsx");
   assert.equal(count(screen, "<AddSkillForm"), 1, "PersonnelScreen mounts AddSkillForm once");
-  assert.ok(screen.includes("{proposed && <AddSkillForm"), "AddSkillForm is mounted only under `proposed`");
+  // The form lives inside the capability drawer, which is itself the `proposed` branch (Current renders the plain SkillRow list).
+  const branch = screen.slice(screen.indexOf("{proposed ? (\n                    <CapabilityDrawer"), screen.indexOf(") : cap.skillProfiles.map(sp => {"));
+  assert.ok(branch.includes("<AddSkillForm") && branch.includes("</CapabilityDrawer>"), "AddSkillForm is mounted only under `proposed`, inside the capability drawer");
   assert.ok(read("src/screens/personnel/SkillEditor.jsx").includes("remove_skill_from_capability"), "the Remove button posts remove_skill_from_capability");
 
   // ── (e) LIVE ───────────────────────────────────────────────────────────────

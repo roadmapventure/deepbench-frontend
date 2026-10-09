@@ -391,3 +391,18 @@ export function AddCapabilityForm({ agentId, showToast, onAdded }) {
     </div>
   );
 }
+
+// A capability's Skills live in a drawer: closed until the user opens it, so a long list of capabilities stays scannable.
+export function CapabilityDrawer({ count, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 8, borderTop: `1px solid ${T.lineSoft}` }}>
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, textAlign: "left" }}>
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <span>Skills ({count})</span>
+      </button>
+      {open && <div>{children}</div>}
+    </div>
+  );
+}

@@ -172,6 +172,9 @@ function delFake(intentTraits) {
   // the "Dim what stays in DeepBench" switch matches what is sent: only the model settings and the key source are dimmed
   assert.deepEqual([...sk.matchAll(/<Line unsent label="([^"]+)"/g)].map(m => m[1]), ["Model", "Key source"]);
   assert.ok(sk.includes("const UNSENT_FIELDS = [];"));
+  // each capability has a Skills drawer, closed until opened
+  assert.ok(sk.includes("export function CapabilityDrawer") && sk.includes("useState(false)") && sk.includes("{open && <div>{children}</div>}"));
+  assert.equal(count(read("src/screens/PersonnelScreen.jsx"), "<CapabilityDrawer count="), 1);
 }
 
 console.log("ok add-capability");
