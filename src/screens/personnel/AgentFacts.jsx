@@ -106,9 +106,15 @@ export const isConnectionCapability = (cap) => !!cap && CONNECTION_INTENTS.inclu
 
 const lastUsedLabel = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
 
-// Under the Connect to AI button: Connected / Not connected yet, when it was last used, then Times used.
-// Connected = at least one MCP call has been made for this agent (the same test as the Activity tab). A failed read
-// leaves the status line out; it never claims "not connected" on an error.
+// Under the Connect to AI button: Active / No recent activity / Not connected yet, when it was last used, then Times used.
+// DeepBench cannot see an AI tool being disconnected (the connection is stateless; it only hears from a tool when the tool calls),
+// so the status is about recent calls, never about a live link: Active = a call for this agent in the last ACTIVE_DAYS days.
+// A failed read leaves the status line out; it never claims "not connected" on an error.
+export const ACTIVE_DAYS = 7;
+export function connectionState(lastIso, now = Date.now()) {
+  if (!lastIso) return "never";
+  return now - new Date(lastIso).getTime() <= ACTIVE_DAYS * 86400000 ? "active" : "quiet";
+}
 export function ConnectionStatus({ agentId, align = "right" }) {
   const [last, setLast] = useState(undefined); // undefined: loading or failed, null: never, string: last call
   useEffect(() => {
@@ -123,7 +129,9 @@ export function ConnectionStatus({ agentId, align = "right" }) {
   return (
     <div style={{ width: "100%", textAlign: align }}>
       {last !== undefined && (
-        <div style={{ ...text, color: last ? T.moss : T.muted, fontWeight: 700 }}>{last ? "● Connected" : "○ Not connected yet"}</div>
+        <div style={{ ...text, color: connectionState(last) === "active" ? T.moss : T.muted, fontWeight: 700 }}>
+          {{ active: "● Active", quiet: "○ No recent activity", never: "○ Not connected yet" }[connectionState(last)]}
+        </div>
       )}
       {last && <div style={{ ...text, color: T.muted }}>Last used {lastUsedLabel(last)}</div>}
       <UsageCountRow agentId={agentId} align={align} />
