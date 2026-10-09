@@ -1,3 +1,4 @@
+// DeepBench v7.0.828 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
 // DeepBench v7.0.778 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-304 slice 3 -- re-pin arm F twice: requirement-check now binds a third Intent, vc-process-break-class (AGT-309 v7.0.743, agent-row decision 54d80a6a), and the AGT-281 agent-row decision is pinned by id e2c0d503 rather than newest-first, which SES-114's act 9ee2fe9b now wins; nothing weakened.
 // DeepBench v7.0.741 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-281 -- THE LIST TURN:
 // the door AGT-280 slice 2 built rules one ticket at a time, and this is the guard on the one that
@@ -17,7 +18,9 @@
 //      0 / 6 / "4", a blank reason -- each refusal NAMING the ticket. Then two DOORS with
 //      SUPABASE_URL / SUPABASE_SERVICE_KEY DELETED from the child's environment: a held list exits 1
 //      before any read, and a refused `--apply-list` exits 1 having sent nothing (exit 2 there would
-//      be a credential failure wearing a refusal's clothes).
+//      be a credential failure wearing a refusal's clothes). AGT-432 re-pinned this arm to an EMPTY
+//      `EXCLUDED_KINDS`, `CANDIDATE_FILTER` and the fifth head column, and added the `ctxJ` case: a
+//      `pass` may not replace an existing `john:` need_source, and echoing it passes.
 //   B  THE TWO CROSS-FILE STRINGS, which are the ones that can rot silently. `PROPOSED_STATUS` here
 //      must still be the literal `scripts/ticket-owner.js` writes (it is not exported there, so this
 //      arm reads that file), and `VICTORIA_PREFIX` in the brief must still equal `LIST_PREFIX` in the
@@ -26,14 +29,17 @@
 //      `routine/trig_012xvmXsXAjbVxdbYhUTq6W1/prompt` (the ID -- the routine exists, created 2026-10-02
 //      and switched off, so location 1 is its id and never the string "null"), and the block's own
 //      content -- the three list slugs, `--apply-list`, the `--ai-type`, and NO `claude-` and NO
-//      `trig_`.
+//      `trig_`. AGT-432 re-pinned the content to John's VICTORIA-PRIORITIZE prompt: the duty row, the
+//      `executing` projects and `victoria-prioritize-<yyyymmdd>`, and NEITHER planned findings list.
 //   D  THE BRIEF (§6.4): `renderVictoriaList()`'s three branches render differently, and
 //      `renderBlock()` carries the lead BETWEEN Ticket hygiene and Staff watch.
 //   E  THE REPO PLUMBING: the `SERVICE_CATALOG` slug the runbook's block prescribes verbatim, the
 //      `ROUTINES` key, the `CLAUDE.md` pointer row and the `ARCHITECTURE.md` header + §19v sentence.
 //   F  LIVE: the Skill row, its binding, and the two before-images under ONE `agent-row` decision
 //      (§6.5).
-//   G  THE LIVE DISCRIMINATOR (§6.1), end to end over the real CLI. See its own block.
+//   G  THE LIVE DISCRIMINATOR (§6.1), end to end over the real CLI. See its own block. AGT-432
+//      re-pinned its candidate check: ALL of John's unreversed rulings are candidates, and nothing
+//      else from `runner_decisions`.
 //
 // WHERE THE FIXTURES LIVE, AND WHY THAT IS THE WHOLE SAFETY ARGUMENT -- the same argument
 // `agt-280-requirement-check.test.mjs` makes, plus one more this arm needs.
@@ -66,7 +72,7 @@ import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   LIST_INTENT, LIST_PREFIX, HELD_LISTS, HEAD_CHARS, DESC_CHARS, LIST_REASON_CHARS, TOP_N,
-  CANDIDATE_HEAD, EXCLUDED_KINDS, PROPOSED_STATUS, AWAITING_LIST_ANSWER,
+  CANDIDATE_HEAD, CANDIDATE_FILTER, EXCLUDED_KINDS, PROPOSED_STATUS, AWAITING_LIST_ANSWER,
   buildListContext, validateListVerdict, runLine,
 } from "../../scripts/requirement-check.js";
 import { ROUTINES } from "../../scripts/check-routine-prompt.js";
@@ -186,13 +192,14 @@ async function run() {
     assert.equal(DESC_CHARS, 1500, "the 1,500-char description cut (the Designer's call (d))");
     assert.equal(LIST_REASON_CHARS, 400, "the schema's own reason ceiling");
     assert.equal(TOP_N, 3, "runLine names three passes");
-    assert.deepEqual([...EXCLUDED_KINDS], ["john:runner_decisions"],
-      "decisions are excluded from the candidates by design, not by omission");
-    assert.ok(!Object.hasOwn(CANDIDATE_HEAD, "runner_decisions"),
-      "and the head map must not carry a column for them either");
+    assert.deepEqual([...EXCLUDED_KINDS], [],
+      "nothing is excluded since AGT-432: a John ruling is a need (directive 0078af4d)");
+    assert.deepEqual(CANDIDATE_FILTER, { runner_decisions: "kind=eq.john-ruling&reversed_at=is.null" },
+      "only John's unreversed rulings, never the agents' records (AGT-432)");
     assert.deepEqual(CANDIDATE_HEAD, {
       runner_directives: "body", napkin_ideas: "text", market_records: "title", knowledge_entries: "title",
-    }, "the four candidate tables and the column each one's head comes from");
+      runner_decisions: "summary",
+    }, "the five candidate tables and the column each one's head comes from");
     assert.ok(AWAITING_LIST_ANSWER.includes("exit 3"), "the exit-3 line must say what exit 3 means");
 
     // §6.1's OWN expected notes string, asserted against runLine() rather than described.
@@ -252,6 +259,19 @@ async function run() {
       /is ruled 2 times; every ticket of the list is ruled exactly once/);
     assert.match(must(withRows([{ ...rows[0], need_source: "nathan:market_records:deadbeef" }, rows[1]]),
       A, "a source that is NOT a candidate"), /is not one of them/);
+    const J = "john:runner_decisions:00000000-0000-4000-8000-000000000432";
+    const ctxJ = buildListContext({
+      project: "backlog-intake", epics: ["e1"],
+      tickets: [{ backlog_id: A, title: "A", description: "d", status: "open", need_source: J },
+        { backlog_id: B, title: "B", description: null, status: "partial" }],
+      candidates: [{ key: SRC, head: "record" }, { key: J, head: "John's ruling" }],
+      kinds: ["nathan:market_records", "john:runner_decisions"],
+    });
+    const swapped = validateListVerdict(withRows([{ ...rows[0], need_source: SRC }, rows[1]]), ctxJ);
+    assert.equal(swapped.ok, false, "(AGT-432) a pass may not replace an existing john: source");
+    assert.match(swapped.refusals.join(" | "), new RegExp(`^${A}: already carries John's own source ${J}`));
+    const echoed = validateListVerdict(withRows([{ ...rows[0], need_source: J }, rows[1]]), ctxJ);
+    assert.deepEqual(echoed.refusals, [], "(AGT-432) echoing John's source passes");
     for (const score of [0, 6, "4", 3.5, undefined]) {
       assert.match(must(withRows([{ ...rows[0], need_score: score }, rows[1]]), A, `need_score ${JSON.stringify(score)}`),
         /need_score must be a whole number 1-5/);
@@ -372,17 +392,19 @@ async function run() {
     // THE BLOCK'S OWN CONTENT. A block that drifts from itself passes the check above and still
     // tells the routine to do the wrong thing.
     const b = block();
-    for (const s of ["dev-mgr-findings", "auditor-findings", "builder-found-tickets",
-      "--prepare-list", "--apply-list", "--ai-type=requirement-check",
-      "requirement-check:vc-reorganize-intent:depth0", "victoria-reorg-<yyyymmdd>"]) {
+    for (const s of ["builder-found-tickets", "--prepare-list", "--apply-list", "--ai-type=requirement-check",
+      "requirement-check:vc-reorganize-intent:depth0", "victoria-prioritize-<yyyymmdd>",
+      "vc-prioritization-duty", "status = 'executing'"]) {
       assert.ok(b.includes(s), `the block must name ${s}`);
     }
+    assert.ok(!b.includes("dev-mgr-findings") && !b.includes("auditor-findings"),
+      "the two planned findings lists are no longer her scope (AGT-432, directive 0078af4d)");
     assert.ok(/NEVER builder-found-tickets/.test(b),
       "and it must name builder-found-tickets only to forbid it -- a held list is not a list to run");
     assert.ok(!b.includes("claude-"),
       "NO model id in the block: the model is the model_assignments row the render prints at run time");
     assert.ok(!b.includes("trig_"),
-      "and NO trigger id: the routine does not exist yet, and AGT-102 is what an invented one costs");
+      "and NO trigger id: the id lives in the table, never the block (AGT-102)");
     for (const forbidden of ["file a ticket", "removed", "push", "card", "message", "ask John"]) {
       assert.ok(b.includes(forbidden), `the block's refusal list must still name ${JSON.stringify(forbidden)}`);
     }
@@ -594,8 +616,10 @@ async function run() {
             "the 2,000-character fixture description must come back CUT at DESC_CHARS");
           const keys = prepared.context.candidates.map(c => c.key);
           assert.ok(keys.includes(GOOD), `the live market record must be among the candidates; got ${keys.length} candidates`);
-          assert.ok(!keys.some(k => k.startsWith("john:runner_decisions:")),
-            "and NO decision may be a candidate (the Designer's call (b))");
+          const johnKeys = keys.filter(k => k.startsWith("john:runner_decisions:"));
+          const rulings = await count(url, key, "runner_decisions?select=id&kind=eq.john-ruling&reversed_at=is.null");
+          assert.ok(rulings > 0 && johnKeys.length === rulings,
+            `ALL of John's unreversed rulings are candidates and nothing else from that table: ${johnKeys.length} keys vs ${rulings} rows (AGT-432)`);
           for (const c of prepared.context.candidates) {
             assert.ok(c.head === null || String(c.head).length <= HEAD_CHARS,
               `every candidate travels as a HEAD of at most ${HEAD_CHARS} chars; got ${String(c.head).length}`);

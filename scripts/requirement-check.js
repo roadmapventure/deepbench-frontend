@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.828 | scripts/requirement-check.js | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
 // DeepBench v7.0.743 | scripts/requirement-check.js | AGT-309 -- `--prepare` gains `--home=<slug>`,
 // the destination the manager's review routed this ticket to. The slug is checked HERE, before any
 // model turn, against `projects` (`status = 'executing'` AND `accepts_findings` -- AGT-240's own
@@ -23,8 +24,8 @@
 // (d)): every open/partial ticket of the named project's epics with its `description` cut at
 // DESC_CHARS, and the candidate need sources as `{key, head}` -- the first HEAD_CHARS characters of
 // each row, never the whole row, because a list turn over 277 candidate rows is a budget question
-// before it is a judgment one. `john:runner_decisions` is excluded from the candidates outright: a
-// decision is the record of a call already made, not a need waiting to be answered.
+// before it is a judgment one.
+// John's rulings (kind john-ruling) ARE candidates since AGT-432: a ruling is a need he stated.
 //
 // WHAT AN ANSWER CAN DO, AND THE TWO WRITERS IT REACHES. `validateListVerdict()` runs FIRST and
 // offline, and it holds the three rules neither writer can see: every ticket of the list is ruled
@@ -241,11 +242,21 @@ export const CANDIDATE_HEAD = Object.freeze({
   napkin_ideas: "text",
   market_records: "title",
   knowledge_entries: "title",
+  runner_decisions: "summary",
 });
 
-// Excluded from the candidates by DESIGN, not by omission (the Designer's call (b)): a recorded
-// decision is the trace of a call already made, so a ticket citing one answers nothing new.
-export const EXCLUDED_KINDS = Object.freeze(["john:runner_decisions"]);
+// WHICH ROWS OF A CANDIDATE TABLE ARE CANDIDATES AT ALL (AGT-432). `runner_decisions` holds 2,500
+// rows and only the `john-ruling` ones that stand are John's own words -- the rest are the agents'
+// records of calls already made. Like the head column above, this is a fact about which rows ARE
+// John's rulings, not a content judgment; the allowlisted pairs themselves stay DATA (pattern:2).
+export const CANDIDATE_FILTER = Object.freeze({
+  runner_decisions: "kind=eq.john-ruling&reversed_at=is.null",
+});
+
+// EMPTY since AGT-432 (directive 0078af4d): John's rulings were the one excluded pair and they are
+// candidates now, narrowed to his own rulings by CANDIDATE_FILTER rather than shut out. The export
+// and the skip below stay, so a pair that must be excluded later is one line here.
+export const EXCLUDED_KINDS = Object.freeze([]);
 
 // The status a turned-down proposal lands on. ticket-owner.js:294's own value, which is NOT exported
 // there; `tests/regression/agt-281-victoria-runs.test.mjs` asserts that file still reads this exact
@@ -342,6 +353,15 @@ export function validateListVerdict(answer, ctx) {
       else if (!keys.has(src)) {
         no(id, `a pass must name one of the ${keys.size} candidate source(s) it was handed; ` +
           `${JSON.stringify(src)} is not one of them`);
+      }
+      // AND IT NEVER REPLACES ONE OF JOHN'S (AGT-432, directive 0078af4d): 8 tickets lost a
+      // John-authored need_source to a market record on 2026-10-08. A `john:` source already on the
+      // ticket may only be echoed; any other existing source may still be replaced, which is the
+      // only tier the directive states.
+      const held = blank(want.get(id)?.need_source) ? null : String(want.get(id).need_source);
+      if (held !== null && held.startsWith("john:") && src !== null && src !== held) {
+        no(id, `already carries John's own source ${held}; a pass must echo it; an existing ` +
+          "John-authored need_source is never replaced (directive 0078af4d)");
       }
       const score = row.need_score;
       if (!Number.isInteger(score) || score < 1 || score > 5) {
@@ -679,7 +699,7 @@ async function prepareList(args) {
         `has no head column for ${table || "(no table)"} — add one to CANDIDATE_HEAD rather than ` +
         "letting a candidate source the list turn cannot read look like one that does not exist");
     }
-    const rows = await get(`${enc(table)}?select=id,${enc(col)}&order=id.asc&limit=5000`);
+    const rows = await get(`${enc(table)}?select=id,${enc(col)}${CANDIDATE_FILTER[table] ? "&" + CANDIDATE_FILTER[table] : ""}&order=id.asc&limit=5000`);
     for (const r of Array.isArray(rows) ? rows : []) {
       candidates.push({ key: `${pair}:${r.id}`, head: cut(r[col], HEAD_CHARS) });
     }
