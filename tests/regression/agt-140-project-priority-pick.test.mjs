@@ -1,3 +1,4 @@
+// DeepBench v7.0.825 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-427 slice 1 -- arm B reads its key NAMES out of the shipped ORDER BY (pickKeys()) instead of listing them, and asserts the WITHHOLDING the ordering clauses cannot see: every row the pick serves is scored 3+, and an unscored ticket is not a zero.
 // DeepBench v7.0.797 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-304 slice 8 -- arm B's order oracle carries SIX keys, not five: AGT-280's `sort_need` (`6 - COALESCE(need_score, 0)`, unscored last) sits between project priority and the filing lane, exactly as the live prime_directive_queue()'s recorded ORDER BY declares it.
 // DeepBench v7.0.604 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-140 -- THE
 // PICK HONOURS `projects.priority`, IN THE SHIPPED SQL AND IN THE ORDER THE DATABASE ACTUALLY
@@ -85,6 +86,10 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MIGRATION = path.join(ROOT, "docs", "design", "agt-140-project-priority-pick.sql");
+// AGT-427 (v7.0.825): the mirror of migration `agt427_scored_pick`, which carries the CURRENT
+// prime_directive_queue(). pickKeys() reads its ORDER BY; arm A still grades AGT-140's own
+// migration above, because that is the text AGT-140 shipped and this file is its pin.
+const MIGRATION_427 = path.join(ROOT, "docs", "design", "agt-427-scored-pick.sql");
 const LANE = "selfbuild";
 const MAX = Number.MAX_SAFE_INTEGER;
 
@@ -160,6 +165,43 @@ function splitList(text) {
 }
 
 const splitKeys = clause => splitList(uncomment(clause));
+
+// ---------------------------------------------------------------------------------------------
+// AGT-427 (v7.0.825) -- THE ORACLE'S KEY VECTOR IS READ OUT OF THE SHIPPED SQL, NOT LISTED HERE.
+//
+// WHY. Every time a key was added to the pick's ORDER BY -- AGT-140's `sort_project`, AGT-238's
+// `sort_leverage`, AGT-280's `sort_need` -- it had to be hand-copied into the graded vector here
+// AND into ses-281's, and a hand-copy that lags the SQL grades the OLD order while reporting green.
+// AGT-304 slice 8 caught exactly that: this file graded five keys against a six-key ORDER BY. So
+// the names now come from the one place that cannot lag, the shipped text itself, and both oracles
+// call this function rather than keeping two lists in step by hand (pattern:14, pattern:10).
+//
+// `lane_ord` and `sort_key` are dropped deliberately: they separate the LANES (directive, drain,
+// selfbuild, board) and order the time-sorted directive lane, and arm B grades one lane's interior.
+export function pickKeys() {
+  const src = fs.readFileSync(MIGRATION_427, "utf8");
+  const body = sliceFunction(src, "public.prime_directive_queue()");
+  const m = body.match(/row_number\(\) OVER \(\s*\n\s*ORDER BY ([\s\S]*?)\n\s*\)::int AS pos/);
+  assert.ok(
+    m,
+    `${path.relative(ROOT, MIGRATION_427)}: no \`row_number() OVER (ORDER BY ...)::int AS pos\` in ` +
+      "prime_directive_queue(). That window IS the pick's order, and the two oracles read their " +
+      "graded keys from it -- without it they would grade nothing and say so as a green",
+  );
+  const keys = splitKeys(m[1])
+    .map(k => k.replace(/\s+NULLS\s+LAST$/i, "").trim())
+    .filter(k => k !== "lane_ord" && k !== "sort_key");
+  assert.ok(
+    keys.length >= 3,
+    `the shipped pick ORDER BY parsed to ${keys.length} graded key(s) (${JSON.stringify(keys)}) -- ` +
+      "too few to be the live order, so the parse is wrong rather than the SQL",
+  );
+  assert.strictEqual(
+    new Set(keys).size, keys.length,
+    `the shipped pick ORDER BY carries a duplicate graded key: ${JSON.stringify(keys)}`,
+  );
+  return keys;
+}
 
 // A CTE's body -- what sits INSIDE the `<name> AS ( ... )` parentheses. The opening paren is
 // excluded deliberately: leaving it in leaves every later split one level deep forever, so the
@@ -401,14 +443,64 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   // MAX rather than 0 is the whole of D2 -- with 0 an admitted enhancement would outrank every
   // chartered ticket on the board.
   // AGT-238: the leading `lev` key -- leverage FIRST, then project priority.
+  // AGT-427: the key NAMES come from the shipped ORDER BY (pickKeys()); this table only says how to
+  // VALUE each one. A key added to the SQL with no entry here THROWS rather than being skipped --
+  // grading five keys of a six-key order is the failure AGT-304 slice 8 found, and it reports green.
+  const KEYS = pickKeys();
+  const VAL = {
+    sort_leverage: it => (it.leverage_reason ? 0 : 1),
+    sort_project: it => {
+      const p = project.get(projectOfEpic.get(it.epic_id));
+      return p && p.status === "executing" ? p.priority : MAX;
+    },
+    // AGT-427 / Designer's call (iii): NO COALESCE. The shipped key is `6 - bu.need_score`, and an
+    // unscored row is now withheld by pick_exclusions() rather than valued as a PARKED 0 -- so a
+    // `?? 0` here would quietly re-create the behaviour this ticket removed and then grade it green.
+    sort_need: it => 6 - it.need_score,
+    sort_lane: it => laneOf(it.filed_at),
+    sort_queue: it => it.queue,
+    sort_cycles: it => it.predicted_cycles ?? MAX,
+  };
+  for (const k of KEYS) {
+    assert.ok(
+      VAL[k],
+      `the shipped pick ORDER BY carries the key \`${k}\`, which this oracle does not know how to ` +
+        "value. Add it to VAL -- an unvalued key is graded as `undefined` and every comparison " +
+        "against it passes, so the oracle would go quiet instead of red",
+    );
+  }
+  const IDX = n => {
+    const i = KEYS.indexOf(n);
+    assert.ok(
+      i >= 0,
+      `the shipped pick ORDER BY no longer carries \`${n}\`, which the clauses below address by ` +
+        `name. Keys as shipped: ${JSON.stringify(KEYS)}`,
+    );
+    return i;
+  };
+  const fmt = a => KEYS.map((k, i) => `${k.slice(5)} ${a[i]}`).join(", ");
   const key4 = ref => {
     const it = byRef.get(ref);
     assert.ok(it, `prime_directive_queue() returned ${ref}, which is not in backlog_items`);
-    const p = project.get(projectOfEpic.get(it.epic_id));
-    const prio = p && p.status === "executing" ? p.priority : MAX;
-    const lev = it.leverage_reason ? 0 : 1;
-    return [lev, prio, 6 - (it.need_score ?? 0), laneOf(it.filed_at), it.queue, it.predicted_cycles ?? MAX];
+    return KEYS.map(k => VAL[k](it));
   };
+
+  // AGT-427 (v7.0.825), John 2026-10-09 -- THE WITHHOLDING, asserted BEFORE the ordering clauses
+  // because they structurally cannot see it: a lane of nothing but `need_score = 1` rows is
+  // perfectly monotonic in every key above. Measured live on the unfixed tree 2026-10-09: the
+  // selfbuild lane served AGT-389, AGT-383 and AGT-396, all scored 1, so an unattended cycle could
+  // be handed the work Victoria had already ranked as the least needed on the board.
+  // `Number.isInteger` is the NULL half: an unscored ticket is not yet scored, never a zero, and
+  // `null >= 3` is false but so is `undefined >= 3` -- the integer check is what tells a missing
+  // column apart from a real score.
+  for (const r of lane) {
+    const it = byRef.get(r.ref);
+    assert.ok(it, `prime_directive_queue() returned ${r.ref}, which is not in backlog_items`);
+    assert.ok(
+      Number.isInteger(it.need_score) && it.need_score >= 3,
+      `${r.ref} is served with need_score ${it.need_score} (AGT-427: scored 3+ only)`,
+    );
+  }
 
   // (i) MONOTONICITY of the order the DATABASE returned. Never a re-sort in JS (SES-45).
   for (let i = 1; i < lane.length; i++) {
@@ -417,19 +509,28 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
     assert.ok(
       lex(a, b) <= 0,
       `the ${LANE} lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
-        `[lev ${a[0]}, prio ${a[1]}, need ${a[2]}, lane ${a[3]}, queue ${a[4]}, cycles ${a[5]}] precedes ${lane[i].ref} ` +
-        `[lev ${b[0]}, prio ${b[1]}, need ${b[2]}, lane ${b[3]}, queue ${b[4]}, cycles ${b[5]}]. The pick orders by ` +
-        "leverage FIRST (AGT-238), then project priority (AGT-140), then AGT-280's need (6 - need_score, unscored last), then SES-281 / M5-02's filing lane, " +
-        "then the queue, then M5-07's predicted_cycles nulls last",
+        `[${fmt(a)}] precedes ${lane[i].ref} [${fmt(b)}]. The pick orders by ` +
+        `${KEYS.join(", ")} -- leverage FIRST (AGT-238), then project priority (AGT-140), then ` +
+        "AGT-280's need (6 - need_score; AGT-427 withholds an unscored or low-scored ticket rather " +
+        "than sorting it last), then SES-281 / M5-02's filing lane, then the queue, then M5-07's " +
+        "predicted_cycles nulls last",
     );
   }
 
   // (ii) THE INVERSION CLAUSE, stated on its own because it is the one AGT-140 exists to close and
   // a reader must be able to see it fail by itself. Every pair, not just adjacent ones.
+  // AGT-427: both positions are addressed BY NAME through IDX, not by a literal 0 and 1. The
+  // literals were correct only as long as leverage and priority stayed the first two keys, and
+  // slice 2 moves `sort_need` to the FRONT of this very ORDER BY -- at which point a literal `a[1]`
+  // would silently compare the NEED of one row against the PRIORITY of another and still pass.
   for (let i = 0; i < lane.length; i++) {
     for (let j = i + 1; j < lane.length; j++) {
-      const [la, a] = key4(lane[i].ref);
-      const [lb, b] = key4(lane[j].ref);
+      const ka = key4(lane[i].ref);
+      const kb = key4(lane[j].ref);
+      const la = ka[IDX("sort_leverage")];
+      const lb = kb[IDX("sort_leverage")];
+      const a = ka[IDX("sort_project")];
+      const b = kb[IDX("sort_project")];
       // AGT-238: a leverage row may precede any priority; the clause holds WITHIN a leverage group.
       if (la !== lb) continue;
       assert.ok(
@@ -437,7 +538,8 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
         `${lane[i].ref} (project priority ${a}) is served at pos ${i + 1}, ahead of ${lane[j].ref} ` +
           `(project priority ${b}) at pos ${j + 1}. A ticket in a lower-priority project may never ` +
           "precede one in a higher-priority project within one leverage group (leverage FIRST (AGT-238), then project priority (AGT-140)) -- that is the live inversion AGT-140 closed " +
-          "(AGT-141/agent-training p3 ahead of AGT-132/dev-manager-capabilities p2, 2026-09-26)",
+          `(AGT-141/agent-training p3 ahead of AGT-132/dev-manager-capabilities p2, 2026-09-26). ` +
+          `Keys as shipped: ${JSON.stringify(KEYS)}`,
       );
     }
   }
@@ -453,13 +555,16 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   }));
   const servedExecuting = executing.filter(p => served.has(p.id));
 
+  // AGT-427: the discriminating shape is stated against `sort_project`'s POSITION rather than
+  // against indices 0..1 -- equal on every key BEFORE priority, rising AT priority, falling on
+  // every key AFTER it. Written this way it survives slice 2 moving a key in front of priority.
   let discriminating = null;
+  const P = IDX("sort_project");
   for (let i = 1; i < lane.length; i++) {
     const a = key4(lane[i - 1].ref);
     const b = key4(lane[i].ref);
-    if (a[0] === b[0] && a[1] < b[1] && lex(a.slice(2), b.slice(2)) > 0) {
-      discriminating = `${lane[i - 1].ref} [lev ${a[0]}, prio ${a[1]}, need ${a[2]}, lane ${a[3]}, queue ${a[4]}, cycles ${a[5]}] ` +
-        `before ${lane[i].ref} [lev ${b[0]}, prio ${b[1]}, need ${b[2]}, lane ${b[3]}, queue ${b[4]}, cycles ${b[5]}]`;
+    if (lex(a.slice(0, P), b.slice(0, P)) === 0 && a[P] < b[P] && lex(a.slice(P + 1), b.slice(P + 1)) > 0) {
+      discriminating = `${lane[i - 1].ref} [${fmt(a)}] before ${lane[i].ref} [${fmt(b)}]`;
       break;
     }
   }
@@ -476,8 +581,9 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   } else {
     console.log(
       `  [AGT-140] arm B: ${lane.length} ${LANE} row(s) over ${servedExecuting.length} executing ` +
-        `project(s); the returned order is monotonic in [leverage, priority, need, filing lane, queue, cycles] and ` +
-        `DISCRIMINATING -- ${discriminating} is a pair the pre-AGT-140 order inverted; leverage FIRST (AGT-238), then project priority (AGT-140).`,
+        `project(s), every one scored 3+ (AGT-427); the returned order is monotonic in ` +
+        `[${KEYS.join(", ")}] -- read out of the shipped ORDER BY, not listed here -- and ` +
+        `DISCRIMINATING: ${discriminating} is a pair the pre-AGT-140 order inverted; leverage FIRST (AGT-238), then project priority (AGT-140).`,
     );
   }
 

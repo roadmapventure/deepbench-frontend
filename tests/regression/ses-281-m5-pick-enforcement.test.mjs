@@ -1,3 +1,4 @@
+// DeepBench v7.0.825 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-427 slice 1 -- the live arm's lane oracle reads its key NAMES from the shipped ORDER BY through agt-140's pickKeys() instead of keeping a second hand-copied list, the bare-queue inversion counter follows `sort_queue` BY NAME rather than by index 4, and every served row is asserted scored 3+.
 // DeepBench v7.0.797 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-304 slice 8 -- the live arm's lane oracle carries SIX keys: AGT-280's `sort_need` (`6 - COALESCE(need_score, 0)`, unscored last) sits between project priority and M5-02's filing lane, and the bare-queue inversion counter follows the queue key to index 4.
 // DeepBench v7.0.567 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-89 -- the
 // stored-queue oracle below reads `filed_at` ALONE, mirroring recompute_backlog_queue() after the
@@ -80,6 +81,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { readBoardState, isDeclarable } from "./_lib/board-state.js";
+// AGT-427 (v7.0.825): the graded key NAMES come from the shipped `prime_directive_queue()` ORDER BY,
+// read by agt-140's pickKeys() out of docs/design/agt-427-scored-pick.sql. ONE home for the key
+// list, read by both pick oracles (pattern:14): this file and agt-140 each carried their own
+// hand-copied vector, and AGT-304 slice 8 found BOTH of them a key behind the live ORDER BY --
+// grading the five-key order against a six-key function and reporting green for it.
+import { pickKeys } from "./agt-140-project-priority-pick.test.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CANONICAL_REL = "docs/RUNNER-GOV-M5-REQUIREMENTS.md";
@@ -427,14 +434,60 @@ async function theLivePickPathObeysTheFourRules() {
   //
   // AGT-238 (v7.0.660): a LEADING `lev` key -- leverage_reason ? 0 : 1. A ticket The Development
   // Manager marked as leverage precedes project priority; everything after it is unchanged.
+  // AGT-427: the NAMES are the shipped ORDER BY's (pickKeys()); this table only values them. A key
+  // added to the SQL with no entry here throws -- it is not skipped, because an unvalued key grades
+  // as `undefined` and every comparison against it passes, which is a quiet oracle, not a green one.
+  const KEYS = pickKeys();
+  const VAL = {
+    sort_leverage: it => (it.leverage_reason ? 0 : 1),
+    sort_project: it => {
+      const proj = projectById.get(projectOfEpic.get(it.epic_id));
+      return proj && proj.status === "executing" ? proj.priority : Number.MAX_SAFE_INTEGER;
+    },
+    // AGT-427 / Designer's call (iii): no COALESCE. An unscored ticket is WITHHELD by
+    // pick_exclusions() now, never valued as a PARKED 0 -- a `?? 0` here would re-create the old
+    // behaviour inside the oracle and then grade it as correct.
+    sort_need: it => 6 - it.need_score,
+    sort_lane: it => laneOf(it.filed_at),
+    sort_queue: it => it.queue,
+    sort_cycles: it => it.predicted_cycles ?? Number.MAX_SAFE_INTEGER,
+  };
+  for (const k of KEYS) {
+    assert.ok(
+      VAL[k],
+      `the shipped pick ORDER BY carries the key \`${k}\`, which this oracle cannot value. Add it ` +
+        "to VAL -- an unvalued key passes every comparison silently",
+    );
+  }
+  const IDX = n => {
+    const i = KEYS.indexOf(n);
+    assert.ok(
+      i >= 0,
+      `the shipped pick ORDER BY no longer carries \`${n}\`, which this arm addresses by name. ` +
+        `Keys as shipped: ${JSON.stringify(KEYS)}`,
+    );
+    return i;
+  };
+  const fmt = a => KEYS.map((k, i) => `${k.slice(5)} ${a[i]}`).join(", ");
   const key4 = ref => {
     const it = byRef.get(ref);
     assert.ok(it, `prime_directive_queue returned ${ref}, which is not in backlog_items`);
-    const proj = projectById.get(projectOfEpic.get(it.epic_id));
-    const prio = proj && proj.status === "executing" ? proj.priority : Number.MAX_SAFE_INTEGER;
-    const lev = it.leverage_reason ? 0 : 1;
-    return [lev, prio, 6 - (it.need_score ?? 0), laneOf(it.filed_at), it.queue, it.predicted_cycles ?? Number.MAX_SAFE_INTEGER];
+    return KEYS.map(k => VAL[k](it));
   };
+
+  // AGT-427 (v7.0.825), John 2026-10-09 -- EVERY ROW THE PICK SERVES IS SCORED 3+, asserted ahead
+  // of the ordering clauses because none of them can see it: a lane holding nothing but
+  // `need_score = 1` rows is monotonic in every key above and would pass this arm untouched.
+  // Measured live on the unfixed tree 2026-10-09: AGT-389, AGT-383 and AGT-396 were all served at
+  // score 1. `Number.isInteger` carries the NULL half -- not yet scored is not a zero.
+  for (const r of lane) {
+    const it = byRef.get(r.ref);
+    assert.ok(it, `prime_directive_queue returned ${r.ref}, which is not in backlog_items`);
+    assert.ok(
+      Number.isInteger(it.need_score) && it.need_score >= 3,
+      `${r.ref} is served with need_score ${it.need_score} (AGT-427: scored 3+ only)`,
+    );
+  }
   const lexLte = (a, b) => {
     for (let i = 0; i < a.length; i++) {
       if (a[i] < b[i]) return true;
@@ -450,11 +503,16 @@ async function theLivePickPathObeysTheFourRules() {
     assert.ok(
       ordered,
       `the selfbuild lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
-        `[leverage ${a[0]}, priority ${a[1]}, need ${a[2]}, lane ${a[3]}, queue ${a[4]}, cycles ${a[5]}] precedes ${lane[i].ref} ` +
-        `[leverage ${b[0]}, priority ${b[1]}, need ${b[2]}, lane ${b[3]}, queue ${b[4]}, cycles ${b[5]}]. The pick path orders by ` +
-        "leverage FIRST (AGT-238), then project priority (AGT-140), then AGT-280's need (6 - need_score, unscored last), then filing lane, queue, cycles",
+        `[${fmt(a)}] precedes ${lane[i].ref} [${fmt(b)}]. The pick path orders by ` +
+        `${KEYS.join(", ")} -- leverage FIRST (AGT-238), then project priority (AGT-140), then ` +
+        "AGT-280's need (6 - need_score; AGT-427 WITHHOLDS an unscored or below-3 ticket instead of " +
+        "sorting it last), then filing lane, queue, cycles",
     );
-    if (a[4] > b[4]) inversionsAgainstBareQueue++;
+    // AGT-427: the queue key is addressed BY NAME. As the literal `a[4]` this counter silently
+    // followed whatever key happened to sit at index 4 -- it had to be moved by hand when AGT-280
+    // inserted `sort_need` ahead of it, and slice 2 moves a key again. Counting the wrong key here
+    // does not fail: it just makes the non-vacuity guard below assert about something else.
+    if (a[IDX("sort_queue")] > b[IDX("sort_queue")]) inversionsAgainstBareQueue++;
   }
 
   // NON-VACUITY for the lane rule: monotonicity is satisfied trivially by bare queue order when
