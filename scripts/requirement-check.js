@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.827 | scripts/requirement-check.js | AGT-433 slice 2 -- need_score 0 = PARKED: both validators take 0-5 like apply_requirement_verdict() (v7.0.826).
 // DeepBench v7.0.743 | scripts/requirement-check.js | AGT-309 -- `--prepare` gains `--home=<slug>`,
 // the destination the manager's review routed this ticket to. The slug is checked HERE, before any
 // model turn, against `projects` (`status = 'executing'` AND `accepts_findings` -- AGT-240's own
@@ -199,8 +200,8 @@ export function validateVerdict(answer, ctx) {
         `${a.need_source === undefined || a.need_source === null ? "<NULL>" : JSON.stringify(String(a.need_source))}`);
     }
     const score = a.need_score;
-    if (!Number.isInteger(score) || score < 1 || score > 5) {
-      no(`need_score must be a whole number 1-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
+    if (!Number.isInteger(score) || score < 0 || score > 5) {
+      no(`need_score must be a whole number 0-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
     }
   }
   return { ok: refusals.length === 0, refusals };
@@ -344,8 +345,8 @@ export function validateListVerdict(answer, ctx) {
           `${JSON.stringify(src)} is not one of them`);
       }
       const score = row.need_score;
-      if (!Number.isInteger(score) || score < 1 || score > 5) {
-        no(id, `need_score must be a whole number 1-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
+      if (!Number.isInteger(score) || score < 0 || score > 5) {
+        no(id, `need_score must be a whole number 0-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
       }
     }
   }
