@@ -1,3 +1,18 @@
+// DeepBench v7.0.835 | api/_lib/mcp.js | AGT-341 slice 1 -- an MCP row records WHICH TOOL CONNECTED.
+// All 2,995 `call_source='mcp'` rows named the capability, the agent and the key, but nothing said
+// whether Claude, ChatGPT or a script was on the other end. This server is stateless (no
+// `Mcp-Session-Id`), so `initialize`'s `clientInfo` cannot be joined to a later `tools/call` -- and
+// `initialize` writes no row at all. The `tools/call` request's own headers are therefore the only
+// place a client names itself at the moment there is a row to name it on, and `User-Agent` is the one
+// such header. So handler() now wraps dispatchJsonRpc() in runWithCallSource('mcp', ...) carrying
+// mcpRequestContext(), which adds `userAgent` to the request-scoped store; both seams already spread
+// `ctx` through mcpAttribution(), so the value rides to lib/activity-log.js untouched and
+// mcpAttribution() itself is unchanged. STORED RAW AND UNPARSED, capped at 256 chars: what Claude or
+// ChatGPT actually send is NOT verifiable from this environment, so normalising it into
+// "Claude"/"ChatGPT"/"other" here would be a guess frozen into history (§19i: new rows only, no
+// backfill). That naming rule is slice 2, authored from observed strings. No slug conditional, no new
+// import, no model call, and api/ stays at 12 of 12 functions.
+//
 // DeepBench v7.0.792 | api/_lib/mcp.js | AGT-390 -- a second deterministic handler, `agent-teach`, is
 // registered by NAME (the Intent row `agent-teach-intent` declares it), and runDeterministic() hands
 // every handler the matched MCP key's NAME as handler_context.caller_key_name, so a taught row records
@@ -651,6 +666,45 @@ export function resolveCallerKey(presented, rows) {
 }
 
 /**
+ * FEATURE: AGT-341 -- the cap on the stored User-Agent. 256 chars is the store-it-raw budget: long
+ * enough for every real client string (a desktop browser UA, the longest thing that lands here, runs
+ * ~120-180), short enough that a hostile or runaway header cannot bloat the row.
+ */
+export const USER_AGENT_MAX = 256;
+
+/**
+ * FEATURE: AGT-341 -- adds the caller's raw User-Agent to the attribution the MCP request carries.
+ *
+ * WHY A HEADER AND NOT `clientInfo`. The MCP spec hands the client's self-declared name and version
+ * to `initialize`. This server is stateless -- it issues no `Mcp-Session-Id` -- so there is nothing to
+ * join an `initialize` to a later `tools/call`, and `initialize` writes no audit row of its own. The
+ * request that gets logged carries only its headers; `User-Agent` is the one that names a client.
+ *
+ * STORED RAW. No parsing, no normalisation, no client-name mapping: this environment cannot verify
+ * what Claude Desktop or ChatGPT actually send, and a guessed mapping would be written permanently
+ * into rows §19i forbids backfilling. Slice 2 derives names from strings this slice has observed.
+ *
+ * NEVER THROWS, same posture as lib/request-context.js's own derivers: attribution is observability
+ * and may never become a failure mode for the platform. An absent, blank or non-string header reads
+ * as null -- "not captured" -- never as a guess and never as an exception.
+ *
+ * `userAgent` is a PLUMBING value bound for a plumbing column, never a §19k `call_facts` key.
+ */
+export function mcpRequestContext(ctx, headers) {
+  let userAgent = null;
+  try {
+    const raw = (headers || {})['user-agent'];
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed) userAgent = trimmed.slice(0, USER_AGENT_MAX);
+    }
+  } catch {
+    userAgent = null; // unattributed, never an exception
+  }
+  return { ...ctx, userAgent };
+}
+
+/**
  * FEATURE: AGT-163 -- THE ONE ATTRIBUTION CORE both seams call.
  *
  * runThroughExecutor() and runDeterministic() each establish the same attribution, and two copies of
@@ -1004,7 +1058,13 @@ async function handler(req, res) {
     return scopePromise;
   };
 
-  const response = await dispatchJsonRpc(message, {
+  // FEATURE: AGT-341 -- the whole dispatch runs inside the request's attribution, so the User-Agent
+  // read from THESE headers reaches whichever seam the call lands on. Both seams re-establish
+  // `call_source = 'mcp'` with their own runWithCallSource() and spread the store through
+  // mcpAttribution(), so this outer wrap adds `userAgent` without changing anything either of them
+  // already wrote -- and `tools/list`, `initialize` and a notification carry it harmlessly, because
+  // none of them writes an audit row.
+  const response = await runWithCallSource('mcp', () => dispatchJsonRpc(message, {
     listTools: async () => (await visible()).rows.map(toTool),
     callTool: async ({ name, args }) => {
       const { rows, governanceUnlocked, callerKeyName } = await visible();
@@ -1022,7 +1082,7 @@ async function handler(req, res) {
         return SERVER_INSTRUCTIONS;
       }
     },
-  });
+  }), mcpRequestContext(getRequestContext(), req.headers));
 
   // A notification is owed 202 Accepted with no body -- literally, per the transport spec.
   if (response === null) return res.status(202).end();
