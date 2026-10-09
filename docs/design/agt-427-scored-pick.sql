@@ -1,3 +1,38 @@
+-- DeepBench v7.0.841 | docs/design/agt-427-scored-pick.sql | AGT-427 slice 2 -- SEVERITY IS THE FIRST PICK KEY IN EVERY LANE, GATED.
+--
+-- SLICE 2, APPLIED 2026-10-09 18:44Z as migration `agt427_severity_first` (watermark 20261009184404)
+-- by cycle 76b85201-7ffd-4b7b-9acf-ffa327426e89, branch session/agt427-severity-coding, v7.0.841.
+-- John 2026-10-08: "a 5 and 4 always wins, no matter the lane."
+--
+-- INV, read-only BEFORE the migration (each row whose need_score exceeds the previous row's, over
+-- prime_directive_queue() lanes drain/selfbuild in q.pos order, as `ref:need`):
+--   AGT-304:5   (lane then: AGT-341:3 AGT-304:5 AGT-393:4 AGT-394:4 AGT-395:4 AGT-387:3 AGT-418:3)
+--
+-- DOWN, captured BEFORE the apply. Returned `auto-downable`, objects_captured = 2, refusals = 0:
+--   SELECT * FROM public.capture_migration_down('76b85201-7ffd-4b7b-9acf-ffa327426e89',
+--     'agt427_severity_first',
+--     '[{"kind":"function","identity":"public.prime_directive_queue()"},
+--       {"kind":"function","identity":"public.drain_epic_next(uuid)"}]'::jsonb);
+--
+-- LANE AFTER APPLY (`ref:need`, drain/selfbuild; directive 3c1cc23d still pos 1):
+--   AGT-304:5 AGT-393:4 AGT-394:4 AGT-395:4 AGT-341:3 AGT-387:3 AGT-418:3
+--   md5(pg_get_functiondef('public.pick_exclusions()'::regprocedure)):      6fe579e2dc6b7bdeacb472f38154cce8 (unchanged)
+--   md5(pg_get_functiondef('public.prime_directive_queue()'::regprocedure)): 0cf969bdeb2cb060e84d1b5bf58f5f78
+--   md5(pg_get_functiondef('public.drain_epic_next(uuid)'::regprocedure)):   01c45e6516771d1b630d4b8a58808bcc
+-- The prime_directive_queue() and drain_epic_next(uuid) bodies below ARE their post-apply
+-- pg_get_functiondef (the md5s above were computed over this file's text and equal the live ones);
+-- pick_exclusions() is slice 1's body, unchanged. The slice-1 header below is kept as history; its
+-- md5 lines for the two edited functions are superseded by the two above.
+--
+-- WHAT SLICE 2 CHANGED (the 3-file cap's split, Designer's call (ii) of slice 1):
+--   (a) prime_directive_queue(): `sort_need` moves to the FRONT of `ranked`'s window ORDER BY,
+--       ahead of `lane_ord`. A directive's constant 0 keeps lane (a) at the head; drain beats
+--       selfbuild only at an equal score; within a score, leverage then project priority decide.
+--   (b) drain_epic_next(uuid): the pick's `6 - b.need_score` becomes its first ORDER BY key, the key
+--       prime_directive_queue() leads with. The function is never called by the gate.
+--   (c) THE GATE appended at the end of this file, which RAISED-or-passed in the same transaction.
+--
+-- ===================================== SLICE 1 (history) =====================================
 -- DeepBench v7.0.825 | docs/design/agt-427-scored-pick.sql | AGT-427 slice 1 -- THE PICK LISTS ONLY
 -- TICKETS VICTORIA HAS SCORED 3 OR HIGHER, AND AN UNSCORED ONE IS NOT A ZERO.
 --
@@ -61,8 +96,10 @@
 --       the shared sentence in (a); this is the one seam that is genuinely separate).
 -- Signatures and grants are unchanged, and the trailing GATE asserts both.
 --
--- NOT IN THIS SLICE (the 3-file cap's split, Designer's call (ii)): moving `sort_need` to the FRONT
--- of both picks is slice 2. This slice only withholds a low score; it does not re-rank what is left.
+-- WHAT SLICE 2 CHANGED (formerly "NOT IN THIS SLICE"): `sort_need` moved to the FRONT of both picks
+-- -- prime_directive_queue()'s window ORDER BY and drain_epic_next(uuid)'s pick ORDER BY -- by
+-- migration `agt427_severity_first` (v7.0.841); see the slice-2 header at the top of this file.
+-- Slice 1 withheld a low score; slice 2 re-ranks what is left, severity first.
 CREATE OR REPLACE FUNCTION public.pick_exclusions()
  RETURNS TABLE(id uuid, backlog_id text, reasons text[])
  LANGUAGE sql
@@ -261,8 +298,9 @@ ranked AS (
   -- AGT-238 (v7.0.660) / D2: LEVERAGE FIRST (John 2026-09-27). A ticket The Development Manager
   -- marked as leverage (leverage_reason set) precedes project priority; AGT-140's keys then decide,
   -- unchanged. drain_epic_next's pick carries the same leading key.
+  -- AGT-427 slice 2 (v7.0.841), John 2026-10-08: severity FIRST in every lane; a directive's constant 0 keeps lane (a) at the head; lane_ord decides only among equal scores.
   SELECT row_number() OVER (
-           ORDER BY lane_ord, sort_key, sort_leverage, sort_project NULLS LAST, sort_need, sort_lane, sort_queue, sort_cycles NULLS LAST
+           ORDER BY sort_need, lane_ord, sort_key, sort_leverage, sort_project NULLS LAST, sort_lane, sort_queue, sort_cycles NULLS LAST
          )::int AS pos,
          picks.*
     FROM picks
@@ -550,9 +588,10 @@ BEGIN
      -- decide WITHIN a project, unchanged.
      -- AGT-238 (v7.0.660) / D2: leverage precedes pj.priority -- a named member The Development
      -- Manager marked as leverage (leverage_reason set) is picked first; the rest is AGT-140's order.
-     ORDER BY CASE WHEN b.leverage_reason IS NOT NULL THEN 0 ELSE 1 END,
+     -- AGT-427 slice 2 (v7.0.841): severity first, the key prime_directive_queue() leads with.
+     ORDER BY 6 - b.need_score,
+              CASE WHEN b.leverage_reason IS NOT NULL THEN 0 ELSE 1 END,
               pj.priority,
-              6 - b.need_score,
               CASE WHEN b.filed_at < c_lane_cut THEN 0 ELSE 1 END,
               b.queue,
               b.predicted_cycles NULLS LAST
@@ -825,3 +864,66 @@ BEGIN
   RAISE NOTICE 'AGT-427 GATE passed: % pick-lane row(s), 0 unscored or below 3, one overload each, EXECUTE closed to anon and authenticated and open to service_role, and neither pick wrapping need_score in a COALESCE.', v_rows;
 END
 $do$;
+
+-- (slice 2, c) THE GATE of migration `agt427_severity_first` (v7.0.841), as applied after the two
+-- patches above. It RAISES -- and the migration rolls back -- unless every clause holds. Proven to
+-- fire: the same migration WITHOUT edit (a), run inside a forced rollback 2026-10-09, raised
+-- "AGT-427 GATE: prime_directive_queue()'s shipped ORDER BY does not lead with sort_need".
+-- drain_epic_next(uuid) is NEVER called here (it can retire John's standing drain directive).
+-- THE prime PATTERN IS BUILT BY CONCATENATION ON PURPOSE: AGT-427's QA guard greps this file for
+-- the literal ORDER BY and must count exactly ONE -- the function body's own.
+DO $gate$
+DECLARE
+  c integer; v_name text; v_ident text; v_src text;
+  v_rows integer; v_bad integer; v_inv integer; v_dir_max integer; v_tix_min integer;
+BEGIN
+  -- 1. the shipped text leads with severity, in both picks.
+  SELECT p.prosrc INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'prime_directive_queue' AND p.prokind = 'f';
+  IF v_src NOT LIKE ('%ORDER BY sort_need, ' || 'lane_ord,%') THEN
+    RAISE EXCEPTION 'AGT-427 GATE: prime_directive_queue()''s shipped ORDER BY does not lead with sort_need';
+  END IF;
+  SELECT p.prosrc INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'drain_epic_next' AND p.prokind = 'f';
+  IF v_src NOT LIKE '%ORDER BY 6 - b.need_score,%' THEN
+    RAISE EXCEPTION 'AGT-427 GATE: drain_epic_next(uuid)''s pick ORDER BY does not lead with 6 - b.need_score';
+  END IF;
+
+  -- 2. exactly one overload per name (.claude/rules/supabase-function-signature.md).
+  FOR v_name IN SELECT unnest(ARRAY['prime_directive_queue', 'drain_epic_next']) LOOP
+    SELECT count(*)::integer INTO c FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = v_name AND p.prokind = 'f';
+    IF c <> 1 THEN RAISE EXCEPTION 'AGT-427 GATE: public.% has % overload(s), not 1', v_name, c; END IF;
+  END LOOP;
+
+  -- 3. EXECUTE closed to anon and authenticated, open to service_role, both directions.
+  FOR v_ident IN SELECT unnest(ARRAY['public.prime_directive_queue()', 'public.drain_epic_next(uuid)']) LOOP
+    IF has_function_privilege('anon', v_ident, 'EXECUTE') THEN RAISE EXCEPTION 'AGT-427 GATE: anon holds EXECUTE on %', v_ident; END IF;
+    IF has_function_privilege('authenticated', v_ident, 'EXECUTE') THEN RAISE EXCEPTION 'AGT-427 GATE: authenticated holds EXECUTE on %', v_ident; END IF;
+    IF NOT has_function_privilege('service_role', v_ident, 'EXECUTE') THEN RAISE EXCEPTION 'AGT-427 GATE: service_role lost EXECUTE on %', v_ident; END IF;
+  END LOOP;
+
+  -- 4. the behaviour, over the function's own output, in q.pos order: at least 3 rows, none
+  --    unscored or below 3, none outranking a lower score ahead of it, every directive ahead.
+  WITH l AS (
+    SELECT q.pos, b.need_score, lag(b.need_score) OVER (ORDER BY q.pos) AS prev
+      FROM public.prime_directive_queue() q
+      JOIN public.backlog_items b ON b.backlog_id = q.ref
+     WHERE q.lane IN ('drain', 'selfbuild'))
+  SELECT count(*)::integer,
+         count(*) FILTER (WHERE need_score IS NULL OR need_score < 3)::integer,
+         count(*) FILTER (WHERE need_score > prev)::integer,
+         min(pos)
+    INTO v_rows, v_bad, v_inv, v_tix_min
+    FROM l;
+  IF v_rows < 3 THEN RAISE EXCEPTION 'AGT-427 GATE: the pick lanes returned % row(s), fewer than 3', v_rows; END IF;
+  IF v_bad <> 0 THEN RAISE EXCEPTION 'AGT-427 GATE: % served row(s) unscored or below 3', v_bad; END IF;
+  IF v_inv <> 0 THEN RAISE EXCEPTION 'AGT-427 GATE: % row(s) outrank a lower need_score ahead of them (severity is not first)', v_inv; END IF;
+  SELECT max(q.pos) INTO v_dir_max FROM public.prime_directive_queue() q WHERE q.lane = 'directive';
+  IF v_dir_max IS NOT NULL AND v_dir_max >= v_tix_min THEN
+    RAISE EXCEPTION 'AGT-427 GATE: a directive sits at pos %, not ahead of the first ticket-lane pos %', v_dir_max, v_tix_min;
+  END IF;
+
+  RAISE NOTICE 'AGT-427 GATE passed: % pick-lane row(s), 0 below 3, 0 severity inversions, directives ahead, one overload each, EXECUTE closed to anon/authenticated and open to service_role, both picks lead with severity.', v_rows;
+END
+$gate$;

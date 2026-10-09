@@ -1,3 +1,4 @@
+// DeepBench v7.0.841 | tests/regression/agt-238-leverage-first.test.mjs | AGT-427 slice 2 -- arm C grades leverage-first WITHIN one need_score, since severity now leads the pick.
 // DeepBench v7.0.660 | tests/regression/agt-238-leverage-first.test.mjs | AGT-238 slice 1 -- LEVERAGE
 // FIRST ON THE BOARD, AND TICKETS ONLY FROM FINDINGS.
 //
@@ -150,9 +151,11 @@ async function armC(url, key) {
   const lane = q.json.filter(r => r.lane === "selfbuild");
   if (!lane.length) { notRun("arm C -- the selfbuild lane's leverage order", "the lane is empty this run; ses-281 owns that finding"); return; }
   const ids = lane.map(r => r.ref);
-  const rows = await call(url, key, `backlog_items?select=backlog_id,leverage_reason&backlog_id=in.(${ids.map(encodeURIComponent).join(",")})`);
+  const rows = await call(url, key, `backlog_items?select=backlog_id,leverage_reason,need_score&backlog_id=in.(${ids.map(encodeURIComponent).join(",")})`);
   assert.ok(rows.ok && Array.isArray(rows.json), `backlog_items read failed: ${rows.status} ${rows.text.slice(0, 200)}`);
   const lev = new Map(rows.json.map(r => [r.backlog_id, r.leverage_reason != null]));
+  // AGT-427 slice 2: severity leads the pick, so leverage is graded within one need_score.
+  const need = new Map(rows.json.map(r => [r.backlog_id, r.need_score]));
   const marked = lane.filter(r => lev.get(r.ref));
   if (!marked.length) {
     notRun("arm C -- leverage first as an OBSERVED property of the live lane",
@@ -160,9 +163,12 @@ async function armC(url, key) {
     return;
   }
   let seenPlain = null;
+  let prevNeed;
   for (const r of lane) {
+    if (need.get(r.ref) !== prevNeed) seenPlain = null;
+    prevNeed = need.get(r.ref);
     if (!lev.get(r.ref)) { seenPlain = seenPlain ?? r; continue; }
-    assert.ok(!seenPlain, `${seenPlain && seenPlain.ref} (no leverage) at pos ${seenPlain && seenPlain.pos} precedes ${r.ref} (leverage) at pos ${r.pos} -- leverage outranks project order (AGT-238)`);
+    assert.ok(!seenPlain, `${seenPlain && seenPlain.ref} (no leverage) at pos ${seenPlain && seenPlain.pos} precedes ${r.ref} (leverage) at pos ${r.pos} -- leverage leads within one need_score (AGT-238; AGT-427 slice 2)`);
   }
   console.log(`  [AGT-238] arm C: ${marked.length} leverage row(s) lead the ${lane.length}-row selfbuild lane.`);
 }

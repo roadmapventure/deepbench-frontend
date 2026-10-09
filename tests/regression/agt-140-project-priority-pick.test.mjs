@@ -1,3 +1,4 @@
+// DeepBench v7.0.841 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-427 slice 2 -- the shipped pick ORDER BY leads with `sort_need` (severity FIRST, John 2026-10-08), and the priority inversion clause (ii) grades only within one score and leverage group.
 // DeepBench v7.0.825 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-427 slice 1 -- arm B reads its key NAMES out of the shipped ORDER BY (pickKeys()) instead of listing them, and asserts the WITHHOLDING the ordering clauses cannot see: every row the pick serves is scored 3+, and an unscored ticket is not a zero.
 // DeepBench v7.0.797 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-304 slice 8 -- arm B's order oracle carries SIX keys, not five: AGT-280's `sort_need` (`6 - COALESCE(need_score, 0)`, unscored last) sits between project priority and the filing lane, exactly as the live prime_directive_queue()'s recorded ORDER BY declares it.
 // DeepBench v7.0.604 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-140 -- THE
@@ -510,10 +511,10 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
       lex(a, b) <= 0,
       `the ${LANE} lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
         `[${fmt(a)}] precedes ${lane[i].ref} [${fmt(b)}]. The pick orders by ` +
-        `${KEYS.join(", ")} -- leverage FIRST (AGT-238), then project priority (AGT-140), then ` +
-        "AGT-280's need (6 - need_score; AGT-427 withholds an unscored or low-scored ticket rather " +
-        "than sorting it last), then SES-281 / M5-02's filing lane, then the queue, then M5-07's " +
-        "predicted_cycles nulls last",
+        `${KEYS.join(", ")} -- severity FIRST (AGT-427), then leverage (AGT-238), then project ` +
+        "priority (AGT-140), then SES-281 / M5-02's filing lane, then the queue, then M5-07's " +
+        "predicted_cycles nulls last (AGT-427 withholds an unscored or low-scored ticket rather " +
+        "than sorting it last)",
     );
   }
 
@@ -532,12 +533,14 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
       const a = ka[IDX("sort_project")];
       const b = kb[IDX("sort_project")];
       // AGT-238: a leverage row may precede any priority; the clause holds WITHIN a leverage group.
-      if (la !== lb) continue;
+      // AGT-427 slice 2: and a higher score may precede any leverage or priority, so the clause
+      // holds within one score AND leverage group.
+      if (la !== lb || ka[IDX("sort_need")] !== kb[IDX("sort_need")]) continue;
       assert.ok(
         b >= a,
         `${lane[i].ref} (project priority ${a}) is served at pos ${i + 1}, ahead of ${lane[j].ref} ` +
           `(project priority ${b}) at pos ${j + 1}. A ticket in a lower-priority project may never ` +
-          "precede one in a higher-priority project within one leverage group (leverage FIRST (AGT-238), then project priority (AGT-140)) -- that is the live inversion AGT-140 closed " +
+          "precede one in a higher-priority project within one score and leverage group (severity FIRST (AGT-427), then leverage (AGT-238), then project priority (AGT-140)) -- that is the live inversion AGT-140 closed " +
           `(AGT-141/agent-training p3 ahead of AGT-132/dev-manager-capabilities p2, 2026-09-26). ` +
           `Keys as shipped: ${JSON.stringify(KEYS)}`,
       );
@@ -597,8 +600,23 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   );
 }
 
+// AGT-427 slice 2 (v7.0.841) -- THE SHIPPED PICK LEADS WITH SEVERITY. John 2026-10-08: "a 5 and 4
+// always wins, no matter the lane." pickKeys() drops lane_ord and sort_key, so its first graded key
+// is the first key that orders tickets; it must be `sort_need`. No credentials: graded over the
+// mirror of the applied migration.
+function theShippedPickLeadsWithSeverity() {
+  const keys = pickKeys();
+  assert.strictEqual(
+    keys[0], "sort_need",
+    `the shipped pick's first ticket-ordering key is \`${keys[0]}\`, not \`sort_need\`. John 2026-10-08: ` +
+      `"a 5 and 4 always wins, no matter the lane" -- severity FIRST (AGT-427 slice 2). Keys as shipped: ${JSON.stringify(keys)}`,
+  );
+  console.log(`  [AGT-427] the shipped pick ORDER BY leads with sort_need: ${JSON.stringify(keys)}.`);
+}
+
 async function run() {
   theShippedMigrationOrdersByProjectPriorityFirst();
+  theShippedPickLeadsWithSeverity();
   await theLiveLaneIsOrderedByProjectPriorityFirst();
 }
 
