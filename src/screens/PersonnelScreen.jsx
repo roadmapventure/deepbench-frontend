@@ -1,3 +1,14 @@
+// DeepBench v7.0.818 | PersonnelScreen.jsx | AGT-402 -- Future Controls Training section gains a sample Your trainee badge card (the badge means you can train this agent; John moved it to Future Controls).
+// DeepBench v7.0.816 | PersonnelScreen.jsx | AGT-416 -- Future Controls Access group opens with the Access levels sample card (where it can be used, which model, what an AI client receives, who can teach, what stays protected).
+// DeepBench v7.0.815 | PersonnelScreen.jsx | AGT-415 -- Future Controls gains a sample Skill score card (the typed 0-100 score John moved there; the Profile level bar is the editor).
+// DeepBench v7.0.814 | PersonnelScreen.jsx | AGT-415 -- the Skill Ladder is a five-section bar in the Profile top card (the user clicks a level; it saves agents.skill_score), and Future Controls gains a sample Promotion by accomplishments card.
+// DeepBench v7.0.813 | PersonnelScreen.jsx | AGT-402 -- the team picker announces a saved team (db-team-changed) so the badge heading follows without a reload.
+// DeepBench v7.0.812 | PersonnelScreen.jsx | AGT-414 -- each capability gets an Add Skill form (name, type, optional text) and each Skill a Remove (unlinks from that capability only).
+// DeepBench v7.0.811 | PersonnelScreen.jsx | AGT-402 -- Documents shows a real count including 0 (was a dash for 0).
+// DeepBench v7.0.810 | PersonnelScreen.jsx | AGT-413 -- Capabilities card: every Skill under its fixed type header with all fields shown, Skill Type editable, Capability name and description editable; AGT-402 -- the ID badge heading is the agent's team name and a Times used row reads usage_count; Documents on Future Controls counts the agent's active taught items; Future Controls gains Access, Voice, Rating and Teaching origin cards with sample values.
+// DeepBench v7.0.808 | PersonnelScreen.jsx | AGT-409 -- the Skill editor: on the Capabilities card each Skill expands in place to SkillEditorRow (personnel/SkillEditor.jsx) and saves through update_skill.
+// DeepBench v7.0.809 | PersonnelScreen.jsx | AGT-412 -- the agent quote shows one pair of quote marks (plainQuip); before that AGT-411 --Future Controls' Intelligence Configuration footer names the Profile and Training pages; before that AGT-410 --Future Controls: the Teach control card moves into a new Training group; before that AGT-408 --phone width checked on every tab; the Training stats strip's two buttons drop under the stats; before that AGT-407 --the Proposed view is the only view (CURRENT_VIEW_RETIRED), Current code kept; before that AGT-406 --Proposed tab content held to half the browser width; before that AGT-405 --Future Controls: labeled sample rows on the header-only cards, Report Card and Work Performed; before that AGT-404 --Proposed Profile: name and role edit in place on the badge card (InlineText), Quick Stats lives in Future Controls, no Layer prefixes on Profile cards; before that AGT-403 --Proposed: one-column Profile holding Resume prompts and Playbook, CONFIGURE / COMING SOON nav, Future Controls, no ACTIVE / YOUR TRAINEE chips or header lines, tight key/value cards; before that AGT-397 slice 2 + AGT-392 --the Future View relocates the Resume tab's Vitals (Subscription and status) and the stat trio + Skill Ladder (Readiness and levels); in Proposed the Resume tab's left column is the Identity editor, and a save patches this page's agent locally (identityPatch)
+// DeepBench v7.0.795 | PersonnelScreen.jsx | AGT-397 -- slice 1: on a dev host with the agt-397-layout-switch flag on, a LAYOUT switch (Current / Proposed, remembered per browser) above the breadcrumb and the mobile tab bar; Proposed trims the Profile tab to the ID badge, Capabilities and Documents and adds a COMING group with the Future View tab, which lays out the moved cards by group with an empty box for each field not yet built. The Profile cards are extracted into components defined once here
 // DeepBench v7.0.792 | PersonnelScreen.jsx | AGT-390 -- a taught item's Training card and each guardrail say where it was taught and when (originTag); guardrails taught over MCP list under their Always/Never box, each with a Delete, and the boxes keep the DeepBench-written row
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 round 2 -- the Add to a team button is switched off and grayed out (John, 2026-10-05) until the drawer is redesigned (AGT-389); the picker code stays
 // DeepBench v7.0.790 | PersonnelScreen.jsx | AGT-386 -- a private agent's badge gains a team picker (one team per agent, saved through add_agent_to_team); the Connect button names no agent; the desktop left nav opens with the Bench breadcrumb; an id not yet in the roster shows Loading… and an unknown or archived id redirects to /bench (no other agent's file flashes); a Delete Agent link under every tab archives a private agent after a confirm popup
@@ -20,14 +31,18 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { T, display, body, mono, fmt$, skillLabel } from "../tokens.js";
 import { TENANT_ID } from "../config.js";
-import { AppShell } from "../AppShell.jsx";
+import { AppShell, IS_ADMIN_HOST } from "../AppShell.jsx";
+import { useFeatureFlag } from "../lib/featureFlags.js"; // FEATURE: AGT-397 — the layout switch's flag
+import FutureViewTab, { AccessLevelsCard, SampleTag, LayoutSwitch, resolveLayout, LAYOUT_FLAG, LAYOUT_KEY } from "./personnel/FutureViewTab.jsx"; // FEATURE: AGT-397
 import { Corners, SkillBar, Toast, AiBadge, FeatureBadge, AgentAvatar } from "../components/SharedUI.jsx";
 import { useRoster, forgetAgent } from "../hooks/useAgents.js"; // FEATURE: AGT-386 — settled read + cache forget
 import { Breadcrumb } from "../components/BenchNav.jsx"; // FEATURE: AGT-386 — the Bench breadcrumb
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { AGENT_PRONOUNS, STANDARD_CATEGORIES, BRENT_CATEGORIES, FLAG_TRIGGERS, JURISDICTIONS } from "../data/agents.js";
 import { readinessColor, readinessLabel, priorityInfo } from "../utils.js";
-import ResumeTab, { ConfigCard, AddConfigForm, originTag } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag
+import ResumeTab, { ConfigCard, AddConfigForm, originTag, VitalsCard, SkillLadderCard, IdentityEditor, saveIdentityFields } from "./personnel/ResumeTab.jsx"; // FEATURE: AGT-390 — originTag; AGT-397 — VitalsCard, SkillLadderCard
+import { SkillEditorRow, CapabilityHeader, AddSkillForm, AddCapabilityForm, CapabilityDrawer, CapabilitiesGuide, SKILL_TYPES } from "./personnel/SkillEditor.jsx"; // FEATURE: AGT-409 / AGT-413 — the Skills view and editors
+import { TeamHeading, SkillLevelBar, ProfileGuide, ConnectionStatus, isConnectionCapability } from "./personnel/AgentFacts.jsx"; // FEATURE: AGT-402 / AGT-413 — real team name and usage count
 import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
@@ -467,6 +482,8 @@ function TeamPicker({ agent }) {
       if (res.status === 200) {
         const out = await res.json();
         setCurrent(out.team.name);
+        // FEATURE: AGT-402 — tell the badge heading (AgentFacts useTeamName) the team changed, so it follows without a reload
+        window.dispatchEvent(new CustomEvent("db-team-changed", { detail: { agentId: agent.id, name: out.team.name } }));
         setTeams(ts => (ts.some(t => t.id === out.team.id) ? ts : [...ts, { id: out.team.id, name: out.team.name }].sort((a, b) => a.name.localeCompare(b.name))));
         setTeamName("");
         setNewPicked(false);
@@ -540,7 +557,7 @@ function TeamPicker({ agent }) {
 // destination); on private agents only (isPrivateAgent reads the agent's own row — Rule #1), the
 // team picker (AGT-386) and the Connect to AI button, which names no agent (AGT-386). Styles:
 // STYLE-GUIDE §7 Primary CTA and Secondary/ghost, sized for the card.
-function BadgeActions({ agent, onAddTraining, onConnect, style }) {
+function BadgeActions({ agent, onAddTraining, onConnect, style, align = "right" }) {
   return (
     <div style={style}>
       {agent.trainable && (
@@ -550,147 +567,46 @@ function BadgeActions({ agent, onAddTraining, onConnect, style }) {
       {isPrivateAgent(agent) && (
         <button onClick={onConnect} style={TEAM_GHOST}>Connect to AI</button>
       )}
+      {isPrivateAgent(agent) && <ConnectionStatus agentId={agent.id} align={align}/>}
     </div>
   );
 }
 
-// FEATURE: PE-01 — Profile tab
-// FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
-// ── Tab: Profile ──────────────────────────────────────────────────────────────
-function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect }) {
-  // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
-  // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
-  // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
-  const [reportCard, setReportCard] = useState(null);
-  const [reportCardLoaded, setReportCardLoaded] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    setReportCardLoaded(false);
-    setReportCard(null);
-    fetchReportCard(agent.id)
-      .then(r => { if (!cancelled) { setReportCard(r); setReportCardLoaded(true); } })
-      // Never block the user (STANDARDS.md Section 5): a failed rollup read leaves the card in its
-      // honest empty state, it does not break the Profile tab.
-      .catch(err => { console.error("FEATURE: LOG-143 — failed to load the Bench Report Card", err); if (!cancelled) setReportCardLoaded(true); });
-    return () => { cancelled = true; };
-  }, [agent.id]);
-  // The Skill Profiles this screen already lists (SK-06's Capabilities card, the same rows the
-  // Configure → Resume tab edits) are what resolves `lowest_skill`'s slug to a name.
-  const reportCardView = reportCardLines(reportCard, capabilities.flatMap(c => c.skillProfiles || []));
+// FEATURE: AGT-397 — the Profile tab's cards, each defined once here so the Current arrangement
+// (ProfileTab) and the Proposed arrangement's Future View render the same component, never a copy.
 
-  const readiness     = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
-  const rc            = readinessColor;
-  const fmt           = fmt$;
-  const agentTasks    = AGENT_TASKS[agent.id]     || [];
-  const agentCompleted= AGENT_COMPLETED[agent.id] || [];
-
-  const STATUS_S = {
-    "needs-review":   {bg:"rgba(90,117,56,.12)",  color:T.moss,       border:"rgba(90,117,56,.3)",   label:"Needs Review"},
-    "in-progress":    {bg:"rgba(182,135,58,.12)", color:T.brassDeep,  border:"rgba(182,135,58,.35)", label:"In Progress"},
-    "pending":        {bg:"rgba(18,36,60,.07)",   color:T.mutedDeep,  border:T.lineSoft,             label:"Pending"},
-    "awaiting-input": {bg:"rgba(182,135,58,.08)", color:T.brassDeep,  border:T.lineSoft,             label:"Awaiting Input"},
-    "action-required":{bg:"rgba(168,51,25,.1)",   color:T.flag,       border:"rgba(168,51,25,.3)",   label:"Action Required"},
-    "completed":      {bg:"rgba(90,117,56,.08)",  color:T.moss,       border:"rgba(90,117,56,.2)",   label:"Completed"},
-  };
-  const PRIORITY_S = {
-    "High":  {color:T.flag,       bg:"rgba(168,51,25,.08)",  border:"rgba(168,51,25,.25)"},
-    "Normal":{color:T.muted,      bg:"rgba(18,36,60,.06)",   border:T.lineSoft},
-    "Low":   {color:T.muted,      bg:"rgba(120,109,82,.08)", border:T.line},
-  };
-
+// Compensation card
+function CompensationCard({ agent, tight = false }) {
+  const fmt = fmt$;
   return (
-    <>
-    <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",gap:18,alignItems:"start"}}>
-
-      {/* ── Left column: ID Badge + Compensation ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-
-        {/* ID Badge card — FEATURE: PE-17 — redundant with the mobile persona block, desktop-only */}
-        {!isMobile && (
-        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
-          <Corners color={agent.color}/>
-          <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
-          <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence</div>
-          <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
-            <AgentAvatar who={agent.id} size={92} ring={true} />
-          </div>
-          <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
-          <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role}</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
-            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}}>{agent.code}</span>
-            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
-            {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
-          </div>
-          {agent.quip && (
-          <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
-            "{agent.quip}"
-          </div>
-          )}
-        </div>
-        )}
-
-        {/* FEATURE: SK-06 — Capabilities card */}
-        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", position: "relative" }}>
-          <Corners />
-          <FeatureBadge id="SK-06" />
-          <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 10 }}>Capabilities</div>
-          {capabilities.length === 0 ? (
-            <div style={{ border: `1px dashed ${T.lineSoft}`, padding: "16px 12px", textAlign: "center" }}>
-              <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>No capabilities assigned.</div>
-            </div>
-          ) : (
-            capabilities.map(cap => {
-              const TYPE_CHIP = {
-                intent:   { bg: "rgba(182,135,58,.1)",  color: T.brassDeep, border: "rgba(182,135,58,.3)", label: "INTENT"   },
-                format:   { bg: "rgba(90,117,56,.08)",  color: T.moss,      border: "rgba(90,117,56,.25)", label: "FORMAT"   },
-                knowledge:{ bg: "rgba(18,36,60,.07)",   color: T.mutedDeep, border: T.lineSoft,            label: "KNOWLEDGE"},
-                behavior: { bg: "rgba(120,109,82,.08)", color: T.mutedDeep, border: T.lineSoft,            label: "BEHAVIOR" },
-                identity: { bg: "rgba(168,51,25,.06)",  color: T.flag,      border: "rgba(168,51,25,.2)",  label: "IDENTITY" },
-              };
-              return (
-                <div key={cap.slug} style={{ marginBottom: 12 }}>
-                  <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{cap.name}</div>
-                  {cap.description && (
-                    <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>{cap.description}</div>
-                  )}
-                  {cap.skillProfiles.map(sp => {
-                    const chip = TYPE_CHIP[sp.skill_type_slug] || TYPE_CHIP.intent;
-                    return <SkillRow key={sp.slug} sp={sp} chip={chip} />;
-                  })}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Compensation card */}
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 18px",position:"relative"}}>
           <Corners/>
           <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:8}}>Compensation · FY2026 · The Ledger</div>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:tight?"flex-start":"space-between",gap:tight?28:undefined,marginBottom:8}}>
             <div>
               <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Salary Equiv.</div>
               <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.navy}}>{agent.salary===0?"Free":fmt(agent.salary)}</div>
             </div>
-            <div style={{textAlign:"right"}}>
+            <div style={{textAlign:tight?"left":"right"}}>
               <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>Yearly Value</div>
               <div style={{fontFamily:display,fontSize:19,fontWeight:600,color:T.moss}}>{agent.value===0?"Demo":fmt(agent.value)}</div>
             </div>
           </div>
           {[["Hourly rate","$"+agent.hourly],["Hours / report",agent.reportHrs+"h"],["Cost / report",agent.reportCost===0?"Free":"$"+agent.reportCost],["Revenue model",agent.revenueModel||"—"]].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
-              <span style={{color:T.mutedDeep}}>{k}</span>
+            <div key={k} style={{display:"flex",justifyContent:tight?"flex-start":"space-between",gap:tight?12:undefined,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+              <span style={{color:T.mutedDeep,...(tight?{minWidth:110,flexShrink:0}:null)}}>{k}</span>
               <span style={{fontFamily:mono,fontSize:10.5,color:T.ink}}>{v}</span>
             </div>
           ))}
           <div style={{marginTop:7,fontFamily:body,fontSize:10,color:T.muted,fontStyle:"italic"}}><strong style={{fontStyle:"normal"}}>Mock data.</strong> Live billing in v5.</div>
         </div>
-      </div>
+  );
+}
 
-      {/* ── Right column: Readiness + Intel Config + Quick Stats ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-
-        {/* Readiness score */}
+// Readiness score
+function ReadinessCard({ layers, readiness }) {
+  const rc = readinessColor;
+  return (
         <div style={{background:T.navy,padding:"14px 18px",position:"relative",border:`1px solid rgba(182,135,58,.3)`}}>
           <Corners color={T.brass}/>
           <div style={{fontFamily:mono,fontSize:8.5,color:T.brassLight,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:7}}>Agent Readiness Score</div>
@@ -720,8 +636,13 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
             </div>
           ))}
         </div>
+  );
+}
 
-        {/* Intelligence config */}
+// Intelligence config
+function IntelConfigCard({ agent, layers, isMobile, proposed = false }) {
+  const rc = readinessColor;
+  return (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
           <Corners/>
           <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:4}}>Intelligence Configuration</div>
@@ -736,15 +657,20 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
               </div>
             ))}
           </div>
-          <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5,fontStyle:"italic"}}>Configure each layer in Resume, Training, and Playbook tabs.</div>
+          <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,lineHeight:1.5,fontStyle:"italic"}}>{proposed ? "Configure each layer on the Profile and Training pages." : "Configure each layer in Resume, Training, and Playbook tabs."}</div>
         </div>
+  );
+}
 
-        {/* Quick stats */}
+// Quick stats — FEATURE: AGT-397 — one component; show = "all" (Current), "documents" (Proposed
+// Profile), "parked" (Future View: Skill + Reports Run, Situational Awareness, Skill Level)
+function QuickStatsCard({ agent, show = "all" }) {
+  return (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
           <Corners/>
           <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Quick Stats</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
-            {[["Skill",`${agent.skill}/100`,skillLabel(agent.skill),"#886224"],["Documents",agent.docs||"—","training docs",T.navy],["Reports Run","—","mock data",T.moss]].map(([l,v,s,c])=>(
+            {[["Skill",`${agent.skill}/100`,skillLabel(agent.skill),"#886224"],["Documents",agent.docs ?? "—","training docs",T.navy],["Reports Run","—","mock data",T.moss]].filter(([l]) => show === "all" || (show === "documents" ? l === "Documents" : l !== "Documents")).map(([l,v,s,c])=>(
               <div key={l}>
                 <div style={{fontFamily:body,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:1}}>{l}</div>
                 <div style={{fontFamily:display,fontSize:18,fontWeight:600,color:c,lineHeight:1}}>{v}</div>
@@ -752,6 +678,7 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
               </div>
             ))}
           </div>
+          {show !== "documents" && (<>
           <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:10,marginBottom:8}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
               <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600}}>Situational Awareness</div>
@@ -765,20 +692,54 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
             <div style={{fontFamily:body,fontSize:8.5,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600,marginBottom:6}}>Skill Level</div>
             <SkillBar skill={agent.skill} color={agent.color}/>
           </div>
+          </>)}
         </div>
+  );
+}
 
-        {/* FEATURE: LOG-143 (b) — Report Card. Same card + Corners pattern as its siblings above;
-            no new token, no new visual rule. On mobile the enclosing grid is already a single
-            column, so this renders full width below the persona block with no second branch —
-            desktop/mobile parity from one root. */}
+// FEATURE: LOG-143 (b) — Report Card. Same card + Corners pattern as its siblings;
+// no new token, no new visual rule.
+function ReportCardPanel({ agent, capabilities, tight = false, sample = false }) {
+  // FEATURE: LOG-143 (b) — the Report Card panel's own load. null = still loading, so the card
+  // shows a loading state rather than flashing "No runs judged yet" at an agent that has some
+  // (STANDARDS.md Section 5, Supabase Operations: loading state shown while data fetches).
+  const [reportCard, setReportCard] = useState(null);
+  const [reportCardLoaded, setReportCardLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setReportCardLoaded(false);
+    setReportCard(null);
+    fetchReportCard(agent.id)
+      .then(r => { if (!cancelled) { setReportCard(r); setReportCardLoaded(true); } })
+      // Never block the user (STANDARDS.md Section 5): a failed rollup read leaves the card in its
+      // honest empty state, it does not break the Profile tab.
+      .catch(err => { console.error("FEATURE: LOG-143 — failed to load the Bench Report Card", err); if (!cancelled) setReportCardLoaded(true); });
+    return () => { cancelled = true; };
+  }, [agent.id]);
+  // The Skill Profiles this screen already lists (SK-06's Capabilities card, the same rows the
+  // Configure → Resume tab edits) are what resolves `lowest_skill`'s slug to a name.
+  const reportCardView = reportCardLines(reportCard, capabilities.flatMap(c => c.skillProfiles || []));
+
+  return (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"13px 15px",position:"relative"}}>
           <Corners/>
           <FeatureBadge id="LOG-143" />
-          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}>Report Card</div>
+          <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600,marginBottom:10}}><span>Report Card</span>{sample && reportCardLoaded && reportCardView.empty && <SampleTag/>}</div>
           {!reportCardLoaded ? (
             <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
               <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>Loading…</div>
             </div>
+          ) : reportCardView.empty && sample ? (
+            <>
+              {/* AGT-405 — an agent with no judged runs shows a labeled sample, so the card's purpose reads */}
+              {[["Runs judged","12"],["Accuracy","4.2 / 5"],["Completeness","3.9 / 5"],["Tone","4.5 / 5"],["Skill to improve","Citing sources"]].map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"flex-start",gap:12,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0,minWidth:110}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink}}>{v}</span>
+                </div>
+              ))}
+              <div style={{marginTop:7,fontFamily:body,fontSize:10,color:T.muted,fontStyle:"italic"}}>{reportCardView.emptyText}</div>
+            </>
           ) : reportCardView.empty ? (
             <div style={{border:`1px dashed ${T.lineSoft}`,padding:"16px 12px",textAlign:"center"}}>
               <div style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic"}}>{reportCardView.emptyText}</div>
@@ -788,20 +749,43 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
               {[["Runs judged", String(reportCardView.runsJudged)],
                 ...reportCardView.dimensions.map(d => [d.label, d.unknownText ? `${d.scoreText} · ${d.unknownText}` : d.scoreText]),
                 ["Skill to improve", reportCardView.skillToImproveText]].map(([k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
-                  <span style={{color:T.mutedDeep,flexShrink:0}}>{k}</span>
-                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:"right"}}>{v}</span>
+                <div key={k} style={{display:"flex",justifyContent:tight?"flex-start":"space-between",gap:tight?12:10,padding:"4px 0",borderBottom:`1px solid ${T.lineSoft}`,fontSize:11}}>
+                  <span style={{color:T.mutedDeep,flexShrink:0,...(tight?{minWidth:110}:null)}}>{k}</span>
+                  <span style={{fontFamily:mono,fontSize:10.5,color:T.ink,textAlign:tight?"left":"right"}}>{v}</span>
                 </div>
               ))}
             </>
           )}
         </div>
-      </div>
-    </div>
+  );
+}
 
-    {/* ── Active Work Assignments ── */}
+// ── Active Work Assignments ──
+function WorkAssignments({ agent, sample = false }) {
+  const realTasks     = AGENT_TASKS[agent.id]     || [];
+  const realCompleted = AGENT_COMPLETED[agent.id] || [];
+  // AGT-405 — Future Controls: an agent with no work yet shows one labeled sample of each, so the section's purpose reads
+  const useSample     = sample && realTasks.length === 0 && realCompleted.length === 0;
+  const agentTasks    = useSample ? [{ id:"sample-1", title:"Review the Q4 janitorial bids", type:"Bid review", due:"Oct 14", preview:"Compares three bids against the scope and flags price gaps.", status:"in-progress", priority:"Normal" }] : realTasks;
+  const agentCompleted= useSample ? [{ id:"sample-2", title:"Summary of September contract renewals", type:"Report", completedOn:"Sep 30" }] : realCompleted;
+
+  const STATUS_S = {
+    "needs-review":   {bg:"rgba(90,117,56,.12)",  color:T.moss,       border:"rgba(90,117,56,.3)",   label:"Needs Review"},
+    "in-progress":    {bg:"rgba(182,135,58,.12)", color:T.brassDeep,  border:"rgba(182,135,58,.35)", label:"In Progress"},
+    "pending":        {bg:"rgba(18,36,60,.07)",   color:T.mutedDeep,  border:T.lineSoft,             label:"Pending"},
+    "awaiting-input": {bg:"rgba(182,135,58,.08)", color:T.brassDeep,  border:T.lineSoft,             label:"Awaiting Input"},
+    "action-required":{bg:"rgba(168,51,25,.1)",   color:T.flag,       border:"rgba(168,51,25,.3)",   label:"Action Required"},
+    "completed":      {bg:"rgba(90,117,56,.08)",  color:T.moss,       border:"rgba(90,117,56,.2)",   label:"Completed"},
+  };
+  const PRIORITY_S = {
+    "High":  {color:T.flag,       bg:"rgba(168,51,25,.08)",  border:"rgba(168,51,25,.25)"},
+    "Normal":{color:T.muted,      bg:"rgba(18,36,60,.06)",   border:T.lineSoft},
+    "Low":   {color:T.muted,      bg:"rgba(120,109,82,.08)", border:T.line},
+  };
+
+  return (
     <div style={{marginTop:18}}>
-      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Active Work Assignments</div>
+      <div style={{fontFamily:mono,fontSize:9,fontWeight:700,color:T.brassDeep,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}><span>Active Work Assignments</span>{useSample && <SampleTag/>}</div>
       {agentTasks.length===0 ? (
         <div style={{background:T.card,border:`1px dashed ${T.lineSoft}`,padding:"24px",textAlign:"center",marginBottom:10}}>
           <div style={{fontFamily:display,fontSize:14,color:T.muted,fontStyle:"italic"}}>No active assignments for {agent.name.split(" ")[0]} right now.</div>
@@ -857,6 +841,244 @@ function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTrain
         </div>
       ))}
     </div>
+  );
+}
+
+// Stat badges — FEATURE: AGT-397 — the page header's Situational Awareness / Readiness / Skill trio;
+// mobile = the persona block's grid, desktop = the page header's divided row
+function StatBadges({ agent, readiness, isMobile }) {
+  if (isMobile) return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
+                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
+                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                </div>
+  );
+  return (
+                <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
+                  </div>
+                  <div style={{width:1,height:30,background:T.lineSoft}}/>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
+                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                  <div style={{width:1,height:30,background:T.lineSoft}}/>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
+                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
+                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
+                    </div>
+                  </div>
+                </div>
+  );
+}
+
+// AGT-404 — a line of text that looks as it always did and edits in place on click; it saves on blur or
+// Enter (Escape cancels), through the same single identity save as the Biography card
+function InlineText({ value, field, agent, onSaved, showToast, style, quote = false, placeholder = "" }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState(value);
+  const [saving, setSaving]   = useState(false);
+  const cancelled = useRef(false);
+  const commit = async () => {
+    setEditing(false);
+    const next = draft.trim();
+    if (cancelled.current || !next || next === value) { cancelled.current = false; setDraft(value); return; }
+    setSaving(true);
+    try { const saved = await saveIdentityFields(agent, { [field]: next }); onSaved && onSaved(saved); showToast("Saved ✦"); }
+    catch (e) { setDraft(value); showToast("Save failed: " + e.message, "⚠"); }
+    setSaving(false);
+  };
+  if (editing) return (
+    <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") { cancelled.current = true; e.currentTarget.blur(); } }}
+      style={{ ...style, width:"100%", boxSizing:"border-box", textAlign:"center", background:T.cardAlt, border:`1px solid ${T.lineSoft}`, outline:"none", padding:"2px 6px" }}/>
+  );
+  return <div onClick={() => { setDraft(value); setEditing(true); }} title="Click to edit" style={{ ...style, cursor:"text", opacity: saving ? .6 : 1 }}>{value ? (quote ? `"${value}"` : value) : <span style={{ opacity:.6 }}>{placeholder}</span>}</div>;
+}
+
+// AGT-412 — a quip is stored with its own quote marks for the built-in agents and without for a created one;
+// strip any surrounding pair so the page can wrap it in exactly one
+const plainQuip = q => String(q).replace(/^["“”]+|["“”]+$/g, "");
+
+// AGT-407 — true = the Proposed view is the only view; false = the Current / Proposed switch is back
+const CURRENT_VIEW_RETIRED = true;
+
+// FEATURE: sent-lens -- "Dim what stays in DeepBench": a per-browser switch on the Profile and Training tabs of a private
+// agent. Elements an AI client never receives carry data-sent="no"; with the switch on they fade so the sent fields stand
+// out. Off is the page as it was.
+// Hidden for now (John): the switch, the dimming and every data-sent="no" mark stay in the code, so setting this to false brings the
+// whole feature back. While hidden, a browser that had it switched on is not dimmed either.
+const SENT_LENS_HIDDEN = true;
+const SENT_LENS_KEY = "deepbench-sent-lens";
+const SENT_LENS_CSS = '.sent-lens [data-sent="no"]{opacity:.38;transition:opacity .15s}';
+function SentLensToggle({ on, onChange }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:14,padding:"8px 12px",background:T.card,border:`1px solid ${T.line}`}}>
+      <button role="switch" aria-checked={on} aria-label="Dim what is not sent to AI clients" onClick={() => onChange(!on)}
+        style={{width:34,height:18,borderRadius:9,border:`1px solid ${on ? T.moss : T.line}`,background:on ? T.moss : T.cardAlt,position:"relative",cursor:"pointer",padding:0,flexShrink:0}}>
+        <span style={{position:"absolute",top:1,left:on ? 17 : 1,width:14,height:14,borderRadius:7,background:on ? "#fff" : T.muted,transition:"left .15s"}}/>
+      </button>
+      <span style={{fontFamily:body,fontSize:12,fontWeight:600,color:T.navy}}>Dim what stays in DeepBench</span>
+      <span style={{fontFamily:body,fontSize:11,color:T.muted,fontStyle:"italic",flex:"1 1 200px"}}>{on ? "Dimmed fields are not sent to a connected AI client." : "Off: the page as it is today."}</span>
+    </div>
+  );
+}
+
+// FEATURE: PE-01 — Profile tab
+// FEATURE: PE-08 — NIGP 2-col layout: ID Badge + Compensation left; Readiness + Intel Config + Quick Stats right
+// ── Tab: Profile ──────────────────────────────────────────────────────────────
+function ProfileTab({ agent, entries, layers, capabilities, isMobile, onAddTraining, onConnect, arrangement = "current", showToast, onIdentitySaved, onSkillChange, onCapabilityChange, onSkillAdded, onSkillRemoved, onCapabilityAdded, onCapabilityDeleted, onLevelSaved }) {
+  const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
+  // FEATURE: AGT-397 — Proposed keeps only the ID badge + Capabilities left and Documents right; the
+  // rest moves to the Future View tab
+  const proposed  = arrangement === "proposed";
+
+  // AGT-403 — the ID badge and Capabilities cards are defined once so Current (two columns) and
+  // Proposed (one column, in John's order) place the same cards
+  /* ID Badge card — FEATURE: PE-17 — redundant with the mobile persona block, desktop-only */
+  const idBadge = !isMobile && (
+        <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"16px 14px 12px",textAlign:"center",position:"relative"}}>
+          <Corners color={agent.color}/>
+          <BadgeActions agent={agent} onAddTraining={onAddTraining} onConnect={onConnect} style={{position:"absolute",top:14,right:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}/>
+          <div data-sent="no"><TeamHeading agentId={agent.id}/></div>
+          <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
+            <AgentAvatar who={agent.id} size={92} ring={true} />
+          </div>
+          {proposed
+            ? <InlineText value={agent.name} field="name" agent={agent} onSaved={onIdentitySaved} showToast={showToast} style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}/>
+            : <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>}
+          {proposed
+            ? <InlineText value={agent.role} field="role" agent={agent} onSaved={onIdentitySaved} showToast={showToast} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:2}}/>
+            : <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role}</div>}
+          {proposed && <div data-sent="no" style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
+            <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(182,135,58,.1)",color:T.brassDeep,border:`1px solid rgba(182,135,58,.3)`}} data-sent="no">{agent.code}</span>
+            {!proposed && <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>}
+            {!proposed && agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
+          </div>
+          
+          <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
+          {/* Proposed: the quote edits in place like the name and role; an empty one shows a prompt */}
+          {proposed && (
+            <div data-sent="no" style={{background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
+              <InlineText value={plainQuip(agent.quip || "")} field="quip" quote placeholder="Add a quote" agent={agent} onSaved={onIdentitySaved} showToast={showToast} style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep}}/>
+            </div>
+          )}
+          {!proposed && agent.quip && (
+          <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5}}>
+            "{plainQuip(agent.quip)}"
+          </div>
+          )}
+        </div>
+  );
+
+  /* FEATURE: SK-06 — Capabilities card */
+  const capsCard = (
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "14px 16px", position: "relative" }}>
+          <Corners />
+          <FeatureBadge id="SK-06" />
+          <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 10 }}>Capabilities</div>
+          {proposed && <CapabilitiesGuide canAdd={isPrivateAgent(agent)} />}
+          {capabilities.filter(c => !isConnectionCapability(c)).length === 0 ? (
+            <div style={{ border: `1px dashed ${T.lineSoft}`, padding: "16px 12px", textAlign: "center" }}>
+              <div style={{ fontFamily: body, fontSize: 11, color: T.muted, fontStyle: "italic" }}>{proposed && isPrivateAgent(agent) ? "No capabilities yet. Add one, then add Skills inside it." : "No capabilities assigned."}</div>
+            </div>
+          ) : (
+            capabilities.filter(c => !isConnectionCapability(c)).map(cap => {
+              const TYPE_CHIP = {
+                intent:   { bg: "rgba(182,135,58,.1)",  color: T.brassDeep, border: "rgba(182,135,58,.3)", label: "INTENT"   },
+                format:   { bg: "rgba(90,117,56,.08)",  color: T.moss,      border: "rgba(90,117,56,.25)", label: "FORMAT"   },
+                knowledge:{ bg: "rgba(18,36,60,.07)",   color: T.mutedDeep, border: T.lineSoft,            label: "KNOWLEDGE"},
+                behavior: { bg: "rgba(120,109,82,.08)", color: T.mutedDeep, border: T.lineSoft,            label: "BEHAVIOR" },
+                identity: { bg: "rgba(168,51,25,.06)",  color: T.flag,      border: "rgba(168,51,25,.2)",  label: "IDENTITY" },
+                guardrails:{ bg: "rgba(168,51,25,.06)", color: T.flag,      border: "rgba(168,51,25,.2)",  label: "GUARDRAILS" },
+              };
+              return (
+                <div key={cap.slug} style={proposed ? { marginBottom: 12, padding: "12px 14px", background: T.cardAlt, border: `1px solid ${T.line}` } : { marginBottom: 12 }}>
+                  {/* FEATURE: AGT-413 — Proposed: editable capability name and description; Current keeps the plain heading */}
+                  {proposed ? <CapabilityHeader cap={cap} showToast={showToast} onSaved={onCapabilityChange} onDeleted={onCapabilityDeleted} /> : (<>
+                    <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: T.navy, marginBottom: 2 }}>{cap.name}</div>
+                    {cap.description && (
+                      <div style={{ fontFamily: body, fontSize: 10, color: T.muted, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>{cap.description}</div>
+                    )}
+                  </>)}
+                  {/* FEATURE: AGT-399 / AGT-409 / AGT-413 — Proposed: every Skill under its fixed type header, fields always shown, editable in place */}
+                  {proposed ? (
+                    <CapabilityDrawer count={cap.skillProfiles.length}>
+                    {cap.skillProfiles.length === 0
+                      ? <div style={{ border: `1px dashed ${T.line}`, padding: "10px 12px", fontFamily: body, fontSize: 11.5, color: T.muted, fontStyle: "italic" }}>No Skills yet. Add one to tell this capability what to do.</div>
+                      : SKILL_TYPES.flatMap(([typeSlug]) => cap.skillProfiles
+                          .filter(sp => (sp.skill_type_slug || "intent") === typeSlug)
+                          .map(sp => <SkillEditorRow key={sp.slug} sp={sp} chip={TYPE_CHIP[typeSlug] || TYPE_CHIP.intent} showToast={showToast} onSaved={onSkillChange} capSlug={cap.slug} onRemoved={onSkillRemoved} />))}
+                    {/* FEATURE: AGT-414 — type in a new Skill and attach it to this capability */}
+                    <AddSkillForm capSlug={cap.slug} showToast={showToast} onAdded={onSkillAdded} />
+                    </CapabilityDrawer>
+                  ) : cap.skillProfiles.map(sp => {
+                    const chip = TYPE_CHIP[sp.skill_type_slug] || TYPE_CHIP.intent;
+                    return <SkillRow key={sp.slug} sp={sp} chip={chip} />;
+                  })}
+                </div>
+              );
+            })
+          )}
+          {/* FEATURE: add-capability -- a private agent's user adds a capability, then Skills inside it */}
+          {proposed && isPrivateAgent(agent) && <AddCapabilityForm agentId={agent.id} showToast={showToast} onAdded={onCapabilityAdded} />}
+        </div>
+  );
+
+  // AGT-403 — Proposed: one column, top to bottom — badge, Identity, Capabilities, Role prompts,
+  // Playbook (Resume and Playbook are sections here, not tabs; Quick Stats moved to Future Controls)
+  if (proposed) return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {idBadge}
+      <ProfileGuide/>
+      <IdentityEditor agent={agent} onSaved={onIdentitySaved} showToast={showToast}/>
+      {capsCard}
+      <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} part="prompts"/>
+      <PlaybookTab agent={agent} showToast={showToast} plain/>
+    </div>
+  );
+
+  return (
+    <>
+    <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",gap:18,alignItems:"start"}}>
+
+      {/* ── Left column: ID Badge + Compensation ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {idBadge}
+        {capsCard}
+        <CompensationCard agent={agent}/>
+      </div>
+
+      {/* ── Right column: Readiness + Intel Config + Quick Stats ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <ReadinessCard layers={layers} readiness={readiness}/>
+        <IntelConfigCard agent={agent} layers={layers} isMobile={isMobile}/>
+        <QuickStatsCard agent={agent}/>
+        <ReportCardPanel agent={agent} capabilities={capabilities}/>
+      </div>
+    </div>
+
+    <WorkAssignments agent={agent}/>
     </>
   );
 }
@@ -1284,14 +1506,22 @@ function AddCourseView({ agent, existingEntry = null, addState, setAddState, add
 
 // FEATURE: PE-03 — Training tab live wiring
 // ── Tab: Training ─────────────────────────────────────────────────────────────
+// Typing a note is hidden from end users for beta (John): Skills and capabilities are where a person teaches an agent. It stays in the
+// code and still shows on the admin address; set this to false to give it back to everyone. Existing notes, including the ones an AI
+// tool saves with "remember this", still list, edit, switch off and delete.
+const NOTE_ADD_HIDDEN = true;
+
 function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEntries, showToast, navigate }) {
+  const canTypeNote = !NOTE_ADD_HIDDEN || IS_ADMIN_HOST;
+  const [lessonOpen, setLessonOpen] = useState(false); // the "little lesson" under How training works, closed until clicked
+  const isMobile = useIsMobile(); // AGT-408 — the stats strip's buttons drop under the stats at phone width
   const [expandedIds, setExpandedIds] = useState({});
   const toggleEntry = (id) => setExpandedIds(p=>({...p,[id]:!p[id]}));
   const pronouns = AGENT_PRONOUNS[agent.id] || { subject:"they" };
   const firstName = agent.name.split(" ")[0];
 
   // FEATURE: AGT-344 — the note form (add: id null; edit: the entry's id); a deep link opens either form
-  const [noteForm,   setNoteForm]   = useState(initialAdd === "note" ? { id: null, title: "", text: "" } : null);
+  const [noteForm,   setNoteForm]   = useState(initialAdd === "note" && canTypeNote ? { id: null, title: "", text: "" } : null);
   const [noteSaving, setNoteSaving] = useState(false);
 
   const saveNote = async () => {
@@ -1440,7 +1670,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
       <FeatureBadge id="PE-03" />
 
       {/* Navy stats strip — FEATURE: PE-03 */}
-      <div style={{background:T.navy,padding:"11px 18px",display:"flex",gap:22,alignItems:"center",border:`1px solid rgba(182,135,58,.3)`}}>
+      <div style={{background:T.navy,padding:"11px 18px",display:"flex",gap:isMobile?12:22,alignItems:"center",flexWrap:isMobile?"wrap":"nowrap",border:`1px solid rgba(182,135,58,.3)`}}>
         {/* FEATURE: AGT-344 — what was taught, and how much of it is given on every run */}
         {[["Taught items",counts.taught,T.card],["Always given",counts.always,T.brassLight],["Looked up",counts.lookedUp,T.navyTextLo]].map(([k,v,c])=>(
           <div key={k}>
@@ -1451,7 +1681,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
         <div style={{flex:1}}/>
         {/* Stats strip buttons — context-aware: Type a note + Upload a file / Cancel */}
         {/* FEATURE: PE-03 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, ...(isMobile ? { flexBasis: "100%" } : null) }}>
           {formOpen ? (
             <button
               onClick={resetAddView}
@@ -1473,7 +1703,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               ✕ Cancel
             </button>
           ) : (
-            [["+ Type a note", () => setNoteForm({ id: null, title: "", text: "" })], ["+ Upload a file", () => setShowAddView(true)]].map(([label, open]) => (
+            [...(canTypeNote ? [["+ Type a note", () => setNoteForm({ id: null, title: "", text: "" })]] : []), ["+ Upload a file", () => setShowAddView(true)]].map(([label, open]) => (
               <button
                 key={label}
                 onClick={open}
@@ -1490,6 +1720,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
+                  ...(isMobile ? { flex: 1, justifyContent: "center" } : null),
                 }}
               >
                 {label}
@@ -1547,8 +1778,22 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
 
       {/* How it works */}
       <div style={{background:T.cardAlt,border:`1px dashed ${T.lineSoft}`,padding:"9px 13px"}}>
-        <div style={{fontFamily:mono,fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.3,fontWeight:600,marginBottom:3}}>How Background Knowledge Works · Layer 02</div>
-        <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,lineHeight:1.5}}>Documents are stored in vector format. Before each analysis, the system queries this library and injects the most relevant rules, statutes, and standards as Layer 02 of the prompt.</div>
+        <div style={{fontFamily:mono,fontSize:8.5,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.3,fontWeight:600,marginBottom:3}}>How training works</div>
+        <div style={{fontFamily:body,fontSize:11.5,color:T.mutedDeep,lineHeight:1.55}}>
+          <div style={{marginBottom:4}}>Everything you add here is something your agent can use.</div>
+          <div style={{marginBottom:4}}>Short items, about five pages or less, are always given to the agent in full. Longer ones are looked up when they match the question.</div>
+          <div style={{marginBottom:4}}>When you connect an AI tool, it gets every item you have added, in full. So keep each item short, and split a long document into several.</div>
+          <div style={{marginBottom:6}}>Switch an item off at any time and your agent stops using it.</div>
+          <button onClick={() => setLessonOpen(o => !o)} aria-expanded={lessonOpen} style={{background:"transparent",border:"none",padding:0,cursor:"pointer",fontFamily:body,fontSize:11.5,fontWeight:600,color:T.brassDeep}}>{lessonOpen ? "▾" : "▸"} A little lesson: how AI finds things</button>
+          {lessonOpen && (
+            <div style={{marginTop:6,paddingLeft:14,borderLeft:`2px solid ${T.lineSoft}`}}>
+              <div style={{marginBottom:4}}>When you save an item, DeepBench turns its words into a long list of numbers. This is called an <strong>embedding</strong>, or a <strong>vector</strong>. The numbers capture what the text means.</div>
+              <div style={{marginBottom:4}}>Items that mean similar things end up close together, like neighbours on a map. When your agent gets a question, DeepBench turns the question into numbers the same way and looks at the items nearby. It finds the right topics by meaning, not just by matching words.</div>
+              <div style={{marginBottom:4}}>That is why a question about "late payments" can find your item about "overdue invoices".</div>
+              <div>A connected AI tool skips the search and receives every item in full.</div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Export + count header */}
@@ -1582,7 +1827,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
           <div key={e.id} style={{background:T.card,border:`1px solid ${T.line}`,marginBottom:10,overflow:"hidden",display:"flex"}}>
 
             {/* Left date/timeline column */}
-            <div style={{width:56,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0 10px",borderRight:`1px solid ${T.lineSoft}`,background:T.cardAlt,gap:2}}>
+            <div data-sent="no" style={{width:56,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0 10px",borderRight:`1px solid ${T.lineSoft}`,background:T.cardAlt,gap:2}}>
               <div style={{fontFamily:mono,fontSize:9,color:T.muted,textTransform:"uppercase",letterSpacing:.8,fontWeight:600,lineHeight:1}}>{dateCol.month}</div>
               {dateCol.day && <div style={{fontFamily:mono,fontSize:9,color:T.muted,lineHeight:1}}>{dateCol.day},</div>}
               <div style={{marginTop:6,fontSize:14,color:T.moss,lineHeight:1}}>●</div>
@@ -1595,17 +1840,17 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
                 {facts ? (<>
                   <span style={{...chip,border:`1px solid ${T.brass}`,color:T.brassDeep}}>{facts.kind}</span>
-                  <span style={{...chip,border:`1px solid ${e.always?T.moss:T.muted}`,color:e.always?T.moss:T.mutedDeep}}>{facts.reach}</span>
-                  {facts.count!==null&&<span style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{facts.count}</span>}
+                  <span data-sent="no" style={{...chip,border:`1px solid ${e.always?T.moss:T.muted}`,color:e.always?T.moss:T.mutedDeep}}>{facts.reach}</span>
+                  {facts.count!==null&&<span data-sent="no" style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{facts.count}</span>}
                   {/* FEATURE: AGT-390 — where and when it was taught */}
-                  {originTag(e)&&<span style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{originTag(e)}</span>}
+                  {originTag(e)&&<span data-sent="no" style={{fontFamily:mono,fontSize:8.5,color:T.muted}}>{originTag(e)}</span>}
                 </>) : (<>
-                <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category||"INTERNAL"}</span>
-                {e.jurisdiction&&<span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
+                <span data-sent="no" style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:`${T.brass}10`,color:T.brassDeep,border:`1px solid ${T.brass}30`}}>{e.category||"INTERNAL"}</span>
+                {e.jurisdiction&&<span data-sent="no" style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(45,111,181,.1)",color:"#2d6fb5",border:"1px solid rgba(45,111,181,.3)"}}>{e.jurisdiction}</span>}
                 </>)}
                 <div style={{flex:1}}/>
                 {/* Toggle button */}
-                <button
+                <button data-sent="no"
                   onClick={() => toggleStatus(e.id, e.status)}
                   style={{
                     fontFamily:mono, fontSize:9, fontWeight:700,
@@ -1646,7 +1891,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
 
               {/* Run ID row */}
               {!facts && runId && (
-                <div style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:6}}>
+                <div data-sent="no" style={{fontFamily:mono,fontSize:8,color:T.muted,marginBottom:6}}>
                   Run {runId}
                 </div>
               )}
@@ -1662,7 +1907,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               {!facts && (<>
               {/* Trigger chips */}
               {e.triggers?.length > 0 && (
-                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
+                <div data-sent="no" style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
                   {e.triggers.includes("all")
                     ? <span style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ ALL FLAGS</span>
                     : e.triggers.map(t=><span key={t} style={{fontFamily:mono,fontSize:8.5,padding:"1px 6px",background:"rgba(168,51,25,.1)",color:T.flag,border:`1px solid rgba(168,51,25,.35)`}}>⚑ {t.toUpperCase().replace(/-/g," ")}</span>)
@@ -1671,7 +1916,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               )}
 
               {/* Priority */}
-              <div style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:5}}>Priority {e.priority}/100</div>
+              <div data-sent="no" style={{fontFamily:mono,fontSize:9,color:T.muted,marginBottom:5}}>Priority {e.priority}/100</div>
 
               {/* Field notes */}
               {e.fieldNotes && (
@@ -1681,11 +1926,11 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
               )}
 
               {/* What X Learned expandable */}
-              <button onClick={()=>toggleEntry(e.id)} style={{marginTop:4,fontFamily:mono,fontSize:9,color:T.brassDeep,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 8px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",display:"flex",alignItems:"center",gap:4}}>
+              <button data-sent="no" onClick={()=>toggleEntry(e.id)} style={{marginTop:4,fontFamily:mono,fontSize:9,color:T.brassDeep,background:"transparent",border:`1px solid ${T.lineSoft}`,padding:"2px 8px",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",display:"flex",alignItems:"center",gap:4}}>
                 {isExpanded?"▲":"▸"} + What {agent.name.split(" ")[0]} Learned
               </button>
               {isExpanded && e.learnedSummary && (
-                <div style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
+                <div data-sent="no" style={{marginTop:8,background:`${T.moss}08`,border:`1px solid ${T.moss}30`,padding:"10px 14px",fontSize:12,color:T.mutedDeep,lineHeight:1.6,fontFamily:body}}>
                   {/* FEATURE: AI-28 — KNOWLEDGE_TRAINING pattern label */}
                   <AiBadge style={{marginBottom:5,display:"inline-block"}} label={AI_PAT.KNOWLEDGE_TRAINING}/> {e.learnedSummary}
                 </div>
@@ -1702,7 +1947,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
 
 // FEATURE: PE-04 — Playbook tab live wiring
 // ── Tab: Playbook ─────────────────────────────────────────────────────────────
-function PlaybookTab({ agent, showToast }) {
+function PlaybookTab({ agent, showToast, plain = false }) {
   const firstName = agent.name.split(" ")[0];
   const pronouns  = AGENT_PRONOUNS[agent.id] || { possessive: "their" };
   const canEdit   = agent.trainable;
@@ -1784,7 +2029,7 @@ function PlaybookTab({ agent, showToast }) {
     <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 6, padding: "7px 10px", border: `1px solid ${T.lineSoft}`, background: T.cardAlt }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: T.ink, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.text}</div>
-        <div style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginTop: 3 }}>{originTag(r)}</div>
+        <div data-sent="no" style={{ fontFamily: mono, fontSize: 8.5, color: T.muted, marginTop: 3 }}>{originTag(r)}</div>
       </div>
       <button onClick={() => deleteMcpGuardrail(r.id)} style={{ fontFamily: mono, fontSize: 8.5, color: T.flag, background: "transparent", border: `1px solid ${T.flag}30`, padding: "1px 8px", cursor: "pointer", textTransform: "uppercase", letterSpacing: .5 }}>Delete</button>
     </div>
@@ -1809,7 +2054,7 @@ function PlaybookTab({ agent, showToast }) {
       {/* Output formats */}
       <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
         <Corners />
-        <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>Layer 04 · Output Structure</div>
+        <div style={{ fontFamily: mono, fontSize: 9, color: T.brassDeep, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>{plain ? "Output Structure" : "Layer 04 · Output Structure"}</div>
         <div style={{ fontFamily: display, fontSize: 16, fontWeight: 600, color: T.navy, marginBottom: 6 }}>How does {firstName} format {pronouns.possessive} responses?</div>
         <div style={{ fontFamily: body, fontSize: 12, color: T.mutedDeep, lineHeight: 1.5, marginBottom: 13, padding: "9px 13px", background: T.cardAlt, borderLeft: `3px solid ${T.brassDeep}` }}>
           Final block sent to the LLM. Set one as <strong>Default</strong> for automatic use. Toggle <strong>User Selectable</strong> to let users choose in the analysis UI.
@@ -1838,7 +2083,7 @@ function PlaybookTab({ agent, showToast }) {
       {/* Guardrails */}
       <div style={{ background: T.card, border: `1px solid ${T.line}`, padding: "15px 18px", position: "relative" }}>
         <Corners color={T.flag} />
-        <div style={{ fontFamily: mono, fontSize: 9, color: T.flag, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>Layer 05 · Guardrails</div>
+        <div style={{ fontFamily: mono, fontSize: 9, color: T.flag, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600, marginBottom: 4 }}>{plain ? "Guardrails" : "Layer 05 · Guardrails"}</div>
         <div style={{ fontFamily: body, fontSize: 12, color: T.mutedDeep, lineHeight: 1.5, marginBottom: 18, padding: "9px 13px", background: `${T.flag}07`, borderLeft: `3px solid ${T.flag}` }}>
           Applied to every prompt regardless of which Role or Format is active. Protects against legal overreach and unsupported claims.
         </div>
@@ -1963,17 +2208,45 @@ export default function PersonnelScreen() {
   // FEATURE: AGT-386 — no fallback to another agent: an id the roster does not hold (yet) is
   // "Loading…" until the read settles, then a redirect to /bench (guards below every hook).
   const { agents, settled } = useRoster();
-  const agent       = agents.find(a => a.id === agentId);
+  // FEATURE: AGT-392 — an Identity save patches this page's agent locally (Designer call 3)
+  const [identityPatch, setIdentityPatch] = useState(null);
+  // FEATURE: AGT-415 — a saved Skill Ladder level patches this page's agent locally (the roster read is cached)
+  const [levelPatch, setLevelPatch] = useState(null);
+  const found       = agents.find(a => a.id === agentId);
+  const patched     = found && identityPatch?.id === agentId ? { ...found, ...identityPatch } : found;
+  const agent       = patched && levelPatch?.id === agentId ? { ...patched, skill: levelPatch.skill } : patched;
+  const onLevelSaved = (score) => setLevelPatch({ id: agentId, skill: score });
   const isMobile    = useIsMobile();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
+  const [sentLens, setSentLensState] = useState(() => { try { return localStorage.getItem(SENT_LENS_KEY) === "1"; } catch { return false; } });
+  const setSentLens = (v) => { setSentLensState(v); try { localStorage.setItem(SENT_LENS_KEY, v ? "1" : "0"); } catch { /* private window */ } };
   const [entries, setEntries]     = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
   const [toast, setToast]         = useState(null);
   const [capabilities, setCapabilities] = useState([]);
+  // FEATURE: AGT-413 — a saved Skill (matched by slug, it may sit on several capabilities) or capability replaces its row
+  const patchSkill = (sk) => setCapabilities(cs => cs.map(c => ({ ...c, skillProfiles: c.skillProfiles.map(s => (s.slug === sk.slug ? { ...s, ...sk, level: s.level } : s)) })));
+  // FEATURE: AGT-414 — a new Skill joins one capability; a removed one leaves that capability only
+  const removeCapabilityFrom = (slug) => setCapabilities(cs => cs.filter(c => c.slug !== slug));
+  const addCapabilityTo = (cap) => setCapabilities(cs => [...cs, cap]);
+  const addSkillTo = (capSlug, skill) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: [...c.skillProfiles, skill] } : c)));
+  const removeSkillFrom = (capSlug, skillSlug) => setCapabilities(cs => cs.map(c => (c.slug === capSlug ? { ...c, skillProfiles: c.skillProfiles.filter(s => s.slug !== skillSlug) } : c)));
+  const patchCapability = (cap) => setCapabilities(cs => cs.map(c => (c.slug === cap.slug ? { ...c, ...cap, skillProfiles: c.skillProfiles } : c)));
   // FEATURE: AGT-386 — the Delete Agent confirm popup
   const [removeOpen, setRemoveOpen]     = useState(false);
   const [removing, setRemoving]         = useState(false);
   const [removeFailed, setRemoveFailed] = useState(false);
+  // FEATURE: AGT-397 — the Current / Proposed layout switch: dev host + flag on; the choice is kept per
+  // browser (a blocked storage read or write falls back to Current, never breaks the page)
+  const flagOn = useFeatureFlag(LAYOUT_FLAG);
+  const [stored, setStored] = useState(() => { try { return localStorage.getItem(LAYOUT_KEY); } catch { return null; } });
+  // AGT-407 — the Proposed view is the page now: the Current view is retired, not deleted. Every Current
+  // branch below (arrangement === "current", the OVERVIEW/CONFIGURE tab list, the two-column Profile) is
+  // still here and works; set CURRENT_VIEW_RETIRED to false to bring the Current / Proposed switch back.
+  const { switchShown, arrangement } = CURRENT_VIEW_RETIRED
+    ? { switchShown: false, arrangement: "proposed" }
+    : resolveLayout({ hostOk: IS_ADMIN_HOST, flagOn, stored });
+  const setLayout = v => { try { localStorage.setItem(LAYOUT_KEY, v); } catch { /* storage blocked: the choice lasts this visit */ } setStored(v); };
 
   const showToast = (msg, icon="✓") => {
     setToast({msg,icon});
@@ -2006,7 +2279,14 @@ export default function PersonnelScreen() {
   };
 
   // FEATURE: PE-07 — Left-sidebar nav replaces horizontal tab bar
-  const NAV_GROUPS = [
+  // AGT-403 — Proposed: one CONFIGURE group, Profile then Training; Resume and Playbook are sections of Profile
+  const proposed = arrangement === "proposed";
+  const NAV_GROUPS = proposed ? [
+    { id:"configure", label:"CONFIGURE", tabs:[
+      { id:"profile",  label:"Profile",  icon:"◈" },
+      { id:"training", label:"Training", icon:"◎" },
+    ]},
+  ] : [
     { id:"overview",  label:"OVERVIEW",  tabs:[{ id:"profile",  label:"Profile",  icon:"◈" }] },
     { id:"configure", label:"CONFIGURE", tabs:[
       { id:"resume",   label:"Resume",   icon:"▣" },
@@ -2020,6 +2300,12 @@ export default function PersonnelScreen() {
   const showActivity = isPrivateAgent(agent);
   if (showActivity) NAV_GROUPS[0].tabs.push({ id:"activity", label:"Activity", icon:"◉" });
   useEffect(() => { if (activeTab === "activity" && !showActivity) setActiveTab("profile"); }, [activeTab, showActivity]);
+  // FEATURE: AGT-397 — the COMING group and its Future View tab exist only under Proposed; a deep link
+  // to it under Current falls back to Profile
+  if (proposed) NAV_GROUPS.push({ id:"coming", label:"COMING SOON", tabs:[{ id:"future", label:"Future Controls", icon:"◇" }] });
+  useEffect(() => { if (activeTab === "future" && arrangement !== "proposed") setActiveTab("profile"); }, [activeTab, arrangement]);
+  // AGT-403 — a deep link to the Resume or Playbook tab under Proposed lands on Profile, where both now live
+  useEffect(() => { if ((activeTab === "resume" || activeTab === "playbook") && proposed) setActiveTab("profile"); }, [activeTab, proposed]);
 
   // FEATURE: PE-09 — Breadcrumb uses NAV_GROUPS lookup
   const activeLabel = NAV_GROUPS.flatMap(g => g.tabs).find(t => t.id === activeTab)?.label || activeTab;
@@ -2065,6 +2351,8 @@ export default function PersonnelScreen() {
         {/* FEATURE: PE-17 — desktop-only; mobile renders a merged persona header + horizontal tab bar instead */}
         {!isMobile && (
         <div style={{ width:180, flexShrink:0, background:T.card, borderRight:`1px solid ${T.line}`, display:"flex", flexDirection:"column", overflowY:"auto" }}>
+          {/* FEATURE: AGT-397 — the layout switch, above the breadcrumb */}
+          {switchShown && <LayoutSwitch arrangement={arrangement} onChange={setLayout}/>}
           {/* FEATURE: AGT-386 — the Bench breadcrumb, above the identity strip */}
           <Breadcrumb current={agent.name}/>
 
@@ -2076,12 +2364,14 @@ export default function PersonnelScreen() {
             </div>
             <div style={{ fontFamily:display, fontSize:13, fontWeight:600, color:T.navy, lineHeight:1.2 }}>{agent.name}</div>
             <div style={{ fontFamily:mono, fontSize:8, color:T.muted, marginTop:2 }}>{agent.code}</div>
+            {!proposed && (
             <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>
               <span style={{ fontFamily:mono, fontSize:8, padding:"1px 6px", background:"rgba(90,117,56,.1)", color:T.moss, border:`1px solid rgba(90,117,56,.3)`, fontWeight:700 }}>● ACTIVE</span>
               {agent.trainable && (
                 <span style={{ fontFamily:mono, fontSize:8, padding:"1px 6px", background:`${agent.color}18`, color:agent.color, border:`1px solid ${agent.color}40`, fontWeight:700 }}>YOUR TRAINEE</span>
               )}
             </div>
+            )}
           </div>
 
           {/* Nav groups */}
@@ -2118,41 +2408,42 @@ export default function PersonnelScreen() {
               {/* Mobile persona block — FEATURE: PE-17 — merges the old page header + ProfileTab's ID Badge card into one persistent block, above the tab bar, on every tab */}
               <div style={{background:T.card,padding:"16px 18px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0,textAlign:"center"}}>
                 <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:12,color:T.brassDeep,cursor:"pointer",textAlign:"left",marginBottom:12}}>← Agent Roster</div>
-                <div style={{fontFamily:mono,fontSize:8,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.6,fontWeight:700,marginBottom:12}}>Bureau of Procurement Intelligence · {agent.code}</div>
+                <div data-sent="no"><TeamHeading agentId={agent.id} suffix={agent.code}/></div>
                 <div style={{margin:"0 auto 12px",display:"flex",justifyContent:"center"}}>
                   <AgentAvatar who={agent.id} size={56} ring={true} />
                 </div>
+                {proposed ? (<>
+                  <InlineText value={agent.name} field="name" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}/>
+                  <InlineText value={agent.role} field="role" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:2}}/>
+                  <div data-sent="no" style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>Tenure · {agent.hiredOn}</div>
+                </>) : (<>
                 <div style={{fontFamily:display,fontSize:20,fontWeight:600,color:T.navy,marginBottom:3}}>{agent.name}</div>
                 <div style={{fontFamily:body,fontSize:12,color:T.mutedDeep,fontStyle:"italic",marginBottom:10}}>{agent.role} · tenure {agent.hiredOn}</div>
+                </>)}
+                {!proposed && (
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:10}}>
                   <span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:"rgba(90,117,56,.1)",color:T.moss,border:`1px solid rgba(90,117,56,.3)`,fontWeight:700}}>● ACTIVE</span>
                   {agent.trainable&&<span style={{fontFamily:mono,fontSize:8.5,padding:"2px 8px",background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}40`,fontWeight:700}}>YOUR TRAINEE</span>}
                 </div>
-                {agent.quip && (
-                <div style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
-                  "{agent.quip}"
+                )}
+                {proposed && (
+                <div data-sent="no" style={{background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
+                  <InlineText value={plainQuip(agent.quip || "")} field="quip" quote placeholder="Add a quote" agent={agent} onSaved={setIdentityPatch} showToast={showToast} style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep}}/>
                 </div>
                 )}
-                <BadgeActions agent={agent} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",gap:8,justifyContent:"center",marginBottom:10}}/>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                  <div>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
-                  </div>
-                  <div>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
-                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
-                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
+                {!proposed && agent.quip && (
+                <div data-sent="no" style={{fontFamily:display,fontStyle:"italic",fontSize:12,color:T.mutedDeep,background:`${T.moss}08`,border:`1px solid ${T.moss}25`,padding:"8px 12px",lineHeight:1.5,marginBottom:10}}>
+                  "{plainQuip(agent.quip)}"
                 </div>
+                )}
+                
+                <div data-sent="no">{proposed && <SkillLevelBar agent={agent} onSaved={onLevelSaved} showToast={showToast}/>}</div>
+                <BadgeActions agent={agent} align="center" onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:10}}/>
+                {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={true}/>}
               </div>
+
+              {/* FEATURE: AGT-397 — the layout switch, mirrored on mobile above the tab bar */}
+              {switchShown && <LayoutSwitch arrangement={arrangement} onChange={setLayout}/>}
 
               {/* Mobile tab bar — FEATURE: PE-17 — reuses RO-13's horizontal chip pattern (STYLE-GUIDE.md §27); persists across all 4 tabs */}
               <div style={{display:"flex",overflowX:"auto",gap:6,padding:"8px 12px",background:T.cardAlt,borderBottom:`1px solid ${T.line}`,flexShrink:0}}>
@@ -2180,49 +2471,82 @@ export default function PersonnelScreen() {
             /* Page header — desktop only */
             <div style={{background:T.cardAlt,padding:"16px 24px 14px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
               {/* Breadcrumb — FEATURE: PE-09 */}
+              {!proposed && (
               <div style={{fontFamily:mono,fontSize:9,color:T.brassDeep,textTransform:"uppercase",letterSpacing:1.8,fontWeight:600,marginBottom:4}}>
                 Personnel File · {agent.code} · {agent.trainableBy} Bench · {activeLabel}
               </div>
+              )}
               {/* Title row */}
               <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
                 <div>
                   <div style={{fontFamily:display,fontSize:26,fontWeight:500,color:T.navy,letterSpacing:"-.5px",lineHeight:1,marginBottom:4}}>
                     The personnel file of {agent.name}.
                   </div>
+                  {!proposed && (
                   <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.mutedDeep}}>
                     Tenure · {agent.hiredOn} · {skillLabel(agent.skill)}-level agent
                   </div>
+                  )}
                 </div>
-                {/* Stat badges */}
-                <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Situational Awareness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:agent.situational>=30?T.brass:T.muted,lineHeight:1}}>{agent.situational}%</div>
-                  </div>
-                  <div style={{width:1,height:30,background:T.lineSoft}}/>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Readiness</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:readinessColor(readiness),lineHeight:1}}>
-                      {readiness}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
-                  <div style={{width:1,height:30,background:T.lineSoft}}/>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:mono,fontSize:8,color:T.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:1}}>Skill</div>
-                    <div style={{fontFamily:display,fontSize:18,fontWeight:700,color:T.brassDeep,lineHeight:1}}>
-                      {agent.skill}<span style={{fontFamily:mono,fontSize:9,color:T.muted,fontWeight:400}}>/100</span>
-                    </div>
-                  </div>
-                </div>
+                {/* Stat badges — FEATURE: AGT-397 — Current arrangement only */}
+                {arrangement === "current" && <StatBadges agent={agent} readiness={readiness} isMobile={false}/>}
               </div>
             </div>
           )}
 
           {/* Tab content */}
           <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 64px", background:T.paperDeep }}>
+            {/* AGT-406 — Proposed, desktop: every tab's content takes at most half the browser width, left-aligned */}
+            <div className={!SENT_LENS_HIDDEN && sentLens && isPrivateAgent(agent) ? "sent-lens" : undefined} style={proposed && !isMobile ? { maxWidth:"50vw" } : undefined}>
+            <style>{SENT_LENS_CSS}</style>
+            {!SENT_LENS_HIDDEN && (activeTab === "profile" || activeTab === "training") && isPrivateAgent(agent) && <SentLensToggle on={sentLens} onChange={setSentLens}/>}
             {/* FEATURE: PE-08 */}
-            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)}/>}
-            {activeTab === "resume"   && <ResumeTab agent={agent} showToast={showToast}/>}
+            {activeTab === "profile"  && <ProfileTab agent={agent} entries={entries} layers={layers} capabilities={capabilities} onSkillChange={patchSkill} onCapabilityChange={patchCapability} onSkillAdded={addSkillTo} onSkillRemoved={removeSkillFrom} onCapabilityAdded={addCapabilityTo} onCapabilityDeleted={removeCapabilityFrom} onLevelSaved={onLevelSaved} isMobile={isMobile} onAddTraining={() => setActiveTab("training")} onConnect={() => navigate(`/bench/connect?agent=${agent.id}`)} arrangement={arrangement} showToast={showToast} onIdentitySaved={setIdentityPatch}/>}
+            {/* FEATURE: AGT-397 — the Future View: the moved cards by group, an empty box per field not yet built */}
+            {activeTab === "future" && arrangement === "proposed" && (
+              <FutureViewTab isMobile={isMobile} groups={[
+                { id:"subscription", items:[<VitalsCard key="vitals" agent={agent} tight/>], placeholders:[
+                  { label:"Active status", line:"Not yet read from the agent row", rows:[["Status","Active"],["Since","Sep 2026"],["Last run","2 hours ago"],["Available to","Your team"]] },
+                  { label:"Answer mode",   line:"Not yet read from the agent row", rows:[["Style","Cite sources"],["Length","Concise"],["When unsure","Ask a question"],["Language","English"]] },
+                ]},
+                // AGT-410 — the Teach control card moved here from Configurations
+                { id:"training", items:[], placeholders:[
+                  { label:"Teach control", line:"Not yet read from the agent row", rows:[["Who can teach","Owner only"],["Lessons waiting","0"],["Last taught","Oct 3, 2026"],["Review first","Required"]] },
+                  // AGT-402 — the YOUR TRAINEE badge, moved to Future Controls by John (it means "you can train this agent", not the skill level)
+                  { label:"Your trainee badge", line:"Not yet read from who created the agent", rows:[["Badge","YOUR TRAINEE"],["Shown when","You created this agent, so you can train it"],["Set by","The system, from who created the agent"],["Changes when","The agent passes to a different owner"]] },
+                  // AGT-413 — teaching origin and date, moved to Future Controls by John's register ruling
+                  { label:"Teaching origin and date", line:"Not yet read from the taught items", rows:[["Taught from","DeepBench"],["Taught over MCP","3 lessons"],["First taught","Sep 29, 2026"],["Last taught","Oct 3, 2026"]] },
+                ]},
+                { id:"billing", items:[<CompensationCard key="comp" agent={agent} tight/>], placeholders:[] },
+                { id:"readiness", items:[
+                  <StatBadges key="trio" agent={agent} readiness={readiness} isMobile={isMobile}/>,
+                  <ReadinessCard key="ready" layers={layers} readiness={readiness}/>,
+                  <IntelConfigCard key="intel" agent={agent} layers={layers} isMobile={isMobile} proposed/>,
+                  // AGT-402 — Documents is the agent's real count of active taught items, not the roster's constant
+                  <QuickStatsCard key="stats" agent={{ ...agent, docs: taughtCounts(entries).always + taughtCounts(entries).lookedUp }} show="all"/>,
+                  <ReportCardPanel key="rc" agent={agent} capabilities={capabilities} tight sample/>,
+                  <SkillLadderCard key="ladder" agent={agent} tight/>,
+                ], placeholders:[
+                  // AGT-413 — rating, moved to Future Controls by John's register ruling
+                  { label:"Rating", line:"Not yet read from the agent row", rows:[["Average","4.6 of 5"],["Ratings","38"],["Last rated","Oct 5, 2026"],["Who can rate","People who used it"]] },
+                  // AGT-415 — the typed 0-100 skill score, moved to Future Controls by John (the level bar on Profile is the editor today)
+                  { label:"Skill score", line:"Typing a score arrives later; set the level with the bar on Profile", rows:[["Score","62 of 100"],["Level it falls in","Proficient (55 to 75)"],["Set by","You, Oct 6, 2026"],["Next level at","75"]] },
+                  // AGT-415 — the ladder's other half: the agent promotes itself from what it has done (the user still sets the level on Profile)
+                  { label:"Promotion by accomplishments", line:"Arrives when levels are graded from real runs; the level you set on Profile stays until then", rows:[["Current level","Proficient"],["Next level","Expert, at 75"],["Progress to it","18 of 25 graded reports passed"],["Last promoted","Sep 30, 2026, to Proficient"],["Promoted by","The agent, from its record"]] },
+                ] },
+                { id:"library", items:[<AccessLevelsCard key="levels"/>], placeholders:[
+                  // AGT-413 — the Access card moved here (read-only for now) and the fixed Voice text, each with sample values
+                  { label:"Access", line:"Editing sharing and visibility arrives with sign-in", rows:[["Owner","Jordan Lee"],["Sharing","Named people"],["Shared with","Dana Ruiz, Sam Okafor"],["Visibility","Visible to the people it is shared with"],["Lane","Product"],["Uber access","Off"]] },
+                  { label:"Voice", line:"One fixed text for every agent today; a per-agent Voice needs its own storage first", rows:[["Applies to","Every agent"],["Position","Last section of every prompt"],["Speaks as","\"you\" or \"I\", never \"the user\""],["Edited per agent","Not yet"]] },
+                  { label:"Library catalog",  line:"Hidden from AI clients until the Library opens to this agent", rows:[["Collections","4"],["Documents","128"],["Last updated","Sep 28, 2026"]] },
+                  { label:"Library records",  line:"Hidden from AI clients until the Library opens to this agent", rows:[["Records","1,240"],["Kinds","Contracts, bids, notices"],["Newest","Oct 1, 2026"]] },
+                  { label:"Library tier",     line:"Hidden from AI clients until the Library opens to this agent", rows:[["Tier","Standard"],["Storage used","2.1 of 10 GB"],["Kept for","12 months"]] },
+                  { label:"Data-room access", line:"Hidden from AI clients until the Library opens to this agent", rows:[["Rooms shared","2"],["Who can open","Owner + 3 guests"],["Downloads","Off"]] },
+                ]},
+                { id:"work", items:[<WorkAssignments key="work" agent={agent} sample/>], placeholders:[] },
+              ]}/>
+            )}
+            {activeTab === "resume"   && !proposed && <ResumeTab agent={agent} showToast={showToast} arrangement={arrangement} onIdentitySaved={setIdentityPatch}/>}
             {/* FEATURE: PE-03 */}
             {activeTab === "training" && (
               <TrainingTab
@@ -2236,10 +2560,11 @@ export default function PersonnelScreen() {
                 navigate={navigate}
               />
             )}
-            {activeTab === "playbook" && <PlaybookTab agent={agent} showToast={showToast}/>}
+            {activeTab === "playbook" && !proposed && <PlaybookTab agent={agent} showToast={showToast}/>}
             {activeTab === "activity" && showActivity && <ActivityTab agent={agent} entries={entries}/>}
             {/* FEATURE: AGT-386 — Delete Agent: private agents only, every tab, desktop and mobile */}
             {isPrivateAgent(agent) && (<div style={{textAlign:"right",marginTop:32}}><button onClick={() => setRemoveOpen(true)} style={{background:"none",border:"none",padding:0,fontFamily:body,fontSize:11,color:T.muted,textDecoration:"underline",cursor:"pointer"}}>Delete Agent</button></div>)}
+            </div>
           </div>
 
         </div>

@@ -1,0 +1,2800 @@
+{
+ "artifact": "https://claude.ai/artifact/CyLXYhju9s9nW7Lyb2LbsE",
+ "collection": "fields",
+ "taken": "2026-10-06",
+ "count": 113,
+ "documents": [
+  {
+   "id": "f01-id",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "On the roster, ids are first names, so a link is guessable. Created agents get a random suffix.",
+    "edited_where": "Set at creation, fixed",
+    "field": "id",
+    "filter": [
+     "All tabs (header)"
+    ],
+    "flag": "",
+    "group": "Identity",
+    "holds": "The agent's id, e.g. brittany. It is also the end of the agent's own MCP link.",
+    "john_decision": [
+     "Discuss"
+    ],
+    "john_note": "Let's discuss the id vs the name vs mcp components",
+    "john_updated_at": "2026-10-06T16:07:27.335Z",
+    "personnel": "Yes",
+    "personnel_detail": "Header and URLs",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "agents.id",
+    "updated": "Never: set once",
+    "updated_note": "Fixed at creation. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f02-name",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Shipped inside the answer and written into every tool description (Run by <name>).",
+    "edited_where": "Create-agent screen at creation; no editor found after",
+    "field": "name",
+    "filter": [
+     "All tabs (header)",
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Identity",
+    "holds": "Display name",
+    "john_decision": [
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_note": "Need to understand the reprcussions of changing names, what it does to the mcp connection and how the ai client knows to call access edit if name changes",
+    "john_updated_at": "2026-10-06T15:44:58.988Z",
+    "personnel": "Yes",
+    "personnel_detail": "Everywhere",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "agents.name",
+    "updated": "Never: set once",
+    "updated_note": "Set when the agent is created. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f03-role",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Every created private agent introduces itself to an AI client as 'New Agent' until someone can change it.",
+    "edited_where": "Create-agent screen at creation; no editor found after",
+    "field": "role",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Shipped, no editor",
+    "group": "Identity",
+    "holds": "Role title. Created agents all read 'New Agent'.",
+    "john_decision": [
+     "Add an editor"
+    ],
+    "john_updated_at": "2026-10-06T15:56:53.695Z",
+    "personnel": "Yes",
+    "personnel_detail": "Header",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "agents.role",
+    "updated": "Never: placeholder",
+    "updated_note": "4 of 37 agents (all made on the create screen) read 'New Agent'. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f04-specialty",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "First thing an AI client reads about what the agent is for. Brittany's is blank today.",
+    "edited_where": "No editor found",
+    "field": "specialty",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "Shipped, no editor",
+    "group": "Identity",
+    "holds": "One-line specialty",
+    "john_decision": [
+     "Add an editor"
+    ],
+    "john_updated_at": "2026-10-06T16:03:46.655Z",
+    "personnel": "Yes",
+    "personnel_detail": "Resume tab facts",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "agents.specialty",
+    "updated": "Never: placeholder",
+    "updated_note": "Blank on the 4 agents made on the create screen; 33 of 37 are filled, by seed. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f05-bio",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Leaves DeepBench on every call but nobody can see or edit it on Personnel.",
+    "edited_where": "No editor found",
+    "field": "bio",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "Shipped, no editor",
+    "group": "Identity",
+    "holds": "Biography",
+    "john_decision": [
+     "AI Client can update",
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_note": "let's discuss the origin and allowing the user to see and where to put it",
+    "john_updated_at": "2026-10-06T16:08:49.867Z",
+    "personnel": "No",
+    "personnel_detail": "Not displayed",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "agents.bio",
+    "updated": "Never: placeholder",
+    "updated_note": "Blank on the 4 agents made on the create screen; 33 of 37 are filled, by seed. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f06-lane",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not a field in the answer, but written into each tool description as '(product lane)'. It also decides who may see the tool.",
+    "edited_where": "No editor found",
+    "field": "lane",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "product / governance / personal",
+    "john_updated_at": "2026-10-06T15:16:51.903Z",
+    "personnel": "No",
+    "personnel_detail": "Not displayed",
+    "reviewed": "Complete",
+    "shipped": "Indirect",
+    "source": "agents.lane",
+    "updated": "Never: set once",
+    "updated_note": "Set at creation (product, governance or personal). Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f07-role_prompts",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "One of the three rule kinds an AI client can now write.",
+    "edited_where": "Personnel Resume tab; AI client via Teach tool (AGT-390)",
+    "field": "role_prompts",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "Role prompts: how the agent should behave",
+    "personnel": "Yes",
+    "personnel_detail": "Resume tab, add and edit",
+    "shipped": "Yes",
+    "source": "agent_configs, type role_prompt",
+    "updated": "User",
+    "updated_note": "9 rows on 7 agents, last written 2026-06-10, by the Resume tab; the Teach tool can now add more."
+   }
+  },
+  {
+   "id": "f08-guardrails",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "Easy to confuse with the Guardrails Skill, which never ships. Worth confirming the Playbook tab really lists these rows.",
+    "edited_where": "AI client via Teach tool (always/never). No DeepBench editor confirmed; AGT-390 names the Playbook tab.",
+    "field": "guardrails (typed)",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "Verify editor",
+    "group": "Rules and behavior",
+    "holds": "Always/never rules typed for the agent (not the Guardrails Skill)",
+    "personnel": "Partly",
+    "personnel_detail": "Playbook tab shows the Skill's guardrails, not these",
+    "shipped": "Yes",
+    "source": "agent_configs, type guardrail",
+    "updated": "User",
+    "updated_note": "7 rows on 5 agents, last written 2026-06-09, by the Playbook tab; the Teach tool can now add more."
+   }
+  },
+  {
+   "id": "f09-output_formats",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "",
+    "edited_where": "Personnel formats panel; AI client via Teach tool",
+    "field": "output_formats",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "Output formats",
+    "personnel": "Yes",
+    "personnel_detail": "Formats panel",
+    "shipped": "Yes",
+    "source": "agent_configs, type output_format",
+    "updated": "User",
+    "updated_note": "6 rows on 4 agents, all written 2026-04-24 by the Playbook tab; the Teach tool can now add more."
+   }
+  },
+  {
+   "id": "f10-taught",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "The core of a handover agent. AGT-390 tags new items with origin and date; I did not confirm those tags appear in the answer.",
+    "edited_where": "Teach screen; AI client via Teach tool",
+    "field": "taught",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Every taught item: title, text (with the trainer's note), length, and whether it is short enough to hand over whole (12,000 characters)",
+    "personnel": "Yes",
+    "personnel_detail": "Counts and cards",
+    "shipped": "Yes",
+    "source": "knowledge_entries, source user",
+    "updated": "User",
+    "updated_note": "14 taught rows on 6 agents, newest 2026-10-06, by the Teach screen and Teach tool."
+   }
+  },
+  {
+   "id": "f11-records",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Framed in the answer as 'not instructions'.",
+    "edited_where": "Not editable; the agent writes them",
+    "field": "records",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Notes the agent saved for itself from past work",
+    "personnel": "Yes",
+    "personnel_detail": "Cards",
+    "shipped": "Yes",
+    "source": "knowledge_entries, other sources",
+    "updated": "System",
+    "updated_note": "26 rows, all written by one agent (2026-05-30 to 2026-07-21); nothing since."
+   }
+  },
+  {
+   "id": "f12-knowledge_entries",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "An index, so the AI client can see what exists without reading every item.",
+    "edited_where": "Follows taught and records",
+    "field": "knowledge_entries",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Index of taught items and records: id, title, length, kind",
+    "personnel": "Yes",
+    "personnel_detail": "Counts line",
+    "shipped": "Yes",
+    "source": "derived from the two rows above",
+    "suspect": "Duplicate",
+    "suspect_why": "Only an index built from f10 taught and f11 records.",
+    "updated": "System",
+    "updated_note": "An index rebuilt from the taught and record rows on every call."
+   }
+  },
+  {
+   "id": "f13-sections",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Empty for created agents, which have no Skills. For an agent with Skills this would ship Skill text, so a handover agent with Skills is a different decision.",
+    "edited_where": "Skill rows; not editable by a product user",
+    "field": "sections",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "",
+    "group": "Skills and capabilities",
+    "holds": "The assembled Skill sections minus the per-call ones (current-task, task-details, prior-conversation, voice)",
+    "personnel": "Partly",
+    "personnel_detail": "Playbook tab",
+    "shipped": "Yes",
+    "source": "assemblePrompt(), Skill rows",
+    "updated": "System",
+    "updated_note": "Rebuilt on every call from Skill rows. Empty for created agents, which have none."
+   }
+  },
+  {
+   "id": "f14-library_catalog",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not yet checked what it contains for Brittany.",
+    "edited_where": "Not editable",
+    "field": "library.catalog",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Library and data rooms",
+    "holds": "The Library catalogue the agent may see",
+    "john_decision": [
+     "Move to Future View",
+     "Hide from AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:26:12.916Z",
+    "personnel": "No",
+    "personnel_detail": "Panel describes the Library, not this catalogue",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "the_library_catalog via the Librarian broker",
+    "updated": "System",
+    "updated_note": "Read live from the Library on every call."
+   }
+  },
+  {
+   "id": "f15-library_records",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "library.records",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Library and data rooms",
+    "holds": "How many catalogue records matched",
+    "john_decision": [
+     "Move to Future View",
+     "Hide from AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:26:13.112Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "broker matchCount",
+    "updated": "System",
+    "updated_note": "Counted on every call."
+   }
+  },
+  {
+   "id": "f16-library_tier",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Says 'denied-no-access' rather than staying silent.",
+    "edited_where": "Not editable",
+    "field": "library.tier",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Library and data rooms",
+    "holds": "The Library access verdict",
+    "john_decision": [
+     "Move to Future View",
+     "Hide from AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:26:13.349Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "broker tier",
+    "updated": "System",
+    "updated_note": "Decided on every call by the Librarian broker."
+   }
+  },
+  {
+   "id": "f17-data_room_access",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Empty for Brittany.",
+    "edited_where": "No editor found",
+    "field": "data_room_access",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "Shipped, no editor",
+    "group": "Library and data rooms",
+    "holds": "Which data rooms the agent may read",
+    "john_decision": [
+     "Move to Future View",
+     "Hide from AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:09:46.999Z",
+    "personnel": "No",
+    "personnel_detail": "Not displayed anywhere in the UI",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "agents.data_room_access",
+    "updated": "Never: placeholder",
+    "updated_note": "Empty on 33 of 37 agents; 4 hold a list, set outside the product. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f18-no_inference",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Fixed",
+    "field": "no_inference",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Handover markers",
+    "holds": "Always true: a marker that no model ran on DeepBench",
+    "john_decision": [
+     "Hide from AI client",
+     "Discuss"
+    ],
+    "john_note": "don't understand this purpose",
+    "john_updated_at": "2026-10-06T16:11:43.578Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "fixed in agent-bundle.js",
+    "updated": "Never: hardcoded",
+    "updated_note": "A constant true in agent-bundle.js."
+   }
+  },
+  {
+   "id": "f19-architecture",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The page shows a static roster value, not necessarily this column.",
+    "edited_where": "No editor found",
+    "field": "architecture",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Identity",
+    "holds": "Model architecture label",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:00:09.519Z",
+    "personnel": "Yes",
+    "personnel_detail": "Resume tab facts",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.architecture",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; 17 distinct values on the rest, set by seed. The page shows a static roster value anyway. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f20-code",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "code",
+    "filter": [
+     "All tabs (header)",
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Identity",
+    "holds": "Agent code (short tag)",
+    "john_decision": [
+     "Discuss"
+    ],
+    "john_note": "What does this mean? ID?",
+    "john_updated_at": "2026-10-06T15:39:11.217Z",
+    "personnel": "Yes",
+    "personnel_detail": "Header",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.code",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; set by seed on the rest. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f21-hourly_rate",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "hourly_rate",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Business and pay",
+    "holds": "Pay rate",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:51:50.991Z",
+    "personnel": "Yes",
+    "personnel_detail": "Business panel",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.hourly_rate",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; seeded on the rest. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f22-report_cost",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Three columns, one idea.",
+    "edited_where": "No editor found",
+    "field": "report_cost (also base_ and current_)",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Business and pay",
+    "holds": "Cost per report",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:55:32.811Z",
+    "personnel": "Yes",
+    "personnel_detail": "Business panel",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.report_cost, base_report_cost, current_report_cost",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents. current_report_cost equals base_report_cost on all 37 agents, so it has never moved. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f23-report_hours",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "report_hours",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Business and pay",
+    "holds": "Hours per report",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:55:49.159Z",
+    "personnel": "Yes",
+    "personnel_detail": "Business panel",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.report_hours",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; seeded on the rest. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f24-revenue_model",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "revenue_model",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Business and pay",
+    "holds": "Revenue model label",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:56:08.275Z",
+    "personnel": "Yes",
+    "personnel_detail": "Business panel",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.revenue_model",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; seeded on the rest. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f25-salary",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "salary (also yearly_value)",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Business and pay",
+    "holds": "Pay and value figures",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:57:14.475Z",
+    "personnel": "Yes",
+    "personnel_detail": "Business panel",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.salary, yearly_value",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; seeded on the rest. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f26-situational_awareness",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "situational_awareness",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "Awareness score",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:57:30.324Z",
+    "personnel": "Yes",
+    "personnel_detail": "Readiness",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.situational_awareness",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; seeded on the rest. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f27-skill_score",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Also drives the L1 readiness number.",
+    "edited_where": "No editor found",
+    "field": "skill_score",
+    "filter": [
+     "Profile (home)",
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "Skill score, shown as Trainee to Principal",
+    "john_decision": [
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_updated_at": "2026-10-06T15:59:13.011Z",
+    "personnel": "Yes",
+    "personnel_detail": "Resume tab ladder",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.skill_score",
+    "updated": "Never: placeholder",
+    "updated_note": "0 on created agents and on Brittany and Nathan; seeded on others. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f28-trainer_org",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "trainer_org",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "Who trains the agent",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:04:10.455Z",
+    "personnel": "Yes",
+    "personnel_detail": "Shown as Trainer and Update Rights",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.trainer_org",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on created agents; 5 distinct values, seeded. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f29-rating",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "rating",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "Rating",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:12:55.499Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.rating",
+    "updated": "Never: placeholder",
+    "updated_note": "0 on all 37 agents. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f30-usage_count",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable, counted",
+    "field": "usage_count",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "How many times used",
+    "john_decision": [
+     "System should update",
+     "Add to Personnel page"
+    ],
+    "john_updated_at": "2026-10-06T16:13:59.699Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.usage_count",
+    "suspect": "Duplicate",
+    "suspect_why": "Duplicates p70 Connections, and is stuck at 0.",
+    "updated": "Never: placeholder",
+    "updated_note": "0 on all 37 agents, though AI clients have called agents 2,400+ times, so nothing increments it. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f31-uber_access",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "uber_access",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "Elevated access flag",
+    "john_updated_at": "2026-10-06T15:16:52.716Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.uber_access",
+    "updated": "Never: placeholder",
+    "updated_note": "False on 35 of 37 agents; the 2 true were set outside the product. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f32-is_active",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not returned, but an inactive agent drops off every tool list, which makes it the off switch for a connection.",
+    "edited_where": "John's call",
+    "field": "is_active",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "On the roster or retired",
+    "john_updated_at": "2026-10-06T15:16:51.712Z",
+    "personnel": "No",
+    "personnel_detail": "Not shown",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.is_active",
+    "updated": "User",
+    "updated_note": "The Remove agent button sets it false (archive_private_agent). No other product path touches it."
+   }
+  },
+  {
+   "id": "f33-owner_id",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The private-agent check (AGT-336) reads it but is not enforced until sign-in exists.",
+    "edited_where": "Nothing sets it yet; null on every agent",
+    "field": "owner_id",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "Who owns the agent",
+    "john_updated_at": "2026-10-06T15:16:52.245Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.owner_id",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on all 37 agents. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f34-sharing",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "'Private' does not hide an agent from the admin MCP address today.",
+    "edited_where": "Set at creation; no editor found after",
+    "field": "sharing (also shared_with)",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "private / users / public, and the user list",
+    "john_updated_at": "2026-10-06T15:16:52.450Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.sharing, shared_with",
+    "updated": "Never: set once",
+    "updated_note": "Set at creation (private for created agents). Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f35-visibility",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "visibility",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Access and status",
+    "holds": "config / create",
+    "john_decision": [
+     "Add an editor"
+    ],
+    "john_updated_at": "2026-10-06T16:05:34.127Z",
+    "personnel": "Label",
+    "personnel_detail": "Page shows hardcoded 'Configurable'; the column is ignored",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.visibility",
+    "updated": "Never: placeholder",
+    "updated_note": "Default value on created agents; 3 distinct values, seeded. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f36-update_cadence",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "update_cadence",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Access and status",
+    "holds": "How often the agent is updated",
+    "john_decision": [
+     "System should update"
+    ],
+    "john_updated_at": "2026-10-06T16:05:08.443Z",
+    "personnel": "Label",
+    "personnel_detail": "Page shows hardcoded 'Quarterly'; the column is ignored",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.update_cadence",
+    "updated": "Never: placeholder",
+    "updated_note": "Null on most agents; 2 distinct values, seeded. The page ignores it and shows 'Quarterly'. Nothing writes it after creation."
+   }
+  },
+  {
+   "id": "f37-label-update-rights",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Reads as a permission setting; it is not one.",
+    "edited_where": "Not editable",
+    "field": "Update Rights label",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Access and status",
+    "holds": "'<trainer> admin' under Resume facts",
+    "john_decision": [
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_updated_at": "2026-10-06T16:04:39.783Z",
+    "personnel": "Label",
+    "personnel_detail": "Resume tab",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "derived from trainer_org",
+    "suspect": "Duplicate",
+    "suspect_why": "Built from f28 trainer_org plus the word admin.",
+    "updated": "Never: hardcoded",
+    "updated_note": "Built from the trainer name plus 'admin' in the page."
+   }
+  },
+  {
+   "id": "f38-label-readiness",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Reads as a measurement, mostly constants.",
+    "edited_where": "Not editable",
+    "field": "L1 to L5 readiness scores",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Scores and readiness",
+    "holds": "Five bars: role, background, payload, output format, guardrails",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:35:22.223Z",
+    "personnel": "Label",
+    "personnel_detail": "L3 fixed at 100; L4 and L5 fixed at 72/50 and 68/45 by one flag; L2 counts taught items",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "computed in PersonnelScreen.jsx",
+    "suspect": "Duplicate",
+    "suspect_why": "The same five scores as p14 Agent Readiness Score.",
+    "updated": "System",
+    "updated_note": "Computed on each page load; L3 is a constant and L4 and L5 are flag-based constants."
+   }
+  },
+  {
+   "id": "f39-label-tasks",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Sample data presented as the agent's work.",
+    "edited_where": "Not editable",
+    "field": "Tasks list",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Work assignments",
+    "holds": "Sample tasks for a few roster agents",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:58:14.775Z",
+    "personnel": "Label",
+    "personnel_detail": "Marked 'replace with Supabase' in the code",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "AGENT_TASKS in PersonnelScreen.jsx",
+    "suspect": "Duplicate",
+    "suspect_why": "The same sample tasks as p22 Active Work Assignments.",
+    "updated": "Never: hardcoded",
+    "updated_note": "Sample tasks written into PersonnelScreen.jsx."
+   }
+  },
+  {
+   "id": "f40-label-roster",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Display only.",
+    "edited_where": "Not editable",
+    "field": "quip, classes, docs, chunks",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Identity",
+    "holds": "Static roster display data",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:54:51.123Z",
+    "personnel": "Yes",
+    "personnel_detail": "Cards",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "src/data/agents.js",
+    "updated": "Never: hardcoded",
+    "updated_note": "Static values in src/data/agents.js."
+   }
+  },
+  {
+   "id": "f41-voice",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "voice is built for the agent but sits in the list of sections the handover removes. An AI client playing Brittany has no voice to keep.",
+    "edited_where": "Skill rows today",
+    "field": "voice (suggested)",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "Suggested addition",
+    "group": "Skills and capabilities",
+    "holds": "How the agent sounds: tone and style the AI client should keep when speaking as the agent",
+    "john_decision": [
+     "Add to AI client",
+     "Add an editor"
+    ],
+    "john_updated_at": "2026-10-06T16:13:37.247Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "voice section, built and then dropped from the handover",
+    "updated": "Not built",
+    "updated_note": "A suggestion; not built."
+   }
+  },
+  {
+   "id": "f42-origin-date",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Shipped to dev 2026-10-05. I did not check that the bundle returns the tags, only that they are written.",
+    "edited_where": "Set automatically",
+    "field": "teaching origin and date (check)",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "Unverified",
+    "group": "Training content",
+    "holds": "Where each taught item came from (Teach screen or MCP, which caller) and when",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:26:13.548Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "knowledge_entries, tagged by AGT-390",
+    "updated": "System",
+    "updated_note": "Written automatically on each new item since AGT-390 (2026-10-05). Not yet shipped to AI clients."
+   }
+  },
+  {
+   "id": "f43-capabilities",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Lets an AI client introduce the agent accurately. The tool list gives some of this, but only on the address the client used.",
+    "edited_where": "Not editable by a product user",
+    "field": "capability list (suggested)",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Suggested addition",
+    "group": "Skills and capabilities",
+    "holds": "The names and descriptions of the Capabilities the agent holds",
+    "john_decision": [
+     "Add to AI client",
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_note": "let's discuss this one, one on one, i want to know, is this showing all the cababilities assigned in the database with its associated skillsets.  Can we make this an editable function, perhaps its own page, that allows a user to type in its skill and skill types. Allow the user to edit the capability and its defintion. Its my understanding this is passed to teh AI client as individual tools, and want to get this locked down. Also understand how an AI client can update these. Need to think through this one.",
+    "john_updated_at": "2026-10-06T15:50:58.984Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, Capabilities card",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "capabilities, agent_capability_assignments",
+    "suspect": "Duplicate",
+    "suspect_why": "The same data as the p11 Capabilities card; AI clients already see names and descriptions in the tool list.",
+    "updated": "Not built",
+    "updated_note": "A suggestion to ship it to AI clients; the Capabilities card itself already exists."
+   }
+  },
+  {
+   "id": "f44-edit-identity",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Three of the fields an AI client sees first have no editor. This is the smallest change that makes the handover presentable.",
+    "edited_where": "None today",
+    "field": "editor for role, specialty, bio (suggested)",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "Suggested addition",
+    "group": "Identity",
+    "holds": "A form on Personnel to change the three identity fields that every AI client reads first",
+    "john_decision": [
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_note": "is this overlap with the other identity fields marked needing an editor",
+    "john_updated_at": "2026-10-06T16:10:46.718Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "Yes",
+    "source": "agents.role, specialty, bio",
+    "suspect": "Duplicate",
+    "suspect_why": "An editor, not a field: the data is f03 role, f04 specialty and f05 bio.",
+    "updated": "Not built",
+    "updated_note": "A suggestion; not built."
+   }
+  },
+  {
+   "id": "f45-real-labels",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Today they show constants that look like settings.",
+    "edited_where": "None today",
+    "field": "real data for cadence and visibility (suggested)",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "Suggested addition",
+    "group": "Access and status",
+    "holds": "Make 'Update Cadence' and 'Visibility' read the agent's own columns, or remove the labels",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:00:52.147Z",
+    "personnel": "Label",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.update_cadence, visibility",
+    "suspect": "Duplicate",
+    "suspect_why": "The same data as f35 visibility and f36 update_cadence.",
+    "updated": "Not built",
+    "updated_note": "A suggestion; not built."
+   }
+  },
+  {
+   "id": "f46-last-taught",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Lets an AI client say how current the agent's knowledge is.",
+    "edited_where": "Derived",
+    "field": "last taught (suggested)",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "Suggested addition",
+    "group": "Training content",
+    "holds": "Date the agent's training last changed, by anyone",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Training card",
+    "shipped": "No",
+    "source": "max(knowledge_entries.created_at, agent_configs.created_at)",
+    "suspect": "Duplicate",
+    "suspect_why": "Already shown as p91 Last taught on the Activity tab.",
+    "updated": "System",
+    "updated_note": "Derived from the newest taught row; already shown on Activity."
+   }
+  },
+  {
+   "id": "f47-out-of-scope",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Teachable now as a guardrail with side 'never'. A dedicated field would make it findable.",
+    "edited_where": "None today",
+    "field": "out-of-scope statement (suggested)",
+    "filter": [
+     "Not on page"
+    ],
+    "flag": "Suggested addition",
+    "group": "Rules and behavior",
+    "holds": "What the agent should decline or send elsewhere",
+    "john_decision": [
+     "Add to AI client",
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_note": "let's understand what this means vs guardrails vs playbook vs trained",
+    "john_updated_at": "2026-10-06T16:12:33.083Z",
+    "personnel": "No",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "not stored today",
+    "updated": "Not built",
+    "updated_note": "A suggestion; not built."
+   }
+  },
+  {
+   "id": "john-01",
+   "data": {
+    "added_at": "2026-10-06T14:42:26.081Z",
+    "added_by": "John",
+    "claude_note": "",
+    "discussion": [],
+    "edited_where": "",
+    "field": "new field 1",
+    "flag": "",
+    "group": "Added by John",
+    "holds": "",
+    "john_decision": [
+     "Remove from page"
+    ],
+    "john_note": "",
+    "john_updated_at": "2026-10-06T16:14:46.547Z",
+    "personnel": "",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "",
+    "source": ""
+   }
+  },
+  {
+   "id": "john-02",
+   "data": {
+    "added_at": "2026-10-06T14:42:27.980Z",
+    "added_by": "John",
+    "claude_note": "",
+    "discussion": [],
+    "edited_where": "",
+    "field": "new field 2",
+    "flag": "",
+    "group": "Added by John",
+    "holds": "",
+    "john_decision": [
+     "Remove from page"
+    ],
+    "john_note": "",
+    "john_updated_at": "2026-10-06T16:14:46.743Z",
+    "personnel": "",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "",
+    "source": ""
+   }
+  },
+  {
+   "id": "john-03",
+   "data": {
+    "added_at": "2026-10-06T14:42:29.188Z",
+    "added_by": "John",
+    "claude_note": "",
+    "discussion": [],
+    "edited_where": "",
+    "field": "new field 3",
+    "flag": "",
+    "group": "Added by John",
+    "holds": "",
+    "john_decision": [
+     "Remove from page"
+    ],
+    "john_note": "",
+    "john_updated_at": "2026-10-06T16:14:46.927Z",
+    "personnel": "",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "",
+    "source": ""
+   }
+  },
+  {
+   "id": "john-04",
+   "data": {
+    "added_at": "2026-10-06T14:42:30.007Z",
+    "added_by": "John",
+    "claude_note": "",
+    "discussion": [],
+    "edited_where": "",
+    "field": "new field 4",
+    "flag": "",
+    "group": "Added by John",
+    "holds": "",
+    "john_decision": [
+     "Remove from page"
+    ],
+    "john_note": "",
+    "john_updated_at": "2026-10-06T16:14:47.098Z",
+    "personnel": "",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "",
+    "source": ""
+   }
+  },
+  {
+   "id": "john-05",
+   "data": {
+    "added_at": "2026-10-06T14:42:30.663Z",
+    "added_by": "John",
+    "claude_note": "",
+    "discussion": [],
+    "edited_where": "",
+    "field": "new field 5",
+    "flag": "",
+    "group": "Added by John",
+    "holds": "",
+    "john_decision": [
+     "Remove from page"
+    ],
+    "john_note": "",
+    "john_updated_at": "2026-10-06T16:14:47.304Z",
+    "personnel": "",
+    "personnel_detail": "",
+    "reviewed": "Complete",
+    "shipped": "",
+    "source": ""
+   }
+  },
+  {
+   "id": "p01-active-badge",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Printed for every agent whatever is_active says.",
+    "edited_where": "Not editable",
+    "field": "ACTIVE badge",
+    "filter": [
+     "All tabs (header)",
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Page text",
+    "holds": "Green '● ACTIVE' under the agent's name",
+    "john_decision": [
+     "Remove from page"
+    ],
+    "john_updated_at": "2026-10-06T15:37:29.660Z",
+    "personnel": "Label",
+    "personnel_detail": "Sidebar and ID badge, every tab",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "hardcoded in PersonnelScreen.jsx",
+    "suspect": "Duplicate",
+    "suspect_why": "Shows the status f32 is_active already holds, as a fixed label.",
+    "updated": "Never: hardcoded",
+    "updated_note": "Printed for every agent in PersonnelScreen.jsx."
+   }
+  },
+  {
+   "id": "p02-trainee-badge",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The same flag gates Edit and Delete on Training entries and the Add buttons on Resume and Playbook.",
+    "edited_where": "Not editable",
+    "field": "YOUR TRAINEE badge",
+    "filter": [
+     "All tabs (header)",
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "Shown when the agent is trainable",
+    "john_decision": [
+     "System should update",
+     "Add an editor"
+    ],
+    "john_note": "System should update its status.",
+    "john_updated_at": "2026-10-06T15:46:26.695Z",
+    "personnel": "Yes",
+    "personnel_detail": "Sidebar and ID badge",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agent.trainable (roster data)",
+    "updated": "Never: hardcoded",
+    "updated_note": "Reads the static roster flag agent.trainable."
+   }
+  },
+  {
+   "id": "p03-team-picker",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not in the answer, but it decides which tools appear on the team's AI link.",
+    "edited_where": "Personnel Profile (team picker)",
+    "field": "Team",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Access and status",
+    "holds": "The team the agent belongs to",
+    "john_updated_at": "2026-10-06T16:30:21.513Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, badge actions",
+    "reviewed": "Complete",
+    "shipped": "Indirect",
+    "source": "teams, agent_teams",
+    "updated": "User",
+    "updated_note": "1 team and 1 membership row exist, written by the team picker."
+   }
+  },
+  {
+   "id": "p10-bureau-heading",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Every agent, private ones included, is labelled as a procurement bureau agent.",
+    "edited_where": "Not editable",
+    "field": "Bureau of Procurement Intelligence heading",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Page text",
+    "holds": "Heading above every ID badge",
+    "john_decision": [
+     "Add to AI client",
+     "Add an editor"
+    ],
+    "john_updated_at": "2026-10-06T17:01:39.403Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, ID badge",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "hardcoded in PersonnelScreen.jsx",
+    "updated": "Never: hardcoded",
+    "updated_note": "A fixed heading in PersonnelScreen.jsx."
+   }
+  },
+  {
+   "id": "p11-capabilities-card",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Names and descriptions reach an AI client in the tool list; Skill content never does. The chip colours cover Intent, Format, Knowledge, Behavior and Identity only, so a Guardrails Skill is drawn as Intent.",
+    "edited_where": "Not editable by a product user",
+    "field": "Capabilities card",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Mislabel",
+    "group": "Skills and capabilities",
+    "holds": "Each Capability the agent holds: name, description, and its Skills as typed chips",
+    "john_decision": [
+     "AI Client can update",
+     "Add an editor"
+    ],
+    "john_updated_at": "2026-10-06T16:30:21.300Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, left column",
+    "reviewed": "Complete",
+    "shipped": "Indirect",
+    "source": "capabilities, capability_skill_profiles, skill_profiles",
+    "updated": "System",
+    "updated_note": "Read live from the Capability tables; changed by DeepBench builds, not by users."
+   }
+  },
+  {
+   "id": "p12-skill-hover",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "I did not read what the card shows.",
+    "edited_where": "Not editable",
+    "field": "Skill hover card",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Unverified",
+    "group": "Skills and capabilities",
+    "holds": "Detail shown when hovering a Skill row",
+    "john_decision": [
+     "Discuss"
+    ],
+    "john_note": "lets discuss duplication and purpose",
+    "john_updated_at": "2026-10-06T16:45:02.706Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, Capabilities card",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "SkillHoverCard in PersonnelScreen.jsx",
+    "suspect": "Duplicate",
+    "suspect_why": "The same Skills as the p11 Capabilities card, shown on hover.",
+    "updated": "System",
+    "updated_note": "Read live from Skill rows. Not read in detail."
+   }
+  },
+  {
+   "id": "p13-compensation-note",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The page itself says these figures are mock. The six lines are the salary, value, rate, hours, cost and revenue rows above.",
+    "edited_where": "Not editable",
+    "field": "Compensation card footer",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Page text",
+    "holds": "'Mock data. Live billing in v5.' under the six pay and cost lines",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:51:29.891Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, Compensation card",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "hardcoded in PersonnelScreen.jsx",
+    "updated": "Never: hardcoded",
+    "updated_note": "A fixed footer in PersonnelScreen.jsx."
+   }
+  },
+  {
+   "id": "p14-readiness-score",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Mostly constants; see the L1 to L5 row.",
+    "edited_where": "Not editable",
+    "field": "Agent Readiness Score",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Scores and readiness",
+    "holds": "Average of the five readiness layers, with a label",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:34:53.536Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, right column",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "computeLayers() in PersonnelScreen.jsx",
+    "updated": "System",
+    "updated_note": "Computed on each page load from the five layer scores."
+   }
+  },
+  {
+   "id": "p15-intel-config",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Duplicates the readiness bars directly above it.",
+    "edited_where": "Not editable",
+    "field": "Intelligence Configuration strip",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "The same five layer scores again, with 'Configure each layer in Resume, Training, and Playbook tabs.'",
+    "john_decision": [
+     "Discuss"
+    ],
+    "john_note": "what does it mean it is duplicated, where and does it serve different purposes or confuses",
+    "john_updated_at": "2026-10-06T16:44:32.187Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, right column",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "computeLayers()",
+    "suspect": "Duplicate",
+    "suspect_why": "The same five scores as p14 Agent Readiness Score, drawn a second time.",
+    "updated": "System",
+    "updated_note": "Computed on each page load, same numbers as the readiness bars."
+   }
+  },
+  {
+   "id": "p16-quick-skill",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "Quick Stats: Skill",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "Skill n/100 with its label",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:54:16.811Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, Quick Stats",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.skill_score",
+    "suspect": "Duplicate",
+    "suspect_why": "The same value as f27 skill_score, shown as a number.",
+    "updated": "Never: placeholder",
+    "updated_note": "Reads skill_score, which is 0 on created agents and never updated."
+   }
+  },
+  {
+   "id": "p17-quick-docs",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not counted from the agent's real taught items.",
+    "edited_where": "Not editable",
+    "field": "Quick Stats: Documents",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Training content",
+    "holds": "Count of training documents",
+    "john_decision": [
+     "System should update",
+     "Discuss"
+    ],
+    "john_updated_at": "2026-10-06T15:52:44.143Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, Quick Stats",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agent.docs (static roster data)",
+    "suspect": "Duplicate",
+    "suspect_why": "The documents count already in f40 (static roster data).",
+    "updated": "Never: hardcoded",
+    "updated_note": "Static agent.docs from src/data/agents.js, not a count of real items."
+   }
+  },
+  {
+   "id": "p18-quick-reports",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Placeholder.",
+    "edited_where": "Not editable",
+    "field": "Quick Stats: Reports Run",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Activity and usage",
+    "holds": "A dash, captioned 'mock data'",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:53:16.068Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, Quick Stats",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "hardcoded in PersonnelScreen.jsx",
+    "updated": "Never: hardcoded",
+    "updated_note": "A fixed dash captioned 'mock data'."
+   }
+  },
+  {
+   "id": "p19-quick-awareness",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "Quick Stats: Situational Awareness",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "Percentage and bar",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:53:35.660Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, Quick Stats",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.situational_awareness",
+    "suspect": "Duplicate",
+    "suspect_why": "The same value as f26 situational_awareness.",
+    "updated": "Never: placeholder",
+    "updated_note": "Reads situational_awareness, which is null on created agents and never updated."
+   }
+  },
+  {
+   "id": "p20-skill-level-bar",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "No editor found",
+    "field": "Skill Level bar",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "A bar for the skill score",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:57:53.359Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, Quick Stats",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agents.skill_score",
+    "suspect": "Duplicate",
+    "suspect_why": "The same value as f27 skill_score, shown as a bar.",
+    "updated": "Never: placeholder",
+    "updated_note": "Reads skill_score, which is 0 on created agents and never updated."
+   }
+  },
+  {
+   "id": "p21-report-card",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "How the agent's own runs were judged. Not sent to AI clients.",
+    "edited_where": "Not editable",
+    "field": "Report Card",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "Runs judged, a score for each dimension, and the Skill to improve",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:35:53.279Z",
+    "personnel": "Yes",
+    "personnel_detail": "Profile, right column",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "bench report card rollup (LOG-143)",
+    "updated": "System",
+    "updated_note": "Rolled up from judged runs. I did not check whether any agent has rows yet."
+   }
+  },
+  {
+   "id": "p22-active-work",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Marked 'replace with Supabase' in the code. Only roster agents have any; private agents show 'No active assignments'.",
+    "edited_where": "Not editable",
+    "field": "Active Work Assignments",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Sample data",
+    "group": "Work assignments",
+    "holds": "Sample tasks per agent: title, type, due date, preview, status chip, priority chip",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:39:10.996Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, below the cards",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "AGENT_TASKS in PersonnelScreen.jsx",
+    "updated": "Never: hardcoded",
+    "updated_note": "Sample tasks in AGENT_TASKS; none for created agents."
+   }
+  },
+  {
+   "id": "p24-recently-completed",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Sample data; the View button has no click handler.",
+    "edited_where": "Not editable",
+    "field": "Recently Completed list and View button",
+    "filter": [
+     "Profile (home)"
+    ],
+    "flag": "Buttons do nothing",
+    "group": "Work assignments",
+    "holds": "Sample completed projects with a View button",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T15:55:12.095Z",
+    "personnel": "Label",
+    "personnel_detail": "Profile, bottom",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "AGENT_COMPLETED in PersonnelScreen.jsx",
+    "updated": "Never: hardcoded",
+    "updated_note": "Sample items in AGENT_COMPLETED; none for created agents."
+   }
+  },
+  {
+   "id": "p30-resume-vitals",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Architecture, Specialty and Trainer read the agent. Update Cadence and Visibility are constants, and Update Rights is built from Trainer. Specialty is the one line an AI client also receives.",
+    "edited_where": "No editor found",
+    "field": "Resume Vitals card",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "Hardcoded label",
+    "group": "Identity",
+    "holds": "Six lines: Architecture, Specialty, Trainer, Update Cadence, Update Rights, Visibility",
+    "john_decision": [
+     "Move to Future View"
+    ],
+    "john_updated_at": "2026-10-06T16:02:41.055Z",
+    "personnel": "Yes",
+    "personnel_detail": "Resume, left column",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "agent columns, plus constants",
+    "suspect": "Duplicate",
+    "suspect_why": "Repeats f19 architecture, f04 specialty and f28 trainer_org on one card.",
+    "updated": "Never: hardcoded",
+    "updated_note": "Three lines read static roster values; Update Cadence and Visibility are constants."
+   }
+  },
+  {
+   "id": "p31-skill-ladder",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The thresholds are constants in the page.",
+    "edited_where": "No editor found",
+    "field": "Skill Ladder",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Scores and readiness",
+    "holds": "Trainee 0-30, Developing 30-55, Proficient 55-75, Expert 75-90, Principal 90-100, with the agent's level highlighted",
+    "john_decision": [
+     "Add an editor",
+     "Discuss"
+    ],
+    "john_updated_at": "2026-10-06T16:03:15.411Z",
+    "personnel": "Yes",
+    "personnel_detail": "Resume, left column",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "constants plus agents.skill_score",
+    "suspect": "Duplicate",
+    "suspect_why": "Only the labels for f27 skill_score ranges.",
+    "updated": "Never: hardcoded",
+    "updated_note": "Constant thresholds; the highlighted level reads skill_score, which never updates."
+   }
+  },
+  {
+   "id": "p32-roleprompt-name",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "",
+    "edited_where": "Personnel Resume tab; AI client via Teach tool (as title)",
+    "field": "Role prompt name",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "A short label for one role prompt, e.g. Board Presentation Mode",
+    "personnel": "Yes",
+    "personnel_detail": "Resume, Layer 01",
+    "shipped": "Yes",
+    "source": "agent_configs.name, type role_prompt",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f07 role_prompts: the same rows, split into name and text.",
+    "updated": "User",
+    "updated_note": "Resume tab and Teach tool; 9 rows on 7 agents, last 2026-06-10."
+   }
+  },
+  {
+   "id": "p33-roleprompt-text",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "Every role prompt ships, default or not.",
+    "edited_where": "Personnel Resume tab; AI client via Teach tool",
+    "field": "Role prompt text",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "How the agent introduces itself: 'You are <Name>, a <role>...'",
+    "personnel": "Yes",
+    "personnel_detail": "Resume, Layer 01",
+    "shipped": "Yes",
+    "source": "agent_configs.text, type role_prompt",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f07 role_prompts: the same rows, split into name and text.",
+    "updated": "User",
+    "updated_note": "Resume tab and Teach tool; 9 rows on 7 agents, last 2026-06-10."
+   }
+  },
+  {
+   "id": "p34-roleprompt-default",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Matters on the model path. The handover sends every role prompt and does not say which is default. The Teach tool never sets it.",
+    "edited_where": "Personnel Resume tab",
+    "field": "Set as default (role prompt)",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "Marks the one role prompt used automatically",
+    "personnel": "Yes",
+    "personnel_detail": "Resume, Layer 01",
+    "shipped": "No",
+    "source": "agent_configs.is_default",
+    "updated": "User",
+    "updated_note": "Resume tab checkbox."
+   }
+  },
+  {
+   "id": "p35-roleprompt-selectable",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not sent, and the Teach tool never sets it.",
+    "edited_where": "Personnel Resume tab",
+    "field": "Expose to users in analysis UI (role prompt)",
+    "filter": [
+     "Resume"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "Lets analysis users pick that role prompt",
+    "personnel": "Yes",
+    "personnel_detail": "Resume, Layer 01",
+    "shipped": "No",
+    "source": "agent_configs.is_user_selectable",
+    "updated": "User",
+    "updated_note": "Resume tab checkbox."
+   }
+  },
+  {
+   "id": "p40-train-stats",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The 12,000 character limit that decides 'always given' is in lib/read-taught.js.",
+    "edited_where": "Not editable",
+    "field": "Stats strip: Taught items, Always given, Looked up",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Counts of taught items, those given on every run, and those looked up when relevant",
+    "personnel": "Yes",
+    "personnel_detail": "Training, top strip",
+    "shipped": "No",
+    "source": "taughtCounts() in src/lib/taughtItems.js",
+    "updated": "System",
+    "updated_note": "Counted from the taught rows on each page load."
+   }
+  },
+  {
+   "id": "p43-entry-title",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "",
+    "edited_where": "Personnel Training tab; AI client via Teach tool",
+    "field": "Entry title",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Name of one taught item",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card",
+    "shipped": "Yes",
+    "source": "knowledge_entries.title",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f10 taught: the same item, split into title, text and note.",
+    "updated": "User",
+    "updated_note": "Training tab and Teach tool; 14 taught rows, newest 2026-10-06."
+   }
+  },
+  {
+   "id": "p44-entry-content",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "The whole text goes out on every handover call.",
+    "edited_where": "Personnel Training tab; AI client via Teach tool",
+    "field": "Entry text (note text or extracted file text)",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "The full text the agent was taught",
+    "personnel": "Yes",
+    "personnel_detail": "Training, edit form",
+    "shipped": "Yes",
+    "source": "knowledge_entries.content",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f10 taught: the same item, split into title, text and note.",
+    "updated": "User",
+    "updated_note": "Training tab and Teach tool; 14 taught rows, newest 2026-10-06."
+   }
+  },
+  {
+   "id": "p45-teaching-note",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "Appended to the text as 'Trainer's note:' in the handover.",
+    "edited_where": "Personnel Training tab; AI client via Teach tool",
+    "field": "Teaching note (shown as Field notes)",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "The trainer's note on how to use an item",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card and form",
+    "shipped": "Yes",
+    "source": "knowledge_entries.teaching_note",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f10 taught: the same item, split into title, text and note.",
+    "updated": "User",
+    "updated_note": "Training tab and Teach tool."
+   }
+  },
+  {
+   "id": "p46-entry-category",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Shown as a chip. Not sent to an AI client.",
+    "edited_where": "Personnel Training tab, file form",
+    "field": "Category",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "A label from a fixed list (Standards and others; one extra set for Brent)",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card and form",
+    "shipped": "No",
+    "source": "knowledge_entries.category",
+    "updated": "User",
+    "updated_note": "Set in the file form."
+   }
+  },
+  {
+   "id": "p47-entry-jurisdiction",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not sent to an AI client.",
+    "edited_where": "Personnel Training tab, file form",
+    "field": "Jurisdiction",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Where the item applies, from a fixed list (default All)",
+    "john_decision": [
+     "Add to AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:37:56.239Z",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card and form",
+    "shipped": "No",
+    "source": "knowledge_entries.jurisdiction",
+    "updated": "User",
+    "updated_note": "Set in the file form."
+   }
+  },
+  {
+   "id": "p48-entry-priority",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not sent. I did not check where the model path uses it.",
+    "edited_where": "Personnel Training tab, file form",
+    "field": "Priority (0 to 100)",
+    "filter": [
+     "Training"
+    ],
+    "flag": "Unverified",
+    "group": "Training content",
+    "holds": "How much weight an item carries",
+    "john_decision": [
+     "Add to AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:38:27.779Z",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card and form",
+    "shipped": "No",
+    "source": "knowledge_entries.priority",
+    "updated": "User",
+    "updated_note": "Set in the file form."
+   }
+  },
+  {
+   "id": "p49-entry-triggers",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not sent. The handover gives an AI client no way to apply an item only when a flag fires.",
+    "edited_where": "Personnel Training tab, file form",
+    "field": "Triggers (flag list)",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Which flags make an item apply; 'all' means every flag",
+    "john_decision": [
+     "Add to AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:39:56.890Z",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card and form",
+    "shipped": "No",
+    "source": "knowledge_entries.triggers",
+    "updated": "User",
+    "updated_note": "Set in the file form."
+   }
+  },
+  {
+   "id": "p50-entry-status",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Not a field in the answer, but the handover reads active rows only, so disabling an item removes it from what clients receive. The Teach tool cannot switch an item off.",
+    "edited_where": "Personnel Training tab, toggle on each card",
+    "field": "Status: Active or Disabled",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Whether an item is in use",
+    "john_decision": [
+     "Hide from AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:30:21.091Z",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card",
+    "reviewed": "Complete",
+    "shipped": "Indirect",
+    "source": "knowledge_entries.status",
+    "updated": "User",
+    "updated_note": "The Active toggle on each card."
+   }
+  },
+  {
+   "id": "p51-entry-date",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "AGT-390 tags new items with origin and date. I did not check whether the handover returns them.",
+    "edited_where": "Not editable",
+    "field": "Date column on each card",
+    "filter": [
+     "Training"
+    ],
+    "flag": "Unverified",
+    "group": "Training content",
+    "holds": "Month and day the item was created",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card",
+    "shipped": "No",
+    "source": "knowledge_entries.created_at",
+    "updated": "System",
+    "updated_note": "Stamped by the database when the item is saved."
+   }
+  },
+  {
+   "id": "p52-entry-chips",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The handover sends the always-given flag per item, not the kind.",
+    "edited_where": "Not editable",
+    "field": "Kind and reach chips",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "Whether an item is a note or a file, and whether it is given on every run or looked up",
+    "john_decision": [
+     "Hide from AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:28:02.979Z",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card",
+    "reviewed": "Complete",
+    "shipped": "Partly",
+    "source": "cardFacts() in src/lib/taughtItems.js",
+    "updated": "System",
+    "updated_note": "Derived on each page load from the item's length and kind."
+   }
+  },
+  {
+   "id": "p53-entry-runid",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Shown on file entries only, not on typed notes.",
+    "edited_where": "Not editable",
+    "field": "Run ID line",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "A timestamp-style id under older file entries",
+    "personnel": "Label",
+    "personnel_detail": "Training, entry card",
+    "shipped": "No",
+    "source": "derived from created_at",
+    "suspect": "Duplicate",
+    "suspect_why": "Derived from the same creation time as p51 entry date.",
+    "updated": "System",
+    "updated_note": "Derived from the creation time."
+   }
+  },
+  {
+   "id": "p54-what-learned",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "File entries only.",
+    "edited_where": "Not editable",
+    "field": "What <name> Learned",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "An AI-labelled summary under an expandable button",
+    "john_decision": [
+     "Add to AI client"
+    ],
+    "john_updated_at": "2026-10-06T16:40:19.135Z",
+    "personnel": "Yes",
+    "personnel_detail": "Training, entry card",
+    "shipped": "No",
+    "source": "knowledge_entries.learned_summary",
+    "updated": "System",
+    "updated_note": "Generated when a file is uploaded; file entries only."
+   }
+  },
+  {
+   "id": "p57-exhibit-counts",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Exhibit I counts",
+    "filter": [
+     "Training"
+    ],
+    "flag": "",
+    "group": "Training content",
+    "holds": "'<n> active, <n> disabled, <n> chunks'",
+    "personnel": "Yes",
+    "personnel_detail": "Training, header",
+    "shipped": "No",
+    "source": "derived from entries",
+    "updated": "System",
+    "updated_note": "Counted on each page load."
+   }
+  },
+  {
+   "id": "p58-how-it-works",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Describes the model path. A handover agent sends everything it was taught, not the most relevant slice.",
+    "edited_where": "Not editable",
+    "field": "How Background Knowledge Works, Layer 02",
+    "filter": [
+     "Training"
+    ],
+    "flag": "Out of step",
+    "group": "Page text",
+    "holds": "Explainer: documents are stored as vectors and the most relevant are injected before each analysis",
+    "john_decision": [
+     "Discuss"
+    ],
+    "john_note": "Let's discuss the accuracy of this information",
+    "john_updated_at": "2026-10-06T16:06:16.127Z",
+    "personnel": "Label",
+    "personnel_detail": "Training, top",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "hardcoded in PersonnelScreen.jsx",
+    "updated": "Never: hardcoded",
+    "updated_note": "A fixed explainer in PersonnelScreen.jsx."
+   }
+  },
+  {
+   "id": "p60-format-name",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "",
+    "edited_where": "Personnel Playbook tab; AI client via Teach tool (as title)",
+    "field": "Output format name",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "Label for one output format",
+    "personnel": "Yes",
+    "personnel_detail": "Playbook, Layer 04",
+    "shipped": "Yes",
+    "source": "agent_configs.name, type output_format",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f09 output_formats: the same rows, split into name and text.",
+    "updated": "User",
+    "updated_note": "Playbook tab and Teach tool; 6 rows on 4 agents, all 2026-04-24."
+   }
+  },
+  {
+   "id": "p61-format-text",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "",
+    "edited_where": "Personnel Playbook tab; AI client via Teach tool",
+    "field": "Output format text",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "The structure the answer must follow; the page calls it the final block sent to the model",
+    "personnel": "Yes",
+    "personnel_detail": "Playbook, Layer 04",
+    "shipped": "Yes",
+    "source": "agent_configs.text, type output_format",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f09 output_formats: the same rows, split into name and text.",
+    "updated": "User",
+    "updated_note": "Playbook tab and Teach tool; 6 rows on 4 agents, all 2026-04-24."
+   }
+  },
+  {
+   "id": "p62-format-default",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Every output format ships, default or not.",
+    "edited_where": "Personnel Playbook tab",
+    "field": "Default (output format)",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "Marks the format used automatically",
+    "personnel": "Yes",
+    "personnel_detail": "Playbook, Layer 04",
+    "shipped": "No",
+    "source": "agent_configs.is_default",
+    "updated": "User",
+    "updated_note": "Playbook tab."
+   }
+  },
+  {
+   "id": "p63-format-selectable",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Personnel Playbook tab",
+    "field": "User Selectable (output format)",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "",
+    "group": "Rules and behavior",
+    "holds": "Lets analysis users choose that format",
+    "personnel": "Yes",
+    "personnel_detail": "Playbook, Layer 04",
+    "shipped": "No",
+    "source": "agent_configs.is_user_selectable",
+    "updated": "User",
+    "updated_note": "Playbook tab."
+   }
+  },
+  {
+   "id": "p65-guardrail-always",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "The page edits the first 'always' row only. The Teach tool inserts a new row every time, so a second always-rule taught from an AI client is sent to clients but never appears on this page.",
+    "edited_where": "Personnel Playbook tab; AI client via Teach tool (side always)",
+    "field": "Guardrails: What must <name> always do?",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "Hidden duplicates",
+    "group": "Rules and behavior",
+    "holds": "One text box of always-rules, autosaved when you click away",
+    "personnel": "Partly",
+    "personnel_detail": "Playbook, Layer 05",
+    "shipped": "Yes",
+    "source": "agent_configs, type guardrail, name always",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f08 guardrails: the same rows, shown as an always box and a never box.",
+    "updated": "User",
+    "updated_note": "Playbook tab (autosaves on blur) and Teach tool; 7 guardrail rows on 5 agents."
+   }
+  },
+  {
+   "id": "p66-guardrail-never",
+   "data": {
+    "ai_update": "Yes",
+    "claude_note": "Same as always: only the first never-row is shown and editable.",
+    "edited_where": "Personnel Playbook tab; AI client via Teach tool (side never)",
+    "field": "Guardrails: What must <name> never do?",
+    "filter": [
+     "Playbook"
+    ],
+    "flag": "Hidden duplicates",
+    "group": "Rules and behavior",
+    "holds": "One text box of never-rules, autosaved when you click away",
+    "personnel": "Partly",
+    "personnel_detail": "Playbook, Layer 05",
+    "shipped": "Yes",
+    "source": "agent_configs, type guardrail, name never",
+    "suspect": "Duplicate",
+    "suspect_why": "Part of f08 guardrails: the same rows, shown as an always box and a never box.",
+    "updated": "User",
+    "updated_note": "Playbook tab (autosaves on blur) and Teach tool; 7 guardrail rows on 5 agents."
+   }
+  },
+  {
+   "id": "p70-act-connections",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Activity is shown on private agents only.",
+    "edited_where": "Not editable",
+    "field": "Connections",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "How many times AI clients have called the agent",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Connections card",
+    "shipped": "No",
+    "source": "ai_activity_log, call_source mcp",
+    "updated": "System",
+    "updated_note": "Counted from ai_activity_log, 2,400+ AI-client calls so far."
+   }
+  },
+  {
+   "id": "p71-act-days",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Days active",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Number of distinct days with a connection",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Connections card",
+    "shipped": "No",
+    "source": "ai_activity_log",
+    "updated": "System",
+    "updated_note": "Counted from ai_activity_log."
+   }
+  },
+  {
+   "id": "p72-act-latency",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Average response time",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Mean time DeepBench took to answer",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Connections card",
+    "shipped": "No",
+    "source": "ai_activity_log.latency_ms",
+    "updated": "System",
+    "updated_note": "Averaged from ai_activity_log."
+   }
+  },
+  {
+   "id": "p73-act-first",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "First connection",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Earliest connection, in Central time",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Connections card",
+    "shipped": "No",
+    "source": "ai_activity_log.created_at",
+    "updated": "System",
+    "updated_note": "Read from ai_activity_log."
+   }
+  },
+  {
+   "id": "p74-act-last",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Last connection",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Latest connection, in Central time",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Connections card",
+    "shipped": "No",
+    "source": "ai_activity_log.created_at",
+    "updated": "System",
+    "updated_note": "Read from ai_activity_log."
+   }
+  },
+  {
+   "id": "p75-act-networks",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Shows which network each call came from, not which person.",
+    "edited_where": "Not editable",
+    "field": "Connected from (Network, Type, Count, Last)",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "A table of the networks calls came from; Type separates cloud and data-centre owners from other networks",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Connected from card",
+    "shipped": "No",
+    "source": "ai_activity_log.caller_ip, network lookup, DATA_CENTRE_OWNERS",
+    "updated": "System",
+    "updated_note": "Looked up from caller IPs in ai_activity_log."
+   }
+  },
+  {
+   "id": "p80-act-lessons",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Knowledge delivered: Lessons",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "How many knowledge entries the last handover carried",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Knowledge delivered card",
+    "shipped": "No",
+    "source": "call_facts.knowledge_entries",
+    "updated": "System",
+    "updated_note": "Written to the call record on every handover."
+   }
+  },
+  {
+   "id": "p81-act-roleprompts",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Knowledge delivered: Role prompts",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Role prompts carried",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Knowledge delivered card",
+    "shipped": "No",
+    "source": "call_facts.role_prompts",
+    "updated": "System",
+    "updated_note": "Written to the call record on every handover."
+   }
+  },
+  {
+   "id": "p82-act-guardrails",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "Counts rows, so a second always-rule taught from an AI client counts here but not on Playbook.",
+    "edited_where": "Not editable",
+    "field": "Knowledge delivered: Guardrails",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Guardrail rows carried",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Knowledge delivered card",
+    "shipped": "No",
+    "source": "call_facts.guardrails",
+    "updated": "System",
+    "updated_note": "Written to the call record on every handover."
+   }
+  },
+  {
+   "id": "p83-act-sections",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Knowledge delivered: Skill sections",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Assembled Skill sections carried",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Knowledge delivered card",
+    "shipped": "No",
+    "source": "call_facts.sections",
+    "updated": "System",
+    "updated_note": "Written to the call record on every handover."
+   }
+  },
+  {
+   "id": "p84-act-library",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "The same verdict the handover sends, under library.tier.",
+    "edited_where": "Not editable",
+    "field": "Knowledge delivered: Library access",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "'No access' or the Library tier",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Knowledge delivered card",
+    "shipped": "No",
+    "source": "call_facts.library_tier",
+    "suspect": "Duplicate",
+    "suspect_why": "The same verdict as f16 library_tier.",
+    "updated": "System",
+    "updated_note": "Written to the call record on every handover."
+   }
+  },
+  {
+   "id": "p90-act-lessons-taught",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Training: Lessons taught",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Count of active taught items",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Training card",
+    "shipped": "No",
+    "source": "knowledge_entries",
+    "suspect": "Duplicate",
+    "suspect_why": "The same count as the Taught items number in p40.",
+    "updated": "System",
+    "updated_note": "Counted on each page load."
+   }
+  },
+  {
+   "id": "p91-act-last-taught",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "This is the 'last taught' value suggested as an AI-client field; it exists on the page already.",
+    "edited_where": "Not editable",
+    "field": "Training: Last taught",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "When the agent was last taught, Central time",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Training card",
+    "shipped": "No",
+    "source": "knowledge_entries.created_at",
+    "updated": "System",
+    "updated_note": "Read from the newest taught row."
+   }
+  },
+  {
+   "id": "p92-act-model-calls",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Training: Model calls",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Teaching steps that used a model",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Training card",
+    "shipped": "No",
+    "source": "ai_activity_log",
+    "updated": "System",
+    "updated_note": "Counted from ai_activity_log."
+   }
+  },
+  {
+   "id": "p93-act-tokens",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Training: Tokens",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Tokens used teaching the agent",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Training card",
+    "shipped": "No",
+    "source": "ai_activity_log",
+    "updated": "System",
+    "updated_note": "Summed from ai_activity_log."
+   }
+  },
+  {
+   "id": "p94-act-cost",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "",
+    "edited_where": "Not editable",
+    "field": "Training: Cost",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Activity and usage",
+    "holds": "Dollar cost of teaching",
+    "personnel": "Yes",
+    "personnel_detail": "Activity, Training card",
+    "shipped": "No",
+    "source": "ai_activity_log.cost_usd",
+    "updated": "System",
+    "updated_note": "Summed from ai_activity_log."
+   }
+  },
+  {
+   "id": "p99-act-footnote",
+   "data": {
+    "ai_update": "No",
+    "claude_note": "True and worth keeping: a handover agent's answers are written outside DeepBench.",
+    "edited_where": "Not editable",
+    "field": "Activity footnote",
+    "filter": [
+     "Activity"
+    ],
+    "flag": "",
+    "group": "Page text",
+    "holds": "'Tokens, model, decisions and reasoning from the connected AI tool are not shown because DeepBench never receives them.'",
+    "john_updated_at": "2026-10-06T16:06:38.363Z",
+    "personnel": "Label",
+    "personnel_detail": "Activity, bottom",
+    "reviewed": "Complete",
+    "shipped": "No",
+    "source": "hardcoded in PersonnelScreen.jsx",
+    "updated": "Never: hardcoded",
+    "updated_note": "A fixed footnote in PersonnelScreen.jsx."
+   }
+  }
+ ]
+}

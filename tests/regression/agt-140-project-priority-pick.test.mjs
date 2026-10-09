@@ -1,3 +1,4 @@
+// DeepBench v7.0.797 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-304 slice 8 -- arm B's order oracle carries SIX keys, not five: AGT-280's `sort_need` (`6 - COALESCE(need_score, 0)`, unscored last) sits between project priority and the filing lane, exactly as the live prime_directive_queue()'s recorded ORDER BY declares it.
 // DeepBench v7.0.604 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-140 -- THE
 // PICK HONOURS `projects.priority`, IN THE SHIPPED SQL AND IN THE ORDER THE DATABASE ACTUALLY
 // RETURNS.
@@ -372,7 +373,7 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   const laneOf = filedAt => (filedAt && Date.parse(filedAt) < laneCut ? 0 : 1);
 
   const rows = await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" });
-  const items = await pg(url, key, "backlog_items?select=backlog_id,queue,filed_at,predicted_cycles,epic_id,leverage_reason&limit=2000");
+  const items = await pg(url, key, "backlog_items?select=backlog_id,queue,filed_at,predicted_cycles,epic_id,leverage_reason,need_score&limit=2000");
   const epics = await pg(url, key, "epics?select=id,project_id&limit=500");
   const projects = await pg(url, key, "projects?select=id,priority,status&limit=200");
 
@@ -406,7 +407,7 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
     const p = project.get(projectOfEpic.get(it.epic_id));
     const prio = p && p.status === "executing" ? p.priority : MAX;
     const lev = it.leverage_reason ? 0 : 1;
-    return [lev, prio, laneOf(it.filed_at), it.queue, it.predicted_cycles ?? MAX];
+    return [lev, prio, 6 - (it.need_score ?? 0), laneOf(it.filed_at), it.queue, it.predicted_cycles ?? MAX];
   };
 
   // (i) MONOTONICITY of the order the DATABASE returned. Never a re-sort in JS (SES-45).
@@ -416,9 +417,9 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
     assert.ok(
       lex(a, b) <= 0,
       `the ${LANE} lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
-        `[lev ${a[0]}, prio ${a[1]}, lane ${a[2]}, queue ${a[3]}, cycles ${a[4]}] precedes ${lane[i].ref} ` +
-        `[lev ${b[0]}, prio ${b[1]}, lane ${b[2]}, queue ${b[3]}, cycles ${b[4]}]. The pick orders by ` +
-        "leverage FIRST (AGT-238), then project priority (AGT-140), then SES-281 / M5-02's filing lane, " +
+        `[lev ${a[0]}, prio ${a[1]}, need ${a[2]}, lane ${a[3]}, queue ${a[4]}, cycles ${a[5]}] precedes ${lane[i].ref} ` +
+        `[lev ${b[0]}, prio ${b[1]}, need ${b[2]}, lane ${b[3]}, queue ${b[4]}, cycles ${b[5]}]. The pick orders by ` +
+        "leverage FIRST (AGT-238), then project priority (AGT-140), then AGT-280's need (6 - need_score, unscored last), then SES-281 / M5-02's filing lane, " +
         "then the queue, then M5-07's predicted_cycles nulls last",
     );
   }
@@ -457,8 +458,8 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
     const a = key4(lane[i - 1].ref);
     const b = key4(lane[i].ref);
     if (a[0] === b[0] && a[1] < b[1] && lex(a.slice(2), b.slice(2)) > 0) {
-      discriminating = `${lane[i - 1].ref} [lev ${a[0]}, prio ${a[1]}, lane ${a[2]}, queue ${a[3]}, cycles ${a[4]}] ` +
-        `before ${lane[i].ref} [lev ${b[0]}, prio ${b[1]}, lane ${b[2]}, queue ${b[3]}, cycles ${b[4]}]`;
+      discriminating = `${lane[i - 1].ref} [lev ${a[0]}, prio ${a[1]}, need ${a[2]}, lane ${a[3]}, queue ${a[4]}, cycles ${a[5]}] ` +
+        `before ${lane[i].ref} [lev ${b[0]}, prio ${b[1]}, need ${b[2]}, lane ${b[3]}, queue ${b[4]}, cycles ${b[5]}]`;
       break;
     }
   }
@@ -475,7 +476,7 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   } else {
     console.log(
       `  [AGT-140] arm B: ${lane.length} ${LANE} row(s) over ${servedExecuting.length} executing ` +
-        `project(s); the returned order is monotonic in [leverage, priority, filing lane, queue, cycles] and ` +
+        `project(s); the returned order is monotonic in [leverage, priority, need, filing lane, queue, cycles] and ` +
         `DISCRIMINATING -- ${discriminating} is a pair the pre-AGT-140 order inverted; leverage FIRST (AGT-238), then project priority (AGT-140).`,
     );
   }

@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// DeepBench v7.0.793 | scripts/verifier.js | AGT-391 -- selective regression. `--related=<file>` (the
+// related set from scripts/related-tests.js) runs the regression gate as `run-all.js --only-from=<it>`
+// through a copy of the GATES entry, never an edit to GATES; an unreadable or empty set is exit 2
+// `related-unreadable`. The kickoff is read once, before baselineGate(), and its BASELINE block
+// (readKickoffBaseline()) is the baseline unless `--regression-baseline=` is passed, which wins.
+// baselineGate() refuses only when baseline, declaration and related set are ALL absent.
+//
 // DeepBench v7.0.689 | scripts/verifier.js | AGT-265 -- the regression gate takes a test slot. The gate
 // loop wraps `regression` in withTestSlot() (scripts/test-slot.js): the suite waits in the one line
 // for a green database, beating the slot every 60 s while it runs, and its child run-all.js gets
@@ -453,7 +460,11 @@
 //   --context-file=<p>  AGT-67: override the derived `<scratch>/verify-<ticket>.json` path.
 //   --scratch=<dir>     AGT-67: where the judgment context is written. Defaults to os.tmpdir().
 //   --kickoff=<path>    AGT-67: the kickoff doc handed to the agent as part of its evidence. Since
-//                       SES-376 an over-cap kickoff here also forces the verdict to BLOCK.
+//                       SES-376 an over-cap kickoff here also forces the verdict to BLOCK. Since
+//                       AGT-391 its BASELINE block is the regression baseline when no
+//                       --regression-baseline= is passed.
+//   --related=<file>    AGT-391: the related test set (scripts/related-tests.js); the regression
+//                       gate runs only it. Unreadable or empty -> exit 2 `related-unreadable`.
 //   --check-kickoff=<p> SES-376: measure ONE kickoff against KICKOFF_BYTE_CAP and exit. Runs no
 //                       gate, reads no board, needs no credentials -- it is the FIRST branch of
 //                       main(), ahead of the credential check, so step 6 can call it at the moment
@@ -1030,14 +1041,76 @@ export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFi
 //
 // Pure and exported so the suite grades the rule without a process: `read` is
 // `readRegressionBaseline()`'s return, `declared` is the raw `--no-baseline=` value.
-export function baselineGate({ read, declared }) {
+//
+// AGT-391: `related` is the third input -- the related set `--related=` named, as readRelatedSet()'s
+// `names`. The gate refuses only when ALL THREE are absent: a run handed its related set grades the
+// set against whatever baseline it has (the kickoff's BASELINE block, or --regression-baseline=), and
+// without one the absolute exit code of that set stands, exactly as AGT-170 left it. With `related`
+// absent every return below is byte-identical to AGT-245's.
+export function baselineGate({ read, declared, related }) {
   const reason = String(declared ?? "");
   if (read.names === null || read.names === undefined) {
+    if (!reason.trim() && Array.isArray(related) && related.length) {
+      return { refuse: false, declared: null,
+        source: `${read.source}; the ${related.length}-test related set (--related=) runs, and its absolute exit code stands (AGT-391)` };
+    }
     if (!reason.trim()) return { refuse: true, reason: read.source };
     return { refuse: false, declared,
       source: `omitted by declaration (--no-baseline=${declared}); the absolute exit code stands (AGT-245)` };
   }
   return { refuse: false, declared: null, source: read.source };
+}
+
+// FEATURE: AGT-391 -- SELECTIVE REGRESSION. A build runs its RELATED set (scripts/related-tests.js over
+// the files it changed) and is graded against the kickoff's BASELINE block -- the reds the Designer
+// measured on the unchanged tree for that same set -- instead of a full-suite baseline captured by the
+// cycle before its first edit. The full suite runs weekly (docs/runbooks/auditor-routine.md) and before
+// a production release (docs/runbooks/release-to-main.md); its reds become findings.
+//
+// readKickoffBaseline(text): the paragraph starting `BASELINE (`, its `Red set: r of n`, and its names
+// -- the comma list on a `Red:` line plus the basename of every `- <path> — RED` line. Same return
+// shape as readRegressionBaseline(). A block that is absent, carries no count, or whose names do not
+// number exactly r is `names: null` (fail closed: a list that disagrees with its own count is not a
+// baseline anyone measured). Otherwise `unverified: []` -- the Designer's run is the related set's.
+export function readKickoffBaseline(text) {
+  const paras = String(text ?? "").replace(/\r\n/g, "\n").split(/\n\s*\n/);
+  const para = paras.find(p => p.trimStart().startsWith("BASELINE ("));
+  if (!para) return { names: null, unverified: null, source: "the kickoff carries no BASELINE block; the gate grades the absolute exit code (AGT-391)" };
+  const count = para.match(/Red set:\s*(\d+)\s+of\s+(\d+)/);
+  if (!count) return { names: null, unverified: null, source: "the kickoff's BASELINE block carries no `Red set: r of n`; the gate grades the absolute exit code (AGT-391)" };
+  const r = Number(count[1]);
+  const names = [];
+  for (const line of para.split("\n")) {
+    const red = line.match(/^\s*Red:\s*(.*)$/);
+    if (red) names.push(...red[1].split(",").map(s => s.trim()).filter(Boolean).map(s => path.basename(s)));
+    const item = line.match(/^\s*-\s+`?([^`\s]+)`?\s+—\s+RED\b/);
+    if (item) names.push(path.basename(item[1]));
+  }
+  const unique = [...new Set(names)];
+  if (unique.length !== r) {
+    return { names: null, unverified: null,
+      source: `the kickoff's BASELINE block says Red set: ${r} of ${count[2]} but names ${unique.length}; the gate grades the absolute exit code (AGT-391)` };
+  }
+  return { names: unique, unverified: [], source: `the kickoff's BASELINE block (${r} red of ${count[2]} on the unchanged tree, related set)` };
+}
+
+// The related set `--related=` names: a csv or one name per line, as basenames. An unreadable or empty
+// file is `names: null` -- main() exits 2 on it (`related-unreadable`), because an empty set would run
+// nothing and a silent fall-back to the full suite is not what the caller asked for.
+export function readRelatedSet(p, readFile = (f) => fs.readFileSync(f, "utf8")) {
+  let text;
+  try { text = readFile(p); }
+  catch (e) { return { names: null, reason: `--related=${p} could not be read (${e.message})` }; }
+  const names = [...new Set(String(text).split(/[,\r\n]+/).map(s => s.trim()).filter(Boolean).map(s => path.basename(s)))];
+  if (!names.length) return { names: null, reason: `--related=${p} names no test` };
+  return { names, reason: null };
+}
+
+// The regression gate's argv for this run. GATES itself is never edited: with a related set the loop
+// spawns `{ ...gate, argv: regressionArgv(p) }`, so the frozen entry still says what a full run is.
+export function regressionArgv(p) {
+  const base = [...GATES.find(g => g.key === "regression").argv];
+  return p ? [...base, `--only-from=${path.resolve(p)}`] : base;
 }
 
 // The whole verdict rule, in one pure function.
@@ -2967,6 +3040,9 @@ async function main() {
   // into a report nobody reads. A BARE `--no-baseline` is "" here (`arg()` needs `=`) and refuses:
   // the Designer's recorded call, and the only reading that keeps the gate from being an option.
   const noBaselineDeclared = arg("no-baseline", "");
+  // FEATURE: AGT-391 -- the related set the regression gate runs (`run-all.js --only-from=<it>`), from
+  // scripts/related-tests.js. Absent -> the full suite, exactly as before.
+  const relatedPath = arg("related", "");
   // Pass two is "session mode AND a verdict file". It re-runs NOTHING: the gates that graded this
   // delivery ran in pass one and their results are in the context file. Re-running them here would
   // grade a different instant with the same version number on it -- and would cost 20 minutes.
@@ -3043,8 +3119,29 @@ async function main() {
   // NO GATE RUNS AND NO ROW IS WRITTEN. Exit 2, `kind: "cannot-run"`, exactly as a missing credential
   // or an unreadable judgment context exits -- this is the absence of a verdict, never a block, so it
   // cannot cost the ladder a streak for a step the cycle merely skipped.
-  const baselineRead = readRegressionBaseline(regressionBaselinePath);
-  const baselineDecision = baselineGate({ read: baselineRead, declared: noBaselineDeclared });
+  //
+  // AGT-391: the kickoff is read ONCE, here, and the same text feeds its BASELINE block below and the
+  // SES-376 / SES-359 findings further down. `--regression-baseline=` wins over the kickoff's block --
+  // an explicit capture is the more specific instruction. A named related set that cannot be read is
+  // exit 2 `related-unreadable` before anything runs.
+  let kickoffText = null;
+  if (kickoffPath) {
+    try { kickoffText = fs.readFileSync(path.resolve(repoRoot, kickoffPath), "utf8"); }
+    catch { kickoffText = null; }
+  }
+  let relatedRead = null;
+  if (relatedPath) {
+    relatedRead = readRelatedSet(relatedPath);
+    if (relatedRead.names === null) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "related-unreadable", related: relatedPath },
+        prose: `verifier: RELATED SET UNREADABLE (${relatedRead.reason}). Exiting 2 and recording NOTHING -- no gate ran (AGT-391).\n`
+          + `  Re-measure it: node scripts/related-tests.js --files-from=<the delivery's files> > <file>, then pass --related=<file>.` });
+    }
+  }
+  const baselineRead = regressionBaselinePath
+    ? readRegressionBaseline(regressionBaselinePath)
+    : kickoffText !== null ? readKickoffBaseline(kickoffText) : readRegressionBaseline("");
+  const baselineDecision = baselineGate({ read: baselineRead, declared: noBaselineDeclared, related: relatedRead?.names ?? null });
   if (baselineDecision.refuse) {
     return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "no-regression-baseline",
         regression_baseline_source: baselineDecision.reason },
@@ -3066,8 +3163,10 @@ async function main() {
     let r;
     if (gate.key === "regression") {
       const slotEnv = cycleId ? { ...process.env, DEEPBENCH_CYCLE_ID: cycleId } : process.env;
+      // AGT-391: the related set, when named, through a copy -- GATES stays the full-suite definition.
+      const asRun = relatedPath ? { ...gate, argv: regressionArgv(relatedPath) } : gate;
       const taken = await withTestSlot(slotEnv, () =>
-        runGate(gate, repoRoot, { ...process.env, DEEPBENCH_TEST_SLOT: "held" }));
+        runGate(asRun, repoRoot, { ...process.env, DEEPBENCH_TEST_SLOT: "held" }));
       r = taken.ran ? taken.value : { status: "red", fails: null, detail: taken.notRun };
     } else {
       r = await runGate(gate, repoRoot);
@@ -3153,8 +3252,8 @@ async function main() {
   // already puts `[UNREADABLE: ...]` into the agent's evidence, where the judgment can see it and
   // act, and manufacturing a cap block out of a missing file would report the wrong defect.
   let kickoffOverCap = null;
-  if (kickoffPath) {
-    try { kickoffOverCap = kickoffCapFinding(fs.readFileSync(path.resolve(repoRoot, kickoffPath), "utf8")); }
+  if (kickoffText !== null) {
+    try { kickoffOverCap = kickoffCapFinding(kickoffText); }
     catch { kickoffOverCap = null; }
   }
   if (kickoffOverCap) {
@@ -3169,8 +3268,8 @@ async function main() {
   // as shipped -- it fires only once a caller passes `--kickoff=`, which task 2 of this ticket adds
   // to the attended runbook line and card 1d57ebca still owes step 7a.
   let kickoffNoLanes = null;
-  if (kickoffPath) {
-    try { kickoffNoLanes = kickoffLaneFinding(fs.readFileSync(path.resolve(repoRoot, kickoffPath), "utf8")); }
+  if (kickoffText !== null) {
+    try { kickoffNoLanes = kickoffLaneFinding(kickoffText); }
     catch { kickoffNoLanes = null; }
   }
   if (kickoffNoLanes) {

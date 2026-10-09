@@ -2905,13 +2905,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
   --task='{"kickoff_path":"docs/kickoffs/…","worktree":"<clone>","branch":"<branch>","version":"v<ver>","cycle_id":"<cid>","caps":{"files":N,"tasks":M},"heartbeat":"node scripts/cycle-heartbeat.js --cycle=<cid> --step='7 — builder: <task>'"}'
 ```
 
-   **Then capture the regression baseline on the unchanged clone, credentialed like 7a's run (`$S` = your scratchpad):**
-
-```
-SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js > $S/regression-baseline-<your cycle id>.txt
-```
-
-   7a reds only a test newly red BY NAME; a flaky green here costs a false block, never a false approve (`AGT-116`).
+   7a grades only the related set (`scripts/related-tests.js` over 2's `files`) against the kickoff's BASELINE block (`AGT-391`, `v7.0.793`).
 
    Run the rendered prompt as a sub-agent on the **`orchestrator`** lane (the
    lanes table at step 6, read from `runner_model_lanes`; the Builder's own Skill rows carry the
@@ -3028,10 +3022,11 @@ against, and an attended cycle runs no Builder.
 
 ```
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js
+node scripts/related-tests.js --files-from=$S/changed-<your cycle id>.json > $S/related-<your cycle id>.csv
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/verifier.js --kickoff=<the ticket's kickoff_link> \
   --cycle-id=<your cycle id> --ticket=<TICKET-ID> --version=v<your version> \
   --changed-files=$S/changed-<your cycle id>.json \
-  --regression-baseline=$S/regression-baseline-<your cycle id>.txt
+  --related=$S/related-<your cycle id>.csv
 ```
 
   The row carries `graded_sha` = the HEAD the gates ran on (`SES-345`), written by

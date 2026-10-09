@@ -1,3 +1,4 @@
+// DeepBench v7.0.797 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-304 slice 8 -- the live arm's lane oracle carries SIX keys: AGT-280's `sort_need` (`6 - COALESCE(need_score, 0)`, unscored last) sits between project priority and M5-02's filing lane, and the bare-queue inversion counter follows the queue key to index 4.
 // DeepBench v7.0.567 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-89 -- the
 // stored-queue oracle below reads `filed_at` ALONE, mirroring recompute_backlog_queue() after the
 // agt89_filing_lane_filed_at_only migration dropped its `coalesce(filed_at, created_at)`; a NULL
@@ -341,7 +342,7 @@ async function theLivePickPathObeysTheFourRules() {
 
   const items = await pg(
     url, key,
-    "backlog_items?select=backlog_id,title,status,design_status,queue,filed_at,predicted_cycles,epic_id,leverage_reason&limit=2000",
+    "backlog_items?select=backlog_id,title,status,design_status,queue,filed_at,predicted_cycles,epic_id,leverage_reason,need_score&limit=2000",
   );
   // AGT-140 (v7.0.604): `project_id` joins the epics projection, and `projects` joins the read,
   // because the lane's FIRST ordering key is now the owning project's `priority`. Without them the
@@ -432,7 +433,7 @@ async function theLivePickPathObeysTheFourRules() {
     const proj = projectById.get(projectOfEpic.get(it.epic_id));
     const prio = proj && proj.status === "executing" ? proj.priority : Number.MAX_SAFE_INTEGER;
     const lev = it.leverage_reason ? 0 : 1;
-    return [lev, prio, laneOf(it.filed_at), it.queue, it.predicted_cycles ?? Number.MAX_SAFE_INTEGER];
+    return [lev, prio, 6 - (it.need_score ?? 0), laneOf(it.filed_at), it.queue, it.predicted_cycles ?? Number.MAX_SAFE_INTEGER];
   };
   const lexLte = (a, b) => {
     for (let i = 0; i < a.length; i++) {
@@ -449,11 +450,11 @@ async function theLivePickPathObeysTheFourRules() {
     assert.ok(
       ordered,
       `the selfbuild lane is out of order at position ${i}: ${lane[i - 1].ref} ` +
-        `[leverage ${a[0]}, priority ${a[1]}, lane ${a[2]}, queue ${a[3]}, cycles ${a[4]}] precedes ${lane[i].ref} ` +
-        `[leverage ${b[0]}, priority ${b[1]}, lane ${b[2]}, queue ${b[3]}, cycles ${b[4]}]. The pick path orders by ` +
-        "leverage FIRST (AGT-238), then project priority (AGT-140), then filing lane, queue, cycles",
+        `[leverage ${a[0]}, priority ${a[1]}, need ${a[2]}, lane ${a[3]}, queue ${a[4]}, cycles ${a[5]}] precedes ${lane[i].ref} ` +
+        `[leverage ${b[0]}, priority ${b[1]}, need ${b[2]}, lane ${b[3]}, queue ${b[4]}, cycles ${b[5]}]. The pick path orders by ` +
+        "leverage FIRST (AGT-238), then project priority (AGT-140), then AGT-280's need (6 - need_score, unscored last), then filing lane, queue, cycles",
     );
-    if (a[3] > b[3]) inversionsAgainstBareQueue++;
+    if (a[4] > b[4]) inversionsAgainstBareQueue++;
   }
 
   // NON-VACUITY for the lane rule: monotonicity is satisfied trivially by bare queue order when

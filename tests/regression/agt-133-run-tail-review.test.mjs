@@ -1,3 +1,4 @@
+// DeepBench v7.0.821 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-304 slice 12 -- route pin follows decision ccab94da
 // DeepBench v7.0.610 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-133 -- THE RUN TAIL
 // REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. (7e) (AGT-137) wrote findings that
 // nothing read: 28 rows sat `open` with `ruling` NULL across 5 cycles on the day this shipped, and
@@ -40,6 +41,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { MANAGER_PROJECT } from "./_lib/finding-routes.js";
 import { parseSteps, runbookSha, NOTES } from "../../scripts/render-cycle-card.js";
 import { routeGroup } from "../../scripts/audit-review.js";
 import { isoWeek } from "../../scripts/audit-ledger.js";
@@ -254,7 +256,7 @@ async function run() {
       assert.equal(runner.length, 1, `exactly one runner route; got ${JSON.stringify(runner)}`);
       assert.equal(runner[0].precedence, 30, "the runner routes at precedence 30");
       assert.equal(runner[0].finding_type, "*", "for every finding type");
-      assert.equal(runner[0].project_slug, null, "with the project left to The Development Manager");
+      assert.equal(runner[0].project_slug, MANAGER_PROJECT, "under the manager's capture project (decision ccab94da), as the one home pins it");
 
       assert.ok(!rows.some(r => r.source === "*" && r.finding_type === "*"),
         "there is deliberately NO catch-all row: an unmapped source must still stop a review");

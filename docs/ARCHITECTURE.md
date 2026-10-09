@@ -135,6 +135,7 @@ under their governing section. Nothing below this index was edited when it was a
 - **§19t.** IP Access Gate — Live-Site Cost Protection [design `design-ip-security`, John, 2026-08-08]
 - **§19u.** The Recruiter — Agent-Built Agents & Persona Intake [discovery `design-agent-readiness`, John, 2026-08-11]
 - **§19v.** The Self-Building Platform — Autonomous Development Governance [discovery `design-selfbuilding-0819`, John, 2026-08-19]
+- **§19w.** Agent Data — What an Agent Carries, What the Page Shows, What an AI Client Receives [discovery `design-agent-fields-1006`, John, 2026-10-06]
 
 ---
 
@@ -2974,3 +2975,91 @@ calls.
 - Enforceable file-scoped subset lives in `.claude/rules/autonomous-surface-changes.md`,
   `.claude/rules/agent-roster-inert.md`, and the gated-mirror line in
   `.claude/rules/capabilities-are-data.md`.
+
+## 19w. Agent Data — What an Agent Carries, What the Page Shows, What an AI Client Receives [discovery `design-agent-fields-1006`, John, 2026-10-06]
+
+**The governing rule (John, verbatim):** "there can't be data behind the scenes that is not visible
+in deepbench or secretly given to the ai client that is not editable in deepbench." Every piece of
+agent data is visible in DeepBench, and anything sent to an AI client over MCP is editable in
+DeepBench. The register that grades every field against it is the Agent Field Register
+(`https://claude.ai/artifact/CyLXYhju9s9nW7Lyb2LbsE`, Inventory tab); the rulings below are the
+ones it records.
+
+**The data model John confirmed.** Six categories, each with a target for *on the Personnel page* /
+*used by the prompt assembler* / *passed to the AI client*:
+
+| Category | Personnel page | Assembler | AI client |
+|---|---|---|---|
+| Identity (name, badge, role, specialty, bio) | Yes, editable | Yes | Yes |
+| Behavior-shaping content: every Skill of the six types, including role prompts, guardrails, formats, taught items | Yes, editable | Yes | Yes |
+| Access and ownership (owner, sharing, visibility, lane, active) | Yes | No | No |
+| Operating records (activity, usage, costs, report cards) | Yes, Activity tab | No | No |
+| Future View (billing, Library, subscription controls) | Future View only | No | No |
+| Call plumbing (lead text, answer mode, `no_inference`) | Lead text and answer mode yes, editable | No | Per ruling |
+
+Measured 2026-10-06: 120 register rows, 31 fit, 85 off, 4 n/a. The 37 off rows in Behavior-shaping
+content are Skill text that reaches AI clients while no user can see or edit it (M1) and taught
+content the handover or assembler only partly uses.
+
+### Current state: two generations stapled together
+
+- **Generation 1 — Skills on Capabilities** (§2): `skill_profiles` rows, six types, grouped by
+  `capability_skill_profiles`, assigned by `agent_capability_assignments`. Authored only in SQL;
+  §2's "created by users" half was never built. 175 Skills, 76 Capabilities, held almost entirely
+  by the 30 seeded agents.
+- **Generation 2 — what the agent was taught**: `agent_configs` (role prompts, output formats,
+  always/never guardrails) and `knowledge_entries` (taught items, records), written on the Resume,
+  Playbook and Training tabs and, since `AGT-390`, by AI clients through the Teach tool. The 4
+  created agents and Brittany carry only this generation: 0 Skills each.
+- The assembler (`api/prompt/db-assembly.js`) reads both and stitches them; the scaffold an AI
+  client receives (`api/_lib/handlers/agent-bundle.js`) is both, minus the per-call tail. Every
+  misfit found sits on a seam: role prompts rendered twice (AA-66 added them to Identity, Behavior
+  already carried them); four Skill columns (tone, confidence, output description, notes) read by
+  nothing; Behavior Skills' own objective and method unread; Skill model settings and traits
+  visible nowhere.
+- **Doc drift this corrects:** §3's "private to the Agent … not shared or exposed" for
+  `agent_configs` predates `AGT-162`; the scaffold sends every row and John has ruled it does.
+  §14's "Behavior Skill Profile stored in `agent_configs`" names a generation-2 row with a
+  generation-1 word; an `agent_configs` row is not a Skill until R1 below converges them.
+
+### Decisions locked this session
+
+1. **Identity.** One Identity editor on the Resume tab: agent name (DeepBench user only), role
+   (DeepBench user only), specialty and bio (DeepBench user, and an AI client through the Teach
+   tool), each edit tagged with who and when. A rename rewrites the agent's two tool rows.
+   (`AGT-392`, `AGT-393`.)
+2. **The badge number is the id.** There is no separate internal id: the badge (`MK-07`) is shown
+   on DeepBench and used in the MCP link; auto-assigned at creation, never editable; its own
+   migration with backup and redirects (`AGT-398`). Open: the prefix rule for user-created agents.
+3. **The handover is the prompt built for the question, not a copy of the page.** The agent's
+   Knowledge tool takes the user's question; the assembler runs with it; scaffold mode returns that
+   prompt, answer mode runs it on DeepBench's model; a lead text is the first thing the AI client
+   reads; voice is sent; a long taught file sends its summary. One tool per capability is
+   unchanged. (`AGT-394`.)
+4. **Hidden from AI clients:** the Library block and the per-item `always` flag (`AGT-395`).
+   `no_inference` stays as the scaffold-mode flag.
+5. **Future View:** 35 items parked on a Future View tab behind a Current / Proposed layout switch
+   on the Personnel left nav (a dev flag), the same React components relocated, never redrawn,
+   grouped by what unlocks them; the switch is removed once John approves Proposed (`AGT-397`).
+   The ACTIVE badge is removed (`AGT-396`); three page constants read real facts (`AGT-402`).
+6. **Every Skill visible, read-only**, grouped by the six types, model settings and traits included
+   (`AGT-399`); assembler seams fixed (`AGT-400`); two live scaffolds measured first (`AGT-401`).
+7. **Out-of-scope is not a new field.** Guardrails become a Capability of the agent with distinct
+   guardrail types (how-to-answer rules, out-of-scope rules); its own design session, parked.
+
+### Open — not decided, do not build against either
+
+- **R1, one generation or two.** Converge generation 2 onto Skills (a role prompt → Identity Skill,
+  a guardrail → Guardrails Skill, a format → Format Skill, taught items → the corpus of one
+  Knowledge Skill per agent, all held by a per-agent Capability), or keep both and make both
+  visible. John leans converge; the before/after is on the Inventory tab. Blocks only the Skill
+  and Capability editors and the migration; runs after `AGT-398`.
+- The badge prefix rule for user-created agents; whether an AI client receives model settings
+  and traits; what Skill `confidence` means before it is shown.
+
+### Invariants (enforceable subset in `.claude/rules/agent-data-visibility.md`)
+
+- The scaffold handler sends no field the Personnel page cannot show and no field a DeepBench
+  user cannot edit, except the call-plumbing keys John has ruled on.
+- The assembler reads every Behavior-shaping field it is handed once; a field the schema adds
+  gets its reader in the same ticket or does not get the column.

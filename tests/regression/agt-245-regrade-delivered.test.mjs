@@ -1,3 +1,4 @@
+// DeepBench v7.0.799 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-304 slice 10 -- the live clause's pair must still be `delivered`, or no leg runs.
 // DeepBench v7.0.705 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-245 slices 3-5 of 5
 //
 // FEATURE: ONE DELIVERED TICKET, RE-GRADED ON THE DELTA BETWEEN ITS OWN TWO TREES. 77 `delivered`
@@ -38,7 +39,7 @@
 //     FIRST COHORT PAIR STILL CURRENT ON THE BOARD -- which is no longer `AGT-101`, and that is a
 //     consequence of slice 4 rather than a preference: fence (b) refuses a ticket whose newest verdict
 //     is no longer the cohort's, and slice 4's own re-grade row IS a newer verdict for `AGT-101`. So
-//     the live clause picks its pair at runtime (55 of the 56 resolved rows still qualify) instead of
+//     the live clause picks its pair at runtime (29 of the 56 qualify on 2026-10-07: verdict still current AND status still delivered) instead of
 //     pinning the one ticket this ship supersedes, and the supersede is asserted in its own right
 //     below. Read as: two dry-runs on a real pair `<base>` → `<ship>`. The first `--suite=` prints the CHECKED-OUT
 //     TREE'S OWN SHA as a failing test name: the base leg must name `tree-7bddd226.test.mjs` and the
@@ -228,6 +229,14 @@ async function firstCurrentPair(url, key, cohort) {
     assert.equal(res.status, 200, `runner_verdicts read for ${row.backlog_id} answered HTTP ${res.status}`);
     const rows = await res.json();
     if (!rows[0] || String(rows[0].id) !== String(row.verdict_id)) continue;
+    // `--ticket=` refuses a ticket the board moved off `delivered` (regrade-delivered.js:431,
+    // `not-delivered`), so currency alone is not eligibility: NO leg runs on such a pair.
+    const item = await fetch(
+      `${url.replace(/\/+$/, "")}/rest/v1/backlog_items?select=status&backlog_id=eq.${row.backlog_id}&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    assert.equal(item.status, 200, `backlog_items read for ${row.backlog_id} answered HTTP ${item.status}`);
+    const onBoard = await item.json();
+    if (!onBoard[0] || onBoard[0].status !== "delivered") continue;
     const git = args => spawnSync("git", ["-C", ROOT, ...args], { encoding: "utf8" });
     const deps = git(["diff", "--name-only", row.base_sha, row.ship_sha, "--", "package.json", "package-lock.json"]);
     if (deps.status !== 0 || String(deps.stdout || "").trim()) continue;
@@ -477,6 +486,9 @@ async function run() {
   }
 
   const shaPay = payloadOf(shaRun);
+  assert.equal(shaPay.kind, "regrade-delta",
+    `the sha probe on ${probe.backlog_id} came back ${JSON.stringify(shaPay.kind)} instead of a grade, so no leg ran: ` +
+      "the live clause's pair must satisfy every precondition `--ticket=` enforces, not just verdict currency");
   assert.deepEqual(shaPay.base_leg.fails, [`tree-${baseShort}.test.mjs`],
     `the BASE leg must have run in a worktree at ${baseShort} — a script that ran both legs on one tree names one sha twice`);
   assert.deepEqual(shaPay.ship_leg.fails, [`tree-${shipShort}.test.mjs`],

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// DeepBench v7.0.793 | scripts/render-cycle-card.js | AGT-391 -- step 7 no longer captures a full-suite
+// baseline: its NOTES entry carries blocks [1, 4] (the Builder prompt, 7a's related set + verdict) and
+// the outcome names --related= graded against the kickoff's BASELINE block.
+//
 // DeepBench v7.0.608 | scripts/render-cycle-card.js | SES-377, SES-424 slice 5, AGT-138 (4b retired) -- the cycle card: a 5-10 KB
 // executable digest of docs/runbooks/runner-cycle.md, GENERATED from it and never hand-written.
 //
@@ -138,7 +142,7 @@ export const NOTES = {
   "5":        { outcome: "the queue's first admitted row is the pick; ONE item; rename at the pick", block: 1 },
   "5a":       { outcome: "write files N (+k) / tasks M (+k) into notes; step 7 grades the ship on them", block: 1 },
   "6":        { outcome: "premise holds → revalidated_at = now() and build; dead → removal proposed", block: 1 },
-  "7":        { outcome: "baseline FIRST; 7a: --regression-baseline or exit 2; settle-ship.js writes the status", block: [1, 2, 5] },
+  "7":        { outcome: "7a: --related=<set> vs the kickoff BASELINE, else exit 2; settle-ship.js writes the status", block: [1, 4] },
   "7b":       { outcome: "every judgment write is a decision row with a handle and a reversal window", block: 2 },
   "8":        { outcome: "your own ship broke dev → revert-forward, restore before-images, 'reverted'", block: 0 },
   "8a":       { outcome: "re-run 4a with the post-push sha; the engine classifies, never you by hand", block: 0 },

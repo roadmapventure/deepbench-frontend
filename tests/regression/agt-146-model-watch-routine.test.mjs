@@ -1,3 +1,4 @@
+// DeepBench v7.0.798 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-304 slice 9 -- arm E's release pairs come off the live catalog, not one frozen trial.
 // DeepBench v7.0.741 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-281 -- arm D's
 // registry pin moves from six routines to seven: `victoria-reorg` (id null, the model-watch and
 // jerry-linkedin-alerts reason -- the routine is created by an attended session, AGT-281 §7). Nothing
@@ -316,13 +317,26 @@ async function run() {
       }
       const keys = rel.map(p => `${p.job_kind}/${p.job_key}->${p.candidate}`);
       assert.equal(new Set(keys).size, keys.length, "no pair appears twice");
-      assert.deepEqual(keys, ["lane/orchestrator->claude-opus-5-5"],
-        `today the release query is exactly the Opus 5.5 trial (got ${JSON.stringify(keys)})`);
+      // Completeness and maximality off the live rows, not one frozen trial (slice 9, pattern:162);
+      // `owed` is derived independently of releasePairs(), so a change there breaks this equality.
+      const owed = assignments.flatMap(a => {
+        const c = byId.get(a.model_id), d = c && String(c.released_on ?? c.first_seen).slice(0, 10);
+        const n = c && catalog.filter(x => x.family === c.family && x.deprecated_on === null
+          && x.released_on != null && String(x.released_on).slice(0, 10) > d
+          && String(x.model_id).startsWith("claude-"))
+          .reduce((b, x) => b && String(b.released_on) >= String(x.released_on) ? b : x, null);
+        return n ? [`${a.job_kind}/${a.job_key}->${n.model_id}`] : [];
+      });
+      assert.deepEqual(keys, owed,
+        `must name every assignment with a newer undeprecated same-family Claude model, the ` +
+        `NEWEST one: owed ${JSON.stringify(owed)}, got ${JSON.stringify(keys)}`);
+      assert.ok(keys.length > 0, "arm E proves nothing with no live release pair at all");
 
-      // Teeth: deprecate the candidate and the single pair must disappear -- the filter is load-
-      // bearing, not decoration. Read-only: the mutation is on the local copy, never on the table.
-      const deprecated = catalog.map(c => c.model_id === "claude-opus-5-5" ? { ...c, deprecated_on: "2026-09-27" } : c);
-      assert.deepEqual(releasePairs(assignments, deprecated), [], "control: a deprecated candidate yields no pair");
+      // Teeth: deprecated_on is load-bearing; the NAMED candidate alone just promotes the next
+      // row (slice 9). Read-only -- the mutation is on the local copy, never on the table.
+      const deprecated = catalog.map(c => ({ ...c, deprecated_on: "2026-09-27" }));
+      assert.deepEqual(releasePairs(assignments, deprecated), [],
+        "control: with every catalog row deprecated there is no release pair");
       // Teeth: an undated catalog is no release evidence at all.
       assert.deepEqual(releasePairs(assignments, catalog.map(c => ({ ...c, released_on: null }))), [],
         "control: with no released_on anywhere there is no release pair");
