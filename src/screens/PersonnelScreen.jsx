@@ -1,3 +1,4 @@
+// DeepBench v7.0.833 | PersonnelScreen.jsx | mobile -- Agent Roster link moves to the right of the name row in the compact persona block.
 // DeepBench v7.0.832 | PersonnelScreen.jsx | mobile -- Personnel persona block compacts to avatar left, name + title right, quote underneath (~15% of the screen); the rest of the card sits behind a Details dropdown, default closed.
 // DeepBench v7.0.818 | PersonnelScreen.jsx | AGT-402 -- Future Controls Training section gains a sample Your trainee badge card (the badge means you can train this agent; John moved it to Future Controls).
 // DeepBench v7.0.816 | PersonnelScreen.jsx | AGT-416 -- Future Controls Access group opens with the Access levels sample card (where it can be used, which model, what an AI client receives, who can teach, what stays protected).
@@ -2429,8 +2430,7 @@ export default function PersonnelScreen() {
           {isMobile ? (
             <>
               {/* Mobile persona block — FEATURE: PE-17 — merges the old page header + ProfileTab's ID Badge card into one persistent block, above the tab bar, on every tab */}
-              <div style={{background:T.card,padding:"8px 14px 8px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
-                <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:11,color:T.brassDeep,cursor:"pointer",marginBottom:6}}>← Agent Roster</div>
+              <div style={{background:T.card,padding:"10px 14px 8px",borderBottom:`2px solid ${T.brass}`,flexShrink:0}}>
                 {/* Compact header: avatar left, name + title right, quote underneath */}
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <AgentAvatar who={agent.id} size={40} ring={true} />
@@ -2443,6 +2443,7 @@ export default function PersonnelScreen() {
                       <div style={{fontFamily:body,fontSize:11,color:T.mutedDeep,fontStyle:"italic"}}>{agent.role}</div>
                     </>)}
                   </div>
+                  <div onClick={() => navigate("/bench")} style={{fontFamily:body,fontSize:11,color:T.brassDeep,cursor:"pointer",flexShrink:0,alignSelf:"flex-start",whiteSpace:"nowrap"}}>← Agent Roster</div>
                 </div>
                 {proposed && (
                 <div data-sent="no" style={{marginTop:6,lineHeight:1.4}}>
