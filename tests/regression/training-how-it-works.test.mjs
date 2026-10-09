@@ -4,6 +4,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ALWAYS_MAX_CHARS, shapeTaught } from "../../lib/read-taught.js";
+import { selfRun } from "./_lib/self-run.js";
+
+export default async function run() {
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const screen = read("src/screens/PersonnelScreen.jsx");
 assert.ok(screen.includes("How training works") && !screen.includes("How Background Knowledge Works"), "the heading is plain");
@@ -27,3 +30,6 @@ const shaped = shapeTaught([{ id: "1", title: "Big", content: big, source: "user
 assert.equal(shaped.taught[0].text.length, 200000, "no cut-off on the way to the AI client");
 assert.equal(shaped.taught[0].always, false, "the always flag is only about DeepBench's own prompt");
 console.log("ok training-how-it-works");
+}
+
+selfRun(import.meta.url, run);

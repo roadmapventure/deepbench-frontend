@@ -4,6 +4,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { readIdentityInput, updateAgentIdentity } from "../../lib/private-agent-create.js";
+import { selfRun } from "./_lib/self-run.js";
+
+export default async function run() {
 // useAgents.js imports the browser Supabase client, which needs a URL and key to construct (no network is used here).
 process.env.VITE_SUPABASE_URL ||= "https://example.test"; process.env.VITE_SUPABASE_ANON_KEY ||= "anon";
 const { mergeRoster, ROSTER_TABLE_FIELDS, tableOnlyAgent } = await import("../../src/hooks/useAgents.js");
@@ -46,3 +49,6 @@ assert.ok(facts.includes('localStorage.getItem(PROFILE_GUIDE_KEY) !== "1"') && f
 assert.ok(facts.includes("Hide tips") && facts.includes("Show the fill-it-out tips"), "it can be closed and reopened");
 assert.ok(screen.includes("{idBadge}\n      <ProfileGuide/>\n      <IdentityEditor"), "it sits directly under the first card");
 console.log("ok quip-editable");
+}
+
+selfRun(import.meta.url, run);

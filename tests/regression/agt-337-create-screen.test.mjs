@@ -69,7 +69,8 @@ const ABSENT = [
 
 const HEX_LITERAL = /#[0-9a-fA-F]{3,8}\b/;
 
-const QUIP_GUARD = `{agent.quip && (`;
+// The quote renders only when there is one in the Current view; the Proposed view edits it in place and prompts "Add a quote" when empty (quip-editable).
+const QUIP_GUARD = `{!proposed && agent.quip && (`;
 const QUIP_QUOTED = `"{plainQuip(agent.quip)}"`; // AGT-412 -- one pair, whatever the stored quip holds
 
 function checkScreenPresent() {

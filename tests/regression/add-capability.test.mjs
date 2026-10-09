@@ -6,6 +6,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { readAddCapabilityInput, addCapabilityToAgent, actorFromRequest, authorCols, updateSkill, deleteCapability, readDeleteCapabilityInput } from "../../lib/skill-write.js";
 import { assembleCapabilityRows } from "../../api/_lib/mcp.js";
+import { selfRun } from "./_lib/self-run.js";
+
+export default async function run() {
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const count = (s, t) => s.split(t).length - 1;
 
@@ -189,3 +192,6 @@ function delFake(intentTraits) {
 }
 
 console.log("ok add-capability");
+}
+
+selfRun(import.meta.url, run);
