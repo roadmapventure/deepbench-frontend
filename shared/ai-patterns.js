@@ -1,3 +1,4 @@
+// DeepBench v7.0.840 | shared/ai-patterns.js | AGT-449 -- `rule-cap-case` enters the catalog with the Development Manager's capability row: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.747 | shared/ai-patterns.js | AGT-312 -- `review-proposal` enters the catalog with Victoria's capability row (migration agt312_proposal_review): scripts/agent-log.js refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per proposal-review turn that docs/runbooks/auditor-routine.md prescribes verbatim would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.741 | shared/ai-patterns.js | AGT-281 -- `requirement-check` enters the catalog beside the audit-run-review row whose shape it copies: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per list turn that docs/runbooks/victoria-reorg.md prescribes verbatim would be refused. Measured at this ship: the capability and its two intents are live and this file named it 0 times. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.680 | shared/ai-patterns.js | AGT-136 -- `design-ruling` enters the catalog with the Designer's capability row: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per ruling run would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
@@ -350,6 +351,13 @@ export const SERVICE_CATALOG = [
   // answer. No AI_TYPE_TO_SERVICE entry -- ai_type equals the slug via the `|| e.type` fallback,
   // the same path run-project and review-audit-worklist take.
   { slug: 'decide-gated-card',       name: 'Decide Gated Card (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  // AGT-449 -- rule-cap-case, the manager's sixth capability: one cap case ruled split or waive
+  // through public.rule_capped_ticket() (pattern:172). Same MANDATORY reason as decide-gated-card
+  // above: scripts/agent-log.js refuses an --ai-type this array does not carry. Same patterns for
+  // the same reasons: the answer is validated against dm-cap-case-intent's stored schema (offline
+  // by scripts/rule-cap-case.js validateRuling(), again inside the function) and the turn IS the
+  // judgment. No AI_TYPE_TO_SERVICE entry -- ai_type equals the slug via the `|| e.type` fallback.
+  { slug: 'rule-cap-case',           name: 'Rule Cap Case (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
   // AGT-144 -- model-assignment, the manager's fourth capability: watch Claude releases into
   // model_catalog, trial a candidate, and switch / keep / money / file-ticket per job type. Same
   // MANDATORY reason as decide-gated-card above: scripts/agent-log.js refuses an --ai-type this

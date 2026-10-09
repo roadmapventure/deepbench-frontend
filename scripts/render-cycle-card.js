@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.840 | scripts/render-cycle-card.js | AGT-449 -- step 5a's NOTES outcome names the Manager's door: a cap case → node scripts/rule-cap-case.js.
+//
 // DeepBench v7.0.793 | scripts/render-cycle-card.js | AGT-391 -- step 7 no longer captures a full-suite
 // baseline: its NOTES entry carries blocks [1, 4] (the Builder prompt, 7a's related set + verdict) and
 // the outcome names --related= graded against the kickoff's BASELINE block.
@@ -140,7 +142,7 @@ export const NOTES = {
   "4d":       { outcome: "retired: the Auditor runs in its own routine (auditor-routine.md); go to 4e", block: 1 },
   "4e":       { outcome: "already run today → step 5; exit 3 → ticketowner judges; no Agent/exit 2 → re-run unjudged", block: 1 },
   "5":        { outcome: "the queue's first admitted row is the pick; ONE item; rename at the pick", block: 1 },
-  "5a":       { outcome: "write files N (+k) / tasks M (+k) into notes; a cap case → devmanager rules split/waive", block: 1 },
+  "5a":       { outcome: "write files N (+k) / tasks M (+k) into notes; a cap case → node scripts/rule-cap-case.js", block: 1 },
   "6":        { outcome: "premise holds → revalidated_at = now() and build; dead → removal proposed", block: 1 },
   "7":        { outcome: "7a: --related=<set> vs the kickoff BASELINE, else exit 2; settle-ship.js writes the status", block: [1, 4] },
   "7b":       { outcome: "every judgment write is a decision row with a handle and a reversal window", block: 2 },

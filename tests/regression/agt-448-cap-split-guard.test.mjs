@@ -1,3 +1,4 @@
+// DeepBench v7.0.840 | tests/regression/agt-448-cap-split-guard.test.mjs | AGT-449 -- three more arms: D pure (scripts/rule-cap-case.js's isCapCase / validateRuling / nextAction / refusedSplitReason), E static (the runbook, the card, the agt-449 mirror and the SERVICE_CATALOG entry name the Manager's script), F live (rule-cap-case and dm-cap-case-intent are devmanager's alone, linked like decide-gated-card).
 // DeepBench v7.0.839 | tests/regression/agt-448-cap-split-guard.test.mjs | AGT-448 -- the cap-split guard.
 //
 // WHAT THIS PINS. pattern:172 (John 2026-10-09): when the file or task cap would force a split, the
@@ -20,6 +21,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { render, readDoc } from "../../scripts/render-role-patterns.js";
+import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -78,7 +80,21 @@ const STATIC = [
     ["CREATE OR REPLACE FUNCTION public.rule_capped_ticket(", "'DRAIN-CAP-SPLIT'"]],
   ["render(designer)", () => render(readDoc(), "designer"), ["\n- pattern:172 — "]],
   ["render(manager)", () => render(readDoc(), "manager"), ["\n- pattern:172 — "]],
+  // E (AGT-449): the cap case reaches the Development Manager through his own script.
+  ["docs/runbooks/runner-cycle.md", () => readRel("docs/runbooks/runner-cycle.md"), ["the DM rules\nit, `scripts/rule-cap-case.js`;"]],
+  ["docs/runbooks/cycle-card.md", () => readRel("docs/runbooks/cycle-card.md"), ["a cap case → node scripts/rule-cap-case.js"]],
+  ["docs/design/agt-449-rule-cap-case.sql", () => readRel("docs/design/agt-449-rule-cap-case.sql"), ["'dm-cap-case-intent'", "'rule-cap-case'"]],
+  ["SERVICE_CATALOG", () => JSON.stringify(SERVICE_CATALOG.map(e => ({ slug: e.slug, serviceType: e.serviceType }))),
+    ['{"slug":"rule-cap-case","serviceType":"ai"}']],
 ];
+
+/** AGT-449: the Manager's capability, its Intent, and the capability whose links it copies. */
+export const CAP = "rule-cap-case";
+export const INTENT = "dm-cap-case-intent";
+export const TWIN = "decide-gated-card";
+export const TWIN_INTENT = "dm-gate-intent";
+/** Rule #1: no agent's data names another agent. */
+export const OTHER_AGENT_RE = /\b(designer|auditor|librarian|victoria|builder|michelle)\b/i;
 
 const missing = (text, needles) => needles.filter(n => !text.includes(n));
 
@@ -121,11 +137,41 @@ async function run() {
     assert.strictEqual(cases.length, 7);
   });
 
+  // --- D: pure (AGT-449) -------------------------------------------------------------------------
+  await arm("D-pure-rule-cap-case", async () => {
+    const { isCapCase, validateRuling, nextAction, refusedSplitReason, AGENT, CAPABILITY } =
+      await import("../../scripts/rule-cap-case.js");
+    assert.strictEqual(AGENT, "devmanager");
+    assert.strictEqual(CAPABILITY, CAP);
+    const C = { premise: "alive", kickoff_markdown: null, kickoff_path: null, harvest_markdown: "p" };
+    assert.strictEqual(isCapCase(C), true, "D isCapCase: the case itself");
+    assert.strictEqual(isCapCase({ ...C, kickoff_markdown: "k" }), false, "D isCapCase: a kickoff is no case");
+    assert.strictEqual(isCapCase({ ...C, premise: "dead" }), false, "D isCapCase: a dead premise is no case");
+    assert.strictEqual(isCapCase({ ...C, harvest_markdown: "" }), false, "D isCapCase: no parts is no case");
+    const ok = (a, label) => assert.strictEqual(validateRuling(a, "X-1").ok, true, `D validateRuling ${label}: ${JSON.stringify(validateRuling(a, "X-1"))}`);
+    const no = (a, label) => assert.strictEqual(validateRuling(a, "X-1").ok, false, `D validateRuling ${label} should refuse`);
+    const A = { ruling: "split", parts: ["X-2", "X-3"], reason: "r", patterns_applied: [172] };
+    ok({ ...A, ruling: "waive", parts: [] }, "waive []");
+    ok(A, "split [X-2,X-3]");
+    no({ ...A, parts: ["X-2"] }, "split of one part");
+    no({ ...A, parts: ["X-2", "X-2"] }, "split with a repeated part");
+    no({ ...A, parts: ["X-1", "X-2"] }, "split naming the ticket");
+    no({ ...A, ruling: "waive", parts: ["X-2"] }, "waive with parts");
+    no({ ...A, ruling: "merge" }, "ruling merge");
+    no({ ...A, reason: "" }, "empty reason");
+    assert.strictEqual(nextAction({ ruling: "waive", decision_id: "d" }),
+      'next: re-assemble design-kickoff with "cap_waived":"d"');
+    assert.strictEqual(nextAction({ ruling: "split", decision_id: "d", directive_id: "r", parts: ["X-2", "X-3"] }),
+      "next: build X-2 (drain r)");
+    assert.strictEqual(refusedSplitReason("why", "rule_capped_ticket: m"),
+      "split refused (rule_capped_ticket: m); a refused split is a waive (pattern:172): why");
+  });
+
   // --- C: live -----------------------------------------------------------------------------------
   const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   if (!base || !key) {
-    notRun("the live arm (ds-/dm-guardrails rows, pattern:172 in the knowledge rows, DRAIN-CAP-SPLIT, the refusal, unruled splits since CUTOFF)",
+    notRun("the live arm (ds-/dm-guardrails rows, pattern:172 in the knowledge rows, DRAIN-CAP-SPLIT, the refusal, unruled splits since CUTOFF; F: rule-cap-case is devmanager's)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent. Run: node --env-file-if-exists=.env.local tests/regression/agt-448-cap-split-guard.test.mjs");
   } else {
     const hdr = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
@@ -186,6 +232,29 @@ async function run() {
       const early = unruledSplits(rows, "2026-10-09");
       assert.ok(early.includes("AGT-427"), `control: from 2026-10-09 the guard should find AGT-427, got ${JSON.stringify(early)}`);
       console.log(`    rows ${rows.length}; since CUTOFF ${JSON.stringify(unruledSplits(rows))}; since 2026-10-09 ${JSON.stringify(early)}`);
+    });
+
+    // --- F: live (AGT-449) -----------------------------------------------------------------------
+    await arm("F-rule-cap-case-is-the-managers", async () => {
+      const cap = await get(`capabilities?select=slug,execution_type,default_intent_slug&slug=eq.${CAP}`);
+      assert.strictEqual(cap.length, 1, `${CAP}: expected 1 capabilities row, got ${cap.length}`);
+      assert.strictEqual(cap[0].execution_type, "ai", `${CAP}.execution_type`);
+      assert.strictEqual(cap[0].default_intent_slug, INTENT, `${CAP}.default_intent_slug`);
+      const links = async slug => (await get(`capability_skill_profiles?select=skill_profile_slug,level,is_required,display_order` +
+        `&capability_slug=eq.${slug}&order=display_order`))
+        .map(l => [l.skill_profile_slug === TWIN_INTENT ? INTENT : l.skill_profile_slug, l.level, l.is_required, l.display_order]);
+      const twin = await links(TWIN);
+      assert.ok(twin.length > 0, `control: ${TWIN} has no links to copy`);
+      assert.deepStrictEqual(await links(CAP), twin, `${CAP}'s links are not ${TWIN}'s with ${TWIN_INTENT} -> ${INTENT}`);
+      const held = await get(`agent_capability_assignments?select=agent_id&capability_slug=eq.${CAP}`);
+      assert.deepStrictEqual(held.map(h => h.agent_id), ["devmanager"], `${CAP} is assigned to ${JSON.stringify(held.map(h => h.agent_id))}`);
+      const intent = await get(`skill_profiles?select=slug,traits,method&slug=eq.${INTENT}`);
+      assert.strictEqual(intent.length, 1, `${INTENT}: expected 1 row, got ${intent.length}`);
+      assert.deepStrictEqual(intent[0].traits?.schema?.properties?.ruling?.enum, ["split", "waive"], `${INTENT} schema ruling enum`);
+      const method = String(intent[0].method ?? "");
+      assert.ok(method.includes("pattern:172"), `${INTENT}.method does not cite pattern:172`);
+      assert.ok(OTHER_AGENT_RE.test("send it to the Designer"), "control: the Rule #1 pattern matches an agent name");
+      assert.ok(!OTHER_AGENT_RE.test(method), `${INTENT}.method names another agent (Rule #1): ${method.match(OTHER_AGENT_RE)?.[0]}`);
     });
   }
 

@@ -1,3 +1,4 @@
+// DeepBench v7.0.840 | tests/regression/agt-68-devmanager.test.mjs | AGT-449 -- the assignment pin names SIX capabilities: rule-cap-case (cap-case ruling, decision 6ee431f9) joins the closed set.
 // DeepBench v7.0.794 | tests/regression/agt-68-devmanager.test.mjs | AGT-304 slice 7 -- the assignment pin names all FIVE capabilities the manager's rows carry (model-assignment, propose-project added), and both driver answers carry the patterns_applied the live Intent requires.
 // DeepBench v7.0.625 | tests/regression/agt-68-devmanager.test.mjs | AGT-183 -- header note (8): the
 // own-claim arm and the pass-over arm, each pinning the EXACT refusal sentence it used to return and
@@ -547,7 +548,7 @@ export default async function run() {
   // tests/regression/agt-127-decide-gated-card.test.mjs.
   // AGT-304 slice 7 (v7.0.794): FOURTH model-assignment (AGT-144, row 2026-09-25; agt-144 pins "devmanager holds 5") and FIFTH propose-project (AGT-240, row 2026-09-27, the finish line's proposal turn). Still a CLOSED set.
   assert.deepEqual(assigns.map(a => a.capability_slug).sort(),
-    ["decide-gated-card", "model-assignment", "propose-project", "review-audit-worklist", RUN_PROJECT_CAPABILITY].sort());
+    ["decide-gated-card", "model-assignment", "propose-project", "review-audit-worklist", "rule-cap-case", RUN_PROJECT_CAPABILITY].sort());
   const cap = (await rest(`capabilities?slug=eq.${RUN_PROJECT_CAPABILITY}&select=slug,execution_type,default_intent_slug`))[0];
   assert.equal(cap.execution_type, "ai");
   assert.equal(cap.default_intent_slug, INTENT_SLUG,

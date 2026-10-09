@@ -2729,8 +2729,8 @@ numbers. Four things not to get wrong:
   feature — so a widened cap is never a licence to fold a second ticket into this cycle.
 
 **A cap case is the Development Manager's to rule, never the cycle's to slice:** the Designer
-answers `alive`, `kickoff_markdown` null, case in `harvest_markdown`; you call
-`public.rule_capped_ticket()` once; split → build the drain's first part, waive → re-assemble
+answers `alive`, `kickoff_markdown` null, case in `harvest_markdown`; the DM rules
+it, `scripts/rule-cap-case.js`; split → build the drain's first part, waive → re-assemble
 with `"cap_waived":"<id>"`, build it whole.
 
 **6. Full ceremony — no shortcuts, you earn no exemption.** **STEP ONE OF ANY BUILD IS
