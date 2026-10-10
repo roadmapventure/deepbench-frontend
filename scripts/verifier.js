@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.843 | scripts/verifier.js | AGT-451 -- an uncredentialed BASELINE block is refused, not graded: `UNCREDENTIALED_BASELINE_RE` on the `BASELINE (` paragraph makes `readKickoffBaseline()` return `uncredentialed: true` with `names: null`, `baselineGate()` refuses it BEFORE AGT-391's related-set escape, `--pre-build-baseline=<file>` (the cycle's own credentialed measurement, `scripts/pre-build-baseline.js`) sits between `--regression-baseline=` and the block in the precedence, and step 6's `--check-kickoff` arms with the flag -- exit 1 `kickoff-baseline-uncredentialed` when the file is no baseline, a `baseline_note` saying NOT GRADED when no flag was handed.
 // DeepBench v7.0.793 | scripts/verifier.js | AGT-391 -- selective regression. `--related=<file>` (the
 // related set from scripts/related-tests.js) runs the regression gate as `run-all.js --only-from=<it>`
 // through a copy of the GATES entry, never an edit to GATES; an unreadable or empty set is exit 2
@@ -1047,8 +1048,17 @@ export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFi
 // set against whatever baseline it has (the kickoff's BASELINE block, or --regression-baseline=), and
 // without one the absolute exit code of that set stands, exactly as AGT-170 left it. With `related`
 // absent every return below is byte-identical to AGT-245's.
+//
+// AGT-451: AN UNCREDENTIALED BLOCK REFUSES BEFORE THE RELATED-SET ESCAPE, and the order is the whole
+// fix. AGT-391's escape says "no baseline, but a related set was named, so run the set and let its
+// absolute exit code stand" -- sound for an ABSENT baseline, because the cycle then knows it is
+// grading absolutely. An uncredentialed block is not absent: it is present, specific, and wrong, and
+// every unattended cycle hands `--related=`, so the escape would swallow this refusal on every run it
+// matters for. A declared reason still wins (`--no-baseline=<reason>`, pattern:19): an attended cycle
+// with no measurable tree records the choice rather than being hard-blocked.
 export function baselineGate({ read, declared, related }) {
   const reason = String(declared ?? "");
+  if (read.uncredentialed === true && !reason.trim()) return { refuse: true, reason: read.source };
   if (read.names === null || read.names === undefined) {
     if (!reason.trim() && Array.isArray(related) && related.length) {
       return { refuse: false, declared: null,
@@ -1072,10 +1082,31 @@ export function baselineGate({ read, declared, related }) {
 // shape as readRegressionBaseline(). A block that is absent, carries no count, or whose names do not
 // number exactly r is `names: null` (fail closed: a list that disagrees with its own count is not a
 // baseline anyone measured). Otherwise `unverified: []` -- the Designer's run is the related set's.
+//
+// AGT-451: A BLOCK THAT SAYS IT WAS MEASURED WITHOUT CREDENTIALS IS NOT A BASELINE, and it is the one
+// bad block that USED TO READ AS A GOOD ONE. `v7.0.827`'s kickoff declared "Red set: 0 of 2" with the
+// words "credentials stripped" in the block itself: the parse above accepted it (0 names, count 0, the
+// list agrees with itself), so the gate graded against an empty baseline over a tree holding six
+// standing reds -- all six would have landed on the Builder as newly red. Uncredentialed is not a
+// smaller measurement of the same thing: five of those six declare their arms `notRun` and report
+// GREEN without a database, so the block is self-consistently wrong.
+//
+// SO THE BLOCK'S OWN WORDS ARE THE SIGNAL, read off the `BASELINE (` paragraph only (a §2 sentence
+// elsewhere that discusses credentials is not a declaration about the measurement). `uncredentialed:
+// true` with `names: null` -- never `names: []` -- because the two facts are different: `[]` says the
+// unchanged tree was green, and this block cannot support that claim about any test. `baselineGate()`
+// then refuses it even when a related set was handed over, which is the escape an absent block gets
+// and this one must not.
+export const UNCREDENTIALED_BASELINE_RE = /\bcredentials?\b[^.\n]{0,40}\b(?:stripped|absent|withheld|omitted|deleted|removed)\b|\buncredentialed\b|\b(?:measured|run|taken|captured)\s+without\s+credentials\b|\bSUPABASE_SERVICE_KEY\b[^.\n]{0,40}\b(?:stripped|deleted|removed|absent)\b/i;
+
 export function readKickoffBaseline(text) {
   const paras = String(text ?? "").replace(/\r\n/g, "\n").split(/\n\s*\n/);
   const para = paras.find(p => p.trimStart().startsWith("BASELINE ("));
   if (!para) return { names: null, unverified: null, source: "the kickoff carries no BASELINE block; the gate grades the absolute exit code (AGT-391)" };
+  if (UNCREDENTIALED_BASELINE_RE.test(para)) {
+    return { names: null, unverified: null, uncredentialed: true,
+      source: "the kickoff's BASELINE was measured without credentials; run scripts/pre-build-baseline.js on the unchanged tree and pass --pre-build-baseline=<file> (AGT-451)" };
+  }
   const count = para.match(/Red set:\s*(\d+)\s+of\s+(\d+)/);
   if (!count) return { names: null, unverified: null, source: "the kickoff's BASELINE block carries no `Red set: r of n`; the gate grades the absolute exit code (AGT-391)" };
   const r = Number(count[1]);
@@ -2843,6 +2874,11 @@ async function main() {
   // judgement about the kickoff ("it is too big"), 2 is the absence of one ("there was nothing to
   // measure"). A caller that collapses them would treat a typo'd path as a passing cap check.
   const checkKickoffPath = arg("check-kickoff", "");
+  // AGT-451: ONE const for BOTH ends of this flag -- step 7's `--check-kickoff` arming below and 7a's
+  // baseline precedence further down. The file is the same file, measured once by
+  // `scripts/pre-build-baseline.js` on the unchanged clone before the Builder was spawned, and two
+  // reads of two argv entries is how the two ends drift apart.
+  const preBuildBaselinePath = arg("pre-build-baseline", "");
   if (checkKickoffPath) {
     const abs = path.resolve(repoRoot, checkKickoffPath);
     let text;
@@ -2862,6 +2898,48 @@ async function main() {
     const lanes = kickoffLaneFinding(text);
     if (lanes) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...lanes }, prose: lanes.reason });
+    }
+    // ---- AGT-451: THE BASELINE BLOCK, GRADED AT STEP 6/7 -- BEFORE THE BUILDER IS SPAWNED. -----
+    //
+    // THIRD, AFTER THE CAP AND THE LANES, for the reason the whole branch is ordered this way: the
+    // first two grade whether this document is a kickoff at all, and a draft that is not one yet has
+    // no baseline worth reading. This clause grades a kickoff that passed both.
+    //
+    // THE REFUSAL ARMS WITH THE FLAG, AND ONLY WITH IT (the Designer's call, reversible). A bare
+    // `--check-kickoff` -- which is what runbook step 6 runs, and what `ses-376`, `ses-359`,
+    // `ses-378h` and every `agt-187` arm spawn with both credentials deleted -- stays exit 0 and SAYS
+    // it did not grade (`baseline_note`, N3). Refusing there would wedge step 6 on a block only step
+    // 7 can fix, and would turn four shipped tests red for an input they do not hand over. Step 7
+    // passes `--pre-build-baseline=<file>`, and THAT is the run where an uncredentialed block is a
+    // refusal: the file it names is the measurement that replaces the block, so a missing or
+    // unreadable one means the cycle claimed a fix it never made.
+    //
+    // EXIT 1, NEVER 2, and the distinction is the one this branch already draws twice above: 1 is a
+    // judgement about the kickoff ("its BASELINE cannot be graded against"), 2 is the absence of one.
+    // `remedy_owner: "cycle"` because the remedy is the cycle's own step 7 command, not a re-assembly
+    // the Designer owes -- the Designer's environment is where the measurement could not be taken.
+    const kb = readKickoffBaseline(text);
+    let baselineNote = "";
+    if (kb.uncredentialed) {
+      if (preBuildBaselinePath) {
+        const handed = readRegressionBaseline(preBuildBaselinePath);
+        if (handed.names === null) {
+          const reason = `kickoff-baseline-uncredentialed: ${kb.source}. The run passed `
+            + `--pre-build-baseline=${preBuildBaselinePath}, but that file is no baseline (${handed.source}) -- `
+            + `so the uncredentialed block is still the only one there is, and a green here would attest to a `
+            + `measurement nobody took (AGT-451).`;
+          return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "kickoff-baseline-uncredentialed",
+              baseline_source: kb.source, pre_build_baseline: preBuildBaselinePath,
+              pre_build_baseline_source: handed.source,
+              remedy_owner: "cycle",
+              remedy: "run scripts/pre-build-baseline.js on the UNCHANGED tree, then re-run --check-kickoff with --pre-build-baseline=<file>",
+              reason }, prose: reason });
+        }
+        baselineNote = `cycle-measured baseline ${preBuildBaselinePath} (${handed.names.length} red) `
+          + "replaces the uncredentialed block (AGT-451)";
+      } else {
+        baselineNote = "NOT GRADED (AGT-451): uncredentialed BASELINE, no --pre-build-baseline= handed; step 7 measures it before the spawn";
+      }
     }
     // ---- AGT-189: the Builder's DECLARED MODEL, graded against the lane row, read live. ------
     //
@@ -2982,12 +3060,14 @@ async function main() {
       return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: true,
         answer_bytes: answerBytes, byte_delta: 0,
         builder_model: orchestratorModel, builder_model_note: builderModelNote,
+        baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
         attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
         prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
     }
     return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "kickoff-within-cap", bytes, cap: KICKOFF_BYTE_CAP, attested: false,
       builder_model: orchestratorModel, builder_model_note: builderModelNote,
+      baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
       attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
       prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
@@ -3138,9 +3218,18 @@ async function main() {
           + `  Re-measure it: node scripts/related-tests.js --files-from=<the delivery's files> > <file>, then pass --related=<file>.` });
     }
   }
+  // AGT-451: THREE SOURCES, ONE PRECEDENCE -- `--regression-baseline=`, then
+  // `--pre-build-baseline=`, then the kickoff's block. The explicit full-suite capture still wins (an
+  // operator naming a file is the most specific instruction there is). The cycle-measured file comes
+  // second because it is measured by a script, credentialed, on the unchanged clone, at step 7 -- so
+  // where it exists it is strictly better evidence than the block the Designer wrote, which may have
+  // been written where the measurement could not be taken. The block is last and is still the ordinary
+  // case. Both files are read by the SAME reader, so `names`/`unverified` mean one thing throughout.
   const baselineRead = regressionBaselinePath
     ? readRegressionBaseline(regressionBaselinePath)
-    : kickoffText !== null ? readKickoffBaseline(kickoffText) : readRegressionBaseline("");
+    : preBuildBaselinePath
+      ? readRegressionBaseline(preBuildBaselinePath)
+      : kickoffText !== null ? readKickoffBaseline(kickoffText) : readRegressionBaseline("");
   const baselineDecision = baselineGate({ read: baselineRead, declared: noBaselineDeclared, related: relatedRead?.names ?? null });
   if (baselineDecision.refuse) {
     return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "no-regression-baseline",
@@ -3151,6 +3240,13 @@ async function main() {
         + `    SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node tests/regression/run-all.js > $S/regression-baseline-<your cycle id>.txt\n`
         + `  then pass --regression-baseline=<that file> here. Credentialed, like this run: an uncredentialed `
         + `capture declares far more not-run and its wider unverified set can absorb a real newly red test (AGT-170).\n`
+        + `  OR, the way step 7 measures it now (AGT-451) -- the kickoff's own declared files, on the UNCHANGED\n`
+        + `  clone, BEFORE the Builder is spawned, which is also what arms this refusal when the block itself says\n`
+        + `  it was measured without credentials:\n`
+        + `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/pre-build-baseline.js --kickoff=<the kickoff_path> \\\n`
+        + `  --out=$S/pre-build-baseline-<your cycle id>.txt\n`
+        + `  then pass it here, the same file step 6's --check-kickoff was armed with:\n`
+        + `  --pre-build-baseline=$S/pre-build-baseline-<your cycle id>.txt\n`
         + `  A cycle that genuinely has no unchanged tree to measure DECLARES it: --no-baseline=<reason>. The `
         + `reason is recorded in the row; a bare --no-baseline is not a reason and refuses.` });
   }

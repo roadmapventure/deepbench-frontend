@@ -1,3 +1,4 @@
+// DeepBench v7.0.843 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-451 -- BYTES_AT_SHIP re-pinned 380977 -> 380978 (step 7 measures the baseline credentialed before the spawn: INS, the 7a flag line and R1 added, the v7.0.650 stamp rotated out for a 188-byte one -- measured with wc -c, 22 B of headroom left under the 381,000 B ceiling).
 // DeepBench v7.0.839 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-448 -- BYTES_AT_SHIP re-pinned 380952 -> 380977 (step 5a's cap-case paragraph names the Designer's case and cap_waived).
 // DeepBench v7.0.838 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-447 -- BYTES_AT_SHIP re-pinned 380843 -> 380952 (step 5a's cap-case paragraph).
 // DeepBench v7.0.793 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-391 -- BYTES_AT_SHIP re-pinned 380985 -> 380843
@@ -59,7 +60,7 @@ const CEILING = 381000;
 // into one is tracked separately rather than done inline here (pattern:96). AGT-291 (v7.0.749)
 // re-pinned it again, for the same reason and in the same commit as the runbook edit; AGT-391
 // (v7.0.793) once more.
-const BYTES_AT_SHIP = 380977;
+const BYTES_AT_SHIP = 380978;
 // Clause (c), step 6. The two function names are what make it load-bearing: a clause that named
 // neither would leave a cycle with nothing to call.
 const CLAUSE_C = "**Design-only project (`AGT-253`): when `public.ticket_design_only('<ID>')` is true, " +
