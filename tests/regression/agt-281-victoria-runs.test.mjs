@@ -1,3 +1,4 @@
+// DeepBench v7.0.844 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-433 slice 2 -- need_score 0 = PARKED: the validator accepts 0 and refuses -1 (band 0-5).
 // DeepBench v7.0.828 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
 // DeepBench v7.0.778 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-304 slice 3 -- re-pin arm F twice: requirement-check now binds a third Intent, vc-process-break-class (AGT-309 v7.0.743, agent-row decision 54d80a6a), and the AGT-281 agent-row decision is pinned by id e2c0d503 rather than newest-first, which SES-114's act 9ee2fe9b now wins; nothing weakened.
 // DeepBench v7.0.741 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-281 -- THE LIST TURN:
@@ -272,9 +273,12 @@ async function run() {
     assert.match(swapped.refusals.join(" | "), new RegExp(`^${A}: already carries John's own source ${J}`));
     const echoed = validateListVerdict(withRows([{ ...rows[0], need_source: J }, rows[1]]), ctxJ);
     assert.deepEqual(echoed.refusals, [], "(AGT-432) echoing John's source passes");
-    for (const score of [0, 6, "4", 3.5, undefined]) {
+    const parked = validateListVerdict(withRows([{ ...rows[0], need_score: 0 }, rows[1]]), ctx);
+    assert.deepEqual(parked.refusals, [], "(AGT-433) a PARKED ticket scored 0 is accepted by the list validator too");
+    assert.equal(parked.ok, true);
+    for (const score of [-1, 6, "4", 3.5, undefined]) {
       assert.match(must(withRows([{ ...rows[0], need_score: score }, rows[1]]), A, `need_score ${JSON.stringify(score)}`),
-        /need_score must be a whole number 1-5/);
+        /need_score must be a whole number 0-5/);
     }
     assert.match(must(withRows([rows[0], { ...rows[1], reason: "   " }]), B, "a BLANK reason"),
       /the verdict needs a reason/);
@@ -309,7 +313,7 @@ async function run() {
       assert.equal(refused.status, 1,
         `--apply-list must REFUSE with exit 1 and send nothing (exit 2 there would be a credential ` +
         `failure wearing a refusal's clothes); got ${refused.status} stderr=${refused.stderr}`);
-      assert.match(refused.stderr, new RegExp(`refused: ${A}: need_score must be a whole number 1-5`),
+      assert.match(refused.stderr, new RegExp(`refused: ${A}: need_score must be a whole number 0-5`),
         "printing every refusal, naming the ticket");
       assert.match(refused.stderr, new RegExp(`refused: ${B}: the verdict needs a reason`),
         "and collecting BOTH, not stopping at the first");

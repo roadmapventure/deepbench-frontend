@@ -1,3 +1,4 @@
+// DeepBench v7.0.844 | tests/regression/agt-280-requirement-check.test.mjs | AGT-433 slice 2 -- need_score 0 = PARKED: the validator accepts 0 and refuses -1 (band 0-5).
 // DeepBench v7.0.740 | tests/regression/agt-280-requirement-check.test.mjs | AGT-280 slice 2 --
 // THE CALLER: the gate slice 1 built now has a door, and this is the guard on it.
 //
@@ -195,8 +196,11 @@ async function run() {
       }
       return v.refusals.join(" | ");
     };
-    assert.match(must({ ...base, need_score: 0 }, "need_score 0"), /need_score must be a whole number 1-5/);
-    assert.match(must({ ...base, need_score: 6 }, "need_score 6"), /need_score must be a whole number 1-5/);
+    const parked = validateVerdict({ ...base, need_score: 0 }, ctx);
+    assert.deepEqual(parked.refusals, [], "(AGT-433) a PARKED ticket scored 0 is accepted -- 0 is a score, not an absence");
+    assert.equal(parked.ok, true);
+    assert.match(must({ ...base, need_score: -1 }, "need_score -1"), /need_score must be a whole number 0-5/);
+    assert.match(must({ ...base, need_score: 6 }, "need_score 6"), /need_score must be a whole number 0-5/);
     must({ ...base, need_score: 3.5 }, "need_score 3.5 is not a whole number");
     must({ ...base, need_score: "4" }, "need_score \"4\" is a string, not an integer");
     must({ ...base, need_score: undefined }, "a pass with no need_score at all");
@@ -242,7 +246,7 @@ async function run() {
         `wearing a refusal's clothes); got status ${bad.status} stderr=${bad.stderr}`);
       assert.match(bad.stderr, /refused: ZAGTREQ-1a: the verdict needs a reason/,
         "and must print every refusal, naming the ticket");
-      assert.match(bad.stderr, /refused: ZAGTREQ-1a: need_score must be a whole number 1-5/,
+      assert.match(bad.stderr, /refused: ZAGTREQ-1a: need_score must be a whole number 0-5/,
         "and must collect BOTH refusals, not stop at the first");
       const maybe = cli([`--dry-run=${tmpJson(dir, "maybe.json", { ...base, verdict: "maybe" })}`,
         `--context=${ctxPath}`], naked);

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.844 | scripts/requirement-check.js | AGT-433 slice 2 -- need_score 0 = PARKED: both validators take 0-5 like apply_requirement_verdict() (v7.0.826).
 // DeepBench v7.0.828 | scripts/requirement-check.js | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
 // DeepBench v7.0.743 | scripts/requirement-check.js | AGT-309 -- `--prepare` gains `--home=<slug>`,
 // the destination the manager's review routed this ticket to. The slug is checked HERE, before any
@@ -200,8 +201,8 @@ export function validateVerdict(answer, ctx) {
         `${a.need_source === undefined || a.need_source === null ? "<NULL>" : JSON.stringify(String(a.need_source))}`);
     }
     const score = a.need_score;
-    if (!Number.isInteger(score) || score < 1 || score > 5) {
-      no(`need_score must be a whole number 1-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
+    if (!Number.isInteger(score) || score < 0 || score > 5) {
+      no(`need_score must be a whole number 0-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
     }
   }
   return { ok: refusals.length === 0, refusals };
@@ -364,8 +365,8 @@ export function validateListVerdict(answer, ctx) {
           "John-authored need_source is never replaced (directive 0078af4d)");
       }
       const score = row.need_score;
-      if (!Number.isInteger(score) || score < 1 || score > 5) {
-        no(id, `need_score must be a whole number 1-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
+      if (!Number.isInteger(score) || score < 0 || score > 5) {
+        no(id, `need_score must be a whole number 0-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
       }
     }
   }
