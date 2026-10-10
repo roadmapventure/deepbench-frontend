@@ -1,3 +1,4 @@
+// DeepBench v7.0.845 | tests/regression/agt-280-requirement-gate.test.mjs | AGT-433 slice 3 -- arm D runs the band's cases on an unlocked backlog-intake epic.
 // DeepBench v7.0.826 | tests/regression/agt-280-requirement-gate.test.mjs | AGT-433 slice 1 -- need_score 0 = PARKED: CHECK and writer 0-5.
 // DeepBench v7.0.729 | tests/regression/agt-280-requirement-gate.test.mjs | AGT-280 slice 1 --
 // THE REQUIREMENT GATE: a ticket reaches an EXECUTING project's list only when it cites a need
@@ -162,6 +163,55 @@ async function run() {
   const mkt = await req(url, key, "market_records?select=id&order=id.asc&limit=1");
   assert.ok(mkt.ok, `a market_records id must read; got ${describe(mkt)}`);
 
+  // AGT-433 slice 3: the band's own fixtures, read independently of the executing-epic pick above.
+  // An UNLOCKED `backlog-intake` epic (deterministic, ordered by id -- pattern:127) is a legal home
+  // for these cases: `requirement_gate` fires on epic_project_executing(), so it decides none of
+  // them, and the only thing left to refuse a row is the score itself.
+  const score_epics = await req(url, key,
+    "epics?select=id,name,locked_at,projects!inner(slug,status)&projects.slug=eq.backlog-intake" +
+    "&locked_at=is.null&order=id.asc&limit=1");
+  assert.ok(score_epics.ok, `an UNLOCKED backlog-intake epic must read; got ${describe(score_epics)}`);
+  const SCORE_EPIC = (score_epics.json ?? [])[0] ?? null;
+  const SCORE_MKT = (mkt.json ?? [])[0]?.id ?? null;
+  const SCORE_GOOD = SCORE_MKT ? `nathan:market_records:${SCORE_MKT}` : null;
+
+  // accepted(n, epicId, extra, why): the insert must LAND, carry what it was given, and then be
+  // deleted again. The read-back is what makes this more than "the POST returned 201".
+  const accepted = async (n, epicId, extra, why) => {
+    const r = await req(url, key, "backlog_items",
+      { method: "POST", prefer: "return=representation", body: ticket(n, epicId, extra) });
+    try {
+      assert.ok(r.ok, `${why}: the insert must be accepted; got ${describe(r)}`);
+      const row = Array.isArray(r.json) ? r.json[0] : r.json;
+      assert.equal(row.epic_id, epicId, `${why}: the row must land on the epic it named`);
+      assert.equal(row.need_source, extra.need_source ?? null,
+        `${why}: the row must carry the need_source it was given`);
+      assert.equal(row.need_score, extra.need_score ?? null,
+        `${why}: the row must read back the need_score it was given -- 0 is a score, not an absence`);
+    } finally {
+      const del = await req(url, key, `backlog_items?backlog_id=eq.${FIXTURE_PREFIX}-${n}`, { method: "DELETE" });
+      assert.ok(del.ok, `${why}: the fixture row must be deleted again; got ${describe(del)}`);
+    }
+  };
+
+  // refusedScore(n, epicId, s): AGT-433's band, from the TABLE's side. The source is traceable and
+  // `discovered` is legal here, so the only thing left to refuse the row is the score itself:
+  // 6 and -1 trip `ck_backlog_need_score` (23514), and 2.5 never reaches a constraint at all --
+  // PostgREST casts the body first and `'2.5'::smallint` is 22P02, which is why the whole-number
+  // case asserts "not accepted" rather than a constraint name it cannot produce.
+  const refusedScore = async (n, epicId, s) => {
+    const why = `(AGT-433) need_score ${s} must not land on a ticket`;
+    const r = await req(url, key, "backlog_items", { method: "POST", body: ticket(n, epicId, { need_source: SCORE_GOOD, need_score: s }) });
+    if (r.ok) {
+      await req(url, key, `backlog_items?backlog_id=eq.${FIXTURE_PREFIX}-${n}`, { method: "DELETE" });
+      assert.fail(`${why}: the insert SUCCEEDED -- the CHECK took a score outside 0-5`);
+    }
+    assert.ok(s === 2.5 || r.text.includes("ck_backlog_need_score"),
+      `${why}: it must be ck_backlog_need_score that refused it (not another guard); got ${describe(r)}`);
+    const left = await req(url, key, `backlog_items?select=id&backlog_id=eq.${FIXTURE_PREFIX}-${n}`);
+    assert.deepEqual(left.json, [], `${why}: a refused insert must leave no row`);
+  };
+
   if (!usable.length || !(intake.json ?? []).length || !(mkt.json ?? []).length) {
     notRun("AGT-280 arms A and B",
       `the live fixtures this gate is measured against are not all present right now ` +
@@ -197,43 +247,6 @@ async function run() {
         assert.deepEqual(left.json, [], `${why}: a refused insert must leave no row`);
       };
 
-      // accepted(n, epicId, extra, why): the insert must LAND, carry what it was given, and then be
-      // deleted again. The read-back is what makes this more than "the POST returned 201".
-      const accepted = async (n, epicId, extra, why) => {
-        const r = await req(url, key, "backlog_items",
-          { method: "POST", prefer: "return=representation", body: ticket(n, epicId, extra) });
-        try {
-          assert.ok(r.ok, `${why}: the insert must be accepted; got ${describe(r)}`);
-          const row = Array.isArray(r.json) ? r.json[0] : r.json;
-          assert.equal(row.epic_id, epicId, `${why}: the row must land on the epic it named`);
-          assert.equal(row.need_source, extra.need_source ?? null,
-            `${why}: the row must carry the need_source it was given`);
-          assert.equal(row.need_score, extra.need_score ?? null,
-            `${why}: the row must read back the need_score it was given -- 0 is a score, not an absence`);
-        } finally {
-          const del = await req(url, key, `backlog_items?backlog_id=eq.${FIXTURE_PREFIX}-${n}`, { method: "DELETE" });
-          assert.ok(del.ok, `${why}: the fixture row must be deleted again; got ${describe(del)}`);
-        }
-      };
-
-      // refusedScore(n, s): AGT-433's band, from the TABLE's side. The source is traceable and
-      // `discovered` is legal here, so the only thing left to refuse the row is the score itself:
-      // 6 and -1 trip `ck_backlog_need_score` (23514), and 2.5 never reaches a constraint at all --
-      // PostgREST casts the body first and `'2.5'::smallint` is 22P02, which is why the whole-number
-      // case asserts "not accepted" rather than a constraint name it cannot produce.
-      const refusedScore = async (n, s) => {
-        const why = `(AGT-433) need_score ${s} must not land on a ticket`;
-        const r = await req(url, key, "backlog_items", { method: "POST", body: ticket(n, EPIC, { need_source: GOOD, need_score: s }) });
-        if (r.ok) {
-          await req(url, key, `backlog_items?backlog_id=eq.${FIXTURE_PREFIX}-${n}`, { method: "DELETE" });
-          assert.fail(`${why}: the insert SUCCEEDED -- the CHECK took a score outside 0-5`);
-        }
-        assert.ok(s === 2.5 || r.text.includes("ck_backlog_need_score"),
-          `${why}: it must be ck_backlog_need_score that refused it (not another guard); got ${describe(r)}`);
-        const left = await req(url, key, `backlog_items?select=id&backlog_id=eq.${FIXTURE_PREFIX}-${n}`);
-        assert.deepEqual(left.json, [], `${why}: a refused insert must leave no row`);
-      };
-
       // (i) THE GAP ITSELF. No source at all, `discovered`, into an executing project's epic.
       //     On the unchanged tree this SUCCEEDS -- that is the defect, not a passing case.
       await refused(1, {}, "(i) a discovered ticket with NO need_source");
@@ -260,16 +273,8 @@ async function run() {
       await accepted(6, INTAKE_EPIC, {},
         "(vi) the same source-less discovered row into the backlog-intake epic");
 
-      // (vii) AGT-433's DISCRIMINATOR. A ticket John has judged valid but EARLY is a 0, and 0 is a
-      //       score the table has to keep -- on the unchanged tree this case is 23514
-      //       `ck_backlog_need_score` and this arm exits 1 here. The band's two ends and the
-      //       whole-number rule follow it, so widening the floor cannot quietly open the ceiling.
-      await accepted(7, EPIC, { need_source: GOOD, need_score: 0 },
-        "(vii) AGT-433: a PARKED ticket scored 0 lands and reads back 0");
-      for (const [n, s] of [[8, 6], [9, -1], [10, 2.5]]) await refusedScore(n, s);
-
       assert.equal(await count(url, key, "backlog_items?select=id"), before,
-        "ZERO RESIDUE: backlog_items' exact count must re-read unmoved after all ten cases");
+        "ZERO RESIDUE: backlog_items' exact count must re-read unmoved after all six cases");
       console.log(`    [AGT-280 arm A] epic ${EPIC_NAME} (${EPIC}), market_records ${MKT}, ` +
         `backlog_items ${before} before and after`);
     });
@@ -320,6 +325,26 @@ async function run() {
         `a pass verdict on an UNTRACEABLE need_source must raise before it writes; got ${describe(untraceable)}`);
       assert.ok(untraceable.text.includes("AGT-280:"),
         `and must refuse in AGT-280's own words; got ${describe(untraceable)}`);
+    });
+  }
+
+  if (!SCORE_EPIC || !SCORE_MKT) {
+    notRun("AGT-433 arm D", `unlocked backlog-intake epics: ${(score_epics.json ?? []).length}, ` +
+      `market_records rows: ${(mkt.json ?? []).length} -- a substitute measures something else`);
+  } else {
+    // AGT-433 slice 3: the band's cases, OUTSIDE the executing-epic gate that kept them inert for
+    // two slices. Each one cites a traceable source or is refused before the row lands, so
+    // `requirement_gate` decides none of them -- which is why an intake epic is a legal home.
+    await arm("D AGT-433's band, the table and the writer", async () => {
+      const before = await count(url, key, "backlog_items?select=id");
+
+      // (vii) AGT-433's DISCRIMINATOR. A ticket John has judged valid but EARLY is a 0, and 0 is a
+      //       score the table has to keep -- on the unchanged tree this case is 23514
+      //       `ck_backlog_need_score` and this arm exits 1 here. The band's two ends and the
+      //       whole-number rule follow it, so widening the floor cannot quietly open the ceiling.
+      await accepted(7, SCORE_EPIC.id, { need_source: SCORE_GOOD, need_score: 0, priority_class: null },
+        "(vii) AGT-433: a PARKED ticket scored 0 lands and reads back 0");
+      for (const [n, s] of [[8, 6], [9, -1], [10, 2.5]]) await refusedScore(n, SCORE_EPIC.id, s);
 
       // AGT-433: the WRITER's band, the other half of (vii). Both of its score guards raise with
       // errcode check_violation after the ticket lookup and the traceability check but BEFORE
@@ -330,12 +355,17 @@ async function run() {
       for (const s of [6, -1, 2.5]) {
         const r = await rpc(url, key, "apply_requirement_verdict", {
           p_cycle: null, p_session: "agt-280-test",
-          p: { verdict: "pass", backlog_id: any, need_source: GOOD, need_score: s, reason: "probe" },
+          p: { verdict: "pass", backlog_id: any, need_source: SCORE_GOOD, need_score: s, reason: "probe" },
         });
         assert.ok(!r.ok, `a pass verdict scoring ${s} must raise before it writes; got ${describe(r)}`);
         assert.ok(r.text.includes("0-5"),
           `and must refuse in the writer's own 0-5 words (AGT-433 widened both guards); got ${describe(r)}`);
       }
+
+      assert.equal(await count(url, key, "backlog_items?select=id"), before,
+        "ZERO RESIDUE: backlog_items' count must re-read unmoved after AGT-433's four cases");
+      console.log(`    [AGT-433 arm D] intake epic ${SCORE_EPIC.name} (${SCORE_EPIC.id}), ` +
+        `market_records ${SCORE_MKT}, backlog_items ${before} before and after`);
     });
   }
 
