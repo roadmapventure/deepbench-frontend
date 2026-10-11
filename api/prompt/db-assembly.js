@@ -1,3 +1,17 @@
+// DeepBench v7.0.850 | api/prompt/db-assembly.js | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
+// A Skill every call of an agent must carry is pinned ONCE at AGENT level and read here, instead of
+// being linked to every one of that agent's capabilities: `deepbench-north-star` held 49
+// `capability_skill_profiles` links over 11 agents, and the agent-wide path below (no
+// capability_slug) pushes every assigned capability's links with no slug check -- so Jerry's prompt
+// carried the same north star 12 times, Nathan's 11 and the Designer's 2 (measured live 2026-10-11
+// through this function). assemblePrompt() now reads `agent_skill_pins` AFTER the signature snapshot
+// (a pin is agent configuration, and the SS19k signature is agent-agnostic --
+// .claude/rules/ai-pattern-signature.md) and merges through the new pure mergePinnedSkills(), where
+// a PIN WINS over a loaded link of the same slug -- so the pinned Skill renders exactly once in both
+// paths whether or not those links still exist, which is what makes this half correct on its own and
+// therefore safe to land before the links are removed. An agent with no pin row assembles
+// byte-identical. A failed pins read warns and assembles without the pin (pattern:105: a config read
+// never breaks the product path). Names no agent and no slug (.claude/rules/capabilities-are-data.md).
 // DeepBench v7.0.774 | api/prompt/db-assembly.js | DAT-004 -- what a trainer taught an agent is now
 // in every prompt assembled for that agent. assemblePrompt() reads the agent's own taught rows
 // through the one shared reader (lib/read-taught.js) and adds one stable section, `taught`, at
@@ -555,6 +569,54 @@ export function buildTaughtSection(shaped) {
   };
 }
 
+// FEATURE: AGT-434 -- the ONE merge of an agent's pinned Skills into the set assemblePrompt() loaded
+// from capabilities. PURE on purpose: no fetch, no env, no clock, so arm A of
+// tests/regression/agt-434-agent-skill-pins.test.mjs grades the rule itself rather than a round trip.
+// THE RULE IS "PINNED WINS", and each clause is a measured case:
+//   * every loaded row whose slug is pinned is DROPPED, and ONE pin row takes its place -- the pin is
+//     the agent-level statement of that Skill, so a capability link of the same slug can never be the
+//     reason it renders twice. This is what makes the assembler half correct on its own: with the 49
+//     interim links still present, jerry's agent-wide prompt carries the north star ONCE, not 12
+//     times, so this half is safe to land before Part 2 removes them (order is safety: remove the
+//     links first and every pinned agent loses the Skill until this ships);
+//   * two pin rows naming one slug add it ONCE, in pin order -- the unique key makes one per
+//     tenant/agent/slug, but a widened read could still return a second, and it must not double a
+//     section;
+//   * pinned rows go FIRST: buildSections() emits one section per row in array order and all
+//     Knowledge rows share one `order`, so array position is what puts the pinned Skill first among
+//     BACKGROUND KNOWLEDGE -- matching the display_order 0 the interim links carried, so no pinned
+//     agent's section order changes;
+//   * nothing added returns the SAME array, so an agent with no pin row assembles byte-identical
+//     (susan: 0 north-star sections before this ticket and 0 after).
+// `pinned: true` marks the row's provenance for a later reader; `source_capability_slug: null` is the
+// honest answer to "which capability brought this in" -- none did, the agent did. `level`/`skill_level`
+// are consumed only for the fired Intent, so a Knowledge pin carrying null changes no rendered text.
+export function mergePinnedSkills(skillProfiles, pins) {
+  const loaded = Array.isArray(skillProfiles) ? skillProfiles : [];
+  const rows = Array.isArray(pins) ? pins : [];
+  if (!rows.length) return loaded;
+
+  const pinnedSlugs = new Set();
+  const added = [];
+  for (const pin of rows) {
+    const profile = pin?.skill_profiles;
+    const slug = profile?.slug;
+    if (!slug || pinnedSlugs.has(slug)) continue;
+    pinnedSlugs.add(slug);
+    added.push({
+      ...profile,
+      pinned: true,
+      source_capability_slug: null,
+      level: null,
+      skill_level: null,
+      is_required: true,
+      display_order: pin.display_order,
+    });
+  }
+  if (!added.length) return loaded;
+  return [...added, ...loaded.filter(sp => !pinnedSlugs.has(sp?.slug))];
+}
+
 // FEATURE: SES-341 -- the ONE renderer for an inline Knowledge Skill's text, exported so
 // api/prompt/ai-enrichment.js's fetchSection() renders the executor's copy from the SAME function
 // buildSections() already used to fill `content`. A second copy in the enrichment file would be
@@ -765,6 +827,23 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
   // capability's own config only (agent-agnostic), never the enrichment capability's skills. Taken
   // after the fired-intent filter above so it inherits the correct intent scoping for free.
   const signatureConfig = buildSignatureConfig(skillProfiles, { capability_slug, execution_type: executionType });
+
+  // FEATURE: AGT-434 -- the agent's PINNED Skills, read once, AFTER the signature snapshot above.
+  // The order is the ticket's: the SS19k runtime signature is the primary capability's own config and
+  // is agent-agnostic (.claude/rules/ai-pattern-signature.md -- never an agent-specific input), and a
+  // pin is agent configuration, so a pinned Skill must NOT enter `assembled_skill_slugs`. Moving this
+  // block one line up would put it there and change every pinned agent's signature.
+  // ONE read, on `agent_id` alone, so the capability path and the agent-wide path both get it; the
+  // merge drops a loaded row of the same slug, so neither path can render a pinned Skill twice. A
+  // failed read warns and assembles without the pin rather than failing the call.
+  if (agent_id) {
+    const pinR = await fetch(
+      `${supabaseUrl}/rest/v1/agent_skill_pins?tenant_id=eq.${encodeURIComponent(tenant_id)}&agent_id=eq.${encodeURIComponent(agent_id)}&select=display_order,skill_profiles(*)&order=display_order.asc`,
+      { headers }
+    );
+    if (pinR.ok) skillProfiles = mergePinnedSkills(skillProfiles, await pinR.json() || []);
+    else console.warn('[db-assembly] pins read failed:', pinR.status);
+  }
 
   // FEATURE: BUG-17 — load enrichment capability skill profiles (e.g. dan-ai-enrichment)
   // These profiles contribute technical_services triggers (reflect, synthesis) with Dan's authored prompts.

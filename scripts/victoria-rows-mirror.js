@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.850 | scripts/victoria-rows-mirror.js | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
 // DeepBench v7.0.849 | scripts/victoria-rows-mirror.js | AGT-453 -- EXPECTED_BINDINGS + bindingDrift(): the one hand-written list of the requirement-check bindings; agt-281 and agt-452 import it.
 // DeepBench v7.0.848 | scripts/victoria-rows-mirror.js | AGT-452 -- THE REPO'S RECORD OF VICTORIA'S
 // ROWS, GENERATED FROM A READ.
@@ -84,12 +85,14 @@ export const BCOLS = ["capability_slug", "skill_profile_slug", "level", "is_requ
 
 export const CAPABILITY = "requirement-check";
 
-// §2's six bindings of `requirement-check`, in `display_order`. HAND-WRITTEN on purpose, and this is
-// the ONE place in the repo that writes them down (AGT-453): derived from a read of the live rows it
-// would make every guard that imports it assert that the rows equal themselves. AGT-434 (which
-// removes the north-star link) edits THIS array and nothing else, then runs `--write`.
+// §2's five bindings of `requirement-check`, in `display_order` -- six until AGT-434. HAND-WRITTEN
+// on purpose, and this is the ONE place in the repo that writes them down (AGT-453): derived from a
+// read of the live rows it would make every guard that imports it assert that the rows equal
+// themselves. AGT-434 removed the north-star link and renumbered the five survivors to
+// display_order 0..4 under its own decision, so this array lost its first slug and `--write`
+// regenerated the record from it.
 export const EXPECTED_BINDINGS = [
-  "deepbench-north-star", "vc-requirement-intent", "vc-reorganize-intent",
+  "vc-requirement-intent", "vc-reorganize-intent",
   "vc-process-break-class", "vc-john-severity-tree", "vc-prioritization-duty",
 ];
 

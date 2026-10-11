@@ -1,16 +1,20 @@
 -- AGT-452 (v7.0.848) -- THE REPO'S RECORD OF VICTORIA'S ROWS.
 --
 -- WHAT IS RECORDED HERE. The four `skill_profiles` rows that carry Victoria Chen's prioritization
--- rules, and the six ordered `capability_skill_profiles` rows that bind the `requirement-check`
+-- rules, and the five ordered `capability_skill_profiles` rows that bind the `requirement-check`
 -- capability to them. Read live 2026-10-11, tree `969c68bc`:
 --   skill_profiles            vc-john-severity-tree   (knowledge)  method 16,212 chars
 --                             vc-prioritization-duty  (knowledge)  method  3,079 chars
 --                             vc-requirement-intent   (intent)     method  1,426 chars
 --                             vc-reorganize-intent    (intent)     method  2,209 chars
---   capability_skill_profiles requirement-check, display_order 0-5: deepbench-north-star,
+--   capability_skill_profiles requirement-check, display_order 0-4:
 --                             vc-requirement-intent, vc-reorganize-intent, vc-process-break-class,
 --                             vc-john-severity-tree, vc-prioritization-duty -- all level 3, all
---                             required.
+--                             required. SIX until AGT-434 (v7.0.850): `deepbench-north-star` sat at
+--                             display_order 0 and was removed with its other 48 capability links,
+--                             replaced by one agent-level `agent_skill_pins` row per agent, and
+--                             these five were renumbered 1-5 -> 0-4 under that removal's own
+--                             decision so each line's display_order is still its index.
 --   `updated_at` was NULL on all four at this reading, and is still NULL after it: see below.
 --
 -- WHY IT EXISTS. Before this file, no tracked file carried the text of `vc-john-severity-tree`,
@@ -317,41 +321,36 @@ WHAT HER TOOLS DO TODAY (not John's words): the list door (--prepare-list / --ap
   if r.temperature is distinct from NULL
     then raise exception 'AGT-452 drift: vc-reorganize-intent.temperature'; end if;
 
-  -- capability_skill_profiles · requirement-check · deepbench-north-star · display_order 0
+  -- capability_skill_profiles · requirement-check · vc-requirement-intent · display_order 0
   select count(*) into n from public.capability_skill_profiles where
-    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$deepbench-north-star$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 0;
-  if n <> 1 then raise exception 'AGT-452 drift: binding deepbench-north-star'; end if;
-
-  -- capability_skill_profiles · requirement-check · vc-requirement-intent · display_order 1
-  select count(*) into n from public.capability_skill_profiles where
-    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-requirement-intent$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 1;
+    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-requirement-intent$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 0;
   if n <> 1 then raise exception 'AGT-452 drift: binding vc-requirement-intent'; end if;
 
-  -- capability_skill_profiles · requirement-check · vc-reorganize-intent · display_order 2
+  -- capability_skill_profiles · requirement-check · vc-reorganize-intent · display_order 1
   select count(*) into n from public.capability_skill_profiles where
-    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-reorganize-intent$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 2;
+    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-reorganize-intent$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 1;
   if n <> 1 then raise exception 'AGT-452 drift: binding vc-reorganize-intent'; end if;
 
-  -- capability_skill_profiles · requirement-check · vc-process-break-class · display_order 3
+  -- capability_skill_profiles · requirement-check · vc-process-break-class · display_order 2
   select count(*) into n from public.capability_skill_profiles where
-    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-process-break-class$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 3;
+    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-process-break-class$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 2;
   if n <> 1 then raise exception 'AGT-452 drift: binding vc-process-break-class'; end if;
 
-  -- capability_skill_profiles · requirement-check · vc-john-severity-tree · display_order 4
+  -- capability_skill_profiles · requirement-check · vc-john-severity-tree · display_order 3
   select count(*) into n from public.capability_skill_profiles where
-    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-john-severity-tree$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 4;
+    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-john-severity-tree$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 3;
   if n <> 1 then raise exception 'AGT-452 drift: binding vc-john-severity-tree'; end if;
 
-  -- capability_skill_profiles · requirement-check · vc-prioritization-duty · display_order 5
+  -- capability_skill_profiles · requirement-check · vc-prioritization-duty · display_order 4
   select count(*) into n from public.capability_skill_profiles where
-    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-prioritization-duty$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 5;
+    capability_slug is not distinct from $r452$requirement-check$r452$ and skill_profile_slug is not distinct from $r452$vc-prioritization-duty$r452$ and level is not distinct from 3 and is_required is not distinct from true and display_order is not distinct from 4;
   if n <> 1 then raise exception 'AGT-452 drift: binding vc-prioritization-duty'; end if;
 
-  -- and nothing else is bound to the capability: 6 is the whole list.
+  -- and nothing else is bound to the capability: 5 is the whole list.
   select count(*) into n from public.capability_skill_profiles
     where capability_slug is not distinct from $r452$requirement-check$r452$;
-  if n <> 6 then raise exception 'AGT-452 drift: requirement-check binds % profiles, the record says 6', n; end if;
+  if n <> 5 then raise exception 'AGT-452 drift: requirement-check binds % profiles, the record says 5', n; end if;
 
-  raise notice 'AGT-452: 4 rows and 6 bindings match the record';
+  raise notice 'AGT-452: 4 rows and 5 bindings match the record';
 end $agt452$;
 -- AGT-452 RECORD END

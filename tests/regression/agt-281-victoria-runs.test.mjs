@@ -1,3 +1,4 @@
+// DeepBench v7.0.850 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
 // DeepBench v7.0.849 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-453 -- arm F re-pinned to EXPECTED_BINDINGS, six in display_order, two-direction via bindingDrift(); arm A proves missing/extra/duplicate/order each refuse.
 // DeepBench v7.0.844 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-433 slice 2 -- need_score 0 = PARKED: the validator accepts 0 and refuses -1 (band 0-5).
 // DeepBench v7.0.828 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
@@ -193,24 +194,28 @@ async function run() {
     // and `bindingDrift()` is the instrument arm F grades the live rows with. Prove the instrument
     // here, offline and in BOTH directions -- a happy-path-only assertion would also pass on a
     // detector that returned null for everything, which is the defect AGT-453 removes.
-    assert.equal(EXPECTED_BINDINGS.length, 6,
-      "six bindings of requirement-check, in display_order (scripts/victoria-rows-mirror.js)");
-    const SIX = EXPECTED_BINDINGS.map((s, i) => ({ skill_profile_slug: s, display_order: i }));
-    assert.equal(bindingDrift(SIX), null, "the expected six, in order, is no drift");
+    // AGT-434: five, not six -- the north-star link that sat at display_order 0 was removed with the
+    // other 48 and replaced by one agent-level pin, and the five survivors were renumbered to 0..4
+    // under that removal's own decision. The count and the first slug are both re-pinned here rather
+    // than the guard loosened to accept any offset (pattern:166).
+    assert.equal(EXPECTED_BINDINGS.length, 5,
+      "five bindings of requirement-check, in display_order (scripts/victoria-rows-mirror.js)");
+    const FIVE = EXPECTED_BINDINGS.map((s, i) => ({ skill_profile_slug: s, display_order: i }));
+    assert.equal(bindingDrift(FIVE), null, "the expected five, in order, is no drift");
     const refusals = {
-      missing: bindingDrift(SIX.slice(1)),
-      extra: bindingDrift([...SIX, { skill_profile_slug: "vc-extra", display_order: 6 }]),
-      duplicate: bindingDrift([...SIX, { skill_profile_slug: "vc-reorganize-intent", display_order: 6 }]),
-      order: bindingDrift([{ ...SIX[0], display_order: 1 }, { ...SIX[1], display_order: 0 }, ...SIX.slice(2)]),
+      missing: bindingDrift(FIVE.slice(1)),
+      extra: bindingDrift([...FIVE, { skill_profile_slug: "vc-extra", display_order: 5 }]),
+      duplicate: bindingDrift([...FIVE, { skill_profile_slug: "vc-reorganize-intent", display_order: 5 }]),
+      order: bindingDrift([{ ...FIVE[0], display_order: 1 }, { ...FIVE[1], display_order: 0 }, ...FIVE.slice(2)]),
     };
-    assert.ok(refusals.missing?.startsWith("missing deepbench-north-star"),
+    assert.ok(refusals.missing?.startsWith("missing vc-requirement-intent"),
       `a MISSING binding must refuse, naming the slug; got ${refusals.missing}`);
     assert.ok(refusals.extra?.startsWith("extra vc-extra"),
       `an EXTRA binding must refuse, naming the slug; got ${refusals.extra}`);
     assert.ok(refusals.duplicate?.startsWith("duplicate vc-reorganize-intent"),
       `a binding bound TWICE must refuse, naming the slug; got ${refusals.duplicate}`);
     assert.ok(refusals.order?.startsWith("order: position 0"),
-      `the right six in the WRONG ORDER must refuse, naming the position; got ${refusals.order}`);
+      `the right five in the WRONG ORDER must refuse, naming the position; got ${refusals.order}`);
     assert.equal(LIST_PREFIX, "SCHEDULED-AGENT: victoria-reorg", "the run's signature in runner_cycles.notes");
     assert.deepEqual([...HELD_LISTS], ["builder-found-tickets"], "the one held list");
     assert.equal(HEAD_CHARS, 200, "heads, not bodies (the Designer's call (b))");
