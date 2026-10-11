@@ -1,3 +1,4 @@
+// DeepBench v7.0.849 | tests/regression/agt-452-victoria-rows.test.mjs | AGT-453 -- EXPECTED_BINDINGS imported from scripts/victoria-rows-mirror.js (one home).
 // DeepBench v7.0.848 | tests/regression/agt-452-victoria-rows.test.mjs | AGT-452 -- THE DRIFT
 // DETECTOR ON THE REPO'S RECORD OF VICTORIA'S ROWS.
 //
@@ -45,21 +46,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
-  SLUGS, PCOLS, BCOLS, CAPABILITY, TAG, BEGIN, END, FILE,
+  SLUGS, PCOLS, BCOLS, CAPABILITY, TAG, BEGIN, END, FILE, EXPECTED_BINDINGS,
   LIT, renderRecord, extractSection, fetchRows, compare,
 } from "../../scripts/victoria-rows-mirror.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RUNBOOK_REL = "docs/runbooks/victoria-reorg.md";
 const read = rel => fs.readFileSync(path.join(REPO, rel), "utf8").replace(/\r\n/g, "\n");
-
-// §2's six bindings, in display_order. The one list in this file written by hand -- it is the
-// EXPECTATION arm B grades the live rows against, so deriving it from the live rows would make the
-// arm assert that the rows equal themselves.
-const EXPECTED_BINDINGS = [
-  "deepbench-north-star", "vc-requirement-intent", "vc-reorganize-intent",
-  "vc-process-break-class", "vc-john-severity-tree", "vc-prioritization-duty",
-];
 
 // The two cross-file strings arm C grades, and the sentence the prompt block must still carry.
 const STAMP = "<!-- DeepBench v7.0.848 | runbooks/victoria-reorg.md | AGT-452 — the rows the duty reads have a repo record, docs/design/agt-452-victoria-rows.sql (scripts/victoria-rows-mirror.js --write; guard tests/regression/agt-452-victoria-rows.test.mjs). It writes no row; the block below is byte-unchanged. -->";

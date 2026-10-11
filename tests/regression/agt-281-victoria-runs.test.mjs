@@ -1,3 +1,4 @@
+// DeepBench v7.0.849 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-453 -- arm F re-pinned to EXPECTED_BINDINGS, six in display_order, two-direction via bindingDrift(); arm A proves missing/extra/duplicate/order each refuse.
 // DeepBench v7.0.844 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-433 slice 2 -- need_score 0 = PARKED: the validator accepts 0 and refuses -1 (band 0-5).
 // DeepBench v7.0.828 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
 // DeepBench v7.0.778 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-304 slice 3 -- re-pin arm F twice: requirement-check now binds a third Intent, vc-process-break-class (AGT-309 v7.0.743, agent-row decision 54d80a6a), and the AGT-281 agent-row decision is pinned by id e2c0d503 rather than newest-first, which SES-114's act 9ee2fe9b now wins; nothing weakened.
@@ -81,6 +82,7 @@ import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 import {
   renderBlock, renderVictoriaList, asOf, VICTORIA_PREFIX, VICTORIA_RUNS_READ,
 } from "../../scripts/render-standing-brief.js";
+import { EXPECTED_BINDINGS, bindingDrift } from "../../scripts/victoria-rows-mirror.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CLI = path.join(REPO, "scripts", "requirement-check.js");
@@ -187,6 +189,28 @@ async function run() {
   // ---- A. OFFLINE: the constants, runLine(), validateListVerdict(), and two doors --------------
   await arm("A the list validator and the two doors, zero network", async () => {
     assert.equal(LIST_INTENT, "vc-reorganize-intent", "the list turn fires the sibling Intent by name");
+    // AGT-453: the ONE hand-written list of this capability's bindings lives in the mirror module,
+    // and `bindingDrift()` is the instrument arm F grades the live rows with. Prove the instrument
+    // here, offline and in BOTH directions -- a happy-path-only assertion would also pass on a
+    // detector that returned null for everything, which is the defect AGT-453 removes.
+    assert.equal(EXPECTED_BINDINGS.length, 6,
+      "six bindings of requirement-check, in display_order (scripts/victoria-rows-mirror.js)");
+    const SIX = EXPECTED_BINDINGS.map((s, i) => ({ skill_profile_slug: s, display_order: i }));
+    assert.equal(bindingDrift(SIX), null, "the expected six, in order, is no drift");
+    const refusals = {
+      missing: bindingDrift(SIX.slice(1)),
+      extra: bindingDrift([...SIX, { skill_profile_slug: "vc-extra", display_order: 6 }]),
+      duplicate: bindingDrift([...SIX, { skill_profile_slug: "vc-reorganize-intent", display_order: 6 }]),
+      order: bindingDrift([{ ...SIX[0], display_order: 1 }, { ...SIX[1], display_order: 0 }, ...SIX.slice(2)]),
+    };
+    assert.ok(refusals.missing?.startsWith("missing deepbench-north-star"),
+      `a MISSING binding must refuse, naming the slug; got ${refusals.missing}`);
+    assert.ok(refusals.extra?.startsWith("extra vc-extra"),
+      `an EXTRA binding must refuse, naming the slug; got ${refusals.extra}`);
+    assert.ok(refusals.duplicate?.startsWith("duplicate vc-reorganize-intent"),
+      `a binding bound TWICE must refuse, naming the slug; got ${refusals.duplicate}`);
+    assert.ok(refusals.order?.startsWith("order: position 0"),
+      `the right six in the WRONG ORDER must refuse, naming the position; got ${refusals.order}`);
     assert.equal(LIST_PREFIX, "SCHEDULED-AGENT: victoria-reorg", "the run's signature in runner_cycles.notes");
     assert.deepEqual([...HELD_LISTS], ["builder-found-tickets"], "the one held list");
     assert.equal(HEAD_CHARS, 200, "heads, not bodies (the Designer's call (b))");
@@ -518,10 +542,11 @@ async function run() {
         "capability_skill_profiles?capability_slug=eq.requirement-check&select=skill_profile_slug,level,display_order,is_required&order=display_order.asc");
       assert.ok(bind.ok, `the bindings must read; got ${describe(bind)}`);
       const slugs = (bind.json ?? []).map(b => b.skill_profile_slug);
-      assert.deepEqual(slugs, ["vc-requirement-intent", "vc-reorganize-intent", "vc-process-break-class"],
-        "BOTH DIRECTIONS: the new intent is bound AND the AGT-280 one still is; the third, vc-process-break-class, is AGT-309 v7.0.743 (agent-row decision 54d80a6a) -- a migration that " +
-        `replaced rather than joined would read as a pass on the new row alone; got ${JSON.stringify(slugs)}`);
-      assert.equal(bind.json[1].level, 3, "same depth as its sibling");
+      const drift = bindingDrift(bind.json ?? []);
+      assert.equal(drift, null,
+        "BOTH DIRECTIONS (AGT-453): the live requirement-check bindings must be EXPECTED_BINDINGS in " +
+        `display_order -- ${drift}; got ${JSON.stringify(slugs)}`);
+      assert.equal(bind.json.find(b => b.skill_profile_slug === LIST_INTENT).level, 3, "same depth as its sibling");
 
       const dec = await req(url, key,
         "runner_decisions?id=eq.e2c0d503-9514-4bf9-aa06-68c2ef4af4ac&kind=eq.agent-row&backlog_id=eq.AGT-281&select=id,summary");

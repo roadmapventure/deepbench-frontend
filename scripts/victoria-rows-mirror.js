@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.849 | scripts/victoria-rows-mirror.js | AGT-453 -- EXPECTED_BINDINGS + bindingDrift(): the one hand-written list of the requirement-check bindings; agt-281 and agt-452 import it.
 // DeepBench v7.0.848 | scripts/victoria-rows-mirror.js | AGT-452 -- THE REPO'S RECORD OF VICTORIA'S
 // ROWS, GENERATED FROM A READ.
 //
@@ -82,6 +83,39 @@ export const PCOLS = [
 export const BCOLS = ["capability_slug", "skill_profile_slug", "level", "is_required", "display_order"];
 
 export const CAPABILITY = "requirement-check";
+
+// §2's six bindings of `requirement-check`, in `display_order`. HAND-WRITTEN on purpose, and this is
+// the ONE place in the repo that writes them down (AGT-453): derived from a read of the live rows it
+// would make every guard that imports it assert that the rows equal themselves. AGT-434 (which
+// removes the north-star link) edits THIS array and nothing else, then runs `--write`.
+export const EXPECTED_BINDINGS = [
+  "deepbench-north-star", "vc-requirement-intent", "vc-reorganize-intent",
+  "vc-process-break-class", "vc-john-severity-tree", "vc-prioritization-duty",
+];
+
+// null when `bindings` is exactly `expected` in `display_order`; otherwise ONE string naming the
+// FIRST drift, in this order: `missing <slugs>` (expected, not live), `extra <slugs>` (live, not
+// expected), `duplicate <slugs>` (bound twice), `order: position <i> is <live>, expected <slug>`.
+// TWO-DIRECTION by construction -- a missing binding and an extra one are different messages, so
+// neither can pass as the other, which the one-direction deepEqual this replaced could not say.
+// Pure: no network, no fs, and it writes no row. Reads only `skill_profile_slug`/`display_order`.
+export function bindingDrift(bindings, expected = EXPECTED_BINDINGS) {
+  const live = [...(bindings ?? [])]
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    .map(b => b.skill_profile_slug);
+  const uniq = a => [...new Set(a)];
+  const missing = expected.filter(s => !live.includes(s));
+  if (missing.length) return `missing ${uniq(missing).join(", ")}`;
+  const extra = live.filter(s => !expected.includes(s));
+  if (extra.length) return `extra ${uniq(extra).join(", ")}`;
+  const twice = live.filter((s, i) => live.indexOf(s) !== i);
+  if (twice.length) return `duplicate ${uniq(twice).join(", ")}`;
+  const name = s => (s === undefined ? "<nothing>" : s);
+  for (let i = 0; i < Math.max(live.length, expected.length); i++) {
+    if (live[i] !== expected[i]) return `order: position ${i} is ${name(live[i])}, expected ${name(expected[i])}`;
+  }
+  return null;
+}
 
 // The three jsonb columns. They are rendered as JSON text cast to jsonb, so the comparison is a jsonb
 // comparison and key order on either side is not drift.
