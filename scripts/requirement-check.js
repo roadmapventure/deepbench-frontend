@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.846 | scripts/requirement-check.js | AGT-450 -- a john: source homes into ANY executing project.
 // DeepBench v7.0.844 | scripts/requirement-check.js | AGT-433 slice 2 -- need_score 0 = PARKED: both validators take 0-5 like apply_requirement_verdict() (v7.0.826).
 // DeepBench v7.0.828 | scripts/requirement-check.js | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
 // DeepBench v7.0.743 | scripts/requirement-check.js | AGT-309 -- `--prepare` gains `--home=<slug>`,
@@ -489,11 +490,22 @@ async function prepare(args) {
   //     locked list is refused for nothing rather than after a turn is spent and the function's
   //     UPDATE rolls the whole verdict back. A missing row and a present-but-wrong row are the same
   //     refusal: neither is a list a ticket may be moved onto.
+  //
+  //     AGT-450: `accepts_findings` is not the only door. A need_source JOHN HIMSELF wrote is John
+  //     naming the ticket, and `epic_lock_guard()` has always admitted his naming outright
+  //     (`scope_origin = 'john-named'` returns NEW before the lock is read) -- so for a `john:`
+  //     source the lock will NOT refuse the move and refusing it here would be this file inventing
+  //     a condition the database does not hold. `executing` still holds for every source, and so
+  //     does the writer's one-epic rule: a project that is not running is not a destination at all.
+  //     The first segment is the whole test (`parsed.who`), never a list of tables kept here --
+  //     `runner_settings.need_source_kinds` above is the data that says which `john:` tables exist.
   if (home !== "") {
+    const johnSource = parsed.who === "john";
     const projects = await get(`projects?slug=eq.${encodeURIComponent(home)}&select=slug,status,accepts_findings`);
     const proj = Array.isArray(projects) ? projects[0] : null;
-    if (!proj || proj.status !== "executing" || proj.accepts_findings !== true) {
-      die(1, `requirement-check --prepare: --home ${home} is not an executing project that accepts findings (AGT-240)`);
+    if (!proj || proj.status !== "executing" || (proj.accepts_findings !== true && !johnSource)) {
+      die(1, `requirement-check --prepare: --home ${home} is not an executing project that accepts findings, ` +
+        `and ${parsed.pair} is not a john: source (AGT-240, AGT-450)`);
     }
   }
 

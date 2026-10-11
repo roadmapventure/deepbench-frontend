@@ -1,3 +1,5 @@
+// DeepBench v7.0.846 | scripts/audit-review.js | AGT-450 -- homeAccepts() takes the need_source too:
+// a john: source is John's own naming, so any EXECUTING project is a home for it.
 // DeepBench v7.0.743 | scripts/audit-review.js | AGT-309 -- THE PROCESS-BREAK CLASS REACHES THE
 // ROUTER. A `root-cause` group may now carry two more keys: `need_source` (the text `who:table:id`,
 // normally `john:runner_decisions:<id>`) and `home` (the executing `projects.slug` that accepts
@@ -134,13 +136,22 @@ export const NEED_SOURCE_NEEDS_HOME =
 export const HOME_NEEDS_NEED_SOURCE = "home needs need_source (the text who:table:id)";
 export const CLASS_KEYS_ROOT_CAUSE_ONLY = "need_source/home apply only to a root-cause group";
 export function homeNotExecutingRefusal(slug) {
-  return `home ${slug} is not an executing project that accepts findings (AGT-240)`;
+  return `home ${slug} is not an executing project that accepts findings, ` +
+    "and the need_source is not a john: source (AGT-240, AGT-450)";
 }
 // AGT-240's own condition, stated positively: this is the destination a `pass` may MOVE a ticket
 // onto. A context row carrying no `accepts_findings` fails it, so the check fails closed exactly as
 // listLocked() does.
-export function homeAccepts(row) {
-  return !!row && row.status === "executing" && row.accepts_findings === true;
+//
+// AGT-450: the SECOND limb, and it is the same limb `scripts/requirement-check.js --prepare` and
+// `epic_lock_guard()` hold -- one rule in three places rather than three rules (pattern:14/163). A
+// need_source John himself wrote is John naming the ticket, and the lock admits his naming outright
+// (`scope_origin = 'john-named'` returns NEW before the lock is read), so refusing his destination
+// here would refuse a move the database would have allowed. `executing` is unconditional: a project
+// that is not running is not a home for anybody. The first segment is the whole test, never a list.
+export function homeAccepts(row, needSource) {
+  return !!row && row.status === "executing" &&
+    (row.accepts_findings === true || /^john:/.test(String(needSource ?? "")));
 }
 
 // The `next:` lines --apply prints, pure so the test asserts the PAIRING rather than the printing.
@@ -445,7 +456,7 @@ export function validateReview(review, worklist, week, checklist, routes, projec
           refusals.push(HOME_NEEDS_NEED_SOURCE);
         }
         if (classHome !== null && Array.isArray(projects) &&
-            !homeAccepts(projects.find(pr => String(pr.slug) === classHome))) {
+            !homeAccepts(projects.find(pr => String(pr.slug) === classHome), classNS)) {
           refusals.push(homeNotExecutingRefusal(classHome));
         }
       }

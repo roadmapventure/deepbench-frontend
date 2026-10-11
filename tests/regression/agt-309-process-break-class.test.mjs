@@ -1,3 +1,6 @@
+// DeepBench v7.0.846 | tests/regression/agt-309-process-break-class.test.mjs | AGT-450 -- arm A's
+// homeAccepts() cases take the need_source: SRC is a john: source, so the LOCKED executing project
+// is now a home for it, and NSRC (nathan:) is the case that still carries H6's refusal.
 // DeepBench v7.0.743 | tests/regression/agt-309-process-break-class.test.mjs | AGT-309 --
 // THE PROCESS-BREAK CLASS: John's 2026-10-02 ruling (decision 874648b6) made into a rule row,
 // Victoria's inline Knowledge, and ONE path a ticket of that class may take into an executing
@@ -87,6 +90,10 @@ const CHECK = path.join(REPO, "scripts", "requirement-check.js");
 
 // SRC -- John's ruling, cited exactly as AGT-309's own row cites it (kickoff §2).
 const SRC = "john:runner_decisions:874648b6-c254-4a1f-b152-5d94d6b28b72";
+// NSRC (AGT-450) -- a traceable source that is NOT John's: `nathan:market_records`, from
+// `runner_settings.need_source_kinds`. It is the control for every john: case below, and it is what
+// keeps the flipped cases from being "the refusal was removed" rather than "the refusal moved".
+const NSRC = "nathan:market_records:fbaa1d6e-06e4-4015-b0fe-b4915fa7bfef";
 const RULE_ID = "JOHN-1002-PROCESS-BREAK-CLASS";
 const KNOWLEDGE_SLUG = "vc-process-break-class";
 // A phrase from John's OWN words, inside the span the migration reads out of 874648b6.reasoning.
@@ -219,10 +226,21 @@ function armA() {
     "home with a blank need_source");
 
   // H6 refusal 3 -- AGT-240's own condition. Both keys are well-formed; only the destination is wrong.
-  check({ need_source: SRC, home: HOME_LOCKED }, [homeNotExecutingRefusal(HOME_LOCKED)],
-    "home on an executing project that does NOT accept findings");
+  //
+  // AGT-450 FLIPPED THIS CASE, and it is the whole point of the ticket: SRC is a `john:` source, so
+  // the executing-but-locked project IS a home for it -- `epic_lock_guard()` admits John's naming
+  // and this check no longer refuses what the database would allow. The case is kept rather than
+  // deleted, with its expectation inverted, so the flip is measured and not merely absent.
+  check({ need_source: SRC, home: HOME_LOCKED }, [],
+    "a john: source homes onto an executing project that does NOT accept findings (AGT-450)");
+  // ... and the SAME destination with a non-john source still carries refusal 3. One column of the
+  // pair moves, so a homeAccepts() that simply stopped refusing could not pass both of these.
+  check({ need_source: NSRC, home: HOME_LOCKED }, [homeNotExecutingRefusal(HOME_LOCKED)],
+    "a nathan: source on an executing project that does NOT accept findings is still refused");
+  // `executing` is unconditional in both limbs (AGT-450 kept it): a john: source does not make a
+  // planned project a destination, and this case proves the new limb did not swallow the old one.
   check({ need_source: SRC, home: LIST_PROJECT }, [homeNotExecutingRefusal(LIST_PROJECT)],
-    "home on a project that is not executing at all");
+    "home on a project that is not executing at all -- a john: source does not open it");
   check({ need_source: SRC, home: "no-such-project" }, [homeNotExecutingRefusal("no-such-project")],
     "home naming no projects row at all");
 
@@ -273,6 +291,17 @@ function armA() {
   assert.equal(homeAccepts({ slug: "x", status: "planned", accepts_findings: true }), false,
     "accepts_findings does not make a non-executing project a home");
   assert.equal(homeAccepts(undefined), false, "no row at all is not a home");
+
+  // AGT-450's second limb, as three units on the SAME two rows -- so the limb is pinned by which
+  // input moved the answer rather than by one call that happens to be true.
+  const EXEC_LOCKED = { slug: "x", status: "executing", accepts_findings: false };
+  const PLANNED_OK = { slug: "y", status: "planned", accepts_findings: true };
+  assert.equal(homeAccepts(EXEC_LOCKED, SRC), true,
+    "executing + accepts_findings false IS a home for a john: source (AGT-450)");
+  assert.equal(homeAccepts(EXEC_LOCKED, NSRC), false,
+    "the same row is NOT a home for a nathan: source -- the need_source is what moved the answer");
+  assert.equal(homeAccepts(PLANNED_OK, SRC), false,
+    "and a john: source never opens a project that is not executing");
 
   // --- nextLines(): the PAIRING, which is the only part of the print that can be wrong ----------
   //
