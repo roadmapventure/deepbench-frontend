@@ -1,3 +1,5 @@
+// DeepBench v7.0.852 | tests/regression/agt-454-directive-closes-with-ticket.test.mjs | AGT-454 --
+// directive link column ticket_ref; the five of 2026-10-08/09 linked and closed.
 // DeepBench v7.0.851 | tests/regression/agt-454-directive-closes-with-ticket.test.mjs | AGT-454 --
 // directive closes with its ticket's delivered settle; closed stays closed.
 //
@@ -26,14 +28,16 @@
 //     DIRECTLY and must each plan nothing -- an implementation that filtered only in the URL would
 //     pass a URL-shaped test and close a standing instruction the first time a caller widened the
 //     read.
-// (A3) `item_ref` IS POLYSEMOUS IN SHIPPED DATA, so the match is identity with THIS ticket's
-//     `backlog_items.id` and nothing looser. Measured live 2026-10-12 with the service key:
-//     `runner_directives` carries NO foreign key on `item_ref` (its only FK is
-//     `runner_directives_epic_id_fkey` → `epics(id)`), and of the 8 non-NULL values among 109 rows
-//     SEVEN resolve to `runner_items` (briefing card ids -- `lib/briefing-automation.mjs` reads the
-//     column that way) and exactly ONE (`009eeb7a`) resolves to `backlog_items` (AGT-264). So a
-//     non-resolving value is NOT a ticket link: arm (A) hands in a card id and a second ticket's id
-//     and requires both to plan nothing.
+// (A3) THE LINK IS `ticket_ref` AND `item_ref` IS NEVER READ. v7.0.852 added
+//     `runner_directives.ticket_ref uuid` with `runner_directives_ticket_ref_fkey` →
+//     `backlog_items(id)` ON DELETE RESTRICT, because `item_ref` is polysemous in shipped data --
+//     measured live 2026-10-12, 8 of 109 rows set it, SEVEN resolving to `runner_items` (briefing
+//     card ids -- `lib/briefing-automation.mjs` reads the column that way) and exactly ONE
+//     (`009eeb7a`) to `backlog_items` (AGT-264). The match is still identity and nothing looser, so
+//     arm (A) hands in a card id and a second ticket's id in `ticket_ref` and requires both to plan
+//     nothing -- AND hands in a row whose `item_ref` IS this ticket while `ticket_ref` is NULL,
+//     which must plan nothing too. That last case is the one an implementation that kept the old
+//     column, or read either of the two, would fail.
 // (B) THE SEAM, DRIVEN over a stubbed `globalThis.fetch` (the shape `dat-004-taught-in-assembly`'s
 //     arm (b) uses): `partial` must cost ZERO fetches -- not "one GET that returns nothing" -- the
 //     RPC body's keys must be the four live identity arguments of `public.close_directive`
@@ -50,15 +54,18 @@
 //     arguments". It also runs the CLI's own GET against this ticket's row id and requires the
 //     filter to be honoured.
 //
-// WHAT THIS FILE DOES NOT COVER, named rather than skipped (pattern:77, STANDARDS Section 5). The
-// kickoff's arm (C) asked for the five 2026-10-08/09 directives (`a738da38`, `418095d5`,
-// `2458c24b`, `0078af4d`, `3c1cc23d`) to read `item_ref` non-NULL and the finished ones closed.
-// Measured live this cycle, ALL FIVE read `item_ref` NULL, and the write that would link them is
-// GATED, not built: `item_ref` already means "card id" on 7 of its 8 populated rows, so whether a
-// governing-ticket link may live there at all is John's design call, and three of the five name no
-// governing ticket anywhere in the repo. `docs/design/agt-454-directive-item-ref.sql` is therefore a
-// PROPOSAL and was not applied. The arm below declares that gap with `notRun()` and prints the
-// measured NULLs as its evidence rather than asserting a state nobody shipped.
+// WHAT SHIPPED IN v7.0.852, which is why arm (C3) now ASSERTS where it used to `notRun()`. The
+// gate (A3) describes is ruled -- card `1d100088` option B -- and migration
+// `agt454_directive_ticket_ref` applied it: the column, the FK, five before-images, four rows
+// linked and three closed `shipped`, all inside one `do` block whose every assertion RAISEs.
+// The map was DERIVED, not typed in: each directive body names `audit finding <uuid>` and
+// `audit_findings.filed_backlog_id` names the ticket, which yields exactly
+// `418095d5>AGT-427, 2458c24b>AGT-433, 0078af4d>AGT-432, 3c1cc23d>AGT-434`. `a738da38` names nine
+// gate cards and NO finding, so no rule derives a ticket for it and it stays unlinked -- asserted
+// below as its own case, because "linked everything" is the plausible wrong answer. Card
+// `1d100088` said three of five needed John's word; it had read the repo only, and the database
+// derives four (named, not quietly corrected -- pattern:89). The mirror of the applied SQL is
+// `docs/design/agt-454-directive-ticket-ref.sql`; the option-A proposal it supersedes was removed.
 //
 // NO MODEL CALL, NO SPEND. Pure calls, a stubbed fetch, two REST reads and one deliberately
 // refused RPC.
@@ -86,7 +93,7 @@ const CARD_ID = "f6c7c54a-4682-4163-92a6-96a131d1d5ae";      // a real `runner_i
 const NOTE = `Shipped as ${TICKET}: the close-out settled it delivered (kickoff ${KICKOFF}).`;
 const CYCLE = "e6d95725-4e92-4643-a276-ef188301943d";
 
-const open = (extra = {}) => ({ id: "11111111-1111-1111-1111-111111111111", type: "directive", status: "in_progress", outcome: null, item_ref: ROW_ID, ...extra });
+const open = (extra = {}) => ({ id: "11111111-1111-1111-1111-111111111111", type: "directive", status: "in_progress", outcome: null, ticket_ref: ROW_ID, item_ref: null, ...extra });
 const plan = (status, directives) => planDirectiveClose({ directives, ticket: TICKET, ticketRowId: ROW_ID, status, kickoffPath: KICKOFF });
 
 // ---------------------------------------------------------------------------------------------
@@ -130,24 +137,26 @@ function armA_pure() {
   }
   results.push("only-queued-or-in_progress-directive-rows-close");
 
-  // (A3) `item_ref` is polysemous: identity with THIS ticket's row id, nothing looser.
+  // (A3) the link is `ticket_ref`: identity with THIS ticket's row id, nothing looser, and
+  // `item_ref` is not a link at all any more -- the last case is the one that proves it.
   for (const [label, row] of [
-    ["another ticket's item_ref", open({ item_ref: OTHER_ROW_ID })],
-    ["a runner_items card id", open({ item_ref: CARD_ID })],
-    ["item_ref NULL", open({ item_ref: null })],
+    ["another ticket's ticket_ref", open({ ticket_ref: OTHER_ROW_ID })],
+    ["a runner_items card id", open({ ticket_ref: CARD_ID })],
+    ["ticket_ref NULL", open({ ticket_ref: null })],
+    ["this ticket in item_ref, ticket_ref NULL", open({ ticket_ref: null, item_ref: ROW_ID })],
   ]) {
     assert.deepStrictEqual(plan("delivered", [row]), [],
       `${label} is not a link to ${TICKET} — it must plan nothing`);
   }
   assert.deepStrictEqual(planDirectiveClose({ directives: [open()], ticket: TICKET, ticketRowId: null, status: "delivered", kickoffPath: KICKOFF }), [],
     "with no ticket row id there is nothing to match against — it must plan nothing rather than match everything");
-  results.push("item_ref-must-be-this-tickets-own-row-id");
+  results.push("ticket_ref-must-be-this-tickets-own-row-id-and-item_ref-is-never-read");
 
   // Mixed set: the one eligible row is picked out of five ineligible ones.
   const mixed = plan("delivered", [
     open({ id: "a", status: "done", outcome: "shipped" }),
     open({ id: "b", type: "drain-epic" }),
-    open({ id: "c", item_ref: CARD_ID }),
+    open({ id: "c", ticket_ref: CARD_ID }),
     open({ id: "d", status: "queued" }),
     open({ id: "e", status: "standing" }),
   ]);
@@ -207,9 +216,11 @@ async function armB_seam() {
     const closed = await call("delivered");
     const gets = calls.filter(c => c.method === "GET");
     assert.strictEqual(gets.length, 1, `exactly one GET, made ${gets.length}`);
-    assert.ok(gets[0].url.includes(`item_ref=eq.${ROW_ID}`),
-      `the GET must filter \`item_ref\` to this ticket's row id, got ${gets[0].url}`);
-    assert.ok(gets[0].url.includes("select=id,type,status,outcome,item_ref") && gets[0].url.includes("limit=100"),
+    assert.ok(gets[0].url.includes(`ticket_ref=eq.${ROW_ID}`),
+      `the GET must filter \`ticket_ref\` to this ticket's row id, got ${gets[0].url}`);
+    assert.ok(!/[?&]item_ref=/.test(gets[0].url),
+      `the GET must not filter on \`item_ref\` at all — that column means "card id", got ${gets[0].url}`);
+    assert.ok(gets[0].url.includes("select=id,type,status,outcome,ticket_ref") && gets[0].url.includes("limit=100"),
       `the GET must name its columns and bound itself, got ${gets[0].url}`);
     assert.strictEqual(posts().length, 1, `exactly one POST rpc/close_directive, made ${posts().length}`);
     assert.ok(posts()[0].url.includes("/rpc/close_directive"), `the POST must be rpc/close_directive, got ${posts()[0].url}`);
@@ -310,18 +321,18 @@ async function armC_live(url, key) {
   results.push("live-blank-note-refused");
 
   // C2 -- THE CLI'S OWN GET, run against this ticket's real row id. The filter must be honoured:
-  // every row it returns carries exactly that `item_ref`.
+  // every row it returns carries exactly that `ticket_ref`.
   const mine = await rest(url, key, `backlog_items?backlog_id=eq.${TICKET}&select=id,status`);
   assert.ok(mine.ok && Array.isArray(mine.json) && mine.json.length === 1,
     `${TICKET} must read exactly one backlog row, got HTTP ${mine.status}: ${mine.text}`);
   const myRow = mine.json[0];
   const linked = await rest(url, key,
-    `runner_directives?select=id,type,status,outcome,item_ref&item_ref=eq.${myRow.id}&limit=100`);
+    `runner_directives?select=id,type,status,outcome,ticket_ref&ticket_ref=eq.${myRow.id}&limit=100`);
   assert.ok(linked.ok && Array.isArray(linked.json),
     `the close-out's own GET must answer, got HTTP ${linked.status}: ${linked.text}`);
   for (const r of linked.json) {
-    assert.strictEqual(r.item_ref, myRow.id,
-      `the \`item_ref=eq.\` filter must be honoured — row ${r.id} came back carrying ${r.item_ref}`);
+    assert.strictEqual(r.ticket_ref, myRow.id,
+      `the \`ticket_ref=eq.\` filter must be honoured — row ${r.id} came back carrying ${r.ticket_ref}`);
   }
   // And the plan over whatever that read returns is self-consistent: every planned row is one of
   // the rows actually read, and every planned row was open.
@@ -333,25 +344,53 @@ async function armC_live(url, key) {
     assert.ok(src && src.type === "directive" && DIRECTIVE_OPEN.has(src.status),
       `every planned close must come from an open \`directive\` row actually read; ${p.id} did not`);
   }
-  console.log(`  (C2) live GET item_ref=eq.${myRow.id} → ${linked.json.length} row(s), ${planned.length} would close on a \`delivered\` settle`);
+  console.log(`  (C2) live GET ticket_ref=eq.${myRow.id} → ${linked.json.length} row(s), ${planned.length} would close on a \`delivered\` settle`);
   results.push("live-get-filter-honoured-and-plan-self-consistent");
 
-  // C3 -- the kickoff's five, measured and DECLARED rather than asserted. See the header: the link
-  // write is gated, so there is no shipped state here to assert.
-  const five = ["a738da38", "418095d5", "2458c24b", "0078af4d", "3c1cc23d"];
-  const all = await rest(url, key, "runner_directives?select=id,type,status,outcome,item_ref&limit=1000");
+  // C3 -- THE KICKOFF'S FIVE, ASSERTED. This arm was `notRun()` one version ago because the link
+  // write was gated; v7.0.852 ruled it and applied `agt454_directive_ticket_ref`, so there is now a
+  // shipped state to be wrong about. Every clause of the ticket's own sentence is a case here
+  // (pattern:95), and the row that must NOT be linked is a case of its own -- "linked all five" is
+  // the plausible wrong answer, and nothing else in this file would catch it.
+  const UNLINKED = "a738da38";
+  const PAIRS = { "418095d5": "AGT-427", "2458c24b": "AGT-433", "0078af4d": "AGT-432", "3c1cc23d": "AGT-434" };
+  const five = [UNLINKED, ...Object.keys(PAIRS)];
+  const all = await rest(url, key, "runner_directives?select=id,type,status,outcome,ticket_ref,item_ref&limit=1000");
   assert.ok(all.ok && Array.isArray(all.json), `the directive read must answer, got HTTP ${all.status}: ${all.text}`);
-  const rows = five.map(p => all.json.find(r => String(r.id).startsWith(p))).filter(Boolean);
-  const nulls = rows.filter(r => r.item_ref === null).map(r => String(r.id).slice(0, 8));
-  notRun(
-    "AGT-454 (C3): the five 2026-10-08/09 directives linked to their tickets and the finished ones closed",
-    `the data half is GATED, not built. Measured live this run: ${rows.length} of the five read, ` +
-      `${nulls.length} with \`item_ref\` NULL (${nulls.join(", ") || "none"}). \`item_ref\` already means ` +
-      `"runner_items card id" on 7 of its 8 populated rows platform-wide, so whether a governing-ticket ` +
-      `link may live there is John's design call; \`docs/design/agt-454-directive-item-ref.sql\` is a ` +
-      "PROPOSAL and was not applied. The mechanism arms (A)/(B)/(C1)/(C2) above are the shipped half.",
-  );
-  console.log(`  (C3) the five: ${rows.map(r => `${String(r.id).slice(0, 8)}=${r.status}/${r.item_ref === null ? "item_ref NULL" : r.item_ref}`).join(" · ")}`);
+  const rows = five.map(pfx => all.json.find(r => String(r.id).startsWith(pfx)));
+  assert.ok(rows.every(Boolean),
+    `all five directives must read; missing ${five.filter((pfx, i) => !rows[i]).join(", ") || "none"}`);
+
+  // The one row the RULE cannot derive: its body names nine gate cards and no `audit finding`.
+  const unlinked = rows[0];
+  assert.strictEqual(unlinked.ticket_ref, null,
+    `${UNLINKED} names no audit finding, so no rule derives a ticket for it — it must stay unlinked, got ${JSON.stringify(unlinked.ticket_ref)}`);
+
+  // `item_ref` is never written by any of this: the link lives in its own column.
+  for (const r of rows) {
+    assert.strictEqual(r.item_ref, null,
+      `the link lives in \`ticket_ref\` and nothing writes \`item_ref\` — ${String(r.id).slice(0, 8)} came back carrying ${JSON.stringify(r.item_ref)}`);
+  }
+
+  // The four the rule DOES derive, each resolved through the FK's own target table.
+  const readBack = [];
+  for (const [pfx, ticket] of Object.entries(PAIRS)) {
+    const r = rows[five.indexOf(pfx)];
+    assert.ok(typeof r.ticket_ref === "string" && r.ticket_ref.length === 36,
+      `${pfx} must carry a \`ticket_ref\` uuid, got ${JSON.stringify(r.ticket_ref)}`);
+    assert.strictEqual(r.status, "done", `${pfx} must read \`done\` — its ticket settled, so John's instruction is finished; got ${r.status}`);
+    assert.strictEqual(r.outcome, "shipped", `${pfx} must read outcome \`shipped\`, got ${JSON.stringify(r.outcome)}`);
+    const t = await rest(url, key, `backlog_items?id=eq.${r.ticket_ref}&select=backlog_id`);
+    assert.ok(t.ok && Array.isArray(t.json) && t.json.length === 1,
+      `${pfx}'s \`ticket_ref\` must resolve to exactly one backlog row — the FK says it has to; got HTTP ${t.status}: ${t.text}`);
+    assert.strictEqual(t.json[0].backlog_id, ticket,
+      `${pfx} must link ${ticket} (derived from audit_findings.filed_backlog_id, not guessed), got ${t.json[0].backlog_id}`);
+    readBack.push(`${pfx}>${t.json[0].backlog_id}`);
+  }
+  assert.strictEqual(readBack.join(","), "418095d5>AGT-427,2458c24b>AGT-433,0078af4d>AGT-432,3c1cc23d>AGT-434",
+    `the four pairs must read back exactly, in created_at order, got ${readBack.join(",")}`);
+  console.log(`  (C3) the five: ${UNLINKED}=${unlinked.status}/unlinked · ${readBack.join(" · ")}`);
+  results.push("live-five-linked-by-derived-rule-and-the-finished-ones-closed-shipped");
 
   return results;
 }

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.852 | scripts/settle-ship.js | AGT-454 -- directive link column
+// ticket_ref; the five of 2026-10-08/09 linked and closed.
 // DeepBench v7.0.851 | scripts/settle-ship.js | AGT-454 -- directive closes with its ticket's
 // delivered settle; closed stays closed.
 // DeepBench v7.0.654 | scripts/settle-ship.js | AGT-128 -- TRIGGER 2 FIRES ONLY WHEN THE STOP LINE
@@ -275,16 +277,18 @@ export const canResettle = row => Boolean(row) && typeof row === "object" && row
 // actually writes, so `delivered` is the trigger. `partial` names unbuilt work and closes NOTHING:
 // a directive whose ticket is half-built is still live, and that is the whole discrimination.
 //
-// `item_ref` IS NOT A TICKET LINK BY ITSELF, AND THAT IS WHY THIS READS IT DEFENSIVELY. Measured on
-// the live table this cycle: `runner_directives` carries NO foreign key on `item_ref` (the only FK
-// on the table is `runner_directives_epic_id_fkey`), and of the 8 non-NULL values among 109 rows,
-// SEVEN resolve to `runner_items` (briefing card ids -- `lib/briefing-automation.mjs` reads them
-// that way) and exactly ONE (`009eeb7a`) resolves to `backlog_items` (AGT-264). The column is
-// polysemous in shipped data. So this never asks "does this row carry a ticket?"; it asks the one
-// question that cannot be wrong -- "is this row's `item_ref` THIS ticket's `backlog_items.id`?" --
-// and a value that resolves anywhere else is not a ticket link and is left strictly alone. Whether
-// the governing-ticket link may live in `item_ref` at all is John's call, not this script's; the
-// mechanism below is correct either way, and writes nothing to `item_ref`.
+// THE LINK IS `ticket_ref`, AND `item_ref` IS NEVER READ (D1 -- card `1d100088`, option B). The
+// gate that parked this one version ago is ruled. `item_ref` was polysemous in shipped data:
+// measured live 2026-10-12, 8 of 109 rows set it, SEVEN resolving to `runner_items` (briefing card
+// ids -- `lib/briefing-automation.mjs` reads the column that way) and exactly ONE (`009eeb7a`) to
+// `backlog_items` (AGT-264), so a ticket link read from there could only ever be a guess checked
+// against two tables. `v7.0.852` gave the link a column of its own instead:
+// `runner_directives.ticket_ref uuid`, constraint `runner_directives_ticket_ref_fkey` ->
+// `backlog_items(id)` ON DELETE RESTRICT, proven both directions in the migration's own gate. The
+// database now refuses a wrong answer, so this file stops reading `item_ref` ENTIRELY -- not in the
+// SELECT, not in the filter, not in the match -- and asks the FK-enforced question: "is this row's
+// `ticket_ref` THIS ticket's `backlog_items.id`?" It writes neither column: the only write here is
+// `close_directive()`.
 export const DIRECTIVE_OPEN = new Set(["queued", "in_progress"]);
 export const DIRECTIVE_CLOSES_AT = "delivered";
 
@@ -301,7 +305,7 @@ export function planDirectiveClose({ directives = [], ticket, ticketRowId, statu
       Boolean(d) && typeof d === "object" &&
       d.type === "directive" &&
       DIRECTIVE_OPEN.has(d.status) &&
-      typeof d.item_ref === "string" && d.item_ref === ticketRowId)
+      typeof d.ticket_ref === "string" && d.ticket_ref === ticketRowId)
     .map(d => ({ id: d.id, outcome: "shipped", note }));
 }
 
@@ -675,18 +679,18 @@ export async function closeDirectives({
     return [];
   }
   if (!row || typeof row.id !== "string" || row.id === "") {
-    log("  directives: not read — the ticket row carries no id to match `item_ref` against\n");
+    log("  directives: not read — the ticket row carries no id to match `ticket_ref` against\n");
     return [];
   }
 
   const rows = await rest(base, key,
-    `runner_directives?select=id,type,status,outcome,item_ref&item_ref=eq.${encodeURIComponent(row.id)}&limit=100`,
+    `runner_directives?select=id,type,status,outcome,ticket_ref&ticket_ref=eq.${encodeURIComponent(row.id)}&limit=100`,
     {}, "read directives");
   if (!Array.isArray(rows)) fail("read directives: the runner_directives read came back non-array — refusing to close a directive on a set that was not read.");
 
   const plans = planDirectiveClose({ directives: rows, ticket, ticketRowId: row.id, status, kickoffPath });
   if (plans.length === 0) {
-    log(`  directives: none open (${rows.length} row(s) link \`item_ref\` = ${row.id})\n`);
+    log(`  directives: none open (${rows.length} row(s) link \`ticket_ref\` = ${row.id})\n`);
     return [];
   }
 
