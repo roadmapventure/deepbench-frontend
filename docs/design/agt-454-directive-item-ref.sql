@@ -1,0 +1,225 @@
+-- DeepBench v7.0.851 | docs/design/agt-454-directive-item-ref.sql | AGT-454 -- directive closes
+-- with its ticket's delivered settle; closed stays closed.
+--
+-- ==============================================================================================
+-- THIS IS A PROPOSAL, NOT A MIRROR. NOTHING BELOW WAS APPLIED.
+-- There is no migration `agt454_directive_item_ref`. `capture_migration_down()` was NOT called --
+-- there is nothing to capture until the apply is approved, and calling it would record a down for
+-- a migration that does not exist. The write half of AGT-454 is GATED on one ruling of John's,
+-- stated in section 2 below; the MECHANISM half shipped this cycle and is green
+-- (`scripts/settle-ship.js`, `tests/regression/agt-454-directive-closes-with-ticket.test.mjs`).
+-- Section 4 holds the SQL the apply would run, deliberately INSIDE A COMMENT: no statement in the
+-- live body of this file writes a row, so pasting it can only measure.
+-- ==============================================================================================
+--
+--
+-- ---- 1. WHAT WAS MEASURED, live 2026-10-12 ~07:10Z, cycle e6d95725, service key --------------
+--
+-- (a) THE RPC, one overload, read by identity:
+--     select pg_get_function_identity_arguments('public.close_directive'::regproc),
+--            pg_get_function_result('public.close_directive'::regproc);
+--     ->  p_cycle uuid, p_directive uuid, p_outcome text, p_note text
+--         TABLE(directive_id uuid, status text, outcome text, outcome_note text,
+--               already_closed boolean)
+--     `already_closed` is the idempotency signal: `close_directive()` returns a row that is
+--     already `done` WITH an outcome untouched, so a second settle cannot overwrite a verdict.
+--     The shipped CLI half sends exactly those four names and reports that flag.
+--
+-- (b) THE CONSTRAINT SURFACE of `public.runner_directives` (pg_constraint, all six):
+--       runner_directives_pkey              PRIMARY KEY (id)
+--       runner_directives_epic_id_fkey      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT
+--       runner_directives_type_check        CHECK (type = ANY (ARRAY['directive','budget_override','drain-epic']))
+--       runner_directives_status_check      CHECK (status = ANY (ARRAY['queued','in_progress','done','expired','cancelled','standing']))
+--       runner_directives_outcome_check     CHECK (outcome IS NULL OR outcome = ANY (ARRAY['shipped','carded','superseded','closed_unrecorded']))
+--       runner_directives_drain_names_epic  CHECK ((type = 'drain-epic') = (epic_id IS NOT NULL))
+--     THERE IS NO FOREIGN KEY ON `item_ref` AT ALL, and the column is a plain nullable `uuid`
+--     (information_schema.columns). The kickoff's T1(b) STOP reads "an FK on `item_ref` to
+--     anything but `backlog_items`: STOP, report, write nothing (AGT-250)". No FK is the stronger
+--     form of that condition, not the weaker one: nothing in the database says what this column
+--     points at, so nothing in the database would catch a wrong answer.
+--
+-- (c) THE POLYSEMY, which is why the write half is gated rather than merely unwritten. 109
+--     directive rows, 8 with `item_ref` set; each resolved against both candidate tables:
+--       58e13c5d  done  item_ref 0edac766-10e1-44c8-956e-b59c2bccd02b  -> runner_items
+--       acfdfa0c  done  item_ref bfa4f42a-48d8-416e-91ce-f15193874525  -> runner_items
+--       73e41d2c  done  item_ref 85c05e8d-b673-4924-bcfb-f13fe573a95e  -> runner_items
+--       7c72a860  done  item_ref f6c7c54a-4682-4163-92a6-96a131d1d5ae  -> runner_items
+--       4f659438  done  item_ref f6c7c54a-4682-4163-92a6-96a131d1d5ae  -> runner_items
+--       ceb5cf0b  done  item_ref 18b8fdd8-9c4d-4c36-be06-5b015802ff0a  -> runner_items
+--       1532666b  done  item_ref 73f71531-658b-4fab-9c6c-a12288731e97  -> runner_items
+--       009eeb7a  done  item_ref fb7340e7-ad5d-43a4-8ca4-dc5d7761be3e  -> backlog_items (AGT-264)
+--     SEVEN of eight are briefing CARD ids (`lib/briefing-automation.mjs` reads the column that
+--     way); exactly ONE is a ticket. Nothing distinguishes the two meanings -- not a type, not a
+--     check, not an FK.
+--
+-- (d) THE FIVE the ticket names, with their bodies' governing ticket where one exists:
+--       a738da38  directive  done         outcome shipped  item_ref NULL
+--                 "RULE EVERY UNDECIDED GATE CARD NOW" (2026-10-09) -- a sweep over every
+--                 undecided `gated_before_build` card; its body names NINE cards and the
+--                 mechanism ticket AGT-127, and NO single governing ticket. Not derivable.
+--       418095d5  directive  done         outcome shipped  item_ref NULL   -> AGT-427 (status done)
+--       2458c24b  directive  in_progress  outcome NULL     item_ref NULL   -> AGT-433 (status delivered)
+--       0078af4d  directive  in_progress  outcome NULL     item_ref NULL   -> AGT-432 (status delivered)
+--       3c1cc23d  directive  in_progress  outcome NULL     item_ref NULL   -> AGT-434 (status delivered)
+--     The MAP above is the KICKOFF'S, not the database's: no row, column or decision in Supabase
+--     links any of the five to a ticket. For `a738da38` the kickoff itself left the ticket to be
+--     read from the body, and the body names none -- so for that row the link is not derivable at
+--     all, and the same is true of any directive whose body names a finding and a review rather
+--     than one ticket.
+--       select id, backlog_id, status from backlog_items where backlog_id in (...)
+--       ->  72691e30-ce35-494b-9734-2d1aae7b82a3  AGT-427  done
+--           d896d815-d17b-493e-8f7a-61dc4da0dddf  AGT-432  delivered
+--           9888d9fc-3d50-4251-a731-f0150d9551df  AGT-433  delivered
+--           6fa0143c-73c8-40a2-b11f-f48f122c7436  AGT-434  delivered
+--
+-- (e) THE CENSUS: select count(*) filter (where item_ref is not null), count(*)
+--                 from runner_directives;  ->  8, 109
+--
+--
+-- ---- 2. THE RULING THIS WAITS ON (John's, not an agent's) ------------------------------------
+--
+-- QUESTION: may a directive's governing TICKET live in `item_ref`, the same column that already
+-- holds a briefing CARD id on 7 of its 8 populated rows?
+--
+--   OPTION A -- overload `item_ref`. One column, two meanings, resolved by trying both tables.
+--   Cheapest to write and it is what row `009eeb7a` already does. It also makes every future
+--   reader of the column guess: `lib/briefing-automation.mjs` reads it as a card today.
+--
+--   OPTION B -- a column of its own, e.g. `ticket_ref uuid references backlog_items(id)`, with a
+--   real FK so the database refuses a wrong answer, and `item_ref` left to mean "card". One
+--   migration, one new column, fail-closed by construction (.claude/rules/supabase-column-grants.md:
+--   a new column needs its SELECT grant in the same migration).
+--
+-- THE SHIPPED MECHANISM IS CORRECT UNDER EITHER, and that is why it shipped without the ruling:
+-- `planDirectiveClose()` never asks "does this row carry a ticket?" -- it asks "is this row's
+-- `item_ref` THIS ticket's `backlog_items.id`?", which cannot be wrong under A and reads nothing
+-- under B until the read is pointed at the new column. It writes NOTHING to `item_ref` ever.
+--
+-- SEPARATELY, AND NOT A MATTER OF OPINION: three of the five rows above (`a738da38`, and any row
+-- whose body names a finding plus a findings review rather than one ticket) have no governing
+-- ticket to link. A backfill cannot invent one (pattern:11: never hardcode a content judgment),
+-- so those rows stay as they are whichever option John takes.
+--
+-- WHAT IS NOT GATED, and is already true: a directive whose ticket settles `delivered` from this
+-- version forward closes itself, with `outcome = 'shipped'` and John's sentence in
+-- `outcome_note`, the moment that link exists in whatever column holds it.
+--
+--
+-- ---- 3. THE LIVE BODY OF THIS FILE: READ-ONLY -------------------------------------------------
+-- These four statements are the measurements in section 1, re-runnable. They write nothing.
+
+select pg_get_function_identity_arguments('public.close_directive'::regproc) as ident_args,
+       pg_get_function_result('public.close_directive'::regproc)             as result_type;
+
+select conname, pg_get_constraintdef(oid) as def
+  from pg_constraint
+ where conrelid = 'public.runner_directives'::regclass
+ order by conname;
+
+-- The polysemy, both directions, in one pass.
+select left(d.id::text, 8)                                                              as dir8,
+       d.type, d.status, d.outcome, d.item_ref,
+       (select 'runner_items' from public.runner_items i where i.id = d.item_ref)       as resolves_card,
+       (select b.backlog_id from public.backlog_items b where b.id = d.item_ref)        as resolves_ticket
+  from public.runner_directives d
+ where d.item_ref is not null
+ order by d.created_at;
+
+select count(*) filter (where item_ref is not null) as with_item_ref, count(*) as total
+  from public.runner_directives;
+
+
+-- ---- 4. THE WITHHELD WRITE HALF -- NOT APPLIED, AND NOT EXECUTABLE AS IT STANDS --------------
+--
+-- The form the apply would take under OPTION A, kept here so the ruling has something concrete to
+-- rule on. It is a COMMENT on purpose: this file must not be able to set `item_ref` on any row.
+-- Before any of it runs: (i) John rules section 2, (ii) `capture_migration_down()` is called for
+-- `agt454_directive_item_ref` FIRST (runbook step 6), (iii) the MAP is re-derived from whatever
+-- John's ruling says the link is, never from this file's table.
+--
+-- select * from public.capture_migration_down(
+--   'e6d95725-4e92-4643-a276-ef188301943d', 'agt454_directive_item_ref', '[]');
+-- -- '[]' because the migration creates and replaces no object: it is rows only, so the down is
+-- -- the before-images below, and `captured_class` would read `manual-down` rather than
+-- -- `auto-downable`. Reversal is `reverse_decision(v_dec)` -- `runner_directives` IS in
+-- -- `reversible_tables()`, checked before relying on it.
+--
+-- do $$
+-- declare
+--   v_cycle uuid := 'e6d95725-4e92-4643-a276-ef188301943d';
+--   v_dec   uuid;
+--   v_row   public.runner_directives%rowtype;
+--   v_map   jsonb := jsonb_build_object(   -- the ruling's map, re-derived, NOT this file's
+--     '418095d5', 'AGT-427', '2458c24b', 'AGT-433', '0078af4d', 'AGT-432', '3c1cc23d', 'AGT-434');
+--   k text; v_ticket uuid; v_linked int := 0; v_imaged int := 0; v_closed int := 0;
+-- begin
+--   v_dec := public.record_decision(
+--     v_cycle, null, 'directive-close', 'AGT-454',
+--     'Five 2026-10-08/09 directives linked to their tickets; the finished ones closed shipped',
+--     'Measured live 2026-10-12 before the write: runner_directives carries NO FK on item_ref; 8 of '
+--     'its 109 rows set it, and SEVEN of those 8 resolve to runner_items (briefing cards) while ONE '
+--     '(009eeb7a) resolves to backlog_items (AGT-264). All five rows named by AGT-454 read item_ref '
+--     'NULL. a738da38 names nine gate cards and no governing ticket, so it is left alone. '
+--     '418095d5->AGT-427 (done), 2458c24b->AGT-433 (delivered), 0078af4d->AGT-432 (delivered), '
+--     '3c1cc23d->AGT-434 (delivered). Every row imaged before it moves. pattern:16 pattern:95',
+--     public.ladder_work_class('P10 - Tooling'));
+--
+--   -- Every one of the five imaged, including the two already `done` that nothing updates: the
+--   -- before-image set is the down (pattern:95 -- the record is the deliverable, not a side effect).
+--   for k in select unnest(array['a738da38','418095d5','2458c24b','0078af4d','3c1cc23d']) loop
+--     select * into v_row from public.runner_directives where left(id::text, 8) = k;
+--     if not found then raise exception 'AGT-454: directive % not found', k; end if;
+--     insert into public.runner_before_images (cycle_id, table_name, pk_value, row_data, decision_id)
+--     values (v_cycle, 'runner_directives', v_row.id::text, to_jsonb(v_row), v_dec);
+--     v_imaged := v_imaged + 1;
+--   end loop;
+--
+--   -- The link. a738da38 is absent from v_map by construction: no ticket, no link.
+--   for k in select jsonb_object_keys(v_map) loop
+--     select id into v_ticket from public.backlog_items where backlog_id = v_map->>k;
+--     if v_ticket is null then raise exception 'AGT-454: no backlog row for %', v_map->>k; end if;
+--     update public.runner_directives set item_ref = v_ticket
+--      where left(id::text, 8) = k and item_ref is distinct from v_ticket;
+--     v_linked := v_linked + coalesce((select count(*)::int from public.runner_directives
+--                                       where left(id::text, 8) = k and item_ref = v_ticket), 0);
+--   end loop;
+--
+--   -- The close, for the OPEN rows whose ticket is FINISHED. Read inside the block, never assumed:
+--   -- `close_directive()` images the row itself and leaves an already-closed row untouched.
+--   for v_row in
+--     select d.* from public.runner_directives d
+--      where d.type = 'directive' and d.status in ('queued','in_progress')
+--        and d.item_ref in (select b.id from public.backlog_items b
+--                            where b.backlog_id in (select jsonb_object_keys(v_map))
+--                              and b.status in ('delivered','done'))
+--   loop
+--     perform public.close_directive(v_cycle, v_row.id, 'shipped',
+--       'Shipped as ' || (select b.backlog_id from public.backlog_items b where b.id = v_row.item_ref)
+--       || ': the work you asked for is on dev and the ticket settled delivered, so this '
+--       || 'instruction of yours is finished. (AGT-454, v7.0.851)');
+--     v_closed := v_closed + 1;
+--   end loop;
+--
+--   -- GATE. Every assertion RAISEs, so a committed migration IS the gate's pass.
+--   if v_imaged <> 5 then raise exception 'AGT-454 GATE: % before-images, expected 5', v_imaged; end if;
+--   if v_linked <> (select count(*) from jsonb_object_keys(v_map)) then
+--     raise exception 'AGT-454 GATE: % rows linked, expected %', v_linked,
+--       (select count(*) from jsonb_object_keys(v_map)); end if;
+--   if exists (select 1 from public.runner_directives d
+--               where d.type = 'directive' and d.status in ('queued','in_progress')
+--                 and d.item_ref in (select b.id from public.backlog_items b
+--                                     where b.status in ('delivered','done'))) then
+--     raise exception 'AGT-454 GATE: an open directive still points at a finished ticket'; end if;
+--   if exists (select 1 from public.runner_directives
+--               where left(id::text,8) = '418095d5'
+--                 and (status <> 'done' or outcome <> 'shipped')) then
+--     raise exception 'AGT-454 GATE: 418095d5 moved on something other than item_ref'; end if;
+--   if exists (select 1 from public.runner_directives
+--               where left(id::text,8) = 'a738da38' and item_ref is not null) then
+--     raise exception 'AGT-454 GATE: a738da38 has no governing ticket and must stay unlinked'; end if;
+--   raise notice 'AGT-454: % imaged, % linked, % closed, decision %', v_imaged, v_linked, v_closed, v_dec;
+-- end $$;
+--
+-- Rationale: docs/ARCHITECTURE.md §19v (:2551), §19b (:1096); SES-129 (close_directive, closed
+-- stays closed); SES-154 (`done` is UNSETTLEABLE in settle-ship.js, so `delivered` is the
+-- trigger); AGT-250 (never stack a write on something unknown -- find out why first).

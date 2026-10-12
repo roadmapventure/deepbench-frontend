@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.851 | scripts/settle-ship.js | AGT-454 -- directive closes with its ticket's
+// delivered settle; closed stays closed.
 // DeepBench v7.0.654 | scripts/settle-ship.js | AGT-128 -- TRIGGER 2 FIRES ONLY WHEN THE STOP LINE
 // SAYS **THIS** TICKET CLOSES `partial`. The measurement that found it, and the four ordered steps
 // that decide it, live at `stopLineClosesPartial()` below -- the one home for both.
@@ -255,6 +257,53 @@ export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainde
 // ticket's own gate ruling parked, so it is not written here on a guess.
 export const RESETTLE_FROM = "delivered";
 export const canResettle = row => Boolean(row) && typeof row === "object" && row.status === RESETTLE_FROM;
+
+// AGT-454 -- A DIRECTIVE OF JOHN'S CLOSES WHEN THE TICKET THAT CARRIES IT SETTLES `delivered`.
+//
+// THE DEFECT, measured live 2026-10-12 rather than recalled. `close_directive()` has existed since
+// SES-129 and the ONLY thing that called it was PROSE: runbook step 9 (`runner-cycle.md:4136`) asked
+// a model at the end of a long cycle to notice that the ticket it just shipped was John's directive
+// and to run the RPC by hand. `grep -c 'close_directive\|item_ref\|runner_directives'` over this
+// file read 0 before this ship. So John's own queued words stayed `in_progress` after the work that
+// discharged them was on `dev`, and the board he reads could not tell a live instruction from a
+// finished one. A rule a human has to remember at the end of a long cycle is a rule that gets
+// forgotten at the end of a long cycle (the SES-385 slice-2 lesson, same shape, same file).
+//
+// THE TRIGGER IS `delivered`, NOT `done` (pattern:89). The ticket's own words say "settles that
+// ticket done"; this script NEVER writes `done` -- `done` is `UNSETTLEABLE` at :122 and belongs to
+// `sweep_decision_windows` (runbook :4285). `delivered` is the finished state `applySettle()`
+// actually writes, so `delivered` is the trigger. `partial` names unbuilt work and closes NOTHING:
+// a directive whose ticket is half-built is still live, and that is the whole discrimination.
+//
+// `item_ref` IS NOT A TICKET LINK BY ITSELF, AND THAT IS WHY THIS READS IT DEFENSIVELY. Measured on
+// the live table this cycle: `runner_directives` carries NO foreign key on `item_ref` (the only FK
+// on the table is `runner_directives_epic_id_fkey`), and of the 8 non-NULL values among 109 rows,
+// SEVEN resolve to `runner_items` (briefing card ids -- `lib/briefing-automation.mjs` reads them
+// that way) and exactly ONE (`009eeb7a`) resolves to `backlog_items` (AGT-264). The column is
+// polysemous in shipped data. So this never asks "does this row carry a ticket?"; it asks the one
+// question that cannot be wrong -- "is this row's `item_ref` THIS ticket's `backlog_items.id`?" --
+// and a value that resolves anywhere else is not a ticket link and is left strictly alone. Whether
+// the governing-ticket link may live in `item_ref` at all is John's call, not this script's; the
+// mechanism below is correct either way, and writes nothing to `item_ref`.
+export const DIRECTIVE_OPEN = new Set(["queued", "in_progress"]);
+export const DIRECTIVE_CLOSES_AT = "delivered";
+
+// The pure half: rows in, a plan out, no I/O and no clock. The `type` / `status` filter lives HERE
+// and not only in the PostgREST query, so the one rule has one home -- a caller that widens its
+// read (or a test that hands in a row by hand) cannot close a `standing` row or a `drain-epic` by
+// reaching this function through a different door.
+export function planDirectiveClose({ directives = [], ticket, ticketRowId, status, kickoffPath } = {}) {
+  if (status !== DIRECTIVE_CLOSES_AT) return [];
+  if (typeof ticketRowId !== "string" || ticketRowId === "") return [];
+  const note = `Shipped as ${ticket}: the close-out settled it delivered (kickoff ${kickoffPath}).`;
+  return (Array.isArray(directives) ? directives : [])
+    .filter(d =>
+      Boolean(d) && typeof d === "object" &&
+      d.type === "directive" &&
+      DIRECTIVE_OPEN.has(d.status) &&
+      typeof d.item_ref === "string" && d.item_ref === ticketRowId)
+    .map(d => ({ id: d.id, outcome: "shipped", note }));
+}
 
 // AGT-167 -- `fail()` THROWS; only the CLI entry point turns it into an exit code. It used to call
 // `process.exit(2)` directly, which was correct while this file was a command and nothing else.
@@ -602,6 +651,64 @@ export async function resettleTicket({
   return { ticket, from: row.status, to: decided.status, changed: true, decision, note: "re-settled" };
 }
 
+// AGT-454 -- the write half. One GET, one RPC per planned row, and NOTHING on the `partial` side.
+//
+// IT RUNS AFTER THE STATUS WRITE AND AFTER THE COST WRITE, on purpose and in that order: settling
+// the ticket is this script's primary job (`applySettle()`), and a directive close that failed must
+// never take the status or the ledger figure with it.
+//
+// CLOSED STAYS CLOSED (SES-129). `close_directive()` is itself idempotent -- a row already `done`
+// WITH an outcome comes back untouched carrying `already_closed = true` -- and the plan above
+// filters those rows out before the RPC is ever reached. Both guards are kept: the plan is what
+// makes a second settle cost ZERO calls, and `already_closed` is what keeps a row that closed
+// between the GET and the POST from having its verdict overwritten. Neither one reopens anything;
+// this file has no path that moves a directive OFF `done`.
+export async function closeDirectives({
+  base, key, cycleId, ticket, row, status, kickoffPath, log = s => process.stdout.write(s),
+} = {}) {
+  if (status !== DIRECTIVE_CLOSES_AT) {
+    log(`  directives: not read — ${ticket} settles \`${status}\`, and only \`${DIRECTIVE_CLOSES_AT}\` closes a directive\n`);
+    return [];
+  }
+  if (typeof cycleId !== "string" || cycleId === "") {
+    log("  directives: not read — no --cycle-id, and `close_directive()` images the row against the cycle that closed it\n");
+    return [];
+  }
+  if (!row || typeof row.id !== "string" || row.id === "") {
+    log("  directives: not read — the ticket row carries no id to match `item_ref` against\n");
+    return [];
+  }
+
+  const rows = await rest(base, key,
+    `runner_directives?select=id,type,status,outcome,item_ref&item_ref=eq.${encodeURIComponent(row.id)}&limit=100`,
+    {}, "read directives");
+  if (!Array.isArray(rows)) fail("read directives: the runner_directives read came back non-array — refusing to close a directive on a set that was not read.");
+
+  const plans = planDirectiveClose({ directives: rows, ticket, ticketRowId: row.id, status, kickoffPath });
+  if (plans.length === 0) {
+    log(`  directives: none open (${rows.length} row(s) link \`item_ref\` = ${row.id})\n`);
+    return [];
+  }
+
+  const closed = [];
+  for (const plan of plans) {
+    const answer = await rest(base, key, "rpc/close_directive", {
+      method: "POST",
+      body: JSON.stringify({
+        p_cycle: cycleId,
+        p_directive: plan.id,
+        p_outcome: plan.outcome,
+        p_note: plan.note,
+      }),
+    }, `close_directive ${plan.id}`);
+    const back = Array.isArray(answer) ? answer[0] : answer;
+    const already = Boolean(back && back.already_closed);
+    log(`  directive ${String(plan.id).slice(0, 8)}: ${already ? "already closed, untouched" : "closed shipped"}\n`);
+    closed.push({ id: plan.id, already_closed: already, outcome: back ? back.outcome ?? null : null });
+  }
+  return closed;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   for (const a of argv) {
@@ -719,6 +826,9 @@ async function main() {
   // write on purpose: settling the ticket is this script's primary job, and a cost write that failed
   // must not take the status with it.
   if (cost) await writeCost({ base, key, cycleId, cost });
+
+  // 5 -- AGT-454: John's directive closes with the ticket that carried it. `delivered` only.
+  await closeDirectives({ base, key, cycleId, ticket, row, status: plan.patch.status, kickoffPath: kickoffArg });
 
   process.exit(0);
 }
