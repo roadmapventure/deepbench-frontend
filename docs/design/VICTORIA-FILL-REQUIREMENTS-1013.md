@@ -60,6 +60,8 @@ Status: DESIGN, being walked through one rule at a time with John. Nothing here 
 
 36. **Graded-on date: NOT a requirement (John, 2026-10-13).** Only Victoria grades, and the score-once rule reads the date from her existing grade record (it is needed only to tell whether a description or charter changed after she graded). Folded into the score-once build. Checked live 2026-10-13: every graded ticket has her `requirement-check` record; every ticket without a record is ungraded.
 
+37. **FILED (John, 2026-10-13).** Slices AGT-480..485 (Platform Reliability epic, drain 326f062f) and AGT-486..494 (Product Team Agents epic, drain 7a7dcfbe) are on the board as John-named, unscored tickets; decision record 4722ea64. AGT-494 (added at John's "yes let's only do #2") updates the Development Manager's prompt and skills for the findings review it gave up. Everything else John had not walked through was filed as FINDINGS for the Development Manager's review (found_by session:design-self-completion-1009, week 2026-W42): a stuck-queue outcome check, Victoria's removal-proposed dead end, a drain exit rule, the block-triage design, and the morning report skill. The existing drain 11db3e2d and the finaliser fix AGT-423 were deliberately left alone by John, to see what the routines do tonight.
+
 ## Future features (John, 2026-10-13)
 - **Measure each agent's load** (calls and tokens per day, pass minutes, findings waiting) so overload shows before it breaks, e.g. the Development Manager (43 calls and 2.72M tokens in 7 days) and the new Governance Architect. Token logs for Victoria, the Builder and the Ticket Owner read 0 and look incomplete, so the measure needs that fixed first.
 
