@@ -33,5 +33,15 @@ The first directive finished building on 2026-10-12 but can never be marked fini
 5. An outcome check (pickable count, drain stall age, delivered-without-exit count, tickets reaching done) in a named Auditor job.
 6. One shared daily guard for every routine that uses the pace limit (day index times 14.29 points) as well as the 90% ceiling, and per-run token logging so a daily count exists (logs read 0 for most agents).
 
+## Agreed approach (John, 2026-10-17): enhance, change nothing that exists
+The root cause, in John's lifecycle terms: a ticket has a status for "built and released" (`delivered`); a drain has none. The system ends a drain only when every ticket is `done`, so a drain whose tickets are all delivered stays queued and blocks the next drain.
+John's four rules (the whole fix):
+1. When all of a drain's tickets reach `delivered`...
+2. ...the drain's status becomes `delivered`.
+3. A `delivered` drain lets the runner pick up the next drain.
+4. If no drain is available, the runner picks the next prioritized ticket in an active project.
+Additive build only: (a) allow the status value `delivered` on drains (the check constraint allows only queued, in_progress, done, expired, cancelled, standing today); (b) the transition when every member is delivered, done or removed; (c) a one-time update of the old drain 11db3e2d (all 9 members delivered). Nothing existing changes: a drain whose members are all `done` still retires as today; an exclusive drain still holds the pick while it has work; a stuck or deferred member still holds its drain open on purpose (SES-305: a signal for the gate to re-rule), which is existing behavior and is NOT being changed. An earlier proposal of mine to step past stalled drains or to count stuck members as settled is withdrawn.
+Proof (rolled back, live data): with the old drain marked delivered, the runner picked AGT-480 to AGT-494 in order across both new drains, each drain flipping to delivered after its last ticket; with no drain left, `should_boot` read true, pickable 1, next ticket AGT-304 (rule 4 works today). Negative control: a stuck member (AGT-483) holds its drain queued and stops the sequence, as the existing design intends.
+
 ## Confidence
 High for the database chain (real functions, live data). Moderate for cycle behavior (whether cycles record decisions, whether the runner boots tonight). Not simulated: the settle-ship change, the stall rule, the pace guard inside routine prompts.
