@@ -1,3 +1,10 @@
+// DeepBench v7.0.853 | tests/regression/agt-93-enhancement-filing-lane.test.mjs | AGT-480 -- THE
+// LIVE ARM'S SECOND DIRECTION GRADED THE LIVE WORLD, NOT THE CHANGE. It failed any documented value
+// no row carried yet, which a brand-new constraint value cannot be (victoria-placed: the constraint
+// admits seven, rows carry six; found at AGT-480's QA bar, ruled rework by decision 9b8fb462). That
+// direction is now a named NOT RUN declaration; direction 1, the probe and the snapshot arm are
+// unchanged.
+//
 // DeepBench v7.0.571 | tests/regression/agt-93-enhancement-filing-lane.test.mjs | AGT-93
 //
 // FEATURE: AGT-93 -- the enhancement lane reaches FILE-MATRIX and the filing template.
@@ -321,24 +328,28 @@ async function bothHomesMatchWhatTheDatabaseAdmits(url, key) {
         `${admitted.size} -- missing: ${undocumented.join(", ")}`,
     );
 
-    // Direction 2 -- and nothing documented may be a value the platform would refuse. An invented
-    // value in the template is the same defect pointing the other way.
-    const invented = missingFrom(documented, admitted);
-    assert.deepStrictEqual(
-      invented, [],
-      `${rel} documents scope_origin value(s) ${invented.join(", ")} that no live row carries -- ` +
-        "either the constraint refuses them and the doc is wrong, or they are correct and this " +
-        "test's behavioural sampling has gone stale. Both are findings.",
-    );
+    // Direction 2 -- a documented value NO live row carries is DECLARED, never failed (AGT-480,
+    // ruling 9b8fb462; pattern:162 -- a check grades the change, not the live world). The sample
+    // is a lower bound, so an unused value is undecidable here without a write; an invented one
+    // surfaces as a refused write the first time a filing uses it. The first row that carries the
+    // value folds it into direction 1 and this declaration disappears on its own.
+    const unsampled = missingFrom(documented, admitted);
+    if (unsampled.length) {
+      notRun(
+        `${rel}: documented scope_origin value(s) ${unsampled.join(", ")} carried by no live row`,
+        "the admitted set is sampled from live rows (a lower bound; PostgREST cannot read " +
+          "pg_constraint), so a documented value no row carries yet cannot be graded without " +
+          "writing one. Declared by name until a filing carries it (AGT-480: victoria-placed).",
+      );
+    }
   }
 
   notRun(
     "an admitted scope_origin value that NO live row carries yet",
     "PostgREST cannot read pg_constraint (recorded independently by ses-309 and ses-282), so the " +
       "admitted set is sampled from the values real rows carry, licensed by the rejection probe " +
-      "above. Measured this session: all six values ck_backlog_scope_origin admits are presently " +
-      "carried by rows, so the sample is complete today -- but a seventh value added to the " +
-      "constraint and not yet used would not be caught here.",
+      "above. A value the constraint admits that no row carries is invisible to direction 1 and " +
+      "is declared by name in direction 2 (AGT-480, 2026-10-17: victoria-placed was the first).",
   );
 }
 
