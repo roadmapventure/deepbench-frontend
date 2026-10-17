@@ -1,3 +1,7 @@
+// DeepBench v7.0.853 | tests/regression/agt-309-process-break-class.test.mjs | AGT-480 -- arm A's
+// control flips the other way too: Victoria places a non-john source, so NSRC on the LOCKED
+// executing project is accepted and `executing` is the only limb homeAccepts() has left. The
+// planned-project cases are what keep that from reading as "the validator stopped refusing".
 // DeepBench v7.0.846 | tests/regression/agt-309-process-break-class.test.mjs | AGT-450 -- arm A's
 // homeAccepts() cases take the need_source: SRC is a john: source, so the LOCKED executing project
 // is now a home for it, and NSRC (nathan:) is the case that still carries H6's refusal.
@@ -233,10 +237,15 @@ function armA() {
   // deleted, with its expectation inverted, so the flip is measured and not merely absent.
   check({ need_source: SRC, home: HOME_LOCKED }, [],
     "a john: source homes onto an executing project that does NOT accept findings (AGT-450)");
-  // ... and the SAME destination with a non-john source still carries refusal 3. One column of the
-  // pair moves, so a homeAccepts() that simply stopped refusing could not pass both of these.
-  check({ need_source: NSRC, home: HOME_LOCKED }, [homeNotExecutingRefusal(HOME_LOCKED)],
-    "a nathan: source on an executing project that does NOT accept findings is still refused");
+  // ... and AGT-480 FLIPPED THE CONTROL TOO, which is that ticket's whole claim: Victoria's move
+  // door writes `scope_origin = 'victoria-placed'` for a non-john source and the lock admits it, so
+  // the SAME executing-but-locked destination is now reachable for a nathan: source as well. The
+  // case is kept with its expectation inverted rather than deleted, so the flip is measured.
+  // The pair that still discriminates is this destination against LIST_PROJECT below: `executing`
+  // is the only limb left, so a homeAccepts() that simply stopped refusing would pass here and FAIL
+  // the two planned-project cases that follow (the LOO-013 lesson -- which input moved the answer).
+  check({ need_source: NSRC, home: HOME_LOCKED }, [],
+    "a nathan: source now homes onto an executing project that does NOT accept findings (AGT-480)");
   // `executing` is unconditional in both limbs (AGT-450 kept it): a john: source does not make a
   // planned project a destination, and this case proves the new limb did not swallow the old one.
   check({ need_source: SRC, home: LIST_PROJECT }, [homeNotExecutingRefusal(LIST_PROJECT)],
@@ -283,25 +292,27 @@ function armA() {
     assert.ok(!NEED_SOURCE_SHAPE.test(bad), `${JSON.stringify(bad)} is not a who:table:id`);
   }
 
-  // homeAccepts() fails CLOSED on a row that carries no accepts_findings column (a pre-AGT-264
-  // context), exactly as listLocked() does.
+  // AGT-480: `accepts_findings` no longer moves the answer in EITHER direction -- the first two
+  // rows differ in exactly that column and both are homes now, which is the only way to tell a
+  // dropped limb from one that still reads the column and happens to agree.
   assert.equal(homeAccepts({ slug: "x", status: "executing", accepts_findings: true }), true);
-  assert.equal(homeAccepts({ slug: "x", status: "executing" }), false,
-    "a context row with no accepts_findings is not an accepting home");
+  assert.equal(homeAccepts({ slug: "x", status: "executing" }), true,
+    "a context row with no accepts_findings IS a home now -- the column is not read (AGT-480)");
   assert.equal(homeAccepts({ slug: "x", status: "planned", accepts_findings: true }), false,
-    "accepts_findings does not make a non-executing project a home");
+    "and accepts_findings still does not make a non-executing project a home");
   assert.equal(homeAccepts(undefined), false, "no row at all is not a home");
 
-  // AGT-450's second limb, as three units on the SAME two rows -- so the limb is pinned by which
-  // input moved the answer rather than by one call that happens to be true.
+  // AGT-480: the need_source does not move the answer either, so the SAME two rows that pinned
+  // AGT-450's limb now pin its REMOVAL -- `executing` is the one thing left, and the planned row
+  // proves it is still being read rather than that the function stopped refusing anything.
   const EXEC_LOCKED = { slug: "x", status: "executing", accepts_findings: false };
   const PLANNED_OK = { slug: "y", status: "planned", accepts_findings: true };
   assert.equal(homeAccepts(EXEC_LOCKED, SRC), true,
-    "executing + accepts_findings false IS a home for a john: source (AGT-450)");
-  assert.equal(homeAccepts(EXEC_LOCKED, NSRC), false,
-    "the same row is NOT a home for a nathan: source -- the need_source is what moved the answer");
+    "executing + accepts_findings false IS a home for a john: source (AGT-450, AGT-480)");
+  assert.equal(homeAccepts(EXEC_LOCKED, NSRC), true,
+    "and for a nathan: source too -- Victoria places it, so the source moves nothing (AGT-480)");
   assert.equal(homeAccepts(PLANNED_OK, SRC), false,
-    "and a john: source never opens a project that is not executing");
+    "and no source of any kind opens a project that is not executing");
 
   // --- nextLines(): the PAIRING, which is the only part of the print that can be wrong ----------
   //

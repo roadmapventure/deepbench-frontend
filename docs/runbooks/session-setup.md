@@ -281,7 +281,7 @@ SELECT '<PREFIX-N>', '<now|next|later>', '<Type from SCREEN-INVENTORY taxonomy>'
        'session-<short-session-name>', '<short-session-name> <yyyy-mm-dd>',
        coalesce(max(row_ordinal),0)+1,
        now(),                                   -- filed_at: the created date (never created_at, M5-04)
-       '<original|gate-review|john-named|discovered|pre-existing|enhancement>',   -- scope_origin (FILE-MATRIX)
+       '<original|gate-review|john-named|discovered|pre-existing|enhancement|victoria-placed>',   -- scope_origin (FILE-MATRIX)
        '<S|M|L>', <predicted cycles, >= 1>, '<no|maybe|yes>',           -- size_stamp, predicted_cycles, defer_status
        '<scope_rationale: WHY it belongs — "Goal N, <name>: …" — REQUIRED on a Selfbuild ticket, M5-03>',
        '<M0..M7 the ticket serves, or NULL>',                           -- milestone (SES-304)

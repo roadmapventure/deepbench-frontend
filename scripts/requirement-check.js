@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.853 | scripts/requirement-check.js | AGT-480 -- `--home` asks ONE thing: is the project executing. Victoria's move door writes victoria-placed for every non-john source, so neither accepts_findings nor the john: limb may refuse what the lock now admits.
 // DeepBench v7.0.846 | scripts/requirement-check.js | AGT-450 -- a john: source homes into ANY executing project.
 // DeepBench v7.0.844 | scripts/requirement-check.js | AGT-433 slice 2 -- need_score 0 = PARKED: both validators take 0-5 like apply_requirement_verdict() (v7.0.826).
 // DeepBench v7.0.828 | scripts/requirement-check.js | AGT-432 -- John's rulings are candidates, a john: need_source is never replaced, the block is John's VICTORIA-PRIORITIZE prompt (directive 0078af4d).
@@ -499,13 +500,22 @@ async function prepare(args) {
   //     does the writer's one-epic rule: a project that is not running is not a destination at all.
   //     The first segment is the whole test (`parsed.who`), never a list of tables kept here --
   //     `runner_settings.need_source_kinds` above is the data that says which `john:` tables exist.
+  //
+  //     AGT-480: AND NEITHER LIMB IS LEFT. `epic_lock_guard()` now admits `scope_origin =
+  //     'victoria-placed'` inside Victoria's move door, and `apply_requirement_verdict()` writes
+  //     that value for EVERY source her pass homes -- John's own naming still writes `john-named`,
+  //     everything else is her placement. So the source no longer decides whether the move is
+  //     possible, and keeping either `accepts_findings` or the `john:` test here would refuse a
+  //     move the database would now allow: this file would again be holding a condition the
+  //     database does not (the AGT-450 defect, one layer along). `executing` is what remains, and
+  //     it is unconditional -- a project that is not running is not a destination at all, and the
+  //     writer's own one-epic rule still answers the rest. A missing row and a present-but-wrong
+  //     row stay the same refusal.
   if (home !== "") {
-    const johnSource = parsed.who === "john";
     const projects = await get(`projects?slug=eq.${encodeURIComponent(home)}&select=slug,status,accepts_findings`);
     const proj = Array.isArray(projects) ? projects[0] : null;
-    if (!proj || proj.status !== "executing" || (proj.accepts_findings !== true && !johnSource)) {
-      die(1, `requirement-check --prepare: --home ${home} is not an executing project that accepts findings, ` +
-        `and ${parsed.pair} is not a john: source (AGT-240, AGT-450)`);
+    if (!proj || proj.status !== "executing") {
+      die(1, `requirement-check --prepare: --home ${home} is not an executing project (AGT-240, AGT-480)`);
     }
   }
 
