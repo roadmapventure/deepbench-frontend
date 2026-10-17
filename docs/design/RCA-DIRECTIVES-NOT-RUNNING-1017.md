@@ -33,6 +33,9 @@ The first directive finished building on 2026-10-12 but can never be marked fini
 5. An outcome check (pickable count, drain stall age, delivered-without-exit count, tickets reaching done) in a named Auditor job.
 6. One shared daily guard for every routine that uses the pace limit (day index times 14.29 points) as well as the 90% ceiling, and per-run token logging so a daily count exists (logs read 0 for most agents).
 
+## Scope (John, 2026-10-17): only tickets that are `delivered` inside a drain
+This fix looks only at the tickets that belong to a drain and whether they are delivered. It does NOT try to give the other delivered tickets an exit to `done` (about 135 delivered tickets sit outside any drain), does not rule on blocked verdicts, and does not touch the finaliser or AGT-423. Those items in the build list above are parked, not part of this fix.
+
 ## Agreed approach (John, 2026-10-17): enhance, change nothing that exists
 The root cause, in John's lifecycle terms: a ticket has a status for "built and released" (`delivered`); a drain has none. The system ends a drain only when every ticket is `done`, so a drain whose tickets are all delivered stays queued and blocks the next drain.
 John's four rules (the whole fix):
