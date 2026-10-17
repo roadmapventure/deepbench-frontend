@@ -114,7 +114,7 @@ node scripts/audit-review.js --apply=$S/answer.json --context=$S/ctx.json --week
 ```
 A `--dry-run` refusal → re-run the sub-agent ONCE with the refusal lines appended to the prompt; a second refusal → no `--apply`, the summary quotes the refusals, the findings stay `open` for next week. Keep `--apply`'s `Decision <id> — reversible until …` line and its ticket ids for step 7.
 
-**The process-break class (`AGT-309`; John 2026-10-02, rule `JOHN-1002-PROCESS-BREAK-CLASS`).** A `root-cause` group may carry `need_source` (`john:runner_decisions:<id>`) and `home` (an executing project that accepts findings). The ticket still files to its routed list; `--apply` prints one `next:` line per such group. Run it — Victoria rules the ticket against the cited need AND the class before it enters:
+**The process-break class (`AGT-309`; John 2026-10-02, rule `JOHN-1002-PROCESS-BREAK-CLASS`).** A `root-cause` group may carry `need_source` (`john:runner_decisions:<id>`) and `home` (an executing project). The ticket still files to its routed list; `--apply` prints one `next:` line per such group. Run it — Victoria rules the ticket against the cited need AND the class before it enters:
 ```
 node scripts/requirement-check.js --prepare --ticket=<ID> --source=<need_source> --home=<home> --out=$S/<ID>.prompt.md --json > $S/<ID>.json; echo "prepare exit $?"
 ```

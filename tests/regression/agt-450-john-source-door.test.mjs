@@ -1,3 +1,17 @@
+// DeepBench v7.0.853 | tests/regression/agt-450-john-source-door.test.mjs | AGT-480 -- THE LIMB
+// THIS FILE MEASURED IS GONE, so every expectation here is re-measured rather than deleted.
+// Victoria's move door writes `scope_origin = 'victoria-placed'` for every non-john source and
+// `epic_lock_guard()` admits it, so: arm 1 (b)'s nathan: control is now ACCEPTED and the
+// discriminator moves to the STAMP (`john-named` on (a), `victoria-placed` on (b) -- a weakened
+// lock would write neither); arm 2 (b) exits 3 like (a); and arm 3's `homeAccepts()` takes ONE
+// argument. The CLI refusal that used to live in arm 2 (b) is measured live in
+// `agt-480-victoria-placed-origin.test.mjs` arm C, by the input that still refuses.
+// NOTE, measured 2026-10-17 and unchanged by this ship: arms 1 and 2 are NOT RUN on today's board,
+// because `tooling` carries 2 epics and the writer's own one-epic rule makes it unreachable by
+// `home_project` at all (AGT-480 harvest section 6, FILED not fixed). Arm 3 runs. AGT-480's own
+// guard is written against `go-to-market`, which has exactly one epic, and is where the live
+// victoria-placed door is actually proven.
+//
 // DeepBench v7.0.846 | tests/regression/agt-450-john-source-door.test.mjs | AGT-450 --
 // THE JOHN-SOURCE DOOR. A need_source John himself wrote (`john:<table>:<id>`) is John naming the
 // ticket, and `epic_lock_guard()` has always admitted his naming outright -- its own second line:
@@ -156,41 +170,57 @@ function ticket(n, epicId, extra) {
 // ---------------------------------------------------------------------------------------------
 
 function armPure() {
-  // The two rows. Neither is edited between calls, so the only thing that can move an answer below
-  // is the need_source argument -- which is the entire claim AGT-450 makes.
+  // AGT-480 CLOSED THIS ARM'S QUESTION BY REMOVING THE LIMB IT MEASURED. Victoria's move door
+  // writes `scope_origin = 'victoria-placed'` for every source her pass homes, and
+  // `epic_lock_guard()` admits that value, so the need_source cannot decide whether a destination
+  // is reachable any more -- `homeAccepts(row)` takes ONE argument and asks ONE thing. The arm is
+  // kept rather than deleted, with every expectation re-measured, because that is what proves the
+  // limb is gone instead of merely untested.
+  //
+  // The rows still differ in `accepts_findings`, which is now the discriminator IN REVERSE: both
+  // executing rows must be homes, so a function that still read the column would fail here. The
+  // planned row is what keeps "both are homes" from reading as "it stopped refusing anything"
+  // (the LOO-013 lesson, STANDARDS.md Section 4 -- which input moved the answer).
   const EXEC_LOCKED = { slug: HOME, status: "executing", accepts_findings: false };
   const PLANNED_OK = { slug: LIST_PROJECT, status: "planned", accepts_findings: true };
 
-  assert.equal(homeAccepts(EXEC_LOCKED, JSRC), true,
-    "an executing project that does NOT accept findings IS a home for a john: source");
-  assert.equal(homeAccepts(EXEC_LOCKED, NSRC), false,
-    "the SAME row is not a home for a nathan: source -- the need_source is what moved the answer");
-  assert.equal(homeAccepts(PLANNED_OK, JSRC), false,
-    "and `executing` is unconditional: a john: source never opens a project that is not running");
+  assert.equal(homeAccepts(EXEC_LOCKED), true,
+    "an executing project that does NOT accept findings IS a home -- Victoria places the ticket");
+  assert.equal(homeAccepts({ slug: HOME, status: "executing", accepts_findings: true }), true,
+    "and so is one that does: accepts_findings no longer moves the answer in either direction");
+  assert.equal(homeAccepts({ slug: HOME, status: "executing" }), true,
+    "a context row carrying no accepts_findings is a home too -- the column is not read (AGT-480)");
+  assert.equal(homeAccepts(PLANNED_OK), false,
+    "and `executing` is unconditional and STILL READ: a planned project is nobody's destination");
+  assert.equal(homeAccepts({ slug: LIST_PROJECT, status: "proposed", accepts_findings: false }), false,
+    "nor a proposed one");
+  assert.equal(homeAccepts({ slug: LIST_PROJECT, status: "done", accepts_findings: true }), false,
+    "nor a finished one");
 
-  // The limb reads the FIRST SEGMENT and nothing else (kickoff §4's stub definition). These pin the
-  // boundary so a later `includes("john")` or a `john` anywhere in the id cannot pass for it.
-  assert.equal(homeAccepts(EXEC_LOCKED, "johnny:runner_decisions:x"), false,
-    "`johnny:` is not `john:` -- the segment is the test, not a prefix match");
-  assert.equal(homeAccepts(EXEC_LOCKED, "nathan:market_records:john:x"), false,
-    "a `john` later in the citation is not John's source");
-  assert.equal(homeAccepts(EXEC_LOCKED, "JOHN:runner_decisions:x"), false,
-    "the segment is lower-case, exactly as parseSource() and need_source_kinds spell it");
+  // Still fails CLOSED on no row at all, and a row with no status is not a running project.
+  assert.equal(homeAccepts(undefined), false, "no row at all is not a home");
+  assert.equal(homeAccepts(null), false, "and neither is a null one");
+  assert.equal(homeAccepts({ slug: HOME }), false, "a row carrying no status is not executing");
 
-  // Fails CLOSED with no citation at all, and still fails closed on a row with no accepts_findings.
-  assert.equal(homeAccepts(EXEC_LOCKED, undefined), false, "no need_source is not a john: source");
-  assert.equal(homeAccepts(EXEC_LOCKED, null), false, "and neither is a null one");
-  assert.equal(homeAccepts({ slug: HOME, status: "executing" }, NSRC), false,
-    "a context row carrying no accepts_findings is still not an accepting home");
-  assert.equal(homeAccepts(undefined, JSRC), false, "no row at all is not a home, whoever cited it");
+  // THE SECOND ARGUMENT IS GONE, not ignored-but-accepted: the whole point is that no citation can
+  // change the answer, so the same row must answer identically however it is called. A function
+  // that still branched on the citation would move at least one of these.
+  for (const src of [JSRC, NSRC, undefined, null, "johnny:runner_decisions:x", "JOHN:runner_decisions:x"]) {
+    assert.equal(homeAccepts(EXEC_LOCKED, src), true,
+      `the executing row is a home whatever is cited; ${JSON.stringify(src)} moved it`);
+    assert.equal(homeAccepts(PLANNED_OK, src), false,
+      `and the planned row is not, whatever is cited; ${JSON.stringify(src)} moved it`);
+  }
 
-  // The refusal the review prints names the second limb, so the manager reading it knows WHY the
-  // destination was refused and what would have opened it.
+  // The refusal the review prints names the one limb that is left, so the manager reading it knows
+  // WHY the destination was refused -- and no longer suggests a john: source would have opened it.
   const refusal = homeNotExecutingRefusal(HOME);
-  assert.ok(refusal.includes("is not a john: source"),
-    `the refusal must name the second limb; got ${JSON.stringify(refusal)}`);
-  assert.ok(refusal.includes("AGT-240, AGT-450"),
-    `and cite both tickets; got ${JSON.stringify(refusal)}`);
+  assert.ok(refusal.includes("is not an executing project"),
+    `the refusal must name the one remaining limb; got ${JSON.stringify(refusal)}`);
+  assert.ok(refusal.includes("(AGT-240, AGT-480)"),
+    `and cite AGT-240 and AGT-480; got ${JSON.stringify(refusal)}`);
+  assert.ok(!refusal.includes("accepts findings") && !refusal.includes("john: source"),
+    `and name neither removed limb; got ${JSON.stringify(refusal)}`);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -315,32 +345,36 @@ async function run() {
       } catch (e) { casefail("a the john: pass", e); }
 
       // (b) THE CONTROL, one field moved. Same home, same score band, same session -- a nathan:
-      //     source. AGT-240's lock must still refuse it, and the refusal rolls the WHOLE verdict
-      //     back, so F2 reads exactly as it was inserted.
+      //     source.
+      //
+      //     AGT-480 FLIPPED THIS CASE. Before that ship AGT-240's lock refused it and the refusal
+      //     rolled the whole verdict back; now Victoria PLACES it -- the writer stamps
+      //     `victoria-placed` and the lock admits that value inside her door. The case is kept with
+      //     its expectation inverted, so the flip is measured rather than merely absent, and the
+      //     DISCRIMINATOR moves to the stamp: (a) must read `john-named` and (b) `victoria-placed`
+      //     on the same home in the same run, which is the only thing that can tell "Victoria's
+      //     door opened" from "the lock was weakened" -- a weakened lock would write neither.
       try {
-        const decBefore = await count(url, key, "runner_decisions?select=id");
-        const locked = await rpc(url, key, "apply_requirement_verdict", {
+        const pass2 = await rpc(url, key, "apply_requirement_verdict", {
           p_cycle: null, p_session: SESSION,
           p: {
             verdict: "pass", backlog_id: F2, need_source: NSRC, need_score: 4,
             proposal: `AGT-450 regression probe control ${NONCE}`,
-            reason: "regression probe: a non-john source has no claim on a locked list",
+            reason: "regression probe: Victoria places a non-john source onto the executing list",
             account: "Ruled one proposal", home_project: HOME,
           },
         });
-        assert.ok(!locked.ok,
-          `a pass citing a nathan: source and homed to ${HOME} must STILL be refused; got ${describe(locked)}`);
-        assert.ok(locked.text.includes("AGT-240:"),
-          `and refused by AGT-240's lock, not by anything AGT-450 added; got ${describe(locked)}`);
-        assert.ok(locked.text.includes(homeEpics[0].name),
-          `and name the locked list; got ${describe(locked)}`);
+        assert.ok(pass2.ok,
+          `a pass citing a nathan: source and homed to ${HOME} must now be ACCEPTED; got ${describe(pass2)} ` +
+          `-- a refusal naming AGT-240 is the defect AGT-480 closes`);
 
         const f2 = await row(F2);
-        assert.equal(f2.epic_id, LIST_EPIC, "NOTHING WRITTEN: F2 stays on the findings list");
-        assert.equal(f2.scope_origin, "discovered", "and takes no stamp");
-        assert.equal(f2.need_score, null, "and no score -- the refusal rolled the verdict back");
-        assert.equal(await count(url, key, "runner_decisions?select=id"), decBefore,
-          "and no decision row survives the rollback");
+        assert.equal(f2.epic_id, HOME_EPIC,
+          `the pass must MOVE F2 onto ${HOME}'s epic; it is still on ${f2.epic_id}`);
+        assert.equal(f2.scope_origin, "victoria-placed",
+          "and stamp it VICTORIA-PLACED, not john-named -- the source is what picks the stamp");
+        assert.equal(f2.need_score, 4, "and carry her score");
+        assert.equal(f2.need_source, NSRC, "and the source she echoed");
       } catch (e) { casefail("b the nathan: control", e); }
 
       // (c) THE UNDO IS ONE CALL. `scope_origin` travels in the same before-image as `epic_id` and
@@ -390,17 +424,22 @@ async function run() {
       assert.equal(head.source, JSRC, "and the source it was handed");
       assert.ok(head.model, "and name the model the turn would run on, never a hardcoded id (AGT-147)");
 
-      // (b) the control, one argument moved. Exit 1, at step 2b, naming the limb that refused it.
+      // (b) the control, one argument moved. AGT-480: step 2b asks only whether the project is
+      //     executing, so this now exits 3 as well and reaches the assembly. The refusal that used
+      //     to live here has its own live case in `agt-480-victoria-placed-origin.test.mjs` arm C
+      //     (`--home=dev-mgr-findings`, exit 1), so the CLI's refusal path is still measured --
+      //     by the input that still refuses, which is a non-executing home rather than a source.
       const nathan = prepare(NSRC);
-      assert.equal(nathan.status, 1,
-        `--prepare with a nathan: source and the same --home must still exit 1; got ${nathan.status}: ${nathan.out.slice(0, 600)}`);
-      assert.ok(nathan.out.includes("is not a john: source (AGT-240, AGT-450)"),
-        `and name the second limb in its refusal; got ${nathan.out.slice(0, 600)}`);
+      assert.equal(nathan.status, 3,
+        `--prepare with a nathan: source and the same --home must now exit 3 (it exited 1 before ` +
+        `AGT-480); got ${nathan.status}: ${nathan.out.slice(0, 600)}`);
+      assert.ok(nathan.out.includes(`would be homed to ${HOME}`),
+        `and say where the pass would send it; got ${nathan.out.slice(0, 600)}`);
       assert.ok(nathan.out.includes("nathan:market_records"),
         `and name the pair it read; got ${nathan.out.slice(0, 600)}`);
-      assert.ok(!nathan.out.includes("would be homed to"),
-        `and must NOT reach the assembly; got ${nathan.out.slice(0, 600)}`);
-      console.log(`    [AGT-450 arm 2] exit 3 on john: (${head.prompt_bytes} prompt bytes, model ${head.model}); exit 1 on nathan:`);
+      assert.ok(!nathan.out.includes("is not a john: source"),
+        `and must no longer hold the removed limb; got ${nathan.out.slice(0, 600)}`);
+      console.log(`    [AGT-450 arm 2] exit 3 on john: (${head.prompt_bytes} prompt bytes, model ${head.model}); exit 3 on nathan: too (AGT-480)`);
     });
   } finally {
     // ---- the undo, in reverse order, and it runs whatever happened above ----------------------

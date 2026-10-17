@@ -1,3 +1,7 @@
+// DeepBench v7.0.853 | scripts/audit-review.js | AGT-480 -- homeAccepts(row) asks ONE thing again:
+// is the project EXECUTING. Victoria's move door writes scope_origin = 'victoria-placed', which
+// epic_lock_guard() admits, so the need_source no longer decides whether a home is reachable and
+// projects.accepts_findings decides nothing here. The needSource parameter is GONE, not ignored.
 // DeepBench v7.0.846 | scripts/audit-review.js | AGT-450 -- homeAccepts() takes the need_source too:
 // a john: source is John's own naming, so any EXECUTING project is a home for it.
 // DeepBench v7.0.743 | scripts/audit-review.js | AGT-309 -- THE PROCESS-BREAK CLASS REACHES THE
@@ -132,26 +136,30 @@ export function listLocked(home) { return !!home && LOCKED_PROJECT_STATUSES.incl
 // `runner_settings.need_source_kinds`.
 export const NEED_SOURCE_SHAPE = /^[a-z]+:[a-z_]+:[^:]+$/;
 export const NEED_SOURCE_NEEDS_HOME =
-  "a root-cause group citing need_source needs home (an executing projects.slug that accepts findings)";
+  "a root-cause group citing need_source needs home (an executing projects.slug)";
 export const HOME_NEEDS_NEED_SOURCE = "home needs need_source (the text who:table:id)";
 export const CLASS_KEYS_ROOT_CAUSE_ONLY = "need_source/home apply only to a root-cause group";
 export function homeNotExecutingRefusal(slug) {
-  return `home ${slug} is not an executing project that accepts findings, ` +
-    "and the need_source is not a john: source (AGT-240, AGT-450)";
+  return `home ${slug} is not an executing project (AGT-240, AGT-480)`;
 }
 // AGT-240's own condition, stated positively: this is the destination a `pass` may MOVE a ticket
-// onto. A context row carrying no `accepts_findings` fails it, so the check fails closed exactly as
-// listLocked() does.
+// onto. It is the same question `scripts/requirement-check.js --prepare` asks and the same one
+// `epic_lock_guard()` answers -- one rule in three places rather than three rules (pattern:14/163).
 //
-// AGT-450: the SECOND limb, and it is the same limb `scripts/requirement-check.js --prepare` and
-// `epic_lock_guard()` hold -- one rule in three places rather than three rules (pattern:14/163). A
-// need_source John himself wrote is John naming the ticket, and the lock admits his naming outright
-// (`scope_origin = 'john-named'` returns NEW before the lock is read), so refusing his destination
-// here would refuse a move the database would have allowed. `executing` is unconditional: a project
-// that is not running is not a home for anybody. The first segment is the whole test, never a list.
-export function homeAccepts(row, needSource) {
-  return !!row && row.status === "executing" &&
-    (row.accepts_findings === true || /^john:/.test(String(needSource ?? "")));
+// AGT-480 REMOVED BOTH EXTRA LIMBS, and the mirror is the whole reason. `epic_lock_guard()` now
+// admits `scope_origin = 'victoria-placed'` inside Victoria's move door, and
+// `apply_requirement_verdict()` writes that value for every source her `pass` homes (a `john:`
+// source, and a row already `john-named`, still write `john-named` -- AGT-450 unchanged). So the
+// SOURCE no longer decides whether the move is possible: her verdict does, and `projects
+// .accepts_findings` decides nothing here at all. Keeping either limb would make this mirror refuse
+// a destination the database would now accept -- the AGT-450 defect exactly, one ship along.
+//
+// `executing` is what remains and it is unconditional: a project that is not running is not a home
+// for anybody, and the writer's own one-epic rule still answers the rest. `needSource` is no longer
+// read, so the parameter is gone rather than kept and ignored -- a dropped argument is a rule that
+// looks live and is not. Still fails CLOSED on a missing row.
+export function homeAccepts(row) {
+  return !!row && row.status === "executing";
 }
 
 // The `next:` lines --apply prints, pure so the test asserts the PAIRING rather than the printing.
@@ -456,7 +464,7 @@ export function validateReview(review, worklist, week, checklist, routes, projec
           refusals.push(HOME_NEEDS_NEED_SOURCE);
         }
         if (classHome !== null && Array.isArray(projects) &&
-            !homeAccepts(projects.find(pr => String(pr.slug) === classHome), classNS)) {
+            !homeAccepts(projects.find(pr => String(pr.slug) === classHome))) {
           refusals.push(homeNotExecutingRefusal(classHome));
         }
       }
