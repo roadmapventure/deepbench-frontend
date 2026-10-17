@@ -1,1 +1,0 @@
-researcher-2026-W42 — The Researcher weekly market review (GV-02): Napkin validation + past-7-day market pass. Cloud routine, single clone per docs/runbooks/researcher-routine.md step 0 (no worktree, not a builder cycle).
