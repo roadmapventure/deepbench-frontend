@@ -1,3 +1,4 @@
+// DeepBench v7.0.861 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-486 -- the list vocabulary is LIST_VERDICTS (three values, `no-fit` added) and every list context carries the active charters; arm F reads the three-value enum off the live row. The no-fit rules themselves are graded by tests/regression/agt-486-charter-fit.test.mjs.
 // DeepBench v7.0.850 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
 // DeepBench v7.0.849 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-453 -- arm F re-pinned to EXPECTED_BINDINGS, six in display_order, two-direction via bindingDrift(); arm A proves missing/extra/duplicate/order each refuse.
 // DeepBench v7.0.844 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-433 slice 2 -- need_score 0 = PARKED: the validator accepts 0 and refuses -1 (band 0-5).
@@ -259,6 +260,13 @@ async function run() {
       ],
       candidates: [{ key: SRC, head: "the record's first words" }],
       kinds: ["nathan:market_records"],
+      // AGT-486: every list context now carries the active charters, and validateListVerdict()
+      // refuses an answer whose context carries none -- a fit cannot be judged against nothing. One
+      // charter here is enough to keep THIS arm about the rules it was written for; the three-value
+      // vocabulary, the empty-charter refusal and the no-fit rules are graded by
+      // tests/regression/agt-486-charter-fit.test.mjs arm C.
+      charters: [{ slug: "zagtvic-project", charter: "A charter, so the fit question is answerable." }],
+      fingerprint: "0".repeat(32),
     });
     assert.equal(ctx.proposals[0].description.length, DESC_CHARS,
       "a proposal's description is CUT at DESC_CHARS, so one long ticket cannot eat the list's budget");
@@ -296,6 +304,8 @@ async function run() {
         { backlog_id: B, title: "B", description: null, status: "partial" }],
       candidates: [{ key: SRC, head: "record" }, { key: J, head: "John's ruling" }],
       kinds: ["nathan:market_records", "john:runner_decisions"],
+      charters: [{ slug: "zagtvic-project", charter: "A charter, so the fit question is answerable." }],
+      fingerprint: "0".repeat(32),
     });
     const swapped = validateListVerdict(withRows([{ ...rows[0], need_source: SRC }, rows[1]]), ctxJ);
     assert.equal(swapped.ok, false, "(AGT-432) a pass may not replace an existing john: source");
@@ -313,8 +323,9 @@ async function run() {
       /the verdict needs a reason/);
     assert.match(must(withRows([{ ...rows[0], reason: "r".repeat(LIST_REASON_CHARS + 1) }, rows[1]]),
       A, "a reason past the schema's ceiling"), /the reason is 401 characters/);
-    assert.match(must(withRows([{ ...rows[0], verdict: "maybe" }, rows[1]]), A, "a verdict outside the two"),
-      /is not one of pass, not-needed/);
+    assert.match(must(withRows([{ ...rows[0], verdict: "maybe" }, rows[1]]), A,
+      "a verdict outside the three (AGT-486 added no-fit; LIST_VERDICTS, not the writer's VERDICTS)"),
+      /is not one of pass, not-needed, no-fit/);
     assert.match(must({ ...answer, list: "auditor-findings" }, "backlog-intake", "ANOTHER list's slug"),
       /which is not the one it was handed/);
     assert.match(must({ ...answer, account: "" }, "backlog-intake", "a blank account"), /needs an account/);
@@ -537,7 +548,7 @@ async function run() {
       const item = schema.properties?.rows?.items ?? {};
       assert.deepEqual(item.required, ["backlog_id", "verdict", "need_source", "need_score", "reason"],
         "and the row shape §4 names");
-      assert.deepEqual(item.properties?.verdict?.enum, ["pass", "not-needed"]);
+      assert.deepEqual(item.properties?.verdict?.enum, ["pass", "not-needed", "no-fit"]);
       assert.equal(item.properties?.need_score?.minimum, 1);
       assert.equal(item.properties?.need_score?.maximum, 5);
       assert.equal(item.properties?.reason?.maxLength, LIST_REASON_CHARS,

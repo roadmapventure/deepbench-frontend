@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.861 | scripts/requirement-check.js | AGT-486 -- THE LIST TURN IS TOLD WHAT THE PROJECTS ARE FOR, AND A TICKET THAT FITS NONE IS READ ONCE. `--prepare-list` calls `public.victoria_charter_state()` after the project read, so the context carries `active_charters` (the `{slug, charter}` of every `executing` project) and `charter_fingerprint` (the md5 of that array) -- no project slug and no charter text is written into this file (requirements d.5, d.17). Her answer gains a third verdict, `no-fit`: `LIST_VERDICTS`, which `validateListVerdict()` enforces in place of the writer's two, refusing a context with no charter at all and a `no-fit` that still carries a `need_source` or a `need_score`. A `no-fit` reaches ONE writer and no other -- `rpc/record_decision` of kind `fit-stamp` whose summary IS `fitStampSummary(id, fingerprint)`; no status PATCH, no before-image, nothing on the ticket moves. `--prepare-list` then drops every ticket the rpc's `stamped` names, so a ticket that fits nothing is read once instead of every run, and any charter edit moves the fingerprint, matches no stamp and offers them all again.
 // DeepBench v7.0.853 | scripts/requirement-check.js | AGT-480 -- `--home` asks ONE thing: is the project executing. Victoria's move door writes victoria-placed for every non-john source, so neither accepts_findings nor the john: limb may refuse what the lock now admits.
 // DeepBench v7.0.846 | scripts/requirement-check.js | AGT-450 -- a john: source homes into ANY executing project.
 // DeepBench v7.0.844 | scripts/requirement-check.js | AGT-433 slice 2 -- need_score 0 = PARKED: both validators take 0-5 like apply_requirement_verdict() (v7.0.826).
@@ -269,14 +270,44 @@ export const PROPOSED_STATUS = "removal proposed";
 export const AWAITING_LIST_ANSWER =
   "prompt assembled and printed; exit 3 = awaiting Victoria's one answer for the whole list, then --apply-list";
 
+// AGT-486: THE LIST TURN'S OWN VERDICT VOCABULARY, which is deliberately NOT `VERDICTS`. The two
+// above are what `apply_requirement_verdict()` enforces, and nothing about that writer changed: a
+// `no-fit` never reaches it. The third value exists only at the list grain, because only the list
+// turn is handed the charters a fit is judged against -- so widening `VERDICTS` would tell the
+// single-ticket door about an answer its one writer cannot take.
+export const LIST_VERDICTS = Object.freeze(["pass", "not-needed", "no-fit"]);
+
+// The `runner_decisions.kind` a `no-fit` is recorded under. A kind, never a status: nothing on the
+// ticket moves, so there is no row to image and nothing to propose for removal.
+export const FIT_STAMP_KIND = "fit-stamp";
+
+// THE STAMP'S WHOLE LIFE IS THIS STRING, which is why one function builds it and both the writer
+// here and `victoria_charter_state()`'s `stamped` predicate read the same shape. The fingerprint is
+// INSIDE the summary on purpose: a stamp says "fits none of THESE charters", so a charter edit moves
+// the fingerprint, the function's EXACT `=` matches nothing, and every stamped ticket is offered
+// again -- requirement d.5's clearing condition with no job to run (pattern:9, pattern:16).
+export function fitStampSummary(backlogId, fingerprint) {
+  return `${backlogId} fits no active project (charters ${fingerprint})`;
+}
+
 const cut = (v, n) => (v === null || v === undefined ? null : String(v).slice(0, n));
 
 // The list task_context. The tickets' own columns and the candidates' own keys -- this file judges
 // nothing about either, it only decides how much of each travels.
-export function buildListContext({ project, epics, tickets, candidates, kinds }) {
+export function buildListContext({ project, epics, tickets, candidates, kinds, charters, fingerprint }) {
   return {
     list: project ?? null,
     epics: Array.isArray(epics) ? [...epics] : [],
+    // AGT-486: the charters themselves, as the rpc returned them -- this file names no slug and
+    // carries no charter text of its own (requirements d.5, d.17), it only decides that the whole
+    // charter travels rather than a head of it: a fit judged against 200 characters of a charter is
+    // a fit judged against its first sentence.
+    active_charters: (Array.isArray(charters) ? charters : []).map(c => ({
+      slug: c?.slug ?? null, charter: c?.charter ?? null,
+    })),
+    // The md5 the rpc computed, echoed verbatim and never recomputed here: the stamp this run may
+    // write has to carry the SAME fingerprint the function will match it against.
+    charter_fingerprint: typeof fingerprint === "string" && fingerprint ? fingerprint : null,
     proposals: (Array.isArray(tickets) ? tickets : []).map(t => ({
       backlog_id: t.backlog_id ?? null,
       title: t.title ?? null,
@@ -318,6 +349,15 @@ export function validateListVerdict(answer, ctx) {
   const keys = new Set((Array.isArray(body.candidates) ? body.candidates : [])
     .map(c => String(c?.key ?? "")).filter(k => k !== ""));
 
+  // AGT-486: A FIT CANNOT BE JUDGED AGAINST NOTHING. `no-fit` means "none of the charters you were
+  // handed", so a context carrying no charter makes every verdict on the list unanswerable -- not
+  // just the `no-fit` ones. Refused here, offline, before any writer is reached.
+  const charters = (Array.isArray(body.active_charters) ? body.active_charters : [])
+    .filter(c => Object(c) === c && c !== null && !blank(c.slug) && !blank(c.charter));
+  if (charters.length === 0) {
+    no(label, "the context carries no active project charter to judge fit against");
+  }
+
   const a = Object(answer) === answer && answer !== null ? answer : {};
   if (blank(a.list)) no(label, "the answer names no list");
   else if (list !== null && String(a.list) !== list) {
@@ -340,8 +380,10 @@ export function validateListVerdict(answer, ctx) {
       no(id, "is not a ticket of this list — a row may only rule the tickets it was handed");
       continue;
     }
-    if (!VERDICTS.includes(row.verdict)) {
-      no(id, `verdict ${blank(row.verdict) ? "<NULL>" : String(row.verdict)} is not one of ${VERDICTS.join(", ")}`);
+    // AGT-486: the LIST vocabulary, not the writer's two -- `no-fit` is answerable here and nowhere
+    // else, because only this turn is handed the charters.
+    if (!LIST_VERDICTS.includes(row.verdict)) {
+      no(id, `verdict ${blank(row.verdict) ? "<NULL>" : String(row.verdict)} is not one of ${LIST_VERDICTS.join(", ")}`);
     }
     if (blank(row.reason)) no(id, "the verdict needs a reason");
     else if (String(row.reason).length > LIST_REASON_CHARS) {
@@ -369,6 +411,21 @@ export function validateListVerdict(answer, ctx) {
       const score = row.need_score;
       if (!Number.isInteger(score) || score < 0 || score > 5) {
         no(id, `need_score must be a whole number 0-5; got ${score === undefined ? "<NULL>" : JSON.stringify(score)}`);
+      }
+    }
+    // AGT-486: A `no-fit` IS NOT A GRADE, AND IT MUST NOT CARRY ONE. The stamp is the only write a
+    // `no-fit` reaches and it touches no ticket column at all -- so a `no-fit` that still names a
+    // source or a score is an answer that graded a ticket it had just said it could not place, and
+    // letting it through would hand `apply_requirement_verdict()` nothing while reading, to whoever
+    // looks at it later, as a scored ticket (the Designer's call, harvest §2).
+    if (row.verdict === "no-fit") {
+      if (row.need_source !== null && row.need_source !== undefined) {
+        no(id, `a no-fit carries need_source ${JSON.stringify(String(row.need_source))}; a ticket that ` +
+          "fits no charter is not graded, so both need_source and need_score are null");
+      }
+      if (row.need_score !== null && row.need_score !== undefined) {
+        no(id, `a no-fit carries need_score ${JSON.stringify(row.need_score)}; a ticket that fits no ` +
+          "charter is not graded, so both need_source and need_score are null");
       }
     }
   }
@@ -678,6 +735,24 @@ async function prepareList(args) {
   const proj = Array.isArray(projects) ? projects[0] : null;
   if (!proj) die(1, `requirement-check: no projects row reads slug ${project}`);
 
+  // 1b. AGT-486: THE CHARTERS AND THE FINGERPRINT, in ONE call, before anything else is read. The
+  //     function owns the whole answer -- which projects are active, what each is for, the md5 of
+  //     that set, and which tickets already hold a live stamp taken under it -- so this file writes
+  //     no slug and no charter text of its own (requirements d.5, d.17).
+  const state = await rest(base, key, "POST", "rpc/victoria_charter_state", {});
+  if (!state.ok) {
+    die(1, `requirement-check: POST rpc/victoria_charter_state -> HTTP ${state.status} ${state.text.slice(0, 400)}`);
+  }
+  const cs = Array.isArray(state.json) ? state.json[0] : state.json;
+  const charters = Array.isArray(cs?.charters) ? cs.charters : [];
+  const fingerprint = typeof cs?.fingerprint === "string" ? cs.fingerprint : "";
+  const stamped = new Set((Array.isArray(cs?.stamped) ? cs.stamped : []).map(String));
+  if (charters.length === 0) {
+    die(1, "requirement-check: victoria_charter_state() returns no active project charter — a fit " +
+      "cannot be judged against nothing, and no model turn is spent on a list whose destinations " +
+      "are all closed");
+  }
+
   // 2. Its epics, or the one named. An `--epic` of another project is refused rather than silently
   //    reorganized under this list's name.
   let epicIds;
@@ -697,12 +772,25 @@ async function prepareList(args) {
 
   // 3. The tickets. `open` and `partial` only: a `done` row's need was answered by shipping it, and a
   //    `removal proposed` row is already in John's waiting room.
-  const tickets = await get(
+  const listed = await get(
     `backlog_items?epic_id=in.(${epicIds.map(enc).join(",")})&status=in.(open,partial)` +
     "&select=backlog_id,title,description,status,tier,type,priority_class,scope_origin," +
     "scope_rationale,enhancement_claim,epic_id,need_source,need_score&order=backlog_id.asc&limit=1000");
-  if (!Array.isArray(tickets) || tickets.length === 0) {
+  if (!Array.isArray(listed) || listed.length === 0) {
     die(1, `requirement-check: ${project} has no open or partial tickets to reorganize`);
+  }
+  // AGT-486: READ ONCE, NOT EVERY RUN. A ticket holding a live `fit-stamp` taken under TODAY's
+  // fingerprint has already been read against exactly these charters and placed nowhere, so putting
+  // it to her again buys the same answer at the same cost. The count is printed on stderr, never on
+  // stdout -- stdout is the prompt.
+  const tickets = listed.filter(t => !stamped.has(String(t.backlog_id)));
+  const dropped = listed.length - tickets.length;
+  console.error(`requirement-check: ${dropped} of ${listed.length} ticket(s) dropped — a live ` +
+    `${FIT_STAMP_KIND} at charter fingerprint ${fingerprint} already says they fit no active project`);
+  if (tickets.length === 0) {
+    die(1, `requirement-check: every open or partial ticket of ${project} already holds a live ` +
+      `${FIT_STAMP_KIND} at charter fingerprint ${fingerprint} — there is nothing left to read, and ` +
+      "a charter edit is what offers them again");
   }
 
   // 4. The candidates, from the allowlist that is DATA (pattern:2). An allowlisted pair this file has
@@ -732,13 +820,19 @@ async function prepareList(args) {
       "ticket to be matched against");
   }
 
-  const task_context = buildListContext({ project, epics: epicIds, tickets, candidates, kinds });
+  const task_context = buildListContext({
+    project, epics: epicIds, tickets, candidates, kinds, charters, fingerprint,
+  });
   await assembleAndEmit({
     base, key, args, task_context, intentSlug: LIST_INTENT,
-    head: { list: project, epics: epicIds.length, tickets: tickets.length, candidates: candidates.length },
+    head: {
+      list: project, epics: epicIds.length, tickets: tickets.length, candidates: candidates.length,
+      charters: charters.length, charter_fingerprint: fingerprint, dropped,
+    },
   });
   die(3, `requirement-check --prepare-list: ${project} — ${tickets.length} ticket(s) against ` +
-    `${candidates.length} candidate source(s) — ${AWAITING_LIST_ANSWER}`);
+    `${candidates.length} candidate source(s) and ${charters.length} active charter(s) ` +
+    `(fingerprint ${fingerprint}) — ${AWAITING_LIST_ANSWER}`);
 }
 
 // ONE answer, TWO writers, then ONE record of the run. The validator runs first and a refusal sends
@@ -823,6 +917,43 @@ async function applyList(args) {
     }
     console.log(`${bid}: not-needed — ${PROPOSED_STATUS}; no row removed (SES-113).`);
     console.log(`Decision ${handle} — one Reverse returns it to the drain: select * from public.reverse_decision('${handle}', 'John', '<why>');`);
+  }
+
+  // --- AGT-486: the `no-fit` rows. ONE `runner_decisions` row each and NOTHING ELSE -- no status
+  //     PATCH, no before-image, no `audit_findings` row, no `need_source` and no `need_score`. There
+  //     is no before-image because there is no "before": the stamp records that this ticket was read
+  //     against THESE charters and placed nowhere, and the ticket itself is byte-unchanged. The
+  //     summary carries the fingerprint the prepare context was handed, never a freshly read one: a
+  //     stamp has to be matchable by the same charter set it was taken under, and a charter edited
+  //     between the prepare and the apply must leave the ticket unstamped rather than stamped
+  //     against a set she never saw.
+  const fingerprint = blank(body.charter_fingerprint) ? null : String(body.charter_fingerprint);
+  const noFits = rows.filter(r => r.verdict === "no-fit");
+  if (noFits.length && fingerprint === null) {
+    die(1, "requirement-check --apply-list: the context carries no charter_fingerprint, and a " +
+      `${FIT_STAMP_KIND} without one is a stamp nothing can ever clear`);
+  }
+  for (const row of noFits) {
+    const bid = String(row.backlog_id);
+    const dec = await rest(base, key, "POST", "rpc/record_decision", {
+      p_cycle_id: cycleId, p_session_name: sessionName,
+      p_kind: FIT_STAMP_KIND, p_backlog_id: bid,
+      p_summary: fitStampSummary(bid, fingerprint),
+      p_reasoning: `AGT-486 list reorganization of ${list}, ${startedAt}: this ticket fits none of ` +
+        `the ${(Array.isArray(body.active_charters) ? body.active_charters : []).length} active ` +
+        `project charter(s) at fingerprint ${fingerprint} — ${row.reason}.` +
+        " Nothing on the ticket changed and it is NOT proposed for removal; it is held out of this" +
+        " list's turn while that fingerprint stands, and any charter edit, pause or newly executing" +
+        " project offers it again. Reverse this decision to offer it again now. pattern:0",
+      p_ladder_work_class: null,
+    });
+    if (!dec.ok) die(1, `requirement-check --apply-list: ${bid} ${FIT_STAMP_KIND} -> HTTP ${dec.status} ${dec.text}`);
+    const handle = typeof dec.json === "string" ? dec.json : dec.json?.id ?? null;
+    if (typeof handle !== "string" || handle.length !== 36) {
+      die(1, `requirement-check --apply-list: ${bid} record_decision returned ${JSON.stringify(dec.json)}, which is not a decision id`);
+    }
+    console.log(`${bid}: no-fit — ${FIT_STAMP_KIND} recorded; nothing on the ticket changed, no removal proposed.`);
+    console.log(`Decision ${handle} — one Reverse offers it again: select * from public.reverse_decision('${handle}', 'John', '<why>');`);
   }
 
   // --- THE RUN'S ONE RECORD, as ticket-owner's recordNightly() writes its own: the parent row is read
