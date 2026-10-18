@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.862 | scripts/requirement-check.js | AGT-487 -- A TICKET'S OWN JOHN SOURCE IS CITABLE ON ITS OWN ROW. `--prepare-list` reads the head of the row behind each listed ticket's OWN `need_source` and hands it over as that proposal's `need_source_head` -- per proposal, read only for a ticket already carrying a source that is not already a candidate key, and NEVER appended to the shared `candidates` pool, which stays John's unreversed rulings (`CANDIDATE_FILTER`): appending it would let any ticket cite a non-ruling decision and weaken AGT-432 without John's words (pattern:166). `validateListVerdict()` then accepts a `pass` whose `need_source` IS the key the ticket already holds -- every other value must still be one of the candidates it was handed, and AGT-432's rule that a `john:` source is echoed and never replaced is byte-unchanged. Live before this: AGT-237 held `john:runner_decisions:2c38d860-...`, a `kind='scope'` decision of John's that `CANDIDATE_FILTER` never hands over, so neither the membership rule nor the echo rule could be satisfied and the whole `tooling` list was refused with no write (2026-10-12, 10-13).
 // DeepBench v7.0.861 | scripts/requirement-check.js | AGT-486 -- THE LIST TURN IS TOLD WHAT THE PROJECTS ARE FOR, AND A TICKET THAT FITS NONE IS READ ONCE. `--prepare-list` calls `public.victoria_charter_state()` after the project read, so the context carries `active_charters` (the `{slug, charter}` of every `executing` project) and `charter_fingerprint` (the md5 of that array) -- no project slug and no charter text is written into this file (requirements d.5, d.17). Her answer gains a third verdict, `no-fit`: `LIST_VERDICTS`, which `validateListVerdict()` enforces in place of the writer's two, refusing a context with no charter at all and a `no-fit` that still carries a `need_source` or a `need_score`. A `no-fit` reaches ONE writer and no other -- `rpc/record_decision` of kind `fit-stamp` whose summary IS `fitStampSummary(id, fingerprint)`; no status PATCH, no before-image, nothing on the ticket moves. `--prepare-list` then drops every ticket the rpc's `stamped` names, so a ticket that fits nothing is read once instead of every run, and any charter edit moves the fingerprint, matches no stamp and offers them all again.
 // DeepBench v7.0.853 | scripts/requirement-check.js | AGT-480 -- `--home` asks ONE thing: is the project executing. Victoria's move door writes victoria-placed for every non-john source, so neither accepts_findings nor the john: limb may refuse what the lock now admits.
 // DeepBench v7.0.846 | scripts/requirement-check.js | AGT-450 -- a john: source homes into ANY executing project.
@@ -322,6 +323,13 @@ export function buildListContext({ project, epics, tickets, candidates, kinds, c
       epic_id: t.epic_id ?? null,
       need_source: t.need_source ?? null,
       need_score: t.need_score ?? null,
+      // AGT-487: THE HEAD OF THE ROW THIS TICKET ALREADY CITES, travelling ON THE PROPOSAL and
+      // nowhere else. `prepareList()` reads it per ticket; this file adds nothing to `candidates`,
+      // because a held source in the shared pool would be a source EVERY ticket could cite --
+      // which is AGT-432's rule (only John's unreversed rulings are candidates) widened without
+      // John's words (pattern:166). Null is the ordinary case: a ticket with no source yet, a
+      // source that is already a candidate key, or a pair with no readable head.
+      need_source_head: t.need_source_head ?? null,
     })),
     candidates: (Array.isArray(candidates) ? candidates : []).map(c => ({
       key: c.key ?? null, head: c.head ?? null,
@@ -394,8 +402,15 @@ export function validateListVerdict(answer, ctx) {
       // equality against the one source it handed over; here the same rule is membership of the
       // candidate set, which is the same rule over a set of one or many.
       const src = blank(row.need_source) ? null : String(row.need_source);
+      // AGT-487: THE TICKET'S OWN SOURCE IS ALWAYS ONE OF ITS OPTIONS, which is why `held` is read
+      // BEFORE the membership test rather than after it. A key already on the ticket was put there
+      // by whoever filed it -- John himself, for a `john:` one -- so it is citable on that ticket
+      // whether or not `CANDIDATE_FILTER` hands the same row to everyone. It is an EXEMPTION FOR
+      // ONE ROW ONLY: every other value this ticket could name must still be a candidate it was
+      // handed, and no other ticket gains anything from this one's source.
+      const held = blank(want.get(id)?.need_source) ? null : String(want.get(id).need_source);
       if (src === null) no(id, "a pass names no need_source");
-      else if (!keys.has(src)) {
+      else if (src !== held && !keys.has(src)) {
         no(id, `a pass must name one of the ${keys.size} candidate source(s) it was handed; ` +
           `${JSON.stringify(src)} is not one of them`);
       }
@@ -403,7 +418,6 @@ export function validateListVerdict(answer, ctx) {
       // John-authored need_source to a market record on 2026-10-08. A `john:` source already on the
       // ticket may only be echoed; any other existing source may still be replaced, which is the
       // only tier the directive states.
-      const held = blank(want.get(id)?.need_source) ? null : String(want.get(id).need_source);
       if (held !== null && held.startsWith("john:") && src !== null && src !== held) {
         no(id, `already carries John's own source ${held}; a pass must echo it; an existing ` +
           "John-authored need_source is never replaced (directive 0078af4d)");
@@ -818,6 +832,38 @@ async function prepareList(args) {
   if (candidates.length === 0) {
     die(1, "requirement-check: the allowlist named no candidate rows at all — there is nothing for a " +
       "ticket to be matched against");
+  }
+
+  // 4b. AGT-487: THE SOURCE A TICKET ALREADY CARRIES, read PER TICKET and attached to its own
+  //     proposal. A `john:` key John put on a ticket himself may name a row `CANDIDATE_FILTER`
+  //     does not hand over (AGT-237's `kind='scope'` decision), and then neither the membership
+  //     rule nor AGT-432's echo rule could be satisfied -- so the whole list was refused with no
+  //     write. The head travels on the proposal and is NEVER pushed into `candidates`: the pool
+  //     stays John's unreversed rulings, or every ticket could cite one ticket's non-ruling source.
+  //     A pair the allowlist does not name, a table with no head column and a key naming no row
+  //     are all left NULL with ONE stderr line each -- never a `die`, because a ticket whose own
+  //     source cannot be read is still a ticket she can rule on the candidates she was handed.
+  const candidateKeys = new Set(candidates.map(c => c.key));
+  for (const t of tickets) {
+    if (blank(t.need_source)) continue;
+    const src = String(t.need_source);
+    if (candidateKeys.has(src)) continue;          // already in the pool; the proposal needs no head
+    const parsed = parseSource(src);
+    const col = parsed ? CANDIDATE_HEAD[parsed.table] : null;
+    if (!parsed || !kinds.includes(parsed.pair) || !col) {
+      console.error(`requirement-check: ${t.backlog_id} carries need_source ${src}, which names ` +
+        `${parsed ? `the pair ${parsed.pair}` : "no who:table:id pair"} — no head travels for it ` +
+        "(the allowlist and CANDIDATE_HEAD decide what is readable, and this is not a refusal)");
+      continue;
+    }
+    const held = await get(`${enc(parsed.table)}?id=eq.${enc(parsed.id)}&select=id,${enc(col)}&limit=1`);
+    const row = Array.isArray(held) ? held[0] : null;
+    if (!row) {
+      console.error(`requirement-check: ${t.backlog_id} carries need_source ${src} and ` +
+        `${parsed.table} holds no row with that id — no head travels for it`);
+      continue;
+    }
+    t.need_source_head = cut(row[col], HEAD_CHARS);
   }
 
   const task_context = buildListContext({

@@ -270,7 +270,7 @@ WHAT HER TOOLS DO TODAY (not John's words): the list door (--prepare-list / --ap
   if r.temperature is distinct from NULL
     then raise exception 'AGT-452 drift: vc-requirement-intent.temperature'; end if;
 
-  -- skill_profiles · vc-reorganize-intent · intent · method md5 fea049fe8c3bacf2bc69479eacf899a8
+  -- skill_profiles · vc-reorganize-intent · intent · method md5 9fe43806320eed77bfcfa3f103203fed
   select * into r from public.skill_profiles where slug = $r452$vc-reorganize-intent$r452$;
   if not found then raise exception 'AGT-452 drift: vc-reorganize-intent missing'; end if;
   if r.slug is distinct from $r452$vc-reorganize-intent$r452$
@@ -292,7 +292,9 @@ WHAT HER TOOLS DO TODAY (not John's words): the list door (--prepare-list / --ap
 3. `pass` means a candidate supports it: put that candidate's key in `need_source` exactly as you were given it, and score `need_score` 1-5 as the SEVERITY of the problem the ticket fixes, NOT how strongly the cited row supports it. Run each ticket through John's severity decision tree in your Knowledge (vc-john-severity-tree), from 5 down to 1, and give the highest severity it genuinely fits with evidence in the ticket text. Where a ticket shows no frequency and no impact, score the default and say in its reason what evidence would raise it. If the tree says a ticket is PARKED (0), your answer format does not accept 0: put "PARKED (0) until <project> is active" first in its reason and score it 1 (the lowest the checker accepts; the pick skips anything below 3, and the PARKED (0) prefix marks it to be re-scored), and name the project.
 4. `not-needed` means no candidate supports it -- the proposal answers a need nobody recorded, or it has outgrown the one it was filed against. Set `need_source` and `need_score` to null. The ticket is not deleted: it is proposed for removal and waits for John, so your reason is the whole case he reads.
 5. `reason` is one line, at most 400 characters, in plain business language, quoting the part of the candidate row (or of the ticket) you relied on.
-6. Several tickets may share one candidate -- say so plainly rather than inventing a different source per ticket. Never invent a key, never widen one you were given, never score a `not-needed`, and never rule on the ticket of another list.$r452$
+6. Several tickets may share one candidate -- say so plainly rather than inventing a different source per ticket. Never invent a key, never widen one you were given, never score a `not-needed`, and never rule on the ticket of another list.
+
+3a. A TICKET'S OWN SOURCE IS ALWAYS CITABLE. A ticket already carrying a need_source is handed that key on the ticket itself, with the first 200 characters of the row behind it as need_source_head, whether or not it also appears in the candidate list. A john: key was John naming the ticket: echo it back exactly as given and score it -- never replace it, and never turn a ticket down for want of a candidate when it already carries one.$r452$
     then raise exception 'AGT-452 drift: vc-reorganize-intent.method'; end if;
   if r.output_desc is distinct from $r452$One JSON object: the list slug, one row per ticket (verdict, the candidate key or null, a 1-5 score or null, a one-line reason) and your account of the turn.$r452$
     then raise exception 'AGT-452 drift: vc-reorganize-intent.output_desc'; end if;
