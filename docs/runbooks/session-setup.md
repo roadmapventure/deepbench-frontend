@@ -146,14 +146,14 @@ principle as the counters below:
 <!-- {{rule:B40}} · rendered from public.governance_rules — do not hand-edit the quoted line(s)
      below. Edit the registry row, re-export docs/governance/RULES-SNAPSHOT.md, then run
      `node scripts/render-rule-blocks.js --write`. Checked by that script's default mode (SES-175). -->
-> **Rule B40** — Claim a backlog ticket atomically via claimed_by/claimed_at columns at pick time (any session, manual or scheduled); a claim expires after 24h so a dead session can't strand a ticket.
+> **Rule B40** — Claim a backlog ticket atomically via claimed_by/claimed_at columns at pick time (any session, manual or scheduled); a claim expires after 6h, never a STOPPED-BY-JOHN one, so a dead session can't strand a ticket.
 
 ```sql
 UPDATE public.backlog_items
    SET claimed_by = '<short-session-name>', claimed_at = now()
  WHERE backlog_id = '<TICKET-ID>'
    AND status <> 'done'
-   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
+   AND public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL
 RETURNING backlog_id;
 ```
 
@@ -187,8 +187,9 @@ decision this very session just recorded un-restorable one statement after the p
 
 The holder guard is the point — a session can never clear a claim that has since moved to
 another session. On an abort, release at the point you stop. An unreleased claim expires after
-24h, so a dead session cannot strand a ticket. Discussion-only sessions that never settle on a
-ticket claim nothing.
+6h, so a dead session cannot strand a ticket — except a `STOPPED-BY-JOHN` claim, which no amount
+of elapsed time frees (`AGT-482`; only John releases it). Discussion-only sessions that never
+settle on a ticket claim nothing.
 
 **After any close-out write that completes/removes a ticket or files a new classed one, run
 `SELECT public.recompute_backlog_queue();`** — the board's queue numbers are materialized

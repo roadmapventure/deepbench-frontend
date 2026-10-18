@@ -50,7 +50,7 @@ UPDATE public.backlog_items
    SET claimed_by = '<your cycle id or session name>', claimed_at = now()
  WHERE backlog_id = '<TICKET-ID>'
    AND status <> 'done'
-   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
+   AND public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL
 RETURNING backlog_id;
 ```
 
@@ -83,10 +83,14 @@ re-assert at the push gate).
   irreversible act — the push, and every counter claim. A cycle that lost its claim and kept
   working came one command short of pushing a duplicate to `dev` (`v7.0.123`).
 
-**The 24-hour expiry is why a dead session cannot strand a ticket.** A session that vanishes
-mid-build holds its claim for at most 24 hours; after that the ticket is re-claimable and the
-board heals with nobody intervening. That bar is the same evidence bar used for calling a cycle
-silent — derived from the longest observed resurrection gap (~9h20m), not chosen for neatness.
+**The 6-hour expiry is why a dead session cannot strand a ticket.** A session that vanishes
+mid-build holds its claim for at most 6 hours (`AGT-482`, John's decision 10); after that the
+ticket is re-claimable and the board heals with nobody intervening. **The one claim age never
+frees is John's own:** a `claimed_by` beginning `STOPPED-BY-JOHN` stays claimed at any age, and
+only John releases it (decision 23). The 24 hours that remains is
+`runner_settings.claim_stale_hours`, which now paints `public.backlog_mode()`'s *in development*
+badge alone, and the evidence bar for calling a cycle silent — derived from the longest observed
+resurrection gap (~9h20m) — is that separate 24, not this one.
 
 Mechanics and the exact SQL for a manual session: `docs/runbooks/session-setup.md`
 step 2c. Runner-cycle specifics: `docs/runbooks/runner-cycle.md` step 5.

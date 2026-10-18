@@ -100,12 +100,12 @@ the batch at the end, for John. The only database write is the registry rows the
 
 ### <a id="OD-08"></a>OD-08 — The claim expiry
 
-> A ticket claim goes stale after `runner_settings.claim_stale_hours` hours (default and live value 24), read by `public.prime_directive_queue()` since AGT-88 and by `public.drain_epic_next()` (twice) and `public.backlog_mode()` since AGT-109, which retired the last hand-copied `INTERVAL '24 hours'` literals, so a dead session can never strand a ticket permanently; canonical: `runner_settings.claim_stale_hours`.
+> A ticket claim's staleness has TWO homes, two numbers and two jobs: the pick and the countable sensor read `public.claim_exclusion_reason(text, timestamptz)` (AGT-482), whose 6 hours come from `public.countable_claim_hours()` (John's decision 10) and which never frees a `STOPPED-BY-JOHN` claim at any age (John's decision 23); `runner_settings.claim_stale_hours` (default and live value 24) now serves `public.backlog_mode()`'s 'in development' badge alone, which has read the column since AGT-109, the ticket that retired the last hand-copied `INTERVAL '24 hours'` literals, so a dead session can never strand a ticket permanently; canonical: `public.claim_exclusion_reason()` for the pick and the sensor, `runner_settings.claim_stale_hours` for the badge.
 
 - **Enforcement:** `script`
-- **Lives in:** `public.runner_settings.claim_stale_hours` (AGT-88), read by `public.prime_directive_queue()` and — since AGT-109 — by `public.drain_epic_next()` (twice) and `public.backlog_mode()`.
-- **Pinned by:** `tests/regression/ses-84-claims-classed.test.mjs`.
-- **Judgment:** **keep.** G1: without an expiry a crashed cycle stops the loop, and the loop is the deliverable. AGT-109 retired the last two copies, so every reader now goes to the column.
+- **Lives in:** TWO homes since AGT-482 (v7.0.856): `public.claim_exclusion_reason(text, timestamptz)` holds the pick-side window, the `STOPPED-BY-JOHN` sentinel and the sentence, taking its 6 hours from `public.countable_claim_hours()` (AGT-481), and is read by `public.pick_exclusions()`, `public.drain_epic_next()` (twice) and `public.countable_tickets_per_project()`; `public.runner_settings.claim_stale_hours` (AGT-88) is read by `public.backlog_mode()` alone — since AGT-109 — where its 24 paints the display badge. `public.prime_directive_queue()` reads no claim column at all since AGT-173, which joins `public.pick_exclusions()`.
+- **Pinned by:** `tests/regression/agt-482-claim-stop-fence.test.mjs` asserts both windows and the stop in one run; `tests/regression/ses-84-claims-classed.test.mjs`; `tests/regression/agt-88-constant-homes.test.mjs` holds this row to its home with no copy outstanding.
+- **Judgment:** **amend.** G1 still holds: without an expiry a crashed cycle stops the loop, and the loop is the deliverable. But one number could not serve two questions. **AGT-482 (v7.0.856) split them on John's decisions 10 and 23: the pick and the countable sensor read 6 hours through one function that also refuses to free a `STOPPED-BY-JOHN` claim at any age; the 24 stays on the badge.** Measured live the same day: AGT-020, AGT-159 and PRO-3 had carried that sentinel for 18 days and `pick_exclusions()` gave them no claim reason at all.
 
 ### <a id="OD-09"></a>OD-09 — The one design_status that still blocks
 

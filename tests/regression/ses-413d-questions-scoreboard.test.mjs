@@ -1,3 +1,4 @@
+// DeepBench v7.0.856 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-482 -- BYTES_AT_SHIP re-pinned 380978 -> 380972 (the claim fence: rule B40's rendered block grows +29 B, the two claim-SQL blocks and step 0b census (b) move to public.claim_exclusion_reason(), the 24h claim prose across the runbook reads 6h, and the v7.0.602 stamp rotated out for a 140-byte one -- measured with wc -c. The operative ceiling is NOT SES-336's 381,000 but agt-138-researcher-routine.test.mjs's one-way ratchet at PRE_CHANGE_BYTES = 380,980, which the AGT-482 kickoff did not name; this pin leaves 8 B under it.
 // DeepBench v7.0.843 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-451 -- BYTES_AT_SHIP re-pinned 380977 -> 380978 (step 7 measures the baseline credentialed before the spawn: INS, the 7a flag line and R1 added, the v7.0.650 stamp rotated out for a 188-byte one -- measured with wc -c, 22 B of headroom left under the 381,000 B ceiling).
 // DeepBench v7.0.839 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-448 -- BYTES_AT_SHIP re-pinned 380952 -> 380977 (step 5a's cap-case paragraph names the Designer's case and cap_waived).
 // DeepBench v7.0.838 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-447 -- BYTES_AT_SHIP re-pinned 380843 -> 380952 (step 5a's cap-case paragraph).
@@ -260,7 +261,7 @@ export const RUNBOOK_CEILING = 381000;
 // bar and 35 B under SES-336's ceiling -- REPORTED, not absorbed. No header stamp (ses-424c pins
 // stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c, re-pinned and the card re-rendered in the
 // same commit as the runbook edit.
-export const BYTES_AT_SHIP = 380978;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
+export const BYTES_AT_SHIP = 380972;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

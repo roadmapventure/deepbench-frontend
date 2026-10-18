@@ -424,10 +424,12 @@ export default async function run() {
   assert.ok(q.startsWith("backlog_items?backlog_id=eq.SES-000"), `the claim must filter on the ticket's identity: ${q}`);
   assert.ok(q.includes("status=neq.done"), "a done ticket is not claimable");
   assert.ok(q.includes("or=(claimed_by.is.null") && q.includes("claimed_at.lt."),
-    `rule B40's 24h-expiry guard must ride IN the query so the DATABASE decides, not this file -- a ` +
+    `rule B40's 6h-expiry guard must ride IN the query so the DATABASE decides, not this file -- a ` +
     `check-then-claim pair is what let cycles e36d4379 and 4da5a7bd both build ADM-1 seventeen ` +
     `seconds apart. got: ${q}`);
-  assert.equal(CLAIM_TTL_HOURS, 24, "rule B40's expiry window");
+  assert.equal(CLAIM_TTL_HOURS, 6,
+    "rule B40's expiry window -- AGT-482 narrowed it from 24 to 6 (John's decision 10), the same 6 " +
+    "`public.countable_claim_hours()` holds. A 24 here means the driver and the database disagree.");
   assert.equal(claimOutcome([{ claimed_by: "me" }]).ok, true, "1 row -> it's yours (rule B40)");
   assert.equal(claimOutcome([]).ok, false, "0 rows -> someone holds it (rule B40)");
   assert.ok(/live peer holds this ticket/.test(claimOutcome([]).reason || ""), "the refusal must say why");

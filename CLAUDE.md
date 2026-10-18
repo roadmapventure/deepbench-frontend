@@ -106,8 +106,10 @@ These are the always-on rules. Statements only — the *procedures* they imply l
 > 0 rows → someone holds it, take the next queued ticket.** Release it AFTER the push, in its
 > own holder-guarded `UPDATE`, never in the status write (`q-claim-release-order`, `SES-106`).
 > It serializes ticket *selection* only — the `dev` branch is still fetch/rebase/push, and the
-> briefing republish has its own lock. A claim expires after 24h, which is why a dead session
-> cannot strand a ticket; re-assert it before the push and before every counter claim. Full rule
+> briefing republish has its own lock. A claim expires after 6h, which is why a dead session
+> cannot strand a ticket — except a `claimed_by` beginning `STOPPED-BY-JOHN`, which no elapsed
+> time frees and only John releases (`AGT-482`); re-assert it before the push and before every
+> counter claim. Full rule
 > with what it does and does not protect: `docs/GOVERNANCE-MODES.md`.
 
 > **Sub-agents inherit the worktree, never nest one (2026-07-16, extended 2026-07-17):** Any

@@ -2,7 +2,7 @@
 <!-- DeepBench v7.0.843 | runbooks/runner-cycle.md | AGT-451 — step 7 measures the baseline credentialed before the spawn; 7a reads it. v7.0.650 DROPPED (its facts: step 6), count 5. -->
 <!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171 — THE (6) CLOSE RELEASES THE PUBLISH LEASE IN THE SAME STATEMENT: a CLOSED cycle held it 26 min (steals 17) because the release came after the (7e)/(7f) sub-agents. Nothing after (6) is leased; step 1's release block is gone; 0b probe (c) flags a closed holder. v7.0.532 DROPPED (docs/SESSIONS.md), 2 ZERO-hit facts RELOCATED to Reading 0; count 5. Guard agt-171-lease-released-at-close.test.mjs. -->
 <!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
-<!-- DeepBench v7.0.602 | runbooks/runner-cycle.md | AGT-137 — (7e): the Auditor reviews THIS run (`audit-run-review.js`). `v7.0.520` DROPPED, count 5. -->
+<!-- DeepBench v7.0.856 | runbooks/runner-cycle.md | AGT-482 — the claim fence: 6h, never STOPPED-BY-JOHN. v7.0.602 DROPPED, count 5. -->
 # Runner Cycle — Standing Prompt (§19v)
 
 You are one cycle of DeepBench's Automated development runner, executing in an isolated cloud
@@ -347,7 +347,7 @@ standing guarantee (`v7.0.123`'s lesson, directive `c4d95dc7`, retargeted from t
 cycle lease to the ticket claim, register B42).** The principle `633fe486` paid for is
 unchanged: a cycle that lost its coordination token keeps working, because nothing tells it —
 it came one command short of pushing a duplicate to `dev` and was saved only by an incidental
-`git fetch`. Under parallel cycles the token is the **ticket claim** (24h expiry), so run this
+`git fetch`. Under parallel cycles the token is the **ticket claim** (6h expiry), so run this
 immediately before **any** irreversible act — the step-7 push, and every counter claim
 (`dev_version_counter`, `feature_id_counter`):
 
@@ -356,7 +356,7 @@ immediately before **any** irreversible act — the step-7 push, and every count
 -- and another session took it.
 SELECT claimed_by, claimed_at FROM public.backlog_items
  WHERE backlog_id = '<your TICKET-ID>' AND claimed_by = '<your cycle id>'
-   AND claimed_at > now() - INTERVAL '24 hours';
+   AND claimed_at > now() - INTERVAL '6 hours';
 ```
 
 **0 rows → your claim is gone. STOP, and note precisely what stop means here:**
@@ -456,9 +456,9 @@ SELECT id, started_at, item_id,
   FROM public.runner_cycles
  WHERE ended_at IS NULL AND id <> '<your cycle id>'
    AND started_at < now() - INTERVAL '24 hours';
--- (b) ticket claims past their 24h expiry (a session that vanished mid-build)
+-- (b) ticket claims past their 6h expiry (a session that vanished mid-build)
 SELECT backlog_id, claimed_by, claimed_at FROM public.backlog_items
- WHERE claimed_at < now() - INTERVAL '24 hours' AND claimed_by IS NOT NULL;
+ WHERE claimed_by IS NOT NULL AND public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL;
 -- (c) the publish lease past its 10-minute TTL, or held by a CLOSED cycle (AGT-171: (6) releases it, so a closed holder means (6) was bypassed)
 SELECT l.holder, l.held_since, c.ended_at FROM public.runner_lease l LEFT JOIN public.runner_cycles c ON c.id = l.holder
  WHERE l.id = 1 AND l.holder IS NOT NULL AND (l.held_since < now() - INTERVAL '10 minutes' OR c.ended_at IS NOT NULL);
@@ -534,7 +534,7 @@ clock. Guarded by `tests/regression/ses-423b-stall-signal.test.mjs`.
 **THE WATCHDOG — one call, run it right after the sweep, every cycle (`SES-194`, `v7.0.230`,
 migration `ses194_stall_watchdog`).** Probe (d) *detects* a frozen peer and reports it once.
 Until this shipped **nothing ever closed one**, so a silent cycle's row stayed open forever and
-its ticket claim stranded until the 24h expiry — measured live 2026-08-24T17:45Z: `e4074c97`
+its ticket claim stranded until the 6h expiry — measured live 2026-08-24T17:45Z: `e4074c97`
 (frozen 124 min at *"step 5 — pick"*) and `039d1477` (108 min at *"step 3/4"*) both still open
 and both stall-notified at 16:25Z, with a claim on `SES-141` stranded 2,238 minutes:
 
@@ -604,7 +604,7 @@ leave the silent row alone:
   explained by B39, and the row should say so rather than reach for the nearest known cause —
   that reflex is how this platform got three wrong rulings in a row.
 - **What to do next — concretely, including "nothing".** Most silences need no action at all:
-  the claim's 24h expiry re-opens the ticket, the next cycle re-picks it, and the silent
+  the claim's 6h expiry re-opens the ticket, the next cycle re-picks it, and the silent
   cycle may simply come back and finish. Say that plainly rather than implying an emergency. Name
   an action only for real residue: a directive stuck `in_progress` (re-claim it — before-image
   first, never quietly), a version number claimed and unused (a permanent counter gap; record it,
@@ -1981,7 +1981,7 @@ row, which `prime_directive_queue()` names in `lane_note`. **(c)** **Exit 2 nami
 --detail='assignment differs from the queue head'` (the ledger groups it; the note keeps X and
 Y) — and **build
 `prime_directive_queue()`'s first row** — the `SES-45` boundary: a mismatch is a finding on the
-Skill text, never a re-ordering of the board. **A RECORDED PASS-OVER IS NOT A MISMATCH (`AGT-183`, `v7.0.625`) — this clause ADDS to (c) and removes nothing from it.** An assignment the driver ACCEPTED (exit **0**) whose answer carried `passed_over` — an optional list of `{backlog_id, reason}` that names the pick and every row the manager went past, each of those already in `project_blockers`, landing on a `prime_directive_queue()` row every earlier row of which is blocked too — is a pass-over, not a re-ordering: the blocked pick KEEPS ITS SLOT, you build the row the driver accepted, and you write `MANAGER PASS-OVER: <X> over <Y> (blocked: <reason>)` in the cycle row notes — no `--kind='assignment mismatch'` record, because nothing was re-ordered. `scripts/run-project.js` checks all five of those conditions itself and refuses anything short of them, naming which condition closed, so a pass-over you are asked to act on is one the driver already admitted; you never adjudicate it here. Exit **2** naming a ticket other than the pick is still (c) above, unchanged. TODAY THIS IS THE ACCEPTING HALF ONLY: no manager Skill row emits `passed_over` yet (teaching `dm-run-intent` / `dm-guardrails` to emit it is a Skill-row change, filed separately at this ship), so until one does, every off-pick answer still arrives as (c). AND THE CYCLE'S OWN CLAIM IS NOT DRIFT (`AGT-183`): pass two re-reads the stored pick's own `backlog_items` row, so a pick path that moved on because THIS `--cycle-id` holds the pick's claim (rule B40 claims at pick time) is acted on as the STORED pick and says so — `pick_source: "own-claim"` in the payload. A peer's claim, a claim past 24h, an unreadable row or a moved lane still refuse. **(d)** Exit **1** (`stop`), any other exit **2**, or
+Skill text, never a re-ordering of the board. **A RECORDED PASS-OVER IS NOT A MISMATCH (`AGT-183`, `v7.0.625`) — this clause ADDS to (c) and removes nothing from it.** An assignment the driver ACCEPTED (exit **0**) whose answer carried `passed_over` — an optional list of `{backlog_id, reason}` that names the pick and every row the manager went past, each of those already in `project_blockers`, landing on a `prime_directive_queue()` row every earlier row of which is blocked too — is a pass-over, not a re-ordering: the blocked pick KEEPS ITS SLOT, you build the row the driver accepted, and you write `MANAGER PASS-OVER: <X> over <Y> (blocked: <reason>)` in the cycle row notes — no `--kind='assignment mismatch'` record, because nothing was re-ordered. `scripts/run-project.js` checks all five of those conditions itself and refuses anything short of them, naming which condition closed, so a pass-over you are asked to act on is one the driver already admitted; you never adjudicate it here. Exit **2** naming a ticket other than the pick is still (c) above, unchanged. TODAY THIS IS THE ACCEPTING HALF ONLY: no manager Skill row emits `passed_over` yet (teaching `dm-run-intent` / `dm-guardrails` to emit it is a Skill-row change, filed separately at this ship), so until one does, every off-pick answer still arrives as (c). AND THE CYCLE'S OWN CLAIM IS NOT DRIFT (`AGT-183`): pass two re-reads the stored pick's own `backlog_items` row, so a pick path that moved on because THIS `--cycle-id` holds the pick's claim (rule B40 claims at pick time) is acted on as the STORED pick and says so — `pick_source: "own-claim"` in the payload. A peer's claim, a claim past 6h, an unreadable row or a moved lane still refuse. **(d)** Exit **1** (`stop`), any other exit **2**, or
 no Agent tool → note it and carry on with the queue's first row; a manager that cannot answer never
 stops the cycle. **(e)** Log the call with the command below and write
 `MANAGER: ai_activity_log <id>` into the cycle row.
@@ -2088,7 +2088,7 @@ SELECT backlog_id, queue, tier, priority_class, status, design_status, kickoff_l
        left(regexp_replace(coalesce(description,''), '^\*\*P[0-9]+[^*]*\*\*\s*', ''), 200) AS gist
   FROM public.backlog_items
  WHERE queue IS NOT NULL
-   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
+   AND public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL
  ORDER BY queue
  LIMIT 5;
 ```
@@ -2329,8 +2329,8 @@ the code. **Anyone editing this must preserve all five:**
   to `next`, the shipped build still picks it and the retired build drops it and picks `SES-140`.
 - **`blocked` is NOT `retired`, and this is the parallel-cycles trap (register B42).** The two
   predicates differ on purpose: **retirement** asks whether any **named** member is still open,
-  claims ignored; the **pick** asks which named member *you* can claim, claims honoured (24h
-  expiry, the B37 bar). Conflate them and two peers holding the last two claims between them each
+  claims ignored; the **pick** asks which named member *you* can claim, claims honoured (6h
+  expiry). Conflate them and two peers holding the last two claims between them each
   cancel John's standing order while both tickets are still being built. Proven live: sole member
   claimed by a peer → `blocked`, `open_now=1`, directive untouched.
 - **It never self-activates.** Nothing creates a drain row **or a scope row** but John's own
@@ -2564,8 +2564,8 @@ with the code:
   use `gist`, not `title`, until the stored column is repaired.
 - **The `claimed_by` filter is SES-86 phase 1 — claim-on-pick (John, 2026-08-21, live in chat:
   tickets are the coordination point across ALL sessions, manual and scheduled).** A claimed
-  ticket is invisible to selection until its claim expires (24h — the same evidence bar as
-  step 0b's silent-cycle rule). See the claim step below.
+  ticket is invisible to selection until its claim expires (6h — decision 10, not
+  step 0b's 24h silent-cycle bar). See the claim step below.
 - **`id` is the final tie-break, and `backlog_id` is NOT unique (`SES-86` phase 2, found live by
   its own QA).** The sixth and last `ORDER BY` clause is the primary key. It exists because
   `backlog_id` carries no unique constraint and **`CHI-48` occupies two rows** (queue 152/153;
@@ -2646,7 +2646,7 @@ Four things about the call, each of which prevents a real failure:
   adding a second one — which is what stops John's standing drain (25 open `now`-tier members,
   eight cycles a day) from showing him the same row 8×/day.
 - **Do NOT record a skip you can resolve yourself.** A contested ticket claim (0 rows, a peer
-  holds it) expires in 24h with nothing for John to do, and `claimed-by-peer` is deliberately
+  holds it) expires in 6h with nothing for John to do, and `claimed-by-peer` is deliberately
   absent from the `reason_kind` vocabulary — the section is titled *waiting on **your** input*,
   and filling it with rows he cannot action is how an actionable section stops being read.
 - **You do not resolve it afterwards.** §10 derives "still skipped" by joining `backlog_items`
@@ -2663,14 +2663,14 @@ lease and the counters — never check-then-claim in two statements:
 <!-- {{rule:B40}} · rendered from public.governance_rules — do not hand-edit the quoted line(s)
      below. Edit the registry row, re-export docs/governance/RULES-SNAPSHOT.md, then run
      `node scripts/render-rule-blocks.js --write`. Checked by that script's default mode (SES-175). -->
-> **Rule B40** — Claim a backlog ticket atomically via claimed_by/claimed_at columns at pick time (any session, manual or scheduled); a claim expires after 24h so a dead session can't strand a ticket.
+> **Rule B40** — Claim a backlog ticket atomically via claimed_by/claimed_at columns at pick time (any session, manual or scheduled); a claim expires after 6h, never a STOPPED-BY-JOHN one, so a dead session can't strand a ticket.
 
 ```sql
 UPDATE public.backlog_items
    SET claimed_by = '<your cycle id or session name>', claimed_at = now()
  WHERE backlog_id = '<TICKET-ID>'
    AND status <> 'done'
-   AND (claimed_by IS NULL OR claimed_at < now() - INTERVAL '24 hours')
+   AND public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL
 RETURNING backlog_id;
 ```
 
@@ -2696,8 +2696,8 @@ later and its own re-assertion returned 0 rows — which the gate defines as *"d
 order is therefore fixed: status write (before-image first, **claim untouched**) → queue
 recompute → re-assert → push → **then** one holder-guarded release. On an abort or a wall-stop
 there is no push, so the release happens at the point the cycle stops instead. A
-claim you never release expires on the 24h boundary, so a dead session cannot strand a ticket;
-QA proved all three arms live on real rows (fresh → 1, contested → 0, 25h-stale → re-claimable).
+claim you never release expires on the 6h boundary, so a dead session cannot strand a ticket;
+QA proved all three arms live on real rows (fresh → 1, contested → 0, 7h-stale → re-claimable).
 **The moment the
 pick is made, rename this session** to `"<TICKET-ID> — <short name>"` (e.g. "SES-83 (b) —
 import NEXT+LATER") so John's runs list shows the work at a glance; on a wall-stop, rename to
@@ -3437,7 +3437,7 @@ RETURNING backlog_id;   -- 0 rows = already re-claimed by someone else; leave th
 
   On an abort or a wall-stop this is still where the release happens, just without a push in
   front of it — release at the point the cycle stops. Nothing here can strand a ticket either
-  way: an unreleased claim expires on the 24h boundary.
+  way: an unreleased claim expires on the 6h boundary.
 
 <!-- FEATURE: SES-315 (b) — the close-out finally calls part (a)'s function, so a shipped change has a Reverse. -->
 - **RECORD THE SHIP AS A DECISION — this is the shipped change's Reverse handle, and it is the
@@ -4539,7 +4539,7 @@ nothing before `SES-197` and calls nothing now.
 
 **Why every gate fails toward stopping, which is what licenses adding them.** This step's own
 sentence, below: *a continuation that fails to open is a **note, never a wall** — the cron remains
-the fallback engine.* A chain that stops early loses nothing (the claim expires in 24h, the next
+the fallback engine.* A chain that stops early loses nothing (the claim expires in 6h, the next
 scheduled fire resumes with a fresh context); a chain that runs too long spends John's tokens and
 buries his briefing in cards he must clear. The costs are asymmetric.
 
@@ -4580,7 +4580,7 @@ accumulating one.
    `M6-01` and `john-paced` **converted**)**, **Gate D fails (two cycles running without a
    ship)**, Gate E fails if John set a ceiling, or the platform ends the session itself — and
    nothing is lost on that
-   last one: an open claim expires in 24h and the next scheduled fire resumes the drain. A
+   last one: an open claim expires in 6h and the next scheduled fire resumes the drain. A
    continuation that fails to open is a **note, never a wall**: the cron remains the fallback
    engine.
 

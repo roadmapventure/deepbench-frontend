@@ -674,11 +674,12 @@
   ticket must get its old status back, and overwriting destroys it. Behavior is exactly what he
   described: any session — manual or scheduled — atomically claims a ticket at pick
   (`runner-cycle.md` step 5; `session-setup` skill step 2c), every other session's selection
-  skips claimed tickets, and a claim expires after 24h (the B37 evidence bar) so a dead session
-  cannot strand one. B6's full lifecycle status (`filed`→…→`completed`) remains SES-86's
+  skips claimed tickets, and a claim expires after 6h so a dead session cannot strand one —
+  except a `claimed_by` beginning `STOPPED-BY-JOHN`, which no elapsed time frees and only John
+  releases (`AGT-482`). B6's full lifecycle status (`filed`→…→`completed`) remains SES-86's
   unbuilt remainder; this phase covers only the collision John hit live (SES-95 shipped
   attended while a cycle carded the same work). QA: three arms live on real rows — fresh → 1,
-  contested → 0, 25h-stale → re-claimable.
+  contested → 0, 7h-stale → re-claimable, STOPPED-BY-JOHN never.
 
 - **B41. The inflight marker is out of `.claude/` (John, live in chat 2026-08-21: "yes move the
   marker"; `v7.0.131`, attended session `automation-review`).** B38 identified the fix, B39 left

@@ -90,8 +90,9 @@
 //
 // (4) IT NEVER CLAIMS A TICKET A LIVE PEER HOLDS, AND THE CLAIM IT WRITES IS THE CYCLE'S OWN ID
 //     (SES-378 slice 2). The claim is ONE atomic PATCH carrying the runbook's own guard
-//     (`docs/runbooks/session-setup.md` § 2c, rule B40): the 24h-expiry filter rides in the query
-//     string, so the database -- not this file -- decides. 1 row back = ours, 0 rows = somebody
+//     (`docs/runbooks/session-setup.md` § 2c, rule B40): the 6h-expiry filter AND the
+//     STOPPED-BY-JOHN fence (AGT-482) ride in the query string, so the database -- not this file
+//     -- decides. 1 row back = ours, 0 rows = somebody
 //     else's, and there is no check-then-claim pair anywhere in this file. It sets `claimed_by` /
 //     `claimed_at` and NOTHING else: `SES-316` made bumping `updated_at` on a claim the reason a
 //     decision minutes earlier became un-restorable.
@@ -204,8 +205,20 @@ export const ACTIONS = Object.freeze(["assign", "stop", "report"]);
 
 // The claim's expiry window, from rule B40 (`docs/runbooks/session-setup.md` § 2c): a claim older
 // than this is a dead session's, not a live peer's. Hours rather than a literal timestamp because
-// the cutoff is computed per call.
-export const CLAIM_TTL_HOURS = 24;
+// the cutoff is computed per call. AGT-482 (v7.0.856) narrowed it from 24 to 6 -- John's decision
+// 10, and the SAME 6 the database holds in `public.countable_claim_hours()`, which
+// `public.claim_exclusion_reason()` reads. The 24 that remains is `runner_settings.claim_stale_hours`
+// and it now serves the "in development" badge alone (OD-08).
+export const CLAIM_TTL_HOURS = 6;
+
+// AGT-482: the stop. A claim whose holder begins with this sentinel is JOHN'S, and no amount of
+// elapsed time frees it -- only John releases it. A DECLARED SECOND COPY of the sentinel that
+// `public.claim_exclusion_reason()` holds, and declared rather than derived for one reason:
+// PostgREST cannot call a SQL function inside a filter, so the atomic single-statement claim rule
+// B40 requires cannot ask the database for this. `tests/regression/agt-482-claim-stop-fence.test.mjs`
+// arm E round-trips this constant through `rpc/claim_exclusion_reason` every run, so it is a
+// CHECKED copy, not a silent one.
+export const STOP_CLAIM_PREFIX = "STOPPED-BY-JOHN";
 
 const DEFAULT_TENANT = "global";
 const DEFAULT_MAX_STEPS = 8;
@@ -327,8 +340,8 @@ export function wallReading({ shouldBoot, dayTokenCap, schedulerGate }) {
 // is the right answer there as well -- the manager reasoned about a pick that no longer exists.
 // AGT-183: THE ONE READING THAT TELLS THE CYCLE'S OWN CLAIM APART FROM FOREIGN DRIFT.
 //
-// The pick lane filters on `claimed_by IS NULL OR claimed_at < now() - claim_stale_hours`
-// (`docs/design/agt-140-project-priority-pick.sql:295,561`) -- HOLDER-BLIND. Rule B40 has the cycle
+// The pick lane filters on `public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL`
+// (AGT-482; 6h, and never a STOPPED-BY-JOHN claim) -- HOLDER-BLIND. Rule B40 has the cycle
 // claim its ticket AT pick time and step 5 runs this driver twice, so between the passes the cycle's
 // OWN claim removes its OWN ticket from the pick path, and the id comparison in `stateDrift` then
 // reads the happy path as tampering. Measured live 2026-09-27 on AGT-183 itself: `claimed_by =
@@ -695,8 +708,13 @@ export function answerErrors(answer, state) {
 export function claimQueryFor(backlogId, cutoffIso) {
   const id = encodeURIComponent(String(backlogId));
   const cutoff = encodeURIComponent(String(cutoffIso));
+  // AGT-482: TWO conditions free a claim, never one. Age (`claimed_at.lt.<cutoff>`, 6h) is now
+  // AND-ed with the stop (`claimed_by.not.like.STOPPED-BY-JOHN*`), so a STOPPED-BY-JOHN row is
+  // unclaimable at any age -- at 24h the live 18-day-old stops would have been re-claimed the
+  // moment the pick offered one, and at 6h the hole is wider. Both still ride IN the query, so the
+  // PATCH stays the single server-side `UPDATE ... WHERE` § 2c specifies.
   return `backlog_items?backlog_id=eq.${id}&status=neq.done`
-    + `&or=(claimed_by.is.null,claimed_at.lt.${cutoff})`
+    + `&or=(claimed_by.is.null,and(claimed_at.lt.${cutoff},claimed_by.not.like.${STOP_CLAIM_PREFIX}*))`
     + `&select=backlog_id,claimed_by,claimed_at`;
 }
 
