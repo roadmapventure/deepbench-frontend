@@ -22,7 +22,9 @@
 //      whose absence is the fix.
 //   B. live (service key, else notRun), READ-ONLY: every named member of every queued drain-epic
 //      scope is free of a score reason; every selfbuild row the queue serves carries an integer
-//      need_score >= 3; and a queued open NON-member scored below 3 still reads its score reason.
+//      need_score >= 3 -- the EFFECTIVE one since AGT-483 (v7.0.857), because lane (c) grades the
+//      score `buildable` projects and that is now public.effective_need_score(b.id); and a queued
+//      open NON-member scored below 3 still reads its score reason.
 //      This is the discriminating arm -- on origin/dev's bodies the same board answered a score
 //      reason for AGT-452 and AGT-453, so arm B's first assert fails there and passes here.
 //   C. the positive pair is declared NOT RUN here -- driving it means standing a drain and a
@@ -150,10 +152,22 @@ async function run() {
         + "(agt-140-project-priority-pick, ses-281-m5-pick-enforcement) grade this same lane whenever it is non-empty, "
         + "and the migration's gate drove the populated case under fixtures (arm C, case C).");
     } else {
-      const items = await get(`backlog_items?backlog_id=in.(${selfbuild.join(",")})&select=backlog_id,need_score`);
+      const items = await get(`backlog_items?backlog_id=in.(${selfbuild.join(",")})&select=id,backlog_id,need_score`);
       const byRef = new Map(items.map(i => [i.backlog_id, i.need_score]));
-      const under = selfbuild.filter(ref => !(Number.isInteger(byRef.get(ref)) && byRef.get(ref) >= 3))
-        .map(ref => `${ref} (need_score ${JSON.stringify(byRef.get(ref) ?? null)})`);
+      // AGT-483 (v7.0.857): lane (c)'s rule grades the score `buildable` PROJECTS, and that is
+      // public.effective_need_score(b.id) now -- a blocker scored 1 standing in front of a ticket
+      // scored 5 is a legitimate selfbuild row, and reading its raw column here would report the
+      // fix as the leak. The own score stays in the message, so a real leak still names both.
+      const effOf = new Map();
+      for (const i of items) {
+        const r = await fetch(`${base}/rest/v1/rpc/effective_need_score`, {
+          method: "POST", headers: hdr, body: JSON.stringify({ p_id: i.id }),
+        });
+        if (!r.ok) assert.fail(`rpc/effective_need_score -> HTTP ${r.status}: ${await r.text().catch(() => "")}`);
+        effOf.set(i.backlog_id, await r.json());
+      }
+      const under = selfbuild.filter(ref => !(Number.isInteger(effOf.get(ref)) && effOf.get(ref) >= 3))
+        .map(ref => `${ref} (effective_need_score ${JSON.stringify(effOf.get(ref) ?? null)}, own need_score ${JSON.stringify(byRef.get(ref) ?? null)})`);
       assert.deepStrictEqual(under, [],
         `the selfbuild lane served a ticket below AGT-427's bar -- lane (c)'s own rule is the exemption's fence: ${under.join("; ")}`);
       results.push(`selfbuild-lane-all-scored-3-plus-${selfbuild.length}-rows`);

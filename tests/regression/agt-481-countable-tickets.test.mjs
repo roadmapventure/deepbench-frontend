@@ -2,7 +2,10 @@
 //
 // WHAT THIS PINS. `public.countable_tickets_per_project()` returns ONE row per `executing` project
 // -- slug, name, the count, and the ids -- where a ticket counts only if all eight predicates hold:
-// P1 status open/partial, P2 need_score >= 3, P3 an unreversed `requirement-check` row exists,
+// P1 status open/partial, P2 need_score >= 3 -- `public.effective_need_score()` since AGT-483
+// (v7.0.857), so a blocker is counted at the score of the open work waiting behind it and this
+// guard's hand count recomputes that lift itself rather than letting PostgREST filter on the raw
+// column -- P3 an unreversed `requirement-check` row exists,
 // P4 no blocker outside `backlog_unblocking_statuses()`, P5 the newest unreversed grade's reasoning
 // does not begin `PARKED` (DL-09 keeps PARKED in `runner_decisions.reasoning`, not in a column),
 // P6 no undecided `gated_before_build` card, P7 no `needs-` design flag, P8 no claim younger than
@@ -43,6 +46,15 @@ export function claimIsLive(claimedBy, claimedAt, hours, now = Date.now()) {
   if (claimedBy === null || claimedBy === undefined || claimedBy === "") return false;
   if (!claimedAt) return true;
   return Date.parse(claimedAt) >= now - hours * 3600 * 1000;
+}
+
+// Pure -- P2, AGT-483 (v7.0.857). A ticket's EFFECTIVE severity: the highest of its own score and
+// the scores lifted from the open/partial tickets blocked by it. A non-integer (an unscored row) is
+// ignored and null comes back when nothing in the set is scored at all -- which is exactly what
+// GREATEST does inside `public.effective_need_score`, and it is how an unscored blocker inherits.
+export function effectiveScore(own, lifts = []) {
+  const ints = [own, ...lifts].filter(s => Number.isInteger(s));
+  return ints.length === 0 ? null : Math.max(...ints);
 }
 
 // Pure -- P7. The rule is the PREFIX, not a list of today's three values, so a new `needs-` flag is
@@ -104,18 +116,34 @@ async function run() {
   const now = Date.now();
   const printed = [];
 
+  // AGT-483 call (ii): only an open/partial ticket whose epic's project is EXECUTING lends its
+  // score to its blocker, so the hand count needs the executing epics before it starts.
+  const executingEpicIds = new Set(
+    (projects.length
+      ? await get(`epics?project_id=in.(${projects.map(p => p.id).join(",")})&select=id`)
+      : []).map(e => e.id));
+
   for (const pj of projects) {
     const epics = await get(`epics?project_id=eq.${pj.id}&select=id`);
     let raw = [];
     if (epics.length > 0) {
       raw = await get(
         `backlog_items?epic_id=in.(${epics.map(e => e.id).join(",")})`
-        + "&status=in.(open,partial)&need_score=gte.3"
-        + "&select=id,backlog_id,blocked_by,design_status,claimed_by,claimed_at");
+        + "&status=in.(open,partial)"
+        + "&select=id,backlog_id,need_score,blocked_by,design_status,claimed_by,claimed_at");
     }
 
     const countable = [];
     for (const b of raw) {
+      // P2 -- AGT-483: the effective score, recomputed here from the raw rows. The filter is NOT
+      // handed to PostgREST any more, because `need_score=gte.3` would drop exactly the row this
+      // ticket is about: a blocker scored below 3 that the open work behind it lifts to 3 or more.
+      const waiters = await get(
+        `backlog_items?blocked_by=eq.${b.id}&status=in.(open,partial)&select=need_score,epic_id`);
+      const lifts = waiters.filter(w => executingEpicIds.has(w.epic_id)).map(w => w.need_score);
+      const eff = effectiveScore(b.need_score, lifts);
+      if (!(Number.isInteger(eff) && eff >= 3)) continue;
+
       // P7 and P8 need no round trip.
       if (hasDesignFlag(b.design_status)) continue;
       if (claimIsLive(b.claimed_by, b.claimed_at, hours, now)) continue;
@@ -147,11 +175,11 @@ async function run() {
     assert.deepStrictEqual([...(row.backlog_ids ?? [])].sort(), countable,
       `${pj.slug}: the sensor's ids and the hand count disagree -- sensor `
       + `${JSON.stringify(row.backlog_ids)}, hand count ${JSON.stringify(countable)} over ${raw.length} raw `
-      + "scored open ticket(s). One of P1-P8 is not doing what §4 of the kickoff says it does.");
+      + "open/partial ticket(s). One of P1-P8 is not doing what §4 of the kickoff says it does.");
     assert.strictEqual(row.countable, countable.length,
       `${pj.slug}: countable reads ${row.countable} but it returned ${countable.length} id(s) -- the count and `
       + "the ids must come from the same set.");
-    printed.push(`${pj.slug}: raw ${raw.length} -> countable ${countable.length} ${JSON.stringify(countable)}`);
+    printed.push(`${pj.slug}: raw ${raw.length} open -> countable ${countable.length} ${JSON.stringify(countable)}`);
   }
 
   console.log(`         AGT-481 hand count, recomputed this run: ${printed.join(" | ")}`);
