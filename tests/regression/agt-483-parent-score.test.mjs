@@ -1,3 +1,4 @@
+// DeepBench v7.0.858 | tests/regression/agt-483-parent-score.test.mjs | AGT-483 closing slice -- arm C is LIVE via parent_score_probe()
 // DeepBench v7.0.857 | tests/regression/agt-483-parent-score.test.mjs | AGT-483 -- a blocker takes its parent's score: one function lifts a ticket's severity to the highest score of the open work waiting behind it, and the four readers that gate a pick on need_score call it.
 //
 // WHAT THIS PINS. AGT-427 (v7.0.825) made severity the leading key of every pick and the bar for
@@ -20,13 +21,20 @@
 //      hand count recomputed with the EFFECTIVE score in P2. This is the discriminating arm for
 //      the lift's arithmetic -- but see its own notRun: there are 0 ACTUAL lifts on the board
 //      today, so it grades the identity case live and the positive case is arm C's.
-//   C. the positive pair is declared NOT RUN here -- driving it means standing a drain, a parent
-//      and a blocker up on the LIVE board -- and quotes the migration's own rolled-back gate.
+//   C. the positive pair, DRIVEN EVERY RUN (v7.0.858, migration `agt483_pair_probe`): the one
+//      call `public.parent_score_probe(uuid)` stands the parent, the blocker, the stranger, the
+//      control and a dated exclusive drain up inside a sub-block that ends in sentinel P0483, so
+//      every fixture write is rolled back before the call returns, and hands back the
+//      measurements as jsonb. `gradePair()` below -- pure, exported, graded case by named case --
+//      is what says they hold. THIS IS THE ARM THAT DISCRIMINATES: with 0 actual lifts on the
+//      live board, arm B grades only the identity case, so swapping the lift back out for the raw
+//      `need_score` column leaves every other arm GREEN and fails here at `child-reads-5`.
 //
 // WHY ARM B READS RATHER THAN WRITES. pattern:76: a regression run never mutates working data.
 // Reaching the lift's positive branch means writing a parent, a blocker and a queued drain onto
-// the live board, so the migration's trailing DO block does it inside a sub-block that ends in
-// sentinel P0483 -- fixtures rolled back, migration committed -- and this file quotes that instead.
+// the live board, so `parent_score_probe()` does it inside a sub-block that ends in sentinel
+// P0483 -- every fixture write rolled back before the call returns, nothing of it committed -- and
+// arm C drives THAT, which is a read of this suite's working data and a write of nothing.
 
 import assert from "assert";
 import crypto from "crypto";
@@ -74,6 +82,43 @@ export function sqlHalf(text) {
   return text.slice(nl + 1).replace(/\n$/, "");
 }
 
+// Pure, and the whole verdict on the pair: the named cases that FAILED, in order, over one
+// parent_score_probe() row. The probe measures and never asserts (designer's call (vii)), so this
+// is the only place the pair is graded -- and because it is pure, the test below can mutate one
+// field of a real live row and prove each case can still fail.
+export function gradePair(j) {
+  const failed = [];
+  const arr = v => (Array.isArray(v) ? v : null);
+  const cReasons = arr(j?.child_reasons) ?? [];
+  const sReasons = arr(j?.stranger_reasons);
+  const floor = arr(j?.tooling_countable);
+  const lane = arr(j?.selfbuild);
+  const res = j?.residue ?? {};
+
+  // (1) THE WHOLE TICKET: the CHILD's own column says 1 and it blocks a 5, so the lift must read 5.
+  if (j?.child !== 5) failed.push("child-reads-5");
+  // the three controls: a STRANGER or a CONTROL that moved means the lift is not reading blocked_by.
+  if (!(j?.parent === 5 && j?.stranger === 1 && j?.control === 4)) failed.push("own-scores-hold");
+  // (2) the pick's own sentence: the lifted CHILD carries no score reason any more...
+  if (cReasons.some(r => /is below 3$|not yet scored/.test(String(r)))) failed.push("child-no-score-reason");
+  // ...while the STRANGER, which blocks nobody, still reads its own -- designer's call (iv).
+  if (!(sReasons && sReasons.includes("need_score 1 is below 3"))) failed.push("stranger-keeps-own-reason");
+  // (3) AGT-432's floor counts the lifted CHILD and neither the STRANGER nor the blocked PARENT.
+  if (!(floor && floor.includes("ZFIX-48302"))) failed.push("floor-counts-child");
+  if (!floor || floor.includes("ZFIX-48301") || floor.includes("ZFIX-48303")) failed.push("floor-excludes-stranger-and-parent");
+  // (4) the selfbuild lane, in its own pos order.
+  if (!(lane && lane.includes("ZFIX-48302") && lane.includes("ZFIX-48304"))) failed.push("lane-names-child-and-control");
+  if (!lane || lane.includes("ZFIX-48301") || lane.includes("ZFIX-48303")) failed.push("lane-excludes-stranger-and-parent");
+  // the 1 sorting ahead of a 4 IS the ticket: 6 - need_score is the leading key of every lane.
+  if (!(lane && lane.indexOf("ZFIX-48302") >= 0 && lane.indexOf("ZFIX-48302") < lane.indexOf("ZFIX-48304"))) failed.push("child-ahead-of-control");
+  // (5) the drain pick, where the same board before v7.0.857 answered the CONTROL.
+  if (!(j?.drain_outcome === "pick" && j?.drain_pick === "ZFIX-48302")) failed.push("drain-picks-child");
+  // and the sentinel took every fixture write with it.
+  if (!(res.items === 0 && res.directives === 0 && res.decisions === 0 && res.scope === 0)) failed.push("residue-zero");
+
+  return failed;
+}
+
 function readMirror() {
   const p = path.join(ROOT, MIRROR_REL);
   assert.ok(fs.existsSync(p), `${MIRROR_REL} is missing -- the migration has no mirror`);
@@ -111,7 +156,7 @@ async function run() {
   const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   if (!base || !key) {
-    notRun("the live arms (the lift's arithmetic over every blocker on the board, and the floor's ids)",
+    notRun("the live arms (the lift's arithmetic over every blocker on the board, and the floor's ids, and the pair via parent_score_probe)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent -- the lift is a database function and there is nothing "
       + "to read without them. Run: node --env-file-if-exists=.env.local tests/regression/agt-483-parent-score.test.mjs");
   } else {
@@ -151,7 +196,7 @@ async function run() {
       notRun("the lift's arithmetic over live blockers (arm B1)",
         `the board carries ${waiters.length} open/partial ticket(s) with a blocker and none of their blockers is `
         + "itself open or partial, so there is no row the lift speaks about. The ordinary quiet-board state, not a "
-        + "pass -- arm C quotes the migration's own gate, which measured the positive case under fixtures.");
+        + "pass -- arm C below drives the positive case every run, under fixtures it rolls back itself.");
     } else {
       const wrong = [];
       let lifted = 0;
@@ -175,8 +220,8 @@ async function run() {
           `all ${blockers.length} open/partial blocker(s) on the board right now read their own score back: every `
           + "ticket waiting behind one of them is itself unscored, so there is no score to lend and GREATEST has "
           + "nothing to raise. That is a real board state, not a pass -- the identity case IS graded above (and it "
-          + "is the case that would break if the lift read the wrong row), and the positive case was measured under "
-          + "the migration's own rolled-back fixtures (arm C).");
+          + "is the case that would break if the lift read the wrong row), and the POSITIVE case is arm C below, "
+          + "which drives it live this run through parent_score_probe() under fixtures it rolls back itself.");
       } else {
         results.push(`lift-matches-hand-value-on-all-${blockers.length}-blockers-${lifted}-lifted`);
       }
@@ -234,42 +279,60 @@ async function run() {
     }
     console.log(`         AGT-483 floor, recomputed this run with the effective score: ${printed.join(" | ")}`);
     results.push("floor-ids-match-the-effective-score-hand-count-per-project");
-  }
 
-  // --- C: the positive pair ----------------------------------------------------------------------
-  notRun("the positive pair -- a scored-1 blocker ranked, listed and picked as the 5 it stands in front of, and the same score-1 ticket refused when it blocks nobody",
-    "driving it means writing a parent, its blocker, a stranger, a control and a queued exclusive drain onto the "
-    + "LIVE board and then handing real tickets to a real pick, which a permanent regression test must never do "
-    + "(pattern:76, the SES-196 / SES-218 / SES-275 refusal), and this suite reaches Supabase only over PostgREST, "
-    + "which cannot open a transaction to roll a fixture back. MEASURED IN THE MIGRATION INSTEAD: "
-    + "`agt483_parent_score`'s trailing DO block writes its fixtures inside a sub-block that ends in sentinel "
-    + "P0483, so every fixture write is undone while the migration still commits, and the outer block RAISEs -- "
-    + "aborting the whole migration, F1 and all four splices included -- unless every case holds. The fixtures, all "
-    + "in epic ced3a7d0 (Tooling, project executing), graded in this order: PARENT ZFIX-48301 open scored 5 with "
-    + "blocked_by = the CHILD; CHILD ZFIX-48302 open scored 1; STRANGER ZFIX-48303 open scored 1 blocking nobody; "
-    + "CONTROL ZFIX-48304 open scored 4; CHILD and STRANGER each carrying an unreversed requirement-check row. "
-    + "(1) effective_need_score reads 5 / 5 / 1 / 4 for PARENT / CHILD / STRANGER / CONTROL -- the CHILD's own "
-    + "column says 1. (2) pick_exclusions() gives the CHILD no reason matching 'is below 3' or 'not yet scored', "
-    + "while the STRANGER still reads exactly 'need_score 1 is below 3' -- THE CONTROL, and the half designer's "
-    + "call (iv) deliberately left alone: the sentence still names the ticket's OWN score. "
-    + "(3) countable_tickets_per_project()'s tooling ids hold the CHILD and hold neither the STRANGER nor the "
-    + "blocked PARENT. Then a fixture drain D, exclusive and dated 2020-01-01 so both picks read it rather than the "
-    + "board's own, naming all four: (4) prime_directive_queue()'s selfbuild lane names the CHILD and the CONTROL "
-    + "and neither the STRANGER nor the PARENT, with pos(CHILD) < pos(CONTROL) -- the 1 sorting ahead of a 4 is the "
-    + "whole ticket, since 6 - need_score is the leading key of every lane; (5) drain_epic_next(cycle) answers "
-    + "outcome 'pick' with the CHILD, where the same board before this migration answered the CONTROL. Then, "
-    + "outside the fixtures: exactly 1 pg_proc overload of each of the five functions, EXECUTE reading anon=false, "
-    + "authenticated=false, service_role=true on each, public.effective_need_score(b.id) occurring exactly once in "
-    + "each of the four spliced bodies and zero times in F1 itself, and zero fixture residue. Applied 2026-10-18 "
-    + "07:32Z, result {\"success\":true}. THE CAVEAT, because a false green here would be invisible: the gate's own "
-    + "`AGT-483 GATE PASSED` and `AGT-483 SPLICE` NOTICE bodies were NOT relayed by the apply channel, so nobody "
-    + "has read them and they are quoted nowhere. What the success flag proves is what the gate was built to prove "
-    + "-- the outer block aborts the entire migration unless every case above holds, so a COMMITTED migration is "
-    + "the pass. What was re-read live afterwards, outside the gate, and is quoted in the mirror's header: the five "
-    + "functions at one overload each with their post-apply md5s, EXECUTE closed to anon and authenticated on all "
-    + "five, zero residue, 0 mismatches between effective_need_score and the hand value over the board's 10 "
-    + "open/partial blockers, and the floor unmoved at tooling 1 {AGT-304} -- which is the right answer, because "
-    + "with 0 actual lifts the effective score IS the own score everywhere.");
+    // --- C: THE PAIR, driven every run ----------------------------------------------------------
+    // One call stands the four fixtures and the dated exclusive drain up, measures them and rolls
+    // every write back inside itself (sentinel P0483), so this arm writes nothing that outlives it
+    // and still reaches the lift's POSITIVE branch -- the branch arm B cannot reach while the live
+    // board carries 0 actual lifts. gradePair() is the verdict; the probe asserts nothing.
+    const j = await rpc("parent_score_probe", {});
+    console.log(`         AGT-483 pair probe: ${JSON.stringify(j)}`);
+
+    // TRANSPORT IS NOT A VERDICT (AGT-116, docs/STANDARDS.md Section 4), applied one layer out: an
+    // in-process run-all.js can hand this file a STUBBED globalThis.fetch left behind by an earlier
+    // test, and a stub's catch-all `[]` is not the database answering. Grading it would blame the
+    // lift for another test's leak, so the shape is checked first and the arm declares itself
+    // not-run instead -- loudly, never as a pass. It cannot hide a real regression: a genuinely
+    // reverted lift still returns a full jsonb object (measured: child 1 under a raw-column
+    // effective_need_score), so that case is GRADED below and goes red at child-reads-5.
+    const answered = j !== null && typeof j === "object" && !Array.isArray(j) && Number.isInteger(j.child);
+    if (!answered) {
+      notRun("the pair via parent_score_probe (arm C)",
+        `the probe answered ${JSON.stringify(j)}, which is not the jsonb object a service_role `
+        + "PostgREST call returns -- so NOTHING about the lift was measured here and this is not a "
+        + "pass. MEASURED CAUSE on this tree, not recalled: tests/regression/add-capability.test.mjs "
+        + "assigns globalThis.fetch at module scope (its lines 67 and 148) and never restores it, "
+        + "and the second stub's catch-all returns `{ ok: true, status: 200, json: async () => [] }` "
+        + "with no text() -- so every credentialed test after it in ONE in-process run-all.js reads "
+        + "[] or throws `res.text is not a function`. run-all.js's SES-215 restore covers "
+        + "process.env only, not globalThis.fetch, which is the same cross-test pollution class one "
+        + "layer out. Reproduce both directions: "
+        + "`node tests/regression/run-all.js --only=add-capability.test.mjs,agt-483-parent-score.test.mjs` "
+        + "answers [] here, `--only=agt-483-parent-score.test.mjs` answers the real object. Drive the "
+        + "arm with: node --env-file-if-exists=.env.local tests/regression/agt-483-parent-score.test.mjs");
+    } else {
+      assert.deepStrictEqual(gradePair(j), [],
+        `the pair failed: ${JSON.stringify(gradePair(j))}. One call of public.parent_score_probe() `
+        + `returned ${JSON.stringify(j)}. A 1 that stands in front of a 5 must be ranked, listed, `
+        + "counted and picked as that 5, while an unrelated 1 must still be refused -- if "
+        + "child-reads-5 is in that list, the four readers are back on the raw need_score column.");
+
+      // the controls, on the real row this run returned: each case must still be ABLE to fail, or
+      // gradePair() is an empty list that means nothing (the SES-158 / LOO-013 assert).
+      assert.deepStrictEqual(gradePair({ ...j, child: 1 }), ["child-reads-5"],
+        "control: a CHILD reading its own 1 must fail exactly child-reads-5 and nothing else");
+      assert.ok(gradePair({ ...j, selfbuild: [...j.selfbuild].reverse() }).includes("child-ahead-of-control"),
+        "control: the lifted CHILD sorting BEHIND the CONTROL must fail child-ahead-of-control");
+
+      // and the rollback, read from OUTSIDE the probe in a second statement -- the probe's own
+      // residue counts are taken inside the call that wrote them, so they cannot prove this.
+      const leftOver = await get("backlog_items?source_file=eq.agt483-gate&select=id");
+      assert.strictEqual(leftOver.length, 0,
+        `the probe left ${leftOver.length} agt483-gate ticket(s) on the LIVE board -- sentinel P0483 `
+        + "did not roll its fixtures back, which is a regression run mutating working data (pattern:76)");
+      results.push("pair-asserted-live-a-1-sorts-as-the-5-behind-it-an-unrelated-1-does-not");
+    }
+  }
 
   return results;
 }
