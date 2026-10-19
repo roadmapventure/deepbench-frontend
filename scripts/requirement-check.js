@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.864 | scripts/requirement-check.js | AGT-489 -- THE MOVE DOOR. The list turn now carries `graded` and `parent_home` per proposal and answers `move` (place a graded ticket, never re-grading it) or `hold` (graded, fits, waits) beside `pass`, `not-needed` and `no-fit`: `prepareList()` reads `grade_standing()` and `parent_project_of_blockers()` ONCE per list, drops a graded ticket scoring under 3 that no parent lifts (it cannot move and must not be re-graded), and `applyList()` sends a `pass`'s `home_project` from the row's own `home` and a `move` to `apply_requirement_verdict()`, which writes it as its own `placement` decision. Live before this: `applyList` sent NO `home_project` on any pass and `prepareList` had no notion of "already graded", so `auditor-findings` offered the same 35 graded tickets every run (43 open/partial = 8 ungraded + 35 graded; `dev-mgr-findings` 201 = 6 + 195) while `countable_tickets_per_project()` read 1/0/0 (2026-10-19). pattern:2, pattern:9, pattern:14.
 // DeepBench v7.0.862 | scripts/requirement-check.js | AGT-487 -- A TICKET'S OWN JOHN SOURCE IS CITABLE ON ITS OWN ROW. `--prepare-list` reads the head of the row behind each listed ticket's OWN `need_source` and hands it over as that proposal's `need_source_head` -- per proposal, read only for a ticket already carrying a source that is not already a candidate key, and NEVER appended to the shared `candidates` pool, which stays John's unreversed rulings (`CANDIDATE_FILTER`): appending it would let any ticket cite a non-ruling decision and weaken AGT-432 without John's words (pattern:166). `validateListVerdict()` then accepts a `pass` whose `need_source` IS the key the ticket already holds -- every other value must still be one of the candidates it was handed, and AGT-432's rule that a `john:` source is echoed and never replaced is byte-unchanged. Live before this: AGT-237 held `john:runner_decisions:2c38d860-...`, a `kind='scope'` decision of John's that `CANDIDATE_FILTER` never hands over, so neither the membership rule nor the echo rule could be satisfied and the whole `tooling` list was refused with no write (2026-10-12, 10-13).
 // DeepBench v7.0.861 | scripts/requirement-check.js | AGT-486 -- THE LIST TURN IS TOLD WHAT THE PROJECTS ARE FOR, AND A TICKET THAT FITS NONE IS READ ONCE. `--prepare-list` calls `public.victoria_charter_state()` after the project read, so the context carries `active_charters` (the `{slug, charter}` of every `executing` project) and `charter_fingerprint` (the md5 of that array) -- no project slug and no charter text is written into this file (requirements d.5, d.17). Her answer gains a third verdict, `no-fit`: `LIST_VERDICTS`, which `validateListVerdict()` enforces in place of the writer's two, refusing a context with no charter at all and a `no-fit` that still carries a `need_source` or a `need_score`. A `no-fit` reaches ONE writer and no other -- `rpc/record_decision` of kind `fit-stamp` whose summary IS `fitStampSummary(id, fingerprint)`; no status PATCH, no before-image, nothing on the ticket moves. `--prepare-list` then drops every ticket the rpc's `stamped` names, so a ticket that fits nothing is read once instead of every run, and any charter edit moves the fingerprint, matches no stamp and offers them all again.
 // DeepBench v7.0.853 | scripts/requirement-check.js | AGT-480 -- `--home` asks ONE thing: is the project executing. Victoria's move door writes victoria-placed for every non-john source, so neither accepts_findings nor the john: limb may refuse what the lock now admits.
@@ -276,7 +277,14 @@ export const AWAITING_LIST_ANSWER =
 // `no-fit` never reaches it. The third value exists only at the list grain, because only the list
 // turn is handed the charters a fit is judged against -- so widening `VERDICTS` would tell the
 // single-ticket door about an answer its one writer cannot take.
-export const LIST_VERDICTS = Object.freeze(["pass", "not-needed", "no-fit"]);
+export const LIST_VERDICTS = Object.freeze(["pass", "not-needed", "no-fit", "move", "hold"]);
+
+// AGT-489: THE `runner_decisions.kind` A MOVE IS RECORDED UNDER, and the whole reason a move is not
+// a second `pass`. A `requirement-check` row IS a grade -- `countable_tickets_per_project()` counts
+// it and `grade_standing()` reads it as the newest one -- so writing a placement under that kind
+// would re-grade the very ticket this door exists to place without re-grading. The writer owns the
+// row; this constant is what the guard and the reader here agree it is called.
+export const MOVE_KIND = "placement";
 
 // The `runner_decisions.kind` a `no-fit` is recorded under. A kind, never a status: nothing on the
 // ticket moves, so there is no row to image and nothing to propose for removal.
@@ -323,6 +331,17 @@ export function buildListContext({ project, epics, tickets, candidates, kinds, c
       epic_id: t.epic_id ?? null,
       need_source: t.need_source ?? null,
       need_score: t.need_score ?? null,
+      // AGT-489: THE TWO FACTS SHE CANNOT DERIVE FROM THE TICKET'S OWN COLUMNS, both read once per
+      // list from a function and carried per proposal. `graded` is `grade_standing()` -- the newest
+      // `requirement-check` decision unreversed and its before-image's description still today's --
+      // and it is what makes `move`/`hold` answerable and `pass`/`not-needed` refusable on this row.
+      // `parent_home` is `parent_project_of_blockers()`: the project an open/partial ticket of an
+      // executing project is blocked by this one, which is the home it must take (d.11). Both
+      // default to the safe reading -- not graded, no parent -- so a context assembled without them
+      // behaves exactly as it did before this ship. They are placed BEFORE `need_source_head`
+      // deliberately: agt-487's guard pins that key as the proposal's LAST one.
+      graded: t.graded === true,
+      parent_home: blank(t.parent_home) ? null : String(t.parent_home),
       // AGT-487: THE HEAD OF THE ROW THIS TICKET ALREADY CITES, travelling ON THE PROPOSAL and
       // nowhere else. `prepareList()` reads it per ticket; this file adds nothing to `candidates`,
       // because a held source in the shared pool would be a source EVERY ticket could cite --
@@ -365,6 +384,9 @@ export function validateListVerdict(answer, ctx) {
   if (charters.length === 0) {
     no(label, "the context carries no active project charter to judge fit against");
   }
+  // AGT-489: the destinations she may name, from the same charters and nowhere else -- this file
+  // still writes no project slug of its own (requirements d.5, d.17).
+  const slugs = charters.map(c => String(c.slug));
 
   const a = Object(answer) === answer && answer !== null ? answer : {};
   if (blank(a.list)) no(label, "the answer names no list");
@@ -440,6 +462,60 @@ export function validateListVerdict(answer, ctx) {
       if (row.need_score !== null && row.need_score !== undefined) {
         no(id, `a no-fit carries need_score ${JSON.stringify(row.need_score)}; a ticket that fits no ` +
           "charter is not graded, so both need_source and need_score are null");
+      }
+    }
+
+    // AGT-489, V1-V7: THE PLACEMENT RULES, held offline and in ONE block. Two of them -- a grade
+    // stands, a parent lifts a blocker -- are facts the answer cannot see from the ticket's columns,
+    // so they travel ON the proposal (`graded`, `parent_home`) and are read back off it here. The
+    // writer refuses a `move` on an ungraded ticket and a `john-named` move of its own accord
+    // (`grade_standing()`, `placement_target()`); these refusals are the same rules one turn
+    // earlier, where a refusal costs no write and names the ticket (pattern:10).
+    const want_p = want.get(id) ?? {};
+    const graded = want_p.graded === true;
+    const parentHome = blank(want_p.parent_home) ? null : String(want_p.parent_home);
+    const home = blank(row.home) ? null : String(row.home);
+
+    // V1. A home is a slug of a project she was handed a charter for, or nothing at all. She never
+    //     composes a destination, exactly as she never composes a candidate key.
+    if (home !== null && !slugs.includes(home)) {
+      no(id, `home ${JSON.stringify(home)} is not an active project's slug (${slugs.join(", ")})`);
+    }
+    // V2. A GRADE IS NOT RE-ANSWERED. Its text changing or John reversing it are the only reopeners
+    //     (requirements d.13); until then the two answers left on this ticket are where it goes.
+    if (graded && (row.verdict === "pass" || row.verdict === "not-needed")) {
+      no(id, "is already graded; a grade reopens only when its text changes or John reverses it " +
+        "-- answer move or hold");
+    }
+    // V3. And the mirror of it: a move PLACES a grade, it does not make one.
+    if (!graded && row.verdict === "move") {
+      no(id, "is ungraded; it is graded first -- answer pass");
+    }
+    // V4. A move with nowhere to move to is not a move.
+    if (row.verdict === "move" && home === null) {
+      no(id, "a move names the home it moves into");
+    }
+    // V5. A hold is the answer for a graded ticket that fits and waits its turn -- so it is not an
+    //     answer for an ungraded one, and it writes NOTHING: no home, no source, no score.
+    if (!graded && row.verdict === "hold") {
+      no(id, "is ungraded; hold is for a graded ticket -- answer pass with home null");
+    }
+    if (row.verdict === "hold" &&
+        (home !== null ||
+         (row.need_source !== null && row.need_source !== undefined) ||
+         (row.need_score !== null && row.need_score !== undefined))) {
+      no(id, "a hold moves nothing and grades nothing; home, need_source and need_score are null");
+    }
+    // V6/V7. A BLOCKER GOES WHERE ITS PARENT IS (requirements d.11). It may not be sent elsewhere,
+    //     and it may not be held back or stamped no-fit either -- `effective_need_score()` already
+    //     lifts its score, and leaving it behind is the thing d.11 names.
+    if (parentHome !== null) {
+      if ((row.verdict === "pass" || row.verdict === "move") && home !== parentHome) {
+        no(id, `blocks a parent in ${parentHome}; its home is ${parentHome}`);
+      }
+      if (row.verdict === "hold" || row.verdict === "no-fit") {
+        no(id, `blocks a parent in ${parentHome}; it cannot be held or left behind (d.11) ` +
+          `-- answer ${graded ? "move" : "pass"} with that home`);
       }
     }
   }
@@ -797,7 +873,7 @@ async function prepareList(args) {
   // fingerprint has already been read against exactly these charters and placed nowhere, so putting
   // it to her again buys the same answer at the same cost. The count is printed on stderr, never on
   // stdout -- stdout is the prompt.
-  const tickets = listed.filter(t => !stamped.has(String(t.backlog_id)));
+  let tickets = listed.filter(t => !stamped.has(String(t.backlog_id)));
   const dropped = listed.length - tickets.length;
   console.error(`requirement-check: ${dropped} of ${listed.length} ticket(s) dropped — a live ` +
     `${FIT_STAMP_KIND} at charter fingerprint ${fingerprint} already says they fit no active project`);
@@ -805,6 +881,44 @@ async function prepareList(args) {
     die(1, `requirement-check: every open or partial ticket of ${project} already holds a live ` +
       `${FIT_STAMP_KIND} at charter fingerprint ${fingerprint} — there is nothing left to read, and ` +
       "a charter edit is what offers them again");
+  }
+
+  // 3b. AGT-489: WHICH GRADES STAND, AND WHICH TICKETS A PARENT LIFTS. Two rpcs, read ONCE for the
+  //     whole list and never per ticket, because both answer over the whole board in one pass and a
+  //     per-ticket read would be 43 round trips for the same rows. `grade_standing()` is the
+  //     newest `requirement-check` decision unreversed with its before-image's description still
+  //     equal to today's (requirements d.13); `parent_project_of_blockers()` is the project an
+  //     open/partial ticket of an executing project is blocked by this one (d.11).
+  const gradedRpc = await rest(base, key, "POST", "rpc/grade_standing", {});
+  if (!gradedRpc.ok) {
+    die(1, `requirement-check: POST rpc/grade_standing -> HTTP ${gradedRpc.status} ${gradedRpc.text.slice(0, 400)}`);
+  }
+  const graded = new Map((Array.isArray(gradedRpc.json) ? gradedRpc.json : [])
+    .map(r => [String(r?.backlog_id), r]));
+  const parentRpc = await rest(base, key, "POST", "rpc/parent_project_of_blockers", {});
+  if (!parentRpc.ok) {
+    die(1, `requirement-check: POST rpc/parent_project_of_blockers -> HTTP ${parentRpc.status} ${parentRpc.text.slice(0, 400)}`);
+  }
+  const parents = new Map((Array.isArray(parentRpc.json) ? parentRpc.json : [])
+    .map(r => [String(r?.backlog_id), r?.project_slug ?? null]));
+  for (const t of tickets) {
+    t.graded = graded.has(String(t.backlog_id));
+    t.parent_home = parents.get(String(t.backlog_id)) ?? null;
+  }
+
+  // AND THE ONE THE TURN CANNOT ANSWER IS NOT PUT TO HER. A graded ticket scoring under 3 that no
+  // parent lifts cannot move (requirements d.3: only a 3 or more fills a project) and must not be
+  // re-graded (d.13) -- so every answer left on it is one the validator would refuse, and the turn
+  // buys nothing. It returns the moment its grade reopens or a parent claims it (pattern:9).
+  const offered = tickets.filter(t => !t.graded || Number(t.need_score) >= 3 || t.parent_home !== null);
+  const heldBack = tickets.length - offered.length;
+  tickets = offered;
+  console.error(`requirement-check: ${heldBack} graded ticket(s) under 3 held back (no re-grade; ` +
+    "offered again when the grade reopens)");
+  if (tickets.length === 0) {
+    die(1, `requirement-check: every ticket left on ${project} is graded, scores under 3 and no ` +
+      "parent lifts it — there is nothing a turn could answer, and a description change, John " +
+      "reversing a grade or a new blocker offers them again");
   }
 
   // 4. The candidates, from the allowlist that is DATA (pattern:2). An allowlisted pair this file has
@@ -874,6 +988,9 @@ async function prepareList(args) {
     head: {
       list: project, epics: epicIds.length, tickets: tickets.length, candidates: candidates.length,
       charters: charters.length, charter_fingerprint: fingerprint, dropped,
+      // AGT-489: how many of the tickets offered already hold a standing grade -- the half of the
+      // list that can only be moved or held, never graded again.
+      graded: tickets.filter(t => t.graded === true).length, held_back: heldBack,
     },
   });
   die(3, `requirement-check --prepare-list: ${project} — ${tickets.length} ticket(s) against ` +
@@ -912,6 +1029,11 @@ async function applyList(args) {
       proposal: blank(titles.get(String(row.backlog_id)))
         ? String(row.backlog_id) : String(titles.get(String(row.backlog_id))),
       account: answer.account,
+      // AGT-489: AND WHERE IT GOES, which no list pass has ever carried -- before this ship only the
+      // single-ticket door (`--home`) sent a `home_project`, so a list pass graded the ticket and
+      // left it exactly where it was. A blank or absent `home` sends none, which is today's
+      // behaviour byte for byte: the ticket is graded and stays on its list.
+      ...(blank(row.home) ? {} : { home_project: String(row.home) }),
     };
     const r = await rest(base, key, "POST", "rpc/apply_requirement_verdict",
       { p_cycle: cycleId, p_session: sessionName, p });
@@ -921,6 +1043,9 @@ async function applyList(args) {
     const d = await rest(base, key, "GET", `runner_decisions?id=eq.${handle}&select=expires_at`);
     const expires = d.ok && Array.isArray(d.json) && d.json[0] ? d.json[0].expires_at : null;
     console.log(`${row.backlog_id}: pass — need_source ${row.need_source}, need_score ${row.need_score}`);
+    // Printed only when the ticket actually MOVED, the single-ticket door's own shape. The move is
+    // inside the same decision as the score, so the one reverse line below puts both back.
+    if (!blank(row.home)) console.log(`Homed: ${row.backlog_id} -> ${row.home}`);
     console.log(`Decision ${handle} — reversible until ${chicago(expires)}: select * from public.reverse_decision('${handle}', 'John', '<why>');`);
   }
 
@@ -1002,6 +1127,40 @@ async function applyList(args) {
     console.log(`Decision ${handle} — one Reverse offers it again: select * from public.reverse_decision('${handle}', 'John', '<why>');`);
   }
 
+  // --- AGT-489: the `move` rows. The SAME writer the passes use and the same one handle back, but
+  //     under its own decision kind (`MOVE_KIND`) because a move is NOT a grade: it carries no
+  //     need_source and no need_score, it re-reads neither, and `apply_requirement_verdict()`
+  //     refuses it outright unless `grade_standing()` already names the ticket. Everything the
+  //     placement turns on -- the ticket John named, the blocker whose parent decides for it, the
+  //     executing project's oldest epic -- is `placement_target()`'s, not this file's.
+  const moves = rows.filter(r => r.verdict === "move");
+  for (const row of moves) {
+    const bid = String(row.backlog_id);
+    const r = await rest(base, key, "POST", "rpc/apply_requirement_verdict", {
+      p_cycle: cycleId, p_session: sessionName,
+      p: {
+        verdict: "move", backlog_id: bid, reason: row.reason,
+        home_project: String(row.home), account: answer.account,
+      },
+    });
+    if (!r.ok) die(1, `requirement-check --apply-list: ${bid} move -> HTTP ${r.status} ${r.text}`);
+    const handle = typeof r.json === "string" ? r.json : r.json?.id ?? null;
+    if (!handle) die(1, `requirement-check --apply-list: ${bid} — the writer returned no handle; got ${r.text.slice(0, 300)}`);
+    const d = await rest(base, key, "GET", `runner_decisions?id=eq.${handle}&select=expires_at`);
+    const expires = d.ok && Array.isArray(d.json) && d.json[0] ? d.json[0].expires_at : null;
+    console.log(`${bid}: move — ${row.reason}`);
+    console.log(`Homed: ${bid} -> ${row.home}`);
+    console.log(`Decision ${handle} — reversible until ${chicago(expires)}: select * from public.reverse_decision('${handle}', 'John', '<why>');`);
+  }
+
+  // --- AGT-489: the `hold` rows. NOTHING IS WRITTEN -- not a decision, not a stamp, not a column.
+  //     A hold says the grade stands and the ticket waits its turn, and the record of that is the
+  //     grade already on the board; a row written here would be a second copy of it (pattern:93).
+  const holds = rows.filter(r => r.verdict === "hold");
+  for (const row of holds) {
+    console.log(`${String(row.backlog_id)}: hold — ${row.reason}`);
+  }
+
   // --- THE RUN'S ONE RECORD, as ticket-owner's recordNightly() writes its own: the parent row is read
   //     for its `model` and nothing else where a cycle is the author, because this door calls no model
   //     itself and `model` is how the brief says which lane ruled. With `--session-name` the model
@@ -1032,6 +1191,9 @@ async function applyList(args) {
   const cycRow = Array.isArray(cyc.json) ? cyc.json[0] : null;
   if (!cycRow) die(1, `requirement-check --apply-list: the runner_cycles POST returned no row; got ${cyc.text.slice(0, 300)}`);
   console.log(`${notes}`);
+  // AGT-489: the placements, on their OWN line. `runLine()` is byte-unchanged (agt-281 pins that
+  // string), and the two counts a run of this door now also has to report go beside it.
+  console.log(`moves: ${moves.length}, holds: ${holds.length}`);
   console.log(`runner_cycles ${cycRow.id} — the run's one record (model ${model}).`);
   process.exitCode = 0;
 }

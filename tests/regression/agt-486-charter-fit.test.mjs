@@ -210,8 +210,8 @@ async function run() {
 
   // ---- C. THE VALIDATOR'S THREE NEW RULES, zero network ----------------------------------------
   await arm("C validateListVerdict: a no-fit is never graded, and a fit needs a charter", async () => {
-    assert.deepEqual([...LIST_VERDICTS], ["pass", "not-needed", "no-fit"],
-      "the LIST vocabulary is three values -- and it is NOT the writer's VERDICTS, which stay two");
+    assert.deepEqual([...LIST_VERDICTS], ["pass", "not-needed", "no-fit", "move", "hold"],
+      "the LIST vocabulary is five values (AGT-489 added move and hold) -- and it is NOT the writer's VERDICTS, which stay two");
 
     const A = "ZAGT486-1a";
     const B = "ZAGT486-1b";
@@ -284,9 +284,9 @@ async function run() {
     assert.match(must(answer([pass, noFit]), "backlog-intake", "a charter with no text", blankCharter),
       /no active project charter/);
 
-    // And the vocabulary refusal names all three, so a fourth verdict cannot slip in as a no-fit.
-    assert.match(must(answer([{ ...pass, verdict: "maybe" }, noFit]), A, "a verdict outside the three"),
-      /is not one of pass, not-needed, no-fit/);
+    // And the vocabulary refusal names all five, so a sixth verdict cannot slip in as a no-fit.
+    assert.match(must(answer([{ ...pass, verdict: "maybe" }, noFit]), A, "a verdict outside the five"),
+      /is not one of pass, not-needed, no-fit, move, hold/);
 
     // The stamp's summary is built in ONE place and carries the fingerprint INSIDE it.
     assert.equal(fitStampSummary("AGT-486", "f".repeat(32)),
