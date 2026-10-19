@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.866 | scripts/requirement-check.js | AGT-490 -- A PARKED 0 NAMES WHERE IT WAITS. `prepareList()` POSTs `rpc/victoria_parked_homes` once per run and the context carries `parked_homes` (`{slug, name, status}` of every paused and planned project), so a ticket the tree calls PARKED can be scored 0 AND say where it waits -- `home` a parked slug, or `new_project` the name of a PLANNED project created for it (capture only, John turns one on). `validateListVerdict()` holds the five rules offline (P1 a 0's reason begins `PARKED (0) until `; P2 a 0's home is a parked slug while V1 is byte-unchanged above 0; P3 `new_project` only on a 0 or a `no-fit`, 3-80 characters, never beside `home`, and never a slug she was already handed; P4 a `no-fit`'s home is a parked slug; P5 a ticket John named names neither, d.10), `applyList()` sends a pass's `new_project` beside its `home`, and a `no-fit` that named a destination POSTs the writer's new `park` verdict AFTER its `fit-stamp` -- its own `placement` decision, no grade, printed as `Parked: <id> -> <target>` and counted on the counts line. Live before this: 0 tickets on the whole board read `need_score` 0 though every validator has accepted one since `v7.0.844`, AGT-383 and AGT-252 both read 1 against John's 2026-10-08 ruling, and `home` reached `placement_target()`, which admits an `executing` project and nothing else (2026-10-19). pattern:2, pattern:10, pattern:17.
 // DeepBench v7.0.865 | scripts/requirement-check.js | AGT-489 -- THE MOVE DOOR. The list turn now carries `graded` and `parent_home` per proposal and answers `move` (place a graded ticket, never re-grading it) or `hold` (graded, fits, waits) beside `pass`, `not-needed` and `no-fit`: `prepareList()` reads `grade_standing()` and `parent_project_of_blockers()` ONCE per list, drops a graded ticket scoring under 3 that no parent lifts (it cannot move and must not be re-graded), and `applyList()` sends a `pass`'s `home_project` from the row's own `home` and a `move` to `apply_requirement_verdict()`, which writes it as its own `placement` decision. Live before this: `applyList` sent NO `home_project` on any pass and `prepareList` had no notion of "already graded", so `auditor-findings` offered the same 35 graded tickets every run (43 open/partial = 8 ungraded + 35 graded; `dev-mgr-findings` 201 = 6 + 195) while `countable_tickets_per_project()` read 1/0/0 (2026-10-19). pattern:2, pattern:9, pattern:14.
 // DeepBench v7.0.862 | scripts/requirement-check.js | AGT-487 -- A TICKET'S OWN JOHN SOURCE IS CITABLE ON ITS OWN ROW. `--prepare-list` reads the head of the row behind each listed ticket's OWN `need_source` and hands it over as that proposal's `need_source_head` -- per proposal, read only for a ticket already carrying a source that is not already a candidate key, and NEVER appended to the shared `candidates` pool, which stays John's unreversed rulings (`CANDIDATE_FILTER`): appending it would let any ticket cite a non-ruling decision and weaken AGT-432 without John's words (pattern:166). `validateListVerdict()` then accepts a `pass` whose `need_source` IS the key the ticket already holds -- every other value must still be one of the candidates it was handed, and AGT-432's rule that a `john:` source is echoed and never replaced is byte-unchanged. Live before this: AGT-237 held `john:runner_decisions:2c38d860-...`, a `kind='scope'` decision of John's that `CANDIDATE_FILTER` never hands over, so neither the membership rule nor the echo rule could be satisfied and the whole `tooling` list was refused with no write (2026-10-12, 10-13).
 // DeepBench v7.0.861 | scripts/requirement-check.js | AGT-486 -- THE LIST TURN IS TOLD WHAT THE PROJECTS ARE FOR, AND A TICKET THAT FITS NONE IS READ ONCE. `--prepare-list` calls `public.victoria_charter_state()` after the project read, so the context carries `active_charters` (the `{slug, charter}` of every `executing` project) and `charter_fingerprint` (the md5 of that array) -- no project slug and no charter text is written into this file (requirements d.5, d.17). Her answer gains a third verdict, `no-fit`: `LIST_VERDICTS`, which `validateListVerdict()` enforces in place of the writer's two, refusing a context with no charter at all and a `no-fit` that still carries a `need_source` or a `need_score`. A `no-fit` reaches ONE writer and no other -- `rpc/record_decision` of kind `fit-stamp` whose summary IS `fitStampSummary(id, fingerprint)`; no status PATCH, no before-image, nothing on the ticket moves. `--prepare-list` then drops every ticket the rpc's `stamped` names, so a ticket that fits nothing is read once instead of every run, and any charter edit moves the fingerprint, matches no stamp and offers them all again.
@@ -290,6 +291,27 @@ export const MOVE_KIND = "placement";
 // ticket moves, so there is no row to image and nothing to propose for removal.
 export const FIT_STAMP_KIND = "fit-stamp";
 
+// AGT-490: THE WRITER VERDICT A PARK IS SENT AS, and it is deliberately NOT in `LIST_VERDICTS`. She
+// never types `park`: she answers a 0 or a `no-fit` and names where it waits, and this file turns
+// that into the one call `apply_requirement_verdict()` takes. Widening her vocabulary would give
+// her a fifth thing to choose between for no gain (pattern:10).
+export const PARK_VERDICT = "park";
+
+// The prefix a PARKED (0) reason begins with. One string, read by her row's `method`, by P1 here
+// and by `countable_tickets_per_project()`'s own `PARKED` sensor (AGT-481) -- a second copy of it
+// would be a second answer to "what marks a parked ticket" (pattern:93).
+export const PARKED_PREFIX = "PARKED (0) until ";
+
+// A new project's NAME is what she answers; its slug is DERIVED, here and in `park_target()`, by the
+// same rule in both places: lowercase, every run of non-alphanumerics to one `-`, trimmed. This copy
+// exists so the refusal "that slug already names a project" can be made offline, before a write --
+// the function holds the same rule and is the one that enforces it (pattern:10).
+export function projectSlug(name) {
+  return String(name ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+export const NEW_PROJECT_MIN = 3;
+export const NEW_PROJECT_MAX = 80;
+
 // THE STAMP'S WHOLE LIFE IS THIS STRING, which is why one function builds it and both the writer
 // here and `victoria_charter_state()`'s `stamped` predicate read the same shape. The fingerprint is
 // INSIDE the summary on purpose: a stamp says "fits none of THESE charters", so a charter edit moves
@@ -303,10 +325,19 @@ const cut = (v, n) => (v === null || v === undefined ? null : String(v).slice(0,
 
 // The list task_context. The tickets' own columns and the candidates' own keys -- this file judges
 // nothing about either, it only decides how much of each travels.
-export function buildListContext({ project, epics, tickets, candidates, kinds, charters, fingerprint }) {
+export function buildListContext({ project, epics, tickets, candidates, kinds, charters, fingerprint,
+  parked_homes }) {
   return {
     list: project ?? null,
     epics: Array.isArray(epics) ? [...epics] : [],
+    // AGT-490: WHERE A PARKED TICKET MAY WAIT -- the paused and planned projects, as
+    // `victoria_parked_homes()` returned them. The other half of the board from `active_charters`,
+    // and read the same way: the function owns which projects these are, this file writes no slug
+    // of its own (requirements d.5, d.17). Empty is the safe reading -- a context assembled
+    // without it accepts no parked home at all rather than accepting any.
+    parked_homes: (Array.isArray(parked_homes) ? parked_homes : []).map(h => ({
+      slug: h?.slug ?? null, name: h?.name ?? null, status: h?.status ?? null,
+    })),
     // AGT-486: the charters themselves, as the rpc returned them -- this file names no slug and
     // carries no charter text of its own (requirements d.5, d.17), it only decides that the whole
     // charter travels rather than a head of it: a fit judged against 200 characters of a charter is
@@ -387,6 +418,14 @@ export function validateListVerdict(answer, ctx) {
   // AGT-489: the destinations she may name, from the same charters and nowhere else -- this file
   // still writes no project slug of its own (requirements d.5, d.17).
   const slugs = charters.map(c => String(c.slug));
+  // AGT-490: and the destinations a PARKED ticket may name, from `parked_homes` and nowhere else.
+  // A separate set, never merged with `slugs`: a 0 that named an executing project would be a
+  // placement wearing a park's clothes, and a 3 that named a paused one would be a ticket filed
+  // where nothing runs. [] when the context carries none, which refuses every parked home rather
+  // than accepting any.
+  const parkedSlugs = (Array.isArray(body.parked_homes) ? body.parked_homes : [])
+    .filter(h => Object(h) === h && h !== null && !blank(h.slug))
+    .map(h => String(h.slug));
 
   const a = Object(answer) === answer && answer !== null ? answer : {};
   if (blank(a.list)) no(label, "the answer names no list");
@@ -475,10 +514,18 @@ export function validateListVerdict(answer, ctx) {
     const graded = want_p.graded === true;
     const parentHome = blank(want_p.parent_home) ? null : String(want_p.parent_home);
     const home = blank(row.home) ? null : String(row.home);
+    // AGT-490: the two facts that make this row a PARK rather than a placement -- a `pass` scoring
+    // 0 and a `no-fit` are the only answers that may name a paused or planned project, and the only
+    // ones that may name a project that does not exist yet.
+    const parked = row.verdict === "pass" && row.need_score === 0;
+    const parking = parked || row.verdict === "no-fit";
+    const newProject = blank(row.new_project) ? null : String(row.new_project);
 
     // V1. A home is a slug of a project she was handed a charter for, or nothing at all. She never
-    //     composes a destination, exactly as she never composes a candidate key.
-    if (home !== null && !slugs.includes(home)) {
+    //     composes a destination, exactly as she never composes a candidate key. AGT-490: above 0
+    //     this rule is byte-unchanged; a parked answer is judged by P2/P4 against `parked_homes`
+    //     instead, because an executing project is exactly where a parked ticket must NOT go.
+    if (!parking && home !== null && !slugs.includes(home)) {
       no(id, `home ${JSON.stringify(home)} is not an active project's slug (${slugs.join(", ")})`);
     }
     // V2. A GRADE IS NOT RE-ANSWERED. Its text changing or John reversing it are the only reopeners
@@ -517,6 +564,53 @@ export function validateListVerdict(answer, ctx) {
         no(id, `blocks a parent in ${parentHome}; it cannot be held or left behind (d.11) ` +
           `-- answer ${graded ? "move" : "pass"} with that home`);
       }
+    }
+
+    // AGT-490, P1-P5: THE PARKED ANSWER. A 0 says "this is real and it waits"; the half that was
+    // missing is WHERE. All five rules are held here, offline, where a refusal costs no write and
+    // names its ticket (pattern:10) -- `park_target()` holds the same rules one layer down and is
+    // what actually enforces them against a hand-written call.
+
+    // P1. A 0 says so in its own words, in the one shape every reader of a parked ticket matches:
+    //     `countable_tickets_per_project()` reads this prefix off the grade's reason (AGT-481).
+    if (parked && !String(row.reason ?? "").startsWith(PARKED_PREFIX)) {
+      no(id, `scores 0, so its reason begins ${JSON.stringify(PARKED_PREFIX)} and names the ` +
+        `project it waits for; it begins ${JSON.stringify(String(row.reason ?? "").slice(0, 40))}`);
+    }
+    // P2 / P4. A parked home is a PAUSED or PLANNED project she was handed -- a 0 sent into an
+    //     executing project is a placement wearing a park's clothes, and the pick skips it anyway.
+    if (parking && home !== null && !parkedSlugs.includes(home)) {
+      no(id, `home ${JSON.stringify(home)} is not a paused or planned project's slug ` +
+        `(${parkedSlugs.join(", ") || "none"}); a parked ticket waits where nothing is running`);
+    }
+    // P3. A project named for the FIRST time. Only a 0 or a `no-fit` may name one; never beside a
+    //     home (two destinations is not an answer); inside the length her row allows; and never a
+    //     name whose slug is one she was already handed -- that project exists, so it is a home.
+    if (newProject !== null) {
+      if (!parking) {
+        no(id, `names new_project ${JSON.stringify(newProject)}; only a pass at 0 or a no-fit ` +
+          "names a project to wait in");
+      }
+      if (home !== null) {
+        no(id, `names both home ${JSON.stringify(home)} and new_project ` +
+          `${JSON.stringify(newProject)}; a ticket waits in one place`);
+      }
+      if (newProject.length < NEW_PROJECT_MIN || newProject.length > NEW_PROJECT_MAX) {
+        no(id, `new_project is ${newProject.length} character(s); a project name is ` +
+          `${NEW_PROJECT_MIN}-${NEW_PROJECT_MAX}`);
+      }
+      const made = projectSlug(newProject);
+      if ([...slugs, ...parkedSlugs].includes(made)) {
+        no(id, `new_project ${JSON.stringify(newProject)} makes the slug ${JSON.stringify(made)}, ` +
+          "which already names a project she was handed; name it as home instead");
+      }
+    }
+    // P5. AND A TICKET JOHN NAMED IS NEVER MOVED (d.10), parked or not. `park_target()` refuses it
+    //     as well; this is the same refusal one turn earlier, before any write is attempted.
+    if (parking && (home !== null || newProject !== null) &&
+        String(want_p.scope_origin ?? "") === "john-named") {
+      no(id, "is a ticket John named; it is never moved, so a parked answer on it names neither " +
+        "home nor new_project (d.10)");
     }
   }
   for (const [id, n] of seen) {
@@ -843,6 +937,17 @@ async function prepareList(args) {
       "are all closed");
   }
 
+  // 1c. AGT-490: WHERE A PARKED TICKET MAY WAIT. One read, beside the charters and never merged
+  //     with them: `victoria_parked_homes()` owns which projects are paused or planned, so this
+  //     file still names no slug of its own. An empty answer is NOT a refusal -- a list whose
+  //     tickets all fit an active charter needs no parking place, and the validator refuses every
+  //     parked home for a context that carries none.
+  const parkedRpc = await rest(base, key, "POST", "rpc/victoria_parked_homes", {});
+  if (!parkedRpc.ok) {
+    die(1, `requirement-check: POST rpc/victoria_parked_homes -> HTTP ${parkedRpc.status} ${parkedRpc.text.slice(0, 400)}`);
+  }
+  const parkedHomes = Array.isArray(parkedRpc.json) ? parkedRpc.json : [];
+
   // 2. Its epics, or the one named. An `--epic` of another project is refused rather than silently
   //    reorganized under this list's name.
   let epicIds;
@@ -982,12 +1087,15 @@ async function prepareList(args) {
 
   const task_context = buildListContext({
     project, epics: epicIds, tickets, candidates, kinds, charters, fingerprint,
+    parked_homes: parkedHomes,
   });
   await assembleAndEmit({
     base, key, args, task_context, intentSlug: LIST_INTENT,
     head: {
       list: project, epics: epicIds.length, tickets: tickets.length, candidates: candidates.length,
       charters: charters.length, charter_fingerprint: fingerprint, dropped,
+      // AGT-490: how many places a parked ticket may be sent to wait.
+      parked_homes: parkedHomes.length,
       // AGT-489: how many of the tickets offered already hold a standing grade -- the half of the
       // list that can only be moved or held, never graded again.
       graded: tickets.filter(t => t.graded === true).length, held_back: heldBack,
@@ -1034,6 +1142,11 @@ async function applyList(args) {
       // left it exactly where it was. A blank or absent `home` sends none, which is today's
       // behaviour byte for byte: the ticket is graded and stays on its list.
       ...(blank(row.home) ? {} : { home_project: String(row.home) }),
+      // AGT-490: AND WHERE A PARKED (0) TICKET WAITS, when she named a project that does not exist
+      // yet. The writer refuses a `new_project` above 0 and sends a 0 that names either one through
+      // `park_target()` instead of `placement_target()` -- the choice is the SCORE's, not this
+      // file's, so nothing here branches on it.
+      ...(blank(row.new_project) ? {} : { new_project: String(row.new_project) }),
     };
     const r = await rest(base, key, "POST", "rpc/apply_requirement_verdict",
       { p_cycle: cycleId, p_session: sessionName, p });
@@ -1100,6 +1213,9 @@ async function applyList(args) {
   //     against a set she never saw.
   const fingerprint = blank(body.charter_fingerprint) ? null : String(body.charter_fingerprint);
   const noFits = rows.filter(r => r.verdict === "no-fit");
+  // AGT-490: the tickets this run sent somewhere to WAIT, counted on the line below beside the
+  // moves and the holds.
+  const parked = [];
   if (noFits.length && fingerprint === null) {
     die(1, "requirement-check --apply-list: the context carries no charter_fingerprint, and a " +
       `${FIT_STAMP_KIND} without one is a stamp nothing can ever clear`);
@@ -1125,6 +1241,30 @@ async function applyList(args) {
     }
     console.log(`${bid}: no-fit — ${FIT_STAMP_KIND} recorded; nothing on the ticket changed, no removal proposed.`);
     console.log(`Decision ${handle} — one Reverse offers it again: select * from public.reverse_decision('${handle}', 'John', '<why>');`);
+
+    // AGT-490: AND A `no-fit` MAY ALSO SAY WHERE IT WAITS. The stamp above is unchanged and comes
+    // FIRST -- it records that this ticket was read against these charters and fits none of them,
+    // which stays true whether or not it is parked. The park is a second, separate write under its
+    // own `placement` decision: John's call is that a placed `no-fit` stays UNGRADED, so no
+    // `need_source` and no `need_score` travel with it and the writer takes no grade check on it.
+    if (blank(row.home) && blank(row.new_project)) continue;
+    const target = blank(row.home) ? String(row.new_project) : String(row.home);
+    const park = await rest(base, key, "POST", "rpc/apply_requirement_verdict", {
+      p_cycle: cycleId, p_session: sessionName,
+      p: {
+        verdict: PARK_VERDICT, backlog_id: bid, reason: row.reason,
+        ...(blank(row.home) ? { new_project: String(row.new_project) } : { home_project: String(row.home) }),
+        account: answer.account,
+      },
+    });
+    if (!park.ok) die(1, `requirement-check --apply-list: ${bid} ${PARK_VERDICT} -> HTTP ${park.status} ${park.text}`);
+    const parkHandle = typeof park.json === "string" ? park.json : park.json?.id ?? null;
+    if (!parkHandle) die(1, `requirement-check --apply-list: ${bid} — the writer returned no handle; got ${park.text.slice(0, 300)}`);
+    const pd = await rest(base, key, "GET", `runner_decisions?id=eq.${parkHandle}&select=expires_at`);
+    const parkExpires = pd.ok && Array.isArray(pd.json) && pd.json[0] ? pd.json[0].expires_at : null;
+    parked.push(bid);
+    console.log(`Parked: ${bid} -> ${target}`);
+    console.log(`Decision ${parkHandle} — reversible until ${chicago(parkExpires)}: select * from public.reverse_decision('${parkHandle}', 'John', '<why>');`);
   }
 
   // --- AGT-489: the `move` rows. The SAME writer the passes use and the same one handle back, but
@@ -1193,7 +1333,7 @@ async function applyList(args) {
   console.log(`${notes}`);
   // AGT-489: the placements, on their OWN line. `runLine()` is byte-unchanged (agt-281 pins that
   // string), and the two counts a run of this door now also has to report go beside it.
-  console.log(`moves: ${moves.length}, holds: ${holds.length}`);
+  console.log(`moves: ${moves.length}, holds: ${holds.length}, parked: ${parked.length}`);
   console.log(`runner_cycles ${cycRow.id} — the run's one record (model ${model}).`);
   process.exitCode = 0;
 }
