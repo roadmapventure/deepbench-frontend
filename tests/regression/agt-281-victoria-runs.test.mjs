@@ -324,8 +324,8 @@ async function run() {
     assert.match(must(withRows([{ ...rows[0], reason: "r".repeat(LIST_REASON_CHARS + 1) }, rows[1]]),
       A, "a reason past the schema's ceiling"), /the reason is 401 characters/);
     assert.match(must(withRows([{ ...rows[0], verdict: "maybe" }, rows[1]]), A,
-      "a verdict outside the three (AGT-486 added no-fit; LIST_VERDICTS, not the writer's VERDICTS)"),
-      /is not one of pass, not-needed, no-fit/);
+      "a verdict outside the five (AGT-486 added no-fit, AGT-489 move and hold; LIST_VERDICTS, not the writer's VERDICTS)"),
+      /is not one of pass, not-needed, no-fit, move, hold/);
     assert.match(must({ ...answer, list: "auditor-findings" }, "backlog-intake", "ANOTHER list's slug"),
       /which is not the one it was handed/);
     assert.match(must({ ...answer, account: "" }, "backlog-intake", "a blank account"), /needs an account/);
@@ -546,9 +546,9 @@ async function run() {
       const schema = row.traits?.schema ?? {};
       assert.deepEqual(schema.required, ["list", "rows", "account"], "the three required keys §4 names");
       const item = schema.properties?.rows?.items ?? {};
-      assert.deepEqual(item.required, ["backlog_id", "verdict", "need_source", "need_score", "reason"],
-        "and the row shape §4 names");
-      assert.deepEqual(item.properties?.verdict?.enum, ["pass", "not-needed", "no-fit"]);
+      assert.deepEqual(item.required, ["backlog_id", "verdict", "home", "need_source", "need_score", "reason"],
+        "and the row shape §4 names, with AGT-489's `home` after the verdict it belongs to");
+      assert.deepEqual(item.properties?.verdict?.enum, ["pass", "not-needed", "no-fit", "move", "hold"]);
       assert.equal(item.properties?.need_score?.minimum, 1);
       assert.equal(item.properties?.need_score?.maximum, 5);
       assert.equal(item.properties?.reason?.maxLength, LIST_REASON_CHARS,
