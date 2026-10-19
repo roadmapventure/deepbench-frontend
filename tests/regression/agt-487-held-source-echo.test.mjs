@@ -1,3 +1,6 @@
+// DeepBench v7.0.865 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-489 -- ARM B'S LIVE
+// HALF: both tickets are graded and V2 refuses a `pass` on them, so the live echo is graded with
+// `graded` lifted, after the V2 refusal is asserted as handed. Nothing else in this file moved.
 // DeepBench v7.0.862 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-487 -- THE GUARD ON
 // "A TICKET'S OWN JOHN SOURCE IS CITABLE ON ITS OWN ROW".
 //
@@ -285,9 +288,28 @@ async function run() {
     }
 
     // THE SAME THREE RULES over the live context, when arm A measured one. One grader, two shapes.
+    // AGT-489: both tooling tickets hold a STANDING grade, so V2 refuses a `pass` on them by design
+    // (d.13). That refusal is measured FIRST, then the rules run with the grade fact lifted -- the
+    // held-source contract is a rule about a `pass`, which only an ungraded ticket can answer.
     if (liveCtx) {
+      const heldLive = liveCtx.proposals.find(p => p.backlog_id === HELD_TICKET);
+      assert.equal(heldLive?.graded, true,
+        `${HELD_TICKET} holds a standing grade (AGT-489); got ${JSON.stringify(heldLive?.graded)}`);
+      const asHanded = validateListVerdict({
+        list: liveCtx.list, account: "Ruled both tickets on the source each already carries",
+        rows: [HELD_TICKET, CANDIDATE_TICKET].map(id => ({
+          backlog_id: id, verdict: "pass", need_score: 5,
+          need_source: id === HELD_TICKET ? liveHeld : liveCtrl,
+          reason: "echoes the source the ticket already carries",
+        })),
+      }, liveCtx);
+      assert.equal(asHanded.ok, false, "as handed, a pass on a graded ticket is refused (AGT-489 V2)");
+      assert.ok(asHanded.refusals.some(r => r.startsWith(`${HELD_TICKET}:`) && /is already graded/.test(r)),
+        `refused by V2's sentence, naming ${HELD_TICKET}; got ${JSON.stringify(asHanded.refusals)}`);
+      console.log(`    [AGT-487 arm B] live context: a pass on the graded ${HELD_TICKET} is refused as handed (is already graded, AGT-489 V2)`);
+      const lifted = { ...liveCtx, proposals: liveCtx.proposals.map(p => ({ ...p, graded: false })) };
       for (const line of gradeHeldEcho({
-        ctx: liveCtx, heldKey: liveHeld, otherCandidateKey: liveCtrl, where: "live context",
+        ctx: lifted, heldKey: liveHeld, otherCandidateKey: liveCtrl, where: "live context, grade lifted",
       })) {
         console.log(`    [AGT-487 arm B] ${line}`);
       }

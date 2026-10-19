@@ -1,4 +1,4 @@
-// DeepBench v7.0.864 | tests/regression/agt-489-move-door.test.mjs | AGT-489 -- THE MOVE DOOR.
+// DeepBench v7.0.865 | tests/regression/agt-489-move-door.test.mjs | AGT-489 -- THE MOVE DOOR.
 //
 // THE DEFECT, measured live 2026-10-19 on tree 08a615d rather than reasoned about: Victoria's list
 // turn GRADED and never MOVED. `applyList()`'s pass payload was `{ ...row, proposal, account }` --
