@@ -1,3 +1,4 @@
+// DeepBench v7.0.867 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-490 -- arm A's parked answer re-pinned to the shipped P1/P2/P3 and arm F to need_score.minimum 0 plus the new_project property; the rule v7.0.866 shipped is unchanged.
 // DeepBench v7.0.861 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-486 -- the list vocabulary is LIST_VERDICTS (three values, `no-fit` added) and every list context carries the active charters; arm F reads the three-value enum off the live row. The no-fit rules themselves are graded by tests/regression/agt-486-charter-fit.test.mjs.
 // DeepBench v7.0.850 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
 // DeepBench v7.0.849 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-453 -- arm F re-pinned to EXPECTED_BINDINGS, six in display_order, two-direction via bindingDrift(); arm A proves missing/extra/duplicate/order each refuse.
@@ -24,7 +25,10 @@
 //      before any read, and a refused `--apply-list` exits 1 having sent nothing (exit 2 there would
 //      be a credential failure wearing a refusal's clothes). AGT-432 re-pinned this arm to an EMPTY
 //      `EXCLUDED_KINDS`, `CANDIDATE_FILTER` and the fifth head column, and added the `ctxJ` case: a
-//      `pass` may not replace an existing `john:` need_source, and echoing it passes.
+//      `pass` may not replace an existing `john:` need_source, and echoing it passes. AGT-490
+//      added `ctxP` -- the same context plus `parked_homes` -- and moved the parked case onto
+//      the rule that shipped: a 0 naming a parked home is accepted with and without that home,
+//      and the five P1/P2/P3 refusals plus V1 above 0 are each graded by their own message.
 //   B  THE TWO CROSS-FILE STRINGS, which are the ones that can rot silently. `PROPOSED_STATUS` here
 //      must still be the literal `scripts/ticket-owner.js` writes (it is not exported there, so this
 //      arm reads that file), and `VICTORIA_PREFIX` in the brief must still equal `LIST_PREFIX` in the
@@ -40,7 +44,9 @@
 //   E  THE REPO PLUMBING: the `SERVICE_CATALOG` slug the runbook's block prescribes verbatim, the
 //      `ROUTINES` key, the `CLAUDE.md` pointer row and the `ARCHITECTURE.md` header + §19v sentence.
 //   F  LIVE: the Skill row, its binding, and the two before-images under ONE `agent-row` decision
-//      (§6.5).
+//      (§6.5). AGT-490 re-pinned its row shape: `need_score.minimum` is 0 (John's directive 3 --
+//      parked is 0) and the `new_project` property is pinned by type, `NEW_PROJECT_MAX` and its
+//      absence from `required`.
 //   G  THE LIVE DISCRIMINATOR (§6.1), end to end over the real CLI. See its own block. AGT-432
 //      re-pinned its candidate check: ALL of John's unreversed rulings are candidates, and nothing
 //      else from `runner_decisions`.
@@ -77,6 +83,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   LIST_INTENT, LIST_PREFIX, HELD_LISTS, HEAD_CHARS, DESC_CHARS, LIST_REASON_CHARS, TOP_N,
   CANDIDATE_HEAD, CANDIDATE_FILTER, EXCLUDED_KINDS, PROPOSED_STATUS, AWAITING_LIST_ANSWER,
+  PARKED_PREFIX, NEW_PROJECT_MAX,
   buildListContext, validateListVerdict, runLine,
 } from "../../scripts/requirement-check.js";
 import { ROUTINES } from "../../scripts/check-routine-prompt.js";
@@ -312,9 +319,68 @@ async function run() {
     assert.match(swapped.refusals.join(" | "), new RegExp(`^${A}: already carries John's own source ${J}`));
     const echoed = validateListVerdict(withRows([{ ...rows[0], need_source: J }, rows[1]]), ctxJ);
     assert.deepEqual(echoed.refusals, [], "(AGT-432) echoing John's source passes");
-    const parked = validateListVerdict(withRows([{ ...rows[0], need_score: 0 }, rows[1]]), ctx);
-    assert.deepEqual(parked.refusals, [], "(AGT-433) a PARKED ticket scored 0 is accepted by the list validator too");
+    // ---- AGT-490: THE PARKED ANSWER, against the rule v7.0.866 shipped ----------------------
+    // A 0 was accepted bare until v7.0.866; P1-P3 now ask it to say WHERE it waits, so the case
+    // moves onto that rule rather than the rule being relaxed to keep the old case passing
+    // (pattern:166 -- John's directive 3 is that parked is 0). `ctxP` is a SECOND context beside
+    // `ctx`, exactly as `ctxJ` is, so every assertion standing on `ctx` above is byte-unchanged.
+    const PARKED_HOME = "zagtvic-parked";
+    const ctxP = buildListContext({
+      project: "backlog-intake",
+      epics: ["e1"],
+      tickets: [
+        { backlog_id: A, title: "A", description: "d", status: "open" },
+        { backlog_id: B, title: "B", description: null, status: "partial" },
+      ],
+      candidates: [{ key: SRC, head: "the record's first words" }],
+      kinds: ["nathan:market_records"],
+      charters: [{ slug: "zagtvic-project", charter: "A charter, so the fit question is answerable." }],
+      // The one added key: where a parked ticket may wait, as `victoria_parked_homes()` returns it.
+      parked_homes: [{ slug: PARKED_HOME, name: "ZAGTVIC Parked", status: "paused" }],
+      fingerprint: "0".repeat(32),
+    });
+    assert.deepEqual(ctxP.parked_homes, [{ slug: PARKED_HOME, name: "ZAGTVIC Parked", status: "paused" }],
+      "the list context carries the parked homes through -- P2 judges against these and nothing else");
+
+    const parkedRow = { ...rows[0], need_score: 0, home: PARKED_HOME,
+      reason: PARKED_PREFIX + PARKED_HOME + " is active" };
+    const parked = validateListVerdict(withRows([parkedRow, rows[1]]), ctxP);
+    assert.deepEqual(parked.refusals, [],
+      "(AGT-490) a PARKED ticket scored 0 that says where it waits is accepted by the list validator");
     assert.equal(parked.ok, true);
+    const stays = validateListVerdict(withRows([{ ...parkedRow, home: null }, rows[1]]), ctxP);
+    assert.deepEqual(stays.refusals, [], "(AGT-490) and a 0 may stay put -- home null names no destination");
+    assert.equal(stays.ok, true);
+
+    // `must()`'s shape against ctxP: refused, something said, and the refusal NAMES the ticket --
+    // so a validator refusing everything with a bare message would still fail every case below.
+    const mustP = (bad, who, why) => {
+      const v = validateListVerdict(bad, ctxP);
+      assert.equal(v.ok, false, `${why}: must be refused`);
+      assert.ok(v.refusals.length > 0, `${why}: a refusal must say something`);
+      assert.ok(v.refusals.some(r => r.startsWith(`${who}:`)),
+        `${why}: a refusal must name ${who}; got ${JSON.stringify(v.refusals)}`);
+      return v.refusals.join(" | ");
+    };
+    // P1. The old answer's reason, which is the one this arm used to accept.
+    assert.match(mustP(withRows([{ ...parkedRow, reason: "the record asks for it" }, rows[1]]),
+      A, "a 0 whose reason does not begin with the PARKED prefix"),
+      /scores 0, so its reason begins "PARKED \(0\) until "/);
+    // P2. A 0 sent into the EXECUTING charter's project is a placement wearing a park's clothes.
+    assert.match(mustP(withRows([{ ...parkedRow, home: "zagtvic-project" }, rows[1]]),
+      A, "a 0 whose home is an executing project"), /is not a paused or planned project's slug/);
+    // P3. Two destinations is not an answer.
+    assert.match(mustP(withRows([{ ...parkedRow, new_project: "ZAGTVIC Planned Probe" }, rows[1]]),
+      A, "a 0 naming both a home and a new project"), /a ticket waits in one place/);
+    // P3. And a new project above 0 is not a park at all.
+    assert.match(mustP(withRows([{ ...rows[0], new_project: "ZAGTVIC Planned Probe" }, rows[1]]),
+      A, "a score of 4 naming a new project"), /only a pass at 0 or a no-fit names a project to wait in/);
+    // P3. A name whose slug she was already handed is a HOME, not a project to create.
+    assert.match(mustP(withRows([{ ...parkedRow, home: null, new_project: "ZAGTVIC Parked" }, rows[1]]),
+      A, "a new project whose slug is already a parked home"), /already names a project she was handed/);
+    // V1 ABOVE 0 IS BYTE-UNCHANGED: a 4 may not name a paused project either.
+    assert.match(must(withRows([{ ...rows[0], home: PARKED_HOME }, rows[1]]),
+      A, "a score of 4 whose home is a paused project"), /is not an active project's slug/);
     for (const score of [-1, 6, "4", 3.5, undefined]) {
       assert.match(must(withRows([{ ...rows[0], need_score: score }, rows[1]]), A, `need_score ${JSON.stringify(score)}`),
         /need_score must be a whole number 0-5/);
@@ -549,8 +615,17 @@ async function run() {
       assert.deepEqual(item.required, ["backlog_id", "verdict", "home", "need_source", "need_score", "reason"],
         "and the row shape §4 names, with AGT-489's `home` after the verdict it belongs to");
       assert.deepEqual(item.properties?.verdict?.enum, ["pass", "not-needed", "no-fit", "move", "hold"]);
-      assert.equal(item.properties?.need_score?.minimum, 1);
+      assert.equal(item.properties?.need_score?.minimum, 0,
+        "AGT-490: the band starts at 0 -- a 0 IS her parked answer (John's directive 3: parked is 0), " +
+        "so a schema refusing it would refuse the verdict the validator accepts");
       assert.equal(item.properties?.need_score?.maximum, 5);
+      // AGT-490: and the property that carries WHERE a parked ticket waits when no handed slug fits.
+      assert.deepEqual(item.properties?.new_project?.type, ["string", "null"],
+        "new_project is an optional string -- null on every answer that names no new project");
+      assert.equal(item.properties?.new_project?.maxLength, NEW_PROJECT_MAX,
+        "the schema's new_project ceiling and the validator's NEW_PROJECT_MAX are ONE number (pattern:163)");
+      assert.ok(!item.required.includes("new_project"),
+        `new_project is NOT required -- almost every row names none; got ${JSON.stringify(item.required)}`);
       assert.equal(item.properties?.reason?.maxLength, LIST_REASON_CHARS,
         "the schema's reason ceiling and the validator's must be the same number");
 
