@@ -1,3 +1,11 @@
+// DeepBench v7.0.868 | tests/regression/agt-434-agent-skill-pins.test.mjs | AGT-491 -- the pinned
+// population grows by one: `architect` (The Governance Architect, GV-09) is created with a
+// `deepbench-north-star` pin of its own, so arm (C)'s census moves 11 -> 12 and the AGENTS list above
+// gains that id. Nothing about the RULE changes -- AGT-491 adds no capability and no capability link,
+// so the zero-links assertion, the md5 of the north star's own text and the un-reversed 5b4f3dd2 are
+// untouched. The arm's own discriminator still fires the same way: left at 11 this file is red at the
+// census, and a third pin on the architect is red at 13.
+//
 // DeepBench v7.0.850 | tests/regression/agt-434-agent-skill-pins.test.mjs | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
 //
 // FEATURE: AGT-434 -- a Skill every call of an agent must carry is pinned ONCE at agent level and read
@@ -56,6 +64,8 @@ const DEC = "5b4f3dd2-d072-434f-bef4-edfc7494812e";
 const AGENTS = [
   "jerry", "nathan", "victoria", "devmanager", "auditor", "designer",
   "builder", "prioritizer", "verifier", "researcher", "ticketowner",
+  // AGT-491: GV-09, the twelfth pinned agent -- the Governance Architect.
+  "architect",
 ];
 
 const md5 = s => crypto.createHash("md5").update(String(s), "utf8").digest("hex");
@@ -284,7 +294,7 @@ async function armC_live() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     notRun(
-      "the live arm (11 pins over the directive's 11 agents; zero capability links left; the north star row present with its text unchanged; decision 5b4f3dd2 NOT reversed; a real assemblePrompt() carrying the north star exactly once for jerry agent-wide and for designer+design-kickoff, and never for susan)",
+      "the live arm (12 pins over the directive's 11 agents plus AGT-491's architect; zero capability links left; the north star row present with its text unchanged; decision 5b4f3dd2 NOT reversed; a real assemblePrompt() carrying the north star exactly once for jerry agent-wide and for designer+design-kickoff, and never for susan)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent -- read them from public.runner_secrets by name and export them inline, per docs/STANDARDS.md Section 2 rule 5.",
     );
     return results;
@@ -298,13 +308,13 @@ async function armC_live() {
     return (await r.json()) || [];
   };
 
-  // 1. THE PINS: eleven, one per agent, exactly the directive's eleven.
+  // 1. THE PINS: twelve, one per agent, exactly the directive's eleven plus AGT-491's architect.
   const pins = await rest(`agent_skill_pins?skill_profile_slug=eq.${NS}&select=agent_id,tenant_id,display_order&order=agent_id.asc`);
-  assert.strictEqual(pins.length, 11, `the north star must be pinned to exactly 11 agents, got ${pins.length} row(s)`);
+  assert.strictEqual(pins.length, 12, `the north star must be pinned to exactly 12 agents, got ${pins.length} row(s)`);
   const pinned = [...new Set(pins.map(p => p.agent_id))].sort();
-  assert.strictEqual(pinned.length, 11, `11 pin rows must name 11 DISTINCT agents, got ${JSON.stringify(pinned)}`);
+  assert.strictEqual(pinned.length, 12, `12 pin rows must name 12 DISTINCT agents, got ${JSON.stringify(pinned)}`);
   assert.deepStrictEqual(pinned, [...AGENTS].sort(),
-    `the pinned agents must be the directive's eleven, got ${JSON.stringify(pinned)}`);
+    `the pinned agents must be the directive's eleven plus AGT-491's architect, got ${JSON.stringify(pinned)}`);
   assert.ok(!pinned.includes("susan"), "susan holds no capability with the link and is not pinned (pattern:90)");
   results.push("live-eleven-pins-over-the-directives-eleven-agents");
 

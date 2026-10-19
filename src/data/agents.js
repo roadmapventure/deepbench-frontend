@@ -1,10 +1,8 @@
+// DeepBench v7.0.868 | agents.js | AGT-491 — AVATAR_CFG + AGENT_PRONOUNS entries for `architect` (The Governance Architect, GV-09, role `Governance — Architect`), lane `governance` and is_active true in `public.agents` (the SES-338 lane carve-out, .claude/rules/agent-roster-inert.md). NOT in the AGENTS array, same terms as every governance id before it: the Bench's Governance section renders those agents from the live `lane = 'governance'` rows (src/components/GovernanceSection.jsx, view governance_agent_activity_7d), never from a list in this file — AGT-69 deleted OFF_BENCH_AGENT_IDS for that reason (John's ruling 2026-09-11, decision 146256c1) — and the AVATAR_CFG / AGENT_PRONOUNS entries exist only so a portrait and pronouns resolve wherever a findings, audit, cycle or decision surface already draws the id. Applied with docs/design/agt-491-governance-architect-seed.sql (migration agt491_governance_architect), pinned by tests/regression/agt-491-governance-architect.test.mjs. The header keeps the newest five stamps: the v7.0.485 AGT-70 (`auditor` GV-07, `ticketowner` GV-08), v7.0.456 AGT-69 and v7.0.434 AGT-68 (`devmanager` GV-01) lines retire here, and every claim in all three is restated in this one.
 // DeepBench v7.0.788 | agents.js | AGT-384 — BENCH_PRIVATE.label "Private" → "Private Agents" (John, 2026-10-05); the id stays "private", so isPrivateAgent() and every benchGroups value are unchanged.
 // DeepBench v7.0.752 | agents.js | AGT-332 slice 1 — BENCH_PRIVATE + isPrivateAgent(); brittany benchGroups ["platform"] → ["private"]
 // DeepBench v7.0.700 | agents.js | AGT-164 — AGENTS entry `brittany` (Brittany, MK-07, Marketing Agent, lane `product`, is_active=false in `public.agents` — the outside tester's blank agent; the hire is John's) with benchGroups ["platform"] (not "mi"), plus AVATAR_CFG and AGENT_PRONOUNS she/her/her. Blank by design: no agent_configs, capability, Skill, knowledge or Library row exists for her and data_room_access is `[]` — everything she knows arrives on her Teach screen, and this roster entry IS that access (useAgents.js returns this static array; TeachScreen.jsx resolves the id against it). Money and training numbers are all 0. Applied with docs/design/agt-164-brittany-seed.sql, pinned by tests/regression/agt-164-brittany.test.mjs. The header keeps the newest five stamps: the v7.0.433 AGT-67 line retires here, and every claim in it is restated above — that entry is off the AGENTS array on the v7.0.485 AGT-70 terms, and the OFF_BENCH_AGENT_IDS list it named was deleted by the v7.0.456 AGT-69 line.
 // DeepBench v7.0.581 | agents.js | AGT-120 — AGENTS entry `nathan` (Nathan Laan, MK-06, Product Marketing Manager, lane `product`, is_active=false in `public.agents` — tryout; the hire is John's) with benchGroups ["platform"] (not "mi", so the Channel Intelligence screen does not list him), plus AVATAR_CFG and AGENT_PRONOUNS he/him/his. The broker roster never sees him while inactive (lib/project-manager.js fences is_active=eq.true&lane=eq.product).
-// DeepBench v7.0.485 | agents.js | AGT-70 —AVATAR_CFG + AGENT_PRONOUNS entries for `auditor` (The Auditor, GV-07) and `ticketowner` (The Ticket Owner, GV-08, AGT-79), both lane `governance` and is_active true in `public.agents`. Same terms as AGT-63..AGT-69: NOT in the AGENTS array — the Bench's Governance section renders them from the live `lane = 'governance'` rows, and these entries exist only so the portrait and pronouns resolve wherever an audit, cycle or decision surface already draws those two ids. The header is trimmed to the newest five stamps in this same edit (the session-hygiene check 7 shape): every retired line was either a historical label rename or is restated by a stamp still standing above it.
-// DeepBench v7.0.456 | agents.js | AGT-69 — OFF_BENCH_AGENT_IDS deleted with its comment (John's ruling 2026-09-11, decision 146256c1): the governance agents render on the Bench's Governance section from live lane=governance rows (src/components/GovernanceSection.jsx, view governance_agent_activity_7d), never from a list here. Their AVATAR_CFG / AGENT_PRONOUNS entries stay — the portraits render from them.
-// DeepBench v7.0.434 | agents.js | AGT-68 — AVATAR_CFG + AGENT_PRONOUNS entries for `devmanager` (The Development Manager, GV-01, lane `governance`), added to OFF_BENCH_AGENT_IDS. NOT in the AGENTS array, same terms as AGT-63/64/65/66/67.
 // FEATURE: SH-03 — Agent roster data
 // src/data/agents.js — v5.0.0
 // DeepBench v5 — Authoritative agent roster
@@ -375,6 +373,10 @@ export const AVATAR_CFG = {
   // Off the Bench for the same reason as the seven entries above; the portrait exists because the
   // census, findings and board surfaces already draw this id.
   ticketowner: { skin:"#c6ad8d", hair:"#302a30", collar:"#40323c", extra:"",        border:T.muted },
+  // FEATURE: AGT-491 — The Governance Architect (GV-09), the governance lane’s finding-to-ticket
+  // architect. Off the Bench for the same reason as the eight entries above; the portrait exists
+  // because the findings, cycle and decision surfaces already draw this id.
+  architect:   { skin:"#cdb193", hair:"#2f2b33", collar:"#2a3f4a", extra:"glasses", border:T.navy  },
 };
 
 // ── Pronouns ──────────────────────────────────────────────────────────────────
@@ -425,6 +427,8 @@ export const AGENT_PRONOUNS = {
   auditor:     { subject:"they", object:"them", possessive:"their" },
   // FEATURE: AGT-79 — The Ticket Owner pronouns (they/them/their).
   ticketowner: { subject:"they", object:"them", possessive:"their" },
+  // FEATURE: AGT-491 — The Governance Architect pronouns (they/them/their).
+  architect:   { subject:"they", object:"them", possessive:"their" },
 };
 
 // ── Training form constants ───────────────────────────────────────────────────
