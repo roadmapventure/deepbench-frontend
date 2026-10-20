@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.870 | scripts/requirement-check.js | AGT-493 -- A TICKET FILED MORE THAN 14 DAYS AGO IS NOT OFFERED UNTIL A VALIDATION STANDS. prepareList() reads needs_validation() once per list and drops what it names (the architect's validate-ticket door runs first: scripts/ticket-validation.js); each proposal carries needs_validation; V8 refuses a move or a homing pass on it. Live before this: 77 + 13 graded tickets older than 14 days in the two holding lists, every one placeable by a move (2026-10-20). d.8, d.30; pattern:9, pattern:10, pattern:17.
 // DeepBench v7.0.866 | scripts/requirement-check.js | AGT-490 -- A PARKED 0 NAMES WHERE IT WAITS. `prepareList()` POSTs `rpc/victoria_parked_homes` once per run and the context carries `parked_homes` (`{slug, name, status}` of every paused and planned project), so a ticket the tree calls PARKED can be scored 0 AND say where it waits -- `home` a parked slug, or `new_project` the name of a PLANNED project created for it (capture only, John turns one on). `validateListVerdict()` holds the five rules offline (P1 a 0's reason begins `PARKED (0) until `; P2 a 0's home is a parked slug while V1 is byte-unchanged above 0; P3 `new_project` only on a 0 or a `no-fit`, 3-80 characters, never beside `home`, and never a slug she was already handed; P4 a `no-fit`'s home is a parked slug; P5 a ticket John named names neither, d.10), `applyList()` sends a pass's `new_project` beside its `home`, and a `no-fit` that named a destination POSTs the writer's new `park` verdict AFTER its `fit-stamp` -- its own `placement` decision, no grade, printed as `Parked: <id> -> <target>` and counted on the counts line. Live before this: 0 tickets on the whole board read `need_score` 0 though every validator has accepted one since `v7.0.844`, AGT-383 and AGT-252 both read 1 against John's 2026-10-08 ruling, and `home` reached `placement_target()`, which admits an `executing` project and nothing else (2026-10-19). pattern:2, pattern:10, pattern:17.
 // DeepBench v7.0.865 | scripts/requirement-check.js | AGT-489 -- THE MOVE DOOR. The list turn now carries `graded` and `parent_home` per proposal and answers `move` (place a graded ticket, never re-grading it) or `hold` (graded, fits, waits) beside `pass`, `not-needed` and `no-fit`: `prepareList()` reads `grade_standing()` and `parent_project_of_blockers()` ONCE per list, drops a graded ticket scoring under 3 that no parent lifts (it cannot move and must not be re-graded), and `applyList()` sends a `pass`'s `home_project` from the row's own `home` and a `move` to `apply_requirement_verdict()`, which writes it as its own `placement` decision. Live before this: `applyList` sent NO `home_project` on any pass and `prepareList` had no notion of "already graded", so `auditor-findings` offered the same 35 graded tickets every run (43 open/partial = 8 ungraded + 35 graded; `dev-mgr-findings` 201 = 6 + 195) while `countable_tickets_per_project()` read 1/0/0 (2026-10-19). pattern:2, pattern:9, pattern:14.
 // DeepBench v7.0.862 | scripts/requirement-check.js | AGT-487 -- A TICKET'S OWN JOHN SOURCE IS CITABLE ON ITS OWN ROW. `--prepare-list` reads the head of the row behind each listed ticket's OWN `need_source` and hands it over as that proposal's `need_source_head` -- per proposal, read only for a ticket already carrying a source that is not already a candidate key, and NEVER appended to the shared `candidates` pool, which stays John's unreversed rulings (`CANDIDATE_FILTER`): appending it would let any ticket cite a non-ruling decision and weaken AGT-432 without John's words (pattern:166). `validateListVerdict()` then accepts a `pass` whose `need_source` IS the key the ticket already holds -- every other value must still be one of the candidates it was handed, and AGT-432's rule that a `john:` source is echoed and never replaced is byte-unchanged. Live before this: AGT-237 held `john:runner_decisions:2c38d860-...`, a `kind='scope'` decision of John's that `CANDIDATE_FILTER` never hands over, so neither the membership rule nor the echo rule could be satisfied and the whole `tooling` list was refused with no write (2026-10-12, 10-13).
@@ -373,6 +374,11 @@ export function buildListContext({ project, epics, tickets, candidates, kinds, c
       // deliberately: agt-487's guard pins that key as the proposal's LAST one.
       graded: t.graded === true,
       parent_home: blank(t.parent_home) ? null : String(t.parent_home),
+      // AGT-493: the THIRD fact she cannot read off the columns -- whether this ticket is older than
+      // the validation window with no validation standing on it (`needs_validation()`, d.8/d.30).
+      // `false` is the safe reading, so a context assembled without it behaves exactly as it did
+      // before this ship; it is placed before `need_source_head`, which agt-487 pins last.
+      needs_validation: t.needs_validation === true,
       // AGT-487: THE HEAD OF THE ROW THIS TICKET ALREADY CITES, travelling ON THE PROPOSAL and
       // nowhere else. `prepareList()` reads it per ticket; this file adds nothing to `candidates`,
       // because a held source in the shared pool would be a source EVERY ticket could cite --
@@ -564,6 +570,14 @@ export function validateListVerdict(answer, ctx) {
         no(id, `blocks a parent in ${parentHome}; it cannot be held or left behind (d.11) ` +
           `-- answer ${graded ? "move" : "pass"} with that home`);
       }
+    }
+
+    // V8. AGT-493 (d.8, d.30): a ticket filed more than 14 days ago is validated before it moves.
+    //     prepareList() does not offer one; this is the backstop for a context assembled elsewhere.
+    if (want_p.needs_validation === true &&
+        (row.verdict === "move" || (row.verdict === "pass" && home !== null && row.need_score !== 0))) {
+      no(id, "was filed more than 14 days ago and no validation stands on it; it is validated first " +
+        "(AGT-493) -- answer hold, or pass with home null");
     }
 
     // AGT-490, P1-P5: THE PARKED ANSWER. A 0 says "this is real and it waits"; the half that was
@@ -1006,20 +1020,37 @@ async function prepareList(args) {
   }
   const parents = new Map((Array.isArray(parentRpc.json) ? parentRpc.json : [])
     .map(r => [String(r?.backlog_id), r?.project_slug ?? null]));
+  // AGT-493: AND WHICH OF THEM ARE TOO OLD TO MOVE UNVALIDATED. A third rpc, read ONCE for the
+  // whole board like the two above it: `needs_validation()` names every open/partial non-john-named
+  // ticket filed more than 14 days ago with no standing `ticket-validation` decision (d.8, d.30).
+  // The age rule lives in the function, never here.
+  const needsRpc = await rest(base, key, "POST", "rpc/needs_validation", {});
+  if (!needsRpc.ok) {
+    die(1, `requirement-check: POST rpc/needs_validation -> HTTP ${needsRpc.status} ${needsRpc.text.slice(0, 400)}`);
+  }
+  const needs = new Set((Array.isArray(needsRpc.json) ? needsRpc.json : [])
+    .map(r => String(r?.backlog_id)));
   for (const t of tickets) {
     t.graded = graded.has(String(t.backlog_id));
     t.parent_home = parents.get(String(t.backlog_id)) ?? null;
+    t.needs_validation = needs.has(String(t.backlog_id));
   }
 
   // AND THE ONE THE TURN CANNOT ANSWER IS NOT PUT TO HER. A graded ticket scoring under 3 that no
   // parent lifts cannot move (requirements d.3: only a 3 or more fills a project) and must not be
   // re-graded (d.13) -- so every answer left on it is one the validator would refuse, and the turn
   // buys nothing. It returns the moment its grade reopens or a parent claims it (pattern:9).
-  const offered = tickets.filter(t => !t.graded || Number(t.need_score) >= 3 || t.parent_home !== null);
+  // AGT-493: and neither is the one whose premise nobody has checked in 14 days. Every answer left
+  // on it would be refused too -- V8 refuses a `move` and a homing `pass`, V7 refuses a `hold` on a
+  // blocker -- so a list turn on it buys nothing; the architect's validation door is what offers it
+  // again (d.30, pattern:9).
+  const offered = tickets.filter(t => !t.needs_validation && (!t.graded || Number(t.need_score) >= 3 || t.parent_home !== null));
+  const unvalidated = tickets.filter(t => t.needs_validation).length;
+  console.error(`requirement-check: ${unvalidated} ticket(s) filed more than 14 days ago hold no standing validation and are not offered -- node scripts/ticket-validation.js --prepare --list=${project}`);
   const heldBack = tickets.length - offered.length;
   tickets = offered;
-  console.error(`requirement-check: ${heldBack} graded ticket(s) under 3 held back (no re-grade; ` +
-    "offered again when the grade reopens)");
+  console.error(`requirement-check: ${heldBack} graded ticket(s) under 3 held back (no re-grade, or ` +
+    "no validation standing; offered again when the grade reopens)");
   if (tickets.length === 0) {
     die(1, `requirement-check: every ticket left on ${project} is graded, scores under 3 and no ` +
       "parent lifts it — there is nothing a turn could answer, and a description change, John " +
@@ -1099,6 +1130,8 @@ async function prepareList(args) {
       // AGT-489: how many of the tickets offered already hold a standing grade -- the half of the
       // list that can only be moved or held, never graded again.
       graded: tickets.filter(t => t.graded === true).length, held_back: heldBack,
+      // AGT-493: how many of the list's tickets are waiting on the architect's validation door.
+      needs_validation: unvalidated,
     },
   });
   die(3, `requirement-check --prepare-list: ${project} — ${tickets.length} ticket(s) against ` +

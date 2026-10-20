@@ -1,3 +1,4 @@
+// DeepBench v7.0.870 | shared/ai-patterns.js | AGT-493 -- validate-ticket enters the catalog beside requirement-check: the Governance Architect's stale-ticket validation, logged as --ai-type=validate-ticket (agent-log.js refuses a slug not listed here).
 // DeepBench v7.0.869 | shared/ai-patterns.js | AGT-492 -- the `review-audit-worklist` catalog entry reads
 // (The Governance Architect): the findings review moved from GV-01 to GV-09. Name only -- the slug,
 // serviceType, patterns and roadmap are unchanged, and the manager's other five entries are untouched.
@@ -318,6 +319,7 @@ export const SERVICE_CATALOG = [
   // turn IS the judgment on whether a cited need source supports a proposal. No AI_TYPE_TO_SERVICE
   // entry -- ai_type equals capability_slug via the `|| e.type` fallback.
   { slug: 'requirement-check',       name: 'Requirement Check (The Requirements Analyst)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  { slug: 'validate-ticket',         name: 'Validate Ticket (The Governance Architect)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // AGT-240 -- the finish line's two turns enter the catalog with their capability rows (migration
   // agt240_project_finish_line): scripts/agent-log.js refuses any --ai-type this array does not carry,

@@ -1,3 +1,4 @@
+// DeepBench v7.0.870 | tests/regression/agt-491-governance-architect.test.mjs | AGT-493 -- arm 5 repinned: the architect now holds exactly TWO capabilities, `review-audit-worklist` (AGT-492) and `validate-ticket` (AGT-493). AGT-491 itself still creates none -- the assertion moved from a count of zero to the named set, so a THIRD capability appearing without a ticket is still caught.
 // DeepBench v7.0.868 | tests/regression/agt-491-governance-architect.test.mjs | AGT-491 -- The
 // Governance Architect (GV-09) exists as a row, a portrait and two Skill pins, and the Verifier did
 // not pay for it.
@@ -188,12 +189,14 @@ async function armB_live(rest) {
     `${LENS}'s one link must still be to ${LENS_CAP}, got ${JSON.stringify(links[0].capability_slug)}`);
   results.push("live-the-lens-still-holds-its-one-verify-ship-link");
 
-  // 5. NO CAPABILITY. This ticket makes a row and two pins; a handler and a capability are separate
-  //    work, unfiled by it.
+  // 5. EXACTLY THE TWO CAPABILITIES TWO TICKETS GAVE IT. AGT-491 itself creates none; AGT-492 moved
+  //    the findings review here and AGT-493 added the stale-ticket validation. The assertion is the
+  //    NAMED SET rather than a count, so a capability landing on this agent without a ticket behind
+  //    it is still caught -- which is the thing arm 5 has guarded since AGT-491.
   const asgn = await rest(`agent_capability_assignments?agent_id=eq.${ID}&select=capability_slug`);
-  assert.strictEqual(asgn.length, 0,
-    `the architect must hold 0 capability assignments -- AGT-491 creates no capability; got ${asgn.length}: ${JSON.stringify(asgn.map(a => a.capability_slug))}`);
-  results.push("live-the-architect-holds-no-capability-assignment");
+  assert.deepStrictEqual(asgn.map(a => a.capability_slug).sort(), ["review-audit-worklist", "validate-ticket"],
+    `the architect holds exactly the two capabilities AGT-492 and AGT-493 gave it; got ${asgn.length}: ${JSON.stringify(asgn.map(a => a.capability_slug))}`);
+  results.push("live-the-architect-holds-its-two-capabilities");
 
   console.log(`  [AGT-491] live: ${gov.length} governance rows / ${allPins.length} pins (${ours.length} the architect's) / ${links.length} lens link / ${asgn.length} assignments`);
   return results;

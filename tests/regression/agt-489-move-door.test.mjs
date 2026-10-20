@@ -1,3 +1,4 @@
+// DeepBench v7.0.870 | tests/regression/agt-489-move-door.test.mjs | AGT-493 -- arm C's `expected` now subtracts what `needs_validation()` names: a ticket filed more than 14 days ago with no standing validation is not offered to the list turn at all (d.30), so a re-derivation that did not subtract them would read the new, correct behaviour as a defect.
 // DeepBench v7.0.865 | tests/regression/agt-489-move-door.test.mjs | AGT-489 -- THE MOVE DOOR.
 //
 // THE DEFECT, measured live 2026-10-19 on tree 08a615d rather than reasoned about: Victoria's list
@@ -528,9 +529,17 @@ async function run() {
       const cs = Array.isArray(state.json) ? state.json[0] : state.json;
       const stamped = new Set((cs?.stamped ?? []).map(String));
 
+      // AGT-493: and the ones awaiting the architect's validation door. `prepareList()` drops what
+      // `needs_validation()` names before it drops the graded-under-3, so the re-derivation has to
+      // subtract them in the same order or it reads the age gate as a missing ticket.
+      const needsRpc = await rpc(url, key, "needs_validation");
+      assert.ok(needsRpc.ok, `needs_validation() must read; got ${describe(needsRpc)}`);
+      const needs = new Set((needsRpc.json ?? []).map(r => String(r.backlog_id)));
+
       const gradedSet = new Set(fromFn);
       const expected = board
         .filter(t => !stamped.has(String(t.backlog_id)))
+        .filter(t => !needs.has(String(t.backlog_id)))
         .filter(t => !gradedSet.has(String(t.backlog_id)) ||
           Number(t.need_score) >= 3 || (parentOf.get(String(t.backlog_id)) ?? null) !== null)
         .map(t => String(t.backlog_id))
@@ -551,7 +560,7 @@ async function run() {
         .sort();
       assert.deepEqual(offered, expected,
         "the tickets offered are the ungraded ones plus the graded ones a 3+ score or a parent " +
-        "lifts -- nothing else");
+        "lifts -- nothing else, minus the ones awaiting validation (AGT-493)");
       for (const p of head.context?.proposals ?? []) {
         const bid = String(p.backlog_id);
         if (bid.startsWith(`${FIXTURE_PREFIX}-`)) continue;
