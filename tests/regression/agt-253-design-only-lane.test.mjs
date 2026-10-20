@@ -1,3 +1,9 @@
+// DeepBench v7.0.869 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-492 -- arm A's
+// docs/runbooks/runner-cycle.md byte pin moves 380972 -> 380963. This is the OTHER of the two pins the
+// arm's own message names (ses-413d's BYTES_AT_SHIP is the first); step 7f's review moved to the
+// Governance Architect, which freed 9 B -- two --agent swaps, the sub-agent prose, and the feature
+// string. The kickoff named only ses-413d; both pins move together or this arm reds on the drift.
+// Still 17 B under agt-138's 380,980 ratchet and 37 B under SES-336's 381,000 ceiling.
 // DeepBench v7.0.856 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-482 -- BYTES_AT_SHIP re-pinned 380978 -> 380972 (the claim fence: rule B40's rendered block +29 B, the two claim-SQL blocks and step 0b census (b) moved to public.claim_exclusion_reason(), the claim prose across the runbook reads 6h, and the v7.0.602 stamp rotated out for a 140-byte one -- measured with wc -c, 8 B under agt-138's 380,980 ratchet and 28 B under SES-336's 381,000 ceiling).
 // DeepBench v7.0.843 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-451 -- BYTES_AT_SHIP re-pinned 380977 -> 380978 (step 7 measures the baseline credentialed before the spawn: INS, the 7a flag line and R1 added, the v7.0.650 stamp rotated out for a 188-byte one -- measured with wc -c, 22 B of headroom left under the 381,000 B ceiling).
 // DeepBench v7.0.839 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-448 -- BYTES_AT_SHIP re-pinned 380952 -> 380977 (step 5a's cap-case paragraph names the Designer's case and cap_waived).
@@ -61,7 +67,7 @@ const CEILING = 381000;
 // into one is tracked separately rather than done inline here (pattern:96). AGT-291 (v7.0.749)
 // re-pinned it again, for the same reason and in the same commit as the runbook edit; AGT-391
 // (v7.0.793) once more.
-const BYTES_AT_SHIP = 380972;
+const BYTES_AT_SHIP = 380963;
 // Clause (c), step 6. The two function names are what make it load-bearing: a clause that named
 // neither would leave a cycle with nothing to call.
 const CLAUSE_C = "**Design-only project (`AGT-253`): when `public.ticket_design_only('<ID>')` is true, " +

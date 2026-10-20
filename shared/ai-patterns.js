@@ -1,3 +1,6 @@
+// DeepBench v7.0.869 | shared/ai-patterns.js | AGT-492 -- the `review-audit-worklist` catalog entry reads
+// (The Governance Architect): the findings review moved from GV-01 to GV-09. Name only -- the slug,
+// serviceType, patterns and roadmap are unchanged, and the manager's other five entries are untouched.
 // DeepBench v7.0.840 | shared/ai-patterns.js | AGT-449 -- `rule-cap-case` enters the catalog with the Development Manager's capability row: scripts/agent-log.js refuses any --ai-type outside this array (SES-338). No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.747 | shared/ai-patterns.js | AGT-312 -- `review-proposal` enters the catalog with Victoria's capability row (migration agt312_proposal_review): scripts/agent-log.js refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per proposal-review turn that docs/runbooks/auditor-routine.md prescribes verbatim would be refused. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
 // DeepBench v7.0.741 | shared/ai-patterns.js | AGT-281 -- `requirement-check` enters the catalog beside the audit-run-review row whose shape it copies: scripts/agent-log.js:227 refuses any --ai-type outside this array (SES-338), so the one Layer-3 row per list turn that docs/runbooks/victoria-reorg.md prescribes verbatim would be refused. Measured at this ship: the capability and its two intents are live and this file named it 0 times. No AI_TYPE_TO_SERVICE entry -- ai_type equals capability_slug via the `|| e.type` fallback.
@@ -289,7 +292,7 @@ export const SERVICE_CATALOG = [
   { slug: 'audit-work-quality',      name: 'Audit Work Quality (The Auditor)',  serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
   { slug: 'audit-config-review',     name: 'Audit Config Review (The Auditor)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
   { slug: 'audit-advisor',           name: 'Audit Advisor (The Auditor)',       serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier', 'Tool Use'], roadmap: 'now' },
-  { slug: 'review-audit-worklist',   name: 'Review Audit Worklist (The Development Manager)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
+  { slug: 'review-audit-worklist',   name: 'Review Audit Worklist (The Governance Architect)', serviceType: 'ai', patterns: ['Structured Output', 'LLM-as-Judge / Verifier'], roadmap: 'now' },
 
   // AGT-177 -- audit-run-review, the Auditor's per-run review (AGT-137, v7.0.602), on the five audit
   // rows immediately above: its capabilities row and five Skill links are live, and agent-log.js

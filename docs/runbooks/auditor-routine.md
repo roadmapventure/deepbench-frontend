@@ -104,10 +104,10 @@ node scripts/audit-review.js --prepare --week=$W --weekly --out=$S/ctx.json; ech
 ```
 `--weekly` keeps every family (`AGT-239`): the run tail's per-run review leaves `paperwork` findings for this one. Exit 3 → "nothing to review — no manager run" goes in the summary; skip to step 5. Exit 0 →
 ```
-node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json > $S/review.prompt.md
-node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+node scripts/agent-prompt.js --agent=architect --capability=review-audit-worklist --task-file=$S/ctx.json > $S/review.prompt.md
+node scripts/agent-prompt.js --agent=architect --capability=review-audit-worklist --task-file=$S/ctx.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
 ```
-Sub-agent on the printed model → `$S/answer.json` (`{groups, summary_for_john, patterns_applied}`); log it: `node scripts/agent-log.js --agent=devmanager --capability=review-audit-worklist --model=<printed> --ai-type=review-audit-worklist --feature=review-audit-worklist:dm-audit-review-intent:depth1 […]`. Then:
+Sub-agent on the printed model → `$S/answer.json` (`{groups, summary_for_john, patterns_applied}`); log it: `node scripts/agent-log.js --agent=architect --capability=review-audit-worklist --model=<printed> --ai-type=review-audit-worklist --feature=review-audit-worklist:ga-review-intent:depth1 […]`. Then:
 ```
 node scripts/audit-review.js --dry-run=$S/answer.json --context=$S/ctx.json
 node scripts/audit-review.js --apply=$S/answer.json --context=$S/ctx.json --week=$W --session-name=$N

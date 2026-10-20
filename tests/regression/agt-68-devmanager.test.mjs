@@ -1,3 +1,7 @@
+// DeepBench v7.0.869 | tests/regression/agt-68-devmanager.test.mjs | AGT-492 -- review-audit-worklist
+// dropped from the manager's closed capability set (six -> five): the findings review moved to the
+// Governance Architect. The dm-* Skill rows, links and lane pins in this file are untouched -- only the
+// assignment set shrank.
 // DeepBench v7.0.840 | tests/regression/agt-68-devmanager.test.mjs | AGT-449 -- the assignment pin names SIX capabilities: rule-cap-case (cap-case ruling, decision 6ee431f9) joins the closed set.
 // DeepBench v7.0.794 | tests/regression/agt-68-devmanager.test.mjs | AGT-304 slice 7 -- the assignment pin names all FIVE capabilities the manager's rows carry (model-assignment, propose-project added), and both driver answers carry the patterns_applied the live Intent requires.
 // DeepBench v7.0.625 | tests/regression/agt-68-devmanager.test.mjs | AGT-183 -- header note (8): the
@@ -540,9 +544,11 @@ export default async function run() {
   assert.deepEqual(links.map(l => l.skill_profile_slug).sort(), [...SKILL_SLUGS].sort());
 
   const assigns = await rest(`agent_capability_assignments?agent_id=eq.${DEVMANAGER_AGENT_ID}&select=capability_slug`);
-  // AGT-86 slice 2a (v7.0.546): the manager's SECOND capability, review-audit-worklist (the weekly
-  // audit review), is pinned by name next to run-project. Sorted, so row order cannot redden it; its
-  // own rows and links are asserted in tests/regression/agt-86b-audit-review.test.mjs.
+  // AGT-492 (v7.0.869): review-audit-worklist LEFT this set -- the weekly audit review is the
+  // Governance Architect's now (GV-09), and its rows and links are asserted against the architect in
+  // tests/regression/agt-86b-audit-review.test.mjs. The set stays CLOSED in both directions: a
+  // capability arriving on the manager without a ticket naming it reddens this line, and so does one
+  // leaving without one (AGENT-ROW-AGREED-TICKET). It was added here by AGT-86 slice 2a (v7.0.546).
   // AGT-127 (v7.0.585): the THIRD, decide-gated-card -- ruling every undecided gated_before_build
   // card. Same one-line extension AGT-86 made here, for the same reason: this is a CLOSED set, so a
   // capability appearing on the manager without a ticket naming it reddens this line, which is the
@@ -550,7 +556,7 @@ export default async function run() {
   // tests/regression/agt-127-decide-gated-card.test.mjs.
   // AGT-304 slice 7 (v7.0.794): FOURTH model-assignment (AGT-144, row 2026-09-25; agt-144 pins "devmanager holds 5") and FIFTH propose-project (AGT-240, row 2026-09-27, the finish line's proposal turn). Still a CLOSED set.
   assert.deepEqual(assigns.map(a => a.capability_slug).sort(),
-    ["decide-gated-card", "model-assignment", "propose-project", "review-audit-worklist", "rule-cap-case", RUN_PROJECT_CAPABILITY].sort());
+    ["decide-gated-card", "model-assignment", "propose-project", "rule-cap-case", RUN_PROJECT_CAPABILITY].sort());
   const cap = (await rest(`capabilities?slug=eq.${RUN_PROJECT_CAPABILITY}&select=slug,execution_type,default_intent_slug`))[0];
   assert.equal(cap.execution_type, "ai");
   assert.equal(cap.default_intent_slug, INTENT_SLUG,

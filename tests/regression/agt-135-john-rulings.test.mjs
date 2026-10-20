@@ -1,3 +1,8 @@
+// DeepBench v7.0.869 | tests/regression/agt-135-john-rulings.test.mjs | AGT-492 -- both the offline (A) and
+// the live (C) registry arms now expect JOHN-0925-FINDINGS-STANDARD to read status 'superseded' with
+// superseded_by JOHN-1013-TESTED-TICKETS, and the other six to be unchanged and live -- the row is kept, not
+// removed (pattern:166). The governance-agent count moves 8 -> 9 (AGT-491's Governance Architect), which is
+// the baseline red this ship clears. ds-guardrails' "8 must entries" is a different count and is untouched.
 // DeepBench v7.0.839 | tests/regression/agt-135-john-rulings.test.mjs | AGT-448 -- ds-guardrails counts re-pinned 7/6 -> 8/7 (the cap-case stop).
 // DeepBench v7.0.782 | tests/regression/agt-135-john-rulings.test.mjs | AGT-304 slice 5 -- C3 pins the kinds this ship wrote (rule, agent-row); settle-ship's later ticket-status row is not one of them.
 // DeepBench v7.0.603 | tests/regression/agt-135-john-rulings.test.mjs | AGT-135
@@ -48,6 +53,12 @@ const RULE_IDS = [
   "JOHN-0925-NOTIFICATIONS-OFF",
 ];
 const CANONICAL_DOC = "docs/WORKING-WITH-JOHN.md#decision-authority-matrix";
+// AGT-492: JOHN-0925-FINDINGS-STANDARD is the one of the seven John REPLACED. The row stays -- a John rule
+// is never removed (pattern:166) -- but it reads status 'superseded', superseded_by JOHN-1013-TESTED-TICKETS.
+// The other six are still live with superseded_by empty, and this pair is what tells the two apart.
+const SUPERSEDED_ID = "JOHN-0925-FINDINGS-STANDARD";
+const SUPERSEDED_BY = "JOHN-1013-TESTED-TICKETS";
+const expectedStatus = id => (id === SUPERSEDED_ID ? "superseded" : "live");
 const SOURCE_GROUP = "claude-md-hard-rules";
 const ATTRIBUTION = "John 2026-09-25";
 
@@ -105,11 +116,12 @@ export function assertSevenRulesIn(text) {
   assert.deepEqual(missing, [], `${SNAPSHOT_REL} is missing rule row(s): ${missing.join(", ")}`);
   for (const id of RULE_IDS) {
     const r = rules.get(id);
-    assert.equal(r.status, "live", `${id} must be live, is "${r.status}"`);
+    assert.equal(r.status, expectedStatus(id), `${id} must be ${expectedStatus(id)}, is "${r.status}"`);
     assert.equal(r.source_group, SOURCE_GROUP, `${id} source group`);
     assert.equal(r.enforcement, "reviewer", `${id} enforcement`);
     assert.equal(r.canonical_doc, CANONICAL_DOC, `${id} canonical_doc`);
-    assert.equal(r.superseded_by, "", `${id} must not be superseded`);
+    assert.equal(r.superseded_by, id === SUPERSEDED_ID ? SUPERSEDED_BY : "",
+      id === SUPERSEDED_ID ? `${id} must be superseded by ${SUPERSEDED_BY}` : `${id} must not be superseded`);
     assert.ok(
       r.statement.includes(ATTRIBUTION),
       `${id}'s statement must carry the attribution "${ATTRIBUTION}" -- a ruling with no date is not traceable to John`
@@ -150,7 +162,7 @@ async function run() {
     /missing rule row\(s\): JOHN-0925-DESIGNER-DECIDES/,
     "control: arm A must FAIL on a snapshot whose JOHN-0925-DESIGNER-DECIDES row was removed"
   );
-  console.log("    [arm A registry] ok -- 7 rows live in the snapshot, control throws");
+  console.log(`    [arm A registry] ok -- 7 rows in the snapshot (6 live, ${SUPERSEDED_ID} superseded by ${SUPERSEDED_BY}), control throws`);
 
   // --- B. pointer (pure) ------------------------------------------------------------------------
   assertPointerIn(wwj);
@@ -191,11 +203,11 @@ async function run() {
     `public.governance_rules must hold exactly the seven JOHN-0925 rows; got ${live.length}`
   );
   for (const r of live) {
-    assert.equal(r.status, "live", `${r.id} live`);
+    assert.equal(r.status, expectedStatus(r.id), `${r.id} ${expectedStatus(r.id)}`);
     assert.equal(r.enforcement, "reviewer", `${r.id} enforcement`);
     assert.equal(r.source_group, SOURCE_GROUP, `${r.id} source group`);
     assert.equal(r.canonical_doc, CANONICAL_DOC, `${r.id} canonical_doc`);
-    assert.equal(r.superseded_by, null, `${r.id} superseded_by`);
+    assert.equal(r.superseded_by, r.id === SUPERSEDED_ID ? SUPERSEDED_BY : null, `${r.id} superseded_by`);
     assert.ok(r.statement.includes(ATTRIBUTION), `${r.id} statement attribution`);
   }
   // The export and the registry must agree, or a reader of the repo reads a stale ruling.
@@ -210,7 +222,7 @@ async function run() {
 
   // C2 -- each Skill row carries its own ruling, and names no other governance agent.
   const agents = await get("agents?lane=eq.governance&select=id,name");
-  assert.equal(agents.length, 8, `expected the eight governance agents; got ${agents.length}`);
+  assert.equal(agents.length, 9, `expected the nine governance agents; got ${agents.length}`);
   for (const [slug, spec] of Object.entries(SKILL_MARKERS)) {
     const [row] = await get(`skill_profiles?slug=eq.${slug}&select=slug,method,guardrails`);
     assert.ok(row, `no skill_profiles row ${slug}`);

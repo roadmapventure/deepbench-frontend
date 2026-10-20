@@ -1,3 +1,8 @@
+// DeepBench v7.0.869 | tests/regression/agt-132-finding-routes.test.mjs | AGT-492 -- the `pick` filing
+// fixture gains a standard-B `test` block (the new refusal would otherwise be collected by every route
+// assertion), on top of arm D running agent-prompt.js as --agent=architect.
+// DeepBench v7.0.869 | tests/regression/agt-132-finding-routes.test.mjs | AGT-492 -- arm D runs
+// agent-prompt.js as --agent=architect: the findings review is the Governance Architect's capability now.
 // DeepBench v7.0.662 | tests/regression/agt-132-finding-routes.test.mjs | AGT-240 -- arm C retargeted:
 // the Dev Manager Capabilities pick and the Auditor route now expect finding_group_epic()'s LOCK
 // refusal while their project is executing/proposed/done (a locked list), byte-for-byte the
@@ -34,7 +39,7 @@
 //      refusal is compared BYTE-FOR-BYTE with validateReview()'s mirror plus the function's prefix
 //      (agt-86i arm R's convention), and the three ledger counts are re-read equal.
 //      Pre-change: every call is PGRST202.
-//   D  PROMPT (live) -- agent-prompt.js --agent=devmanager --capability=review-audit-worklist over a
+//   D  PROMPT (live) -- agent-prompt.js --agent=architect --capability=review-audit-worklist over a
 //      real --prepare file exits 0 and PRINTS the routing paragraph, so the manager actually reads it.
 //      Pre-change: the paragraph was in no Skill row, so it could not be printed.
 //
@@ -213,7 +218,9 @@ async function run() {
 
     const review = groups => ({ groups, summary_for_john: "qa", patterns_applied: [] });
     const nad = ids => ({ kind: "not-a-defect", reason: "qa", finding_ids: ids });
-    const pick = extra => ({ kind: "root-cause", title: "t", root_cause: "r", fix: "f", finding_ids: ["to"], ...extra });
+    // AGT-492: standard B, so the route refusals below are the only ones these assertions can see.
+    const pick = extra => ({ kind: "root-cause", title: "t", root_cause: "r", fix: "f", finding_ids: ["to"],
+      test: { reproduced: true, how: "a read-only query", result: "reproduced" }, ...extra });
     const refusalsOf = groups => validateReview(review(groups), wl, "2026-W39", undefined, ROUTES, projects).refusals;
 
     assert.deepEqual(refusalsOf([pick(), nad(["au", "sec", "sw", "new"])]),
@@ -425,7 +432,7 @@ async function run() {
   await arm("D prompt", async () => {
     if (!fs.existsSync(ctxPath)) throw new Error(`arm B did not leave a prepared context at ${ctxPath}`);
     const p = spawnSync(process.execPath,
-      [PROMPT, "--agent=devmanager", "--capability=review-audit-worklist", `--task-file=${ctxPath}`],
+      [PROMPT, "--agent=architect", "--capability=review-audit-worklist", `--task-file=${ctxPath}`],
       { encoding: "utf8" });
     assert.equal(p.status, 0, `agent-prompt must exit 0; got ${p.status} ${(p.stderr ?? "").slice(0, 400)}`);
     assert.ok(p.stdout.includes(PARA_HEAD), "the assembled prompt PRINTS the routing paragraph");

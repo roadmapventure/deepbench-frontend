@@ -1,3 +1,10 @@
+// DeepBench v7.0.869 | tests/regression/agt-86b-audit-review.test.mjs | AGT-492 -- re-pointed to the
+// Governance Architect: AGENT architect, INTENT ga-review-intent, LINKS the five ga-* rows plus the kept
+// dm-knowledge-patterns, and arm R's "must hold" message names the Architect. Two edits the kickoff's T5
+// did not enumerate but the arms need to stay discriminating: the nine 2a INSERT images were taken over
+// dm-audit-review-intent, which this build unlinked WITHOUT deleting, so the image arm reads that row's id
+// (SEED_INTENT) and additionally asserts it is intact and unlinked; and the RC fixture gains a standard-B
+// `test` block, without which every arm-D case would collect the new refusal as a second entry.
 // DeepBench v7.0.554 | tests/regression/agt-86b-audit-review.test.mjs | AGT-86 slice 9b -- arm R re-pinned:
 // the nine INSERT before-images are counted under 2a's seed decision (aefd0627), since 9b's reversible edit
 // of dm-audit-review-intent adds a tenth, UPDATE image on the same row under its own decision.
@@ -12,12 +19,12 @@
 // script arms (D, E).
 //
 // FOUR ARMS (kickoff §6), each discriminating -- every one FAILS on the tree before the change:
-//   R  ROWS -- one capabilities row defaulting to the intent; the devmanager assignment; six links,
+//   R  ROWS -- one capabilities row defaulting to the intent; the architect assignment; six links,
 //      display_order 1..6 unique, no dm-knowledge-cycle-card; the intent's traits.schema.required is
 //      exactly [groups, summary_for_john, patterns_applied]; its llm_model is the orchestrator lane's;
 //      nine before-images under ONE decision, all row_data NULL, every pk_value a live row.
 //      Pre-change: 0 rows.
-//   P  PROMPT -- scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist exits 0
+//   P  PROMPT -- scripts/agent-prompt.js --agent=architect --capability=review-audit-worklist exits 0
 //      and prints the capability header, the INTENT section and the weeks_seen rule. Pre-change: it
 //      exits non-zero naming the missing capabilities row.
 //   F  REFUSALS -- six rpc probes, each 400 P0001 naming its cause and writing nothing (findings,
@@ -54,10 +61,14 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CAPABILITY = "review-audit-worklist";
-const INTENT = "dm-audit-review-intent";
-const AGENT = "devmanager";
+const INTENT = "ga-review-intent";
+const AGENT = "architect";
+// AGT-492: the intent row 2a seeded is still the one its nine INSERT images were taken over, and it is
+// intact but no longer linked (the capability now links ga-review-intent). Arm R reads the SEED intent
+// for the image count and the LIVE intent for everything else.
+const SEED_INTENT = "dm-audit-review-intent";
 const SEED_DECISION = "aefd0627-f371-469d-a0a1-0fbac32db4bf"; // 2a's seed decision: the nine INSERT images
-const LINKS = ["dm-identity", "dm-knowledge-platform", "dm-behavior", INTENT, "dm-guardrails", "dm-knowledge-patterns"];
+const LINKS = ["ga-identity", "ga-knowledge-review", "ga-behavior", INTENT, "ga-guardrails", "dm-knowledge-patterns"];
 const WEEK = "2026-W37";
 const SESSION_TAG = "agt-86b-qa";
 
@@ -89,7 +100,11 @@ const W4 = [
   { id: "w3", fingerprint: "fp3", iso_week: "2026-W39", weeks_seen: 2 },
   { id: "w4", fingerprint: "fp4", iso_week: "2026-W39", weeks_seen: 3 },
 ];
-const RC = { kind: "root-cause", title: "t", root_cause: "rc", fix: "f" };
+// AGT-492: a filing root-cause now needs test {reproduced, how, result} or untested_reason (standard B),
+// so the fixture carries one -- otherwise every case below would collect that refusal too and the
+// one-refusal assertions would stop discriminating.
+const RC = { kind: "root-cause", title: "t", root_cause: "rc", fix: "f",
+  test: { reproduced: true, how: "a read-only query", result: "the cause reproduced" } };
 const GOOD = () => review([
   { ...RC, finding_ids: ["w1", "w2"] },
   { kind: "cleanup", fix: "one-liners", finding_ids: ["w3"] },
@@ -208,12 +223,12 @@ async function run() {
     assert.equal(caps[0].tenant_id, "global");
 
     const assigns = await get(`agent_capability_assignments?agent_id=eq.${AGENT}&capability_slug=eq.${CAPABILITY}&select=id,tenant_id`);
-    assert.equal(assigns.length, 1, `The Development Manager must hold ${CAPABILITY} exactly once; got ${assigns.length}`);
+    assert.equal(assigns.length, 1, `The Governance Architect must hold ${CAPABILITY} exactly once; got ${assigns.length}`);
     assert.equal(assigns[0].tenant_id, "global");
 
     const links = await get(`capability_skill_profiles?capability_slug=eq.${CAPABILITY}&select=id,skill_profile_slug,display_order,level,is_required&order=display_order`);
     assert.deepEqual(links.map(l => l.skill_profile_slug), LINKS,
-      "six links in order identity, platform knowledge, behavior, intent, guardrails, patterns -- and NOT dm-knowledge-cycle-card (the build-cycle card)");
+      "six links in order identity, review knowledge, behavior, intent, guardrails, patterns -- and NOT dm-knowledge-cycle-card (the build-cycle card)");
     assert.deepEqual(links.map(l => l.display_order), [1, 2, 3, 4, 5, 6], "display_order must be 1..6, unique");
     assert.ok(links.every(l => l.level === 2 && l.is_required === true), "every link is level 2, required");
 
@@ -226,7 +241,13 @@ async function run() {
     const [lane] = await get("runner_model_lanes?lane=eq.orchestrator&select=model_id");
     assert.equal(intent.llm_model, lane.model_id, "the Intent's llm_model must be the orchestrator lane's (the manager's lane)");
 
-    const pks = [caps[0].id, assigns[0].id, intent.id, ...links.map(l => l.id)];
+    // AGT-492: the nine 2a INSERT images were taken over the SEED intent row, which this build left
+    // intact and merely unlinked -- so the image arm reads its id, not the newly seeded ga-review-intent's
+    // (whose own INSERT image hangs from AGT-492's decision, not 2a's).
+    const [seedIntent] = await get(`skill_profiles?slug=eq.${SEED_INTENT}&select=id,method`);
+    assert.ok(seedIntent, `${SEED_INTENT} must still exist -- AGT-492 unlinked it, it did not delete it`);
+    assert.ok(!links.some(l => l.skill_profile_slug === SEED_INTENT), `${SEED_INTENT} must no longer be linked to ${CAPABILITY}`);
+    const pks = [caps[0].id, assigns[0].id, seedIntent.id, ...links.map(l => l.id)];
     // Re-pinned v7.0.554 (AGT-86 slice 9b): later reversible edits of these rows add their own UPDATE images
     // (9b's intent-row edit, decision cd942b73), so the nine INSERT images are counted under 2a's decision.
     const imgs = await get(`runner_before_images?pk_value=in.(${pks.join(",")})&decision_id=eq.${SEED_DECISION}&select=pk_value,table_name,row_data,decision_id,session_name`);

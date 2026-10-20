@@ -1,3 +1,8 @@
+// DeepBench v7.0.869 | scripts/audit-review.js | AGT-492 -- validateReview mirrors the function's new
+// standard-B refusal: a root-cause group that files a ticket needs test {reproduced, how, result} or
+// untested_reason, and a reuse_backlog_id group needs neither (John 2026-10-13, decisions 27-29;
+// rule JOHN-1013-TESTED-TICKETS). The review itself is the Governance Architect's now, not the
+// Development Manager's -- the ruler is read from agent_capability_assignments, never hardcoded.
 // DeepBench v7.0.853 | scripts/audit-review.js | AGT-480 -- homeAccepts(row) asks ONE thing again:
 // is the project EXECUTING. Victoria's move door writes scope_origin = 'victoria-placed', which
 // epic_lock_guard() admits, so the need_source no longer decides whether a home is reachable and
@@ -419,6 +424,19 @@ export function validateReview(review, worklist, week, checklist, routes, projec
       if ((g.reuse_backlog_id === undefined || g.reuse_backlog_id === null) &&
           (blank(g.title) || blank(g.root_cause) || blank(g.fix))) {
         refusals.push("root-cause needs title, root_cause and fix, or reuse_backlog_id");
+      }
+      // 1a (AGT-492), standard B. Mirrors apply_audit_review()'s own refusal, minus the
+      // `apply_audit_review: ` prefix (the agt-86i arm R convention): a group that FILES a ticket
+      // must carry either a test {reproduced boolean, how, result} or an untested_reason saying why
+      // the cause cannot be tested before building. A group reusing an open ticket needs neither --
+      // the ticket it reuses was already tested. `prior_art` is optional and never refused.
+      if (g.reuse_backlog_id === undefined || g.reuse_backlog_id === null) {
+        const t = g.test;
+        const tested = !!t && typeof t === "object" && !Array.isArray(t) &&
+                       typeof t.reproduced === "boolean" && !blank(t.how) && !blank(t.result);
+        if (!tested && blank(g.untested_reason)) {
+          refusals.push("root-cause needs test (reproduced, how, result) or untested_reason (standard B)");
+        }
       }
     } else if (kind === "cleanup") {
       cleanups += 1;

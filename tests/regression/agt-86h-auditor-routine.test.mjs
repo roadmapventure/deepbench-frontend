@@ -1,3 +1,5 @@
+// DeepBench v7.0.869 | tests/regression/agt-86h-auditor-routine.test.mjs | AGT-492 -- the parseArgs pair
+// for review-audit-worklist reads ga-review-intent: the review's Intent Skill is the Architect's now.
 // DeepBench v7.0.646 | tests/regression/agt-86h-auditor-routine.test.mjs | AGT-177 -- arm G grows the
 // sixth slug and the sweep that stops the next one. `audit-run-review`'s capability row shipped in
 // AGT-137 (v7.0.602) with no SERVICE_CATALOG entry, so agent-log.js refused every
@@ -279,7 +281,7 @@ export default async function run() {
         assert.ok(e.patterns.includes("Structured Output") && e.patterns.includes("LLM-as-Judge / Verifier"), `${slug} judge patterns`);
       }
       assert.ok(SERVICE_CATALOG.find(s => s.slug === "audit-advisor").patterns.includes("Tool Use"), "advisor carries Tool Use");
-      for (const [cap, intent] of [["audit-advisor", "au-advisor-intent"], ["review-audit-worklist", "dm-audit-review-intent"],
+      for (const [cap, intent] of [["audit-advisor", "au-advisor-intent"], ["review-audit-worklist", "ga-review-intent"],
         ["audit-run-review", "au-run-intent"]]) {
         const p = parseArgs(["--agent=auditor", `--capability=${cap}`, "--model=m", `--ai-type=${cap}`, `--feature=${cap}:${intent}:depth1`]);
         assert.equal(p.error, undefined, `parseArgs accepts ${cap}: ${p.error}`);

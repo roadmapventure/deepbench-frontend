@@ -1,3 +1,9 @@
+// DeepBench v7.0.869 | tests/regression/agt-134-upkeep-rulings.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
+// a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
+// FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
+// 2026-10-13, rule JOHN-1013-TESTED-TICKETS). Without it every assertion here collects that refusal
+// as an extra entry and stops discriminating what it was written to discriminate. A reuse_backlog_id
+// fixture needs nothing and is untouched.
 // DeepBench v7.0.819 | tests/regression/agt-134-upkeep-rulings.test.mjs | AGT-304 slice 11 -- route pin follows decision ccab94da
 // DeepBench v7.0.609 | tests/regression/agt-134-upkeep-rulings.test.mjs | AGT-134 -- A RULING ON THE
 // MANAGER'S OWN UPKEEP CANNOT COME OUT EMPTY. The routine-prompt drift finding
@@ -182,8 +188,10 @@ async function run() {
     const review = groups => ({ groups, summary_for_john: "qa", patterns_applied: [] });
     const refusalsOf = groups => validateReview(review(groups), wl, "2026-W39", undefined, ROUTES, projects).refusals;
     const carry = extra => ({ kind: "carry", reason: "next week", finding_ids: ["d1"], ...extra });
+    // AGT-492: standard B, so the needs_desktop assertions read only the needs_desktop refusals.
     const files = extra => ({ kind: "root-cause", title: "t", root_cause: "r", fix: "f",
-                              project: "dev-manager-capabilities", finding_ids: ["d1"], ...extra });
+                              project: "dev-manager-capabilities", finding_ids: ["d1"],
+                              test: { reproduced: true, how: "a read-only query", result: "reproduced" }, ...extra });
 
     assert.deepEqual(refusalsOf([carry({ needs_desktop: true })]), [R_FILES],
       "the flag on a group that files no ticket is refused, not dropped");

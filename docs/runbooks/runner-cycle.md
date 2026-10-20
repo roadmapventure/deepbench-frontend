@@ -4402,15 +4402,15 @@ review` into the cycle `notes` and go on to `(8)`. Exit 0 → run the manager ex
 id — `AGT-147`), stating the clone's absolute path:
 
 ```
-node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json > $S/review.prompt.md
-node scripts/agent-prompt.js --agent=devmanager --capability=review-audit-worklist --task-file=$S/ctx.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
+node scripts/agent-prompt.js --agent=architect --capability=review-audit-worklist --task-file=$S/ctx.json > $S/review.prompt.md
+node scripts/agent-prompt.js --agent=architect --capability=review-audit-worklist --task-file=$S/ctx.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
 ```
 
-The `devmanager` sub-agent's answer is one JSON object (`{groups, summary_for_john,
+The `architect` sub-agent's answer is one JSON object (`{groups, summary_for_john,
 patterns_applied}`) saved as `$S/answer.json`. **Log the call exactly as `auditor-routine.md` step 4
 logs it** — that command has ONE home and this step does not restate it — with
 `--ai-type=review-audit-worklist` and
-`--feature=review-audit-worklist:dm-audit-review-intent:depth1` (§19k). Then:
+`--feature=review-audit-worklist:ga-review-intent:depth1` (§19k). Then:
 
 ```
 node scripts/audit-review.js --dry-run=$S/answer.json --context=$S/ctx.json

@@ -1,3 +1,9 @@
+// DeepBench v7.0.869 | tests/regression/agt-264-accepts-findings.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
+// a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
+// FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
+// 2026-10-13, rule JOHN-1013-TESTED-TICKETS). Without it every assertion here collects that refusal
+// as an extra entry and stops discriminating what it was written to discriminate. A reuse_backlog_id
+// fixture needs nothing and is untouched.
 // DeepBench v7.0.821 | tests/regression/agt-264-accepts-findings.test.mjs | AGT-304 slice 12 -- route pin follows decision ccab94da
 // DeepBench v7.0.692 | tests/regression/agt-264-accepts-findings.test.mjs | AGT-264 -- AGENT TRAINING
 // ACCEPTS FINDINGS WHILE IT EXECUTES.
@@ -173,6 +179,9 @@ async function run() {
     const group = pick => ({
       kind: "root-cause", project: pick, finding_ids: ["ag"],
       title: "qa", root_cause: "qa", fix: "qa", needs_desktop: false,
+      // AGT-492: standard B -- a filing root-cause needs a test, or the accepts_findings assertions
+      // below would each collect that refusal instead of the empty list they are testing for.
+      test: { reproduced: true, how: "a read-only query", result: "reproduced" },
     });
     const rv = (pick, projs = projects) => validateReview(
       { groups: [group(pick)], summary_for_john: "qa", patterns_applied: [] },

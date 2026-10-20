@@ -1,3 +1,6 @@
+// DeepBench v7.0.869 | tests/regression/agt-144-model-assignment.test.mjs | AGT-492 -- the held-capability
+// pin drops review-audit-worklist (six -> five), which moved to the Governance Architect. The "six standing
+// prohibitions" assertion below is about dm-guardrails.must_not, not the capability count, and is unchanged.
 // DeepBench v7.0.840 | tests/regression/agt-144-model-assignment.test.mjs | AGT-449 -- re-pin: devmanager's closed capability set moved 5 -> 6 (rule-cap-case, decision 6ee431f9); nothing weakened.
 // DeepBench v7.0.777 | tests/regression/agt-144-model-assignment.test.mjs | AGT-304 slice 2 -- re-pin: devmanager's closed capability set moved 4 -> 5 (propose-project) under AGT-240 v7.0.662, migration agt240_project_finish_line, ship decision 33b801dd; nothing weakened.
 // DeepBench v7.0.590 | tests/regression/agt-144-model-assignment.test.mjs | AGT-144 -- The
@@ -143,8 +146,8 @@ async function run() {
     "the stored contract's action enum is the function's k_actions, in its order");
   const held = await pg(url, key, "agent_capability_assignments?agent_id=eq.devmanager&select=capability_slug");
   assert.deepEqual(held.map(h => h.capability_slug).sort(),
-    ["decide-gated-card", "model-assignment", "propose-project", "review-audit-worklist", "rule-cap-case", "run-project"],
-    "devmanager holds exactly six capabilities -- the fifth, propose-project, is AGT-240 v7.0.662 (migration agt240_project_finish_line, ship decision 33b801dd)");
+    ["decide-gated-card", "model-assignment", "propose-project", "rule-cap-case", "run-project"],
+    "devmanager holds exactly five capabilities -- propose-project is AGT-240 v7.0.662 (migration agt240_project_finish_line, ship decision 33b801dd), and review-audit-worklist LEFT for the Governance Architect in AGT-492 v7.0.869");
   const guard = await pg(url, key, "skill_profiles?slug=eq.dm-guardrails&select=guardrails");
   const mustNot = guard[0].guardrails.must_not;
   for (const s of FIVE) assert.ok(mustNot.includes(s), `dm-guardrails.must_not carries "${s}"`);

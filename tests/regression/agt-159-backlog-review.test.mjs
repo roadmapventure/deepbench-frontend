@@ -1,3 +1,9 @@
+// DeepBench v7.0.869 | tests/regression/agt-159-backlog-review.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
+// a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
+// FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
+// 2026-10-13, rule JOHN-1013-TESTED-TICKETS). Without it every assertion here collects that refusal
+// as an extra entry and stops discriminating what it was written to discriminate. A reuse_backlog_id
+// fixture needs nothing and is untouched.
 // DeepBench v7.0.699 | tests/regression/agt-159-backlog-review.test.mjs | AGT-159 slice 1 -- AN OPEN
 // TICKET IS A FINDING, AND THE MANAGER'S RULING LANDS ON THAT TICKET.
 //
@@ -220,7 +226,9 @@ async function run() {
       { groups: [group], summary_for_john: "qa", patterns_applied: [] },
       wl, "2026-W40", undefined, routes, projects).refusals;
 
-    const fileFresh = { kind: "root-cause", finding_ids: ["f1"], title: "t", root_cause: "r", fix: "x", project: "general" };
+    // AGT-492: standard B -- fileFresh FILES a ticket, so it needs a test; the four reuse fixtures below do not.
+    const fileFresh = { kind: "root-cause", finding_ids: ["f1"], title: "t", root_cause: "r", fix: "x", project: "general",
+      test: { reproduced: true, how: "a read-only query", result: "reproduced" } };
     const cleanup = { kind: "cleanup", finding_ids: ["f1"], fix: "bundle", project: "general" };
     const homeNoProject = { kind: "root-cause", finding_ids: ["f1"], reuse_backlog_id: "AGT-158" };
     const homeGeneral = { kind: "root-cause", finding_ids: ["f1"], reuse_backlog_id: "AGT-158", project: "general" };

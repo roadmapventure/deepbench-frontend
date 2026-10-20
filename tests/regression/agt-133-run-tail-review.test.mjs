@@ -1,3 +1,5 @@
+// DeepBench v7.0.869 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-492 -- step 7f's feature
+// string is review-audit-worklist:ga-review-intent:depth1 now (the Governance Architect's Intent Skill).
 // DeepBench v7.0.821 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-304 slice 12 -- route pin follows decision ccab94da
 // DeepBench v7.0.610 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-133 -- THE RUN TAIL
 // REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. (7e) (AGT-137) wrote findings that
@@ -130,7 +132,7 @@ async function run() {
     assert.ok(/never \*\*`gate_failed`\*\*|never `gate_failed`/.test(block7f),
       "(7f) never writes gate_failed -- a refusal is a notes line");
     assert.ok(/exit 3/.test(block7f), "and exit 3 (no findings) costs nothing");
-    assert.ok(/review-audit-worklist:dm-audit-review-intent:depth1/.test(block7f),
+    assert.ok(/review-audit-worklist:ga-review-intent:depth1/.test(block7f),
       "the manager call is logged with its §19k feature string");
     assert.ok(!/claude-opus-5|claude-fable|claude-sonnet/.test(block7f),
       "and names NO hardcoded model id -- the model is what agent-prompt.js prints (AGT-147)");

@@ -1,3 +1,9 @@
+// DeepBench v7.0.869 | tests/regression/agt-309-process-break-class.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
+// a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
+// FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
+// 2026-10-13, rule JOHN-1013-TESTED-TICKETS). Without it every assertion here collects that refusal
+// as an extra entry and stops discriminating what it was written to discriminate. A reuse_backlog_id
+// fixture needs nothing and is untouched.
 // DeepBench v7.0.853 | tests/regression/agt-309-process-break-class.test.mjs | AGT-480 -- arm A's
 // control flips the other way too: Victoria places a non-john source, so NSRC on the LOCKED
 // executing project is accepted and `executing` is the only limb homeAccepts() has left. The
@@ -207,7 +213,8 @@ function armA() {
   }];
   const group = extra => ({
     kind: "root-cause", finding_ids: [FID],
-    title: "t", root_cause: "rc", fix: "f", ...extra,
+    // AGT-492: standard B, so every check() below reads only the refusal it is about.
+    title: "t", root_cause: "rc", fix: "f", test: { reproduced: true, how: "a read-only query", result: "reproduced" }, ...extra,
   });
   const check = (extra, expected, why) => {
     const v = validateReview({ groups: [group(extra)] }, worklist, undefined, undefined, undefined, PROJECTS);

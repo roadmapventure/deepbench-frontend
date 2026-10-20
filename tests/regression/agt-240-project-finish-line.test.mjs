@@ -1,3 +1,9 @@
+// DeepBench v7.0.869 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
+// a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
+// FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
+// 2026-10-13, rule JOHN-1013-TESTED-TICKETS). Without it every assertion here collects that refusal
+// as an extra entry and stops discriminating what it was written to discriminate. A reuse_backlog_id
+// fixture needs nothing and is untouched.
 // DeepBench v7.0.794 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-304 slice 7 -- arm D's finding_group_epic probe reads the auditor route out of finding_routes and grades the answer by the function's own rule over that project's live status, both branches exact, instead of pinning one slug's lock refusal.
 // DeepBench v7.0.662 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-240
 // FEATURE: AGT-240 -- PROJECTS GET A FINISH LINE. Kickoff:
@@ -134,13 +140,13 @@ async function run() {
 
     assert.deepEqual(rv([list(["au", "to"])]), ["list needs a reason"]);
     assert.deepEqual(rv([list(["au", "to"], "waits for the next proposal")]), []);
-    assert.deepEqual(rv([{ kind: "root-cause", title: "t", root_cause: "r", fix: "f", finding_ids: ["au"] }, list(["to"], "x")]),
+    assert.deepEqual(rv([{ kind: "root-cause", title: "t", root_cause: "r", fix: "f", finding_ids: ["au"], test: { reproduced: true, how: "a read-only query", result: "reproduced" } }, list(["to"], "x")]),
       ["project auditor-enhancements is executing -- its list is locked; use kind list (AGT-240)"],
       "the Auditor route files into an executing project: refused with the function's sentence");
-    assert.deepEqual(rv([{ kind: "root-cause", title: "t", root_cause: "r", fix: "f", project: "dev-manager-capabilities", finding_ids: ["to"] }, list(["au"], "x")]),
+    assert.deepEqual(rv([{ kind: "root-cause", title: "t", root_cause: "r", fix: "f", project: "dev-manager-capabilities", finding_ids: ["to"], test: { reproduced: true, how: "a read-only query", result: "reproduced" } }, list(["au"], "x")]),
       ["project dev-manager-capabilities is executing -- its list is locked; use kind list (AGT-240)"],
       "the manager's pick of an executing project is refused the same way");
-    assert.deepEqual(rv([{ kind: "root-cause", title: "t", root_cause: "r", fix: "f", project: "security", finding_ids: ["to"] }, list(["au"], "x")]), [],
+    assert.deepEqual(rv([{ kind: "root-cause", title: "t", root_cause: "r", fix: "f", project: "security", finding_ids: ["to"], test: { reproduced: true, how: "a read-only query", result: "reproduced" } }, list(["au"], "x")]), [],
       "CONTROL: the same pick into a planned project is clean");
   });
 
