@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.874 | scripts/verifier.js | AGT-457 -- one instrument, one baseline, one refusal: `measuredTestsFrom()` harvests the per-test `- <path> — green|RED|NOT RUN` lines `renderBlock()` already writes, so `readKickoffBaseline()` and `readRegressionBaseline()` now return `measured` (what the baseline ACTUALLY ran) and `instrument` (which script measured it) beside `names`; `regressionDelta()` gains a THIRD bucket, `neverMeasured` -- a post name the baseline never measured is no longer charged as newly red and the suite's own exit code stands; `baselineCoverageFinding()` refuses a baseline narrower than the set being graded (exit 1 `kickoff-baseline-narrower` at `--check-kickoff`, exit 2 `baseline-narrower-than-graded-set` at 7a) or one measured by an instrument outside `BASELINE_INSTRUMENTS`; and a PRESENT-but-unparseable block is exit 1 `kickoff-baseline-unparseable` (`present: true`), while a kickoff with NO block keeps AGT-391's escape untouched.
 // DeepBench v7.0.843 | scripts/verifier.js | AGT-451 -- an uncredentialed BASELINE block is refused, not graded: `UNCREDENTIALED_BASELINE_RE` on the `BASELINE (` paragraph makes `readKickoffBaseline()` return `uncredentialed: true` with `names: null`, `baselineGate()` refuses it BEFORE AGT-391's related-set escape, `--pre-build-baseline=<file>` (the cycle's own credentialed measurement, `scripts/pre-build-baseline.js`) sits between `--regression-baseline=` and the block in the precedence, and step 6's `--check-kickoff` arms with the flag -- exit 1 `kickoff-baseline-uncredentialed` when the file is no baseline, a `baseline_note` saying NOT GRADED when no flag was handed.
 // DeepBench v7.0.793 | scripts/verifier.js | AGT-391 -- selective regression. `--related=<file>` (the
 // related set from scripts/related-tests.js) runs the regression gate as `run-all.js --only-from=<it>`
@@ -835,6 +836,154 @@ export function notRunTestsFrom(output) {
   return names.sort();
 }
 
+// ---- FEATURE: AGT-457 -- ONE INSTRUMENT, ONE BASELINE. THE READER KEEPS WHAT IT READ. --------
+//
+// WHAT THE TWO PARSES ABOVE CANNOT SAY, and it is the whole defect. `failingTestsFrom` harvests the
+// `[FAIL]` names and `notRunTestsFrom` the `NOT A FULL RUN:` notice -- so a baseline can say "this
+// test was MEASURED and it was GREEN" and no reader in this file hears it. `renderBlock()`
+// (`scripts/baseline-red-set.js`) has printed one `- <path> — green` line per test since `v7.0.504`
+// and `renderOut()` (`scripts/pre-build-baseline.js`) embeds that block VERBATIM in the file step 7
+// hands the gate, so the fact has been on disk all along; nothing read it. The consequence is that a
+// test measured green and a test never measured are the SAME absence to `regressionDelta()`, and both
+// land in `newlyRed` -- which is how cycle `a50537cc` charged AGT-494 for a test its baseline never
+// covered (pattern:162 -- a check grades the change, never the live world).
+//
+// SO THIS IS A READER CHANGE AND NOTHING ELSE: no new block format, no new flag, no kickoff byte
+// spent, and `KICKOFF_BYTE_CAP` does not move. The lines were already written; the parse is the fix
+// (pattern:17 -- extend a structure that already fits rather than standing up a parallel one).
+
+// Pure. The basename of every per-test line a baseline block carries -- `- <path> — green`,
+// `- <path> — RED (exit n): ...` or `- <path> — NOT RUN (transport, exit 2): ...` -- deduped, in BLOCK
+// ORDER rather than sorted, because this list is read back to a human beside the block it came from.
+//
+// LINE-ANCHORED AND EM-DASH-KEYED, the same mutant `failingTestsFrom` and `notRunTestsFrom` are
+// anchored against: a failing ASSERTION MESSAGE can quote a whole block line (several tests in this
+// suite assert about exactly this format), and a scan for `— green` anywhere in a line would harvest
+// a test name out of a message body and report a measurement nobody took. The optional backticks are
+// AGT-391's: `readKickoffBaseline()` already accepts `` `- `path` — RED` `` and the two parses must
+// agree about what a line is.
+//
+// THE BASENAME, because every other name in this file is a basename: the block carries whatever path
+// its caller was handed (relative in a kickoff, absolute in a cycle-measured capture) and
+// `failingTestsFrom`/`notRunTestsFrom`/`readRelatedSet` all key on `run-all.js`'s bare file name. A
+// set keyed two ways cannot be compared with `includes`.
+export const PER_TEST_LINE = /^\s*-\s+`?([^`\s]+)`?\s+—\s+(?:RED\b|green\b|NOT RUN\b)/;
+
+export function measuredTestsFrom(text) {
+  const names = [];
+  for (const raw of String(text ?? "").split("\n")) {
+    const hit = raw.match(PER_TEST_LINE);
+    if (!hit) continue;
+    const name = path.basename(hit[1]);
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+// The ONLY two scripts whose output is a baseline this gate can compare to its own run, and the list
+// is the point rather than paperwork. `GATES` runs the regression suite as ONE process
+// (`tests/regression/run-all.js`), while both scripts below measure ONE CHILD PROCESS PER TEST FILE --
+// which is what makes their per-test lines alignable BY NAME with this run's `[FAIL]` names. A
+// capture taken any other way (a full `run-all.js` log, a hand-written list) names tests that cannot
+// be aligned, and the row that recorded the grade named neither instrument.
+export const BASELINE_INSTRUMENTS = Object.freeze([
+  "scripts/baseline-red-set.js",
+  "scripts/pre-build-baseline.js",
+]);
+
+// Pure. The `BASELINE (` paragraph of a text, or "" when there is none. ONE finder for both readers,
+// so "the block" means one thing at both ends (pattern:14) -- and paragraph-scoped on purpose: a
+// section 2 sentence that happens to name a script is not a statement about the measurement, the same
+// rule `UNCREDENTIALED_BASELINE_RE`'s own header already sets.
+export function baselineParagraph(text) {
+  const paras = String(text ?? "").replace(/\r\n/g, "\n").split(/\n\s*\n/);
+  return paras.find(p => p.trimStart().startsWith("BASELINE (")) ?? "";
+}
+
+// Pure. The first `scripts/...` or `tests/...` `.js`/`.mjs` path in the `BASELINE (` paragraph that is
+// NOT one of the block's own per-test measurement lines, else null. Two lines of a block state the
+// instrument and both are covered: the header, which is where `renderOut()` puts it
+// (`BASELINE (cycle-measured, credentialed, scripts/pre-build-baseline.js, tree ...)`) and where a
+// Designer-measured block names `scripts/baseline-red-set.js`, and the `Instrument:` line
+// `renderBlock()` now appends to every block it prints.
+//
+// A PER-TEST LINE IS A MEASUREMENT, NEVER A STATEMENT ABOUT THE INSTRUMENT, and skipping those lines
+// is the whole difference between a refusal that means something and one manufactured out of the
+// block's own contents. Found live while building this ticket: with the per-test lines included, a
+// block whose header names no instrument reported `tests/regression/red.test.mjs` -- the first test it
+// MEASURED -- as the script that measured it, and
+// `tests/regression/agt-451-pre-build-baseline.test.mjs` arm E's credentialed control went red for it.
+// A block that names no instrument anywhere is NOT GRADED on this half (null), which is the same
+// escape the 1,014 blockless kickoffs take. Measured over the 1,119 kickoffs in `docs/kickoffs/` on
+// this tree: 1,014 carry no block at all, 91 name `scripts/baseline-red-set.js`, 3 name
+// `scripts/pre-build-baseline.js`, and the rest name no instrument.
+export function baselineInstrumentFrom(text) {
+  for (const line of baselineParagraph(text).split("\n")) {
+    if (PER_TEST_LINE.test(line)) continue;
+    const hit = line.match(/(?:scripts|tests)\/[\w./-]+\.m?js\b/);
+    if (hit) return hit[0];
+  }
+  return null;
+}
+
+// Pure. The refusal when a baseline cannot answer for the set being graded, else null -- and "cannot
+// answer for" is TWO failures with one shape, which is why they live in one function and not two.
+//
+//   measured     the names the baseline ACTUALLY measured (`measuredTestsFrom`), or null for "no
+//                per-test line, so it never said" -- NOT GRADED, never a refusal.
+//   graded       the names this run will grade (the related set, or the cycle's own measurement),
+//                or null for the same reason.
+//   instrument   which script measured it (`baselineInstrumentFrom`), or null for "the block does
+//                not say" -- NOT GRADED on that half.
+//
+// NARROWER IS THE FIRST FAILURE. A baseline measured over 4 tests cannot grade a run of 5: the fifth
+// has no measurement behind it, so the old code read its red as this delivery's. `regressionDelta()`'s
+// `neverMeasured` bucket stops CHARGING such a name, and this refusal stops the run before the gate
+// spends 20 minutes producing a grade nobody can use -- two mechanisms, one direction, neither
+// clearing anything.
+//
+// THE WRONG INSTRUMENT IS THE SECOND, and it refuses even when the coverage half is NOT GRADED. A
+// block that names `tests/regression/run-all.js` as its instrument is not a smaller measurement of
+// the same thing -- it is a different measurement whose names this gate cannot align, and accepting
+// it is how a one-process log came to stand in for a per-file baseline. Null `instrument` is the
+// escape every one of the 1,014 blockless kickoffs takes, and it is NOT GRADED rather than refused.
+export function baselineCoverageFinding({ measured, graded, instrument }) {
+  const inst = instrument === null || instrument === undefined ? null : String(instrument).trim();
+  if (inst && !BASELINE_INSTRUMENTS.includes(inst)) {
+    return {
+      instrument: inst,
+      instruments: [...BASELINE_INSTRUMENTS],
+      uncovered: [],
+      measured_count: Array.isArray(measured) ? measured.length : null,
+      graded_count: Array.isArray(graded) ? graded.length : null,
+      remedy: "re-measure it with the instrument the gate can align: node scripts/pre-build-baseline.js --kickoff=<the kickoff path> --out=<file>",
+      reason: `baseline INSTRUMENT is not one of ours: the BASELINE block names ${inst} as the script ` +
+        `that measured it, and this gate can only align a baseline measured ONE CHILD PROCESS PER TEST ` +
+        `FILE -- by ${BASELINE_INSTRUMENTS.join(" or ")}. The regression gate runs the suite as one ` +
+        `process, so a capture taken any other way names tests it cannot match BY NAME (AGT-457).`,
+    };
+  }
+  if (!Array.isArray(measured) || !Array.isArray(graded)) return null;
+  const have = measured.map(n => path.basename(String(n)));
+  const uncovered = [];
+  for (const g of graded.map(n => path.basename(String(n)))) {
+    if (!have.includes(g) && !uncovered.includes(g)) uncovered.push(g);
+  }
+  if (!uncovered.length) return null;
+  return {
+    instrument: inst,
+    uncovered,
+    measured_count: have.length,
+    graded_count: graded.length,
+    remedy: "measure the baseline over the SAME set this run grades -- node scripts/pre-build-baseline.js --kickoff=<the kickoff path> --out=<file> -- and hand that one file to both ends",
+    reason: `baseline NARROWER than the set being graded: ${uncovered.length} of the ${graded.length} ` +
+      `graded ${graded.length === 1 ? "test" : "tests"} ${uncovered.length === 1 ? "is" : "are"} ` +
+      `absent from the ${have.length} ${have.length === 1 ? "test" : "tests"} the baseline measured, so a red in ` +
+      `${uncovered.length === 1 ? "it" : "them"} would be graded against a measurement nobody took: ` +
+      `${uncovered.join(", ")} (AGT-457).`,
+  };
+}
+
 // Pure. The regression gate's status once the delta is taken into account.
 //
 //   absolute    what `gateStatus` said about the run: 'green' | 'red' | 'skipped'.
@@ -880,11 +1029,30 @@ export function notRunTestsFrom(output) {
 export const REGRESSION_NO_BASELINE_REASON =
   "no baseline handed to the gate; the absolute exit code stands — fail closed (AGT-170)";
 
-export function regressionDelta({ absolute, baseline, post, unverified }) {
+// AGT-457 -- THE FOURTH BUCKET, `measured`, AND WHY IT CHARGES NOTHING AND CLEARS NOTHING. Slice 2
+// above stopped charging a name the baseline DECLARED it did not fully run. `measured` closes the
+// other half of the same hole: a name the baseline never ran AT ALL, which it declares by simply not
+// having a per-test line for it. The two are the same mistake at different widths -- "the unchanged
+// tree ran this and it passed" asserted off an absence -- and the cost is the same, a manufactured
+// red charged to a delivery that cannot answer it (cycle `a50537cc`, AGT-494).
+//
+// `measured` ABSENT MUST GRADE EXACTLY AS SLICE 2 DID, byte for byte: `scripts/regrade-delivered.js`
+// and every existing caller passes four keys, and a reader that hands over no measured set has made
+// no claim about what was measured. So an absent or non-array `measured` sends every unexplained post
+// name to `newlyRed`, which is the slice 1 and slice 2 partition unchanged, and the reasons below are
+// untouched in that case.
+//
+// AND IT IS `status: absolute`, NEVER `green`. A never-measured red still blocks -- the suite's own
+// exit code stands, exactly as the unverified bucket leaves it. What moves is only the CLAIM: the
+// name goes into its own list with its own sentence instead of into an accusation this delivery
+// cannot answer. Nothing is cleared, which is the whole safety argument for touching a red -> green
+// rule a third time.
+export function regressionDelta({ absolute, baseline, post, unverified, measured }) {
   // Every fail-closed exit reports `unverifiedInBaseline: null` for the same reason it reports the other
   // two lists as null -- nothing was graded, so no list may be published as if it had been. `[]` here
   // would read as the positive fact "the baseline ran everything", off a baseline nobody parsed.
-  const none = (status, reason) => ({ status, standing: null, newlyRed: null, unverifiedInBaseline: null, reason });
+  // AGT-457: `neverMeasured` is null on those exits for the identical reason.
+  const none = (status, reason) => ({ status, standing: null, newlyRed: null, unverifiedInBaseline: null, neverMeasured: null, reason });
 
   if (baseline === null || baseline === undefined) return none(absolute, REGRESSION_NO_BASELINE_REASON);
   if (!Array.isArray(baseline)) {
@@ -902,6 +1070,11 @@ export function regressionDelta({ absolute, baseline, post, unverified }) {
   // `unverified` is advisory and may be absent -- slice 1's callers pass three keys, and a reader that
   // handed over no not-run set must grade exactly as slice 1 did rather than differently-by-accident.
   const unverifiedNames = Array.isArray(unverified) ? unverified.map(n => String(n)) : [];
+  // AGT-457: NULL, NOT `[]`, when the caller handed over no measured set -- and the difference is the
+  // whole rule. `[]` would mean "this baseline measured nothing", so every post name would become
+  // never-measured and nothing could ever be newly red again; null means "no claim was made about what
+  // was measured", and the partition below falls back to slice 2's exactly.
+  const measuredNames = Array.isArray(measured) ? measured.map(n => String(n)) : null;
 
   // ONE PASS, THREE BUCKETS, AND THE ORDER OF THE TESTS IS THE PRECEDENCE RULE. `baseline` is checked
   // FIRST, so a name in both lists is standing: `run-all.js:157-162` drains the not-run buffer on the
@@ -911,13 +1084,21 @@ export function regressionDelta({ absolute, baseline, post, unverified }) {
   // function is exported and pure, and a caller that partitions differently must not be able to turn a
   // proven standing red into an unverified one -- that is the only direction here that could launder a
   // ship.)
+  //
+  // AGT-457 ADDS THE FOURTH BUCKET AT THE END OF THE SAME CHAIN, so the three tests above it keep
+  // their precedence to the byte: a name in `baseline` is standing however many other lists it is in,
+  // a name the baseline declared not-run is unverified, and ONLY a name no list explains at all is
+  // sorted by whether the baseline measured it. `measuredNames === null` -> no claim was made ->
+  // newly red, which is slice 2's answer unchanged.
   const standing = [];
   const unverifiedInBaseline = [];
   const newlyRed = [];
+  const neverMeasured = [];
   for (const n of postNames) {
     if (baselineNames.includes(n)) standing.push(n);
     else if (unverifiedNames.includes(n)) unverifiedInBaseline.push(n);
-    else newlyRed.push(n);
+    else if (measuredNames === null || measuredNames.includes(n)) newlyRed.push(n);
+    else neverMeasured.push(n);
   }
 
   // STILL FIRST, AND STILL BEFORE THE EMPTY-LIST TESTS BELOW. An empty `post` gives all three buckets
@@ -925,12 +1106,12 @@ export function regressionDelta({ absolute, baseline, post, unverified }) {
   // have graded as its cleanest green. Keeping this exit ahead of them is the whole reason slice 1 wrote
   // it here, and slice 2 adds a third empty list without changing that.
   if (!postNames.length) {
-    return { status: "red", standing, newlyRed, unverifiedInBaseline: null,
+    return { status: "red", standing, newlyRed, unverifiedInBaseline: null, neverMeasured: null,
       reason: `regression exited non-zero and named NO failing test, so there is no failing set to ` +
         `prove against the ${baselineNames.length}-name baseline -- fail closed (AGT-170)` };
   }
   if (newlyRed.length) {
-    return { status: "red", standing, newlyRed, unverifiedInBaseline,
+    return { status: "red", standing, newlyRed, unverifiedInBaseline, neverMeasured,
       reason: `regression RED on ${newlyRed.length} newly red ${newlyRed.length === 1 ? "test" : "tests"} ` +
         `this delivery must answer for: ${newlyRed.join(", ")} (absent from the ${baselineNames.length}-name ` +
         `baseline). ${standing.length} other red ${standing.length === 1 ? "test is" : "tests are"} standing (AGT-170)` };
@@ -942,7 +1123,7 @@ export function regressionDelta({ absolute, baseline, post, unverified }) {
   // exit code stands, the delta declining to move it -- rather than as a coincidence of two reds agreeing.
   if (unverifiedInBaseline.length) {
     const u = unverifiedInBaseline.length;
-    return { status: absolute, standing, newlyRed, unverifiedInBaseline,
+    return { status: absolute, standing, newlyRed, unverifiedInBaseline, neverMeasured,
       reason: `regression ${absolute.toUpperCase()} and the absolute exit code STANDS: ${u} red ` +
         `${u === 1 ? "test is" : "tests are"} absent from the ${baselineNames.length}-name baseline's ` +
         `[FAIL] lines but named in its NOT A FULL RUN notice, so the unchanged tree never ran ` +
@@ -952,7 +1133,24 @@ export function regressionDelta({ absolute, baseline, post, unverified }) {
         `exactly as before, it is just not charged to this delivery; a ship blocked ONLY on unverified ` +
         `names is AGT-245's re-grade candidate (AGT-170, AGT-245)` };
   }
-  return { status: "green", standing, newlyRed, unverifiedInBaseline,
+  // AGT-457's FOURTH STATE, and it sits HERE -- after the unverified bucket, before the green. Every
+  // red this run named is explained, but at least one is a test the baseline never measured at all, so
+  // there is no green to prove and no accusation to make. `status: absolute` is provably "red" by the
+  // guard at the top of this function; it is written as `absolute` so the rule reads as what it is --
+  // the suite's own exit code standing, the delta declining to move it.
+  if (neverMeasured.length) {
+    const k = neverMeasured.length;
+    return { status: absolute, standing, newlyRed, unverifiedInBaseline, neverMeasured,
+      reason: `regression ${absolute.toUpperCase()} and the absolute exit code STANDS: ${k} red ` +
+        `${k === 1 ? "test is" : "tests are"} absent from the ${baselineNames.length}-name baseline AND ` +
+        `from the ${measuredNames.length} ${measuredNames.length === 1 ? "test" : "tests"} that baseline ` +
+        `MEASURED, so the unchanged tree never ran ${k === 1 ? "it" : "them"} and ` +
+        `${k === 1 ? "it is" : "they are"} NEVER MEASURED, not proven red, rather than newly red: ` +
+        `${neverMeasured.join(", ")}. 0 tests are newly red; ${standing.length} ` +
+        `${standing.length === 1 ? "is" : "are"} standing. Nothing is cleared -- a never-measured red ` +
+        `blocks exactly as before, it is just not charged to this delivery (AGT-457, AGT-170)` };
+  }
+  return { status: "green", standing, newlyRed, unverifiedInBaseline, neverMeasured,
     reason: `regression GREEN on the delta: all ${standing.length} red ${standing.length === 1 ? "test" : "tests"} ` +
       `in this run are in the ${baselineNames.length}-name baseline BY NAME (${standing.join(", ")}), and 0 are ` +
       `newly red. The suite's absolute exit code is red and stays reported as such (AGT-170)` };
@@ -998,15 +1196,25 @@ export function deltaVerdictNote(delta, baselineNames) {
 // a baseline that was never read has no such fact to report, and reporting `[]` would let a downstream
 // reader conclude a full run from a file that does not exist. Same reasoning the null `names` above
 // already carries, and the same reasoning the delta's `unverifiedInBaseline: null` carries below.
+// AGT-457: `measured` AND `instrument` RIDE IN BESIDE `unverified`, off the SAME read of the SAME
+// file -- the defect `scripts/baseline-red-set.js`'s own header records, applied one level down: two
+// facts read from two reads can describe two baselines. `measured` is null, never [], for every
+// return that is not a real baseline AND for a real capture carrying no per-test line (a full
+// `run-all.js` log is exactly that): [] would assert "this baseline measured nothing", which no file
+// can mean, and would make every graded name uncovered. `instrument` is read off the `BASELINE (`
+// paragraph, so a capture that has none reports null and is NOT GRADED rather than refused.
 export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFileSync(f, "utf8")) {
-  if (!baselinePath) return { names: null, unverified: null, source: "no --regression-baseline passed; the gate grades the absolute exit code (AGT-170)" };
+  if (!baselinePath) return { names: null, unverified: null, measured: null, instrument: null, source: "no --regression-baseline passed; the gate grades the absolute exit code (AGT-170)" };
   let text;
   try { text = readFile(baselinePath); }
-  catch (e) { return { names: null, unverified: null, source: `--regression-baseline=${baselinePath} could not be read (${e.message}); the gate grades the absolute exit code (AGT-170)` }; }
-  if (!String(text).trim()) return { names: null, unverified: null, source: `--regression-baseline=${baselinePath} is empty; the gate grades the absolute exit code (AGT-170)` };
+  catch (e) { return { names: null, unverified: null, measured: null, instrument: null, source: `--regression-baseline=${baselinePath} could not be read (${e.message}); the gate grades the absolute exit code (AGT-170)` }; }
+  if (!String(text).trim()) return { names: null, unverified: null, measured: null, instrument: null, source: `--regression-baseline=${baselinePath} is empty; the gate grades the absolute exit code (AGT-170)` };
   const names = failingTestsFrom(text);
   const unverified = notRunTestsFrom(text).filter(n => !names.includes(n));
+  const measured = measuredTestsFrom(text);
   return { names, unverified,
+    measured: measured.length ? measured : null,
+    instrument: baselineInstrumentFrom(text),
     source: `${baselinePath} (${names.length} red on the unchanged tree, ${unverified.length} never run)` };
 }
 
@@ -1099,16 +1307,26 @@ export function baselineGate({ read, declared, related }) {
 // and this one must not.
 export const UNCREDENTIALED_BASELINE_RE = /\bcredentials?\b[^.\n]{0,40}\b(?:stripped|absent|withheld|omitted|deleted|removed)\b|\buncredentialed\b|\b(?:measured|run|taken|captured)\s+without\s+credentials\b|\bSUPABASE_SERVICE_KEY\b[^.\n]{0,40}\b(?:stripped|deleted|removed|absent)\b/i;
 
+// AGT-457: `present`, `measured` AND `instrument`, AND `present` IS THE ONE THAT ARMS A REFUSAL.
+// `names: null` has meant two opposite things since AGT-391: "this kickoff has no block, grade
+// absolutely" (1,014 of the 1,119 kickoffs on this tree, and the escape AGT-391 deliberately left
+// open) and "this kickoff HAS a block and it cannot be read" (23 of them, 7 of the newest 20) -- the
+// second is a claim nobody can check, and it fell back to the same silent absolute grading as the
+// first. `present` separates them so `--check-kickoff` can refuse the second and leave the first
+// exactly as it was. `measured` is null wherever `names` is null, for the reason `names` is null
+// there: nothing was parsed, so no list may be published as if it had been.
 export function readKickoffBaseline(text) {
   const paras = String(text ?? "").replace(/\r\n/g, "\n").split(/\n\s*\n/);
   const para = paras.find(p => p.trimStart().startsWith("BASELINE ("));
-  if (!para) return { names: null, unverified: null, source: "the kickoff carries no BASELINE block; the gate grades the absolute exit code (AGT-391)" };
+  if (!para) return { names: null, unverified: null, measured: null, instrument: null, present: false, source: "the kickoff carries no BASELINE block; the gate grades the absolute exit code (AGT-391)" };
+  const instrument = baselineInstrumentFrom(para);
+  const measuredNames = measuredTestsFrom(para);
   if (UNCREDENTIALED_BASELINE_RE.test(para)) {
-    return { names: null, unverified: null, uncredentialed: true,
+    return { names: null, unverified: null, measured: null, instrument, present: true, uncredentialed: true,
       source: "the kickoff's BASELINE was measured without credentials; run scripts/pre-build-baseline.js on the unchanged tree and pass --pre-build-baseline=<file> (AGT-451)" };
   }
   const count = para.match(/Red set:\s*(\d+)\s+of\s+(\d+)/);
-  if (!count) return { names: null, unverified: null, source: "the kickoff's BASELINE block carries no `Red set: r of n`; the gate grades the absolute exit code (AGT-391)" };
+  if (!count) return { names: null, unverified: null, measured: null, instrument, present: true, source: "the kickoff's BASELINE block carries no `Red set: r of n`; the gate grades the absolute exit code (AGT-391)" };
   const r = Number(count[1]);
   const names = [];
   for (const line of para.split("\n")) {
@@ -1119,10 +1337,12 @@ export function readKickoffBaseline(text) {
   }
   const unique = [...new Set(names)];
   if (unique.length !== r) {
-    return { names: null, unverified: null,
+    return { names: null, unverified: null, measured: null, instrument, present: true,
       source: `the kickoff's BASELINE block says Red set: ${r} of ${count[2]} but names ${unique.length}; the gate grades the absolute exit code (AGT-391)` };
   }
-  return { names: unique, unverified: [], source: `the kickoff's BASELINE block (${r} red of ${count[2]} on the unchanged tree, related set)` };
+  return { names: unique, unverified: [],
+    measured: measuredNames.length ? measuredNames : null, instrument, present: true,
+    source: `the kickoff's BASELINE block (${r} red of ${count[2]} on the unchanged tree, related set)` };
 }
 
 // The related set `--related=` names: a csv or one name per line, as basenames. An unreadable or empty
@@ -2941,6 +3161,70 @@ async function main() {
         baselineNote = "NOT GRADED (AGT-451): uncredentialed BASELINE, no --pre-build-baseline= handed; step 7 measures it before the spawn";
       }
     }
+    // ---- AGT-457: A PRESENT-BUT-UNREADABLE BLOCK IS REFUSED, AND IT ARMS WITH NO FLAG. -----
+    //
+    // THE ONE REFUSAL HERE THAT NEEDS NOTHING BUT THE FILE, because the defect needs nothing but the
+    // file: the kickoff HAS a `BASELINE (` paragraph and `readKickoffBaseline()` cannot read it --
+    // no `Red set: r of n`, or a count that disagrees with the names under it. AGT-391 made that
+    // `names: null`, which is the SAME value a kickoff with no block at all returns, so both fell
+    // through to the absolute exit code in silence: the Builder's whole related set graded as its own
+    // reds, off a block the Designer believed was being read. A list that disagrees with its own count
+    // is not a baseline anyone measured, and a claim nobody can check must not pass as a green.
+    //
+    // `kb.present === false` IS UNTOUCHED, and that is the load-bearing half of this clause. Measured
+    // over `docs/kickoffs/` on this tree: 1,119 kickoffs, 1,014 of them carry NO `BASELINE (`
+    // paragraph. Refusing those would wedge every one of them on a block that was never required --
+    // AGT-391's escape (no baseline, a related set was named, the absolute exit code stands) is
+    // deliberate and stays exactly as it was. 23 kickoffs carry a block that cannot be read, 7 of them
+    // in the newest 20, and those are the only documents this refusal is about.
+    //
+    // EXIT 1 AND `remedy_owner: "designer"`, which is the one difference from the AGT-451 refusal
+    // above it: an uncredentialed block is the CYCLE's to re-measure, because the Designer's
+    // environment is where the measurement could not be taken -- but an unreadable block is a
+    // re-assembly, the Designer's own document. `kb.source` travels verbatim into the reason: "says
+    // Red set: 1 of 7 but names 0" is the whole diagnosis, and paraphrasing it would cost the number.
+    if (kb.present === true && kb.names === null && !kb.uncredentialed) {
+      const reason = `kickoff-baseline-unparseable: ${kb.source}. The kickoff HAS a BASELINE block and `
+        + `it cannot be read, so every red in the Builder's related set would be graded as its own off a `
+        + `block nobody could parse. A kickoff with NO block keeps AGT-391's escape; this one made a `
+        + `claim that cannot be checked (AGT-457).`;
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "kickoff-baseline-unparseable",
+          baseline_source: kb.source, baseline_present: true,
+          baseline_instrument: kb.instrument,
+          remedy_owner: "designer",
+          remedy: "re-assemble design-kickoff ONCE carrying the block scripts/pre-build-baseline.js printed, verbatim -- its per-test lines and a `Red set: r of n` that agrees with them; the caller never edits the block into shape",
+          reason }, prose: reason });
+    }
+    // ---- AGT-457: THE BLOCK MUST COVER THE SET THE CYCLE ACTUALLY MEASURED. ----------------
+    //
+    // ARMED BY THE FLAG, like the refusal above it and for the same reason: the comparison needs a
+    // second measurement, and `--pre-build-baseline=<file>` IS that measurement -- taken by a script,
+    // credentialed, on the unchanged clone, over the kickoff's own declared files. A bare
+    // `--check-kickoff` (runbook step 6, and every `ses-376` / `ses-359` / `agt-187` arm) has nothing
+    // to compare and stays exit 0.
+    //
+    // THE BLOCK IS THE `measured` SIDE AND THE FILE IS THE `graded` SIDE, not the other way round.
+    // What the cycle measures at step 7 is what 7a will grade, so a block NARROWER than it is a
+    // kickoff whose BASELINE cannot answer for part of its own build -- and the Builder reads the
+    // BLOCK, from its opening line, as the list of reds that are not its own. A block that covers MORE
+    // than the file is not a finding: a wider measurement answers for every graded name.
+    //
+    // EXIT 1 AND `remedy_owner: "cycle"`, the same pair the AGT-451 refusal above carries: 1 is a
+    // judgement about the kickoff, and the remedy is the cycle's own step 7 command -- re-measure and
+    // paste, never hand-edit the block into shape.
+    if (preBuildBaselinePath && !kb.uncredentialed) {
+      const handed = readRegressionBaseline(preBuildBaselinePath);
+      const coverage = baselineCoverageFinding({ measured: kb.measured, graded: handed.measured, instrument: kb.instrument });
+      if (coverage) {
+        const reason = `kickoff-baseline-narrower: ${coverage.reason} ${kb.source}; the cycle's own `
+          + `measurement is ${handed.source}. A green here would attest that the Builder's opening block `
+          + `names every red it is not answerable for, which it does not (AGT-457).`;
+        return emit({ code: 1, payload: { ok: false, exitCode: 1, ...coverage, kind: "kickoff-baseline-narrower",
+            baseline_source: kb.source, pre_build_baseline: preBuildBaselinePath,
+            pre_build_baseline_source: handed.source,
+            remedy_owner: "cycle", reason }, prose: reason });
+      }
+    }
     // ---- AGT-189: the Builder's DECLARED MODEL, graded against the lane row, read live. ------
     //
     // THE ROW IS READ HERE AND NOWHERE ELSE IN THIS BRANCH, because the answer must come from
@@ -3251,6 +3535,32 @@ async function main() {
         + `reason is recorded in the row; a bare --no-baseline is not a reason and refuses.` });
   }
 
+  // ---- AGT-457: THE BASELINE MUST COVER THE SET THIS RUN IS ABOUT TO GRADE. ------------------
+  //
+  // AFTER THE GATE ABOVE, NEVER BEFORE IT: that gate answers "is there a baseline at all", and a run
+  // with none (or with a declared omission) has nothing to compare -- `measured` is null there and
+  // this is NOT GRADED. This clause answers the next question, which nothing used to ask: the
+  // baseline that WAS handed over, does it reach every test this run will grade?
+  //
+  // EXIT 2, NOT 1, AND NO ROW -- the distinction AGT-245 drew and the reason this cannot cost a
+  // streak. A baseline narrower than the graded set means the grader was not given what it grades
+  // with, which is a cannot-run, not a verdict about the delivery. Reaching the gate anyway would
+  // spend the suite's full run to produce a grade whose newly-red list cannot be trusted, which is
+  // the state cycle `a50537cc` shipped AGT-494's block on.
+  const coverage = baselineCoverageFinding({
+    measured: baselineRead.measured,
+    graded: relatedRead?.names ?? null,
+    instrument: baselineRead.instrument,
+  });
+  if (coverage) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, ...coverage, kind: "cannot-run",
+        error: "baseline-narrower-than-graded-set",
+        regression_baseline_source: baselineRead.source, related: relatedPath },
+      prose: `verifier: ${coverage.reason}\n`
+        + `  Exiting 2 and recording NOTHING -- no gate ran, no row was written, and this is NOT a verdict (AGT-457).\n`
+        + `  ${coverage.remedy}` });
+  }
+
   const gateResults = {};
   const gateDetail = {};
   const gateFails = {};
@@ -3296,6 +3606,9 @@ async function main() {
     baseline: baselineRead.names,
     post: gateFails.regression ?? null,
     unverified: baselineRead.unverified,
+    // AGT-457: the THIRD list off the SAME read of the SAME file, for the reason slice 2's comment
+    // above gives -- three facts read from three reads can describe three baselines.
+    measured: baselineRead.measured,
   });
   // AGT-245: a DECLARED omission replaces the delta's own "no baseline handed to the gate" reason with
   // the declaration, so the row says WHY it was omitted and by whose choice rather than only that it
@@ -3311,6 +3624,9 @@ async function main() {
     // back to re-run the suite to find out which. Silent when the count is 0 or nothing was graded, so a
     // full-run baseline's detail line is byte-identical to slice 1's.
     `${delta.unverifiedInBaseline && delta.unverifiedInBaseline.length ? `, ${delta.unverifiedInBaseline.length} unverified in baseline [${delta.unverifiedInBaseline.join(", ")}]` : ""}` +
+    // AGT-457: the fourth count, NAMED for the reason the third one is, and SILENT at 0 or not-graded
+    // so a detail line from a baseline that measured everything is byte-identical to slice 2's.
+    `${delta.neverMeasured && delta.neverMeasured.length ? `, ${delta.neverMeasured.length} never measured [${delta.neverMeasured.join(", ")}]` : ""}` +
     ` -- ${delta.reason}`;
 
   let { verdict, reasoning } = verdictFor(gateResults);

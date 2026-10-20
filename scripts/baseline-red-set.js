@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// DeepBench v7.0.874 | scripts/baseline-red-set.js | AGT-457 -- the block NAMES ITS OWN INSTRUMENT
+// and SAYS when it was measured with no credentials. renderBlock() ends every block with
+// `Instrument: scripts/baseline-red-set.js (one child process per test file)`, which is the fact
+// scripts/verifier.js baselineInstrumentFrom() reads and BASELINE_INSTRUMENTS grades -- a one-process
+// run-all.js log is not a baseline this gate can align by name. And an uncredentialed run now says so
+// as the block's FIRST line, on stdout and on stderr, matching UNCREDENTIALED_BASELINE_RE so a block
+// pasted into a kickoff from such a run arms AGT-451's refusal instead of reading as a real one. The
+// exit code is untouched: 0, whatever the tests did. It reports, it does not gate.
 // DeepBench v7.0.657 | scripts/baseline-red-set.js | AGT-116 — a child that exits 2 with a
 // `[NOT RUN] ... -- transport` line (the database never answered) renders as
 // `— NOT RUN (transport, exit 2): <line>`, does not count toward `Red set:`, and adds `Not run: k`
@@ -97,6 +105,21 @@ export function transportNotRunLine(r) {
   return hit ? trim(hit[0]) : null;
 }
 
+// AGT-457: the one home for the instrument's own name, read back by `scripts/verifier.js`
+// `BASELINE_INSTRUMENTS`. The parenthetical is the fact that makes the baseline comparable at all --
+// the regression gate runs the suite as ONE process, and only a per-file measurement can be aligned
+// with its `[FAIL]` names.
+export const INSTRUMENT_LINE =
+  "Instrument: scripts/baseline-red-set.js (one child process per test file)";
+
+// AGT-457: the words an uncredentialed measurement must carry, and they are chosen to MATCH
+// `UNCREDENTIALED_BASELINE_RE` in scripts/verifier.js (the `\buncredentialed\b` arm). A block pasted
+// into a kickoff from a credential-less run then arms AGT-451's refusal rather than reading as a real
+// measurement -- which is the whole defect AGT-451 recorded: five of six standing reds declare their
+// arms notRun and report GREEN without a database, so the block is self-consistently wrong.
+export const UNCREDENTIALED_LINE =
+  "UNCREDENTIALED: measured with no database credentials; arms that need one report green without running.";
+
 export function renderBlock(results) {
   let red = 0;
   let notRunCount = 0;
@@ -109,6 +132,11 @@ export function renderBlock(results) {
   });
   lines.push(`Red set: ${red} of ${results.length}`);
   if (notRunCount > 0) lines.push(`Not run: ${notRunCount}`);
+  // LAST, AFTER THE COUNTS, so every line above it keeps the position its readers already key on:
+  // `failLines()` / `notRunLine()` (scripts/pre-build-baseline.js) walk the per-test lines, and
+  // `/^Red set: 1 of 2$/m` is pinned by tests/regression/ses-396b-designer-knowledge-row.test.mjs.
+  // A reader looking for the instrument reads the whole paragraph, so the tail is enough.
+  lines.push(INSTRUMENT_LINE);
   return lines.join("\n");
 }
 
@@ -133,6 +161,21 @@ function main(argv) {
     console.error(`baseline-red-set: these paths do not exist, so no baseline was measured:\n` +
       missing.map(m => `    ${m}`).join("\n"));
     return 2;
+  }
+
+  // AGT-457: BEFORE THE FIRST CHILD, AND AFTER THE MISSING-PATH CHECK ABOVE. The notice describes a
+  // measurement, so it belongs only to a run that is about to take one -- a refused run (exit 2,
+  // nothing measured) prints nothing but its error, which is what
+  // tests/regression/ses-396b-designer-knowledge-row.test.mjs asserts by demanding no `Red set:` there.
+  //
+  // THE FIRST LINE OF STDOUT *AND* ON STDERR, because the two readers are different: whoever pastes
+  // this block into a kickoff copies stdout, and whoever is watching a cycle reads stderr. The exit
+  // code stays 0 -- this script reports and does not gate, and refusing here would only move the
+  // uncredentialed measurement somewhere nobody records it (AGT-451 refuses it one level up, in
+  // scripts/pre-build-baseline.js, which is the place that has the credentials to lose).
+  if (["SUPABASE_URL", "SUPABASE_SERVICE_KEY"].some(k => !String(process.env[k] ?? "").trim())) {
+    console.log(UNCREDENTIALED_LINE);
+    console.error(UNCREDENTIALED_LINE);
   }
 
   const results = tests.map(t => {
