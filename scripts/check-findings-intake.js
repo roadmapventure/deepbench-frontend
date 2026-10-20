@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.871 | scripts/check-findings-intake.js | AGT-494 -- the out-of-scope note names the live
+// filer: the Governance Architect, under JOHN-1013-TESTED-TICKETS (JOHN-0925-FINDINGS-STANDARD superseded).
 // DeepBench v7.0.673 | scripts/check-findings-intake.js | AGT-160 -- A FINDING HAS ONE HOME AND A
 // TICKET HAS ONE AUTHOR, AND BOTH ARE NOW GRADED BY A COMMAND INSTEAD OF BY MEMORY.
 //
@@ -30,7 +32,7 @@
 // false green the whole check exists to remove.
 //
 // NOT IN SCOPE, AND UNWRITTEN BY THIS BUILD ON PURPOSE (both filed as findings through the intake,
-// never as tickets -- only The Development Manager files):
+// never as tickets -- only the Governance Architect files, JOHN-1013-TESTED-TICKETS):
 //   (a) the eight `skill_profiles` guardrail rows -- gated above; `--file-card` asks instead.
 //   (b) docs/runbooks/runner-cycle.md -- 380,862 of its 381,000-byte ceiling, with its sha256
 //       pinned in docs/runbooks/cycle-card.md, so a one-byte edit reds two green tests and forces

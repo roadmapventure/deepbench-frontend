@@ -1,7 +1,9 @@
+// DeepBench v7.0.871 | tests/regression/agt-131-findings-intake.test.mjs | AGT-494 -- the header states the
+// one-author clause without naming the retired filer; the Governance Architect files since AGT-492.
 // DeepBench v7.0.596 | tests/regression/agt-131-findings-intake.test.mjs | AGT-131
 //
 // ONE FINDINGS LIST: every agent and process reports into public.audit_findings with a source, a
-// type and a location, and only the Development Manager files tickets. This file guards the four
+// type and a location, and one agent files tickets (the Governance Architect since AGT-492). This file guards the four
 // things that ticket changed, and each arm is RED on the tree it was written against:
 //
 //   A  PURE -- toRow() carries finding_type (the finding's own value beats the run's) and THROWS

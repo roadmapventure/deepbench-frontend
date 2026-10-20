@@ -1,10 +1,12 @@
+// DeepBench v7.0.871 | tests/regression/_lib/finding-routes.js | AGT-494 -- decision ccab94da's note reads in
+// past tense and names today's filer; the route rows themselves are unchanged.
 // DeepBench v7.0.859 | tests/regression/_lib/finding-routes.js | AGT-484 -- the `agent` row routes to
 // the holding list: agent-sourced findings (market-agent.js Jerry, Nathan) land on Dev Mgr Findings
 // and only Victoria promotes them (AGT-480). John 2026-10-13, decision ccab94da.
 // DeepBench v7.0.819 | tests/regression/_lib/finding-routes.js | AGT-304 slice 11 -- ONE home for the
 // rows public.finding_routes holds, in --prepare's order (precedence, source), each by its ticket.
 // decision ccab94da-81aa-4b9e-81ba-02cbfb376bb7 (status-0929, John 2026-09-29): every ticket the
-// Development Manager files goes to Dev Mgr Findings (capture only).
+// Development Manager filed went to Dev Mgr Findings (capture only); the Governance Architect files now.
 export const MANAGER_PROJECT = "dev-mgr-findings";
 export const LIVE_ROUTES = [
   { precedence: 10, source: "*", finding_type: "security", project_slug: "security" }, // AGT-132

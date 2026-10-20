@@ -1,3 +1,5 @@
+// DeepBench v7.0.871 | tests/regression/agt-160-findings-intake-routing.test.mjs | AGT-494 -- the
+// one-author assertion message names the live filer, the Governance Architect (JOHN-1013-TESTED-TICKETS).
 // DeepBench v7.0.673 | tests/regression/agt-160-findings-intake-routing.test.mjs | AGT-160
 //
 // A FINDING HAS ONE HOME AND A TICKET HAS ONE AUTHOR. `scripts/check-findings-intake.js` grades
@@ -122,7 +124,7 @@ async function run() {
     for (const col of ["found_by", "finding_type", "locations"]) {
       assert.ok(INTAKE_DIRECTIVE.includes(col), `the directive names ${col} -- the three columns the intake refuses without`);
     }
-    assert.match(INTAKE_DIRECTIVE, /no agent files a ticket/, "only The Development Manager files");
+    assert.match(INTAKE_DIRECTIVE, /no agent files a ticket/, "only the Governance Architect files (JOHN-1013-TESTED-TICKETS)");
 
     // The eight rows in the shape the live table actually returns them: `guardrails` is a JSON
     // ARRAY, not a string -- measured live 2026-09-28, which is why guardrailText() exists.

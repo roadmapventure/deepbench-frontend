@@ -1,3 +1,5 @@
+// DeepBench v7.0.871 | tests/regression/agt-138-researcher-routine.test.mjs | AGT-494 -- the route message says
+// the review files under the manager's capture project; the filer itself is JOHN-1013-TESTED-TICKETS's.
 // DeepBench v7.0.819 | tests/regression/agt-138-researcher-routine.test.mjs | AGT-304 slice 11 -- route pin follows decision ccab94da
 // DeepBench v7.0.608 | tests/regression/agt-138-researcher-routine.test.mjs | AGT-138 -- THE
 // RESEARCHER LEFT THE BUILDER CYCLE FOR ITS OWN WEEKLY ROUTINE, and this file is the guard on all
@@ -270,7 +272,7 @@ export default async function run() {
       assert.equal(mine.length, 1, `exactly one researcher route; got ${JSON.stringify(mine)}`);
       assert.equal(mine[0].finding_type, "*", "the researcher route covers every finding_type");
       assert.equal(mine[0].project_slug, MANAGER_PROJECT,
-        "the Development Manager files it under its capture project (decision ccab94da), as for staff-watch and " +
+        "the review files it under the manager's capture project (decision ccab94da), as for staff-watch and " +
         "ticket-owner -- project creation is John's");
       assert.equal(Number(mine[0].precedence), 30, "the researcher route sits in the manager-picks tier");
       assert.ok(!routes.some(r => r.source === "*" && r.finding_type === "*"),

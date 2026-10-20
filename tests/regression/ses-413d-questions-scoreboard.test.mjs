@@ -1,3 +1,6 @@
+// DeepBench v7.0.871 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-494 -- BYTES_AT_SHIP
+// re-pinned 380963 -> 380920: JOHN-0925 passages re-pointed +37 B, one dangling 7f sentence -80 B; wc -c;
+// 60 B under agt-138's 380,980 ratchet.
 // DeepBench v7.0.869 | tests/regression/ses-413d-questions-scoreboard.test.mjs | AGT-492 -- BYTES_AT_SHIP
 // re-pinned 380972 -> 380963 (step 7f's review moves to the Governance Architect: two --agent=devmanager
 // become --agent=architect (-1 B each), the `devmanager` sub-agent prose becomes `architect` (-1 B), and the
@@ -267,7 +270,7 @@ export const RUNBOOK_CEILING = 381000;
 // bar and 35 B under SES-336's ceiling -- REPORTED, not absorbed. No header stamp (ses-424c pins
 // stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c, re-pinned and the card re-rendered in the
 // same commit as the runbook edit.
-export const BYTES_AT_SHIP = 380963;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
+export const BYTES_AT_SHIP = 380920;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

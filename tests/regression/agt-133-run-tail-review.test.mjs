@@ -1,3 +1,6 @@
+// DeepBench v7.0.871 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-494 -- the filing-boundary
+// pin reads the runbook's live wording: only the Governance Architect files tickets (JOHN-1013-TESTED-TICKETS
+// replaced the superseded JOHN-0925-FINDINGS-STANDARD at 1283, 2972 and 4429).
 // DeepBench v7.0.869 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-492 -- step 7f's feature
 // string is review-audit-worklist:ga-review-intent:depth1 now (the Governance Architect's Intent Skill).
 // DeepBench v7.0.821 | tests/regression/agt-133-run-tail-review.test.mjs | AGT-304 slice 12 -- route pin follows decision ccab94da
@@ -204,8 +207,8 @@ async function run() {
     }
     assert.ok(!filing.includes("step 4b's invention card"),
       "and step 4b is no longer named a filing site -- the Researcher left the cycle at AGT-138");
-    assert.ok(/only The Development Manager files tickets|only \*\*The Development Manager files tickets\*\*/.test(md),
-      "the runbook states the boundary: anyone reports, only the manager files");
+    assert.ok(/only the Governance Architect files tickets/.test(md),
+      "anyone reports, only the Governance Architect files (JOHN-1013-TESTED-TICKETS)");
     assert.ok(/ingestFindings/.test(md), "and names the finding path that replaced the cycle's own filing");
 
     // The card is a VIEW: its generated header pins the runbook it was rendered from.

@@ -1280,8 +1280,8 @@ Four boundaries, each of which is how this gets built wrong:
   to every filing site that REMAINS in this runbook, and there are exactly four: step 2b's routed
   tickets, step 6's removal-proposal successors, `heal-engine.js`'s `LOO-` rows at step 8b, and
   `tripwire-to-backlog`'s rows at step 8b-bis.
-- **THE CYCLE NO LONGER FILES WHAT IT JUDGED (`AGT-133`; `JOHN-0925-FINDINGS-STANDARD`).** Anyone
-  reports findings; **only The Development Manager files tickets**, for every source. Measured at
+- **THE CYCLE NO LONGER FILES WHAT IT JUDGED (`AGT-133`; `JOHN-1013-TESTED-TICKETS`).** Anyone
+  reports findings; **only the Governance Architect files tickets**, for every source. Measured at
   this ship: `source_file='runner-cycle'` stood at **84 `backlog_items` rows over 45 days** — a cycle
   judging that something needed doing and filing its own ticket for it. That path is closed. Residue
   a cycle judges — a defect it noticed, a gap it hit, a proposal it formed — becomes a **finding**:
@@ -2969,15 +2969,15 @@ The detail names no ticket on purpose: `--backlog=` carries that, or the finding
 way every cycle and never reaches the 3-cycle promotion bar.
 
 **A `deviations` ENTRY NAMING A DEFECT THE KICKOFF DID NOT OWN IS DECIDED BY A RULE, NOT BY A MODEL
-(`AGT-133`; `JOHN-0925-FINDINGS-STANDARD`).** The Builder reports such a defect and never silently
+(`AGT-133`; `JOHN-1013-TESTED-TICKETS`).** The Builder reports such a defect and never silently
 fixes or silently drops it. Apply the test in this order and record the answer:
 
 1. **Fix it now only if BOTH hold** — it fits inside the **remaining** `files` and `tasks` caps for
    this kickoff, **and** it lives in a file the kickoff **already names**. Either one failing means
    capture. A new file or a cap breach is never a fix-now, however small the diff looks: that is the
    caps breach arriving through the door nothing watches.
-2. **Otherwise capture it as a finding** — never a ticket you file, because only The Development
-   Manager files (`(7f)`):
+2. **Otherwise capture it as a finding** — never a ticket you file, because only the Governance
+   Architect files (`(7f)`):
 
 ```
 ingestFindings({ findings:[…], foundBy:'runner:cycle:<your cycle id>',
@@ -4423,11 +4423,10 @@ review. Keep `--apply`'s `Decision <id> — reversible until …` line and its t
 
 **THIS STEP NEVER GATES THE CHAIN.** A refusal, an exit 3, a missing credential or an unmapped
 source is a line in `notes` — **never `gate_failed`**, never a `did_not_run`, never a reason `(8)`
-does not run. A cycle that let an
-unread finding stop its own drain would have inverted both.
+does not run.
 
-**AND THIS STEP FILES THE TICKETS — the cycle does not (`JOHN-0925-FINDINGS-STANDARD`).** Only The
-Development Manager files, for every source.
+**AND THIS STEP FILES THE TICKETS — the cycle does not (`JOHN-1013-TESTED-TICKETS`).** Only the
+Governance Architect files, for every source, after a reproduced cause and a tested fix.
 
 
 **(7g) THE DESIGNER RULES (`AGT-136`; `JOHN-0925-DESIGNER-DECIDES`).** `node scripts/design-ruling.js
