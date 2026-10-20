@@ -1,3 +1,4 @@
+// DeepBench v7.0.872 | tests/regression/agt-159-backlog-review.test.mjs | AGT-304 slice 15 -- arm C reads its one home
 // DeepBench v7.0.869 | tests/regression/agt-159-backlog-review.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
 // a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
 // FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
@@ -32,8 +33,8 @@
 //      row whose check_slug is NOT `backlog-review` draw NOTHING, and the correct forms (reuse+project,
 //      reuse of another id) draw nothing either -- so the block is keyed on the check_slug and not on
 //      the kind. Pre-change: neither refusal existed at any spelling.
-//   C  LIVE, READ-ONLY (service key) -- ten routing rows including `backlog-review` at precedence 30
-//      with project_slug NULL and still no catch-all; the migration in the ledger with its down
+//   C  LIVE, READ-ONLY (service key) -- the rows of _lib/finding-routes.js including `backlog-review` at precedence 30
+//      on the manager's capture project and still no catch-all; the migration in the ledger with its down
 //      captured BEFORE the up (its prior_ddl holds a definition WITHOUT the limb); the Intent row
 //      carrying the harvest's paragraph byte-for-byte under one unreversed design-ruling decision with
 //      one full-row image; `--raise --dry-run --limit=15` exits 0 and selects AGT-158 first; and the
@@ -49,6 +50,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { LIVE_ROUTES, MANAGER_PROJECT } from "./_lib/finding-routes.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RAISE = path.join(ROOT, "scripts", "backlog-review.js");
@@ -64,24 +66,7 @@ const INTENT_SLUG = "dm-audit-review-intent";
 // compares the live row against it, rather than carrying a second copy that can drift (pattern:93).
 const PARA_LINE = 53;
 
-// Every row public.finding_routes holds after this ship, in the order --prepare reads them
-// (precedence, source). Nine before; `backlog-review` is the tenth, precedence 30 / project_slug NULL
-// -- the Development Manager picks the project, as for staff-watch, ticket-owner, runner and session.
-// This constant has TWO other homes (agt-132's LIVE_ROUTES, agt-134's ROUTES) and all three moved in
-// this one ship: a route row the platform holds and a test still pins at nine is a false red that
-// costs the next cycle a diagnosis (pattern:163).
-const LIVE_ROUTES = [
-  { precedence: 10, source: "*", finding_type: "security", project_slug: "security" },
-  { precedence: 20, source: "auditor", finding_type: "*", project_slug: "auditor-enhancements" },
-  { precedence: 30, source: "agent", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "backlog-review", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "researcher", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "runner", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "session", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "staff-watch", finding_type: "*", project_slug: null },
-  { precedence: 30, source: "ticket-owner", finding_type: "*", project_slug: null },
-];
+// The route rows' ONE home is _lib/finding-routes.js (AGT-304 slice 11).
 
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 
@@ -271,11 +256,11 @@ async function run() {
     await arm("C live routes, migration, Intent and raise", async () => {
       const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
       assert.equal(r.status, 200, `finding_routes read -> HTTP ${r.status}`);
-      assert.deepEqual(r.json, LIVE_ROUTES, "the ten routing rows, exactly");
+      assert.deepEqual(r.json, LIVE_ROUTES, "the routing rows of _lib/finding-routes.js, exactly");
       const mine = r.json.filter(x => x.source === "backlog-review");
       assert.equal(mine.length, 1, `exactly one backlog-review route; got ${JSON.stringify(mine)}`);
-      assert.equal(mine[0].project_slug, null,
-        "project_slug NULL: the Development Manager picks the project, as for staff-watch and ticket-owner");
+      assert.equal(mine[0].project_slug, MANAGER_PROJECT,
+        "project_slug is the manager's capture project (decision ccab94da), as for staff-watch and ticket-owner");
       assert.ok(!r.json.some(x => x.source === "*" && x.finding_type === "*"),
         "there is STILL deliberately no catch-all row: an unmapped source must stop a review");
 
