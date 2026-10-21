@@ -1,4 +1,4 @@
--- DeepBench v7.0.749 | docs/design/agt-291-finish-sensor.sql | AGT-291 -- THE FINISH LINE GETS ITS
+-- DeepBench v7.0.879 | docs/design/agt-291-finish-sensor.sql | AGT-304 slice 19 -- the AGT-291 migration lands: captured 2026-10-03, never applied; parts 2-3 byte-unchanged, part 4 fixture-free.
 -- SENSOR.
 --
 -- AGT-240 gave projects a finish line and `project_batch_state().proposal_due` measures it. Nothing
@@ -30,12 +30,9 @@
 --   3. `runner_should_boot()` CREATE OR REPLACE from its LIVE `pg_get_functiondef` with the kickoff
 --      §4 edits only -- the identity argument list is UNCHANGED (still zero arguments) and so are the
 --      RETURNS TABLE columns, so no overload is created and no DROP is owed there.
---   4. The trailing probe: a due batch built as a fixture, the four arms A-D of the kickoff §6.1, the
---      `pg_proc` overload counts, and every fixture rolled back inside a subtransaction that ends in
---      the sentinel P0291 -- so the probe proves both directions without leaving a row behind and the
---      migration still commits. A mismatch raises for real and aborts the whole migration.
+--   4. The trailing block (AGT-304 slice 19): overloads, LEFT/DUE/FRESH per row, the finish_due key and number, the ACL -- fixture-free; raises on the pre-migration bodies.
 --
--- Down: public.capture_migration_down('ba7c3c09-97f2-4f03-9bee-d92523901897', 'agt291_finish_sensor',
+-- Down: public.capture_migration_down('0d32431b-2f4e-4f37-836b-a89e750e19b8', 'agt291_finish_sensor',
 --   '[{"kind":"function","identity":"public.project_batch_state()"},
 --     {"kind":"function","identity":"public.runner_should_boot()"}]'::jsonb)
 -- plus `alter table public.epics drop column if exists proposal_attempted_at;` -- a column the capture
@@ -50,7 +47,7 @@
 -- restore; the migration stops here rather than changing a function it cannot put back.
 
 SELECT public.capture_migration_down(
-  'ba7c3c09-97f2-4f03-9bee-d92523901897',
+  '0d32431b-2f4e-4f37-836b-a89e750e19b8',
   'agt291_finish_sensor',
   '[{"kind":"function","identity":"public.project_batch_state()"},
     {"kind":"function","identity":"public.runner_should_boot()"}]'::jsonb) AS captured;
@@ -392,198 +389,27 @@ FROM verdict v;
 $function$;
 
 -- ============================================================================================
--- 4. THE TRAILING PROBE -- the four arms, every fixture rolled back (sentinel P0291)
+-- 4. THE TRAILING BLOCK -- fixture-free; raises on the pre-migration bodies (AGT-304 slice 19)
 -- ============================================================================================
--- WHY A PROBE AND NOT A PERMANENT TEST: the arms below move runner_settings, runner_items,
--- backlog_items, audit_findings and epics on the LIVE board. A regression test must never do that
--- (the SES-196 / SES-218 / SES-275 refusal) and PostgREST can neither read pg_proc nor open a
--- transaction to roll a fixture back. So the proof is taken HERE, inside one subtransaction that
--- ends in the sentinel P0291, which the handler swallows -- every fixture write is undone and the
--- migration above still commits. plpgsql variables survive the rollback, so the facts are reported
--- after it.
---
--- WHY IT DISCRIMINATES: on origin/dev's bodies the fixture reads `left` = 1 and BOTH flags false
--- (its one member is `delivered`, which the old LEFT counted), arm B's `paused` project is not due
--- at all, and arm C's board answers `nothing_pickable` with no `finish_due` key in the payload. A
--- pass therefore proves THIS change did something rather than proving the board happens to sit in a
--- convenient state.
 
 do $agt291$
-declare
-  v_proj   uuid := gen_random_uuid();
-  v_epic   uuid := gen_random_uuid();
-  v_item   uuid := gen_random_uuid();
-  v        record;
-  n_pbs    int;
-  n_rsb    int;
-  v_left   int;
-  v_mem    int;
-  v_due    boolean;
-  v_review boolean;
-  v_other  int;
+declare v record; n_pbs int; n_rsb int; n_bad int; n_due int;
 begin
-  -- .claude/rules/supabase-function-signature.md, ASSERTED and never taken on the migration's
-  -- success flag: project_batch_state() was DROPPED before it was created (its RETURNS TABLE
-  -- changed, which CREATE OR REPLACE cannot do), and runner_should_boot() kept its identity
-  -- argument list. Either leaving a second overload behind would make every omitted-parameter call
-  -- ambiguous, which PostgREST surfaces to its callers as an EMPTY RESULT rather than a crash.
-  select count(*)::int into n_pbs from pg_proc p
-    join pg_namespace ns on ns.oid = p.pronamespace
-   where p.proname = 'project_batch_state' and ns.nspname = 'public';
-  select count(*)::int into n_rsb from pg_proc p
-    join pg_namespace ns on ns.oid = p.pronamespace
-   where p.proname = 'runner_should_boot' and ns.nspname = 'public';
-  if n_pbs <> 1 or n_rsb <> 1 then
-    raise exception 'AGT-291: % overload(s) of public.project_batch_state and % of '
-                    'public.runner_should_boot (want exactly 1 each) -- a stale overload reads as '
-                    'an empty result to every caller', n_pbs, n_rsb;
-  end if;
-
-  -- THE OMITTED-PARAMETER PATH, which here is the only path: both must answer a real caller.
+  select count(*)::int into n_pbs from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace where ns.nspname = 'public' and p.proname = 'project_batch_state';
+  select count(*)::int into n_rsb from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace where ns.nspname = 'public' and p.proname = 'runner_should_boot';
+  if n_pbs <> 1 or n_rsb <> 1 then raise exception 'AGT-291: overloads pbs=% rsb=% (want 1 each)', n_pbs, n_rsb; end if;
+  select count(*)::int into n_bad from public.project_batch_state() s
+   where s."left" <> (select count(*) from public.backlog_items b where b.epic_id = s.epic_id and b.status in ('open', 'partial'))
+      or s.proposal_due is distinct from (s.status in ('executing', 'paused') and s.locked_at is not null and s.finished_at is null and s.members > 0 and s."left" = 0)
+      or s.review_due is distinct from (s.proposal_due and (s.proposal_attempted_at is null or s.proposal_attempted_at < now() - interval '24 hours'));
+  if n_bad <> 0 then raise exception 'AGT-291: % batch row(s) disagree with LEFT/DUE/FRESH re-derived from backlog_items', n_bad; end if;
+  select count(*)::int into n_due from public.project_batch_state() s where s.review_due;
   select * into v from public.runner_should_boot();
-  if v.reason is null then
-    raise exception 'AGT-291: runner_should_boot() returned no row on the no-argument call';
-  end if;
-  raise notice 'AGT-291 live gate answers: reason=% should_boot=% finish_due=% list_tickets=% open_findings=%',
-    v.reason, v.should_boot, v.detail->>'finish_due', v.detail->>'list_tickets', v.detail->>'open_findings';
-
-  begin
-    -- ---- THE FIXTURE (AGT-312's shape, the member `delivered`): inserted while the project is
-    -- ---- `planned` and the list unlocked, so neither epic_lock_guard nor requirement_gate has
-    -- ---- anything to refuse; then the project executes and the list locks.
-    insert into public.projects (id, slug, name, status, charter)
-    values (v_proj, 'zprobe-0291-source', 'AGT-291 probe source', 'planned', 'probe');
-    insert into public.epics (id, name, description, project_id)
-    values (v_epic, 'AGT-291 probe batch', 'probe', v_proj);
-    insert into public.backlog_items
-      (id, backlog_id, tier, type, priority_class, title, description, status, epic_id, source_file,
-       session_ref, row_ordinal, filed_at, scope_origin, size_stamp, predicted_cycles, defer_status,
-       scope_rationale, milestone, enhancement_claim, gate_count, design_status)
-    values (v_item, 'ZPROBE-0291', 'next', 'Tooling', 'P10 - Tooling', 'AGT-291 probe member', 'probe',
-            'delivered', v_epic, 'agt-291-probe', 'agt291-probe', 999999291, now(), 'john-named', 'S', 1,
-            'no', 'probe', null, 'none: probe', 0, null);
-    update public.projects set status = 'executing' where id = v_proj;
-    update public.epics set locked_at = now() where id = v_epic;
-
-    -- ---- ARM A (D1): one member, `delivered`, and the batch is FINISHED --------------------------
-    select s.members, s."left", s.proposal_due, s.review_due
-      into v_mem, v_left, v_due, v_review
-      from public.project_batch_state() s where s.epic_id = v_epic;
-    if v_mem <> 1 or v_left <> 0 or v_due is not true or v_review is not true then
-      raise exception 'AGT-291 QA A: members=% left=% proposal_due=% review_due=% (want 1/0/true/true) '
-                      '-- on origin/dev this reads left=1 and both flags false, because `delivered` '
-                      'counted as left (AGT-240 D2)', v_mem, v_left, v_due, v_review;
-    end if;
-    raise notice 'AGT-291 QA A PASS: members=% left=% proposal_due=% review_due=%',
-      v_mem, v_left, v_due, v_review;
-
-    -- ---- ARM B (D2): the same batch under a `paused` project is STILL due ------------------------
-    update public.projects set status = 'paused' where id = v_proj;
-    select s."left", s.proposal_due, s.review_due into v_left, v_due, v_review
-      from public.project_batch_state() s where s.epic_id = v_epic;
-    if v_left <> 0 or v_due is not true or v_review is not true then
-      raise exception 'AGT-291 QA B: a paused project''s finished batch reads left=% proposal_due=% '
-                      'review_due=% (want 0/true/true) -- D2; origin/dev graded `executing` alone, '
-                      'which is why Auditor Enhancements (paused, 16 members, all delivered) could '
-                      'never finish', v_left, v_due, v_review;
-    end if;
-    raise notice 'AGT-291 QA B PASS (paused still finishes): left=% proposal_due=% review_due=%',
-      v_left, v_due, v_review;
-
-    -- ---- ARM C (D3): the GATE reads it, and finish_due ALONE carries the verdict -----------------
-    -- Every wall above the split is cleared so the ladder can REACH it (AGT-314's fixture A), AND
-    -- BOTH of AGT-314's own halves are emptied (its fixture B) -- so the only thing left that can
-    -- answer work_to_find is the finish line. Every OTHER review_due batch is claimed, so
-    -- finish_due is exactly this fixture and the number is checkable.
-    update public.runner_settings
-       set scheduler_on = true, meter_limiter_off = true, hard_stop_pct = null, max_lanes = 99
-     where id = 1;
-    update public.runner_items
-       set decision = 'accept', decided_at = now()
-     where kind = 'gated_before_build' and decision is null;
-    update public.backlog_items
-       set claimed_by = 'agt291', claimed_at = now()
-     where backlog_id in (select q.ref from public.prime_directive_queue() q
-                           where q.lane in ('drain', 'selfbuild'));
-    update public.audit_findings set status = 'listed' where status in ('open', 'carried');
-    update public.runner_settings set find_work_lists = '{}' where id = 1;
-    update public.epics e set proposal_attempted_at = now()
-     where e.id <> v_epic
-       and e.id in (select s.epic_id from public.project_batch_state() s where s.review_due);
-    select count(*)::int into v_other from public.project_batch_state() s
-     where s.review_due and s.epic_id <> v_epic;
-    if v_other <> 0 then
-      raise exception 'AGT-291 QA C: % other review_due batch(es) survived the claim, so finish_due '
-                      'would not be checkable', v_other;
-    end if;
-
-    select * into v from public.runner_should_boot();
-    if v.reason is distinct from 'work_to_find' then
-      raise exception 'AGT-291 QA C: reason=% (want work_to_find); detail=%', v.reason, v.detail;
-    end if;
-    if v.should_boot is not true then
-      raise exception 'AGT-291 QA C: should_boot=% (want true) on reason %', v.should_boot, v.reason;
-    end if;
-    if v.detail->>'mode' is distinct from 'find-work-only' then
-      raise exception 'AGT-291 QA C: detail.mode=% (want find-work-only)', v.detail->>'mode';
-    end if;
-    if v.detail->>'finish_due' is distinct from '1' then
-      raise exception 'AGT-291 QA C: detail.finish_due=% (want 1) -- origin/dev carries no such key '
-                      'at all and answers nothing_pickable here', coalesce(v.detail->>'finish_due', 'ABSENT');
-    end if;
-    if v.detail->>'open_findings' is distinct from '0' or v.detail->>'list_tickets' is distinct from '0' then
-      raise exception 'AGT-291 QA C: open_findings=% list_tickets=% (want 0 and 0) -- with either '
-                      'non-zero, AGT-314''s own halves could have answered work_to_find and this arm '
-                      'would prove nothing about the finish line',
-        v.detail->>'open_findings', v.detail->>'list_tickets';
-    end if;
-    raise notice 'AGT-291 QA C PASS: reason=% should_boot=% mode=% finish_due=% (open_findings=% list_tickets=% pickable_count=% gate_cards_to_rule=%)',
-      v.reason, v.should_boot, v.detail->>'mode', v.detail->>'finish_due',
-      v.detail->>'open_findings', v.detail->>'list_tickets', v.detail->>'pickable_count',
-      v.detail->>'gate_cards_to_rule';
-
-    -- ---- ARM D (D4): the CLAIM mutes the sensor without un-finishing the batch -------------------
-    -- This is the control for the whole change: the same board, one timestamp different.
-    update public.epics set proposal_attempted_at = now() where id = v_epic;
-    select s.proposal_due, s.review_due into v_due, v_review
-      from public.project_batch_state() s where s.epic_id = v_epic;
-    if v_due is not true or v_review is not false then
-      raise exception 'AGT-291 QA D: proposal_due=% review_due=% (want true/false) -- a claimed batch '
-                      'is still finished and must stay visibly so; only the SENSOR goes quiet',
-        v_due, v_review;
-    end if;
-    select * into v from public.runner_should_boot();
-    if v.reason is distinct from 'nothing_pickable' then
-      raise exception 'AGT-291 QA D: reason=% (want nothing_pickable); detail=%', v.reason, v.detail;
-    end if;
-    if v.should_boot is not false then
-      raise exception 'AGT-291 QA D: should_boot=% (want false) on reason %', v.should_boot, v.reason;
-    end if;
-    if v.detail->>'finish_due' is distinct from '0' then
-      raise exception 'AGT-291 QA D: detail.finish_due=% (want 0)', v.detail->>'finish_due';
-    end if;
-    if v.detail->>'mode' is not null then
-      raise exception 'AGT-291 QA D: detail.mode=% (want NULL)', v.detail->>'mode';
-    end if;
-    raise notice 'AGT-291 QA D PASS: reason=% should_boot=% finish_due=% proposal_due=% review_due=%',
-      v.reason, v.should_boot, v.detail->>'finish_due', v_due, v_review;
-
-    raise exception using errcode = 'P0291',
-      message = 'AGT-291 discriminator complete -- rolling every fixture back';
-  exception when sqlstate 'P0291' then
-    null;
-  end;
-
-  -- After the rollback: the live board answers for a real caller again, from its own real rows, and
-  -- the fixture is gone.
-  select * into v from public.runner_should_boot();
-  raise notice 'AGT-291 after rollback, live board: reason=% should_boot=% finish_due=% open_findings=% list_tickets=% find_work_lists=%',
-    v.reason, v.should_boot, v.detail->>'finish_due', v.detail->>'open_findings',
-    v.detail->>'list_tickets',
-    (select s.find_work_lists::text from public.runner_settings s where s.id = 1);
-  raise notice 'AGT-291 after rollback, probe residue: % project(s), % epic(s), % member(s)',
-    (select count(*) from public.projects where slug = 'zprobe-0291-source'),
-    (select count(*) from public.epics where id = v_epic),
-    (select count(*) from public.backlog_items where backlog_id = 'ZPROBE-0291');
+  if v.reason is null then raise exception 'AGT-291: runner_should_boot() returned no row'; end if;
+  if not (v.detail ? 'finish_due') then raise exception 'AGT-291: detail has no finish_due key (the pre-migration body)'; end if;
+  if (v.detail->>'finish_due')::int <> n_due then raise exception 'AGT-291: finish_due=% but % review_due', v.detail->>'finish_due', n_due; end if;
+  if has_function_privilege('anon', 'public.project_batch_state()', 'EXECUTE') or has_function_privilege('authenticated', 'public.project_batch_state()', 'EXECUTE')
+     or not has_function_privilege('service_role', 'public.project_batch_state()', 'EXECUTE') then raise exception 'AGT-291: project_batch_state() not service_role-only'; end if;
+  raise notice 'AGT-291 landed: reason=% finish_due=% review_due=% pbs=% rsb=%', v.reason, v.detail->>'finish_due', n_due, n_pbs, n_rsb;
 end
 $agt291$;
