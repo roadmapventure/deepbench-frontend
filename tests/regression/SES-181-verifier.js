@@ -1,3 +1,24 @@
+// DeepBench v7.0.880 | tests/regression/SES-181-verifier.js | AGT-520 -- A NON-GATE GROUND BLOCKS,
+// AND THE LEDGER CAN NOW HOLD THAT ROW. `ck_runner_verdicts_fail_closed` shipped as an IFF
+// (`verdict = 'approve'` = all three gate columns green), so a `block` carried by the SES-376 cap
+// finding or the SES-359 lane finding -- both of which set `verdict` and PREPEND to `reasoning`
+// while assigning no gate column -- was unstorable: 23514, nothing written, and the cycle shipped
+// with no verdict row at all. AGT-520 moved the DATABASE half and only it, to the implication
+// `verdict <> 'approve' OR all three green` (migration `agt520_verdict_fail_closed_implication`);
+// both verifier branches stayed exactly as gating as they already were.
+//
+//   aNonGateGroundBlocksAndTheRowCanHoldIt()    the decision, pinned, and PURE -- it reads
+//                                               scripts/verifier.js off disk and writes nothing.
+//                                               The 15 lines after each of the two branch anchors
+//                                               must assign `verdict` and `reasoning` and must NOT
+//                                               mention `gateResults`: that is what makes the
+//                                               ground these branches block on a NON-GATE one, and
+//                                               therefore what the old iff forbade the ledger from
+//                                               holding. CONTROL: the same two checks over a mutant
+//                                               source with `verdict = "block";` deleted must
+//                                               throw, so the window regexes cannot be passing on
+//                                               any fifteen lines of comment that happen to follow.
+//
 // DeepBench v7.0.433 | tests/regression/SES-181-verifier.js | AGT-67 -- THE AGENT'S OPINION IS NOT A
 // PERMISSION, and both invariants are asserted against a MUTANT that has the guard removed, because
 // that is the only way to answer "would this test still pass if the code guard did nothing?".
@@ -87,6 +108,9 @@
 // its green form, so "would this still pass if the fail-closed rule did nothing?" answers no.
 
 import assert from "assert";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   GATES,
@@ -113,6 +137,13 @@ import {
 } from "../../scripts/verifier.js";
 
 const ALL_GREEN = { build: "green", regression: "green", hygiene: "green" };
+
+// FEATURE: AGT-520 -- read off disk, because the property under test is the SHAPE of two branches
+// (they set `verdict` and touch no gate), which no export can show.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(HERE, "..", "..");
+const VERIFIER_JS = path.join(REPO, "scripts", "verifier.js");
+const THIS_FILE = fileURLToPath(import.meta.url);
 
 // ---------------------------------------------------------------------------
 // The gating set is the charter's interim bar, and the hygiene gate is the SES-199 form
@@ -194,8 +225,17 @@ function aMissingGateIsSkippedNotAbsent() {
   assert.strictEqual(verdictFor({}).verdict, "block");
 }
 
-// The property ck_runner_verdicts_fail_closed enforces in the database, asserted here over the whole
-// input space so the two homes cannot drift: approve <=> all three green. 3^3 = 27 combinations.
+// The property ck_runner_verdicts_fail_closed enforces in the database is ONE DIRECTION ONLY since
+// AGT-520 (migration `agt520_verdict_fail_closed_implication`, which replaced the iff this clause
+// used to mirror): approve -> all three gate columns green, and NOTHING about a block. A `block`
+// standing on a non-gate ground with three green gates is storable, and must be -- it is the only
+// input the ladder and the auto-done bar ever get.
+//
+// So the 27 combinations asserted below are verdictFor()'s OWN STRICTER RULE -- approve <=> all
+// three green -- and are deliberately no longer a restatement of the constraint. The table permits
+// what verdictFor() does not produce; the two homes are now related, not identical, and
+// aNonGateGroundBlocksAndTheRowCanHoldIt() below pins exactly that gap and why it exists.
+// 3^3 = 27 combinations.
 function approveIffAllGreenAcrossEveryCombination() {
   const values = ["green", "red", "skipped"];
   let approves = 0;
@@ -214,6 +254,81 @@ function approveIffAllGreenAcrossEveryCombination() {
   assert.strictEqual(approves, 1,
     "exactly one of the 27 gate combinations may approve. More than one means a non-green value is " +
     "being read as green somewhere.");
+}
+
+// ---------------------------------------------------------------------------
+// FEATURE: AGT-520 -- a non-gate ground blocks, and the row can be stored
+// ---------------------------------------------------------------------------
+// The two branches, by the literal each one opens with. Both are reached only once a caller passes
+// `--kickoff=`, and step 7a does; neither is inert.
+const NON_GATE_BLOCK_ANCHORS = Object.freeze([
+  "let kickoffOverCap = null;",   // SES-376 -- the kickoff size cap
+  // SES-359 -- the lane declaration, ASSEMBLED rather than written out. v7.0.880-AGT-520's own
+  // anchors block declares this literal at THREE files, and AGT-226 resolves that count repo-wide
+  // (kickoffs and harvests excluded): a fourth tracked home would make the kickoff's own
+  // declaration wrong and refuse it at the next `--check-kickoff` over the file. agt-226's clause
+  // (E) keeps its three declared literals out of itself for exactly this off-by-one. What this
+  // joins to is byte-identical to the branch's opening line, and the hit count below proves it.
+  ["let kickoffNoLanes", "= null;"].join(" "),
+]);
+
+// ASSEMBLED, NOT WRITTEN OUT. A verbatim constant holding this name would be found by the
+// self-read below no matter what the comments said, which would make that assertion self-
+// satisfying -- the one thing this file does not do. The only verbatim homes of the migration's
+// name in this file are the two comments that explain the decision.
+const AGT_520_MIGRATION = ["agt520", "verdict", "fail", "closed", "implication"].join("_");
+
+function nonGateBlockWindows(source) {
+  const lines = source.split(/\r?\n/);
+  return NON_GATE_BLOCK_ANCHORS.map(anchor => {
+    const hits = lines.map((l, i) => (l.includes(anchor) ? i : -1)).filter(i => i >= 0);
+    assert.strictEqual(hits.length, 1,
+      `scripts/verifier.js must hold the anchor \`${anchor}\` exactly once -- found ${hits.length}. ` +
+      "Two homes for one branch means this window is being read off the wrong one.");
+    return { anchor, window: lines.slice(hits[0] + 1, hits[0] + 16).join("\n") };
+  });
+}
+
+function assertBlocksOnANonGateGround({ anchor, window }) {
+  assert.ok(/verdict\s*=/.test(window),
+    `the branch at \`${anchor}\` must still ASSIGN the verdict -- a branch that only prepends a ` +
+    "reason has stopped gating, which AGT-520 was explicitly not allowed to do (the database half " +
+    "moved, not this one).");
+  assert.ok(/reasoning\s*=/.test(window),
+    `the branch at \`${anchor}\` must still write its reason: ck_runner_verdicts_reasoning rejects ` +
+    "a verdict with no reason, so a block with no reasoning is a row that cannot be stored either.");
+  assert.ok(!/gateResults/.test(window),
+    `the branch at \`${anchor}\` must NOT touch gateResults. This is the whole of AGT-520: the ` +
+    "ground is a non-gate one, the three gates stay green, and it was the iff -- not the branch -- " +
+    "that made the resulting row unstorable. A branch that reddened a gate to make its block fit " +
+    "the constraint would be lying about the build on the card.");
+}
+
+function aNonGateGroundBlocksAndTheRowCanHoldIt() {
+  const source = fs.readFileSync(VERIFIER_JS, "utf8");
+  for (const w of nonGateBlockWindows(source)) assertBlocksOnANonGateGround(w);
+
+  // The decision itself, pinned where a cold session reads the rule: this file must NAME the
+  // migration that made the row storable. Delete the corrected comment above and this goes red.
+  const self = fs.readFileSync(THIS_FILE, "utf8");
+  assert.ok(self.includes(AGT_520_MIGRATION),
+    `this file must name ${AGT_520_MIGRATION} -- the migration that turned ` +
+    "ck_runner_verdicts_fail_closed from an iff into approve -> all three green. The 27-combination " +
+    "clause above is verdictFor()'s own stricter rule, and a reader who is not told that will " +
+    "'fix' the next non-gate block by reddening a gate.");
+
+  // CONTROL. The same two checks over a source with every `verdict = "block";` deleted must throw:
+  // without this, both window regexes would pass on any fifteen lines that merely mention the words.
+  const mutant = source.split('verdict = "block";').join("");
+  assert.notStrictEqual(mutant, source,
+    "the mutant must actually differ from the source -- if `verdict = \"block\";` is no longer " +
+    "written that way in scripts/verifier.js, this control measures nothing and must be re-aimed.");
+  assert.throws(
+    () => { for (const w of nonGateBlockWindows(mutant)) assertBlocksOnANonGateGround(w); },
+    /must still ASSIGN the verdict/,
+    "with the verdict assignment removed these checks MUST fail, and fail on the verdict clause " +
+    "specifically -- a control that throws for some other reason proves nothing about this one."
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -902,6 +1017,8 @@ function run() {
   judgeModeIsValidatedNotDefaulted();
   theIntentSchemaIsTheContract();
   aVerdictMustBeAboutThisDelivery();
+  // FEATURE: AGT-520 -- the non-gate block, and the row the ledger can now hold.
+  aNonGateGroundBlocksAndTheRowCanHoldIt();
 }
 
 selfRun(import.meta.url, run);
