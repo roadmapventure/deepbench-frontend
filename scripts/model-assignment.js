@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.881 | scripts/model-assignment.js | AGT-502 -- the reported trial count is the LOG's (reportedTrialCount over trialLogQuery), never `kept`: a trial logs its row before its answer is scored, so a pair whose child exited 1 spent its tokens and still read as 0 trials. `kept` stays for the evidence map and the dedupe.
 // DeepBench v7.0.671 | scripts/model-assignment.js | AGT-150 -- the model assignment driver: one
 // command that reviews the watch window, runs the trials the answer will have to cite, assembles the
 // Development Manager's turn, and applies his answer as a client of public.apply_model_assignment().
@@ -88,6 +89,37 @@ export function parsePairs(s) {
 }
 
 export const pairLabel = p => `${p.jobKind}/${p.jobKey}:${p.candidate}`;
+
+// FEATURE: AGT-502 -- THE REPORTED TRIAL COUNT IS THE LOG'S, NOT THIS LOOP'S TALLY.
+//
+// `kept` holds the pairs whose child EXITED 0, and the count was read off it. Those are two
+// different facts: a trial logs its ai_activity_log row inside runCandidate(), BEFORE the answer is
+// scored and before model-trial.js decides its own exit code, so a pair whose child exited 1 spent
+// its tokens, wrote its row, and still reported as a trial that never happened. Measured live: the
+// model-watch-2026-10-16 report row reads `trials 0` while the log holds a 6,885,415-token
+// model-assignment:trial:depth0 call in that same window (AGT-502's own finding). The number the
+// report prints must come from the table the trial wrote, which is the only record that cannot
+// disagree with what was spent.
+//
+// `kept` is NOT removed and must not be: the evidence map the manager reads and step 3's 28-day
+// dedupe are both about trials that PASSED, which is what `kept` correctly means.
+export const TRIAL_LOG_FEATURE = "model-assignment:trial:depth0";
+
+// The window's trial rows, by the feature the trial logs under. `id` only -- the count is the
+// question, and a trial row carries 6.9M-token figures that have no business in this reading.
+export function trialLogQuery(windowStart, windowEnd) {
+  return `ai_activity_log?select=id&feature=eq.${encodeURIComponent(TRIAL_LOG_FEATURE)}`
+    + `&created_at=gte.${encodeURIComponent(windowStart)}&created_at=lte.${encodeURIComponent(windowEnd)}`
+    + `&order=id`;
+}
+
+// Pure and exported so tests/regression/agt-502-trial-token-split.test.mjs grades the real rule
+// (docs/STANDARDS.md Section 4). `kept` is accepted and deliberately unused: the signature is the
+// assertion -- a reading that fell back to the tally for ANY input would fail the arm that passes a
+// logged row with nothing kept.
+export function reportedTrialCount({ logged, kept } = {}) {
+  return Array.isArray(logged) ? logged.length : 0;
+}
 export const trialFileName = p => `trial-${p.jobKind}-${p.jobKey}-${p.candidate}.json`;
 
 // THE TWENTY REFUSALS of public.apply_model_assignment(), read live from
@@ -351,6 +383,9 @@ async function prepare(args) {
   const outDir = typeof args.out === "string" && args.out ? path.dirname(path.resolve(args.out)) : os.tmpdir();
   const kept = [];
   let noRoom = null;
+  // AGT-502: the run's window opens before the first child and closes after the last, so the count
+  // below reads exactly the rows THIS run's trials wrote.
+  const trialWindowStart = new Date().toISOString();
   for (const p of pairs) {
     const file = path.join(outDir, trialFileName(p));
     const child = spawnSync(process.execPath, [
@@ -369,6 +404,14 @@ async function prepare(args) {
     if (child.status === 4) { console.log(`skipped: ${pairLabel(p)}`); continue; }
     die(1, `model-assignment: trial-failed: ${pairLabel(p)} exit ${child.status}`);
   }
+
+  // AGT-502: the reported count, read off the log the trials wrote rather than off `kept`. The read
+  // goes through the same get() every other row in this function uses, so a failed count fails
+  // loudly instead of printing a number nobody measured.
+  const loggedTrials = pairs.length
+    ? await get(trialLogQuery(trialWindowStart, new Date().toISOString()))
+    : [];
+  const trialsRan = reportedTrialCount({ logged: loggedTrials, kept });
 
   const trials = [];
   for (const k of kept) {
@@ -407,7 +450,8 @@ async function prepare(args) {
   if (typeof args.out === "string" && args.out) fs.writeFileSync(path.resolve(args.out), text, "utf8");
   if (args.json) {
     process.stdout.write(`${JSON.stringify({
-      assignments: assignments.length, trials: trials.length, model: assembly.llm?.model,
+      assignments: assignments.length, trials: trialsRan, evidence_files: trials.length,
+      model: assembly.llm?.model,
       prompt_bytes: Buffer.byteLength(text, "utf8"), context: task_context,
     }, null, 2)}\n`);
   } else if (!args.out) {
@@ -415,8 +459,8 @@ async function prepare(args) {
   }
   if (omitted.length) console.error(`model-assignment: sections omitted (no stored content): ${omitted.join(", ")}`);
   die(3, noRoom
-    ? `model-assignment --prepare: ${trials.length} trial(s) of ${pairs.length} pair(s) — the queue stopped at ${noRoom}; ${AWAITING_ANSWER}`
-    : `model-assignment --prepare: ${trials.length} trial(s), ${watched.length} watched — ${AWAITING_ANSWER}`);
+    ? `model-assignment --prepare: ${trialsRan} trial(s) of ${pairs.length} pair(s) — the queue stopped at ${noRoom}; ${AWAITING_ANSWER}`
+    : `model-assignment --prepare: ${trialsRan} trial(s), ${watched.length} watched — ${AWAITING_ANSWER}`);
 }
 
 function refuse(refusals) {

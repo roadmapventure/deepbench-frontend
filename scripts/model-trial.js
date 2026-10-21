@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.881 | scripts/model-trial.js | AGT-502 -- usageSplit(): the envelope's four token quantities reach their own four columns. --input-tokens is usage.input_tokens ALONE; the trial's `tokens:` keeps the total under its own name. One exported derivation, read by scripts/audit-cluster.js's second home of it.
 // DeepBench v7.0.677 | scripts/model-trial.js | AGT-151 -- the orchestrator lane's recorded job is a
 // BUILD, so a trial of it has to re-run the Builder turn, not a design turn wearing its name.
 // REPLAYABLE gains `build-ticket:bd-build-intent:depth0` and every entry now declares its `lane` and
@@ -210,6 +211,27 @@ const git = (args, opts = {}) => spawnSync("git", ["-C", ROOT, ...args], { encod
 const gitIn = (dir, args) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
 const lines = s => String(s ?? "").split("\n").map(l => l.trim()).filter(Boolean);
 
+/**
+ * FEATURE: AGT-502 -- the ONE place an envelope's `usage` becomes four counts and a total.
+ *
+ * Exported and pure so tests/regression/agt-502-trial-token-split.test.mjs drives the real derivation
+ * rather than a copy of it (docs/STANDARDS.md Section 4), and so the second home of this expression
+ * (scripts/audit-cluster.js) reads the same rule rather than a byte-identical twin of it (pattern:14).
+ * Absent keys read 0, as they did before: an envelope that reports no cache split spent no cache.
+ */
+export function usageSplit(usage) {
+  const n = v => Number(v ?? 0);
+  const inputTokens = n(usage?.input_tokens);
+  const cacheCreationTokens = n(usage?.cache_creation_input_tokens);
+  const cacheReadTokens = n(usage?.cache_read_input_tokens);
+  const outputTokens = n(usage?.output_tokens);
+  return {
+    inputTokens, cacheCreationTokens, cacheReadTokens, outputTokens,
+    // Every quantity the call spent, which is what a trial's `tokens:` has always meant.
+    totalTokens: inputTokens + cacheCreationTokens + cacheReadTokens + outputTokens,
+  };
+}
+
 // What the baseline turn cost, over whichever token columns its row actually carries.
 const baselineTokens = job => Number(job.input_tokens ?? 0) + Number(job.output_tokens ?? 0)
   + Number(job.cache_creation_input_tokens ?? 0) + Number(job.cache_read_input_tokens ?? 0);
@@ -270,8 +292,15 @@ function runCandidate({ prompt, scratch, candidate, cycleId, allowedTools, maxTu
   let envelope = null;
   try { envelope = JSON.parse(c.stdout); } catch { /* scored as is_error by the caller */ }
   const usage = envelope?.usage ?? {};
-  const inTok = Number(usage.input_tokens ?? 0) + Number(usage.cache_creation_input_tokens ?? 0) + Number(usage.cache_read_input_tokens ?? 0);
-  const outTok = Number(usage.output_tokens ?? 0);
+  // FEATURE: AGT-502 -- FOUR quantities, kept four. `inTok` used to be the sum of the three input
+  // kinds and was passed as --input-tokens, so the column held three different prices added together
+  // (a cache read bills about 0.1x an uncached input token) and both cache columns stored NULL --
+  // measured live on ai_activity_log row 72661, 6,885,415 / NULL / NULL. `totalTok` keeps the one
+  // figure that was always meant to be a total: the trial's own `tokens:`, which compares one run's
+  // whole usage against another's.
+  const split = usageSplit(usage);
+  const { inputTokens: inTok, cacheCreationTokens: cacheCreateTok, cacheReadTokens: cacheReadTok,
+          outputTokens: outTok, totalTokens: totalTok } = split;
   const durationMs = Number(envelope?.duration_ms ?? (Date.now() - t0));
 
   // §19k: log every call that reached the model, parsed or not.
@@ -279,12 +308,14 @@ function runCandidate({ prompt, scratch, candidate, cycleId, allowedTools, maxTu
     const log = spawnSync(process.execPath, [
       path.join(ROOT, "scripts", "agent-log.js"), "--agent=devmanager", "--capability=model-assignment",
       `--model=${candidate}`, "--ai-type=agent-turn", "--feature=model-assignment:trial:depth0",
-      `--input-tokens=${inTok}`, `--output-tokens=${outTok}`, `--latency-ms=${Math.round(durationMs)}`,
+      `--input-tokens=${inTok}`, `--output-tokens=${outTok}`,
+      `--cache-creation-tokens=${cacheCreateTok}`, `--cache-read-tokens=${cacheReadTok}`,
+      `--latency-ms=${Math.round(durationMs)}`,
       ...(cycleId ? [`--cycle=${cycleId}`] : []),
     ], { cwd: ROOT, encoding: "utf8" });
     if (log.status !== 0) throw new Error(`agent-log.js refused the trial row (exit ${log.status}): ${(log.stderr ?? "").slice(0, 300)}`);
   }
-  return { c, envelope, inTok, outTok, durationMs };
+  return { c, envelope, inTok, cacheCreateTok, cacheReadTok, outTok, totalTok, durationMs };
 }
 
 async function replay(job, { candidate, cycleId }) {
@@ -323,7 +354,7 @@ async function replayTurn({ job, cycle, spec, jobRef, candidate, cycleId }) {
     const prompt = assemblePrompt(spec, taskFile);
     const required = requiredKeys(prompt);
 
-    const { c, envelope, inTok, outTok, durationMs } = runCandidate({
+    const { c, envelope, totalTok, durationMs } = runCandidate({
       prompt, scratch, candidate, cycleId,
       allowedTools: "Read,Grep,Glob,Bash(node scripts/baseline-red-set.js:*)",
       maxTurns: 60, credFree: false,
@@ -346,7 +377,7 @@ async function replayTurn({ job, cycle, spec, jobRef, candidate, cycleId }) {
         tokens: baselineTokens(job),
         minutes: job.latency_ms ? job.latency_ms / 60000 : null,
       },
-      candidate: { passed: c.status === 0 && score.passed, verdict: "none", tokens: inTok + outTok, minutes: durationMs / 60000 },
+      candidate: { passed: c.status === 0 && score.passed, verdict: "none", tokens: totalTok, minutes: durationMs / 60000 },
     };
     if (c.error || c.status !== 0) {
       trial.error = `claude -p exited ${c.status}: ${c.error?.message ?? (c.stderr ?? "").slice(0, 300)}`;
@@ -410,7 +441,7 @@ async function replayBuild({ job, cycle, spec, jobRef, candidate, cycleId }) {
     const prompt = assemblePrompt(spec, taskFile);
     const required = requiredKeys(prompt);
 
-    const { c, envelope, inTok, outTok, durationMs } = runCandidate({
+    const { c, envelope, totalTok, durationMs } = runCandidate({
       prompt, scratch, candidate, cycleId,
       allowedTools: "Read,Grep,Glob,Edit,Write,MultiEdit,Bash(npm run build),Bash(node tests/regression/:*),"
         + "Bash(node scripts/baseline-red-set.js:*),Bash(node scripts/verifier.js --check-kickoff:*),"
@@ -439,7 +470,7 @@ async function replayBuild({ job, cycle, spec, jobRef, candidate, cycleId }) {
     const trial = {
       job_ref: jobRef, run_at: runAt,
       baseline: { passed: baselinePassed, verdict: "none", tokens: baselineTokens(job), minutes },
-      candidate: { passed: score.passed, verdict: "none", why: score.why, tokens: inTok + outTok, minutes: durationMs / 60000 },
+      candidate: { passed: score.passed, verdict: "none", why: score.why, tokens: totalTok, minutes: durationMs / 60000 },
     };
     if (note) trial.note = note;
     if (c.error || c.status !== 0) {

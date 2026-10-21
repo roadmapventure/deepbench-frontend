@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.881 | scripts/agent-log.js | AGT-502 -- --cache-creation-tokens / --cache-read-tokens: the two flags whose absence from parseArgs() made every caller sum three differently-priced input quantities into --input-tokens. All-or-nothing as a pair with each other, independent of input/output, absent = NULL not 0 (SES-423).
 // DeepBench v7.0.538 | scripts/agent-log.js | SES-424 slice 6 -- the parser and the citation writer MOVED
 // OUT to lib/pattern-citations.js, unchanged, so the EXECUTOR's writer (lib/activity-log.js) calls the same
 // two functions instead of a second copy of them. Nothing this script does changed: same flags, same printed
@@ -88,6 +89,15 @@
 // THE CITATIONS ARE CASCADE-DELETED with their log row (`on delete cascade`), so the pair can never
 // read as a citation with no turn behind it.
 //
+// THREE PRICES ARE NOT ONE NUMBER (AGT-502). `usage` on an Anthropic envelope reports FOUR token
+// quantities, and three of them are inputs priced differently -- a cache read bills about 0.1x an
+// uncached input token, a cache write about 1.25x. Summing them into --input-tokens stores a figure
+// that cannot be priced from and reads back as a single enormous call: measured live, ai_activity_log
+// row 72661 (2026-10-16, a model-assignment trial) holds input_tokens 6,885,415 with BOTH cache
+// columns NULL, and row 64526 repeats it. lib/activity-log.js has accepted and priced all four
+// columns since HAR-02a; the only thing missing was a way to say so from a command line, because
+// parseArgs() ends in a `default:` that refuses an unrecognized flag. Hence the two flags below.
+//
 // USAGE
 //   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/agent-log.js \
 //     --agent=owen --capability=bench-report-card --model=claude-opus-5 \
@@ -115,6 +125,13 @@
 //                              One without the other is refused. The non-negative bar IS the DB's
 //                              CHECK constraint; the requirement that they be PRESENT never was --
 //                              see the header's quotation of the live constraint.
+//   --cache-creation-tokens / --cache-read-tokens
+//                              optional, ALL-OR-NOTHING AS A PAIR WITH EACH OTHER and INDEPENDENT
+//                              of --input-tokens/--output-tokens: a caller may know its uncached
+//                              input without knowing its cache split, and the reverse never happens.
+//                              Absent stores NULL, never 0 -- the same SES-423 rule, for the same
+//                              reason: a stored 0 asserts "this call read nothing from cache", which
+//                              is a measurement, while NULL says nobody looked.
 //   --latency-ms=<int>         optional
 //   --trace=<id>               optional; one is minted when absent, and is what the row is read back by
 //   --cycle=<uuid>             optional runner_cycles.id -> visitor_id
@@ -187,6 +204,39 @@ export function tokenPairFrom(inputRaw, outputRaw) {
   return { inputTokens: inTok.value, outputTokens: outTok.value };
 }
 
+/**
+ * FEATURE: AGT-502 -- the cache pair, on tokenPairFrom()'s rules and deliberately NOT merged into it.
+ *
+ * The two pairs are independent: a caller that cannot observe its cache split still reports the
+ * input/output pair it can, and a half-measured CACHE pair is refused for exactly the reason a half
+ * input/output pair is -- storing the half that arrived reads back afterwards as a call that created
+ * cache and never read it. Absent is the third outcome, NULL and not 0.
+ *
+ * Pure and exported so tests/regression/agt-502-trial-token-split.test.mjs drives the real validator
+ * rather than a copy of its rules (docs/STANDARDS.md Section 4).
+ *
+ * Returns { cacheCreationInputTokens, cacheReadInputTokens } or { error }.
+ */
+export function cachePairFrom(creationRaw, readRaw) {
+  const given = [['cache-creation-tokens', creationRaw], ['cache-read-tokens', readRaw]]
+    .filter(([, v]) => v !== undefined);
+
+  // UNMEASURED. Both NULL, never 0 -- see the header.
+  if (given.length === 0) return { cacheCreationInputTokens: null, cacheReadInputTokens: null };
+
+  if (given.length === 1) {
+    const [presentFlag] = given[0];
+    const missing = presentFlag === 'cache-creation-tokens' ? 'cache-read-tokens' : 'cache-creation-tokens';
+    return { error: `--${missing} is required when --${presentFlag} is given: a half-measured cache pair is not a measurement. Pass both, or omit both to record the cache split as unmeasured.` };
+  }
+
+  const create = parseCount(creationRaw, 'cache-creation-tokens');
+  if (create.error) return create;
+  const read = parseCount(readRaw, 'cache-read-tokens');
+  if (read.error) return read;
+  return { cacheCreationInputTokens: create.value, cacheReadInputTokens: read.value };
+}
+
 // FEATURE: SES-424 slice 6 -- MOVED to lib/pattern-citations.js verbatim (same dedup+sort, same
 // {error} shapes). Re-exported from this path, not re-implemented: ses-424e-patterns-cited.test.mjs:50
 // imports parsePatternsApplied from here, and a test that drives a copy of the rules grades a copy
@@ -207,6 +257,10 @@ export function parseArgs(argv, catalogSlugs = SERVICE_CATALOG.map(s => s.slug))
       case 'feature': out.feature = value; break;
       case 'input-tokens': out.inputTokensRaw = value; break;
       case 'output-tokens': out.outputTokensRaw = value; break;
+      // FEATURE: AGT-502 -- the two flags whose absence from this switch was the whole gate: the
+      // `default:` below refused them, so every caller summed its four quantities into one.
+      case 'cache-creation-tokens': out.cacheCreationTokensRaw = value; break;
+      case 'cache-read-tokens': out.cacheReadTokensRaw = value; break;
       case 'latency-ms': out.latencyRaw = value; break;
       case 'trace': out.trace = value; break;
       case 'cycle': out.cycle = value; break;
@@ -230,6 +284,10 @@ export function parseArgs(argv, catalogSlugs = SERVICE_CATALOG.map(s => s.slug))
   if (usage.error) return usage;
   out.inputTokens = usage.inputTokens;
   out.outputTokens = usage.outputTokens;
+  const cache = cachePairFrom(out.cacheCreationTokensRaw, out.cacheReadTokensRaw);
+  if (cache.error) return cache;
+  out.cacheCreationInputTokens = cache.cacheCreationInputTokens;
+  out.cacheReadInputTokens = cache.cacheReadInputTokens;
   if (out.latencyRaw !== undefined) {
     const r = parseCount(out.latencyRaw, 'latency-ms');
     if (r.error) return r;
@@ -271,6 +329,10 @@ async function main() {
     model: args.model,
     inputTokens: args.inputTokens,
     outputTokens: args.outputTokens,
+    // FEATURE: AGT-502 -- lib/activity-log.js has taken these two since HAR-02a and prices from all
+    // four columns (LOG-149); passing them is what stops input_tokens holding three prices at once.
+    cacheCreationInputTokens: args.cacheCreationInputTokens,
+    cacheReadInputTokens: args.cacheReadInputTokens,
     latencyMs: args.latencyMs ?? null,
     // FEATURE: SES-383 -- see the header note. NULL = "not billable", and it must be passed
     // explicitly: the default is `undefined`, which prices the row from its tokens.

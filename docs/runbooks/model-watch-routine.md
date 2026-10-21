@@ -1,4 +1,4 @@
-<!-- DeepBench v7.0.678 | runbooks/model-watch-routine.md | AGT-146 — the model-watch playbook: the routine holds a copy of the prompt block; this file is the source (ARCHITECTURE.md §19v). Steps 0-6 are docs/harvests/AGT-146.md §S, with step 3's exit-4 clause amended against v7.0.677 (AGT-151) — see the note under the steps. -->
+<!-- DeepBench v7.0.881 | runbooks/model-watch-routine.md | AGT-502 — Step 0's FIRST action is the shared public.routine_meter_ok() stop, fail closed on a false `ok` and on the query erroring at all; step 6 defines `trials <n>` as the logged trial count. The routine holds a copy of the prompt block; this file is the source (ARCHITECTURE.md §19v) and the block is unchanged by AGT-502. Steps 0-6 are docs/harvests/AGT-146.md §S, with step 3's exit-4 clause amended against v7.0.677 (AGT-151) — see the note under the steps. -->
 # The model-watch routine — playbook and canonical prompt
 
 ## What this is
@@ -35,7 +35,17 @@ The hand-off is table rows sequenced by the runbook — never agent to agent. No
 
 ## Steps 0-6
 
-**Step 0 — stamp, clone, drift check, meter, room, the one stop.**
+**Step 0 — the shared meter stop, then stamp, clone, drift check, room.**
+
+**Step 0 runs this first, before the stamp, before the clone and before anything is spent** — over the Supabase MCP tools, which need no exported credentials (AGT-502; the same shared STEP 0 the four routines guarded on 2026-10-14 and the five guarded on 2026-10-17 already carry — `docs/design/routine-meter-day-ceiling.sql`):
+```sql
+select ok, reason, all_models_pct, age_hours, threshold from public.routine_meter_ok();
+```
+**It fails closed.** Stop the run when `ok` is false, **and stop it just the same when that query errors at all** — a meter nobody could read is not permission to spend. On either, do no work, spend no sub-agent turn, write nothing but the step-6 row, and make step 6's summary `model-watch <D> did not run — weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>)`, or, when the query itself failed, `model-watch <D> did not run — meter check failed: <error>`. Only when `ok` is true does the rest of step 0 run. The function already carries every reading this stop needs: it returns false for no reading at all, for a reading older than `runner_settings.meter_stale_hours`, and at or above `least(90, the day-of-week pace ceiling)` — so this routine estimates nothing and reads no meter of its own (pattern:165, pattern:9).
+
+> The prompt block above summarises the one stop as the weekly wall "or a usage meter that could not be read and is older than its staleness limit". This body is the source and outranks it (the table's `prompt` row): the stop here is `routine_meter_ok()`, with no `NO_READING` conjunction. Bringing the live routine's own STEP 0 and this block into agreement is `AGT-517`'s class and is not this change.
+
+Then the rest:
 ```
 export D=$(TZ=America/Chicago date +%F) N=model-watch-$D S=$(mktemp -d); WEEKLY=$([ "$(TZ=America/Chicago date +%u)" = 5 ] && echo yes || echo no)
 export SUPABASE_URL=<runner_secrets.SUPABASE_URL> SUPABASE_SERVICE_KEY=<runner_secrets.SUPABASE_SERVICE_KEY>   # read by name over the MCP; export inline; never echo
@@ -53,7 +63,7 @@ SELECT (detail->>'gated_pct')::numeric >= (detail->>'wall_pct')::numeric        
        detail->>'fable_pct' AS fable_pct, detail->>'fable_share' AS fable_share
 FROM public.runner_should_boot();
 ```
-Stop iff `weekly_wall` is true, or `meter_stale` is true AND the self-read printed `NO_READING`: step 6 writes `model-watch did not run — weekly wall: <gated_pct>% ≥ <wall_pct>%` or `— meter unreadable: <age_hours> h old, NO_READING <reason>`, and the run ends. `scheduler_off`, `nothing_pickable`, `weekly_pace` are the builder's refusals and never stop this routine.
+Stop iff `weekly_wall` is true: step 6 writes `model-watch did not run — weekly wall: <gated_pct>% ≥ <wall_pct>%` and the run ends. The staleness stop is NOT this query's and no longer waits on a `NO_READING` line — `routine_meter_ok()` above already refused a reading older than `meter_stale_hours`, and that conjunction was the hole AGT-502 measured: a stale meter alone let the run spend (one trial call, 6,885,415 input tokens, 2026-10-16 09:55:52Z). `meter_stale`, `age_hours` and the self-read's `NO_READING` line stay as step-6 notes, never as a gate. `scheduler_off`, `nothing_pickable`, `weekly_pace` are the builder's refusals and never stop this routine.
 
 **Step 1 — the cheap exit, then the release watch only if it is earned.**
 ```
@@ -123,7 +133,7 @@ AGT-145 proved a cloud run cannot update a routine (`update_trigger` refuses rou
 ```sql
 select public.record_decision(NULL, '$N', 'model-report', NULL, '<summary>', '<reasoning>', NULL);
 ```
-Summary, in this order: for each `select summary, detail from public.john_alerts where source = 'model-assignment' and acknowledged_at is null order by created_at`, one leading clause `MONEY waiting on John: <summary>` (the summary already carries `about $<n>/week`); then `model-watch <D>: releases <n>, retirements <n>, watch reviewed <n>, trials <n>, switched <n>, kept <n>, reverted <n>`; when `WEEKLY=yes` append ` · models: ` + `select string_agg(job_kind || '/' || job_key || '=' || model_id, ', ' order by job_kind, job_key) from public.model_assignments` + ` · changes this week: ` + `select count(*) from public.runner_decisions where kind in ('model-assignment','model-revert') and decided_at > now() - interval '7 days'`. A step-0 stop replaces all of it with the did-not-run text. Reasoning: `trials: <job_kind/job_key->candidate, …|none>; skipped: <job_kind/job_key->candidate (exit N reason), …|none>; drift: <exit>; no-room: <yes|no>; sync: <pending|refused|none>; refusals: <text|none>`. Only `trials:` feeds the 28-day dedupe. The reasoning argument must not be blank — `runner_decisions_reasoning_check` refuses an empty string. The run ends when this row is written.
+Summary, in this order: for each `select summary, detail from public.john_alerts where source = 'model-assignment' and acknowledged_at is null order by created_at`, one leading clause `MONEY waiting on John: <summary>` (the summary already carries `about $<n>/week`); then `model-watch <D>: releases <n>, retirements <n>, watch reviewed <n>, trials <n>, switched <n>, kept <n>, reverted <n>`; when `WEEKLY=yes` append ` · models: ` + `select string_agg(job_kind || '/' || job_key || '=' || model_id, ', ' order by job_kind, job_key) from public.model_assignments` + ` · changes this week: ` + `select count(*) from public.runner_decisions where kind in ('model-assignment','model-revert') and decided_at > now() - interval '7 days'`. A step-0 stop replaces all of it with the did-not-run text. Reasoning: `trials: <job_kind/job_key->candidate, …|none>; skipped: <job_kind/job_key->candidate (exit N reason), …|none>; drift: <exit>; no-room: <yes|no>; sync: <pending|refused|none>; refusals: <text|none>`. `trials <n>` is **the count of logged trial calls, not of trials that passed** (AGT-502): `select count(*) from public.ai_activity_log where feature = 'model-assignment:trial:depth0' and created_at between '<the first trial command of this run>' and '<now>'`. Every trial logs that row inside `model-trial.js` before its answer is scored, so a pair whose child exited 1 spent its tokens and counts here; it is the same number `scripts/model-assignment.js --prepare` prints, derived by its exported `reportedTrialCount()` over `trialLogQuery()`. Measured live: the `model-watch-2026-10-16` row reads `trials 0` while that window holds exactly **1** such call. The `trials:`/`skipped:` lists in the reasoning are unchanged — they are about trials that PASSED. Only `trials:` feeds the 28-day dedupe. The reasoning argument must not be blank — `runner_decisions_reasoning_check` refuses an empty string. The run ends when this row is written.
 
 ## On demand
 

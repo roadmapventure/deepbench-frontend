@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.881 | scripts/audit-cluster.js | AGT-502 -- the byte-identical second home of the token sum, fixed in the same commit: it now imports model-trial.js's usageSplit() and logs the cache columns instead of folding them into --input-tokens.
 // DeepBench v7.0.552 | scripts/audit-cluster.js | AGT-86 slice 8a -- the Auditor routine runs this script under a SESSION NAME (it has no runner_cycles row): --run takes exactly one of --cycle-id / --session-name via audit-ledger.js attribution(), and agent-log.js gets --cycle only when a cycle exists. Config clusters (statements carrying slice 6's `project` label) route to audit-config-review / au-config-intent, and --build writes --repo-visibility=<label>=<public|private> as task_context.repo_visibility. The --collect note names the routine's ingest, not a hand step.
 // DeepBench v7.0.469 | scripts/audit-cluster.js | AGT-70
 // FEATURE: AGT-70 slice 4 -- two additions, one of them a bug fix the negative-control corpus found.
@@ -82,6 +83,11 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { normalize, locationKey, fingerprint, attribution } from "./audit-ledger.js";
+// FEATURE: AGT-502 -- usage -> four counts has ONE home (pattern:14). This file used to carry a
+// byte-identical copy of model-trial.js's sum, which is how one fix would have left the other home
+// wrong; the import is the same script-to-script shape scripts/model-assignment.js already uses for
+// that file's roomFor(). model-trial.js guards its own entry point, so importing it runs nothing.
+import { usageSplit } from "./model-trial.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -691,8 +697,11 @@ async function doRun(argv) {
 
     const parsed = parseModelResult(spawned.stdout);
     const usage = parsed.envelope?.usage ?? {};
-    const inTok = Number(usage.input_tokens ?? 0) + Number(usage.cache_creation_input_tokens ?? 0) + Number(usage.cache_read_input_tokens ?? 0);
-    const outTok = Number(usage.output_tokens ?? 0);
+    // FEATURE: AGT-502 -- the second home of the same defect, fixed in the same commit (pattern:163).
+    // This was a byte-identical copy of model-trial.js's sum; it now reads that file's one exported
+    // derivation, so the three differently-priced input quantities reach their own columns.
+    const { inputTokens: inTok, cacheCreationTokens: cacheCreateTok,
+            cacheReadTokens: cacheReadTok, outputTokens: outTok } = usageSplit(usage);
     const latency = Number(parsed.envelope?.duration_api_ms ?? 0);
 
     // §19k. The log row is written for EVERY call that reached the model, including one whose answer
@@ -702,7 +711,9 @@ async function doRun(argv) {
       path.join(ROOT, "scripts", "agent-log.js"), "--agent=auditor",
       `--capability=${cap}`, `--model=${callModel}`, `--ai-type=${cap}`,
       `--feature=${cap}:${intent}:depth1`,
-      `--input-tokens=${inTok}`, `--output-tokens=${outTok}`, `--latency-ms=${latency}`,
+      `--input-tokens=${inTok}`, `--output-tokens=${outTok}`,
+      `--cache-creation-tokens=${cacheCreateTok}`, `--cache-read-tokens=${cacheReadTok}`,
+      `--latency-ms=${latency}`,
       ...(cycleId ? [`--cycle=${cycleId}`] : []), "--json",
     ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
     if (log.status !== 0) {
@@ -714,6 +725,7 @@ async function doRun(argv) {
     const runBlock = {
       model: callModel, prompt_source: source,
       input_tokens: inTok, output_tokens: outTok,
+      cache_creation_input_tokens: cacheCreateTok, cache_read_input_tokens: cacheReadTok,
       duration_api_ms: latency, num_turns: parsed.envelope?.num_turns ?? null,
       logged_id: loggedId,
     };
@@ -723,7 +735,7 @@ async function doRun(argv) {
     fs.writeFileSync(resultFile, JSON.stringify(body, null, 2), "utf8");
 
     const k = Array.isArray(body.findings) ? body.findings.length : "error";
-    console.log(`run ${stem.slice(0, 2)} ${task.task_context.cluster}: ${k} findings · ${source} · ${callModel} · in ${inTok} out ${outTok} · log ${loggedId}`);
+    console.log(`run ${stem.slice(0, 2)} ${task.task_context.cluster}: ${k} findings · ${source} · ${callModel} · in ${inTok} cache ${cacheCreateTok}/${cacheReadTok} out ${outTok} · log ${loggedId}`);
   }
   process.exitCode = 0;
 }
