@@ -1,3 +1,4 @@
+// DeepBench v7.0.876 | tests/regression/SES-215-env-isolation.js | AGT-304 slice 16 -- fetch leak fixture, clause, control 4c
 // DeepBench v7.0.307 | tests/regression/SES-215-env-isolation.js | SES-215 -- the suite restores
 // process.env around every test, so one test's placeholder can never be another test's answer.
 //
@@ -124,6 +125,16 @@ export const CLAUSES = [
           "      console.log(`  [PASS] ${file}`);\n      restoreEnv(envBefore);"
         ),
   },
+  {
+    id: "fetch-restored-on-both-arms",
+    detail: "AGT-304 slice 16: fetch snapshotted BEFORE the import, restored OUTSIDE the try/catch",
+    test: src => {
+      const snap = src.indexOf("const fetchBefore = globalThis.fetch;"), restore = src.indexOf("globalThis.fetch = fetchBefore;");
+      return snap !== -1 && snap < src.indexOf("await import(pathToFileURL(fullPath).href)")
+        && restore > src.indexOf("console.log(`  [FAIL] ${file} -- ${e.message}`);") && restore < src.indexOf("const declared = takeNotRun();");
+    },
+    breaks: src => src.replace("    globalThis.fetch = fetchBefore;\n", ""),
+  },
 ];
 
 // --- 2. the fixture: two leak shapes, one suite ------------------------------------------------
@@ -138,6 +149,7 @@ const FIXTURE_FILES = {
 export default async function run() {
   process.env.SES215_ADDED = "leaked-by-a";
   process.env.SES215_PRESET = "clobbered-by-a";
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => [] });
 }
 `,
   "b-reads.js": `
@@ -147,6 +159,8 @@ export default async function run() {
     "SES215_ADDED leaked from a-leaks.js -- an ADDED key was not deleted by the restore");
   assert.strictEqual(process.env.SES215_PRESET, "set-by-the-parent",
     "SES215_PRESET leaked from a-leaks.js -- a MODIFIED key was not reset by the restore");
+  const r = await fetch("data:text/plain,ok");
+  assert.strictEqual(typeof r.text, "function", "globalThis.fetch leaked from a-leaks.js -- not restored by the runner");
 }
 `,
 };
@@ -290,6 +304,12 @@ export default async function run() {
       fixture,
       "the shipped run-all.js with its restore's delete-half removed"
     );
+
+    // ---- part 4c (AGT-304 slice 16): the fetch-restore mutation control ----
+    const fm = runSuite(writeControlRunner("fetch-mutated-run-all.mjs",
+      relocate(CLAUSES.find(c => c.id === "fetch-restored-on-both-arms").breaks(shipped))), fixture);
+    assert.ok(fm.status === 1 && /1\/2 passed/.test(fm.stdout || "") && /globalThis\.fetch leaked from a-leaks\.js/.test(fm.stdout || ""),
+      "the fetch mutant must lose on the fetch leak alone -- got:\n" + (fm.stdout || ""));
 
     // ---- part 4b: the file-level negative control ----------------------------------------------
     // A real pre-fix runner out of history, same fixture, asserted to LOSE. Without this the

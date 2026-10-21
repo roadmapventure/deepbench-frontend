@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.876 | tests/regression/run-all.js | AGT-304 slice 16 -- fetch restored per test beside the env restore
 // DeepBench v7.0.793 | tests/regression/run-all.js | AGT-391 -- `--only=<csv>` / `--only-from=<file>`
 // run a SELECTIVE set, by basename: the build's related set (scripts/related-tests.js). Checked FIRST
 // in main(), before any slot is taken: an empty set, or a name not in DIR, prints `run-all: --only
@@ -231,6 +232,7 @@ async function runSuite(transport) {
     // SES-215: taken BEFORE the import, because a module's env writes are import-time side effects
     // in several of these tests, not run() bodies. A snapshot taken any later has already lost.
     const envBefore = snapshotEnv();
+    const fetchBefore = globalThis.fetch;
     const logOffset = logSize(transport.file);
     try {
       const mod = await import(pathToFileURL(fullPath).href);
@@ -255,6 +257,7 @@ async function runSuite(transport) {
     // SES-215, and OUTSIDE the try/catch on purpose: a test that threw still owns whatever it wrote
     // to process.env before it threw. Same both-arms reasoning as the notRun drain below.
     restoreEnv(envBefore);
+    globalThis.fetch = fetchBefore;
     // Drained on BOTH arms -- see the header. A throw must not hand its declaration to the
     // next file, and a test that declared a part and then failed still owns that declaration.
     const declared = takeNotRun();

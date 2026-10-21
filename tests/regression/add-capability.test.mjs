@@ -1,3 +1,4 @@
+// DeepBench v7.0.876 | tests/regression/add-capability.test.mjs | AGT-304 slice 16 -- fetch stubs restored (try/finally)
 // DeepBench | tests/regression/add-capability.test.mjs -- a private agent's user can add a capability, then Skills
 // inside it. The capability is a listed no-model tool scoped to its own Skills.
 // PURE + FAKE fetch (always run): readAddCapabilityInput() refusals, addCapabilityToAgent() write order and undo,
@@ -61,6 +62,8 @@ const screen = read("src/screens/PersonnelScreen.jsx");
 assert.ok(screen.includes("{proposed && isPrivateAgent(agent) && <AddCapabilityForm"), "private agents only, Proposed view");
 
 // ── the Teach tool: an AI client creates a capability, then a Skill inside it; and replaces specialty / bio ──
+const realFetch = globalThis.fetch;
+try {
 process.env.SUPABASE_URL = "https://x.test"; process.env.SUPABASE_SERVICE_KEY = "k";
 const { handle } = await import("../../api/_lib/handlers/agent-teach.js");
 const calls = [];
@@ -164,6 +167,7 @@ function delFake(intentTraits) {
   const scoped = await readCapabilitySkills("zoe-k3x9ab", "global", "zoe-x-abc123");
   assert.deepEqual(scoped.map(c => c.slug), ["zoe-x-abc123"], "a scoped call lists that one capability");
 }
+} finally { globalThis.fetch = realFetch; }
 
 // ── the page ────────────────────────────────────────────────────────────────────────────────────────────────────
 {
