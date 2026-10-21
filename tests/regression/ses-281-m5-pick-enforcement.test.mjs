@@ -1,3 +1,4 @@
+// DeepBench v7.0.878 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-304 slice 18 -- whole-board reads go through `pgAll()`; `limit=2000` was capped at 1000 of 1393 rows, so a ref past row 1000 read as missing.
 // DeepBench v7.0.825 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-427 slice 1 -- the live arm's lane oracle reads its key NAMES from the shipped ORDER BY through agt-140's pickKeys() instead of keeping a second hand-copied list, the bare-queue inversion counter follows `sort_queue` BY NAME rather than by index 4, and every served row is asserted scored 3+.
 // DeepBench v7.0.797 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-304 slice 8 -- the live arm's lane oracle carries SIX keys: AGT-280's `sort_need` (`6 - COALESCE(need_score, 0)`, unscored last) sits between project priority and M5-02's filing lane, and the bare-queue inversion counter follows the queue key to index 4.
 // DeepBench v7.0.567 | tests/regression/ses-281-m5-pick-enforcement.test.mjs | AGT-89 -- the
@@ -86,7 +87,7 @@ import { readBoardState, isDeclarable } from "./_lib/board-state.js";
 // list, read by both pick oracles (pattern:14): this file and agt-140 each carried their own
 // hand-copied vector, and AGT-304 slice 8 found BOTH of them a key behind the live ORDER BY --
 // grading the five-key order against a six-key function and reporting green for it.
-import { pickKeys } from "./agt-140-project-priority-pick.test.mjs";
+import { pickKeys, pgAll } from "./agt-140-project-priority-pick.test.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CANONICAL_REL = "docs/RUNNER-GOV-M5-REQUIREMENTS.md";
@@ -347,9 +348,9 @@ async function theLivePickPathObeysTheFourRules() {
     return;
   }
 
-  const items = await pg(
+  const items = await pgAll(
     url, key,
-    "backlog_items?select=backlog_id,title,status,design_status,queue,filed_at,predicted_cycles,epic_id,leverage_reason,need_score&limit=2000",
+    "backlog_items?select=backlog_id,title,status,design_status,queue,filed_at,predicted_cycles,epic_id,leverage_reason,need_score",
   );
   // AGT-140 (v7.0.604): `project_id` joins the epics projection, and `projects` joins the read,
   // because the lane's FIRST ordering key is now the owning project's `priority`. Without them the
@@ -621,11 +622,11 @@ async function theLivePickPathObeysTheFourRules() {
   // priority lane, sat at queue 290: BECAUSE it was oldest. Two homes, one rule, and the visible
   // home was wrong. This asserts the invariant on the LIVE board rather than reading the function
   // body, which PostgREST cannot do.
-  const ordered = await pg(
+  const ordered = await pgAll(
     url, key,
     "backlog_items?select=backlog_id,queue,filed_at,created_at,tier,priority_class," +
       "automation_rank,pinned_position,predicted_cycles&queue=not.is.null" +
-      "&pinned_position=is.null&automation_rank=is.null&limit=2000",
+      "&pinned_position=is.null&automation_rank=is.null",
   );
   const LANE_CUT = Date.parse("2026-08-21T00:00:00Z");
   const bucket = r => `${r.tier}|${r.priority_class}`;
@@ -683,10 +684,10 @@ async function theLivePickPathObeysTheFourRules() {
   // The first row filed without a filed_at turns the queue's oldest-first key into a NULL, and
   // this goes red naming it instead of letting it sit in the tail unremarked.
   const unfiled = rows => rows.filter(r => r.filed_at === null || r.filed_at === undefined);
-  const openRows = await pg(
+  const openRows = await pgAll(
     url, key,
     "backlog_items?select=backlog_id,status,filed_at,created_at,queue" +
-      "&status=not.in.(done,removed)&limit=2000",
+      "&status=not.in.(done,removed)",
   );
   assert.ok(
     openRows.length > 0,

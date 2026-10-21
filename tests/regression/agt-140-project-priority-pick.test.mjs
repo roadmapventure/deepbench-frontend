@@ -1,3 +1,4 @@
+// DeepBench v7.0.878 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-304 slice 18 -- whole-board reads go through `pgAll()`; `limit=2000` was capped at 1000 of 1393 rows, so a ref past row 1000 read as missing.
 // DeepBench v7.0.841 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-427 slice 2 -- the shipped pick ORDER BY leads with `sort_need` (severity FIRST, John 2026-10-08), and the priority inversion clause (ii) grades only within one score and leverage group.
 // DeepBench v7.0.825 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-427 slice 1 -- arm B reads its key NAMES out of the shipped ORDER BY (pickKeys()) instead of listing them, and asserts the WITHHOLDING the ordering clauses cannot see: every row the pick serves is scored 3+, and an unscored ticket is not a zero.
 // DeepBench v7.0.797 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-304 slice 8 -- arm B's order oracle carries SIX keys, not five: AGT-280's `sort_need` (`6 - COALESCE(need_score, 0)`, unscored last) sits between project priority and the filing lane, exactly as the live prime_directive_queue()'s recorded ORDER BY declares it.
@@ -202,6 +203,36 @@ export function pickKeys() {
     `the shipped pick ORDER BY carries a duplicate graded key: ${JSON.stringify(keys)}`,
   );
   return keys;
+}
+// Shared like `pickKeys()`: PostgREST caps any single response at 1000 rows, so the whole-board
+// reads were served 1000 of 1393 and every ref past row 1000 read as missing from the board.
+export async function pgAll(url, key, pathAndQuery, orderKey = "backlog_id", pageSize = 1000) {
+  if (/[?&](limit|offset|order)=/.test(pathAndQuery)) {
+    throw new Error(`pgAll: ${pathAndQuery} carries limit=, offset= or order=`);
+  }
+  const rows = [];
+  let total = null;
+  for (let offset = 0; total === null || rows.length < total; offset += pageSize) {
+    const page = `${pathAndQuery}&order=${orderKey}.asc&limit=${pageSize}&offset=${offset}`;
+    const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${page}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
+    });
+    if (!res.ok) throw new Error(`${page} returned HTTP ${res.status} ${res.statusText}`);
+    const range = res.headers.get("content-range") ?? "";
+    const m = /\/(\d+)$/.exec(range);
+    if (!m) throw new Error(`pgAll: ${page} no exact count: ${range}`);
+    const reported = Number(m[1]);
+    if (total === null) total = reported;
+    else if (reported !== total) throw new Error(`pgAll: count moved ${total} -> ${reported} mid-read`);
+    const body = await res.json();
+    if (!Array.isArray(body)) throw new Error(`${page} returned a non-array payload`);
+    if (body.length === 0 && rows.length < total) throw new Error(`pgAll: ${page} returned 0 rows with ${rows.length} of ${total} collected`);
+    rows.push(...body);
+  }
+  if (rows.length !== total) throw new Error(`pgAll: collected ${rows.length} rows but PostgREST reported exactly ${total}`);
+  const unique = new Set(rows.map(r => r[orderKey])).size;
+  if (unique !== total) throw new Error(`pgAll: ${unique} unique ${orderKey} of ${total} rows`);
+  return rows;
 }
 
 // A CTE's body -- what sits INSIDE the `<name> AS ( ... )` parentheses. The opening paren is
@@ -416,7 +447,7 @@ async function theLiveLaneIsOrderedByProjectPriorityFirst() {
   const laneOf = filedAt => (filedAt && Date.parse(filedAt) < laneCut ? 0 : 1);
 
   const rows = await pg(url, key, "rpc/prime_directive_queue", { method: "POST", body: "{}" });
-  const items = await pg(url, key, "backlog_items?select=backlog_id,queue,filed_at,predicted_cycles,epic_id,leverage_reason,need_score&limit=2000");
+  const items = await pgAll(url, key, "backlog_items?select=backlog_id,queue,filed_at,predicted_cycles,epic_id,leverage_reason,need_score");
   const epics = await pg(url, key, "epics?select=id,project_id&limit=500");
   const projects = await pg(url, key, "projects?select=id,priority,status&limit=200");
 

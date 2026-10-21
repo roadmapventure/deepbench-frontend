@@ -1,3 +1,4 @@
+// DeepBench v7.0.878 | tests/regression/ses-340-projects-govern.test.mjs | AGT-304 slice 18 -- whole-board reads go through `pgAll()`; `limit=2000` was capped at 1000 of 1393 rows, so a ref past row 1000 read as missing.
 // DeepBench v7.0.497 | tests/regression/ses-340-projects-govern.test.mjs | SES-401 -- clause (b) is
 // extracted into theLaneServesOnlyTheExecutingProject() and now reads the four-state board
 // classification (tests/regression/_lib/board-state.js) before it asserts. `held` and `drained` are
@@ -40,6 +41,7 @@
 import assert from "assert";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { readBoardState, isDeclarable } from "./_lib/board-state.js";
+import { pgAll } from "./agt-140-project-priority-pick.test.mjs";
 
 // The lane value `prime_directive_queue()` still uses for in-scope tickets. SES-340 kept it on
 // purpose -- ses-281 asserts on it and renaming it was out of that ticket's scope -- so this
@@ -209,9 +211,9 @@ async function theLaneServesOnlyTheExecutingProject(url, key, { projects, epics,
       "empty lane cannot demonstrate a fence",
   );
 
-  const items = await pg(
+  const items = await pgAll(
     url, key,
-    "backlog_items?select=backlog_id,epic_id,status&limit=2000",
+    "backlog_items?select=backlog_id,epic_id,status",
   );
   assert.ok(items.length > 100, `backlog_items returned ${items.length} rows -- refusing to grade a truncated read`);
   const epicOf = new Map(items.map(i => [i.backlog_id, i.epic_id]));
