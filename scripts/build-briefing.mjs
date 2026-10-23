@@ -721,7 +721,18 @@ splice("+bdRow('Drain members still open'", `+'</table>'\n    +'<p class="tnote"
 // over a rolling 30 DELIVERIES; a time window would make the rate move when nothing shipped.
 const SV_WINDOW = 30;
 const svVerdicts = await sel('runner_verdicts?select=verdict,auto_done_eligible,backlog_id,created_at&order=created_at.desc&limit=500');
-const svTaps = await sel('runner_items?select=backlog_id,decision,decided_at&kind=eq.ship&decision=not.is.null&order=decided_at.desc&limit=500');
+// AGT-459: THE POPULATION IS JOHN'S OWN THREE WORDS, NAMED, never "has a decision". `retired` is
+// the fourth value `runner_items_decision_check` admits and it is a MACHINE close --
+// `retire_stale_ship_cards()` takes a card off the board when its ticket is already done, removed
+// or removal-proposed, or when it carries no `backlog_id` and so could never be ruled at all. It is
+// not a tap of John's and it is not a judgment on the work, so counting it here would publish a
+// Rework/Reverse rate ABOUT HIM that he never produced -- and this panel's whole job is to compare
+// the verifier's catch rate against his. `decision=not.is.null` read all four values alike, so the
+// backfill of 111 machine closes would have moved this figure the moment it landed.
+// NO-OP ON THE DAY IT SHIPPED and that is the check, not an excuse: zero ship cards read `retired`
+// before the backfill, so this edit must leave every §16 figure byte-identical, and the test's
+// before/after arm asserts exactly that. `kind=eq.ship` STAYS -- SES-181b greps for it.
+const svTaps = await sel('runner_items?select=backlog_id,decision,decided_at&kind=eq.ship&decision=in.(accept,rework,reverse)&order=decided_at.desc&limit=500');
 if (!svVerdicts.length) die('§16: runner_verdicts is empty — refusing to publish a scoreboard over the template\'s sample rows');
 const svPct = (n, of) => (of ? (100 * n / of).toFixed(1) : '0.0');
 const sv30 = svVerdicts.slice(0, SV_WINDOW);

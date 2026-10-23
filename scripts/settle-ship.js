@@ -713,6 +713,57 @@ export async function closeDirectives({
   return closed;
 }
 
+// FEATURE: AGT-459 -- THE BOARD SWEEPS ITSELF, ONCE PER CYCLE.
+//
+// A `runner_items` row with `kind='ship'` is a build report awaiting John's tap. Nothing in
+// `scripts/`, `api/` or `lib/` ever wrote `decision` on one: measured on the unchanged tree this
+// cycle, `decide-gated-card.js` is gate-only (`:103`, `:279`) and no other caller exists. So a ship
+// card whose ticket had already reached `done`, `removed` or `removal proposed` -- or which carried
+// no `backlog_id` at all, and a ship verdict is keyed by `backlog_id` -- could never be ruled by
+// ANY path, by John or by the runner. Measured live before this ship: 111 such cards.
+//
+// IT LIVES HERE, NOT IN A NEW RUNBOOK STEP (pattern:16 -- tracking systems must be
+// self-maintaining). `settle-ship.js --apply` is the one thing every delivering cycle runs, so
+// hanging the sweep off it means the board is swept by construction rather than by a model
+// remembering a step at the end of a long cycle. `runner-cycle.md` is also 380,902 of its
+// 381,000-byte ceiling, so a new step there would not fit even if it were the right home.
+//
+// THE PREDICATE IS NOT HERE, AND THAT IS THE POINT. It is one SQL statement inside
+// `public.retire_stale_ship_cards()`, so the set is selected and closed in ONE transaction with
+// one `record_decision()` and one before-image per row. Computing the set here and closing rows
+// one REST call at a time would race every other cycle and could half-close the board.
+//
+// NOT A JUDGMENT, AND NOT A TAP OF JOHN'S. `retired` is a structural close: the card could never
+// be ruled, so it is taken off the board. `scripts/build-briefing.mjs` §16 excludes `retired` from
+// John's own Rework/Reverse rate for exactly that reason -- see the `svTaps` select there.
+export async function retireStaleShipCards({
+  base, key, cycleId, log = s => process.stdout.write(s),
+} = {}) {
+  // THE CYCLE ID IS REQUIRED, and it is a refusal rather than a fallback: every row this closes is
+  // imaged against the cycle that closed it (Section 19v), and `record_decision()` takes EXACTLY
+  // one of cycle / session. A sweep attributed to nobody is a sweep nobody can reverse.
+  if (typeof cycleId !== "string" || cycleId === "") {
+    log("  ship cards: not swept — no --cycle-id, and `retire_stale_ship_cards()` images every row it closes against the cycle that closed it\n");
+    return null;
+  }
+
+  // `p_session_name` is sent EXPLICITLY null, never omitted: the function's one fixed identity
+  // argument list is `(uuid, text)` with no DEFAULT, so an omitted key is a different call.
+  const answer = await rest(base, key, "rpc/retire_stale_ship_cards", {
+    method: "POST",
+    body: JSON.stringify({ p_cycle_id: cycleId, p_session_name: null }),
+  }, "retire_stale_ship_cards");
+
+  const back = Array.isArray(answer) ? answer[0] : answer;
+  const cards = back && Number.isFinite(back.cards) ? back.cards : 0;
+  if (cards === 0) {
+    log("  ship cards: none stale — every undecided ship card still has a ticket that can be ruled\n");
+  } else {
+    log(`  ship cards: ${cards} retired (decision ${String(back.decision ?? "").slice(0, 8)}) — ${JSON.stringify(back.by_status ?? {})}\n`);
+  }
+  return back;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   for (const a of argv) {
@@ -833,6 +884,13 @@ async function main() {
 
   // 5 -- AGT-454: John's directive closes with the ticket that carried it. `delivered` only.
   await closeDirectives({ base, key, cycleId, ticket, row, status: plan.patch.status, kickoffPath: kickoffArg });
+
+  // 6 -- AGT-459: the whole board, not just this ticket. It runs LAST and is UNCONDITIONAL on the
+  // settled status, which is the difference from step 5: a directive closes only with the ticket
+  // that carried it, while a stale ship card is stale no matter what this cycle shipped. Running it
+  // after the status write is deliberate for the same reason as steps 4 and 5 -- settling the
+  // ticket is this script's primary job, and a sweep that failed must not take the status with it.
+  await retireStaleShipCards({ base, key, cycleId });
 
   process.exit(0);
 }
