@@ -48,7 +48,7 @@ const lf = t => String(t).replace(/\r\n/g, "\n");
 const E = "\u{1F60E}";
 const GOOD = "I asked my agent for one answer and got nine, which is how my team feels in my meetings. " + E;
 const STEP0 = "STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.";
-const FEEDS = ["https://mashable.com/feeds/rss/all", "https://www.wired.com/feed/rss", "https://techcrunch.com/feed/"];
+const FEEDS = ["https://techcrunch.com/feed/", "https://venturebeat.com/feed/", "https://www.fastcompany.com/technology/rss"]; // John 2026-10-23: Mashable and Wired refuse the fetcher
 const MARKERS = {
   wednesday: ["<!-- HUMORIST-WEDNESDAY-PROMPT-BEGIN -->", "<!-- HUMORIST-WEDNESDAY-PROMPT-END -->"],
   friday: ["<!-- HUMORIST-FRIDAY-PROMPT-BEGIN -->", "<!-- HUMORIST-FRIDAY-PROMPT-END -->"],
