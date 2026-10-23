@@ -9,7 +9,7 @@
 // noted under the agent's own column, the personal sources the agent holds a grant for, and the week
 // with its shipped ticket titles -- one task_context key each, null when empty, repos null.
 // --write on a humor slug runs validateHumorAnswer() (pure) against every phrase_set deny list:
-// sunglasses last, 280 code points, ASCII otherwise, at most one `!`, no `#`, no deny name, non-empty
+// sunglasses last, the ceiling (data: hw-guardrails traits.length_ceiling, default 280) in code points, ASCII otherwise, at most one `!`, no `#`, no deny name, non-empty
 // source refs -- a single bad draft refuses the whole answer, nothing written (pattern:10). Draft rows
 // gain derived data.char_count / data.word_count; ONE humor_records insert (no target_row, no log
 // row); then one PATCH per Napkin note through napkinPatch(), the agent's own two columns only
@@ -181,8 +181,20 @@ export const HUMOR_READ_MAP = {
 // the ~200 target the summary reports against (never a quota); the 14-day window every humor read
 // uses (AGO = now - 14 days, computed per call so a long-lived import never goes stale).
 export const SUNGLASSES = '\u{1F60E}';
+// They are DEFAULTS only: the live values are data, read at --write from the guardrails Skill row's
+// traits.length_ceiling / traits.length_target (John 2026-10-23: a length rule is a writing rule, so
+// it changes as data, never as code). humorLimits() falls back here when the row carries none.
 export const HUMOR_CEILING = 280;
 export const HUMOR_TARGET = 200;
+export const HUMOR_LIMITS_SKILL = 'hw-guardrails';
+const HUMOR_LIMIT_MAX = 3000; // LinkedIn's own post cap; a value above it is a typo, not a rule
+
+// traits -> {ceiling, target}; each must be a positive integer up to HUMOR_LIMIT_MAX, else its default.
+export function humorLimits(traits) {
+  const pick = (v, dflt) => (Number.isInteger(v) && v > 0 && v <= HUMOR_LIMIT_MAX ? v : dflt);
+  const t = traits && typeof traits === 'object' ? traits : {};
+  return { ceiling: pick(t.length_ceiling, HUMOR_CEILING), target: pick(t.length_target, HUMOR_TARGET) };
+}
 const RECENT_MS = 14 * 24 * 3600 * 1000;
 const agoIso = () => new Date(Date.now() - RECENT_MS).toISOString();
 // A draft already posted, or written before the window, is not this week's material.
@@ -275,11 +287,11 @@ const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // One draft text -> null when it passes, else the reason. A deny entry is matched case-insensitively
 // and bounded by non-alphanumerics, and the reason names its INDEX, never the entry: the deny list is
 // private (customer and product names) and a refusal message can reach a run summary.
-function humorTextError(text, refs, denyList) {
+function humorTextError(text, refs, denyList, ceiling = HUMOR_CEILING) {
   if (typeof text !== 'string' || !text) return 'has no text';
   const cps = [...text];
   if (cps[cps.length - 1] !== SUNGLASSES) return 'does not end in the sunglasses emoji (U+1F60E)';
-  if (cps.length > HUMOR_CEILING) return `is ${cps.length} characters, over the ${HUMOR_CEILING} ceiling`;
+  if (cps.length > ceiling) return `is ${cps.length} characters, over the ${ceiling} ceiling`;
   const wide = cps.slice(0, -1).find(c => c.codePointAt(0) > 0x7f);
   if (wide !== undefined) return `carries U+${wide.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')} -- plain ASCII only apart from the closing emoji`;
   if ((text.match(/!/g) || []).length > 1) return 'carries more than one exclamation mark';
@@ -299,7 +311,7 @@ const isPlainObject = v => v !== null && typeof v === 'object' && !Array.isArray
 // The humor answer, checked before anything is written. denyList null = the deny check is skipped
 // (the caller says so on stderr). Returns {ok, counts} -- one {char_count, word_count} per `draft`
 // row in records_to_write, in order: the counts --write stores on those rows -- or {error}.
-export function validateHumorAnswer(answer, denyList) {
+export function validateHumorAnswer(answer, denyList, ceiling = HUMOR_CEILING) {
   if (!isPlainObject(answer)) return { error: 'the answer must be a JSON object' };
   const items = answer.records_to_write;
   if (!Array.isArray(items)) return { error: 'the answer carries no records_to_write array' };
@@ -314,7 +326,7 @@ export function validateHumorAnswer(answer, denyList) {
       return { error: `records_to_write[${i}].data must be an object` };
     }
     if (item.kind === 'draft') {
-      const why = humorTextError(item.data?.text, item.data?.source_refs, denyList);
+      const why = humorTextError(item.data?.text, item.data?.source_refs, denyList, ceiling);
       if (why) return { error: `records_to_write[${i}] (draft) data.text ${why}` };
       counts.push(humorCounts(item.data.text));
     }
@@ -323,7 +335,7 @@ export function validateHumorAnswer(answer, denyList) {
     if (!Array.isArray(answer.drafts)) return { error: 'drafts must be an array' };
     for (const [i, d] of answer.drafts.entries()) {
       if (!isPlainObject(d)) return { error: `drafts[${i}] is not an object` };
-      const why = humorTextError(d.text, d.source_refs, denyList);
+      const why = humorTextError(d.text, d.source_refs, denyList, ceiling);
       if (why) return { error: `drafts[${i}].text ${why}` };
     }
   }
@@ -701,8 +713,11 @@ async function readCompetitors(db) {
 
 // The product lane's recent copy: release notes, feature benefits, messages; never a retired one.
 async function readRecentMarket(db) {
-  return db.get(`market_records?kind=in.(release_note,feature_benefit,message)&or=(status.is.null,status.neq.retired)` +
+  // Heads, not bodies (John 2026-10-23): titles plus a 240-character head keep the humorist's own records the larger share of his prompt.
+  const __head = (t, n = 240) => (t == null ? null : String(t).replace(/\s+/g, ' ').slice(0, n));
+  const rows = await db.get(`market_records?kind=in.(release_note,feature_benefit,message)&or=(status.is.null,status.neq.retired)` +
     `&created_at=gte.${agoIso()}&select=id,kind,title,body,data,created_at&order=created_at.asc`);
+  return rows.map(r => ({ id: r.id, kind: r.kind, title: r.title, head: __head(r.body || (r.data && (r.data.headline || r.data.can_do || r.data.summary)) || ''), created_at: r.created_at }));
 }
 
 // The career lane's recent market signal: posting TITLES only (a posting's text, pay and verdict
@@ -710,9 +725,11 @@ async function readRecentMarket(db) {
 async function readRecentCareer(db) {
   const since = agoIso();
   const postings = await db.get(`career_records?kind=eq.posting&created_at=gte.${since}&select=id,kind,title&order=created_at.asc`);
-  const rest_ = await db.get(`career_records?kind=in.(market_requirement,review)&created_at=gte.${since}` +
-    '&select=id,kind,title,body,data&order=created_at.asc');
-  return [...postings, ...rest_];
+  // Heads, not bodies (John 2026-10-23): titles plus a 240-character head keep the humorist's own records the larger share of his prompt.
+  const __head = (t, n = 240) => (t == null ? null : String(t).replace(/\s+/g, ' ').slice(0, n));
+  const rest_ = (await db.get(`career_records?kind=in.(market_requirement,review)&created_at=gte.${since}` +
+    '&select=id,kind,title,body,data&order=created_at.asc')).map(r => ({ id: r.id, kind: r.kind, title: r.title, head: __head(r.body || (r.data && r.data.summary) || '') }));
+  return [...postings.slice(-40), ...rest_];
 }
 
 // The Napkin rows not yet noted under this agent's column -- never noted, or edited 60+ seconds after
@@ -732,6 +749,7 @@ async function readPersonalSources(db, args) {
     '&select=id,kind,title,body,data,origin,voice,created_at&order=created_at.asc');
 }
 
+const HUMOR_WEEK_KINDS = ['ship', 'john-ruling', 'directive', 'ticket-status', 'removal-proposal'];
 // The platform's week (readWeek) plus `ships`: the backlog titles of the week's pushed cycles.
 async function readWeekShips(db) {
   const week = await readWeek(db);
@@ -740,7 +758,14 @@ async function readWeekShips(db) {
     ? await db.get(`backlog_items?backlog_id=in.(${ids.map(i => encodeURIComponent(`"${i}"`)).join(',')})&select=backlog_id,title`)
     : [];
   if (!week.cycles.length && !week.decisions.length) return null;
-  return { ...week, ships };
+  // The humorist reads the week trimmed (John 2026-10-23, "going backwards since we built the agent":
+  // raw dumps were 87% of a 1.2 MB prompt and his own grades 5%): only the decision kinds a reader
+  // would recognize, newest 60, each summary cut to 220 characters. The career review keeps readWeek whole.
+  const decisions = week.decisions
+    .filter(d => HUMOR_WEEK_KINDS.includes(d.kind))
+    .slice(-60)
+    .map(d => ({ ...d, summary: d.summary == null ? null : String(d.summary).slice(0, 220) }));
+  return { ...week, decisions, ships };
 }
 
 const EXTRA_READERS = {
@@ -886,7 +911,10 @@ async function writeHumor(args, answer) {
   const denyList = phraseSets.flatMap(r => (Array.isArray(r.data?.deny_list) ? r.data.deny_list : []))
     .filter(n => typeof n === 'string' && n.trim());
   if (!denyList.length) console.error('personal-agent: no phrase_set deny_list -- deny check skipped');
-  const check = validateHumorAnswer(answer, denyList.length ? denyList : null);
+  let limitRows;
+  try { limitRows = await db.get(`skill_profiles?slug=eq.${HUMOR_LIMITS_SKILL}&select=traits`); } catch (e) { return stop(e.message); }
+  const limits = humorLimits(limitRows?.[0]?.traits);
+  const check = validateHumorAnswer(answer, denyList.length ? denyList : null, limits.ceiling);
   if (check.error) return stop(`answer refused, nothing written: ${check.error}`);
   const notes = Array.isArray(answer.napkin_notes) ? answer.napkin_notes : [];
   // The agent id must be able to name its Napkin columns BEFORE the insert, so a bad id never leaves
@@ -919,8 +947,9 @@ async function writeHumor(args, answer) {
     inserted: inserted.length,
     ids: inserted.map(r => r.id),
     napkin_notes: noted,
-    target: HUMOR_TARGET,
-    drafts: check.counts.map(c => ({ ...c, over_target: c.char_count > HUMOR_TARGET })),
+    target: limits.target,
+    ceiling: limits.ceiling,
+    drafts: check.counts.map(c => ({ ...c, over_target: c.char_count > limits.target })),
   }) + '\n');
 }
 

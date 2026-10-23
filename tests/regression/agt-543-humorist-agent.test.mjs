@@ -14,6 +14,8 @@
 //      it refuses 281 code points, a period after the emoji, two `!`, a hashtag, a non-ASCII em dash,
 //      a word on the deny list, empty source refs, and a bad `draft` row behind a good drafts[] entry.
 //      Each refusal is paired with a passing control so the arm proves the rule, not a broken check.
+//      The ceiling is a parameter read from data: 320 passes / 321 refused under ceiling 320, and
+//      humorLimits() falls back to 280 / 200 on missing, non-integer, negative or > 3000 values.
 //   C  RUNBOOK -- the four marker lines appear once each as whole lines; line 1 of both blocks is the
 //      STEP 0 meter stop byte for byte (control: one character off fails); both blocks hold the three
 //      news feeds; the file carries no model id, no trigger id, no `WebSearch` and no fenced code
@@ -36,7 +38,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
-  READ_MAP, HUMOR_READ_MAP, HUMOR_KINDS, napkinPatch, validateHumorAnswer,
+  READ_MAP, HUMOR_READ_MAP, HUMOR_KINDS, napkinPatch, validateHumorAnswer, humorLimits,
 } from "../../scripts/personal-agent.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -113,6 +115,14 @@ async function run() {
       ok(answerOf(GOOD), null, "deny null");
 
       refused(answerOf("a".repeat(280) + E), null, "281 code points");
+      // The ceiling is data (hw-guardrails traits.length_ceiling, John 2026-10-23): a passed ceiling
+      // moves the edge, and the default stays 280 when none is passed.
+      assert.ok(validateHumorAnswer(answerOf("a".repeat(319) + E), null, 320).ok, "320 code points under a 320 ceiling");
+      assert.ok(validateHumorAnswer(answerOf("a".repeat(320) + E), null, 320).error, "321 code points under a 320 ceiling");
+      assert.deepEqual(humorLimits({ length_ceiling: 320, length_target: 300 }), { ceiling: 320, target: 300 });
+      assert.deepEqual(humorLimits(null), { ceiling: 280, target: 200 }, "no traits -> defaults");
+      assert.deepEqual(humorLimits({ length_ceiling: "320", length_target: -1 }), { ceiling: 280, target: 200 }, "bad values -> defaults");
+      assert.deepEqual(humorLimits({ length_ceiling: 5000 }), { ceiling: 280, target: 200 }, "over LinkedIn's 3000 -> default");
       refused(answerOf(GOOD + "."), null, "a period after the emoji");
       ok(answerOf(GOOD.replace("meetings.", "meetings!")), null, "control: one `!`");
       refused(answerOf(GOOD.replace("nine,", "nine!,").replace("meetings.", "meetings!")), null, "two `!`");
