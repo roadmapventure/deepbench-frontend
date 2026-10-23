@@ -39,7 +39,7 @@ const REVIEW = path.join(ROOT, "scripts", "audit-review.js");
 const CID = "4313b4c0-fc8c-4a3a-85d9-0e1ac6c759a2";
 const STUB_ENV = { SUPABASE_URL: "https://stub.invalid", SUPABASE_SERVICE_KEY: "stub-key" };
 const EIGHT = ["kind", "finding_type", "confidence", "check_slug", "family", "locations", "governing_fact", "proposed_resolution"];
-const SLUGS = ["flow-ship-not-closed", "flow-verdict-gate-red", "flow-wasted-cycles", "flow-filing-outpaces-closing"];
+const SLUGS = ["flow-ship-not-closed", "flow-verdict-gate-red", "flow-wasted-cycles", "flow-filing-outpaces-closing", "flow-nothing-produced"];
 
 // True when the list's ranks never go down -- the property D4 promises.
 export function rankOrdered(list) {
