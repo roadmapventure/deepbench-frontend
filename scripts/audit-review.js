@@ -1,3 +1,12 @@
+// DeepBench v7.0.887 | scripts/audit-review.js | AGT-424 -- AN UNROUTABLE FINDING IS COVERED, NEVER
+// OMITTED. routeGroup() runs only on a group that FILES a ticket (the gate at L491 of the unchanged
+// tree, under `files` at L448), so an open finding whose source has no finding_routes row (AGT-380,
+// open) is coverable by any group that files none -- and nothing said so. Two refusals now say it,
+// both GATED ON THE ROUTE so the sentence appears only where it is true:
+// the unmapped-source throw carries UNROUTABLE_DISPOSITIONS as its "or", and the coverage refusal
+// names the missing row and the dispositions when (and only when) the omitted finding's source has
+// no route. routeGroup()'s own throw text and public.finding_group_epic() keep their words -- the
+// route gate is not what was wrong. routesFor() is the one filter both limbs ask (pattern:14).
 // DeepBench v7.0.869 | scripts/audit-review.js | AGT-492 -- validateReview mirrors the function's new
 // standard-B refusal: a root-cause group that files a ticket needs test {reproduced, how, result} or
 // untested_reason, and a reuse_backlog_id group needs neither (John 2026-10-13, decisions 27-29;
@@ -212,6 +221,25 @@ export function sourceOf(foundBy) {
   return s === "" ? null : s.split(":")[0];
 }
 
+// AGT-424: the dispositions that discharge an open finding whose source no finding_routes row maps.
+// ONE text, two refusals (both below) and the same words the two review Skills now carry in
+// skill_profiles.method (migration agt424_unroutable_dispositions) -- a reviewing agent reads the
+// same sentence wherever it meets the wall. The five are exactly the kinds that file no ticket, which
+// is what makes them reachable without a route: routeGroup() is never asked about them.
+export const UNROUTABLE_DISPOSITIONS = "cover it with a group that files no ticket (carry, escalate, not-a-defect, list, or root-cause with reuse_backlog_id) and name it in summary_for_john; never omit it -- the coverage rule refuses an omission";
+
+// AGT-424: the route rows that map ONE worklist finding, which is the filter routeGroup() already
+// carried inline. It is lifted out because the coverage rule below must ask the same question about a
+// finding that was never routed, and two copies of a route match is how the two limbs drift apart
+// (pattern:14). Same shape as public.finding_group_epic()'s join: the row's own source or the
+// wildcard, the row's own finding_type or the wildcard.
+export function routesFor(w, rows) {
+  const src = w.source ?? sourceOf(w.found_by);
+  const type = w.finding_type ?? null;
+  return (Array.isArray(rows) ? rows : []).filter(r => (r.source === src || r.source === "*") &&
+                                                       (r.finding_type === type || r.finding_type === "*"));
+}
+
 // AGT-132: the mirror of public.finding_group_epic()'s route pick, and nothing more -- it answers WHICH
 // ROUTE a group takes, never which epic (that needs the epics table and stays the function's). The
 // group's route is the LOWEST precedence over its findings, tie-broken by source, so a group holding
@@ -229,9 +257,7 @@ export function routeGroup(group, worklist, routes) {
     const w = list.find(x => String(x.id) === id);
     if (w === undefined) continue;
     const src = w.source ?? sourceOf(w.found_by);
-    const type = w.finding_type ?? null;
-    const matches = rows.filter(r => (r.source === src || r.source === "*") &&
-                                     (r.finding_type === type || r.finding_type === "*"));
+    const matches = routesFor(w, rows);
     if (matches.length === 0) {
       throw new Error(`finding ${id} has unmapped source ${src} — add a finding_routes row; project creation is John's`);
     }
@@ -493,7 +519,10 @@ export function validateReview(review, worklist, week, checklist, routes, projec
       try {
         route = routeGroup(g, list, routes);
       } catch (e) {
-        refusals.push(e.message);
+        // AGT-424: the throw stays routeGroup()'s, word for word (it is the function's text). What the
+        // manager was missing is the way out, so it is appended here and ONLY to the unmapped-source
+        // throw -- "a group has no known findings to route" is a different defect with no disposition.
+        refusals.push(e.message.includes("unmapped source") ? `${e.message}; or ${UNROUTABLE_DISPOSITIONS}` : e.message);
       }
       let slug = null;   // AGT-240: the project this group would file into, once known
       if (route !== null && (route.project_slug === null || route.project_slug === undefined)) {
@@ -531,7 +560,20 @@ export function validateReview(review, worklist, week, checklist, routes, projec
       seen.push(id);
     }
   }
-  for (const id of open) if (!seen.includes(id)) refusals.push(`finding ${id} not covered`);
+  // AGT-424: still a REFUSAL -- an omission is never allowed, and the coverage rule is what makes the
+  // dispositions above the only way through. The longer text fires only where it is TRUE: a routes
+  // table was handed over AND this finding's source has no row in it. Without routes (the SQL-side caller, which
+  // validates coverage alone) or for a routable source, the old bare text stands unchanged.
+  for (const id of open) {
+    if (seen.includes(id)) continue;
+    const w = list.find(x => String(x.id) === id);
+    if (Array.isArray(routes) && w !== undefined && routesFor(w, routes).length === 0) {
+      const src = w.source ?? sourceOf(w.found_by);
+      refusals.push(`finding ${id} not covered -- its source ${src} has no finding_routes row (AGT-380), so it cannot be ticketed: ${UNROUTABLE_DISPOSITIONS}`);
+    } else {
+      refusals.push(`finding ${id} not covered`);
+    }
+  }
 
   // 4b (AGT-159), and it is LAST because that is where the function puts it: the backlog-review limb
   // lives in apply_audit_review()'s step 4, after every validation and after coverage. Mirrored with

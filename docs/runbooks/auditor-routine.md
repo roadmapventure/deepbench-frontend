@@ -112,7 +112,7 @@ Sub-agent on the printed model → `$S/answer.json` (`{groups, summary_for_john,
 node scripts/audit-review.js --dry-run=$S/answer.json --context=$S/ctx.json
 node scripts/audit-review.js --apply=$S/answer.json --context=$S/ctx.json --week=$W --session-name=$N
 ```
-A `--dry-run` refusal → re-run the sub-agent ONCE with the refusal lines appended to the prompt; a second refusal → no `--apply`, the summary quotes the refusals, the findings stay `open` for next week. Keep `--apply`'s `Decision <id> — reversible until …` line and its ticket ids for step 7.
+A `--dry-run` refusal → re-run the sub-agent ONCE with the refusal lines appended to the prompt; a second refusal → no `--apply`, the summary quotes the refusals, the findings stay `open` for next week. An open finding whose source has no `finding_routes` row (`AGT-380`) cannot be ticketed; cover it with a group that files no ticket (carry, escalate, not-a-defect, list, or root-cause with reuse_backlog_id) and name it in summary_for_john; never omit it -- the coverage rule refuses an omission (`AGT-424`). Keep `--apply`'s `Decision <id> — reversible until …` line and its ticket ids for step 7.
 
 **The process-break class (`AGT-309`; John 2026-10-02, rule `JOHN-1002-PROCESS-BREAK-CLASS`).** A `root-cause` group may carry `need_source` (`john:runner_decisions:<id>`) and `home` (an executing project). The ticket still files to its routed list; `--apply` prints one `next:` line per such group. Run it — Victoria rules the ticket against the cited need AND the class before it enters:
 ```
