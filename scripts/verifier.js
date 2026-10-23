@@ -482,6 +482,9 @@
 //                       differing line, because a caller that patched the refusal's own remedy into
 //                       the file would otherwise collect a green over its own bytes. Unreadable JSON
 //                       or no `kickoff_markdown` -> exit 2, NEVER a green.
+//   --check-answer=<p>  AGT-519: measure the answer JSON's kickoff_markdown against KICKOFF_BYTE_CAP
+//                       and the Lanes: line BEFORE any file exists; 0/1/2 as --check-kickoff; no
+//                       credentials.
 //
 // The `--judge=session` two-pass shape (AGT-67):
 //   node scripts/verifier.js --judge=session --ticket=AGT-67 --version=v7.0.433 \
@@ -3093,6 +3096,59 @@ async function main() {
   // 2 for an unreadable file, never 1. Same distinction the exit-code table already draws: 1 is a
   // judgement about the kickoff ("it is too big"), 2 is the absence of one ("there was nothing to
   // measure"). A caller that collapses them would treat a typo'd path as a passing cap check.
+  // ---- AGT-519: THE CAP, MEASURED ON THE ANSWER -- BEFORE ANY KICKOFF FILE EXISTS. -----------
+  //
+  // WHAT THE FILE CHECK BELOW CANNOT REACH. `--check-kickoff=<path>` measures a FILE, so the
+  // earliest moment it can run is after the kickoff has been written -- and runbook step 6's own
+  // instruction was "BEFORE the write, run --check-kickoff=<the path>", a path that cannot exist
+  // yet. Between the Designer's answer and that write there was no measurement at all: told the cap
+  // in its Intent row, the Designer returned 10,191 bytes while reporting 8,192, and nothing in the
+  // cycle counted the bytes it actually returned. This branch counts them, at the one moment the
+  // answer is in hand and no file has been written over it.
+  //
+  // THE SAME TWO FUNCTIONS, NEVER A SECOND CAP. `kickoffCapFinding` and `kickoffLaneFinding` are
+  // called unchanged, so the bytes this refuses and the bytes the file check refuses can never
+  // disagree; a separate script or a re-stated constant is the drift this avoids. The exit codes
+  // are the file check's: 0 within, 1 over cap or no lane declaration, 2 nothing could be measured.
+  //
+  // IT SITS AHEAD OF `--check-kickoff`, AND AHEAD OF THE CREDENTIAL CHECK FOR THE SAME REASON SES-376
+  // gives below: its caller is step 6, which has nothing to authenticate for yet. SES-376's note
+  // below still describes its own branch as main()'s first; as of AGT-519 this one precedes it, and
+  // the property both depend on -- running before the credential check -- is unchanged.
+  //
+  // 2 IS NEVER 1 HERE EITHER. An unreadable file, unparseable JSON, or an answer carrying no
+  // `kickoff_markdown` string is the ABSENCE of a measurement, not a verdict that the answer fits:
+  // a caller that collapsed them would read a typo'd path as a kickoff within the cap.
+  const checkAnswerPath = arg("check-answer", "");
+  if (checkAnswerPath) {
+    const abs = path.resolve(repoRoot, checkAnswerPath);
+    let answer;
+    try {
+      answer = JSON.parse(fs.readFileSync(abs, "utf8"));
+    } catch (e) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: `answer unreadable JSON: ${e.message}`, path: checkAnswerPath },
+        prose: `verifier: could not read the answer JSON at ${checkAnswerPath} (${e.message}). Exiting 2 -- this is NOT a cap verdict, it is the absence of one.` });
+    }
+    const md = answer && typeof answer.kickoff_markdown === "string" ? answer.kickoff_markdown : null;
+    if (md === null) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "answer carries no kickoff_markdown string", path: checkAnswerPath },
+        prose: `verifier: ${checkAnswerPath} carries no \`kickoff_markdown\` string, so there is nothing to measure against the cap. Exiting 2 -- NEVER a green.` });
+    }
+    const answerFinding = kickoffCapFinding(md);
+    if (answerFinding) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "kickoff-over-cap", measured: "answer.kickoff_markdown", ...answerFinding },
+        prose: answerFinding.reason });
+    }
+    const answerLanes = kickoffLaneFinding(md);
+    if (answerLanes) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, measured: "answer.kickoff_markdown", ...answerLanes },
+        prose: answerLanes.reason });
+    }
+    const bytes = Buffer.byteLength(md, "utf8");
+    return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "answer-within-cap", bytes, cap: KICKOFF_BYTE_CAP, measured: "answer.kickoff_markdown" },
+      prose: `answer kickoff_markdown ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (AGT-519) -- write it as returned; --check-kickoff=<path> --answer=<this file> attests the file (AGT-187)` });
+  }
+
   const checkKickoffPath = arg("check-kickoff", "");
   // AGT-451: ONE const for BOTH ends of this flag -- step 7's `--check-kickoff` arming below and 7a's
   // baseline precedence further down. The file is the same file, measured once by

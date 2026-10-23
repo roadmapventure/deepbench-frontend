@@ -2798,10 +2798,10 @@ node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<
    `CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` refuses `designed` without a
    link, so the two are one act or neither. From here the kickoff is the build's contract: step 7
    hands it to The Builder unchanged, and a task not in it is not the build's.
-   **BEFORE the write, run `node scripts/verifier.js --check-kickoff=<the path>` (`SES-376`, cap
-   8,192 bytes — the constant is `KICKOFF_BYTE_CAP` in `scripts/verifier.js`, and the Designer's and
-   Builder's Intent rows carry the same bytes in `docs/design/ga-agents-seed.sql` — and, since
-   `SES-359`, a missing lane declaration). Exit 1 is a NAMED DEVIATION, never a quiet trim: do not write it as the kickoff, do
+   **BEFORE the write, run `node scripts/verifier.js --check-answer=<the saved answer JSON>` (`AGT-519`:
+   it measures `kickoff_markdown` itself -- never the Designer's reported number -- against
+   `KICKOFF_BYTE_CAP` 8,192 in `scripts/verifier.js`, the bytes `docs/design/ga-agents-seed.sql`'s Intent
+   rows carry; `SES-376`; and, since `SES-359`, a missing lane declaration). Exit 1 is a NAMED DEVIATION, never a quiet trim: do not write it as the kickoff, do
    not set `designed`. TWO CAUSES (`SES-378`), branched on the `--json` `kind`, never the prose.
    `kickoff-over-cap`: re-assemble `design-kickoff` ONCE with `"over_cap":{"bytes":N,"cap":8192}` in `task_context`, then
    `node scripts/staff-watch.js --record --cycle-id=<your cycle id> --agent=designer --kind='over-cap refusal' --backlog=<ID> --detail='kickoff over KICKOFF_BYTE_CAP on first assembly'`.
