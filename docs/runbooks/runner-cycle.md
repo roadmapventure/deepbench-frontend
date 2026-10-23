@@ -2952,7 +2952,8 @@ node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the
    returned no `files` array is a finding, not a file you write empty:** an empty or unwritten list
    blocks the auto-done bar (correctly), so say so in `notes` rather than inventing paths.
 3. **`outcome = 'blocked'` → nothing shipped, and you do not finish it by hand.** Do not push on
-   the Builder's behalf and do not widen the kickoff to get past the blocker: close the cycle
+   the Builder's behalf — step 9's tail pushes via `scripts/tail-push.js`, never this HEAD
+   (`AGT-525`) — and do not widen the kickoff to get past the blocker: close the cycle
    `gated_before_build`, or `shipped` when part finished and pushed (`partial` settles the TICKET), carry
    the Builder's `deviations` into `notes` and onto the card, and let 7a grade what actually
    happened.
@@ -4213,15 +4214,14 @@ writes have landed. Re-run step 7's `scripts/export-backlog-snapshot.js`; the sc
 deterministic and prints `unchanged`, writing nothing, when John's taps moved no board row — the
 common case. Then re-run
 `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js` because your ship card
-now exists. Commit whichever of `docs/backlog/BACKLOG-SNAPSHOT.md` and `CLAUDE-STATE.md` changed
-and push it (`git fetch origin dev && git rebase origin/dev &&
-git push origin HEAD:dev`, the rebase-retry×3 of step 7). **This is the one sanctioned second
-push of a cycle** — those two files only, inside the serial tail, guarded by the publish lease you
-already hold (NOT the ticket claim, which step 7 released in its own statement after the push —
-`SES-106`, `v7.0.150`), so the "one push per ship point" spirit holds. A
-rebase conflict that survives the retries is not a wall: leave the snapshot one harvest stale
-exactly as before this fix — the next cycle's step-7 export captures the same writes — and note
-it in the cycle row; **(5)** rebuild cards from the DB's undecided set — **each with its More-info
+now exists. Then `node scripts/tail-push.js --cycle-id=<your cycle id>`: it commits whichever of
+`docs/backlog/BACKLOG-SNAPSHOT.md` and `CLAUDE-STATE.md` changed on a worktree off a fresh
+`origin/dev` and pushes THAT `HEAD:dev` (rebase-retry×3), never this HEAD. **This is the
+one sanctioned second push of a cycle** — those two files only, inside the serial tail, under the
+publish lease you hold (not the ticket claim — `SES-106`), so the
+"one push per ship point" spirit holds. Exit 3 (rejected after the retries) is not a wall: the
+snapshot stays one harvest stale — the next cycle's export captures the same writes; note it in
+the cycle row; **(5)** rebuild cards from the DB's undecided set — **each with its More-info
 panel, and each open `runner_card_asks` row answered on its own card** (`v7.0.145`; a card
 rendered without those fields carries a visible defect line, by design) — and republish **if and
 only if the bridge above leaves that republish yours to make; an unattended cycle builds, records
