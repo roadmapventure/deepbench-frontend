@@ -1,3 +1,4 @@
+// DeepBench v7.0.892 | tests/regression/agt-491-governance-architect.test.mjs | AGT-542 -- arm 3's pin census moves 13 -> 14: AGT-542 adds dilbert's (HW-01) one deepbench-north-star pin.
 // DeepBench v7.0.870 | tests/regression/agt-491-governance-architect.test.mjs | AGT-493 -- arm 5 repinned: the architect now holds exactly TWO capabilities, `review-audit-worklist` (AGT-492) and `validate-ticket` (AGT-493). AGT-491 itself still creates none -- the assertion moved from a count of zero to the named set, so a THIRD capability appearing without a ticket is still caught.
 // DeepBench v7.0.868 | tests/regression/agt-491-governance-architect.test.mjs | AGT-491 -- The
 // Governance Architect (GV-09) exists as a row, a portrait and two Skill pins, and the Verifier did
@@ -170,8 +171,8 @@ async function armB_live(rest) {
 
   // 3. THE PINS: thirteen in all, two of them the architect's, in the declared order.
   const allPins = await rest("agent_skill_pins?select=agent_id,tenant_id,skill_profile_slug,display_order");
-  assert.strictEqual(allPins.length, 13,
-    `agent_skill_pins must hold 13 rows after this ticket (11 before it), got ${allPins.length}`);
+  assert.strictEqual(allPins.length, 14,
+    `agent_skill_pins must hold 14 rows (13 after AGT-491, +1 AGT-542), got ${allPins.length}`);
   const ours = allPins.filter(p => p.agent_id === ID).sort((a, b) => a.display_order - b.display_order);
   assert.strictEqual(ours.length, 2,
     `the architect must hold EXACTLY 2 pins -- a third is this ticket overreaching; got ${ours.length}: ${JSON.stringify(ours.map(p => p.skill_profile_slug))}`);
