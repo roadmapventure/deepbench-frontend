@@ -1,4 +1,20 @@
 #!/usr/bin/env node
+// DeepBench v7.0.893 | scripts/personal-agent.js | AGT-543 -- the humorist's call path. A second
+// record store, keyed by capability slug exactly as the career one (pattern:13, pattern:17): STORES
+// pairs each read map with its table, so HUMOR_READ_MAP (humor-weekly-draft, humor-topic-scout) reads
+// public.humor_records with no --target, every humor `correction` row, and KIND_FILTERS drops a
+// draft already posted or older than 14 days. READ_MAP and KINDS stay byte-same (agt-84 pins both).
+// EXTRA_READS grows from one string to a list per slug: the humor slugs read recent market records,
+// recent career postings (titles only), market requirements and reviews, the Napkin rows not yet
+// noted under the agent's own column, the personal sources the agent holds a grant for, and the week
+// with its shipped ticket titles -- one task_context key each, null when empty, repos null.
+// --write on a humor slug runs validateHumorAnswer() (pure) against every phrase_set deny list:
+// sunglasses last, 280 code points, ASCII otherwise, at most one `!`, no `#`, no deny name, non-empty
+// source refs -- a single bad draft refuses the whole answer, nothing written (pattern:10). Draft rows
+// gain derived data.char_count / data.word_count; ONE humor_records insert (no target_row, no log
+// row); then one PATCH per Napkin note through napkinPatch(), the agent's own two columns only
+// (migration agt543_napkin_dilbert_note). Kickoff: docs/kickoffs/v7.0.893-AGT-543-dilbert-call-path.md.
+//
 // DeepBench v7.0.728 | scripts/personal-agent.js | AGT-156 - postingChannel() derives a posting's
 // CHANNEL from the same `source` stamp postingOrigin() already reads, so the Sunday market watch can
 // read the LinkedIn alert postings and only those. No 12th kind, no migration, no write-back
@@ -153,6 +169,27 @@ export const READ_MAP = {
   'career-linkedin-alerts': ['resume_fact', 'target', 'ladder_rung', 'evidence', 'network_contact', 'posting', 'log'],
 };
 
+// AGT-543. The humor store's six kinds (humor_records_kind_check, AGT-542) and its OWN read map --
+// never folded into READ_MAP, whose keys agt-84 pins to the live career-* capabilities. `correction`
+// is in neither list: every humor correction row is read on every render (readRecords below).
+export const HUMOR_KINDS = ['draft', 'grade', 'correction', 'topic', 'research', 'phrase_set'];
+export const HUMOR_READ_MAP = {
+  'humor-weekly-draft': ['draft', 'grade', 'topic', 'research', 'phrase_set'],
+  'humor-topic-scout': ['draft', 'topic', 'phrase_set'],
+};
+// The write check's constants: the one emoji, always last (rule 1); the hard ceiling in code points;
+// the ~200 target the summary reports against (never a quota); the 14-day window every humor read
+// uses (AGO = now - 14 days, computed per call so a long-lived import never goes stale).
+export const SUNGLASSES = '\u{1F60E}';
+export const HUMOR_CEILING = 280;
+export const HUMOR_TARGET = 200;
+const RECENT_MS = 14 * 24 * 3600 * 1000;
+const agoIso = () => new Date(Date.now() - RECENT_MS).toISOString();
+// A draft already posted, or written before the window, is not this week's material.
+const LIVE_DRAFTS = {
+  draft: rec => rec?.data?.status !== 'posted' && !(Date.parse(rec?.created_at) < Date.now() - RECENT_MS),
+};
+
 // A read filter, keyed by CAPABILITY and then by kind (AGT-154). It was keyed by kind alone, which
 // made "postings not yet reviewed" a property of the posting kind rather than of the one capability
 // that wants it -- so every later reader of `posting` silently inherited it. Match-finder's filter
@@ -176,10 +213,20 @@ export const KIND_FILTERS = {
   'career-strengths-gaps': REVIEWED_POSTINGS,
   'career-posting-review': REVIEWED_POSTINGS,
   'career-growth-review': REVIEWED_POSTINGS,
+  // AGT-543: both humor capabilities drop a posted or out-of-window draft.
+  'humor-weekly-draft': LIVE_DRAFTS,
+  'humor-topic-scout': LIVE_DRAFTS,
 };
 
-// Extra, capability-specific reads that are not career_records. The value names the task_context key.
-export const EXTRA_READS = { 'career-linkedin-alerts': 'competitors' };
+// Extra, capability-specific reads that are not the capability's own record store. The value names
+// the task_context key -- one string, or (AGT-543) a list of keys, each read by EXTRA_READERS below
+// and set to null when it comes back empty.
+const HUMOR_EXTRA_READS = ['market', 'career', 'napkin', 'personal_sources', 'week'];
+export const EXTRA_READS = {
+  'career-linkedin-alerts': 'competitors',
+  'humor-weekly-draft': HUMOR_EXTRA_READS,
+  'humor-topic-scout': HUMOR_EXTRA_READS,
+};
 
 // The evidence sources the design named, read-only (git log, files). Paths only -- no remote, no
 // credential. deepbench-personal is the personal-lane clone of dev -- never the shared checkout
@@ -195,6 +242,114 @@ export const REPOS = [
 
 const BOARDS = ['greenhouse', 'lever', 'ashby'];
 const RECORD_FIELDS = 'id,kind,title,body,data,target_row,source';
+const HUMOR_FIELDS = 'id,kind,title,body,data,source,created_at';
+
+// AGT-543. Which store a capability reads, decided by WHICH MAP holds its slug -- data, never an
+// `if (capability === ...)` and never an agent id (pattern:2, pattern:13). The career store keeps its
+// --target narrowing, its per-capability corrections and its repos; the humor store has no target_row,
+// reads every correction, carries no repos, and writes through writeHumor (no `log` row).
+const STORES = [
+  { table: 'career_records', fields: RECORD_FIELDS, map: READ_MAP, targeted: true, allCorrections: false, repos: REPOS, write: null },
+  { table: 'humor_records', fields: HUMOR_FIELDS, map: HUMOR_READ_MAP, targeted: false, allCorrections: true, repos: null, write: writeHumor },
+];
+
+export function storeFor(capability) {
+  return STORES.find(s => Object.prototype.hasOwnProperty.call(s.map, capability)) ?? null;
+}
+
+// --- AGT-543: the humor write check ------------------------------------------------------------
+//
+// Pure. Every rule the design marks "write check" is a property of this code path, never an
+// instruction the model is asked to obey (pattern:10). Lengths are CODE POINTS ([...t]), so the
+// emoji counts as one character, as the principal counts it.
+export function humorCounts(text) {
+  const t = String(text ?? '');
+  return {
+    char_count: [...t].length,
+    word_count: t.split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w)).length,
+  };
+}
+
+const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// One draft text -> null when it passes, else the reason. A deny entry is matched case-insensitively
+// and bounded by non-alphanumerics, and the reason names its INDEX, never the entry: the deny list is
+// private (customer and product names) and a refusal message can reach a run summary.
+function humorTextError(text, refs, denyList) {
+  if (typeof text !== 'string' || !text) return 'has no text';
+  const cps = [...text];
+  if (cps[cps.length - 1] !== SUNGLASSES) return 'does not end in the sunglasses emoji (U+1F60E)';
+  if (cps.length > HUMOR_CEILING) return `is ${cps.length} characters, over the ${HUMOR_CEILING} ceiling`;
+  const wide = cps.slice(0, -1).find(c => c.codePointAt(0) > 0x7f);
+  if (wide !== undefined) return `carries U+${wide.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')} -- plain ASCII only apart from the closing emoji`;
+  if ((text.match(/!/g) || []).length > 1) return 'carries more than one exclamation mark';
+  if (text.includes('#')) return 'carries a hashtag';
+  for (const [i, name] of (Array.isArray(denyList) ? denyList : []).entries()) {
+    if (typeof name !== 'string' || !name.trim()) continue;
+    if (new RegExp(`(^|[^A-Za-z0-9])${escapeRe(name.trim())}($|[^A-Za-z0-9])`, 'i').test(text)) {
+      return `names deny-list entry ${i}`;
+    }
+  }
+  if (!Array.isArray(refs) || refs.length === 0) return 'carries no source_refs';
+  return null;
+}
+
+const isPlainObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+// The humor answer, checked before anything is written. denyList null = the deny check is skipped
+// (the caller says so on stderr). Returns {ok, counts} -- one {char_count, word_count} per `draft`
+// row in records_to_write, in order: the counts --write stores on those rows -- or {error}.
+export function validateHumorAnswer(answer, denyList) {
+  if (!isPlainObject(answer)) return { error: 'the answer must be a JSON object' };
+  const items = answer.records_to_write;
+  if (!Array.isArray(items)) return { error: 'the answer carries no records_to_write array' };
+  const counts = [];
+  for (const [i, item] of items.entries()) {
+    if (!isPlainObject(item)) return { error: `records_to_write[${i}] is not an object` };
+    if (!HUMOR_KINDS.includes(item.kind)) return { error: `records_to_write[${i}] has unknown kind "${item.kind}"` };
+    if (typeof item.title !== 'string' || !item.title.trim()) {
+      return { error: `records_to_write[${i}] (${item.kind}) has no title` };
+    }
+    if (item.data !== undefined && !isPlainObject(item.data)) {
+      return { error: `records_to_write[${i}].data must be an object` };
+    }
+    if (item.kind === 'draft') {
+      const why = humorTextError(item.data?.text, item.data?.source_refs, denyList);
+      if (why) return { error: `records_to_write[${i}] (draft) data.text ${why}` };
+      counts.push(humorCounts(item.data.text));
+    }
+  }
+  if (answer.drafts !== undefined) {
+    if (!Array.isArray(answer.drafts)) return { error: 'drafts must be an array' };
+    for (const [i, d] of answer.drafts.entries()) {
+      if (!isPlainObject(d)) return { error: `drafts[${i}] is not an object` };
+      const why = humorTextError(d.text, d.source_refs, denyList);
+      if (why) return { error: `drafts[${i}].text ${why}` };
+    }
+  }
+  if (answer.napkin_notes !== undefined) {
+    if (!Array.isArray(answer.napkin_notes)) return { error: 'napkin_notes must be an array' };
+    for (const [i, n] of answer.napkin_notes.entries()) {
+      if (!isPlainObject(n) || n.entry_id === undefined || n.entry_id === null || String(n.entry_id).trim() === '') {
+        return { error: `napkin_notes[${i}] has no entry_id` };
+      }
+      if (typeof n.note !== 'string' || [...n.note].length > 200) {
+        return { error: `napkin_notes[${i}].note is missing or over 200 characters` };
+      }
+    }
+  }
+  return { ok: true, counts };
+}
+
+// The ONE Napkin write this script makes: the agent's own two columns, named from the agent id. The
+// id is checked against the column-name shape BEFORE it reaches a PostgREST select or body, so no
+// flag value can address another column.
+export function napkinPatch(agent, note, at) {
+  if (typeof agent !== 'string' || !/^[a-z][a-z0-9_]*$/.test(agent)) {
+    throw new Error(`agent id "${agent}" cannot name a Napkin column`);
+  }
+  return { [`${agent}_note`]: note, [`${agent}_noted_at`]: at };
+}
 
 // --- AGT-268: telling a FETCHED posting from a capability WRITE-BACK ---------------------------
 //
@@ -430,7 +585,8 @@ export function parseArgs(argv) {
   }
   if (out.mode !== 'fetch-postings') {
     if (!out.capability) return { error: '--capability=<slug> is required' };
-    if (!READ_MAP[out.capability]) return { error: `--capability "${out.capability}" is not in the read map` };
+    // AGT-543: either read map -- the career one or the humor one.
+    if (!storeFor(out.capability)) return { error: `--capability "${out.capability}" is not in the read map` };
   }
   if (out.mode === 'write' && !out.answer) return { error: '--answer=<json | path> is required with --write' };
   return out;
@@ -454,19 +610,35 @@ function rest() {
     if (!r.ok) throw new Error(`insert into ${table} returned HTTP ${r.status} ${await r.text()}`);
     return r.json();
   }
-  return { root, headers, get, insert };
+  // AGT-543: the Napkin note write-back, one row by id, the columns napkinPatch() names and no other.
+  async function patch(pathAndQuery, body) {
+    const r = await fetch(`${root}/rest/v1/${pathAndQuery}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`PATCH ${pathAndQuery.split('?')[0]} returned HTTP ${r.status} ${await r.text()}`);
+    return r.json();
+  }
+  return { root, headers, get, insert, patch };
 }
 
 async function readRecords(db, capability, target) {
-  const kinds = READ_MAP[capability];
-  let q = `career_records?kind=in.(${kinds.join(',')})&select=${RECORD_FIELDS}&order=created_at.asc`;
-  // A record with no target_row applies to every target; --target narrows the targeted ones.
-  if (target) q += `&or=(target_row.is.null,target_row.eq.${encodeURIComponent(target)})`;
+  const store = storeFor(capability);
+  const kinds = store.map[capability];
+  let q = `${store.table}?kind=in.(${kinds.join(',')})&select=${store.fields}&order=created_at.asc`;
+  // A record with no target_row applies to every target; --target narrows the targeted ones. The
+  // humor store has no target_row (AGT-543), so --target never narrows it.
+  if (target && store.targeted) q += `&or=(target_row.is.null,target_row.eq.${encodeURIComponent(target)})`;
   const rows = await db.get(q);
   const records = Object.fromEntries(kinds.map(k => [k, []]));
   const filters = KIND_FILTERS[capability];
   for (const r of rows) {
     if (filters?.[r.kind] && !filters[r.kind](r)) continue;
+    if (!store.targeted) {
+      records[r.kind].push({ id: r.id, title: r.title, body: r.body, data: r.data, created_at: r.created_at });
+      continue;
+    }
     const rec = { id: r.id, title: r.title, body: r.body, data: r.data, target_row: r.target_row };
     // AGT-268: a posting carries its PROVENANCE, never its raw `source` -- the stamp is
     // `<capability slug> <date>`, and a capability slug in the prompt would name another agent's
@@ -475,6 +647,12 @@ async function readRecords(db, capability, target) {
     // stamp never reaches the pushed object (Rule #1), so the derived label is the whole fact.
     if (r.kind === 'posting') { rec.origin = postingOrigin(r); rec.channel = postingChannel(r); }
     records[r.kind].push(rec);
+  }
+  if (store.allCorrections) {
+    // AGT-543: every humor correction applies to every humor run -- a rule the principal stated is
+    // never scoped to one capability.
+    const all = await db.get(`${store.table}?kind=eq.correction&select=${store.fields}&order=created_at.asc`);
+    return { records, corrections: all.map(r => ({ id: r.id, title: r.title, body: r.body, data: r.data, created_at: r.created_at })) };
   }
   const corrections = (await db.get(
     `career_records?kind=eq.correction&data->>capability=eq.${encodeURIComponent(capability)}&select=${RECORD_FIELDS}&order=created_at.asc`,
@@ -515,6 +693,65 @@ async function readCompetitors(db) {
   return rows.map(r => ({ name: r.title, domain: r.data?.domain ?? null }));
 }
 
+// --- AGT-543: the humor capabilities' extra reads, each one task_context key ---------------------
+//
+// Every read is bounded to the last 14 days where the table carries a time, and to the columns the
+// drafter needs. None names an agent: the Napkin columns are derived from the --agent flag through
+// napkinPatch()'s own shape check.
+
+// The product lane's recent copy: release notes, feature benefits, messages; never a retired one.
+async function readRecentMarket(db) {
+  return db.get(`market_records?kind=in.(release_note,feature_benefit,message)&or=(status.is.null,status.neq.retired)` +
+    `&created_at=gte.${agoIso()}&select=id,kind,title,body,data,created_at&order=created_at.asc`);
+}
+
+// The career lane's recent market signal: posting TITLES only (a posting's text, pay and verdict
+// stay in its own lane), plus market requirements and weekly reviews.
+async function readRecentCareer(db) {
+  const since = agoIso();
+  const postings = await db.get(`career_records?kind=eq.posting&created_at=gte.${since}&select=id,kind,title&order=created_at.asc`);
+  const rest_ = await db.get(`career_records?kind=in.(market_requirement,review)&created_at=gte.${since}` +
+    '&select=id,kind,title,body,data&order=created_at.asc');
+  return [...postings, ...rest_];
+}
+
+// The Napkin rows not yet noted under this agent's column -- never noted, or edited 60+ seconds after
+// the note (the note's own write moves updated_at, so a 60 s margin keeps a just-noted row out).
+async function readNapkin(db, args) {
+  const notedAt = Object.keys(napkinPatch(args.agent, null, null))[1];
+  const rows = await db.get(`napkin_ideas?select=id,text,status,updated_at,${notedAt}&order=updated_at.asc`);
+  return rows.filter(r => r[notedAt] == null || Date.parse(r[notedAt]) <= Date.parse(r.updated_at) - 60 * 1000);
+}
+
+// The principal's own material, only the kinds this agent holds a grant row for.
+async function readPersonalSources(db, args) {
+  const grants = await db.get(`personal_source_grants?agent_id=eq.${encodeURIComponent(args.agent)}&select=kind`);
+  const kinds = [...new Set(grants.map(g => g.kind).filter(Boolean))];
+  if (!kinds.length) return null;
+  return db.get(`personal_sources?kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
+    '&select=id,kind,title,body,data,origin,voice,created_at&order=created_at.asc');
+}
+
+// The platform's week (readWeek) plus `ships`: the backlog titles of the week's pushed cycles.
+async function readWeekShips(db) {
+  const week = await readWeek(db);
+  const ids = [...new Set(week.cycles.map(c => c.item_id).filter(Boolean))];
+  const ships = ids.length
+    ? await db.get(`backlog_items?backlog_id=in.(${ids.map(i => encodeURIComponent(`"${i}"`)).join(',')})&select=backlog_id,title`)
+    : [];
+  if (!week.cycles.length && !week.decisions.length) return null;
+  return { ...week, ships };
+}
+
+const EXTRA_READERS = {
+  competitors: readCompetitors,
+  market: readRecentMarket,
+  career: readRecentCareer,
+  napkin: readNapkin,
+  personal_sources: readPersonalSources,
+  week: readWeekShips,
+};
+
 async function render(args) {
   const db = rest();
   const caps = await db.get(`capabilities?slug=eq.${encodeURIComponent(args.capability)}&tenant_id=eq.${TENANT}&select=default_intent_slug&limit=1`);
@@ -531,10 +768,11 @@ async function render(args) {
   }
   // The capability's extra read, by slug -- absent for the other eleven, so task_context is unchanged
   // for them and the key is null rather than missing when the read returns nothing.
+  // AGT-543: a slug's extra reads are one key or a list of keys, each read by EXTRA_READERS.
   const extra = {};
-  if (EXTRA_READS[args.capability] === 'competitors') {
-    const competitors = await readCompetitors(db);
-    extra.competitors = competitors.length ? competitors : null;
+  for (const key of [].concat(EXTRA_READS[args.capability] ?? [])) {
+    const value = await EXTRA_READERS[key](db, args);
+    extra[key] = value == null || (Array.isArray(value) && !value.length) ? null : value;
   }
   const task_context = {
     ask: args.ask || null,
@@ -542,7 +780,7 @@ async function render(args) {
     records,
     corrections,
     posting_coverage,
-    repos: REPOS,
+    repos: storeFor(args.capability).repos,
     week,
     input,
     intake,
@@ -597,6 +835,8 @@ function loadAnswer(raw) {
 async function write(args) {
   let answer;
   try { answer = loadAnswer(args.answer); } catch (e) { fail(`--answer is not readable JSON: ${e.message}`); }
+  const store = storeFor(args.capability);
+  if (store.write) return store.write(args, answer);
   const check = validateAnswer(answer);
   if (check.error) fail(`answer refused, nothing written: ${check.error}`);
 
@@ -628,6 +868,60 @@ async function write(args) {
     try { filed = await db.insert('market_leads', leads); } catch (e) { fail(e.message); }
   }
   process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), leads: filed.length }) + '\n');
+}
+
+// AGT-543. The humor store's --write: the deny list is every phrase_set row's data.deny_list, read
+// live; the whole answer is checked before anything is written; draft rows gain the derived counts
+// with their text untouched; ONE humor_records insert (no target_row column, no `log` row); then one
+// PATCH per Napkin note, the agent's own two columns. Exit 2 on a refusal, nothing written.
+async function writeHumor(args, answer) {
+  // Every exit below follows a live fetch, so it sets process.exitCode and RETURNS instead of calling
+  // fail(): process.exit() while the fetch's socket is still closing aborts node on Windows
+  // (libuv `!(handle->flags & UV_HANDLE_CLOSING)`, exit 3221226505 instead of 2 -- measured in this
+  // build's arm D). Same exit code, same stderr line, no crash.
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  const db = rest();
+  let phraseSets;
+  try { phraseSets = await db.get('humor_records?kind=eq.phrase_set&select=data'); } catch (e) { return stop(e.message); }
+  const denyList = phraseSets.flatMap(r => (Array.isArray(r.data?.deny_list) ? r.data.deny_list : []))
+    .filter(n => typeof n === 'string' && n.trim());
+  if (!denyList.length) console.error('personal-agent: no phrase_set deny_list -- deny check skipped');
+  const check = validateHumorAnswer(answer, denyList.length ? denyList : null);
+  if (check.error) return stop(`answer refused, nothing written: ${check.error}`);
+  const notes = Array.isArray(answer.napkin_notes) ? answer.napkin_notes : [];
+  // The agent id must be able to name its Napkin columns BEFORE the insert, so a bad id never leaves
+  // the records written and the notes not.
+  if (notes.length) {
+    try { napkinPatch(args.agent, '', ''); } catch (e) { return stop(`answer refused, nothing written: ${e.message}`); }
+  }
+
+  const source = `${args.capability} ${new Date().toISOString().slice(0, 10)}`;
+  const session_name = args.sessionName || null;
+  const rows = answer.records_to_write.map(item => {
+    const data = { ...(item.data ?? {}) };
+    if (item.kind === 'draft') Object.assign(data, humorCounts(data.text));
+    return { kind: item.kind, title: item.title, body: item.body ?? null, data, source, session_name };
+  });
+  let inserted = [];
+  if (rows.length) {
+    try { inserted = await db.insert('humor_records', rows); } catch (e) { return stop(e.message); }
+  }
+
+  let noted = 0;
+  for (const n of notes) {
+    try {
+      const patched = await db.patch(`napkin_ideas?id=eq.${encodeURIComponent(n.entry_id)}`,
+        napkinPatch(args.agent, n.note, new Date().toISOString()));
+      noted += patched.length;
+    } catch (e) { return stop(e.message); }
+  }
+  process.stdout.write(JSON.stringify({
+    inserted: inserted.length,
+    ids: inserted.map(r => r.id),
+    napkin_notes: noted,
+    target: HUMOR_TARGET,
+    drafts: check.counts.map(c => ({ ...c, over_target: c.char_count > HUMOR_TARGET })),
+  }) + '\n');
 }
 
 async function fetchPostings() {
