@@ -77,7 +77,7 @@ Length: about 200 characters is the target, never a quota; the write check's har
 
 ## 5. What this agent skips from `docs/AGENT-ARCHITECTURE.md`, stated as exceptions
 
-As the career agent does: no deliverables-table row (drafts are private records, not sellable deliverables), no Agent Intelligence Score, no Knowledge Hunger states, no marketplace or BYOK economics, no Test Scorecard. Everything else — the full agent row with avatar and pronouns, the Skill/Capability data model, prompt assembly from rows, Rule #1 (no row names another agent), AI Audit logging — applies in full.
+As the career agent does: no deliverables-table row (drafts are private records, not sellable deliverables), no Agent Intelligence Score, no Knowledge Hunger states, no marketplace or BYOK economics, no Test Scorecard. **No roster entry in `src/data/agents.js`** (no AGENTS row, no AVATAR_CFG, no AGENT_PRONOUNS): measured 2026-10-23, the career agent has none either, because no product screen renders the personal lane and a pronoun entry with no AGENTS member reads as an orphan to the roster test. His pronouns (he/him) live in his agent row's bio and in this record until AGT-85 gives personal-lane agents a screen. The build therefore touches two repo files — the seed and its regression test — plus one migration applied over the Supabase MCP. Everything else — the full agent row with avatar and pronouns, the Skill/Capability data model, prompt assembly from rows, Rule #1 (no row names another agent), AI Audit logging — applies in full.
 
 ## 6. Reverse handles
 
