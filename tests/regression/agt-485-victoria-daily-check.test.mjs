@@ -10,7 +10,12 @@
 //     `countable_tickets_per_project()` UNCHANGED (AGT-481, its own guard still grades it); arm 2
 //     is that function's own P1-P8 block with two changes -- `effective_need_score(b.id) = 5`
 //     (d.3) and `planned`-or-unhomed in place of `executing` (d.10: never a `paused` project's
-//     ticket). `detail` = `{below, counts, fives, five_ids}`.
+//     ticket) -- plus P9 since `AGT-516` (`v7.0.884`): a ticket in `victoria_charter_state()`'s
+//     `stamped` is not a loose five, so the SENSOR drops what `--prepare-list` already drops.
+//     `detail` = `{below, counts, fives, five_ids}`.
+//   * `public.victoria_daily_probe()` -- AGT-516's standing proof that P9 is wired: it stamps one
+//     five under the live fingerprint inside a `P0516` sub-block, re-reads, rolls back, and returns
+//     `{id, before, after, after_ids, residue}`. `service_role` only, like the two above.
 //   * `docs/runbooks/victoria-daily-check.md` -- the routine's canonical prompt block, carrying no
 //     trigger id and no model id (AGT-102's placeholder week is why).
 //   Both functions are `service_role` only. Before the migration both names 404'd with `PGRST202`.
@@ -19,10 +24,14 @@
 // the verdict a COUNT SET IT BUILT ITSELF and demands the answer flip at exactly ten. Nine prompts
 // and ten is silent -- the Done-when both ways, which is the one assertion a reader that prompted
 // on everything (or on nothing) cannot pass. Arm C is the second teeth: it re-derives the fives
-// over REST from epics, scored open tickets, their grades, their blockers and their gate cards,
-// applying P1-P8 in JavaScript, and demands the same ids the function returned. The predicates it
-// applies are IMPORTED from AGT-481's guard rather than retyped, so the hand count has one home
-// (pattern:14/17) and a change to the rules moves both guards at once.
+// over REST from epics, scored open tickets, their grades, their blockers, their gate cards and
+// their fit-stamps, applying P1-P9 in JavaScript, and demands the same ids the function returned.
+// The predicates it applies are IMPORTED from AGT-481's guard rather than retyped, so the hand
+// count has one home (pattern:14/17) and a change to the rules moves both guards at once.
+// ARM E is P9's own teeth, because arm C cannot grow them: nothing stamped is scored 5 on today's
+// board, so arm C would agree with the reader just as loudly on a function that never read the
+// stamp. E drives `victoria_daily_probe()`, which stamps one five in a rolled-back sub-block and
+// demands exactly that five leave with zero residue afterwards (AGT-516).
 //
 // NOTHING IS PINNED TO TODAY'S BOARD. The counts, the slugs and the fives are recomputed every
 // run, so this guard keeps working as tickets ship and never has to be edited when one moves.
@@ -103,7 +112,8 @@ async function run() {
   const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   if (!base || !key) {
-    notRun("arms A, B and C (the verdict at nine and ten, the reader's one row, the re-derived fives)",
+    notRun("arms A, B, C and E (the verdict at nine and ten, the reader's one row, the re-derived "
+      + "fives, and E's probe that stamps one five and demands the sensor drop it)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent -- the check is a pair of database functions and "
       + "there is nothing to read without them. Arm D (the runbook) ran. Run: node "
       + "--env-file-if-exists=.env.local tests/regression/agt-485-victoria-daily-check.test.mjs");
@@ -197,6 +207,10 @@ async function run() {
   // --- C: THE FIVES, re-derived over REST without ever asking the reader -------------------------
   // Arm 2's scope: a `planned` project's list, or no epic at all. A `paused` project's ticket is not
   // hers to move (requirements d.10), so the scope is NAMED `planned` rather than "not executing".
+  // P1-P9 since AGT-516: P9 is the fit-stamp, the ninth predicate -- a ticket Victoria has already
+  // read against every active charter and turned down is not a loose five, because `--prepare-list`
+  // (AGT-486) will not offer it either. Sensor and door drop the same tickets or the daily check
+  // asks John about a ticket the door refuses, every day, forever.
   const planned = await get("projects?status=eq.planned&select=id,slug");
   const executing = await get("projects?status=eq.executing&select=id,slug");
   const plannedEpics = new Set((planned.length
@@ -210,6 +224,12 @@ async function run() {
   const hours = await rpc("countable_claim_hours");
   assert.strictEqual(typeof hours, "number",
     `rpc/countable_claim_hours must return a bare integer, got ${JSON.stringify(hours)}`);
+
+  // P9 (AGT-516): the stamped set, read from the fingerprint rule's ONE home. `victoria_charter_state()`
+  // recomputes the md5 of the live `executing` charters on every call and returns only the stamps
+  // taken under THAT fingerprint, so this hand count inherits the clearing condition instead of
+  // re-deriving it -- a charter edit moves the fingerprint and both sides stop excluding at once.
+  const stamped = new Set(one(await rpc("victoria_charter_state")).stamped ?? []);
 
   // Two bulk reads, then the arithmetic is local: the whole open/partial board once, and every
   // waiter once. The per-ticket round trips below are spent only on the handful that reach five.
@@ -248,6 +268,7 @@ async function run() {
       `runner_items?backlog_id=eq.${b.backlog_id}&kind=eq.gated_before_build&decision=is.null&select=id`);
     if (cards.length > 0) continue;
 
+    if (stamped.has(b.backlog_id)) continue;                              // P9 (AGT-516)
     hand.push(b.backlog_id);
   }
   hand.sort();
@@ -255,11 +276,52 @@ async function run() {
   assert.deepStrictEqual([...(detail.five_ids ?? [])].sort(), hand,
     `the reader's fives and the hand count disagree -- reader ${JSON.stringify(detail.five_ids)}, hand `
     + `count ${JSON.stringify(hand)} over ${scoped.length} open/partial ticket(s) in planned-or-unhomed `
-    + `scope, ${atFive.length} of them at effective score 5. One of arm 2's two changes (score 5, `
-    + "planned-or-unhomed) or one of P1-P8 is not doing what the kickoff's §4 says it does.");
+    + `scope, ${atFive.length} of them at effective score 5, ${stamped.size} ticket(s) holding a live `
+    + `fit-stamp. One of arm 2's two changes (score 5, planned-or-unhomed) or one of P1-P9 -- P9 being `
+    + "AGT-516's fit-stamp -- is not doing what the kickoff's §4 says it does.");
   console.log(`         AGT-485 fives re-derived this run: ${scoped.length} scoped -> ${atFive.length} at `
     + `effective 5 -> ${hand.length} countable ${JSON.stringify(hand)}`);
   results.push("fives-re-derived-from-the-raw-board-match-the-readers-ids");
+
+  // --- E: P9's OWN DISCRIMINATOR -- stamp one five and the sensor must drop THAT five ------------
+  // Arm C proves the reader and the hand count agree, but it cannot prove P9 is WIRED: nothing
+  // stamped is scored 5 on today's board (the four live stamps sit at 3-4), so both sides agree
+  // just as loudly on a function that never read the stamp at all -- a false green that is
+  // structurally possible, which is the kind that is not allowed (pattern:75). `victoria_daily_probe()`
+  // makes the case the board does not offer: it stamps the FIRST of the fives under the live
+  // fingerprint inside a sub-block ending in the `P0516` sentinel, re-reads the fives through the
+  // same door, and rolls the stamp back. `residue` is read AFTER the sentinel from the real table,
+  // so the one thing this arm must never do -- leave a stamp on the board it grades -- is itself
+  // asserted rather than assumed (pattern:76).
+  const probe = await rpc("victoria_daily_probe");
+  assert.strictEqual(probe.residue ?? 0, 0,
+    `victoria_daily_probe() left ${probe.residue} unreversed fit-stamp row(s) under session_name `
+    + `agt516-probe -- its P0516 sentinel did not roll the fixture back, so this read-only guard is `
+    + `writing to the board it grades. Probe: ${JSON.stringify(probe)}`);
+  if (probe.before > 0) {
+    // On the path that actually wrote, the count must be a real number: a missing key must not read
+    // as a pass through the `?? 0` above, which exists only for the skip return below.
+    assert.strictEqual(typeof probe.residue, "number",
+      `the probe measured ${probe.before} five(s) and returned no residue count -- the read-only `
+      + `assertion has nothing to stand on. Probe: ${JSON.stringify(probe)}`);
+    assert.strictEqual(probe.after, probe.before - 1,
+      `the probe stamped ${probe.id} under the live charter fingerprint and victoria_daily_check() `
+      + `still reads ${probe.after} fives against ${probe.before} before it -- exactly one five must `
+      + `leave. P9 is not reading victoria_charter_state().stamped, which is the whole of AGT-516. `
+      + `Probe: ${JSON.stringify(probe)}`);
+    assert.ok(Array.isArray(probe.after_ids) && !probe.after_ids.includes(probe.id),
+      `the probe stamped ${probe.id} and the reader still lists it among the fives `
+      + `${JSON.stringify(probe.after_ids)} -- the count moved but the wrong ticket left, which is a `
+      + "P9 that excludes by accident rather than by stamp.");
+    console.log(`         AGT-516 probe: stamped ${probe.id} -> fives ${probe.before} became `
+      + `${probe.after}, residue ${probe.residue}`);
+  } else {
+    // Named, never silently passed (pattern:77): with no five on the board there is nothing to
+    // stamp, so P9's discriminator could not be driven this run and says so out loud.
+    console.log(`         AGT-516 probe SKIPPED: no five on the board, so stamping one could not be `
+      + `driven this run -- probe returned ${JSON.stringify(probe)}`);
+  }
+  results.push("probe-stamp-on-one-five-drops-it-and-leaves-no-residue");
 
   // --- the anon denial, declared ------------------------------------------------------------------
   const anon = process.env.SUPABASE_ANON_KEY ?? "";
