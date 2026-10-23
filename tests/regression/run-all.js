@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.888 | tests/regression/run-all.js | AGT-428 -- DIR's commit count read before the first import and after the last test; a change is REPORTED
 // DeepBench v7.0.876 | tests/regression/run-all.js | AGT-304 slice 16 -- fetch restored per test beside the env restore
 // DeepBench v7.0.793 | tests/regression/run-all.js | AGT-391 -- `--only=<csv>` / `--only-from=<file>`
 // run a SELECTIVE set, by basename: the build's related set (scripts/related-tests.js). Checked FIRST
@@ -105,6 +106,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
+import { spawnSync } from "child_process";
 // AGT-116: the transport helpers come THROUGH self-run.js, so this file keeps exactly one relative
 // import -- SES-215's control relocates a copy of this runner by rewriting that one specifier.
 import {
@@ -141,6 +143,14 @@ function readOnly() {
   return [...new Set(raw.split(/[,\r\n]+/).map(s => s.trim()).filter(Boolean).map(s => path.basename(s)))];
 }
 const ONLY = readOnly();
+
+// AGT-428: DIR's repository, counted. null outside a repository or when git is unusable -- a
+// null is never reported as a change.
+function commitCount() {
+  const r = spawnSync("git", ["-C", DIR, "rev-list", "--count", "HEAD"], { encoding: "utf8" });
+  const n = r.status === 0 ? parseInt(String(r.stdout).trim(), 10) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
 
 // SES-215. A shallow copy is the whole snapshot: process.env is a flat string map whose values are
 // strings, so there is nothing deeper to clone.
@@ -213,6 +223,7 @@ async function main() {
 async function runSuite(transport) {
   const all = listTests();
   const files = ONLY === null ? all : all.filter(f => ONLY.includes(f));
+  const historyBefore = commitCount();
   if (ONLY !== null) {
     console.log(`SELECTIVE RUN: ${files.length} of ${all.length} files (--only; the full suite runs weekly and before a production release, AGT-391)`);
   }
@@ -279,6 +290,11 @@ async function runSuite(transport) {
       `(${partialTests.join(", ")}). Those parts are UNVERIFIED -- a green suite does not cover them.`
     );
   }
+  const historyAfter = commitCount();
+  if (historyBefore !== null && historyAfter !== null && historyAfter !== historyBefore)
+    console.log(
+      `HISTORY CHANGED MID-RUN: ${historyBefore} -> ${historyAfter} commits in ${DIR}'s repository (AGT-428) -- this run and a baseline captured before it graded different histories.`
+    );
   if (transport.created) removeTransportLog(transport.file);
   return failCount > 0 ? 1 : transportNotRun > 0 ? 2 : 0;
 }

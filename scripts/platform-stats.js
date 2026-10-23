@@ -1,3 +1,4 @@
+// DeepBench v7.0.888 | scripts/platform-stats.js | AGT-428 -- the shallow-clone deepen is opt-in (PLATFORM_STATS_DEEPEN=1)
 // DeepBench v7.0.78 | platform-stats.js | S-DAT-18 -- writes with the service key (anon key lost its platform_stats write grant)
 // Runs automatically from package.json's `prebuild` on every Vercel build of dev/main, or
 // locally via `node --env-file=.env.local scripts/platform-stats.js`. Plain Node, no deps.
@@ -16,6 +17,7 @@ import { execSync } from "node:child_process";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SOFT = process.argv.includes("--soft");
+const DEEPEN = process.env.PLATFORM_STATS_DEEPEN === "1";
 
 function skip(reason) {
   console.log(`platform-stats: skipped — ${reason}`);
@@ -90,8 +92,7 @@ async function main() {
   //     apparently-successful fetch because nothing about the repository had changed.
   //   * Therefore commits_dev is EXPECTED to be preserved rather than refreshed on Vercel
   //     builds; the monotonic guard below does that. Correct behavior, not a bug to fix.
-  //   * The attempt is kept because it does work from a full-depth/local checkout, which is
-  //     where the count actually advances. It is time-bounded, ~70 ms, and never fatal.
+  //   * AGT-428 (v7.0.888): fetch ONLY under PLATFORM_STATS_DEEPEN=1 -- via prebuild, an always-on fetch rewrote the history the suite was grading.
   //   * `VERCEL_DEEP_CLONE` was considered and rejected -- it is not in Vercel's
   //     documentation; do not add it.
   // Because the exit code proves nothing here, the outcome is VERIFIED by counting before and
@@ -105,7 +106,11 @@ async function main() {
     }
   };
   try {
-    if (git("git rev-parse --is-shallow-repository") === "true") {
+    if (!DEEPEN && git("git rev-parse --is-shallow-repository") === "true") {
+      console.log(
+        "platform-stats: shallow clone left as-is (AGT-428: set PLATFORM_STATS_DEEPEN=1 to deepen) -- commit count will be preserved"
+      );
+    } else if (DEEPEN && git("git rev-parse --is-shallow-repository") === "true") {
       const beforeCount = countCommits();
       execSync("git fetch --unshallow --quiet", {
         cwd: repoRoot,
