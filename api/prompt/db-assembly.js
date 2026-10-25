@@ -1,3 +1,4 @@
+// DeepBench v7.0.895 | api/prompt/db-assembly.js | AGT-429 -- 44->4 / 22->2 / 11->1
 // DeepBench v7.0.850 | api/prompt/db-assembly.js | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
 // A Skill every call of an agent must carry is pinned ONCE at AGENT level and read here, instead of
 // being linked to every one of that agent's capabilities: `deepbench-north-star` held 49
@@ -591,6 +592,45 @@ export function buildTaughtSection(shaped) {
 // `pinned: true` marks the row's provenance for a later reader; `source_capability_slug: null` is the
 // honest answer to "which capability brought this in" -- none did, the agent did. `level`/`skill_level`
 // are consumed only for the fired Intent, so a Knowledge pin carrying null changes no rendered text.
+// FEATURE: AGT-429 -- ONE dedupe of the loaded Skill Profile rows by their own `slug`, so each
+// distinct Skill renders as ONE assembled section per bundle instead of one per capability that
+// links it. PURE on purpose (no fetch, no env, no clock), so arm A of
+// tests/regression/agt-429-bundle-section-dedupe.test.mjs grades the rule itself.
+// THE FAULT IT CLOSES, measured live this cycle through the agent-wide path below: that path pushes
+// every assigned capability's `capability_skill_profiles` rows with no slug check, and
+// buildSections() emits one section per row -- so an agent holding 11 capabilities that each link
+// the same 4 Skills assembled 44 sections of only 4 distinct slugs, one role prompt 22 times and one
+// guardrail 11 (`.claude/rules/agent-data-visibility.md`: never render a role prompt, guardrail or
+// taught item into more than one assembled section; docs/ARCHITECTURE.md §19b).
+// Each clause is a measured case:
+//   * FIRST ROW PER SLUG WINS and order is kept -- the rows arrive ordered by `display_order` within
+//     each capability, in assignment order, so the first occurrence is the earliest-ordered one and
+//     its `source_capability_slug` is the first capability that brought the Skill in. Keeping the
+//     later copy would rewrite that provenance for no gain;
+//   * a row with NO `slug` is KEPT, never collapsed -- slug-less rows are not "the same Skill", and
+//     silently dropping an unidentifiable row would lose entitled content (pattern:28);
+//   * a non-array is `[]`, the same defensive shape mergePinnedSkills() takes;
+//   * DROPPING NOTHING RETURNS THE SAME REFERENCE, so every bundle that had no repeat assembles
+//     byte-identical -- the single-capability path is untouched by construction.
+// The key is `sp.slug` ALONE -- never an agent id or a capability slug
+// (`.claude/rules/capabilities-are-data.md`), so this names no agent and no capability and holds no
+// content judgment.
+export function dedupeSkillProfilesBySlug(rows) {
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set();
+  const kept = [];
+  let dropped = false;
+  for (const sp of rows) {
+    const slug = sp?.slug;
+    if (slug) {
+      if (seen.has(slug)) { dropped = true; continue; }
+      seen.add(slug);
+    }
+    kept.push(sp);
+  }
+  return dropped ? kept : rows;
+}
+
 export function mergePinnedSkills(skillProfiles, pins) {
   const loaded = Array.isArray(skillProfiles) ? skillProfiles : [];
   const rows = Array.isArray(pins) ? pins : [];
@@ -787,6 +827,12 @@ export async function assemblePrompt({ capability_slug, agent_id, tenant_id, tas
           })));
         }
       }
+      // FEATURE: AGT-429 -- the agent-wide path ONLY, after every assigned capability's rows are in
+      // and before anything else reads the set. The single-capability path above cannot repeat a slug
+      // (one capability, one link per Skill) and is deliberately not touched; the pins merge below
+      // (AGT-434) already drops a loaded row of a PINNED slug, and running after it would make this
+      // function's same-reference guarantee depend on that merge's output instead of on the load.
+      skillProfiles = dedupeSkillProfilesBySlug(skillProfiles);
     }
   }
 
