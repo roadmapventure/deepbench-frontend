@@ -60,7 +60,7 @@ const TRIGGER_ID = "trig_01862LsK4ZQF8PTgQoK2cgCV";
 // The pre-change tree, from the kickoff's own CONTEXT section: the runbook measured 380,980 B and
 // step 4b still carried the pass. Kept as a literal rather than read from git, because a rebase
 // rewrites the sha of the commit it would have to be read from.
-const PRE_CHANGE_BYTES = 380980;
+export const PRE_CHANGE_BYTES = 380980;
 
 const RETIREMENT_LINE =
   "**4b. Invention pass — retired from the cycle (`AGT-138`, `v7.0.608`).** The Researcher runs in " +
