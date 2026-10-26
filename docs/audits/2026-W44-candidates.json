@@ -1,0 +1,2132 @@
+{
+  "week": "2026-W44",
+  "found_by": "auditor:judgment:claude-fable-5-1 + auditor:board-checks + auditor:headroom-checks + auditor:private-scan + auditor:routine:board-health + auditor:routine:work-quality + auditor:routine:advisor + check-routine-prompt:auditor + check-routine-prompt:runner + check-routine-prompt:runner + auditor:routine:suite",
+  "findings": [
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "config-outdated-fact",
+      "locations": [
+        {
+          "location": "claude-config:memory/C--Projects/project-cap-split-rule-2026-10-09.md:15",
+          "text": "Gaps: no runner capability receives a cap case yet (runbook prose only); runner-cycle.md at 380,977/381,000 bytes (finding filed: governance hygiene + runbook ceiling RCA); ses-415 criterion-170 red is pre-existing (finding dd603ab9)."
+        },
+        {
+          "location": "capabilities/rule-cap-case/description",
+          "text": "Rules one cap case split or waive through public.rule_capped_ticket(); writes nothing else."
+        },
+        {
+          "location": "scripts/rule-cap-case.js:1",
+          "text": "// DeepBench v7.0.840 | scripts/rule-cap-case.js | AGT-449 -- a cap case reaches the Development Manager.\n// Spec: docs/kickoffs/v7.0.840-AGT-449-cap-case-reaches-the-manager.md sections 4 and 5 (T2).\n//\n// WHY THIS EXISTS. pattern:172 (John 2026-10-09): when the file or task cap would force a split, the\n// design step stops and sends a CAP CASE -- premise alive, kickoff_markdown and kickoff_path null, the\n// parts in build order in harvest_markdown (AGT-448). The Development Manager rules it split or waive\n// with ONE call to public.rule_capped_ticket() (AGT-445, AGT-447). Until this ship, runbook step 5a had\n// the cycle make that call itself: devmanager held five capabilities and none of them took a cap case."
+        }
+      ],
+      "governing_fact": "Whether a runner capability exists that receives a cap case: the memory note says none does yet, while the live capabilities table carries rule-cap-case (AGT-449, v7.0.840) which rules one cap case through public.rule_capped_ticket().",
+      "confidence": "medium",
+      "proposed_resolution": "The capabilities row capabilities/rule-cap-case/description should win, as the live source the AGT-449 v7.0.840 ship (pattern:172, John 2026-10-09) made true; the memory note's Gaps line is the location to update so it no longer states that no capability takes a cap case. Confidence is medium because AGT-449's own ticket status is not among the handed statements.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "config-outdated-fact",
+      "locations": [
+        {
+          "location": "claude-config:memory/C--Projects/feedback-dev-manager-owns-discovered-work.md:30",
+          "text": "Rule: a finding surfaced in a status/diagnosis session goes into `audit_findings` for The Development Manager's RCA review; report the DM's ruling, and never hand John a project-scope fix as a question."
+        },
+        {
+          "location": "scripts/check-findings-intake.js:1",
+          "text": "// DeepBench v7.0.871 | scripts/check-findings-intake.js | AGT-494 -- the out-of-scope note names the live\n// filer: the Governance Architect, under JOHN-1013-TESTED-TICKETS (JOHN-0925-FINDINGS-STANDARD superseded)."
+        },
+        {
+          "location": "skill_profiles/ga-knowledge-review/method",
+          "text": "public.audit_findings (the one intake, AGT-131; a finding moves open/carried -> ticketed, not-a-defect, carried, listed or escalated), public.backlog_items (open tickets; reuse_backlog_id names one), public.finding_routes and public.projects (task_context.routes / projects), public.apply_audit_review() (the one write path; scripts/audit-review.js --prepare, --dry-run, --apply), public.record_decision() with before-images (every ruling reversible). Standard B: the cause is reproduced and the fix tested with a read-only query or command before a ticket is written."
+        }
+      ],
+      "governing_fact": "Which role reviews audit_findings and files tickets from it: the memory rule routes findings to The Development Manager's RCA review; the live repo names the Governance Architect under JOHN-1013-TESTED-TICKETS, with JOHN-0925 superseded.",
+      "confidence": "medium",
+      "proposed_resolution": "The repo home wins: check-findings-intake.js:1 (AGT-494, v7.0.871) and the ga-knowledge-review Skill row record JOHN-1013-TESTED-TICKETS (John 2026-10-13, decisions 27-29) superseding JOHN-0925-FINDINGS-STANDARD, which is retired in governance_rules. The memory file's rule should name the Governance Architect's review under JOHN-1013 as the route.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "config-disagrees",
+      "locations": [
+        {
+          "location": "claude-config:memory/C--Projects/MEMORY.md:63",
+          "text": "discovered work = finding via `audit-ledger.js --ingest` (needs the service key; direct `audit_findings` insert works without it)."
+        },
+        {
+          "location": "claude-config:memory/C--Projects/project-victoria-fill-requirements-1013.md:19",
+          "text": "Five findings (stuck-queue outcome check, removal-proposed dead end, drain exit rule, block-triage design, morning report skill) were filed for review, inserted directly into `audit_findings` because the ingest script needs the service key."
+        },
+        {
+          "location": "scripts/audit-ledger.js:1",
+          "text": "// FEATURE: AGT-131 -- ONE FINDINGS LIST, AND THIS FILE IS ITS ONE INTAKE. Four writers reach\n// public.audit_findings: this CLI, api/_lib/handlers/auditor-write.js, scripts/staff-watch.js and\n// scripts/ticket-owner.js."
+        }
+      ],
+      "governing_fact": "Whether a hand INSERT into public.audit_findings outside the named writers is a sanctioned intake: memory presents it as the working path when the service key is absent; the repo says audit-ledger.js is the one intake with four named writers.",
+      "confidence": "medium",
+      "proposed_resolution": "The repo home wins: AGT-131 (v7.0.596) made audit-ledger.js the one intake and names its four writers. MEMORY.md:63 and the 1013 note should direct an attended session to audit-ledger.js --ingest, and the missing local service key should be raised as its own access finding rather than kept as a standing bypass.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "config-disagrees",
+      "locations": [
+        {
+          "location": "claude-config:memory/C--Projects/feedback-real-agent-loop-required.md:12",
+          "text": "**The actual requirement — Rule #1 of this platform: no agent is dependent on another. Ever.** No agent's Skill Profile, tool description, or delegate declaration may name another agent by id. The only thing an agent may express is a *skill it needs* (inference, mid-reasoning — a tool call it chooses to emit). Resolving that need to an actual executing agent is never code's job, at any layer — it is **Michelle Manning's job** (Project Manager, `project-manager` capability, `agent_capability_assignments` row already live). Concretely, per John's own restatement, confirmed accurate 2026-07-02:"
+        },
+        {
+          "location": "docs/ARCHITECTURE.md:1214",
+          "text": "| Full roster (all 21 agents) — `capabilities`/`skill_profiles`/`agent_capability_assignments` + `agents` table competency fields; **surfacing ranked candidates** for a delegated skill need (never unilaterally selecting — the requesting agent chooses, `S-ARCH-OWNERSHIP-02-design`) | Michelle Manning (PP-01) | `lib/project-manager.js` (`AA-86`) | ✅ Built (`S-ARCH-PM-BROKER-01`) — **but see 2026-07-08 note below: the built broker doesn't yet surface real Skill-level content, only the thin Capability wrapper (`AA-165`)** |"
+        }
+      ],
+      "governing_fact": "Who resolves a delegated skill need to the executing agent: the memory says resolving it is Michelle Manning's job; ARCHITECTURE.md §19e says she only surfaces ranked candidates and the requesting agent chooses.",
+      "confidence": "medium",
+      "proposed_resolution": "docs/ARCHITECTURE.md:1214 should win: it cites the later design decision S-ARCH-OWNERSHIP-02-design (never unilaterally selecting; the requesting agent chooses), which post-dates the memory's 2026-07-02 wording. The memory row's 'it is Michelle Manning's job' sentence is the field that no longer matches; the memory's truncated continuation should be read before any edit.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "config-outdated-fact",
+      "locations": [
+        {
+          "location": "docs/ARCHITECTURE.md:1214",
+          "text": "| Full roster (all 21 agents) — `capabilities`/`skill_profiles`/`agent_capability_assignments` + `agents` table competency fields; **surfacing ranked candidates** for a delegated skill need (never unilaterally selecting — the requesting agent chooses, `S-ARCH-OWNERSHIP-02-design`) | Michelle Manning (PP-01) | `lib/project-manager.js` (`AA-86`) | ✅ Built (`S-ARCH-PM-BROKER-01`) — **but see 2026-07-08 note below: the built broker doesn't yet surface real Skill-level content, only the thin Capability wrapper (`AA-165`)** |"
+        },
+        {
+          "location": "docs/ARCHITECTURE.md:3025",
+          "text": "- **Generation 1 — Skills on Capabilities** (§2): `skill_profiles` rows, six types, grouped by\n  `capability_skill_profiles`, assigned by `agent_capability_assignments`. Authored only in SQL;\n  §2's \"created by users\" half was never built. 175 Skills, 76 Capabilities, held almost entirely\n  by the 30 seeded agents."
+        }
+      ],
+      "governing_fact": "How many agents make up the full roster that the project-manager broker ranks over: the §19e table says all 21 agents; the later Generation 1 summary in the same file says 30 seeded agents.",
+      "confidence": "medium",
+      "proposed_resolution": "The live agents table should win, per the same file's own convention at docs/ARCHITECTURE.md:582 ('read the live table for the roster; no count is copied here'). The §19e row at :1214 is the stale field (a copied count from the S-ARCH-PM-BROKER-01 era). I am unsure whether 'seeded agents' and 'full roster' are the same set; a live count would settle it.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "config-disagrees",
+      "locations": [
+        {
+          "location": "docs/ARCHITECTURE.md:636",
+          "text": "```sql\n-- Agents are assigned to Capabilities — not to individual Skill Profiles\n-- Agents inherit level from capability_skill_profiles.level (no per-agent ceiling yet)\nagent_capability_assignments (\n  id, tenant_id, agent_id,\n  capability_slug,    -- FK → capabilities.slug\n  created_at\n)\n```"
+        },
+        {
+          "location": "claude-config:memory/C--Projects/reference-agent-skill-pins.md:16",
+          "text": "1. Queried Skill→agent only through `capability_skill_profiles` → `agent_capability_assignments`; pins are a second path. Any \"which agents hold Skill X\" question must UNION both."
+        }
+      ],
+      "governing_fact": "Whether an agent can hold an individual Skill outside a Capability: the §2 schema comment says agents are never assigned to individual Skill Profiles; the memory says agent-skill pins are a live second path that must be unioned in.",
+      "confidence": "medium",
+      "proposed_resolution": "The live schema should win, per feedback-skill-capability-agent-model.md:40 ('if the doc and this memory ever disagree, the ground truth is the live schema'). If a pin table exists, the comment at docs/ARCHITECTURE.md:636 is the stale field. I have no ledger entry or decision for the pin path in hand; confirm the pin table and its ticket before ruling.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "config-disagrees",
+      "locations": [
+        {
+          "location": "scripts/audit-headroom.js:1",
+          "text": "`docs/runbooks/runner-cycle.md` measures 380,920 B under `agt-138`'s binding\n// ratchet `bytes < 380980`, which is FIFTY-NINE bytes of room"
+        },
+        {
+          "location": "claude-config:memory/C--Projects/project-mcp-teach-and-selective-regression-1005.md:23",
+          "text": "- `docs/runbooks/runner-cycle.md` sits 15 bytes under `RUNBOOK_CEILING` (381,000; `ses-413d` re-pins the measured size) — any edit must be net-negative."
+        }
+      ],
+      "governing_fact": "The byte ceiling docs/runbooks/runner-cycle.md is held under: the script header names a ratchet of bytes < 380,980 (59 bytes free at 380,920 B); the memory note names a ceiling of 381,000 with 15 bytes free, a size that would already breach the script's ratchet.",
+      "confidence": "medium",
+      "proposed_resolution": "The deepbench-frontend ratchet pin the script header cites (the agt-138 test pin, as re-pinned by ses-413d) is the one home for the ceiling; the memory note should cite that pin by name rather than restate a number, and the audit-headroom.js header should be re-measured against the same pin. I cannot see the live pin from here, so which number is current is unverified.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "config-outdated-fact",
+      "locations": [
+        {
+          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:459",
+          "text": "- **`M5-02` — the filing lane replaces bare queue order.** `drain_epic_next` ordered by\n  `b.queue` and nothing else. It now orders by **filing lane first** (`filed_at < 2026-08-21` is the\n  priority lane; on or after it is the review bucket), then `queue`, then `M5-07`."
+        },
+        {
+          "location": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:562",
+          "text": "`public.drain_epic_next(uuid)`, whose pick\ngained `JOIN public.projects pj` and now reads `ORDER BY pj.priority, CASE WHEN b.filed_at <\nc_lane_cut THEN 0 ELSE 1 END, b.queue, b.predicted_cycles NULLS LAST`."
+        }
+      ],
+      "governing_fact": "The first ORDER BY key of public.drain_epic_next: line 459 says the filing lane comes first; line 562 (v7.0.604) says pj.priority comes before the lane.",
+      "confidence": "high",
+      "proposed_resolution": "docs/RUNNER-GOV-M5-REQUIREMENTS.md:562 wins — migration agt140_project_priority_pick (v7.0.604) rewrote the function and captured the prior definition in runner_migration_downs; amend line 459 to say project priority precedes the filing lane.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "config-disagrees",
+      "locations": [
+        {
+          "location": "docs/ARCHITECTURE.md:636",
+          "text": "-- Agents are assigned to Capabilities — not to individual Skill Profiles\n-- Agents inherit level from capability_skill_profiles.level (no per-agent ceiling yet)"
+        },
+        {
+          "location": "claude-config:memory/C--Projects/feedback-skills-are-the-differentiator.md:11",
+          "text": "Three real layers (Skill / Capability / Agent) joined by two many-to-many joins (`capability_skill_profiles`, `agent_capability_assignments`). `PLATFORM-AGENT-RULEBOOK.md` AR-1.0 restates it: an agent's effective skills arrive only through the capabilities it's assigned"
+        },
+        {
+          "location": "claude-config:memory/C--Projects/reference-agent-skill-pins.md:16",
+          "text": "1. Queried Skill→agent only through `capability_skill_profiles` → `agent_capability_assignments`; pins are a second path. Any \"which agents hold Skill X\" question must UNION both."
+        },
+        {
+          "location": "scripts/victoria-rows-mirror.js:1",
+          "text": "// DeepBench v7.0.850 | scripts/victoria-rows-mirror.js | AGT-434 -- north star pinned ONCE per agent; 49 links removed."
+        }
+      ],
+      "governing_fact": "Whether a Skill reaches an agent only through capability_skill_profiles + agent_capability_assignments, or also directly through agent_skill_pins (AGT-434).",
+      "confidence": "medium",
+      "proposed_resolution": "reference-agent-skill-pins.md should win: AGT-434 (v7.0.850, 2026-10-11) added agent_skill_pins as a second Skill→agent path. Amend ARCHITECTURE.md:636's comment and feedback-skills-are-the-differentiator.md:11's 'only through the capabilities' so neither denies the pins path. Unsure whether a later ARCHITECTURE section already records pins.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "config-disagrees",
+      "locations": [
+        {
+          "location": "docs/ARCHITECTURE.md:250",
+          "text": "**Same concept as §2's \"Competency\"** (a Capability-set held by an entity, the same real-time construct as an Agent without a persona) — §2 describes what Competency *is* at the product/runtime level; this entry describes what it's *built from* at the data level. Competency is also the platform's core intellectual-property/monetization unit (John, 2026-07-17)"
+        },
+        {
+          "location": "docs/ARCHITECTURE.md:426",
+          "text": "Agents              — a Capability-set + persona (name, avatar, role, quip);\n                       without a persona, the same construct is a sellable Competency"
+        },
+        {
+          "location": "claude-config:memory/C--Projects/feedback-deepbench-native-terminology.md:16",
+          "text": "this line previously read \"Agent → Capability → Skill Profile → Skill types,\" restating the very Skill/Skill-Profile split and invented Competency layer §2 repudiated"
+        },
+        {
+          "location": "claude-config:memory/C--Projects/feedback-skills-are-the-differentiator.md:11",
+          "text": "there is no separate \"Skill Profile\" layer above Skill and no \"Competency\" table at all. Current model: **Skill is the atomic unit, full stop**"
+        }
+      ],
+      "governing_fact": "Whether ARCHITECTURE.md §2 still defines Competency as a live product concept (an Agent without a persona, the monetization unit) or repudiated Competency altogether.",
+      "confidence": "medium",
+      "proposed_resolution": "docs/ARCHITECTURE.md:250 and :426 should win: the 2026-07-15 §2 rewrite kept Competency as the persona-less Agent construct and John named it the core monetization unit on 2026-07-17. Amend the two memory lines to say §2 repudiated a Competency table/layer, not the Competency concept.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "config-outdated-fact",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:4628",
+          "text": "`drain_epic_next`'s pick predicate still reads `queue` and claims and **never\n`design_status`**, so a `needs-desktop` member — or a legacy `needs-john` / `john-paced` one, both\nof which left `c_flagged` at `SES-281` when `M6-01` **retired** the first and that migration\n**converted** the second — still comes back "
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:2341",
+          "text": "The pick predicate filtered `queue`, `status <> 'delivered'`, the\nthree flags and claims, and **never whether the remainder was blocked on another ticket**"
+        },
+        {
+          "location": "governance_rules/OD-09",
+          "text": "Exactly one `design_status` value blocks a pick — `needs-desktop`, a physical constraint about a machine John has — and since AGT-88 it has one home, `public.pick_blocking_flags()`, which `public.drain_chain_gate()`'s `c_flagged` and `public.prime_directive_queue()`'s `buildable` CTE read, joined since AGT-109 by `public.drain_epic_next()`'s own `c_flagged`; `needs-john` was retired by M6-01 and `john-paced` was converted, because blocking on a human judgment is what M6-01 forbids; canonical: `public.pick_blocking_flags()`."
+        }
+      ],
+      "governing_fact": "Whether public.drain_epic_next()'s pick predicate reads design_status: the SES-197-era paragraph says it never does, while the SES-218 paragraph in the same runbook and OD-09 (AGT-109, v7.0.584) say it filters the flag through its own c_flagged read from pick_blocking_flags().",
+      "confidence": "medium",
+      "proposed_resolution": "governance_rules/OD-09 should win, with docs/runbooks/runner-cycle.md:2341 as the runbook's own later text (SES-218 then AGT-109 made drain_epic_next read the flag). Re-amend the runner-cycle.md:4628 paragraph so it no longer claims the pick predicate never reads design_status; confidence is medium because that passage is truncated and may carry a later amendment past the cut.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "config-outdated-fact",
+      "locations": [
+        {
+          "location": "claude-config:memory/C--Projects/reference-deepbench-cost-accounting.md:23",
+          "text": "- **`runner_usage_readings`** — the real Anthropic meter (`all_models_pct`, `fable_pct`,\n  `session_5h_pct`). **Manually typed by John or scraped opportunistically — frequently stale.**\n  `SES-82` and `SES-161` (open) are the tickets to make it a live read. Weekly windows reset Friday."
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:660",
+          "text": "The weekly pace gate (`M5-16`) and the rest wall (`M5-06`) read the freshest\n`public.runner_usage_readings` row. The meter was first readable only on John's machine — the Claude\nCode CLI's `/usage` under his subscription login — and since `SES-398` the routine reads it itself\n(first bullet below). `scripts/read-usage-meter.js` is the machine read, made a scheduled task:"
+        },
+        {
+          "location": "claude-config:memory/C--Projects/reference-cloud-runner-routine.md:30",
+          "text": "**METER READER INSTALLED 2026-09-11 17:30 CT (SES-374 done, v7.0.455):** Windows scheduled task \"DeepBench meter reader\" runs `%USERPROFILE%.deepbench\nead-usage-meter.js` (a COPY of scripts/read-usage-meter.js — re-copy when the repo file changes) every 30 min while John is logged on, writing runner_usage_readings source=meter-reader. Credentials DPAPI at %USERPROFILE%.deepbenchsupabase-meter-reader.dpapi (never .env.local, ruling d7670e18). Three install traps, all in session-setup.md §3g: schtasks defaults to AC-power-only (laptop → Queued), the shared checkout is `dev-stale-local-do-not-use` (no script → exit 1), schtasks /Change prompts for a password (use PowerShell Set-ScheduledTask). Task Last Result ≠ 0 or a reading older than 2h = the task is failing."
+        }
+      ],
+      "governing_fact": "How runner_usage_readings rows are produced today: the memory reference says manually typed or opportunistically scraped with a live read still an open ticket; the repo and the runner memory say a scheduled meter-reader (SES-374) and the routine's own self-read (SES-398) write them.",
+      "confidence": "high",
+      "proposed_resolution": "docs/runbooks/session-setup.md:660 and scripts/read-usage-meter.js:1 win, made true by SES-374 (v7.0.455, 2026-09-11) and SES-398 (v7.0.489, 2026-09-15); claude-config memory reference-deepbench-cost-accounting.md:23 (modified 2026-09-01) should be rewritten to point at reference-cloud-runner-routine.md:30 and :39.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "config-outdated-fact",
+      "locations": [
+        {
+          "location": "claude-config:memory/C--Projects/reference-deepbench-cost-accounting.md:23",
+          "text": "- **`runner_usage_readings`** — the real Anthropic meter (`all_models_pct`, `fable_pct`,\n  `session_5h_pct`). **Manually typed by John or scraped opportunistically — frequently stale.**\n  `SES-82` and `SES-161` (open) are the tickets to make it a live read. Weekly windows reset Friday."
+        },
+        {
+          "location": "scripts/check-token-wall-binding.js:1",
+          "text": "// DeepBench v7.0.376 | scripts/check-token-wall-binding.js | SES-161\n// FEATURE: SES-161 -- \"the token wall governs the runner on a number nobody has ever checked\n// against the platform's own usage figures.\" runner_cycles.est_tokens_dev / est_tokens_qa are the\n// ONLY input to the subscription-token wall (runner-cycle.md step 3), every value in them is a\n// cycle's own hand-estimate, and until this ship nothing had ever compared them to a figure the\n// platform produced. This is that comparison, and it needs no platform usage block -- see below."
+        }
+      ],
+      "governing_fact": "The status and subject of SES-161: the memory reference lists it as open and as a ticket to make the meter a live read; the shipped script header records it as delivered at v7.0.376 (2026-09-02) as a comparison of cycle token estimates against platform figures.",
+      "confidence": "high",
+      "proposed_resolution": "scripts/check-token-wall-binding.js:1 wins, made true by the SES-161 ship at v7.0.376 on 2026-09-02; claude-config memory reference-deepbench-cost-accounting.md:23 should drop the open marker and the live-read characterization for SES-161.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "config-disagrees",
+      "locations": [
+        {
+          "location": "docs/runbooks/runner-cycle.md:1375",
+          "text": "- **Subscription tokens (the governor that replaced the phantom-dollar wall):**\n  read the latest `runner_usage_readings` row (John's typed-in meter percentages).\n  (a) `all_models_pct ≥ rest_pct` from `resolve_day_token_cap()` (85; 90 from Thursday 01:00 to the reset) → rest: `did_not_run`, reason \"weekly meter at\n  N% — resting\", END. (b) No reading, or latest older than 48h → today's allowance =\n  `stale_fallback_tokens` (3M). (c) Otherwise: calibrate `tokens_per_pct` from the estimated\n  tokens logged between the two most recent readings vs. the meter delta (store it on the\n  reading row); remaining weekly pool = `(100 − all_models_pct) × tokens_per_pct`; today's\n  availability = pool ÷ days left in the meter week; runner allowance = availability ×\n  `runner_share_pct` (50%), capped at `runner_day_token_allowance` (10M) until two readings\n  exist to calibrate from. Sum today's `est_tokens_dev + est_tokens_qa`; at or over the\n  allowance → `did_not_run`, reason \"runner token share for the day spent (~N est)\", END —\n  **unless an unexpired `budget_override` directive covers today's token track, exactly as the\n  dollar track above works** (register B32, John live 2026-08-20 21:0xZ"
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:1399",
+          "text": "**THE CALIBRATION IS DERIVED BY ONE CALL, NOT BY EACH CYCLE'S ARITHMETIC (`SES-128`,\n`v7.0.163`, migration `ses128_reading_slots`).** Step (c) above describes calibrating\n`tokens_per_pct` from \"the two most recent readings\", and **that instruction has never once been\ncarried out** — measured before this shipped, all eight stored `runner_usage_readings` rows carry\n`tokens_per_pct = NULL`, so every allowance this runner has ever computed fell through to the\nuncalibrated 10M cap or the 3M stale floor. The reason is not that cycles forgot: **the two most\nrecent readings are the wrong window.** John's meter is spent by his own manual sessions *and* the\nrunner, so any window mixing the two yields a rate that is confidently wrong. Run this instead,\nbefore you compute the allowance:"
+        }
+      ],
+      "governing_fact": "Which window calibrates tokens_per_pct: step (c) still instructs each cycle to compute it from the two most recent readings, while the later passage in the same runbook says that window is wrong and one call derives it from runner-only windows.",
+      "confidence": "medium",
+      "proposed_resolution": "docs/runbooks/runner-cycle.md:1399 wins, made true by SES-128 (v7.0.163, migration ses128_reading_slots); step (c) at runner-cycle.md:1375 should be reduced to a pointer at the one call rather than standing as a live instruction.",
+      "found_by": "auditor:judgment:claude-fable-5-1",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-337",
+          "text": "4 cycles (streak cap 4); status delivered"
+        }
+      ],
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
+      "confidence": "high",
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged.",
+      "found_by": "auditor:board-checks",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-headroom",
+      "kind": "other",
+      "finding_type": "gap",
+      "locations": [
+        {
+          "location": "governance/runner-cycle.md",
+          "text": "bytes=380920 bar=380980 free=59 pct_used=99.98 prev_week=none prev_bytes=none delta=none"
+        }
+      ],
+      "governing_fact": "A governance surface under a byte bar must keep measurable room under it: a bar discovered by the build that trips it is a stop with no warning in front of it. The bar on this surface is 380980 B, exclusive (bytes must stay strictly under it).",
+      "confidence": "high",
+      "proposed_resolution": "nearly full: 59 B free is under the 19049 B warning floor (5% of the 380980 B bar). Cut bytes from the surface, or move a section to its own home -- never raise the bar.",
+      "found_by": "auditor:headroom-checks"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "public/Austin_2025Data_.csv:5529",
+          "text": "personal_email: 15505,\"Barriers and Enclosures, Construction\",Shade Structure Design by Rudy Herrera 210-896-9304 rudy****,0.,,,0.,\"4,600.00\",,Shade Structure Design,PO600025070701537,07/07/2025,V00000993007,Rudy M H…"
+        }
+      ],
+      "governing_fact": "personal_email must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_email value from public/Austin_2025Data_.csv (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/vision/evidence-sources.md:40",
+          "text": "personal_path: - [C-src-20] (HIGH) The local Claude Code session archive (`C:\\U****\\.claude\\projects\\C--Projects\\*.jsonl`, 186 sessions, 2026-07-08 → 2026-08-21) is the highest-authority source for John's typed word…"
+        }
+      ],
+      "governing_fact": "personal_path must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the personal_path value from docs/vision/evidence-sources.md (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v5.2.27-S-PROMPT-ARCH-01-prompt-architecture.md:505",
+          "text": "secret_assignment: const BYPASS = 'deep****';"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from docs/kickoffs/v5.2.27-S-PROMPT-ARCH-01-prompt-architecture.md (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v5.2.35-S-DAN-PIPELINE-01-dan-enrichment-pipeline.md:481",
+          "text": "secret_assignment: const BYPASS_HEADER = 'deep****';"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from docs/kickoffs/v5.2.35-S-DAN-PIPELINE-01-dan-enrichment-pipeline.md (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/kickoffs/v6.1.31-S-ARCH-AGENT-SELECT-BUDGET-01-aa151-agent-selection-max-tokens.md:70",
+          "text": "secret_assignment: const BYPASS = 'deep****';"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from docs/kickoffs/v6.1.31-S-ARCH-AGENT-SELECT-BUDGET-01-aa151-agent-selection-max-tokens.md (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "tests/regression/agt-434-agent-skill-pins.test.mjs:188",
+          "text": "secret_assignment: process.env.SUPABASE_SERVICE_KEY = \"agt-****\";"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from tests/regression/agt-434-agent-skill-pins.test.mjs (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "tests/regression/agt-454-directive-closes-with-ticket.test.mjs:179",
+          "text": "secret_assignment: const KEY = \"agt-****\";"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from tests/regression/agt-454-directive-closes-with-ticket.test.mjs (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "tests/regression/dat-004-taught-in-assembly.test.mjs:105",
+          "text": "secret_assignment: process.env.SUPABASE_SERVICE_KEY = \"dat-****\";"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from tests/regression/dat-004-taught-in-assembly.test.mjs (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "tests/regression/ses-424f-executor-citations.test.mjs:76",
+          "text": "secret_assignment: const FAKE_KEY = \"ses4****\";"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from tests/regression/ses-424f-executor-citations.test.mjs (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "audit-private/vercel_bypass",
+          "text": "42 lines in 42 files: docs/kickoffs/v5.2.29-CONTENT-01a-format-routing-enrichment-logging.md, docs/kickoffs/v5.2.30-CONTENT-01b-ai-audit-alex-ui.md, docs/kickoffs/v5.2.30-VICTORIA-01-product-strategist-solution-catalog.md, docs/kickoffs/v5.2.34-BUG12p-enrichment-tenant-id.md, docs/kickoffs/v5.2.37-AI-AUDIT-FIX-01-ai-audit-panel-data-integrity.md, docs/kickoffs/v6.1.24-S-ARCH-RETRY-TOOLRESULT-01-aa150-aa151-tool-result-retry-fix.md, docs/kickoffs/v6.1.25-S-ARCH-RETRY-CATCH-01-aa151-second-parse-failure-guard.md, docs/kickoffs/v6.1.26-S-ARCH-TEMPERATURE-01-aa154-llm-sampling-determinism.md, docs/kickoffs/v6.1.27-S-ARCH-RETRY-DIAGNOSTICS-01-aa157-retry-rejection-detail.md, docs/kickoffs/v6.1.28-S-ARCH-SPEED-CI-ANSWER-01-aa149-haiku-swap-model-drawer.md, docs/kickoffs/v6.1.29-S-ARCH-EXECUTE-DETAIL-01-aa158-execute-catch-detail-passthrough.md, docs/kickoffs/v6.1.31-S-ARCH-AGENT-SELECT-BUDGET-01-aa151-agent-selection-max-tokens.md, docs/kickoffs/v6.1.37-S-ARCH-RAW-INPUT-DIAGNOSTIC-01-aa151-raw-input-visibility.md, docs/kickoffs/v6.2.3-S-ARCH-CATALOG-ROUTING-01-aa176-catalog-delegation-consolidation.md, docs/kickoffs/v6.3.10-S-ARCH-RETRY-SPECIFICITY-01-aa182-retry-correction-specificity.md, docs/kickoffs/v6.3.13-S-ARCH-FAILURE-DETAIL-01-aa195-durable-hops-error-detail.md, docs/kickoffs/v6.3.131-HAR-9-truncation-aware-parse-retry.md, docs/kickoffs/v6.3.132-LOG-37a-layer-a-call-facts.md, docs/kickoffs/v6.3.133-LOG-37b-agent-turn-call-facts.md, docs/kickoffs/v6.3.135-CHI-65-empty-section-crash.md, docs/kickoffs/v6.3.136-LOG-37a-patch-retrieval-method.md, docs/kickoffs/v6.3.137-CHI-66-react-error-boundary.md, docs/kickoffs/v6.3.16-AA-195-nested-checkpoint-resume-fix.md, docs/kickoffs/v6.3.184-LOG-95-hop-event-span-identity.md, docs/kickoffs/v6.3.19-AA-196-per-intent-hop-budget-estimate.md, docs/kickoffs/v6.3.204-LOG-91-single-write-per-model-call.md, docs/kickoffs/v6.3.21-AA-196-patch-hop-budget-pagination.md, docs/kickoffs/v6.3.215-LOG-37c-embedding-call-facts.md, docs/kickoffs/v6.3.216-LOG-109-article-extraction-visibility.md, docs/kickoffs/v6.3.222-HAR-21-claim-resolver.md, docs/kickoffs/v6.3.224-AGT-37-citation-envelope.md, docs/kickoffs/v6.3.227-CHI-92-news-search-display-split.md, docs/kickoffs/v6.3.25-AI-46a-trace-id-foundation.md, docs/kickoffs/v6.3.26-AI-46b-trace-id-threading.md, docs/kickoffs/v6.3.27-LOG-09c-embedding-logging-fetchcontext-fix.md, docs/kickoffs/v6.3.28-S-ARCH-LOOP-CONTINUITY-01-loo001-loo002-loo004-agent-selection-fixes.md, docs/kickoffs/v6.3.31-LOG-18-activity-log-delivery-fix.md, docs/kickoffs/v7.0.10-AA-179c-assembly-emit.md, docs/kickoffs/v7.0.3-LAV-1d-prompt-exposure.md, docs/kickoffs/v7.0.58-LAV-23-agent-decided-opening-retrieval.md, docs/kickoffs/v7.0.6-LAV-1f-hitl.md, docs/kickoffs/v7.0.85-LOG-133-broker-pattern-coverage.md"
+        }
+      ],
+      "governing_fact": "vercel_bypass must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "42 lines in 42 files carry a vercel_bypass value -- rotate it once, remove every copy from the tracked files, and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-423",
+          "text": "One ticket stuck behind its own block verdict wedges the decision-window sweep for the whole platform, because the sweep is one all-or-nothing transaction"
+        },
+        {
+          "location": "backlog_items:AGT-475",
+          "text": "Step 7b's decision-window sweep is wedged for every cycle: one unfinishable ticket aborts the whole statement"
+        }
+      ],
+      "governing_fact": "sweep_decision_windows() is one all-or-nothing UPDATE, so the one ticket backlog_done_requires_verdict() refuses (verdict 38959e02, raised 23514 at line 85) aborts every decision window for every cycle; both rows describe this defect and both propose per-row fault isolation.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-423 survives (filed 2026-10-09, revalidated 2026-10-20, kickoff v7.0.873 at 927e8f9, migration mirror 2f3147d); AGT-475 (2026-10-12, gated before build at 64ee271 on the same migration) closes as duplicate, its cycle-e6d95725 instance appended to AGT-423.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-426",
+          "text": "The citation guard writes a verdict id into the one column the ledger renderer refuses raw uuids in, so a correct ship card blocks the render"
+        },
+        {
+          "location": "backlog_items:AGT-518",
+          "text": "Every ship's cycle card refuses to render, because a verdict handle on the row is read as another cycle's fact"
+        }
+      ],
+      "governing_fact": "scripts/render-claude-state.js bulletProvenanceFinding() admits only the cycle's decision ids, while the citation guard and record_ship_decision() write the cycle's own verdict id into the card, so every ship card blocks the render; both rows name the same fix (admit the cycle's own verdict ids).",
+      "confidence": "high",
+      "proposed_resolution": "AGT-426 survives (older, 2026-10-09, same epic ced3a7d0 as the sweep family); AGT-518 (2026-10-19) closes as duplicate, its measured instance (card 9bc17701 refused on its own verdict 9ca61d8d) and render-claude-state.js:621 appended to AGT-426.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-400",
+          "text": "(1) role prompts are added by both the Identity branch (AA-66) and the Behavior branch, so every prompt carries them twice and the scaffold three times; keep one copy, in Identity."
+        },
+        {
+          "location": "backlog_items:AGT-552",
+          "text": "A role prompt renders into two assembled sections, because the identity and behavior branches each push the same agent_configs rows"
+        },
+        {
+          "location": "api/prompt/db-assembly.js:288-303",
+          "text": "parts.push(...rolePrompts); [...] const roleParts = (agentConfigs || []).filter(c => c.type === \"role_prompt\")"
+        }
+      ],
+      "governing_fact": "api/prompt/db-assembly.js pushes every agent_configs role_prompt row in both the identity branch (L288-292) and the behavior branch (L301-303), so one role prompt renders into two sections; AGT-400 item (1) and AGT-552 are the same defect with the same fix.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-400 survives as the home (filed 2026-10-06, tier now); AGT-552 (2026-10-25) closes as duplicate, carrying its line citations and the agt-429-bundle-section-dedupe.test.mjs:155 arm-B move (2 to 1) into AGT-400 item (1). a4e49a7 (v7.0.895) deliberately left this residue, so neither row is fixed.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-010",
+          "text": "Agent role_prompt re-fetches once per same-type Skill with no dedup — Michelle's renders twice"
+        },
+        {
+          "location": "backlog_items:AGT-400",
+          "text": "(1) role prompts are added by both the Identity branch (AA-66) and the Behavior branch, so every prompt carries them twice and the scaffold three times; keep one copy, in Identity."
+        },
+        {
+          "location": "api/prompt/db-assembly.js:618-632",
+          "text": "if (seen.has(slug)) { dropped = true; continue; }"
+        }
+      ],
+      "governing_fact": "AGT-010's repeat (a role_prompt rendered once per Behavior-type Skill) is the behavior branch at db-assembly.js:301-303 pushing all role prompts per Skill section; AGT-429's dedupeSkillProfilesBySlug() dedupes by skill slug, so two Behavior Skills still each push it; AGT-400 item (1) is the fix.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-400 survives; AGT-010 (2026-07-16, revalidated 2026-10-08) closes as duplicate of AGT-400 item (1), its Michelle project-manager case (capability-assignment plus planning-behavior) appended as the multi-Behavior-Skill assertion AGT-552 already asks for.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-003",
+          "text": "Michelle's planning-behavior Skill has rich objective/method content the behavior harness never reads"
+        },
+        {
+          "location": "backlog_items:AGT-400",
+          "text": "(2) The Behavior branch reads only role prompts and two style traits; 5 of 22 Behavior Skills carry objective or method text that never renders; render them as Identity and Intent do."
+        },
+        {
+          "location": "api/prompt/db-assembly.js:300-308",
+          "text": "if (traits.reasoning_style) traitParts.push(`Reasoning style: ${traits.reasoning_style}`); if (traits.writing_style) traitParts.push(`Writing style: ${traits.writing_style}`); const allParts = [...roleParts, ...traitParts];"
+        }
+      ],
+      "governing_fact": "The behavior branch of buildSections() (db-assembly.js:300-308) renders role prompts and two style traits only, so a Behavior Skill's objective and method never reach the prompt; AGT-003 (Michelle's planning-behavior) is one instance of AGT-400 item (2).",
+      "confidence": "high",
+      "proposed_resolution": "AGT-400 survives; AGT-003 (2026-07-16, revalidated 2026-10-08) closes as duplicate, with Michelle's planning-behavior row named as the fixture for AGT-400 item (2)'s both-directions assertion.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-254",
+          "text": "runner-cycle.md:4704 still says the reversible-table allowlist is fifteen and lists fifteen names; it is seventeen"
+        },
+        {
+          "location": "backlog_items:AGT-157",
+          "text": "(3) docs: docs/runbooks/session-setup.md:424 and runner-cycle.md:4722 \"fifteen\" -> \"sixteen\" (AGT-152 widens reversible_tables to 16) with their ses-399:232 / ses-364:309 regexes."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:4718",
+          "text": "**The allowlist, widened 7 → 14 by `SES-364`** and to 15 by `AGT-86` slice 1b (`v7.0.543`) (read live):"
+        },
+        {
+          "location": "docs/runbooks/session-setup.md:425",
+          "text": "seventeen `public.reversible_tables()` returns — the twin of `reverse_decision()`'s own"
+        }
+      ],
+      "governing_fact": "runner-cycle.md:4718 still states the reversible-table allowlist as 15 while session-setup.md:425 says seventeen; AGT-157 (partial) item (3) and AGT-254 (its declared residue) both own that one edit, and AGT-157's target count (sixteen) is itself stale.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-254 survives (names the live count and the two blockers: the byte ceiling and the cycle-card re-pin); AGT-157 closes as delivered-with-residue, its item (3) re-pointed to AGT-254 so the one edit has one owner. Read public.reversible_tables() live before editing, as AGT-254 asks.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-478",
+          "text": "(1) runner-cycle.md step 9 names a fallback write path for the tail record -- the PostgREST write that was measured at 93 ms -- so a wedged connector no longer costs the cycle its own record."
+        },
+        {
+          "location": "backlog_items:AGT-547",
+          "text": "(1) Point step 9's notes write at the PostgREST path -- a read-modify-write on the cycle's own row, the shape scripts/cycle-heartbeat.js already uses for the heartbeat columns -- and keep the connector UPDATE only as a documented fallback"
+        }
+      ],
+      "governing_fact": "A runner_cycles.notes append through mcp__Supabase__execute_sql times out at 60s and writes nothing while the same append lands over PostgREST; AGT-478 (2026-10-12, revalidated 2026-10-22) and AGT-547 (2026-10-25) both ask step 9 to name the PostgREST path as the primary write.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-478 survives (older, revalidated, already cites AGT-303 and AGT-465 as the connector-side instances); AGT-547 closes as duplicate, its two lost appends of 2026-10-25 and its guard-versus-connector timing discriminator appended to AGT-478's fix (2).",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "competing-purpose",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-289",
+          "text": "Until one exists, step 7 should refuse a migration ticket at pick time with that reason, instead of spending a Builder to rediscover it."
+        },
+        {
+          "location": "backlog_items:AGT-548",
+          "text": "Until it is fixed, step 7 must check that committing DDL works before accepting a kickoff whose tasks include a migration, so a schema ticket is not picked into a lane that cannot apply it"
+        }
+      ],
+      "governing_fact": "Two open rows each add a pick-time refusal of migration-bearing tickets to runner-cycle.md step 7 under different conditions (no DDL path in the build lane; committing DDL times out at 60s), so the one guard would be written twice in a file with 59 bytes of headroom.",
+      "confidence": "medium",
+      "proposed_resolution": "Keep both root causes on their rows (lane access on AGT-289, connector commit timeout on AGT-548) but give the step-7 guard one home: AGT-548 (2026-10-25, carries the blocked AGT-459 build) owns the pick-time check, and AGT-289's interim clause points at it instead of restating it.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AA-05",
+          "text": "Character Layer L1 settings panel — Personnel File new tab: philosophy dropdown, skeptic level slider, autonomy dial, lock/adaptive/supervised toggle per setting"
+        },
+        {
+          "location": "backlog_items:AA-17",
+          "text": "Lock/Adaptive/Supervised controls — UI toggle per dimension and character setting"
+        }
+      ],
+      "governing_fact": "AA-17's whole ask (a Lock/Adaptive/Supervised toggle per character setting) is one control inside AA-05's Character Layer L1 settings panel; both are P2 - Inventive, tier later, filed 2026-06-13, revalidated 2026-09-29, unbuilt.",
+      "confidence": "medium",
+      "proposed_resolution": "AA-05 survives as the panel; AA-17 closes as duplicate with its 'per dimension' clause appended to AA-05 so the toggle's wider scope is not lost.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-77",
+          "text": "THE DEMO NO COMPETITOR CAN REPRODUCE: Open the public record of the last shipped version and see which governance agent prioritized it, which designed it, which built it, which verified it, and what each step cost."
+        },
+        {
+          "location": "backlog_items:ADM-3",
+          "text": "This ticket packages a read-only showcase of that loop as an investor-facing artifact — the story is already true, it is just not visible."
+        }
+      ],
+      "governing_fact": "Both rows ask for one public read-only page of the governance loop's record (who prioritised, designed, built and verified a version; trust ladder; accept/reject trail); AGT-77 is P2 - Inventive in project Moat, ADM-3 is P3 - Investor Value on the general board.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-77 survives (moat feature 7 of 8, depends on SES-345, revalidated 2026-10-19); ADM-3 closes as duplicate with its SES-131 research pointer appended, unless John's Moat review splits a smaller investor artifact off it.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-387",
+          "text": "The class loop can run twice in one Chicago day: its once-a-day gate reads the cycle's start date, not when the loop actually ran"
+        },
+        {
+          "location": "backlog_items:AGT-255",
+          "text": "The once-a-day class loop can run twice: the gate keys on when the cycle started, not on when the loop ran"
+        }
+      ],
+      "governing_fact": "public.class_understanding_due() keys 'already ran today' on runner_cycles.started_at in America/Chicago rather than on when the CLASS LOOP line was written; both rows quote that function body and propose keying the gate on the loop's own write time.",
+      "confidence": "high",
+      "proposed_resolution": "SES-387 survives (older, 2026-09-13, revalidated 2026-10-19); AGT-255 (2026-09-28) closes as duplicate with its cycle 6f101f97 instance appended. AGT-371 (2026-10-05) records the decided survivor: 'SES-387 over AGT-255'; still open on this board.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-259",
+          "text": "docs/SESSIONS.md crossed its 1.5 MB rotation threshold"
+        },
+        {
+          "location": "backlog_items:SES-268",
+          "text": "Rotate docs/SESSIONS.md — it has crossed its own SES-172 rotation ceiling (1560.8 KB > ~1.5 MB)"
+        },
+        {
+          "location": "backlog_items:SES-262",
+          "text": "docs/SESSIONS.md is 1548.8 KB, over the ~1.5 MB rotation threshold -- rotate entries older than the previous month VERBATIM into a dated docs/SESSIONS-ARCHIVE-*.md"
+        },
+        {
+          "location": "docs/SESSIONS.md",
+          "text": "2110733 bytes at dev head f2fda7c (wc -c, 2026-10-26)"
+        }
+      ],
+      "governing_fact": "docs/SESSIONS.md is over its SES-172 rotation ceiling (2,110,733 bytes today, measured by wc -c at f2fda7c) and three open rows filed the same day, 2026-08-31, each ask for the one rotation.",
+      "confidence": "high",
+      "proposed_resolution": "SES-259 survives (carries the rotation procedure); SES-268 and SES-262 close as duplicates, and SES-262's tripwire signature c8ef18391ff4 is recorded on SES-259 so check 8 stops re-filing it. AGT-371 (2026-10-05) records the decided survivor: 'SES-259 over SES-268/SES-262'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:DAT-23",
+          "text": "A newly created table still gets anon SELECT by default; the rules doc overstates the lockdown"
+        },
+        {
+          "location": "backlog_items:SES-384",
+          "text": "Every new public table is born readable by anon: the default ACL grants SELECT that no migration asked for, and the rule file says otherwise"
+        },
+        {
+          "location": ".claude/rules/supabase-column-grants.md:64",
+          "text": "**Corrected 2026-08-19 (`SES-78a`, found live): SELECT is NOT closed** — the six `runner_`"
+        }
+      ],
+      "governing_fact": "pg_default_acl grants anon/authenticated SELECT on every new public table; both rows ask to correct the rule file and to decide whether to close the default, and the rule file's correction (line 64, dated 2026-08-19) already stood before SES-384 was filed on 2026-09-13.",
+      "confidence": "high",
+      "proposed_resolution": "DAT-23 survives (older, 2026-08-11, carries the new-column and ordering-trap cases); SES-384 closes as duplicate with its pg_default_acl evidence and read-surface survey appended, and both rows drop the 'rule file says otherwise' clause, which line 64 already settles. AGT-371 (2026-10-05) records the decided survivor: 'DAT-23 over SES-384'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:PE-06",
+          "text": "Projects tab — live wiring to `deliverables` table; shows agent's completed deliverables: count, type, task name, date; stub until DL-04 ships"
+        },
+        {
+          "location": "backlog_items:DL-07",
+          "text": "Agent work history on Projects tab (PE-06) — wired to `deliverables` table; shows deliverable count, types, task names, dates per agent; categorizes what kind of work each agent is capable of"
+        }
+      ],
+      "governing_fact": "One Projects-tab wiring to the deliverables table showing count, type, task name and date per agent is filed twice; DL-07 names PE-06 in its own title.",
+      "confidence": "high",
+      "proposed_resolution": "PE-06 survives (older, partial); DL-07 closes as duplicate with its one extra clause ('categorizes what kind of work each agent is capable of') appended to PE-06. AGT-371 (2026-10-05) records the decided survivor: 'PE-06 over DL-07'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-168",
+          "text": "A public repo carries a live Vercel bypass value on 48 lines, four hardcoded keys, and eleven files quoting local paths or a personal email"
+        },
+        {
+          "location": "backlog_items:AGT-98",
+          "text": "The Vercel deployment-protection bypass secret is written in plain text in about 46 files of the public deepbench-frontend repo; rotate it and stop writing it into docs"
+        },
+        {
+          "location": "backlog_items:AGT-130",
+          "text": "The live Vercel protection-bypass secret and local Windows paths are committed in the public repo; replace every literal with a reference to the stored secret"
+        }
+      ],
+      "governing_fact": "The live VERCEL_AUTOMATION_BYPASS_SECRET value appears on 48 lines in 46 files of the public repo and must be rotated then scrubbed; three open rows (2026-09-23, 09-25, 09-26) carry this one fact, two of them revalidated again on 2026-10-25 and 2026-10-26.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-168 survives (widest: secret, four key-shaped literals, paths, personal email, pre-commit scanner); AGT-98 and AGT-130 close as duplicates, AGT-130's file list and rotation steps appended. AGT-371 (2026-10-05) records the decided survivor: 'AGT-168 over AGT-98/AGT-130'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-328",
+          "text": "The six deny-hooks travel with the repo and bind in every environment: hooks versioned and tested in-repo, PowerShell matched, dev branch protected with CI as a required check, and the eleven orphaned check scripts wired into CI"
+        },
+        {
+          "location": "backlog_items:SES-349",
+          "text": "The seven enforcement hooks travel with the repo, so a cloud cycle and a fresh clone run the same guards as John's machine"
+        },
+        {
+          "location": "backlog_items:SES-350",
+          "text": "CI runs every check script instead of two, and the repo gains npm test, a lint baseline and an engines pin"
+        },
+        {
+          "location": "backlog_items:SES-351",
+          "text": "Decide how dev is protected: the branch Vercel serves and the runner pushes to has zero protection while main is protected and abandoned"
+        }
+      ],
+      "governing_fact": "SES-328's three parts (hooks in-repo, check scripts in CI, dev branch protection) are each filed again as SES-349, SES-350 and SES-351; none has shipped: .claude/ has no hooks folder, settings.json has no hooks key, ci.yml runs two gates, package.json is 5.0.0 with no engines pin.",
+      "confidence": "high",
+      "proposed_resolution": "SES-349, SES-350 and SES-351 survive as the buildable rows (each within the 3-file cap); SES-328 closes as superseded, its PowerShell-matching clause appended to SES-349. AGT-371 (2026-10-05) records the decided survivor: 'SES-349/350/351 over the SES-328 umbrella'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:ADM-5",
+          "text": "The briefing becomes a DeepBench Super Admin page — live render of runner_ tables, passcode-gated taps, artifact retires at cutover"
+        },
+        {
+          "location": "backlog_items:ADM-4",
+          "text": "The briefing moves into the app: standard server capture, rendered live from the DB"
+        },
+        {
+          "location": "backlog_items:ADM-2",
+          "text": "**SUPERSEDED IN PART 2026-08-31, directive b2252555 (attended, ses-258-244).** The \"cannot BE an in-app page until login lands\" premise is overruled by John: a runner_secrets owner passcode is accepted as interim owner-auth, and the in-app briefing build is ADM-5."
+        }
+      ],
+      "governing_fact": "Both rows build the in-app briefing page rendered live from the runner_ tables, taps through an api route, artifact retired; ADM-4's prerequisite (John's auth story, Clerk) was overruled by directive b2252555 on 2026-08-31, which names ADM-5 as the in-app briefing build.",
+      "confidence": "high",
+      "proposed_resolution": "ADM-5 survives (directive b2252555); ADM-4 closes as superseded, with its explicit hold ('design session AFTER the Selfbuild project ends', directive ceb5cf0b part 3) recorded on ADM-5 for John to confirm as carried or lifted. AGT-371 (2026-10-05) records the decided survivor: 'ADM-5 over ADM-4'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-361",
+          "text": "A blank created agent reads Agent Readiness 52 Developing: three of five layers score as if configured when nothing exists"
+        },
+        {
+          "location": "backlog_items:AGR-001",
+          "text": "Personnel readiness meter uses the superseded 5-layer model with a hardcoded 100% layer"
+        },
+        {
+          "location": "src/screens/PersonnelScreen.jsx:296-301",
+          "text": "function computeLayers(agent, entries) { [...] { num:\"L3\", label:\"Analysis Payload\",   tab:\"—\",        s: 100 },"
+        }
+      ],
+      "governing_fact": "PersonnelScreen.jsx computeLayers() hardcodes L3 Analysis Payload at 100 and scores L4/L5 from platform defaults (lines 296-302 at f2fda7c), so a blank agent reads 52 DEVELOPING; AGR-001 (2026-07-16) names the cause and AGT-361 (2026-10-05) the symptom.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-361 survives (names the fix: score every layer from the agent's own rows, mock first); AGR-001 closes as duplicate with computeLayers() and the superseded five-layer model appended as the cause. AGT-371 (2026-10-05) records the decided survivor: 'AGT-361 over AGR-001'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-287",
+          "text": "The model behind data-room-custody retires 2026-10-15 and the catalog holds no same-family replacement"
+        },
+        {
+          "location": "backlog_items:AGT-282",
+          "text": "Declare a replayable feature for capability/data-room-custody, then move it off claude-haiku-4-5 before 2026-10-15"
+        }
+      ],
+      "governing_fact": "model_assignments pins capability/data-room-custody to claude-haiku-4-5-20251001 (retire_not_before 2026-10-15, now past) with no same-family trial pair; both rows (filed 2026-09-29) ask for the replacement path before that date.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-287 survives (the revisit trigger is its own, 'I re-check this every review'); AGT-282 closes as duplicate with its replayable-feature mechanism (pickJobs admits only REPLAYABLE prefixes) appended as the enabling step. The survivor must re-measure the pin now that 2026-10-15 has passed. AGT-371 (2026-10-05) records the decided survivor: 'AGT-287 over AGT-282'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-304",
+          "text": "38 regression suites fail on dev, so the ship gate cannot tell a new red from the standing one"
+        },
+        {
+          "location": "backlog_items:SES-426",
+          "text": "dev CI has been red since 2026-09-16 on three tests that assert live board state, and nothing on the platform notices: every cycle since has shipped onto a red dev, the green anchor has not moved in four days, and the rollback engine cannot card it"
+        }
+      ],
+      "governing_fact": "The blocking Tripwire + regression job has been red on every dev head since the 2026-09-16 anchor 9515291b, so step 7a cannot tell a ship's red from the standing one; SES-426's three live-state tests sit inside AGT-304's standing set, and AGT-304 is the John-named row with 18 slices shipped.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-304 survives (partial, slices through v7.0.878 at 0289c51); SES-426 closes as duplicate, its three named tests and its rollback-actuator second finding re-pointed to AGT-304 and SES-427. AGT-371 (2026-10-05) records the decided survivor: 'AGT-304 over SES-426'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SK-13",
+          "text": "JD → Capability Auto-Generation — upload a job description, extract competencies mapped to Skill types, match to existing Skill Profiles via RAG, propose new Skill Profiles for unmatched competencies, assemble into a Capability, HITL approval before creation."
+        },
+        {
+          "location": "backlog_items:AGT-019",
+          "text": "Load a Job Description: build an agent's full Skillset from a real job description"
+        }
+      ],
+      "governing_fact": "Building an agent's Skillset from an uploaded job description, mapping its lines onto Skill types, is filed as SK-13 (2026-06-19) and again as AGT-019 (2026-07-16); both are tier later, unbuilt.",
+      "confidence": "high",
+      "proposed_resolution": "SK-13 survives (the fuller spec, extends PE-10); AGT-019 closes as duplicate with its 'use a real JD as a completeness test of the six-type model' clause appended. AGT-371 (2026-10-05) records the decided survivor: 'SK-13 over AGT-019'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:DL-09",
+          "text": "Deliverable marketplace — publish, price, sell; 30/60/10 split (platform/IP owner/infrastructure)"
+        },
+        {
+          "location": "backlog_items:AA-25",
+          "text": "Deliverables marketplace UI — discovery, preview, purchase flow for other tenants' published capabilities and deliverables"
+        },
+        {
+          "location": "backlog_items:AA-19",
+          "text": "Margin sharing engine — 30% platform / 60% IP owner / 10% infrastructure; $0.10 minimum L4 price"
+        }
+      ],
+      "governing_fact": "DL-09 restates AA-25 (the marketplace UI) and AA-19 (the 30/60/10 margin split) in one line; all three are tier later, filed June 2026, unbuilt.",
+      "confidence": "high",
+      "proposed_resolution": "AA-25 and AA-19 survive as the two halves; DL-09 closes as duplicate with its 'publish, price, sell' verbs appended to AA-25. AGT-371 (2026-10-05) records the decided survivor: 'AA-25/AA-19 over DL-09'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:HAR-29",
+          "text": "api/plan.js and api/brief.js bypass the shared prompt pipeline and its caching"
+        },
+        {
+          "location": "backlog_items:SK-20",
+          "text": "Refactor `api/plan.js` — replace hardcoded system prompt and hardcoded tool schema with Prompt Container + Builder; tool schema moves to SP-PM-03 traits.schema (SK-18)."
+        },
+        {
+          "location": "backlog_items:SK-19",
+          "text": "Refactor `api/brief.js` legacy path — remove hardcoded McKinsey memo system prompt from the no-agent_id path; route through Prompt Container + Builder instead."
+        },
+        {
+          "location": "backlog_items:AG-05",
+          "text": "api/plan.js reads Michelle prompt from Supabase"
+        }
+      ],
+      "governing_fact": "api/plan.js and api/brief.js hand-build their system prompts outside the shared prompt pipeline; four open rows (AG-05 2026-06-07, SK-19/SK-20 2026-06-19, HAR-29 2026-07-31) ask for the same migration onto it.",
+      "confidence": "high",
+      "proposed_resolution": "SK-19 (brief.js) and SK-20 (plan.js) survive as the per-file rows; HAR-29 closes as duplicate with its cache_control/cache-logging minimum appended to both, and AG-05 closes into SK-20. AGT-371 (2026-10-05) records the decided survivor: 'SK-19/SK-20 over HAR-29'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "competing-purpose",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AA-94",
+          "text": "Retire the dead `capability-registry-knowledge` Skill Profile (Knowledge type, attached to Michelle's `project-manager` capability) — `traits.fetch_instruction` is `null`, so it has never actually fetched anything"
+        },
+        {
+          "location": "backlog_items:AGT-012",
+          "text": "Retag capability-registry-knowledge and pm-roster-knowledge from knowledge to intent"
+        }
+      ],
+      "governing_fact": "One skill_profiles row, capability-registry-knowledge, is to be deleted by AA-94 (dead, redundant with pm-roster-knowledge) and retagged to intent by AGT-012; AGT-013 would then scope the same row via intent_allowlist. The three asks cannot all be done.",
+      "confidence": "high",
+      "proposed_resolution": "AA-94 survives (a row that has never fetched anything is retired, not retagged); AGT-012 closes with its pm-roster-knowledge retag kept as AGT-012's only remaining clause or moved onto AGT-001, and AGT-013 drops capability-registry-knowledge from its list. AGT-371 (2026-10-05) records the decided survivor: 'AA-94 over AGT-012/AGT-013'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-250",
+          "text": "Susan Smith gains the agent-authoring capability: read an agent's uploaded training documents and decide what to build"
+        },
+        {
+          "location": "backlog_items:TC-02",
+          "text": "Trainer Agent — dedicated agent role that trains/configures other agents; visible as participant in multi-agent workflows; shows who taught an agent in the personnel file training log"
+        }
+      ],
+      "governing_fact": "Susan Smith is The Trainer (ARCHITECTURE §19e per AGR-01); TC-02 (2026-06-09) asks for the trainer agent that configures other agents and AGT-250 (2026-09-28, John-scoped 2026-09-26) is that capability's concrete build.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-250 survives (John-scoped, tier now, design only until he approves); TC-02 closes as duplicate with its 'shows who taught an agent in the training log' clause appended, and AGR-01 keeps only its harness-rewire and no-hardcoded-agent-id half. AGT-371 (2026-10-05) records the decided survivor: 'AGT-250 over TC-02'.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AA-180",
+          "text": "**Closed 2026-07-22 (`design-session-0722`), John's explicit call, N/A — the premise doesn't apply:** confirmed live in `MarketIntelligenceScreen.jsx` that Priya is never a routing destination for typed text"
+        }
+      ],
+      "governing_fact": "AA-180's own description records John closing it as not applicable on 2026-07-22, yet the row is status open, tier now, P6 - Agent Enhancement, and was revalidated on 2026-10-07.",
+      "confidence": "high",
+      "proposed_resolution": "Close AA-180 with status removed, citing the 2026-07-22 ruling already written in its description (design-session-0722); no build is owed.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AI-21",
+          "text": "AI Audit output token tracking — extend `logAICall()` to accept `outputTokens` param; include output cost in formula; write to existing `output_tokens` column in ai_activity_log; all `logAICall()` call sites updated"
+        },
+        {
+          "location": "lib/activity-log.js:286",
+          "text": "output_tokens: outputTokens,"
+        },
+        {
+          "location": "backlog_items:LOG-122",
+          "text": "Dead logAICall() still writes ai_activity_log from the browser, bypassing the server writer"
+        }
+      ],
+      "governing_fact": "Output tokens are written to ai_activity_log by the server writer lib/activity-log.js:286 (at f2fda7c), and logAICall() has no live call site left (FetchContext.jsx:151 and CreateWorkOrderScreen.jsx:79 are removal comments), so AI-21 is done and its target is the dead code LOG-122 asks to delete.",
+      "confidence": "high",
+      "proposed_resolution": "Close AI-21 as fixed, citing lib/activity-log.js:286; LOG-122 survives as the home for deleting the browser-side logAICall(). AGT-372 (2026-10-05) already lists AI-21 among the eight fixed rows nothing closed.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AI-25",
+          "text": "`ai_services` table — Supabase catalog of all 14 named Services: slug, name, service_type (ai/deterministic/mixed), description, patterns jsonb (array of pattern slugs)"
+        },
+        {
+          "location": "docs/ARCHITECTURE.md:2037",
+          "text": "a separate `ai_services` name (services are services; model use is a flag)."
+        }
+      ],
+      "governing_fact": "docs/ARCHITECTURE.md:2035-2037 rules out a separate ai_services table (listed among the rejected shapes), and public.platform_services is the live services catalog the AI Audit renders (LOG-56, AGT-372), so AI-25's table will never be built under its own name.",
+      "confidence": "medium",
+      "proposed_resolution": "Close AI-25 as superseded by platform_services, citing ARCHITECTURE.md:2037; any wanted fields (service_type, patterns, byok_eligible) go on a new row as column proposals against platform_services, as AGT-372's fix already prescribes.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:SES-82",
+          "text": "Replace the briefing's manual usage-meter reading with a programmatic read the day one exists"
+        },
+        {
+          "location": "scripts/read-usage-meter.js:2-3",
+          "text": "// DeepBench v7.0.484 | scripts/read-usage-meter.js | SES-388 -- --via-headers: the always-on reader. // DeepBench v7.0.455 | scripts/read-usage-meter.js | SES-374 -- the scheduled meter reader."
+        },
+        {
+          "location": "scripts/build-briefing.mjs:357",
+          "text": "const [reading] = await sel('runner_usage_readings?select=all_models_pct,fable_pct&order=taken_at.desc&limit=1');"
+        }
+      ],
+      "governing_fact": "The programmatic meter read SES-82 waited for exists (scripts/read-usage-meter.js, SES-374 v7.0.455 and SES-388 v7.0.484, run by meter-reader.yml) and the briefing already reads runner_usage_readings at build-briefing.mjs:357, so the row's own condition ('the day one exists') is met.",
+      "confidence": "medium",
+      "proposed_resolution": "Close SES-82 as fixed, citing read-usage-meter.js and build-briefing.mjs:357; if the manual-card fallback half is still wanted, file it as its own row rather than keeping a deferred row the picker keeps naming. AGT-372 already lists SES-82 among the fixed rows.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AA-66",
+          "text": "Identity section additive assembly — db-assembly.js Identity section combines ALL non-blank sources: agents table (name, role, specialty), all role_prompt entries from agent_configs (not just is_default), skill profile objective + method."
+        },
+        {
+          "location": "api/prompt/db-assembly.js:278-297",
+          "text": "// FEATURE: AA-66 — additive Identity assembly: agents table + all role_prompts + skill profile [...] // Source 2: all role_prompt entries from agent_configs (not just is_default) [...] // Source 3: skill profile objective + method"
+        }
+      ],
+      "governing_fact": "db-assembly.js's identity branch (lines 278-297 at f2fda7c) implements AA-66's three sources under a FEATURE: AA-66 comment, identity Skill rows are seeded (AGT-005 counts seven on the CHI roster) and agt-429-bundle-section-dedupe.test.mjs exercises the branch, so the partial row's last clause is met.",
+      "confidence": "medium",
+      "proposed_resolution": "Close AA-66 as delivered, citing db-assembly.js:278-297; the one open question about the identity section (role prompts also pushed by the behavior branch) is AGT-400 item (1), not AA-66.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-183",
+          "text": "The driver refuses the manager's answer on the happy path: claim-then-answer always exits 2"
+        },
+        {
+          "location": "scripts/run-project.js:30",
+          "text": "// DeepBench v7.0.625 | scripts/run-project.js | AGT-183 -- TWO REFUSALS THAT FIRED ON THE HAPPY"
+        },
+        {
+          "location": "scripts/run-project.js:341",
+          "text": "// AGT-183: THE ONE READING THAT TELLS THE CYCLE'S OWN CLAIM APART FROM FOREIGN DRIFT."
+        }
+      ],
+      "governing_fact": "scripts/run-project.js carries AGT-183's fix at v7.0.625 (header line 30; the own-claim reading at lines 341-382), so the row's title claim no longer holds; the row is still status partial with no residue named.",
+      "confidence": "medium",
+      "proposed_resolution": "Close AGT-183 as delivered at v7.0.625, citing run-project.js:30 and :341, or re-title it to the one residue it still owns (its second finding, a cycle-named defect never filed, which AGT-444 now covers as a class). AGT-372 cites the same ship as what fixed SES-431.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-530",
+          "text": "Four regression arms grade a live board read truncated at 1000 rows, so well-formed rows read as board defects"
+        },
+        {
+          "location": "tests/regression/agt-140-project-priority-pick.test.mjs:1",
+          "text": "// DeepBench v7.0.878 | tests/regression/agt-140-project-priority-pick.test.mjs | AGT-304 slice 18 -- whole-board reads go through `pgAll()`; `limit=2000` was capped at 1000 of 1393 rows, so a ref past row 1000 read as missing."
+        },
+        {
+          "location": "tests/regression/agt-482-claim-stop-fence.test.mjs:176",
+          "text": "&epics.projects.status=eq.executing&status=in.(open,partial)&queue=not.is.null&limit=2000"
+        }
+      ],
+      "governing_fact": "Commit 0289c51 (v7.0.878, 2026-10-21, the day AGT-530 was filed) routed three of its four arms (agt-140, ses-281, ses-340) through an ordered, paged, count=exact pgAll() reader; only agt-482 arm C (limit=2000 at line 176; rpc pick_exclusions with no Range) still grades a truncated read.",
+      "confidence": "medium",
+      "proposed_resolution": "Re-scope AGT-530 to its remainder: route agt-482 arm C and the pick_exclusions RPC through the paged reader and move pgAll() from agt-140's test file into tests/regression/_lib/board-state.js as the one home; cite 0289c51 for the three arms already done.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-429 (description)",
+          "text": "api/_lib/handlers/agent-bundle.js assembles its sections per assigned capability, so an agent holding several capabilities sends its role prompts, guardrails and taught items to the AI client more than once."
+        },
+        {
+          "location": "docs/kickoffs/v7.0.895-AGT-429-sections-once-per-bundle.md:12-13",
+          "text": "`api/_lib/handlers/agent-bundle.js:179` is the only agent-wide `assemblePrompt()` call of 18, no `capability_slug`: not the fault, not edited.\n- Fault: `api/prompt/db-assembly.js:765-790`, the `} else if (agent_id) {` branch pushes every assigned capability's `capability_skill_profiles` rows with **no slug check**"
+        },
+        {
+          "location": "commit a4e49a74b8e51f885a73e897bd95541dded04473 (changed files)",
+          "text": "api/prompt/db-assembly.js\ntests/regression/agt-429-bundle-section-dedupe.test.mjs"
+        }
+      ],
+      "governing_fact": "Which file repeats each assembled section once per assigned capability: the delivered description names api/_lib/handlers/agent-bundle.js; the kickoff measured the fault in api/prompt/db-assembly.js and the fix touched only that file.",
+      "confidence": "high",
+      "proposed_resolution": "The shipped record wins: commit a4e49a7 and kickoff §2 locate the fault in api/prompt/db-assembly.js. Correct the first sentence of backlog_items:AGT-429's description to name that file; agent-bundle.js was neither the mechanism nor edited.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "quality-shipped-vs-asked",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-429 (description)",
+          "text": "so an AI client receives each role prompt and guardrail exactly once however many capabilities the agent holds. Assert both directions with a multi-capability agent: every section appears exactly once"
+        },
+        {
+          "location": "commit a4e49a74b8e51f885a73e897bd95541dded04473 (message)",
+          "text": "The §7 residue (a role prompt renders in BOTH the identity and behavior branches, so `ROLE-A` is 2 and not 1 even after the dedupe) is unchanged by this build and is pinned at its true value of 2 by arm B; not filed here, per the kickoff's STOP LINE."
+        },
+        {
+          "location": "docs/backlog/BACKLOG-SNAPSHOT.md:1730",
+          "text": "| AGT-552 | Tooling | P9 - Bug Fixes | A role prompt renders into two assembled sections, because the identity and behavior branches each push the same agent_configs rows | open"
+        }
+      ],
+      "governing_fact": "After v7.0.895 a role prompt still renders in two assembled sections (identity and behavior), so the ticket's own sentence 'every section appears exactly once' is not met by the delivery; the residue is AGT-552, open.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-552 is the home of the residue (filed by the same cycle, kickoff §7 STOP LINE). AGT-429 stays delivered on the per-capability repeat it closed, but its row should say the role-prompt count is 2 until AGT-552 ships, so 'exactly once' is not read as proven.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-502 (title and description)",
+          "text": "A model-assignment trial spent 6.9M input tokens in one call and model-watch's own report counted 0 trials ... One call on claude-opus-4-7 (2026-10-16 09:55:52Z, feature model-assignment:trial:depth0) recorded 6,885,415 input and 48,527 output tokens over about 11 minutes ... nothing bounds the input a single trial call may assemble ... (4) Bound one trial call's input, with the bound read from runner_settings, never a literal, and a record written when it binds."
+        },
+        {
+          "location": "commit e3e9707e96515931c4f863ac6176b050c811a9a0 (message)",
+          "text": "row 72661's 6,885,415 is a whole 60-turn agent run's cumulative usage, overwhelmingly cache reads, flattened into the input column. No single call could carry it — no context window is that large. ... Part 4 of the ticket — bound one trial call's input — stays struck on evidence: there is no one call, and the figure is mostly the cheap half."
+        },
+        {
+          "location": "scripts/model-trial.js:295-300 (shipped comment)",
+          "text": "`inTok` used to be the sum of the three input kinds and was passed as --input-tokens, so the column held three different prices added together (a cache read bills about 0.1x an uncached input token) and both cache columns stored NULL -- measured live on ai_activity_log row 72661, 6,885,415 / NULL / NULL."
+        }
+      ],
+      "governing_fact": "Whether 6,885,415 input tokens were one trial call: the delivered row's title, description and fix (4) say one call and ask for a per-call bound; the shipped record says it was a 60-turn run's summed usage including cache reads, and the bound was struck.",
+      "confidence": "high",
+      "proposed_resolution": "The measured record wins (commit e3e9707, scripts/model-trial.js usageSplit()). Correct backlog_items:AGT-502's title and description to the summed-usage cause and mark fix (4) struck with that reason, so a delivered row does not promise a guard that was deliberately not built.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-516 (description)",
+          "text": "the decision-33 'fits-no-active-project' stamp it keys on exists nowhere on the board, so nothing records that she has already looked at a ticket. Measured at that ship: 15 such tickets, 11 in dev-mgr-findings and 4 in auditor-findings. ... Then re-read the fifteen once: the arm should ask about none of them twice."
+        },
+        {
+          "location": "docs/kickoffs/v7.0.884-AGT-516-daily-arm-reads-stamp.md:11-12",
+          "text": "Premise ALIVE, NARROWED (live 2026-10-23). The stamp EXISTS: 4 unreversed `kind='fit-stamp'` rows (AGT-438, AGT-440, AGT-500, AGT-501; fingerprint `3b09cd44c2260491b6ab6d87b55fc5c4`), 183 `placement` rows; `--prepare-list` already drops stamped tickets. Still broken: `public.victoria_daily_check()` arm 2 holds `fit-stamp` 0 times ... Live arm 2: `fives` 10, 0 of them stamped.\nMy calls (JOHN-0925-DESIGNER-DECIDES, reversible): (1) no new decision kind -- `placement` is \"placed\", `fit-stamp` is \"turned down\" ... (4) no hand re-read of the ten; the routine stays John's switch (d.35)."
+        },
+        {
+          "location": "docs/design/agt-516-daily-arm-reads-stamp.sql:1-4",
+          "text": "`AGT-486` (v7.0.861) built the fit-stamp: Victoria reads every unplaced ticket once against all the active charters, and a ticket that fits none takes ONE `runner_decisions` row of kind `fit-stamp`"
+        }
+      ],
+      "governing_fact": "Whether the fit-stamp existed on the board: the delivered description says it exists nowhere and names fifteen tickets to re-read; the kickoff measured four live fit-stamp rows (AGT-486, v7.0.861), ten fives, and declined the re-read as designer call (4).",
+      "confidence": "high",
+      "proposed_resolution": "The kickoff's live measurement wins (AGT-486 v7.0.861 is the stamp's home; docs/design/agt-516-daily-arm-reads-stamp.sql). Correct backlog_items:AGT-516's premise to 'the daily arm does not read the stamp' and strike the fifteen-ticket re-read, citing designer call (4).",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-428 (description)",
+          "text": "scripts/platform-stats.js:110 runs `git fetch --unshallow` from inside a suite that tests/regression/run-all.js spawns, so a run rewrites the history of the very checkout it is grading."
+        },
+        {
+          "location": "commit 62c3b0d956ed4564ed2a52926281f37a2c351b85 (message and scripts/platform-stats.js:95)",
+          "text": "AGT-428 (v7.0.888): fetch ONLY under PLATFORM_STATS_DEEPEN=1 -- via prebuild, an always-on fetch rewrote the history the suite was grading."
+        },
+        {
+          "location": "package.json:8",
+          "text": "\"prebuild\": \"node scripts/platform-stats.js --soft\","
+        }
+      ],
+      "governing_fact": "What invokes the unshallow fetch: the delivered description says the regression suite spawns platform-stats.js; the shipped record says package.json's prebuild (npm run build) does, and no file under tests/regression spawns platform-stats.js or a build (grep this session).",
+      "confidence": "medium",
+      "proposed_resolution": "The code wins (package.json prebuild; commit 62c3b0d). Correct the description to say the build gate's prebuild runs the fetch between the baseline and the post-build suite run; the shipped fix (opt-in flag plus run-all.js's mid-run report) is unaffected.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "quality-safety-never-on",
+      "locations": [
+        {
+          "location": "scripts/verifier.js:3550-3557",
+          "text": "const coverage = baselineCoverageFinding({\n    measured: baselineRead.measured,\n    graded: relatedRead?.names ?? null,\n    instrument: baselineRead.instrument,\n  });\n  if (coverage) {\n    return emit({ code: 2, payload: { ok: false, exitCode: 2, ...coverage, kind: \"cannot-run\",\n        error: \"baseline-narrower-than-graded-set\","
+        },
+        {
+          "location": "scripts/verifier.js:1096-1101 and :3604",
+          "text": "const neverMeasured = [];\n ... else neverMeasured.push(n);\n ... const delta = regressionDelta({"
+        },
+        {
+          "location": "CLAUDE-STATE.md at commit a5eebac, line 13 (AGT-457 ship card)",
+          "text": "the new coverage refusal also fires when a delivery ADDS a test to its own related set, because no baseline could have measured a file that did not exist - which is most deliveries, including this one. ... it gets no verdict and no ladder signal. The mechanism to reuse already exists in this same delivery: the neverMeasured bucket handles an unmeasured name without charging it, and the refusal currently preempts that bucket."
+        },
+        {
+          "location": "docs/SESSIONS.md:12 (v7.0.877, AGT-304 slice 17)",
+          "text": "NO VERDICT ROW EXISTS FOR THIS SHIP, and the cause is a contradiction between two live rules rather than anything about the delivery. `scripts/verifier.js` exited **2** `baseline-narrower-than-graded-set`: `AGT-457`'s `baselineCoverageFinding()` refuses a baseline that does not reach every graded test, while `AGT-451` measures the pre-build baseline on the *unchanged* tree"
+        }
+      ],
+      "governing_fact": "On the related-set path the exit-2 coverage refusal (verifier.js:3550) runs before regressionDelta() (:3604), so the neverMeasured bucket AGT-457 built cannot fire there; AGT-457 (v7.0.874) and v7.0.877 shipped with no verdict row, and no ruling on the new-test exemption is in the clone.",
+      "confidence": "medium",
+      "proposed_resolution": "scripts/verifier.js is the one home. The ship card asks John whether a test NEW IN THE DIFF is exempt from the coverage refusal (or whether neverMeasured absorbs it); that ruling decides which half moves. Until then, record that Designers widen the BASELINE block to the graded set (commit b0b1e1d) as the live workaround, not a fix.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "docs/runbooks/humorist-agent.md:54 (section (d) table)",
+          "text": "| routine id | not yet created | not yet created | filled only when the attended session creates the routine, never a placeholder |"
+        },
+        {
+          "location": "commit eed22a61ac3a1a3d760362c27acdebc1c6a3bac8 (message, same day)",
+          "text": "AGT-543 feeds: Dilbert reads TechCrunch, VentureBeat and Fast Company (John 2026-10-23, decisions 2eca2c97 + be9ac30e); Mashable and Wired refuse the fetcher; both live routines updated from the blocks"
+        },
+        {
+          "location": "backlog_items:AGT-543 (title) and task_context ship_summary",
+          "text": "the runbook with the Wednesday and Friday routine prompt blocks (meter STEP 0, created OFF) ... ship_summary: \"\""
+        }
+      ],
+      "governing_fact": "Whether the two humorist routines exist: the runbook table that is their source says neither has been created; the same day's commit says both live routines were updated from the blocks, and nothing in the clone records that they were created with enabled=false as the title requires.",
+      "confidence": "medium",
+      "proposed_resolution": "The runbook is the source the routines copy (ARCHITECTURE.md §19v; humorist-agent.md (d)). Update its table to say the routines exist (ids stay out of the public file per its header) and record in runner_decisions that each was created OFF, which the empty ship_summary never reported.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-543 (description)",
+          "text": "a news file the session fetched from the three outlets John named (Mashable, Wired, TechCrunch) handed in as --input-file"
+        },
+        {
+          "location": "docs/runbooks/humorist-agent.md:30",
+          "text": "WebFetch the three outlets John named, and only these: `https://techcrunch.com/feed/`, `https://venturebeat.com/feed/`, `https://www.fastcompany.com/technology/rss`."
+        },
+        {
+          "location": "docs/runbooks/humorist-agent.md:1 (header)",
+          "text": "AGT-543 (feeds amended 2026-10-23 on John's word, decision 2eca2c97 / correction: TechCrunch, VentureBeat, Fast Company; Mashable and Wired refuse the fetcher)"
+        }
+      ],
+      "governing_fact": "Which three outlets the humorist reads: the done row's text names Mashable, Wired and TechCrunch; the shipped runbook, on John's 2026-10-23 decisions 2eca2c97 and be9ac30e, names TechCrunch, VentureBeat and Fast Company because Mashable and Wired refuse the fetcher.",
+      "confidence": "medium",
+      "proposed_resolution": "John's later decision wins (2eca2c97, be9ac30e; commit eed22a6). Append the correction to backlog_items:AGT-543's description so the done row and its runbook name the same outlets.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "quality-shipped-vs-asked",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-542 (description)",
+          "text": "public.humor_records (id, kind, title, body, data jsonb, source, session_name, created_at, updated_at; kind in draft, grade, correction, topic, research, phrase_set) with ZERO public grants, asserted both directions like career_records; public.personal_sources ... and public.personal_source_grants ... with zero public grants"
+        },
+        {
+          "location": "runner_verdicts:989f3847-666b-464f-a0c9-4776ecdf1c71 (reasoning)",
+          "text": "[NOT RUN] the anon half of the three-table pair -- no real SUPABASE_ANON_KEY / VITE_SUPABASE_ANON_KEY in env (runner_secrets carries none; the browser bundle's key lives in .env.local). The service half above ran."
+        },
+        {
+          "location": "backlog_items:AGT-542 (ship_summary)",
+          "text": "[CLOSED BY STALL WATCHDOG (SES-194, v7.0.230) at 2026-10-25T07:42:38Z by cycle 68372c07-1ba8-4e5c-a957-ca7499d861c4. This cycle WENT SILENT — that is the observable fact and the only one claimed."
+        },
+        {
+          "location": "docs/kickoffs/v7.0.892-AGT-542-dilbert-humorist-writer.md §4",
+          "text": "MIGRATION `agt542_humor_records_personal_sources` (text lives here, no mirror; confirm `agents.id` is text)"
+        }
+      ],
+      "governing_fact": "Whether the anon-side denial on the three Dilbert tables was proven: the ticket asks for both directions; the verdict's regression gate declared the anon half NOT RUN, the ship_summary is a stall-watchdog closure, and the migration has no repo mirror, so the clone holds no record of the denial.",
+      "confidence": "medium",
+      "proposed_resolution": "Evidence missing, not disproven. The rule home is .claude/rules/supabase-column-grants.md (the denied query must fail AND the read still work). Record the anon-refused/service-200 pair for the three tables in runner_cycles e79e2bec or as AGT-544's verification line, or run agt-542-dilbert.test.mjs's anon arm with the browser key and log it.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "quality-shipped-vs-asked",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-544 (description)",
+          "text": "Verification: counts by kind match the lists above; a select with the public browser key returns zero rows from both new tables; Jerry's render still passes its regression guard."
+        },
+        {
+          "location": "commit 52f9fcade8d3abe053f3a84904b7a75864da3951 (message)",
+          "text": "close-out: design-dilbert-1023 — Dilbert (HW-01) shipped: AGT-542 v7.0.892, AGT-543 v7.0.893 done, AGT-544 delivered; inflight removed"
+        },
+        {
+          "location": "task_context shipped[AGT-544]",
+          "text": "kickoff_path: null, ship_summary: null, verdict: null"
+        }
+      ],
+      "governing_fact": "AGT-544 is delivered on a close-out commit alone: no kickoff, no ship summary, no verdict, and nothing in the clone records the three verification results its description names (counts by kind, zero anon rows, Jerry's guard).",
+      "confidence": "low",
+      "proposed_resolution": "Evidence missing. AGT-544 is data-only by its own rule (no repo file), so its record belongs in runner_decisions under need source e0605a1b (the design record's decision home): one decision row carrying the counts by kind and the anon zero-row probe would make the delivered status checkable.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "advisor-model-change",
+      "locations": [
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/models/overview (retrieved 2026-10-26), closing paragraph of 'Compare models' (link text, markup removed)",
+          "text": "Legacy models (still available): Claude Fable 5, Claude Opus 5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 5, Claude Sonnet 4.6, Claude Haiku 4.5."
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/model-deprecations (retrieved 2026-10-26), Overview glossary and Model status table",
+          "text": "**Legacy:** The model will no longer receive updates and might be deprecated in the future. [...] | claude-opus-5 | Active | N/A | Not sooner than July 24, 2027 | [...] | claude-sonnet-5 | Active | N/A | Not sooner than June 30, 2027 |"
+        },
+        {
+          "location": "public.model_catalog row model_id=claude-sonnet-5, field stated_strengths (last_checked 2026-10-16T10:01:34Z, source_url .../pricing)",
+          "text": "Holds lane/mechanical. Active, Deprecated N/A, floor 2027-06-30. $2/$10 confirmed standard; the scheduled increase to $3/$15 will not occur. Cache hits $0.20, twice what Sonnet 5.5 charges at the same base price."
+        },
+        {
+          "location": "public.model_catalog row model_id=claude-opus-5, field stated_strengths (last_checked 2026-10-16T10:01:34Z, source_url .../model-deprecations)",
+          "text": "Holds lane/orchestrator. Active, Deprecated N/A, floor 2027-07-24. Dearer on input, output, cache and batch than the Opus 5.5 that succeeded it; its fast mode is still in research preview at $10/$50."
+        },
+        {
+          "location": "public.runner_model_lanes rows lane=orchestrator and lane=mechanical (both updated_at 2026-09-02T23:17:49Z, updated_by ses-313-coding)",
+          "text": "orchestrator | claude-opus-5 | Parent cycle: orchestrates, codes, QAs, ships (register B21). / mechanical | claude-sonnet-5 | Mechanical delegated steps: doc sweeps, imports, formatting (register B21)."
+        },
+        {
+          "location": "docs/runbooks/model-watch-routine.md:70",
+          "text": "curl -sfL https://platform.claude.com/docs/en/release-notes/overview https://platform.claude.com/docs/en/about-claude/model-deprecations | grep -oE 'claude-[a-z0-9]+(-[0-9]+)+' | sort -u > $S/ids.txt; echo \"ids exit ${PIPESTATUS[0]}\""
+        },
+        {
+          "location": "public.model_catalog row model_id=claude-sonnet-5-5, field stated_strengths",
+          "text": "The queued, untrialled candidate for capability/bench-report-card and lane/mechanical. Active, current lineup, floor 2027-09-28. Best combination of speed and intelligence; cache hits $0.10, halved on 2026-10-07. 1M context, default effort high."
+        },
+        {
+          "location": "public.runner_decisions kind=model-report, session_name=model-watch-2026-10-16, decided_at 2026-10-16T10:03:51Z (the newest model-watch row of any kind; the runbook's cron is daily)",
+          "text": "model-watch 2026-10-16: releases 0, retirements 12, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · models: capability/bench-report-card=claude-sonnet-4-6, capability/data-room-custody=claude-haiku-4-5-20251001, lane/judgment=claude-fable-5-1, lane/mechanical=claude-sonnet-5, lane/orche"
+        }
+      ],
+      "governing_fact": "Lifecycle state of claude-opus-5 and claude-sonnet-5, the orchestrator and mechanical lane models: the catalog carries Active from the deprecations table; Anthropic's models overview lists both under Legacy models, which that page defines as no longer receiving updates.",
+      "confidence": "medium",
+      "proposed_resolution": "Home: public.model_catalog via model-watch step 1 (ARCHITECTURE s19v), which AGT-522 already rewrites: read the overview's legacy list too, so a legacy lane is flagged. Remedy: the queued trials, Sonnet 5.5 for mechanical ($2/$10, cache $0.10 vs $0.20) and Opus 5.5 ($4/$20 vs $5/$25), via apply_model_assignment(), reversible. Cheaper per API token; meter effect unmeasured, so money is John's call.",
+      "found_by": "auditor:routine:advisor",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "advisor-feature-replaces-handbuilt",
+      "locations": [
+        {
+          "location": "scripts/agent-log.js:2",
+          "text": "// DeepBench v7.0.881 | scripts/agent-log.js | AGT-502 -- --cache-creation-tokens / --cache-read-tokens: the two flags whose absence from parseArgs() made every caller sum three differently-priced input quantities into --input-tokens. All-or-nothing as a pair with each other, independent of input/output, absent = NULL not 0 (SES-423)."
+        },
+        {
+          "location": "scripts/agent-log.js:103-105 (usage example in the header)",
+          "text": "//     --agent=owen --capability=bench-report-card --model=claude-opus-5 \\ [...] //     --input-tokens=8123 --output-tokens=642 --latency-ms=19400 --cycle=<runner_cycles.id>"
+        },
+        {
+          "location": "docs/runbooks/auditor-routine.md:87",
+          "text": "node scripts/agent-log.js --agent=auditor --capability=<cap> --model=<printed model> --ai-type=<cap> --feature=<cap>:<intent>:depth1 [--input-tokens=<n> --output-tokens=<n>] [--patterns-applied=<csv>]"
+        },
+        {
+          "location": "https://code.claude.com/docs/en/monitoring-usage (retrieved 2026-10-26), event claude_code.api_request",
+          "text": "Logged for each API request to Claude. [...] `model`: Model used (for example, \"claude-sonnet-5\") · `cost_usd`: Estimated cost in USD · `cost_usd_micros` · `duration_ms`: Request duration in milliseconds · `input_tokens`: Number of input tokens, excluding tokens read from or written to the prompt cache · `output_tokens`: Number of output tokens · `cache_read_tokens`: Number of tokens read from cache · `cache_creation_tokens`: Number of tokens used for cache creation · `request_id`: API request ID, such as \"req_011...\" · `query_source`: Subsystem that issued the request, such as \"repl_main_thread\", \"compact\", or a subagent name · `agent.name`, `skill.name`, `plugin.name`, `marketplace.name`, `mcp_server.name`, `mcp_tool.name`: Skill, plugin, agent, and MCP attribution for the request."
+        },
+        {
+          "location": "https://code.claude.com/docs/en/monitoring-usage (retrieved 2026-10-26), 'Configure OpenTelemetry using environment variables'",
+          "text": "export CLAUDE_CODE_ENABLE_TELEMETRY=1 [...] export OTEL_LOGS_EXPORTER=otlp          # Options: otlp, console, none [...] export OTEL_EXPORTER_OTLP_PROTOCOL=grpc  export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 [...] Claude Code exports the following events via OpenTelemetry logs/events (when `OTEL_LOGS_EXPORTER` is configured)."
+        },
+        {
+          "location": "https://code.claude.com/docs/en/changelog (retrieved 2026-10-26), 2.1.300 (October 14, 2026) and 2.1.307 (October 21, 2026)",
+          "text": "Added `cache_creation_5m_tokens` and `cache_creation_1h_tokens` to the OpenTelemetry `api_request` event, splitting cache writes by lifetime [...] Added OpenTelemetry GenAI semantic-convention attributes to trace spans, such as `gen_ai.provider.name`, `gen_ai.conversation.id`, `gen_ai.tool.name` and `error.type` [...] Added the `claude_code.safety_event` OpenTelemetry event for each tool call a permission rule, auto mode, a safety check, a hook or the sandbox stopped, prompted or sent back"
+        },
+        {
+          "location": "docs/backlog/BACKLOG-SNAPSHOT.md:171 (AI-35, status partial)",
+          "text": "Three-layer AI-pattern model, `ARCHITECTURE.md §19i` (LOCKED), grounded in OpenTelemetry GenAI Semantic Conventions + Anthropic's \"Building Effective Agents.\""
+        }
+      ],
+      "governing_fact": "Who measures a governance sub-agent's tokens and cost: agent-log.js takes them as flags the session types (--input-tokens, --output-tokens, --cache-creation-tokens, --cache-read-tokens, --model); Claude Code's api_request event emits the same split per request and sub-agent, with request_id.",
+      "confidence": "medium",
+      "proposed_resolution": "Home stays scripts/agent-log.js writing ai_activity_log (SES-424 one path, AGT-502 cache split); the upgrade is the source of its numbers: CLAUDE_CODE_ENABLE_TELEMETRY=1 and OTEL_LOGS_EXPORTER=otlp in the routines' cloud environment, a collector landing api_request events keyed by request_id, under AI-35's OTel conventions. A discovery session sizes it; the collector is the only cost, John's call.",
+      "found_by": "auditor:routine:advisor",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "routine-prompt-drift",
+      "locations": [
+        {
+          "location": "routine/trig_01BCzPdanZ1YiK956dAqU6YN/prompt",
+          "text": "STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below."
+        },
+        {
+          "location": "docs/runbooks/auditor-routine.md:22",
+          "text": "DEEPBENCH AUDITOR — WEEKLY AUDIT — stamp: DEEPBENCH-AUDITOR-trig_01BCzPdanZ1YiK956dAqU6YN · trigger: scheduled (Monday 5:00 AM Central) or manual (\"Run now\"). The canonical copy of this prompt is docs/runbooks/auditor-routine.md (AGT-86): if the two differ, follow the runbook — it is the complete playbook and outranks this summary."
+        }
+      ],
+      "governing_fact": "the live routine prompt must equal its repo block (the repo is the source)",
+      "confidence": "high",
+      "proposed_resolution": "update the live routine from the repo block on John's word (routine-prompt.md update rule), or fix the block",
+      "found_by": "check-routine-prompt:auditor",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "routine-prompt-drift",
+      "locations": [
+        {
+          "location": "routine/trig_017TZ3JZcLBK6AYH6DKURqMH/prompt",
+          "text": "cycle 9c275f46-ffbc-4014-84d8-490b58e5c91d: tokens_at_open: unmeasured (get_session returned no external_metadata.usage object). Meter self-read OK: reading 9551d352-b770-4dbe-a7bf-4f964975bde0 all_models 47 / 5h 11 / fable 53. Stamp match verified verbatim against stored prompt of trig_017TZ3JZcLBK6AYH6DKURqMH. Branch session/cycle-20261026-"
+        },
+        {
+          "location": "docs/runbooks/routine-prompt.md:42",
+          "text": "<!-- ROUTINE-PROMPT-BEGIN -->"
+        }
+      ],
+      "governing_fact": "the live routine prompt must equal its repo block (the repo is the source)",
+      "confidence": "medium",
+      "proposed_resolution": "update the live routine from the repo block on John's word (routine-prompt.md update rule), or fix the block",
+      "found_by": "check-routine-prompt:runner",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/SES-352-green-anchor-from-ci.js",
+          "text": "no green dev conclusion in the newest 200 ci_run_conclusions rows -- either CI has not been green in 200 pushes or ref is not being published."
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-120-nathan-laan.test.mjs",
+          "text": "no real SUPABASE_ANON_KEY / VITE_SUPABASE_ANON_KEY in env -- the market_records anon half is required, not optional"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-132-finding-routes.test.mjs",
+          "text": "4 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-151-build-trial.test.mjs",
+          "text": "each est line states tokens, minutes and the base it would start from:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-159-backlog-review.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-161-market-findings.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-166-board-burn-down.test.mjs",
+          "text": "live: the drain must have something to drain — the §2.2 predicate counts 0. A zero here is either a finished drain (write the ticket done) or a broken predicate"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-167-noship-pick-fence.test.mjs",
+          "text": "backlog_items returned HTTP 400 Bad Request: {\"code\":\"23514\",\"details\":null,\"hint\":null,\"message\":\"AGT-240: epic Victoria Fill - Platform Reliability is locked; the finding waits on the findings list\""
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-173-card-citations.test.mjs",
+          "text": "card 7c55bf10 now cites a removed ticket (AGT-141) — that is a real finding about the board, not a bug in this guard"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-184-ledger-orphan.test.mjs",
+          "text": "the ledger must carry NO orphan (it carried exactly one, 'agt138_researcher_route', before Task 1). Orphans now: [\"agt423_sweep_fault_isolation\",\"agt291_finish_sensor\"]"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-245-regrade-cohort.test.mjs",
+          "text": "at least one resolved pair must be checkable here, or (e) proves nothing"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-245-regrade-delivered.test.mjs",
+          "text": "no resolved cohort pair is still current on the board, so the live clause has no pair to grade — a re-freeze is due"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-267-careers-page-fetch.test.mjs",
+          "text": "9 of 19 careers-page watch companies neither carry a json_url nor say why not. This count stood at 19 before v7.0.702 and must stay 0: give the row a measured json_url + json_map, or search_only = tru"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-277-db-health-watch.test.mjs",
+          "text": "the 04:00 reading is gone from db_health_readings; got []"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-291-finish-sensor.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-309-process-break-class.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-314-find-work-boot.test.mjs",
+          "text": "runner_settings.find_work_lists is [] -- with no slug listed the lists half of this branch is switched off and the fixture below cannot discriminate anything"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-390-teach-tool.test.mjs",
+          "text": "Unknown agent: testjohn-w50rvr"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-448-cap-split-guard.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-487-held-source-echo.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-490-parked-home.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-492-architect-review.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-493-ticket-validation.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-543-humorist-agent.test.mjs",
+          "text": "D live: Expected values to be strictly equal:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-70-auditor.test.mjs",
+          "text": "a fingerprint the ledger holds in SOME week must be RECOGNISED, never re-filed as new. ledger says 3 new / 2 seen / 4 rec+ruled; got: ingest 2026-W38: 6 findings, 0 new, 4 seen, 1 recurring, 1 ruled-o"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-84-personal-agent.test.mjs",
+          "text": "write_backs went 0 -> 0, expected +1"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-86b-audit-review.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-90-fable-temperature.test.mjs",
+          "text": "7 live skill_profiles row(s) store a temperature their model family rejects: hw-behavior=0.7, hw-guardrails=0.7, hw-identity=0.7, hw-knowledge-craft=0.7, hw-knowledge-style=0.7, hw-topic-scout-intent="
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-297-pre-boot-pickability.test.mjs",
+          "text": "detail must always carry finish_due -- without it a reader cannot tell 'there is nothing at all' from 'a project batch is finished and nobody has proposed the next one'"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-320b-window-finaliser.test.mjs",
+          "text": "the decision-window finaliser is NOT healthy: newest run carries an error: AGT-166: AGT-281 cannot be written done over its latest verdict block (38959e02-fdd5-4858-bf19-11fc48fdc5d2) — record a ship/"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-332-first-run.test.mjs",
+          "text": "2 rows carry a supports_reason with no supports_class: AGT-250, SES-435"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-378d-manager-skill-rows.test.mjs",
+          "text": "dm-guardrails.guardrails.must must hold 5 entries (it held 5 before this slice). got 8"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-415-role-tagged-criteria.test.mjs",
+          "text": "criterion 170: the harvest's passage is NOT in backlog_items.SES-382.defer_reason — it was edited to fit or invented:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-424a-gate-card-excludes-pick.test.mjs",
+          "text": "backlog_items returned HTTP 400 Bad Request: {\"code\":\"23514\",\"details\":null,\"hint\":null,\"message\":\"AGT-240: epic Victoria Fill - Platform Reliability is locked; the finding waits on the findings list\""
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-424g-blocker-cleared.test.mjs",
+          "text": "epic 1af331b4-682e-4f8a-ac75-c68e0f1887fe must belong to an executing project or the fixture dependent is unbuildable for a reason that has nothing to do with blockers -- re-point EPIC_ID at the execu"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-424h-johns-three-carried.test.mjs",
+          "text": "(A i) exactly 1 undecided gated_before_build card must carry \"judged-lane\" -- item 1 of the three SES-424 carried for John -- got 0. 0 means the item has no home once this id closes and it is dropped "
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-84-claims-classed.test.mjs",
+          "text": "docs/runbooks/standing-brief.md carries the unclassed FLAG — a live claim was inserted without a classing decision; record one"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    }
+  ],
+  "carried": [],
+  "gone": [
+    {
+      "fingerprint": "08f253b74804a677",
+      "from_week": "2026-W43",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "build needed a fact the kickoff did not carry"
+    }
+  ]
+}
