@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.899 | scripts/agent-prompt.js | AGT-504 -- --prior-proposals=<found_by>: the turn reads its lane's prior proposals
 // DeepBench v7.0.587 | scripts/agent-prompt.js | AGT-129 -- the task may come from a FILE or STDIN,
 // not only from one argv entry. Linux caps a single argv entry at MAX_ARG_STRLEN = 131,072 B, so
 // `--task=$(cat big.json)` dies E2BIG before node starts -- measured 2026-09-25: 127 KB spawns,
@@ -54,6 +55,7 @@
 //                              (argv caps at 128 KB on Linux -- use this for a big task_context)
 //   --tenant=<id>              optional, default 'global'
 //   --json                     print the raw assembly object instead of the rendered prompt
+//   --prior-proposals=<v>      optional; task_context.prior_proposals = audit_findings proposal rows for v (AGT-504)
 //
 // EXIT CODES: 0 ok; 2 any missing/invalid input or missing credential.
 
@@ -112,6 +114,39 @@ export async function resolveIntentSlug({ intent, capability, tenant, fetchImpl 
   return fallback
     ? { intentSlug: fallback, source: 'capability-default' }
     : { intentSlug: null, source: 'no-default-declared' };
+}
+
+// FEATURE: AGT-504 -- the research turn reads ITS OWN LANE'S PRIOR PROPOSALS, so a candidate that is
+// already on the board is dropped by the agent instead of re-filed as a duplicate. Measured on tree
+// 9d505e4, not assumed: this script carried 0 hits for `audit_findings` and
+// docs/runbooks/researcher-routine.md's method command passed `{lens, allowed, census, corpus}` only
+// -- so nothing in the assembly path could see that `audit_findings` cf3d80b5
+// (`found_by` = researcher:weekly-market, status `ticketed`, filed as `AGT-323`) already holds the
+// 2026-10-17 proposal, and the pass re-proposed it.
+//
+// KEYED ON A `found_by` VALUE, NEVER ON A SLUG (ARCHITECTURE.md §19b/§19v). The caller names the lane
+// whose proposals it wants and this reads exactly that lane's rows; nothing here maps an agent id, a
+// capability slug or a routine name onto a filter, so a new lane needs no edit to this file.
+//
+// THE `proposal` FILTER IS THE WHOLE FILTER (pattern:90 -- the spec implemented literally, with no
+// unrequested extra category). `audit_findings` also carries this lane's `defect` and `gap` rows;
+// they are a different conversation and this flag does not carry them.
+//
+// A FAILED READ THROWS; IT NEVER RETURNS `[]`. Downstream, "the board is empty" and "the board could
+// not be read" are the same empty array -- and the first silently licenses exactly the duplicate this
+// ticket exists to stop. So the failure is loud here and `main()` turns it into exit 2, rather than a
+// pass that proceeds believing nothing has been proposed before.
+export async function attachPriorProposals(taskContext, { foundBy, supabaseUrl, headers, fetchImpl = fetch }) {
+  const root = String(supabaseUrl || '').replace(/\/+$/, '');
+  const url = `${root}/rest/v1/audit_findings`
+    + '?select=id,iso_week,status,filed_backlog_id,governing_fact,locations'
+    + '&finding_type=eq.proposal'
+    + `&found_by=eq.${encodeURIComponent(foundBy)}`;
+  const r = await fetchImpl(url, { headers });
+  if (!r.ok) throw new Error(`audit_findings read failed: HTTP ${r.status}`);
+  const rows = await r.json();
+  if (!Array.isArray(rows)) throw new Error(`audit_findings read failed: HTTP ${r.status}`);
+  return { ...taskContext, prior_proposals: rows };
 }
 
 // FEATURE: SES-395 -- the judgment lane DEGRADES instead of the gate refusing. John, 2026-09-14:
@@ -204,11 +239,18 @@ export function parseArgs(argv) {
       // silently meaning `{}` -- the regex above yields undefined for a valueless flag.
       case 'task-file': out.taskFile = value ?? ''; break;
       case 'json': out.json = true; break;
+      // AGT-504. Same `?? ''` shape as --task-file above and for the same reason: a BARE
+      // --prior-proposals must be refused for want of a lane, never read as "no lane asked for".
+      case 'prior-proposals': out.priorProposals = value ?? ''; break;
       default: return { error: `unrecognized flag "--${key}"` };
     }
   }
   if (!out.agent) return { error: '--agent=<agents.id> is required' };
   if (!out.capability) return { error: '--capability=<slug> is required' };
+  // AGT-504: the flag is optional, but having been passed it must name a lane.
+  if (out.priorProposals !== undefined && !out.priorProposals) {
+    return { error: '--prior-proposals=<found_by> needs a value' };
+  }
   // AGT-129. Two flags, ONE source of task text and ONE validity check below -- a second copy of
   // the JSON check is how the two paths would drift into disagreeing about what a task is.
   if (out.task !== undefined && out.taskFile !== undefined) {
@@ -290,6 +332,21 @@ async function main() {
   if (args.error) fail(args.error);
   if (!process.env.SUPABASE_URL) fail('SUPABASE_URL not set');
   if (!process.env.SUPABASE_SERVICE_KEY) fail('SUPABASE_SERVICE_KEY not set');
+
+  // AGT-504: the rows land in the task_context BEFORE assemblePrompt() renders it, so the agent
+  // reads them in the executor's own CURRENT TASK section -- this script still assembles nothing.
+  if (args.priorProposals) {
+    const priorKey = process.env.SUPABASE_SERVICE_KEY;
+    try {
+      args.taskContext = await attachPriorProposals(args.taskContext, {
+        foundBy: args.priorProposals,
+        supabaseUrl: process.env.SUPABASE_URL,
+        headers: { apikey: priorKey, Authorization: `Bearer ${priorKey}` },
+      });
+    } catch (e) {
+      fail(e.message);
+    }
+  }
 
   const tenant = args.tenant || DEFAULT_TENANT;
   const resolved = await resolveIntentSlug({ intent: args.intent, capability: args.capability, tenant });

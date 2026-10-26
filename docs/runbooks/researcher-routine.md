@@ -80,8 +80,14 @@ and there is no fifth:
 ```
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
   --agent=researcher --capability=research-class-lens --intent=rs-research-intent \
+  --prior-proposals=researcher:weekly-market \
   --task='{"lens":"<the class>","allowed":<invention_due().allowed>,"census":{…},"corpus":{…}}'
 ```
+
+   `--prior-proposals=researcher:weekly-market` reads this lane's own earlier proposals live from
+   `audit_findings` — the `proposal` rows whose `found_by` is that value, each with its `status` and
+   `filed_backlog_id` — into `task_context.prior_proposals`, so a candidate already on the board is
+   dropped by the agent rather than re-proposed (`AGT-504`).
 
    Run the rendered prompt as a sub-agent on the **`judgment`** lane (`claude-fable-5-1` — step 6's
    lanes table, read from `runner_model_lanes`, never a literal), with web search available.
