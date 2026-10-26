@@ -1,3 +1,6 @@
+// DeepBench v7.0.903 | tests/regression/ses-378d-manager-skill-rows.test.mjs | AGT-304 slice 22 --
+// the two guardrail counts are floors, because John's own appends are not the defect.
+//
 // DeepBench v7.0.674 | tests/regression/ses-378d-manager-skill-rows.test.mjs | AGT-157 -- the
 // must_not count was already re-pointed to 11 by AGT-145 (v7.0.612) and this file is GREEN; what
 // ships here is the CITATION of the agent-row decision that moved it, and the direct assertion the
@@ -226,10 +229,20 @@ async function run() {
   const gr = await get(`skill_profiles?select=id,slug,guardrails&slug=eq.${GUARDRAILS_SLUG}`);
   assert.strictEqual(gr.length, 1, `public.skill_profiles must hold exactly one ${GUARDRAILS_SLUG} row`);
   const guard = gr[0].guardrails || {};
-  assert.strictEqual(Array.isArray(guard.must) ? guard.must.length : -1, MUST_AFTER,
-    `${GUARDRAILS_SLUG}.guardrails.must must hold ${MUST_AFTER} entries (it held 5 before this slice). got ${JSON.stringify(guard.must && guard.must.length)}`);
-  assert.strictEqual(Array.isArray(guard.must_not) ? guard.must_not.length : -1, MUST_NOT_UNCHANGED,
-    `${GUARDRAILS_SLUG}.guardrails.must_not must be UNCHANGED at ${MUST_NOT_UNCHANGED} -- an append that landed in the wrong array would still make the pair total 12`);
+  const mustLen = Array.isArray(guard.must) ? guard.must.length : -1;
+  const mustNotLen = Array.isArray(guard.must_not) ? guard.must_not.length : -1;
+  // AGT-304 slice 22: FLOORS, never equalities. John appends his OWN guardrails to this row (must
+  // 5 -> 8, must_not 11 -> 12 by 2026-10-26), so an equality pin reds on his words. The counts were
+  // only ever a PROXY for the indexOfExact pair below, which runs byte-unchanged and still catches
+  // an append into the wrong array. pattern:166, STANDARDS.md:238.
+  assert.ok(mustLen >= MUST_AFTER,
+    `${GUARDRAILS_SLUG}.guardrails.must must hold AT LEAST ${MUST_AFTER} entries -- this slice added one and John has appended since. got ${mustLen}`);
+  assert.ok(mustNotLen >= MUST_NOT_UNCHANGED,
+    `${GUARDRAILS_SLUG}.guardrails.must_not must hold AT LEAST ${MUST_NOT_UNCHANGED} -- an append into the wrong array is caught by indexOfExact below, never by a count. got ${mustNotLen}`);
+  notRun(`SES-378d (c): the EXACT pair ${MUST_AFTER} / ${MUST_NOT_UNCHANGED} on ${GUARDRAILS_SLUG}`,
+    `graded as floors instead -- live ${mustLen} / ${mustNotLen}, because John appends his own `
+    + `guardrails to this row. The chain rule's absence from BOTH arrays and its presence as the `
+    + `LAST paragraph of ${RUN_INTENT_SLUG}.method are asserted below, unchanged.`);
   // What the count was only ever a PROXY for, asserted directly and through the SAME matcher (c)
   // and (e) share, so (e)'s one-character mutation controls this arm too. A count says "eleven
   // things are here"; it cannot say the chain rule is not one of them, and after AGT-144 appended
