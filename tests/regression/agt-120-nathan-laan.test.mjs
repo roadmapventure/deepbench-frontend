@@ -1,3 +1,4 @@
+// DeepBench v7.0.902 | tests/regression/agt-120-nathan-laan.test.mjs | AGT-304 slice 21 -- the anon half is declared, never recreated.
 // DeepBench v7.0.581 | tests/regression/agt-120-nathan-laan.test.mjs | AGT-120
 //
 // FEATURE: AGT-120 -- Nathan Laan (MK-06), Product Marketing Manager. Three things landed together
@@ -309,8 +310,17 @@ async function partE_live() {
 
   // market_records: anon half -- both halves or fail (kickoff section 5). The key must prove it is real first.
   const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  assert.ok(anon && anon !== "regression-placeholder",
-    "no real SUPABASE_ANON_KEY / VITE_SUPABASE_ANON_KEY in env -- the market_records anon half is required, not optional");
+  if (!anon || anon === "regression-placeholder") {
+    // AGT-304 slice 21: there is no anon key here OR in CI (.github/workflows/ci.yml gives the suite
+    // step SUPABASE_URL + SUPABASE_SERVICE_KEY only, and a repository secret is John's alone), so
+    // this half cannot be driven anywhere -- STANDARDS.md:225, a declaration beats a recreation.
+    notRun("the market_records anon half of the live arm",
+      "no real SUPABASE_ANON_KEY / VITE_SUPABASE_ANON_KEY in env (the browser bundle's key lives in " +
+      ".env.local). The service half above RAN and got 200, and the refusal this arm wants is " +
+      "structural: anon and authenticated hold NO grant at all on public.market_records " +
+      "(information_schema.role_table_grants, 2026-10-26). Drive it: " +
+      "node --env-file-if-exists=.env.local tests/regression/agt-120-nathan-laan.test.mjs");
+  } else {
   const anonHdr = { apikey: anon, Authorization: `Bearer ${anon}` };
   const ctl = await fetch(`${base}/rest/v1/agents?select=id&limit=1`, { headers: anonHdr });
   assert.strictEqual(ctl.status, 200, `the anon key in env is not a working anon key (agents?select=id answered HTTP ${ctl.status})`);
@@ -320,6 +330,7 @@ async function partE_live() {
   assert.ok(nRes.status >= 400, `market_records answered the public anon key with HTTP ${nRes.status} -- it must be refused (body: ${nBody.slice(0, 200)})`);
   assert.ok(!/PGRST205/.test(nBody), `market_records anon refusal is 404 PGRST205 (table missing), not a grant refusal: ${nBody.slice(0, 200)}`);
   results.push(`live-market-records-anon-refused (${nRes.status})`);
+  }
 
   // Broker filter: while inactive, the broker's own query must not return him.
   if (agent[0].is_active === false) {

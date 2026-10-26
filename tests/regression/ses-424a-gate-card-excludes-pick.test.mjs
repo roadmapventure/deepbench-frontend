@@ -1,3 +1,4 @@
+// DeepBench v7.0.902 | tests/regression/ses-424a-gate-card-excludes-pick.test.mjs | AGT-304 slice 21 -- the fixture is john-named and scored, because those three gates landed after it.
 // DeepBench v7.0.533 | tests/regression/ses-424a-gate-card-excludes-pick.test.mjs | SES-424 slice 1
 // (reopens SES-391) -- an UNDECIDED `gated_before_build` card takes its own ticket out of the pick
 // path, and a DECIDED one gives it back.
@@ -152,6 +153,9 @@ async function run() {
         row_ordinal: fixOrdinal,
         epic_id: epicId,
         need_source: needSource,             // AGT-280: the executing project's list takes no ticket without one
+        scope_origin: "john-named",          // AGT-240 / AGT-280 / AGT-238: the early return in epic_lock_guard, requirement_gate AND backlog_requires_finding
+        need_score: 5,                       // AGT-455: lane (c) selfbuild is effective_need_score >= 3 (agt-167's green fixture shape)
+        scope_rationale: "SES-424a regression fixture; deleted in the same run.",
         queue: 999990,                       // last in the order; `queue IS NULL` is the not-pickable condition
         filed_at: "2026-08-01T00:00:00Z",    // before the 2026-08-21 M5-02 cut, so no scope_rationale is owed
         claimed_by: null,
