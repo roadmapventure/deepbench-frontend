@@ -1,3 +1,4 @@
+// DeepBench v7.0.900 | tests/regression/agt-390-teach-tool.test.mjs | AGT-304 slice 19 -- arm (g) is declared NOT RUN on the handler's own refusal (bundleTargetReadable, AGT-338) while the fixture agent row is inactive, never silently skipped.
 // DeepBench v7.0.792 | tests/regression/agt-390-teach-tool.test.mjs | AGT-390
 //
 // FEATURE: AGT-390 -- the "Teach <name>" tool over MCP. A connected AI client can teach a customer
@@ -387,6 +388,14 @@ async function liveTeach() {
   const { handle } = await import("../../api/_lib/handlers/agent-teach.js");
   const { get, del } = liveClient(base, key);
   const handler_context = { governance_unlocked: false, any_agent: false, caller_key_name: LIVE_KEY_NAME };
+  // AGT-304 slice 19: the handler's own rule gates the arm.
+  const { bundleTargetReadable } = await import("../../api/_lib/handlers/agent-bundle.js");
+  const [agentRow] = await get(`agents?id=eq.${LIVE_AGENT}&select=id,name,lane,is_active,owner_id,sharing,shared_with`);
+  if (!bundleTargetReadable(agentRow, handler_context)) {
+    notRun(`(g) the live teach on ${LIVE_AGENT}`,
+      `agents row ${agentRow ? `is_active=${agentRow.is_active}` : "absent"} -- bundleTargetReadable() refuses it (AGT-338); set agents.is_active = true to restore this arm`);
+    return [];
+  }
   const results = [];
   let entryId = null;
   let configId = null;

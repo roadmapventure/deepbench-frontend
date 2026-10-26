@@ -1,3 +1,4 @@
+// DeepBench v7.0.900 | tests/regression/agt-167-noship-pick-fence.test.mjs | AGT-304 slice 19 -- the fixture is john-named and scored, so the two gates that landed after this file (AGT-240's epic lock, AGT-455's lane (c) score) admit it.
 // DeepBench v7.0.642 | tests/regression/agt-167-noship-pick-fence.test.mjs | AGT-167 -- THE NO-SHIP
 // CAP BINDS AT PICK TIME, ON A MEASURE THAT MATCHES ITS OWN WORDS.
 //
@@ -223,6 +224,8 @@ async function run() {
         row_ordinal: fixOrdinal,
         epic_id: epicId,
         need_source: needSource,          // AGT-280: the executing project's list takes no ticket without one
+        scope_origin: "john-named",       // AGT-240: epic_lock_guard's first return; every executing epic is locked
+        need_score: 5,                    // AGT-455: lane (c) selfbuild is need_score >= 3 (agt-455's fixture shape)
         queue: 999991,                    // last in the order; `queue IS NULL` is the not-pickable condition
         filed_at: "2026-08-01T00:00:00Z",
         // Non-empty so the SES-295/M5-03 filing-lane cut cannot exclude the fixture whatever the
