@@ -1,3 +1,4 @@
+// DeepBench v7.0.901 | tests/regression/agt-151-build-trial.test.mjs | AGT-304 slice 20 -- `base ?` is accepted only where the job's recorded push_sha is absent here.
 // DeepBench v7.0.677 | tests/regression/agt-151-build-trial.test.mjs | AGT-151 -- the model trial
 // runner can replay the ORCHESTRATOR lane's recorded job, which is a build, and a lane key picks
 // only the turns recorded on that lane.
@@ -157,8 +158,29 @@ async function partD() {
       `every picked job is a BUILD turn, not a design turn borrowed from the judgment lane:\n${refs.join("\n")}`);
     const est = lane.stdout.split("\n").filter(l => l.startsWith("est: "));
     assert.equal(est.length, 3, `expected 3 est lines, got:\n${lane.stdout}`);
-    assert.ok(est.every(l => /^est: \d+ tokens, (\d+\.\d|\?) min, base [0-9a-f]{7,}$/.test(l)),
+    assert.ok(est.every(l => /^est: \d+ tokens, (\d+\.\d|\?) min, base ([0-9a-f]{7,}|\?)$/.test(l)),
       `each est line states tokens, minutes and the base it would start from:\n${est.join("\n")}`);
+    // AGT-304: a `?` is honest ONLY where the push_sha is not in THIS checkout (SES-393).
+    const ids = refs.map(l => l.slice("job_ref: ".length).split("/")[0]);
+    const cr = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/runner_cycles?id=in.(${ids.join(",")})&select=id,push_sha`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    assert.ok(cr.ok, `runner_cycles read HTTP ${cr.status}`);
+    const pushBy = new Map((await cr.json()).map(r => [r.id, r.push_sha]));
+    const floorless = [];
+    est.forEach((line, i) => {
+      const sha = pushBy.get(ids[i]) ?? null;
+      const here = sha ? spawnSync("git", ["-C", ROOT, "cat-file", "-e", `${sha}^{commit}`]).status === 0 : false;
+      if (/ base \?$/.test(line)) {
+        assert.ok(!here, `est ${i + 1} reads \`base ?\` but push_sha ${sha} IS here`);
+        floorless.push(`${ids[i].slice(0, 8)}/${String(sha).slice(0, 8)}`);
+      } else {
+        assert.ok(here || !sha, `est ${i + 1} names a base but push_sha ${sha} is NOT here`);
+      }
+    });
+    if (floorless.length) {
+      notRun(`AGT-151 (d): the base half of ${floorless.length} of ${est.length} est line(s)`,
+        `the push_sha is below this checkout's floor (${floorless.join(", ")}) -- a shallow clone is missing evidence, not a failure`);
+    }
     assert.ok(/^est total: \d+ tokens, (\d+\.\d|\?) min over 3 jobs$/m.test(lane.stdout), `no est total line:\n${lane.stdout}`);
     assert.ok(/^room: ok$/m.test(lane.stdout));
 

@@ -1,3 +1,4 @@
+// DeepBench v7.0.901 | tests/regression/agt-245-regrade-cohort.test.mjs | AGT-304 slice 20 -- (e) is NOT RUN when the checkout carries none of the 56 pairs, and still FAILS in a complete clone.
 // DeepBench v7.0.668 | tests/regression/agt-245-regrade-cohort.test.mjs | AGT-245 slice 1 of 3
 //
 // FEATURE: THE RE-GRADE COHORT IS FROZEN, AND EACH SHIP'S BEFORE/AFTER PAIR COMES FROM COMMIT
@@ -187,7 +188,15 @@ function run() {
       notRun("AGT-245 (e)", `${unreachable.length} resolved pair(s) name commits this clone cannot reach ` +
         `(${unreachable.join(", ")}) — a shallow checkout is missing evidence, not a failure`);
     }
-    assert.ok(checked > 0, "at least one resolved pair must be checkable here, or (e) proves nothing");
+    assert.strictEqual(checked + unreachable.length, resolved.length,
+      "every resolved pair is checked against git or named unreachable");
+    if (!checked) {
+      assert.strictEqual(git(["rev-parse", "--is-shallow-repository"]).out, "true",
+        `0 of ${resolved.length} pairs reachable in a COMPLETE clone -- a cohort defect, not a checkout one`);
+      notRun("AGT-245 (e)", `0 of ${resolved.length} resolved pair(s) are in this checkout at all ` +
+        `(shallow, oldest commit ${git(["rev-list", "--max-parents=0", "HEAD"]).out.slice(0, 8)}) -- the ancestor ` +
+        `check has no evidence here: the checkout's depth (SES-393), not a cohort defect`);
+    }
   }
 
   // ---- (f) the two rows on the two axes --------------------------------------------------------
