@@ -1,3 +1,4 @@
+// DeepBench v7.0.906 | tests/regression/agt-490-parked-home.test.mjs | AGT-304 slice 25 -- case 4b names its active home by reading the board, never by pinning a slug.
 // DeepBench v7.0.866 | tests/regression/agt-490-parked-home.test.mjs | AGT-490 -- A PARKED 0 NAMES
 // WHERE IT WAITS.
 //
@@ -46,13 +47,14 @@
 
 import assert from "node:assert/strict";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { executingHome } from "./_lib/board-state.js";
 import { buildListContext, validateListVerdict, projectSlug, PARKED_PREFIX, PARK_VERDICT,
   NEW_PROJECT_MIN, NEW_PROJECT_MAX } from "../../scripts/requirement-check.js";
 
 // The park destination this file measures against: PLANNED, one epic, unlocked. A park into it is
 // the ordinary case, and `security` is the slug arm C writes to and reverses out of.
 const PARK_HOME = "security";
-const EXEC_HOME = "go-to-market";                                  // executing -- the refusal
+const EXEC_HOME = "go-to-market";   // arm A's OFFLINE fixture slug ONLY -- arm C reads the live one
 const LIST = "auditor-findings";
 const LIST_EPIC_PRIMARY = "ba12f804-9ff1-4160-ac3d-5c0bf8470877";
 const LIST_EPIC_FALLBACK = "48c63dac-4e5e-4287-8e72-01777fedbbf2"; // agt-480's list epic, agt-489's fallback
@@ -371,6 +373,8 @@ async function run() {
 
     await arm("C a park waits, a new project is created, a 0 reaches the board, three are refused", async () => {
       const cases = [];
+      const live = await executingHome(req, url, key);
+      console.log(`      [AGT-490] executing home: ${live ? live.slug : "(none)"}`);
       const casefail = (label, e) => { cases.push(`(${label}) ${e.message}`); console.log(`      (${label}) FAIL -- ${e.message}`); };
       const reverse = async (handle, why) => {
         const rev = await rpc(url, key, "reverse_decision", {
@@ -510,20 +514,25 @@ async function run() {
         assert.equal(f3.epic_id, LIST_EPIC, "and F3 must still be on its list");
 
         // (4b) An EXECUTING project is a placement, never a parking place.
-        const exec = await rpc(url, key, "apply_requirement_verdict", {
-          p_cycle: null, p_session: SESSION,
-          p: {
-            verdict: PARK_VERDICT, backlog_id: F1, home_project: EXEC_HOME,
-            reason: `${PARKED_PREFIX}${EXEC_HOME} is active -- regression probe`,
-            account: "Tried one park",
-          },
-        });
-        assert.equal(exec.ok, false, `a park into ${EXEC_HOME} must be REFUSED; got ${describe(exec)}`);
-        assert.ok(exec.status >= 400 && exec.status < 500, `with a 4xx; got ${exec.status}`);
-        assert.match(exec.text, /is not a paused or planned project/,
-          `saying why; got ${exec.text.slice(0, 300)}`);
-        const f1 = await row(F1);
-        assert.equal(f1.epic_id, LIST_EPIC, "and F1 must not have moved");
+        if (!live) {
+          notRun("AGT-490 case 4b",
+            "no executing project has an epic today, so no active home to refuse a park into");
+        } else {
+          const exec = await rpc(url, key, "apply_requirement_verdict", {
+            p_cycle: null, p_session: SESSION,
+            p: {
+              verdict: PARK_VERDICT, backlog_id: F1, home_project: live.slug,
+              reason: `${PARKED_PREFIX}${live.slug} is active -- regression probe`,
+              account: "Tried one park",
+            },
+          });
+          assert.equal(exec.ok, false, `a park into ${live.slug} must be REFUSED; got ${describe(exec)}`);
+          assert.ok(exec.status >= 400 && exec.status < 500, `with a 4xx; got ${exec.status}`);
+          assert.match(exec.text, /is not a paused or planned project/,
+            `saying why; got ${exec.text.slice(0, 300)}`);
+          const f1 = await row(F1);
+          assert.equal(f1.epic_id, LIST_EPIC, "and F1 must not have moved");
+        }
 
         // (4c) A new project is where a PARKED ticket waits; a scored one goes to a running project.
         const above = await rpc(url, key, "apply_requirement_verdict", {

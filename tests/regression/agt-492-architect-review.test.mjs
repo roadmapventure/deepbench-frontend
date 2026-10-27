@@ -1,3 +1,4 @@
+// DeepBench v7.0.906 | tests/regression/agt-492-architect-review.test.mjs | AGT-304 slice 25 -- arm B grades the five rows its own ship seeded; the Rule #1 scan still covers every live ga-* row.
 // DeepBench v7.0.869 | tests/regression/agt-492-architect-review.test.mjs | AGT-492 -- the findings review
 // moves from the Development Manager (GV-01) to the Governance Architect (GV-09) and gains John's tested
 // step (decisions 27-29 of docs/design/VICTORIA-FILL-REQUIREMENTS-1013.md, 2026-10-13; rule
@@ -184,9 +185,11 @@ async function run() {
 
       // The five ga-* rows exist, carry their type, and name no other agent in any text field.
       const gaRows = await get("skill_profiles?slug=like.ga-*&select=slug,skill_type_slug,objective,method,description,guardrails,traits");
-      assert.deepEqual(gaRows.map(r => r.slug).sort(), [...LINKS.slice(0, 5)].sort(),
+      const SEEDED = [...LINKS.slice(0, 5)].sort();
+      const seeded = gaRows.filter(r => SEEDED.includes(r.slug));
+      assert.deepEqual(seeded.map(r => r.slug).sort(), SEEDED,
         "exactly the five ga-* rows this ship seeded");
-      assert.deepEqual(gaRows.map(r => r.skill_type_slug).sort(),
+      assert.deepEqual(seeded.map(r => r.skill_type_slug).sort(),
         ["behavior", "guardrails", "identity", "intent", "knowledge"],
         "one row of each of the five Skill types");
       for (const r of gaRows) {
