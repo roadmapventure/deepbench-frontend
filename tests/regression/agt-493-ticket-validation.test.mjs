@@ -1,3 +1,5 @@
+// DeepBench v7.0.905 | tests/regression/agt-493-ticket-validation.test.mjs | AGT-304 slice 24 --
+// arm C reads the executing home live instead of pinning go-to-market, which John paused.
 // DeepBench v7.0.870 | tests/regression/agt-493-ticket-validation.test.mjs | AGT-493 -- THE
 // STALE-TICKET VALIDATION. A ticket filed more than 14 days ago is validated by the Governance
 // Architect before Victoria's move door may place it.
@@ -47,6 +49,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { executingHome } from "./_lib/board-state.js";
 import { buildValidationContext, validateValidation, VERDICTS, REASON_CHARS, STANDING_DAYS, DEFAULT_LIMIT }
   from "../../scripts/ticket-validation.js";
 import { buildListContext, validateListVerdict } from "../../scripts/requirement-check.js";
@@ -57,7 +60,6 @@ const PROMPT = path.join(REPO, "scripts", "agent-prompt.js");
 
 const NSRC = "nathan:market_records:fbaa1d6e-06e4-4015-b0fe-b4915fa7bfef";
 const HOME = "go-to-market";
-const HOME_EPIC_EXPECTED = "589f2d4b-3a2a-4d25-960c-040d36ccdbaa";
 const LIST = "auditor-findings";
 const LIST_EPIC_PRIMARY = "ba12f804-9ff1-4160-ac3d-5c0bf8470877";
 const LIST_EPIC_FALLBACK = "48c63dac-4e5e-4287-8e72-01777fedbbf2";
@@ -378,6 +380,12 @@ async function run() {
   let wrote = false;
 
   await arm("C the move refused, confirmed, landed -- and revised / not-real", async () => {
+    const liveHome = await executingHome(req, url, key);   // AGT-304 slice 24: live, not a constant
+    console.log(`    [AGT-493] executing home: ${liveHome ? `${liveHome.slug} / ${liveHome.epicId}` : "(none)"}`);
+    if (!liveHome) {
+      notRun("AGT-493 arm C", "no executing project has an epic today, so no move can land");
+      return;
+    }
     const epics = await req(url, key,
       `epics?select=id&id=in.(${LIST_EPIC_PRIMARY},${LIST_EPIC_FALLBACK})`);
     assert.ok(epics.ok, `the list's epics must read; got ${describe(epics)}`);
@@ -407,7 +415,7 @@ async function run() {
     };
     const moveIt = async bid => rpc(url, key, "apply_requirement_verdict", {
       p_cycle: null, p_session: AUTHOR,
-      p: { verdict: "move", backlog_id: bid, home_project: HOME,
+      p: { verdict: "move", backlog_id: bid, home_project: liveHome.slug,
         reason: "AGT-493 probe: the move the gate is measured on", account: "Moved one probe ticket" },
     });
     const validate = async (bid, p) => rpc(url, key, "apply_ticket_validation", {
@@ -464,7 +472,7 @@ async function run() {
     const landed = await moveIt(one);
     assert.ok(landed.ok, `${one}'s move must land once a validation stands; got ${describe(landed)}`);
     const moved = await read(one);
-    assert.equal(String(moved.epic_id), HOME_EPIC_EXPECTED, `${one} must sit on ${HOME}'s epic`);
+    assert.equal(String(moved.epic_id), liveHome.epicId, `${one} must sit on ${liveHome.slug}'s oldest epic`);
     assert.equal(moved.scope_origin, "victoria-placed", "and carry the placing origin");
     assert.equal(await grades(one), 1, "with its ONE grade untouched by either the validation or the move");
 

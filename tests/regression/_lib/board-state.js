@@ -1,3 +1,5 @@
+// DeepBench v7.0.905 | tests/regression/_lib/board-state.js | AGT-304 slice 24 -- executingHome()
+// resolves the executing project's oldest epic live from the board, so no test pins a slug.
 // DeepBench v7.0.497 | tests/regression/_lib/board-state.js | SES-401 -- an empty or all-claimed
 // pick lane is DECLARED, not failed, and the discrimination lives in ONE place.
 //
@@ -206,4 +208,19 @@ export async function readBoardState(pg, url, key) {
 // spell the pair differently from its neighbour -- the copy-propagation this module exists to stop.
 export function isDeclarable(state) {
   return state === "held" || state === "drained";
+}
+
+// AGT-304 slice 24: the executing home, read live instead of pinned to a slug -- placement_target()
+// takes the OLDEST epic (created_at, id) of an 'executing' project, park_target() refuses a status
+// not in (paused, planned). One read, no writes; `req` is the caller's own helper returning
+// { ok, status, text, json }. Null = no executing project has an epic: board state, not a bug.
+export async function executingHome(req, url, key) {
+  const r = await req(url, key,
+    "epics?select=id,created_at,projects!inner(slug,status)&projects.status=eq.executing&limit=1000");
+  if (!r.ok) throw new Error(`executingHome: HTTP ${r.status} ${String(r.text).slice(0, 200)}`);
+  const rows = (Array.isArray(r.json) ? r.json : [])
+    .map(e => ({ slug: e.projects.slug, epicId: String(e.id), at: String(e.created_at ?? "") }))
+    .sort((a, b) => a.slug.localeCompare(b.slug) || a.at.localeCompare(b.at)
+      || a.epicId.localeCompare(b.epicId));
+  return rows[0] ? { slug: rows[0].slug, epicId: rows[0].epicId } : null;
 }
