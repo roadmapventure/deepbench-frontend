@@ -1,3 +1,4 @@
+// DeepBench v7.0.904 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-304 slice 23 -- the list size is reported and every listed ticket is ruled, because board growth is not the defect.
 // DeepBench v7.0.865 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-489 -- ARM B'S LIVE
 // HALF: both tickets are graded and V2 refuses a `pass` on them, so the live echo is graded with
 // `graded` lifted, after the V2 refusal is asserted as handed. Nothing else in this file moved.
@@ -103,9 +104,18 @@ export function gradeHeldEcho({ ctx, heldKey, otherCandidateKey, where }) {
   assert.equal(keys.has(otherCandidateKey), true,
     `${where}: ${CANDIDATE_TICKET}'s key IS a candidate — the control half of every arm`);
 
-  const answer = rows => ({
-    list: ctx.list, account: "Ruled both tickets on the source each already carries", rows,
-  });
+  // AGT-304 slice 23: the answer rules EVERY proposal the context carries, each echoing the source
+  // it already holds -- validateListVerdict refuses an unruled listed ticket, and the live list
+  // has grown past the two this file names. The fixture carries exactly two, so `rest` is empty there.
+  const answer = rows => {
+    const named = new Set(rows.map(r => r.backlog_id));
+    const rest = ctx.proposals.filter(p => !named.has(p.backlog_id))
+      .map(p => row(p.backlog_id, String(p.need_source), score(p)));
+    return {
+      list: ctx.list, account: "Ruled both tickets on the source each already carries",
+      rows: [...rows, ...rest],
+    };
+  };
   const row = (id, src, sc) => ({
     backlog_id: id, verdict: "pass", need_source: src, need_score: sc,
     reason: "the cited row asks for exactly what this ticket proposes to build",
@@ -190,13 +200,14 @@ async function run() {
         `--prepare-list must exit 3 (awaiting her ONE answer); got ${prep.status} stderr=${String(prep.stderr).slice(0, 800)}`);
       const prepared = JSON.parse(prep.stdout);
       assert.equal(prepared.list, LIST, "the context names the list it was given");
-      assert.equal(prepared.tickets, 2,
-        `${LIST} holds EXACTLY the two tickets this ticket was designed against; got ` +
-        `${prepared.tickets} — if the board has moved, the board is right: re-measure (kickoff §7)`);
+      // AGT-304 slice 23: the list size is live board state -- reported, never pinned (STANDARDS.md:238).
+      assert.ok(prepared.tickets >= 2,
+        `${LIST} holds AT LEAST the two tickets this ticket was designed against; got ` +
+        `${prepared.tickets} — the board may carry more; it may not carry fewer`);
       const ctx = prepared.context;
       const ids = ctx.proposals.map(p => p.backlog_id).sort();
-      assert.deepEqual(ids, [HELD_TICKET, CANDIDATE_TICKET].sort(),
-        `both tickets and nothing else; got ${JSON.stringify(ids)}`);
+      assert.ok([HELD_TICKET, CANDIDATE_TICKET].every(id => ids.includes(id)),
+        `both tickets must be present, other tickets may be; got ${JSON.stringify(ids)}`);
 
       const held = ctx.proposals.find(p => p.backlog_id === HELD_TICKET);
       const ctrl = ctx.proposals.find(p => p.backlog_id === CANDIDATE_TICKET);
