@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.913 | scripts/ticket-owner.js | AGT-304 slice 32 -- the runner_decisions read names the delivered ids: whole-table it passed readAll's 10,000 ceiling (10,160 rows, 2026-10-28) and the census refused itself; check 10 only ever asks it about delivered rows (170 today, 653 decisions).
 // DeepBench v7.0.687 | scripts/ticket-owner.js | AGT-166 slice 4 -- ARM (b)'S TWO EXITS. The drain
 // had a way IN for every open premise and a way OUT for only the confirmed ones. Measured
 // 2026-09-28: `board-stale` reads 430, and the twelve refusals of the first completed night sit in
@@ -1205,8 +1206,14 @@ async function readBoard(base, key, now) {
   // `gated_before_build` cards. classifyBoard splits them; a second read would be a second board.
   const accepts = await readAll(base, key, "runner_items",
     "runner_items?select=backlog_id,kind,decided_at&backlog_id=not.is.null&order=id", 10000);
+  // AGT-304 slice 32: `decisions` serves check 10 alone, and check 10 asks it one question per
+  // DELIVERED row -- so the read names those ids and nothing else. Whole-table, it passed readAll's
+  // 10,000 ceiling on 2026-10-28 (10,160 rows with a backlog_id) and the census refused itself.
+  const deliveredIds = items.filter(r => r.status === "delivered").map(r => r.backlog_id);
+  const badId = deliveredIds.find(id => !/^[A-Za-z0-9_-]+$/.test(id));
+  if (badId !== undefined) fail(`delivered backlog_id ${badId} cannot sit unquoted in a PostgREST in.() list`);
   const decisions = await readAll(base, key, "runner_decisions",
-    "runner_decisions?select=backlog_id,decided_at&backlog_id=not.is.null&order=id", 10000);
+    `runner_decisions?select=backlog_id,decided_at&backlog_id=in.(${deliveredIds.join(",")})&order=id`, 10000);
   const openCycles = await readAll(base, key, "runner_cycles",
     "runner_cycles?select=id&ended_at=is.null&order=id", 1000);
   // SES-385 slice 3: check 12 asks the closed ticket's OWN kickoff whether it names a remainder,
