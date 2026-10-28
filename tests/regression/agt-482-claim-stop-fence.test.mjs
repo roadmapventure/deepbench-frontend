@@ -1,3 +1,4 @@
+// DeepBench v7.0.914 | tests/regression/agt-482-claim-stop-fence.test.mjs | AGT-304 slice 33 -- arm C names the stopped ids in its pick_exclusions() read: unfiltered, 1,427 rows met PostgREST's 1,000-row reply and AGT-020/PRO-3 fell out of it (2026-10-28); the fence itself answered all three.
 // DeepBench v7.0.856 | tests/regression/agt-482-claim-stop-fence.test.mjs | AGT-482 -- the claim fence: one function holds the claim's 6-hour window, its STOPPED-BY-JOHN sentinel and the sentence it prints, and this guard proves both halves in both directions.
 //
 // WHAT THIS PINS. `public.claim_exclusion_reason(text, timestamptz)` answers ONE question -- "does
@@ -151,7 +152,11 @@ async function run() {
       + "empty set would be a vacuous green (pattern:77). Arm B still drives the same code path through "
       + "rpc/claim_exclusion_reason at two ages.");
   } else {
-    const excl = await rpc("pick_exclusions");
+    // AGT-304 slice 33: ask for the stopped ids BY NAME. Unfiltered, pick_exclusions() held 1,427
+    // rows on 2026-10-28 and PostgREST answers the first 1,000 of an unordered scan, so AGT-020 and
+    // PRO-3 fell out of the reply and this arm read "no row at all" -- the fence was never the cause.
+    // Same query-string form as agt-455's arm B1; the helper's `fn` is the URL tail it already was.
+    const excl = await rpc(`pick_exclusions?id=in.(${stopped.map(r => r.id).join(",")})&select=id,backlog_id,reasons`);
     const byId = new Map(excl.map(r => [r.id, r.reasons ?? []]));
     const missing = [];
     for (const row of stopped) {
