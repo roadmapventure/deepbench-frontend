@@ -1,3 +1,4 @@
+// DeepBench v7.0.909 | tests/regression/agt-277-db-health-watch.test.mjs | AGT-304 slice 28 -- the live arm grades the 14-day keep; the outage replays from its fixture
 // DeepBench v7.0.731 | tests/regression/agt-277-db-health-watch.test.mjs | AGT-277 -- the watcher
 // that runs OUTSIDE the database notices a silence the database itself cannot report.
 //
@@ -22,7 +23,7 @@
 //   B  LIVE, READ-ONLY (SUPABASE_URL + SUPABASE_SERVICE_KEY; notRun otherwise) -- the window reads
 //      back a positive number from runner_settings, and the REAL 2026-09-29 outage
 //      (04:00:00.657808+00 -> 04:45:00.487736+00, the only gap over 400 s in the table) is still
-//      there and replays through the pure verdict as `silent` at 45.0 min. Nothing is written:
+//      replayed from the pure fixture (the table keeps 14 days, AGT-237 step (4)) as `silent` at 45.0 min. Nothing is written:
 //      a regression run never mutates working data (pattern:76), and `audit_findings` is
 //      append-only and off reversible_tables() -- a row filed here could not be taken back.
 //
@@ -215,20 +216,18 @@ async function armLive(base, key) {
   assert.ok(Number.isFinite(w) && w > 0,
     `runner_settings.db_health_thresholds.window_minutes must be a positive number; got ${JSON.stringify(settings?.[0]?.db_health_thresholds)}`);
 
-  // The real outage, still in the table: 04:00:00.657808+00 completes, then NOTHING until
-  // 04:45:00.487736+00. Read by the script's own query shape, restricted to that morning.
+  // The real outage is older than the 14 days db_health_tick() keeps (step (4), docs/design/agt-237-db-health.sql:380),
+  // so the table no longer holds it BY DESIGN. Grade the retention the tick keeps, by the script's own query shape.
+  const KEEP_MS = 14 * 86400e3, SLACK_MS = 86400e3;
   const rows = await (await fetch(
-    `${base}/rest/v1/db_health_readings?select=id,fired_at,level&level=not.is.null`
-    + `&fired_at=gte.2026-09-29T03:55:00Z&fired_at=lte.2026-09-29T04:50:00Z&order=fired_at.asc`,
+    `${base}/rest/v1/db_health_readings?select=id,fired_at,level&level=not.is.null&order=fired_at.asc&limit=1`,
     { headers: h })).json();
-  const firedAts = rows.map(r => r.fired_at);
-  assert.ok(firedAts.includes("2026-09-29T04:00:00.657808+00:00"),
-    `the 04:00 reading is gone from db_health_readings; got ${JSON.stringify(firedAts)}`);
-  assert.ok(firedAts.includes("2026-09-29T04:45:00.487736+00:00"),
-    `the 04:45 recovery reading is gone; got ${JSON.stringify(firedAts)}`);
-  const i = firedAts.indexOf("2026-09-29T04:00:00.657808+00:00");
-  assert.strictEqual(firedAts[i + 1], "2026-09-29T04:45:00.487736+00:00",
-    `something now sits inside the 45-minute gap: ${JSON.stringify(firedAts.slice(i, i + 3))}`);
+  assert.ok(rows.length === 1 && Date.parse(rows[0].fired_at) > 0, `no completed reading in db_health_readings; got ${JSON.stringify(rows)}`);
+  const oldestAge = Date.now() - Date.parse(rows[0].fired_at);
+  assert.ok(oldestAge <= KEEP_MS + SLACK_MS,
+    `the oldest completed reading is ${(oldestAge / 86400e3).toFixed(1)} days old -- db_health_tick() step (4) keeps 14 days, so the prune has stopped`);
+  assert.ok(Date.parse(FIRED) < Date.parse(rows[0].fired_at),
+    `the 2026-09-29 outage must lie BEFORE the oldest retained reading (${rows[0].fired_at}); it replays below from the pure fixture, never from the table`);
 
   // It replays through the pure verdict as `silent` at 45.0 min against the LIVE window.
   const v = verdictFor({
