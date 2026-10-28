@@ -1,3 +1,4 @@
+// DeepBench v7.0.907 | tests/regression/agt-309-process-break-class.test.mjs | AGT-304 slice 26 -- arm D finds the vc-process-break-class Knowledge link among the live requirement-check links and reports its display_order instead of pinning one link at slot 3, so later links reordering it is not a red.
 // DeepBench v7.0.869 | tests/regression/agt-309-process-break-class.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
 // a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
 // FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
@@ -723,11 +724,13 @@ async function run() {
       "&select=skill_profile_slug,display_order,is_required,skill_profiles!inner(skill_type_slug,method,traits)" +
       "&skill_profiles.skill_type_slug=eq.knowledge");
     assert.ok(links.ok, `the Knowledge links must read; got ${describe(links)}`);
-    assert.equal((links.json ?? []).length, 1,
-      `requirement-check must hold exactly 1 Knowledge link (measured 0 before this ship); got ${(links.json ?? []).length}`);
-    const l0 = links.json[0];
-    assert.equal(l0.skill_profile_slug, KNOWLEDGE_SLUG, "and it is the class row");
-    assert.equal(l0.display_order, 3, "at display_order 3");
+    const mine = (links.json ?? []).filter(l => l.skill_profile_slug === KNOWLEDGE_SLUG);
+    assert.equal(mine.length, 1,
+      `requirement-check must link the class row ${KNOWLEDGE_SLUG} exactly once (measured 0 before this ship); got ${mine.length} of ${(links.json ?? []).length} Knowledge links`);
+    const l0 = mine[0];
+    assert.equal(l0.is_required, true, "and the link is required");
+    assert.ok(Number.isInteger(l0.display_order) && l0.display_order >= 1,
+      `at a display_order slot (shipped at 3; later links reorder it -- reported, never pinned); got ${l0.display_order}`);
     assert.equal(l0.skill_profiles.traits?.source, "inline",
       "with traits.source = inline -- without it db-assembly.js renders the method as nothing (SES-341)");
     assert.ok(l0.skill_profiles.method.includes(CLASS_PHRASE),
@@ -760,7 +763,7 @@ async function run() {
       assert.ok(prompt.includes(CLASS_PHRASE),
         `and the class test that turns it into a verdict; it does not (${prompt.length} bytes)`);
       console.log(`    [AGT-309 arm D] prompt ${prompt.length} bytes on ${head.model}; rule ${RULE_ID} live; ` +
-        `requirement-check Knowledge links 1`);
+        `requirement-check Knowledge links ${(links.json ?? []).length}, class row at display_order ${l0.display_order}`);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

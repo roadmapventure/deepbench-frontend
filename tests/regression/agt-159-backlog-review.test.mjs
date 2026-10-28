@@ -1,3 +1,4 @@
+// DeepBench v7.0.907 | tests/regression/agt-159-backlog-review.test.mjs | AGT-304 slice 26 -- arm C reads the batch head from selectBatch() over the live board instead of pinning AGT-158, and asserts the Intent paragraph sits as its own paragraph rather than last, so a later append is not a red.
 // DeepBench v7.0.872 | tests/regression/agt-159-backlog-review.test.mjs | AGT-304 slice 15 -- arm C reads its one home
 // DeepBench v7.0.869 | tests/regression/agt-159-backlog-review.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
 // a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
@@ -290,8 +291,8 @@ async function run() {
       assert.equal(sp.json[0].slug, INTENT_SLUG, "the row is the manager's own Intent -- not a guardrail, not an identity");
       const method = String(sp.json[0].method).replace(/\r\n/g, "\n");
       assert.equal(method.split(para).length - 1, 1, "the paragraph is in the Skill row exactly once");
-      assert.ok(method.endsWith(`\n\n${para}`),
-        "and it is APPENDED, byte-for-byte against the harvest -- nothing he already reads was reworded");
+      assert.ok(method.includes(`\n\n${para}`) && (method.endsWith(para) || method.includes(`${para}\n\n`)),
+        "and it sits as its own paragraph, byte-for-byte against the harvest -- a later append below it is the platform working; a reworded copy is not");
 
       const dec = await req(url, key,
         `runner_decisions?select=id,kind,backlog_id,status&cycle_id=eq.${CYCLE}&kind=eq.design-ruling&backlog_id=eq.AGT-159`);
@@ -315,8 +316,12 @@ async function run() {
       assert.equal(res.status, 0, `--raise --dry-run must exit 0; got ${res.status}\n${out}`);
       assert.match(out, /^BACKLOG REVIEW: raised \d+, remaining \d+$/m,
         `the progress line must print in the shape (7f) copies into notes; got:\n${out}`);
-      assert.match(out, /backlog-review first: AGT-158/,
-        `the first ticket of the batch is the one ticket-step-1 row (open, discovered, no epic); got:\n${out}`);
+      const board = await raiseMod.readBoard(async q => (await req(url, key, q)).json);
+      const { batch } = raiseMod.selectBatch(raiseMod.joinBoard(board.tickets, board.epics, board.projects),
+        raiseMod.excludedTickets(board.ruled), 15);
+      assert.ok(batch.length > 0, "the live board holds at least one open ticket the review can raise");
+      assert.match(out, new RegExp(`^backlog-review first: ${batch[0].backlog_id}$`, "m"),
+        `the first ticket of the batch is the head of selectBatch() over the LIVE board (step-1 rows first, then board order; AGT-158 at ship, ${batch[0].backlog_id} today); got:\n${out}`);
 
       // And a run with no --cycle-id is exit 2, never a pass: every before-image owes an owner.
       const bad = spawnSync(process.execPath, [RAISE, "--raise", "--limit=15"],

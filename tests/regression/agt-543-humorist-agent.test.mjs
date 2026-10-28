@@ -1,3 +1,4 @@
+// DeepBench v7.0.907 | tests/regression/agt-543-humorist-agent.test.mjs | AGT-304 slice 26 -- arm D reads the humor length target from its owning skill_profiles row (hw-guardrails.traits.length_target) instead of pinning 200, so the arm grades the write and not today's data.
 // DeepBench v7.0.893 | tests/regression/agt-543-humorist-agent.test.mjs | AGT-543 -- the humorist's
 // call path: scripts/personal-agent.js gains its own humor read map, extra reads, the pure write check
 // validateHumorAnswer() and napkinPatch(); docs/runbooks/humorist-agent.md carries the method and the
@@ -38,7 +39,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
-  READ_MAP, HUMOR_READ_MAP, HUMOR_KINDS, napkinPatch, validateHumorAnswer, humorLimits,
+  READ_MAP, HUMOR_READ_MAP, HUMOR_KINDS, napkinPatch, validateHumorAnswer, humorLimits, HUMOR_LIMITS_SKILL,
 } from "../../scripts/personal-agent.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -231,15 +232,18 @@ async function run() {
         assert.equal(good.status, 0, `GOOD writes (got ${good.status}: ${(good.stderr ?? "").slice(-300)})`);
         const out = JSON.parse(good.stdout.trim().split("\n").pop());
         assert.equal(out.inserted, 1, `stdout inserted 1: ${good.stdout}`);
-        assert.equal(out.target, 200);
-        assert.deepEqual(out.drafts, [{ char_count: 90, word_count: 19, over_target: false }]);
+        const lim = await fetch(`${url}/rest/v1/skill_profiles?slug=eq.${HUMOR_LIMITS_SKILL}&select=traits`, { headers: svc });
+        assert.equal(lim.status, 200, `read the humor limits row (HTTP ${lim.status})`);
+        const target = humorLimits((await lim.json())[0]?.traits).target;
+        assert.equal(out.target, target, `the write reports the LIVE target (${HUMOR_LIMITS_SKILL}.traits.length_target, default 200); got ${out.target}`);
+        assert.deepEqual(out.drafts, [{ char_count: 90, word_count: 19, over_target: 90 > target }]);
         const stored = await rows();
         assert.equal(stored.length, 1, `exactly 1 row stored (got ${stored.length})`);
         assert.equal(stored[0].kind, "draft");
         assert.equal(stored[0].data.char_count, 90);
         assert.equal(stored[0].data.word_count, 19);
         assert.equal(stored[0].data.text, GOOD, "the draft text is stored untouched");
-        console.log(`    D write: refused -> exit 2, 0 rows; GOOD -> 1 row ${stored[0].id}, 90/19`);
+        console.log(`    D write: refused -> exit 2, 0 rows; GOOD -> 1 row ${stored[0].id}, 90/19, target ${target}`);
       } finally {
         await fetch(`${url}/rest/v1/humor_records?session_name=eq.${encodeURIComponent(session)}`, { method: "DELETE", headers: svc });
         const left = await rows();
