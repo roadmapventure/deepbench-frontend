@@ -1,0 +1,23 @@
+# AGT-304 -- harvest, slice 32 (v7.0.913, cycle 89cdcafc, 2026-10-28)
+
+## 1. Premise (alive), measured this cycle on tree 7028a82
+- `scripts/baseline-red-set.js` over the 7-test related set of `scripts/ticket-owner.js` (`scripts/related-tests.js --files=scripts/ticket-owner.js`; adding the two test files to the declared set changes nothing): `Red set: 2 of 7`. `agt-166-board-burn-down` fails arm F at `ticket-owner.js --census must exit 0; got 2`; `agt-79-ticket-owner` fails its live part at `the live census must run; stderr: ticket-owner: the runner_decisions read reached its ceiling of 10000 rows and the last page was still full -- the board is truncated, so this is not a census`. Measured twice (my run, then `scripts/pre-build-baseline.js` over the draft kickoff): identical.
+- The manager's experiment: the ceiling at line 1209 raised in the tree -> both suites green including arm F's live dry run -> reverted (`git status --porcelain` empty, line 1209 back to 10000, nothing written). One cause, two suites. `agt-79` was carried as wedge-downstream; it is ceiling-downstream, which is why the Verifier must expect TWO greens.
+- Live, over PostgREST (count=exact): `runner_decisions` rows with `backlog_id not null` **10,160** (all rows 10,988); gained in the last 7 days (`decided_at >= now-7d`) **1,837**. `runner_items` with a backlog_id 642 (ceiling 10000); `runner_verdicts` 590 (10000); `ticket_matrix` 1,427 (5000); board rows in open/partial/done/delivered **1,100** (5000): open 564, partial 65, done 301, delivered **170**.
+- A first measurement of the board came back 1,000 rows -- PostgREST's max-rows cap, the very thing AGT-166 slice 2 fixed in `readAll()`; re-measured paged.
+
+## 2. Why narrow by backlog_id, not bump the ceiling
+- `board.decisions` has exactly one consumer: check 10 `delivered-unaccepted` (`classifyBoard`, line 667 `laterDecision`), evaluated only when `status === "delivered"`. Every other read of `runner_decisions` in the file is by `id=eq.` (line 1416). So the census needs decisions for the 170 delivered ids and no others.
+- Narrowed query `runner_decisions?select=backlog_id,decided_at&backlog_id=in.(<170 ids>)&order=id`: list 1,345 bytes, query 1,416 bytes; returns **653** rows, every one with a `decided_at`, read paged through the same `readAll()` with the ceiling left at 10000 (pattern:67: no new bound; the existing one now has 15x headroom).
+- A bump to 20000 would bound the problem, not remove it (pattern:1): at 1,837/week the table passes 20,000 in about 5 weeks, and 30,000 in about 11.
+- A `limit=` is impossible by construction: `readAll()` refuses a query carrying `limit=` and `agt-166` (A2) pins both that refusal and `order=` on every `readAll(base, key, "<name>", <args>)` call, capturing the call's arguments with `[\s\S]{0,400}?` -- the new template-literal argument is 105 chars, carries `order=id`, no `&limit=`, and the call count stays >= 8.
+- Empty delivered set: `runner_decisions?select=id&backlog_id=in.()` answers `content-range */0` -- zero rows, no error (measured). No guard needed for emptiness.
+- Id safety: all 170 delivered ids match `^[A-Za-z0-9_-]+$` (measured); `runner_decisions_backlog_id_check` enforces `^[A-Z]+-[0-9]+[a-z]?$` on the decisions side (agt-281 header). The stub still fails loud on a non-matching id, because a comma or paren inside an unquoted `in.()` would silently change the filter and a silent miss is a false `delivered-unaccepted` finding -- the file's own convention is `fail()`, never a quiet degrade.
+- `scripts/audit-board.js:305` holds its own copy of the whole-table read at 20000 -- not red today (10,160 < 20,000), re-trips in ~5 weeks. Named for the STOP LINE as a discovery; not touched here (one cause per slice, John's standing ruling).
+
+## 3. What was NOT done
+- No test edited (pattern:162 -- the checks are right). No Supabase write, no DDL. No change to `PAGE_ROWS`, to `readAll()`, or to any other read.
+- A general "narrow every board read to what its consumer needs" sweep: not this slice; the other reads sit at 6-29% of their ceilings.
+
+## 4. Sources opened
+`scripts/ticket-owner.js` (lines 324, 477-530, 640-690, 1123, 1171-1258, 1416), `tests/regression/agt-166-board-burn-down.test.mjs` (lines 110-200, 425-470), `tests/regression/agt-79-ticket-owner.test.mjs` (1296-1330), `scripts/audit-board.js:301-307`, `scripts/related-tests.js`, `scripts/pre-build-baseline.js`, `scripts/verifier.js` (kickoff findings), `docs/kickoffs/v7.0.908..912`, `docs/harvests/AGT-304-slice31.md`, `runner_model_lanes` (orchestrator = `claude-opus-5`), the PostgREST reads above.
