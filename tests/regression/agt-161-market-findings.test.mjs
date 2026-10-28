@@ -1,3 +1,4 @@
+// DeepBench v7.0.910 | tests/regression/agt-161-market-findings.test.mjs | AGT-304 slice 29 -- arm C grades the agent route against _lib/finding-routes.js, the home AGT-484 moved it to
 // DeepBench v7.0.681 | tests/regression/agt-161-market-findings.test.mjs | AGT-161
 //
 // THE PRODUCT LANE'S PROPOSALS REACH THE ONE FINDINGS LIST. A `feature_signal` row carrying a whole
@@ -24,7 +25,7 @@
 //      falsy posts NOTHING while still returning both verdicts, so a dry run is genuinely dry.
 //      Pre-change: raiseFindings did not exist.
 //   C  LIVE, READ-ONLY -- finding_routes holds exactly 1 `source=agent` row and its project_slug is
-//      NULL (the manager picks, the staff-watch shape); and a real `--raise-findings` DRY RUN over
+//      dev-mgr-findings, the holding list _lib/finding-routes.js names (AGT-484, John 2026-10-13); and a real `--raise-findings` DRY RUN over
 //      the live table exits 0 or 1 -- NEVER 2 -- and reports `considered` >= 5.
 //      Pre-change: 0 agent rows, and the flag was an unrecognized argument (exit 2).
 //   D  LIVE -- one `market_size` draft written through `--write` prints `findings.raised 0`: the
@@ -41,6 +42,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { LIVE_ROUTES, MANAGER_PROJECT } from "./_lib/finding-routes.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = path.join(ROOT, "scripts", "market-agent.js");
@@ -183,8 +185,10 @@ function runScript(args, env) {
 async function armC(getJson, env) {
   const routes = await getJson("finding_routes?source=eq.agent&select=precedence,source,finding_type,project_slug");
   assert.equal(routes.length, 1, `exactly one finding_routes row for source=agent; got ${routes.length}`);
-  assert.equal(routes[0].project_slug, null,
-    "project_slug must be NULL -- the Development Manager picks the project, the staff-watch shape");
+  const AGENT_ROUTE = LIVE_ROUTES.find(r => r.source === "agent");
+  assert.equal(AGENT_ROUTE.project_slug, MANAGER_PROJECT, "control: _lib/finding-routes.js names the holding list (AGT-484)");
+  assert.deepEqual(routes[0], AGENT_ROUTE,
+    "the live agent row must match _lib/finding-routes.js -- AGT-484 (John 2026-10-13, decision ccab94da) routes agent findings to the holding list dev-mgr-findings, never a manager pick");
   assert.equal(routes[0].precedence, 30);
   assert.equal(routes[0].finding_type, "*");
 
@@ -259,7 +263,7 @@ async function run() {
     notRun("AGT-161 live arms (C, D)",
       "SUPABASE_URL + SUPABASE_SERVICE_KEY absent -- the agent route row, the dry run's exit code and " +
       "the --write raise are unverified here. Measured live when this shipped (2026-09-28, v7.0.681): " +
-      "finding_routes holds exactly 1 source=agent row with project_slug NULL; the dry run considered 5 " +
+      "finding_routes holds exactly 1 source=agent row, project_slug dev-mgr-findings since v7.0.859 (AGT-484); the dry run considered 5 " +
       "feature_signal rows, all `new`, and exited 1; one market_size draft wrote findings.raised 0. " +
       "Run: node --env-file=.env.local tests/regression/agt-161-market-findings.test.mjs");
   } else {
