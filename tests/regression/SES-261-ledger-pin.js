@@ -1,3 +1,7 @@
+// DeepBench v7.0.908 | tests/regression/SES-261-ledger-pin.js | AGT-304 slice 27 -- two new cases pin the
+// SHIP-CARD join the way the ledger pin already pinned the rows: a card filed after the render is the live
+// world moving and must stay green, while a vanished, swapped or unpinned card is still drift.
+//
 // DeepBench v7.0.451 | tests/regression/SES-261-ledger-pin.js | SES-354 — aPinTheLedgerCannotAnswerIsDrift's
 // second fixture was RETARGETED, not deleted (STANDARDS §4 clause 1): the ledger's ship predicate moved
 // from `outcome === "shipped"` to `push_sha IS NOT NULL`, so the fixture now drops the pinned row's
@@ -34,7 +38,7 @@ import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { renderBody, renderPin, parsePin, checkAgainstPin } from "../../scripts/render-claude-state.js";
+import { renderBody, renderPin, parsePin, checkAgainstPin, parseCardPin } from "../../scripts/render-claude-state.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const STATE = path.join(ROOT, "CLAUDE-STATE.md");
@@ -147,6 +151,7 @@ function thePinRoundTrips() {
   assert.deepStrictEqual(parsePin(file), LEDGER.map(c => c.id),
     "the pin must parse back to exactly the ids, in render order");
   assert.strictEqual(renderPin(LEDGER), LEDGER.map(c => c.id).join(","), "renderPin is the id list, in order");
+  assert.deepStrictEqual([...parseCardPin(file)], LEDGER.slice(0, 3).map(c => [c.id, null]), "the card-pin names the three bullet cycles, none when card-less");
 }
 
 function reorderingThePinIsDrift() {
@@ -156,6 +161,34 @@ function reorderingThePinIsDrift() {
   assert.notStrictEqual(reordered, file, "the fixture must actually have reordered the pin");
   assert.strictEqual(checkAgainstPin(reordered, LEDGER, NO_CARDS).code, 1,
     "the pin names an ORDER as well as a set — the version lines read cycles[0..1], so a swap is a real change");
+}
+
+// ---------------------------------------------------------------------------
+// THE CARD JOIN IS PINNED TOO (AGT-304 slice 27) — a card filed after the render is not drift
+//
+// THE DEFECT THIS PINS: the ledger pin froze the pinned ROWS, but `checkAgainstPin` re-rendered the
+// bullets against a LIVE ship-card join, and a cycle files its own card AFTER it pushes the render.
+// Live on this tree: `93010f2` committed 08:08:02Z, its card was created 08:09:23Z, so `--check` grew a
+// bullet the committed file could not have carried and graded an authentic render red. The first
+// assertion below is therefore a DIFFERENCE, not a shared property: the re-render with the late card
+// must differ from the committed bytes AND still be green. The second keeps the teeth — a pinned card
+// that vanished, was swapped, or whose pin was stripped is drift, and a missing card-pin is never a pass.
+// ---------------------------------------------------------------------------
+const LATE_CARD = { id: "11111111-1111-4111-8111-000000000001", title: "SES-110 — late" };
+function aCardFiledAfterTheRenderIsNotDrift() {
+  const file = renderBody(LEDGER, NO_CARDS), later = new Map([[LEDGER[0].id, LATE_CARD]]);
+  assert.notStrictEqual(renderBody(LEDGER, later), file, "control: the live-card re-render differs");
+  assert.strictEqual(checkAgainstPin(file, LEDGER, later).code, 0,
+    "a ship card filed after the render is the live world moving, never drift in the committed file");
+}
+function theCardPinFailsClosed() {
+  const withCard = new Map([[LEDGER[0].id, LATE_CARD]]), file = renderBody(LEDGER, withCard);
+  assert.strictEqual(checkAgainstPin(file, LEDGER, withCard).code, 0, "control: pinned card present");
+  assert.strictEqual(checkAgainstPin(file, LEDGER, NO_CARDS).code, 1, "a vanished pinned card is drift");
+  assert.strictEqual(checkAgainstPin(file, LEDGER, new Map([[LEDGER[0].id, { ...LATE_CARD, id: "x" }]])).code, 1, "a swapped card is drift");
+  const stripped = file.replace(/ card-pin: [^ ]* ledger-pin:/, " ledger-pin:");
+  assert.strictEqual(parseCardPin(stripped), null, "control: card-pin stripped");
+  assert.strictEqual(checkAgainstPin(stripped, LEDGER, withCard).code, 1, "NO CARD-PIN MUST BE DRIFT, never a pass");
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +253,8 @@ function run() {
   theComparatorNeverReturnsCouldNotRun();
   thePinRoundTrips();
   reorderingThePinIsDrift();
+  aCardFiledAfterTheRenderIsNotDrift();
+  theCardPinFailsClosed();
   theCommittedFileCarriesAPin();
   theRealScriptAgreesAndHasTeeth();
 }

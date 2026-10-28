@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// DeepBench v7.0.908 | scripts/render-claude-state.js | AGT-304 slice 27 -- the ledger pin now pins the
+// SHIP CARD ids the bullets were rendered from (`card-pin:`), so `--check` re-renders from the cards the
+// committed file actually carried instead of re-reading that join live; see THE CARD PIN below.
 // DeepBench v7.0.622 | scripts/render-claude-state.js | AGT-174 -- ONE NEW PURE EXPORT,
 // `renderingCycleFinding(fileText, cycleId)`, and NOTHING ELSE. It answers "is the file I just rendered
 // publishing MY ship or my predecessor's?" from the pin the render already carries. It is NON-GATING by
@@ -234,6 +237,32 @@ export function parsePin(fileText) {
   return m[1].split(",").map(s => s.trim()).filter(Boolean);
 }
 
+// THE CARD PIN (AGT-304 slice 27, v7.0.908) — the SHIP CARD ids the three bullets were rendered from,
+// carried in the file beside the ledger pin. The ledger pin froze the ROWS, but `renderBullet` also
+// joins each bullet to its cycle's ship card and `--check` re-read THAT join live: `93010f2` committed
+// 08:08:02Z and its own card was created 08:09:23Z, so a re-render 81 seconds later legitimately grew a
+// bullet the committed file could not have carried, and an authentic render graded red (same shape on
+// `81d829e`: 11:03:59Z vs 11:06:22Z). A card filed AFTER the render is the live world moving, which this
+// check never grades (STANDARDS.md:237-238, pattern:162); a pinned card that VANISHED or was SWAPPED is
+// drift and still fails. `none` is a real value — a bullet rendered card-less pins card-less, so filing
+// its card later cannot flip the file red either.
+export function renderCardPin(cycles, cardsByCycle) {
+  return cycles.slice(0, 3).map(c => `${c.id}=${cardsByCycle.get(c.id)?.id || "none"}`).join(",");
+}
+
+// Parse the card pin back out. `null` means the file carries NO card-pin, and the caller must read that
+// as DRIFT (exit 1), never a pass — stripping one comment is a hand-edit, exactly as parsePin above.
+export function parseCardPin(fileText) {
+  const m = typeof fileText === "string" ? fileText.match(/card-pin:\s*([0-9a-fA-F,=none-]*?)\s*ledger-pin:/) : null;
+  if (!m) return null;
+  const out = new Map();
+  for (const part of m[1].split(",").filter(Boolean)) {
+    const [cyc, cid] = part.split("=");
+    out.set(cyc, cid && cid !== "none" ? cid : null);
+  }
+  return out;
+}
+
 // THE RENDER SAYS WHOSE SHIP IT IS PUBLISHING (AGT-174, v7.0.622) -- non-gating, pure, no network.
 //
 // THE MEASURED GAP. Every close-out renders this file at step 7a and pushes it, but `LEDGER_FILTER`
@@ -456,8 +485,17 @@ export function checkAgainstPin(fileText, rows, cardsByCycle) {
   if (noPush.length) {
     return { code: 1, reason: `pinned cycle(s) no longer record a push_sha: ${noPush.join(", ")}` };
   }
+  const cardPin = parseCardPin(fileText);
+  if (cardPin === null) return { code: 1, reason: "no card-pin in the committed file — re-render it (AGT-304 slice 27)" };
+  const pinnedCards = new Map(), lost = [];
+  for (const [cyc, cid] of cardPin) {
+    if (!cid) continue;
+    const card = (cardsByCycle || new Map()).get(cyc);
+    if (card && String(card.id) === cid) pinnedCards.set(cyc, card); else lost.push(`${cyc.slice(0, 8)}=${cid.slice(0, 8)}`);
+  }
+  if (lost.length) return { code: 1, reason: `${lost.length} pinned card(s) gone: ${lost.join(", ")}` };
   const ordered = pin.map(id => byId.get(id));
-  const body = renderBody(ordered, cardsByCycle);
+  const body = renderBody(ordered, pinnedCards);
   return body === fileText
     ? { code: 0, reason: "the committed file is a byte-exact render of the cycles it pins" }
     : { code: 1, reason: "the committed file differs from a re-render of the cycles it pins" };
@@ -507,7 +545,7 @@ export function renderBody(cycles, cardsByCycle) {
   lines.push("## Last 3 sessions", "");
   for (const c of cycles.slice(0, 3)) lines.push(renderBullet(c, cardsByCycle.get(c.id) || null));
   lines.push("");
-  lines.push(`${GENERATED_MARK} — do not hand-edit the sections above. ledger-pin: ${renderPin(cycles)} -->`);
+  lines.push(`${GENERATED_MARK} — do not hand-edit the sections above. card-pin: ${renderCardPin(cycles, cardsByCycle)} ledger-pin: ${renderPin(cycles)} -->`);
   return lines.join("\n") + "\n";
 }
 
@@ -556,7 +594,7 @@ async function main() {
   const cardsByCycle = new Map();
   if (cycleIds.length) {
     const cards = await rest(url, key,
-      `runner_items?select=backlog_id,cycle_id,title,plain_after,plain_worth,kind,created_at` +
+      `runner_items?select=id,backlog_id,cycle_id,title,plain_after,plain_worth,kind,created_at` +
       `&kind=eq.ship&cycle_id=in.(${cycleIds.join(",")})&order=created_at.desc`);
     for (const c of cards) if (c.cycle_id && !cardsByCycle.has(c.cycle_id)) cardsByCycle.set(c.cycle_id, c);
   }
@@ -588,9 +626,10 @@ async function main() {
       // Keyed on the CYCLE, exactly as the render path is (AGT-191) — a pin-anchored re-render that
       // joined cards by ticket would re-derive a DIFFERENT bullet for any pinned row whose ticket
       // later shipped again, and report that as drift in a file nobody touched.
-      const pinnedCardRows = await rest(url, key,
-        `runner_items?select=backlog_id,cycle_id,title,plain_after,plain_worth,kind,created_at` +
-        `&kind=eq.ship&cycle_id=in.(${pin.join(",")})&order=created_at.desc`);
+      const cardIds = [...(parseCardPin(current) || new Map()).values()].filter(Boolean);
+      const pinnedCardRows = cardIds.length ? await rest(url, key,
+        `runner_items?select=id,backlog_id,cycle_id,title,plain_after,plain_worth,kind,created_at` +
+        `&id=in.(${cardIds.join(",")})`) : [];
       for (const c of pinnedCardRows) if (c.cycle_id && !pinnedCards.has(c.cycle_id)) pinnedCards.set(c.cycle_id, c);
     }
     const verdict = checkAgainstPin(current, pinnedRows, pinnedCards);
