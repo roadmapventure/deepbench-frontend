@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.924 | scripts/settle-ship.js | AGT-506 -- the close-out records its own ship
+// decision; a `delivered` status is refused before the first write when no verdict backs it.
 // DeepBench v7.0.852 | scripts/settle-ship.js | AGT-454 -- directive link column
 // ticket_ref; the five of 2026-10-08/09 linked and closed.
 // DeepBench v7.0.851 | scripts/settle-ship.js | AGT-454 -- directive closes with its ticket's
@@ -244,12 +246,100 @@ export function planSettle(row, kickoffPath, status) {
   return { id: row.id, patch: { status, design_status: null, kickoff_link: kickoffPath } };
 }
 
+// AGT-506 -- THE SHIP DECISION IS THIS SCRIPT'S TO RECORD, NOT A LINE A MODEL HAND-TYPES AT THE
+// FOOT OF A LONG RUN.
+//
+// THE DEFECT, measured on tree 3a42e3f on 2026-10-30 rather than recalled. `grep -c
+// record_ship_decision scripts/settle-ship.js` read 0; the only code callers were the two RE-GRADE
+// paths (`scripts/verifier.js`, `scripts/regrade-delivered.js`), which record a handle for a ship
+// somebody already recorded wrong. The only writer of a FORWARD ship decision was PROSE: the SQL
+// block at `docs/runbooks/runner-cycle.md` step 7, asked of a model at the end of the cycle. The
+// cost of that is countable, and was counted: 19 `delivered` tickets hold an `approve` verdict and
+// NO `kind = 'ship'` decision, so 19 accepted deliveries shipped with no Reverse handle at all --
+// and `reverse_decision()` being the only demote, none of them could cost the ladder a rung. Same
+// shape, same file, same lesson as `AGT-454`'s directive close two versions ago: a rule a human has
+// to remember at the end of a long cycle is a rule that gets forgotten at the end of a long cycle.
+//
+// IT IS A SECOND DOOR OF THIS SCRIPT, NOT THE SAME STATEMENT AS THE STATUS WRITE, and that is the
+// deviation this ship declares rather than buries (the `SES-196` convention). AGT-506's text asks
+// for "the same statement as the delivered status"; that is NOT buildable. The runbook's own
+// **IT GOES HERE, AT THE FOOT OF THE CLOSE-OUT** block forbids moving the call up beside the status
+// write -- the `decision_id IS NULL` adoption would pick up none of the cycle's later writes, and
+// `reverse_decision()`'s written-since guard would refuse every one of them -- and
+// `tests/regression/ses-315-ship-reverse.test.mjs` pins that ordering with a break-mutation whose
+// text is literally "IT GOES BESIDE THE STATUS WRITE". So `--ship` runs where the hand-typed line
+// stood, after the push, and the ordinary settle gets the ticket's OTHER half instead: an `approve`
+// carrying no verdict row is refused BEFORE the first write.
+//
+// THE VERDICT IS STILL NOT AN INPUT TO THE STATUS -- see `decideStatus()`'s header, which says so
+// in full, and nothing here weakens it. It is an input to the SHIP DECISION, a different write with
+// a different subject: `record_ship_decision()` takes the verdict id as an ARGUMENT, so a ship
+// decision with no verdict cannot be recorded at all, and the refusals below are its refusals read
+// out of the function body rather than guessed at.
+//
+// planShip({ status, ticket, verdict, cycleRow, existing }) -> { action, reason, args?, id? }
+//
+// FIVE ACTIONS, EACH WITH ITS OWN `reason`, because the operator reading a line that wrote nothing
+// has to know WHICH nothing it was: a `partial` ship (`skip`) is correct and final, a `block`
+// (`none`) is `SES-402`/`SES-403`'s subject and belongs to the re-grade, and a missing verdict or a
+// sha that does not match (`refuse`) is a MISTAKE that must stop the run rather than pass quietly.
+// `existing` is read before anything is planned rather than relying on the function's idempotence:
+// the runbook STATES it is idempotent per (cycle, ticket) and this session did not probe it, so the
+// script asks the ledger instead of trusting a sentence (CLAUDE.md: verify, never assert from memory).
+export function planShip({ status, ticket, verdict = null, cycleRow = null, existing = null } = {}) {
+  if (status !== "delivered") {
+    return {
+      action: "skip",
+      reason: `${ticket} reads \`${status}\` — only a \`delivered\` ticket has an accepted delivery to hand a Reverse for; a \`partial\` records none`,
+    };
+  }
+  if (existing && typeof existing === "object" && typeof existing.id === "string" && existing.id !== "") {
+    return {
+      action: "done",
+      id: existing.id,
+      reason: `a \`ship\` decision for ${ticket} already exists on this cycle — a second one would adopt no before-images (the sweep is \`decision_id IS NULL\`) and report a Reverse that restores nothing`,
+    };
+  }
+  if (!verdict || typeof verdict !== "object" || typeof verdict.id !== "string" || verdict.id === "") {
+    return {
+      action: "refuse",
+      reason: `this cycle holds no \`runner_verdicts\` row for ${ticket} — the verdict id is an ARGUMENT of record_ship_decision(), so there is nothing to attach the handle to`,
+    };
+  }
+  if (verdict.verdict !== "approve") {
+    return {
+      action: "none",
+      reason: `verdict ${verdict.id} reads \`${verdict.verdict}\` — a ship decision is the handle on an ACCEPTED delivery, and record_ship_decision() raises on anything but \`approve\` (SES-402/SES-403 read that refusal)`,
+    };
+  }
+  const sha = typeof cycleRow?.push_sha === "string" ? cycleRow.push_sha.trim() : "";
+  if (sha === "" || sha !== verdict.graded_sha) {
+    return {
+      action: "refuse",
+      reason: sha === ""
+        ? `the cycle row carries no \`push_sha\` — before the push has landed there is no sha to pass (\`SES-345\`)`
+        : `push_sha ${sha} is not verdict ${verdict.id}'s graded_sha ${verdict.graded_sha} — the tree graded is not the tree pushed: re-run 7a on the pushed HEAD, never pass the sha through (\`SES-345\`)`,
+    };
+  }
+  return {
+    action: "record",
+    reason: `${ticket} settled \`delivered\` on \`approve\` verdict ${verdict.id}, whose graded_sha is the pushed sha`,
+    args: {
+      p_cycle_id: cycleRow.id ?? null,
+      p_backlog_id: ticket,
+      p_version: verdict.version,
+      p_push_sha: sha,
+      p_verdict_id: verdict.id,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------------------------
 // The CLI half (credentials, disk, exit codes).
 // ---------------------------------------------------------------------------------------------
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle"]);
+export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle", "ship"]);
 
 // AGT-167 -- ONE DIRECTION, and the constant is here rather than inline so the guard has a name a
 // test can point at. `resettleTicket()` moves a row OFF `delivered` and nothing else: `partial` is
@@ -362,6 +452,54 @@ function renderPlan({ ticket, kickoffRel, row, decided, plan, gatedOpen }) {
   out += `  open gated_before_build card: ${gatedOpen ? "yes" : "no"}\n`;
   for (const r of decided.reasons) out += `  · ${r}\n`;
   return out;
+}
+
+// AGT-506 -- THE THREE READS THE SHIP DECISION IS PLANNED FROM, in one place so the ordinary
+// settle's precondition and the `--ship` door ask the ledger the SAME question (pattern:14). All
+// three go through `rest()` like everything else, so none of them gets its own chance to swallow a
+// 403. The verdict read is `order=created_at.desc&limit=1`: a cycle that was re-graded holds more
+// than one row for the ticket and the NEWEST is the one the ship attaches to.
+export async function readShipInputs({ base, key, cycleId, ticket } = {}) {
+  const c = encodeURIComponent(cycleId);
+  const t = encodeURIComponent(ticket);
+  const verdicts = await rest(base, key,
+    `runner_verdicts?select=id,verdict,graded_sha,version&cycle_id=eq.${c}&backlog_id=eq.${t}&order=created_at.desc&limit=1`,
+    {}, "read verdict");
+  const cycles = await rest(base, key, `runner_cycles?select=id,push_sha&id=eq.${c}`, {}, "read cycle row");
+  const decisions = await rest(base, key,
+    `runner_decisions?select=id&kind=eq.ship&cycle_id=eq.${c}&backlog_id=eq.${t}&limit=1`, {}, "read ship decision");
+  if (!Array.isArray(verdicts) || !Array.isArray(cycles) || !Array.isArray(decisions)) {
+    fail("read ship inputs: one of the three reads came back non-array — refusing to plan a ship decision on a set that was not read.");
+  }
+  return { verdict: verdicts[0] ?? null, cycleRow: cycles[0] ?? null, existing: decisions[0] ?? null };
+}
+
+// AGT-506 -- THE WRITE, AND IT IS THE ONLY BRANCH THAT POSTS. `done`, `none` and `skip` report
+// themselves and return, so this function is safe to call on a dry run for those three: that is
+// how the no-write path prints the SAME words it would print under `--apply`, instead of a second
+// copy of the sentence living in `main()`. `refuse` never reaches here under `--apply` -- `main()`
+// turns it into exit 2 before any write, which is the ticket's own second half.
+export async function recordShip({ base, key, plan, log = s => process.stdout.write(s) } = {}) {
+  if (!plan || typeof plan !== "object") {
+    fail("recordShip: no plan — planShip() decides and this function only writes what it decided.");
+  }
+  if (plan.action === "done") {
+    log(`  already recorded ${plan.id}\n`);
+    return { recorded: null, id: plan.id };
+  }
+  if (plan.action !== "record") {
+    log(`  ${plan.action} — ${plan.reason}\n`);
+    return { recorded: null, id: null };
+  }
+  const id = await rest(base, key, "rpc/record_ship_decision", {
+    method: "POST",
+    body: JSON.stringify(plan.args),
+  }, "record_ship_decision");
+  if (typeof id !== "string" || id.length !== 36) {
+    fail(`record_ship_decision: returned ${JSON.stringify(id)}, which is not a decision id`);
+  }
+  log(`  ship decision: ${id}\n`);
+  return { recorded: id, id };
 }
 
 // AGT-176 (part c) -- the write half. Two targets, one decision: the cycle row (always present at
@@ -718,7 +856,7 @@ async function main() {
   for (const a of argv) {
     const name = a.startsWith("--") ? a.slice(2).split("=")[0] : a;
     if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
-      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --resettle and --apply.`);
+      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --resettle, --ship and --apply.`);
     }
   }
 
@@ -728,8 +866,55 @@ async function main() {
   const remainderArg = arg(argv, "remainder");
   const applyArg = arg(argv, "apply");
   const resettleArg = arg(argv, "resettle");
+  const shipArg = arg(argv, "ship");
 
   if (typeof ticket !== "string" || ticket === "") fail("--ticket=<ID> is required — this script settles exactly one ticket.");
+
+  // AGT-506 -- THE THIRD DOOR, and the one the runbook's step 7 SQL block now points at. It takes
+  // no `--kickoff`: the ship decision is keyed by (cycle, ticket) and reads the ticket's SETTLED
+  // status off the board, so a kickoff path handed in here would invite a reader to think this door
+  // re-decides the status. It does not -- it records a handle for a status the first door already
+  // wrote. `--resettle` is refused for the mirror reason: that door moves a row OFF `delivered`,
+  // and recording a ship decision for a delivery in the same breath as un-delivering it is two
+  // answers to one question. Both refusals raise before any read.
+  if (shipArg !== undefined) {
+    if (kickoffArg !== undefined) {
+      fail("--kickoff is refused beside --ship — the ship decision is keyed by (cycle, ticket) and reads the status the close-out already wrote; it never re-decides it from a document.");
+    }
+    if (resettleArg !== undefined) {
+      fail("--resettle is refused beside --ship — one moves the row OFF `delivered` and the other records the handle for a delivery; they are two answers to one question.");
+    }
+    if (typeof cycleId !== "string" || cycleId === "") {
+      fail("--ship needs --cycle-id=<uuid> — the decision is keyed by (cycle, ticket) and the cycle row carries the push sha it records.");
+    }
+    const sbase = process.env.SUPABASE_URL;
+    const skey = process.env.SUPABASE_SERVICE_KEY;
+    if (!sbase) fail("SUPABASE_URL is not set — the ship decision is planned and recorded over REST.");
+    if (!skey) fail("SUPABASE_SERVICE_KEY is not set — the ship decision is planned and recorded over REST.");
+    const shipRows = await rest(sbase, skey,
+      `backlog_items?backlog_id=eq.${encodeURIComponent(ticket)}&select=id,backlog_id,status`, {}, "ship read row");
+    if (!Array.isArray(shipRows) || shipRows.length !== 1) {
+      fail(`ship read row: ${ticket} matched ${Array.isArray(shipRows) ? shipRows.length : 0} rows — one is the only number whose delivery can be handed a Reverse.`);
+    }
+    const shipInputs = await readShipInputs({ base: sbase, key: skey, cycleId, ticket });
+    const shipPlan = planShip({ status: shipRows[0].status, ticket, ...shipInputs });
+    process.stdout.write(`settle-ship: ${ticket} — ship decision on cycle ${cycleId}\n`);
+    process.stdout.write(`  would ${shipPlan.action} — ${shipPlan.reason}\n`);
+    if (applyArg === undefined) {
+      // The three non-writing actions report themselves through `recordShip()` on the dry run too,
+      // so the words a reader sees here are the words `--apply` would print rather than a second
+      // copy of them (pattern:14). It cannot write: only the `record` branch POSTs.
+      if (shipPlan.action !== "record" && shipPlan.action !== "refuse") {
+        await recordShip({ base: sbase, key: skey, plan: shipPlan });
+      }
+      process.stdout.write("  (no --apply; nothing was written)\n");
+      process.exit(0);
+    }
+    // A `refuse` under `--apply` is exit 2 BEFORE the write, never a warning over one.
+    if (shipPlan.action === "refuse") fail(`ship: ${shipPlan.reason}`);
+    await recordShip({ base: sbase, key: skey, plan: shipPlan });
+    process.exit(0);
+  }
 
   // AGT-167 -- THE SECOND DOOR, and it takes no `--kickoff`. A re-settle reads the document the ROW
   // links, so a path handed in on the command line would decide a status against a record the board
@@ -797,6 +982,28 @@ async function main() {
   }
 
   process.stdout.write(renderPlan({ ticket, kickoffRel: kickoffArg, row, decided, plan, gatedOpen }));
+
+  // AGT-506 -- A `delivered` SETTLE NEEDS THE VERDICT ITS SHIP DECISION ATTACHES TO, and that is
+  // the half of the ticket that DOES belong in this statement's path. The verdict is still not an
+  // input to the STATUS (`decideStatus()` has no verdict parameter and keeps none): a `delivered`
+  // decided off a record that names no unbuilt work stays `delivered`. What is refused is writing
+  // it while the evidence the ship decision requires does not exist -- an `approve` carrying no
+  // verdict row, in the ticket's own words. The refusal raises BEFORE `applySettle()`, so the
+  // decision row, the before-image and the PATCH have not happened when it fires. `partial` is
+  // untouched: it records no ship decision and needs no verdict.
+  if (decided.status === "delivered") {
+    if (typeof cycleId === "string" && cycleId !== "") {
+      const { verdict: settleVerdict } = await readShipInputs({ base, key, cycleId, ticket });
+      process.stdout.write(settleVerdict
+        ? `  verdict ${settleVerdict.id} \`${settleVerdict.verdict}\` ${settleVerdict.version} graded_sha ${settleVerdict.graded_sha}\n`
+        : "  verdict (none on this cycle for this ticket)\n");
+      if (applyArg !== undefined && !settleVerdict) {
+        fail(`a \`delivered\` settle needs the verdict its ship decision attaches to — this cycle holds no \`runner_verdicts\` row for ${ticket}, so nothing is written.`);
+      }
+    } else {
+      process.stdout.write("  verdict (not read — no --cycle-id given)\n");
+    }
+  }
 
   // AGT-176 (part c) -- the cycle's OWN cost, resolved from the log rows it wrote, printed on the
   // dry run too so `cost_usd` can be read before anything is written. `visitor_id` is the column
