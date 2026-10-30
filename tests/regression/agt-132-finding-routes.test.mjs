@@ -1,3 +1,4 @@
+// DeepBench v7.0.919 | tests/regression/agt-132-finding-routes.test.mjs | AGT-304 slice 38 -- arms C, D, G, H grade the change.
 // DeepBench v7.0.872 | tests/regression/agt-132-finding-routes.test.mjs | AGT-304 slice 15 -- arm B reads its one home
 // DeepBench v7.0.869 | tests/regression/agt-132-finding-routes.test.mjs | AGT-492 -- the `pick` filing
 // fixture gains a standard-B `test` block (the new refusal would otherwise be collected by every route
@@ -84,7 +85,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 // implementation agreeing with itself proves nothing). Importing a test module does not run it --
 // selfRun only fires for the entry module.
 import { chainRuleFromPrompt, indexOfExact } from "./ses-378d-manager-skill-rows.test.mjs";
-import { LIVE_ROUTES } from "./_lib/finding-routes.js";
+import { LIVE_ROUTES, MANAGER_PROJECT } from "./_lib/finding-routes.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = path.join(ROOT, "scripts", "audit-review.js");
@@ -97,11 +98,11 @@ const INTENT_ID = "a6d3568f-3a39-44ff-a2b9-0aa62035281e";
 const GUARDRAILS_SLUG = "dm-guardrails";
 const RUN_INTENT_SLUG = "dm-run-intent";
 const MUST_AFTER = 5;       // slice 2 moved the 6th out; must_not is AGT-144's business, not ours
-const JOINED_OPEN_CARRIED = 27;
+const JOINED_LEGACY = 27; // AGT-304 slice 38: the rows the dropped CHECK froze, every status
 const SLICE1_CYCLE = "352017f7-dc36-4eb0-a4e6-a48baf8cbb0e";
 const SLICE2_CYCLE = "47423449-171c-4dbe-b162-48cbeca76834";
-const EPIC_DMC = "e0335c39-0728-4ff1-99ca-232a02912176";
-const EPIC_AUD = "6c8a8325-205c-4e08-b0b2-64c939582cc6";
+const EPIC_DMF = "48c63dac-4e5e-4287-8e72-01777fedbbf2"; // Dev Mgr Findings (decision ccab94da, AGT-484)
+const EPIC_AUF = "ba12f804-9ff1-4160-ac3d-5c0bf8470877"; // Auditor Findings (2136ce7c)
 const PARA_HEAD = "THE FINDINGS STANDARD AND ROUTING";
 const PREFIX = "apply_audit_review: ";
 
@@ -339,30 +340,13 @@ async function run() {
     const f = await req(url, key, "audit_findings?status=in.(open,carried)&select=id,found_by,finding_type&order=created_at,id");
     assert.equal(f.status, 200, describe(f));
     const bySource = s => (f.json ?? []).find(x => sourceOf(x.found_by) === s);
-    const to = bySource("ticket-owner");
+    const to = (f.json ?? []).find(x => LIVE_ROUTES.some(r => r.source === sourceOf(x.found_by) && r.project_slug === MANAGER_PROJECT));
     const au = bySource("auditor");
-    assert.ok(to, "a live open ticket-owner finding to route (the ticket's own case: a census gap)");
+    assert.ok(to, `a live open finding from a precedence-30 source (routes to ${MANAGER_PROJECT})`);
     assert.ok(au, "and a live open auditor finding");
-
     const probe = (group, k = key) => req(url, k, "rpc/finding_group_epic", { method: "POST", body: { p_group: group } });
     const group = extra => ({ kind: "root-cause", title: "t", root_cause: "r", fix: "f", finding_ids: [to.id], ...extra });
-
-    const missing = await probe(group());
-    assert.equal(missing.status, 400, `a pick group with no project must be refused; got ${describe(missing)}`);
-    assert.equal(missing.code, "P0001", `a RAISE, not a type error; got ${describe(missing)}`);
-    assert.match(String(missing.json.message), /needs project \(a projects\.slug or general\)/);
-    assert.ok(String(missing.json.message).includes("ticket-owner"), "and it names the source with no home");
-
-    const general = await probe(group({ project: "general" }));
-    assert.equal(general.status, 200, describe(general));
-    assert.equal(general.json, null, "`general` is the general backlog: no epic, and that is a value, not a failure");
-
-    // AGT-240 (v7.0.662) RETARGET: a project that is executing, proposed or done has a LOCKED list, so
-    // finding_group_epic() now refuses to file into it -- in its own sentence, which audit-review.js
-    // mirrors (lockedListRefusal). Dev Manager Capabilities and Auditor Enhancements both execute, so
-    // the pick and the Auditor route are refused where they used to return the epic. The expectation is
-    // keyed on each project's status as read, so an unlocked project still resolves to its one epic.
-    const st = await req(url, key, "projects?slug=in.(dev-manager-capabilities,auditor-enhancements)&select=slug,status");
+    const st = await req(url, key, `projects?slug=in.(${MANAGER_PROJECT},auditor-findings)&select=slug,status,accepts_findings`);
     assert.equal(st.status, 200, describe(st));
     const statusOf = s => (st.json ?? []).find(x => x.slug === s)?.status;
     const expectRoute = (r, slug, epic, what) => {
@@ -377,29 +361,12 @@ async function run() {
       }
     };
 
-    const picked = await probe(group({ project: "dev-manager-capabilities" }));
-    expectRoute(picked, "dev-manager-capabilities", EPIC_DMC, "the manager's pick");
-
-    // Precedence beats the pick: the SAME `general` on an Auditor finding still routes to Auditor
-    // Enhancements (and, while it executes, is refused THERE -- never quietly sent to general). This is
-    // the pair that discriminates a real routing table from "whatever he typed".
-    const auditor = await probe({ kind: "root-cause", project: "general", finding_ids: [au.id] });
-    expectRoute(auditor, "auditor-enhancements", EPIC_AUD, "an Auditor finding keeps its own home whatever the group asked for");
-
+    const missing = await probe(group());
+    expectRoute(missing, MANAGER_PROJECT, EPIC_DMF, "a precedence-30 source routes to the holding list, no pick needed");
     const bad = await probe(group({ project: "nope" }));
-    assert.equal(bad.status, 400, describe(bad));
-    assert.equal(bad.code, "P0001", describe(bad));
-    assert.match(String(bad.json.message), /project nope is not a projects row; project creation is John's/);
-
-    // The dry-run mirror reads the FUNCTION's texts, prefix aside (agt-86i arm R's convention).
-    const mirror = (g, projects) => validateReview(
-      { groups: [g], summary_for_john: "qa", patterns_applied: [] },
-      (f.json ?? []).map(x => ({ id: x.id, source: sourceOf(x.found_by), finding_type: x.finding_type, weeks_seen: 1 })),
-      undefined, undefined, ROUTES, projects).refusals[0];
-    assert.equal(`${PREFIX}${mirror(group(), [{ slug: "dev-manager-capabilities" }])}`, missing.json.message,
-      "the offline refusal for a missing project is the function's own sentence");
-    assert.equal(`${PREFIX}${mirror(group({ project: "nope" }), [{ slug: "dev-manager-capabilities" }])}`, bad.json.message,
-      "and so is the one for a project that does not exist");
+    assert.deepEqual([bad.status, bad.json], [missing.status, missing.json], "the route names the project; a typed pick changes nothing");
+    const auditor = await probe({ kind: "root-cause", project: "general", finding_ids: [au.id] });
+    expectRoute(auditor, "auditor-findings", EPIC_AUF, "precedence beats the pick: the Auditor home");
 
     if (anon) {
       const a = await probe(group({ project: "general" }), anon);
@@ -424,7 +391,7 @@ async function run() {
     if (!fs.existsSync(ctxPath)) throw new Error(`arm B did not leave a prepared context at ${ctxPath}`);
     const p = spawnSync(process.execPath,
       [PROMPT, "--agent=architect", "--capability=review-audit-worklist", `--task-file=${ctxPath}`],
-      { encoding: "utf8" });
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });   // AGT-304 slice 38: the prompt is >1 MiB
     assert.equal(p.status, 0, `agent-prompt must exit 0; got ${p.status} ${(p.stderr ?? "").slice(0, 400)}`);
     assert.ok(p.stdout.includes(PARA_HEAD), "the assembled prompt PRINTS the routing paragraph");
     assert.ok(p.stdout.includes("task_context.routes"), "so the manager is told where to read the table");
@@ -478,15 +445,13 @@ async function run() {
 
   // --- G. the 27 rows the dropped CHECK used to freeze --------------------------------------------
   await arm("G joined rows", async () => {
-    const all = await req(url, key, "audit_findings?status=in.(open,carried)&select=id,found_by");
+    const all = await req(url, key, "audit_findings?found_by=like.*%20%2B%20*&select=id,found_by,ruling&order=id");
     assert.equal(all.status, 200, describe(all));
     const joined = (all.json ?? []).filter(x => / \+ /.test(String(x.found_by)));
-    assert.equal(joined.length, JOINED_OPEN_CARRIED,
-      `${JOINED_OPEN_CARRIED} of the open/carried findings carry a joined found_by. Every one of them is a row apply_audit_review() must re-status to cover the worklist, and each was refused 23514 by audit_findings_found_by_single until ${UP2} dropped it. got ${joined.length} of ${(all.json ?? []).length}`);
-    assert.equal(new Set(joined.map(x => x.found_by)).size, 1,
-      "they share ONE found_by value -- one legacy writer, not a scattered class");
-    assert.ok((all.json ?? []).length > joined.length,
-      "and they are a subset of the worklist, so a review call still has single-source rows to route");
+    assert.equal(joined.length, JOINED_LEGACY, `${JOINED_LEGACY} joined found_by rows (frozen: arm F); got ${joined.length}`);
+    assert.equal(new Set(joined.map(x => x.found_by)).size, 1, "ONE found_by value: one legacy writer");
+    assert.deepEqual(joined.filter(x => !x.ruling).map(x => x.id), [],
+      `every one carries a ruling -- the write the dropped CHECK refused 23514 (${UP2})`);
   });
 
   // --- H. the chain rule's new home ----------------------------------------------------------------
@@ -497,8 +462,6 @@ async function run() {
     const gr = (rows.json ?? []).find(x => x.slug === GUARDRAILS_SLUG);
     const ri = (rows.json ?? []).find(x => x.slug === RUN_INTENT_SLUG);
     assert.ok(gr && ri, `both ${GUARDRAILS_SLUG} and ${RUN_INTENT_SLUG} must exist; got ${JSON.stringify((rows.json ?? []).map(x => x.slug))}`);
-    assert.equal(Array.isArray(gr.guardrails?.must) ? gr.guardrails.must.length : -1, MUST_AFTER,
-      `${GUARDRAILS_SLUG}.guardrails.must must be back to ${MUST_AFTER}; got ${JSON.stringify(gr.guardrails?.must?.length)}`);
     assert.equal(indexOfExact(gr.guardrails.must, rule), -1,
       `the chain rule must be GONE from ${GUARDRAILS_SLUG}.must -- that row is linked to four capabilities and the rule governs only the runner chain`);
     const paras = String(ri.method ?? "").replace(/\r\n/g, "\n").split("\n\n");
@@ -528,6 +491,11 @@ async function run() {
     const grImg = img.json.find(i => i.row_data?.slug === GUARDRAILS_SLUG);
     assert.equal(grImg.row_data.guardrails.must.length, MUST_AFTER + 1,
       "the guardrails image is the row BEFORE the split (6 musts), so a Reverse actually puts the rule back");
+    const rule = chainRuleFromPrompt(fs.readFileSync(path.join(ROOT, "docs", "runbooks", "routine-prompt.md"), "utf8"));
+    const must = (await req(url, key, `skill_profiles?slug=eq.${GUARDRAILS_SLUG}&select=guardrails`)).json?.[0]?.guardrails?.must ?? [];
+    const kept = grImg.row_data.guardrails.must.filter(m => m !== rule);
+    assert.equal(kept.length, MUST_AFTER, `the image kept ${MUST_AFTER} musts beside the rule; got ${kept.length}`);
+    assert.deepEqual(kept.filter(m => !must.includes(m)), [], `every kept must is still live (${must.length} now); a John rule leaves only on his words`);
   });
 
   notRun(
