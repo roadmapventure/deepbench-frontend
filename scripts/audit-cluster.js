@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.920 | scripts/audit-cluster.js | AGT-304 slice 39 -- both audit_findings reads page by id: unpaged, 1,000 of 2,399 rows came back and the carry saw 2 of 24 open fingerprints.
 // DeepBench v7.0.881 | scripts/audit-cluster.js | AGT-502 -- the byte-identical second home of the token sum, fixed in the same commit: it now imports model-trial.js's usageSplit() and logs the cache columns instead of folding them into --input-tokens.
 // DeepBench v7.0.552 | scripts/audit-cluster.js | AGT-86 slice 8a -- the Auditor routine runs this script under a SESSION NAME (it has no runner_cycles row): --run takes exactly one of --cycle-id / --session-name via audit-ledger.js attribution(), and agent-log.js gets --cycle only when a cycle exists. Config clusters (statements carrying slice 6's `project` label) route to audit-config-review / au-config-intent, and --build writes --repo-visibility=<label>=<public|private> as task_context.repo_visibility. The --collect note names the routine's ingest, not a hand step.
 // DeepBench v7.0.469 | scripts/audit-cluster.js | AGT-70
@@ -485,6 +486,14 @@ function creds() {
   return { base, key };
 }
 
+// AGT-304 slice 39: PostgREST answers 1,000 rows and audit_findings holds 2,399 -- page by id, or the carry sees a slice.
+async function restGetAll(base, key, q) {
+  const out = [];
+  for (let page = await restGet(base, key, `${q}&order=id&limit=1000&offset=0`); page.length;
+       page = await restGet(base, key, `${q}&order=id&limit=1000&offset=${out.length}`)) out.push(...page);
+  return out;
+}
+
 async function restGet(base, key, q) {
   let res;
   try {
@@ -533,7 +542,7 @@ async function doBuild(argv) {
   let rows = [];
   if (!noDb) {
     const { base, key } = creds();
-    rows = await restGet(base, key, "audit_findings?select=*");
+    rows = await restGetAll(base, key, "audit_findings?select=*");
   }
 
   const prior = priorClusters(rows, statements);
@@ -752,7 +761,7 @@ async function doCollect(argv) {
   let rows = [];
   if (!noDb) {
     const { base, key } = creds();
-    rows = await restGet(base, key, "audit_findings?select=*");
+    rows = await restGetAll(base, key, "audit_findings?select=*");
   }
 
   const byId = new Map(statements.map(s => [s.id, s]));

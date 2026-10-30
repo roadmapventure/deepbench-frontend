@@ -1,3 +1,4 @@
+// DeepBench v7.0.920 | tests/regression/agt-70-auditor.test.mjs | AGT-304 slice 39 -- parts M and Q page every audit_findings read (PostgREST answers 1,000 of 2,399 rows); step (5) mirrors carryForward's week guard and probes a far week.
 // DeepBench v7.0.578 | tests/regression/agt-70-auditor.test.mjs | AGT-108
 // DeepBench v7.0.576 | tests/regression/agt-70-auditor.test.mjs | AGT-107
 // DeepBench v7.0.563 | tests/regression/agt-70-auditor.test.mjs | AGT-101
@@ -477,6 +478,18 @@ function assertWeekFiling(rows, findings) {
 
 function restHeaders(key, extra = {}) {
   return { apikey: key, Authorization: `Bearer ${key}`, ...extra };
+}
+
+// AGT-304 slice 39: PostgREST answers 1,000 rows and audit_findings holds 2,399 -- every ledger read pages by id.
+async function getAll(url, key, q) {
+  const out = [];
+  for (;;) {
+    const res = await fetch(`${url}/rest/v1/${q}&order=id&limit=1000&offset=${out.length}`, { headers: restHeaders(key) });
+    if (!res.ok) throw new Error(`GET ${q} -> HTTP ${res.status}: ${await res.text().catch(() => "")}`);
+    const page = await res.json();
+    if (!page.length) return out;
+    out.push(...page);
+  }
 }
 
 async function theLedgerIsAppendOnly() {
@@ -1154,7 +1167,7 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
   };
   // AGT-107 -- snapshot BEFORE this part's first spawn, so the assertions below grade this part's
   // own commands rather than the size the live ledger happens to have reached.
-  const ledgerBefore = (await get("audit_findings?select=id")).length;
+  const ledgerBefore = (await getAll(url, key, "audit_findings?select=id")).length;
   const filedBefore  = (await get("backlog_items?select=id&source_file=eq.audit-ledger")).length;
 
   let out = "";
@@ -1180,7 +1193,7 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
   // it -- here, and in the QA above -- must leave both exactly where it found them.
   // AGT-107 -- the claim is INVARIANCE, not a size. The ledger grows week on week (65 rows this
   // cycle across W37/W38/W39); pinning it to 6 graded the live world, not this part (pattern:162).
-  assert.strictEqual((await get("audit_findings?select=id")).length, ledgerBefore,
+  assert.strictEqual((await getAll(url, key, "audit_findings?select=id")).length, ledgerBefore,
     `every command in this part is a dry run: the ledger must end where it started (${ledgerBefore} rows)`);
   assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, filedBefore,
     `no board row may be filed from the ledger by a dry run; started at ${filedBefore}`);
@@ -1447,7 +1460,7 @@ async function weekTwoRunsAgainstTheRealLedger() {
   };
   // AGT-107 -- snapshot BEFORE this part's first spawn, so (6) below grades this part's own
   // commands rather than the size the live ledger happens to have reached.
-  const ledgerBefore = (await get("audit_findings?select=id")).length;
+  const ledgerBefore = (await getAll(url, key, "audit_findings?select=id")).length;
   const filedBefore  = (await get("backlog_items?select=id&source_file=eq.audit-ledger")).length;
 
   const spawn = (script, args) => execFileSync(process.execPath, [path.join(ROOT, "scripts", script), ...args],
@@ -1460,7 +1473,7 @@ async function weekTwoRunsAgainstTheRealLedger() {
   // never write it down (pattern:162 -- `6 recurring` held only while W38 was empty).
   const W38 = "2026-W38";
   const fixtureFps = JSON.parse(read(FINDINGS_REL)).findings.map(fingerprint);
-  const ledgerFps  = await get("audit_findings?select=fingerprint,iso_week");
+  const ledgerFps  = await getAll(url, key, "audit_findings?select=fingerprint,iso_week");
   const atW38   = new Set(ledgerFps.filter(r => r.iso_week === W38).map(r => r.fingerprint));
   const anyWeek = new Set(ledgerFps.map(r => r.fingerprint));
   const expectSeen = fixtureFps.filter(fp => atW38.has(fp)).length;
@@ -1545,16 +1558,23 @@ async function weekTwoRunsAgainstTheRealLedger() {
     assert.ok(m, `--collect over an empty dir must report every band at 0 and then the carry; got: ${collected.trim()}`);
     const [carriedN, goneN] = [Number(m[1]), Number(m[2])];
 
-    const res = await fetch(`${url}/rest/v1/audit_findings?select=fingerprint,iso_week,status`, { headers: restHeaders(key) });
-    if (!res.ok) throw new Error(`GET audit_findings -> HTTP ${res.status}`);
     const latest = new Map();
-    for (const r of await res.json()) {
+    for (const r of await getAll(url, key, "audit_findings?select=fingerprint,iso_week,status")) {
       const cur = latest.get(r.fingerprint);
       if (!cur || r.iso_week > cur.iso_week) latest.set(r.fingerprint, r);
     }
-    const stillOpen = [...latest.values()].filter(r => r.status === "open").length;
+    // AGT-304 slice 39: carryForward() carries only a latest row BEFORE the week; mirror that guard (W39..W44 live).
+    const openLatest = [...latest.values()].filter(r => r.status === "open");
+    const stillOpen = openLatest.filter(r => r.iso_week < "2026-W38").length;
     assert.strictEqual(carriedN + goneN, stillOpen,
       `every fingerprint whose latest ledger row is open must land in exactly one of carried/gone; ledger says ${stillOpen}, the run said ${carriedN} + ${goneN}`);
+    // AGT-304 slice 39: a week after every row must see EVERY open fingerprint (unpaged, audit-cluster saw 2 of 24).
+    const far = spawn("audit-cluster.js", ["--collect", `--dir=${path.join(tmp, "empty")}`,
+      `--statements=${path.join(tmp, "s.json")}`, "--week=2099-W01", `--out=${path.join(tmp, "far.json")}`]);
+    const fm = far.match(/(\d+) carried, (\d+) gone/);
+    assert.ok(fm, `the far-week collect must print the carry; got: ${far.trim()}`);
+    assert.strictEqual(Number(fm[1]) + Number(fm[2]), openLatest.length,
+      `a collect at a week after every row sees every open fingerprint: ledger says ${openLatest.length}, the run said ${fm[1]} + ${fm[2]}`);
 
     // ...and the carry must arrive at the ledger as RECURRING, which is the two scripts' seam.
     let ingest = "";
@@ -1576,7 +1596,7 @@ async function weekTwoRunsAgainstTheRealLedger() {
   // (6) THE TWO COUNTS. Nothing above passed --apply, so the ledger and the board are untouched.
   // AGT-107 -- the claim is INVARIANCE, not a size. The ledger grows week on week (65 rows this
   // cycle across W37/W38/W39); pinning it to 6 graded the live world, not this part (pattern:162).
-  assert.strictEqual((await get("audit_findings?select=id")).length, ledgerBefore,
+  assert.strictEqual((await getAll(url, key, "audit_findings?select=id")).length, ledgerBefore,
     `every command in this part is a dry run: the ledger must end where it started (${ledgerBefore} rows)`);
   assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, filedBefore,
     `no board row may be filed from the ledger by a dry run; started at ${filedBefore}`);
