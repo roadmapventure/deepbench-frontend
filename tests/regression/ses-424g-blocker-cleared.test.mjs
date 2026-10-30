@@ -1,3 +1,5 @@
+// DeepBench v7.0.917 | tests/regression/ses-424g-blocker-cleared.test.mjs | AGT-304 slice 36 -- the
+// executing epic is READ live (ses-424a's form) and AGT-166's homed blocker is UN-HOMED; the rest holds.
 // DeepBench v7.0.539 | tests/regression/ses-424g-blocker-cleared.test.mjs | SES-424 slice 7 --
 // there is ONE definition of "the blocker no longer blocks", both pick homes read it, and no
 // ticket is left waiting on a blocker that definition can never admit.
@@ -56,10 +58,8 @@ import assert from "assert";
 import { selfRun, notRun } from "./_lib/self-run.js";
 
 const EXPECTED_LANE = "selfbuild";
-// The executing Selfbuild epic the kickoff names. Asserted live below rather than trusted: if the
-// executing project ever changes, the fixture becomes unbuildable and clause A would fail for a
-// reason that has nothing to do with blockers -- so it fails HERE, saying that.
-const EPIC_ID = "1af331b4-682e-4f8a-ac75-c68e0f1887fe";
+// AGT-304 slice 36: the executing epic is READ inside run() (ses-424a's form), never pinned -- the
+// v7.0.539 pin, Moat Support's 1af331b4, went `paused` and the fixture became unbuildable for it.
 // One status the definition must NOT hold. It is also the status of all five blockers slice 7's
 // second migration cleared, so it is the real shape of the bug, not an invented one.
 const OUTSIDE_THE_SET = "removal proposed";
@@ -136,11 +136,16 @@ async function run() {
     `(C) "${OUTSIDE_THE_SET}" must NOT end a blocked_by wait. Admitting it would weaken John's ` +
     `SES-218 directive, which is his to change -- slice 7 cleared the five stale EDGES instead.`);
 
-  const executing = await pg(url, key,
-    `epics?id=eq.${EPIC_ID}&select=id,name,projects!inner(id,status)&projects.status=eq.executing`);
-  assert.equal(executing.length, 1,
-    `epic ${EPIC_ID} must belong to an executing project or the fixture dependent is unbuildable for ` +
-    `a reason that has nothing to do with blockers -- re-point EPIC_ID at the executing Selfbuild epic`);
+  const epics = await pg(url, key,
+    "epics?select=id,name,projects!inner(id,status)&projects.status=eq.executing&limit=50");
+  assert.ok(epics.length > 0,
+    "no epic belongs to an executing project -- the fixture would be unbuildable for a reason that " +
+    "has nothing to do with blockers, so this file refuses to grade (ses-424a's form)");
+  const EPIC_ID = epics[0].id;
+  // AGT-280: an executing epic takes no row without a traceable need source.
+  const needRows = await pg(url, key, "market_records?select=id&order=id.asc&limit=1");
+  assert.equal(needRows.length, 1, "market_records is empty -- no traceable need source (AGT-280)");
+  const needSource = `nathan:market_records:${needRows[0].id}`;
 
   const { blockerId, dependentId, ordinal } = fixtureNonce();
   const held = await pg(url, key,
@@ -168,6 +173,13 @@ async function run() {
           source_file: "ses-424g",
           row_ordinal: ordinal,
           epic_id: null,              // note 6: no epic, so clause C can walk it to 'done'
+          // PostgREST refuses a bulk INSERT whose objects' key sets differ (PGRST102, "All object
+          // keys must match"), so the blocker names the dependent's three gate columns explicitly.
+          // All three are nullable, so null here is exactly the absent key it replaces: the blocker
+          // still carries no epic and no gate data, and is still never itself a pick (queue null).
+          need_source: null,
+          scope_origin: null,
+          need_score: null,
           queue: null,                // never itself a pick
           filed_at: "2026-08-01T00:00:00Z",
           blocked_by: null,
@@ -180,12 +192,23 @@ async function run() {
           source_file: "ses-424g",
           row_ordinal: ordinal + 100000,
           epic_id: EPIC_ID,
+          need_source: needSource,    // AGT-280: requirement_gate
+          scope_origin: "john-named", // AGT-240/280/238: the early return in epic_lock_guard, requirement_gate, backlog_requires_finding
+          need_score: 5,              // AGT-455: lane selfbuild is effective_need_score >= 3
           queue: 999990,              // last in the order; queue IS NULL is the not-pickable condition
           filed_at: "2026-08-01T00:00:00Z",   // before the 2026-08-21 M5-02 cut, so no scope_rationale is owed
           blocked_by: null,
         },
       ]),
     });
+
+    // AGT-166: `backlog_home_intake` (BEFORE INSERT) homed the epic-less blocker into `Intake — ZBLK`, and
+    // `backlog_done_requires_verdict` refuses `done` on a homed row (note 6) -- un-home it before clause C.
+    await setBlocker({ epic_id: null });
+    const unhomed = await pg(url, key, `backlog_items?backlog_id=eq.${blockerId}&select=epic_id`);
+    assert.deepStrictEqual(unhomed, [{ epic_id: null }],
+      `the blocker fixture must carry NO epic before clause C walks it to 'done' (note 6) -- ` +
+      `backlog_home_intake homed it and the un-home PATCH did not take: ${JSON.stringify(unhomed)}`);
 
     // -- A (i) POSITIVE CONTROL. Nothing blocks it yet, so it must be a pick. If this is 0 the pick
     // path is withholding real work, which is a worse failure than the drift slice 7 fixes.
