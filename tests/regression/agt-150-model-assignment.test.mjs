@@ -267,8 +267,8 @@ async function partE() {
   };
   // select=* rather than a column name: model_catalog and model_pricing are keyed by model_id /
   // model, so one hardcoded pk would 400 on two of the three tables.
-  const count = async table => {
-    const res = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, { headers: { ...headers, Prefer: "count=exact" } });
+  const count = async (table, filter = "") => {
+    const res = await fetch(`${url}/rest/v1/${table}?select=*&limit=1${filter}`, { headers: { ...headers, Prefer: "count=exact" } });
     assert.ok(res.ok, `count ${table} -> HTTP ${res.status}`);
     return Number(String(res.headers.get("content-range") ?? "").split("/")[1]);
   };
@@ -290,7 +290,11 @@ async function partE() {
   const detail = (Array.isArray(boot) ? boot[0] : boot)?.detail ?? null;
   const room = roomFor(detail, CANDIDATE);
 
-  const before = { a: await count("model_assignments"), c: await count("model_catalog"), d: await count("runner_decisions") };
+  // AGT-304 slice 43: d scoped to decisions THIS probe could write. Cycle 26a05523 completed 2026-09-28, so no peer writes under it, and decided_at >= t0 drops its 4 historical rows -- elimination, not a window. a/c stay whole-table: 5 and 27 rows, no created_at on the first.
+  const t0 = new Date().toISOString();
+  const before = { a: await count("model_assignments"), c: await count("model_catalog"), d: await count("runner_decisions", `&cycle_id=eq.${CYCLE}&decided_at=gte.${t0}`) };
+  assert.strictEqual(before.d, 0,
+    `cycle ${CYCLE} already owns ${before.d} runner_decisions row(s) since ${t0} BEFORE --prepare: the key is the probe's own attribution, and it owns none`);
   const liveAssignments = await get("model_assignments?select=job_kind");
   const started = new Date().toISOString();
 
@@ -338,7 +342,7 @@ async function partE() {
   // NO MODEL CALL: model-trial.js logs every replay that reaches the model under this feature prefix.
   const logged = await get(`ai_activity_log?feature=like.model-assignment:trial:*&created_at=gt.${encodeURIComponent(started)}&select=id`);
   assert.deepEqual(logged, [], "a no-room --prepare spawns no claude, so it writes no trial log row");
-  const after = { a: await count("model_assignments"), c: await count("model_catalog"), d: await count("runner_decisions") };
+  const after = { a: await count("model_assignments"), c: await count("model_catalog"), d: await count("runner_decisions", `&cycle_id=eq.${CYCLE}&decided_at=gte.${t0}`) };
   assert.deepEqual(after, before,
     `--prepare moved no assignment, no catalog row and no decision (before ${JSON.stringify(before)}, after ${JSON.stringify(after)})`);
   console.log(`  (e) live --prepare: exit 3, watch 0/0, ${room ? `no-room: ${room.reason}` : "no pair spawned"}, model ${json.model}, ${json.prompt_bytes} prompt bytes, 0 trial log rows, counts unchanged -- PASS`);

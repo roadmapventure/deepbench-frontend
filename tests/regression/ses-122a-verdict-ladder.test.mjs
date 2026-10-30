@@ -337,11 +337,15 @@ async function theThresholdsAreColumnsAndTheRungIsRead() {
       "awards the class two rungs for one gate",
   );
 
+  // AGT-304 slice 43: images windowed to the tables class_autonomy reads or could stamp (runner_ladder, runner_verdicts, runner_settings -- SES-122a kickoff), stamps since t0. NOT elimination: a peer write inside the ~1-2 s window still reds this arm, the residual the six-row snapshot below accepts.
+  const t0 = new Date().toISOString();
   const before = {
     ladder: await pg(url, key, "runner_ladder?select=work_class,rung,streak&order=work_class"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    stamped: await countOf(url, key, "runner_verdicts?select=id&ladder_applied_at=not.is.null"),
+    images: await countOf(url, key, `runner_before_images?select=id&table_name=in.(runner_ladder,runner_verdicts,runner_settings)&created_at=gte.${t0}`),
+    stamped: await countOf(url, key, `runner_verdicts?select=id&ladder_applied_at=gte.${t0}`),
   };
+  assert.deepStrictEqual({ images: before.images, stamped: before.stamped }, { images: 0, stamped: 0 },
+    `the window already owns board rows BEFORE the probe: images=${before.images} stamped=${before.stamped} since ${t0} -- the window is the key, and it owns none`);
 
   // 3. A TRACKED CLASS. auto_done and the extras are RECOMPUTED from the columns read above, so
   // this cannot pass against a function that hardcoded the thresholds.
@@ -415,8 +419,8 @@ async function theThresholdsAreColumnsAndTheRungIsRead() {
   // just granted -- which would make a read of the board a write to it.
   const after = {
     ladder: await pg(url, key, "runner_ladder?select=work_class,rung,streak&order=work_class"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    stamped: await countOf(url, key, "runner_verdicts?select=id&ladder_applied_at=not.is.null"),
+    images: await countOf(url, key, `runner_before_images?select=id&table_name=in.(runner_ladder,runner_verdicts,runner_settings)&created_at=gte.${t0}`),
+    stamped: await countOf(url, key, `runner_verdicts?select=id&ladder_applied_at=gte.${t0}`),
   };
   assert.deepStrictEqual(
     after, before,
