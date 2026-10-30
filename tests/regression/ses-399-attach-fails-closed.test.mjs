@@ -339,10 +339,13 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
     return;
   }
 
+  // AGT-304 slice 41: counts scoped to the probe's own key (NIL) -- a whole-table count reads peers' writes, never this probe's UPDATE.
   const before = {
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
+    images: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}`),
+    decisions: await countOf(url, key, `runner_decisions?select=id&id=eq.${NIL}`),
   };
+  assert.deepStrictEqual(before, { images: 0, decisions: 0 },
+    `decision ${NIL} owns a runner_decisions row or an attached image BEFORE the probes: ${JSON.stringify(before)} -- clause 2's refusal is write-free only while it owns none`);
 
   // 1. THE DEPLOYED VOCABULARY, read rather than believed. This is what stops REVERSIBLE_TABLES
   //    above from being a list that agrees only with itself.
@@ -392,8 +395,8 @@ async function theDeployedVocabularyAndTheGuardPathAreReal() {
   // 5. WRITE-FREE, asserted by side effect (pg_proc is unreachable from here). Three calls above;
   //    neither table may have moved by a single row.
   const after = {
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
+    images: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}`),
+    decisions: await countOf(url, key, `runner_decisions?select=id&id=eq.${NIL}`),
   };
   assert.deepStrictEqual(after, before,
     "the guard-path probes MOVED THE LEDGER. attach_before_images() is a writer, and these arms are " +

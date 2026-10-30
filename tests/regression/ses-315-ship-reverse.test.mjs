@@ -545,12 +545,16 @@ async function theShipDecisionRpcIsReachableAndFailsClosed() {
     return;
   }
 
+  // AGT-304 slice 41: counts scoped to the probes' own keys (cycle/decision NIL, ticket SES-999, a revert-forward queued since t0) -- a whole-table count reads peers' writes, never these probes'.
+  const t0 = new Date().toISOString();
   const before = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    shipDecisions: await countOf(url, key, "runner_decisions?select=id&kind=eq.ship"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    directives: await countOf(url, key, "runner_directives?select=id"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL},cycle_id.eq.${NIL})`),
+    shipDecisions: await countOf(url, key, `runner_decisions?select=id&kind=eq.ship&backlog_id=eq.SES-999`),
+    images: await countOf(url, key, `runner_before_images?select=id&or=(decision_id.eq.${NIL},cycle_id.eq.${NIL})`),
+    directives: await countOf(url, key, `runner_directives?select=id&body=like.REVERT-FORWARD*&created_at=gte.${t0}`),
   };
+  assert.deepStrictEqual(before, { decisions: 0, shipDecisions: 0, images: 0, directives: 0 },
+    `the probes' keys own ledger rows BEFORE the probes: ${JSON.stringify(before)} -- every guard-path arm is write-free only while they own none`);
 
   const post = (name, body) =>
     raw(url, key, `rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
@@ -678,10 +682,10 @@ async function theShipDecisionRpcIsReachableAndFailsClosed() {
   // 7. WRITE-FREE, asserted by side effect (pg_proc is unreachable from here). Six calls above;
   //    not one ledger table may have moved by a single row.
   const after = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    shipDecisions: await countOf(url, key, "runner_decisions?select=id&kind=eq.ship"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    directives: await countOf(url, key, "runner_directives?select=id"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL},cycle_id.eq.${NIL})`),
+    shipDecisions: await countOf(url, key, `runner_decisions?select=id&kind=eq.ship&backlog_id=eq.SES-999`),
+    images: await countOf(url, key, `runner_before_images?select=id&or=(decision_id.eq.${NIL},cycle_id.eq.${NIL})`),
+    directives: await countOf(url, key, `runner_directives?select=id&body=like.REVERT-FORWARD*&created_at=gte.${t0}`),
   };
   assert.deepStrictEqual(
     after, before,

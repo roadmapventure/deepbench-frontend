@@ -325,12 +325,15 @@ async function theDeployedFunctionsCarryTheShip() {
     `runner_decisions?select=id&status=eq.open&expires_at=lte.${encodeURIComponent(new Date().toISOString())}`,
   );
 
+  // AGT-304 slice 41: counts scoped to the probes' own keys (decision NIL; images this probe's session wrote) -- a whole-table count reads peers' writes, never these probes'.
   const before = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    finalDecisions: await countOf(url, key, "runner_decisions?select=id&status=eq.final"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    delivered: await countOf(url, key, "backlog_items?select=id&status=eq.delivered"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL})`),
+    finalDecisions: await countOf(url, key, `runner_before_images?select=id&session_name=eq.ses-320-guard-probe&table_name=eq.runner_decisions`),
+    images: await countOf(url, key, `runner_before_images?select=id&or=(decision_id.eq.${NIL},session_name.eq.ses-320-guard-probe)`),
+    delivered: await countOf(url, key, `runner_before_images?select=id&session_name=eq.ses-320-guard-probe&table_name=eq.backlog_items`),
   };
+  assert.deepStrictEqual(before, { decisions: 0, finalDecisions: 0, images: 0, delivered: 0 },
+    `the probes' keys own ledger rows BEFORE the probes: ${JSON.stringify(before)} -- the sweep and reverse arms are write-free only while they own none`);
 
   if (expired > 0) {
     notRun(
@@ -424,10 +427,10 @@ async function theDeployedFunctionsCarryTheShip() {
   // WRITE-FREE, asserted by side effect (pg_proc is unreachable from here). Not one ledger table,
   // and not the delivered census, may have moved by a single row.
   const after = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    finalDecisions: await countOf(url, key, "runner_decisions?select=id&status=eq.final"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    delivered: await countOf(url, key, "backlog_items?select=id&status=eq.delivered"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL})`),
+    finalDecisions: await countOf(url, key, `runner_before_images?select=id&session_name=eq.ses-320-guard-probe&table_name=eq.runner_decisions`),
+    images: await countOf(url, key, `runner_before_images?select=id&or=(decision_id.eq.${NIL},session_name.eq.ses-320-guard-probe)`),
+    delivered: await countOf(url, key, `runner_before_images?select=id&session_name=eq.ses-320-guard-probe&table_name=eq.backlog_items`),
   };
   assert.deepStrictEqual(
     after, before,
