@@ -1,3 +1,4 @@
+// DeepBench v7.0.918 | scripts/audit-review.js | AGT-304 slice 37 -- --prepare pages audit_findings (2,399 rows vs the 1,000-row reply).
 // DeepBench v7.0.887 | scripts/audit-review.js | AGT-424 -- AN UNROUTABLE FINDING IS COVERED, NEVER
 // OMITTED. routeGroup() runs only on a group that FILES a ticket (the gate at L491 of the unchanged
 // tree, under `files` at L448), so an open finding whose source has no finding_routes row (AGT-380,
@@ -665,7 +666,10 @@ async function prepare(args) {
     return r.json;
   };
   const findings = await get("audit_findings?status=in.(open,carried)&select=id,fingerprint,iso_week,kind,check_slug,locations,governing_fact,confidence,proposed_resolution,found_by,finding_type,family&order=created_at,id");
-  const allRows = await get("audit_findings?select=id,fingerprint,iso_week,status,ruling,ruled_by,check_slug");
+  // AGT-304 slice 37: every row, paged -- weeks_seen and prior_rulings need the whole history.
+  const getPage = offset => get(`audit_findings?select=id,fingerprint,iso_week,status,ruling,ruled_by,check_slug&order=id&limit=1000&offset=${offset}`);
+  const allRows = [];
+  for (let page = await getPage(0); page.length; page = await getPage(allRows.length)) allRows.push(...page);
   const tickets = await get("backlog_items?source_file=eq.audit-review&status=not.in.(done,removed)&select=backlog_id,title,status,description&order=backlog_id");
   const scorecardRows = await get("audit_check_scorecard?select=*&order=check_slug,iso_week");
   const profiles = await get("skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug");

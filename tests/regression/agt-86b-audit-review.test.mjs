@@ -1,3 +1,4 @@
+// DeepBench v7.0.918 | tests/regression/agt-86b-audit-review.test.mjs | AGT-304 slice 37 -- arm E grades both --prepare doors (AGT-239).
 // DeepBench v7.0.869 | tests/regression/agt-86b-audit-review.test.mjs | AGT-492 -- re-pointed to the
 // Governance Architect: AGENT architect, INTENT ga-review-intent, LINKS the five ga-* rows plus the kept
 // dm-knowledge-patterns, and arm R's "must hold" message names the Architect. Two edits the kickoff's T5
@@ -333,11 +334,13 @@ async function run() {
   // --- E. live prepare (read-only) + the exit-3 source arm ---------------------------------------
   await arm("E prepare", async () => {
     const { buildTaskContext, NOTHING_TO_REVIEW } = await loadScript();
-    const live = (await get("audit_findings?status=in.(open,carried)&select=id&order=id")).map(f => f.id);
+    const liveRows = await get("audit_findings?status=in.(open,carried)&select=id,family&order=id");
+    const live = liveRows.map(f => f.id);
+    const outcomes = liveRows.filter(f => f.family !== "paperwork").map(f => f.id);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agt86b-"));
     const out = path.join(dir, "prepare.json");
     try {
-      const r = runScript(["--prepare", "--week=2026-W39", `--out=${out}`]);
+      const r = runScript(["--prepare", "--week=2026-W39", "--weekly", `--out=${out}`]);
       if (live.length === 0) {
         assert.equal(r.status, 3, `no open/carried findings -> exit 3; got ${r.status}: ${r.stderr}`);
       } else {
@@ -347,6 +350,14 @@ async function run() {
         assert.ok(ctx.worklist.every(w => w.weeks_seen >= 1), "every weeks_seen >= 1");
         assert.deepEqual(Object.keys(ctx.john_calls).sort(), ["hiring", "money", "production", "rules", "switch"]);
         assert.ok(Array.isArray(ctx.open_audit_tickets), "open_audit_tickets is an array");
+        assert.equal(ctx.scope, "weekly", "--weekly prepares the weekly scope (AGT-239)");
+        const o = runScript(["--prepare", "--week=2026-W39", `--out=${out}`]);   // AGT-304 slice 37: the default door
+        assert.equal(o.status, outcomes.length ? 0 : 3, `--prepare (outcomes) exit; got ${o.status}: ${o.stderr}`);
+        if (outcomes.length) {
+          const octx = JSON.parse(fs.readFileSync(out, "utf8"));
+          assert.equal(octx.scope, "outcomes", "the default scope is outcomes (AGT-239)");
+          assert.deepEqual(octx.worklist.map(w => w.id).sort(), [...outcomes].sort(), "the per-run worklist is the live set minus paperwork (AGT-239)");
+        }
       }
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
