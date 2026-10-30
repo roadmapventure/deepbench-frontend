@@ -3440,10 +3440,10 @@ RETURNING backlog_id;   -- 0 rows = already re-claimed by someone else; leave th
   front of it — release at the point the cycle stops. Nothing here can strand a ticket either
   way: an unreleased claim expires on the 6h boundary.
 
-<!-- FEATURE: SES-315 (b) — the close-out finally calls part (a)'s function, so a shipped change has a Reverse. -->
+<!-- FEATURE: SES-315 (b) — the close-out gives a shipped change its Reverse. -->
 - **RECORD THE SHIP AS A DECISION — this is the shipped change's Reverse handle, and it is the
-  whole of `SES-315` (`M6-01`; migration `ses315_ship_decision`, `v7.0.404`).** One call, after the
-  push has landed and the claim is released:
+  whole of `SES-315` (`M6-01`; migration `ses315_ship_decision`, `v7.0.404`).** `node
+  scripts/settle-ship.js --ship --apply` MAKES THIS CALL. Type the SQL below only on exit 2:
 
 ```sql
 SELECT public.record_ship_decision('<your cycle id>', '<TICKET-ID>', 'v<your version>',

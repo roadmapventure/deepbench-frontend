@@ -247,6 +247,12 @@ function partC() {
     "delivered status'; that is refused here and in §2 of the kickoff, because the adoption sweep " +
     "(`decision_id IS NULL`) and reverse_decision()'s written-since guard both depend on the call " +
     "coming LAST — ses-315-ship-reverse.test.mjs break-mutates this very line");
+  assert.ok(runbook.includes("scripts/settle-ship.js --ship --apply` MAKES THIS CALL"),
+    "step 7 must NAME the command that makes the call. The hand-typed SQL standing ALONE is the " +
+    "defect this ticket opened on — 19 `delivered` tickets with an `approve` verdict and no ship " +
+    "decision, because a model was asked to type a five-argument call at the end of a long cycle. " +
+    "The block above keeps the SQL as the documented exit-2 fallback; this pins the pointer that " +
+    "makes it the fallback rather than the instruction");
   // NO ASSERTION ON THE RUNBOOK'S SIZE BEYOND SES-336's CEILING, DELIBERATELY: ses-413d's
   // `BYTES_AT_SHIP` is the ONE home for the live size and it is already copied in agt-253 and
   // agt-525; a fourth copy here would make the next editor of this file pay for one more. The
