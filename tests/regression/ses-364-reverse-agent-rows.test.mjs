@@ -522,12 +522,15 @@ async function theRpcIsReachableAndFailsClosed() {
     return;
   }
 
+  // AGT-304 slice 42: counts scoped to the probes' own keys (decision NIL; images the actor "ses-364 probe" wrote; a restore reaches runner_items/agents only through NIL's images) -- a whole-table count reads peers' writes, never these probes'. The bare actor "probe" owns a live image and is deliberately not a key.
   const before = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    items: await countOf(url, key, "runner_items?select=id"),
-    agents: await countOf(url, key, "agents?select=id"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL})`),
+    images: await countOf(url, key, `runner_before_images?select=id&or=(decision_id.eq.${NIL},session_name.eq.ses-364 probe)`),
+    items: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}&table_name=eq.runner_items`),
+    agents: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}&table_name=eq.agents`),
   };
+  assert.deepStrictEqual(before, { decisions: 0, images: 0, items: 0, agents: 0 },
+    `the probes' keys own ledger rows BEFORE the probes: ${JSON.stringify(before)} -- the four guard-path calls are write-free only while they own none`);
 
   const post = (name, body) => raw(url, key, `rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
 
@@ -597,10 +600,10 @@ async function theRpcIsReachableAndFailsClosed() {
   //    not one of these tables may have moved by a single row. `agents` and `runner_items` are in
   //    this set on purpose -- they are the two tables SES-364 newly lets the function WRITE.
   const after = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
-    items: await countOf(url, key, "runner_items?select=id"),
-    agents: await countOf(url, key, "agents?select=id"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL})`),
+    images: await countOf(url, key, `runner_before_images?select=id&or=(decision_id.eq.${NIL},session_name.eq.ses-364 probe)`),
+    items: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}&table_name=eq.runner_items`),
+    agents: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}&table_name=eq.agents`),
   };
   assert.deepStrictEqual(after, before,
     "the guard-path probes MOVED THE LEDGER. reverse_decision() is a writer, and these arms are " +

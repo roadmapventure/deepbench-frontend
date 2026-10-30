@@ -537,10 +537,14 @@ async function theClassMappingHasOneHome() {
     return;
   }
 
+  // AGT-304 slice 42: images windowed to runner_ladder since t0 -- the rows an "improved" writer version of this function could produce. NOT elimination: a peer promotion inside the ~1-2 s window still reds this arm, the same residual the six-row snapshot below already accepts.
+  const t0 = new Date().toISOString();
   const before = {
     ladder: await pg(url, key, "runner_ladder?select=work_class,rung,streak&order=work_class"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
+    images: await countOf(url, key, `runner_before_images?select=id&table_name=eq.runner_ladder&created_at=gte.${t0}`),
   };
+  assert.strictEqual(before.images, 0,
+    `runner_ladder already has ${before.images} before-image(s) since ${t0} BEFORE the probe -- the window is the key, and it owns none`);
 
   for (const [input, expected] of CLASS_CASES) {
     const got = await pg(url, key, "rpc/ladder_work_class", {
@@ -570,7 +574,7 @@ async function theClassMappingHasOneHome() {
   // this breaks is someone "improving" the helper into something that reads or stamps the ladder.
   const after = {
     ladder: await pg(url, key, "runner_ladder?select=work_class,rung,streak&order=work_class"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
+    images: await countOf(url, key, `runner_before_images?select=id&table_name=eq.runner_ladder&created_at=gte.${t0}`),
   };
   assert.deepStrictEqual(
     after, before,
@@ -608,6 +612,7 @@ const SES316_OUT_COLUMNS = [
 ];
 
 const BLANK_ACTOR_GUARD = "p_actor is required";
+const NIL = "00000000-0000-0000-0000-000000000000";
 
 async function theRpcReportsWrittenSinceRefusals() {
   const url = process.env.SUPABASE_URL;
@@ -624,10 +629,13 @@ async function theRpcReportsWrittenSinceRefusals() {
     return;
   }
 
+  // AGT-304 slice 42: counts scoped to the probe's own key (decision NIL) -- a whole-table count reads peers' writes, never this probe's refusal.
   const before = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL})`),
+    images: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}`),
   };
+  assert.deepStrictEqual(before, { decisions: 0, images: 0 },
+    `decision ${NIL} owns a runner_decisions row or an attached image BEFORE the probe: ${JSON.stringify(before)} -- the refusal is write-free only while it owns none`);
 
   const args = JSON.stringify({
     p_decision: "00000000-0000-0000-0000-000000000000",
@@ -688,8 +696,8 @@ async function theRpcReportsWrittenSinceRefusals() {
   // 3c. WRITE-FREE, asserted by side effect (pg_proc is unreachable from here). Three calls above;
   // the ledger must not have moved by one row.
   const after = {
-    decisions: await countOf(url, key, "runner_decisions?select=id"),
-    images: await countOf(url, key, "runner_before_images?select=id"),
+    decisions: await countOf(url, key, `runner_decisions?select=id&or=(id.eq.${NIL},reverses.eq.${NIL})`),
+    images: await countOf(url, key, `runner_before_images?select=id&decision_id=eq.${NIL}`),
   };
   assert.deepStrictEqual(
     after, before,
