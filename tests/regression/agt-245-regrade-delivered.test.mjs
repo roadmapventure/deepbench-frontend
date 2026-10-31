@@ -1,3 +1,4 @@
+// DeepBench v7.0.930 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-555 -- `--next` has a BOARD leg, so exit 3 is a fact about the board; clause (j) and the live clause's fall-through.
 // DeepBench v7.0.799 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-304 slice 10 -- the live clause's pair must still be `delivered`, or no leg runs.
 // DeepBench v7.0.705 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-245 slices 3-5 of 5
 //
@@ -35,13 +36,16 @@
 //     SUPABASE_URL and no SUPABASE_SERVICE_KEY, which is how the clause proves the refusal comes
 //     first rather than after a credential check that happened to also fail.
 //
-// (d) THE REAL TREES, AND THE SHA IS THE DISCRIMINATOR (the kickoff's §6 bar). Two dry-runs on the
-//     FIRST COHORT PAIR STILL CURRENT ON THE BOARD -- which is no longer `AGT-101`, and that is a
+// (d) THE REAL TREES, AND THE SHA IS THE DISCRIMINATOR (the kickoff's §6 bar). Two `--next` dry-runs
+//     on THE PAIR THAT LANE WILL ACTUALLY PICK -- which is no longer `AGT-101`, and that is a
 //     consequence of slice 4 rather than a preference: fence (b) refuses a ticket whose newest verdict
-//     is no longer the cohort's, and slice 4's own re-grade row IS a newer verdict for `AGT-101`. So
-//     the live clause picks its pair at runtime (29 of the 56 qualify on 2026-10-07: verdict still current AND status still delivered) instead of
-//     pinning the one ticket this ship supersedes, and the supersede is asserted in its own right
-//     below. Read as: two dry-runs on a real pair `<base>` → `<ship>`. The first `--suite=` prints the CHECKED-OUT
+//     is no longer the cohort's, and slice 4's own re-grade row IS a newer verdict for `AGT-101`. Since
+//     AGT-555 it is no longer a cohort row at all: all 71 are answered, so the pick comes off the
+//     BOARD leg (`AGT-432`, one of 7 pairable predicate matches outside the file on 2026-10-31), and
+//     the clause walks the script's own two legs at runtime instead of pinning a ticket. `--ticket=`
+//     could not reach such a pair -- `pairFor` reads the frozen file and answers `not-in-cohort` --
+//     so the runs are `--next`, which is also the flag the tail runs. The supersede is asserted in its
+//     own right below. Read as: two dry-runs on a real pair `<base>` → `<ship>`. The first `--suite=` prints the CHECKED-OUT
 //     TREE'S OWN SHA as a failing test name: the base leg must name `tree-7bddd226.test.mjs` and the
 //     ship leg `tree-119ed083.test.mjs`, so the payload can only come out `newlyRed:
 //     ["tree-119ed083.test.mjs"]` / `standing: []` if each leg really ran in its own worktree -- a
@@ -93,6 +97,23 @@
 //     `graded_sha` derived from the frozen cohort, never pasted -- plus the board-wide count, which
 //     is the only assertion that says the DRAIN moved rather than that one row exists.
 //
+// (j) THE BOARD LEG, AND BOTH DIRECTIONS OF IT (AGT-555). The frozen file was measured on
+//     2026-09-28 and every one of its 71 rows is now answered or refused, so the file leg alone can
+//     only return exit 3 -- while 88 delivered tickets satisfied the file's own stored predicate on
+//     2026-10-31. `--next` therefore falls through to a board leg, and this clause is two pure arms
+//     over a HAND-BUILT census and a hand-built log, because both of its failure modes are invisible
+//     from a green run:
+//       * A board leg that re-derived a pair for a row the frozen file REFUSED would loosen an
+//         AGT-245 refusal without anybody deciding to -- slice 1 measured those refusals against the
+//         git log. So arm (i) runs the SAME census twice, differing only in whether the file holds
+//         that id among its REFUSED rows: pair, then nothing. The same census with the id already
+//         carrying one of this lane's own rows must also return nothing, or a graded pair is re-graded
+//         every cycle forever.
+//       * A DRAINED that counted only what it could pair would be the same false sentence AGT-555
+//         was filed against. So arm (ii) exhausts the board and asserts the exit-3 payload is
+//         `board-drained` AND carries the census, with `board_unreachable` naming the reason class
+//         and `no_verdict_row` the delivered rows the predicate never saw -- present, not dropped.
+//
 // NOT DONE HERE, and named rather than skipped: the WRITE path. Both live runs are `--dry-run`, and
 // `--suite=` can never record by construction. A permanent regression test does not write the live
 // verdict ledger (ses-315 / ses-320's standing refusal) -- slice 4 is the first real pair with the
@@ -105,8 +126,10 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { deltaVerdict, legNames, pairFor, nextPair, REGRADE_PREFIX, DEFAULT_SUITE } from "../../scripts/regrade-delivered.js";
-import { COHORT_PATH } from "../../scripts/regrade-cohort.js";
+import {
+  deltaVerdict, legNames, pairFor, nextPair, boardPair, boardDrained, REGRADE_PREFIX, DEFAULT_SUITE,
+} from "../../scripts/regrade-delivered.js";
+import { COHORT_PATH, readBoardCensus, parseLog, isOwnSubject } from "../../scripts/regrade-cohort.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = path.join(ROOT, "scripts", "regrade-delivered.js");
@@ -216,37 +239,153 @@ export async function theRowIsInTheLedger(base, key) {
   return { rows: rows.length, id: row.id, verdict: row.verdict };
 }
 
-// The live clause's pair, chosen on the board rather than pinned. `AGT-101`'s cohort row is stale for
-// it from slice 4 onward (see the header's (d)), so a pinned ticket would make this clause unrunnable
-// the moment its own feature shipped. The deps fence is checked here too: both legs share one
-// node_modules, so a pair that moved `package.json` is refused by the script and is not a probe pair.
-async function firstCurrentPair(url, key, cohort) {
-  for (const row of (cohort.rows || []).filter(r => r && r.status === "resolved")) {
-    const res = await fetch(
-      `${url.replace(/\/+$/, "")}/rest/v1/runner_verdicts?select=id&backlog_id=eq.${row.backlog_id}` +
-        `&order=created_at.desc&limit=1`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    assert.equal(res.status, 200, `runner_verdicts read for ${row.backlog_id} answered HTTP ${res.status}`);
-    const rows = await res.json();
-    if (!rows[0] || String(rows[0].id) !== String(row.verdict_id)) continue;
-    // `--ticket=` refuses a ticket the board moved off `delivered` (regrade-delivered.js:431,
-    // `not-delivered`), so currency alone is not eligibility: NO leg runs on such a pair.
-    const item = await fetch(
-      `${url.replace(/\/+$/, "")}/rest/v1/backlog_items?select=status&backlog_id=eq.${row.backlog_id}&limit=1`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    assert.equal(item.status, 200, `backlog_items read for ${row.backlog_id} answered HTTP ${item.status}`);
-    const onBoard = await item.json();
-    if (!onBoard[0] || onBoard[0].status !== "delivered") continue;
-    const git = args => spawnSync("git", ["-C", ROOT, ...args], { encoding: "utf8" });
-    const deps = git(["diff", "--name-only", row.base_sha, row.ship_sha, "--", "package.json", "package-lock.json"]);
-    if (deps.status !== 0 || String(deps.stdout || "").trim()) continue;
-    const diff = git(["diff", "--name-only", row.base_sha, row.ship_sha]);
-    if (diff.status !== 0) continue;
-    const ownTests = String(diff.stdout || "").split("\n").map(s => s.trim())
-      .filter(f => f.startsWith("tests/regression/") && /\.m?js$/.test(f));
-    return { ...row, ownTests };
+// The live clause's pair, chosen on the board rather than pinned, THROUGH BOTH OF `--next`'s LEGS
+// (AGT-555). `AGT-101`'s cohort row is stale for it from slice 4 onward (see the header's (d)) and
+// every other cohort row is now answered too, so a clause that could only look inside the frozen file
+// would have nothing left to grade -- which is precisely the BASELINE red this ticket clears. So the
+// walk is the script's own: `nextPair` over the frozen file with the live board's facts, and when that
+// is empty `boardPair` over the re-measured predicate. Same functions, same order, so the pick this
+// clause expects and the pick the child process makes cannot drift apart; the thing that proves the
+// run is real is the sha probe below, not this derivation.
+async function firstEligiblePair(url, key, cohort) {
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const get = async q => {
+    const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${q}`, { headers });
+    assert.equal(res.status, 200, `the live read \`${q.slice(0, 80)}\` answered HTTP ${res.status}`);
+    return res.json();
+  };
+  const git = args => spawnSync("git", ["-C", ROOT, ...args], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+  const resolved = (cohort.rows || []).filter(r => r && r.status === "resolved");
+  const ids = [...new Set(resolved.map(r => String(r.backlog_id)).filter(id => /^[A-Za-z0-9._-]+$/.test(id)))];
+  const inList = `in.(${ids.join(",")})`;
+
+  // Leg 1, the frozen file -- the script's own pre-filter, read once for every resolved id.
+  const verdicts = await get(`runner_verdicts?select=id,backlog_id,created_at,reasoning&backlog_id=${inList}` +
+    "&order=created_at.desc&limit=5000");
+  const latestById = {};
+  const regraded = new Set();
+  for (const row of verdicts) {
+    const id = String(row.backlog_id);
+    if (!(id in latestById)) latestById[id] = String(row.id);
+    if (String(row.reasoning || "").startsWith(REGRADE_PREFIX)) regraded.add(id);
   }
-  return null;
+  const statusById = {};
+  for (const row of await get(`backlog_items?select=backlog_id,status&backlog_id=${inList}&limit=5000`)) {
+    statusById[String(row.backlog_id)] = row.status;
+  }
+  // Both legs share one node_modules, so a pair that moved `package.json` is refused by the script
+  // (fence (c)) and is not a probe pair.
+  const depsClean = row => {
+    const d = git(["diff", "--name-only", row.base_sha, row.ship_sha, "--", "package.json", "package-lock.json"]);
+    return d.status === 0 && !String(d.stdout || "").trim();
+  };
+  let pair = nextPair(cohort, { regraded, latestById, statusById, depsClean }).pair;
+  let leg = "the frozen cohort";
+  let census = null;
+
+  // Leg 2, the board -- the live predicate re-measured, the file's ids (in ANY status) and this
+  // lane's own answered ids dropped, each survivor's pair resolved from the commit subjects.
+  if (!pair) {
+    census = await readBoardCensus(url, key);
+    const lane = await get(`runner_verdicts?select=backlog_id&reasoning=like.${encodeURIComponent(`${REGRADE_PREFIX}%`)}&limit=20000`);
+    const answered = new Set(regraded);
+    for (const row of lane) answered.add(String(row.backlog_id));
+    const walked = git(["log", "--format=%H %P %s", "HEAD"]);
+    assert.equal(walked.status, 0, "git log for the board leg must be readable in this clone");
+    const board = boardPair({ census, cohort, regraded: answered, log: parseLog(String(walked.stdout || "")) });
+    pair = board.pair;
+    leg = "the live board";
+    census = board.census;
+  }
+  if (!pair) return { pair: null, census };
+  const diff = git(["diff", "--name-only", pair.base_sha, pair.ship_sha]);
+  assert.equal(diff.status, 0, `git diff for ${pair.backlog_id}'s pair must be readable in this clone`);
+  const ownTests = String(diff.stdout || "").split("\n").map(s => s.trim())
+    .filter(f => f.startsWith("tests/regression/") && /\.m?js$/.test(f));
+  // THE PAIR IS THIS TICKET'S OWN SHIP, asserted rather than assumed: a board pair resolved off a
+  // peer's commit would grade somebody else's tree under this id, which is the one thing AGT-245's
+  // subject-based resolver exists to prevent.
+  const subject = git(["log", "-1", "--format=%s", pair.ship_sha]);
+  assert.equal(subject.status, 0, `the ship commit ${String(pair.ship_sha).slice(0, 8)} must be in this clone`);
+  assert.ok(isOwnSubject(String(subject.stdout || "").trim(), pair.version, pair.backlog_id),
+    `${pair.backlog_id}'s ship commit subject ${JSON.stringify(String(subject.stdout || "").trim().slice(0, 90))} is not its OWN ` +
+      `(${pair.version} + ${pair.backlog_id}) — a pair resolved off a peer's commit grades a tree this ticket never shipped`);
+  return { pair: { ...pair, ownTests }, census, leg };
+}
+
+// (j) THE BOARD LEG, BOTH DIRECTIONS, PURE (AGT-555). No network and no clone: the census, the frozen
+// file and the log are all hand-built, so the walk is asserted rather than whatever today's board
+// happens to hold. See the header's (j) for why each arm is the control of the other.
+export function theBoardLegPicksAndRefuses() {
+  // Three commits, newest first, exactly `git log --format=%H %P %s HEAD` order. The root line has an
+  // empty `%P`, which is the double space.
+  const log = parseLog([
+    "aaaa1111 bbbb2222 v9.9.9 AGT-900 the board pair's own ship",
+    "bbbb2222 cccc3333 v9.9.8 AGT-899 a peer's commit — the pair's base tree",
+    "cccc3333  v9.9.7 AGT-898 the root of this hand-built history",
+  ].join("\n"));
+  const match = (id, version) => ({
+    id: `verdict-${id}`, backlog_id: id, version, created_at: "2026-10-30T00:00:00Z",
+    verdict: "block", gate_build: "green", gate_hygiene: "green", gate_regression: "red",
+    graded_sha: "aaaa1111",
+  });
+  // AGT-900 pairs (its version+id is in the log); AGT-901 cannot (nothing in the log is its own), so
+  // it is the census's `board_unreachable` row. AGT-902/903 are delivered with NO verdict row at all.
+  const census = {
+    delivered: ["AGT-900", "AGT-901", "AGT-902", "AGT-903"],
+    matches: [match("AGT-900", "v9.9.9"), match("AGT-901", "v9.9.5")],
+    noVerdict: ["AGT-902", "AGT-903"],
+  };
+
+  // (i) THE PICK. An id the predicate matches, the file never held and this lane never answered.
+  const picked = boardPair({ census, cohort: { rows: [] }, regraded: new Set(), log });
+  assert.equal(picked.pair && picked.pair.backlog_id, "AGT-900",
+    "a predicate-matching, unanswered, pairable board row IS the pick — the whole of AGT-555 is that this row has a lane");
+  assert.equal(picked.pair.ship_sha, "aaaa1111", "the ship is its own commit, resolved from the subject");
+  assert.equal(picked.pair.base_sha, "bbbb2222", "and the base is that commit's first parent, never `graded_sha`");
+  assert.equal(picked.pair.status, "resolved");
+  assert.equal(picked.pair.verdict_id, "verdict-AGT-900",
+    "carrying the census row's own verdict id, which is what fence (b) re-checks the pick against");
+
+  // THE CONTROL, and it is the load-bearing half: the SAME census, with that id among the frozen
+  // file's REFUSED rows. A refusal slice 1 measured stays a refusal.
+  const refused = boardPair({
+    census, log, regraded: new Set(),
+    cohort: { rows: [{ backlog_id: "AGT-900", status: "refused", reason: "interleaved: feedface" }] },
+  });
+  assert.equal(refused.pair, null,
+    "a row the frozen file REFUSED must not be re-derived through the board leg — slice 1 measured that refusal against " +
+      "the git log, and a board pair for it would loosen an AGT-245 refusal nobody decided to loosen");
+  assert.equal(refused.census.answered_in_file, 1, "it is counted as answered, not as unreachable");
+
+  // The same drop for a row this lane has already graded: its ledger row IS the record, so a picker
+  // that ignored it would re-grade the same pair every cycle forever.
+  assert.equal(boardPair({ census, cohort: { rows: [] }, regraded: new Set(["AGT-900"]), log }).pair, null,
+    "a board row this lane already answered is dropped — the re-grade row is the record, and a second look at it " +
+      "would be the same pair graded every cycle from now on");
+
+  // (ii) THE DRAIN, AND ITS CENSUS. Every match answered or unpairable => no pair, and exit 3's
+  // payload has to SAY what it could not reach.
+  const drained = boardPair({
+    census, log, regraded: new Set(),
+    cohort: { rows: [{ backlog_id: "AGT-900", status: "refused", reason: "no-version" }] },
+  });
+  assert.equal(drained.pair, null, "with every match answered or unpairable the board is drained");
+  const payload = boardDrained({ skipped: [["AGT-100", "already-regraded"]], census: drained.census });
+  assert.equal(payload.kind, "board-drained",
+    "and exit 3 now says BOARD — `cohort-drained` was a fact about a file frozen on 2026-09-28 while 88 board rows matched its own predicate");
+  assert.equal(payload.exitCode, 3, "still a 3: the lane finished, it did not fail");
+  assert.equal(payload.ticket, null);
+  assert.equal(payload.recorded, false, "a drained walk records nothing");
+  assert.deepEqual(payload.census.board_unreachable, { "no-own-commit": 1 },
+    "the row that could not be paired is REPORTED with its reason class, never skipped silently — a DRAINED that counted " +
+      "only the pairable rows is the same false sentence AGT-555 was filed against");
+  assert.equal(payload.census.no_verdict_row, 2,
+    "and so are the delivered rows the predicate never saw at all, which are invisible to it by construction");
+  assert.equal(payload.census.delivered, 4, "the census names the whole delivered board");
+  assert.equal(payload.census.predicate_matches, 2, "and how many of it the predicate matched");
+  assert.equal(payload.census.answered_in_file, 1);
+  return { picked: picked.pair.backlog_id, census: payload.census };
 }
 
 // (h) THE PICKER WALKS IN ORDER (slice 5). Pure, no credentials, over the REAL frozen cohort -- the
@@ -445,13 +584,16 @@ async function run() {
   // ---- (h) the picker walks in order (slice 5) -------------------------------------------------
   const picker = thePickerWalksInOrder(cohort);
 
+  // ---- (j) the board leg, both directions, pure (AGT-555) --------------------------------------
+  const board = theBoardLegPicksAndRefuses();
+
   // ---- (d) the real trees, twice ----------------------------------------------------------------
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
-    notRun("AGT-245 (d)", "no SUPABASE_URL / SUPABASE_SERVICE_KEY, so the two live dry-runs on AGT-101's real trees " +
-      "(the sha probe that names the ship tree newly red, and the row count before/after) are unverified here");
-    return report(pair, null, terSpan, null, picker, null);
+    notRun("AGT-245 (d)", "no SUPABASE_URL / SUPABASE_SERVICE_KEY, so the two live dry-runs on the real trees of the pair " +
+      "`--next` picks (the sha probe that names the ship tree newly red, and the row count before/after) are unverified here");
+    return report(pair, null, terSpan, null, picker, null, board);
   }
   // The write's own consequence, asserted rather than discovered by the next slice: AGT-245's row IS
   // a newer verdict for AGT-101, so the cohort row that named the v7.0.563 block is stale for it and
@@ -465,8 +607,20 @@ async function run() {
   assert.notEqual(String(stalePay.prior_verdict_id), String(pair.verdict_id),
     "and the board's newest verdict for it is a DIFFERENT row — the one slice 4 wrote");
 
-  const probe = await firstCurrentPair(url, key, cohort);
-  assert.ok(probe, "no resolved cohort pair is still current on the board, so the live clause has no pair to grade — a re-freeze is due");
+  // THE PAIR `--next` WILL PICK, through the same two legs the script walks (AGT-555). Before this
+  // ticket the walk stopped at the frozen file, and this is the line that went red when the last of
+  // its 71 rows was answered: a lane that can only read a file frozen on 2026-09-28 has nothing to
+  // grade, while the board's own predicate matched 88 delivered rows.
+  const eligible = await firstEligiblePair(url, key, cohort);
+  const probe = eligible.pair;
+  if (!probe) {
+    // A genuinely drained BOARD is a true statement, not a broken clause -- so it is DECLARED rather
+    // than passed over or asserted away (`pattern:77`), with the census that backs it.
+    notRun("AGT-245 (d)", "neither the frozen cohort nor the live board holds a pairable row, so there is no pair for the two " +
+      `live dry-runs: ${JSON.stringify(eligible.census)}. Exit 3 \`board-drained\` is then the lane's correct answer, and the ` +
+      "payload shape for it is asserted in clause (j) without a board");
+    return report(pair, null, terSpan, null, picker, null, board);
+  }
   const baseShort = String(probe.base_sha).slice(0, 8);
   const shipShort = String(probe.ship_sha).slice(0, 8);
   const before = await countVerdicts(url, key, probe.backlog_id);
@@ -474,8 +628,12 @@ async function run() {
   // The override suite is an echo and takes no database load, so the line exists to be inherited
   // when a parent holds it (run-all.js sets `held`) and opted out of otherwise -- never jumped.
   const env = { ...process.env, DEEPBENCH_TEST_SLOT: process.env.DEEPBENCH_TEST_SLOT || "off" };
+  // `--next`, NOT `--ticket=` (AGT-555). The pair the lane runs every cycle now comes off the board
+  // as often as out of the file, and `--ticket=` is refused `not-in-cohort` for a board row by
+  // construction -- `pairFor` reads the frozen file and nothing else. Running the flag the tail
+  // actually runs is also the only way this clause sees the fall-through it exists to pin.
   const dryRun = suite => runScript(
-    [`--ticket=${probe.backlog_id}`, `--cycle-id=${CYCLE}`, "--dry-run", "--json", `--scratch=${scratch}`, `--suite=${suite}`],
+    ["--next", `--cycle-id=${CYCLE}`, "--dry-run", "--json", `--scratch=${scratch}`, `--suite=${suite}`],
     { env });
   let shaRun, constRun;
   try {
@@ -487,8 +645,13 @@ async function run() {
 
   const shaPay = payloadOf(shaRun);
   assert.equal(shaPay.kind, "regrade-delta",
-    `the sha probe on ${probe.backlog_id} came back ${JSON.stringify(shaPay.kind)} instead of a grade, so no leg ran: ` +
-      "the live clause's pair must satisfy every precondition `--ticket=` enforces, not just verdict currency");
+    `the sha probe came back ${JSON.stringify(shaPay.kind)} instead of a grade, so no leg ran: \`--next\` must reach a pair ` +
+      `through one of its two legs — \`board-drained\` here would mean the lane found nothing to grade while ` +
+      `${probe.backlog_id} was sitting on the board matching the predicate, which is AGT-555 itself`);
+  assert.equal(shaPay.ticket, probe.backlog_id,
+    `\`--next\` graded ${JSON.stringify(shaPay.ticket)} where this clause's own walk of the same two legs reached ` +
+      `${probe.backlog_id} — the script's pick and the file leg/board leg order must be the same walk, or the lane is ` +
+      "grading a pair nobody can predict");
   assert.deepEqual(shaPay.base_leg.fails, [`tree-${baseShort}.test.mjs`],
     `the BASE leg must have run in a worktree at ${baseShort} — a script that ran both legs on one tree names one sha twice`);
   assert.deepEqual(shaPay.ship_leg.fails, [`tree-${shipShort}.test.mjs`],
@@ -520,10 +683,11 @@ async function run() {
   // ---- (g) the row slice 4 wrote, and (i) the row slice 5's --next wrote ------------------------
   const ledger = await theRowIsInTheLedger(url, key);
   const second = await theSecondRowIsInTheLedger(url, key);
-  return report(pair, { before, after, sha: shaPay, constant: constPay, probe }, terSpan, ledger, picker, second);
+  return report(pair, { before, after, sha: shaPay, constant: constPay, probe, leg: eligible.leg, census: eligible.census },
+    terSpan, ledger, picker, second, board);
 }
 
-function report(pair, live, terSpan, ledger, picker, second) {
+function report(pair, live, terSpan, ledger, picker, second, board) {
   const head =
     `  [AGT-245] delta re-grade: a red only on the ship leg is newlyRed/block, the SAME red on both legs is ` +
     `standing/approve, and those identical captures flip to block when the file is in ownTests (the base tree ran a ` +
@@ -536,6 +700,11 @@ function report(pair, live, terSpan, ledger, picker, second) {
     (picker ? `\n       The picker walks ${picker.resolved} resolved rows in file order: with only ${TICKET} re-graded it ` +
       `picks ${picker.first} (the control), with both re-graded it steps to the next row, a superseded / not-delivered / ` +
       `deps-changed row is stepped OVER with its reason reported, and every row answered is pair:null (exit 3, drained).` : "") +
+    (board ? `\n       The board leg: a predicate-matching, unanswered, pairable board row is picked (${board.picked}, base from its own ` +
+      `commit's first parent), the SAME census returns nothing once the frozen file holds that id REFUSED or this lane has ` +
+      `already answered it, and a drained walk is exit 3 \`board-drained\` carrying its census — ` +
+      `delivered ${board.census.delivered}, ${board.census.predicate_matches} matched, ${board.census.answered_in_file} answered, ` +
+      `unreachable ${JSON.stringify(board.census.board_unreachable)}, ${board.census.no_verdict_row} with no verdict row.` : "") +
     (ledger ? `\n       Ledger: ${TICKET} carries ${ledger.rows} runner_verdicts rows; the newest (${ledger.id}, ${ledger.verdict}) ` +
       `opens with AGT-245's own re-grade prefix and is graded against the pair's ship tree.` : "") +
     (second ? `\n       Drained one more: ${NEXT_TICKET} carries ${second.rows} rows, the newest (${second.id}, ${second.verdict}) ` +
@@ -544,7 +713,7 @@ function report(pair, live, terSpan, ledger, picker, second) {
   if (!live) return console.log(head);
   const b = String(live.probe.base_sha).slice(0, 8);
   const s = String(live.probe.ship_sha).slice(0, 8);
-  console.log(`${head}\n       Live, ${live.probe.backlog_id} ${b} → ${s} (the first cohort pair still current on the board; ` +
+  console.log(`${head}\n       Live, \`--next\` picked ${live.probe.backlog_id} ${b} → ${s} off ${live.leg} (` +
     `${TICKET} itself now refuses \`superseded\`, which is AGT-245's own row): the sha probe named tree-${b}.test.mjs on the base leg and ` +
     `tree-${s}.test.mjs on the ship leg → newlyRed [${live.sha.newlyRed.join(", ")}], standing [], block, recorded:false; ` +
     `the constant probe → standing [${live.constant.standing.join(", ")}], approve, recorded:false. ` +

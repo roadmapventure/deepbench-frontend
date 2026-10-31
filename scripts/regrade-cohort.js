@@ -239,10 +239,23 @@ function gitHead() {
   return r.stdout.trim();
 }
 
-// The cohort's membership query, run once. Latest verdict per delivered ticket, then the
+// THE WHOLE BOARD, MEASURED ONCE, AND THE PREDICATE HAS ONE HOME (AGT-555, `pattern:15`). The two
+// GETs below are the cohort's membership query -- latest verdict per delivered ticket, then the
 // four-column predicate. Ordering ASC and letting the last row win is the "latest" rule, applied in
 // one place so the frozen file and any later audit of it agree on what "latest" meant.
-export async function readCohortVerdicts(base, key) {
+//
+// IT RETURNS THE ROWS THE PREDICATE LEFT OUT, NOT ONLY THE ONES IT MATCHED. `--next`'s board leg
+// (scripts/regrade-delivered.js) has to be able to say DRAINED about the BOARD rather than about the
+// frozen file, and "the board is drained" is only an honest sentence if the rows it could not reach
+// are counted rather than dropped: `delivered` is every delivered id, `matches` the predicate's
+// rows, and `noVerdict` the delivered ids with NO `runner_verdicts` row at all -- invisible to the
+// predicate (24 of 172 on 2026-10-31) and therefore the exact population a silent skip would hide.
+//
+// `matches` keeps the census's own order: one row per delivered id, positioned by that id's FIRST
+// verdict row in the created_at ASC read. Reproducible from the same two reads by construction
+// (`pattern:3`), which is what lets the board leg's pick be "the first survivor" rather than an
+// arbitrary one.
+export async function readBoardCensus(base, key) {
   const delivered = await rest(base, key, "backlog_items?select=backlog_id&status=eq.delivered&limit=5000");
   const ids = new Set(delivered.map(d => d.backlog_id));
   const verdicts = await rest(base, key,
@@ -250,8 +263,16 @@ export async function readCohortVerdicts(base, key) {
     "&order=created_at.asc&limit=20000");
   const latest = new Map();
   for (const v of verdicts) if (ids.has(v.backlog_id)) latest.set(v.backlog_id, v);
-  return [...latest.values()].filter(v =>
+  const matches = [...latest.values()].filter(v =>
     v.verdict === "block" && v.gate_build === "green" && v.gate_hygiene === "green" && v.gate_regression === "red");
+  return { delivered: [...ids], matches, noVerdict: [...ids].filter(id => !latest.has(id)) };
+}
+
+// The cohort's membership query, as `freeze()` has always consumed it: the predicate's rows alone.
+// ONE home for the four columns -- a second copy of them here is how the frozen file and the board
+// leg would come to disagree about what the cohort IS.
+export async function readCohortVerdicts(base, key) {
+  return (await readBoardCensus(base, key)).matches;
 }
 
 function short(sha) { return sha ? String(sha).slice(0, 8) : "-"; }

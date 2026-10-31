@@ -59,12 +59,28 @@
 // `--ticket` -- the same argument answered twice -- and the pick then runs this file's existing path
 // unchanged.
 //
+// `--next` HAS TWO LEGS SINCE AGT-555, AND EXIT 3 IS A FACT ABOUT THE BOARD, NOT ABOUT A FILE. The
+// frozen cohort was measured on 2026-09-28 and every one of its 71 rows is now answered or refused,
+// so the file leg alone could only ever return exit 3 -- while 88 delivered tickets satisfied the
+// file's OWN stored predicate on 2026-10-31 and 40 of them had no grading lane at all. So when the
+// file leg finds nothing, the walk falls through to a BOARD leg: re-measure the predicate
+// (`readBoardCensus`, which is where those four columns live), drop every id the frozen file holds in
+// ANY status -- resolved AND refused, so nothing is re-graded and no AGT-245 refusal is loosened --
+// drop every id this lane has already answered, and resolve each survivor's pair from the commit
+// SUBJECTS exactly as slice 1 did, keeping its refusal reasons (`no-version`, `no-own-commit`,
+// `interleaved: <shas>`). Exit 3 then fires only when BOTH legs are empty, and it carries a census
+// naming what could not be reached rather than implying a clean board: 33 `no-own-commit` (this
+// clone is shallow) and 24 delivered rows with no verdict row at all, on 2026-10-31. A DRAINED that
+// hid those would be the same false sentence AGT-555 was filed against.
+//
 // Exit codes, the verifier's table exactly, plus slice 5's 3:
 //   0  approve -- recorded, with its ship decision written (or `recorded:false` under --dry-run).
 //   1  a VERDICT of block, or a refusal that leaves the prior block standing (`not-regression-only`).
 //   2  THE RE-GRADE COULD NOT RUN -- and it is NOT a verdict. No row is ever written on a 2.
-//   3  `--next` only: THE COHORT IS DRAINED. Every resolved row is answered or skipped for a named
-//      reason. Nothing recorded, and NOT a failure -- the lane finished.
+//   3  `--next` only: THE BOARD IS DRAINED (AGT-555; `kind: "board-drained"`). The frozen file holds
+//      no eligible row AND no predicate-matching board row outside it can be paired. Nothing
+//      recorded, and NOT a failure -- the lane finished. The payload's `census` says what the walk
+//      saw, including the rows it could not reach.
 
 import fs from "fs";
 import os from "os";
@@ -72,7 +88,7 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
-import { COHORT_PATH } from "./regrade-cohort.js";
+import { COHORT_PATH, readBoardCensus, parseLog, ownCommitRange, cohortRow } from "./regrade-cohort.js";
 import { withTestSlot } from "./test-slot.js";
 import {
   gateStatus, verdictFor, regressionDelta, failingTestsFrom, notRunTestsFrom,
@@ -145,6 +161,75 @@ export function nextPair(cohort, { regraded, latestById, statusById, depsClean }
     return { pair: row, skipped };
   }
   return { pair: null, skipped };
+}
+
+// THE BOARD LEG (AGT-555). Pure: the census, the frozen file, this lane's answered ids and ONE git
+// log walk go in; one pair and the census that explains the walk come out. It runs only after
+// `nextPair` returned nothing, and it is what makes exit 3 a sentence about the BOARD.
+//
+// WHY THE FROZEN FILE IS DROPPED IN *ANY* STATUS. A `resolved` row the file already answered must not
+// be re-graded, and a `refused` row must not be quietly re-admitted through the board: slice 1
+// measured `no-version` / `no-own-commit` / `interleaved` against the git log and the ticket says an
+// unresolvable ship is refused, never approximated. A board leg that re-derived a pair for a row the
+// file refused would be that refusal loosened without anybody deciding to loosen it.
+//
+// WHY THE PAIR IS RESOLVED THE SAME WAY, FROM THE SAME FUNCTIONS. `cohortRow`/`ownCommitRange` are
+// slice 1's own resolver imported, not a second opinion formed here -- so a board pair is a pair in
+// exactly the sense the frozen file's rows are, carries the same `verdict_id`/`version` evidence, and
+// refuses under the same named reasons (`pattern:15`: the predicate and the resolver each keep one
+// home). `graded_sha` is evidence here too, never an input.
+//
+// THE CENSUS IS THE HONEST HALF. `board_unreachable` counts, per reason, the predicate rows that
+// could not be paired, and `no_verdict_row` the delivered ids the predicate never saw -- reported
+// rather than skipped silently. The counts are COMPLETE only on a drained walk, which is the only
+// place they are emitted: once a pair is found the walk stops, because the rows below it have not
+// been looked at and a count that implied otherwise would be a measurement nobody took.
+export function boardPair({ census, cohort, regraded, log } = {}) {
+  const c = census || {};
+  const matches = Array.isArray(c.matches) ? c.matches : [];
+  const rows = cohort && Array.isArray(cohort.rows) ? cohort.rows : [];
+  const inFile = new Set(rows.map(r => String(r && r.backlog_id)));
+  const done = regraded instanceof Set ? regraded : new Set(Array.isArray(regraded) ? regraded : []);
+  const walk = Array.isArray(log) ? log : [];
+  const historyShas = new Set(walk.map(e => e && e.sha).filter(Boolean));
+  const unreachable = {};
+  let answered = 0;
+  let pair = null;
+  for (const verdict of matches) {
+    const id = String(verdict && verdict.backlog_id);
+    if (inFile.has(id) || done.has(id)) { answered++; continue; }
+    const row = cohortRow({
+      verdict,
+      range: ownCommitRange({ log: walk, version: verdict && verdict.version, backlogId: id }),
+      historyShas,
+    });
+    if (row.status === "resolved") { pair = row; break; }
+    // `interleaved: <shas>` carries its shas in the reason; the census counts the CLASS, so the
+    // number reads as "33 could not be paired for want of an own commit" rather than 33 singletons.
+    const reason = String(row.reason || "").split(":")[0].trim() || "refused-without-reason";
+    unreachable[reason] = (unreachable[reason] || 0) + 1;
+  }
+  return {
+    pair,
+    census: {
+      delivered: Array.isArray(c.delivered) ? c.delivered.length : 0,
+      predicate_matches: matches.length,
+      answered_in_file: answered,
+      board_unreachable: unreachable,
+      no_verdict_row: Array.isArray(c.noVerdict) ? c.noVerdict.length : 0,
+    },
+  };
+}
+
+// Exit 3's payload, in one place so the guard can assert the shape without a board (AGT-555). `kind`
+// is `board-drained` and not `cohort-drained` because the sentence it stands for changed: the frozen
+// file being empty is no longer the end of the walk.
+export function boardDrained({ skipped, census } = {}) {
+  return {
+    ok: false, exitCode: 3, kind: "board-drained", ticket: null, recorded: false, next: true,
+    skipped: Array.isArray(skipped) ? skipped : [],
+    census: census || null,
+  };
 }
 
 // One leg's capture, read three ways. `ran` is the question the exit code CANNOT answer: a suite
@@ -311,14 +396,22 @@ export async function main(argv, { env = process.env, out = null } = {}) {
     code: 2, json, payload: { ok: false, exitCode: 2, kind, ticket: ticket || null, recorded: false, ...extra },
     prose: `regrade-delivered: ${prose}\n  Exiting 2 — the re-grade COULD NOT RUN. This is NOT a verdict; the prior block stands and nothing was recorded.`,
   });
-  // EXIT 3 IS NOT EXIT 2. A drained cohort is the lane finishing its work, not a run that could not
-  // happen: every resolved row has either been answered or been skipped for a named reason, and a
+  // EXIT 3 IS NOT EXIT 2. A drained board is the lane finishing its work, not a run that could not
+  // happen: every eligible row has either been answered or been skipped for a named reason, and a
   // tail that read that as `could not run` would report a failure every cycle from here on.
-  const drained = skipped => emit({
+  //
+  // AND IT IS THE *BOARD*, NOT THE FILE (AGT-555). The census goes out with it, naming what the walk
+  // could not reach, so DRAINED can be checked rather than believed.
+  const drained = (skipped, census) => emit({
     code: 3, json,
-    payload: { ok: false, exitCode: 3, kind: "cohort-drained", ticket: null, recorded: false, next: true, skipped },
-    prose: `regrade-delivered: the frozen cohort is DRAINED — no resolved row is still eligible ` +
-      `(${skipped.length} skipped: ${skipped.map(([id, why]) => `${id} ${why}`).join(", ") || "none"}).\n` +
+    payload: boardDrained({ skipped, census }),
+    prose: `regrade-delivered: the BOARD is DRAINED — neither the frozen cohort nor the live predicate holds a pairable ` +
+      `row (${skipped.length} cohort rows skipped: ${skipped.map(([id, why]) => `${id} ${why}`).join(", ") || "none"}).\n` +
+      (census
+        ? `  Board census: ${census.delivered} delivered, ${census.predicate_matches} match the predicate, ` +
+          `${census.answered_in_file} already answered, ${census.no_verdict_row} have NO verdict row at all, and ` +
+          `${Object.entries(census.board_unreachable).map(([why, n]) => `${n} ${why}`).join(", ") || "none"} could not be paired.\n`
+        : "") +
       `  Exiting 3 — nothing left to grade and nothing recorded. This is the lane finishing, not a failure.`,
   });
 
@@ -393,9 +486,43 @@ export async function main(argv, { env = process.env, out = null } = {}) {
     say(`regrade-delivered: --next walked ${resolved.length} resolved rows, skipped ${skipped.length}` +
       `${skipped.length ? ` (${skipped.map(([id, why]) => `${id} ${why}`).join(", ")})` : ""}` +
       ` and picked ${picked.pair ? picked.pair.backlog_id : "nothing"}.`);
-    if (!picked.pair) return drained(skipped);
-    pair = picked.pair;
-    ticket = String(pair.backlog_id);
+    if (picked.pair) {
+      pair = picked.pair;
+      ticket = String(pair.backlog_id);
+    } else {
+      // ---- THE BOARD LEG (AGT-555). The file is exhausted; the board is not. --------------------
+      // Three reads and ONE log walk, then slice 1's own resolver. The `like` read is what "this lane
+      // has already answered this id" means board-wide: the ledger row IS the record (`pattern:16`),
+      // and reading it by prefix rather than trusting the latest row keeps a board pair answered even
+      // after an ordinary verdict lands on top of the re-grade.
+      let census;
+      try {
+        census = await readBoardCensus(supabaseUrl, supabaseKey);
+      } catch (e) {
+        return cannot("board-unreadable",
+          `the live predicate could not be re-measured for the board leg (${e.message}). The frozen file is exhausted, so ` +
+          `without the board there is nothing to walk — and reporting DRAINED here would be a claim about a board nobody read.`,
+          { next: true });
+      }
+      const lane = await rest(supabaseUrl, supabaseKey,
+        `runner_verdicts?select=backlog_id&reasoning=like.${encodeURIComponent(`${REGRADE_PREFIX}%`)}&limit=20000`);
+      if (lane.error) return cannot("verdict-unreadable", `this lane's own rows could not be read for the board leg (${lane.error}).`, { next: true });
+      const answered = new Set(regraded);
+      for (const row of (Array.isArray(lane.rows) ? lane.rows : [])) answered.add(String(row.backlog_id));
+      const walked = git(repo, ["log", "--format=%H %P %s", "HEAD"]);
+      if (walked.status !== 0) {
+        return cannot("git-unreadable", `git log for the board leg failed: ${walked.err || `exit ${walked.status}`}.`, { next: true });
+      }
+      const boardLeg = boardPair({ census, cohort, regraded: answered, log: parseLog(walked.out) });
+      const c = boardLeg.census;
+      say(`regrade-delivered: --next board leg — ${c.delivered} delivered, ${c.predicate_matches} match the predicate, ` +
+        `${c.answered_in_file} already answered, ${c.no_verdict_row} with no verdict row, unreachable ` +
+        `{${Object.entries(c.board_unreachable).map(([why, n]) => `${why} ${n}`).join(", ") || "none"}}` +
+        ` and picked ${boardLeg.pair ? boardLeg.pair.backlog_id : "nothing"}.`);
+      if (!boardLeg.pair) return drained(skipped, c);
+      pair = boardLeg.pair;
+      ticket = String(pair.backlog_id);
+    }
   } else {
     pair = pairFor(cohort, ticket);
     if (pair.refuse) {
