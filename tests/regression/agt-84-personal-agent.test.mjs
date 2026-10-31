@@ -1,3 +1,13 @@
+// DeepBench v7.0.932 | tests/regression/agt-84-personal-agent.test.mjs | AGT-84, extended by AGT-569
+//
+// AGT-569 extends this file rather than opening a parallel one (pattern:17), because the change is
+// one rewritten helper in the script these parts already pin: rest().get() sent no Range and no
+// count request, so PostgREST's 1,000-row ceiling truncated every read and the prompt saw only the
+// OLDEST 1,000 of 2,017 career records. That truncation is also why part (e)'s AGT-268 arm was red
+// on origin/dev -- the posting it writes is the newest row and landed past the cut, so write_backs
+// went 0 -> 0. New part (k) is marked AGT-569 below; a red the fix itself must clear is fixed inside
+// the feature (pattern:124).
+//
 // DeepBench v7.0.697 | tests/regression/agt-84-personal-agent.test.mjs | AGT-84, extended by AGT-154
 // and AGT-106
 //
@@ -49,6 +59,13 @@
 //       verdict/act enum strings, two inline Knowledge rows and the seven appended must_not rules,
 //       and names no agent id but jerry. Controls: a spliced agent id is caught, and dropping one
 //       must_not string is caught.
+//   (k) AGT-569 -- STATIC: rest().get() declares PAGE_ROWS = 1000, sends the Range window with
+//       `Prefer: 'count=exact'`, and throws on a short read; all 7 `&order=created_at.asc` clauses
+//       carry the `,id.asc` page-boundary tiebreak and both posting reads are ordered. Controls: a
+//       copy with no exact-count request and a copy with no Range header must each fail.
+//       LIVE: the store's content-range total exceeds one page (cause control), and a growth-review
+//       render loads > 1,041 records -- unreachable by one page plus the 41 corrections -- and its
+//       prompt carries the NEWEST review row by id. Read-only; the temp prompt file is deleted.
 //   (e) LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY, else NOT RUN) -- --render for the resume review
 //       reports >= 30 records, > 4000 prompt bytes and the judgment lane's model; --write inserts
 //       exactly 2 rows (the item + the run log), read back by id, deleted after; a refused answer
@@ -688,6 +705,125 @@ async function partE() {
   return results;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Part (k) -- AGT-569: every record read is PAGED, and the prompt carries the rows past row 1,000
+//
+// STATIC pins the pager in rest().get() -- PAGE_ROWS, the Range window, the exact count request and
+// the short-read error -- plus the page-boundary tiebreak on every order= that can page. LIVE is the
+// proof: the shape cannot show the prompt stopped being truncated, only a render can (pattern:73).
+// The arithmetic is the discriminator -- one page holds <= 1,000 records and corrections add 41, so
+// records_loaded could never pass 1,041 unpaged; it reported 754 on origin/dev.
+// ---------------------------------------------------------------------------------------------
+const countOf = (src, s) => src.split(s).length - 1;
+const PAGER_RANGE = "Range: `${from}-${from + PAGE_ROWS - 1}`";
+const PAGER_COUNT = "Prefer: 'count=exact'";
+const SHORT_READ = "a short read is an error, never a smaller prompt";
+
+function pagesEveryRead(src) {
+  const code = codeLines(src).join("\n");
+  return code.includes("const PAGE_ROWS = 1000;")
+    && code.includes(PAGER_RANGE)
+    && code.includes(PAGER_COUNT)
+    && code.includes(SHORT_READ);
+}
+
+async function partK() {
+  const results = [];
+  const src = read(SCRIPT_REL);
+
+  assert.ok(pagesEveryRead(src),
+    `${SCRIPT_REL} does not page its reads: it must declare \`const PAGE_ROWS = 1000;\` and send ` +
+    `\`${PAGER_RANGE}\` with \`${PAGER_COUNT}\`, and throw "${SHORT_READ}" on a short read`);
+  results.push("get-pages-with-range-and-exact-count");
+
+  const tie = countOf(src, "&order=created_at.asc,id.asc");
+  assert.strictEqual(tie, 7, `${SCRIPT_REL} has ${tie} \`&order=created_at.asc,id.asc\` clauses, expected 7`);
+  const bare = countOf(src, "&order=created_at.asc") - tie;
+  assert.strictEqual(bare, 0,
+    `${SCRIPT_REL} still has ${bare} \`&order=created_at.asc\` clauses with no \`,id.asc\` tiebreak -- ` +
+    `a created_at tie can put the same row on both sides of a page boundary, so a row is skipped`);
+  results.push("seven-ordered-reads-carry-the-id-tiebreak");
+
+  const postings = countOf(src, "career_records?kind=eq.posting&select=data&order=id.asc");
+  assert.strictEqual(postings, 2,
+    `${SCRIPT_REL} has ${postings} ordered \`career_records?kind=eq.posting&select=data\` reads, expected 2 -- ` +
+    `at 1,062 rows they page now, and a multi-page read with no order= throws`);
+  results.push("both-posting-reads-are-ordered");
+
+  // CONTROL 1 -- without the exact-count request the pager cannot know the total, so it cannot
+  // detect a short read. Splice asserted first, exactly as part (a) does.
+  const noCount = src.replace(`, ${PAGER_COUNT}`, "");
+  assert.notStrictEqual(noCount, src, `control setup failed: \`, ${PAGER_COUNT}\` not found verbatim -- fix the mutation string`);
+  assert.ok(!pagesEveryRead(noCount), "control: a copy with no `Prefer: 'count=exact'` still passes the pager check -- it does not discriminate");
+  results.push("control-copy-without-exact-count-fails");
+
+  // CONTROL 2 -- without the Range window every page is the same first 1,000 rows.
+  const noRange = src.replace(`${PAGER_RANGE}, `, "");
+  assert.notStrictEqual(noRange, src, `control setup failed: \`${PAGER_RANGE}\` not found verbatim -- fix the mutation string`);
+  assert.ok(!pagesEveryRead(noRange), "control: a copy with no `Range:` header still passes the pager check -- it does not discriminate");
+  results.push("control-copy-without-range-header-fails");
+
+  // ------------------------------------------------------------------------------------------- LIVE
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) {
+    notRun("the AGT-569 live arm (the paged growth-review render reaches past row 1,000)",
+      "SUPABASE_URL / SUPABASE_SERVICE_KEY absent. Measured live 2026-10-31 on origin/dev: the " +
+      "career read returned HTTP 206 content-range 0-999/2017 unpaged, and the growth-review render " +
+      "reported records_loaded 754 / prompt_bytes 1283258 -- 1,017 rows and 3 of the 6 review rows " +
+      "never reached the prompt. One page holds at most 1,000 records plus 41 corrections, so " +
+      "records_loaded can never pass 1,041 unpaged; the post-fix floor is ~1,775.");
+    return results;
+  }
+  const base = url.replace(/\/+$/, "");
+  const hdr = { apikey: key, Authorization: `Bearer ${key}` };
+  const env = { SUPABASE_URL: url, SUPABASE_SERVICE_KEY: key };
+
+  // (i) CAUSE CONTROL -- the store really is bigger than one page. If it were not, a render passing
+  // the floor below would prove nothing about paging.
+  const THE_QUERY = "career_records?kind=in.(log,market_requirement,resume_fact,evidence,review,posting)" +
+    "&order=created_at.asc,id.asc&select=id";
+  const head = await fetch(`${base}/rest/v1/${THE_QUERY}`, {
+    headers: { ...hdr, "Range-Unit": "items", Range: "0-0", Prefer: "count=exact" },
+  });
+  if (!head.ok) assert.fail(`the cause control GET returned HTTP ${head.status} ${await head.text()}`);
+  const cr = String(head.headers.get("content-range") || "");
+  const total = Number(cr.split("/")[1]);
+  console.log(`  [AGT-569] cause control: content-range ${cr} -- ${total} career records in the store`);
+  assert.ok(Number.isFinite(total) && total > 1000,
+    `the career store holds ${total} rows (content-range "${cr}") -- at or under one page there is ` +
+    `nothing for paging to recover, so this test cannot discriminate`);
+  results.push("cause-control-store-exceeds-one-page");
+
+  // (ii) the newest review row -- by construction it sits past the unpaged cut.
+  const newest = await fetch(`${base}/rest/v1/career_records?kind=eq.review&select=id,created_at&order=created_at.desc&limit=1`, { headers: hdr });
+  if (!newest.ok) assert.fail(`the newest-review GET returned HTTP ${newest.status} ${await newest.text()}`);
+  const [review] = await newest.json();
+  assert.ok(review?.id, "career_records holds no `review` row -- nothing to pin the far end of the read with");
+  console.log(`  [AGT-569] newest review row: ${review.id} created_at=${review.created_at}`);
+
+  // (iii) the render. Read-only: --render never writes a row and never sends a prompt.
+  const file = path.join(os.tmpdir(), `agt-569-${RUN}-growth-review.md`);
+  try {
+    const r = runScript(["--render", "--agent=jerry", "--capability=career-growth-review", `--out=${file}`, "--json"], env);
+    assert.strictEqual(r.status, 0, `--render for career-growth-review exited ${r.status}: ${r.stderr.trim()}`);
+    const out = JSON.parse(r.stdout.trim());
+    console.log(`  [AGT-569] growth-review render: records_loaded=${out.records_loaded} prompt_bytes=${out.prompt_bytes} (was 754 / 1283258 unpaged)`);
+    assert.ok(out.records_loaded > 1041,
+      `the growth-review render loaded ${out.records_loaded} records -- one page is at most 1,000 plus ` +
+      `41 correction rows, so anything at or under 1,041 means the read is still truncated`);
+    const md = fs.readFileSync(file, "utf8");
+    assert.ok(md.includes(review.id),
+      `the growth-review prompt does not carry the newest review record ${review.id} -- the read is ` +
+      `still stopping before the end of the store`);
+    console.log(`  [AGT-569] prompt carries the newest review record ${review.id}`);
+    results.push("paged-render-passes-the-one-page-ceiling", "paged-render-carries-the-newest-review-row");
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+  return results;
+}
+
 async function run() {
   const results = [];
   results.push(...partA());
@@ -698,6 +834,7 @@ async function run() {
   results.push(...(await partG()));
   results.push(...(await partH()));
   results.push(...(await partI()));
+  results.push(...(await partK()));
   results.push(...(await partE()));
   return results;
 }

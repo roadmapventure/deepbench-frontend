@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.932 | scripts/personal-agent.js | AGT-569 -- paged record reads. rest().get() was
+// a single unpaged fetch, so PostgREST's 1,000-row default ceiling silently truncated every read:
+// the career store holds 2,017 rows and the prompt only ever saw the oldest 1,000 (a short read,
+// never an error). get() now walks Range pages to the content-range total and THROWS on a short
+// read, on a missing total, and on a multi-page read with no order= (a page boundary could skip a
+// row) -- the pager lives in get(), not readRecords(), so one change fixes every reader.
 // DeepBench v7.0.893 | scripts/personal-agent.js | AGT-543 -- the humorist's call path. A second
 // record store, keyed by capability slug exactly as the career one (pattern:13, pattern:17): STORES
 // pairs each read map with its table, so HUMOR_READ_MAP (humor-weekly-draft, humor-topic-scout) reads
@@ -145,6 +151,11 @@ import { readMail } from '../lib/imap-readonly.js';
 
 // Same tenant agent-prompt.js measured: every agent_configs / assignment row carries 'global'.
 const TENANT = 'global';
+
+// One Range page. PostgREST caps an unbounded GET at 1,000 rows, so a read past that needs pages.
+// scripts/market-agent.js carries the identical unpaged get() (latent at 406 rows) and would share
+// this constant; that is a 4th file, over this session's cap, and is FILED, not done here.
+const PAGE_ROWS = 1000;
 
 // The eleven kinds career_records_kind_check allows (measured 2026-09-23 from pg_constraint).
 export const KINDS = [
@@ -608,10 +619,23 @@ function rest() {
   const root = String(process.env.SUPABASE_URL).replace(/\/+$/, '');
   const key = process.env.SUPABASE_SERVICE_KEY;
   const headers = { apikey: key, Authorization: `Bearer ${key}` };
-  async function get(pathAndQuery) {
-    const r = await fetch(`${root}/rest/v1/${pathAndQuery}`, { headers });
-    if (!r.ok) throw new Error(`GET ${pathAndQuery.split('?')[0]} returned HTTP ${r.status} ${await r.text()}`);
-    return r.json();
+  async function get(pq) {
+    const n = pq.split('?')[0], short = 'a short read is an error, never a smaller prompt';
+    const one = /[?&]limit=/.test(pq); // a caller with its own ceiling gets one page
+    const out = []; let total = 0;
+    for (let from = 0; ; from += PAGE_ROWS) {
+      const r = await fetch(`${root}/rest/v1/${pq}`, { headers: { ...headers, 'Range-Unit': 'items', Range: `${from}-${from + PAGE_ROWS - 1}`, Prefer: 'count=exact' } });
+      if (!r.ok) throw new Error(`GET ${n} returned HTTP ${r.status} ${await r.text()}`);
+      const rows = await r.json();
+      total = Number(String(r.headers.get('content-range') || '').split('/')[1]);
+      out.push(...rows);
+      if (one) return out;
+      if (!Number.isFinite(total)) throw new Error(`GET ${n} sent no content-range total -- ${short}`);
+      if (rows.length < PAGE_ROWS) break;
+      if (!/[?&]order=/.test(pq)) throw new Error(`GET ${n} has ${total} rows and no order= -- a page boundary may skip a row`);
+    }
+    if (out.length !== total) throw new Error(`GET ${n} returned ${out.length} of ${total} rows -- ${short}`);
+    return out;
   }
   async function insert(table, rows) {
     const r = await fetch(`${root}/rest/v1/${table}`, {
@@ -638,7 +662,7 @@ function rest() {
 async function readRecords(db, capability, target) {
   const store = storeFor(capability);
   const kinds = store.map[capability];
-  let q = `${store.table}?kind=in.(${kinds.join(',')})&select=${store.fields}&order=created_at.asc`;
+  let q = `${store.table}?kind=in.(${kinds.join(',')})&select=${store.fields}&order=created_at.asc,id.asc`;
   // A record with no target_row applies to every target; --target narrows the targeted ones. The
   // humor store has no target_row (AGT-543), so --target never narrows it.
   if (target && store.targeted) q += `&or=(target_row.is.null,target_row.eq.${encodeURIComponent(target)})`;
@@ -663,11 +687,11 @@ async function readRecords(db, capability, target) {
   if (store.allCorrections) {
     // AGT-543: every humor correction applies to every humor run -- a rule the principal stated is
     // never scoped to one capability.
-    const all = await db.get(`${store.table}?kind=eq.correction&select=${store.fields}&order=created_at.asc`);
+    const all = await db.get(`${store.table}?kind=eq.correction&select=${store.fields}&order=created_at.asc,id.asc`);
     return { records, corrections: all.map(r => ({ id: r.id, title: r.title, body: r.body, data: r.data, created_at: r.created_at })) };
   }
   const corrections = (await db.get(
-    `career_records?kind=eq.correction&data->>capability=eq.${encodeURIComponent(capability)}&select=${RECORD_FIELDS}&order=created_at.asc`,
+    `career_records?kind=eq.correction&data->>capability=eq.${encodeURIComponent(capability)}&select=${RECORD_FIELDS}&order=created_at.asc,id.asc`,
   )).map(r => ({ id: r.id, title: r.title, body: r.body, data: r.data, target_row: r.target_row }));
   return { records, corrections };
 }
@@ -716,7 +740,7 @@ async function readRecentMarket(db) {
   // Heads, not bodies (John 2026-10-23): titles plus a 240-character head keep the humorist's own records the larger share of his prompt.
   const __head = (t, n = 240) => (t == null ? null : String(t).replace(/\s+/g, ' ').slice(0, n));
   const rows = await db.get(`market_records?kind=in.(release_note,feature_benefit,message)&or=(status.is.null,status.neq.retired)` +
-    `&created_at=gte.${agoIso()}&select=id,kind,title,body,data,created_at&order=created_at.asc`);
+    `&created_at=gte.${agoIso()}&select=id,kind,title,body,data,created_at&order=created_at.asc,id.asc`);
   return rows.map(r => ({ id: r.id, kind: r.kind, title: r.title, head: __head(r.body || (r.data && (r.data.headline || r.data.can_do || r.data.summary)) || ''), created_at: r.created_at }));
 }
 
@@ -724,11 +748,11 @@ async function readRecentMarket(db) {
 // stay in its own lane), plus market requirements and weekly reviews.
 async function readRecentCareer(db) {
   const since = agoIso();
-  const postings = await db.get(`career_records?kind=eq.posting&created_at=gte.${since}&select=id,kind,title&order=created_at.asc`);
+  const postings = await db.get(`career_records?kind=eq.posting&created_at=gte.${since}&select=id,kind,title&order=created_at.asc,id.asc`);
   // Heads, not bodies (John 2026-10-23): titles plus a 240-character head keep the humorist's own records the larger share of his prompt.
   const __head = (t, n = 240) => (t == null ? null : String(t).replace(/\s+/g, ' ').slice(0, n));
   const rest_ = (await db.get(`career_records?kind=in.(market_requirement,review)&created_at=gte.${since}` +
-    '&select=id,kind,title,body,data&order=created_at.asc')).map(r => ({ id: r.id, kind: r.kind, title: r.title, head: __head(r.body || (r.data && r.data.summary) || '') }));
+    '&select=id,kind,title,body,data&order=created_at.asc,id.asc')).map(r => ({ id: r.id, kind: r.kind, title: r.title, head: __head(r.body || (r.data && r.data.summary) || '') }));
   return [...postings.slice(-40), ...rest_];
 }
 
@@ -746,7 +770,7 @@ async function readPersonalSources(db, args) {
   const kinds = [...new Set(grants.map(g => g.kind).filter(Boolean))];
   if (!kinds.length) return null;
   return db.get(`personal_sources?kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
-    '&select=id,kind,title,body,data,origin,voice,created_at&order=created_at.asc');
+    '&select=id,kind,title,body,data,origin,voice,created_at&order=created_at.asc,id.asc');
 }
 
 const HUMOR_WEEK_KINDS = ['ship', 'john-ruling', 'directive', 'ticket-status', 'removal-proposal'];
@@ -957,7 +981,7 @@ async function fetchPostings() {
   const db = rest();
   const companies = await db.get('career_records?kind=eq.watch_company&select=id,title,data');
   const targets = await db.get('career_records?kind=eq.target&select=data');
-  const stored = await db.get('career_records?kind=eq.posting&select=data');
+  const stored = await db.get('career_records?kind=eq.posting&select=data&order=id.asc');
   const titles = targets.flatMap(t => (Array.isArray(t.data?.titles) ? t.data.titles : []));
   const existing = stored.map(p => p.data?.url).filter(Boolean);
 
@@ -1115,7 +1139,7 @@ async function fetchLinkedinAlerts(args) {
   const sender = args.from || watermark?.sender || LINKEDIN_ALERT_SENDER;
 
   const knownJobIds = new Set();
-  for (const p of await db.get('career_records?kind=eq.posting&select=data')) {
+  for (const p of await db.get('career_records?kind=eq.posting&select=data&order=id.asc')) {
     if (p.data?.linkedin_job_id) knownJobIds.add(String(p.data.linkedin_job_id));
     const m = JOB_VIEW.exec(String(p.data?.url || ''));
     if (m) knownJobIds.add(m[1]);
