@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// DeepBench v7.0.928 | scripts/run-project.js | AGT-532 -- AN UNDECIDED GATE CARD IS REPORTED, AND A
+// REFUSAL CARRIES THE REASON. Pass one reads the undecided `gated_before_build` cards from
+// `runner_items` beside the queue -- `readInstruments()` never read that table -- carries them into
+// the state and prints one line per card filed by an EARLIER cycle, so a ticket held out of the queue
+// by a card nobody ruled is visible instead of silently absent. Pass two, when the answer names an id
+// `prime_directive_queue()` did not return, asks `public.pick_exclusions()` why that id is off the
+// queue and ADDS the reason as its own line: the pinned refusal text stays byte-identical
+// (agt-232 (D), ses-378) and the manager stops being told only that the board did not list it.
+// Guard: tests/regression/agt-532-undecided-card-reported.test.mjs.
+//
 // DeepBench v7.0.667 | scripts/run-project.js | AGT-238 slice 2 -- CONCURRENCY FROM THE CORPUS. Pass
 // one reads `public.project_concurrency_corpus()` beside the queue and carries it into the state as
 // `concurrency_corpus`; the answer may carry an optional `concurrency` object
@@ -530,6 +540,50 @@ export function leverageErrors(answer, state) {
   return errors;
 }
 
+// AGT-532 (v7.0.928) -- AN UNDECIDED GATE CARD IS REPORTED. One line per undecided
+// `gated_before_build` card FILED BY ANOTHER CYCLE: this cycle's own card is the one it is about to
+// rule at 7b and reporting it back at pass one would be noise, while a card left behind by an earlier
+// cycle is the thing nobody is looking at. "Older than one cycle" is `cycle_id` is not this cycle's
+// (JOHN-0925-DESIGNER-DECIDES), never a timestamp comparison -- a clock says when it was filed, only
+// the author id says whose it is. A blank `cycleId` reports every card, because a driver that cannot
+// name its own cycle cannot claim any card as its own. Pure, so the guard asserts it directly.
+export function undecidedGateCardLines(cards, cycleId) {
+  if (!Array.isArray(cards)) return [];
+  const own = String(cycleId ?? "").trim();
+  return cards
+    .filter(c => c && String(c.cycle_id ?? "") !== own)
+    .map(c => `UNDECIDED GATE CARD: ${c.id} holds ${c.backlog_id} out of the queue since ${c.created_at}`
+      + ` (filed by cycle ${c.cycle_id}; rule it at 7b: node scripts/decide-gated-card.js --prepare)`);
+}
+
+// AGT-532 -- THE IDS THE BOARD REFUSED FOR BEING OFF THE QUEUE. `answerErrors` already says an id
+// "which prime_directive_queue() did not return" from three sites (the pass-over, `regrades` and
+// `leverage`); this reads them back out of the refusal lines themselves rather than re-deriving the
+// check, so a fourth site added later is covered the day it is written. Distinct, in first-seen
+// order: one id named twice buys one reason, not two.
+export function offQueueIds(errorLines) {
+  const seen = [];
+  for (const line of (Array.isArray(errorLines) ? errorLines : [])) {
+    const m = /names "([^"]+)", which prime_directive_queue\(\) did not return/.exec(String(line ?? ""));
+    if (m && m[1] && !seen.includes(m[1])) seen.push(m[1]);
+  }
+  return seen;
+}
+
+// AGT-532 -- WHY THAT ID IS OFF THE QUEUE, in the board's own words. `public.pick_exclusions()` is
+// the one home for that rule and this renders its row; the driver never re-derives an exclusion and
+// never guesses at one. Three cases, all three said out loud: a row with reasons, a row with none
+// (the predicate holds nothing against it any more, which is itself the answer), and no row at all
+// (the id is not an open or partial ticket, so the predicate never spoke for it). Pure.
+export function exclusionReasonLine(id, rows) {
+  const row = (Array.isArray(rows) ? rows : []).find(r => r && String(r.backlog_id ?? "") === String(id));
+  if (!row) {
+    return `pick_exclusions() returns no row for "${id}" -- it is not an open or partial ticket the predicate speaks for`;
+  }
+  const reasons = (Array.isArray(row.reasons) ? row.reasons : []).map(r => String(r)).filter(Boolean);
+  return `pick_exclusions() holds "${id}" out of the queue: ${reasons.length ? reasons.join("; ") : "no reason -- the board admits it now"}`;
+}
+
 // AGT-238 slice 2 (v7.0.667) -- CONCURRENCY FROM THE CORPUS (John 2026-09-27). How many projects
 // execute at once, and in what order, is the manager's decision from `state.concurrency_corpus`
 // (`public.project_concurrency_corpus()`, read verbatim) -- never a fixed rule and never a knob:
@@ -1050,6 +1104,18 @@ async function readInstruments({ base, key, project, cycleId, trigger, tenant })
   const regradable = await rpc(base, key, "regradable_ships");
   if (regradable.error) return { error: regradable.error };
 
+  // FEATURE: AGT-532 -- THE UNDECIDED GATE CARDS, read as an instrument beside the queue. A
+  // `runner_items` row of kind `gated_before_build` with a null `decision` holds its ticket OUT of
+  // `prime_directive_queue()` (`pick_exclusions()` says so in as many words), and until this read
+  // `readInstruments()` never touched `runner_items` at all -- so the ticket simply was not there and
+  // nothing on the board said why. Read verbatim, never ruled here: ruling a card is 7b's decision
+  // (`scripts/decide-gated-card.js`), not this driver's.
+  // A FAILED READ IS FATAL FOR PASS ONE, exactly like every instrument above: a manager shown no
+  // cards would conclude none are held, which is the assumption dm-behavior forbids ("a missing row
+  // is a stop, not an assumption").
+  const gateCards = await rest(base, key, "runner_items?kind=eq.gated_before_build&decision=is.null&select=id,backlog_id,cycle_id,created_at&order=created_at");
+  if (gateCards.error) return { error: gateCards.error };
+
   // FEATURE: AGT-238 slice 2 -- THE CONCURRENCY CORPUS, read as an instrument beside the queue. How
   // many projects execute at once and in what order is the manager's decision, and this is the
   // evidence it decides FROM: one row per project (an epic-less project shows epics=0 rather than
@@ -1094,6 +1160,7 @@ async function readInstruments({ base, key, project, cycleId, trigger, tenant })
     schedulerGate: sched.error ? { error: sched.error } : sched.row,
     queue: queue.rows,
     regradable: regradable.rows,   // SES-403
+    undecidedGateCards: gateCards.rows,   // AGT-532
     concurrencyCorpus: corpus.rows,   // AGT-238 slice 2
     roster: roster.roster,
     pick,
@@ -1190,6 +1257,17 @@ async function main() {
       // -- said as an `assign` naming another row -- buys a `runner_skips` row instead of nothing.
       // `answer_errors` is untouched, which is what keeps the `may not re-order the board` line
       // byte-identical for `ses-378` and `agt-68`.
+      // AGT-532: an id the board did not list is refused with the LIST as the whole explanation,
+      // which tells the manager what it already knew. The reason is ADDED -- one further line per
+      // distinct off-queue id, from `public.pick_exclusions()` -- and the existing line is untouched,
+      // which is what keeps the pinned refusal text byte-identical for `agt-232` (D) and `ses-378`.
+      // A failed read is reported as that id's line and changes nothing else.
+      for (const id of offQueueIds(errors)) {
+        const ex = await rpc(base, key, `pick_exclusions?backlog_id=eq.${encodeURIComponent(id)}`);
+        errors.push(ex.error
+          ? `pick_exclusions() could not be read for "${id}": ${ex.error}`
+          : exclusionReasonLine(id, ex.rows));
+      }
       const dec = await recordDeclineSkip({ base, key, args, answer, state });
       return emit({ code: EXIT_CANNOT_RUN, json: args.json,
         payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", answer_errors: errors, ...dec.extra },
@@ -1439,6 +1517,9 @@ async function main() {
     // SES-403: the ships the lister says may be graded again, beside the queue. The manager names
     // ids from THIS list in `regrades` or names none; `answerErrors` refuses anything else.
     regradable: inst.regradable,
+    // AGT-532: the `gated_before_build` cards nobody has ruled, beside the queue. Each one holds its
+    // ticket out of the pick, so the manager reads the hold rather than inferring it from an absence.
+    undecided_gate_cards: inst.undecidedGateCards,
     roster: inst.roster,
     last_handoff: handoff,
     // The Intent's OWN contract, from its row. It reaches the prompt through the executor's TASK
@@ -1469,6 +1550,10 @@ async function main() {
   }
   emitPrompt(prompt.text, promptPath, args.json);
 
+  // AGT-532: rendered once, for the payload and the prose both -- two copies of this rule is how
+  // they drift apart.
+  const gateLines = undecidedGateCardLines(inst.undecidedGateCards, args.cycleId);
+
   return emit({
     code: EXIT_AWAITING_ANSWER, json: args.json,
     // NOT `ok: true`. AGT-67's finding 3, inherited deliberately: an exit-3 payload that said `ok`
@@ -1480,12 +1565,14 @@ async function main() {
       pick: inst.pick, pick_in_project: state.pick_in_project,
       roster: inst.roster.map(r => r.capability_slug),
       state_file: statePath, prompt_file: promptPath,
+      undecided_gate_cards: gateLines,
       intent_slug: contract.intentSlug, model: prompt.model,
     },
     prose: `run-project: AWAITING THE MANAGER'S ANSWER (exit ${EXIT_AWAITING_ANSWER}). Nothing was written.\n`
       + `  project: ${args.project} (${inst.projectRow.status}), step ${args.step}/${args.maxSteps}\n`
       + `  pick:    ${inst.pick ? `${inst.pick.backlog_id} — ${inst.pick.title}` : "(none — nothing pickable)"}\n`
       + `  walls:   ${walls.blocked ? walls.standing.join("; ") : "clear"}\n`
+      + `  gates:   ${gateLines.length ? gateLines.join("\n           ") : "no undecided gate card older than this cycle"}\n`
       + `  state:   ${statePath}\n`
       + `  prompt:  ${promptPath}\n`
       + `  Run that prompt as a ${DEVMANAGER_AGENT_ID} sub-agent on model ${prompt.model}, save its JSON, then re-run with --answer=<path>.`,
