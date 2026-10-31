@@ -541,6 +541,11 @@ import { spawn, spawnSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import { renderingCycleFinding } from "./render-claude-state.js";
 import { shipCardFinding } from "./render-claude-state.js";
+// AGT-562: both halves of the ledger-orphan read already exist and are already guarded
+// (tests/regression/SES-182-rollback-on-red.js, agt-184-ledger-orphan.test.mjs) -- re-deriving
+// either here would be a second home for one rule (pattern:14). `rollback-on-red.js` is
+// entry-point guarded, so importing it runs nothing and writes nothing.
+import { ledgerOrphansIn, readDownsCapturedBy } from "./rollback-on-red.js";
 import { withTestSlot } from "./test-slot.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -2607,6 +2612,91 @@ export function ciConclusionFinding({ gradedSha, rows }) {
     `which names this finding's motivating case. ${tail}` };
 }
 
+// FEATURE: AGT-562 -- A CYCLE THAT CAPTURED A DOWN FOR A MIGRATION THAT NEVER LANDED CANNOT SHIP.
+//
+// CYCLE-SCOPED, NOT WHOLE-LEDGER, and that is the whole design of this finding rather than a soft
+// start. `capture_migration_down()` runs BEFORE `apply_migration` (runner-cycle.md step 6), so a
+// down row with no applied migration of the same `up_name` is the signature of an apply that was
+// captured for and then never happened: the ledger now promises a reversal for a change that is not
+// there, and the next rollback would run a down against a schema that never moved. An orphan THIS
+// cycle captured is a fact about THIS change, so it gates. The whole-ledger count is a fact about
+// the live world, so it is PRINTED at every ship and gates nothing -- two orphans stand on this
+// platform today (`agt423_sweep_fault_isolation`, `agt291_finish_sensor`) and one of them cannot be
+// cleared without an attended apply, so a whole-ledger stop would wedge every ship the moment it
+// landed. That is pattern:162 and it is the same argument `ciConclusionFinding`'s own header makes
+// for CI: a check grades the change, never the live world.
+//
+// FOUR CLAUSES, TWO OF WHICH BLOCK, and collapsing any two would erase the fact the ledger is read
+// for.
+//
+//   clear (`null`)   -- the downs this cycle captured were READ and every one of them names an
+//                       applied migration. Returned ONLY when `known === true` and `orphans` is
+//                       empty, which is why the two are parameters rather than one list.
+//   `no-cycle-id`    -- NOT GRADED, AND IT DOES NOT BLOCK. A run with no `--cycle-id` (the local
+//                       checks, a `--dry-run` invocation, the suite's own imports) has no cycle to
+//                       scope to by construction; blocking it would refuse a ship over a question
+//                       nobody asked. It is still a finding rather than `null` because "nobody
+//                       looked" and "looked and it is clean" are different facts about a delivery.
+//   `unreadable`     -- BLOCKS. UNKNOWN IS NOT INNOCENT, which is the direction `ledgerOrphansIn`
+//                       itself takes for a non-array `cycleDowns` and `schemaPlanFor` takes for an
+//                       absent `--migrations`. "the ledger could not be read" reported as "no
+//                       orphans" is the false green this function exists to make impossible
+//                       (pattern:75), and a REST failure is exactly when a cycle that DID capture a
+//                       down is least able to prove it did not.
+//   `orphan`         -- BLOCKS, naming every `up_name`, because a reader deciding what to do next
+//                       needs the names: each one is either a migration still owed an apply or a
+//                       down row owed a deletion, and which it is depends on the name.
+//
+// PURE AND SYNC, over rows another function already read -- which is what lets the guard
+// (tests/regression/agt-562-ship-gate-orphan.test.mjs) drive all four clauses with no credentials
+// and no network. No live call inside it.
+export function shipOrphanFinding({ cycleId, orphans, known, error } = {}) {
+  const kind = "ship-orphan";
+  const tail = "AGT-562: capture_migration_down() runs before apply_migration, so a captured down " +
+    "whose up_name is in no applied migration means the apply never happened and the ledger is " +
+    "promising a reversal for a change that is not there. Scoped to THIS cycle: the whole-ledger " +
+    "count is printed beside this line and gates nothing.";
+
+  if (!cycleId) {
+    return { kind, clause: "no-cycle-id", reason:
+      `NOT GRADED, and this does not block: no --cycle-id was passed, so there is no cycle whose ` +
+      `captured downs could be scoped to this change. This is "nobody looked", not "it is clean" -- ` +
+      `a credentialed run at the ship point passes --cycle-id and gets one of the other three ` +
+      `clauses. ${tail}` };
+  }
+  if (error) {
+    return { kind, clause: "unreadable", reason:
+      `BLOCKED: the downs captured by cycle ${cycleId} could NOT BE READ, so whether this change ` +
+      `captured an orphan is UNKNOWN -- and unknown is not innocent (${error}). Reading "no orphans" ` +
+      `out of a failed read is the false green this gate exists to make impossible; re-run the gate ` +
+      `once the ledger answers rather than shipping past it. ${tail}` };
+  }
+  if (known !== true) {
+    return { kind, clause: "unreadable", reason:
+      `BLOCKED: the downs captured by cycle ${cycleId} were not supplied as a list, so ` +
+      `ledgerOrphansIn() returned known:false and whether this change captured an orphan is ` +
+      `UNKNOWN -- the same fail-closed reading it gives a non-array cycleDowns, and unknown is not ` +
+      `innocent. ${tail}` };
+  }
+
+  // FILTERED BEFORE IT IS STRINGIFIED, and the order is the whole point: `[null, undefined].map(String)`
+  // yields the TRUTHY strings "null" and "undefined", so a filter after the map manufactures two
+  // orphan names out of two empty slots and blocks the ship on them. Caught by this function's own
+  // guard on its first run. `ledgerOrphansIn()` already drops empties on its side, so production
+  // never hands them over -- which is exactly why nothing but the guard would have found it.
+  const names = (Array.isArray(orphans) ? orphans : [])
+    .filter((n) => n !== null && n !== undefined && String(n) !== "")
+    .map(String);
+  if (!names.length) return null;
+
+  return { kind, clause: "orphan", reason:
+    `BLOCKED: cycle ${cycleId} captured ${names.length} migration down whose up_name is in NO ` +
+    `applied migration: ${names.join(", ")}. Either the apply is still owed (apply it, attended, ` +
+    `then re-run this gate) or the down row is owed a deletion (the migration was abandoned) -- ` +
+    `shipping with it standing leaves the ledger claiming a reversal for a schema change that was ` +
+    `never made. ${tail}` };
+}
+
 function cap(text, limit, what) {
   const s = String(text ?? "");
   if (s.length <= limit) return s;
@@ -3897,6 +3987,64 @@ async function main() {
   // calling this again: see recordJudgedVerdict()'s note on why a second read is a different fact.
   const gradedSha = gradedShaFor(repoRoot);
 
+  // FEATURE: AGT-562 -- the two reads behind `shipOrphanFinding()`, taken ONCE here and carried from
+  // this point into the finding, the prose line and the --json payload.
+  //
+  // THREE READS, TWO QUESTIONS, ONE PURE FUNCTION ANSWERING BOTH. `readDownsCapturedBy()` is the
+  // CYCLE half (the downs keyed on `captured_by_cycle`, which is the only way to see a down whose
+  // migration never landed -- `readMigrationDowns()` starts from the migrations the cycle NAMED and
+  // is blind to exactly this case by construction). The `migrations_in_range` RPC over the full
+  // version range is the APPLIED half. `ledgerOrphansIn()` then answers the gating question over the
+  // cycle's downs and the printed question over EVERY `runner_migration_downs.up_name` -- the same
+  // function twice rather than a second implementation of one rule (pattern:14).
+  //
+  // FAILS CLOSED, AND A MISSING CREDENTIAL IS A FAILED READ. A cycle id with no credentials cannot
+  // read the ledger, so it reaches `unreadable` and blocks -- the same direction the
+  // `runner_before_images` block below takes for the Skill-row check, and for the same reason: a
+  // cycle that DID capture an orphan is least able to prove otherwise exactly when the read fails.
+  // The whole-ledger half is BEST EFFORT by contrast and gates nothing: it is a fact about the live
+  // world, and `prose` says "not read" in words rather than printing a reassuring 0.
+  let shipOrphan = null;
+  let shipOrphanCycleDowns = null;
+  let ledgerWideOrphans = null;
+  if (!cycleId) {
+    shipOrphan = shipOrphanFinding({ cycleId: "" });
+  } else if (!supabaseUrl || !supabaseKey) {
+    shipOrphan = shipOrphanFinding({ cycleId, error: "no credentials were supplied, so runner_migration_downs could not be read at all" });
+  } else {
+    const captured = await readDownsCapturedBy(supabaseUrl, supabaseKey, cycleId);
+    const applied = await rest(supabaseUrl, supabaseKey, "rpc/migrations_in_range", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ p_from: "0", p_to: "99999999999999" }),
+    });
+    const readError = captured.error || applied.error || null;
+    if (readError) {
+      shipOrphan = shipOrphanFinding({ cycleId, error: readError });
+    } else {
+      shipOrphanCycleDowns = Array.isArray(captured.downs) ? captured.downs.length : null;
+      const scoped = ledgerOrphansIn(captured.downs, applied.rows);
+      shipOrphan = shipOrphanFinding({ cycleId, orphans: scoped.orphans, known: scoped.known });
+      const everyDown = await rest(supabaseUrl, supabaseKey, "runner_migration_downs?select=up_name");
+      if (!everyDown.error) {
+        const wide = ledgerOrphansIn(everyDown.rows, applied.rows);
+        if (wide.known) ledgerWideOrphans = wide.orphans;
+      }
+    }
+  }
+
+  // AGT-562: ONE DIRECTION ONLY -- approve -> block on a blocking clause, never block -> approve,
+  // the same discipline the `kickoffOverCap` and `kickoffNoLanes` blocks above hold. `reasoning` is
+  // PREPENDED rather than replaced: a red gate that was already the reason stays the reason, and an
+  // orphaned down must not erase it from the verdict row. `no-cycle-id` is the clause that does NOT
+  // block -- it is "nobody looked", and refusing a ship over a question nobody asked would wedge
+  // every credential-less invocation on the platform. Placed before `autoDoneEligibility()` so a
+  // blocked ship cannot be auto-done eligible on a verdict this block was about to flip.
+  if (shipOrphan && shipOrphan.clause !== "no-cycle-id") {
+    verdict = "block";
+    reasoning = shipOrphan.reason + " | " + reasoning;
+  }
+
   // AGT-194: read ONCE, here, beside the sha it is about, and carried from this point into the prose,
   // the --json payload and BOTH judge lanes. NOTHING below may turn it into a gate -- see
   // ciConclusionFinding()'s header for why a CI read that could flip a verdict re-grades every ship
@@ -3970,7 +4118,18 @@ async function main() {
     // words too -- a line that appeared only on a finding would leave its reader unable to tell
     // "CI graded this sha green" from "this build of the verifier does not look".
     `  CI CONCLUSION: ${ciConclusion ? `[${ciConclusion.clause}] ${ciConclusion.reason}`
-      : "every blocking CI job for this sha concluded success"}`;
+      : "every blocking CI job for this sha concluded success"}\n` +
+    // AGT-562: one line, ALWAYS printed. Its first half IS part of the verdict (the two blocking
+    // clauses flipped it above); its second half never is. The clear case is stated in words for the
+    // reason the CI line above gives -- a line that appeared only on a finding would leave its reader
+    // unable to tell "this cycle captured no orphan" from "this build of the verifier does not look".
+    // The ledger-wide count is printed at every ship and gates nothing (pattern:162).
+    `  SHIP ORPHANS: ${shipOrphan ? shipOrphan.clause
+      : shipOrphanCycleDowns ? `clear (all ${shipOrphanCycleDowns} downs this cycle captured name an applied migration)`
+      : "clear (this cycle captured no down)"}` +
+    ` -- ledger-wide ${ledgerWideOrphans === null
+      ? "not read (runner_migration_downs needs a credentialed read; this half gates nothing either way)"
+      : `${ledgerWideOrphans.length} (${ledgerWideOrphans.length ? ledgerWideOrphans.join(", ") : "none"})`}`;
 
   const payload = {
     ok: verdict === "approve",
@@ -4018,6 +4177,16 @@ async function main() {
     // precedent and AGT-170's convention; the fact reaches the ledger through `reasoning` nowhere and
     // through this key only, because it is not a judgment about the change.
     ci_conclusion: ciConclusion,
+    // AGT-562: the finding object when this cycle's captured downs could not be read or carry an
+    // orphan, null when every one of them names an applied migration (`prose` above keeps "clear"
+    // and "no cycle id" apart in words). UNLIKE the keys above it, this one CAN have changed the
+    // verdict -- the `unreadable` and `orphan` clauses flip approve to block -- and the fact reaches
+    // the ledger through `reasoning`, which that block prepended it to. Reported here, never stored
+    // in its own column and NO MIGRATION: AGT-174's precedent, AGT-170's convention.
+    ship_orphan: shipOrphan,
+    // AGT-562: the whole-ledger orphan names, `null` when that read failed or none was attempted.
+    // PRINTED AND NEVER GATING -- a fact about the live world, not about this change (pattern:162).
+    ship_orphan_ledger_wide: ledgerWideOrphans,
     // AGT-170: the delta's five facts, reported and never stored in their own columns -- the
     // Designer's recorded call (JOHN-0925-DESIGNER-DECIDES): no new `runner_verdicts` column and no
     // migration, the lists ride `--json` and `gateDetail`. `gates.regression` above is the GRADED
