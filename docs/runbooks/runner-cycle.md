@@ -4287,9 +4287,11 @@ SELECT * FROM public.sweep_decision_windows('<your cycle id>', NULL);
 
 It finalises every `open` decision past its `expires_at` and promotes the work class each one named
 (`SES-107`'s streak rule; a class is promoted once, ever — `ladder_applied_at` is the stamp that
-enforces it). It returns `finalized, promoted, closed` — `closed` added by `SES-320`, `v7.0.412`: the tickets this sweep took out of `delivered` because their ship decision just finalised — ; **put all three numbers in your cycle row's `notes`** —
-appending to the row you closed at (6) is an ordinary `UPDATE`, and a closed row is not a frozen
-one. A second call in the same cycle returns `0, 0, 0`, so a retry is never wrong.
+enforces it). It returns `finalized, promoted, closed`, so **put all three numbers in your cycle row's `notes`** —
+write them with `node scripts/cycle-note.js --cycle=<id> --note=<text>`. The connector `UPDATE` is
+a documented FALLBACK: cycle `68372c07` lost two 1.5-2.5 KB appends to its 60s ceiling (`AGT-547`),
+which reports failure, writing nothing. A second call in the same cycle returns `0, 0, 0`, so a
+retry is never wrong.
 
 <!-- FEATURE: SES-320 — the sweep gains a caller with its own clock; the tail call stays. -->
 **THE TAIL IS NO LONGER THE ONLY FINALISER (`SES-320` follow-up, `v7.0.422`, migration
