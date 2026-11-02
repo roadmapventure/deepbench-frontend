@@ -22,6 +22,7 @@
 //        F3 F1 minus every unifiedWindows     -> NO_READING no_unified_windows, exit 1
 //        F4 empty stdin                       -> NO_READING no_output, exit 1
 //        F5 a real Fable 400 failure          -> NO_READING no_rate_limit_event, exit 1
+//        F6 live Ultra call, no five_hour     -> 32 / NULL / 32, exit 0 (that window no longer exists)
 //      Controls: 1e4 -> 1e2 turns F1 red; a filter that exits 0 on NO_READING turns F3 red (it would
 //      stop B from ever running); B before A, or two different filters, turn the shape red.
 //
@@ -59,7 +60,7 @@ const PROMPT_REL = "docs/runbooks/routine-prompt.md";
 
 // The filter carries no single quote (it spells one \x27), no `||` (so the command splits on it
 // unambiguously), no backtick and no newline -- it has to survive being one single-quoted bash word.
-export const SELF_READ_FILTER = String.raw`let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const q="\x27",w={};let n=0,ev=0,uw=0,ver="unknown",u=null;for(const l of d.split(/\r?\n/)){let o;try{o=JSON.parse(l)}catch(e){continue}if(!(o&&typeof o==="object"))continue;n++;if(o.type==="system"&&o.subtype==="init"&&typeof o.claude_code_version==="string"&&/^[0-9A-Za-z.-]+$/.test(o.claude_code_version))ver=o.claude_code_version;if(o.type==="rate_limit_event"){ev++;const x=o.rate_limit_info&&o.rate_limit_info.unifiedWindows;if(x&&typeof x==="object"&&!Array.isArray(x)){uw++;Object.assign(w,x)}}if(o.type==="result"&&o.usage&&typeof o.usage==="object")u=o.usage}const pct=k=>{const v=w[k],f=typeof v==="number"?v:v&&v.utilization;return typeof f==="number"&&isFinite(f)&&f>=0?Math.round(f*1e4)/100:null};const t=k=>u&&Number.isInteger(u[k])?u[k]:"?";let r=!n?"no_output":!ev?"no_rate_limit_event":!uw?"no_unified_windows":w.five_hour==null?"missing_five_hour":w.seven_day==null?"missing_seven_day":null;const s5=pct("five_hour"),s7=pct("seven_day"),oi=w.seven_day_overage_included==null?"NULL":pct("seven_day_overage_included");if(!r&&[s5,s7,oi].includes(null))r="bad_value";if(r){console.log("NO_READING "+r);process.exitCode=1;return}const keys=Object.keys(w).filter(k=>/^[A-Za-z0-9_]+$/.test(k)).join(",");console.log("INSERT INTO public.runner_usage_readings (source, slot, all_models_pct, session_5h_pct, fable_pct, note) VALUES ("+q+"routine-self-read"+q+", "+q+"adhoc"+q+", "+s7+", "+s5+", "+oi+", "+q+"routine self-read (SES-398): Claude Code "+ver+"; claude-fable-5-1 rate_limit_event unifiedWindows "+keys+"; usage in "+t("input_tokens")+" out "+t("output_tokens")+" cache_read "+t("cache_read_input_tokens")+" cache_write "+t("cache_creation_input_tokens")+q+") RETURNING id, taken_at;");process.exitCode=0})`;
+export const SELF_READ_FILTER = String.raw`let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const q="\x27",w={};let n=0,ev=0,uw=0,ver="unknown",u=null;for(const l of d.split(/\r?\n/)){let o;try{o=JSON.parse(l)}catch(e){continue}if(!(o&&typeof o==="object"))continue;n++;if(o.type==="system"&&o.subtype==="init"&&typeof o.claude_code_version==="string"&&/^[0-9A-Za-z.-]+$/.test(o.claude_code_version))ver=o.claude_code_version;if(o.type==="rate_limit_event"){ev++;const x=o.rate_limit_info&&o.rate_limit_info.unifiedWindows;if(x&&typeof x==="object"&&!Array.isArray(x)){uw++;Object.assign(w,x)}}if(o.type==="result"&&o.usage&&typeof o.usage==="object")u=o.usage}const pct=k=>{const v=w[k],f=typeof v==="number"?v:v&&v.utilization;return typeof f==="number"&&isFinite(f)&&f>=0?Math.round(f*1e4)/100:null};const t=k=>u&&Number.isInteger(u[k])?u[k]:"?";let r=!n?"no_output":!ev?"no_rate_limit_event":!uw?"no_unified_windows":w.seven_day==null?"missing_seven_day":null;const s5=w.five_hour==null?"NULL":pct("five_hour"),s7=pct("seven_day"),oi=w.seven_day_overage_included==null?"NULL":pct("seven_day_overage_included");if(!r&&[s5,s7,oi].includes(null))r="bad_value";if(r){console.log("NO_READING "+r);process.exitCode=1;return}const keys=Object.keys(w).filter(k=>/^[A-Za-z0-9_]+$/.test(k)).join(",");console.log("INSERT INTO public.runner_usage_readings (source, slot, all_models_pct, session_5h_pct, fable_pct, note) VALUES ("+q+"routine-self-read"+q+", "+q+"adhoc"+q+", "+s7+", "+s5+", "+oi+", "+q+"routine self-read (SES-398): Claude Code "+ver+"; claude-fable-5-1 rate_limit_event unifiedWindows "+keys+"; usage in "+t("input_tokens")+" out "+t("output_tokens")+" cache_read "+t("cache_read_input_tokens")+" cache_write "+t("cache_creation_input_tokens")+q+") RETURNING id, taken_at;");process.exitCode=0})`;
 export const VARIANT_A =
   'env -C /tmp claude -p "Reply with only: OK" --model claude-fable-5-1 --max-turns 1 --tools "" ' +
   "--strict-mcp-config --disable-slash-commands --no-session-persistence --output-format stream-json --verbose";
@@ -81,6 +82,12 @@ export const LOCAL_SUMMARY = "{\"type\":\"system\",\"subtype\":\"post_turn_summa
 export const LOCAL_RESULT = "{\"is_error\":false,\"duration_api_ms\":906,\"num_turns\":1,\"stop_reason\":\"end_turn\",\"session_id\":\"c8107842-5e19-431d-9dfa-4d38978ca95e\",\"total_cost_usd\":0.0169473,\"usage\":{\"input_tokens\":10,\"cache_creation_input_tokens\":7115,\"cache_read_input_tokens\":25273,\"output_tokens\":36,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":7115,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":10,\"output_tokens\":36,\"cache_read_input_tokens\":25273,\"cache_creation_input_tokens\":7115,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":7115},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":10,\"outputTokens\":36,\"cacheReadInputTokens\":25273,\"cacheCreationInputTokens\":7115,\"webSearchRequests\":0,\"costUSD\":0.0169473,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"OK\",\"ttft_ms\":1442,\"ttft_stream_ms\":1138,\"time_to_request_ms\":568,\"type\":\"result\",\"duration_ms\":2349,\"uuid\":\"4e87e3a8-cdb8-4a40-98ef-9817f79e2c80\"}";
 // A real failure, VERBATIM (local-raw-A.jsonl, all 3 lines: variant A on claude-fable-5-1, Claude Code 2.1.218, API 400).
 export const LOCAL_FABLE_400 = "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"C:\\\\Users\\\\jleon\\\\AppData\\\\Local\\\\Temp\",\"session_id\":\"3bcad894-8822-40e7-b4c5-acb84efd4bca\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-fable-5-1\",\"permissionMode\":\"bypassPermissions\",\"slash_commands\":[],\"apiKeySource\":\"none\",\"claude_code_version\":\"2.1.218\",\"output_style\":\"default\",\"agents\":[\"claude\",\"claude-code-guide\",\"Explore\",\"general-purpose\",\"Plan\",\"statusline-setup\"],\"skills\":[],\"plugins\":[],\"capabilities\":[\"interrupt_receipt_v1\",\"msg_lifecycle_v1\"],\"analytics_disabled\":false,\"product_feedback_disabled\":false,\"uuid\":\"64e8ec59-6dc1-4978-a0d1-2510c11155e0\",\"memory_paths\":{\"auto\":\"C:\\\\Users\\\\jleon\\\\.claude\\\\projects\\\\C--Users-jleon-AppData-Local-Temp\\\\memory\\\\\"},\"fast_mode_state\":\"off\"}\n{\"type\":\"assistant\",\"message\":{\"id\":\"42b0944d-8f56-4c14-be83-e616066d894d\",\"container\":null,\"model\":\"<synthetic>\",\"role\":\"assistant\",\"stop_details\":null,\"stop_reason\":\"stop_sequence\",\"stop_sequence\":\"\",\"type\":\"message\",\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":null,\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":null,\"iterations\":null,\"speed\":null},\"content\":[{\"type\":\"text\",\"text\":\"API Error: 400 Claude Code 2.1.218 does not support this model; version 2.1.251 or newer is required. Run 'claude update', or update the Claude desktop app, then try again.\"}],\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"3bcad894-8822-40e7-b4c5-acb84efd4bca\",\"uuid\":\"21a73fe0-b916-4adf-a03b-ef67ecc644ab\",\"timestamp\":\"2026-09-15T16:42:56.567Z\",\"error\":\"unknown\",\"request_id\":\"req_011Cf5ZRKqMk1Cbdh2zPtEny\"}\n{\"is_error\":true,\"duration_api_ms\":0,\"num_turns\":1,\"stop_reason\":\"stop_sequence\",\"session_id\":\"3bcad894-8822-40e7-b4c5-acb84efd4bca\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"api_error\",\"fast_mode_state\":\"off\",\"subtype\":\"success\",\"api_error_status\":400,\"result\":\"API Error: 400 Claude Code 2.1.218 does not support this model; version 2.1.251 or newer is required. Run 'claude update', or update the Claude desktop app, then try again.\",\"type\":\"result\",\"duration_ms\":1411,\"uuid\":\"316ce5a8-9337-4342-9c95-f05fb93442d1\"}";
+
+// Live rate_limit_info, VERBATIM: John's machine, Claude Code 2.1.280, claude-fable-5-1, 2026-11-02. Since
+// 2026-10-30 a verified Ultra account has no five-hour limit, so unifiedWindows carries only the two weekly
+// windows. Before this fixture the filter answered NO_READING missing_five_hour and the runner went dark for
+// 40+ hours (finding 25440051). The gates read only all_models_pct and fable_pct; session_5h_pct is NULL.
+export const LIVE_ULTRA_EVENT = "{\"status\":\"allowed\",\"resetsAt\":1793944800,\"rateLimitType\":\"seven_day\",\"overageStatus\":\"rejected\",\"overageDisabledReason\":\"org_level_disabled\",\"isUsingOverage\":false,\"unifiedWindows\":{\"seven_day\":{\"utilization\":0.32,\"resetsAt\":1793944800},\"seven_day_overage_included\":{\"utilization\":0.32,\"resetsAt\":1793944800}}}";
 
 const lines = (...ls) => ls.join("\n") + "\n";
 const initAt = version => {
@@ -108,6 +115,8 @@ export const F2 = lines(initAt("2.1.272"), LOCAL_THINKING, LOCAL_TEXT,
 export const F3 = F1.split("\n").map(stripWindows).join("\n");
 export const F4 = "";
 export const F5 = LOCAL_FABLE_400 + "\n";
+export const F6 = lines(initAt("2.1.280"), LOCAL_THINKING, LOCAL_TEXT,
+  eventWith(LIVE_ULTRA_EVENT), LOCAL_SUMMARY, LOCAL_RESULT);
 
 const COLS = "INSERT INTO public.runner_usage_readings (source, slot, all_models_pct, session_5h_pct, fable_pct, note) VALUES ";
 const USAGE = "; usage in 10 out 36 cache_read 25273 cache_write 7115";
@@ -117,6 +126,10 @@ export const F1_INSERT = COLS +
 export const F2_INSERT = COLS +
   "('routine-self-read', 'adhoc', 63, 5, NULL, 'routine self-read (SES-398): Claude Code 2.1.272; claude-fable-5-1 " +
   `rate_limit_event unifiedWindows five_hour,seven_day${USAGE}') RETURNING id, taken_at;`;
+
+export const F6_INSERT = COLS +
+  "('routine-self-read', 'adhoc', 32, NULL, 32, 'routine self-read (SES-398): Claude Code 2.1.280; claude-fable-5-1 " +
+  `rate_limit_event unifiedWindows seven_day,seven_day_overage_included${USAGE}') RETURNING id, taken_at;`;
 
 // Runs the filter the way bash does after `| node -e '<filter>'`: one argv word, stdin piped.
 export function runFilter(filter, input) {
@@ -161,6 +174,7 @@ export function gradeFilter(filter) {
     ["F3 F1 minus every unifiedWindows", F3, 1, "NO_READING no_unified_windows"],
     ["F4 empty stdin", F4, 1, "NO_READING no_output"],
     ["F5 real Fable 400", F5, 1, "NO_READING no_rate_limit_event"],
+    ["F6 Ultra, no five-hour window", F6, 0, F6_INSERT],
     ["F1 behind a non-JSON line", "not json\n" + F1, 0, F1_INSERT],
   ];
   const seen = [];
@@ -186,6 +200,10 @@ function everyClauseHasTeeth(prompt, filter) {
   const noFallback = filter.replace("process.exitCode=1", "process.exitCode=0");
   assert.notStrictEqual(noFallback, filter, "control exit-1 -> exit-0 changed nothing (the SES-158 failure)");
   assert.throws(() => gradeFilter(noFallback), "control: a filter exiting 0 on NO_READING still passed");
+  // The pre-Ultra filter demanded five_hour; putting that demand back must turn F6 red.
+  const demands5h = filter.replace('!uw?"no_unified_windows":', '!uw?"no_unified_windows":w.five_hour==null?"missing_five_hour":');
+  assert.notStrictEqual(demands5h, filter, "control five_hour-required changed nothing");
+  assert.throws(() => gradeFilter(demands5h), "control: a filter that requires five_hour still passed F6");
   // Order and sameness of the two halves.
   assert.throws(() => gradeCommand(`${piped(VARIANT_B)} || ${piped(VARIANT_A)}`), "control: B before A still passed");
   assert.throws(() => gradeCommand(`${piped(VARIANT_A)} || ${piped(VARIANT_B, scaled)}`), "control: two different filters still passed");

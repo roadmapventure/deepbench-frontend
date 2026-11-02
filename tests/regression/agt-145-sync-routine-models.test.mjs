@@ -64,7 +64,10 @@ const RUNBOOK_REL = "docs/runbooks/routine-prompt.md";
 // RE-PINNED bb492c71 -> 3cc55a68 BY AGT-138 close-out (v7.0.695): step 8 stops citing step 4b and
 // names four sub-agents -- a deliberate block edit; the live lanes take it on the attended
 // RemoteTrigger update.
-const PROMPT_BLOCK_SHA256 = "3cc55a688ec5f5a5dfc9a3053839aec4b8fa08e814e590480a77da7d471028d8";
+// RE-PINNED 3cc55a68 -> 66d7d62d BY v7.0.934 (attended, finding 25440051): step 1's self-read stops
+// requiring the five_hour window, which a verified Ultra account no longer has since 2026-10-30, and
+// writes session_5h_pct NULL instead -- a deliberate block edit; the four lanes take it by RemoteTrigger.
+const PROMPT_BLOCK_SHA256 = "66d7d62de4dc1a2ce6d96868cee050902477aeddd5048605e4aef6c0731c5f17";
 
 const PINNED = "claude-opus-5";
 const INTENDED = "claude-opus-5-5";
