@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.935 | scripts/market-agent.js | AGT-550 -- record sections carry HEADS, not
+// bodies, and the render REFUSES a section over the byte ceiling instead of assembling it.
 // DeepBench v7.0.683 | scripts/market-agent.js | AGT-155 -- the competitor leads inbox, read side.
 // A capability in LEAD_READERS now renders with `leads`: the status-new rows of public.market_leads,
 // filed by another lane, carrying seven public columns and nothing else. The answer may come back
@@ -84,6 +86,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { assemblePrompt } from '../api/prompt/db-assembly.js';
 import { renderAssembly, resolveJudgmentModel } from './agent-prompt.js';
+import { overBudget, recordHead } from './agent-prompt.js';
 // ONE INTAKE FOR THE FINDINGS LIST (AGT-131, pattern:14/pattern:15): the read, the four-way
 // classification and the appended before-image + row live in audit-ledger.js and are CALLED here,
 // never re-spelled. `attribution` comes from the same module for the same reason -- the
@@ -145,7 +148,7 @@ const AUDIENCES = ['customer', 'investor', 'career', 'internal'];
 const MOAT_TYPES = ['feature', 'incentive', 'structural', 'data', 'market', 'regulatory'];
 const VERDICTS = ['durable', 'temporary', 'weak'];
 const IP_TYPES = ['patent', 'patentable_candidate', 'trade_secret', 'proprietary_data', 'copyright_brand'];
-const RECORD_FIELDS = 'id,kind,title,body,data,audience,status';
+const RECORD_FIELDS = 'id,kind,title,body,data,audience,status,created_at';
 const BACKLOG_FIELDS = 'backlog_id,title,type,priority_class,status,updated_at';
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -423,7 +426,7 @@ async function readRecords(db, capability) {
   const kinds = READ_MAP[capability];
   const rows = await db.get(`market_records?kind=in.(${kinds.join(',')})&status=neq.retired&select=${RECORD_FIELDS}&order=created_at.asc`);
   const records = Object.fromEntries(kinds.map(k => [k, []]));
-  for (const r of rows) records[r.kind].push({ id: r.id, title: r.title, body: r.body, data: r.data, audience: r.audience, status: r.status });
+  for (const r of rows) records[r.kind].push({ ...recordHead(r), audience: r.audience, status: r.status });
   const corrections = (await db.get(
     `market_records?kind=eq.correction&status=neq.retired&data->>capability=eq.${encodeURIComponent(capability)}&select=${RECORD_FIELDS}&order=created_at.asc`,
   )).map(r => ({ id: r.id, title: r.title, body: r.body, data: r.data, audience: r.audience, status: r.status }));
@@ -483,6 +486,9 @@ async function render(args) {
   // Added, never defaulted: a capability that is not a lead reader renders with no `leads` key, so
   // its prompt carries no empty-inbox line to explain away (kickoff §6, "by construction").
   if (LEAD_READERS.includes(args.capability)) task_context.leads = await readLeads(db);
+
+  const budget = overBudget(task_context);
+  if (budget.over.length) fail(`render refused: section(s) ${budget.over.join(', ')} over the ${budget.ceiling}-byte ceiling -- ` + Object.entries(budget.sizes).map(([k, b]) => `${k}: ${b}`).join(', '));
 
   let assembly;
   try {

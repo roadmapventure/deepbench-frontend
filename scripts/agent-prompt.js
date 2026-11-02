@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.935 | scripts/agent-prompt.js | AGT-550 -- record sections are HEADS under one
+// byte ceiling, measured in overBudget() and shaped by recordHead(); the render refuses over it.
 // DeepBench v7.0.899 | scripts/agent-prompt.js | AGT-504 -- --prior-proposals=<found_by>: the turn reads its lane's prior proposals
 // DeepBench v7.0.587 | scripts/agent-prompt.js | AGT-129 -- the task may come from a FILE or STDIN,
 // not only from one argv entry. Linux caps a single argv entry at MAX_ARG_STRLEN = 131,072 B, so
@@ -325,6 +327,18 @@ export function renderAssembly(assembly) {
     else entries.push({ slug: 'format-contract', order: 5, prompt_phase: 'stable', text: `=== OUTPUT CONTRACT ===\n${contract}` });
   }
   return { ...assemblePhaseSplit(entries), omitted };
+}
+
+// AGT-550: record sections are HEADS under ONE ceiling, measured here.
+export const SECTION_BYTE_CEILING = 786432; // one 200k-token context at 4 B/token (ticket: 1.58 MB ~ 400k)
+export const HEAD_CHARS = 240; // John 2026-10-23: titles plus a 240-character head
+export function recordHead(r) {
+  const text = r.body || (r.data && (r.data.headline || r.data.can_do || r.data.summary || r.data.text)) || '';
+  return { id: r.id, kind: r.kind, title: r.title, date: r.created_at ?? null, head: String(text).replace(/\s+/g, ' ').slice(0, HEAD_CHARS) };
+}
+export function overBudget(task_context, ceiling = SECTION_BYTE_CEILING) {
+  const sizes = Object.fromEntries(Object.entries(task_context).map(([k, v]) => [k, Buffer.byteLength(v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''), 'utf8')]));
+  return { sizes, ceiling, over: Object.entries(sizes).filter(([, b]) => b > ceiling).map(([k]) => k) };
 }
 
 async function main() {

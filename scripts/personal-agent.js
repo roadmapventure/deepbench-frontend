@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.935 | scripts/personal-agent.js | AGT-550 -- record sections carry HEADS, not
+// bodies, and the render REFUSES a section over the byte ceiling instead of assembling it.
 // DeepBench v7.0.932 | scripts/personal-agent.js | AGT-569 -- paged record reads. rest().get() was
 // a single unpaged fetch, so PostgREST's 1,000-row default ceiling silently truncated every read:
 // the career store holds 2,017 rows and the prompt only ever saw the oldest 1,000 (a short read,
@@ -147,6 +149,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { assemblePrompt } from '../api/prompt/db-assembly.js';
 import { renderAssembly, resolveJudgmentModel } from './agent-prompt.js';
+import { overBudget, recordHead } from './agent-prompt.js';
 import { readMail } from '../lib/imap-readonly.js';
 
 // Same tenant agent-prompt.js measured: every agent_configs / assignment row carries 'global'.
@@ -264,7 +267,7 @@ export const REPOS = [
 ];
 
 const BOARDS = ['greenhouse', 'lever', 'ashby'];
-const RECORD_FIELDS = 'id,kind,title,body,data,target_row,source';
+const RECORD_FIELDS = 'id,kind,title,body,data,target_row,source,created_at';
 const HUMOR_FIELDS = 'id,kind,title,body,data,source,created_at';
 
 // AGT-543. Which store a capability reads, decided by WHICH MAP holds its slug -- data, never an
@@ -413,7 +416,7 @@ export function postingCoverage(rows) {
   for (const rec of Array.isArray(rows) ? rows : []) {
     if (postingOrigin(rec) === 'fetched') {
       coverage.fetched += 1;
-      if (rec?.data?.text) coverage.fetched_with_text += 1;
+      if (rec?.data?.text || rec?.has_text) coverage.fetched_with_text += 1;
     } else {
       coverage.write_backs += 1;
     }
@@ -672,10 +675,10 @@ async function readRecords(db, capability, target) {
   for (const r of rows) {
     if (filters?.[r.kind] && !filters[r.kind](r)) continue;
     if (!store.targeted) {
-      records[r.kind].push({ id: r.id, title: r.title, body: r.body, data: r.data, created_at: r.created_at });
+      records[r.kind].push(recordHead(r));
       continue;
     }
-    const rec = { id: r.id, title: r.title, body: r.body, data: r.data, target_row: r.target_row };
+    const rec = { ...recordHead(r), target_row: r.target_row, has_text: Boolean(r.data?.text) };
     // AGT-268: a posting carries its PROVENANCE, never its raw `source` -- the stamp is
     // `<capability slug> <date>`, and a capability slug in the prompt would name another agent's
     // work in data (§19d/§19e Rule #1). The two-value label is the whole fact the reader needs.
@@ -769,8 +772,8 @@ async function readPersonalSources(db, args) {
   const grants = await db.get(`personal_source_grants?agent_id=eq.${encodeURIComponent(args.agent)}&select=kind`);
   const kinds = [...new Set(grants.map(g => g.kind).filter(Boolean))];
   if (!kinds.length) return null;
-  return db.get(`personal_sources?kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
-    '&select=id,kind,title,body,data,origin,voice,created_at&order=created_at.asc,id.asc');
+  return (await db.get(`personal_sources?kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
+    '&select=id,kind,title,body,data,origin,voice,created_at&order=created_at.asc,id.asc')).map(r => ({ ...recordHead(r), origin: r.origin, voice: r.voice }));
 }
 
 const HUMOR_WEEK_KINDS = ['ship', 'john-ruling', 'directive', 'ticket-status', 'removal-proposal'];
@@ -835,6 +838,9 @@ async function render(args) {
     intake,
     ...extra,
   };
+
+  const budget = overBudget(task_context);
+  if (budget.over.length) fail(`render refused: section(s) ${budget.over.join(', ')} over the ${budget.ceiling}-byte ceiling -- ` + Object.entries(budget.sizes).map(([k, b]) => `${k}: ${b}`).join(', '));
 
   let assembly;
   try {
