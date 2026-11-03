@@ -1,3 +1,4 @@
+// DeepBench v7.0.950 | scripts/ticket-validation.js | the intent is read from capabilities.default_intent_slug and PASSED -- assemblePrompt() drops every Intent Skill when intent_slug is null, so the validation turn had no output contract (found by the 2026-11-03 Victoria POC).
 #!/usr/bin/env node
 // DeepBench v7.0.870 | scripts/ticket-validation.js | AGT-493 -- THE VALIDATION DOOR. A ticket filed
 // more than 14 days ago is handed to the Governance Architect's `validate-ticket` capability before
@@ -34,7 +35,7 @@ import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import { assemblePrompt } from "../api/prompt/db-assembly.js";
-import { renderAssembly, resolveJudgmentModel } from "./agent-prompt.js";
+import { renderAssembly, resolveJudgmentModel, resolveIntentSlug } from "./agent-prompt.js";
 
 // --- pure half (imported by tests/regression/agt-493-ticket-validation.test.mjs; no network) ------
 
@@ -301,10 +302,17 @@ async function prepare(args) {
 
   let assembly;
   try {
-    // NO `intent_slug`: `capabilities.default_intent_slug` is `ga-validate-intent` and that column
-    // is the one home of which intent this capability fires (section 19b, pattern:2).
+    // v7.0.950: the intent is READ from `capabilities.default_intent_slug` (its one home, section
+    // 19b) and PASSED. assemblePrompt() does not resolve that default itself -- it drops every
+    // Intent Skill when intent_slug is null (AA-188) -- so the old "omit it, the column decides"
+    // assembled a prompt with no output contract, and every validation turn since could not answer
+    // (found by the 2026-11-03 Victoria POC: 46 old tickets held, none validated).
+    const resolved = await resolveIntentSlug({ capability: CAPABILITY, tenant: TENANT });
+    if (resolved.error) die(1, `ticket-validation: ${resolved.error}`);
+    if (!resolved.intentSlug) die(1, `ticket-validation: capability ${CAPABILITY} declares no default_intent_slug -- refusing to assemble a turn with no output contract`);
     assembly = await assemblePrompt({
       capability_slug: CAPABILITY, agent_id: AGENT, tenant_id: TENANT, task_context,
+      intent_slug: resolved.intentSlug,
     });
   } catch (e) { die(1, `ticket-validation: ${e.message}`); }
   if (!assembly.agent_card) die(1, `ticket-validation: no agents row for ${AGENT}`);
