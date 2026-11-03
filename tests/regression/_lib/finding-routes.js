@@ -1,3 +1,5 @@
+// DeepBench v7.0.953 | tests/regression/_lib/finding-routes.js | AGT-304 slice 47 -- v7.0.949 (platform-invariants.sql,
+// INTAKE-LIFECYCLE-RCA-1103 D6) added the `invariant` row and left this home at eleven; twelve now, in --prepare's order.
 // DeepBench v7.0.871 | tests/regression/_lib/finding-routes.js | AGT-494 -- decision ccab94da's note reads in
 // past tense and names today's filer; the route rows themselves are unchanged.
 // DeepBench v7.0.859 | tests/regression/_lib/finding-routes.js | AGT-484 -- the `agent` row routes to
@@ -15,6 +17,7 @@ export const LIVE_ROUTES = [
   { precedence: 30, source: "backlog-review", finding_type: "*", project_slug: MANAGER_PROJECT }, // AGT-159
   { precedence: 30, source: "builder", finding_type: "*", project_slug: MANAGER_PROJECT }, // status-0929
   { precedence: 30, source: "check-routine-prompt", finding_type: "*", project_slug: MANAGER_PROJECT }, // AGT-134
+  { precedence: 30, source: "invariant", finding_type: "*", project_slug: MANAGER_PROJECT }, // v7.0.949 INTAKE-LIFECYCLE-RCA-1103 D6
   { precedence: 30, source: "researcher", finding_type: "*", project_slug: MANAGER_PROJECT }, // AGT-138
   { precedence: 30, source: "runner", finding_type: "*", project_slug: MANAGER_PROJECT }, // AGT-134
   { precedence: 30, source: "session", finding_type: "*", project_slug: MANAGER_PROJECT }, // AGT-264

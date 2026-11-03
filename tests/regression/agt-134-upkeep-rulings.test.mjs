@@ -218,7 +218,7 @@ async function run() {
   await arm("B live rows", async () => {
     const r = await req(url, key, "finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
     assert.equal(r.status, 200, describe(r));
-    assert.deepEqual(r.json, ROUTES, "the eleven routing rows, exactly (_lib/finding-routes.js)");
+    assert.deepEqual(r.json, ROUTES, "the twelve routing rows, exactly (_lib/finding-routes.js)");
     for (const src of ["check-routine-prompt", "runner"]) {
       const row = r.json.find(x => x.source === src);
       assert.ok(row, `AGT-134's ${src} route is live`);
