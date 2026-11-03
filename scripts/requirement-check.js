@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.937 | scripts/requirement-check.js | AGT-431 -- THE RE-SCORE DOOR, AND THE ORDER JOHN JUDGES. `--prepare-list --rescore` is a MODE of the list door, not a second one (pattern:17): John's ruling `e9b5bfc5` reopened every grade on the executing projects, which is requirement d.13's own reopening condition, so the mode offers every open/partial ticket (nothing held back for carrying a grade) and hands each proposal `graded: false` plus `rescore_note` -- `validateListVerdict()`'s V2 then accepts the `pass` the run exists to collect and V3 still refuses a `move` on it. NOT ONE OF HER ROWS IS TOUCHED: `grade_standing()` still names every one of them and only this one context reads false. `--rescore-report --cycle-id=<uuid>` is the second half: it re-reads the two executing projects' open/partial tickets, their standing grades and `prime_directive_queue()`'s own order, and puts the PICK'S ORDER to John as ONE yes/no `runner_questions` row (`RESCORE_QID`), its creation imaged in `runner_before_images` BEFORE the row exists so one Reverse can take it away. Live before this: all 21 open/partial tickets of `tooling` (16) and `dev-manager-capabilities` (5) were graded, `--prepare-list` offered 12 of 16 on tooling (4 held back) and `validateListVerdict()` refused a `pass` on every one of them as `already graded` (2026-11-03). pattern:10, pattern:17, pattern:152.
 // DeepBench v7.0.870 | scripts/requirement-check.js | AGT-493 -- A TICKET FILED MORE THAN 14 DAYS AGO IS NOT OFFERED UNTIL A VALIDATION STANDS. prepareList() reads needs_validation() once per list and drops what it names (the architect's validate-ticket door runs first: scripts/ticket-validation.js); each proposal carries needs_validation; V8 refuses a move or a homing pass on it. Live before this: 77 + 13 graded tickets older than 14 days in the two holding lists, every one placeable by a move (2026-10-20). d.8, d.30; pattern:9, pattern:10, pattern:17.
 // DeepBench v7.0.866 | scripts/requirement-check.js | AGT-490 -- A PARKED 0 NAMES WHERE IT WAITS. `prepareList()` POSTs `rpc/victoria_parked_homes` once per run and the context carries `parked_homes` (`{slug, name, status}` of every paused and planned project), so a ticket the tree calls PARKED can be scored 0 AND say where it waits -- `home` a parked slug, or `new_project` the name of a PLANNED project created for it (capture only, John turns one on). `validateListVerdict()` holds the five rules offline (P1 a 0's reason begins `PARKED (0) until `; P2 a 0's home is a parked slug while V1 is byte-unchanged above 0; P3 `new_project` only on a 0 or a `no-fit`, 3-80 characters, never beside `home`, and never a slug she was already handed; P4 a `no-fit`'s home is a parked slug; P5 a ticket John named names neither, d.10), `applyList()` sends a pass's `new_project` beside its `home`, and a `no-fit` that named a destination POSTs the writer's new `park` verdict AFTER its `fit-stamp` -- its own `placement` decision, no grade, printed as `Parked: <id> -> <target>` and counted on the counts line. Live before this: 0 tickets on the whole board read `need_score` 0 though every validator has accepted one since `v7.0.844`, AGT-383 and AGT-252 both read 1 against John's 2026-10-08 ruling, and `home` reached `placement_target()`, which admits an `executing` project and nothing else (2026-10-19). pattern:2, pattern:10, pattern:17.
 // DeepBench v7.0.865 | scripts/requirement-check.js | AGT-489 -- THE MOVE DOOR. The list turn now carries `graded` and `parent_home` per proposal and answers `move` (place a graded ticket, never re-grading it) or `hold` (graded, fits, waits) beside `pass`, `not-needed` and `no-fit`: `prepareList()` reads `grade_standing()` and `parent_project_of_blockers()` ONCE per list, drops a graded ticket scoring under 3 that no parent lifts (it cannot move and must not be re-graded), and `applyList()` sends a `pass`'s `home_project` from the row's own `home` and a `move` to `apply_requirement_verdict()`, which writes it as its own `placement` decision. Live before this: `applyList` sent NO `home_project` on any pass and `prepareList` had no notion of "already graded", so `auditor-findings` offered the same 35 graded tickets every run (43 open/partial = 8 ungraded + 35 graded; `dev-mgr-findings` 201 = 6 + 195) while `countable_tickets_per_project()` read 1/0/0 (2026-10-19). pattern:2, pattern:9, pattern:14.
@@ -240,6 +241,10 @@ export const LIST_REASON_CHARS = 400;
 // How many passes runLine() names.
 export const TOP_N = 3;
 
+// AGT-431: a re-score run -- John reopened every grade (ruling e9b5bfc5, 2026-10-09).
+export const RESCORE_NOTE = "John reopened every grade on this list (john-ruling e9b5bfc5-4f28-42b6-9ae8-6c2883496522): score each ticket afresh under the severity tree; answer pass with home null, or a PARKED 0 naming where it waits; never move or hold.";
+export const RESCORE_QID = "q-agt-431-rescore";
+
 // WHICH `who:table` PAIRS BECOME CANDIDATES, AND WHAT OF EACH ROW IS READ. The pairs themselves are
 // DATA (`runner_settings.need_source_kinds`, pattern:2) -- this map only says which column of each
 // table is the head, which is a fact about the table's shape and not a content judgment. A pair the
@@ -326,7 +331,7 @@ const cut = (v, n) => (v === null || v === undefined ? null : String(v).slice(0,
 
 // The list task_context. The tickets' own columns and the candidates' own keys -- this file judges
 // nothing about either, it only decides how much of each travels.
-export function buildListContext({ project, epics, tickets, candidates, kinds, charters, fingerprint,
+export function buildListContext({ project, epics, tickets, candidates, kinds, charters, fingerprint, rescore,
   parked_homes }) {
   return {
     list: project ?? null,
@@ -349,6 +354,12 @@ export function buildListContext({ project, epics, tickets, candidates, kinds, c
     // The md5 the rpc computed, echoed verbatim and never recomputed here: the stamp this run may
     // write has to carry the SAME fingerprint the function will match it against.
     charter_fingerprint: typeof fingerprint === "string" && fingerprint ? fingerprint : null,
+    // AGT-431: THE RE-SCORE MODE, and it is a MODE OF THIS LIST DOOR rather than a second door --
+    // ruling `e9b5bfc5` reopened every grade, which is the one condition requirement d.13 already
+    // names as reopening one (pattern:17). Both keys are ABSENT unless the mode is on, so a context
+    // assembled without it is byte-unchanged; the note is the constant above and no wording of it
+    // lives here or in the runbook (pattern:93).
+    ...(rescore === true ? { rescore: true, rescore_note: RESCORE_NOTE } : {}),
     proposals: (Array.isArray(tickets) ? tickets : []).map(t => ({
       backlog_id: t.backlog_id ?? null,
       title: t.title ?? null,
@@ -372,7 +383,11 @@ export function buildListContext({ project, epics, tickets, candidates, kinds, c
       // default to the safe reading -- not graded, no parent -- so a context assembled without them
       // behaves exactly as it did before this ship. They are placed BEFORE `need_source_head`
       // deliberately: agt-487's guard pins that key as the proposal's LAST one.
-      graded: t.graded === true,
+      // AGT-431: and a re-score run hands every proposal `graded: false` -- John's ruling reopened
+      // the grade, so V2 must not refuse the `pass` this run exists to collect, and V3 must refuse
+      // a `move` on it. Her rows are untouched: `grade_standing()` still names them, and nothing
+      // but this one context says otherwise.
+      graded: rescore === true ? false : t.graded === true,
       parent_home: blank(t.parent_home) ? null : String(t.parent_home),
       // AGT-493: the THIRD fact she cannot read off the columns -- whether this ticket is older than
       // the validation window with no validation standing on it (`needs_validation()`, d.8/d.30).
@@ -914,6 +929,10 @@ const enc = encodeURIComponent;
 // before the reads, cheapest first: a held slug and an unknown project cost nothing.
 async function prepareList(args) {
   const project = typeof args.project === "string" ? args.project : "";
+  // AGT-431: `--rescore`. One flag, two effects and no third: every ticket is offered (nothing is
+  // held back for holding a grade John has reopened) and `graded` travels false. Off by default, so
+  // an ordinary run of this door is byte-unchanged.
+  const rescore = args.rescore === true;
   if (!project) {
     die(2, "requirement-check --prepare-list: --project=<slug> is required");
   }
@@ -1044,7 +1063,10 @@ async function prepareList(args) {
   // on it would be refused too -- V8 refuses a `move` and a homing `pass`, V7 refuses a `hold` on a
   // blocker -- so a list turn on it buys nothing; the architect's validation door is what offers it
   // again (d.30, pattern:9).
-  const offered = tickets.filter(t => !t.needs_validation && (!t.graded || Number(t.need_score) >= 3 || t.parent_home !== null));
+  // AGT-431: a re-score run holds NOTHING back. The one reason a graded ticket under 3 is not
+  // offered is that it must not be re-graded (d.13) -- and John's ruling reopened exactly that, so
+  // under `--rescore` the filter would hold back the very tickets the run exists to score.
+  const offered = rescore ? tickets : tickets.filter(t => !t.needs_validation && (!t.graded || Number(t.need_score) >= 3 || t.parent_home !== null));
   const unvalidated = tickets.filter(t => t.needs_validation).length;
   console.error(`requirement-check: ${unvalidated} ticket(s) filed more than 14 days ago hold no standing validation and are not offered -- node scripts/ticket-validation.js --prepare --list=${project}`);
   const heldBack = tickets.length - offered.length;
@@ -1118,7 +1140,7 @@ async function prepareList(args) {
 
   const task_context = buildListContext({
     project, epics: epicIds, tickets, candidates, kinds, charters, fingerprint,
-    parked_homes: parkedHomes,
+    parked_homes: parkedHomes, rescore,
   });
   await assembleAndEmit({
     base, key, args, task_context, intentSlug: LIST_INTENT,
@@ -1371,6 +1393,149 @@ async function applyList(args) {
   process.exitCode = 0;
 }
 
+// --- AGT-431: THE RE-SCORE REPORT -------------------------------------------------------------
+//
+// ONE yes/no row for John, and the thing it asks about is the PICK'S OWN ORDER rather than any
+// score of hers: the Designer's call (b). It writes no ticket column, no decision and no grade --
+// the grades are already on the board from `--apply-list`, and a second copy of them here would be
+// a second answer to "what does this ticket score" (pattern:93).
+//
+// EVERY NUMBER IS READ, NOT DERIVED HERE. The order is `prime_directive_queue()`'s own `pos` (the
+// one SQL home the picker and the briefing both read, SES-236); the standing grade is
+// `grade_standing()`; the date and her words are the decision row that function names. This file
+// re-ranks nothing: a report that computed its own order would be asking John to accept an order
+// nothing runs.
+//
+// THE CREATION IS IMAGED BEFORE THE ROW EXISTS. `row_data: null` under this cycle is what makes
+// the question reversible at all -- there is no "before" for a row being created, and the image
+// says so in the one shape `reverse_decision()`'s readers already take. It goes FIRST: an image
+// written after the insert is an image of a row the Reverse was meant to undo.
+//
+// AND IT ASKS ONCE. An open `q-agt-431-rescore*` row means John has not answered the last one yet,
+// and a second question about the same order is a second addressee for one decision -- refused
+// here, before any read of the board.
+async function rescoreReport(args) {
+  // BEFORE creds(): a missing cycle id is an argument fault, and an argument fault that costs a
+  // credential read reads as an environment fault to whoever runs it.
+  const cycleId = typeof args["cycle-id"] === "string" ? args["cycle-id"] : "";
+  if (!cycleId) die(2, "requirement-check --rescore-report: --cycle-id=<uuid> is required");
+
+  const { base, key } = creds();
+  const get = async q => {
+    const r = await rest(base, key, "GET", q);
+    if (!r.ok) die(1, `requirement-check: GET ${q} -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
+    return r.json;
+  };
+  const rpc = async name => {
+    const r = await rest(base, key, "POST", `rpc/${name}`, {});
+    if (!r.ok) die(1, `requirement-check: POST rpc/${name} -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
+    return Array.isArray(r.json) ? r.json : [];
+  };
+
+  const standing = await get(`runner_questions?qid=like.${RESCORE_QID}*&status=eq.open&select=id,qid,asked_at`);
+  if (Array.isArray(standing) && standing.length) {
+    die(1, `requirement-check --rescore-report: ${standing.length} open ${RESCORE_QID}* question(s) ` +
+      `already stand (${standing.map(q => `${q.qid} ${q.id}`).join(", ")}) — John answers that one ` +
+      "before the same order is put to him twice; nothing was written");
+  }
+
+  // The lists this run covers: the executing projects, in the priority order the picker runs them.
+  const projects = await get("projects?status=eq.executing&select=id,slug,name,priority&order=priority");
+  if (!Array.isArray(projects) || projects.length === 0) {
+    die(1, "requirement-check --rescore-report: no project reads status executing — there is no " +
+      "order to put to anyone");
+  }
+
+  // The two whole-board reads, ONCE each: which grade stands on which ticket, and where the pick
+  // actually runs it.
+  const grades = new Map((await rpc("grade_standing")).map(r => [String(r?.backlog_id), r?.decision_id ?? null]));
+  const queue = new Map((await rpc("prime_directive_queue"))
+    .filter(r => r?.lane !== "board" && r?.pos !== null && r?.pos !== undefined && r?.ref)
+    .map(r => [String(r.ref), Number(r.pos)]));
+
+  // The tickets, per project, in the order the board reads them: the highest score first, a ticket
+  // with no score last, ties by id so two runs of this report print the same lines (pattern:127).
+  const listed = [];
+  for (const p of projects) {
+    const eps = await get(`epics?project_id=eq.${enc(p.id)}&select=id&order=id.asc`);
+    const epicIds = (Array.isArray(eps) ? eps : []).map(r => r.id);
+    if (epicIds.length === 0) continue;
+    const rows = await get(
+      `backlog_items?epic_id=in.(${epicIds.map(enc).join(",")})&status=in.(open,partial)` +
+      "&select=backlog_id,need_score&order=need_score.desc.nullslast,backlog_id.asc&limit=1000");
+    for (const t of Array.isArray(rows) ? rows : []) listed.push({ slug: String(p.slug), ...t });
+  }
+  if (listed.length === 0) {
+    die(1, "requirement-check --rescore-report: the executing projects hold no open or partial " +
+      "ticket — there is no order to put to anyone");
+  }
+
+  // Her words and the day she wrote them, in ONE read of the decisions `grade_standing()` named.
+  const ids = [...new Set(listed.map(t => grades.get(String(t.backlog_id))).filter(Boolean))];
+  const decisions = new Map();
+  if (ids.length) {
+    const rows = await get(`runner_decisions?id=in.(${ids.map(enc).join(",")})&select=id,decided_at,reasoning&limit=1000`);
+    for (const d of Array.isArray(rows) ? rows : []) decisions.set(String(d.id), d);
+  }
+
+  const lines = [];
+  const picked = [];
+  for (const t of listed) {
+    const id = String(t.backlog_id);
+    const pos = queue.has(id) ? queue.get(id) : null;
+    if (pos !== null) picked.push({ id, pos });
+    const dec = decisions.get(String(grades.get(id) ?? "")) ?? null;
+    const reasoning = dec ? String(dec.reasoning ?? "") : null;
+    const score = t.need_score === null || t.need_score === undefined ? "-" : String(t.need_score);
+    // The Designer's call (e): a parked ticket is written 0. A 1 whose reason begins with the parked
+    // prefix is a STAND-IN for that 0 -- flagged on its own line rather than silently read as a 1,
+    // because `countable_tickets_per_project()` matches the prefix and the score separately.
+    const standIn = Number(t.need_score) === 1 && reasoning !== null && reasoning.startsWith(PARKED_PREFIX)
+      ? " (stand-in 1)" : "";
+    const gradedOn = dec && dec.decided_at ? String(dec.decided_at).slice(0, 10) : "ungraded";
+    lines.push(`${t.slug} | ${id} | ${pos === null ? "pick not offered" : `pick #${pos}`} | ` +
+      `${score}${standIn} | ${gradedOn} | ${reasoning === null ? "(none)" : cut(reasoning, 160)}`);
+  }
+
+  picked.sort((a, b) => a.pos - b.pos);
+  const order = picked.length ? picked.map(p => `#${p.pos} ${p.id}`).join(", ") : "(none offered)";
+  const slugs = projects.map(p => String(p.slug)).join(", ");
+  // The Central day, the stamp every write of this platform's days carries. One question per day:
+  // a second run on the same day collides on `qid` rather than asking twice.
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  const qid = `${RESCORE_QID}-${today}`;
+  const question = `Victoria re-scored the ${lines.length} open tickets of the executing projects ` +
+    `(${slugs}) under her severity tree; the pick now runs them ${order}. Do you accept this order?`;
+  const context = `Cycle ${cycleId}. project | ticket | pick | score | graded on | her reason\n` +
+    lines.join("\n") +
+    "\n\nYES means the order stands. NO means you re-score by your own word and the next pass echoes it.";
+
+  const img = await rest(base, key, "POST", "runner_before_images", {
+    cycle_id: cycleId, table_name: "runner_questions", pk_value: qid, row_data: null,
+  }, "return=minimal");
+  if (!img.ok) {
+    die(1, `requirement-check --rescore-report: before-image -> HTTP ${img.status} ${img.text.slice(0, 400)} ` +
+      "— the question is NOT asked without one; nothing was written");
+  }
+  const asked = await rest(base, key, "POST", "runner_questions", {
+    qid, question, context, asked_cycle: cycleId, asked_at: new Date().toISOString(), status: "open",
+  }, "return=representation");
+  if (!asked.ok) {
+    die(1, `requirement-check --rescore-report: runner_questions -> HTTP ${asked.status} ${asked.text.slice(0, 400)}`);
+  }
+  const row = Array.isArray(asked.json) ? asked.json[0] : asked.json;
+  if (!row || !row.id) {
+    die(1, `requirement-check --rescore-report: the insert returned no row; got ${asked.text.slice(0, 300)}`);
+  }
+
+  console.log(question);
+  for (const line of lines) console.log(line);
+  console.log(`runner_questions ${row.id} (${qid})`);
+  process.exitCode = 0;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.prepare) return prepare(args);
@@ -1378,7 +1543,8 @@ async function main() {
   if (args["dry-run"]) return dryRun(args);
   if (args.apply) return apply(args);
   if (args["apply-list"]) return applyList(args);
-  die(2, "usage: requirement-check.js --prepare --ticket=<ID> --source=<who:table:id> [--home=<slug>] [--out=<path>] [--json] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>) | --prepare-list --project=<slug> [--epic=<uuid>] [--out=<path>] [--json] | --apply-list=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>)");
+  if (args["rescore-report"]) return rescoreReport(args);
+  die(2, "usage: requirement-check.js --prepare --ticket=<ID> --source=<who:table:id> [--home=<slug>] [--out=<path>] [--json] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>) | --prepare-list --project=<slug> [--epic=<uuid>] [--rescore] [--out=<path>] [--json] | --rescore-report --cycle-id=<uuid> | --apply-list=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>)");
 }
 
 // Importing this module for its exports must never run the CLI (SES-45).

@@ -37,6 +37,7 @@ Match the ask to a door:
 | `check` (plus one ticket id and one `who:table:id` source) | `--prepare` → `--dry-run` → `--apply`, the single-ticket path |
 | `reorganize` (plus one project slug) | `--prepare-list` → `--apply-list`, the list path |
 | `prioritize` (no slug) | the (c) block, step for step, in an attended session with `--session-name=victoria-prioritize-<yyyymmdd>` — the by-hand call John named ("until next scheduled routine or she is called upon") |
+| `rescore` (plus one project slug) | `--prepare-list --rescore` → `--apply-list`, then `--rescore-report --cycle-id=<uuid>` once, all executing projects (AGT-431) |
 
 Both `--apply` and `--apply-list` are run with `--session-name=<name>` in an attended session — never `--cycle-id`, which is the runner's own author and would attribute the write to a cycle that did not make it. A list the ask does not name is not reorganized; `builder-found-tickets` is refused outright (`HELD_LISTS`), and the door exits 1 on it before any read.
 
