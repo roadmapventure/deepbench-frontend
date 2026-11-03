@@ -1,3 +1,9 @@
+// DeepBench v7.0.946 | tests/regression/agt-167-noship-pick-fence.test.mjs | the count is a STREAK SINCE THE
+// LAST SHIP (docs/design/noship-streak-since-last-ship.sql). It was a lifetime count, so AGT-304 -- 37 ships
+// and 4 scattered failures -- was fenced out of the pick from 2026-10-30. ARM A's oracle now counts the
+// streak, fixture cycles carry distinct started_at values (the streak is ordered by time), and B5-B7 walk
+// the AGT-304 shape: over the cap in lifetime failures, under it since the last ship -> offered; a real
+// streak at the cap -> refused.
 // DeepBench v7.0.900 | tests/regression/agt-167-noship-pick-fence.test.mjs | AGT-304 slice 19 -- the fixture is john-named and scored, so the two gates that landed after this file (AGT-240's epic lock, AGT-455's lane (c) score) admit it.
 // DeepBench v7.0.642 | tests/regression/agt-167-noship-pick-fence.test.mjs | AGT-167 -- THE NO-SHIP
 // CAP BINDS AT PICK TIME, ON A MEASURE THAT MATCHES ITS OWN WORDS.
@@ -58,6 +64,8 @@ const PAGE = 1000;
 const SOURCE_FILE = "tests/regression/agt-167-noship-pick-fence.test.mjs";
 // Old enough to sit before every shipped cycle on the board, so Gate D's window can never see it.
 const FIXTURE_STARTED_AT = "2020-01-01T00:00:00Z";
+// The streak is ordered by started_at, so every fixture cycle gets its own minute after the base.
+const fixtureAt = minute => new Date(Date.parse(FIXTURE_STARTED_AT) + minute * 60000).toISOString();
 
 function fixtureNonce() {
   const n = String(Math.floor(Math.random() * 100000)).padStart(5, "0");
@@ -130,28 +138,40 @@ async function run() {
   // ARM A -- the counter's ARITHMETIC, against an oracle that is not the counter.
   // ==============================================================================================
   const items = await pageAll(url, key, "backlog_items?select=id,backlog_id,status&order=backlog_id");
-  const cycles = await pageAll(url, key, "runner_cycles?select=backlog_item_id,item_id,outcome&order=id");
+  const cycles = await pageAll(url, key, "runner_cycles?select=backlog_item_id,item_id,outcome,started_at&order=id");
   assert.ok(items.length > 0 && cycles.length > 0,
     `A: the oracle read ${items.length} items and ${cycles.length} cycles -- an empty read would make ` +
     `every comparison below vacuously true, so it is refused rather than banked`);
 
   const uuidToId = new Map(items.map(r => [r.id, r.backlog_id]));
-  const noship = new Map();
   const total = new Map();
+  const lifetimeNoship = new Map();
+  const lastShip = new Map();
+  const keyed = [];
   let viaUuid = 0;
   for (const c of cycles) {
     const key2 = (c.backlog_item_id != null ? uuidToId.get(c.backlog_item_id) : null) ?? c.item_id ?? null;
     if (key2 == null) continue;
     if (c.backlog_item_id != null && uuidToId.has(c.backlog_item_id)) viaUuid += 1;
+    const t = Date.parse(c.started_at);
+    keyed.push({ id: key2, t, shipped: c.outcome === "shipped" });
     total.set(key2, (total.get(key2) ?? 0) + 1);
-    if (c.outcome !== "shipped") noship.set(key2, (noship.get(key2) ?? 0) + 1);
+    if (c.outcome === "shipped") lastShip.set(key2, Math.max(lastShip.get(key2) ?? -Infinity, t));
+    else lifetimeNoship.set(key2, (lifetimeNoship.get(key2) ?? 0) + 1);
+  }
+  // THE ORACLE: non-shipping cycles that started after the ticket's latest shipped cycle.
+  const noship = new Map();
+  for (const k of keyed) {
+    if (!k.shipped && k.t > (lastShip.get(k.id) ?? -Infinity)) noship.set(k.id, (noship.get(k.id) ?? 0) + 1);
   }
 
-  // A sample wide enough to exercise both join halves, shipped exclusion, and the empty case.
+  // A sample wide enough to exercise both join halves, shipped exclusion, the empty case, and the
+  // tickets whose lifetime count differs from the streak (the AGT-304 shape this version fixes).
   const busiest = [...total].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12).map(([id]) => id);
   const shippedOnly = [...total].filter(([id]) => (noship.get(id) ?? 0) === 0).slice(0, 3).map(([id]) => id);
   const noCycles = items.map(r => r.backlog_id).filter(id => !total.has(id)).slice(0, 2);
-  const sample = [...new Set([...busiest, ...shippedOnly, ...noCycles])];
+  const lifetimeDiffers = [...lifetimeNoship].filter(([id, n]) => n > (noship.get(id) ?? 0)).slice(0, 5).map(([id]) => id);
+  const sample = [...new Set([...busiest, ...shippedOnly, ...noCycles, ...lifetimeDiffers])];
 
   // NON-VACUITY. If the sample cannot tell a non-shipping count from a total one, ARM A proves
   // nothing about the measure and says so instead of banking a green.
@@ -167,11 +187,13 @@ async function run() {
     const live = await noshipOf(url, key, id);
     assert.equal(live, noship.get(id) ?? 0,
       `A: ticket_noship_cycles('${id}') returned ${live}, the oracle counts ${noship.get(id) ?? 0} ` +
-      `non-shipping of ${total.get(id) ?? 0} total. A counter that agreed with the TOTAL would read ` +
-      `${total.get(id) ?? 0} here.`);
+      `non-shipping since the last ship, of ${total.get(id) ?? 0} total and ${lifetimeNoship.get(id) ?? 0} ` +
+      `non-shipping in its lifetime. A counter that agreed with the TOTAL would read ${total.get(id) ?? 0}; ` +
+      `one that agreed with the LIFETIME count would read ${lifetimeNoship.get(id) ?? 0}.`);
   }
   console.log(`    [A] ticket_noship_cycles agrees with an independent count on ${sample.length} tickets ` +
-    `(${discriminating.length} of them have shipped cycles the measure must ignore; ${viaUuid} cycles join via uuid)`);
+    `(${discriminating.length} of them have shipped cycles the measure must ignore; ` +
+    `${lifetimeDiffers.length} have older failures before a ship; ${viaUuid} cycles join via uuid)`);
 
   // The standing property over the real board: nothing lane (c) offers may be at or over the cap.
   // Vacuous today by population -- kept because it is what must hold forever, and it costs one call.
@@ -251,9 +273,9 @@ async function run() {
     const gated = await rest(url, key, "runner_cycles", {
       method: "POST",
       headers: { Prefer: "return=representation" },
-      body: JSON.stringify(Array.from({ length: cap }, () => ({
+      body: JSON.stringify(Array.from({ length: cap }, (_, i) => ({
         stamp: fixStamp, trigger: "scheduled", item_id: fixId,
-        outcome: "gated_before_build", started_at: FIXTURE_STARTED_AT,
+        outcome: "gated_before_build", started_at: fixtureAt(100 + i),
       }))),
     });
     assert.equal(gated.length, cap, `B2: expected ${cap} fixture cycles, created ${gated.length}`);
@@ -275,7 +297,7 @@ async function run() {
       `Anything else is the fence over-filtering the queue.`);
     assert.deepEqual(gainedB2, [], `B2: crossing the cap must not ADD anything. Added: ${JSON.stringify(gainedB2)}`);
 
-    // -- B3. ONE cycle flips to shipped -> cap-1 non-shipping, `cap` TOTAL -> offered again. This is
+    // -- B3. The EARLIEST cycle flips to shipped -> cap-1 non-shipping after it, `cap` TOTAL -> offered again. This is
     // the arm a TOTAL-cycle fence fails, and it also proves the refusal is not permanent.
     await rest(url, key, `runner_cycles?id=eq.${gated[0].id}`, {
       method: "PATCH", headers: { Prefer: "return=minimal" },
@@ -295,9 +317,10 @@ async function run() {
     // Shipping repeatedly must never push a ticket over a cap counted in non-shipping cycles.
     await rest(url, key, "runner_cycles", {
       method: "POST", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify(Array.from({ length: 4 }, () => ({
+      // Earlier than every gated cycle, so the streak after the latest ship is untouched.
+      body: JSON.stringify(Array.from({ length: 4 }, (_, i) => ({
         stamp: fixStamp, trigger: "scheduled", item_id: fixId,
-        outcome: "shipped", started_at: FIXTURE_STARTED_AT,
+        outcome: "shipped", started_at: fixtureAt(10 + i),
       }))),
     });
     assert.equal(await noshipOf(url, key, fixId), cap - 1,
@@ -307,8 +330,40 @@ async function run() {
     assert.equal(laneRefs(q4, EXPECTED_LANE).filter(r => r === fixId).length, 1,
       `B4: at ${cap + 4} total cycles of which only ${cap - 1} did not ship, ${fixId} must still be ` +
       `offered. A fence that counted cycles rather than non-shipping cycles refuses it here.`);
+
+    // -- B5. A ship AFTER every failure resets the streak to 0 (v7.0.946). Lifetime non-shipping is
+    // still cap-1 -- a lifetime counter reads cap-1 here, the streak reads 0.
+    const addCycles = (outcome, minutes) => rest(url, key, "runner_cycles", {
+      method: "POST", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(minutes.map(m => ({
+        stamp: fixStamp, trigger: "scheduled", item_id: fixId, outcome, started_at: fixtureAt(m),
+      }))),
+    });
+    await addCycles("shipped", [500]);
+    assert.equal(await noshipOf(url, key, fixId), 0,
+      `B5: a ship after every failure must reset the streak to 0. A reading of ${cap - 1} is the ` +
+      `lifetime count that fenced AGT-304 from 2026-10-30.`);
+
+    // -- B6. THE AGT-304 SHAPE. Two failures after that ship: lifetime non-shipping is cap+1 (over the
+    // cap), the streak is 2 (under it) -> must be offered. The lifetime counter refuses it here.
+    await addCycles("gated_before_build", [600, 601]);
+    assert.equal(await noshipOf(url, key, fixId), 2, "B6: two failures after the last ship must count 2");
+    const q6 = await queue(url, key);
+    assert.equal(laneRefs(q6, EXPECTED_LANE).filter(r => r === fixId).length, 1,
+      `B6: ${cap + 1} lifetime failures but only 2 since the last ship -- ${fixId} must still be offered. ` +
+      `It is not, so the fence is counting failures across ships again.`);
+
+    // -- B7. A REAL STREAK still binds: cap failures in a row after the last ship -> refused.
+    await addCycles("gated_before_build", Array.from({ length: cap - 2 }, (_, i) => 700 + i));
+    assert.equal(await noshipOf(url, key, fixId), cap, `B7: ${cap} failures since the last ship must count ${cap}`);
+    const q7 = await queue(url, key);
+    assert.equal(refsOf(q7).has(fixId), false,
+      `B7: ${cap} failures in a row since the last ship must fence ${fixId}; it is still offered, so the ` +
+      `streak fix removed the safety rule instead of correcting it.`);
+
     console.log(`    [B] lane (c) fence walked at cap ${cap}: offered at 0, refused at ${cap}, ` +
-      `offered again at ${cap - 1} of ${cap}, still offered at ${cap - 1} of ${cap + 4}`);
+      `offered again at ${cap - 1} of ${cap}, still offered at ${cap - 1} of ${cap + 4}, ` +
+      `reset to 0 by a later ship, offered at 2 since the ship (${cap + 1} lifetime), refused at a streak of ${cap}`);
   } finally {
     // Cycles first, then the ticket. Both by their text key, so a write that landed and then threw
     // while parsing its response is still swept.
