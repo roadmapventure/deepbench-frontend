@@ -177,6 +177,15 @@ export const ROUTINES = {
     end: "<!-- VICTORIA-REORG-PROMPT-END -->",
     id: "trig_012xvmXsXAjbVxdbYhUTq6W1", // created 2026-10-02, attended (decision 956086bc), switched off
   },
+  // v7.0.948 (docs/design/INTAKE-LIFECYCLE-RCA-1103.md D2/D4): Victoria's ONE daily check, created and
+  // enabled 2026-11-03 under John's standing approval (decision 517b6ebe). Lists come from
+  // public.victoria_intake_lists(), never from the block.
+  "victoria-daily-check": {
+    file: "victoria-daily-check.md",
+    begin: "<!-- VICTORIA-DAILY-CHECK-PROMPT-BEGIN -->",
+    end: "<!-- VICTORIA-DAILY-CHECK-PROMPT-END -->",
+    id: "trig_01M1rsFP6HHYxELMr8JdhDg5", // created + enabled 2026-11-03 (decision 517b6ebe)
+  },
 };
 
 export const CHECK_SLUG = "routine-prompt-drift";

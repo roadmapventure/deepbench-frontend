@@ -98,7 +98,15 @@ async function run() {
   assert.ok(!/claude-/.test(block),
     "the prompt block names a model id. The model is the `model_assignments` row the sub-agent's own "
     + "assembly prints at run time (AGT-146), never a literal in the block.");
-  for (const fn of ["public.routine_meter_ok()", "public.victoria_daily_check()"]) {
+  // v7.0.948 (docs/design/INTAKE-LIFECYCLE-RCA-1103.md D3): the lists come from the database, never
+  // from the prompt. On 2026-11-03 a block that named lists (and a weekly one that named only the
+  // active projects) left 446 waiting tickets out of her reach. No holding-list slug may appear.
+  for (const slug of ["dev-mgr-findings", "auditor-findings", "backlog-intake", "security", "moat"]) {
+    assert.ok(!block.includes(slug),
+      `the prompt block names the list ${slug}. Lists come from public.victoria_intake_lists(), so a ` +
+      `list added later is covered without editing the prompt.`);
+  }
+  for (const fn of ["public.routine_meter_ok()", "public.victoria_daily_check()", "public.victoria_intake_lists()"]) {
     assert.ok(block.includes(fn),
       `the prompt block must name ${fn} -- a run that cannot find its meter (d.38) or its check (d.35) `
       + `is a run that decides the floor by itself. Block: ${block.slice(0, 200)}...`);

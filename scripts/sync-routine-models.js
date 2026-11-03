@@ -96,6 +96,8 @@ export const ROUTINES = [
   // AGT-156 and AGT-281, created 2026-10-02 switched off; both run on the orchestrator lane's model.
   { name: "jerry-linkedin-alerts", id: "trig_01QfQmGMv8z5ioHEwucru8Sy", job_kind: "lane", job_key: "orchestrator" },
   { name: "victoria-reorg", id: "trig_012xvmXsXAjbVxdbYhUTq6W1", job_kind: "lane", job_key: "orchestrator" },
+  // v7.0.948: Victoria's daily check, created + enabled 2026-11-03 (decision 517b6ebe).
+  { name: "victoria-daily-check", id: "trig_01M1rsFP6HHYxELMr8JdhDg5", job_kind: "lane", job_key: "orchestrator" },
 ];
 
 export const SYNC_KIND = "routine-pin-sync";
