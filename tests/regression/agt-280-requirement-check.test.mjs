@@ -309,11 +309,18 @@ async function run() {
         const suffix = crypto.randomInt(1000000, 9999999);
         const T_PASS = `ZAGTREQ-${suffix}a`;
         const T_NN = `ZAGTREQ-${suffix}b`;
-        const SESSION = "agt-280-slice2-regression";
+        const SESSION = `agt-280-slice2-regression-${suffix}`;
 
-        const decisionsQ = "runner_decisions?select=id&kind=eq.requirement-check";
+        // AGT-304 slice 45: counts scoped to rows THIS arm could write. decisions and findings are keyed
+        // (elimination); tickets windowed -- a peer insert inside the window still reds this arm.
+        const t0 = new Date().toISOString();
+        const decisionsQ = `runner_decisions?select=id&kind=eq.requirement-check&session_name=eq.${SESSION}`;
+        const findingsQ = `audit_findings?select=id&fingerprint=eq.${FP}&created_at=gte.${t0}`;
+        const ticketsQ = `backlog_items?select=id&created_at=gte.${t0}`;
         const decisionsBefore = await count(url, key, decisionsQ);
-        const findingsBefore = await count(url, key, "audit_findings?select=id");
+        const findingsBefore = await count(url, key, findingsQ);
+        assert.deepEqual([decisionsBefore, findingsBefore], [0, 0],
+          `the key owns rows BEFORE the probe: decisions=${decisionsBefore} findings=${findingsBefore} since ${t0} -- the key is the probe's own attribution, and it owns none`);
         const fpBefore = await req(url, key, `audit_findings?select=id&fingerprint=eq.${FP}`);
         assert.ok(fpBefore.ok, `the fixture fingerprint must read; got ${describe(fpBefore)}`);
         const fpIds = new Set((fpBefore.json ?? []).map(r => r.id));
@@ -335,7 +342,9 @@ async function run() {
             assert.ok(r.ok, `the ${id} fixture must insert (the gate must NOT fire here); got ${describe(r)}`);
             if (id === T_PASS) fixtureUuid = (Array.isArray(r.json) ? r.json[0] : r.json).id;
           }
-          const backlogAfterFixtures = await count(url, key, "backlog_items?select=id");
+          const backlogAfterFixtures = await count(url, key, ticketsQ);
+          assert.equal(backlogAfterFixtures, 2,
+            `the window holds ${backlogAfterFixtures} backlog_items row(s) since ${t0}, not only this arm's two fixtures -- a peer insert inside the window`);
 
           // --- (1) --prepare, live: the whole assembly path, and no model call ------------------
           const prep = cli([`--prepare`, `--ticket=${T_PASS}`, `--source=${GOOD}`, "--json"]);
@@ -465,11 +474,11 @@ async function run() {
               "status listed -- the proposal is on the findings board, and no ticket was written");
             assert.equal(fr.ruling, nnAnswer.reason, "with her reason as the ruling");
           }
-          assert.equal(await count(url, key, "audit_findings?select=id"), findingsBefore + (repeat ? 0 : 1),
+          assert.equal(await count(url, key, findingsQ), findingsBefore + (repeat ? 0 : 1),
             repeat
               ? "this ISO week's fixture finding already existed, so the writer must append NOTHING"
               : "a not-needed must append exactly ONE audit_findings row");
-          assert.equal(await count(url, key, "backlog_items?select=id"), backlogAfterFixtures,
+          assert.equal(await count(url, key, ticketsQ), backlogAfterFixtures,
             "and ZERO new backlog_items rows: a not-needed writes no ticket at all");
           const nnTicket = await req(url, key, `backlog_items?backlog_id=eq.${T_NN}&select=need_source,need_score`);
           assert.deepEqual((nnTicket.json ?? [])[0], { need_source: null, need_score: null },
@@ -555,7 +564,7 @@ async function run() {
           }
           console.log(`    [AGT-280 slice 2 arm B] epic ${epic.name} (${EPIC}), market_records ${MKT}, ` +
             `requirement-check decisions ${decisionsBefore} -> ${decisionsPeak ?? "(not reached)"} -> ${left}, ` +
-            `findings ${findingsBefore} -> ${await count(url, key, "audit_findings?select=id")}`);
+            `findings ${findingsBefore} -> ${await count(url, key, findingsQ)}`);
         }
       });
     }

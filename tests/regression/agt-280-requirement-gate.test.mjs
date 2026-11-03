@@ -63,6 +63,8 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 
 const NOWHERE = "00000000-0000-0000-0000-000000000000";
 const FIXTURE_PREFIX = "ZAGT280";
+// AGT-304 slice 45: every count keyed to this file's own fixture rows -- elimination; a row a killed run left reds it by name.
+const FIXTURE_Q = `backlog_items?select=id&backlog_id=like.${FIXTURE_PREFIX}-*`;
 const SOURCE_FILE = "tests/regression/agt-280-requirement-gate.test.mjs";
 // The five pairs the migration seeds. A FIXTURE of the expectation, asserted against the live
 // column in arm C -- never read from it and compared to itself.
@@ -227,7 +229,9 @@ async function run() {
 
     // ---- A. THE DISCRIMINATOR: the trigger, six cases --------------------------------------------
     await arm("A the requirement gate", async () => {
-      const before = await count(url, key, "backlog_items?select=id");
+      const before = await count(url, key, FIXTURE_Q);
+      assert.equal(before, 0,
+        `${FIXTURE_PREFIX}-* owns ${before} backlog_items row(s) BEFORE the arm -- the key is this file's own fixture prefix, and it owns none`);
 
       // refused(n, extra, why): the insert must be REFUSED, by AGT-280 and by nothing else, and it
       // must leave nothing behind (a refused BEFORE-trigger insert never wrote a row at all).
@@ -273,7 +277,7 @@ async function run() {
       await accepted(6, INTAKE_EPIC, {},
         "(vi) the same source-less discovered row into the backlog-intake epic");
 
-      assert.equal(await count(url, key, "backlog_items?select=id"), before,
+      assert.equal(await count(url, key, FIXTURE_Q), before,
         "ZERO RESIDUE: backlog_items' exact count must re-read unmoved after all six cases");
       console.log(`    [AGT-280 arm A] epic ${EPIC_NAME} (${EPIC}), market_records ${MKT}, ` +
         `backlog_items ${before} before and after`);
@@ -336,7 +340,9 @@ async function run() {
     // two slices. Each one cites a traceable source or is refused before the row lands, so
     // `requirement_gate` decides none of them -- which is why an intake epic is a legal home.
     await arm("D AGT-433's band, the table and the writer", async () => {
-      const before = await count(url, key, "backlog_items?select=id");
+      const before = await count(url, key, FIXTURE_Q);
+      assert.equal(before, 0,
+        `${FIXTURE_PREFIX}-* owns ${before} backlog_items row(s) BEFORE the arm -- the key is this file's own fixture prefix, and it owns none`);
 
       // (vii) AGT-433's DISCRIMINATOR. A ticket John has judged valid but EARLY is a 0, and 0 is a
       //       score the table has to keep -- on the unchanged tree this case is 23514
@@ -362,7 +368,7 @@ async function run() {
           `and must refuse in the writer's own 0-5 words (AGT-433 widened both guards); got ${describe(r)}`);
       }
 
-      assert.equal(await count(url, key, "backlog_items?select=id"), before,
+      assert.equal(await count(url, key, FIXTURE_Q), before,
         "ZERO RESIDUE: backlog_items' count must re-read unmoved after AGT-433's four cases");
       console.log(`    [AGT-433 arm D] intake epic ${SCORE_EPIC.name} (${SCORE_EPIC.id}), ` +
         `market_records ${SCORE_MKT}, backlog_items ${before} before and after`);
