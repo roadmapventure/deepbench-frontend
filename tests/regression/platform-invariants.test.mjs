@@ -56,13 +56,40 @@ async function run() {
   assert.ok(route[0].project_slug, "C: the invariant route must name a project");
 
   // D
-  const lists = await rest(url, key, "rpc/victoria_intake_lists", { method: "POST", body: "{}" });
-  const sum = lists.reduce((n, l) => n + (l.ungraded ?? 0), 0);
-  const stuck = rows.find(r => r.invariant === "intake_stuck");
-  assert.strictEqual(stuck.detail.ungraded, sum,
-    `D: intake_stuck reads ${stuck.detail.ungraded} ungraded, victoria_intake_lists() sums to ${sum}`);
+  // Two reads at two moments: a ticket filed between them (the runner files while this runs) moves
+  // one side. Agreement on any of three back-to-back pairs is the property; three misses is a defect.
+  let lists = [], sum = -1, stuckN = -2;
+  for (let i = 0; i < 3 && sum !== stuckN; i++) {
+    lists = await rest(url, key, "rpc/victoria_intake_lists", { method: "POST", body: "{}" });
+    sum = lists.reduce((n, l) => n + (l.ungraded ?? 0), 0);
+    const again = await rest(url, key, "rpc/platform_invariant_eval", { method: "POST", body: "{}" });
+    stuckN = again.find(r => r.invariant === "intake_stuck").detail.ungraded;
+  }
+  assert.strictEqual(stuckN, sum,
+    `D: intake_stuck reads ${stuckN} ungraded, victoria_intake_lists() sums to ${sum} (three tries)`);
 
-  console.log(`    [A-D] ${rows.map(r => `${r.invariant}=${r.ok ? "ok" : "BROKEN"}`).join(", ")}; ${lists.length} waiting lists, ${sum} ungraded`);
+  // E (v7.0.951, John 2026-11-03): every rule is filed against a named owner, and every trigger has an
+  // owning agent that exists and is active. A rule with no owner row files "unassigned", which this
+  // refuses; a NULL owner is allowed only for the money rule, which is John's.
+  const owners = await rest(url, key, "invariant_owners?select=invariant,owner_agent_id");
+  const byRule = new Map(owners.map(o => [o.invariant, o.owner_agent_id]));
+  for (const rule of RULES) {
+    assert.ok(byRule.has(rule), `E: rule ${rule} has no invariant_owners row -- its finding would name no owner`);
+    if (rule !== "budget_next_month") {
+      assert.ok(byRule.get(rule), `E: rule ${rule} must be owned by an agent; only the money rule is John's`);
+    }
+  }
+  const routines = await rest(url, key, "agent_routines?select=name,owner_agent_id");
+  assert.ok(routines.some(r => r.name === "victoria-daily-check") && routines.some(r => r.name === "platform-invariants-daily"),
+    "E: both 2026-11-03 triggers must be registered in agent_routines");
+  const agentIds = [...new Set(routines.map(r => r.owner_agent_id))];
+  const agents = await rest(url, key, `agents?select=id,is_active&id=in.(${agentIds.join(",")})`);
+  for (const id of agentIds) {
+    const a = agents.find(x => x.id === id);
+    assert.ok(a && a.is_active, `E: trigger owner ${id} must be an existing, active agent`);
+  }
+
+  console.log(`    [A-E] ${rows.map(r => `${r.invariant}=${r.ok ? "ok" : "BROKEN"}`).join(", ")}; ${lists.length} waiting lists, ${sum} ungraded; ${routines.length} owned triggers`);
 }
 
 export default run;
