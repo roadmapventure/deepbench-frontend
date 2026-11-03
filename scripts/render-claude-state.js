@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.940 | scripts/render-claude-state.js | AGT-426 -- the pre-write provenance assertion admits a cycle's OWN `runner_verdicts` id beside its `runner_decisions` ids (`ownIdsByCycle`).
 // DeepBench v7.0.908 | scripts/render-claude-state.js | AGT-304 slice 27 -- the ledger pin now pins the
 // SHIP CARD ids the bullets were rendered from (`card-pin:`), so `--check` re-renders from the cards the
 // committed file actually carried instead of re-reading that join live; see THE CARD PIN below.
@@ -442,10 +443,33 @@ export function shipCardFinding(fileText, cycle, card) {
 // finding is `{ cycle_id, offending, reason }`; `offending` lists the tokens, in prose order, versions
 // before uuids. A row that claimed NO version cannot prove any version token is its own, so every one
 // is offending -- the honest direction, and it is why `own` is compared, never merely tested for truth.
-export function bulletProvenanceFinding(cycle, card, decisionIds) {
+// AGT-426 (v7.0.940): A CYCLE'S OWN IDS ARE NOT ONLY ITS DECISIONS. `record_ship_decision()` appends the
+// cycle's own `runner_verdicts.id` to `plain_worth` ("... on verdict <uuid>."), so a provenance assertion
+// that admits `runner_decisions` ids alone reads that token as another cycle's fact and refuses the whole
+// file -- measured live 2026-11-03 (exit 2) on card `05746e91` of cycle `d6dddd71`, and the same defect
+// behind the `e8dd30bb` refusal and `AGT-518`. ONE merge point for every table whose ids a card may
+// legitimately name: a third table is one more argument, never a second code path (pattern:14, pattern:8).
+// Pure. Each argument is a row set of `{id, cycle_id}`; a `null` row set and a row with no `cycle_id`
+// contribute nothing (a verdict not yet attached to a cycle proves nothing about any cycle). Returns
+// `Map<String(cycle_id), Set<lowercased id>>` -- lower-cased because REST casing is not a promise and the
+// comparison in `bulletProvenanceFinding` is an equality test, not a match.
+export function ownIdsByCycle(...rowSets) {
+  const byCycle = new Map();
+  for (const rows of rowSets) {
+    for (const r of rows || []) {
+      if (!r || !r.cycle_id) continue;
+      const k = String(r.cycle_id);
+      if (!byCycle.has(k)) byCycle.set(k, new Set());
+      byCycle.get(k).add(String(r.id).toLowerCase());
+    }
+  }
+  return byCycle;
+}
+
+export function bulletProvenanceFinding(cycle, card, ownIds) {
   if (!card) return null;
   const bare = v => String(v == null ? "" : v).trim().replace(/^v/i, "");
-  const ids = new Set([...(decisionIds || [])].map(v => String(v).toLowerCase()));
+  const ids = new Set([...(ownIds || [])].map(v => String(v).toLowerCase()));
   const prose = `${card.title} ${card.plain_after} ${card.plain_worth}`;
   const own = bare(cycle && cycle.version);
   const offending = [];
@@ -459,7 +483,7 @@ export function bulletProvenanceFinding(cycle, card, decisionIds) {
     cycle_id: cid,
     offending,
     reason: `the ship card for cycle ${cid.slice(0, 8)} (${own ? "v" + own : "no version claimed"}) names ` +
-      `${offending.map(t => `\`${t}\``).join(", ")} in its own prose -- a version or a decision id that is ` +
+      `${offending.map(t => `\`${t}\``).join(", ")} in its own prose -- a version, decision id or verdict id that is ` +
       "not this cycle's, so the bullet would publish another cycle's facts beside this cycle's version. " +
       "Remedy: fix the CARD's `title`/`plain_after`/`plain_worth` in `runner_items`, then re-render. " +
       "Never edit CLAUDE-STATE.md -- it is generated.",
@@ -651,19 +675,15 @@ async function main() {
   // scoped to the three cycles that actually reach disk.
   const bulletCycles = cycles.slice(0, 3);
   const bulletIds = bulletCycles.map(c => String(c.id)).filter(Boolean);
-  const decisionsByCycle = new Map();
+  let ownByCycle = new Map();
   if (bulletIds.length) {
-    const decisionRows = await rest(url, key,
-      `runner_decisions?select=id,cycle_id&cycle_id=in.(${bulletIds.join(",")})`);
-    for (const d of decisionRows) {
-      if (!d.cycle_id) continue;
-      const k = String(d.cycle_id);
-      if (!decisionsByCycle.has(k)) decisionsByCycle.set(k, new Set());
-      decisionsByCycle.get(k).add(String(d.id).toLowerCase());
-    }
+    const q = `select=id,cycle_id&cycle_id=in.(${bulletIds.join(",")})`;
+    ownByCycle = ownIdsByCycle(
+      await rest(url, key, `runner_decisions?${q}`),
+      await rest(url, key, `runner_verdicts?${q}`));
   }
   const provenance = bulletCycles
-    .map(c => bulletProvenanceFinding(c, cardsByCycle.get(c.id) || null, decisionsByCycle.get(String(c.id)) || new Set()))
+    .map(c => bulletProvenanceFinding(c, cardsByCycle.get(c.id) || null, ownByCycle.get(String(c.id)) || new Set()))
     .filter(Boolean);
   if (provenance.length) {
     die(`refusing to render -- ${provenance.length} of the ${bulletCycles.length} session bullets would ` +

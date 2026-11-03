@@ -1,3 +1,13 @@
+// DeepBench v7.0.940 | tests/regression/SES-177-claude-state-renderer.js | AGT-426 — ONE ARM ADDED,
+// `theCyclesOwnVerdictIdIsNotForeign()`, over the REAL live card that refused the render on 2026-11-03
+// (exit 2): `record_ship_decision()` appends the cycle's OWN `runner_verdicts.id` to `plain_worth`, and
+// the provenance assertion admitted `runner_decisions` ids only. The load-bearing assertion is a
+// DIFFERENCE, per SES-261/SES-354: arm (c) runs the RETIRED decision-ids-only set on the SAME card and
+// must LOSE, naming exactly `2fb852c0-e86a-4462-8d12-49a69b0a3ed1` — the string the live render refused.
+// A test asserting only "the card is clean now" passes on a set that admits every uuid and proves
+// nothing, so arm (d) swaps in another cycle's verdict id (`94e15346…`, live owner `e33d277d`) and the
+// refusal must still fire. `theProvenanceAssertionHasTeeth()` is byte-unchanged.
+//
 // DeepBench v7.0.630 | tests/regression/SES-177-claude-state-renderer.js | AGT-191 — A CARD BELONGS TO
 // THE CYCLE THAT WROTE IT. Three arms added, and the size-clause fixture's `cards` map re-keyed from the
 // ticket `"SES-381"` onto the three RENDERED cycle ids (its size directions are unchanged). The
@@ -47,7 +57,7 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   bodyKeepsStandingLink, renderBullet, stripId, renderBody,
   isLedgerShip, versionRank, pickVersioned, LEDGER_FILTER, skeletonChars,
-  bulletProvenanceFinding,
+  bulletProvenanceFinding, ownIdsByCycle,
 } from "../../scripts/render-claude-state.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -298,6 +308,77 @@ function theProvenanceAssertionHasTeeth() {
 }
 
 // ---------------------------------------------------------------------------
+// AGT-426 — A CYCLE'S OWN VERDICT ID IS ITS OWN FACT. The fixture is the live card that refused the
+// render at tree `feef4c2` on 2026-11-03: `05746e91` of cycle `d6dddd71` (v7.0.937), whose `plain_worth`
+// ends in the sentence `record_ship_decision()` wrote, naming `d6dddd71`'s OWN verdict id. Read live:
+// `2fb852c0-e86a-4462-8d12-49a69b0a3ed1` is in `runner_verdicts` with `cycle_id = d6dddd71`, and
+// `94e15346-ebcd-4887-9a3a-21004122e93f` is in `runner_verdicts` with `cycle_id = e33d277d` — a real
+// foreign verdict, not an invented uuid, so arm (d) grades the predicate against the case it exists for.
+// ---------------------------------------------------------------------------
+
+const D6_ROW = {
+  id: "d6dddd71-bcd4-47c9-9721-99884f7edc71", version: "7.0.937", item_id: "AGT-431",
+  push_sha: "b21096df21c0333918ebd7d402f108c180e91897", outcome: "shipped",
+};
+// `title` and `plain_after` are deliberately uuid-free and version-free: the only tokens the assertion
+// may weigh here live in `plain_worth`, so a pass or a fail is attributable to exactly one sentence.
+const D6_CARD = {
+  backlog_id: "AGT-431", cycle_id: D6_ROW.id,
+  title: "The close-out writes its own ship card",
+  plain_after: "The briefing names the ship it published and the handle that reverses it.",
+  plain_worth:
+    "The reader can undo this ship without asking anyone which row to touch. " +
+    "Reversible through decision handle 32cb6655-575c-46b0-86be-b87e4e92deab (ship): AGT-431 shipped " +
+    "at v7.0.937 (b21096df21c0333918ebd7d402f108c180e91897) on verdict " +
+    "2fb852c0-e86a-4462-8d12-49a69b0a3ed1.",
+};
+const DEC = [{ id: "32cb6655-575c-46b0-86be-b87e4e92deab", cycle_id: D6_ROW.id }];
+// UPPER-CASE on purpose: REST casing is not a promise, and the comparison is equality, not a match.
+const VER = [{ id: "2FB852C0-E86A-4462-8D12-49A69B0A3ED1", cycle_id: D6_ROW.id }];
+const FOREIGN = "94e15346-ebcd-4887-9a3a-21004122e93f";
+
+function theCyclesOwnVerdictIdIsNotForeign() {
+  // (a) THE MERGE. Both row sets land under the cycle, lower-cased; an unattached row proves nothing
+  // about any cycle; a missing row set is not an error.
+  const own = ownIdsByCycle(DEC, VER).get(D6_ROW.id);
+  assert.strictEqual(own.size, 2,
+    `the cycle's own decision AND own verdict must both be admitted -- got ${JSON.stringify([...(own || [])])}`);
+  assert.ok(own.has("2fb852c0-e86a-4462-8d12-49a69b0a3ed1"),
+    "the verdict id must be stored lower-cased; an upper-case REST value that stays upper-case never matches the prose");
+  assert.strictEqual(
+    ownIdsByCycle(DEC, VER, [{ id: "3ae79921-564f-4b24-9e67-d4689662895c", cycle_id: null }]).get(D6_ROW.id).size, 2,
+    "a row with no cycle_id must add nothing -- it cannot prove any cycle owns it");
+  assert.strictEqual(ownIdsByCycle(DEC, null).get(D6_ROW.id).size, 1,
+    "a null row set must be skipped, not throw and not admit anything");
+
+  // (b) THE DEFECT, GONE. This exact card made the live render exit 2 at feef4c2.
+  const clean = bulletProvenanceFinding(D6_ROW, D6_CARD, own);
+  assert.strictEqual(clean, null,
+    `d6dddd71's own card must be clean -- it names v7.0.937, its own decision 32cb6655 and its OWN `
+    + `verdict 2fb852c0. Got: ${JSON.stringify(clean)}`);
+
+  // (c) THE CONTROL, AND IT MUST LOSE. The retired decision-ids-only set on the SAME card reproduces
+  // the live refusal exactly -- if this comes back null, (b) proves nothing.
+  const retired = bulletProvenanceFinding(D6_ROW, D6_CARD, ownIdsByCycle(DEC, []).get(D6_ROW.id));
+  assert.ok(retired,
+    "with verdict ids withheld the finding must fire -- that is the shipped behaviour on origin/dev (exit 2, 2026-11-03)");
+  assert.deepStrictEqual(retired.offending, ["2fb852c0-e86a-4462-8d12-49a69b0a3ed1"],
+    `the retired form must name exactly the string the live render refused -- got ${JSON.stringify(retired.offending)}`);
+
+  // (d) ANOTHER CYCLE'S VERDICT IS STILL REFUSED, graded with the FULL set. Without this, a set that
+  // admitted every uuid would satisfy (b).
+  const foreignCard = Object.assign({}, D6_CARD, {
+    plain_worth: D6_CARD.plain_worth.replace("2fb852c0-e86a-4462-8d12-49a69b0a3ed1", FOREIGN),
+  });
+  const foreign = bulletProvenanceFinding(D6_ROW, foreignCard, ownIdsByCycle(DEC, VER).get(D6_ROW.id));
+  assert.ok(foreign, `e33d277d's verdict id on d6dddd71's card must still be refused -- got ${JSON.stringify(foreign)}`);
+  assert.ok(foreign.offending.includes(FOREIGN),
+    `the finding must name the foreign verdict id -- got ${JSON.stringify(foreign.offending)}`);
+  assert.ok(/runner_items/.test(foreign.reason),
+    "the reason must still send the reader to the CARD in runner_items, never to a hand-edit of the generated file");
+}
+
+// ---------------------------------------------------------------------------
 // SES-354 — A SHIP IS A ROW THAT RECORDS A PUSH. The load-bearing assertion in each of these is a
 // DIFFERENCE (the SES-261 pattern): the retired outcome-based predicate is run on the SAME fixture and
 // must LOSE. A test that only asserted "the new form renders something" is satisfied by a predicate
@@ -421,6 +502,7 @@ function run() {
   theSizeClauseMeasuresTheSplitNotTheLedger();
   anEarlierSliceKeepsItsOwnCard();
   theProvenanceAssertionHasTeeth();
+  theCyclesOwnVerdictIdIsNotForeign();
   anAttendedMultiShipCycleIsTheVersionInDev();
   versionInDevIsTheHighestPushedVersionNotTheNewestStart();
   theQuerySendsThePushPredicate();
