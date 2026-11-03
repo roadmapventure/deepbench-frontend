@@ -1,3 +1,9 @@
+// DeepBench v7.0.936 | tests/regression/agt-86b-audit-review.test.mjs | AGT-528 -- arm D's key
+// list is RETARGETED, never deleted: buildTaskContext() ships ticket heads now, so the default
+// context's open_audit_tickets[0] carries backlog_id, title and status only. The whole-row form
+// moved behind fullTickets / --full-tickets and is graded by agt-528-dedup-heads.test.mjs arm A,
+// which asserts BOTH shapes off one call pair -- so dropping `description` here does not lose the
+// assertion, it relocates it to the arm that can tell the two doors apart.
 // DeepBench v7.0.918 | tests/regression/agt-86b-audit-review.test.mjs | AGT-304 slice 37 -- arm E grades both --prepare doors (AGT-239).
 // DeepBench v7.0.869 | tests/regression/agt-86b-audit-review.test.mjs | AGT-492 -- re-pointed to the
 // Governance Architect: AGENT architect, INTENT ga-review-intent, LINKS the five ga-* rows plus the kept
@@ -164,7 +170,7 @@ async function run() {
     assert.equal(ctx.worklist[0].weeks_seen, 3, "one fingerprint over three weeks -> weeks_seen 3");
     assert.equal(ctx.worklist[0].prior_rulings.length, 2, "only the two ruled rows are prior rulings");
     assert.deepEqual(Object.keys(ctx.john_calls).sort(), Object.keys(JOHN_CALLS).sort());
-    assert.deepEqual(Object.keys(ctx.open_audit_tickets[0]), ["backlog_id", "title", "status", "description"]);
+    assert.deepEqual(Object.keys(ctx.open_audit_tickets[0]), ["backlog_id", "title", "status"]);
     assert.equal(buildTaskContext({ week: "2026-W39", findings: [], allRows, tickets: [] }), null, "no findings -> null");
   });
 

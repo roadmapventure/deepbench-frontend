@@ -1,3 +1,9 @@
+// DeepBench v7.0.936 | scripts/audit-review.js | AGT-528 -- the dedup list ships ticket HEADS
+// (backlog_id, title, status): the title is the key the ticket measured, and a body is read on
+// demand through TICKET_BODY_DOOR (--ticket=<ID>[,<ID>...], a read-only mode of this same script,
+// named INSIDE the context by open_audit_tickets_note so no prompt row changes). --full-tickets
+// keeps the whole-row form. Live 2026-11-02: open_audit_tickets was 1,124,882 B of a 1,326,589 B
+// context (84.8%); the 273 heads are 47,083 B (4.2% of the block). No predicate filter.
 // DeepBench v7.0.918 | scripts/audit-review.js | AGT-304 slice 37 -- --prepare pages audit_findings (2,399 rows vs the 1,000-row reply).
 // DeepBench v7.0.887 | scripts/audit-review.js | AGT-424 -- AN UNROUTABLE FINDING IS COVERED, NEVER
 // OMITTED. routeGroup() runs only on a group that FILES a ticket (the gate at L491 of the unchanged
@@ -204,6 +210,8 @@ export function nextLines(groups, tickets) {
 }
 export const WEEK_RE = /^\d{4}-W\d{2}$/;
 export const NOTHING_TO_REVIEW = "no open or carried findings — no Dev Manager run, no cost (AGT-86 §6)";
+// AGT-528: the dedup list is identity and subject; a body is read on demand through this door.
+export const TICKET_BODY_DOOR = "node scripts/audit-review.js --ticket=<ID>[,<ID>...]";
 // AGT-86 §11(5): the checklist rows the manager may edit. au-identity and au-guardrails are John's.
 export const EDITABLE_SLUG = /^au-(behavior|knowledge-homes|[a-z-]+-intent)$/;
 // AGT-239 D4: what is broken outranks what is stuck, which outranks everything else.
@@ -321,7 +329,7 @@ export function promotableOthers(allRows) {
   return out.sort((x, y) => String(x.fingerprint).localeCompare(String(y.fingerprint)));
 }
 
-export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope = "outcomes" }) {
+export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope = "outcomes", fullTickets = false }) {
   // AGT-239 D3: the per-run scope leaves paperwork for the weekly review.
   const inScope = (Array.isArray(findings) ? findings : [])
     .filter(f => scope === "weekly" || f.family !== "paperwork");
@@ -362,9 +370,12 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
     // asked to remember either, and never invents a project (creating one is John's).
     routes: Array.isArray(routes) ? routes : [],
     projects: Array.isArray(projects) ? projects : [],
-    open_audit_tickets: (Array.isArray(tickets) ? tickets : []).map(t => ({
-      backlog_id: t.backlog_id, title: t.title, status: t.status, description: t.description,
-    })),
+    open_audit_tickets: (Array.isArray(tickets) ? tickets : []).map(t => fullTickets
+      ? { backlog_id: t.backlog_id, title: t.title, status: t.status, description: t.description }
+      : { backlog_id: t.backlog_id, title: t.title, status: t.status }),
+    open_audit_ticket_count: (Array.isArray(tickets) ? tickets : []).length,
+    open_audit_tickets_note: fullTickets ? "whole rows (--full-tickets)"
+      : `backlog_id, title and status only (AGT-528); read a matching ticket's description with ${TICKET_BODY_DOOR} -- the few that match, never all`,
     john_calls: { ...JOHN_CALLS },
     scorecard: (() => {
       const checks = flagChecks(scorecardRows ?? []);
@@ -676,7 +687,8 @@ async function prepare(args) {
   const routes = await get("finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
   const projects = await get("projects?select=slug,name,status,accepts_findings&order=slug");
   const scope = args.weekly === true ? "weekly" : "outcomes";
-  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope });
+  const fullTickets = args["full-tickets"] === true;
+  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope, fullTickets });
   if (ctx === null) die(3, NOTHING_TO_REVIEW);
   const out = JSON.stringify(ctx, null, 2) + "\n";
   if (typeof args.out === "string" && args.out) {
@@ -745,12 +757,23 @@ async function apply(args) {
   process.exitCode = 0;
 }
 
+async function ticketBodies(args) {
+  const ids = String(args.ticket).split(",").map(s => s.trim()).filter(Boolean);
+  if (!ids.length || ids.some(id => !/^[A-Z]+-\d+$/.test(id))) die(2, "audit-review --ticket=<ID>[,<ID>...]: backlog ids like AGT-528");
+  const { base, key } = creds();
+  const r = await rest(base, key, "GET", `backlog_items?backlog_id=in.(${ids.join(",")})&select=backlog_id,title,status,description&order=backlog_id`);
+  if (!r.ok) die(1, `audit-review: GET backlog_items -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
+  process.stdout.write(JSON.stringify(r.json, null, 2) + "\n");
+  process.exitCode = 0;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.prepare) return prepare(args);
+  if (args.ticket) return ticketBodies(args);
   if (args["dry-run"]) return dryRun(args);
   if (args.apply) return apply(args);
-  die(2, "usage: audit-review.js --prepare --week=<YYYY-Www> [--weekly] [--out=<path>] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> --week=<w> (--cycle-id=<uuid> | --session-name=<name>)");
+  die(2, "usage: audit-review.js --prepare --week=<YYYY-Www> [--weekly] [--full-tickets] [--out=<path>] | --ticket=<ID>[,<ID>...] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> --week=<w> (--cycle-id=<uuid> | --session-name=<name>)");
 }
 
 // Importing this module for its exports must never run the CLI (SES-45).
