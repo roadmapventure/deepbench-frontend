@@ -482,6 +482,7 @@
 //                       differing line, because a caller that patched the refusal's own remedy into
 //                       the file would otherwise collect a green over its own bytes. Unreadable JSON
 //                       or no `kickoff_markdown` -> exit 2, NEVER a green.
+//   --check-answer=<p>  AGT-519: measure the answer JSON's kickoff_markdown against KICKOFF_BYTE_CAP and the Lanes: line BEFORE any file exists; 0/1/2 as --check-kickoff; no credentials.
 //
 // The `--judge=session` two-pass shape (AGT-67):
 //   node scripts/verifier.js --judge=session --ticket=AGT-67 --version=v7.0.433 \
@@ -3171,6 +3172,55 @@ async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
 
 async function main() {
   const repoRoot = arg("repo", path.resolve(__dirname, ".."));
+
+  // ---- AGT-519: the cap, measured on the ANSWER, before the write. ---------------------------
+  //
+  // THE SAME TWO REFUSALS, ONE ARGUMENT EARLIER. `--check-kickoff=` below can only grade a file,
+  // and by the time a file exists the over-cap kickoff has already been written: measured
+  // 2026-11-03, `docs/kickoffs/v7.0.858-AGT-483-pair-probe.md` is 10,213 bytes on disk and its
+  // Designer's own self-report said 8,192. Told the cap in its Skill row, the Designer still
+  // returned 10,191 bytes reporting 8,192 -- which is why this is a structural measurement over
+  // the returned JSON and not a third wording of the instruction (pattern:10).
+  //
+  // IT REUSES THE FILE CHECK'S OWN FUNCTIONS, deliberately: `kickoffCapFinding` and
+  // `kickoffLaneFinding` are the two refusals `--check-kickoff=` spends, so the answer and the file
+  // are graded by one implementation and cannot drift into two caps (pattern:14). `measured` names
+  // which of the two inputs was counted, because the exit codes are identical and a reader of the
+  // payload alone would otherwise not know whether a byte count came from disk or from an answer.
+  //
+  // NO CREDENTIALS, AHEAD OF THE CHECK BELOW, for SES-376's reason applied one step earlier: its
+  // caller holds a model's answer and no cycle to authenticate for. 2 is the absence of a verdict
+  // (unreadable JSON, no `kickoff_markdown` string), 1 is a verdict about the kickoff, and an
+  // answer that cannot be read is never a green -- the strongest claim on the weakest evidence.
+  const checkAnswerPath = arg("check-answer", "");
+  if (checkAnswerPath) {
+    const abs = path.resolve(repoRoot, checkAnswerPath);
+    let answer;
+    try {
+      answer = JSON.parse(fs.readFileSync(abs, "utf8"));
+    } catch (e) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: `answer unreadable JSON: ${e.message}`, path: checkAnswerPath },
+        prose: `verifier: --check-answer=${checkAnswerPath} is not readable JSON (${e.message}). Exiting 2 -- this is NOT a cap verdict, it is the absence of one.` });
+    }
+    const md = answer && typeof answer.kickoff_markdown === "string" ? answer.kickoff_markdown : null;
+    if (md === null) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "answer carries no kickoff_markdown string", path: checkAnswerPath },
+        prose: `verifier: --check-answer=${checkAnswerPath} carries no \`kickoff_markdown\` string, so there is nothing to measure. Exiting 2 -- never a green.` });
+    }
+    const capFinding = kickoffCapFinding(md);
+    if (capFinding) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, kind: "kickoff-over-cap", measured: "answer.kickoff_markdown", ...capFinding },
+        prose: capFinding.reason });
+    }
+    const lanes = kickoffLaneFinding(md);
+    if (lanes) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, measured: "answer.kickoff_markdown", ...lanes },
+        prose: lanes.reason });
+    }
+    const bytes = Buffer.byteLength(md, "utf8");
+    return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "answer-within-cap", bytes, cap: KICKOFF_BYTE_CAP, measured: "answer.kickoff_markdown" },
+      prose: `answer kickoff_markdown ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (AGT-519) -- write it as returned; --check-kickoff=<path> --answer=<this file> attests the file (AGT-187)` });
+  }
 
   // ---- SES-376: the kickoff size check, and it is the FIRST branch on purpose. ----------------
   //
