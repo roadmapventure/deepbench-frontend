@@ -1,6 +1,6 @@
 <!-- DeepBench v7.0.658 | runbooks/runner-cycle.md | AGT-237/265 — lanes. -->
 <!-- DeepBench v7.0.843 | runbooks/runner-cycle.md | AGT-451 — step 7 measures the baseline credentialed before the spawn; 7a reads it. v7.0.650 DROPPED (its facts: step 6), count 5. -->
-<!-- DeepBench v7.0.641 | runbooks/runner-cycle.md | AGT-171 — THE (6) CLOSE RELEASES THE PUBLISH LEASE IN THE SAME STATEMENT: a CLOSED cycle held it 26 min (steals 17) because the release came after the (7e)/(7f) sub-agents. Nothing after (6) is leased; step 1's release block is gone; 0b probe (c) flags a closed holder. v7.0.532 DROPPED (docs/SESSIONS.md), 2 ZERO-hit facts RELOCATED to Reading 0; count 5. Guard agt-171-lease-released-at-close.test.mjs. -->
+<!-- DeepBench v7.0.941 | runbooks/runner-cycle.md | AGT-478 — retry on the second path before any hold. -->
 <!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
 <!-- DeepBench v7.0.856 | runbooks/runner-cycle.md | AGT-482 — the claim fence: 6h, never STOPPED-BY-JOHN. v7.0.602 DROPPED, count 5. -->
 # Runner Cycle — Standing Prompt (§19v)
@@ -419,9 +419,11 @@ UPDATE public.runner_cycles
 RETURNING id, (SELECT level FROM public.db_health_level()) AS db_level;
 ```
 
-**`db_level` red/unsafe, or the heartbeat failed or took > 10 s:** finish the step, run
-`db-pressure.js --hold`; exit 4 → close `failed`, `last_step 'held: db_pressure'`, end. Run
-`run-all.js` only after `--check` exits 0 or 1.
+**`db_level` red/unsafe:** finish the step, run `db-pressure.js --hold`; exit 4 → close `failed`,
+`last_step 'held: db_pressure'`, end. **Heartbeat (or any write) failed or > 10 s:** a timeout alone
+is never `db_pressure`, a lock or a restart (`AGT-478`; `AGT-303`, `AGT-465`): retry it IDENTICALLY
+over PostgREST, `cycle-heartbeat.js --cycle=<id> --step=<step>`, read `db-pressure.js --check`,
+record both in `notes`; hold only on red/unsafe. Run `run-all.js` only after `--check` exits 0 or 1.
 
 **THE `AND ended_at IS NULL` IS THE RESUME GUARD, AND IT IS HALF OF `SES-194` (`v7.0.230`) — do
 not drop it back to a bare `WHERE id`.** Since `SES-194` a peer may close your row if it has seen
@@ -4288,8 +4290,8 @@ SELECT * FROM public.sweep_decision_windows('<your cycle id>', NULL);
 It finalises every `open` decision past its `expires_at` and promotes the work class each one named
 (`SES-107`'s streak rule; a class is promoted once, ever — `ladder_applied_at` is the stamp that
 enforces it). It returns `finalized, promoted, closed`, so **put all three numbers in your cycle row's `notes`** —
-write them with `node scripts/cycle-note.js --cycle=<id> --note=<text>`. The connector `UPDATE` is
-a documented FALLBACK: cycle `68372c07` lost two 1.5-2.5 KB appends to its 60s ceiling (`AGT-547`),
+write them with `node scripts/cycle-note.js --cycle=<id> --note=<text>`, the PostgREST path for EVERY notes line of this tail ((7c), (7f), (8), the close-out record). The connector `UPDATE` is
+the FALLBACK: cycle `68372c07` lost two 1.5-2.5 KB appends to its 60s ceiling (`AGT-547`),
 which reports failure, writing nothing. A second call in the same cycle returns `0, 0, 0`, so a
 retry is never wrong.
 
