@@ -1,3 +1,4 @@
+// DeepBench v7.0.954 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-304 slice 48 -- arm D's registry pin moves from seven routines to eight: victoria-daily-check (trig_01M1rsFP6HHYxELMr8JdhDg5, v7.0.948 d0728bc, decision 517b6ebe). Nothing loosened.
 // DeepBench v7.0.798 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-304 slice 9 -- arm E's release pairs come off the live catalog, not one frozen trial.
 // DeepBench v7.0.741 | tests/regression/agt-146-model-watch-routine.test.mjs | AGT-281 -- arm D's
 // registry pin moves from six routines to seven: `victoria-reorg` (id null, the model-watch and
@@ -267,12 +268,13 @@ async function run() {
 
     await arm("D registry", async () => {
       assert.deepEqual(Object.keys(ROUTINES).sort(),
-        ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner", "victoria-reorg"],
-        "seven routines: AGT-281 added victoria-reorg");
+        ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner", "victoria-daily-check", "victoria-reorg"],
+        "eight routines: v7.0.948 added victoria-daily-check");
       assert.equal(ROUTINES.runner.id, "trig_017TZ3JZcLBK6AYH6DKURqMH", "runner id unchanged");
       assert.equal(ROUTINES.auditor.id, "trig_01BCzPdanZ1YiK956dAqU6YN", "auditor id unchanged");
       assert.equal(ROUTINES.researcher.id, "trig_01862LsK4ZQF8PTgQoK2cgCV", "researcher id unchanged");
       assert.equal(ROUTINES["model-watch"].id, "trig_01QTxphS7u5dzD5HdChCBzjV", "model-watch id filled once the routine exists (2026-09-29)");
+      assert.equal(ROUTINES["victoria-daily-check"].id, "trig_01M1rsFP6HHYxELMr8JdhDg5", "victoria-daily-check id as created 2026-11-03 (v7.0.948, decision 517b6ebe)");
       assert.equal(ROUTINES["model-watch"].file, "model-watch-routine.md");
       assert.equal(ROUTINES["model-watch"].begin, BEGIN);
       assert.equal(ROUTINES["model-watch"].end, END);

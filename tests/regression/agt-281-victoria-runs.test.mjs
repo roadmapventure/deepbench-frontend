@@ -1,3 +1,4 @@
+// DeepBench v7.0.954 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-304 slice 48 -- arm C's registry cross-pin moves from seven routines to eight: victoria-daily-check (trig_01M1rsFP6HHYxELMr8JdhDg5, v7.0.948 d0728bc). Nothing loosened.
 // DeepBench v7.0.867 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-490 -- arm A's parked answer re-pinned to the shipped P1/P2/P3 and arm F to need_score.minimum 0 plus the new_project property; the rule v7.0.866 shipped is unchanged.
 // DeepBench v7.0.861 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-486 -- the list vocabulary is LIST_VERDICTS (three values, `no-fit` added) and every list context carries the active charters; arm F reads the three-value enum off the live row. The no-fit rules themselves are graded by tests/regression/agt-486-charter-fit.test.mjs.
 // DeepBench v7.0.850 | tests/regression/agt-281-victoria-runs.test.mjs | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
@@ -467,8 +468,8 @@ async function run() {
     assert.equal(r.id, "trig_012xvmXsXAjbVxdbYhUTq6W1",
       "id filled 2026-10-02 (decision 956086bc); read from the live routine, never guessed");
     assert.deepEqual(Object.keys(ROUTINES).sort(),
-      ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner", "victoria-reorg"],
-      "seven routines, victoria-reorg the seventh");
+      ["auditor", "jerry-linkedin-alerts", "market", "model-watch", "researcher", "runner", "victoria-daily-check", "victoria-reorg"],
+      "eight routines, victoria-daily-check the eighth");
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agt281-routine-"));
     try {
