@@ -243,8 +243,8 @@ function spawnCli(args, { withCreds = false } = {}) {
   return spawnSync(process.execPath, [SCRIPT, ...args], { cwd: ROOT, env, encoding: "utf8" });
 }
 
-async function restCount(base, key, table) {
-  const res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${table}?select=id`, {
+async function restCount(base, key, table, filter = "") {
+  const res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${table}?select=id${filter}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact", Range: "0-0" },
   });
   assert.ok(res.ok, `counting ${table} returned HTTP ${res.status} ${res.statusText}`);
@@ -1299,8 +1299,13 @@ async function main() {
       "part N left fixture findings on the live ledger");
   }
 
-  const findingsBefore = await restCount(base, key, "ticket_owner_findings");
-  const itemsBefore = await restCount(base, key, "backlog_items");
+  // AGT-304 slice 46: windowed to rows created since t0 on the two tables the census could write
+  // (ticket-owner.js has no DELETE). NOT elimination: a peer insert inside the window still reds it.
+  const t0 = new Date().toISOString();
+  const findingsBefore = await restCount(base, key, "ticket_owner_findings", `&first_seen_at=gte.${t0}`);
+  const itemsBefore = await restCount(base, key, "backlog_items", `&created_at=gte.${t0}`);
+  assert.deepStrictEqual([findingsBefore, itemsBefore], [0, 0],
+    `the window owns rows BEFORE the census: findings=${findingsBefore} items=${itemsBefore} since ${t0} -- the window is the key, and it owns none`);
 
   const outFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "agt79-")), "census.json");
   const live = spawnCli(["--census", `--out=${outFile}`, "--json"], { withCreds: true });
@@ -1399,18 +1404,23 @@ async function main() {
   // THE NEGATIVE THAT DEFINES A CENSUS: the same binary that CAN write read the whole board with
   // no --apply and changed nothing. Now that the write pass exists, this is the arm that proves
   // writing is a flag rather than a default.
-  assert.strictEqual(await restCount(base, key, "ticket_owner_findings"), findingsBefore,
+  assert.strictEqual(await restCount(base, key, "ticket_owner_findings", `&first_seen_at=gte.${t0}`), findingsBefore,
     "a census without --apply must not write, touch or clear a findings row");
-  assert.strictEqual(await restCount(base, key, "backlog_items"), itemsBefore, "the census must not have touched the board");
+  assert.strictEqual(await restCount(base, key, "backlog_items", `&created_at=gte.${t0}`), itemsBefore, "the census must not have touched the board");
 
   // --- K live: the capability gate ---------------------------------------------------------------
   // This half shipped AHEAD of its seed, so the arm branches on the ROW rather than asserting one
   // outcome: exit 2 while `capabilities` has no audit-board row, exit 3 once John applies the seed.
   // What does NOT branch is the negative — pass one never writes, whichever side of the gate it
   // lands on, and that is the property this arm exists to pin.
-  const WRITE_TABLES = ["runner_cycles", "runner_decisions", "ticket_owner_findings", "runner_before_images"];
+  // AGT-304 slice 46: scoped to rows THIS probe could write -- pass one is handed --cycle-id=${ZERO},
+  // so its own write carries ZERO. Elimination: no live cycle uses ZERO, so no peer write lands here.
+  const WRITE_TABLES = [["runner_cycles", `&id=eq.${ZERO}`], ["runner_decisions", `&cycle_id=eq.${ZERO}`],
+    ["ticket_owner_findings", `&cycle_id=eq.${ZERO}`], ["runner_before_images", `&cycle_id=eq.${ZERO}`]];
   const kBefore = [];
-  for (const t of WRITE_TABLES) kBefore.push(await restCount(base, key, t));
+  for (const [t, f] of WRITE_TABLES) kBefore.push(await restCount(base, key, t, f));
+  assert.deepStrictEqual(kBefore, [0, 0, 0, 0],
+    `cycle ${ZERO} owns rows BEFORE pass one: ${JSON.stringify(kBefore)} -- the key is the probe's own cycle id, and it owns none`);
 
   const liveStatePath = statePathFor(os.tmpdir(), ZERO);
   try {
@@ -1436,8 +1446,8 @@ async function main() {
   }
 
   for (let i = 0; i < WRITE_TABLES.length; i++) {
-    assert.strictEqual(await restCount(base, key, WRITE_TABLES[i]), kBefore[i],
-      `pass one wrote a ${WRITE_TABLES[i]} row — it must read and print, never write`);
+    assert.strictEqual(await restCount(base, key, ...WRITE_TABLES[i]), kBefore[i],
+      `pass one wrote a ${WRITE_TABLES[i][0]} row — it must read and print, never write`);
   }
 
   // --- G: the write pass, live and rolled back --------------------------------------------------
