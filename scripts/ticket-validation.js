@@ -1,5 +1,5 @@
-// DeepBench v7.0.950 | scripts/ticket-validation.js | the intent is read from capabilities.default_intent_slug and PASSED -- assemblePrompt() drops every Intent Skill when intent_slug is null, so the validation turn had no output contract (found by the 2026-11-03 Victoria POC).
 #!/usr/bin/env node
+// DeepBench v7.0.950 | scripts/ticket-validation.js | the intent is read from capabilities.default_intent_slug and PASSED -- assemblePrompt() drops every Intent Skill when intent_slug is null, so the validation turn had no output contract (found by the 2026-11-03 Victoria POC).
 // DeepBench v7.0.870 | scripts/ticket-validation.js | AGT-493 -- THE VALIDATION DOOR. A ticket filed
 // more than 14 days ago is handed to the Governance Architect's `validate-ticket` capability before
 // Victoria's list door is allowed to offer it, and this file is the only way that turn is prepared,
