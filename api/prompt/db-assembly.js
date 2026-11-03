@@ -1,3 +1,4 @@
+// DeepBench v7.0.944 | api/prompt/db-assembly.js | AGT-552 -- a role prompt renders ONCE per bundle
 // DeepBench v7.0.895 | api/prompt/db-assembly.js | AGT-429 -- 44->4 / 22->2 / 11->1
 // DeepBench v7.0.850 | api/prompt/db-assembly.js | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
 // A Skill every call of an agent must carry is pinned ONCE at AGENT level and read here, instead of
@@ -169,6 +170,20 @@ function getSupabaseHeaders(key) {
   };
 }
 
+// FEATURE: AGT-552 -- a role prompt gets ONE home in the bundle, not one per branch. The identity
+// branch and the behavior branch each pushed every `agent_configs` role_prompt row, and the loop
+// below runs a branch once PER Skill of its type, so the live count was identity Skills + behavior
+// Skills (michelle: 2, in two behavior sections), never a flat 2. That violates
+// `.claude/rules/agent-data-visibility.md` ("never render a role prompt, guardrail or taught item
+// into more than one assembled section") and docs/ARCHITECTURE.md §19w. The home is decided from
+// `skill_type_slug` ALONE -- never an agent id or a capability slug
+// (`.claude/rules/capabilities-are-data.md`): `identity` when the bundle holds an identity Skill,
+// else the FIRST `behavior` Skill, claimed once per bundle. Pure and exported so the rule can be
+// graded on its own, apart from the assembler.
+export function rolePromptHome(skillProfiles) {
+  return (Array.isArray(skillProfiles) ? skillProfiles : []).some(sp => sp?.skill_type_slug === "identity") ? "identity" : "behavior";
+}
+
 // FEATURE: DAT-12 -- retrievalScope is a REQUEST-level value threaded down from assemblePrompt()'s
 // own caller, deliberately NOT read from `traits`. Reading it off Skill data would apply the scope to
 // live CHI permanently, which is the exact outcome DAT-12's constraint forbids: the regression scopes
@@ -190,6 +205,17 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
   let critiqueCapabilitySlug = null;
   let critiqueIntentSlug = null;
   let intentTechnicalServices = [];
+
+  // AGT-552: the role prompt's one claim. Returns its text ONCE, to the section that is its home,
+  // and [] to every other branch and to every later Skill of the home type -- so two behavior
+  // Skills render it in the FIRST behavior section only.
+  const roleHome = rolePromptHome(skillProfiles);
+  let roleClaimed = false;
+  const claimRolePrompts = (slug) => {
+    if (slug !== roleHome || roleClaimed) return [];
+    roleClaimed = true;
+    return (agentConfigs || []).filter(c => c.type === "role_prompt" && c.text).map(c => c.text);
+  };
 
   for (const sp of skillProfiles) {
     const typeSlug = sp.skill_type_slug;
@@ -285,11 +311,7 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
         if (cardParts.length) parts.push(cardParts.join(' · '));
       }
 
-      // Source 2: all role_prompt entries from agent_configs (not just is_default)
-      const rolePrompts = (agentConfigs || [])
-        .filter(c => c.type === "role_prompt" && c.text)
-        .map(c => c.text);
-      parts.push(...rolePrompts);
+      parts.push(...claimRolePrompts(typeSlug));
 
       // Source 3: skill profile objective + method
       if (sp.objective) parts.push(sp.objective);
@@ -298,10 +320,7 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       content = parts.filter(Boolean).join("\n") || null;
 
     } else if (typeSlug === "behavior") {
-      const roleParts = (agentConfigs || [])
-        .filter(c => c.type === "role_prompt")
-        .map(c => c.text)
-        .filter(Boolean);
+      const roleParts = claimRolePrompts(typeSlug);
       const traitParts = [];
       if (traits.reasoning_style) traitParts.push(`Reasoning style: ${traits.reasoning_style}`);
       if (traits.writing_style) traitParts.push(`Writing style: ${traits.writing_style}`);

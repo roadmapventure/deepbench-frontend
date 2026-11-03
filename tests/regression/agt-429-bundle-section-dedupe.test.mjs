@@ -1,3 +1,4 @@
+// DeepBench v7.0.944 | tests/regression/agt-429-bundle-section-dedupe.test.mjs | AGT-552 -- a role prompt renders ONCE per bundle
 // DeepBench v7.0.895 | tests/regression/agt-429-bundle-section-dedupe.test.mjs | AGT-429 -- 44->4 / 22->2 / 11->1
 //
 // FEATURE: AGT-429 -- each DISTINCT assembled section renders ONCE per bundle, not once per
@@ -20,9 +21,10 @@
 //       which is what makes every already-correct bundle byte-identical. No fetch, no env, no
 //       database: this arm grades the rule.
 //   (B) DISCRIMINATOR -- buildSections() over the exact 44-row shape, WITH its own CONTROL. Deduped:
-//       4 sections, `ROLE-A` 2, `GUARD-B` 1. Un-deduped, same input: 44 / 22 / 11 -- the measured
-//       live numbers. A no-op T1 leaves this arm RED on `sections=44`, so the arm cannot pass
-//       against an unchanged assembler.
+//       4 sections, `ROLE-A` 1 (AGT-552), `GUARD-B` 1. Un-deduped, same input: 44 / 1 / 11 -- the
+//       measured live section and guardrail numbers, with the role prompt now claimed once per
+//       bundle regardless of the row count. A no-op AGT-429 dedupe leaves this arm RED on
+//       `sections=44`, so the arm cannot pass against an unchanged assembler.
 //   (C) LIVE (SUPABASE_URL + SUPABASE_SERVICE_KEY, else NOT RUN) -- the shipped state through a REAL
 //       assemblePrompt() for `nathan` and `jerry`, the two agent-wide bundles the ticket names: no
 //       section slug appears twice, and `deepbench-north-star` still renders exactly ONCE (AGT-434's
@@ -33,11 +35,13 @@
 // kept, the north star still present) as well as that the repeats are gone. A one-directional
 // assertion would pass on a function that returned [].
 //
-// WHAT THIS FILE DOES NOT CLAIM. `ROLE-A` renders TWICE in a correct deduped bundle, and that is
-// asserted as 2, not 1: the identity branch (db-assembly.js ~:288) and the behavior branch (~:300)
-// both render agent_configs' role prompts, so a role prompt renders twice even at ONE capability.
-// That is a SEPARATE defect, unchanged by this ticket and filed on its own row -- this arm pins
-// today's true number so the separate fix is visible when it lands.
+// WHAT THIS FILE NO LONGER CLAIMS (AGT-552, v7.0.944). `ROLE-A` used to render TWICE in a correct
+// deduped bundle and was asserted here as 2: the identity branch and the behavior branch both
+// pushed agent_configs' role prompts, so a role prompt rendered twice even at ONE capability. That
+// was the SEPARATE defect this file pinned rather than owned, and AGT-552 CLOSED it -- the role
+// prompt is now claimed once per bundle (`rolePromptHome()` + the claim closure in buildSections()),
+// so both halves of arm B assert 1. The control half still reads 44 sections and 11 guardrails,
+// which is what keeps it a control: AGT-429's dedupe, not AGT-552's claim, is what collapses those.
 //
 // NO MODEL CALL, NO SPEND.
 
@@ -134,16 +138,16 @@ function armB_discriminator() {
   const rows = buildFortyFour();
 
   // CONTROL FIRST: the same input, NOT deduped -- the measured live numbers this ticket exists to
-  // close. If this half ever reads 4/2/1 the fixture has drifted and the discriminator below is
+  // close. If this half ever reads 4/1/1 the fixture has drifted and the discriminator below is
   // grading nothing.
   const control = buildSections(rows, "test-agent", AGENT_CONFIGS, AGENT_ROW, null, null);
   assert.strictEqual(control.sections.length, 44,
     `CONTROL: 44 un-deduped rows must still emit 44 sections (one per row), got ${control.sections.length}`);
-  assert.strictEqual(occurrences(control.sections, "ROLE-A"), 22,
-    `CONTROL: the role prompt must render 22 times un-deduped (11 identity + 11 behavior), got ${occurrences(control.sections, "ROLE-A")}`);
+  assert.strictEqual(occurrences(control.sections, "ROLE-A"), 1,
+    `CONTROL: the role prompt must render ONCE even un-deduped (AGT-552 claims it once per bundle), got ${occurrences(control.sections, "ROLE-A")}`);
   assert.strictEqual(occurrences(control.sections, "GUARD-B"), 11,
     `CONTROL: the guardrail must render 11 times un-deduped, got ${occurrences(control.sections, "GUARD-B")}`);
-  results.push("control-un-deduped-is-44-sections-role-22-guardrail-11");
+  results.push("control-un-deduped-is-44-sections-role-1-guardrail-11");
 
   // THE DISCRIMINATOR: the shipped path. A no-op T1 leaves this RED at sections=44.
   const deduped = buildSections(dedupeSkillProfilesBySlug(rows), "test-agent", AGENT_CONFIGS, AGENT_ROW, null, null);
@@ -152,13 +156,13 @@ function armB_discriminator() {
   assert.deepStrictEqual([...deduped.sections.map(s => s.slug)].sort(),
     ["behavior", "format", "guardrails", "identity"],
     `DEDUPED: one section per distinct Skill type, got ${JSON.stringify(deduped.sections.map(s => s.slug))}`);
-  assert.strictEqual(occurrences(deduped.sections, "ROLE-A"), 2,
-    `DEDUPED: the role prompt must render 2 times -- identity + behavior, the SEPARATE defect this ticket does not own -- got ${occurrences(deduped.sections, "ROLE-A")}`);
+  assert.strictEqual(occurrences(deduped.sections, "ROLE-A"), 1,
+    `DEDUPED: the role prompt must render exactly ONCE (AGT-552 closed the identity+behavior repeat), got ${occurrences(deduped.sections, "ROLE-A")}`);
   assert.strictEqual(occurrences(deduped.sections, "GUARD-B"), 1,
     `DEDUPED: the guardrail must render exactly ONCE, got ${occurrences(deduped.sections, "GUARD-B")}`);
-  results.push("discriminator-deduped-is-4-sections-role-2-guardrail-1");
+  results.push("discriminator-deduped-is-4-sections-role-1-guardrail-1");
 
-  console.log(`  [AGT-429] seam proof (no database, no model): control 44/22/11 -> deduped ${deduped.sections.length}/${occurrences(deduped.sections, "ROLE-A")}/${occurrences(deduped.sections, "GUARD-B")}`);
+  console.log(`  [AGT-429] seam proof (no database, no model): control 44/1/11 -> deduped ${deduped.sections.length}/${occurrences(deduped.sections, "ROLE-A")}/${occurrences(deduped.sections, "GUARD-B")}`);
   return results;
 }
 
