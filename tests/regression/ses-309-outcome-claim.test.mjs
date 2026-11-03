@@ -47,27 +47,32 @@ const METRICS = [
   "cycles_per_shipped_ticket", "cron_silence_hours", "hygiene_flags",
 ];
 
+// AGT-460 (v7.0.942): §3c moved to session-decisions.md; step 4's scoreboard paragraph (the
+// VOCABULARY clause below) stayed in session-setup.md, so the two files are named separately.
+const SETUP = "docs/runbooks/session-setup.md";
+const DECISIONS = "docs/runbooks/session-decisions.md";
+
 const CLAUSES = [
   {
-    id: "filing-insert-names-the-claim-column", file: "docs/runbooks/session-setup.md",
+    id: "filing-insert-names-the-claim-column", file: DECISIONS,
     test: s => /milestone,\n\s+enhancement_claim\)/.test(s),
     breaks: s => s.split(",\n   enhancement_claim)").join(")"),
     detail: "step 3c's canonical INSERT must carry enhancement_claim -- a filing template that omits the column is why zero of 792 rows had one",
   },
   {
-    id: "filing-template-offers-none-with-a-reason", file: "docs/runbooks/session-setup.md",
+    id: "filing-template-offers-none-with-a-reason", file: DECISIONS,
     test: s => /-- outcome claim \(SES-309\)/.test(s) && /'none: <why>'/.test(s),
     breaks: s => s.split("'none: <why>'").join("''"),
     detail: "`none: <why no scoreboard number applies>` is the honest answer most chartered work has; without it in the template the only options look like a fake claim or a blank",
   },
   {
-    id: "filing-bullet-lists-the-seven-metric-names", file: "docs/runbooks/session-setup.md",
+    id: "filing-bullet-lists-the-seven-metric-names", file: DECISIONS,
     test: s => METRICS.every(m => s.includes(m)),
     breaks: s => s.split("`cron_silence_hours`").join("`the silence one`"),
     detail: "a filer who cannot see the legal metric names writes a plausible wrong one, and the constraint rejects it at filing -- the list is what makes the rejection avoidable",
   },
   {
-    id: "session-setup-scoreboard-paragraph-carries-unclaimed", file: "docs/runbooks/session-setup.md",
+    id: "session-setup-scoreboard-paragraph-carries-unclaimed", file: SETUP,
     test: s => s.includes(VOCABULARY),
     breaks: s => s.split(VOCABULARY).join("`held` / `did_not_hold` / `unmeasurable` / `pending`"),
     detail: "the attended push path is where most Selfbuild ships happen; its scoreboard paragraph must name the verdict it can now produce",

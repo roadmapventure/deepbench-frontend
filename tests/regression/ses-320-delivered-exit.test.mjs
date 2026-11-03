@@ -41,7 +41,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const PRE_CHANGE_SHA = "dac315747765826e1155175d1a519372234d2785"; // origin/dev immediately before SES-320
 
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
+// AGT-460 (v7.0.942): the Reverse section moved to session-decisions.md. The clause reads the
+// NEW file; its file-level negative control still reads session-setup.md at PRE_CHANGE_SHA,
+// because session-decisions.md does not exist on that tree and `git show` would simply fail
+// there -- which would downgrade a real control to a notRun. Hence `beforeFile`.
 const SETUP_REL = "docs/runbooks/session-setup.md";
+const DECISIONS_REL = "docs/runbooks/session-decisions.md";
 const M5_REL = "docs/RUNNER-GOV-M5-REQUIREMENTS.md";
 
 // The runbooks are hard-wrapped, so a load-bearing phrase can straddle a line break and a literal
@@ -177,7 +182,8 @@ export const CLAUSES = [
   },
   {
     id: "reversing-a-finalised-ship-undoes-the-close-and-the-non-bump-is-why",
-    file: SETUP_REL,
+    file: DECISIONS_REL,
+    beforeFile: SETUP_REL,
     detail:
       "this is the clause that protects a line that is NOT in the code. The sweep's close writes " +
       "`status` and deliberately not `updated_at`, because reverse_decision() refuses any row " +
@@ -257,7 +263,7 @@ function theClausesFailOnThePreChangeTree() {
       return;
     }
   }
-  const passing = CLAUSES.filter(c => c.test(before[c.file])).map(c => c.id);
+  const passing = CLAUSES.filter(c => c.test(before[c.beforeFile ?? c.file])).map(c => c.id);
   assert.deepStrictEqual(
     passing, [],
     `these clauses pass on the PRE-CHANGE tree and therefore pin nothing: ${passing.join(", ")}`,

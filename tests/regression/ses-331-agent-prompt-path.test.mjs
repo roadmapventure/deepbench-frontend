@@ -47,7 +47,12 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PROMPT_SCRIPT = path.join(ROOT, "scripts/agent-prompt.js");
 const LOG_SCRIPT = path.join(ROOT, "scripts/agent-log.js");
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const RUNBOOK = path.join(ROOT, "docs/runbooks/session-setup.md");
+const DECISIONS = path.join(ROOT, "docs/runbooks/session-decisions.md");
 
 const AGENT = "owen";
 const CAPABILITY = "bench-report-card";
@@ -86,12 +91,12 @@ async function run() {
   // ---------------------------------------------------------------------------------------------
   // (c) The runbook section exists and names BOTH scripts. Source-only; always runs.
   // ---------------------------------------------------------------------------------------------
-  const runbook = fs.readFileSync(RUNBOOK, "utf8");
+  const runbook = fs.readFileSync(DECISIONS, "utf8");
   assert.ok(/^### 3f\. Running a governance agent from a session/m.test(runbook),
-    "docs/runbooks/session-setup.md is missing its §3f heading");
+    "docs/runbooks/session-decisions.md is missing its §3f heading");
   const sectionStart = runbook.indexOf("### 3f. Running a governance agent from a session");
-  const sectionEnd = runbook.indexOf("### 4. Fetch, rebase", sectionStart);
-  assert.ok(sectionEnd > sectionStart, "§3f must sit above §4 -- an empty slice cannot fail honestly");
+  const sectionEnd = runbook.indexOf("### 3g. The meter reader", sectionStart);
+  assert.ok(sectionEnd > sectionStart, "§3f must sit above §3g -- an empty slice cannot fail honestly");
   const section = runbook.slice(sectionStart, sectionEnd);
   assert.ok(section.includes("scripts/agent-prompt.js"), "§3f must name scripts/agent-prompt.js");
   assert.ok(section.includes("scripts/agent-log.js"), "§3f must name scripts/agent-log.js");

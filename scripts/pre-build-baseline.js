@@ -13,7 +13,7 @@
 //
 // SO THE MEASUREMENT MOVES TO THE ONE PLACE THAT HAS THE CREDENTIALS: the cycle, at step 7, on the
 // unchanged clone, immediately before the spawn (`docs/runbooks/runner-cycle.md` step 7;
-// `docs/runbooks/session-setup.md` §3f(b) for an attended session). The cycle pastes the block it
+// `docs/runbooks/session-decisions.md` §3f(b) for an attended session). The cycle pastes the block it
 // gets here into the Builder's opening line and hands the same file to 7a's verifier as
 // `--pre-build-baseline=<file>`, so the Designer, the Builder and the Verifier read ONE
 // measurement taken ONCE -- the same argument `scripts/baseline-red-set.js` already makes for the

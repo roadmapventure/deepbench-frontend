@@ -70,7 +70,13 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CYCLE = "docs/runbooks/runner-cycle.md";
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const SETUP = "docs/runbooks/session-setup.md";
+// §3d and §3f(a) moved; step 4's sweep and §2c's reverse_decision() reference did NOT.
+const DECISIONS = "docs/runbooks/session-decisions.md";
 const GATE = "docs/runbooks/gate-review.md";
 
 // CRLF is normalised on read for one reason, stated so nobody "simplifies" it away: this repo
@@ -227,7 +233,7 @@ export const CLAUSES = [
   },
   {
     id: "session-setup-names-record_decision",
-    file: SETUP,
+    file: DECISIONS,
     test: s => s.includes("record_decision("),
     breaks: [s => s.split("record_decision(").join("recordTheReasoning(")],
     detail:
@@ -315,7 +321,7 @@ export const CLAUSES = [
   },
   {
     id: "session-setup-design-status-write-carries-decision_id",
-    file: SETUP,
+    file: DECISIONS,
     test: s => {
       const b = designedWriteBlock(s);
       return !!b && b.includes("record_decision(") && b.includes("decision_id") &&

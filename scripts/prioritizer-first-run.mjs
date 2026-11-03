@@ -2,7 +2,7 @@
 // DeepBench v7.0.435 | scripts/prioritizer-first-run.mjs | SES-332 -- the Prioritizer's first run over
 // the whole open board, driven from a session on subscription tokens.
 //
-// WHY A DRIVER AND NOT 567 SHELL INVOCATIONS. `docs/runbooks/session-setup.md` §3f says a session
+// WHY A DRIVER AND NOT 567 SHELL INVOCATIONS. `docs/runbooks/session-decisions.md` §3f says a session
 // runs a governance agent through scripts/agent-prompt.js (assembly) and scripts/agent-log.js
 // (audit). Both are per-call scripts, and the first run is 567 calls. This file is the loop around
 // those two, not a replacement for either: --prep calls the SAME assemblePrompt() /

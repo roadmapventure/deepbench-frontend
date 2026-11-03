@@ -24,7 +24,12 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CANONICAL_REL = "docs/RUNNER-GOV-M5-REQUIREMENTS.md";
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const SETUP_REL = "docs/runbooks/session-setup.md";
+const DECISIONS_REL = "docs/runbooks/session-decisions.md";
 
 async function pg(url, key, pathAndQuery) {
   const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
@@ -57,7 +62,7 @@ const CLAUSES = [
     detail: "the note must say the enforcement is pick-time exclusion, not a NOT NULL -- FILE-MATRIX chose fail-LOUD so the runner's filing path can never park mid-drain",
   },
   {
-    id: "canonical-filing-insert-carries-scope-rationale", file: SETUP_REL,
+    id: "canonical-filing-insert-carries-scope-rationale", file: DECISIONS_REL,
     test: s => /INSERT INTO backlog_items[\s\S]{0,600}scope_rationale/.test(s),
     breaks: s => s.replace(/scope_rationale/g, "scope_reason"),
     detail: "a ticket filed from the runbook's own INSERT without scope_rationale is unpickable from the moment it lands (M5-03); the canonical form must carry the field",

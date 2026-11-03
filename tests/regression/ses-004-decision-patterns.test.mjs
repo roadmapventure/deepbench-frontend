@@ -74,7 +74,12 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const CYCLE_REL = "docs/runbooks/runner-cycle.md";
 const EXPORTER_REL = "scripts/export-decision-patterns.js";
 const RENDERER_REL = "scripts/render-standing-brief.js";
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const SETUP_REL = "docs/runbooks/session-setup.md";
+const DECISIONS_REL = "docs/runbooks/session-decisions.md";
 
 const read = rel => fs.readFileSync(path.join(REPO, rel), "utf8").replace(/\r\n/g, "\n");
 
@@ -497,10 +502,14 @@ function step7bTellsACycleToCiteItsPatterns() {
 // SES-004b — the two doc sentences part (a) left under the file cap: session-setup.md 3d cites
 // pattern:N too, and the patterns file names its own rows and its --check gate.
 function the3dSectionAlsoCitesItsPatterns() {
-  const setup = read(SETUP_REL);
+  const setup = read(DECISIONS_REL);
   const from = setup.indexOf("### 3d. Record a decision");
-  const to = setup.indexOf("### 3e. Run the verifier");
-  assert.ok(from > -1 && to > from, "control: 3d's span was not located in session-setup.md");
+  // AGT-460 (v7.0.942): §3d's neighbour is §3f now, not §3e. The cut left §3e in session-setup.md
+  // (ses-311 pins it there) and moved §3d, §3f and §3g here, so §3f is what actually bounds 3d's
+  // span. The control below is the point of the assert -- an unlocated span must fail, never slice
+  // to the end of the file and read green off its neighbours -- and it still does.
+  const to = setup.indexOf("### 3f. Running a governance agent");
+  assert.ok(from > -1 && to > from, "control: 3d's span was not located in session-decisions.md");
   const section = setup.slice(from, to);
 
   const hasSentence = s => {
@@ -512,7 +521,7 @@ function the3dSectionAlsoCitesItsPatterns() {
   };
 
   assert.ok(hasSentence(section),
-    `${SETUP_REL} 3d must carry the pattern:N sentence for attended decisions — naming ` +
+    `${DECISIONS_REL} 3d must carry the pattern:N sentence for attended decisions — naming ` +
     "runner-cycle.md step 7b, pattern:0's meaning, and public.runner_decision_patterns");
 
   // MUTATION CONTROL: strip the sentence from an in-memory copy and confirm the check goes false —

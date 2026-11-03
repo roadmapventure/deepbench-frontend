@@ -94,7 +94,12 @@ import { parseSnapshot } from "./ses-280-m5-governance-rules.test.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SNAPSHOT_REL = "docs/governance/RULES-SNAPSHOT.md";
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const SETUP_REL = "docs/runbooks/session-setup.md";
+const DECISIONS_REL = "docs/runbooks/session-decisions.md";
 const read = rel => fs.readFileSync(path.join(REPO, rel), "utf8").replace(/\r\n/g, "\n");
 
 // A value the constraint must refuse. Deliberately not a near-miss of any real value, so a pass
@@ -169,32 +174,32 @@ function theTwoHomesEnumerateTheSameSet() {
     `${SNAPSHOT_REL} FILE-MATRIX carries no parsable 'scope_origin (...)' enumeration`,
   );
 
-  const fromTemplate = enumerationFromTemplate(read(SETUP_REL));
+  const fromTemplate = enumerationFromTemplate(read(DECISIONS_REL));
   assert.ok(
     fromTemplate && fromTemplate.size > 0,
-    `${SETUP_REL} carries no parsable scope_origin filing-template comment`,
+    `${DECISIONS_REL} carries no parsable scope_origin filing-template comment`,
   );
 
   assert.deepStrictEqual(
     [...fromTemplate].sort(), [...fromSnapshot].sort(),
     `the two homes of the scope_origin enumeration disagree -- ${SNAPSHOT_REL} FILE-MATRIX says ` +
-      `(${show(fromSnapshot)}) and ${SETUP_REL}'s filing template says (${show(fromTemplate)}). ` +
+      `(${show(fromSnapshot)}) and ${DECISIONS_REL}'s filing template says (${show(fromTemplate)}). ` +
       "One was amended and the other was not; a filing rule with two answers has none.",
   );
   return { fromSnapshot, fromTemplate };
 }
 
 function theTemplateCarriesTheEnhancementAdmissionRule() {
-  const doc = read(SETUP_REL);
+  const doc = read(DECISIONS_REL);
   for (const c of CLAUSES) {
-    assert.ok(c.test(doc), `${SETUP_REL} lost clause "${c.id}": ${c.detail}`);
+    assert.ok(c.test(doc), `${DECISIONS_REL} lost clause "${c.id}": ${c.detail}`);
   }
 }
 
 // Every clause and every parser gets a control that is asserted to have CHANGED something first --
 // a control that mutates nothing proves nothing (SES-158).
 function everyCheckHasTeeth() {
-  const doc = read(SETUP_REL);
+  const doc = read(DECISIONS_REL);
   for (const c of CLAUSES) {
     const mutated = c.breaks(doc);
     assert.notStrictEqual(
@@ -313,9 +318,9 @@ async function bothHomesMatchWhatTheDatabaseAdmits(url, key) {
 
   const snapRow = parseSnapshot(read(SNAPSHOT_REL)).find(r => r.id === "FILE-MATRIX");
   const fromSnapshot = enumerationFromStatement(snapRow?.statement);
-  const fromTemplate = enumerationFromTemplate(read(SETUP_REL));
+  const fromTemplate = enumerationFromTemplate(read(DECISIONS_REL));
 
-  for (const [rel, documented] of [[SNAPSHOT_REL, fromSnapshot], [SETUP_REL, fromTemplate]]) {
+  for (const [rel, documented] of [[SNAPSHOT_REL, fromSnapshot], [DECISIONS_REL, fromTemplate]]) {
     assert.ok(documented, `${rel} carries no parsable scope_origin enumeration`);
 
     // Direction 1 -- every value the database admits must be documented. THIS is the AGT-93 defect:

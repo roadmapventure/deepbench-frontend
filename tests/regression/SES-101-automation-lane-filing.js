@@ -29,20 +29,25 @@ import { fileURLToPath } from "url";
 import { selfRun } from "./_lib/self-run.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const PROC = path.join(HERE, "..", "..", "docs", "runbooks", "session-setup.md");
+const DECISIONS = path.join(HERE, "..", "..", "docs", "runbooks", "session-decisions.md");
 
 export const FN = "public.claim_automation_lane_top";
 
 export async function run() {
-  assert.ok(fs.existsSync(PROC),
-    "docs/runbooks/session-setup.md is missing — SES-121 moved the procedure body here in " +
+  assert.ok(fs.existsSync(DECISIONS),
+    "docs/runbooks/session-decisions.md is missing — SES-121 moved the procedure body here in " +
     "v7.0.198 precisely so an unattended cycle could maintain it");
-  const s = fs.readFileSync(PROC, "utf8");
+  const s = fs.readFileSync(DECISIONS, "utf8");
 
   // ---- 1. The call is in the filing procedure ------------------------------------------------
   // FAILS on the pre-change tree: step 3c named only recompute_backlog_queue().
   assert.ok(s.includes(FN),
-    `docs/runbooks/session-setup.md must tell a filing session to call ${FN}() — without it a new ` +
+    `docs/runbooks/session-decisions.md must tell a filing session to call ${FN}() — without it a new ` +
     `automation ticket lands in the class-sorted backlog, which is the failure the lane exists to end`);
 
   // ---- 2. The direction is min-1, NEVER max+1 -------------------------------------------------

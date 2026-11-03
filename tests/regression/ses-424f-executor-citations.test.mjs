@@ -57,7 +57,12 @@ const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/
 
 const EXECUTE = "api/capabilities/execute.js";
 const CYCLE = "docs/runbooks/runner-cycle.md";
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const SETUP = "docs/runbooks/session-setup.md";
+const DECISIONS = "docs/runbooks/session-decisions.md";
 
 // The flag exactly as it must appear in both runbooks, and the number of blocks in each. Measured
 // at this ship, not recalled: 0 and 0 before, 3 and 2 after (§2's own before/after ladder).
@@ -263,7 +268,7 @@ export default async function run_() {
   // ---- (D) the five commands, and the ceiling they had to fit under ---------------------------
 
   const cycleSrc = read(CYCLE);
-  const setupSrc = read(SETUP);
+  const setupSrc = read(DECISIONS);
   const countFlag = src => src.split("\n").filter(l => l.includes(FLAG)).length;
   assert.equal(countFlag(cycleSrc), CYCLE_BLOCKS,
     `${CYCLE} must carry \`${FLAG}\` on ${CYCLE_BLOCKS} lines -- one per scripts/agent-log.js ` +
@@ -271,12 +276,12 @@ export default async function run_() {
     "slice: a command nobody is told to pass cites nothing, which is why the table held 0 rows " +
     "with the whole mechanism already shipped.");
   assert.equal(countFlag(setupSrc), SETUP_BLOCKS,
-    `${SETUP} must carry \`${FLAG}\` on ${SETUP_BLOCKS} lines (designer, builder), got ${countFlag(setupSrc)}`);
+    `${DECISIONS} must carry \`${FLAG}\` on ${SETUP_BLOCKS} lines (designer, builder), got ${countFlag(setupSrc)}`);
   // CONTROL: the counter must be able to report 0, or "got 3" says nothing about what it can see.
   assert.equal(countFlag(cycleSrc.split(FLAG).join("")), 0,
     "the flag counter must report 0 against a copy with the flag stripped");
   // Each flagged line must be an agent-log command line, not prose that happens to name the flag.
-  for (const [rel, src] of [[CYCLE, cycleSrc], [SETUP, setupSrc]]) {
+  for (const [rel, src] of [[CYCLE, cycleSrc], [DECISIONS, setupSrc]]) {
     for (const line of src.split("\n").filter(l => l.includes(FLAG))) {
       assert.ok(line.includes("--cycle="),
         `${rel}: \`${FLAG}\` must be appended to a command's own --cycle= line, not written in ` +

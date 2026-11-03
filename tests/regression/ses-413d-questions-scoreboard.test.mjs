@@ -80,7 +80,13 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 
+// AGT-460 (v7.0.942) cut `session-setup.md` in two. The clauses below assert text that moved
+// to `session-decisions.md`; the `session-setup.md` constant is KEPT so this test stays
+// RELATED to that file in `scripts/related-tests.js` (which relates by whole quoted string),
+// and so the clause that did NOT move still reads the file it lives in.
 const SETUP = "docs/runbooks/session-setup.md";
+// §3c's metric list moved; step 4's scoreboard sentences did NOT.
+const DECISIONS = "docs/runbooks/session-decisions.md";
 const CYCLE = "docs/runbooks/runner-cycle.md";
 const JOHN = "docs/WORKING-WITH-JOHN.md";
 
@@ -299,14 +305,14 @@ const tail4 = s => {
 export const CLAUSES = [
   {
     id: "setup-says-eight",
-    file: SETUP,
+    file: DECISIONS,
     detail: "the claimable metric names are now EIGHT, and the sentence that said seven is gone",
     test: s => s.includes("and the eight metric names are exactly") && !s.includes("the seven metric names"),
     breaks: s => s.replace("and the eight metric names are exactly", "and the seven metric names are exactly"),
   },
   {
     id: "setup-lists-the-column",
-    file: SETUP,
+    file: DECISIONS,
     detail: `\`${COLUMN}\` is listed after \`hygiene_flags\`, so the list and the count agree`,
     test: s => /`hygiene_flags`,\s*\n?\s*`questions_to_john_week`/.test(s),
     breaks: s => s.replace("`hygiene_flags`, `questions_to_john_week`", "`hygiene_flags`"),

@@ -57,7 +57,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 // self-destructs the moment this ship lands on it (the live SES-215 defect, v7.0.307). This is this
 // ticket's own kickoff commit -- the tree with the kickoff on it and the change not yet made.
 const PRE_CHANGE_SHA = "23e74bdd7cf263a27cc2f89254b7c2a5fd72fbd6";
+// AGT-460 (v7.0.942): §3d moved to session-decisions.md, so the live reads below take
+// DECISIONS_REL. The PRE-CHANGE negative control keeps RUNBOOK_REL: session-decisions.md does
+// not exist at PRE_CHANGE_SHA, and a `git show` that fails there turns a real control into a
+// notRun rather than proving the clauses fail on the pre-change tree.
 const RUNBOOK_REL = "docs/runbooks/session-setup.md";
+const DECISIONS_REL = "docs/runbooks/session-decisions.md";
 
 // session-setup.md is hard-wrapped, so a load-bearing phrase straddles a line break and a literal
 // match that fails on a reflow fails for a reason that has nothing to do with the rule (SES-194).
@@ -259,19 +264,19 @@ export const RUNBOOK_CLAUSES = [
 const readRel = rel => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
 function theRunbookCarriesTheChange() {
-  const src = readRel(RUNBOOK_REL);
-  for (const c of RUNBOOK_CLAUSES) assert.ok(c.test(src), `${RUNBOOK_REL}: ${c.id} -- ${c.detail}`);
+  const src = readRel(DECISIONS_REL);
+  for (const c of RUNBOOK_CLAUSES) assert.ok(c.test(src), `${DECISIONS_REL}: ${c.id} -- ${c.detail}`);
 }
 
 // SES-158's vacuity meta-check: a clause that still passes after its own mutation pins nothing.
 function everyClauseHasTeeth() {
-  const src = readRel(RUNBOOK_REL);
+  const src = readRel(DECISIONS_REL);
   for (const c of RUNBOOK_CLAUSES) {
     const broken = c.breaks(src);
     assert.notStrictEqual(broken, src,
       `clause "${c.id}"'s breaks() returned its input unchanged -- the teeth check below would pass ` +
       "vacuously, which is a control that controls nothing");
-    assert.ok(!c.test(broken), `${RUNBOOK_REL}: ${c.id} is VACUOUS -- it still passes after its own breaks() mutation`);
+    assert.ok(!c.test(broken), `${DECISIONS_REL}: ${c.id} is VACUOUS -- it still passes after its own breaks() mutation`);
   }
 }
 
