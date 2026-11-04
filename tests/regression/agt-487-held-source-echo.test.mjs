@@ -1,3 +1,9 @@
+// DeepBench v7.0.961 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-564 -- ARM A
+// FINDS ITS PAIR instead of naming it, and arm B's live half grades the pair arm A measured.
+// AGT-304 went `removal proposed` 2026-11-03 and is off the tooling list, so the two named ids
+// were grading the board rather than the change (pattern:162). The SHAPE is what AGT-487
+// shipped and the shape is what is asserted: one listed proposal whose John source the pool
+// does not carry, one whose it does. No pair on the list -> DECLARED not-run, never green.
 // DeepBench v7.0.904 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-304 slice 23 -- the list size is reported and every listed ticket is ruled, because board growth is not the defect.
 // DeepBench v7.0.865 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-489 -- ARM B'S LIVE
 // HALF: both tickets are graded and V2 refuses a `pass` on them, so the live echo is graded with
@@ -88,21 +94,22 @@ function node(script, args) {
 // The three rules of arm B, over ANY context carrying the two tickets and their held keys. One
 // function so the fixture and the live context are graded by the same assertions rather than by two
 // copies that can disagree (pattern:14).
-export function gradeHeldEcho({ ctx, heldKey, otherCandidateKey, where }) {
+export function gradeHeldEcho({ ctx, heldKey, otherCandidateKey, where,
+                                heldId = HELD_TICKET, ctrlId = CANDIDATE_TICKET }) {
   const out = [];
   const say = m => out.push(`${where}: ${m}`);
   const keys = new Set(ctx.candidates.map(c => c.key));
   const score = p => (Number.isInteger(p?.need_score) && p.need_score > 0 ? p.need_score : 5);
-  const held = ctx.proposals.find(p => p.backlog_id === HELD_TICKET);
-  const ctrl = ctx.proposals.find(p => p.backlog_id === CANDIDATE_TICKET);
-  assert.ok(held && ctrl, `${where}: the context must carry both ${HELD_TICKET} and ${CANDIDATE_TICKET}`);
+  const held = ctx.proposals.find(p => p.backlog_id === heldId);
+  const ctrl = ctx.proposals.find(p => p.backlog_id === ctrlId);
+  assert.ok(held && ctrl, `${where}: the context must carry both ${heldId} and ${ctrlId}`);
 
   // The premise of the whole ticket: the held key is NOT in the pool it was handed.
   assert.equal(keys.has(heldKey), false,
-    `${where}: ${HELD_TICKET}'s held key must NOT be a candidate — if it were, this ticket would ` +
+    `${where}: ${heldId}'s held key must NOT be a candidate — if it were, this ticket would ` +
     "have no problem to fix and the pool would have been widened (pattern:166)");
   assert.equal(keys.has(otherCandidateKey), true,
-    `${where}: ${CANDIDATE_TICKET}'s key IS a candidate — the control half of every arm`);
+    `${where}: ${ctrlId}'s key IS a candidate — the control half of every arm`);
 
   // AGT-304 slice 23: the answer rules EVERY proposal the context carries, each echoing the source
   // it already holds -- validateListVerdict refuses an unruled listed ticket, and the live list
@@ -120,12 +127,12 @@ export function gradeHeldEcho({ ctx, heldKey, otherCandidateKey, where }) {
     backlog_id: id, verdict: "pass", need_source: src, need_score: sc,
     reason: "the cited row asks for exactly what this ticket proposes to build",
   });
-  const ctrlRow = row(CANDIDATE_TICKET, otherCandidateKey, score(ctrl));
+  const ctrlRow = row(ctrlId, otherCandidateKey, score(ctrl));
 
   // (1) ACCEPTED: each ticket echoing its OWN held key. Zero refusals, not "fewer".
-  const echo = validateListVerdict(answer([row(HELD_TICKET, heldKey, score(held)), ctrlRow]), ctx);
+  const echo = validateListVerdict(answer([row(heldId, heldKey, score(held)), ctrlRow]), ctx);
   assert.deepEqual(echo.refusals, [],
-    `${where}: a pass echoing the key ${HELD_TICKET} already carries must raise NO refusal; got ` +
+    `${where}: a pass echoing the key ${heldId} already carries must raise NO refusal; got ` +
     JSON.stringify(echo.refusals));
   assert.equal(echo.ok, true, `${where}: and the answer as a whole is accepted`);
   say("echo accepted with zero refusals");
@@ -134,18 +141,18 @@ export function gradeHeldEcho({ ctx, heldKey, otherCandidateKey, where }) {
   //     the one row the ticket holds, never a licence to compose a key.
   const invented = "john:runner_decisions:00000000-0000-0000-0000-000000000000";
   assert.equal(keys.has(invented), false, `${where}: the invented key must not be a candidate`);
-  const made = validateListVerdict(answer([row(HELD_TICKET, invented, 5), ctrlRow]), ctx);
-  assert.equal(made.ok, false, `${where}: a composed key on ${HELD_TICKET} is still refused`);
-  assert.ok(made.refusals.some(r => r.startsWith(`${HELD_TICKET}:`) && /is not one of them/.test(r)),
-    `${where}: and the refusal NAMES ${HELD_TICKET} with the membership sentence; got ` +
+  const made = validateListVerdict(answer([row(heldId, invented, 5), ctrlRow]), ctx);
+  assert.equal(made.ok, false, `${where}: a composed key on ${heldId} is still refused`);
+  assert.ok(made.refusals.some(r => r.startsWith(`${heldId}:`) && /is not one of them/.test(r)),
+    `${where}: and the refusal NAMES ${heldId} with the membership sentence; got ` +
     JSON.stringify(made.refusals));
   say("a composed key on the same ticket is still refused by name");
 
   // (3) REFUSED: a `john:` REPLACEMENT -- a key that IS a candidate, but not the one the ticket
   //     holds. AGT-432's sentence (directive 0078af4d) is byte-unchanged and must still fire.
-  const swap = validateListVerdict(answer([row(HELD_TICKET, otherCandidateKey, 5), ctrlRow]), ctx);
-  assert.equal(swap.ok, false, `${where}: a john: replacement on ${HELD_TICKET} is still refused`);
-  assert.ok(swap.refusals.some(r => r.startsWith(`${HELD_TICKET}:`) &&
+  const swap = validateListVerdict(answer([row(heldId, otherCandidateKey, 5), ctrlRow]), ctx);
+  assert.equal(swap.ok, false, `${where}: a john: replacement on ${heldId} is still refused`);
+  assert.ok(swap.refusals.some(r => r.startsWith(`${heldId}:`) &&
     /a pass must echo it; an existing John-authored need_source is never replaced \(directive 0078af4d\)/.test(r)),
     `${where}: refused by AGT-432's own sentence, not by the membership rule; got ` +
     JSON.stringify(swap.refusals));
@@ -159,11 +166,11 @@ export function gradeHeldEcho({ ctx, heldKey, otherCandidateKey, where }) {
   // (4) THE EXEMPTION IS ONE TICKET WIDE. The control ticket may not cite the HELD ticket's key,
   //     which is the whole reason the head travels on the proposal and never in `candidates`.
   const borrowed = validateListVerdict(
-    answer([row(HELD_TICKET, heldKey, score(held)), row(CANDIDATE_TICKET, heldKey, 5)]), ctx);
+    answer([row(heldId, heldKey, score(held)), row(ctrlId, heldKey, 5)]), ctx);
   assert.equal(borrowed.ok, false,
-    `${where}: ${CANDIDATE_TICKET} may NOT cite ${HELD_TICKET}'s held key`);
-  assert.ok(borrowed.refusals.some(r => r.startsWith(`${CANDIDATE_TICKET}:`) && /is not one of them/.test(r)),
-    `${where}: and the refusal names ${CANDIDATE_TICKET}; got ${JSON.stringify(borrowed.refusals)}`);
+    `${where}: ${ctrlId} may NOT cite ${heldId}'s held key`);
+  assert.ok(borrowed.refusals.some(r => r.startsWith(`${ctrlId}:`) && /is not one of them/.test(r)),
+    `${where}: and the refusal names ${ctrlId}; got ${JSON.stringify(borrowed.refusals)}`);
   say("and no other ticket may borrow it");
 
   return out;
@@ -181,6 +188,8 @@ async function run() {
   let liveCtx = null;
   let liveHeld = null;
   let liveCtrl = null;
+  let liveHeldId = null;
+  let liveCtrlId = null;
 
   if (!CREDS) {
     notRun(`AGT-487 arm A — --prepare-list --project=${LIST} against the live board`,
@@ -206,12 +215,27 @@ async function run() {
         `${prepared.tickets} — the board may carry more; it may not carry fewer`);
       const ctx = prepared.context;
       const ids = ctx.proposals.map(p => p.backlog_id).sort();
-      assert.ok([HELD_TICKET, CANDIDATE_TICKET].every(id => ids.includes(id)),
-        `both tickets must be present, other tickets may be; got ${JSON.stringify(ids)}`);
-
-      const held = ctx.proposals.find(p => p.backlog_id === HELD_TICKET);
-      const ctrl = ctx.proposals.find(p => p.backlog_id === CANDIDATE_TICKET);
       const keys = new Set(ctx.candidates.map(c => c.key));
+
+      // THE PAIR IS FOUND, NEVER NAMED (pattern:162). What AGT-487 shipped is a SHAPE -- one listed
+      // proposal whose John source the pool does not carry, graded against one whose it does -- and
+      // which ids fill those two seats is live board state: the list is re-prepared on every run and
+      // CANDIDATE_TICKET went `removal proposed` 2026-11-03, so it is not listed at all any more.
+      // Naming the seats held this arm red on a board move rather than on the change. The two
+      // constants stay as the MEASURED REFERENCE they are; the seats are filled from the reading,
+      // and when the shape itself is absent the arm DECLARES that (SES-180 (b)) instead of failing.
+      const held = ctx.proposals.find(p => !keys.has(String(p.need_source)));
+      const ctrl = ctx.proposals.find(p => p !== held && keys.has(String(p.need_source)));
+      if (!held || !ctrl) {
+        notRun("AGT-487 arm A — the held/control PAIR on the live list, and the head that travels with it",
+          `the list prepared ${prepared.tickets} ticket(s) over ${ctx.candidates.length} candidate(s) ` +
+          `and the pair this arm grades is not on it: held (a proposal whose need_source is NOT a ` +
+          `candidate) ${JSON.stringify(held?.backlog_id ?? null)}, control (one whose need_source IS) ` +
+          `${JSON.stringify(ctrl?.backlog_id ?? null)}. The measured reference pair is ${HELD_TICKET} / ` +
+          `${CANDIDATE_TICKET}, and ${CANDIDATE_TICKET} went \`removal proposed\` 2026-11-03. Listed ` +
+          `ids: ${JSON.stringify(ids)}.`);
+        return;
+      }
 
       // (1) THE PREMISE: the key AGT-237 carries is NOT in the pool. Measured, never assumed.
       assert.ok(!keys.has(String(held.need_source)),
@@ -237,10 +261,10 @@ async function run() {
       // (3) THE CONTROL: a ticket whose key IS a candidate gets NO head. The read is for the
       //     source the pool does not carry, not for every ticket.
       assert.ok(keys.has(String(ctrl.need_source)),
-        `${CANDIDATE_TICKET}'s key IS a candidate (its decision is a john-ruling); got ` +
+        `${ctrl.backlog_id}'s key IS a candidate (its decision is a john-ruling); got ` +
         `${ctrl.need_source}`);
       assert.equal(ctrl.need_source_head, null,
-        `${CANDIDATE_TICKET}'s need_source_head must be NULL — its head is already in the pool; ` +
+        `${ctrl.backlog_id}'s need_source_head must be NULL — its head is already in the pool; ` +
         `got ${JSON.stringify(ctrl.need_source_head)}`);
 
       // (4) AND NOTHING WAS APPENDED TO THE POOL. Every john:runner_decisions candidate is still an
@@ -257,9 +281,11 @@ async function run() {
       liveCtx = ctx;
       liveHeld = String(held.need_source);
       liveCtrl = String(ctrl.need_source);
+      liveHeldId = held.backlog_id;
+      liveCtrlId = ctrl.backlog_id;
       console.log(`    [AGT-487 arm A] ${prepared.tickets} ticket(s), ${ctx.candidates.length} candidate(s), ` +
-        `${HELD_TICKET} head ${JSON.stringify(String(held.need_source_head).slice(0, 60))} ` +
-        `(${String(held.need_source_head).length} chars, not a candidate), ${CANDIDATE_TICKET} head null`);
+        `${liveHeldId} head ${JSON.stringify(String(held.need_source_head).slice(0, 60))} ` +
+        `(${String(held.need_source_head).length} chars, not a candidate), ${liveCtrlId} head null`);
     });
   }
 
@@ -303,24 +329,28 @@ async function run() {
     // (d.13). That refusal is measured FIRST, then the rules run with the grade fact lifted -- the
     // held-source contract is a rule about a `pass`, which only an ungraded ticket can answer.
     if (liveCtx) {
-      const heldLive = liveCtx.proposals.find(p => p.backlog_id === HELD_TICKET);
+      // The ids arm A MEASURED, not the two constants: arm A fills its seats from the live list
+      // (pattern:162), so the live half of this arm grades the pair arm A actually found.
+      const heldLive = liveCtx.proposals.find(p => p.backlog_id === liveHeldId);
       assert.equal(heldLive?.graded, true,
-        `${HELD_TICKET} holds a standing grade (AGT-489); got ${JSON.stringify(heldLive?.graded)}`);
+        `${liveHeldId} holds a standing grade (AGT-489); got ${JSON.stringify(heldLive?.graded)}`);
       const asHanded = validateListVerdict({
         list: liveCtx.list, account: "Ruled both tickets on the source each already carries",
-        rows: [HELD_TICKET, CANDIDATE_TICKET].map(id => ({
+        rows: [liveHeldId, liveCtrlId].map(id => ({
           backlog_id: id, verdict: "pass", need_score: 5,
-          need_source: id === HELD_TICKET ? liveHeld : liveCtrl,
+          need_source: id === liveHeldId ? liveHeld : liveCtrl,
           reason: "echoes the source the ticket already carries",
         })),
       }, liveCtx);
       assert.equal(asHanded.ok, false, "as handed, a pass on a graded ticket is refused (AGT-489 V2)");
-      assert.ok(asHanded.refusals.some(r => r.startsWith(`${HELD_TICKET}:`) && /is already graded/.test(r)),
-        `refused by V2's sentence, naming ${HELD_TICKET}; got ${JSON.stringify(asHanded.refusals)}`);
-      console.log(`    [AGT-487 arm B] live context: a pass on the graded ${HELD_TICKET} is refused as handed (is already graded, AGT-489 V2)`);
+      assert.ok(asHanded.refusals.some(r => r.startsWith(`${liveHeldId}:`) && /is already graded/.test(r)),
+        `refused by V2's sentence, naming ${liveHeldId}; got ${JSON.stringify(asHanded.refusals)}`);
+      console.log(`    [AGT-487 arm B] live context: a pass on the graded ${liveHeldId} is refused as handed (is already graded, AGT-489 V2)`);
       const lifted = { ...liveCtx, proposals: liveCtx.proposals.map(p => ({ ...p, graded: false })) };
       for (const line of gradeHeldEcho({
-        ctx: lifted, heldKey: liveHeld, otherCandidateKey: liveCtrl, where: "live context, grade lifted",
+        ctx: lifted, heldKey: liveHeld, otherCandidateKey: liveCtrl,
+        where: `live context (${liveHeldId} / ${liveCtrlId}), grade lifted`,
+        heldId: liveHeldId, ctrlId: liveCtrlId,
       })) {
         console.log(`    [AGT-487 arm B] ${line}`);
       }

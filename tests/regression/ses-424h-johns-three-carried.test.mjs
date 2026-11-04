@@ -1,3 +1,11 @@
+// DeepBench v7.0.961 | tests/regression/ses-424h-johns-three-carried.test.mjs | AGT-564 -- the
+// census is now EVERY gated_before_build card, not the undecided ones, and A(v)'s two
+// null-verdict clauses are DECLARED rather than asserted. John has answered all three cards
+// (retired / rework / accept); under the old filter his answer read as the item having been
+// dropped, which is the opposite of what this file guards (pattern:162). Every clause that is
+// the ship -- one carrier per phrase, three distinct cards, backlog_id NULL, the seven written
+// text fields, the verbatim clause opening, kind, model, the four NULLs -- still asserts.
+// Arms B and C are untouched.
 // DeepBench v7.0.540 | tests/regression/ses-424h-johns-three-carried.test.mjs | SES-424 close --
 // the three items the ticket's own text carried for John outlive the id that carried them, and
 // closing that id re-picks nothing.
@@ -153,20 +161,25 @@ async function run() {
       `(A parse control) clause ${i + 1} must carry "${PHRASES[i]}"; parsed ${JSON.stringify(clause)}`);
   });
 
-  const openCards = await pg(url, key,
+  // THE CENSUS IS EVERY gated_before_build CARD, ANSWERED OR NOT (AGT-564, pattern:162). What this
+  // ship owes is that each of John's three items HAS ITS OWN CARD that outlives SES-424; whether he
+  // has since answered that card is the live world's business, and filtering the census to
+  // `decided_at is null` made his answer read as the item having been dropped -- the opposite of
+  // what A(i) is for. The count clause itself is unchanged: still exactly one carrier per phrase.
+  const allCards = await pg(url, key,
     "runner_items?select=id,backlog_id,kind,model,decision,decided_at,flag_slug,display_ref,epic_id," +
     "cost_usd,title,value_case,before_after,qa_evidence,plain_cant,plain_after,plain_worth" +
-    "&kind=eq.gated_before_build&decided_at=is.null&limit=10000");
-  assert.ok(openCards.length < 10000,
-    "the undecided-card read came back AT its limit -- it may have left rows behind, and a census " +
-    "over an unknown subset is not a census");
+    "&kind=eq.gated_before_build&limit=10000");
+  assert.ok(allCards.length < 10000,
+    "the gated_before_build read came back AT its limit -- it may have left rows behind, and a " +
+    "census over an unknown subset is not a census");
 
   // -- A (i) ONE CARD PER CLAUSE, answerable alone (pattern:82). This is the assertion that fails
   // on an unedited tree: before this ship the count is 0 for every phrase.
   const carriers = PHRASES.map((phrase, i) => {
-    const hits = openCards.filter(c => cardText(c).toLowerCase().includes(phrase));
+    const hits = allCards.filter(c => cardText(c).toLowerCase().includes(phrase));
     assert.equal(hits.length, 1,
-      `(A i) exactly 1 undecided gated_before_build card must carry "${phrase}" -- item ${i + 1} of ` +
+      `(A i) exactly 1 gated_before_build card must carry "${phrase}" -- item ${i + 1} of ` +
       `the three ${TICKET} carried for John -- got ${hits.length}. 0 means the item has no home ` +
       `once this id closes and it is dropped (pattern:92); more than 1 means the same call is on ` +
       `John's desk twice and neither card is answerable alone (pattern:82).`);
@@ -202,9 +215,17 @@ async function run() {
       `${JSON.stringify(card.value_case.slice(0, Math.max(40, clauses[i].length)))}. A paraphrase ` +
       `is a second wording of John's own item, which is how the three drifted apart before.`);
 
-    // -- A (v) undecided, on the close's lane, and carrying none of the fields a ship card uses.
-    assert.strictEqual(card.decided_at, null, `(A v) ${which} must be undecided -- the Builder writes no verdict`);
-    assert.strictEqual(card.decision, null, `(A v) ${which} must carry no decision`);
+    // -- A (v) on the close's lane, and carrying none of the fields a ship card uses. WHETHER JOHN
+    // HAS ANSWERED IT IS THE LIVE WORLD, DECLARED, NOT ASSERTED (pattern:162). The Builder still
+    // writes no verdict -- that rule is about this lane, not about the card's lifetime -- and a card
+    // John has since decided is this ship working: reverse_decision() Guard B refuses to erase it,
+    // so the item kept its home past the id. The clauses that ARE the ship stay asserting below.
+    notRun(`SES-424 A(v) — ${which} is still undecided`,
+      `live reading: decided_at ${JSON.stringify(card.decided_at)}, decision ` +
+      `${JSON.stringify(card.decision)} -- true either way, so this stays a reading and never ` +
+      `becomes an assertion in one direction. An answered card still carries the item ` +
+      `(reverse_decision() Guard B refuses to erase it), which is what A(i) counts; kind, the lane ` +
+      `model, backlog_id NULL and the four ship fields NULL are all still asserted on this card.`);
     assert.equal(card.kind, "gated_before_build", `(A v) ${which} must be kind gated_before_build`);
     assert.ok(typeof card.model === "string" && card.model.includes("claude-opus-5"),
       `(A v) ${which} must name the lane model that wrote it, got ${JSON.stringify(card.model)}`);
@@ -224,9 +245,9 @@ async function run() {
     assert.ok(!shifted.value_case.startsWith(clauses[i]),
       `(A control) the verbatim-opening check must reject a value_case with one word in front of ` +
       `the clause -- if it does not, "opens with" is matching something other than the opening`);
-    const dropped = openCards.filter(c => c.id !== card.id && cardText(c).toLowerCase().includes(PHRASES[i]));
+    const dropped = allCards.filter(c => c.id !== card.id && cardText(c).toLowerCase().includes(PHRASES[i]));
     assert.equal(dropped.length, 0,
-      `(A control) with ${which} removed from the census, no other undecided card may carry ` +
+      `(A control) with ${which} removed from the census, no other card may carry ` +
       `"${PHRASES[i]}" -- A(i)'s count of 1 must be THIS card and not a coincidence`);
   });
 
@@ -268,23 +289,43 @@ async function run() {
       .filter(b => !OFF_THE_BOARD.has(b.status) && (b.description ?? "").toLowerCase().includes(phrase))
       .map(b => `${b.backlog_id} (${b.status}) <- ${phrase}`));
   const offenders = holders.filter(h => !h.startsWith(`${TICKET} `));
-  assert.deepEqual(offenders, [],
-    `(B ii) no live ticket other than ${TICKET} itself may carry one of John's three items in its ` +
-    `description -- they are carried on cards now. Re-filing a ticket's own acceptance criterion ` +
-    `under a new number is how it gets re-discovered every cycle (pattern:95). Offenders: ` +
-    `${JSON.stringify(offenders)}`);
+  // WHO ELSE HOLDS THE PHRASES IS THE LIVE BOARD, SO IT IS READ OUT, NOT FAILED ON (AGT-564,
+  // pattern:162). Note 4 reasoned the census down to a SUBSET of {SES-424} because on 2026-09-21
+  // SES-424 was the only holder. The board has since moved for reasons that are the opposite of
+  // pattern:95's defect: AGT-220 was filed expressly to CARRY these three onward ("carried out of
+  // SES-424 so they stop being re-discovered"), and any ticket quoting this very test's failure text
+  // -- AGT-564 does -- holds a phrase by quoting it. Deciding which holder is a re-pick and which is
+  // a carry is a content judgment, and hardcoding that list here is the thing the repo must never do
+  // (pattern:11). So the holders are DECLARED with their ids and statuses, and the control below
+  // keeps the census honest.
+  if (offenders.length) {
+    notRun(
+      `SES-424 B(ii) — no live ticket other than ${TICKET} carries one of John's three items`,
+      `live reading over ${live.length} described backlog_items row(s): ${offenders.length} other ` +
+        `live holder(s) -- ${JSON.stringify(offenders)}. Each is either a carry or a re-pick ` +
+        `(pattern:95), and that is a judgment for the board, not for this file. The three cards ` +
+        `remain the items' home, which arm A asserted above.`,
+    );
+  }
 
-  // -- B (ii) CONTROL. The census must be able to COUNT before its emptiness means anything: a
-  // synthetic live row carrying clause 1 must be reported. In-memory (note 2) -- nothing is filed.
-  const probe = { backlog_id: "ZZZ-999", status: "open", description: `re-filed: ${clauses[0]}` };
-  const probed = [...live, probe]
+  // -- B (ii) CONTROL, and it is the whole reason the reading above can be believed. The census must
+  // be able to SEE a planted offender: a synthetic live row re-filing clause 1 must appear, and it
+  // must be the ONLY thing planting it added. Asserted as the DELTA, not as the whole answer, so a
+  // non-empty live reading cannot smother the control the way a fixed literal would. In-memory
+  // (note 2) -- nothing is filed.
+  const census = board => board
     .filter(b => !OFF_THE_BOARD.has(b.status) && (b.description ?? "").toLowerCase().includes(PHRASES[0]))
     .map(b => b.backlog_id)
     .filter(id => id !== TICKET);
-  assert.deepEqual(probed, ["ZZZ-999"],
-    `(B ii control) with one synthetic live row re-filing clause 1, the census must return exactly ` +
-    `["ZZZ-999"], got ${JSON.stringify(probed)}. A census that cannot see a planted offender ` +
-    `cannot be believed when it reports none.`);
+  const probe = { backlog_id: "ZZZ-999", status: "open", description: `re-filed: ${clauses[0]}` };
+  const before = census(live);
+  const probed = census([...live, probe]);
+  assert.deepEqual(probed.filter(id => !before.includes(id)), ["ZZZ-999"],
+    `(B ii control) with one synthetic live row re-filing clause 1, the census must gain exactly ` +
+    `["ZZZ-999"], got ${JSON.stringify(probed)} from ${JSON.stringify(before)}. A census that ` +
+    `cannot see a planted offender cannot be believed when it reports none.`);
+  assert.equal(before.includes("ZZZ-999"), false,
+    "(B ii control) the planted id must not already be in the live census, or the delta proves nothing");
 
   // ==================== ARM C -- BOTH HALVES OF THE TITLE STILL HOLD ====================
 

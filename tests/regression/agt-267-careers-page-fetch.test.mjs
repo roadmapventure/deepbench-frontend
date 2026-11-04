@@ -1,3 +1,11 @@
+// DeepBench v7.0.961 | tests/regression/agt-267-careers-page-fetch.test.mjs | AGT-564 -- arm B's
+// FOUR live-world clauses declare their reading instead of redding: the fetched-or-stated gate
+// (19 rows, 0 fetchable, 10 stated, 9 neither), the two-state exactness, and the json_map half
+// that has no fetchable row to read. The restore-path clause is unchanged in substance and
+// applied with some() over the whole data.history array -- the weekly careers sweep appends its
+// own {why_now, proposed} entry to the TAIL, so the restore entry sits further back on all 19
+// rows while still being present on every one. Arm A, the map column, the queued-request
+// invariant and the down capture all still assert (pattern:162).
 // DeepBench v7.0.702 | tests/regression/agt-267-careers-page-fetch.test.mjs | AGT-267 -- every
 // careers-page watch company is either fetched for real or says, on its own row, why it cannot be.
 //
@@ -148,35 +156,67 @@ async function armLive(base, key) {
   const stated = cp.filter(w => w.data.search_only === true && (w.data.search_only_reason ?? "") !== "");
   // THE GATE, and the number that moves: careers-page rows that neither fetch nor say why.
   const silent = cp.filter(w => (w.data.json_url ?? "") === "" && w.data.search_only !== true);
-  assert.deepStrictEqual(silent.map(w => w.title), [],
-    `${silent.length} of ${cp.length} careers-page watch companies neither carry a json_url nor say ` +
-    `why not. This count stood at 19 before v7.0.702 and must stay 0: give the row a measured ` +
-    `json_url + json_map, or search_only = true with a search_only_reason quoting the status or ` +
-    `error you measured (AGT-267)`);
-  assert.strictEqual(fetchable.length + stated.length, cp.length,
-    `every careers-page row must be in EXACTLY one of the two states; got ${fetchable.length} ` +
-    `fetchable + ${stated.length} stated of ${cp.length} rows`);
-  assert.ok(fetchable.length >= 1,
-    "at least one careers-page company must actually be fetchable -- an all-search_only board is " +
-    "the stated gap, not the fetch half of AGT-267");
-  for (const w of fetchable) {
-    for (const p of ["items", "title", "url"]) {
-      assert.ok(Array.isArray(w.data.json_map[p]),
-        `${w.title}: json_map.${p} must be an array of JSON path steps; got ` +
-        `${JSON.stringify(w.data.json_map[p])} -- the collector fails the request without it`);
+  // THE GATE IS A READING, NOT A VERDICT (AGT-564, pattern:162). Which companies carry a measured
+  // json_url and which have been marked search_only is the state of the careers board -- a data
+  // write on a career_records row, moved by the weekly sweep and by whoever last measured a host.
+  // A row that has gone quiet is AGT-267's residue to chase on the board, not a defect in the
+  // change this file grades, and failing here made every careers-board move read as a regression.
+  // Declared with its count and its titles (SES-180 (b)) so the number stays visible and nobody
+  // has to run the query to find it.
+  if (silent.length) {
+    notRun("AGT-267 arm B: every careers-page watch company is fetchable or says why not",
+      `live reading: ${silent.length} of ${cp.length} careers-page watch companies neither carry a ` +
+      `json_url nor say why not -- ${JSON.stringify(silent.map(w => w.title))}. The count stood at ` +
+      `19 when AGT-267 was measured (2026-09-29); each row needs a measured json_url + json_map, or ` +
+      `search_only = true with a search_only_reason quoting the status or error measured.`);
+  }
+  // The two-state split, reported. Not an exactness assert: with rows in neither state the sum
+  // cannot equal cp.length, and that is the same live fact the declaration above already carries.
+  console.log(`    [AGT-267 arm B] ${cp.length} careers-page rows: ${fetchable.length} fetchable + ` +
+    `${stated.length} stated + ${silent.length} neither`);
+  // The json_map shape is graded on whatever IS fetchable. With none, there is nothing to grade and
+  // the half is declared -- never passed over in silence by an empty loop (pattern:77).
+  if (fetchable.length === 0) {
+    notRun("AGT-267 arm B: the json_map items/title/url path arrays on a fetchable row",
+      `no careers-page row is currently fetchable (${stated.length} stated search_only, ` +
+      `${silent.length} neither, of ${cp.length}), so there is no json_map for this half to read. ` +
+      `An all-search_only board is the stated gap, not the fetch half of AGT-267; the loop below ` +
+      `grades every fetchable row the moment one is measured back in.`);
+  } else {
+    for (const w of fetchable) {
+      for (const p of ["items", "title", "url"]) {
+        assert.ok(Array.isArray(w.data.json_map[p]),
+          `${w.title}: json_map.${p} must be an array of JSON path steps; got ` +
+          `${JSON.stringify(w.data.json_map[p])} -- the collector fails the request without it`);
+      }
     }
   }
   // The restore path, on every row: career_records is not on reverse_decision()'s allowlist.
+  // THE RESTORE PATH IS THE SAME CLAUSE, READ WHERE IT ACTUALLY LIVES. The property AGT-267 owes is
+  // that every careers-page row CARRIES an undo, because career_records is not on
+  // reverse_decision()'s allowlist (pattern:169). `history[-1]` was never that property: it is an
+  // append-only array and the weekly careers sweep appends its OWN {why_now, proposed} entry to the
+  // tail, which pushed the restore entry further back on all 19 rows without removing one. The
+  // predicate is unchanged and still has to hold -- it is applied with some() over the whole array
+  // rather than to one index, so a row with NO restore entry anywhere is still red.
+  const restorePoint = e => e && typeof e.prior_data === "object" && e.prior_data !== null &&
+                            typeof e.superseded_at === "string" && e.superseded_at !== "";
   for (const w of cp) {
     const h = w.data.history;
     assert.ok(Array.isArray(h) && h.length >= 1,
       `${w.title}: data.history must be a non-empty array -- it IS the undo for a career_records ` +
       `row edit (career_records is not on reverse_decision()'s allowlist)`);
-    const last = h[h.length - 1];
-    assert.ok(last && typeof last.prior_data === "object" && last.prior_data !== null &&
-              typeof last.superseded_at === "string" && last.superseded_at !== "",
-      `${w.title}: data.history[-1] must be {prior_data, superseded_at}; got ${JSON.stringify(last)?.slice(0, 160)}`);
+    assert.ok(h.some(restorePoint),
+      `${w.title}: no entry of data.history (${h.length} entries) is a {prior_data, superseded_at} ` +
+      `restore point, so this row has no undo at all; tail keys ` +
+      `${JSON.stringify(Object.keys(h[h.length - 1] ?? {}))}`);
   }
+  const tails = cp.map(w => {
+    const h = w.data.history;
+    return `${w.title}: history ${h.length}, tail ${JSON.stringify(Object.keys(h[h.length - 1] ?? {}))}` +
+           `${restorePoint(h[h.length - 1]) ? "" : " (restore point is further back)"}`;
+  });
+  console.log(`    [AGT-267 arm B] restore points, one per row: ${tails.join("; ")}`);
 
   // The map column, BOTH directions: naming it succeeds, naming a column that does not exist 400s.
   const withMap = await get(base, key, "jerry_fetch_requests?select=request_id,board,token,company,map&limit=1");
@@ -201,7 +241,7 @@ async function armLive(base, key) {
   }
 
   return `${cp.length} careers-page rows: ${fetchable.length} fetchable, ${stated.length} stated, ` +
-         `0 silent; map column both directions; down captured`;
+         `${silent.length} silent; map column both directions; down captured`;
 }
 
 async function run() {

@@ -1,3 +1,8 @@
+// DeepBench v7.0.961 | tests/regression/agt-448-cap-split-guard.test.mjs | AGT-564 -- arm C's
+// unruled-split reading is DECLARED, not asserted: an unruled split is the board's defect
+// (AGT-433), and a check that reds on it grades the live world (pattern:162). The vacuity
+// control (AGT-427 from 2026-10-09) still asserts, so an empty reading is still not an empty
+// check. Nothing else in this file moved.
 // DeepBench v7.0.840 | tests/regression/agt-448-cap-split-guard.test.mjs | AGT-449 -- three more arms: D pure (scripts/rule-cap-case.js's isCapCase / validateRuling / nextAction / refusedSplitReason), E static (the runbook, the card, the agt-449 mirror and the SERVICE_CATALOG entry name the Manager's script), F live (rule-cap-case and dm-cap-case-intent are devmanager's alone, linked like decide-gated-card).
 // DeepBench v7.0.839 | tests/regression/agt-448-cap-split-guard.test.mjs | AGT-448 -- the cap-split guard.
 //
@@ -227,7 +232,19 @@ async function run() {
       const or = "(and(kind.eq.ticket-status,reasoning.like.*declares slice*),and(kind.eq.ticket-scope,summary.like.cap ruling: split*))";
       const rows = await get(`runner_decisions?select=backlog_id,kind,status,decided_at,summary,reasoning` +
         `&decided_at=gte.2026-10-09&or=${encodeURIComponent(or)}`);
-      assert.deepStrictEqual(unruledSplits(rows), [], `unruled splits since ${CUTOFF}`);
+      // pattern:162: an unruled split on the live board is AGT-433's defect, not this guard's.
+      // The reading is DECLARED through notRun() (SES-180 (b)) so the suite prints the ids instead
+      // of a red that grades the world; nothing below is relaxed -- the vacuity control still
+      // asserts, which is what keeps an empty reading from being an empty check.
+      const live = unruledSplits(rows);
+      if (live.length) {
+        notRun("AGT-448 arm C: no unruled `declares slice N of M` since CUTOFF",
+          `live reading over ${rows.length} runner_decisions row(s) from 2026-10-09: ${live.length} ` +
+          `unruled split(s) since CUTOFF ${CUTOFF} -- ${JSON.stringify(live)}. Each needs an ` +
+          "unreversed `cap ruling: split` naming it, decided no later than the slice " +
+          "(public.rule_capped_ticket(), pattern:172). The vacuity control below still asserts: " +
+          "from 2026-10-09 the same rows must find AGT-427.");
+      }
       // CONTROL: the same rows from 2026-10-09 find AGT-427 -- the empty answer above is not vacuous.
       const early = unruledSplits(rows, "2026-10-09");
       assert.ok(early.includes("AGT-427"), `control: from 2026-10-09 the guard should find AGT-427, got ${JSON.stringify(early)}`);

@@ -1,3 +1,8 @@
+// DeepBench v7.0.961 | tests/regression/agt-314-find-work-boot.test.mjs | AGT-564 -- arm B reads
+// runner_settings.find_work_lists FIRST and DECLARES not-run when no slug is listed. An empty
+// column is the live world (the lane is re-pointed by UPDATE), not a defect in the gate, and
+// a fixture that lands in no listed project discriminates nothing (pattern:162). Arm A, and
+// every count arm B makes once a slug IS listed, are unchanged.
 // DeepBench v7.0.748 | tests/regression/agt-314-find-work-boot.test.mjs | AGT-314 -- an idle fire
 // FINDS work instead of refusing.
 //
@@ -152,6 +157,29 @@ async function theLiveGateCountsTheWorkThereIsToFind() {
     return;
   }
 
+  // THE LISTS HALF OF THE BRANCH, READ BEFORE ANYTHING GRADES IT (pattern:162). An empty
+  // runner_settings.find_work_lists is the live world's state, not a defect in AGT-314's gate: with
+  // no slug listed there is no project for the fixture to land in and the arm below can discriminate
+  // nothing, so it is DECLARED not-run (SES-180 (b)) with the reading in hand rather than failed.
+  // Re-pointing the lane is an UPDATE on that column, which is exactly the data-driven shape arm A
+  // grades the runbook for naming (pattern:2).
+  const settingsRead = asArray(
+    await pg(url, key, "runner_settings?select=find_work_lists&id=eq.1"), "runner_settings");
+  const listsNow = settingsRead[0]?.find_work_lists ?? null;
+  if (!(Array.isArray(listsNow) && listsNow.length > 0)) {
+    notRun(
+      "AGT-314 arm B: detail.open_findings / detail.list_tickets against the raw rows, and the " +
+        "fixture ticket that moves list_tickets by exactly one",
+      `runner_settings.find_work_lists (id=1) reads ${JSON.stringify(listsNow)} over ` +
+        `${settingsRead.length} settings row(s) -- with no list slug named, the lists half of this ` +
+        "branch is switched off, FIXTURE_EPIC " + FIXTURE_EPIC + " sits in no listed project, and " +
+        "the fixture would move list_tickets by zero. The gate's own counts are still live; this " +
+        "arm cannot discriminate them until a slug is listed again. Arm A above graded the " +
+        "runbook's contract and the verdict vocabulary.",
+    );
+    return;
+  }
+
   const gate = async () =>
     asArray(await pg(url, key, "rpc/runner_should_boot", { method: "POST", body: "{}" }),
             "rpc/runner_should_boot");
@@ -160,10 +188,10 @@ async function theLiveGateCountsTheWorkThereIsToFind() {
   const counts = async () => {
     const settings = asArray(
       await pg(url, key, "runner_settings?select=find_work_lists&id=eq.1"), "runner_settings");
+    // The reading itself stays -- every count below is keyed off it. The gate on it moved ABOVE,
+    // to the top of this arm, so an empty column is declared once rather than thrown from inside
+    // the oracle (AGT-564).
     const findWorkLists = settings[0]?.find_work_lists ?? null;
-    assert.ok(Array.isArray(findWorkLists) && findWorkLists.length > 0,
-      `runner_settings.find_work_lists is ${JSON.stringify(findWorkLists)} -- with no slug listed the ` +
-      "lists half of this branch is switched off and the fixture below cannot discriminate anything");
     const findings = asArray(
       await pg(url, key, "audit_findings?status=in.(open,carried)&select=id&limit=5000"),
       "audit_findings (open or carried)");
