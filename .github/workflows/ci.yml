@@ -1,3 +1,6 @@
+# DeepBench v7.0.958 | .github/workflows/ci.yml | AGT-573 — THE BLOCKING SUITE GRADES THE CHANGE (pattern:162), as the
+# scan's `--base` below does: all 900 dev conclusions since 2026-09-16 read the suite job = failure and the anchor sat 49 days.
+# run-all.js --only over related-tests.js of `git diff $BASE_SHA HEAD`; an EMPTY set exits 0. Guard: tests/regression/agt-573-ci-grades-the-change.test.mjs.
 # DeepBench v7.0.631 | .github/workflows/ci.yml | AGT-194 — ONE CONCURRENCY GROUP PER PUSHED SHA,
 # so every sha that lands on dev keeps its own CI conclusion. The whole change is the `group:` key
 # below; `cancel-in-progress: true` is UNCHANGED and load-bearing.
@@ -298,7 +301,17 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: node tests/regression/run-all.js
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git diff --name-only "$BASE_SHA" HEAD > /tmp/changed-files.txt
+          RELATED="$(node scripts/related-tests.js --files-from=/tmp/changed-files.txt)"
+          if [ -z "$RELATED" ]; then
+            echo "AGT-573: no regression test is related to the $(wc -l < /tmp/changed-files.txt) file(s) changed since ${BASE_SHA} -- nothing to grade; the full suite runs weekly (AGT-391)."
+            exit 0
+          fi
+          node tests/regression/run-all.js --only="$RELATED"
 
   # SES-255, v7.0.339 — CI PUBLISHES ITS OWN GRADE, because nothing else can read it.
   #
