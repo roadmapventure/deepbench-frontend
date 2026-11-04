@@ -1,3 +1,4 @@
+// DeepBench v7.0.962 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-586 -- the charge clause REFUSES a delivery's own standing reds; clause (a)'s third case and its two controls.
 // DeepBench v7.0.930 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-555 -- `--next` has a BOARD leg, so exit 3 is a fact about the board; clause (j) and the live clause's fall-through.
 // DeepBench v7.0.799 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-304 slice 10 -- the live clause's pair must still be `delivered`, or no leg runs.
 // DeepBench v7.0.705 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-245 slices 3-5 of 5
@@ -18,13 +19,21 @@
 //
 // WHERE A LAZIER GUARD WOULD PASS VACUOUSLY, clause by clause.
 //
-// (a) THE PURE GRADE, FOUR CASES, AND THE FIRST TWO ARE EACH OTHER'S CONTROL. A red only on the ship
-//     leg must be `newlyRed` and block; THE SAME red on both legs must be `standing` and approve. A
-//     grader that called everything newly red passes the first alone; one that called everything
-//     standing passes the second alone. The third case is the same both-legs input with the file
-//     added to `ownTests` -- identical captures, opposite verdict, so the clause can only pass if
-//     `ownTests` is actually read. The fourth pins the refusal: a prior block whose hygiene was red
-//     rests on a gate no leg here ran, and carrying it forward as green would vouch for it.
+// (a) THE PURE GRADE, AND THE CASES ARE EACH OTHER'S CONTROLS. A red only on the ship leg must be
+//     `newlyRed` and block; THE SAME red on both legs must be `standing` and approve. A grader that
+//     called everything newly red passes the first alone; one that called everything standing passes
+//     the second alone. The third case is the same both-legs input with the file added to `ownTests`,
+//     and since AGT-586 it REFUSES rather than blocks: the one red it would charge was already red on
+//     this delivery's OWN base leg, so there is no regression here to grade and a block row would
+//     re-block the pair for a red it inherited. That refusal needs THREE controls beside it, one per
+//     clause: `ownFileFresh` (base leg GREEN -- the red IS this delivery's, so AGT-245's charge still
+//     blocks), `ownFileMixed` (a second, genuinely fresh red -- the refusal must not swallow it) and
+//     `ownFileUnverified` (a red the base leg never RAN, so "already red there" is unprovable -- and
+//     the only one of the three that bites the standing clause alone, measured rather than assumed).
+//     A source tooth pins the ORDER of main()'s two refusal
+//     arms, since no pure arm can see an exit code and `own-tests-standing` is exit 2, not exit 1.
+//     The last case pins the other refusal: a prior block whose hygiene was red rests on a gate no
+//     leg here ran, and carrying it forward as green would vouch for it.
 //
 // (b) `ran` IS NOT THE EXIT CODE. `run-all.js:153` prints `[NOT RUN] regression suite -- transport:
 //     <why>` and exits 2 with no test result at all. An empty failing set off that run is "nobody
@@ -518,12 +527,74 @@ async function run() {
     prior: PRIOR_GREEN, base: leg(["standing-a.test.mjs"]), ship: leg(["standing-a.test.mjs"]),
     shipExit: 1, ownTests: ["tests/regression/standing-a.test.mjs"],
   });
-  assert.deepEqual(ownFile.delta.newlyRed, ["standing-a.test.mjs"],
-    "a red whose FILE this delivery changed is newly red however the base leg graded that name — the base tree ran a different file");
-  assert.deepEqual(ownFile.delta.standing, [], "and it is removed from standing, never left in both lists");
-  assert.equal(ownFile.verdict, "block",
-    "identical captures to the approve above, opposite verdict: the clause can only pass if ownTests is read");
-  assert.ok(/THIS DELIVERY CHANGED/.test(ownFile.delta.reason), "and the reason says why, by name");
+  assert.equal(ownFile.ok, false,
+    "AGT-586: the ONE red this delivery would be charged for was ALREADY red on its OWN base leg, so there is no " +
+      "regression here to grade -- a delta that blocked on it would re-block the pair for a red it inherited");
+  assert.equal(ownFile.kind, "own-tests-standing", "and the refusal names itself, so the tail can route it to exit 2");
+  assert.equal(ownFile.gateResults, null,
+    "a refusal publishes no gate results -- the same bar as not-regression-only: no gate this lane did not grade gets a status");
+  assert.equal(ownFile.verdict, null, "and no verdict, so nothing can be written off this answer");
+  assert.ok(/AGT-586/.test(ownFile.reason), "the reason cites the clause that refused, by ticket");
+  assert.ok(/standing-a\.test\.mjs/.test(ownFile.reason), "and names the red it refused on, so the notes line is readable");
+
+  // THE TWO CONTROLS THE REFUSAL MUST NOT SWALLOW. Same `ownTests` as `ownFile`, so neither can pass by
+  // the clause being switched off; each differs from it in exactly the one input the clause reads.
+  const ownFileFresh = deltaVerdict({
+    prior: PRIOR_GREEN, base: leg([]), ship: leg(["standing-a.test.mjs"]),
+    shipExit: 1, ownTests: ["tests/regression/standing-a.test.mjs"],
+  });
+  assert.equal(ownFileFresh.ok, true,
+    "CONTROL: the base leg was GREEN here, so this red is not standing at all -- without this, a clause that " +
+      "refused on any charged red at all would pass, and every own-test regression would go ungraded");
+  assert.equal(ownFileFresh.verdict, "block", "and it still blocks: AGT-245's charge is untouched where the red is this delivery's");
+  assert.deepEqual(ownFileFresh.delta.newlyRed, ["standing-a.test.mjs"], "charged as newly red, by name");
+  assert.ok(/THIS DELIVERY CHANGED/.test(ownFileFresh.delta.reason), "and AGT-245's reason still says why, by name");
+
+  const ownFileMixed = deltaVerdict({
+    prior: PRIOR_GREEN, base: leg(["standing-a.test.mjs"]), ship: leg(["standing-a.test.mjs", "fresh.test.mjs"]),
+    shipExit: 1, ownTests: ["tests/regression/standing-a.test.mjs"],
+  });
+  assert.equal(ownFileMixed.ok, true,
+    "CONTROL: one red here IS newly red (fresh.test.mjs), so the pair has a regression to answer for -- without this, " +
+      "a clause that ignored the rest of the delta would refuse, and a real newly-red test would escape the gate " +
+      "behind an own-test red that happened to be standing");
+  assert.equal(ownFileMixed.verdict, "block", "and the fresh red blocks");
+  assert.deepEqual(ownFileMixed.delta.newlyRed, ["fresh.test.mjs", "standing-a.test.mjs"],
+    "with BOTH names charged: the refusal is off, so AGT-245's charge of the own-test red stands beside the fresh one");
+
+  // THE THIRD CONTROL, and the only arm that bites `charged.every(... standing ...)` on its own --
+  // MEASURED, not assumed. `ownFileFresh` cannot: its base leg is an empty [], so the raw delta already
+  // calls the red NEWLY RED and `!rawNewly.length` alone stops the refusal there. The clause's own tooth
+  // is a red the base leg never VERIFIED: named in the base capture's NOT A FULL RUN notice, so the raw
+  // delta files it under `unverifiedInBaseline` -- neither standing nor newly red. "Already red on the
+  // base leg" is then an unprovable claim, and without `charged.every` the refusal would launder a red
+  // nobody ever ran on the unchanged tree, which is the one direction §19v forbids.
+  const ownFileUnverified = deltaVerdict({
+    prior: PRIOR_GREEN, base: leg([], ["standing-a.test.mjs"]), ship: leg(["standing-a.test.mjs"]),
+    shipExit: 1, ownTests: ["tests/regression/standing-a.test.mjs"],
+  });
+  assert.equal(ownFileUnverified.ok, true,
+    "CONTROL: the base leg never RAN this test, so it is unverified rather than standing -- without this, a clause " +
+      "that only counted newly-red names would refuse on a red the unchanged tree never graded");
+  assert.equal(ownFileUnverified.verdict, "block", "and AGT-245's charge still blocks it");
+  assert.deepEqual(ownFileUnverified.delta.newlyRed, ["standing-a.test.mjs"], "charged as newly red, by name");
+  assert.deepEqual(ownFileUnverified.delta.standing, [],
+    "and `standing` is empty here, which is exactly why the refusal must not read this as a standing red");
+
+  // A SOURCE TOOTH FOR THE EXIT CODE, because no pure arm can see one. `own-tests-standing` must be
+  // answered BEFORE the generic `!graded.ok` arm: that arm exits 1, which the cycle reads as a block
+  // ROW, while this refusal means the re-grade could not run -- exit 2, nothing recorded. Delete the
+  // early return and the refusal silently becomes a block row; this is the only place that notices.
+  const regradeSrc = fs.readFileSync(SCRIPT, "utf8");
+  const refuseArm = regradeSrc.indexOf('graded.kind === "own-tests-standing"');
+  const genericArm = regradeSrc.indexOf("if (!graded.ok) {");
+  assert.ok(refuseArm > 0,
+    "scripts/regrade-delivered.js's main() carries no `own-tests-standing` arm, so the refusal would fall through " +
+      "to the exit-1 arm and be recorded as a block row -- the exact false block AGT-586 exists to stop");
+  assert.ok(genericArm > 0, "CONTROL: the generic `if (!graded.ok) {` arm must still be there -- the refusal adds an arm, it replaces none");
+  assert.ok(refuseArm < genericArm,
+    `the \`own-tests-standing\` arm is at ${refuseArm} and the generic \`!graded.ok\` arm at ${genericArm}: the ` +
+      "specific refusal must be read FIRST, or the generic arm claims it and exits 1");
 
   const hygieneRed = deltaVerdict({
     prior: { build: "green", regression: "red", hygiene: "red" },
@@ -690,9 +761,12 @@ async function run() {
 function report(pair, live, terSpan, ledger, picker, second, board) {
   const head =
     `  [AGT-245] delta re-grade: a red only on the ship leg is newlyRed/block, the SAME red on both legs is ` +
-    `standing/approve, and those identical captures flip to block when the file is in ownTests (the base tree ran a ` +
-    `different file under that name); a prior block on build or hygiene refuses not-regression-only with no gate ` +
-    `results. legNames: a [NOT RUN] transport capture is ran:false, a [PASS] capture is ran:true, and a test that ` +
+    `standing/approve, and those identical captures with the file in ownTests REFUSE own-tests-standing (ok:false, no ` +
+    `gate results, no verdict) because that red was already red on this delivery's own base leg -- while a base leg ` +
+    `that was GREEN still blocks, a second genuinely fresh red still blocks with both names charged, a red the base leg ` +
+    `never RAN is unverified rather than standing and still blocks, and main() reads ` +
+    `the own-tests-standing arm BEFORE the exit-1 arm; a prior block on build or hygiene refuses not-regression-only ` +
+    `with no gate results. legNames: a [NOT RUN] transport capture is ran:false, a [PASS] capture is ran:true, and a test that ` +
     `failed AND skipped a part stays a proven red. AGT-202 exits 2 no-version; --suite=x without --dry-run exits 2 ` +
     `suite-override-requires-dry-run with the credentials stripped, while the default suite passes the fence.` +
     `\n       The tail's (7a-ter) paragraph (${terSpan} B normalised) names the command, --next, --cycle-id= and ONE ` +

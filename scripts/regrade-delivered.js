@@ -272,6 +272,23 @@ function chargeOwnTests(delta, ownTests, shipFails) {
   const fails = (Array.isArray(shipFails) ? shipFails : []).map(n => String(n));
   const charged = fails.filter(n => own.includes(leafName(n)));
   if (!charged.length) return delta;
+
+  // AGT-586. The ONE case where this stricter clause has nothing to charge: every red it would charge
+  // was ALREADY red on this delivery's own BASE leg. The base tree ran a different file under that
+  // name, so that red is not evidence about this one (header fence :39-44) -- but it is equally not
+  // evidence of a regression this delivery introduced. Returning a delta here would re-block on the
+  // reds the pair inherited; so this returns a REFUSAL instead of a delta, and nothing is recorded.
+  // Fail closed stays intact: it fires only when NOTHING is newly red and EVERY charged name is in
+  // the raw delta's own `standing`. One fresh red anywhere, and the charge stands as before.
+  const standingRaw = Array.isArray(delta.standing) ? delta.standing.map(String) : [];
+  const rawNewly = Array.isArray(delta.newlyRed) ? delta.newlyRed.map(String) : [];
+  if (!rawNewly.length && charged.every(n => standingRaw.includes(n))) {
+    return {
+      refuse: "own-tests-standing",
+      reason: `AGT-586: the only reds charged here (${charged.join(", ")}) were ALREADY red on this ` +
+        `delivery's own base leg in a file it changed. REFUSED, nothing recorded, the prior block stands.`,
+    };
+  }
   const without = list => (Array.isArray(list) ? list : []).filter(n => !charged.includes(n));
   const newlyRed = [...new Set([...(Array.isArray(delta.newlyRed) ? delta.newlyRed : []), ...charged])].sort();
   return {
@@ -318,6 +335,11 @@ export function deltaVerdict({ prior, base, ship, shipExit, ownTests } = {}) {
     unverified: Array.isArray(b.notRun) ? b.notRun : null,
   });
   const delta = chargeOwnTests(raw, ownTests, s.fails);
+  // AGT-586: a refusal from the charge clause is `ok:false` like the not-regression-only arm above --
+  // one gate this lane cannot speak to, so no gateResults and no verdict leave here.
+  if (delta.refuse) {
+    return { ok: false, kind: delta.refuse, gateResults: null, delta: null, verdict: null, reason: delta.reason };
+  }
   const gateResults = { build: "green", hygiene: "green", regression: delta.status };
   const { verdict, reasoning } = verdictFor(gateResults);
   return { ok: true, kind: "regrade-delta", gateResults, delta, verdict, reason: `${reasoning} ${delta.reason}` };
@@ -627,6 +649,12 @@ export async function main(argv, { env = process.env, out = null } = {}) {
     base_leg: { exit_code: legs.base.exitCode ?? null, ran: legs.base.names.ran, fails: legs.base.names.fails, not_run: legs.base.names.notRun, capture: legs.base.capture },
     ship_leg: { exit_code: legs.ship.exitCode ?? null, ran: legs.ship.names.ran, fails: legs.ship.names.fails, not_run: legs.ship.names.notRun, capture: legs.ship.capture },
   };
+  // AGT-586: this refusal is NOT the arm below. That arm exits 1, which the cycle reads as a block row;
+  // `own-tests-standing` means the re-grade COULD NOT RUN on this pair, so it goes out through
+  // `cannot()` -- exit 2, no verdict row, the prior block standing untouched.
+  if (!graded.ok && graded.kind === "own-tests-standing") {
+    return cannot(graded.kind, graded.reason, { ...common, reason: graded.reason });
+  }
   if (!graded.ok) {
     return emit({ code: 1, json,
       payload: { ...common, ok: false, exitCode: 1, kind: graded.kind, recorded: false, verdict: null, reason: graded.reason },

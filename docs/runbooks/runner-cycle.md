@@ -4276,9 +4276,10 @@ never listed: that diff is in `dev`, so the job it broke still fails there.
 **(7a-ter) DELTA RE-GRADE THE COHORT'S NEXT TICKET (`AGT-245`).** <!-- FEATURE: AGT-245 -->
 EVERY cycle, nothing to name:
 `node scripts/regrade-delivered.js --next --cycle-id=<your cycle id>`. ONE test slot for
-BOTH legs; `--next` takes the frozen cohort's first still-eligible row, never `graded_sha`.
-**0** = an `approve` row plus its ship decision; **1** = a block row or a refusal; **2** = could
-not run, not a verdict; **3** = DRAINED. Nothing recorded on a 2 or a 3.
+BOTH legs; `--next` takes the cohort's next eligible row, never `graded_sha`. **0** =
+`approve` + ship decision; **1** = a block row or refusal; **2** = no run, no verdict;
+**3** = DRAINED. Nothing recorded on 2 or 3; name a 2's `own-tests-standing` in
+`notes`.
 
 **(7b) SWEEP THE DECISION WINDOWS (`SES-286`, `v7.0.395` — `M6-02`, `M6-07`).** <!-- FEATURE: SES-286 (b) — the cycle tail closes the windows that expired while it ran. -->
 One call, idempotent, safe to run on a cycle that decided nothing:
