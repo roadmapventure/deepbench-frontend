@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DeepBench v7.0.942 | scripts/open-session.js | AGT-460
+// DeepBench v7.0.963 | scripts/open-session.js | AGT-464
 //
 // THE TEN STEPS EVERY SESSION OPENS WITH, as a script instead of as 900 lines of prose a session
 // re-reads and re-types. `docs/runbooks/session-setup.md` steps 1 through 3b, in the runbook's own
@@ -17,18 +17,28 @@
 // claims it or reports who holds it. It never picks a ticket, never re-tiers one, never writes a
 // status, never records a decision -- those are judgment writes and they belong to the session.
 //
-// THE TWO CLAIMS IT CANNOT MAKE ITSELF. `--version` and `--ids=` print §3/§3b's SQL for the
-// operator's one Supabase-connector call rather than faking a number: PostgREST's write API takes
-// column values, not the arithmetic those two statements need. `scripts/lib/session-db.mjs`'s header
-// carries the measurement and the precedent. The steps still appear in the plan, in order, with the
-// statement to run -- an omitted step is how a counter gets read-and-incremented instead.
+// THE ONE CLAIM IT STILL CANNOT MAKE ITSELF. `--ids=` prints §3b's SQL for the operator's one
+// Supabase-connector call rather than faking a block: PostgREST's write API takes column values,
+// not the arithmetic that statement needs. `--version` USED to be the same, and is not any more --
+// AGT-464's `rpc/lean_claim_version` put §3's arithmetic inside a function, so the script claims the
+// version for real and prints the number it got. `scripts/lib/session-db.mjs`'s header carries both
+// measurements. The steps still appear in the plan, in order -- an omitted step is how a counter
+// gets read-and-incremented instead.
+//
+// THE LEAN LANE (AGT-464). This script needs NO service key: `SUPABASE_LEAN_KEY` opens it, and that
+// key's role may EXECUTE four narrow functions and read the meter, nothing else. An interactive
+// session should be given the lean key and never the service key. `--file=` files ONE ticket through
+// `rpc/lean_file_ticket`, so a ticket can be filed from a phone without a privileged credential.
+// The lane in writing, and John's one key-minting chore: `docs/runbooks/lean-lane.md`.
 //
 //   node scripts/open-session.js --name=<short-session-name> --ticket=<ID> \
-//     [--version] [--ids=<PREFIX>:<N>] [--dry-run] [--json] [--repo=<shared checkout>]
+//     [--version] [--ids=<PREFIX>:<N>] [--file="<PREFIX>|<P-class>|<title>|<why it belongs>"] \
+//     [--dry-run] [--json] [--repo=<shared checkout>]
 //
 // Exit 0  — the open sequence ran (or, with --dry-run, the plan is sound and the meter was read).
-// Exit 2  — `no-credentials` (SUPABASE_URL / SUPABASE_SERVICE_KEY unset) or the worktree already
-//           exists. Both are "this session cannot open here", and both are the reader's to fix.
+// Exit 2  — `no-credentials` (SUPABASE_URL, and SUPABASE_LEAN_KEY or SUPABASE_SERVICE_KEY, unset) or
+//           the worktree already exists. Both are "this session cannot open here", and both are the
+//           reader's to fix.
 // Exit 3  — `claim-held`: the atomic claim returned 0 rows. Prints `claimed_by` and `claimed_at`, so
 //           the report names WHO holds the ticket rather than only that it is held. Rule B40: take
 //           the next queued ticket; never work one a live peer holds.
@@ -38,7 +48,7 @@ import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import {
-  budget, claimIds, claimTicket, claimVersion, credentials, meter, noCredentials,
+  budget, claimIds, claimTicket, claimVersion, credentials, fileTicket, meter, noCredentials,
 } from "./lib/session-db.mjs";
 
 const WHO = "open-session";
@@ -51,6 +61,12 @@ const EXIT_CLAIM_HELD = 3;
 // filtered to these prefixes/names, so a shared checkout whose copy has grown a privileged key back
 // cannot propagate it into a new worktree. A privileged key is borrowed BY NAME from
 // public.runner_secrets for the one command that needs it, never written to a file.
+//
+// `SUPABASE_LEAN_KEY` (AGT-464) is not on the PRIVILEGED list below and does not need to be: the
+// filter is an ALLOW-list, so `isPublishable()` already returns false for it and the copy drops it.
+// That is the fail-closed direction, and it is the reason the lean key's home is the cloud
+// environment's settings plus `public.runner_secrets` rather than any file in this repo
+// (docs/runbooks/lean-lane.md). Naming it in ses-260's own FORBIDDEN list is separate work.
 export const PUBLISHABLE = Object.freeze(["SUPABASE_URL", "ALLOWED_ORIGIN"]);
 export const PUBLISHABLE_PREFIX = "VITE_";
 export const PRIVILEGED = Object.freeze([
@@ -96,12 +112,33 @@ export function parseArgs(argv) {
   } else if (rawIds === true) {
     errors.push("--ids needs its block size: --ids=<PREFIX>:<N>, where N is how many rows you are about to file");
   }
+  // §3c, AGT-464: file ONE ticket from the lean lane. FOUR `|`-separated parts, all four required,
+  // because every one of them is a column `lean_file_ticket` refuses to invent: the prefix picks the
+  // id series, the full named priority class is register B9's form (`P9 - Bug Fixes`, never a bare
+  // `P9`), the title is what the board shows, and the fourth part is `scope_rationale` — M5-03, a
+  // ticket filed without one is never picked, so a missing rationale is an error here rather than a
+  // row that lands unpickable.
+  let file = null;
+  const rawFile = arg("file");
+  if (typeof rawFile === "string" && rawFile.trim()) {
+    const parts = rawFile.split("|").map(p => p.trim());
+    if (parts.length !== 4 || parts.some(p => !p)) {
+      errors.push(`--file must read "<PREFIX>|<P-class>|<title>|<why it belongs>" — four `
+        + `non-empty |-separated parts, got ${parts.length} in ${JSON.stringify(rawFile)}. The fourth `
+        + "is the scope rationale (M5-03): a ticket without one is never picked.");
+    } else {
+      file = { prefix: parts[0].toUpperCase(), priority_class: parts[1], title: parts[2], rationale: parts[3] };
+    }
+  } else if (rawFile === true) {
+    errors.push('--file needs its four parts: --file="<PREFIX>|<P-class>|<title>|<why it belongs>"');
+  }
   return {
     errors,
     name: typeof name === "string" ? name.trim() : "",
     ticket: typeof ticket === "string" ? ticket.trim() : "",
     wantVersion: arg("version") === true || typeof arg("version") === "string",
     ids,
+    file,
     dryRun: arg("dry-run") === true,
     json: arg("json") === true,
     repo: typeof arg("repo") === "string" ? arg("repo") : null,
@@ -136,8 +173,8 @@ export function planFor(opts, paths) {
       detail: `one UPDATE … RETURNING on ${opts.ticket}: 1 row → yours, 0 rows → exit 3 naming the holder. updated_at left untouched (SES-316)` },
     { n: 9, step: "3", title: "claim the version number atomically",
       detail: opts.wantVersion
-        ? "§3's UPDATE … RETURNING over the Supabase connector — the write IS the reservation, so no re-check before push"
-        : "not requested (--version); claim it the moment this session needs one, never by reading CLAUDE-STATE.md and incrementing" },
+        ? "§3's UPDATE … RETURNING inside rpc/lean_claim_version — the write IS the reservation, so no re-check before push"
+        : "not requested (--version); claim it through rpc/lean_claim_version the moment this session needs one, never by reading CLAUDE-STATE.md and incrementing" },
     { n: 10, step: "3b", title: "claim the feature/backlog ID block atomically",
       detail: opts.ids
         ? `§3b's INSERT … ON CONFLICT for ONE block of ${opts.ids.n} ${opts.ids.prefix}- ids over the Supabase connector`
@@ -242,8 +279,25 @@ async function main(argv = process.argv.slice(2)) {
     }
   }
 
-  // Steps 3 and 3b — the statements to run over the connector, never a number this script invented.
-  if (opts.wantVersion) out.version_claim = claimVersion(opts.name);
+  // Step 3 — a REAL claim as of AGT-464, and a dry run makes it no more than it makes the ticket
+  // claim above: `--dry-run` claims NOTHING and files NOTHING. A dry run that burned a version
+  // number, or landed a board row, would be a write wearing a plan's clothes — and the version
+  // counter has no undo, so the gap it leaves is permanent (v7.0.103 is one such gap).
+  if (opts.wantVersion) {
+    out.version_claim = opts.dryRun
+      ? { claimed: false, dry_run: true, step: "docs/runbooks/session-setup.md §3",
+          why: "--dry-run claims no version; rpc/lean_claim_version runs on the real open" }
+      : await claimVersion(opts.name);
+  }
+  // Step 3c — file ONE ticket, same rule.
+  if (opts.file) {
+    out.filed = opts.dryRun
+      ? { filed: false, dry_run: true, step: "docs/runbooks/session-setup.md §3c",
+          why: "--dry-run files no ticket; rpc/lean_file_ticket runs on the real open",
+          would_file: opts.file }
+      : await fileTicket({ session: opts.name, ...opts.file });
+  }
+  // Step 3b — still the statement to run over the connector, never a block this script invented.
   if (opts.ids) out.id_claim = claimIds(opts.ids.prefix, opts.ids.n);
 
   // Then the meter (with its age and its source) and the session's own length rule.
@@ -271,7 +325,18 @@ async function main(argv = process.argv.slice(2)) {
   } else {
     console.log(`${WHO}: ${opts.dryRun ? "PLAN" : "OPEN"} — ${opts.name} on ${opts.ticket}`);
     for (const s of plan) console.log(`  ${String(s.n).padStart(2)}. [step ${s.step}] ${s.title} — ${s.detail}`);
-    if (out.version_claim) console.log(`\n§3 version claim — run over the ${out.version_claim.channel}:\n${out.version_claim.sql}`);
+    // The claim prints the number it GOT, never a statement for someone else to run — and when it
+    // claimed nothing it says so with the reason, so a reader can never read a plan as a claim.
+    if (out.version_claim) {
+      console.log(out.version_claim.claimed
+        ? `\n§3 version claimed: ${out.version_claim.version}`
+        : `\n§3 version NOT claimed: ${out.version_claim.why ?? out.version_claim.error}`);
+    }
+    if (out.filed) {
+      console.log(out.filed.filed
+        ? `§3c filed: ${out.filed.backlog_id}`
+        : `§3c NOT filed: ${out.filed.why ?? out.filed.error}`);
+    }
     if (out.id_claim?.sql) console.log(`\n§3b id-block claim — run over the ${out.id_claim.channel}:\n${out.id_claim.sql}`);
     console.log(`\n${meterLine}`);
     console.log(budgetLine);

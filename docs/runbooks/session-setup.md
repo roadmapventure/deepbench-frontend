@@ -58,7 +58,7 @@ sanctioned home, and a session that needs one borrows it for the session, **neve
   SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/run-all.js
   ```
 
-Exit **2** `no-credentials` names whichever of `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` is missing.
+Exit **2** `no-credentials` names whichever of `SUPABASE_URL` / `SUPABASE_LEAN_KEY` (or `SUPABASE_SERVICE_KEY`) is missing; the lean key's home and lane: `docs/runbooks/lean-lane.md`.
 **`VERCEL_TOKEN`** is not needed on this desktop (the Vercel CLI is logged in);
 **`VERCEL_AUTOMATION_BYPASS_SECRET`** is not a Vercel env var — read it by name from
 `public.runner_secrets` into the environment for the one command that needs the header, never into a

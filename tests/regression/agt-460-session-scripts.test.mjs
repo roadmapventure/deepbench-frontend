@@ -6,8 +6,11 @@
 //
 //   A  `open-session.js --dry-run --json` names all TEN open steps, puts `age_minutes` AND `source`
 //      on the meter line, and both of `agt460_session_length`'s new columns on the budget line. With
-//      the service key removed it exits 2 `no-credentials` rather than printing a plan with its
-//      database half silently missing -- which is the failure a dry run must never produce.
+//      BOTH keys removed it exits 2 `no-credentials`, naming each of them, rather than printing a
+//      plan with its database half silently missing -- which is the failure a dry run must never
+//      produce. BOTH is the load-bearing word since AGT-464: `SUPABASE_LEAN_KEY` or
+//      `SUPABASE_SERVICE_KEY` will each open the script, so stripping one leaves the other working
+//      and the gate unproven.
 //
 //   B  THE DISCRIMINATOR. `close-session.js --dry-run` against a claim held by another name exits 2
 //      `claim-lost` and its stdout holds NO `push`. The re-assert is a GATE, and the gate is only
@@ -31,7 +34,8 @@
 // would make are behind the claim it never gets (B) and behind `--dry-run` (both). No fixture ticket
 // is filed and no claim is taken, because a regression run must never claim a real board ticket.
 //
-// Invocation: SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node tests/regression/agt-460-session-scripts.test.mjs
+// Invocation: SUPABASE_URL=… SUPABASE_LEAN_KEY=… (or SUPABASE_SERVICE_KEY=…)
+//             node tests/regression/agt-460-session-scripts.test.mjs
 
 import assert from "assert";
 import fs from "fs";
@@ -64,11 +68,20 @@ const STAYED_ANCHOR = "### 3e. Run the verifier before you write `done`";
 // green on one of them.
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 
-const creds = () => ({ url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY });
+// AGT-464: EITHER key opens the scripts, and the test's gate must agree with the module's gate or
+// it reads not-run on exactly the lane the ticket exists to serve. `key` prefers the lean key for
+// the same reason `credentials()` does. A lean-only environment cannot do the direct
+// `backlog_items` read arm B's positive control needs -- the lean role holds no SELECT on that
+// table, on purpose -- so that control declares itself not-run rather than failing; see arm B.
+const creds = () => ({
+  url: process.env.SUPABASE_URL,
+  key: process.env.SUPABASE_LEAN_KEY || process.env.SUPABASE_SERVICE_KEY,
+});
 const hasCreds = () => Boolean(creds().url && creds().key);
 const CRED_HINT =
-  "set SUPABASE_URL and SUPABASE_SERVICE_KEY (by name from runner_secrets, exported inline per " +
-  "docs/runbooks/session-setup.md step 1b) and re-run the suite";
+  "set SUPABASE_URL and either SUPABASE_LEAN_KEY (the lean lane's own narrow key, from the cloud " +
+  "environment's settings — docs/runbooks/lean-lane.md) or SUPABASE_SERVICE_KEY (by name from " +
+  "runner_secrets, exported inline per docs/runbooks/session-setup.md step 1b) and re-run the suite";
 
 function node(script, args, env = process.env) {
   const r = spawnSync("node", [script, ...args], { cwd: ROOT, encoding: "utf8", env });
@@ -177,18 +190,27 @@ async function theOpenScriptNamesTenStepsAndReadsTheMeter(results) {
     "--dry-run attempted the claim — a dry run that claims a board ticket is a write wearing a plan's clothes");
   results.push("dry-run-claims-nothing");
 
-  // The credential gate, with the key removed. A plan printed without the database half would be a
-  // false all-clear about whether this session may run at all.
+  // The credential gate, with BOTH keys removed (AGT-464: either one opens the script, so deleting
+  // only one proves nothing — the run would simply use the other and this assertion would read
+  // green against a script that still had its database half). A plan printed without that half
+  // would be a false all-clear about whether this session may run at all.
   const stripped = { ...process.env };
+  delete stripped.SUPABASE_LEAN_KEY;
   delete stripped.SUPABASE_SERVICE_KEY;
   const bare = node(OPEN, ["--name=agt-460-regression-fixture", "--ticket=AGT-460", "--dry-run", "--json"], stripped);
   assert.strictEqual(bare.code, 2,
-    `with SUPABASE_SERVICE_KEY removed, open-session.js exited ${bare.code}, not 2`);
+    `with SUPABASE_LEAN_KEY and SUPABASE_SERVICE_KEY both removed, open-session.js exited ${bare.code}, not 2`);
   assert.ok(/no-credentials/.test(bare.err),
     `exit 2 must name \`no-credentials\` so the reader gets the remedy: ${bare.err.slice(0, 300)}`);
-  assert.ok(/SUPABASE_SERVICE_KEY/.test(bare.err),
-    "the message must name the variable that is actually missing, not both of them generically");
-  results.push("no-credentials-exits-2-and-names-the-variable");
+  // BOTH names, because the remedy differs by which one the reader can actually get: the lean key is
+  // John's one minting chore, the service key is step 1b. A message naming only one sends half the
+  // readers to the wrong place.
+  for (const name of ["SUPABASE_LEAN_KEY", "SUPABASE_SERVICE_KEY"]) {
+    assert.ok(new RegExp(name).test(bare.err),
+      `the message must name ${name}: either key opens the script, so the reader needs both remedies `
+      + `— ${bare.err.slice(0, 300)}`);
+  }
+  results.push("no-credentials-exits-2-and-names-both-keys");
 }
 
 // --- Arm B: THE DISCRIMINATOR -------------------------------------------------------------------

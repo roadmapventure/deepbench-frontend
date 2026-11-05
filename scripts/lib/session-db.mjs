@@ -1,9 +1,18 @@
-// DeepBench v7.0.942 | scripts/lib/session-db.mjs | AGT-460
+// DeepBench v7.0.963 | scripts/lib/session-db.mjs | AGT-464
 //
 // THE ONLY POSTGRES CALLER the two session scripts have. `open-session.js` and `close-session.js`
 // make no network call of their own: every read and every write goes through `db()` below, so the
-// service key is held behind ONE module (John's call JOHN-0925, pattern:68) and a later editor who
+// key is held behind ONE module (John's call JOHN-0925, pattern:68) and a later editor who
 // needs a new query adds it here rather than minting a second fetch with a second set of headers.
+//
+// AGT-464 -- THE LEAN LANE. This module now prefers `SUPABASE_LEAN_KEY` over `SUPABASE_SERVICE_KEY`,
+// and every claim it makes goes through one of four SECURITY DEFINER functions (migration
+// `agt464_lean_lane`, mirrored at `docs/design/agt-464-lean-lane.sql`) rather than through a
+// table-level write. The point is that a session opened from a phone needs NO service key: the
+// `lean_lane` role may EXECUTE those four functions and read the meter, and it holds zero write
+// privileges on any table. An interactive session is never handed the service key, and no existing
+// grant was widened to make that true -- every grant the migration issues is to the NEW role.
+// The lane in writing, and John's one key-minting chore: `docs/runbooks/lean-lane.md`.
 //
 // WHAT EACH CLAIM WRAPS. `docs/runbooks/session-setup.md` is the contract these functions execute;
 // each one carries the step's own fenced SQL VERBATIM in its header comment, so the SQL a reader
@@ -13,38 +22,44 @@
 // on a picked ticket un-restorable, because reverse_decision() refuses a row written after the
 // decision and a claim minutes later looks exactly like somebody else's later write).
 //
-// WHAT POSTGREST CAN AND CANNOT DO, because two of the five claims are shaped differently for a
-// measured reason and not a stylistic one:
+// WHAT POSTGREST CAN AND CANNOT DO, because the claims are shaped differently for a measured
+// reason and not a stylistic one:
 //
-//   * The TICKET claim, re-assert and release are single-statement `UPDATE ... WHERE ... RETURNING`
-//     over one table, which PostgREST expresses exactly as a filtered PATCH with
-//     `Prefer: return=representation`. The server still does the whole thing in one statement, which
-//     is what rule B40's atomicity needs. The one part that cannot ride in the URL is
-//     `public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL` -- PostgREST cannot call a SQL
-//     function inside a filter -- so the window and the stop ride as the two conditions that
-//     function reads, taken from `scripts/run-project.js`'s `claimQueryFor()` rather than re-derived
-//     (`CLAIM_TTL_HOURS` 6, `STOP_CLAIM_PREFIX` STOPPED-BY-JOHN, both CHECKED copies: arm E of
-//     `tests/regression/agt-482-claim-stop-fence.test.mjs` round-trips the sentinel through
-//     `rpc/claim_exclusion_reason` every run).
+//   * The TICKET claim, re-assert and release are now `POST rpc/lean_claim_ticket` and
+//     `POST rpc/lean_release_claim`. They used to be filtered PATCHes, which worked but needed a
+//     table-level write grant -- the one thing the lean lane must not have. Inside the function the
+//     claim is still ONE `UPDATE ... WHERE ... RETURNING`, which is what rule B40's atomicity needs,
+//     and moving it server-side fixed the part that could never ride in a URL:
+//     `public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL`. PostgREST cannot call a SQL
+//     function inside a filter, so the PATCH form had to re-state the window and the stop as the two
+//     conditions that function reads; the RPC calls the real function instead, so there is no
+//     declared copy left to drift. `CLAIM_TTL_HOURS` / `STOP_CLAIM_PREFIX` stay exported below as
+//     the documented values, no longer as the claim's own arithmetic.
 //
-//   * The VERSION claim (§3) and the ID-block claim (§3b) have ARITHMETIC in the write --
-//     `patch = patch + 1`, `last_issued_number = feature_id_counter.last_issued_number + <N>` -- and
-//     PostgREST's write API takes column VALUES, not SQL expressions. There is no RPC for either in
-//     this project: re-verified live 2026-11-03 (`rpc/claim_feature_ids` -> 404 PGRST202; the only
-//     version-named function in `public` is `record_issued_version()`, which is a TRIGGER on the
-//     counter and not a callable claim). `scripts/heal-engine.js` reached this same wall on
-//     2026-08-20 and answered it the same way, in terms this module does not reverse: adding an RPC
-//     "would be a schema change this P10 - Tooling ticket has no mandate for", so the claim stays in
-//     the one place that can do it correctly -- the Supabase connector, running §3/§3b's SQL
-//     unaltered. So `claimVersion()` and `claimIds()` do not fake the claim and do not read-then-
-//     increment (the race CLAUDE.md's atomic-counter rule exists to stop, and the mechanism behind
-//     every recorded ID collision in this repo). They RETURN the step's SQL with the session's own
-//     values substituted, for the operator's one connector call, and say so in their `channel`.
-//     A function that cannot claim honestly must not return a number that looks claimed.
+//     `p_write` is the whole difference between the three: TRUE for the claim at pick time, FALSE
+//     for register B42's re-assert and for the holder read. A `p_write: false` call writes nothing
+//     and still reports the holder, which is why re-asserting can never quietly extend a window
+//     that should be expiring. A 0-row claim returns the holder in the same answer, so the role
+//     needs no SELECT on `backlog_items` at all -- and it has none.
 //
-// EXIT 2 `no-credentials` is this module's, not its callers'. A session that has not exported
-// SUPABASE_URL and SUPABASE_SERVICE_KEY has not followed step 1b, and the failure a reader must
-// never get is a run that silently skipped its database half and printed a summary anyway.
+//   * The VERSION claim (§3) is now `POST rpc/lean_claim_version`, and `claimVersion()` is ASYNC
+//     and really claims. `patch = patch + 1` is arithmetic in the write and PostgREST's write API
+//     takes column VALUES, not SQL expressions -- which is why this used to hand its SQL to the
+//     Supabase connector rather than fake a number. `agt464_lean_lane` closed that gap by putting
+//     the arithmetic inside a function, so the claim is atomic AND callable. It still never reads-
+//     then-increments (the race CLAUDE.md's atomic-counter rule exists to stop).
+//
+//   * The ID-BLOCK claim (§3b) is UNCHANGED and still returns SQL for the connector: `claimIds()`
+//     claims a block of N, and AGT-464 did not give the lane a block call. `fileTicket()` files
+//     exactly ONE ticket through `rpc/lean_file_ticket`, which takes its own single id inside the
+//     function. Never claim a single id and hand-count the rest -- that hand-count is the mechanism
+//     behind every recorded ID collision in this repo. A function that cannot claim honestly must
+//     not return a number that looks claimed, and `claimIds()` still says so in its `channel`.
+//
+// EXIT 2 `no-credentials` is this module's, not its callers'. A session that has exported neither
+// SUPABASE_LEAN_KEY nor SUPABASE_SERVICE_KEY has not followed step 1b, and the failure a reader must
+// never get is a run that silently skipped its database half and printed a summary anyway. That exit
+// is also what stops a key-less session hand-composing its way past the pipeline instead.
 
 const EXIT_NO_CREDENTIALS = 2;
 
@@ -64,8 +79,6 @@ export const SQL = Object.freeze({
    AND status <> 'done'
    AND public.claim_exclusion_reason(claimed_by, claimed_at) IS NULL
 RETURNING backlog_id;`,
-  // §2c -- who holds it, when the claim comes back 0 rows.
-  holder: `SELECT claimed_by, claimed_at FROM backlog_items WHERE backlog_id = '<ID>'`,
   // §2c -- the one guarded release, AFTER the push, never in the status write.
   releaseClaim: `UPDATE public.backlog_items
    SET claimed_by = NULL, claimed_at = NULL
@@ -97,26 +110,46 @@ function fill(sql, subs) {
 // Credentials are read per call rather than captured at import, so a test can set them and import
 // this module in either order. Returns { status, rows, text }; a non-2xx is NOT thrown -- the caller
 // decides, because a 0-row claim and a refused claim mean different things to rule B40.
+// THE LEAN KEY COMES FIRST, and the order is the point rather than a preference. A session that has
+// both exported is almost always a runner cycle; a session that has only `SUPABASE_LEAN_KEY` is the
+// phone lane, and preferring the lean key means the lane's narrow role is what actually gets used
+// where it is present instead of being quietly shadowed by a broader credential. Either one opens
+// the module; neither is ever written to a file, and neither is ever printed.
+export const LEAN_KEY_NAME = "SUPABASE_LEAN_KEY";
+export const SERVICE_KEY_NAME = "SUPABASE_SERVICE_KEY";
+
 export function credentials(env = process.env) {
   const url = (env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
-  const key = (env.SUPABASE_SERVICE_KEY ?? "").trim();
+  const key = (env.SUPABASE_LEAN_KEY ?? "").trim() || (env.SUPABASE_SERVICE_KEY ?? "").trim();
   return { url, key, ok: Boolean(url && key) };
 }
 
+// Names what is MISSING, never what is set. The two keys are one requirement with two acceptable
+// answers, so they are reported as one entry: a reader told "SUPABASE_LEAN_KEY is not set" while a
+// service key would have served would go looking for the wrong thing.
 export function missingCredentialNames(env = process.env) {
-  return ["SUPABASE_URL", "SUPABASE_SERVICE_KEY"].filter(n => !String(env[n] ?? "").trim());
+  const missing = [];
+  if (!String(env.SUPABASE_URL ?? "").trim()) missing.push("SUPABASE_URL");
+  const haveKey = String(env[LEAN_KEY_NAME] ?? "").trim() || String(env[SERVICE_KEY_NAME] ?? "").trim();
+  if (!haveKey) missing.push(`${LEAN_KEY_NAME} or ${SERVICE_KEY_NAME}`);
+  return missing;
 }
 
 // The exit a credential-less run takes. Printed to stderr and named `no-credentials` so the reader
-// gets the remedy (step 1b: read the value BY NAME from public.runner_secrets and export it inline
-// for the one command, never into a file) instead of a stack trace.
+// gets the remedy (the lean key from the cloud environment's settings, or the service key BY NAME
+// from public.runner_secrets exported inline for the one command, never into a file) instead of a
+// stack trace. BOTH key names appear whichever one is missing, because the remedy differs by which
+// one the reader can actually get: the lean lane's is John's one chore, the service key's is step 1b.
 export function noCredentials(who, env = process.env, exit = process.exit) {
   const missing = missingCredentialNames(env);
   console.error(
     `${who}: no-credentials — ${missing.join(" and ")} ${missing.length === 1 ? "is" : "are"} not set. ` +
-    "`.env.local` carries publishable values only (ruling d7670e18); read the service key BY NAME " +
-    "from public.runner_secrets and export it inline for this one command, never into a file " +
-    "(docs/runbooks/session-setup.md step 1b).",
+    `\`.env.local\` carries publishable values only (ruling d7670e18). ${LEAN_KEY_NAME} is the lean ` +
+    "lane's own narrow key: it lives in the cloud environment's settings and in public.runner_secrets " +
+    "under that name, never in a file in this repo (docs/runbooks/lean-lane.md). " +
+    `${SERVICE_KEY_NAME} is read BY NAME from public.runner_secrets and exported inline for one ` +
+    "command (docs/runbooks/session-setup.md step 1b). Either one opens this module; an interactive " +
+    "session should be given the lean key, never the service key.",
   );
   return exit(EXIT_NO_CREDENTIALS);
 }
@@ -140,23 +173,10 @@ export async function db(pathAndQuery, init = {}, env = process.env, fetchImpl =
 
 // --- §2c: the ticket claim ----------------------------------------------------------------------
 
-function claimCutoffIso(now = Date.now()) {
-  return new Date(now - CLAIM_TTL_HOURS * 3600 * 1000).toISOString();
-}
-
-// The PATCH that carries SQL.claimTicket. Built as a function so the regression suite can assert the
-// URL without a live claim -- a suite run must never claim a real board ticket.
-export function claimTicketQuery(ticketId, now = Date.now()) {
-  const id = encodeURIComponent(String(ticketId));
-  const cutoff = encodeURIComponent(claimCutoffIso(now));
-  return `backlog_items?backlog_id=eq.${id}&status=neq.done`
-    + `&or=(claimed_by.is.null,and(claimed_at.lt.${cutoff},claimed_by.not.like.${STOP_CLAIM_PREFIX}*))`
-    + `&select=backlog_id,claimed_by,claimed_at`;
-}
-
 // Rule B40's two-line rule, as a function: 1 row -> it's yours; 0 rows -> someone holds it, take the
 // next queued ticket. More than one row from a filter on a unique backlog_id means the identity
-// filter is gone, and that refuses rather than picking one.
+// filter is gone, and that refuses rather than picking one. Kept as the written statement of the
+// rule now that the row count is decided inside `lean_claim_ticket` (which returns `rows` too).
 export function claimOutcome(rows) {
   const n = Array.isArray(rows) ? rows.length : 0;
   if (n === 1) return { ok: true, holder: rows[0]?.claimed_by ?? null, reason: null };
@@ -164,74 +184,164 @@ export function claimOutcome(rows) {
   return { ok: false, holder: null, reason: `${n} rows from a claim filtered on a unique backlog_id — the identity filter is gone; refusing rather than picking one` };
 }
 
-export async function claimTicket(ticketId, claimer, env = process.env, fetchImpl = fetch) {
-  const r = await db(claimTicketQuery(ticketId), {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    // No `updated_at` — SES-316. A claim is coordination, not a judgment write.
-    body: JSON.stringify({ claimed_by: String(claimer), claimed_at: new Date().toISOString() }),
+// The one call all three of the ticket claims make. `lean_claim_ticket` returns jsonb, so PostgREST
+// answers with the object itself rather than a row array -- an answer that is not an object is a
+// transport or grant failure, never "nobody holds it", and the callers below say which.
+async function leanClaimTicket(ticketId, session, write, env, fetchImpl) {
+  const r = await db("rpc/lean_claim_ticket", {
+    method: "POST",
+    // No `updated_at` — SES-316. A claim is coordination, not a judgment write; the function
+    // does not bump it either.
+    body: JSON.stringify({ p_ticket: String(ticketId), p_session: String(session), p_write: Boolean(write) }),
   }, env, fetchImpl);
-  const outcome = claimOutcome(r.rows);
-  if (outcome.ok) return { ...outcome, status: r.status, row: r.rows[0] };
-  const held = await heldBy(ticketId, env, fetchImpl);
-  return { ...outcome, status: r.status, claimed_by: held.claimed_by, claimed_at: held.claimed_at };
+  const answer = r.rows && typeof r.rows === "object" && !Array.isArray(r.rows) ? r.rows : null;
+  return { answer, status: r.status, ok: r.ok, text: r.text };
 }
 
-// SQL.holder — what to print when the claim came back 0 rows, so the report names WHO holds it
-// rather than only that it is held.
-export async function heldBy(ticketId, env = process.env, fetchImpl = fetch) {
-  const id = encodeURIComponent(String(ticketId));
-  const r = await db(`backlog_items?backlog_id=eq.${id}&select=claimed_by,claimed_at,status`, {}, env, fetchImpl);
-  const row = Array.isArray(r.rows) ? r.rows[0] : null;
-  return { claimed_by: row?.claimed_by ?? null, claimed_at: row?.claimed_at ?? null, status: row?.status ?? null };
+function noAnswer(what, status, text) {
+  return `${what}: rpc/lean_claim_ticket answered ${status} with no claim object, so the claim is `
+    + `UNKNOWN rather than lost — check the key's role can EXECUTE it (docs/runbooks/lean-lane.md): `
+    + `${String(text ?? "").slice(0, 200)}`;
 }
 
-// Register B42's re-assertion, run before every irreversible act and again before the push. This is
-// a READ with the holder guard in the filter: a row comes back only while this session still holds
-// the claim, so 0 rows IS the answer `claim-lost` names. It writes nothing -- re-asserting by
-// re-claiming would reset `claimed_at` and quietly extend a window that should be expiring.
+// §2c's atomic claim, `p_write: true`. One UPDATE ... RETURNING inside the function, with
+// `claim_exclusion_reason()` called for real rather than restated as URL filters.
+export async function claimTicket(ticketId, claimer, env = process.env, fetchImpl = fetch) {
+  const { answer, status, text } = await leanClaimTicket(ticketId, claimer, true, env, fetchImpl);
+  if (!answer) {
+    return { ok: false, rows: 0, holder: null, claimed_by: null, claimed_at: null, status,
+      reason: noAnswer("claimTicket", status, text) };
+  }
+  const ok = answer.claimed === true;
+  return {
+    ok,
+    rows: Number(answer.rows ?? 0),
+    status,
+    holder: answer.claimed_by ?? null,
+    claimed_by: answer.claimed_by ?? null,
+    claimed_at: answer.claimed_at ?? null,
+    ticket_status: answer.status ?? null,
+    row: ok ? answer : null,
+    reason: ok ? null : (answer.reason
+      ?? "0 rows from the atomic claim: another session holds this ticket (or it is done)"),
+  };
+}
+
+// Who holds it, for the report that must name WHO rather than only that it is held. `p_write: false`,
+// so this is a read: the function hands back the holder in the same answer the claim would give.
+export async function heldBy(ticketId, env = process.env, fetchImpl = fetch, asker = "(holder-read)") {
+  const { answer } = await leanClaimTicket(ticketId, asker, false, env, fetchImpl);
+  return {
+    claimed_by: answer?.claimed_by ?? null,
+    claimed_at: answer?.claimed_at ?? null,
+    status: answer?.status ?? null,
+  };
+}
+
+// Register B42's re-assertion, run before every irreversible act and again before the push.
+// `p_write: false` is what makes it a re-assertion rather than a re-claim: it writes nothing, so it
+// cannot reset `claimed_at` and quietly extend a window that should be expiring. `claimed` comes
+// back TRUE only while `claimed_by` still equals this session's name, so FALSE IS the answer
+// `claim-lost` names -- and the holder rides along in the same answer.
 export async function reassertClaim(ticketId, claimer, env = process.env, fetchImpl = fetch) {
-  const id = encodeURIComponent(String(ticketId));
-  const who = encodeURIComponent(String(claimer));
-  const r = await db(`backlog_items?backlog_id=eq.${id}&claimed_by=eq.${who}&select=backlog_id,claimed_by,claimed_at`, {}, env, fetchImpl);
-  const rows = Array.isArray(r.rows) ? r.rows : [];
-  if (rows.length === 1) return { held: true, rows: 1, claimed_at: rows[0].claimed_at };
-  const held = await heldBy(ticketId, env, fetchImpl);
-  return { held: false, rows: rows.length, claimed_by: held.claimed_by, claimed_at: held.claimed_at };
+  const { answer, status, text } = await leanClaimTicket(ticketId, claimer, false, env, fetchImpl);
+  if (!answer) {
+    return { held: false, rows: 0, claimed_by: null, claimed_at: null, status,
+      reason: noAnswer("reassertClaim", status, text) };
+  }
+  const held = answer.claimed === true;
+  return {
+    held,
+    rows: held ? 1 : 0,
+    status,
+    claimed_by: answer.claimed_by ?? null,
+    claimed_at: answer.claimed_at ?? null,
+    ticket_status: answer.status ?? null,
+  };
 }
 
 // SQL.releaseClaim — ONE guarded release, AFTER the push, never in the status write
-// (q-claim-release-order, SES-106). The holder guard is the point: a session can never clear a claim
-// that has since moved. No `updated_at` here either, same reason as the claim.
+// (q-claim-release-order, SES-106). The holder guard is the point, and it lives inside the function:
+// a session can never clear a claim that has since moved. `lean_release_claim` returns the row count
+// as a bare integer, so 1 is released and 0 is "the guard held". No `updated_at`, same as the claim.
 export async function releaseClaim(ticketId, claimer, env = process.env, fetchImpl = fetch) {
-  const id = encodeURIComponent(String(ticketId));
-  const who = encodeURIComponent(String(claimer));
-  const r = await db(`backlog_items?backlog_id=eq.${id}&claimed_by=eq.${who}&select=backlog_id`, {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ claimed_by: null, claimed_at: null }),
+  const r = await db("rpc/lean_release_claim", {
+    method: "POST",
+    body: JSON.stringify({ p_ticket: String(ticketId), p_session: String(claimer) }),
   }, env, fetchImpl);
-  const rows = Array.isArray(r.rows) ? r.rows : [];
-  return { released: rows.length === 1, rows: rows.length, status: r.status };
+  const n = Number(r.rows);
+  return { released: n === 1, rows: Number.isFinite(n) ? n : 0, status: r.status };
 }
 
-// --- §3 and §3b: the two claims PostgREST cannot express ----------------------------------------
+// --- §3: the version claim, now a real one ------------------------------------------------------
 //
-// Both return the step's SQL with this session's values in it, plus the channel that can run it.
-// `claimed: false` is the load-bearing field: a caller must not print a version or an ID block as
-// claimed on the strength of these.
+// ASYNC as of AGT-464. `rpc/lean_claim_version` runs §3's `patch = patch + 1` inside the function,
+// so the arithmetic PostgREST's write API cannot express happens in the one place that can do it
+// atomically. The write IS the reservation, so there is no re-check before the push.
+// `claimed` stays the load-bearing field: FALSE means no version was taken and a caller must not
+// print one as claimed. The function returns `text`, so PostgREST answers with the string itself.
 
-export function claimVersion(sessionName) {
-  return {
-    claimed: false,
-    channel: "supabase-connector",
-    step: "docs/runbooks/session-setup.md §3",
-    sql: fill(SQL.claimVersion, { "<short-session-name>": sessionName }),
-    why: "patch = patch + 1 is arithmetic in the write; PostgREST's write API takes column values, "
-      + "not SQL expressions, and this project has no claim RPC for it. Run this one statement over "
-      + "the Supabase connector — the write IS the reservation, so there is no re-check before push.",
-  };
+export async function claimVersion(sessionName, env = process.env, fetchImpl = fetch) {
+  const r = await db("rpc/lean_claim_version", {
+    method: "POST",
+    body: JSON.stringify({ p_session: String(sessionName) }),
+  }, env, fetchImpl);
+  const version = typeof r.rows === "string" && /^v\d+\.\d+\.\d+$/.test(r.rows) ? r.rows : null;
+  if (!version) {
+    return {
+      claimed: false,
+      version: null,
+      status: r.status,
+      step: "docs/runbooks/session-setup.md §3",
+      error: `rpc/lean_claim_version answered ${r.status} with ${JSON.stringify(r.rows)} rather than a `
+        + `v<major>.<minor>.<patch> string — NO version was claimed. Never fall back to reading the `
+        + `counter and incrementing it (CLAUDE.md's atomic-counter rule): ${String(r.text ?? "").slice(0, 200)}`,
+    };
+  }
+  return { claimed: true, version, status: r.status, step: "docs/runbooks/session-setup.md §3" };
 }
+
+// --- §3c: file ONE ticket -----------------------------------------------------------------------
+//
+// `rpc/lean_file_ticket` takes its own id, writes the canonical row with `scope_origin` john-named
+// (the lean lane IS John typing) and runs register B4's `recompute_backlog_queue()` -- all in one
+// call, so a ticket can never exist with an id nothing filed or a board nothing recomputed. The
+// function refuses a bare priority class and an empty rationale itself; both come back as the
+// error text rather than as a silently filed row. ONE ticket per call: a block of N stays
+// `claimIds()`'s business.
+
+export async function fileTicket(
+  { session, prefix, priority_class, title, rationale, description = null, type = "Bug" } = {},
+  env = process.env, fetchImpl = fetch,
+) {
+  const r = await db("rpc/lean_file_ticket", {
+    method: "POST",
+    body: JSON.stringify({
+      p_session: String(session),
+      p_prefix: String(prefix),
+      p_priority_class: String(priority_class),
+      p_title: String(title),
+      p_rationale: String(rationale),
+      p_description: description == null ? null : String(description),
+      p_type: String(type),
+    }),
+  }, env, fetchImpl);
+  const backlogId = typeof r.rows === "string" && /^[A-Za-z]+-\d+$/.test(r.rows) ? r.rows : null;
+  if (!backlogId) {
+    return {
+      filed: false,
+      backlog_id: null,
+      status: r.status,
+      error: `rpc/lean_file_ticket answered ${r.status} with ${JSON.stringify(r.rows)} rather than a `
+        + `<PREFIX>-<N> id — NOTHING was filed: ${String(r.text ?? "").slice(0, 300)}`,
+    };
+  }
+  return { filed: true, backlog_id: backlogId, status: r.status };
+}
+
+// --- §3b: the one claim PostgREST still cannot express -------------------------------------------
+//
+// Returns the step's SQL with this session's values in it, plus the channel that can run it.
 
 export function claimIds(prefix, n) {
   const count = Number(n);
