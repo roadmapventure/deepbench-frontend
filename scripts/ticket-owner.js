@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.972 | scripts/ticket-owner.js | AGT-614 -- CHECK 14, `pick-blocked-field`: THE OWNER GROOMS WHAT WOULD KEEP A TICKET OUT OF THE PICK. None of the thirteen read `scope_rationale`, `need_source` or the queue, so AGT-608/609/610 sat skipped for "no scope rationale (post-cut, M5-03)" and nothing on this board said so (John, decision 087d79ae, 2026-11-06: groomed every run, over the whole board). The check asks `public.pick_exclusions()` -- the pick's ONE predicate, never a second copy of it -- and files only its missing-FIELD reasons: (a) no scope rationale with a `john:runner_decisions:` / `john:runner_directives:` need_source whose row was read is DERIVABLE, `fix: {scope_rationale}` = a COPY of John's recorded words (scopeRationaleCopy, cut at SCOPE_RATIONALE_CAP), never an invented rationale; (b) no copyable source is JUDGMENT for the Governance Architect; (c) no queue number is JUDGMENT naming recompute_backlog_queue(). Not scored / project / claims / cards / blocked-by / grade are not fields and not this check's (a grade is Victoria's, AGT-613). Like check 13 it is JUDGED-ONLY: an unjudged night writes no rationale (planWrites' JUDGED_ONLY), and a refusal files a ledger row, never a removal proposal. THE SLUG SHIPS AFTER ITS CONSTRAINT AGAIN: docs/design/agt-614-pick-blocked-slug.sql widens ticket_owner_findings_check_slug_check to fourteen and must land BEFORE this file reaches dev, or the night's one-array ledger POST answers 23514 and loses the whole night.
 // DeepBench v7.0.913 | scripts/ticket-owner.js | AGT-304 slice 32 -- the runner_decisions read names the delivered ids: whole-table it passed readAll's 10,000 ceiling (10,160 rows, 2026-10-28) and the census refused itself; check 10 only ever asks it about delivered rows (170 today, 653 decisions).
 // DeepBench v7.0.687 | scripts/ticket-owner.js | AGT-166 slice 4 -- ARM (b)'S TWO EXITS. The drain
 // had a way IN for every open premise and a way OUT for only the confirmed ones. Measured
@@ -224,6 +225,10 @@ export const CHECKS = Object.freeze([
   // whether the row's own PREMISE is still alive. It is last because the census's whole open
   // population lands behind it and renderCensus prints one line per slug in this order.
   "unrevalidated-30d",
+  // AGT-614: the fourteenth. The thirteen above find gaps the Owner's own columns show; this one asks
+  // the PICK why it would skip the row, and files only the answers that are a missing field. Last, so
+  // every earlier finding keeps its sort position and renderCensus line.
+  "pick-blocked-field",
 ]);
 
 // AGT-169 -- THE CHECKS THAT ARE NO LONGER ASKED, and the recorded reason each one was retired.
@@ -276,6 +281,76 @@ export const PREMISE_EXCERPT = 600;
 // and the fix count in the decision text all quote THIS string -- a slug that drifted between the
 // read and the file would carry a night's judgment into a row nothing else can find.
 export const REVALIDATION_CHECK = "unrevalidated-30d";
+
+// AGT-614 -- the fourteenth check's slug, named once for the same reason as the thirteenth's.
+export const PICK_FIELD_CHECK = "pick-blocked-field";
+
+// The two `pick_exclusions()` reasons that are a MISSING FIELD, and the only two this check files.
+// `scope` is a PREFIX ("no scope rationale (post-cut, M5-03)"): the function owns the parenthesis, and
+// a literal of the whole sentence would go silent the day it is reworded. `queue` is the whole reason.
+// Every other reason (not scored, project not executing, claims, cards, blocked by, deferred,
+// needs-desktop, the drain) is not a field on the row and is not this check's to raise.
+export const PICK_FIELD_REASONS = Object.freeze({
+  scope: "no scope rationale",
+  queue: "no queue number",
+});
+
+// The cap on a copied rationale, in characters, `…` included. A copy is John's recorded words, and a
+// 1,710-char directive body (live 2026-11-06) is a record, not a rationale; 1,500 is the opening of
+// every one of today's sources and keeps the cut reproducible -- a fixed count, as PREMISE_EXCERPT.
+export const SCOPE_RATIONALE_CAP = 1500;
+
+// The capability that writes a scope rationale no John record can supply (decision 087d79ae: the
+// team moves a ticket forward; ticket filing and review sit with the Governance Architect since 10-13).
+export const RATIONALE_OWNER = "the Governance Architect (agent `architect`)";
+
+// THE CHECKS WHOSE FIX IS A READING, NOT ARITHMETIC. An unjudged night has read nothing, so planWrites
+// drops these fixes without a judge (AGT-166 slice 4's call ii, now for two checks): a copied
+// rationale lands only on an explicit `apply: true`.
+const JUDGED_ONLY = new Set([REVALIDATION_CHECK, PICK_FIELD_CHECK]);
+
+const JOHN_SOURCE = /^john:(runner_decisions|runner_directives):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+// johnSourceRef(needSource) -> {table, id} | null. The ONLY need_source shapes whose row holds John's
+// own words in one column: a decision's `reasoning`, a directive's `body`. A `john:napkin_ideas:` or a
+// `nathan:` source is a real source but not a copyable one, and reads null here (branch b).
+export function johnSourceRef(needSource) {
+  if (typeof needSource !== "string") return null;
+  const m = JOHN_SOURCE.exec(needSource.trim());
+  return m ? { table: m[1].toLowerCase(), id: m[2].toLowerCase() } : null;
+}
+
+// scopeRationaleCopy(ref, source) -> the scope_rationale text, or null when the row cannot supply one.
+// A COPY and nothing else: a dated attribution head, then the source's own text, cut at the cap. The
+// date is the America/Chicago calendar day (John is US Central) of decided_at / created_at.
+export function scopeRationaleCopy(ref, source) {
+  if (!ref || !source || typeof source !== "object") return null;
+  const isDecision = ref.table === "runner_decisions";
+  const text = String((isDecision ? source.reasoning : source.body) ?? "").trim();
+  const when = isDecision ? source.decided_at : source.created_at;
+  if (text === "" || !Number.isFinite(Date.parse(when))) return null;
+  const head = isDecision
+    ? `John ${chicagoDay(when)} (decision ${ref.id.slice(0, 8)}, session ${source.session_name ?? "unrecorded"}): `
+    : `John ${chicagoDay(when)} (directive ${ref.id.slice(0, 8)}): `;
+  const full = head + text;
+  return full.length > SCOPE_RATIONALE_CAP ? `${full.slice(0, SCOPE_RATIONALE_CAP - 1)}…` : full;
+}
+
+// pickSourceRefs(items, pickExclusions) -> [{table, id}]: the John records tonight's flagged rows
+// name, de-duplicated. readBoard reads THESE rows and no others -- the source read is as narrow as the
+// gap it serves. Pure, so the regression file can pin which rows the read would ask for.
+export function pickSourceRefs(items, pickExclusions) {
+  const reasons = new Map((pickExclusions ?? []).map(p => [p.backlog_id, p.reasons ?? []]));
+  const out = new Map();
+  for (const row of items ?? []) {
+    if (!LIVE.has(row.status)) continue;
+    const rs = reasons.get(row.backlog_id) ?? [];
+    if (!rs.some(x => typeof x === "string" && x.startsWith(PICK_FIELD_REASONS.scope))) continue;
+    const ref = johnSourceRef(row.need_source);
+    if (ref) out.set(`${ref.table}:${ref.id}`, ref);
+  }
+  return [...out.values()];
+}
 
 // The refusal's own prefix, named once (slice 4). ingestJudgment WRITES it onto a refused finding's
 // detail and classifyBoard's carried branch READS it back off the ledger a night later -- so the
@@ -362,7 +437,7 @@ export function cellMatches(key, got, want) {
   return false;
 }
 
-// retiredChecks(rulings) -> Map<slug, reason>: which of the 13 checks are no longer asked tonight.
+// retiredChecks(rulings) -> Map<slug, reason>: which of the 14 checks are no longer asked tonight.
 //
 // TWO SOURCES, ONE MAP. `RETIRED_CHECKS` is the standing list -- a Designer's call recorded in the
 // tree. `rulings` is the LIVE half and the whole point of AGT-169: a `not-a-defect` ruling on
@@ -540,6 +615,11 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
   // was never fetched -- which is a judgment, never a confirmation.
   const premiseById = new Map((board.premises ?? []).map(pr => [pr.backlog_id, pr]));
   const statusById = new Map(items.map(i => [i.backlog_id, i.status]));
+  // AGT-614: the pick's own reasons per row, and the John records readBoard fetched for the flagged
+  // rows (keyed `table:id`). A board with no `pickExclusions` (every fixture before AGT-614) asks the
+  // fourteenth check nothing, so it files nothing -- never a guess at what the pick would say.
+  const pickReasons = new Map((board.pickExclusions ?? []).map(p => [p.backlog_id, Array.isArray(p.reasons) ? p.reasons : []]));
+  const sourceByKey = new Map((board.needSources ?? []).map(s => [`${s.table}:${String(s.id).toLowerCase()}`, s]));
 
   const findings = [];
   const backlog = {
@@ -761,6 +841,49 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
       }
     }
 
+    // 14 pick-blocked-field (AGT-614) -- a live row the pick would skip for a MISSING FIELD. No date
+    // fence: pick_exclusions() already applies M5-03's post-cut fence to the rationale reason. ONE
+    // finding per (row, check), so a row missing both fields files one finding whose sentence carries
+    // both; the rationale branch leads, because a queue number is recomputed once the row is pickable.
+    //
+    //   DERIVABLE -- no scope rationale, and need_source names a John decision / directive whose row was
+    //                read: `fix: {scope_rationale}` is a COPY of his recorded words, never a composed
+    //                one, and lands only on the judge's explicit `apply: true` (JUDGED_ONLY).
+    //   JUDGMENT  -- no scope rationale and nothing to copy: the Governance Architect writes it.
+    //   JUDGMENT  -- no queue number alone: recompute_backlog_queue() assigns it.
+    if (live) {
+      const reasons = pickReasons.get(row.backlog_id) ?? [];
+      const noScope = reasons.find(x => typeof x === "string" && x.startsWith(PICK_FIELD_REASONS.scope));
+      const noQueue = reasons.includes(PICK_FIELD_REASONS.queue);
+      const queueClause = " It also has no queue number: recompute_backlog_queue() assigns one once the row is pickable.";
+      if (noScope !== undefined) {
+        const ref = johnSourceRef(row.need_source);
+        const source = ref ? sourceByKey.get(`${ref.table}:${ref.id}`) : undefined;
+        const copy = ref && source ? scopeRationaleCopy(ref, source) : null;
+        if (copy !== null) {
+          file(row, PICK_FIELD_CHECK, "derivable",
+            `the pick skips this ${status} ticket: "${noScope}". need_source ${row.need_source} is John's own` +
+            ` recorded words, so scope_rationale is their copy (${copy.length} chars, cap ${SCOPE_RATIONALE_CAP}).` +
+            " Confirm apply:true only if that record is why this ticket exists; else apply:false naming why." +
+            (noQueue ? queueClause : ""),
+            { scope_rationale: copy });
+        } else {
+          const why = row.need_source == null
+            ? "need_source is null"
+            : ref
+              ? `need_source ${row.need_source} names a John record that could not be read or is empty`
+              : `need_source ${row.need_source} is not a John decision or directive to copy`;
+          file(row, PICK_FIELD_CHECK, "judgment",
+            `the pick skips this ${status} ticket: "${noScope}" and ${why} -- ${RATIONALE_OWNER} writes its` +
+            " scope_rationale from the ticket's need." + (noQueue ? queueClause : ""));
+        }
+      } else if (noQueue) {
+        file(row, PICK_FIELD_CHECK, "judgment",
+          `the pick skips this ${status} ticket: "${PICK_FIELD_REASONS.queue}" -- recompute_backlog_queue()` +
+          " assigns it; no cell here is the census's to write.");
+      }
+    }
+
     // Counts only, never findings: both are reported once as a number, not flagged per row.
     if (status === "open" && ts(T) < D30 && row.revalidated_at == null) backlog.unrevalidated_30d++;
     if (closed && row.actual_tokens_attended == null) backlog.attended_actual_null++;
@@ -862,7 +985,9 @@ export function planWrites(result, prior, items, { rate, judged } = {}) {
   // had looked at. The gate is here rather than in the census because the census must keep REPORTING
   // the population every night -- what an unjudged night loses is the right to write to it.
   const fixes = result.findings
-    .filter(f => f.verdict === "derivable" && (judged ? true : f.check !== REVALIDATION_CHECK))
+    // AGT-614: the gate is JUDGED_ONLY, which now holds the fourteenth check beside the thirteenth --
+    // a copied scope_rationale is a reading of the record, and an unjudged night has read nothing.
+    .filter(f => f.verdict === "derivable" && (judged ? true : !JUDGED_ONLY.has(f.check)))
     .map(f => {
       const id = byId.get(f.backlog_id);
       if (id === undefined) {
@@ -1196,7 +1321,7 @@ async function readBoard(base, key, now) {
   const items = await readAll(base, key, "backlog_items",
     "backlog_items?select=id,backlog_id,status,type,tier,claimed_by,claimed_at,predicted_cycles,size_stamp," +
     "design_status,kickoff_link,cost_pct_snapshot,cost_cycles_snapshot,revalidated_at,filed_at,created_at," +
-    "updated_at,actual_tokens_attended&status=in.(open,partial,done,delivered)&order=backlog_id", 5000);
+    "updated_at,actual_tokens_attended,need_source&status=in.(open,partial,done,delivered)&order=backlog_id", 5000);
   const matrix = await readAll(base, key, "ticket_matrix",
     "ticket_matrix?select=backlog_id,actual_cycles,predicted_cycles&order=backlog_id", 5000);
   const verdicts = await readAll(base, key, "runner_verdicts",
@@ -1262,7 +1387,29 @@ async function readBoard(base, key, now) {
   // treated as unreadable for the same reason `readAll` refuses one: an unknown remainder here
   // would silence an unknown set of checks.
   const ownerRulings = await readRulings(base, key);
-  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs, ownerFindings, premises, ownerRulings };
+  // AGT-614 -- THE PICK'S OWN ANSWER, read whole and paged like the board: `pick_exclusions()` is the
+  // pick's one predicate with a sentence per failed clause, so check 14 reads it rather than restating
+  // any clause. It is board data, so a short read exits 2 like every other read here. Then ONLY the
+  // John records the flagged rows name (pickSourceRefs), by id; a record missing from the read leaves
+  // its row a judgment finding, never a fill.
+  const pickExclusions = await readAll(base, key, "pick_exclusions",
+    "rpc/pick_exclusions?select=backlog_id,reasons&order=backlog_id", 5000);
+  const refs = pickSourceRefs(items, pickExclusions);
+  const idsOf = t => refs.filter(r => r.table === t).map(r => r.id);
+  const needSources = [];
+  const decIds = idsOf("runner_decisions");
+  if (decIds.length) {
+    const rows = await readAll(base, key, "runner_decisions (need sources)",
+      `runner_decisions?select=id,session_name,decided_at,reasoning&id=in.(${decIds.join(",")})&order=id`, decIds.length + 1);
+    needSources.push(...rows.map(r => ({ table: "runner_decisions", ...r })));
+  }
+  const dirIds = idsOf("runner_directives");
+  if (dirIds.length) {
+    const rows = await readAll(base, key, "runner_directives (need sources)",
+      `runner_directives?select=id,created_at,body&id=in.(${dirIds.join(",")})&order=id`, dirIds.length + 1);
+    needSources.push(...rows.map(r => ({ table: "runner_directives", ...r })));
+  }
+  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs, ownerFindings, premises, ownerRulings, pickExclusions, needSources };
 }
 
 const RULINGS_QUERY = "audit_findings?select=check_slug,status,ruling,ruled_by,ruled_at" +
@@ -1387,14 +1534,15 @@ export async function applyPlan(base, key, plan, { cycleId, sessionName, now, ju
     const nClaim = plan.fixes.filter(f => f.check === "claim-on-closed" || f.check === "claim-expired").length;
     const nType = plan.fixes.filter(f => f.check === "type-off-taxonomy").length;
     const nReval = plan.fixes.filter(f => f.check === REVALIDATION_CHECK).length;
+    const nScope = plan.fixes.filter(f => f.check === PICK_FIELD_CHECK).length;
     const counts = plan.meta.counts;
     const rate = plan.meta.rate;
-    const p_summary = `Ticket Owner: ${plan.fixes.length} derivable cell fix(es) on ${ids.length} row(s) — cost ${nCost} · claim ${nClaim} · type ${nType} · revalidation ${nReval}`;
+    const p_summary = `Ticket Owner: ${plan.fixes.length} derivable cell fix(es) on ${ids.length} row(s) — cost ${nCost} · claim ${nClaim} · type ${nType} · revalidation ${nReval} · scope rationale ${nScope}`;
     // AGT-166 slice 2: THE TEXT NO LONGER CLAIMS EVERY FIX IS ARITHMETIC, because one kind is not.
     // A revalidation stamp is a capability's reading of the row's own premise, and John reverses a
     // night by what this sentence says it did -- a line calling a judged stamp arithmetic would
     // misdescribe the one fix on the row that is not mechanical.
-    let p_reasoning = `Nightly census ${now}: ${counts.rows} rows read, ${counts.findings} findings (${counts.derivable} derivable, ${counts.judgment} judgment). Not every fix here is arithmetic: ${nCost} cost snapshot(s) are (cost_pct_snapshot = round(actual_cycles × runner_pct_per_cycle(), 2) at rate ${rate}), ${nClaim} claim clear(s) are the claim column's own rule (a closed row, or 24 h past with no live cycle), ${nType} type fix(es) are a one-to-one spelling (feature → Feature, Bug Fixes → Bug), and ${nReval} revalidated_at stamp(s) are a JUDGED premise re-read — a capability confirmed the row's own text still names work the board does not show done (AGT-166), which no column can compute. Whole rows imaged under this decision; no status, quote or design_status written; judgment findings filed in ticket_owner_findings, not here. pattern:0`;
+    let p_reasoning = `Nightly census ${now}: ${counts.rows} rows read, ${counts.findings} findings (${counts.derivable} derivable, ${counts.judgment} judgment). Not every fix here is arithmetic: ${nCost} cost snapshot(s) are (cost_pct_snapshot = round(actual_cycles × runner_pct_per_cycle(), 2) at rate ${rate}), ${nClaim} claim clear(s) are the claim column's own rule (a closed row, or 24 h past with no live cycle), ${nType} type fix(es) are a one-to-one spelling (feature → Feature, Bug Fixes → Bug), and ${nReval} revalidated_at stamp(s) are a JUDGED premise re-read — a capability confirmed the row's own text still names work the board does not show done (AGT-166), which no column can compute, and ${nScope} scope_rationale fill(s) are a JUDGED copy of John's own recorded words — the decision reasoning or directive body the ticket's need_source names, dated and cut at ${SCOPE_RATIONALE_CAP} chars, so the pick stops skipping the row for a missing rationale (AGT-614). Whole rows imaged under this decision; no status, quote or design_status written; judgment findings filed in ticket_owner_findings, not here. pattern:0`;
     // A JUDGED NIGHT SAYS SO ON ITS OWN DECISION ROW (slice 4). John reads reverse_decision()
     // candidates from `reasoning`; "a capability confirmed these three and refused that one" is the
     // difference between a mechanical write and a ruled one, and it belongs where he is looking.

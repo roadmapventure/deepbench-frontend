@@ -1,3 +1,15 @@
+// DeepBench v7.0.972 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-614 -- NEW PART P: CHECK
+// 14, `pick-blocked-field`, through the REAL classifyBoard / planWrites / ingestJudgment. One-variable
+// rows over one board: a John decision source and a John directive source are DERIVABLE carrying the
+// exact dated copy; a non-John source, no source, an unread John record are JUDGMENT naming the
+// Governance Architect; `no queue number` alone is JUDGMENT naming recompute_backlog_queue(); only
+// `not yet scored`, empty reasons, or a closed row file nothing. An open ledger row is re-seen, never
+// re-filed, and the copy is planned only on a judged `apply: true`. Part B moves with it: CHECKS is
+// fourteen, the census prints fifteen lines, and part N stays red until
+// docs/design/agt-614-pick-blocked-slug.sql widens the live constraint -- which is part N's job. Part P
+// sits BEFORE part K on purpose: K's `statePathFor("/t", …)` pin is red on Windows (path.join answers
+// `\t\…`), and an arm placed after it would never run on the machine the attended session builds on.
+//
 // DeepBench v7.0.687 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-166 slice 4 -- NEW PART
 // O: A JUDGED REFUSAL IS A REMOVAL PROPOSAL, and an UNJUDGED night stamps nothing. Part G proved the
 // CONFIRMED half of the drain end to end; the refused half had no exit to prove -- a refusal filed a
@@ -203,6 +215,8 @@ import {
   chicagoDay, judgeTask, ingestJudgment, statePathFor, EXIT_AWAITING_ANSWER,
   selectRevalidationBatch, premiseDetail, UNREVALIDATED_BATCH, PREMISE_EXCERPT, REVALIDATION_CHECK,
   REFUSED_PREFIX, PROPOSAL_KIND,
+  PICK_FIELD_CHECK, PICK_FIELD_REASONS, SCOPE_RATIONALE_CAP, RATIONALE_OWNER,
+  johnSourceRef, scopeRationaleCopy, pickSourceRefs,
 } from "../../scripts/ticket-owner.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 import { renderTicketHygiene, factsSha, cst, BEGIN, END, HYGIENE_NIGHTS_READ } from "../../scripts/render-standing-brief.js";
@@ -287,6 +301,9 @@ async function main() {
     // a row whose premise text was never read must never be stamped as re-read. The premises-present
     // arm is (vii) below.
     "unrevalidated-30d": ["QA-79-02"],
+    // AGT-614: the fixture board carries no `pickExclusions`, so the fourteenth check is asked nothing
+    // here and files nothing -- its rows are part P's.
+    "pick-blocked-field": [],
   };
   for (const check of CHECKS) {
     assert.deepStrictEqual(byCheck(r, check), expected[check], `${check} did not find exactly its fixture rows`);
@@ -595,16 +612,16 @@ async function main() {
     " · revalidation 1 left (batch 1, carried 0)"),
     `the census headline is not the agreed line:\n${text.split("\n")[0]}`);
   assert.ok(text.endsWith("\n"), "the census ends with a newline");
-  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 14, "headline plus one line per check, always thirteen");
+  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 15, "headline plus one line per check, always fourteen (AGT-614)");
   const sizeLine = text.split("\n").find(l => l.includes("size-missing"));
   assert.ok(sizeLine.endsWith("—"), "a check that found nothing must still print its line, ending in an em dash");
 
   const emptyText = renderCensus(
     run({ board: { items: [], matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] } }), F.now);
-  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 14, "an empty board still prints all thirteen checks");
+  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 15, "an empty board still prints all fourteen checks");
   assert.ok(emptyText.includes("0 rows · 0 findings"), "an empty board reports zero rows, not nothing");
 
-  assert.strictEqual(CHECKS.length, 13);
+  assert.strictEqual(CHECKS.length, 14);
   assert.strictEqual(CHECKS[0], "quote-missing");
   assert.strictEqual(CHECKS[11], "remainder-stranded");
   // AGT-166 slice 2. This pin and the live CHECK constraint ship together: part N feeds the table
@@ -612,6 +629,10 @@ async function main() {
   // widened constraint without this line reddens nothing at all — which is why both exist.
   assert.strictEqual(CHECKS[12], "unrevalidated-30d");
   assert.strictEqual(REVALIDATION_CHECK, "unrevalidated-30d", "one string names the slug, never a literal per site");
+  // AGT-614: the fourteenth, last, and in lockstep with docs/design/agt-614-pick-blocked-slug.sql.
+  assert.strictEqual(CHECKS[13], "pick-blocked-field");
+  assert.strictEqual(PICK_FIELD_CHECK, "pick-blocked-field", "one string names the slug, never a literal per site");
+  assert.strictEqual(SCOPE_RATIONALE_CAP, 1500, "a copied rationale is cut at a fixed, reproducible count");
   assert.strictEqual(UNREVALIDATED_BATCH, 25, "the Designer's call (ii): 25 premises a night");
   assert.strictEqual(PREMISE_EXCERPT, 600, "a premise reaches the judge cut at a fixed, reproducible count");
   assert.strictEqual(TYPE_TAXONOMY.length, 10, "the eight FEATURES.md rows plus the two live majorities");
@@ -624,6 +645,151 @@ async function main() {
     cost_pct_snapshot: "2026-09-01T16:41:41Z",
     runner_verdicts: "2026-08-25T03:50:04Z",
   }, "a fence typo silently reclassifies hundreds of rows in one direction or the other");
+
+  // --- P: check 14, pick-blocked-field (AGT-614), pure ------------------------------------------
+  // One board, one row per branch. Every row is otherwise CLEAN -- open, quoted, sized, on-taxonomy,
+  // unclaimed, young and revalidated -- so the fourteenth check is the only one that can fire and
+  // each row differs from its neighbour in exactly one input: its need_source or its pick reasons.
+  {
+    const PNOW = "2026-11-06T15:00:00Z";
+    const SCOPE = "no scope rationale (post-cut, M5-03)";
+    const DEC = "087d79ae-0000-4000-8000-000000000614";
+    const DIR = "e5fb5b2a-2a6e-439f-8487-9e2222e584a6";
+    const UNREAD = "11111111-2222-4333-8444-555555555555";
+    const pRow = (n, patch = {}) => ({
+      id: `00000000-0000-4000-8000-000000614${String(n).padStart(3, "0")}`,
+      backlog_id: `QA-614-${n}`, status: "open", type: "Tooling", predicted_cycles: 1, size_stamp: "S",
+      design_status: null, kickoff_link: null, claimed_by: null, claimed_at: null,
+      filed_at: "2026-11-01T00:00:00Z", created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z",
+      revalidated_at: "2026-11-01T00:00:00Z", cost_pct_snapshot: null, actual_tokens_attended: null,
+      need_source: null, ...patch,
+    });
+    const pItems = [
+      pRow(1, { need_source: `john:runner_decisions:${DEC}` }),
+      pRow(2, { need_source: `john:runner_directives:${DIR}` }),
+      pRow(3, { need_source: "nathan:market_records:4c344562-f638-44d0-a3d9-bf391c69ffc3" }),
+      pRow(4),
+      pRow(5),
+      pRow(6),
+      pRow(7),
+      pRow(8, { need_source: "john:napkin_ideas:n_fa49c1efb4cc42e084432071bec5f2f1" }),
+      pRow(9, { need_source: `john:runner_decisions:${UNREAD}` }),
+      pRow(10, { status: "removal proposed", need_source: `john:runner_decisions:${DEC}` }),
+      pRow(11, { need_source: `john:runner_decisions:${DEC}` }),
+    ];
+    const pExcl = [
+      { backlog_id: "QA-614-1", reasons: [SCOPE] },
+      { backlog_id: "QA-614-2", reasons: [SCOPE] },
+      { backlog_id: "QA-614-3", reasons: [SCOPE] },
+      { backlog_id: "QA-614-4", reasons: [SCOPE] },
+      { backlog_id: "QA-614-5", reasons: ["no queue number"] },
+      { backlog_id: "QA-614-6", reasons: ["not yet scored (waits for Victoria)"] },
+      { backlog_id: "QA-614-7", reasons: [] },
+      { backlog_id: "QA-614-8", reasons: [SCOPE] },
+      { backlog_id: "QA-614-9", reasons: [SCOPE] },
+      { backlog_id: "QA-614-10", reasons: [SCOPE] },
+      { backlog_id: "QA-614-11", reasons: [SCOPE, "no queue number"] },
+    ];
+    const LONG = "x".repeat(SCOPE_RATIONALE_CAP + 300);
+    const pSources = [
+      // 03:00Z on 2026-11-06 is 21:00 CST on 2026-11-05: the copy is dated by John's calendar, not UTC.
+      { table: "runner_decisions", id: DEC, session_name: "ticket-groom-1106", decided_at: "2026-11-06T03:00:00+00:00",
+        reasoning: "  make sure tickets are groomed so they will not be bypassed  " },
+      { table: "runner_directives", id: DIR, created_at: "2026-08-20T20:25:59+00:00", body: LONG },
+    ];
+    const pBoard = (over = {}) => ({
+      items: pItems, matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [],
+      pickExclusions: pExcl, needSources: pSources, ...over,
+    });
+    const pr = classifyBoard(pBoard(), { now: PNOW, rate: 0.5, retired: NO_RETIREMENT });
+    const pf = id => only(pr, id, PICK_FIELD_CHECK);
+    assert.deepStrictEqual([...new Set(pr.findings.map(f => f.check))], [PICK_FIELD_CHECK],
+      "every row is clean but for its pick reasons, so check 14 is the only check that fires");
+
+    // (1) a John DECISION source -> derivable, the exact dated copy, trimmed, nothing composed.
+    assert.strictEqual(pf("QA-614-1")?.verdict, "derivable", "a John decision source makes the rationale derivable");
+    assert.deepStrictEqual(pf("QA-614-1").fix, {
+      scope_rationale: "John 2026-11-05 (decision 087d79ae, session ticket-groom-1106): make sure tickets are groomed so they will not be bypassed",
+    }, "the fix is exactly the dated copy of the decision's reasoning");
+    // (2) a John DIRECTIVE source -> derivable, cut at the cap with an ellipsis.
+    assert.strictEqual(pf("QA-614-2")?.verdict, "derivable", "a John directive source makes the rationale derivable");
+    const dirCopy = pf("QA-614-2").fix.scope_rationale;
+    assert.ok(dirCopy.startsWith("John 2026-08-20 (directive e5fb5b2a): xxx"), `got: ${dirCopy.slice(0, 50)}`);
+    assert.strictEqual(dirCopy.length, SCOPE_RATIONALE_CAP, "a copy longer than the cap is cut to exactly the cap");
+    assert.ok(dirCopy.endsWith("x…"), "and says it was cut");
+    // (3) a non-John source, (4) no source, (8) a John source that is no decision/directive, (9) a John
+    // decision nobody read -> judgment, owned by the Governance Architect, and NO fix key at all.
+    for (const id of ["QA-614-3", "QA-614-4", "QA-614-8", "QA-614-9"]) {
+      assert.strictEqual(pf(id)?.verdict, "judgment", `${id}: nothing copyable is a judgment, never a composed rationale`);
+      assert.ok(!("fix" in pf(id)), `${id}: a judgment finding carries no fix`);
+      assert.ok(pf(id).detail.includes(RATIONALE_OWNER) && pf(id).detail.includes("`architect`"),
+        `${id}: the sentence must name the Governance Architect as the owner; got ${pf(id).detail}`);
+    }
+    // (5) no queue number -> judgment naming recompute_backlog_queue().
+    assert.strictEqual(pf("QA-614-5")?.verdict, "judgment");
+    assert.ok(pf("QA-614-5").detail.includes("recompute_backlog_queue()"), `got: ${pf("QA-614-5").detail}`);
+    assert.ok(!pf("QA-614-5").detail.includes("architect"), "a queue gap is not the Architect's");
+    // (6) only `not yet scored`, (7) empty reasons, (10) a row not open/partial -> nothing at all.
+    for (const id of ["QA-614-6", "QA-614-7", "QA-614-10"]) {
+      assert.strictEqual(pf(id), undefined, `${id} must file nothing: not a missing field, or not a live row`);
+    }
+    // (11) both gaps on one row -> ONE finding (the ledger key is row + check), carrying both.
+    assert.strictEqual(pr.findings.filter(f => f.backlog_id === "QA-614-11").length, 1, "one finding per (row, check)");
+    assert.strictEqual(pf("QA-614-11").verdict, "derivable");
+    assert.ok(pf("QA-614-11").detail.includes("recompute_backlog_queue()"), "the queue gap rides in the same sentence");
+    assert.deepStrictEqual(pr.counts, { rows: 11, findings: 8, derivable: 3, judgment: 5 });
+
+    // THE ONE PREDICATE: a board with no pick read asks check 14 nothing.
+    assert.deepStrictEqual(classifyBoard(pBoard({ pickExclusions: undefined }), { now: PNOW, rate: 0.5, retired: NO_RETIREMENT }).findings, [],
+      "without pick_exclusions() the fourteenth check must not guess");
+    // The source read is as narrow as the gap: only the live, scope-flagged rows' John records.
+    assert.deepStrictEqual(pickSourceRefs(pItems, pExcl).map(r => `${r.table}:${r.id}`).sort(), [
+      `runner_decisions:${DEC}`, `runner_decisions:${UNREAD}`, `runner_directives:${DIR}`,
+    ], "the read names the flagged rows' John records once each, and never a closed row's or a napkin's");
+    assert.strictEqual(johnSourceRef("john:napkin_ideas:n_fa49c1efb4cc42e084432071bec5f2f1"), null);
+    assert.strictEqual(scopeRationaleCopy({ table: "runner_decisions", id: DEC }, { reasoning: "  ", decided_at: PNOW }), null,
+      "an empty record copies nothing");
+
+    // THE LEDGER: an open row is RE-SEEN, never re-filed; a new judgment is inserted; a derivable fill
+    // files no ledger row.
+    const pPrior = [{ id: "pp3", backlog_id: "QA-614-3", check_slug: PICK_FIELD_CHECK }];
+    const JUDGED = { confirmed: 3, refused: 0, unconfirmed: 0, model: "m" };
+    const pPlan = planWrites(pr, pPrior, pItems, { rate: 0.5, judged: JUDGED });
+    assert.deepStrictEqual(pPlan.ledger.reseen, ["pp3"], "a ticket still blocked tonight is re-seen");
+    assert.ok(!pPlan.ledger.insert.some(f => f.backlog_id === "QA-614-3"), "and is NOT filed a second row");
+    assert.deepStrictEqual(pPlan.ledger.insert.map(f => f.backlog_id).sort(), ["QA-614-4", "QA-614-5", "QA-614-8", "QA-614-9"]);
+    assert.ok(pPlan.ledger.insert.every(f => f.check_slug === PICK_FIELD_CHECK));
+    // THE FILL IS JUDGED-ONLY: planned on a judged night, never on an unjudged one.
+    assert.deepStrictEqual(pPlan.fixes.map(f => [f.backlog_id, Object.keys(f.patch)]),
+      [["QA-614-1", ["scope_rationale"]], ["QA-614-11", ["scope_rationale"]], ["QA-614-2", ["scope_rationale"]]],
+      "a judged night plans the copy, and the patch names scope_rationale alone -- never updated_at");
+    assert.deepStrictEqual(planWrites(pr, pPrior, pItems, { rate: 0.5 }).fixes, [],
+      "an unjudged night has read nothing, so it writes no rationale");
+    // ...and through the REAL merge, only an explicit `apply: true` survives to a write.
+    const pJ = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/fixtures/agt-79/judge.json"), "utf8"));
+    const pState = {
+      schema: pJ.schema, window: "2026-11-06", model: "m",
+      census: { findings: pr.findings, backlog: pr.backlog, counts: pr.counts },
+    };
+    const pAns = {
+      window: "2026-11-06", report: "r", account: "a",
+      fixes: [
+        { backlog_id: "QA-614-1", check: PICK_FIELD_CHECK, apply: true, reason: "the decision is why it exists" },
+        { backlog_id: "QA-614-2", check: PICK_FIELD_CHECK, apply: false, reason: "the directive is about a race, not this ticket" },
+      ],
+      findings: [],
+    };
+    const pg = ingestJudgment(pAns, pState);
+    assert.deepStrictEqual(pg.errors, [], `the pick answer must be accepted; got ${pg.errors.join(" | ")}`);
+    const pgPlan = planWrites(pg.result, [], pItems, { rate: 0.5, judged: pg.judged });
+    assert.deepStrictEqual(pgPlan.fixes.map(f => f.backlog_id), ["QA-614-1"],
+      "apply:true is the only way a copy is written: refused and unanswered fills are not");
+    assert.ok(only(pg.result, "QA-614-2", PICK_FIELD_CHECK).detail.startsWith(REFUSED_PREFIX));
+    assert.ok(pgPlan.ledger.insert.some(f => f.backlog_id === "QA-614-2"), "a refused fill files a judgment row");
+    assert.ok(pgPlan.ledger.insert.some(f => f.backlog_id === "QA-614-11"), "an unanswered fill degrades to a judgment row");
+    assert.deepStrictEqual(pgPlan.proposals, [], "a refused fill is never a removal proposal -- only check 13 proposes");
+    console.log("[AGT-614] part P: check 14 -- 3 derivable / 5 judgment over 11 rows, re-seen not re-filed, fill judged-only");
+  }
 
   // --- C: the CLI over the fixture (spawn, no creds) -------------------------------------------
   const cJson = spawnCli([`--board=${FIXTURE_REL}`, "--json"]);
