@@ -1,3 +1,5 @@
+// DeepBench v7.0.965 | api/capabilities/execute.js | AA-169 -- fetchFormatOverride() renders through
+// renderFormatSection(), the ONE home. TWO header lines offset the two the collapsed render drops: `:1297` is cited by number (request-receivable.js:730, agt-176's test:5, agt-181 arm (c)).
 // DeepBench v7.0.538 | api/capabilities/execute.js | SES-424 slice 6 -- THE TURN'S OWN CITATIONS REACH
 // THE TABLE. The three governance Intent contracts require `patterns_applied` (slice 5), so every
 // executor turn already ANSWERS with the decision criteria it applied -- and this file dropped them:
@@ -153,7 +155,7 @@
 // jobs that genuinely throw are now marked 'status: failed' with a real error instead of sitting
 // orphaned -- DB bookkeeping only, the HTTP error contract is unchanged.
 
-import { assemblePrompt, mergeCallFacts, injectAccountField } from '../prompt/db-assembly.js';
+import { assemblePrompt, mergeCallFacts, injectAccountField, renderFormatSection } from '../prompt/db-assembly.js';
 import { enrichPrompt } from '../prompt/ai-enrichment.js';
 // FEATURE: LOG-49 -- extractSelfReportedClaims + its allowlist live in request-receivable.js (a
 // single shared constant, extensible in one place); imported here so the agent-turn write path uses
@@ -680,9 +682,7 @@ async function fetchFormatOverride({ format_skill_profile_slug, display_agent_id
       if (fsp) {
         const traits = fsp.traits || {};
         const outputType = traits.output_type || 'json';
-        const formatParts = [`Output type: ${outputType}`];
-        if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
-        formatSection = `=== OUTPUT FORMAT ===\n${formatParts.join('\n')}`;
+        formatSection = `=== OUTPUT FORMAT ===\n${renderFormatSection(fsp, 'json')}`;
         formatContract = {
           output_type: outputType,
           skill_profile_slug: fsp.slug,

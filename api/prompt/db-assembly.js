@@ -1,3 +1,4 @@
+// DeepBench v7.0.965 | api/prompt/db-assembly.js | AA-169 -- renderFormatSection() is the ONE home of a Format Skill's section; objective/method/output_desc/guardrails reach the model
 // DeepBench v7.0.944 | api/prompt/db-assembly.js | AGT-552 -- a role prompt renders ONCE per bundle
 // DeepBench v7.0.895 | api/prompt/db-assembly.js | AGT-429 -- 44->4 / 22->2 / 11->1
 // DeepBench v7.0.850 | api/prompt/db-assembly.js | AGT-434 -- north star pinned ONCE per agent; 49 links removed.
@@ -182,6 +183,24 @@ function getSupabaseHeaders(key) {
 // graded on its own, apart from the assembler.
 export function rolePromptHome(skillProfiles) {
   return (Array.isArray(skillProfiles) ? skillProfiles : []).some(sp => sp?.skill_type_slug === "identity") ? "identity" : "behavior";
+}
+
+// FEATURE: AA-169 -- the ONE render of a Format Skill's section. Reads row fields only; keyed on
+// nothing but the row (.claude/rules/capabilities-are-data.md). A row without the columns renders
+// byte-identical to the pre-AA-169 traits-only build. Imported by execute.js and plan.js.
+export function renderFormatSection(sp, defaultOutputType = "html") {
+  const traits = sp?.traits || {};
+  const parts = [`Output type: ${traits.output_type || defaultOutputType}`];
+  if (traits.section_structure) parts.push(`Structure: ${traits.section_structure}`);
+  if (sp?.objective) parts.push(`Objective: ${sp.objective}`);
+  if (sp?.method) parts.push(`Method: ${sp.method}`);
+  if (sp?.output_desc) parts.push(`Output: ${sp.output_desc}`);
+  const g = sp?.guardrails;
+  if (g && typeof g === "object" && !Array.isArray(g)) {
+    if (Array.isArray(g.must) && g.must.length) parts.push(`Must: ${g.must.join("; ")}`);
+    if (Array.isArray(g.must_not) && g.must_not.length) parts.push(`Must not: ${g.must_not.join("; ")}`);
+  }
+  return parts.join("\n");
 }
 
 // FEATURE: DAT-12 -- retrievalScope is a REQUEST-level value threaded down from assemblePrompt()'s
@@ -447,9 +466,7 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
 
     } else if (typeSlug === "format") {
       const outputType = traits.output_type || "html";
-      const formatParts = [`Output type: ${outputType}`];
-      if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
-      content = formatParts.join("\n");
+      content = renderFormatSection(sp, "html");
 
       // FEATURE: AA-44 — format_contract gains handler + guardrails for request-receivable
       formatContract = {

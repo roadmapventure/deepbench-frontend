@@ -1,10 +1,11 @@
+// DeepBench v7.0.965 | api/plan.js | AA-169 -- both format-override sites render through db-assembly.js's renderFormatSection(), the ONE home; the title line's bytes unchanged
 // DeepBench v7.0.34 | api/plan.js | LOG-121 -- handler wrapped in withRequestContext(); the
 // request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v5.2.35 | api/plan.js | BUG-17 wire dan-ai-enrichment into prompt-service + preview-prompt
 // FEATURE: AW-04 — Planning agent structured output
 // FEATURE: AA-44 — title.js merged into plan.js; taskTitle added to tool schema
 
-import { assemblePrompt } from './prompt/db-assembly.js';
+import { assemblePrompt, renderFormatSection } from './prompt/db-assembly.js';
 import { enrichPrompt } from './prompt/ai-enrichment.js';
 import { sendRequest } from './prompt/request-receivable.js';
 import { queryRAG } from '../lib/rag.js';
@@ -234,10 +235,7 @@ async function handler(req, res) {
               if (fsp) {
                 const traits = fsp.traits || {};
                 const outputType = traits.output_type || 'json';
-                const formatParts = [`Output type: ${outputType}`];
-                if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
-                formatParts.push('\n\nAlso return a "title" field (max 8 words) that describes the actual content you produced — not the task goal, but what you actually generated.');
-                const formatSection = `=== OUTPUT FORMAT ===\n${formatParts.join('\n')}`;
+                const formatSection = `=== OUTPUT FORMAT ===\n${renderFormatSection(fsp, 'json')}\n\n\nAlso return a "title" field (max 8 words) that describes the actual content you produced — not the task goal, but what you actually generated.`;
                 stage4WithFormat = (stage4Text || '') + '\n\n---\n\n' + formatSection;
               }
             }
@@ -318,10 +316,7 @@ async function handler(req, res) {
               if (fsp) {
                 const traits = fsp.traits || {};
                 const outputType = traits.output_type || 'json';
-                const formatParts = [`Output type: ${outputType}`];
-                if (traits.section_structure) formatParts.push(`Structure: ${traits.section_structure}`);
-                formatParts.push('\n\nAlso return a "title" field (max 8 words) that describes the actual content you produced — not the task goal, but what you actually generated.');
-                const formatSection = `=== OUTPUT FORMAT ===\n${formatParts.join('\n')}`;
+                const formatSection = `=== OUTPUT FORMAT ===\n${renderFormatSection(fsp, 'json')}\n\n\nAlso return a "title" field (max 8 words) that describes the actual content you produced — not the task goal, but what you actually generated.`;
                 enriched.system_prompt = (enriched.system_prompt || '') + '\n\n---\n\n' + formatSection;
                 enriched.format_contract = {
                   output_type: outputType,
