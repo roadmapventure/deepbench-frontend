@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.968 | scripts/agent-prompt.js | AGT-588 -- ceiling 262144
 // DeepBench v7.0.935 | scripts/agent-prompt.js | AGT-550 -- record sections are HEADS under one
 // byte ceiling, measured in overBudget() and shaped by recordHead(); the render refuses over it.
 // DeepBench v7.0.899 | scripts/agent-prompt.js | AGT-504 -- --prior-proposals=<found_by>: the turn reads its lane's prior proposals
@@ -330,7 +331,7 @@ export function renderAssembly(assembly) {
 }
 
 // AGT-550: record sections are HEADS under ONE ceiling, measured here.
-export const SECTION_BYTE_CEILING = 786432; // one 200k-token context at 4 B/token (ticket: 1.58 MB ~ 400k)
+export const SECTION_BYTE_CEILING = 262144; // 64k tokens at 4 B/token per section (AGT-588)
 export const HEAD_CHARS = 240; // John 2026-10-23: titles plus a 240-character head
 export function recordHead(r) {
   const text = r.body || (r.data && (r.data.headline || r.data.can_do || r.data.summary || r.data.text)) || '';

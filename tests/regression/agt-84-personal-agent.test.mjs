@@ -99,6 +99,7 @@ import { spawnSync } from "child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { SECTION_BYTE_CEILING } from "../../scripts/agent-prompt.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT_REL = "scripts/personal-agent.js";
@@ -485,7 +486,11 @@ async function partE() {
     return r.json();
   };
 
-  const { READ_MAP } = await load();
+  const { READ_MAP, KIND_WINDOWS } = await load();
+  // AGT-588: the career lane now reads posting/log/market_requirement over a 14-day window, so the
+  // two ids this arm discriminates with must be picked from INSIDE that window -- an unordered
+  // limit-1 pick resolved to 2026-09-24 rows, which the windowed render correctly no longer carries.
+  const since = new Date(Date.now() - KIND_WINDOWS["career-strengths-gaps"].posting * 86400000).toISOString();
   const caps = await getJson("capabilities?slug=like.career-*&select=slug");
   assert.deepStrictEqual(caps.map(c => c.slug).sort(), Object.keys(READ_MAP).sort(), "READ_MAP keys differ from the live career-* capabilities");
   results.push("read-map-matches-live-capabilities");
@@ -541,8 +546,8 @@ async function partE() {
   // M and P and must NOT carry N -- the last is what proves REVIEWED_POSTINGS is in force rather
   // than the filter simply being absent.
   const oneId = async q => (await getJson(`career_records?${q}&select=id&limit=1`))[0]?.id;
-  const M = await oneId("kind=eq.market_requirement&target_row=eq.pe-saas");
-  const P = await oneId("kind=eq.posting&target_row=eq.pe-saas&data->>status=neq.new");
+  const M = await oneId(`kind=eq.market_requirement&target_row=eq.pe-saas&created_at=gte.${since}&order=created_at.desc`);
+  const P = await oneId(`kind=eq.posting&target_row=eq.pe-saas&data->>status=neq.new&created_at=gte.${since}&order=created_at.desc`);
   const N = await oneId("kind=eq.posting&data->>status=eq.new");
   if (!M || !P || !N) {
     notRun("the AGT-106 live arm (strengths-gaps carries requirements and reviewed postings)",
@@ -778,6 +783,8 @@ async function partK() {
   const base = url.replace(/\/+$/, "");
   const hdr = { apikey: key, Authorization: `Bearer ${key}` };
   const env = { SUPABASE_URL: url, SUPABASE_SERVICE_KEY: key };
+  const { KIND_WINDOWS } = await load();
+  const since = new Date(Date.now() - KIND_WINDOWS["career-growth-review"].log * 86400000).toISOString();
 
   // (i) CAUSE CONTROL -- the store really is bigger than one page. If it were not, a render passing
   // the floor below would prove nothing about paging.
@@ -809,17 +816,85 @@ async function partK() {
     assert.strictEqual(r.status, 0, `--render for career-growth-review exited ${r.status}: ${r.stderr.trim()}`);
     const out = JSON.parse(r.stdout.trim());
     console.log(`  [AGT-569] growth-review render: records_loaded=${out.records_loaded} prompt_bytes=${out.prompt_bytes} (was 754 / 1283258 unpaged)`);
-    assert.ok(out.records_loaded > 1041,
-      `the growth-review render loaded ${out.records_loaded} records -- one page is at most 1,000 plus ` +
-      `41 correction rows, so anything at or under 1,041 means the read is still truncated`);
+    // AGT-588: `> 1041` is dead under the 14-day window -- the growth review now reads 323 of 2,072
+    // rows, one page. The read is still proved whole in BOTH directions: every EVERGREEN row is loaded
+    // (resume_fact + target + ladder_rung + review, never windowed) and the load is strictly under the
+    // whole store, which is what the window is for. A floor of 1,041 would now be red by design.
+    const evergreenHead = await fetch(`${base}/rest/v1/career_records?kind=in.(resume_fact,target,ladder_rung,review)&select=id`, {
+      headers: { ...hdr, "Range-Unit": "items", Range: "0-0", Prefer: "count=exact" },
+    });
+    if (!evergreenHead.ok) assert.fail(`the evergreen-count GET returned HTTP ${evergreenHead.status} ${await evergreenHead.text()}`);
+    const evergreen = Number(String(evergreenHead.headers.get("content-range") || "").split("/")[1]);
+    assert.ok(Number.isFinite(evergreen) && evergreen > 0, `the evergreen kinds count read back as ${evergreen}`);
+    console.log(`  [AGT-588] evergreen rows (resume_fact,target,ladder_rung,review): ${evergreen} of ${total}`);
+    assert.ok(out.records_loaded >= evergreen && out.records_loaded < total,
+      `the growth-review render loaded ${out.records_loaded} records -- it must carry every evergreen row ` +
+      `(${evergreen}, none of them windowed) and stay strictly under the whole store (${total})`);
     const md = fs.readFileSync(file, "utf8");
     assert.ok(md.includes(review.id),
       `the growth-review prompt does not carry the newest review record ${review.id} -- the read is ` +
       `still stopping before the end of the store`);
     console.log(`  [AGT-569] prompt carries the newest review record ${review.id}`);
     results.push("paged-render-passes-the-one-page-ceiling", "paged-render-carries-the-newest-review-row");
+
+    // AGT-588: the window IN FORCE, from the other end -- the OLDEST log row must be gone from the
+    // prompt. Loading fewer rows is not proof the window fired; a named pre-window row's absence is.
+    const oldestRes = await fetch(`${base}/rest/v1/career_records?kind=eq.log&select=id,created_at&order=created_at.asc&limit=1`, { headers: hdr });
+    if (!oldestRes.ok) assert.fail(`the oldest-log GET returned HTTP ${oldestRes.status} ${await oldestRes.text()}`);
+    const [oldLog] = await oldestRes.json();
+    assert.ok(oldLog?.id, "career_records holds no `log` row -- nothing to prove the window with");
+    if (oldLog.created_at >= since) {
+      notRun("AGT-588's window arm (a pre-window log row absent from the growth-review prompt)",
+        `the oldest log row ${oldLog.id} is dated ${oldLog.created_at}, which is inside the window that ` +
+        `starts ${since} -- every log row is recent, so the window has nothing to drop here and this ` +
+        `direction is UNVERIFIED. Measured 2026-11-06: 6d5a9a5e-edcd-4c51-a1e3-60d76cf4fc71, 2026-09-24, absent.`);
+    } else {
+      assert.ok(!md.includes(oldLog.id),
+        `the growth-review prompt still carries the ${oldLog.created_at} log record ${oldLog.id} -- ` +
+        `KIND_WINDOWS is not bounding the log read to the last 14 days`);
+      console.log(`  [AGT-588] pre-window log row ${oldLog.id} (${oldLog.created_at}) absent; window starts ${since}`);
+      results.push("growth-review-drops-the-pre-window-log-row");
+    }
   } finally {
     fs.rmSync(file, { force: true });
+  }
+
+  // AGT-588 REFUSAL ARM -- the ceiling is only a gate if an over-ceiling section is refused BY NAME.
+  // A control render exits 0 first; then ONE `correction` row whose body is SECTION_BYTE_CEILING + 1024
+  // bytes puts the `corrections` section over the ceiling and the SAME render must exit 2 naming that
+  // section and the ceiling. At the pre-change ceiling (786,432) the same fixture is NOT refused, so
+  // this arm grades the change rather than the live world (pattern:162). Deleted in `finally`.
+  const fixtureTag = `agt-588-${RUN}`;
+  const REFUSED_SLUG = "career-growth-review";
+  try {
+    const control = runScript(["--render", "--agent=jerry", `--capability=${REFUSED_SLUG}`, "--json"], env);
+    assert.strictEqual(control.status, 0,
+      `the control ${REFUSED_SLUG} render exited ${control.status} BEFORE the fixture: ${control.stderr.trim().slice(-300)}`);
+    const ins = await fetch(`${base}/rest/v1/career_records`, {
+      method: "POST",
+      headers: { ...hdr, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify([{
+        kind: "correction", title: "AGT-588 fixture", body: "x".repeat(SECTION_BYTE_CEILING + 1024),
+        data: { capability: REFUSED_SLUG }, session_name: fixtureTag,
+      }]),
+    });
+    if (!ins.ok) assert.fail(`the over-ceiling fixture insert returned HTTP ${ins.status} ${await ins.text()}`);
+    const refused = runScript(["--render", "--agent=jerry", `--capability=${REFUSED_SLUG}`, "--json"], env);
+    assert.strictEqual(refused.status, 2,
+      `the over-ceiling ${REFUSED_SLUG} render exited ${refused.status}, expected 2 -- the ceiling refused nothing`);
+    const needle = `render refused: section(s) corrections over the ${SECTION_BYTE_CEILING}-byte ceiling`;
+    assert.ok(refused.stderr.includes(needle),
+      `the refusal does not name the section and the ceiling ("${needle}"): ${refused.stderr.trim().slice(-300)}`);
+    console.log(`  [AGT-588] ${REFUSED_SLUG}: exit 0 under the ceiling, exit 2 naming corrections at ${SECTION_BYTE_CEILING} B`);
+    results.push("over-ceiling-corrections-section-refused-by-name");
+  } finally {
+    const gone = await fetch(`${base}/rest/v1/career_records?session_name=eq.${encodeURIComponent(fixtureTag)}`,
+      { method: "DELETE", headers: hdr });
+    if (!gone.ok) console.log(`  [AGT-588] WARNING: fixture cleanup failed (HTTP ${gone.status}) -- delete session_name=${fixtureTag} by hand`);
+    const leftRes = await fetch(`${base}/rest/v1/career_records?session_name=eq.${encodeURIComponent(fixtureTag)}&select=id`, { headers: hdr });
+    const left = leftRes.ok ? await leftRes.json() : [{ id: `unreadable HTTP ${leftRes.status}` }];
+    assert.strictEqual(left.length, 0, `${left.length} AGT-588 fixture row(s) left behind under ${fixtureTag}`);
+    console.log(`  [AGT-588] fixture ${fixtureTag} deleted, 0 rows left`);
   }
   return results;
 }

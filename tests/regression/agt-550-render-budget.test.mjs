@@ -8,7 +8,7 @@
 //      falls back body -> data.headline/can_do/summary/text -> '' (each fallback asserted separately,
 //      so the arm proves WHICH branch fired, LOO-013); overBudget() measures each section in bytes,
 //      names only the sections over the ceiling, and JSON-measures object sections;
-//      SECTION_BYTE_CEILING is 786432 and HEAD_CHARS is 240.
+//      SECTION_BYTE_CEILING is 262144 and HEAD_CHARS is 240.
 //   A' SOURCE -- both render scripts hold the AGT-550 import AND their pinned renderAssembly import
 //      byte-same (agt-121:67 / agt-84:151 pin it), the refusal string, `overBudget(task_context)`,
 //      and `body: r.body` exactly once (market) / twice (personal) -- the surviving occurrences are
@@ -98,7 +98,7 @@ async function run() {
       assert.equal(overBudget({ a: { b: 1 } }, 1e9).sizes.a, 7, 'an object section measures its JSON ({"b":1})');
       assert.equal(overBudget({ a: null }, 1e9).sizes.a, 0, "a null section is 0 bytes, never the string 'null'");
       assert.deepEqual(overBudget({ a: "x", b: "y".repeat(20) }, 8).over, ["b"], "only the over-budget section is named");
-      assert.equal(SECTION_BYTE_CEILING, 786432, "one 200k-token context at 4 B/token");
+      assert.equal(SECTION_BYTE_CEILING, 262144, "64k tokens at 4 B/token per section (AGT-588)");
       assert.equal(HEAD_CHARS, 240);
     });
 
@@ -135,10 +135,16 @@ async function run() {
       };
       const newestMessage = await newestId("market_records?kind=eq.message&status=neq.retired&select=id&order=created_at.desc&limit=1");
       const newestDraft = await newestId("humor_records?kind=eq.draft&select=id&order=created_at.desc&limit=1");
+      // AGT-588: the two windowed career renders join arm B. Their pins are EVERGREEN kinds (review,
+      // resume_fact), which the 14-day read window never touches, so the pin never depends on intake timing.
+      const newestReview = await newestId("career_records?kind=eq.review&select=id&order=created_at.desc&limit=1");
+      const newestFact = await newestId("career_records?kind=eq.resume_fact&select=id&order=created_at.desc&limit=1");
 
       const cases = [
         { name: "pmm-messaging", script: MARKET, agent: "nathan", capability: "pmm-messaging", mustHold: newestMessage },
         { name: "humor-weekly-draft", script: PERSONAL, agent: "dilbert", capability: "humor-weekly-draft", mustHold: newestDraft },
+        { name: "career-growth-review", script: PERSONAL, agent: "jerry", capability: "career-growth-review", mustHold: newestReview },
+        { name: "career-linkedin-alerts", script: PERSONAL, agent: "jerry", capability: "career-linkedin-alerts", mustHold: newestFact },
       ];
       for (const c of cases) {
         const out = path.join(tmp, `${c.name}.txt`);
@@ -154,6 +160,7 @@ async function run() {
           `${c.name}: prompt_bytes ${json.prompt_bytes} must be under the ${SECTION_BYTE_CEILING}-byte ceiling`);
 
         const { line, value } = recordsLine(text);
+        assert.ok(Buffer.byteLength(line, "utf8") < SECTION_BYTE_CEILING, `${c.name}: records line under the ceiling`);
         let entries = 0;
         for (const [kind, arr] of Object.entries(value)) {
           assert.ok(Array.isArray(arr), `${c.name}: records.${kind} is an array`);

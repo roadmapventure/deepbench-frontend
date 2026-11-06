@@ -38,6 +38,7 @@ import { randomUUID } from "node:crypto";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { ROUTINES } from "../../scripts/check-routine-prompt.js";
 import { postingChannel, READ_MAP, KIND_FILTERS } from "../../scripts/personal-agent.js";
+import { SECTION_BYTE_CEILING } from "../../scripts/agent-prompt.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = path.join(ROOT, "scripts", "check-routine-prompt.js");
@@ -254,6 +255,36 @@ async function run() {
         assert.ok(monday.includes("AGT-156 control posting"), "Monday's render carries the board control too");
         assert.deepEqual(channels(monday), ["board", "linkedin-alert"],
           `Monday carries BOTH channels (got ${JSON.stringify(channels(monday))})`);
+
+        // AGT-588 REFUSAL ARM -- the ceiling is only a gate if an over-ceiling section is refused BY
+        // NAME. Both renders above already exited 0 under it; now ONE `correction` row whose body is
+        // SECTION_BYTE_CEILING + 1024 bytes puts the `corrections` section over the ceiling and the
+        // alert render must exit 2 NAMING that section and the ceiling. At the pre-change ceiling
+        // (786,432) the same fixture is NOT refused, so the arm grades the change (pattern:162). The
+        // row carries this arm's own `t` tag, so the existing `finally` deletes it and asserts 0 left.
+        const REFUSED_SLUG = "career-linkedin-alerts";
+        const before = spawnSync(process.execPath,
+          [AGENT, "--render", "--agent=jerry", `--capability=${REFUSED_SLUG}`, "--json"],
+          { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+        assert.equal(before.status, 0,
+          `the control ${REFUSED_SLUG} render exited ${before.status} BEFORE the fixture: ${(before.stderr ?? "").slice(-300)}`);
+        await rest("career_records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify([{
+            kind: "correction", title: "AGT-588 fixture", body: "x".repeat(SECTION_BYTE_CEILING + 1024),
+            data: { capability: REFUSED_SLUG }, session_name: t,
+          }]),
+        });
+        const refused = spawnSync(process.execPath,
+          [AGENT, "--render", "--agent=jerry", `--capability=${REFUSED_SLUG}`, "--json"],
+          { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+        assert.equal(refused.status, 2,
+          `the over-ceiling ${REFUSED_SLUG} render exited ${refused.status}, expected 2 -- the ceiling refused nothing`);
+        const needle = `render refused: section(s) corrections over the ${SECTION_BYTE_CEILING}-byte ceiling`;
+        assert.ok((refused.stderr ?? "").includes(needle),
+          `the refusal does not name the section and the ceiling ("${needle}"): ${(refused.stderr ?? "").slice(-300)}`);
+        console.log(`    D ${REFUSED_SLUG}: exit 0 under the ceiling, exit 2 naming corrections at ${SECTION_BYTE_CEILING} B`);
       } finally {
         await rest(`career_records?session_name=eq.${encodeURIComponent(t)}`, { method: "DELETE" });
         const left = await rest(`career_records?session_name=eq.${encodeURIComponent(t)}&select=id`);

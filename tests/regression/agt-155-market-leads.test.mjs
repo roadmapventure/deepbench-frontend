@@ -97,6 +97,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { ROUTINES, extractBlock, comparePrompt } from "../../scripts/check-routine-prompt.js";
+import { SECTION_BYTE_CEILING } from "../../scripts/agent-prompt.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PERSONAL_REL = "scripts/personal-agent.js";
@@ -682,6 +683,47 @@ async function partH() {
     results.push("render-asks-for-both-lead-facts");
   } finally {
     if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
+  }
+
+  // AGT-588 REFUSAL ARM -- the alert render is the one this file already drives, so the byte ceiling
+  // is proved HERE on the same capability (pattern:17). A control render exits 0; then ONE `correction`
+  // row whose body is SECTION_BYTE_CEILING + 1024 bytes puts the `corrections` section over the ceiling
+  // and the SAME render must exit 2 NAMING that section and the ceiling -- growing a prompt nobody can
+  // read is what this replaces. At the pre-change ceiling (786,432) the same fixture is not refused.
+  const fixtureTag = `agt-588-${RUN}`;
+  const REFUSED_SLUG = "career-linkedin-alerts";
+  const svc = { apikey: key, Authorization: `Bearer ${key}` };
+  try {
+    const control = runScript(PERSONAL, ["--render", "--agent=jerry", `--capability=${REFUSED_SLUG}`, "--json"],
+      { SUPABASE_URL: url, SUPABASE_SERVICE_KEY: key });
+    assert.strictEqual(control.status, 0,
+      `the control ${REFUSED_SLUG} render exited ${control.status} BEFORE the fixture: ${control.stderr.trim().slice(-300)}`);
+    const ins = await fetch(`${base}/rest/v1/career_records`, {
+      method: "POST",
+      headers: { ...svc, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify([{
+        kind: "correction", title: "AGT-588 fixture", body: "x".repeat(SECTION_BYTE_CEILING + 1024),
+        data: { capability: REFUSED_SLUG }, session_name: fixtureTag,
+      }]),
+    });
+    if (!ins.ok) assert.fail(`the over-ceiling fixture insert returned HTTP ${ins.status} ${await ins.text()}`);
+    const refused = runScript(PERSONAL, ["--render", "--agent=jerry", `--capability=${REFUSED_SLUG}`, "--json"],
+      { SUPABASE_URL: url, SUPABASE_SERVICE_KEY: key });
+    assert.strictEqual(refused.status, 2,
+      `the over-ceiling ${REFUSED_SLUG} render exited ${refused.status}, expected 2 -- the ceiling refused nothing`);
+    const needle = `render refused: section(s) corrections over the ${SECTION_BYTE_CEILING}-byte ceiling`;
+    assert.ok(refused.stderr.includes(needle),
+      `the refusal does not name the section and the ceiling ("${needle}"): ${refused.stderr.trim().slice(-300)}`);
+    console.log(`  [AGT-588] ${REFUSED_SLUG}: exit 0 under the ceiling, exit 2 naming corrections at ${SECTION_BYTE_CEILING} B`);
+    results.push("over-ceiling-corrections-section-refused-by-name");
+  } finally {
+    const gone = await fetch(`${base}/rest/v1/career_records?session_name=eq.${encodeURIComponent(fixtureTag)}`,
+      { method: "DELETE", headers: svc });
+    if (!gone.ok) console.log(`  [AGT-155] WARNING: fixture cleanup failed (HTTP ${gone.status}) -- delete session_name=${fixtureTag} by hand`);
+    const leftRes = await fetch(`${base}/rest/v1/career_records?session_name=eq.${encodeURIComponent(fixtureTag)}&select=id`, { headers: svc });
+    const left = leftRes.ok ? await leftRes.json() : [{ id: `unreadable HTTP ${leftRes.status}` }];
+    assert.strictEqual(left.length, 0, `${left.length} AGT-588 fixture row(s) left behind under ${fixtureTag}`);
+    console.log(`  [AGT-588] fixture ${fixtureTag} deleted, 0 rows left`);
   }
   return results;
 }

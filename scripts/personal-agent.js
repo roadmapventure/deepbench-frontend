@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.968 | scripts/personal-agent.js | AGT-588 -- windowed career reads
 // DeepBench v7.0.935 | scripts/personal-agent.js | AGT-550 -- record sections carry HEADS, not
 // bodies, and the render REFUSES a section over the byte ceiling instead of assembling it.
 // DeepBench v7.0.932 | scripts/personal-agent.js | AGT-569 -- paged record reads. rest().get() was
@@ -222,6 +223,7 @@ const LIVE_DRAFTS = {
 // is unchanged; alert review deliberately has no entry, because its verification rules count the
 // reposting history and its skip rule reads the already-applied rows, both of which live in the
 // postings match-finder filters out.
+// AGT-588: still no FILTER here; KIND_WINDOWS bounds its posting and log reads to 14 days.
 // AGT-106: the mirror of match-finder's predicate -- it drops only the raw `status:'new'` intake
 // cards (what --fetch-postings and the alert intake write) and keeps every other status, null too.
 const REVIEWED_POSTINGS = { posting: rec => rec?.data?.status !== 'new' };
@@ -230,6 +232,11 @@ const REVIEWED_POSTINGS = { posting: rec => rec?.data?.status !== 'new' };
 // REVIEWED_POSTINGS and ahead of KIND_FILTERS, because the object literal below evaluates at module
 // load; postingChannel() is a hoisted function declaration and is only called when a row is read.
 const LINKEDIN_ALERT_POSTINGS = { posting: rec => postingChannel(rec) === 'linkedin-alert' };
+
+// AGT-588: a read WINDOW in days, keyed like KIND_FILTERS; evergreen kinds are never windowed.
+const RECENT_KINDS = { posting: 14, log: 14, market_requirement: 14 };
+export const KIND_WINDOWS = Object.fromEntries(['career-strengths-gaps', 'career-posting-review', 'career-match-finder',
+  'career-interview-prep', 'career-market-watch', 'career-linkedin-alerts', 'career-growth-review'].map(c => [c, RECENT_KINDS]));
 
 export const KIND_FILTERS = {
   'career-match-finder': { posting: rec => rec?.data?.status === 'new' },
@@ -669,6 +676,9 @@ async function readRecords(db, capability, target) {
   // A record with no target_row applies to every target; --target narrows the targeted ones. The
   // humor store has no target_row (AGT-543), so --target never narrows it.
   if (target && store.targeted) q += `&or=(target_row.is.null,target_row.eq.${encodeURIComponent(target)})`;
+  const windows = KIND_WINDOWS[capability] ?? {};
+  const windowed = kinds.filter(k => windows[k]);
+  if (windowed.length) q += `&or=(kind.not.in.(${windowed.join(',')}),${windowed.map(k => `and(kind.eq.${k},created_at.gte.${new Date(Date.now() - windows[k] * 86400000).toISOString()})`).join(',')})`;
   const rows = await db.get(q);
   const records = Object.fromEntries(kinds.map(k => [k, []]));
   const filters = KIND_FILTERS[capability];
@@ -787,7 +797,7 @@ async function readWeekShips(db) {
   if (!week.cycles.length && !week.decisions.length) return null;
   // The humorist reads the week trimmed (John 2026-10-23, "going backwards since we built the agent":
   // raw dumps were 87% of a 1.2 MB prompt and his own grades 5%): only the decision kinds a reader
-  // would recognize, newest 60, each summary cut to 220 characters. The career review keeps readWeek whole.
+  // would recognize, newest 60, each summary cut to 220 characters. The career review reads this same trimmed week (AGT-588).
   const decisions = week.decisions
     .filter(d => HUMOR_WEEK_KINDS.includes(d.kind))
     .slice(-60)
@@ -812,7 +822,7 @@ async function render(args) {
 
   const { records, corrections } = await readRecords(db, args.capability, args.target);
   const posting_coverage = records.posting ? postingCoverage(records.posting) : null;
-  const week = args.capability === 'career-growth-review' ? await readWeek(db) : null;
+  const week = args.capability === 'career-growth-review' ? await readWeekShips(db) : null;
   let input = null;
   let intake = null;
   if (args.inputFile) {
