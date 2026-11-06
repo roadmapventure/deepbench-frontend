@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.971 | scripts/requirement-check.js | AGT-613 -- A RUNNING PROJECT'S LIST IS GRADED IN PLACE. John's rule (decision 087d79ae, 2026-11-06): she grades in the active projects too, not only in the staging area. `prepareList()` reads the list project's `status` and the context carries `list_executing` (plus `list_note`, the constant `LIST_EXECUTING_NOTE`, only when true); the OFFER is unchanged (a graded 3+ ticket there is still offered and answered `hold`), so AGT-487 and AGT-431 read the list as before. `validateListVerdict()` V9: on an executing project's list a `move` is refused and a placement `home` (any answer that is not a park) is refused -- the ticket is already home, so a grade is a `pass` with home null; a `no-fit` must name where it waits (a parked home or a new project), because a stamp alone would leave it ungraded inside a running project, which is the stall AGT-608/609/610 sat in. V6's parent-home rule does not apply on such a list (the ticket is not leaving). Parks (P1-P5) are unchanged, so a 0 may still be parked out of a running project as `RESCORE_NOTE` already says.
 // DeepBench v7.0.937 | scripts/requirement-check.js | AGT-431 -- THE RE-SCORE DOOR, AND THE ORDER JOHN JUDGES. `--prepare-list --rescore` is a MODE of the list door, not a second one (pattern:17): John's ruling `e9b5bfc5` reopened every grade on the executing projects, which is requirement d.13's own reopening condition, so the mode offers every open/partial ticket (nothing held back for carrying a grade) and hands each proposal `graded: false` plus `rescore_note` -- `validateListVerdict()`'s V2 then accepts the `pass` the run exists to collect and V3 still refuses a `move` on it. NOT ONE OF HER ROWS IS TOUCHED: `grade_standing()` still names every one of them and only this one context reads false. `--rescore-report --cycle-id=<uuid>` is the second half: it re-reads the two executing projects' open/partial tickets, their standing grades and `prime_directive_queue()`'s own order, and puts the PICK'S ORDER to John as ONE yes/no `runner_questions` row (`RESCORE_QID`), its creation imaged in `runner_before_images` BEFORE the row exists so one Reverse can take it away. Live before this: all 21 open/partial tickets of `tooling` (16) and `dev-manager-capabilities` (5) were graded, `--prepare-list` offered 12 of 16 on tooling (4 held back) and `validateListVerdict()` refused a `pass` on every one of them as `already graded` (2026-11-03). pattern:10, pattern:17, pattern:152.
 // DeepBench v7.0.870 | scripts/requirement-check.js | AGT-493 -- A TICKET FILED MORE THAN 14 DAYS AGO IS NOT OFFERED UNTIL A VALIDATION STANDS. prepareList() reads needs_validation() once per list and drops what it names (the architect's validate-ticket door runs first: scripts/ticket-validation.js); each proposal carries needs_validation; V8 refuses a move or a homing pass on it. Live before this: 77 + 13 graded tickets older than 14 days in the two holding lists, every one placeable by a move (2026-10-20). d.8, d.30; pattern:9, pattern:10, pattern:17.
 // DeepBench v7.0.866 | scripts/requirement-check.js | AGT-490 -- A PARKED 0 NAMES WHERE IT WAITS. `prepareList()` POSTs `rpc/victoria_parked_homes` once per run and the context carries `parked_homes` (`{slug, name, status}` of every paused and planned project), so a ticket the tree calls PARKED can be scored 0 AND say where it waits -- `home` a parked slug, or `new_project` the name of a PLANNED project created for it (capture only, John turns one on). `validateListVerdict()` holds the five rules offline (P1 a 0's reason begins `PARKED (0) until `; P2 a 0's home is a parked slug while V1 is byte-unchanged above 0; P3 `new_project` only on a 0 or a `no-fit`, 3-80 characters, never beside `home`, and never a slug she was already handed; P4 a `no-fit`'s home is a parked slug; P5 a ticket John named names neither, d.10), `applyList()` sends a pass's `new_project` beside its `home`, and a `no-fit` that named a destination POSTs the writer's new `park` verdict AFTER its `fit-stamp` -- its own `placement` decision, no grade, printed as `Parked: <id> -> <target>` and counted on the counts line. Live before this: 0 tickets on the whole board read `need_score` 0 though every validator has accepted one since `v7.0.844`, AGT-383 and AGT-252 both read 1 against John's 2026-10-08 ruling, and `home` reached `placement_target()`, which admits an `executing` project and nothing else (2026-10-19). pattern:2, pattern:10, pattern:17.
@@ -279,6 +280,12 @@ export const PROPOSED_STATUS = "removal proposed";
 export const AWAITING_LIST_ANSWER =
   "prompt assembled and printed; exit 3 = awaiting Victoria's one answer for the whole list, then --apply-list";
 
+// AGT-613: what the list turn is told when the list IS a running project's (`list_executing`). One
+// string, read by the context and nowhere else restated (pattern:93), in the shape of RESCORE_NOTE.
+export const LIST_EXECUTING_NOTE = "This list is an ACTIVE (executing) project's own list: every ticket on it is already home. " +
+  "Grade each ungraded ticket WHERE IT SITS -- pass with home null (or not-needed); answer hold on a ticket already graded; never move, and never name an active project as home. " +
+  "A PARKED 0 or a no-fit names the paused/planned project (or new_project) it waits in.";
+
 // AGT-486: THE LIST TURN'S OWN VERDICT VOCABULARY, which is deliberately NOT `VERDICTS`. The two
 // above are what `apply_requirement_verdict()` enforces, and nothing about that writer changed: a
 // `no-fit` never reaches it. The third value exists only at the list grain, because only the list
@@ -332,9 +339,13 @@ const cut = (v, n) => (v === null || v === undefined ? null : String(v).slice(0,
 // The list task_context. The tickets' own columns and the candidates' own keys -- this file judges
 // nothing about either, it only decides how much of each travels.
 export function buildListContext({ project, epics, tickets, candidates, kinds, charters, fingerprint, rescore,
-  parked_homes }) {
+  parked_homes, executing }) {
   return {
     list: project ?? null,
+    // AGT-613: whether the list IS a running project's. `false` is the default reading, so a context
+    // assembled without it is a waiting list exactly as before; the note travels only when true.
+    list_executing: executing === true,
+    ...(executing === true ? { list_note: LIST_EXECUTING_NOTE } : {}),
     epics: Array.isArray(epics) ? [...epics] : [],
     // AGT-490: WHERE A PARKED TICKET MAY WAIT -- the paused and planned projects, as
     // `victoria_parked_homes()` returned them. The other half of the board from `active_charters`,
@@ -420,6 +431,8 @@ export function validateListVerdict(answer, ctx) {
   const list = blank(body.list) ? null : String(body.list);
   const label = list ?? "<the list>";
   const no = (who, msg) => refusals.push(`${who}: ${msg}`);
+  // AGT-613: a running project's own list -- every ticket on it is already home (V9).
+  const executingList = body.list_executing === true;
 
   const want = new Map();
   for (const p of Array.isArray(body.proposals) ? body.proposals : []) {
@@ -577,7 +590,9 @@ export function validateListVerdict(answer, ctx) {
     // V6/V7. A BLOCKER GOES WHERE ITS PARENT IS (requirements d.11). It may not be sent elsewhere,
     //     and it may not be held back or stamped no-fit either -- `effective_need_score()` already
     //     lifts its score, and leaving it behind is the thing d.11 names.
-    if (parentHome !== null) {
+    //     AGT-613: not on a running project's own list -- the ticket is already in a running project
+    //     and is not leaving it (V9), so "go where your parent is" has nothing to send.
+    if (parentHome !== null && !executingList) {
       if ((row.verdict === "pass" || row.verdict === "move") && home !== parentHome) {
         no(id, `blocks a parent in ${parentHome}; its home is ${parentHome}`);
       }
@@ -593,6 +608,26 @@ export function validateListVerdict(answer, ctx) {
         (row.verdict === "move" || (row.verdict === "pass" && home !== null && row.need_score !== 0))) {
       no(id, "was filed more than 14 days ago and no validation stands on it; it is validated first " +
         "(AGT-493) -- answer hold, or pass with home null");
+    }
+
+    // V9. AGT-613 (John, decision 087d79ae): ON A RUNNING PROJECT'S OWN LIST SHE GRADES IN PLACE.
+    //     The ticket is already home, so a `move` is refused, and so is a placement home (a home on
+    //     any answer that is not a park) -- the grade is a `pass` with home null. A park still names
+    //     where it waits (P2-P5 below), and a `no-fit` MUST: a stamp alone leaves the ticket ungraded
+    //     inside a running project, which the pick refuses forever (AGT-608/609/610's stall).
+    if (executingList) {
+      if (row.verdict === "move") {
+        no(id, `is on ${label}, an active project's own list -- it is already home; grade it where ` +
+          "it sits: answer pass with home null (AGT-613)");
+      } else if (!parking && home !== null) {
+        no(id, `is on ${label}, an active project's own list -- it is already home, so it names no ` +
+          `home (${JSON.stringify(home)}); answer pass with home null (AGT-613)`);
+      }
+      if (row.verdict === "no-fit" && home === null && newProject === null) {
+        no(id, `is on ${label}, an active project's own list; a no-fit there names the paused or ` +
+          "planned project (home) or new_project it waits in, or a stamp leaves it ungraded inside a " +
+          "running project (AGT-613)");
+      }
     }
 
     // AGT-490, P1-P5: THE PARKED ANSWER. A 0 says "this is real and it waits"; the half that was
@@ -1066,6 +1101,10 @@ async function prepareList(args) {
   // AGT-431: a re-score run holds NOTHING back. The one reason a graded ticket under 3 is not
   // offered is that it must not be re-graded (d.13) -- and John's ruling reopened exactly that, so
   // under `--rescore` the filter would hold back the very tickets the run exists to score.
+  // AGT-613: whether this list IS a running project's own -- carried on the context (V9). The offer
+  // below is unchanged: a graded 3+ ticket there is still offered and is answered `hold` (V9 refuses
+  // a move), so AGT-487's tooling pair and AGT-431's re-score read the list exactly as before.
+  const executing = proj.status === "executing";
   const offered = rescore ? tickets : tickets.filter(t => !t.needs_validation && (!t.graded || Number(t.need_score) >= 3 || t.parent_home !== null));
   const unvalidated = tickets.filter(t => t.needs_validation).length;
   console.error(`requirement-check: ${unvalidated} ticket(s) filed more than 14 days ago hold no standing validation and are not offered -- node scripts/ticket-validation.js --prepare --list=${project}`);
@@ -1140,12 +1179,13 @@ async function prepareList(args) {
 
   const task_context = buildListContext({
     project, epics: epicIds, tickets, candidates, kinds, charters, fingerprint,
-    parked_homes: parkedHomes, rescore,
+    parked_homes: parkedHomes, rescore, executing,
   });
   await assembleAndEmit({
     base, key, args, task_context, intentSlug: LIST_INTENT,
     head: {
-      list: project, epics: epicIds.length, tickets: tickets.length, candidates: candidates.length,
+      list: project, list_executing: executing,
+      epics: epicIds.length, tickets: tickets.length, candidates: candidates.length,
       charters: charters.length, charter_fingerprint: fingerprint, dropped,
       // AGT-490: how many places a parked ticket may be sent to wait.
       parked_homes: parkedHomes.length,

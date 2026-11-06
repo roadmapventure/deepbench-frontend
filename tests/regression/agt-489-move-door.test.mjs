@@ -1,3 +1,4 @@
+// DeepBench v7.0.971 | tests/regression/agt-489-move-door.test.mjs | AGT-613 -- arm E (offline): V9, an executing project's own list is graded in place -- a move or a placement home is refused there and accepted on a waiting list, a bare no-fit there must name where it waits, parks and P5 unchanged, and the context carries `list_executing` / `list_note`.
 // DeepBench v7.0.870 | tests/regression/agt-489-move-door.test.mjs | AGT-493 -- arm C's `expected` now subtracts what `needs_validation()` names: a ticket filed more than 14 days ago with no standing validation is not offered to the list turn at all (d.30), so a re-derivation that did not subtract them would read the new, correct behaviour as a defect.
 // DeepBench v7.0.865 | tests/regression/agt-489-move-door.test.mjs | AGT-489 -- THE MOVE DOOR.
 //
@@ -54,7 +55,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { buildListContext, validateListVerdict, LIST_VERDICTS, MOVE_KIND }
+import { buildListContext, validateListVerdict, LIST_VERDICTS, MOVE_KIND, LIST_EXECUTING_NOTE }
   from "../../scripts/requirement-check.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -225,6 +226,80 @@ function armOffline() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Arm E -- OFFLINE. AGT-613 V9: on a RUNNING project's own list she grades in place. Every refusal
+// is paired with the SAME answer accepted on a waiting list, so a rule that refused homes everywhere
+// would fail the pair, and a reverted V9 fails the refusal.
+// ---------------------------------------------------------------------------------------------
+
+function armExecutingList() {
+  const U = "ZAGTMVE-1";   // ungraded
+  const G = "ZAGTMVE-2";   // graded 4 -- offered on an executing list too, and answered hold there
+  const P = "ZAGTMVE-3";   // ungraded, a parent in another active project lifts it
+  const J = "ZAGTMVE-4";   // ungraded, john-named
+  const PARKED = "zagt613-parked";
+  const tickets = [
+    { backlog_id: U, title: "U", description: "d", status: "open", graded: false },
+    { backlog_id: G, title: "G", description: "d", status: "open", graded: true, need_score: 4 },
+    { backlog_id: P, title: "P", description: "d", status: "open", graded: false, parent_home: HOME },
+    { backlog_id: J, title: "J", description: "d", status: "open", graded: false, scope_origin: "john-named" },
+  ];
+  const base = {
+    project: PARENT_SLUG, epics: [], tickets,
+    candidates: [{ key: NSRC, head: "h" }], kinds: ["nathan:market_records"],
+    charters: [{ slug: PARENT_SLUG, charter: "t" }, { slug: HOME, charter: "g" }],
+    fingerprint: "0".repeat(32),
+    parked_homes: [{ slug: PARKED, name: "Parked", status: "paused" }],
+  };
+  const live = buildListContext({ ...base, executing: true });
+  const waiting = buildListContext(base);
+
+  assert.equal(live.list_executing, true, "an executing list's context says so");
+  assert.equal(live.list_note, LIST_EXECUTING_NOTE, "and carries the one note, verbatim");
+  assert.equal(waiting.list_executing, false, "a waiting list's context reads false by default");
+  assert.equal("list_note" in waiting, false, "and carries no note");
+
+  const pass = (id, extra) => ({ backlog_id: id, verdict: "pass", home: null, need_source: NSRC, need_score: 3, reason: "r", ...extra });
+  const hold = id => ({ backlog_id: id, verdict: "hold", home: null, need_source: null, need_score: null, reason: "r" });
+  const okRows = [pass(U), hold(G), pass(P), pass(J)];
+  const run = (ctx, rows) => validateListVerdict({ list: PARENT_SLUG, account: "Ruled four tickets", rows }, ctx);
+  // On a WAITING list P must still go where its parent is (V6), so the waiting-list twin of each
+  // answer differs from the executing one in that row only.
+  const okWaiting = okRows.map(r => (r.backlog_id === P ? pass(P, { home: HOME }) : r));
+  const swap = (id, row, rows = okRows) => rows.map(r => (r.backlog_id === id ? row : r));
+  const swapW = (id, row) => swap(id, row, okWaiting);
+  const accept = (ctx, rows, label) => {
+    const v = run(ctx, rows);
+    assert.deepEqual(v.refusals, [], `${label} must be ACCEPTED; got ${v.refusals.join(" | ")}`);
+  };
+  const refuse = (ctx, rows, id, re, label) => {
+    const v = run(ctx, rows);
+    assert.equal(v.ok, false, `${label} must be refused; it was accepted`);
+    assert.ok(v.refusals.some(r => r.startsWith(`${id}: `) && re.test(r)),
+      `${label} must refuse ${id} with ${re}; got ${v.refusals.join(" | ") || "(none)"}`);
+  };
+  const V9 = /an active project's own list -- it is already home/;
+
+  // Graded in place: a pass with home null, and V6 does not drag P to its parent's project.
+  accept(live, okRows, "every ungraded ticket passed with home null on an executing list");
+  // V9 -- a placement home on an executing list, while the SAME row is fine on a waiting list.
+  refuse(live, swap(U, pass(U, { home: HOME })), U, V9, "V9 pass naming an active home");
+  accept(waiting, swapW(U, pass(U, { home: HOME })), "the same pass+home on a WAITING list");
+  // V9 -- a move of a graded ticket (V3 cannot catch it: it IS graded).
+  const moveG = { backlog_id: G, verdict: "move", home: HOME, need_source: null, need_score: null, reason: "r" };
+  refuse(live, swap(G, moveG), G, V9, "V9 move on an executing list");
+  accept(waiting, swapW(G, moveG), "the same move on a WAITING list");
+  // V9 -- a no-fit there must name where it waits; with a parked home it is accepted.
+  const noFit = { backlog_id: U, verdict: "no-fit", home: null, need_source: null, need_score: null, reason: "r" };
+  refuse(live, swap(U, noFit), U, /a no-fit there names the paused or planned project/, "V9 bare no-fit");
+  accept(waiting, swapW(U, noFit), "the same bare no-fit on a WAITING list");
+  accept(live, swap(U, { ...noFit, home: PARKED }), "a no-fit naming its parked home on an executing list");
+  // Parks are unchanged: a PARKED 0 may still wait in a paused project; John's ticket still may not (P5).
+  const park = id => pass(id, { need_score: 0, home: PARKED, reason: "PARKED (0) until the parked project runs" });
+  accept(live, swap(U, park(U)), "a PARKED 0 naming a paused home on an executing list");
+  refuse(live, swap(J, park(J)), J, /is a ticket John named; it is never moved/, "P5 on an executing list");
+}
+
+// ---------------------------------------------------------------------------------------------
 // run
 // ---------------------------------------------------------------------------------------------
 
@@ -239,6 +314,7 @@ async function run() {
   };
 
   await arm("B the validator's V1-V7 (offline)", async () => { armOffline(); });
+  await arm("E AGT-613 V9 -- an executing list is graded in place (offline)", async () => { armExecutingList(); });
 
   if (!url || !key) {
     notRun("AGT-489 arms A, C and D",

@@ -1,3 +1,4 @@
+// DeepBench v7.0.971 | tests/regression/agt-485-victoria-daily-check.test.mjs | AGT-613 -- arm D pins step 2's grade-in-place rule and the verdict's 3-arg signature; arm A drives the third arm `ungraded_in_active` (after the two old ones); arm B checks `detail.ungraded_active` is `victoria_intake_lists()`'s executing rows; arm F re-derives those rows from the raw board; arm G drives `victoria_active_probe()` (un-grade one ticket of a running project, rolled back) so arm 3 is proven wired on a board that holds none.
 // DeepBench v7.0.860 | tests/regression/agt-485-victoria-daily-check.test.mjs | AGT-485 -- the ONE
 // DAILY CHECK: John's ten has a single home and a single daily reader, and this guard drives that
 // home at nine and at ten and recomputes the reader's second arm from the raw board.
@@ -115,13 +116,28 @@ async function run() {
   assert.ok(/SKIPPED: at floor/.test(block) && /SKIPPED: weekly meter/.test(block),
     "the block must carry both stop lines verbatim -- `SKIPPED: weekly meter <all_models_pct>% (<reason>)` "
     + "(d.38, step 0) and `SKIPPED: at floor` (step 1). A stop with no line written is a run nobody can audit.");
+  // AGT-613 (John, decision 087d79ae): she grades in the active projects too -- IN PLACE. The block
+  // must send her to the active projects victoria_intake_lists() returns and forbid a move there; the
+  // v7.0.948 wording that kept her out of them must be gone, and the verdict is named by its 3-arg
+  // signature (the 2-arg overload is dropped).
+  assert.ok(block.includes("public.victoria_daily_verdict(jsonb, integer, integer)"),
+    "the block must name the verdict as public.victoria_daily_verdict(jsonb, integer, integer) -- AGT-613 dropped the 2-arg overload.");
+  assert.ok(!block.includes("never the active projects themselves"),
+    "the block still says the lists are 'never the active projects themselves' -- AGT-613 sends her to every "
+    + "active project victoria_intake_lists() returns, to grade its ungraded tickets in place.");
+  assert.ok(/AND any active project public\.victoria_intake_lists\(\) returns/.test(block)
+    && /grade each ungraded ticket WHERE IT SITS: a pass with NO home, never a move/.test(block),
+    "step 2 must say the lists include the active projects victoria_intake_lists() returns, and that on an "
+    + "active project's list she grades each ungraded ticket where it sits -- a pass with NO home, never a move (AGT-613).");
+  assert.ok(/never move a ticket into a paused or planned project/.test(block),
+    "the NEVER line must keep 'never move a ticket into a paused or planned project'.");
   results.push("runbook-block-has-both-markers-once-no-trigger-id-no-model-id-names-both-rpcs");
 
   const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   if (!base || !key) {
-    notRun("arms A, B, C and E (the verdict at nine and ten, the reader's one row, the re-derived "
-      + "fives, and E's probe that stamps one five and demands the sensor drop it)",
+    notRun("arms A, B, C, E, F and G (the verdict at nine and ten and its third arm, the reader's one row, the re-derived "
+      + "fives, E's probe that stamps one five and demands the sensor drop it, F's executing rows of the intake lists and G's probe that un-grades one ticket of a running project)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent -- the check is a pair of database functions and "
       + "there is nothing to read without them. Arm D (the runbook) ran. Run: node "
       + "--env-file-if-exists=.env.local tests/regression/agt-485-victoria-daily-check.test.mjs");
@@ -179,6 +195,24 @@ async function run() {
   assert.deepStrictEqual([v.prompt, v.reason], [true, "project_below_floor"],
     `one project at ten and one at nine must still prompt -- ANY project under the floor is the `
     + `reason, not the average, got ${JSON.stringify(v)}.`);
+  // AGT-613: the THIRD arm -- an ungraded ticket in a running project prompts, but only AFTER the two
+  // old arms, which keep their priority and wording. Ten countable, no five, one ungraded-in-active
+  // must prompt `ungraded_in_active`; zero must stay silent (the pair is the discriminator).
+  const verdict3 = async (counts, fives, ungraded) => one(await rpc("victoria_daily_verdict",
+    { p_counts: counts, p_fives: fives, p_ungraded_active: ungraded }));
+  v = await verdict3([{ slug: "a", countable: 10 }], 0, 1);
+  assert.deepStrictEqual([v.prompt, v.reason], [true, "ungraded_in_active"],
+    `ten countable, no loose five and ONE ungraded ticket in an active project must prompt with `
+    + `ungraded_in_active, got ${JSON.stringify(v)} (AGT-613, decision 087d79ae).`);
+  v = await verdict3([{ slug: "a", countable: 10 }], 0, 0);
+  assert.deepStrictEqual([v.prompt, v.reason], [false, "at_floor"],
+    `and with none it must stay silent, got ${JSON.stringify(v)}.`);
+  v = await verdict3([{ slug: "a", countable: 9 }], 1, 1);
+  assert.deepStrictEqual([v.prompt, v.reason], [true, "project_below_floor"],
+    `the floor keeps first priority over both later arms, got ${JSON.stringify(v)}.`);
+  v = await verdict3([{ slug: "a", countable: 10 }], 1, 1);
+  assert.deepStrictEqual([v.prompt, v.reason], [true, "five_outside_projects"],
+    `the loose five keeps second priority over arm 3, got ${JSON.stringify(v)}.`);
   results.push("verdict-prompts-at-nine-is-silent-at-ten-and-names-the-arm-that-answered");
 
   // --- B: the reader's one row, and its counts are the sensor's own ------------------------------
@@ -198,8 +232,17 @@ async function run() {
     `detail.below must be exactly the projects under ten, in the sensor's order -- got `
     + `${JSON.stringify(detail.below)} against ${JSON.stringify(sensor.map(s => `${s.project_slug}:${s.countable}`))}.`);
 
+  // AGT-613: arm 3's count is victoria_intake_lists()'s EXECUTING rows -- the predicate's one home --
+  // summed, never a second copy of the rule.
+  const lists = await rpc("victoria_intake_lists");
+  const execSlugs = new Set((await get("projects?status=eq.executing&select=slug")).map(p => p.slug));
+  const activeSum = lists.filter(l => execSlugs.has(l.slug)).reduce((n, l) => n + l.ungraded, 0);
+  assert.strictEqual(detail.ungraded_active, activeSum,
+    `detail.ungraded_active reads ${detail.ungraded_active}, victoria_intake_lists()'s executing rows sum to `
+    + `${activeSum} -- arm 3 must read that function, not restate it (AGT-613).`);
   const expectedReason = sensor.some(s => s.countable < 10) ? "project_below_floor"
-    : (detail.fives > 0 ? "five_outside_projects" : "at_floor");
+    : (detail.fives > 0 ? "five_outside_projects"
+      : (detail.ungraded_active > 0 ? "ungraded_in_active" : "at_floor"));
   assert.strictEqual(row.reason, expectedReason,
     `the reader answered ${row.reason} over counts ${JSON.stringify(sensor.map(s => s.countable))} and `
     + `${detail.fives} loose five(s) -- the verdict's own arms say ${expectedReason}.`);
@@ -331,6 +374,57 @@ async function run() {
   }
   results.push("probe-stamp-on-one-five-drops-it-and-leaves-no-residue");
 
+  // --- F: AN EXECUTING PROJECT'S ROW OF victoria_intake_lists(), re-derived from the raw board ------
+  // AGT-613: an executing project is listed iff it holds open/partial tickets with NO unreversed
+  // `requirement-check` row and no live fit-stamp, and then waiting = ungraded = that count.
+  const execEpicRows = executing.length
+    ? await get(`epics?project_id=in.(${executing.map(p => p.id).join(",")})&select=id,project_id&limit=2000`) : [];
+  const slugOfProject = new Map(executing.map(p => [p.id, p.slug]));
+  const slugOfEpic = new Map(execEpicRows.map(e => [e.id, slugOfProject.get(e.project_id)]));
+  const handBySlug = {};
+  for (const b of open) {
+    if (!slugOfEpic.has(b.epic_id) || stamped.has(b.backlog_id)) continue;
+    const g = await get(`runner_decisions?kind=eq.requirement-check&backlog_id=eq.${b.backlog_id}`
+      + "&reversed_at=is.null&limit=1&select=id");
+    if (g.length > 0) continue;
+    const s = slugOfEpic.get(b.epic_id);
+    handBySlug[s] = (handBySlug[s] ?? 0) + 1;
+  }
+  const fnBySlug = {};
+  for (const l of lists.filter(l => execSlugs.has(l.slug))) {
+    assert.strictEqual(l.waiting, l.ungraded,
+      `victoria_intake_lists() lists executing project ${l.slug} with waiting ${l.waiting} but ungraded `
+      + `${l.ungraded} -- on a running project only UNGRADED tickets wait (a graded one is already home).`);
+    fnBySlug[l.slug] = l.ungraded;
+  }
+  assert.deepStrictEqual(fnBySlug, handBySlug,
+    `victoria_intake_lists()'s executing rows ${JSON.stringify(fnBySlug)} disagree with the hand count `
+    + `${JSON.stringify(handBySlug)} of ungraded, unstamped open/partial tickets in executing projects (AGT-613).`);
+  results.push("intake-lists-executing-rows-match-the-raw-board");
+
+  // --- G: ARM 3's OWN DISCRIMINATOR -- un-grade one ticket of a running project, rolled back ------
+  // Today's board holds no ungraded ticket in an executing project, so arms B and F would agree just
+  // as loudly with functions that never learned arm 3. `victoria_active_probe()` sets reversed_at on
+  // one graded ticket's standing grades inside a P0613 sub-block, re-reads both readers, rolls back,
+  // and reports the residue read AFTER the sentinel (AGT-516's probe form).
+  const ap = await rpc("victoria_active_probe");
+  if (ap.skipped) {
+    console.log(`         AGT-613 probe SKIPPED: ${ap.skipped}`);
+  } else {
+    assert.strictEqual(ap.residue, 0,
+      `victoria_active_probe() left ${ap.id}'s grades changed (residue ${ap.residue}) -- its sentinel did not `
+      + `roll the un-grade back. Probe: ${JSON.stringify(ap)}`);
+    assert.strictEqual(ap.after, ap.before + 1,
+      `un-grading ${ap.id} (in ${ap.slug}) must raise detail.ungraded_active by one; it read ${ap.before} -> `
+      + `${ap.after}. Arm 3 is not reading victoria_intake_lists()'s executing rows. Probe: ${JSON.stringify(ap)}`);
+    assert.strictEqual(ap.list_after, ap.list_before + 1,
+      `un-grading ${ap.id} must add it to ${ap.slug}'s row of victoria_intake_lists(); it read `
+      + `${ap.list_before} -> ${ap.list_after}. Probe: ${JSON.stringify(ap)}`);
+    console.log(`         AGT-613 probe: un-graded ${ap.id} in ${ap.slug} -> ungraded_active ${ap.before} became `
+      + `${ap.after}, list ${ap.list_before} -> ${ap.list_after}, reason ${ap.reason_after}, residue ${ap.residue}`);
+  }
+  results.push("probe-ungrade-in-a-running-project-raises-arm-3-and-leaves-no-residue");
+
   // --- the anon denial, declared ------------------------------------------------------------------
   const anon = process.env.SUPABASE_ANON_KEY ?? "";
   if (!anon) {
@@ -342,7 +436,7 @@ async function run() {
       + "gate's RAISE rolls the whole migration back otherwise -- so a committed migration is that "
       + "assert passing. Run with the anon key present to drive it from outside the database.");
   } else {
-    for (const fn of ["victoria_daily_check", "victoria_daily_verdict"]) {
+    for (const fn of ["victoria_daily_check", "victoria_daily_verdict", "victoria_active_probe"]) {
       const r = await fetch(`${base}/rest/v1/rpc/${fn}`, {
         method: "POST",
         headers: { apikey: anon, Authorization: `Bearer ${anon}`, "Content-Type": "application/json" },
