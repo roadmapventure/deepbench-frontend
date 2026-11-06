@@ -1,3 +1,4 @@
+// DeepBench v7.0.973 | tests/regression/agt-489-move-door.test.mjs | AGT-615 -- arm F (offline): listOffer(), a running project's list offers only ungraded tickets; waiting lists and --rescore unchanged.
 // DeepBench v7.0.971 | tests/regression/agt-489-move-door.test.mjs | AGT-613 -- arm E (offline): V9, an executing project's own list is graded in place -- a move or a placement home is refused there and accepted on a waiting list, a bare no-fit there must name where it waits, parks and P5 unchanged, and the context carries `list_executing` / `list_note`.
 // DeepBench v7.0.870 | tests/regression/agt-489-move-door.test.mjs | AGT-493 -- arm C's `expected` now subtracts what `needs_validation()` names: a ticket filed more than 14 days ago with no standing validation is not offered to the list turn at all (d.30), so a re-derivation that did not subtract them would read the new, correct behaviour as a defect.
 // DeepBench v7.0.865 | tests/regression/agt-489-move-door.test.mjs | AGT-489 -- THE MOVE DOOR.
@@ -55,7 +56,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { buildListContext, validateListVerdict, LIST_VERDICTS, MOVE_KIND, LIST_EXECUTING_NOTE }
+import { buildListContext, validateListVerdict, LIST_VERDICTS, MOVE_KIND, LIST_EXECUTING_NOTE, listOffer }
   from "../../scripts/requirement-check.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -300,6 +301,32 @@ function armExecutingList() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// F. AGT-615 -- what a list turn is OFFERED (offline). A running project's list offers only its
+//    ungraded, validated tickets; a waiting list keeps graded 3+ (to move) and parent-lifted ones;
+//    --rescore offers everything. Each branch has a row that only that branch decides.
+// ---------------------------------------------------------------------------------------------
+
+function armListOffer() {
+  const T = [
+    { backlog_id: "U",  graded: false },                                  // ungraded
+    { backlog_id: "G4", graded: true, need_score: 4, parent_home: null }, // graded 3+
+    { backlog_id: "G2", graded: true, need_score: 2, parent_home: null }, // graded under 3
+    { backlog_id: "GP", graded: true, need_score: 1, parent_home: "x" },  // graded, parent lifts
+    { backlog_id: "UV", graded: false, needs_validation: true },          // ungraded, unvalidated
+  ];
+  const ids = rows => rows.map(r => r.backlog_id).join(",");
+  assert.equal(ids(listOffer(T, { executing: true })), "U",
+    "a running project's list offers ONLY its ungraded, validated tickets -- a graded one is already home");
+  assert.equal(ids(listOffer(T, { executing: false })), "U,G4,GP",
+    "a waiting list is unchanged: ungraded, graded 3+ (to move) and parent-lifted; never under-3 or unvalidated");
+  assert.equal(ids(listOffer(T, { rescore: true, executing: true })), "U,G4,G2,GP,UV",
+    "--rescore offers every ticket, running list or not (AGT-431)");
+  assert.equal(ids(listOffer(T)), "U,G4,GP", "the default is a waiting list");
+  assert.ok(!/hold/.test(LIST_EXECUTING_NOTE),
+    "the running-list note no longer tells her to answer hold -- no graded ticket is offered there");
+}
+
+// ---------------------------------------------------------------------------------------------
 // run
 // ---------------------------------------------------------------------------------------------
 
@@ -315,6 +342,7 @@ async function run() {
 
   await arm("B the validator's V1-V7 (offline)", async () => { armOffline(); });
   await arm("E AGT-613 V9 -- an executing list is graded in place (offline)", async () => { armExecutingList(); });
+  await arm("F AGT-615 -- a running project's list offers only ungraded tickets (offline)", async () => { armListOffer(); });
 
   if (!url || !key) {
     notRun("AGT-489 arms A, C and D",

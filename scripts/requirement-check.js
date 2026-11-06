@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.973 | scripts/requirement-check.js | AGT-615 -- A RUNNING PROJECT'S LIST OFFERS ONLY UNGRADED TICKETS. John 2026-11-06 (decision 58934bfb): "why would victoria grade a ticket already graded? that was supposed to already be in her list of not to do". `listOffer()` (pure, exported) is the whole offer rule: `--rescore` offers every ticket (AGT-431); an executing project's list offers only ungraded tickets with a standing validation (a graded one is already home -- no move, no re-grade -- so a turn on it bought only a `hold`; tooling offered 29 for 1-3 ungraded); a waiting list is unchanged. `LIST_EXECUTING_NOTE` drops its `hold` clause.
 // DeepBench v7.0.971 | scripts/requirement-check.js | AGT-613 -- A RUNNING PROJECT'S LIST IS GRADED IN PLACE. John's rule (decision 087d79ae, 2026-11-06): she grades in the active projects too, not only in the staging area. `prepareList()` reads the list project's `status` and the context carries `list_executing` (plus `list_note`, the constant `LIST_EXECUTING_NOTE`, only when true); the OFFER is unchanged (a graded 3+ ticket there is still offered and answered `hold`), so AGT-487 and AGT-431 read the list as before. `validateListVerdict()` V9: on an executing project's list a `move` is refused and a placement `home` (any answer that is not a park) is refused -- the ticket is already home, so a grade is a `pass` with home null; a `no-fit` must name where it waits (a parked home or a new project), because a stamp alone would leave it ungraded inside a running project, which is the stall AGT-608/609/610 sat in. V6's parent-home rule does not apply on such a list (the ticket is not leaving). Parks (P1-P5) are unchanged, so a 0 may still be parked out of a running project as `RESCORE_NOTE` already says.
 // DeepBench v7.0.937 | scripts/requirement-check.js | AGT-431 -- THE RE-SCORE DOOR, AND THE ORDER JOHN JUDGES. `--prepare-list --rescore` is a MODE of the list door, not a second one (pattern:17): John's ruling `e9b5bfc5` reopened every grade on the executing projects, which is requirement d.13's own reopening condition, so the mode offers every open/partial ticket (nothing held back for carrying a grade) and hands each proposal `graded: false` plus `rescore_note` -- `validateListVerdict()`'s V2 then accepts the `pass` the run exists to collect and V3 still refuses a `move` on it. NOT ONE OF HER ROWS IS TOUCHED: `grade_standing()` still names every one of them and only this one context reads false. `--rescore-report --cycle-id=<uuid>` is the second half: it re-reads the two executing projects' open/partial tickets, their standing grades and `prime_directive_queue()`'s own order, and puts the PICK'S ORDER to John as ONE yes/no `runner_questions` row (`RESCORE_QID`), its creation imaged in `runner_before_images` BEFORE the row exists so one Reverse can take it away. Live before this: all 21 open/partial tickets of `tooling` (16) and `dev-manager-capabilities` (5) were graded, `--prepare-list` offered 12 of 16 on tooling (4 held back) and `validateListVerdict()` refused a `pass` on every one of them as `already graded` (2026-11-03). pattern:10, pattern:17, pattern:152.
 // DeepBench v7.0.870 | scripts/requirement-check.js | AGT-493 -- A TICKET FILED MORE THAN 14 DAYS AGO IS NOT OFFERED UNTIL A VALIDATION STANDS. prepareList() reads needs_validation() once per list and drops what it names (the architect's validate-ticket door runs first: scripts/ticket-validation.js); each proposal carries needs_validation; V8 refuses a move or a homing pass on it. Live before this: 77 + 13 graded tickets older than 14 days in the two holding lists, every one placeable by a move (2026-10-20). d.8, d.30; pattern:9, pattern:10, pattern:17.
@@ -282,8 +283,20 @@ export const AWAITING_LIST_ANSWER =
 
 // AGT-613: what the list turn is told when the list IS a running project's (`list_executing`). One
 // string, read by the context and nowhere else restated (pattern:93), in the shape of RESCORE_NOTE.
+// AGT-615: which tickets a list turn is OFFERED. Pure, so the rule is graded offline.
+//   --rescore           -> every ticket (AGT-431: John's ruling reopened the grades).
+//   a running project   -> only UNGRADED tickets with a standing validation: a graded ticket there is
+//                          already home, so no answer on it is useful (no move, no re-grade).
+//   a waiting list      -> ungraded, or graded 3+ (to be moved), or lifted by a parent (AGT-489/493).
+export function listOffer(tickets, { rescore = false, executing = false } = {}) {
+  const all = Array.isArray(tickets) ? tickets : [];
+  if (rescore) return all;
+  if (executing) return all.filter(t => !t.needs_validation && !t.graded);
+  return all.filter(t => !t.needs_validation && (!t.graded || Number(t.need_score) >= 3 || t.parent_home !== null));
+}
+
 export const LIST_EXECUTING_NOTE = "This list is an ACTIVE (executing) project's own list: every ticket on it is already home. " +
-  "Grade each ungraded ticket WHERE IT SITS -- pass with home null (or not-needed); answer hold on a ticket already graded; never move, and never name an active project as home. " +
+  "Every ticket offered here is ungraded: grade each WHERE IT SITS -- pass with home null (or not-needed); never move, and never name an active project as home. " +
   "A PARKED 0 or a no-fit names the paused/planned project (or new_project) it waits in.";
 
 // AGT-486: THE LIST TURN'S OWN VERDICT VOCABULARY, which is deliberately NOT `VERDICTS`. The two
@@ -1104,18 +1117,25 @@ async function prepareList(args) {
   // AGT-613: whether this list IS a running project's own -- carried on the context (V9). The offer
   // below is unchanged: a graded 3+ ticket there is still offered and is answered `hold` (V9 refuses
   // a move), so AGT-487's tooling pair and AGT-431's re-score read the list exactly as before.
+  // AGT-615 (John 2026-11-06, "why would victoria grade a ticket already graded?"): on a running
+  // project's own list a graded ticket is already home -- nothing to move, nothing to re-grade -- so
+  // it is NOT offered. `listOffer()` holds the whole rule; `--rescore` still offers every ticket.
   const executing = proj.status === "executing";
-  const offered = rescore ? tickets : tickets.filter(t => !t.needs_validation && (!t.graded || Number(t.need_score) >= 3 || t.parent_home !== null));
+  const offered = listOffer(tickets, { rescore, executing });
   const unvalidated = tickets.filter(t => t.needs_validation).length;
   console.error(`requirement-check: ${unvalidated} ticket(s) filed more than 14 days ago hold no standing validation and are not offered -- node scripts/ticket-validation.js --prepare --list=${project}`);
   const heldBack = tickets.length - offered.length;
   tickets = offered;
-  console.error(`requirement-check: ${heldBack} graded ticket(s) under 3 held back (no re-grade, or ` +
-    "no validation standing; offered again when the grade reopens)");
+  console.error(executing && !rescore
+    ? `requirement-check: ${heldBack} ticket(s) held back on this running project's list (already graded -- home -- or no validation standing)`
+    : `requirement-check: ${heldBack} graded ticket(s) under 3 held back (no re-grade, or ` +
+      "no validation standing; offered again when the grade reopens)");
   if (tickets.length === 0) {
-    die(1, `requirement-check: every ticket left on ${project} is graded, scores under 3 and no ` +
-      "parent lifts it — there is nothing a turn could answer, and a description change, John " +
-      "reversing a grade or a new blocker offers them again");
+    die(1, executing && !rescore
+      ? `requirement-check: every ticket on running project ${project} is already graded (or awaits validation) — nothing to grade here`
+      : `requirement-check: every ticket left on ${project} is graded, scores under 3 and no ` +
+        "parent lifts it — there is nothing a turn could answer, and a description change, John " +
+        "reversing a grade or a new blocker offers them again");
   }
 
   // 4. The candidates, from the allowlist that is DATA (pattern:2). An allowlisted pair this file has

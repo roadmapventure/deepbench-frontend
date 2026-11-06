@@ -1,3 +1,4 @@
+// DeepBench v7.0.973 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-615 -- arm A prepares tooling with --rescore: a running project's default list now offers only ungraded tickets.
 // DeepBench v7.0.961 | tests/regression/agt-487-held-source-echo.test.mjs | AGT-564 -- ARM A
 // FINDS ITS PAIR instead of naming it, and arm B's live half grades the pair arm A measured.
 // AGT-304 went `removal proposed` 2026-11-03 and is off the tooling list, so the two named ids
@@ -204,7 +205,10 @@ async function run() {
   } else {
     // ---- A. THE DOOR, over the live board --------------------------------------------------------
     await arm(`A --prepare-list ${LIST}: the held source travels on its own proposal`, async () => {
-      const prep = node(CLI, ["--prepare-list", `--project=${LIST}`, "--json"]);
+      // AGT-615: tooling is a RUNNING project, whose default list now offers only ungraded tickets --
+      // usually none. `--rescore` offers every ticket and changes nothing about the head this arm
+      // grades, so the pair is still found on the full list.
+      const prep = node(CLI, ["--prepare-list", `--project=${LIST}`, "--rescore", "--json"]);
       assert.equal(prep.status, 3,
         `--prepare-list must exit 3 (awaiting her ONE answer); got ${prep.status} stderr=${String(prep.stderr).slice(0, 800)}`);
       const prepared = JSON.parse(prep.stdout);
@@ -331,21 +335,13 @@ async function run() {
     if (liveCtx) {
       // The ids arm A MEASURED, not the two constants: arm A fills its seats from the live list
       // (pattern:162), so the live half of this arm grades the pair arm A actually found.
+      // AGT-615: arm A now prepares with --rescore (tooling is a running project, whose default list
+      // offers only ungraded tickets), and a re-score hands every proposal `graded: false` (AGT-431),
+      // so V2's "already graded" refusal cannot fire on this context. That refusal is graded offline
+      // in agt-489 arm B; here the live context is asserted to carry the re-score shape instead.
       const heldLive = liveCtx.proposals.find(p => p.backlog_id === liveHeldId);
-      assert.equal(heldLive?.graded, true,
-        `${liveHeldId} holds a standing grade (AGT-489); got ${JSON.stringify(heldLive?.graded)}`);
-      const asHanded = validateListVerdict({
-        list: liveCtx.list, account: "Ruled both tickets on the source each already carries",
-        rows: [liveHeldId, liveCtrlId].map(id => ({
-          backlog_id: id, verdict: "pass", need_score: 5,
-          need_source: id === liveHeldId ? liveHeld : liveCtrl,
-          reason: "echoes the source the ticket already carries",
-        })),
-      }, liveCtx);
-      assert.equal(asHanded.ok, false, "as handed, a pass on a graded ticket is refused (AGT-489 V2)");
-      assert.ok(asHanded.refusals.some(r => r.startsWith(`${liveHeldId}:`) && /is already graded/.test(r)),
-        `refused by V2's sentence, naming ${liveHeldId}; got ${JSON.stringify(asHanded.refusals)}`);
-      console.log(`    [AGT-487 arm B] live context: a pass on the graded ${liveHeldId} is refused as handed (is already graded, AGT-489 V2)`);
+      assert.equal(heldLive?.graded, false,
+        `under --rescore ${liveHeldId} travels graded:false (AGT-431); got ${JSON.stringify(heldLive?.graded)}`);
       const lifted = { ...liveCtx, proposals: liveCtx.proposals.map(p => ({ ...p, graded: false })) };
       for (const line of gradeHeldEcho({
         ctx: lifted, heldKey: liveHeld, otherCandidateKey: liveCtrl,
