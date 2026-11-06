@@ -1,3 +1,4 @@
+// DeepBench v7.0.966 | tests/regression/agt-451-pre-build-baseline.test.mjs | AGT-572 -- arms G, H
 // DeepBench v7.0.843 | tests/regression/agt-451-pre-build-baseline.test.mjs | AGT-451
 //
 // FEATURE: AGT-451 -- the baseline is measured credentialed, over the kickoff's own declared files,
@@ -28,6 +29,11 @@
 //   E  --check-kickoff both ways: no flag -> 0 + a NOT GRADED note; a missing file -> 1
 //      `kickoff-baseline-uncredentialed`; the measured file -> 0 + the note that names its count.
 //   F  the homes: the runbook, the generated card, session-setup and render-cycle-card.js.
+//   G  (AGT-572) a kickoff declaring NO file measures the FULL suite, in the header and the count.
+//      CONTROL: the two-file kickoff still measures its related set and says nothing about EMPTY.
+//   H  (AGT-572) the gate grades that measurement: relatedFallback()/regressionArgv() pure, then the
+//      verifier spawned three ways -- an EMPTY --related= is a verdict, NO --related= is graded
+//      against the full suite, and an UNREADABLE --related= is still exit 2.
 //
 // BASELINE: RED on the unchanged tree -- scripts/pre-build-baseline.js does not exist,
 // verifier.js exports no UNCREDENTIALED_BASELINE_RE, and none of arm F's needles are in the docs.
@@ -96,9 +102,27 @@ function fixtureTree(tag) {
   put(fx, "tests/regression/red.test.mjs",
     'import "node:assert";\nconst P = "x.js";\nconsole.log("[FAIL] red.test.mjs -- boom");\nprocess.exit(1);\n');
   put(fx, "tests/regression/green.test.mjs", 'const P = "x.js";\nprocess.exit(0);\n');
+  // AGT-572 arm G/H: RED, and deliberately NAMING NOTHING -- no "x.js" anywhere, so
+  // scripts/related-tests.js never relates it to the two-file kickoff. It is therefore in
+  // suiteTests(fx) and NOT in k.md's related set, which is the whole difference the two arms grade:
+  // a related baseline cannot answer for it, and a full-suite baseline can.
+  put(fx, "tests/regression/named.test.mjs",
+    'console.log("[FAIL] named.test.mjs -- boom");\nprocess.exit(1);\n');
   put(fx, "tests/regression/run-all.js", "");
   put(fx, "k.md", kickoffFixture(STRIPPED_CLAUSE));
   put(fx, "k-credentialed.md", kickoffFixture("credentialed"));
+  // AGT-572: a ZERO-FILE kickoff -- a docs/Supabase-only ticket. No backticked path, no bare
+  // tests/regression mention and no anchors block, so declaredFiles() returns [] and the related set
+  // is empty by construction rather than by accident.
+  put(fx, "k-zero.md", [
+    "- **Lanes:** session `orchestrator`; executor none.",
+    "",
+    "Supabase writes only.",
+    "",
+    "BASELINE (credentialed):",
+    "Red set: 0 of 0",
+    "",
+  ].join("\n"));
   return fx;
 }
 
@@ -325,6 +349,138 @@ async function armF() {
   }
 }
 
+// ---- G: AGT-572 -- a kickoff that declares NO file measures the FULL suite -------------------
+//
+// THE DEFECT, in one sentence: `Red set: 0 of 0` is not a baseline. A docs-only or Supabase-only
+// ticket declares no file, so the related set is empty, so until v7.0.966 the measured block covered
+// ZERO tests -- and `named.test.mjs` below is the test such a block cannot answer for. The widest
+// honest measurement of a delivery that declared nothing is the whole suite, and that is what the
+// header must say and the count must show.
+async function armG() {
+  const fx = fixtureTree("zero");
+  const out = path.join(fx, "out.txt");
+  const ctl = path.join(fx, "ctl.txt");
+  try {
+    const m = await import(path.join(ROOT, "scripts/verifier.js"));
+    const r = node([SCRIPT, `--kickoff=${path.join(fx, "k-zero.md")}`, `--out=${out}`, `--root=${fx}`],
+      credentialedEnv());
+    assert.strictEqual(r.code, 0,
+      `a zero-file kickoff still MEASURES -- it reports, it does not gate; got ${r.code}: ${r.out}`);
+    const block = lf(fs.readFileSync(out, "utf8"));
+    assert.ok(block.includes("0 declared files is EMPTY, so the full suite of 3 tests is the baseline (AGT-572)"),
+      `the header must SAY the related set was empty and name the width measured instead, or a reader `
+      + `cannot tell a full-suite baseline from a related one: ${block.split("\n")[0]}`);
+    assert.ok(block.includes("Red set: 2 of 3"),
+      `the full suite is 3 tests holding 2 reds; "Red set: 0 of 0" was the old answer and it covered `
+      + `no test at all: ${block}`);
+
+    // It must read back, under the gate's OWN reader, as a baseline over the whole suite.
+    const read = m.readRegressionBaseline(out);
+    assert.deepStrictEqual(read.names, ["named.test.mjs", "red.test.mjs"],
+      `both reds must be NAMED, including the one no related set would have reached: ${JSON.stringify(read.names)}`);
+    assert.deepStrictEqual(read.measured, ["green.test.mjs", "named.test.mjs", "red.test.mjs"],
+      `measured is what the baseline RAN, and it is what baselineCoverageFinding() grades the width `
+      + `against: ${JSON.stringify(read.measured)}`);
+    assert.deepStrictEqual(read.measured, m.suiteTests(fx),
+      "the measured set must BE suiteTests() -- one predicate for the suite, not two lists that agree today");
+
+    // CONTROL: the two-file kickoff is untouched. A change that widened EVERY measurement to the
+    // full suite would pass every assertion above and quietly retire AGT-391's selective run.
+    const control = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${ctl}`, `--root=${fx}`],
+      credentialedEnv());
+    assert.strictEqual(control.code, 0, control.out);
+    const cblock = lf(fs.readFileSync(ctl, "utf8"));
+    assert.ok(cblock.includes("Red set: 1 of 2"),
+      `control: a kickoff that DOES declare files still measures only its related set: ${cblock}`);
+    assert.ok(!cblock.includes("named.test.mjs"),
+      `control: the unrelated test must stay out of a related measurement: ${cblock}`);
+    assert.ok(!cblock.includes("is EMPTY"),
+      `control: the EMPTY clause must be absent when the set is not empty: ${cblock}`);
+  } finally {
+    fs.rmSync(fx, { recursive: true, force: true });
+  }
+}
+
+// ---- H: AGT-572 -- the GATE grades the set the baseline measured --------------------------------
+//
+// G proves the measurement. This proves the other half, which is the half that was a cannot-run:
+// every runbook path hands `--related=` unconditionally, so a zero-file delivery handed an EMPTY csv
+// and the verifier exited 2 `related-unreadable` before it had even read the baseline. Three spawned
+// calls, because the three widths fail in three different directions and only one of them is new.
+async function armH() {
+  const fx = fixtureTree("graded");
+  const F = path.join(fx, "pre-build.txt");
+  const EMPTY = path.join(fx, "empty.csv");
+  try {
+    const m = await import(path.join(ROOT, "scripts/verifier.js"));
+
+    // PURE first -- the judgment, gradeable with no tree, no child and no credential.
+    const fell = m.relatedFallback({ names: null, reason: "r", empty: true },
+      { measured: null }, { measured: ["k.test.mjs"] });
+    assert.deepStrictEqual(fell.names, ["k.test.mjs"],
+      `an EMPTY csv grades the first baseline that MEASURED something, skipping the one that measured `
+      + `nothing: ${JSON.stringify(fell)}`);
+    assert.ok(String(fell.fallback).includes("AGT-572"),
+      `the widening must be SAYABLE on the row -- a silent one is indistinguishable from the csv `
+      + `having named those tests: ${fell.fallback}`);
+    // CONTROL: no `empty` flag is an UNREADABLE path, and nothing is known about what it would have
+    // named. Widening that is the silent fall-back readRelatedSet()'s header refuses.
+    assert.strictEqual(m.relatedFallback({ names: null, reason: "r" }, { measured: ["k.test.mjs"] }).names, null,
+      "control: an unreadable --related= must NEVER widen -- only a csv that was read and named nothing");
+    assert.deepStrictEqual(m.regressionArgv("/r.csv", ["a.test.mjs"]),
+      [...m.GATES.find(g => g.key === "regression").argv, "--only=a.test.mjs"],
+      "the resolved names run as --only= -- --only-from= would re-read the same empty csv and run nothing");
+
+    // The measurement the three calls are graded against: k.md's related set, so it measures
+    // green + red and NOT named.test.mjs.
+    const made = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${F}`, `--root=${fx}`],
+      credentialedEnv());
+    assert.strictEqual(made.code, 0, made.out);
+    assert.deepStrictEqual(m.readRegressionBaseline(F).measured, ["green.test.mjs", "red.test.mjs"],
+      "the fixture baseline must measure exactly the two related tests for H2's uncovered name to mean anything");
+
+    fs.writeFileSync(EMPTY, "");
+    const V = (extra, json = true) => node([VERIFIER, "--dry-run", ...(json ? ["--json"] : []),
+      `--repo=${fx}`, `--pre-build-baseline=${F}`, ...extra], offlineEnv());
+    const payload = r => {
+      const line = r.stdout.trim().split("\n").filter(Boolean).pop();
+      try { return JSON.parse(line); } catch { assert.fail(`--json printed no payload: ${r.out}`); }
+    };
+
+    // H1: an EMPTY --related= is a VERDICT, where it used to be exit 2 before any gate ran.
+    const h1 = V([`--related=${EMPTY}`]);
+    assert.notStrictEqual(h1.code, 2,
+      `an EMPTY --related= must reach a verdict, not a cannot-run: ${h1.out}`);
+    const p1 = payload(h1);
+    assert.ok(p1.verdict, `the run must PRODUCE a verdict: ${JSON.stringify(p1)}`);
+    assert.strictEqual(p1.recorded, false, "--dry-run records nothing (pattern:76)");
+    assert.ok(String(p1.reasoning).includes("AGT-572"),
+      `the reasoning must name the width it graded and why -- the command says --related= and the run `
+      + `graded something else: ${p1.reasoning}`);
+
+    // H2: NO --related= means the gate runs the WHOLE suite, so a related baseline is too narrow.
+    // This is the call that used to be NOT GRADED on the coverage half -- the one dangerous width.
+    const h2 = V([]);
+    assert.strictEqual(h2.code, 2,
+      `a 2-test baseline against a full-suite run must be a cannot-run, never a block: ${h2.out}`);
+    const p2 = payload(h2);
+    assert.strictEqual(p2.error, "baseline-narrower-than-graded-set");
+    assert.deepStrictEqual(p2.uncovered, ["named.test.mjs"],
+      `the refusal must NAME the test nobody measured: ${JSON.stringify(p2.uncovered)}`);
+    const h2prose = V([], false);
+    assert.ok(h2prose.out.includes("No --related= was passed"),
+      `the prose must say WHY the graded width is the full suite: ${h2prose.out}`);
+
+    // H3: an UNREADABLE --related= is still exit 2. The refusal moved under the baseline read; it
+    // was not softened, and this is the arm that would catch it if it had been.
+    const h3 = V([`--related=${path.join(fx, "nope.csv")}`]);
+    assert.strictEqual(h3.code, 2, `a missing --related= file must still refuse: ${h3.out}`);
+    assert.strictEqual(payload(h3).error, "related-unreadable");
+  } finally {
+    fs.rmSync(fx, { recursive: true, force: true });
+  }
+}
+
 const ARMS = {
   "a-declared-files": armA,
   "b-refuses-uncredentialed": armB,
@@ -332,6 +488,8 @@ const ARMS = {
   "d-the-delta": armD,
   "e-check-kickoff": armE,
   "f-the-homes": armF,
+  "g-empty-set-is-full-suite": armG,
+  "h-zero-file-graded": armH,
 };
 
 export async function run() {

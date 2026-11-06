@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.966 | scripts/verifier.js | AGT-572 -- a zero-file delivery is graded by its baseline's measured set
 // DeepBench v7.0.874 | scripts/verifier.js | AGT-457 -- one instrument, one baseline, one refusal: `measuredTestsFrom()` harvests the per-test `- <path> — green|RED|NOT RUN` lines `renderBlock()` already writes, so `readKickoffBaseline()` and `readRegressionBaseline()` now return `measured` (what the baseline ACTUALLY ran) and `instrument` (which script measured it) beside `names`; `regressionDelta()` gains a THIRD bucket, `neverMeasured` -- a post name the baseline never measured is no longer charged as newly red and the suite's own exit code stands; `baselineCoverageFinding()` refuses a baseline narrower than the set being graded (exit 1 `kickoff-baseline-narrower` at `--check-kickoff`, exit 2 `baseline-narrower-than-graded-set` at 7a) or one measured by an instrument outside `BASELINE_INSTRUMENTS`; and a PRESENT-but-unparseable block is exit 1 `kickoff-baseline-unparseable` (`present: true`), while a kickoff with NO block keeps AGT-391's escape untouched.
 // DeepBench v7.0.843 | scripts/verifier.js | AGT-451 -- an uncredentialed BASELINE block is refused, not graded: `UNCREDENTIALED_BASELINE_RE` on the `BASELINE (` paragraph makes `readKickoffBaseline()` return `uncredentialed: true` with `names: null`, `baselineGate()` refuses it BEFORE AGT-391's related-set escape, `--pre-build-baseline=<file>` (the cycle's own credentialed measurement, `scripts/pre-build-baseline.js`) sits between `--regression-baseline=` and the block in the precedence, and step 6's `--check-kickoff` arms with the flag -- exit 1 `kickoff-baseline-uncredentialed` when the file is no baseline, a `baseline_note` saying NOT GRADED when no flag was handed.
 // DeepBench v7.0.793 | scripts/verifier.js | AGT-391 -- selective regression. `--related=<file>` (the
@@ -548,6 +549,11 @@ import { shipCardFinding } from "./render-claude-state.js";
 // entry-point guarded, so importing it runs nothing and writes nothing.
 import { ledgerOrphansIn, readDownsCapturedBy } from "./rollback-on-red.js";
 import { withTestSlot } from "./test-slot.js";
+// AGT-572: ONE definition of "a test file in tests/regression" (pattern:14). `suiteTests()`
+// below answers "the whole suite" with the same predicate `scripts/related-tests.js` uses to
+// answer "the related set", so a full-suite baseline and a related one cannot disagree about
+// which files are even candidates. related-tests.js imports nothing from here, so there is no cycle.
+import { isTestFile } from "./related-tests.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1359,14 +1365,53 @@ export function readRelatedSet(p, readFile = (f) => fs.readFileSync(f, "utf8")) 
   try { text = readFile(p); }
   catch (e) { return { names: null, reason: `--related=${p} could not be read (${e.message})` }; }
   const names = [...new Set(String(text).split(/[,\r\n]+/).map(s => s.trim()).filter(Boolean).map(s => path.basename(s)))];
-  if (!names.length) return { names: null, reason: `--related=${p} names no test` };
+  // AGT-572: `empty: true` distinguishes "the csv was READ and named nothing" from "the csv could
+  // not be read at all". Only the first can fall back to the baseline's measured set -- an
+  // unreadable path is an absent input, and nothing is known about what it would have said.
+  if (!names.length) return { names: null, empty: true, reason: `--related=${p} names no test` };
   return { names, reason: null };
+}
+
+// AGT-572. The whole suite, by name, read off the tree -- the widest honest answer to "which tests
+// could this delivery break" when the delivery declared no file at all. `isTestFile` is
+// related-tests.js's own predicate, so this list and a related set are drawn from one candidate pool.
+export function suiteTests(root) {
+  return fs.readdirSync(path.join(root, "tests/regression")).filter(isTestFile).sort();
+}
+
+// AGT-572. Pure. An EMPTY `--related=` csv grades the set the baseline in force actually MEASURED,
+// else the read is returned unchanged.
+//
+// WHY THIS IS NOT A FALL-BACK TO THE FULL SUITE. `readRelatedSet()`'s own header gives the rule a
+// silent widening breaks: an empty set "would run nothing and a silent fall-back to the full suite is
+// not what the caller asked for". Both halves of that still hold -- what changes is that there is now
+// a third answer which is neither. A zero-file delivery's baseline (scripts/pre-build-baseline.js,
+// AGT-572) measures the FULL suite, and grading exactly the tests that baseline measured is the only
+// width for which every red has a measurement behind it. Wider and `baselineCoverageFinding()` refuses
+// it; narrower and the gate grades less than it was given.
+//
+// FIRST BASELINE THAT MEASURED ANYTHING WINS, in the caller's own precedence order (the pre-build
+// file, then the kickoff's block), so one measurement decides the width and the grade.
+// `empty !== true` -- an unreadable path -- is never widened: nothing is known about what it named.
+export function relatedFallback(relatedRead, ...baselines) {
+  if (!relatedRead || relatedRead.names !== null || relatedRead.empty !== true) return relatedRead;
+  for (const b of baselines) {
+    if (b && Array.isArray(b.measured) && b.measured.length) {
+      return { names: [...b.measured], reason: null, empty: true,
+        fallback: `--related= names no test, so the gate grades the ${b.measured.length} tests the baseline measured (AGT-572)` };
+    }
+  }
+  return { ...relatedRead, reason: `${relatedRead.reason}; no baseline measured any test to fall back to` };
 }
 
 // The regression gate's argv for this run. GATES itself is never edited: with a related set the loop
 // spawns `{ ...gate, argv: regressionArgv(p) }`, so the frozen entry still says what a full run is.
-export function regressionArgv(p) {
+export function regressionArgv(p, names = null) {
   const base = [...GATES.find(g => g.key === "regression").argv];
+  // AGT-572: an EMPTY `--related=` file cannot be handed to `--only-from=` -- run-all.js would read
+  // the same empty csv and run nothing. The names the fallback resolved go as `--only=` instead, so
+  // the suite runs exactly the set the gate is about to grade.
+  if (Array.isArray(names) && names.length) return [...base, `--only=${names.join(",")}`];
   return p ? [...base, `--only-from=${path.resolve(p)}`] : base;
 }
 
@@ -3633,15 +3678,10 @@ async function main() {
     try { kickoffText = fs.readFileSync(path.resolve(repoRoot, kickoffPath), "utf8"); }
     catch { kickoffText = null; }
   }
-  let relatedRead = null;
-  if (relatedPath) {
-    relatedRead = readRelatedSet(relatedPath);
-    if (relatedRead.names === null) {
-      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "related-unreadable", related: relatedPath },
-        prose: `verifier: RELATED SET UNREADABLE (${relatedRead.reason}). Exiting 2 and recording NOTHING -- no gate ran (AGT-391).\n`
-          + `  Re-measure it: node scripts/related-tests.js --files-from=<the delivery's files> > <file>, then pass --related=<file>.` });
-    }
-  }
+  // AGT-572: READ HERE, REFUSED BELOW -- the refusal moved down, it did not soften. The read must
+  // happen before the baseline so `baselineGate()` still sees the related set, but an empty csv can
+  // only be answered once the baseline in force is known, so the exit 2 now sits under it.
+  let relatedRead = relatedPath ? readRelatedSet(relatedPath) : null;
   // AGT-451: THREE SOURCES, ONE PRECEDENCE -- `--regression-baseline=`, then
   // `--pre-build-baseline=`, then the kickoff's block. The explicit full-suite capture still wins (an
   // operator naming a file is the most specific instruction there is). The cycle-measured file comes
@@ -3654,6 +3694,27 @@ async function main() {
     : preBuildBaselinePath
       ? readRegressionBaseline(preBuildBaselinePath)
       : kickoffText !== null ? readKickoffBaseline(kickoffText) : readRegressionBaseline("");
+  // ---- AGT-572: A ZERO-FILE DELIVERY IS GRADED BY THE SET ITS BASELINE MEASURED. --------------
+  //
+  // THE HOLE THIS CLOSES, measured. `scripts/pre-build-baseline.js` used to write `Red set: 0 of 0`
+  // whenever the kickoff declared no file -- a docs-only or Supabase-only ticket -- and every runbook
+  // path hands `--related=` unconditionally, so the csv it was handed was empty too. This branch then
+  // exited 2 `related-unreadable` BEFORE the baseline was even read, which is a cannot-run: the one
+  // class of delivery that declares nothing could not be graded at all. AGT-572 measures the full
+  // suite in that case, and grading the set that measurement covers is what makes the grade real.
+  //
+  // THE EXIT 2 IS NOT WEAKENED -- it is reached whenever the fallback finds no measurement to stand
+  // on, and an UNREADABLE `--related=` (as opposed to an empty one) never reaches the fallback at all.
+  if (relatedRead && relatedRead.names === null) {
+    relatedRead = relatedFallback(relatedRead, baselineRead, kickoffText !== null ? readKickoffBaseline(kickoffText) : null);
+    if (relatedRead.names === null) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "related-unreadable", related: relatedPath },
+        prose: `verifier: RELATED SET UNREADABLE (${relatedRead.reason}). Exiting 2 and recording NOTHING -- no gate ran (AGT-391).\n`
+          + `  Re-measure it: node scripts/related-tests.js --files-from=<the delivery's files> > <file>, then pass --related=<file>.\n`
+          + `  An EMPTY csv grades the baseline's measured set (AGT-572); none here.` });
+    }
+  }
+
   const baselineDecision = baselineGate({ read: baselineRead, declared: noBaselineDeclared, related: relatedRead?.names ?? null });
   if (baselineDecision.refuse) {
     return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "no-regression-baseline",
@@ -3687,9 +3748,15 @@ async function main() {
   // with, which is a cannot-run, not a verdict about the delivery. Reaching the gate anyway would
   // spend the suite's full run to produce a grade whose newly-red list cannot be trusted, which is
   // the state cycle `a50537cc` shipped AGT-494's block on.
+  // AGT-572: NO `--related=` MEANS THE GATE GRADES THE WHOLE SUITE, SO THAT IS THE WIDTH THE
+  // BASELINE IS MEASURED AGAINST. `graded: null` was NOT GRADED on this half, which made the one
+  // genuinely dangerous call -- a narrow baseline against a full-suite run -- the only call nothing
+  // checked (`runner_verdicts` 2375cc65 blocked on a 1-name baseline). With no related set `GATES`
+  // runs `tests/regression/run-all.js` bare, so the graded set IS `suiteTests(repoRoot)`, and a
+  // baseline narrower than it is exit 2 -- a cannot-run, never a block charged to the delivery.
   const coverage = baselineCoverageFinding({
     measured: baselineRead.measured,
-    graded: relatedRead?.names ?? null,
+    graded: relatedRead?.names ?? (Array.isArray(baselineRead.measured) ? suiteTests(repoRoot) : null),
     instrument: baselineRead.instrument,
   });
   if (coverage) {
@@ -3698,7 +3765,8 @@ async function main() {
         regression_baseline_source: baselineRead.source, related: relatedPath },
       prose: `verifier: ${coverage.reason}\n`
         + `  Exiting 2 and recording NOTHING -- no gate ran, no row was written, and this is NOT a verdict (AGT-457).\n`
-        + `  ${coverage.remedy}` });
+        + `  ${coverage.remedy}`
+        + (relatedPath ? "" : `\n  No --related= was passed: the graded width is the FULL suite (${suiteTests(repoRoot).length} tests, AGT-572).`) });
   }
 
   const gateResults = {};
@@ -3710,7 +3778,8 @@ async function main() {
     if (gate.key === "regression") {
       const slotEnv = cycleId ? { ...process.env, DEEPBENCH_CYCLE_ID: cycleId } : process.env;
       // AGT-391: the related set, when named, through a copy -- GATES stays the full-suite definition.
-      const asRun = relatedPath ? { ...gate, argv: regressionArgv(relatedPath) } : gate;
+      // AGT-572: on the fallback path the csv is empty, so the resolved names go as `--only=`.
+      const asRun = relatedPath ? { ...gate, argv: regressionArgv(relatedPath, relatedRead?.fallback ? relatedRead.names : null) } : gate;
       const taken = await withTestSlot(slotEnv, () =>
         runGate(asRun, repoRoot, { ...process.env, DEEPBENCH_TEST_SLOT: "held" }));
       r = taken.ran ? taken.value : { status: "red", fails: null, detail: taken.notRun };
@@ -3774,6 +3843,11 @@ async function main() {
   // AGT-245: APPENDED, never replaced -- the same one-direction discipline the kickoff findings below
   // use for their prepend. The red gate that was already the reason stays the reason; what this adds is
   // the fact that the regression half was graded without a baseline, on a named declaration.
+  // AGT-572: APPENDED FIRST, same one-direction discipline. A verdict reached on the fallback width
+  // must SAY so on the row -- a reader who finds `--related=` in the command and a different set in
+  // the run has no other way to learn which width was graded or why.
+  if (relatedRead?.fallback) reasoning += ` ${relatedRead.fallback}.`;
+
   if (baselineDecision.declared) {
     reasoning += ` Baseline omitted by declaration: ${baselineDecision.declared} (AGT-245).`;
   }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.966 | scripts/pre-build-baseline.js | AGT-572 -- an EMPTY related set measures the FULL suite
 // DeepBench v7.0.843 | scripts/pre-build-baseline.js | AGT-451 -- the baseline is measured
 // credentialed, over the kickoff's own declared files, BEFORE the Builder is spawned.
 //
@@ -55,7 +56,7 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { relatedTests } from "./related-tests.js";
-import { anchorBlockLines } from "./verifier.js";
+import { anchorBlockLines, suiteTests } from "./verifier.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -123,10 +124,12 @@ export function notRunLine(block) {
 }
 
 // Pure. The whole block, from the pieces above, so the format can be asserted without a child.
-export function renderOut({ block, sha7, iso, cycleId, declaredCount }) {
+export function renderOut({ block, sha7, iso, cycleId, declaredCount, full = false, suiteCount = 0 }) {
   const lines = [
     `BASELINE (cycle-measured, credentialed, scripts/pre-build-baseline.js, tree ${sha7}, ${iso}, `
-      + `cycle ${cycleId || "-"}; related set over ${declaredCount} declared files):`,
+      + `cycle ${cycleId || "-"}; related set over ${declaredCount} declared files`
+      + (full ? ` is EMPTY, so the full suite of ${suiteCount} tests is the baseline (AGT-572)` : "")
+      + `):`,
     block,
   ];
   const fails = failLines(block);
@@ -191,10 +194,21 @@ function main(argv) {
   try { set = relatedTests({ root, touched: declared, include }); }
   catch (e) { return fail(`the related set could not be measured over ${root} (${e.message}). Nothing was written.`); }
 
-  // AN EMPTY SET IS A MEASUREMENT, AND IT STILL GETS A BLOCK. `baseline-red-set.js` refuses an empty
-  // `--tests=` (correctly -- a measurement of nothing is not what its caller asked for), so the
-  // empty case is rendered here rather than spawned. `Red set: 0 of 0` is the honest block: the
-  // declared files break no test in this tree, so every red the Builder's run reports IS its own.
+  // AGT-572: AN EMPTY RELATED SET MEASURES THE FULL SUITE, AND THIS REPLACES `Red set: 0 of 0`.
+  // Until v7.0.966 an empty set rendered `Red set: 0 of 0` and called that honest -- "the declared
+  // files break no test in this tree, so every red the Builder's run reports IS its own." It is the
+  // opposite: a zero-file delivery (a docs/Supabase-only ticket) declares nothing, so NOTHING was
+  // measured, and `0 of 0` is a baseline that covers no test the gate will ever grade. The widest
+  // honest measurement of a delivery that could touch anything is the whole suite, so that is what
+  // is measured. There is no knob (§4 call (1)): a set that is empty by construction is the one
+  // case where narrowing cannot be justified by what the kickoff declared.
+  //
+  // `baseline-red-set.js` still refuses an empty `--tests=` (correctly -- a measurement of nothing
+  // is not what its caller asked for), so the branch below only renders a block without spawning
+  // when the TREE itself holds no test at all.
+  const full = !set.length;
+  if (full) set = suiteTests(root);
+
   let block;
   if (!set.length) {
     block = "Red set: 0 of 0";
@@ -225,6 +239,8 @@ function main(argv) {
     iso: new Date().toISOString(),
     cycleId,
     declaredCount: declared.length,
+    full,
+    suiteCount: full ? set.length : 0,
   });
 
   try { fs.writeFileSync(path.resolve(out), rendered, "utf8"); }
