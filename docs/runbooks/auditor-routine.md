@@ -148,7 +148,7 @@ Called by `docs/runbooks/runner-cycle.md` step 9 **(7e)**, never by steps 0-7: O
 ```
 node scripts/audit-run-review.js --prepare --cycle-id=<the cycle id> --out=$S/run.json; echo "prepare exit $?"
 ```
-Exit 3 → say so and stop. Exit 0 → the prepare has already filed `public.audit_flow_checks()` (ships not closed, a verdict gate red for days, wasted cycles, filing outpacing closing) as `auditor:flow:<the cycle id>` findings through the one intake, and the file carries `{service, flow, cycle, items, verdicts, ci, filings, prior}` — the reviewer reads the open service findings and the flow before the record (`AGT-239`):
+Exit 3 → nothing of THIS cycle to review; do *The unreviewed ones* below. Exit 0 → the prepare has already filed `public.audit_flow_checks()` (ships not closed, a verdict gate red for days, wasted cycles, filing outpacing closing) as `auditor:flow:<the cycle id>` findings through the one intake, and the file carries `{service, flow, cycle, items, verdicts, ci, filings, prior}` — the reviewer reads the open service findings and the flow before the record (`AGT-239`):
 ```
 node scripts/agent-prompt.js --agent=auditor --capability=audit-run-review --task-file=$S/run.json > $S/run-review.prompt.md
 node scripts/agent-prompt.js --agent=auditor --capability=audit-run-review --task-file=$S/run.json --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).llm.model))'
@@ -159,6 +159,8 @@ node scripts/agent-log.js --agent=auditor --capability=audit-run-review --model=
 node scripts/audit-run-review.js --ingest=$S/run-review.json --cycle-id=<the cycle id> --apply
 ```
 (An attended run passes `--session-name=<N>` INSTEAD of `--cycle-id`; never both — `runner_before_images.ck_before_image_attribution` refuses it and the script exits 2 before it reads anything. Every filed row carries `found_by auditor:run-review:<the cycle id>` and the finding's own `finding_type`, defaulting to `defect`; the append is `audit-ledger.js`'s one intake, before-image first.)
+
+**The unreviewed ones (`AGT-593`).** Every prepare (exit 0 or 3) ends with `audit-run-review: unreviewed this week: <n> (<k> listed, cap 3) -- <ids>`: closed reviewable cycles of this ISO week, not this one, with neither a `RUN-REVIEW STAMP` note nor an `auditor:run-review:<id>` row — a chained continuation's closed cycle never reached (7e). Run this section again for each listed id as `--cycle-id`, prepare to `--apply`, which appends the stamp (cycle-note.js), findings or none, so no cycle is reviewed twice. n > k drains over later cycles; one still unstamped when its week ends stays unreviewed, and the missing stamp says so. A `--session-name` ingest stamps nothing.
 
 *Finish line* (`AGT-240`). A project's list locks when it starts; what is found meanwhile waits on the findings list (`listed`). When no ticket in a locked list is `open` or `partial` (`delivered` is built, AGT-291), the batch is finished and proposes the next project — asked after every reviewable run, and a weekly run may call the same block:
 ```

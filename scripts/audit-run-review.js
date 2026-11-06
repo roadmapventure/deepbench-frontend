@@ -1,4 +1,21 @@
 #!/usr/bin/env node
+// DeepBench v7.0.969 | scripts/audit-run-review.js | AGT-593 -- the week's unreviewed cycles; the stamp
+// FEATURE: AGT-593 -- (7e) REVIEWS THE ONE CYCLE IT IS HANDED, SO THE OTHERS WERE NEVER PICKED UP.
+// Measured live 2026-11-06 (tree 005ad22): of 51 closed reviewable cycles this ISO week, 41 carried
+// no `auditor:run-review:<id>` row at all -- a chained continuation's closed cycle is never the
+// `--cycle-id` any (7e) is given, so its record was never read. Two things change here, both
+// deterministic and neither a judgment (pattern:9):
+//   1. EVERY --prepare, exit 0 AND exit 3, ends with `unreviewedLine()` -- this week's closed
+//      reviewable cycles that are not this one and carry neither the stamp nor a run-review row,
+//      newest first, at most BACKLOG_LIMIT listed. Exit 3 is where it matters most: the cycle in
+//      hand had nothing to review and the routine used to simply stop.
+//   2. A reviewed row SAYS SO. `--ingest --apply --cycle-id` appends a `RUN-REVIEW STAMP:` note
+//      through scripts/cycle-note.js (the same PostgREST append and the same citation guard, never
+//      a second writer), findings or none. "No run-review row" is NOT the mark -- a clean review
+//      files nothing, so the absence of rows would re-offer a cycle forever (§19j). The stamp is
+//      the mark; a stamp that did not land is exit 2 with the rows already filed, and a re-run
+//      reads them `seen` and stamps.
+//
 // DeepBench v7.0.661 | scripts/audit-run-review.js | AGT-239
 // FEATURE: AGT-239 -- OUTCOMES FIRST. After the gate passes, --prepare asks public.audit_flow_checks()
 // for the four flow checks (ships not closed, a verdict gate red for days, wasted cycles, filing
@@ -50,22 +67,30 @@
 //   --cycle-id=<uuid>     The runner cycle under review. Required by --prepare.
 //   --out=<path>          Where --prepare writes its JSON. Required by --prepare.
 //   --ingest=<path>       The reviewer's answer ({cluster, findings, account}) to file.
-//   --apply               Actually append. Without it the ingest is a dry run that writes nothing.
+//   --apply               Actually append. Without it the ingest is a dry run that writes nothing,
+//                         and stamps nothing -- `run-review stamp: skipped`.
 //   --session-name=<name> An attended run's attribution, INSTEAD of --cycle-id. Never both:
 //                         runner_before_images.ck_before_image_attribution refuses both, so both
 //                         is refused here, before any read (audit-ledger.js attribution()).
+//                         A --session-name ingest stamps NO row: the stamp marks a runner_cycles
+//                         row, and an attended run has none (AGT-593).
 //
 // Exit codes:
-//   0  --prepare wrote the file; --ingest ran cleanly.
+//   0  --prepare wrote the file; --ingest ran cleanly (and, with --apply --cycle-id, stamped).
 //   2  could not run: a missing or non-uuid --cycle-id, --cycle-id together with --session-name,
-//      no credentials, an unreadable answer file, a non-2xx from PostgREST. NEVER a pass.
+//      no credentials, an unreadable answer file, a non-2xx from PostgREST. NEVER a pass. ALSO:
+//      the findings were filed but the `RUN-REVIEW STAMP` note did NOT land (AGT-593) -- the rows
+//      are already there, so the re-run reads them `seen` and only the stamp is retried.
 //   3  nothing to review: the cycle's outcome is `did_not_run`, or the row is still open
-//      (`outcome` NULL). Nothing is written and no model is called.
+//      (`outcome` NULL). Nothing is written and no model is called -- but the week's unreviewed
+//      cycles are still listed on the last line (AGT-593), because exit 3 is exactly when the
+//      routine used to stop with the other 40 unread.
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { ingestFindings, isoWeek } from "./audit-ledger.js";
+import { ingestFindings, isoWeek, isoWeekStart } from "./audit-ledger.js";
+import { cycleNote } from "./cycle-note.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,6 +98,61 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // `drain_chain_gate()`'s gate-A set plus `failed`. Exported because the runbook's (7e) states it in
 // prose and tests/regression/agt-137-run-review.test.mjs pins the prose against THIS array.
 export const REVIEWABLE = ["shipped", "gated_before_build", "reverted", "failed"];
+
+// AGT-593. At most three ids are listed per prepare -- the Finish line's "<= 3 passes" ceiling, so
+// one tail cannot turn into an unbounded queue of sub-agent reviews. n > k drains over later cycles.
+export const BACKLOG_LIMIT = 3;
+// The mark a reviewed row carries. NOT "has a run-review row": a clean review files nothing, so
+// absence of rows is not evidence of absence of review (§19j).
+export const STAMP = "RUN-REVIEW STAMP";
+
+// This ISO week's closed reviewable cycles that are NOT this one and have not been reviewed --
+// newest first, at most BACKLOG_LIMIT listed. Two reads and no judgment:
+//   1. runner_cycles, filtered server-side on the REVIEWABLE set, `ended_at` inside this ISO week,
+//      `id` not this cycle, and `notes` carrying no STAMP (a NULL notes column is unstamped too,
+//      which is why the `or=` names both limbs -- `notes.not.like` alone drops every NULL row).
+//   2. audit_findings, once, for the `auditor:run-review:<id>` found_by of exactly those ids. A
+//      cycle somebody reviewed before the stamp existed is named here and dropped, so the backlog
+//      does not re-offer the runs that WERE read.
+// The second read is skipped entirely when the first returns nothing usable -- an id-less row
+// cannot be reviewed and must never reach a `found_by=in.()` filter with an empty list.
+export async function unreviewedPredecessors(cycleId, get, now = new Date()) {
+  const q = encodeURIComponent;
+  const weekStart = isoWeekStart(now);
+  const rows = await get(`runner_cycles?select=id,outcome,ended_at`
+    + `&outcome=in.(${REVIEWABLE.join(",")})`
+    + `&id=neq.${cycleId}`
+    + `&ended_at=gte.${q(weekStart)}`
+    + `&or=(notes.is.null,notes.not.like.${q(`*${STAMP}*`)})`
+    + `&order=ended_at.desc`);
+  let open = (Array.isArray(rows) ? rows : [])
+    .map(r => String(r?.id ?? ""))
+    .filter(id => UUID.test(id));
+  if (open.length) {
+    const reviewed = await get(`audit_findings?select=found_by&found_by=in.`
+      + `(${q(open.map(i => `"auditor:run-review:${i}"`).join(","))})`);
+    const named = new Set((Array.isArray(reviewed) ? reviewed : []).map(r => String(r?.found_by ?? "")));
+    open = open.filter(id => !named.has(`auditor:run-review:${id}`));
+  }
+  return { weekStart, total: open.length, listed: open.slice(0, BACKLOG_LIMIT) };
+}
+
+// The last line of EVERY prepare. `total` is the whole week's open set; `listed` is what this
+// prepare hands the routine. Zero says so in words, so a silent line is never read as "none".
+export function unreviewedLine(u) {
+  const total = u?.total ?? 0;
+  const listed = u?.listed ?? [];
+  return `audit-run-review: unreviewed this week: `
+    + (total === 0
+      ? `0 -- nothing to pick up`
+      : `${total} (${listed.length} listed, cap ${BACKLOG_LIMIT}) -- ${listed.join(", ")}`);
+}
+
+// The note appended to the reviewed row. `0 findings, 0 written` is a real review and must read as
+// one -- that is the whole reason the stamp exists rather than a row count.
+export function stampNote(week, count, written) {
+  return `${STAMP}: ${count} findings, ${written} written, ${week}`;
+}
 
 export function arg(argv, name) {
   const hit = (argv ?? []).find(a => a === `--${name}` || a.startsWith(`--${name}=`));
@@ -203,10 +283,18 @@ export async function readSix(cycleId, cycle, get) {
 async function doPrepare({ cycleId, out }, get, rpc, post) {
   const rows = await get(`runner_cycles?id=eq.${cycleId}&select=outcome,last_step,started_at,notes`);
   const gate = reviewGate(Array.isArray(rows) ? rows[0] : null);
-  if (gate.code !== 0) {
-    if (gate.code === 3) console.log(`audit-run-review: nothing to review -- ${gate.reason}. No file written, no cost.`);
-    else console.error(`audit-run-review: ${gate.reason}`);
-    return gate.code;
+  // Exit 2 is a caller error -- the id names nothing, so there is no week's-worth of context to
+  // offer and nothing is read beyond the gate.
+  if (gate.code === 2) {
+    console.error(`audit-run-review: ${gate.reason}`);
+    return 2;
+  }
+  // AGT-593 -- read BEFORE the exit-3 return, because exit 3 is the path that used to stop silently.
+  const unreviewed = await unreviewedPredecessors(cycleId, get);
+  if (gate.code === 3) {
+    console.log(`audit-run-review: nothing to review -- ${gate.reason}. No file written, no cost.`);
+    console.log(unreviewedLine(unreviewed));
+    return 3;
   }
   const outcomes = await readOutcomes(cycleId, get, rpc, post);
   const six = await readSix(cycleId, rows[0], get);
@@ -218,10 +306,11 @@ async function doPrepare({ cycleId, out }, get, rpc, post) {
     + `${doc.service.length} open service, ${doc.flow.length} flow (${outcomes.filed.written} filed, `
     + `${outcomes.filed.summary.seen} seen), ${doc.items.length} items, ${doc.verdicts.length} verdicts, ${doc.ci.length} ci, `
     + `${doc.filings.length} filings, ${doc.prior.length} prior fingerprints`);
+  console.log(unreviewedLine(unreviewed));
   return 0;
 }
 
-async function doIngest({ ingest, apply, cycleId, sessionName }, get, post) {
+async function doIngest({ ingest, apply, cycleId, sessionName }, get, post, env = process.env) {
   let doc;
   try {
     doc = JSON.parse(fs.readFileSync(path.resolve(ROOT, ingest), "utf8"));
@@ -243,6 +332,20 @@ async function doIngest({ ingest, apply, cycleId, sessionName }, get, post) {
   });
   console.log(`run-review ingest ${week}: ${findings.length} findings, ${summary.new} new, `
     + `${summary.seen} seen, ${summary.recurring} recurring, ${summary.ruledOut} ruled-out, ${written} written`);
+  // AGT-593 -- THE ROW SAYS IT WAS REVIEWED. After the rows are filed, never before: a stamp on a
+  // row whose findings did not land would hide the cycle from the next prepare with nothing read.
+  // The append is cycle-note.js's, so the citation guard still grades it and a refusal is a
+  // non-zero code here, never a silent success. A dry run and a --session-name run stamp nothing.
+  if (apply && cycleId) {
+    const s = await cycleNote([`--cycle=${cycleId}`, `--note=${stampNote(week, findings.length, written)}`], env);
+    console.log(`run-review stamp: ${s.message}`);
+    if (s.code !== 0) {
+      console.error(`audit-run-review: the row was NOT stamped -- re-run this --ingest (rows re-read as seen)`);
+      return 2;
+    }
+  } else {
+    console.log(`run-review stamp: skipped`);
+  }
   return 0;
 }
 
@@ -259,7 +362,7 @@ export async function run(argv, env = process.env) {
   }
   const { get, post, rpc } = restTransports(c.base, c.key);
   try {
-    return args.mode === "prepare" ? await doPrepare(args, get, rpc, post) : await doIngest(args, get, post);
+    return args.mode === "prepare" ? await doPrepare(args, get, rpc, post) : await doIngest(args, get, post, env);
   } catch (e) {
     console.error(`audit-run-review: ${e.message}`);
     return 2;

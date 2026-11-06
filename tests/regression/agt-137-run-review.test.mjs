@@ -1,3 +1,13 @@
+// DeepBench v7.0.969 | tests/regression/agt-137-run-review.test.mjs | AGT-593 -- arms B, E
+// AGT-593 -- (7e) now ends every prepare with the week's unreviewed cycles, and a reviewed row is
+// stamped. Arm B grows from 8 calls to 10 (the backlog's two reads) and gains the stamp PATCH:
+// exactly one, on THIS cycle's row, carrying `RUN-REVIEW STAMP: 2 findings, 2 written`. NEW arm E
+// drives unreviewedPredecessors() both directions -- the found_by read must SUBTRACT (PRE(2) is
+// already reviewed and must not be listed) and the cap must HOLD (4 open, 3 listed); the exit-3
+// prepare must still print the line, since that is the path that used to stop silently; and the
+// stamp must be load-bearing -- 0 rows back from its read is exit 2 with no PATCH, and a dry run
+// stamps nothing. Kickoff: docs/kickoffs/v7.0.969-AGT-593-unreviewed-cycles-picked-up.md §5.
+//
 // DeepBench v7.0.661 | tests/regression/agt-137-run-review.test.mjs | AGT-239 -- arm B retargeted:
 // --prepare now writes EIGHT keys (service and flow lead) from EIGHT calls -- the six reads, the
 // rpc/audit_flow_checks read and the open-service read. With the stub's flow list empty nothing is
@@ -17,7 +27,7 @@
 // John pushes become rows while notifications are off. Kickoff:
 // docs/kickoffs/v7.0.601-AGT-137-run-review-and-push-removal.md §6.
 //
-// FOUR ARMS, each discriminating, and only D needs credentials:
+// FIVE ARMS, each discriminating, and only D needs credentials:
 //   A  PURE -- REVIEWABLE is exactly drain_chain_gate()'s gate-A set plus `failed`; `did_not_run`
 //      and an OPEN row (outcome NULL) are exit 3 while `shipped` is exit 0 (the control that keeps
 //      the gate from being "always 3"); a non-uuid --cycle-id and --cycle-id WITH --session-name
@@ -30,6 +40,10 @@
 //   C  DOCS -- runner-cycle.md <= 381,000 B with step 9's span naming `audit-run-review.js --prepare`;
 //      auditor-routine.md <= 40 KB with its prompt block holding `record_decision` and NEITHER
 //      `claim_john_alerts` NOR `push`. Each clause carries a mutation control.
+//   E  THE WEEK'S UNREVIEWED ONES (stubbed fetch, pure reads) -- the backlog subtracts the cycles
+//      that already carry an `auditor:run-review:<id>` row, caps the listing at three while
+//      reporting the true total, skips the second read entirely when no row carries a usable id,
+//      prints on the exit-3 prepare, and the stamp is load-bearing in both directions.
 //   D  LIVE (read-only) -- the capability row, its five links, the `auditor` assignment, a real
 //      `agent-prompt.js` assembly at exit 0, and (AGT-177) the intent row's own `method`: no
 //      `gate_failed`, still `its three gates`. Declared notRun without credentials.
@@ -49,7 +63,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { parseSteps } from "../../scripts/render-cycle-card.js";
-import { REVIEWABLE, parseArgs, reviewGate, run as runReview } from "../../scripts/audit-run-review.js";
+import { REVIEWABLE, parseArgs, reviewGate, run as runReview,
+  unreviewedPredecessors, unreviewedLine } from "../../scripts/audit-run-review.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CYCLE_MD = path.join(ROOT, "docs", "runbooks", "runner-cycle.md");
@@ -61,6 +76,9 @@ const INTENT = "au-run-intent";
 const CID = "4313b4c0-fc8c-4a3a-85d9-0e1ac6c759a2";
 const STUB_ENV = { SUPABASE_URL: "https://stub.invalid", SUPABASE_SERVICE_KEY: "stub-key" };
 const lf = t => String(t).replace(/\r\n/g, "\n");
+// Five distinct, VALID uuids for the week's other cycles -- unreviewedPredecessors() drops an id
+// that does not pass the uuid test, so a placeholder like `pre-1` would silently empty the backlog.
+const PRE = n => `0000000${n}-0000-4000-8000-00000000000${n}`;
 
 // The text of step 9 from its own marker to the next step's, so a needle found in step 4 cannot
 // pass for one in step 9 (ses-378h's rule, same helper).
@@ -129,6 +147,10 @@ async function run() {
   await arm("B --prepare writes eight keys and --ingest files two typed rows", async () => {
     const calls = [];
     const answer = (url) => {
+      // AGT-593's two backlog reads come FIRST: both are narrower than the lines below them, and
+      // `/runner_cycles?` would otherwise swallow the first of them.
+      if (url.includes("/runner_cycles?select=id,outcome,ended_at")) return [{ id: PRE(1), outcome: "shipped", ended_at: "2026-09-26T00:00:00Z" }];
+      if (url.includes("/audit_findings?select=found_by")) return [];
       if (url.includes("/runner_cycles?")) return [{ outcome: "shipped", last_step: "9", started_at: "2026-09-25T20:24:37Z", notes: "n" }];
       if (url.includes("/runner_items?")) return [{ id: "i1" }, { id: "i2" }];
       if (url.includes("/runner_verdicts?")) return [{ verdict: "done", gate_build: true, gate_regression: true, gate_hygiene: true, reasoning: "r" }];
@@ -146,7 +168,12 @@ async function run() {
       "all eight keys, service and flow first (AGT-239)");
     assert.strictEqual(doc.items.length, 2, "the items came from runner_items, not from another read");
     assert.strictEqual(doc.verdicts[0].gate_regression, true, "the three gates ride on the verdict row");
-    assert.strictEqual(calls.length, 8, `six reads plus the flow rpc and the service read (got ${calls.length})`);
+    assert.strictEqual(calls.length, 10,
+      `six reads, the flow rpc, the service read and AGT-593's two backlog reads (got ${calls.length})`);
+    assert.ok(calls.some(c => c.url.includes("notes.not.like.*RUN-REVIEW%20STAMP*")),
+      "the backlog read excludes a row already carrying the stamp -- `no run-review row` is NOT the mark (§19j)");
+    assert.ok(calls.some(c => c.url.includes(`id=neq.${CID}`)),
+      "and never offers the cycle under review back to itself");
     const nonGet = calls.filter(c => c.method !== "GET");
     assert.deepStrictEqual(nonGet.map(c => c.url.replace(/^.*\/rest\/v1\//, "")), ["rpc/audit_flow_checks"],
       "the only POST is the STABLE flow rpc -- an empty flow list files nothing, so no table is written");
@@ -171,7 +198,11 @@ async function run() {
     const file = path.join(tmp, "answer.json");
     fs.writeFileSync(file, JSON.stringify({ cluster: "run-review", account: "Reviewed one run", findings }));
     const posts = [];
-    const stub = fetchStub(u => (u.includes("/audit_findings?") ? [] : []), posts);
+    // The stamp's read-then-PATCH (cycle-note.js) rides the same stub: the read answers one row so
+    // the append has a prior, and the PATCH echoes a row back so `landed()` sees it.
+    const stub = fetchStub((u, init) => init.method === "PATCH"
+      ? [{ id: CID, notes: "n | s" }]
+      : (u.includes("/runner_cycles?select=id,notes") ? [{ id: CID, notes: "n" }] : []), posts);
     const icode = await withFetch(stub, () => runReview([`--ingest=${file}`, `--cycle-id=${CID}`, "--apply"], STUB_ENV));
     assert.strictEqual(icode, 0, "the ingest ran");
     const images = posts.filter(p => p.method === "POST" && p.url.includes("/runner_before_images"));
@@ -185,6 +216,14 @@ async function run() {
     assert.deepStrictEqual(rows.map(r => r.body.finding_type), ["security", "defect"],
       "the finding's OWN finding_type wins; the run's `defect` only fills the one that has none");
     for (const im of images) assert.strictEqual(im.body.row_data, null, "row_data null = this row did not exist before");
+
+    // AGT-593 -- and the reviewed row SAYS it was reviewed, once, after the rows are filed.
+    const patches = posts.filter(p => p.method === "PATCH");
+    assert.strictEqual(patches.length, 1, `exactly one stamp PATCH, never one per finding; got ${patches.length}`);
+    assert.ok(patches[0].url.includes(`/runner_cycles?id=eq.${CID}`),
+      `the stamp lands on THIS cycle's row; got ${patches[0].url}`);
+    assert.ok(String(patches[0].body.notes).includes("RUN-REVIEW STAMP: 2 findings, 2 written"),
+      `the note counts what was found AND what was written; got ${JSON.stringify(patches[0].body.notes)}`);
   });
 
   // --- C. the two runbooks ----------------------------------------------------------------------
@@ -223,6 +262,80 @@ async function run() {
     assert.ok(/push/i.test(block + "\nsend one push per row"), "control: the no-push clause detects a push that is there");
     assert.ok(!block.split("record_decision").join("x").includes("record_decision"),
       "control: with its own subject mutated away the record_decision clause goes red -- it reads the block, not a constant");
+  });
+
+  // --- E. the week's unreviewed ones, both directions -------------------------------------------
+  await arm("E the unreviewed ones, both directions", async () => {
+    // The same transport shape the CLI uses, driven by the stub -- not a second implementation.
+    const get = async q => (await fetch(`https://stub.invalid/rest/v1/${q}`)).json();
+    const NOW = new Date("2026-11-06T12:00:00Z");   // a Friday; the ISO week opened Monday the 2nd
+
+    const calls = [];
+    const answer = (url) => {
+      if (url.includes("/runner_cycles?select=id,outcome,ended_at")) {
+        return [1, 2, 3, 4, 5].map(n => ({ id: PRE(n), outcome: "shipped", ended_at: `2026-11-0${n + 1}T00:00:00Z` }));
+      }
+      if (url.includes("/audit_findings?select=found_by")) return [{ found_by: `auditor:run-review:${PRE(2)}` }];
+      return undefined;
+    };
+    const u = await withFetch(fetchStub(answer, calls), () => unreviewedPredecessors(CID, get, NOW));
+    assert.strictEqual(u.weekStart, "2026-11-02T00:00:00.000Z", "the week opens on the ISO Monday, UTC");
+    assert.strictEqual(u.total, 4, "five rows back, one already carrying a run-review row -- four open");
+    assert.deepStrictEqual(u.listed, [PRE(1), PRE(3), PRE(4)],
+      "the cap holds at three AND the reviewed one is subtracted -- both directions in one assertion");
+    assert.ok(!u.listed.includes(PRE(2)),
+      "control: drop the found_by filter and PRE(2) is listed, so this clause reads the subtraction");
+    assert.strictEqual(unreviewedLine(u),
+      `audit-run-review: unreviewed this week: 4 (3 listed, cap 3) -- ${[PRE(1), PRE(3), PRE(4)].join(", ")}`,
+      "the line reports the TRUE total next to what it listed, so n > k is visible");
+    assert.ok(calls[0].url.includes("ended_at=gte.2026-11-02T00%3A00%3A00.000Z"),
+      `the week is filtered server-side, encoded; got ${calls[0].url}`);
+    assert.ok(calls[0].url.includes("order=ended_at.desc"), "newest first, so the cap keeps the freshest records");
+
+    // An id-less row cannot be reviewed, and must never reach a `found_by=in.()` with an empty list.
+    const bare = [];
+    const none = await withFetch(
+      fetchStub(url => (url.includes("/runner_cycles?select=id,outcome,ended_at") ? [{ outcome: "shipped" }] : undefined), bare),
+      () => unreviewedPredecessors(CID, get, NOW));
+    assert.strictEqual(none.total, 0, "no usable id, nothing to pick up");
+    assert.strictEqual(bare.length, 1, "and the second read is skipped entirely -- ONE read, not two");
+    assert.strictEqual(unreviewedLine(none), "audit-run-review: unreviewed this week: 0 -- nothing to pick up",
+      "zero says so in words -- a silent line must never read as `none`");
+
+    // The exit-3 prepare is the path that used to stop with the rest of the week unread.
+    const e3 = path.join(tmp, "e3.json");
+    const logs = [];
+    const realLog = console.log;
+    console.log = (...a) => logs.push(a.join(" "));
+    let code3;
+    try {
+      code3 = await withFetch(fetchStub(url => {
+        if (url.includes("/runner_cycles?select=id,outcome,ended_at")) return [{ id: PRE(1), outcome: "shipped", ended_at: "2026-11-03T00:00:00Z" }];
+        if (url.includes("/audit_findings?select=found_by")) return [];
+        if (url.includes("/runner_cycles?")) return [{ outcome: "did_not_run" }];
+        return undefined;
+      }, []), () => runReview(["--prepare", `--cycle-id=${CID}`, `--out=${e3}`], STUB_ENV));
+    } finally { console.log = realLog; }
+    assert.strictEqual(code3, 3, "did_not_run is still exit 3 -- no file, no model, no cost");
+    assert.ok(logs.some(l => l.includes("unreviewed this week: 1 (1 listed, cap 3)")),
+      `exit 3 must STILL print the backlog line; got ${JSON.stringify(logs)}`);
+    assert.ok(!fs.existsSync(e3), "and writes no file");
+
+    // The stamp is load-bearing: a stamp that did not land is exit 2, and a dry run stamps nothing.
+    const efile = path.join(tmp, "e-answer.json");
+    fs.writeFileSync(efile, JSON.stringify({ cluster: "run-review", account: "Reviewed one run", findings: [] }));
+    const unstamped = [];
+    const code2 = await withFetch(fetchStub(() => [], unstamped),
+      () => runReview([`--ingest=${efile}`, `--cycle-id=${CID}`, "--apply"], STUB_ENV));
+    assert.strictEqual(code2, 2, "0 rows back from the stamp's read is a FAILED stamp -- exit 2, never a pass");
+    assert.strictEqual(unstamped.filter(c => c.method === "PATCH").length, 0,
+      "and nothing was PATCHed, so the re-run has a row to stamp");
+    const dry = [];
+    const code0 = await withFetch(fetchStub(() => [], dry),
+      () => runReview([`--ingest=${efile}`, `--cycle-id=${CID}`], STUB_ENV));
+    assert.strictEqual(code0, 0, "control: without --apply the same ingest runs clean");
+    assert.strictEqual(dry.filter(c => c.method === "PATCH").length, 0,
+      "and stamps nothing -- a dry run must not mark the row reviewed");
   });
 
   // --- D. live, read-only -----------------------------------------------------------------------
@@ -287,8 +400,9 @@ async function run() {
   }
   console.log(`[AGT-137] run review: REVIEWABLE ${REVIEWABLE.join("|")} · six reads in, 2 typed rows out · `
     + `runner-cycle.md ${Buffer.byteLength(fs.readFileSync(CYCLE_MD, "utf8"), "utf8")}B <= ${CYCLE_CEILING} with (7e) in step 9 · `
-    + `auditor-routine.md ${Buffer.byteLength(fs.readFileSync(AUDITOR_MD, "utf8"), "utf8")}B <= ${AUDITOR_CEILING}, prompt block records instead of pushing`);
-  return ["reviewable", "refusals", "prepare", "ingest", "docs", "live"];
+    + `auditor-routine.md ${Buffer.byteLength(fs.readFileSync(AUDITOR_MD, "utf8"), "utf8")}B <= ${AUDITOR_CEILING}, prompt block records instead of pushing · `
+    + `the week's unreviewed ones listed newest-first at cap ${3}, the reviewed row stamped once`);
+  return ["reviewable", "refusals", "prepare", "ingest", "docs", "unreviewed", "live"];
 }
 
 selfRun(import.meta.url, run);
