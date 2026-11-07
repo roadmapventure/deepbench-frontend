@@ -276,7 +276,13 @@ export const RUNBOOK_CEILING = 381000;
 // bar and 35 B under SES-336's ceiling -- REPORTED, not absorbed. No header stamp (ses-424c pins
 // stamps[0]), so HEADER_STAMPS stays 5. Re-measured with wc -c, re-pinned and the card re-rendered in the
 // same commit as the runbook edit.
-export const BYTES_AT_SHIP = 380920;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
+// AGT-607 (v7.0.975) re-pinned it in the same commit as the runbook edit: step 6(3)'s "and commit
+// it" gained `scripts/commit-kickoff.js`, step 1's exit-0 branch and the drift finding's route name
+// it too, the v7.0.843 stamp rotated out for a 110-byte one, and the dangling " ahead of the prose
+// note" clause went with it. Net +53 B: 380920 -> 380973, 7 B under agt-138's 380980 ratchet. The
+// kickoff declared 380968; the measured value is pinned instead, per the kickoff's own STOP LINE
+// (pin it when it is < 380980) -- and the 5-byte gap is REPORTED, not absorbed.
+export const BYTES_AT_SHIP = 380973;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
 export const HEADER_STAMPS = 5;
 
 // The column, and the eight names the validator now accepts.

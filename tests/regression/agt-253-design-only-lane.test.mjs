@@ -69,8 +69,10 @@ const CEILING = 381000;
 // nothing to do with AGT-253's clause. Moving it is the narrowest fix; collapsing the two homes
 // into one is tracked separately rather than done inline here (pattern:96). AGT-291 (v7.0.749)
 // re-pinned it again, for the same reason and in the same commit as the runbook edit; AGT-391
-// (v7.0.793) once more.
-const BYTES_AT_SHIP = 380920;
+// (v7.0.793) once more. AGT-607 (v7.0.975) re-pinned it again, in the same commit as the runbook
+// edit that moved it: 380920 -> 380973, 7 B under agt-138's ratchet. The kickoff declared 380968 and
+// its STOP LINE pins the measured value instead when it is under the bar; the 5-byte gap is reported.
+const BYTES_AT_SHIP = 380973;
 // Clause (c), step 6. The two function names are what make it load-bearing: a clause that named
 // neither would leave a cycle with nothing to call.
 const CLAUSE_C = "**Design-only project (`AGT-253`): when `public.ticket_design_only('<ID>')` is true, " +

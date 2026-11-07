@@ -1,5 +1,5 @@
 <!-- DeepBench v7.0.658 | runbooks/runner-cycle.md | AGT-237/265 — lanes. -->
-<!-- DeepBench v7.0.843 | runbooks/runner-cycle.md | AGT-451 — step 7 measures the baseline credentialed before the spawn; 7a reads it. v7.0.650 DROPPED (its facts: step 6), count 5. -->
+<!-- DeepBench v7.0.975 | runbooks/runner-cycle.md | AGT-607 — step 6: commit-kickoff.js; v7.0.843 DROPPED. -->
 <!-- DeepBench v7.0.941 | runbooks/runner-cycle.md | AGT-478 — retry on the second path before any hold. -->
 <!-- DeepBench v7.0.610 | runbooks/runner-cycle.md | AGT-133 — (7f): THE RUN TAIL REVIEWS ITSELF, AND THE RUNNER STOPS FILING WHAT IT JUDGED. Step 9 gains **(7f)** between (7e) and (8): The Development Manager rules (7e)'s findings (`audit-review.js --prepare` → `--dry-run` → `--apply`, the `devmanager` sub-agent as `auditor-routine.md` step 4 runs it, exit 3 = no findings/no cost) and it NEVER gates the chain — a refusal is a `notes` line, never `gate_failed`. Step 7 gains the mid-build fix-now-or-capture rule (both limbs or capture; one `runner_decisions` row either way; (7f) rules it that same run). The runner's judgment filing STOPS — 84 `source_file='runner-cycle'` rows over 45 days — leaving four deterministic sites: 2b, 6, 8b's `LOO-`, 8b-bis's tripwires. Every push to John at the five named sites DELETED (that phrase now has 0 hits, was 5: step 1 notifies nothing, 0b reports in its own row) per `JOHN-0925-NOTIFICATIONS-OFF`. `SES-164` step 2 by grep FIRST: `v7.0.531` DROPPED, its three ZERO-hit facts (the 13-rows/9-shipped stall measurement, `ses-423b-stall-signal`, `SES-409`'s 15.27M) RELOCATED into 0b and step 9; count 5. Guard `agt-133-run-tail-review.test.mjs`. REPORTED NOT FIXED: the deploy-quota, IP spend-gate and cadence alerts still say "push John once" — outside this kickoff's named sites, so they are named in the Builder's report rather than here (a step label in this header would hijack the first-occurrence window `HAR-34` reads). -->
 <!-- DeepBench v7.0.856 | runbooks/runner-cycle.md | AGT-482 — the claim fence: 6h, never STOPPED-BY-JOHN. v7.0.602 DROPPED, count 5. -->
@@ -661,11 +661,11 @@ node scripts/check-routine-prompt.js --routine=runner --prompt="$T" --out=docs/a
 ```
 
 - **Exit 1 — drift. A finding, never a stop.** `git add docs/audits/runner-prompt-drift.json`
-  and carry on with the cycle; step 6's one batched push carries it to `dev`, and the Auditor's
-  step-3 merge reads it as the `high` finding ahead of the prose note. Never edit the live
+  and carry on; step 6's `--extra=` carries it to `dev`, and the Auditor's
+  step-3 merge reads it as the `high` finding. Never edit the live
   routine to close it — pushing the block is John's word alone (`SES-355`).
 - **Exit 0 — equal.** Commit the file only if it is **already tracked** (that clears last week's
-  finding); if it is untracked, delete it, so a green week leaves no file behind.
+  finding) via `scripts/commit-kickoff.js --extra=`; if it is untracked, delete it, so a green week leaves no file behind.
 - **Exit 2 — the check could not run** (bad flags, an unreadable prompt file, a marker count
   other than 1). Write no file; name the reason in this cycle's row. The prose drift note in
   `runner_cycles.notes` is the fallback for this case only.
@@ -2795,7 +2795,7 @@ node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<
    opens with — `status = 'removal proposed'`, the card, `SELECT public.recompute_backlog_queue();`,
    drop to the next ticket — and record it as a decision per **7b**.
 3. **`premise = 'alive'` → write the returned `kickoff_markdown` to the returned `kickoff_path`**
-   (`docs/kickoffs/<version>-<ID>-<slug>.md`) and commit it, then set that path as the ticket's
+   (`docs/kickoffs/<version>-<ID>-<slug>.md`) and commit it with `node scripts/commit-kickoff.js --kickoff=<path> --harvest=docs/harvests/<ID>.md --message-file=$S/msg.txt --push` (`AGT-607`), then set that path as the ticket's
    `kickoff_link` and `design_status = 'designed'` in ONE write, before-image first. `SES-112`'s
    `CHECK (design_status <> 'designed' OR kickoff_link IS NOT NULL)` refuses `designed` without a
    link, so the two are one act or neither. From here the kickoff is the build's contract: step 7

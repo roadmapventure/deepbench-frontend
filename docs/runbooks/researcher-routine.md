@@ -59,7 +59,7 @@ node scripts/audit-ledger.js --ingest=$S/proposals.json --week=$W --found-by=res
 ```
 Each finding carries `kind 'other'`, at least one `location`, and a `confidence`; the ledger prints `ingest <W>: F findings, a new, b seen, c recurring, d ruled-out` — those are the summary's numbers. `finding_routes` carries the `researcher` row (`AGT-138`, precedence 30, `project_slug` NULL) so `audit-review.js` routes the group to the manager's own pick rather than throwing `unmapped source researcher`. **Neither `public.file_invention_proposal()` nor `public.invention_due()` is called here, and neither is retired** — the functions are live, the enhancement lane is theirs, and a proposal that reaches the board does it through the manager's ruling.
 
-**Step 4 — one report, committed.** `docs/research/<yyyy-mm-dd>-weekly-market.md`, then `git fetch origin dev && git rebase origin/dev && git push origin HEAD:dev` — never main. The Napkin section lists ids and verdicts only: the repo is public and the ideas are not.
+**Step 4 — one report, committed.** `docs/research/<yyyy-mm-dd>-weekly-market.md`, then `node scripts/tail-push.js --cycle-id=$N --files=docs/research/<yyyy-mm-dd>-weekly-market.md[,<each step-4b research doc>] --message="researcher $W — weekly market"` — never main. The Napkin section lists ids and verdicts only: the repo is public and the ideas are not.
 
 **Step 5 — one summary message.** Napkin ideas reviewed with their verdicts, what moved in the market, the proposals ingested, and the report path. No push, no email, no Slack (the table above).
 
@@ -111,7 +111,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
    *"class must be one of P1..P4, got (null)"*. `tests/regression/agt-64-researcher.test.mjs`
    exports `covers()` carrying the same rename and is the guard on both shapes.
 4. **Write the returned `research_doc` to `docs/research/<yyyy-mm-dd>-invention-<class-slug>.md`
-   and commit it in this cycle's commit set.** It is not decoration: `file_invention_proposal()`
+   and commit it in step 4's `scripts/tail-push.js --files=` list.** It is not decoration: `file_invention_proposal()`
    RAISES unless the `description` cites both a `VC-` claim ref and a `docs/research/` path, so a
    proposal whose research file was never written is a proposal that cannot be filed.
 

@@ -1360,6 +1360,81 @@ export function renderStaffWatch(staff, stamp) {
   return L.join("\n");
 }
 
+/**
+ * How many `stall_notified_at` rows the group reads. Newest first, so the window is "the last ten
+ * stalls anybody reported", never a count of the whole history: a brief is what John looks at now.
+ */
+export const STALLS_READ = 10;
+
+/**
+ * FEATURE: AGT-607 — `Stalled cycles`: the reported permission-stalls, displayed. Pure, like every
+ * group above it — `stalls` is the array fetchFacts() read and nothing here goes near the network
+ * or the clock.
+ *
+ * WHY IT EXISTS, measured rather than argued: step 0b's tripwire (`SES-103`) claims a stall
+ * atomically into `runner_cycles.stall_notified_at` precisely so the stall is reported ONCE however
+ * many peers are sweeping — and `grep -rl stall_notified_at scripts lib api src` found the column
+ * written by `scripts/cycle-heartbeat.js` and read by NOTHING that renders. Under
+ * `JOHN-0925-NOTIFICATIONS-OFF` the report is a ROW and never a push, so a column no surface renders
+ * is a stall nobody is told about. This is that surface.
+ *
+ * FROZEN SINCE IS `coalesce(heartbeat_at, started_at)`, the SAME basis step 0b's detector and
+ * `stall_watchdog()` use (`SES-104`). A row that never reported a heartbeat at all is the worst case,
+ * not a missing value, so it must read as a time rather than a dash — and printing `started_at`
+ * there is what keeps the 20-minute detector and this group from disagreeing about one cycle.
+ *
+ * STATE IS THE OPEN/CLOSED DISTINCTION AND NOTHING ELSE: a stall that was reported and then shipped
+ * is history; one still carrying `ended_at IS NULL` is a run frozen right now, which is the only row
+ * on this table a reader can act on. So an open row says `**open**` in bold and a closed one says
+ * what it ended as.
+ *
+ * ABSENT IS NOT ZERO, the same three branches every group above it keeps: a missing or non-array
+ * `stalls` renders "the stall ledger was not read", never a count — "the read failed" and "nobody
+ * reported a stall" are opposite facts and only one of them is a measurement.
+ *
+ * OUTSIDE factsSha() DELIBERATELY (`AGT-281`'s rule for a group that moves on its own): a stall
+ * arriving is not drift in what John has to look at twice, and hashing it would report drift on
+ * every sweep until the window rolled over.
+ */
+export function renderStalledCycles(stalls, stamp) {
+  const L = [];
+  const lead = `**Stalled cycles** — *${stamp}.* The permission-stalls step 0b's tripwire ` +
+    "(`SES-103`) claimed into `runner_cycles.stall_notified_at` — a ROW, never a push " +
+    "(`JOHN-0925-NOTIFICATIONS-OFF`). `frozen since` is `coalesce(heartbeat_at, started_at)`, the " +
+    "same basis the 20-minute detector and `stall_watchdog()` use (`SES-104`), so a cycle that " +
+    "never reported a heartbeat still reads as a time rather than a blank.";
+
+  if (!Array.isArray(stalls)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The stall ledger was not read for this render* — which is **not** the same as *no " +
+      "stall was reported*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const open = stalls.filter(r => !r.ended_at).length;
+  L.push(`${lead} **${stalls.length} reported stall(s)**, ${open} still open.`);
+  L.push("");
+
+  if (stalls.length === 0) {
+    L.push("- **No stall reported — a measured zero:** the ledger was read and holds no row.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  L.push("| cycle | ticket | last step | frozen since | reported | state |");
+  L.push("|---|---|---|---|---|---|");
+  for (const r of stalls) {
+    L.push(`| \`${String(r.id).slice(0, 8)}\` | ${r.item_id || "—"} | ` +
+      `${r.last_step ? summarise(r.last_step, 60) : "—"} | ${cst(r.heartbeat_at ?? r.started_at)} | ` +
+      `${cst(r.stall_notified_at)} | ${r.ended_at ? (r.outcome || "—") : "**open**"} |`);
+  }
+  L.push("");
+
+  return L.join("\n");
+}
+
 /** How many gate ids the Human gates block names before it stops listing and says how many are left. */
 export const HUMAN_GATE_IDS_SHOWN = 5;
 
@@ -1498,7 +1573,9 @@ export function renderBlock(facts, nowIso) {
   // FEATURE: AGT-240 (d) — proposedProjects joins on the same terms: absent means "not read".
   // FEATURE: AGT-281 — victoria joins the destructure on the same terms as hygiene: absent means
   // "not read", never "she has not run".
-  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria } = facts;
+  // FEATURE: AGT-607 — stalls joins the destructure on the same terms as victoria: absent means
+  // "not read", never "no stall was reported".
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1744,6 +1821,14 @@ export function renderBlock(facts, nowIso) {
   // above it — a pure helper a fixture can drive, rendering what fetchFacts() read and counting
   // nothing the table could have counted itself.
   L.push(renderStaffWatch(staff, stamp));
+
+  // ---- Stalled cycles (FEATURE: AGT-607) ----------------------------------------------------
+  // AFTER Staff watch and BEFORE Human gates, which keeps Human gates the last group: this one
+  // reports what step 0b's tripwire claimed about a cycle that froze, which belongs beside the
+  // other group about the runner's own agents rather than among the board-hygiene groups. Same
+  // contract as the eight groups above it — a pure helper a fixture can drive, rendering what
+  // fetchFacts() read and counting nothing the table could have counted itself.
+  L.push(renderStalledCycles(stalls, stamp));
 
   // ---- Human gates (FEATURE: SES-386) -------------------------------------------------------
   // After Staff watch (SES-378 slice 5 landed between it and Ticket hygiene), before the provenance
@@ -2095,6 +2180,23 @@ export async function fetchFacts(url, key) {
     `&ended_at=not.is.null&order=ended_at.desc&limit=${VICTORIA_RUNS_READ}`);
   if (!Array.isArray(victoria)) die("the victoria-reorg cycle read came back non-array — refusing to render her list group from nothing");
 
+  // FEATURE: AGT-607 — the reported permission-stalls, one read, no view. `stall_notified_at` is
+  // written by step 0b's atomic claim (`SES-103`) and was rendered NOWHERE before this ship, which
+  // under JOHN-0925-NOTIFICATIONS-OFF means the report reached no reader at all.
+  //
+  // THE FILTER IS THE COLUMN ITSELF: `stall_notified_at=not.is.null` is "somebody reported this
+  // one", which is the set this group is about — an open cycle nobody has reported yet belongs to
+  // the tripwire, not to the brief. Newest first, `STALLS_READ` of them. Columns are NAMED, never
+  // `select=*` (.claude/rules/supabase-column-grants.md).
+  //
+  // AN EMPTY LEDGER IS A REAL STATE (it renders as a measured zero) and the good one; a read that
+  // did not happen is not, so a non-array refuses here rather than publishing a calm-looking brief
+  // nobody measured.
+  const stalls = await rest(url, key,
+    "runner_cycles?select=id,item_id,started_at,last_step,heartbeat_at,stall_notified_at,ended_at,outcome" +
+    "&stall_notified_at=not.is.null&order=stall_notified_at.desc&limit=" + STALLS_READ);
+  if (!Array.isArray(stalls)) die("the stalled-cycle read came back non-array — refusing to render the stalled-cycles group from nothing");
+
   // FEATURE: SES-386 — the two human-gate reads, moved here from two regression guards.
   //
   // THE FILTERS ARE THE ONES ses-285 ASSERTION 6 AND ses-373 ASSERTION 1 RAN, character for
@@ -2121,7 +2223,7 @@ export async function fetchFacts(url, key) {
     "proposed_projects?select=slug,name,proposal_reason,proposed_at,tickets,by_class,cycles&order=proposed_at,slug");
   if (!Array.isArray(proposedProjects)) die("the proposed_projects read came back non-array — refusing to render the proposed-projects group from nothing");
 
-  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria };
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls };
 }
 
 async function main() {

@@ -54,7 +54,7 @@ const KICKOFF = "docs/kickoffs/k.md";
 
 // The runbook's declared size. The 4th-file waive on this build was granted on the condition that
 // T3 is byte-neutral, so this number is a ship condition, not a statistic.
-const RUNBOOK_BYTES = 380920;
+const RUNBOOK_BYTES = 380973;
 
 // Arm E's slice bounds and the string that must no longer be inside it.
 const TAIL4_START = "**(4)** re-export the backlog snapshot";
@@ -258,7 +258,7 @@ async function run() {
     "scratch worktree is left registered; (C) a second run prints `unchanged` and origin/dev does not move; " +
     "(D) the defaults the runbook relies on (two files, retries 3, exits 0/2/3, no stdout on usage); " +
     "(E) the tail-4 slice invokes the script and no longer says `git push origin HEAD:dev`, step 7(3) names " +
-    "the script and AGT-525, the runbook holds exactly 2 references and is still 380920 B -- each clause " +
+    `the script and AGT-525, the runbook holds exactly 2 references and is still ${RUNBOOK_BYTES} B -- each clause ` +
     "with a mutate-it control that flips it.");
 }
 

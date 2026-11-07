@@ -130,7 +130,7 @@ A `pass` homes the ticket with her score (`Homed: <ID> -> <slug>`); a `not-neede
 **Step 5 — report and record.**
 ```
 node scripts/audit-ledger.js --report=$W --write
-git add docs/audits/$W-candidates.json docs/audits/$W.md && git commit -m "auditor $W — <F> found, <T> tickets filed" && git fetch origin dev && git rebase origin/dev && git push origin HEAD:dev
+node scripts/tail-push.js --cycle-id=$N --files=docs/audits/$W-candidates.json,docs/audits/$W.md --message="auditor $W — <F> found, <T> tickets filed"
 ```
 Never main. An attended run commits in its own session's commit.
 

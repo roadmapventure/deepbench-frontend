@@ -72,6 +72,11 @@ export function parseArgs(argv) {
   const retries = retriesRaw === undefined || retriesRaw === "" ? DEFAULT_RETRIES : Number(retriesRaw);
   return {
     cycleId: flag("cycle-id") || "",
+    // AGT-607: the routines commit THEIR files through this script too, and their commit says what
+    // they did ("auditor 2026-W45 — 3 found, 1 ticket filed"), not that a close-out ran. A caller
+    // that passes --message names its own commit; the close-out passes none and keeps the sentence
+    // below. One of the two is required, which is why neither is a default.
+    message: flag("message") || "",
     root: path.resolve(flag("root") || REPO_ROOT),
     files: filesRaw === undefined || filesRaw === ""
       ? [...DEFAULT_FILES]
@@ -93,13 +98,13 @@ function git(cwd, args, { quiet = false } = {}) {
 }
 
 function usage(message) {
-  process.stderr.write(`${message}\nusage: node scripts/tail-push.js --cycle-id=<id> [--root=<repo>] [--files=a,b] [--retries=${DEFAULT_RETRIES}]\n`);
+  process.stderr.write(`${message}\nusage: node scripts/tail-push.js --cycle-id=<id> [--message=<text>] [--root=<repo>] [--files=a,b] [--retries=${DEFAULT_RETRIES}]\n`);
   return EXIT_USAGE;
 }
 
 export function tailPush(argv) {
-  const { cycleId, root, files, retries } = parseArgs(argv);
-  if (!cycleId) return usage("--cycle-id=<id> is required: the commit message names the cycle that produced these writes.");
+  const { cycleId, message, root, files, retries } = parseArgs(argv);
+  if (!cycleId && !message) return usage("--cycle-id=<id> or --message=<text> is required: the commit message names either the cycle that produced these writes or the run that is committing them.");
   if (!Number.isInteger(retries)) return usage("--retries must be a non-negative integer.");
   if (files.length === 0) return usage("--files resolved to nothing.");
   if (!fs.existsSync(path.join(root, ".git"))) return usage(`--root=${root} is not a git repository.`);
@@ -142,7 +147,7 @@ export function tailPush(argv) {
     const commit = git(tmp, [
       "-c", "user.name=DeepBench Runner",
       "-c", "user.email=runner@deepbench.local",
-      "commit", "-q", "-m", `close-out -- backlog snapshot + CLAUDE-STATE (cycle ${cycleId})`,
+      "commit", "-q", "-m", message || `close-out -- backlog snapshot + CLAUDE-STATE (cycle ${cycleId})`,
     ]);
     if (commit.status !== 0) return EXIT_USAGE;
 
