@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.977 | scripts/render-cycle-card.js | AGT-610 -- the pre-boot gate note names the redesign pickup: a find-work-only boot runs `node scripts/redesign-pickup.js --next` FIRST, so a refused ticket is picked up by the team rather than waiting for John (John's standing decision 6e94edcb). DEVIATION, recorded: the kickoff's literal outcome was 180 chars and render() throws over OUTCOME_MAX 90, so it is cut to 90 carrying both branches and the pickup command -- the runbook pointer (docs/runbooks/redesign-after-refusal.md) travels in record_skip()'s own refusal instead, exactly as v7.0.505 (AGT-79 slice 5) cut a 169-char outcome to 90.
 // DeepBench v7.0.843 | scripts/render-cycle-card.js | AGT-451 -- step 7's NOTES block list is [1, 2, 5]: AGT-451 inserted the credentialed pre-build baseline measurement as step 7's SECOND fence, so the card now carries the assembly (1), that measurement + its --check-kickoff arming (2) and the agent-log row (5) -- the generated card is the only door a cycle reads, and an index left at [1, 4] would have carried the measurement's old neighbour instead of the measurement.
 // DeepBench v7.0.840 | scripts/render-cycle-card.js | AGT-449 -- step 5a's NOTES outcome names the Manager's door: a cap case → node scripts/rule-cap-case.js.
 //
@@ -127,7 +128,7 @@ export function blocksByStep(steps, blocks) {
 // with several unreconstructable commands needs several blocks; one index per step was the constraint
 // that hid one of them.
 export const NOTES = {
-  gate:       { outcome: "should_boot true → step 0; false → one did_not_run row and end, nothing else", block: 1 },
+  gate:       { outcome: "should_boot true → step 0; find-work-only → redesign-pickup.js --next; false → did_not_run", block: 1 },
   "0":        { outcome: "branch session/cycle-<UTC>; never main; an unattended cycle writes no .claude/", block: 1 },
   "0b":       { outcome: "a silent predecessor is REPORTED IN A ROW John reads; never close a row that is not yours", block: 1 },
   "1":        { outcome: "insert runner_cycles with the claimed id, outcome NULL; this step notifies nothing", block: 1 },
