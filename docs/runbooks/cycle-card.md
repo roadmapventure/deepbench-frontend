@@ -4,7 +4,7 @@
 **Open `docs/runbooks/runner-cycle.md` only at the L-anchor of the step you are on, and only when that step's line is a pointer or names an exception.**
 **The runbook is the complete procedure and outranks this card; the card is generated from it.**
 
-**gate.** PRE-BOOT GATE · L83 · should_boot true → step 0; false → one did_not_run row and end, nothing else · blocks: L93(sql 42B) L112(sql 354B)
+**gate.** PRE-BOOT GATE · L83 · should_boot true → step 0; find-work-only → redesign-pickup.js --next; false → did_not_run · blocks: L93(sql 42B) L112(sql 354B)
 
 ```sql
 SELECT * FROM public.runner_should_boot();

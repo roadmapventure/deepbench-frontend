@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.977 | scripts/render-standing-brief.js | AGT-610 -- Redesign after refusal: the attempt ledger, displayed; outside factsSha like Stalled and Wasted cycles.
 // DeepBench v7.0.976 | scripts/render-standing-brief.js | AGT-367 -- a tenth group, `Wasted cycles`:
 // the last 7 days of `runner_cycles` with the CAUSE on each row, counted per cause by
 // `runner_waste_by_cause()`. Measured before this ship: 280 cycles in 7 days, 27 carrying a
@@ -1528,6 +1529,78 @@ export function renderWastedCycles(waste, stamp) {
   return L.join("\n");
 }
 
+/**
+ * FEATURE: AGT-610 -- `Redesign after refusal`: the attempt ledger, displayed.
+ *
+ * INFORMATION, NEVER A CARD, and that is John's clause 6 verbatim: "it appears in John's daily brief
+ * as information, not as a card he must act on". The whole point of the directive is that the TEAM
+ * picks a refused ticket up and redesigns it without him; a group that handed him a button would be
+ * the loop he asked to be taken out of.
+ *
+ * NOTHING HERE DECIDES A STATE. `refusal_ledger_brief()` derives `state` from `backlog_items.status`
+ * and from the ledger's own rows, so `shipped`, `parked (diagnosed)`, `parked (guard)`, `redesign
+ * open` and `awaiting redesign` cannot disagree with the tables. This function renders the column.
+ *
+ * ABSENT IS NOT ZERO, the same three branches every group above it keeps: a missing or non-array
+ * `ledger` renders "the attempt ledger was not read", never a count -- "the read failed" and "no
+ * ticket was refused" are opposite facts and only one of them is a measurement.
+ *
+ * THE FEEDBACK COLUMN SAYS `sent` ONLY WHEN SOMETHING CAME BACK (the design's call 5, pattern:33):
+ * `/feedback` from an unattended cycle is unproven, so a `not sent (--no-send)` or a
+ * `spawn error: ...` result prints the text PASTE-READY instead of claiming it was filed.
+ *
+ * OUTSIDE factsSha() DELIBERATELY (`AGT-281`'s rule, the call AGT-607 and AGT-367 made before it):
+ * the group moves whenever an attempt is opened or refused, and hashing it would report drift on
+ * runs where nothing John reads has changed.
+ *
+ * Pure: (ledger, stamp) in, markdown out, driven from fixtures by
+ * tests/regression/agt-610-refusal-brief.test.mjs.
+ */
+export function renderRefusalLedger(ledger, stamp) {
+  const L = [];
+  const lead = `**Redesign after refusal** — *${stamp}.* The attempt ledger ` +
+    "(`runner_refusal_attempts`, AGT-610, John's standing decision 6e94edcb): a ticket the " +
+    "platform's safety check refused is redesigned by the team at most twice, then diagnosed and " +
+    "parked; every row here is information, never a card you must act on.";
+
+  if (!Array.isArray(ledger)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The attempt ledger was not read for this render* — which is **not** the same as *no " +
+      "ticket was refused*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  if (ledger.length === 0) {
+    L.push(`${lead} **0 ticket(s) in the ledger.**`);
+    L.push("");
+    L.push("- **No refused ticket — a measured zero:** the ledger was read and holds no row.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const parked = ledger.filter(r => String(r.state ?? "").startsWith("parked")).length;
+  L.push(`${lead} **${ledger.length} ticket(s) in the ledger, ${parked} parked after two attempts.**`);
+  L.push("");
+  L.push("| ticket | attempts | state | last refusal | feedback |");
+  L.push("|---|---|---|---|---|");
+  for (const r of ledger) {
+    const result = r.feedback_result;
+    const filed = typeof result === "string" && result.length > 0 &&
+      !result.startsWith("not sent") && !result.startsWith("spawn error");
+    const feedback = !r.feedback_text
+      ? "—"
+      : filed ? "sent" : `paste-ready: /feedback ${summarise(r.feedback_text, 60)}`;
+    L.push(`| ${r.backlog_id} | ${r.attempts} | ${r.state} | ` +
+      `${r.last_label ? summarise(r.last_label, 40) : "—"} ` +
+      `${r.last_refused_at ? cst(r.last_refused_at) : ""} | ${feedback} |`);
+  }
+  L.push("");
+
+  return L.join("\n");
+}
+
 /** How many gate ids the Human gates block names before it stops listing and says how many are left. */
 export const HUMAN_GATE_IDS_SHOWN = 5;
 
@@ -1668,7 +1741,7 @@ export function renderBlock(facts, nowIso) {
   // "not read", never "she has not run".
   // FEATURE: AGT-607 — stalls joins the destructure on the same terms as victoria: absent means
   // "not read", never "no stall was reported".
-  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste } = facts;
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1931,6 +2004,15 @@ export function renderBlock(facts, nowIso) {
   // Same contract as the nine groups above it -- a pure helper a fixture can drive, rendering what
   // fetchFacts() read and counting nothing `runner_waste_by_cause()` already counted itself.
   L.push(renderWastedCycles(waste, stamp));
+
+  // ---- Redesign after refusal (FEATURE: AGT-610) ---------------------------------------------
+  // AFTER Wasted cycles and BEFORE Human gates, which keeps Human gates the last group (SES-386).
+  // It belongs directly after the waste table deliberately: `gated` is one of the causes that table
+  // counts, and this group is what became of those cycles' tickets -- a reader who has just seen the
+  // gated count should see, next, which of them the team is redesigning and which have parked.
+  // Same contract as the ten groups above it -- a pure helper a fixture can drive, rendering what
+  // fetchFacts() read and deciding no state `refusal_ledger_brief()` already derived itself.
+  L.push(renderRefusalLedger(ledger, stamp));
 
   // ---- Human gates (FEATURE: SES-386) -------------------------------------------------------
   // After Staff watch (SES-378 slice 5 landed between it and Ticket hygiene), before the provenance
@@ -2312,6 +2394,15 @@ export async function fetchFacts(url, key) {
   const waste = await rest(url, key, "rpc/runner_waste_by_cause?p_hours=" + WASTE_HOURS);
   if (!Array.isArray(waste)) die("the cycle-cause read came back non-array — refusing to render the wasted-cycles group from nothing");
 
+  // FEATURE: AGT-610 — the refusal ledger, read from the FUNCTION (service_role only; the anon key
+  // cannot call it and cannot SELECT the table — .claude/rules/supabase-column-grants.md addendum
+  // SES-315). Every `state` is DERIVED there, so nothing on this side re-decides one.
+  //
+  // AN EMPTY LEDGER IS A REAL STATE (it renders as a measured zero); a read that did not happen is
+  // not, so a non-array refuses rather than publishing a brief that reports no refusal nobody read.
+  const ledger = await rest(url, key, "rpc/refusal_ledger_brief");
+  if (!Array.isArray(ledger)) die("the refusal-ledger read came back non-array — refusing to render the redesign-after-refusal group from nothing");
+
   // FEATURE: SES-386 — the two human-gate reads, moved here from two regression guards.
   //
   // THE FILTERS ARE THE ONES ses-285 ASSERTION 6 AND ses-373 ASSERTION 1 RAN, character for
@@ -2338,7 +2429,7 @@ export async function fetchFacts(url, key) {
     "proposed_projects?select=slug,name,proposal_reason,proposed_at,tickets,by_class,cycles&order=proposed_at,slug");
   if (!Array.isArray(proposedProjects)) die("the proposed_projects read came back non-array — refusing to render the proposed-projects group from nothing");
 
-  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste };
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger };
 }
 
 async function main() {

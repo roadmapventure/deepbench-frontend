@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.977 | scripts/verifier.js | AGT-610 -- the risk declaration: every task names what it touches, how far it reaches, how it is undone; graded for coverage, never for its decision.
 // DeepBench v7.0.966 | scripts/verifier.js | AGT-572 -- a zero-file delivery is graded by its baseline's measured set
 // DeepBench v7.0.874 | scripts/verifier.js | AGT-457 -- one instrument, one baseline, one refusal: `measuredTestsFrom()` harvests the per-test `- <path> — green|RED|NOT RUN` lines `renderBlock()` already writes, so `readKickoffBaseline()` and `readRegressionBaseline()` now return `measured` (what the baseline ACTUALLY ran) and `instrument` (which script measured it) beside `names`; `regressionDelta()` gains a THIRD bucket, `neverMeasured` -- a post name the baseline never measured is no longer charged as newly red and the suite's own exit code stands; `baselineCoverageFinding()` refuses a baseline narrower than the set being graded (exit 1 `kickoff-baseline-narrower` at `--check-kickoff`, exit 2 `baseline-narrower-than-graded-set` at 7a) or one measured by an instrument outside `BASELINE_INSTRUMENTS`; and a PRESENT-but-unparseable block is exit 1 `kickoff-baseline-unparseable` (`present: true`), while a kickoff with NO block keeps AGT-391's escape untouched.
 // DeepBench v7.0.843 | scripts/verifier.js | AGT-451 -- an uncredentialed BASELINE block is refused, not graded: `UNCREDENTIALED_BASELINE_RE` on the `BASELINE (` paragraph makes `readKickoffBaseline()` return `uncredentialed: true` with `names: null`, `baselineGate()` refuses it BEFORE AGT-391's related-set escape, `--pre-build-baseline=<file>` (the cycle's own credentialed measurement, `scripts/pre-build-baseline.js`) sits between `--regression-baseline=` and the block in the precedence, and step 6's `--check-kickoff` arms with the flag -- exit 1 `kickoff-baseline-uncredentialed` when the file is no baseline, a `baseline_note` saying NOT GRADED when no flag was handed.
@@ -2443,6 +2444,136 @@ export const ANCHOR_CLAUSE = "anchors";
 // (an author's spacing is not a declaration); every other line is an anchor, malformed or not, and
 // a malformed one is named rather than dropped -- a silently skipped anchor is a fact the kickoff
 // declared and nobody checked.
+// ---- AGT-610: THE RISK DECLARATION -- what it touches, how far it reaches, how it is undone. ---
+//
+// JOHN'S RULE, not this file's: `runner_directives` 6e94edcb (standing, 2026-11-05) says the
+// Designer re-designs a ticket BY RISK -- "what each part touches, how far it reaches, how it is
+// undone; parts with different risk are staged; a part that cannot be undone or that changes agent
+// autonomy ships as its own ticket". A rule stated in Knowledge and graded by nobody is a rule that
+// holds until the first cycle in a hurry, so the declaration is one fenced `risk` block, one line
+// per task, and this clause grades that every task has one.
+//
+// COVERAGE, NEVER THE DECISION (pattern:162 -- a check grades the change, never the live world).
+// Whether `git revert` really is the undo for T3 is a judgement; whether T3 declared one is a fact.
+// This clause only ever asks the second question: every `**T<n>` in TASKS has a line, every line
+// names a task, and every line splits into four non-blank fields. It never reads what a field says.
+//
+// GRADED ONLY FROM v7.0.977 (`RISK_BLOCK_FROM`), and that boundary is the whole reason this clause
+// can ship at all. Thirteen shipped tests spawn `--check-kickoff` on fixtures and on SHIPPED
+// kickoffs demanding 0 -- `ses-376` runs it over `v7.0.459-SES-376-kickoff-size-cap.md` -- and the
+// whole corpus predates the block. Refusing absence everywhere would turn those red and wedge every
+// cycle at runbook step 6. So below the stamp the absence is NOT GRADED and the green says so
+// (19v: a green declares what it did NOT grade); at or above it, absence is a refusal.
+//
+// THE NOTE TRAVELS ON `out`, for the identical reason the anchors clause above explains at length:
+// the call site's one `if (risk)` must stay a plain truthiness test, so the return value is `null`
+// or the refusal and nothing else.
+export const RISK_CLAUSE = "risk";
+export const RISK_BLOCK_FROM = [7, 0, 977];
+
+/** The kickoff's own stamp, as a comparable triple: `<!-- DeepBench v7.0.977 | kickoff | AGT-610 -->`. */
+export function kickoffStampVersion(text) {
+  const m = String(text ?? "").match(/<!--\s*DeepBench v(\d+)\.(\d+)\.(\d+)/);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+/** Every task part the kickoff declares, by its `**T<n>` marker. A Set, so T1 named twice is one part. */
+export function kickoffTaskParts(text) {
+  const out = new Set();
+  for (const m of String(text ?? "").matchAll(/\*\*T(\d+)\b/g)) out.add(`T${m[1]}`);
+  return [...out];
+}
+
+/**
+ * The FIRST fenced block whose info string is exactly `risk`, parsed like `anchorBlockLines` above:
+ * blank lines skipped, every other line kept whether it is malformed or not. Split on the FIRST
+ * THREE pipes, so `undo` may itself contain pipes (`git revert; decision reverse | re-pin`).
+ */
+export function riskBlockLines(text) {
+  const lines = String(text ?? "").split("\n");
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const fence = lines[i].match(/^\s*`{3,}\s*(.*?)\s*$/);
+    if (fence && fence[1] === RISK_CLAUSE) { start = i + 1; break; }
+  }
+  if (start === -1) return null;
+  const out = [];
+  for (let i = start; i < lines.length; i++) {
+    if (/^\s*`{3,}/.test(lines[i])) break;
+    const raw = lines[i];
+    if (!raw.trim()) continue;
+    const p1 = raw.indexOf("|");
+    const p2 = p1 === -1 ? -1 : raw.indexOf("|", p1 + 1);
+    const p3 = p2 === -1 ? -1 : raw.indexOf("|", p2 + 1);
+    if (p1 === -1 || p2 === -1 || p3 === -1) {
+      out.push({ raw, part: null, touches: null, reach: null, undo: null });
+      continue;
+    }
+    out.push({
+      raw,
+      part: raw.slice(0, p1).trim(),
+      touches: raw.slice(p1 + 1, p2).trim(),
+      reach: raw.slice(p2 + 1, p3).trim(),
+      undo: raw.slice(p3 + 1).trim(),
+    });
+  }
+  return out;
+}
+
+export function kickoffRiskFinding(text, out = {}) {
+  const lines = riskBlockLines(text);
+  const parts = kickoffTaskParts(text);
+  out.parts = parts.length;
+  out.covered = 0;
+
+  const refuse = (why) => ({
+    kind: "kickoff-no-lanes",
+    clause: RISK_CLAUSE,
+    remedy_owner: KICKOFF_REMEDY_OWNER,
+    remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never writes the risk block',
+    reason: `kickoff risk declaration (AGT-610): ${why} John's rule (runner_directives 6e94edcb): for every `
+      + "change, what it touches, how far it reaches, how it is undone -- one risk line per task, "
+      + "T<n> | touches | reach | undo. The checker grades that every part is covered, never what the "
+      + "line decides. The Designer re-assembles design-kickoff ONCE; a block supplied by the caller "
+      + "is not a declaration the Designer made.",
+  });
+
+  if (lines === null) {
+    const stamp = kickoffStampVersion(text);
+    const atOrAfter = stamp !== null && (
+      stamp[0] !== RISK_BLOCK_FROM[0] ? stamp[0] > RISK_BLOCK_FROM[0]
+        : stamp[1] !== RISK_BLOCK_FROM[1] ? stamp[1] > RISK_BLOCK_FROM[1]
+          : stamp[2] >= RISK_BLOCK_FROM[2]);
+    const shown = stamp ? `v${stamp.join(".")}` : "absent";
+    if (atOrAfter) {
+      return refuse(`the kickoff (stamp ${shown}) carries no fenced risk block, and every kickoff from `
+        + "v7.0.977 declares one.");
+    }
+    out.note = `NOT GRADED (AGT-610): no risk block and the kickoff predates v7.0.977 (stamp ${shown}). `
+      + "Exit code unchanged.";
+    return null;
+  }
+
+  for (const l of lines) {
+    if (l.part === null || !l.part || !l.touches || !l.reach || !l.undo) {
+      return refuse(`the line \`${l.raw.trim()}\` does not split on three pipes into four non-blank fields.`);
+    }
+  }
+  const named = new Set(lines.map(l => l.part));
+  out.covered = parts.filter(p => named.has(p)).length;
+
+  const missing = parts.filter(p => !named.has(p));
+  if (missing.length) {
+    return refuse(`task(s) ${missing.join(", ")} have no risk line; ${out.covered} of ${parts.length} covered.`);
+  }
+  const extra = [...named].filter(p => !parts.includes(p));
+  if (extra.length) {
+    return refuse(`risk line(s) ${extra.join(", ")} name no task in TASKS.`);
+  }
+  out.note = `risk: ${out.covered} of ${parts.length} parts covered (AGT-610).`;
+  return null;
+}
+
 export function anchorBlockLines(text) {
   const lines = String(text ?? "").split("\n");
   let start = -1;
@@ -3482,6 +3613,19 @@ async function main() {
     if (anchors) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...anchors, anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared }, prose: anchors.reason });
     }
+    // ---- AGT-610: the RISK DECLARATION -- one line per task, graded for coverage only. --------
+    //
+    // FIFTH, AFTER THE ANCHORS AND BEFORE THE ATTESTATION, and the order is the same argument the
+    // four clauses above it make: the earlier clauses grade whether the document IS a kickoff and
+    // can refuse it outright, so a file that is not one yet must never be measured for its risk
+    // lines; attestation stays the last question, asked only of a file that has passed everything.
+    // This clause reads the bytes in hand and nothing else -- no credentials, no subprocess, no
+    // tree -- so it cannot wedge step 6 the way an unreadable lane row could.
+    const riskOut = {};
+    const risk = kickoffRiskFinding(text, riskOut);
+    if (risk) {
+      return emit({ code: 1, payload: { ok: false, exitCode: 1, ...risk, risk_parts: riskOut.parts, risk_covered: riskOut.covered }, prose: risk.reason });
+    }
     // ---- AGT-187: THE THIRD CLAUSE -- the green says WHOSE declaration it graded. -------------
     //
     // ORDER IS cap -> lanes -> attestation, and it is not interchangeable: the first two grade the
@@ -3531,6 +3675,7 @@ async function main() {
         builder_model: orchestratorModel, builder_model_note: builderModelNote,
         baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
+        risk_note: riskOut.note,
         attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
         prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
     }
@@ -3538,6 +3683,7 @@ async function main() {
       builder_model: orchestratorModel, builder_model_note: builderModelNote,
       baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
+      risk_note: riskOut.note,
       attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
       prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
   }
