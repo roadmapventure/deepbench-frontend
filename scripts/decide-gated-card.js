@@ -57,6 +57,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 import { assemblePrompt } from "../api/prompt/db-assembly.js";
 import { renderAssembly, resolveJudgmentModel } from "./agent-prompt.js";
 import { resettleTicket } from "./settle-ship.js";
+import { ingestFindings, fingerprint, isoWeek } from "./audit-ledger.js";
 
 // --- pure half (imported by tests/regression/agt-127-decide-gated-card.test.mjs; no network) ------
 
@@ -163,6 +164,7 @@ export function validateRulings(answer, cards) {
       refusals.push(`ruling ${ruling ?? "<NULL>"} on card ${shown} is not one of ${RULINGS.join(", ")}`);
     }
     if (blank(r.reason)) refusals.push(`the ruling on card ${shown} needs a reason`);
+    refusals.push(...followUpRefusals(r, shown));
     if (seen.includes(shown)) refusals.push(`card ${shown} appears twice in one call`);
     else seen.push(shown);
     if (known.size > 0 && !known.has(shown)) refusals.push(`card ${shown} is not one of the rulable cards`);
@@ -205,6 +207,35 @@ export function resettleTargets(rulings, cards) {
   }
   return out;
 }
+
+// AGT-444 -- A FOLLOW-UP FAULT IS FILED, NEVER PROMISED. Card `5d1f0891`'s own `value_case` recorded
+// a ship point "denied twice by the permission system" and the ruling said the fault was being filed
+// separately; `scripts/decide-gated-card.js` held ZERO `follow_up` handling and ZERO `ingestFindings`
+// calls, and no row but AGT-444 names that refusal today. A reason that promises a filing nobody
+// makes is worse than one that says nothing: the promise reads as a record and is not one
+// (pattern:92, pattern:162). So a fault the card's own work does not cover now travels as structured
+// `follow_up` on the ruling, this file files it into `audit_findings` BEFORE the ruling is sent, and
+// the `reason` carries the finding id it actually produced -- or says out loud that it is UNFILED and
+// who files it. A failed filing never fails the ruling (the ruling is the card's answer, not the
+// ledger's), which is why the suffix is read BACK off the ledger rather than assumed.
+export const FOLLOW_UP_SLUG = "ruling-follow-up";
+// A reason PROMISING a separate filing, in the words a manager actually writes ("filing it
+// separately", "I will file this separately"). The promise is only refused when no `follow_up`
+// rides with it -- the rule is "file it", not "never mention it".
+export const PROMISE_RE = /\bfil(?:e|es|ed|ing)\b[^.\n]{0,60}\bseparately\b/i;
+export function followUpRefusals(r, shown) {
+  const f = r && r.follow_up;
+  if (f == null) return PROMISE_RE.test(String(r && r.reason)) ? [`the ruling on card ${shown} promises a separate filing and carries no follow_up (AGT-444)`] : [];
+  return typeof f === "object" && !Array.isArray(f) && !blank(f.text) ? [] : [`the follow_up on card ${shown} needs text`];
+}
+// The ledger row a `follow_up` becomes. `location` is the card itself -- the fault was observed on
+// that ruling, and `locationKey()` keeps the whole string, so two follow-ups on two cards never
+// fold into one fingerprint. `finding_type` is the manager's when he names one; `defect` otherwise.
+export const followUpFinding = r => ({ kind: "other", check_slug: FOLLOW_UP_SLUG, confidence: "high", finding_type: r.follow_up.finding_type ?? "defect",
+  locations: [{ text: String(r.follow_up.text), location: `runner_items:${r.card_id}` }],
+  governing_fact: `${String(r.follow_up.text)} (ruling ${r.ruling} on card ${r.card_id})` });
+export const filedSuffix = (id, week) => ` [follow-up filed: audit_findings ${id}, ${week}]`;
+export const unfiledSuffix = why => ` [follow-up UNFILED: ${why}; the Development Manager files it at review-audit-worklist]`;
 
 // --- CLI -----------------------------------------------------------------------------------------
 
@@ -366,6 +397,44 @@ async function apply(args) {
   const { base, key } = creds();
   const patterns = Array.isArray(answer.patterns_applied) ? answer.patterns_applied : [];
   const rulings = answer.rulings.map(r => ({ ...r, patterns_applied: patterns }));
+  // AGT-444 -- THE FOLLOW-UP IS FILED BEFORE THE RULING IS SENT, AND THE REASON SAYS WHICH ROW IT
+  // GOT. Order is load-bearing: the suffix has to be IN the `reason` the function stores, so the
+  // filing cannot happen after the POST. A throw here never fails the ruling -- the card still gets
+  // its answer, and the reason says UNFILED and names who files it instead (§19v: ingestFindings()
+  // writes its own before-image per appended row, so the undo is already in place).
+  const cycleId = hasCycle ? args["cycle-id"] : null;
+  const sessionName = hasSession ? args["session-name"] : null;
+  const get = async q => {
+    const g = await rest(base, key, "GET", q);
+    if (!g.ok) throw new Error(`GET ${q} -> HTTP ${g.status} ${g.text.slice(0, 300)}`);
+    return g.json ?? [];
+  };
+  const post = async (table, body) => {
+    const p = await rest(base, key, "POST", table, body);
+    if (!p.ok) throw new Error(`POST ${table} -> HTTP ${p.status} ${p.text.slice(0, 300)}`);
+    return p.json;
+  };
+  for (const ru of rulings) {
+    if (!ru || !ru.follow_up) continue;
+    const finding = followUpFinding(ru);
+    const week = isoWeek(new Date());
+    let err = null;
+    let row = [];
+    try {
+      await ingestFindings({
+        findings: [finding], week,
+        foundBy: hasCycle ? `runner:cycle:${args["cycle-id"]}` : `session:${args["session-name"]}`,
+        cycleId, sessionName, apply: true, get, post,
+      });
+      // The READ-BACK, not the write's own word for it: `seen` and `ruled-out` append NOTHING, and a
+      // suffix claiming a row that was never written is the defect this ticket exists to remove.
+      row = await get(`audit_findings?select=id&fingerprint=eq.${fingerprint(finding)}&iso_week=eq.${week}&limit=1`);
+    } catch (e) { err = e.message; }
+    ru.reason += row[0]
+      ? filedSuffix(row[0].id, week)
+      : unfiledSuffix(err ?? "ruled-out: a not-a-defect row covers this location");
+  }
+
   const r = await rest(base, key, "POST", "rpc/apply_gate_rulings", {
     p_rulings: rulings,
     p_cycle_id: hasCycle ? args["cycle-id"] : null,

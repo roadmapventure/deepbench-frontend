@@ -44,6 +44,17 @@
 // not route would pass one that routed on nothing, which is the bug unchanged. The live write
 // itself is driven end to end in tests/regression/agt-167b-resettle-on-gate-ruling.test.mjs.
 //
+// AGT-444 ADDS TWO ARMS TO (b) AND THE LIVE PART (h): A FOLLOW-UP FAULT IS FILED, NEVER PROMISED.
+// Card 5d1f0891's own `value_case` records a ship point "denied twice by the permission system" --
+// the auto-mode classifier refusing the push -- and its ruling said the fault was being filed
+// separately. Nothing filed it, and no row but AGT-444 names that refusal: `validateRulings()` read
+// the promise as a sound reason (`ok true`, re-measured on 5017e41 this cycle). (b) now drives the
+// refusal and its negative control -- the SAME sentence carrying `follow_up: { text }` is accepted,
+// which is what makes this a rule about filing rather than a filter on the word "separately" -- and
+// (h) reads the live `dm-gate-intent` row for the instruction and the schema that let the manager
+// answer the way the validator now demands. Only the refusal would pass a script that forbade a
+// promise he could not replace; only the acceptance would pass one that never refused at all.
+//
 // NO MODEL CALL, NO SPEND. Offline parts plus REST reads, one insert pair, one PATCH, one delete pair.
 
 import assert from "assert";
@@ -53,6 +64,8 @@ import {
   validateRulings,
   // AGT-167 -- part (g) below.
   RESETTLE_RULINGS, resettleTargets,
+  // AGT-444 -- part (b)'s follow-up arms and part (h)'s live row.
+  filedSuffix,
 } from "../../scripts/decide-gated-card.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 
@@ -171,7 +184,35 @@ function partB() {
   }, [...rulableCtx, { card_id: "ffffffff-0000-0000-0000-000000000006" }]);
   assert.ok(partial.refusals.some(r => /ffffffff-0000-0000-0000-000000000006 not covered/.test(r)),
     "an uncovered card is named, by id");
-  console.log("  (b) rulableCards both directions, task_context, 6 validator refusals incl. coverage -- PASS");
+  // AGT-444 -- A REASON MAY NOT PROMISE A FILING THE ANSWER DOES NOT CARRY. Card 5d1f0891's own
+  // value_case recorded a ship point refused by the auto-mode classifier and its ruling said the
+  // fault was being filed separately; nothing filed it, because this file's validator read the
+  // sentence as a sound reason. Measured on 5017e41 before the change: `ok true`, no refusal.
+  const promise = {
+    card_id: rulableCtx[0].card_id, ruling: "rework",
+    reason: "The refused push is a platform fault, not this ticket's work, and I am filing it separately rather than asking anyone to work around it.",
+  };
+  const promised = validateRulings({ rulings: [promise] }, rulableCtx);
+  assert.equal(promised.refusals.filter(r => /promises a separate filing and carries no follow_up \(AGT-444\)/.test(r)).length, 1,
+    "(b/AGT-444) a reason promising a separate filing with NO follow_up must be refused, exactly once: " +
+    `got ${JSON.stringify(promised.refusals)}`);
+
+  // THE OTHER DIRECTION, which is what makes the arm above a rule rather than a word filter: the
+  // SAME sentence carrying the structured follow-up is accepted, because the script then files it.
+  assert.deepEqual(
+    validateRulings({ rulings: [{ ...promise, follow_up: { text: "git push origin HEAD:dev refused by the auto-mode classifier" } }] }, rulableCtx),
+    { ok: true, refusals: [] },
+    "(b/AGT-444) the same promise WITH a follow_up carrying text is accepted — the rule is `file it`, not `never say it`");
+
+  // A follow_up that declares nothing is refused on its own account: an empty object would file a
+  // finding whose governing_fact reads `undefined`, which is a worse record than no record.
+  assert.ok(validateRulings({ rulings: [{ ...promise, follow_up: {} }] }, rulableCtx).refusals.some(r => /needs text/.test(r)),
+    "(b/AGT-444) a follow_up with no text is refused");
+
+  // The suffix the reason actually carries, by value: the finding id and the ISO week the row was
+  // appended under, so a reader of the ruling can open the row instead of taking its word.
+  assert.equal(filedSuffix("abc", "2026-W45"), " [follow-up filed: audit_findings abc, 2026-W45]");
+  console.log("  (b) rulableCards both directions, task_context, 8 validator refusals incl. coverage -- PASS");
 }
 
 // ---- (g) AGT-167: which rulings re-settle their ticket, offline and by value ------------------
@@ -392,6 +433,25 @@ async function run() {
       `live verdict ${before.reason}/${before.should_boot}, mode ${JSON.stringify(before.detail.mode)}`);
     console.log("  (d) three refusals driven against the live function, 0 rows written");
     console.log(`  (f) ${CAPABILITY}: 1 capability, ${links.length} links, 1 assignment, contract enum matches`);
+
+    // ---- (h) AGT-444: the Skill row carries the follow-up rule and the schema that lets him use it
+    // The refusal in part (b) is only half the mechanism. If the stored Intent never TELLS the
+    // manager that a follow-up goes in `follow_up`, the validator refuses an answer he had no way
+    // to write, and the ruling run stalls instead of filing. Both halves are asserted on the live
+    // row (pattern:7 -- the behaviour lives in the agent's own Skill content).
+    const gateIntent = await pg(url, key, `skill_profiles?slug=eq.${INTENT}&select=method,traits`);
+    assert.equal(gateIntent.length, 1);
+    assert.equal(
+      gateIntent[0].method.split("A FOLLOW-UP FAULT IS FILED, NEVER PROMISED").length - 1, 1,
+      "(h) `method` must carry the AGT-444 heading EXACTLY once — `contains` would read a doubled " +
+      "paragraph (a second apply of the migration) as a pass, and the manager would be told twice");
+    assert.deepEqual(
+      gateIntent[0].traits?.schema?.properties?.rulings?.items?.properties?.follow_up?.required,
+      ["text"],
+      "(h) the stored contract must declare follow_up with `text` REQUIRED — a follow_up schema " +
+      "whose text were optional would let him return `{}`, which validateRulings() refuses, so the " +
+      "row and the script would disagree and every such answer would be sent back");
+    console.log("  (h) dm-gate-intent carries follow_up -- PASS");
   } finally {
     if (qid) {
       await pg(url, key, `runner_questions?qid=eq.${qid}`, { method: "DELETE", headers: { Prefer: "return=minimal" } })
