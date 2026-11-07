@@ -39,7 +39,7 @@ directly on 2026-11-07, one request per host:
 | `github.com` | 400 (reachable) |
 | `www.sec.gov` | no DNS |
 | `docs.netskope.com` | no DNS |
-| `www.sovra.com` | no DNS |
+| _(one further vendor host, withheld — it names a private Napkin idea's subject)_ | no DNS |
 | `www.hostinger.com` | no DNS |
 | `www.sia-partners.com` | no DNS |
 
@@ -122,20 +122,22 @@ would have made its idea due on its own. So the filter is wrong in both directio
 ideas nothing changed, and it stays silent when a second writer adds real material. That belongs
 with `AGT-577` and is named in the findings below rather than filed as a separate ticket.
 
-The one idea researched this run turned on a fact worth recording here because two other ideas
-depend on it: **Sovra is the rebranded mdf commerce, and Periscope Holdings is one of the brands
-folded into it** (with Bidnet Direct, Merx, Vendor Registry and S2G) — Periscope being the licensor
-of the full 33,838-item NIGP code set that two standing procurement ideas are blocked on. Sovra's
-marketplace already embeds cooperative contracts through Pavilion, with NASPO ValuePoint and TIPS on
-its partner list, so the "co-op" half of that idea competes with its core rather than filling a gap.
-The price-compliance half is the live one: invoice-above-contract detection is a crowded *commercial*
-recovery-audit category (apexanalytix, PRGX, SpendMend, Sirion, Xelix, AppZen) with **no
-public-sector-specific tool found** and most detection running post-payment.
+**The one idea researched this run, stated without its content.** Its verdict is GO DEEPER and the
+deciding question is in its private `research_note`, where you read it. Two things about it are worth
+your attention at this level, because neither is the idea:
 
-Sources: `sovra.com` press and partner pages plus `mdfcommerce.com` and a Feb-2024 earnings
-transcript, all read as dated search text on 2026-11-07 — `www.sovra.com` does not resolve from here,
-so none of it was read at the page. A 2026 spend-recovery comparison covering 16 tools, and vendor
-material from apexanalytix and Sirion, likewise as dated search text.
+1. **It resolved a licensing constraint that two other standing ideas are blocked on.** The research
+   found that the vendor the idea concerns now owns the licensor of a reference dataset two earlier
+   Napkin verdicts named as their blocker. That is a single conversation, not a build, and it is the
+   cheapest thing on the Napkin right now.
+2. **Half of it is crowded and half is open.** One half competes with the named vendor's own core
+   product and is not a gap; the other half is a category with real commercial vendors but **no
+   public-sector-specific tool found**, which is the open space. The verdict reflects that split
+   rather than averaging it.
+
+The market evidence behind both, with its sources and dates, is in the private note. None of it was
+read at a vendor page — the hosts do not resolve from here (fact 1) — so all of it is cited there as
+dated search text.
 
 ---
 ## Where I confirmed, and where I contradict, the week's market records
