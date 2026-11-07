@@ -1,4 +1,17 @@
 #!/usr/bin/env node
+// DeepBench v7.0.976 | scripts/render-standing-brief.js | AGT-367 -- a tenth group, `Wasted cycles`:
+// the last 7 days of `runner_cycles` with the CAUSE on each row, counted per cause by
+// `runner_waste_by_cause()`. Measured before this ship: 280 cycles in 7 days, 27 carrying a
+// push_sha, and NOTHING joined a row to a cause -- `audit_flow_checks()` arm (c) printed one
+// percentage, which says the run is burning budget and nothing about what to fix. The cause is
+// DERIVED (`runner_cycle_causes`) and never a written column, and the vocabulary is DATA
+// (`runner_waste_causes`): what counts as waste and which ticket would burn it down are an INSERT,
+// not a ship. `counts as waste` is the judgment this group exists to show -- a cycle that MOVED a
+// ticket, a scheduled routine and a run still going are NOT waste, and folding them into one rate
+// is what made the old percentage unreadable. Absent says so, `[]` is a measured zero, and NOTHING
+// here recounts what the function already counted. Not in factsSha(): the window advances with the
+// clock, so hashing it would report drift on every run -- `AGT-281`'s rule, the same call AGT-607
+// made for the stalls.
 // DeepBench v7.0.741 | scripts/render-standing-brief.js | AGT-281 -- a ninth group, `Victoria's lists`:
 // the newest two ENDED runner_cycles rows carrying `SCHEDULED-AGENT: victoria-reorg`, each printing
 // its own run line with the prefix stripped, plus the turned-down total parsed back out of those
@@ -1435,6 +1448,86 @@ export function renderStalledCycles(stalls, stamp) {
   return L.join("\n");
 }
 
+/**
+ * The window this group reports over, declared ONCE and shared by the renderer's own sentence and
+ * the read that feeds it. A group that prints "in the last 7 days" from one number while querying
+ * another is a report that lies quietly, and two literals is how that happens.
+ */
+export const WASTE_HOURS = 168;
+
+/**
+ * FEATURE: AGT-367 -- `Wasted cycles`: every wasted cycle NAMES ITS CAUSE. Pure, like every group
+ * above it -- `waste` is the array fetchFacts() read and nothing here goes near the network.
+ *
+ * WHY IT EXISTS AT ALL. Measured live on `runner_cycles` 2026-11-07: 280 cycles in the last 7
+ * days, 27 of them with a `push_sha`, and no surface anywhere joined a row to a CAUSE. The only
+ * reader-facing number was `audit_flow_checks()` arm (c)'s single percentage -- which tells John
+ * the run is spending without shipping and nothing whatsoever about what to change. The cause was
+ * on the row the whole time: 1103 of 1103 pre-boot refusals parse their reason out of `last_step`.
+ *
+ * NOTHING HERE COUNTS WHAT THE DATABASE COUNTED. `runner_waste_by_cause()` does the grouping, in
+ * one place, and this function only sums the three figures the lead states -- the total, the moved
+ * ones, and the ones the VOCABULARY calls waste. The received order is kept rather than re-sorted:
+ * the function already orders by count then cause, and a renderer that re-sorted would be a second
+ * opinion on the same question (pattern:9, pattern:14).
+ *
+ * `counts as waste` IS A COLUMN, NOT A GUESS IN HERE. `moved`, `routine_run` and `in_progress`
+ * are not waste, and the screen holds no content policy about which is which (pattern:12): the
+ * boolean comes from `runner_waste_causes`, so re-judging a cause is an INSERT and never a ship.
+ *
+ * ABSENT IS NOT ZERO, the same three branches every group above it keeps: a missing or non-array
+ * `waste` renders "the cause ledger was not read", never a count -- "the read failed" and "no
+ * cycle was wasted" are opposite facts and only one of them is a measurement.
+ *
+ * OUTSIDE factsSha() DELIBERATELY (`AGT-281`'s rule, the call AGT-607 made for the stalls): the
+ * window advances with the clock, so hashing it would report drift on every single run and the
+ * check would stop being read inside a day.
+ */
+export function renderWastedCycles(waste, stamp) {
+  const L = [];
+  const lead = `**Wasted cycles** — *${stamp}.* The last ${WASTE_HOURS / 24} days of ` +
+    "`runner_cycles` with the cause on each row, counted per cause by `runner_waste_by_cause()`. " +
+    "The cause is DERIVED (`runner_cycle_causes`), never a written column, so it is right for the " +
+    "rows already filed; the vocabulary is DATA (`runner_waste_causes`), so `counts as waste` and " +
+    "`candidate` are an INSERT and not a ship. A cycle that MOVED a ticket, a scheduled routine " +
+    "and a run still going are NOT waste -- folding them into one rate is what made " +
+    "`audit_flow_checks()` arm (c)'s old percentage unreadable.";
+
+  if (!Array.isArray(waste)) {
+    L.push(lead);
+    L.push("");
+    L.push("- *The cause ledger was not read for this render* — which is **not** the same as *no " +
+      "cycle was wasted*. Re-run `scripts/render-standing-brief.js` with a service key.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  const sum = rows => rows.reduce((a, r) => a + Number(r.n || 0), 0);
+  const total = sum(waste);
+  const moved = sum(waste.filter(r => r.cause === "moved"));
+  const wasted = sum(waste.filter(r => r.counts_as_waste));
+
+  L.push(`${lead} **${total} cycle(s) in the last ${WASTE_HOURS / 24} days, ${moved} moved a ` +
+    `ticket, ${wasted} wasted (${pct(wasted, total)}).**`);
+  L.push("");
+
+  if (waste.length === 0) {
+    L.push("- **No cycle in the window — a measured zero:** the ledger was read and holds no row.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  L.push("| cause | cycles | counts as waste | candidate |");
+  L.push("|---|---|---|---|");
+  for (const r of waste) {
+    L.push(`| \`${r.cause}\` | ${r.n} | ${r.counts_as_waste ? "yes" : "no"} | ` +
+      `${(r.candidate_tickets || []).join(", ") || "—"} |`);
+  }
+  L.push("");
+
+  return L.join("\n");
+}
+
 /** How many gate ids the Human gates block names before it stops listing and says how many are left. */
 export const HUMAN_GATE_IDS_SHOWN = 5;
 
@@ -1575,7 +1668,7 @@ export function renderBlock(facts, nowIso) {
   // "not read", never "she has not run".
   // FEATURE: AGT-607 — stalls joins the destructure on the same terms as victoria: absent means
   // "not read", never "no stall was reported".
-  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls } = facts;
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -1829,6 +1922,15 @@ export function renderBlock(facts, nowIso) {
   // contract as the eight groups above it — a pure helper a fixture can drive, rendering what
   // fetchFacts() read and counting nothing the table could have counted itself.
   L.push(renderStalledCycles(stalls, stamp));
+
+  // ---- Wasted cycles (FEATURE: AGT-367) -----------------------------------------------------
+  // AFTER Stalled cycles and BEFORE Human gates, which keeps Human gates the last group (SES-386).
+  // It belongs beside the stalls deliberately: both are about what the RUNNER did with its own
+  // slots, and `permission_stall` is one of the causes this table counts -- a reader who has just
+  // seen three frozen cycles should see, in the next group, how much of the week went that way.
+  // Same contract as the nine groups above it -- a pure helper a fixture can drive, rendering what
+  // fetchFacts() read and counting nothing `runner_waste_by_cause()` already counted itself.
+  L.push(renderWastedCycles(waste, stamp));
 
   // ---- Human gates (FEATURE: SES-386) -------------------------------------------------------
   // After Staff watch (SES-378 slice 5 landed between it and Ticket hygiene), before the provenance
@@ -2197,6 +2299,19 @@ export async function fetchFacts(url, key) {
     "&stall_notified_at=not.is.null&order=stall_notified_at.desc&limit=" + STALLS_READ);
   if (!Array.isArray(stalls)) die("the stalled-cycle read came back non-array — refusing to render the stalled-cycles group from nothing");
 
+  // FEATURE: AGT-367 — the per-cause cycle counts, read from the FUNCTION (service_role only, and
+  // the anon key cannot call it -- .claude/rules/supabase-column-grants.md addendum SES-315). The
+  // grouping happens THERE and nowhere else, so nothing on this side recounts it.
+  //
+  // THE WINDOW IS `WASTE_HOURS`, the same constant the group's own sentence prints, so the query
+  // and the claim "in the last 7 days" cannot drift apart. A function call, so there is no
+  // `select=*` to get wrong here -- the four columns are the function's own return type.
+  //
+  // AN EMPTY WINDOW IS A REAL STATE (it renders as a measured zero); a read that did not happen is
+  // not, so a non-array refuses rather than publishing a brief that reports no waste nobody read.
+  const waste = await rest(url, key, "rpc/runner_waste_by_cause?p_hours=" + WASTE_HOURS);
+  if (!Array.isArray(waste)) die("the cycle-cause read came back non-array — refusing to render the wasted-cycles group from nothing");
+
   // FEATURE: SES-386 — the two human-gate reads, moved here from two regression guards.
   //
   // THE FILTERS ARE THE ONES ses-285 ASSERTION 6 AND ses-373 ASSERTION 1 RAN, character for
@@ -2223,7 +2338,7 @@ export async function fetchFacts(url, key) {
     "proposed_projects?select=slug,name,proposal_reason,proposed_at,tickets,by_class,cycles&order=proposed_at,slug");
   if (!Array.isArray(proposedProjects)) die("the proposed_projects read came back non-array — refusing to render the proposed-projects group from nothing");
 
-  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls };
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste };
 }
 
 async function main() {
