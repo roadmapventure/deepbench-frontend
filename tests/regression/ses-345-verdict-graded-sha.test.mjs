@@ -88,14 +88,15 @@ export default async function run() {
     `could not be read'. got: ${JSON.stringify(withoutSha.graded_sha)}`);
 
   const keys = Object.keys(withSha);
-  assert.strictEqual(keys[keys.length - 1], "graded_sha",
-    `graded_sha must be the LAST key on the row. got: ${keys.join(", ")}`);
-  assert.deepStrictEqual(keys, [...AGT67_KEYS, "graded_sha"],
-    "the verdict row must be the agt-67 key set plus graded_sha and nothing else -- agt-67's own " +
-    "guard compares the two LANES to each other and stays green if both lose the key, so the count " +
-    `is anchored here instead. got: ${keys.join(", ")}`);
+  assert.strictEqual(keys[keys.length - 1], "rules_fingerprint",
+    `rules_fingerprint must be the LAST key on the row -- it took that position from graded_sha at ` +
+    `AGT-609 (v7.0.978), which added it after the sha for the same key-set reason. got: ${keys.join(", ")}`);
+  assert.deepStrictEqual(keys, [...AGT67_KEYS, "graded_sha", "rules_fingerprint"],
+    "the verdict row must be the agt-67 key set plus graded_sha and rules_fingerprint and nothing " +
+    "else -- agt-67's own guard compares the two LANES to each other and stays green if both lose a " +
+    `key, so the count is anchored here instead. got: ${keys.join(", ")}`);
   // NEGATIVE CONTROL: the predicate is an ordered key comparison, so it must notice the key missing.
-  assert.notDeepStrictEqual(AGT67_KEYS.slice(), [...AGT67_KEYS, "graded_sha"]);
+  assert.notDeepStrictEqual(AGT67_KEYS.slice(), [...AGT67_KEYS, "graded_sha", "rules_fingerprint"]);
 
   // -- (C) both judge lanes, on the source ------------------------------------------------------
   const src = fs.readFileSync(path.join(ROOT, VERIFIER_REL), "utf8");
@@ -152,8 +153,8 @@ export default async function run() {
     `ship_handoff_census.missing_sha (${c.missing_sha}) cannot exceed ships (${c.ships}) -- a leg ` +
     "counting more misses than ships is the join having gone cartesian");
 
-  console.log(`[SES-345] gradedShaFor() == git HEAD ${headSha.slice(0, 7)}; graded_sha is the last ` +
-    `verdict-row key; ${shas.length} verdict rows carry a sha, all hex; census ships ${c.ships}, ` +
+  console.log(`[SES-345] gradedShaFor() == git HEAD ${headSha.slice(0, 7)}; graded_sha then ` +
+    `rules_fingerprint are the last two verdict-row keys (AGT-609); ${shas.length} verdict rows carry a sha, all hex; census ships ${c.ships}, ` +
     `all four ${c.ships_all_four}, missing sha ${c.missing_sha}`);
 }
 

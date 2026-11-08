@@ -282,6 +282,14 @@ export const RUNBOOK_CEILING = 381000;
 // note" clause went with it. Net +53 B: 380920 -> 380973, 7 B under agt-138's 380980 ratchet. The
 // kickoff declared 380968; the measured value is pinned instead, per the kickoff's own STOP LINE
 // (pin it when it is < 380980) -- and the 5-byte gap is REPORTED, not absorbed.
+// AGT-609 (v7.0.978): (7a-ter) is now `scripts/regrade-current.js`, and the edit is BYTE-NEUTRAL --
+// this pin does not move. A 473-byte paragraph out, a 484-byte one in, and the serial-tail list line
+// 11 B shorter: 380973 -> 380973 B, measured with wc -c. The kickoff's §R declared the replaced
+// paragraph at 679 B and predicted 380855; it measures 473 B, so §R's 562-byte replacement would
+// have left the file at 381,062 -- over agt-138's one-way 380,980 ratchet AND SES-336's 381,000
+// ceiling. The paragraph was sized to the byte instead, which is also why agt-253's and
+// agt-525-tail-push.test.mjs's own copies of this number needed no edit. THREE files pin it; that is
+// two homes too many for one fact (agt-175) and is reported as this ship's residue, not fixed here.
 export const BYTES_AT_SHIP = 380973;   // 380985 -> 380843 (AGT-391: step 7's full-suite baseline capture -- its line, fence and 7a line -- became one related-set line, and 7a runs related-tests.js and passes --related=; agt-253's pin moved in the same commit)
 export const HEADER_STAMPS = 5;
 

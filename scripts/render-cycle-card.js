@@ -154,7 +154,7 @@ export const NOTES = {
   "8b-bis":   { outcome: "exit 1 → claim one id block in ONE call, then --apply; exit 2 is never a pass", block: 1 },
   "8c":       { outcome: "age triggers, premise decides; on spare capacity, never instead of the build", block: 1 },
   "8d":       { outcome: "0 rows = nothing owed; one review per cycle, never instead of the build", block: 1 },
-  "9":        { outcome: "write the record; ONE statement closes your row and releases the lease; THEN the gate", block: 2 },
+  "9":        { outcome: "write the record; ONE close+release statement; THEN the gate; (7a-ter) regrade-current.js", block: 2 },
 };
 
 // Pure. The blocks a step's note selects, in the order the note names them, each already known to fit.

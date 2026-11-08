@@ -201,8 +201,14 @@ function armDocs() {
   assert.ok(take > 0 && held > take && snap > 0, "run-all.js must take the slot and mark it held");
   assert.ok(runAll.indexOf("code = await runSuite(transport)") > held, "the slot is marked held BEFORE the suite (and its first snapshot) runs");
   const verifier = read("scripts/verifier.js");
-  assert.ok(/withTestSlot\(slotEnv,/.test(verifier) && /DEEPBENCH_TEST_SLOT: "held"/.test(verifier),
-    "the verifier must wrap the regression gate in withTestSlot and pass held to the child");
+  // AGT-609: the regression gate now runs inside `gradeDelivery()`, whose `slot` parameter DEFAULTS to
+  // `withTestSlot` -- so the wiring this arm grades is the pair "the default is withTestSlot" + "the
+  // call passes slotEnv", not one literal call. Both halves are required: a default of withTestSlot
+  // with nobody calling it, or a call to some other wrapper, each leaves the suite running outside the
+  // one slot line, which is the failure this arm exists to catch.
+  assert.ok(/slot = withTestSlot\b/.test(verifier) && /slot\(slotEnv,/.test(verifier)
+      && /DEEPBENCH_TEST_SLOT: "held"/.test(verifier),
+    "the verifier must wrap the regression gate in withTestSlot (gradeDelivery's `slot` default) and pass held to the child");
   return "docs: runbook, prompt, mirror, agt-116, run-all order, verifier";
 }
 

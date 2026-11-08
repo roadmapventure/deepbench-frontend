@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.978 | scripts/verifier.js | AGT-609 -- every verdict carries a rules fingerprint; gradeDelivery() is the ONE grading path verify-ship and the re-grade lane share.
 // DeepBench v7.0.977 | scripts/verifier.js | AGT-610 -- the risk declaration: every task names what it touches, how far it reaches, how it is undone; graded for coverage, never for its decision.
 // DeepBench v7.0.966 | scripts/verifier.js | AGT-572 -- a zero-file delivery is graded by its baseline's measured set
 // DeepBench v7.0.874 | scripts/verifier.js | AGT-457 -- one instrument, one baseline, one refusal: `measuredTestsFrom()` harvests the per-test `- <path> — green|RED|NOT RUN` lines `renderBlock()` already writes, so `readKickoffBaseline()` and `readRegressionBaseline()` now return `measured` (what the baseline ACTUALLY ran) and `instrument` (which script measured it) beside `names`; `regressionDelta()` gains a THIRD bucket, `neverMeasured` -- a post name the baseline never measured is no longer charged as newly red and the suite's own exit code stands; `baselineCoverageFinding()` refuses a baseline narrower than the set being graded (exit 1 `kickoff-baseline-narrower` at `--check-kickoff`, exit 2 `baseline-narrower-than-graded-set` at 7a) or one measured by an instrument outside `BASELINE_INSTRUMENTS`; and a PRESENT-but-unparseable block is exit 1 `kickoff-baseline-unparseable` (`present: true`), while a kickoff with NO block keeps AGT-391's escape untouched.
@@ -537,6 +538,7 @@
 // tests/regression/SES-181-verifier.js, tests/regression/SES-243-prime-directive-autodone.js and
 // tests/regression/ses-340-projects-govern.test.mjs.
 
+import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -571,6 +573,37 @@ export const GATES = Object.freeze([
   Object.freeze({ key: "hygiene", label: "hygiene tripwire",
     cmd: process.execPath, argv: ["scripts/check-session-docs.js", "--gate"] }),
 ]);
+
+// FEATURE: AGT-609 -- WHAT "THE CURRENT RULES" IS, AS ONE VALUE A ROW CAN CARRY.
+//
+// A verdict is only ever a judgment under the rules that were in the tree when it was graded. The
+// board held 94 `delivered` tickets whose latest verdict was a block, 38 of them graded before
+// 2026-09-29 under rules that have since changed, and nothing on the row said which rules those
+// were -- so nobody could tell a block that is still true from one that only used to be. This
+// fingerprint is that missing fact: sha256 over the DISK CONTENT of the seven files that ARE the
+// grading rules, stamped onto every verdict at the one write point (`insertVerdict`), compared by
+// `public.stale_blocked_verdicts()` to decide what is stale.
+//
+// WHY DISK CONTENT AND NOT GIT BLOB IDS: this must answer BEFORE the Builder's commit exists (7a
+// grades a working tree), and it must agree between John's Windows checkout and the cloud -- hence
+// the CRLF normalisation. `package.json` and `.github/workflows/ci.yml` are deliberately NOT here:
+// a dependency bump or a CI tweak is not a change in what a grade means (§A call 6).
+export const RULE_FILES = Object.freeze([
+  "scripts/verifier.js", "scripts/regrade-current.js", "tests/regression/run-all.js",
+  "scripts/check-session-docs.js", "scripts/related-tests.js",
+  "scripts/baseline-red-set.js", "scripts/pre-build-baseline.js",
+]);
+// Pure given its reader. null when ANY rule file is unreadable (fail closed: a row stamped with a
+// partial hash would never read as stale). CRLF-normalised so a Windows checkout and the cloud agree.
+export function rulesFingerprint(repoRoot, readFile = (f) => fs.readFileSync(f, "utf8")) {
+  const h = crypto.createHash("sha256");
+  for (const rel of RULE_FILES) {
+    let text;
+    try { text = readFile(path.join(repoRoot, rel)); } catch { return null; }
+    h.update(`${rel}\n${String(text).replace(/\r\n/g, "\n")}\u0000`);
+  }
+  return h.digest("hex");
+}
 
 // SES-340: a LABEL, where `AUTO_DONE_EPIC_PREFIX = "Selfbuild"` was a TEST. The retired constant was
 // the scope rule itself -- `epicName.startsWith(it)` -- so the name and the fence were one thing and
@@ -2105,7 +2138,9 @@ function spawnGate(cmd, argv, opts) {
   });
 }
 
-async function runGate(gate, repoRoot, env = process.env) {
+// AGT-609: exported so `gradeDelivery()`'s caller can hand in a memoising or stubbed runner. The
+// function itself is unchanged.
+export async function runGate(gate, repoRoot, env = process.env) {
   const shell = process.platform === "win32";
   const res = await spawnGate(spawnCommandFor(gate.cmd, shell), gate.argv, {
     cwd: repoRoot,
@@ -2998,7 +3033,7 @@ export async function ciConclusionFor(supabaseUrl, supabaseKey, gradedSha) {
 // live verdict ledger -- `runner_verdicts` gained no column for this ticket, and the agent's lens
 // findings reach it through `reasoning`, which is the column that already exists to carry exactly
 // that. A judged row that grew a key would be a schema change nobody asked for.
-export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, reasoning, eligible, autoDoneReason, epicName, priorityClass, gradedSha }) {
+export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, reasoning, eligible, autoDoneReason, epicName, priorityClass, gradedSha, rulesFingerprint }) {
   const g = gateResults || {};
   return {
     cycle_id: cycleId,
@@ -3013,20 +3048,33 @@ export function verdictRowFor({ cycleId, ticket, version, verdict, gateResults, 
     auto_done_reason: autoDoneReason,
     epic_name: epicName ?? null,
     priority_class: priorityClass ?? null,
-    // SES-345: LAST key, deliberately -- the agt-67 shape guard compares key SETS between the two
-    // lanes, so a key added here must be added for BOTH or that guard goes red, which is exactly the
-    // protection it exists to give. `null` when the sha could not be read (gradedShaFor()'s note).
+    // SES-345: the agt-67 shape guard compares key SETS between the two lanes, so a key added here
+    // must be added for BOTH or that guard goes red, which is exactly the protection it exists to
+    // give. `null` when the sha could not be read (gradedShaFor()'s note). It was the LAST key until
+    // AGT-609 added one after it.
     graded_sha: gradedSha ?? null,
+    // AGT-609: LAST key, deliberately -- for the reason the key above gives, which it inherits.
+    // `null` when a RULE_FILES entry was unreadable, which the sweep reads as stale (fail closed).
+    rules_fingerprint: rulesFingerprint ?? null,
   };
 }
 
 // The single write this script makes, in one place, so the judged lane and the mechanical lane
 // cannot drift into two payload shapes for one table.
 export async function insertVerdict(args) {
+  // AGT-609: THE ONE WRITE POINT IS THE ONE STAMP POINT. Every lane that records a verdict goes
+  // through here -- verify-ship's mechanical and judged lanes, `--regrade`, regrade-delivered.js and
+  // the re-grade lane -- so stamping the fingerprint here means no lane can record a verdict that
+  // does not say which rules graded it, and no lane has to remember to. An explicit
+  // `rulesFingerprint` (a test's fixture, or a lane that graded on another tree) wins; `undefined`
+  // measures the tree this process is running from, which is the tree that just ran the gates.
+  const rulesFp = args.rulesFingerprint === undefined
+    ? rulesFingerprint(path.resolve(__dirname, ".."))
+    : args.rulesFingerprint;
   const ins = await rest(args.supabaseUrl, args.supabaseKey, "runner_verdicts", {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify(verdictRowFor(args)),
+    body: JSON.stringify(verdictRowFor({ ...args, rulesFingerprint: rulesFp })),
   });
   if (ins.error) return { error: ins.error };
   return { rowId: Array.isArray(ins.rows) && ins.rows[0] ? ins.rows[0].id : null };
@@ -3346,6 +3394,132 @@ async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
     prose: `${prose}\n  recorded as runner_verdicts ${ins.rowId}\n  ship decision: ${shipId ?? "(none returned)"} -- its window closes through the tail's ordinary sweep.` });
 }
 
+// ---- FEATURE: AGT-609 -- ONE GRADING PATH, CALLED BY EVERY LANE THAT GRADES A DELIVERY. ------
+//
+// THE WHOLE SPAN main() USED TO HOLD INLINE, MOVED AND NOT REWRITTEN. Coverage refusal -> the three
+// gates (regression in the one test slot) -> the AGT-170 delta -> `verdictFor` -> the appended
+// notes. Every branch, every string and every key is byte-for-byte what 7a did before this ticket,
+// which is why the 120-test BASELINE set is the equivalence guard rather than a new assertion.
+//
+// WHY A FUNCTION AND NOT SEVEN IMPORTS. `scripts/regrade-current.js` re-grades a shipped delivery
+// under today's rules, which means it must grade it the way 7a grades one -- not approximately. A
+// lane that imported `baselineCoverageFinding`, `regressionDelta` and `verdictFor` and re-assembled
+// the sequence itself would be a SECOND copy of the rule, and it would drift the first time 7a's
+// sequence gained an input (AGT-529 will add one). One home, two callers (§A call 1, pattern:14).
+//
+// THE FOUR SEAMS A SECOND CALLER NEEDS, and nothing else is parameterised:
+//   `regressionRoot`  the tree the SUITE runs in (the re-grade's ship worktree), while build and
+//                    hygiene stay at `repoRoot` -- dev HEAD -- because a red build there is nobody's
+//                    ship (§A call 2). Defaults to `repoRoot`, which is what 7a passes.
+//   `only`           `{ path, names }` or null: the related set, by file or by resolved names.
+//   `declared` / `fallbackNote`  the two sentences that reach the row when the baseline was omitted
+//                    by declaration or the width fell back (AGT-245 / AGT-572).
+//   `run` / `slot`   the gate runner and the test-slot wrapper, injectable so the re-grade lane can
+//                    memoise build+hygiene across attempts and a test can grade a stub.
+//
+// Returns `{ coverage }` ALONE when the baseline does not cover the graded set: that is a cannot-run,
+// and what the caller does about it (7a exits 2 and records nothing) is the caller's exit-code
+// vocabulary, not this function's. Otherwise `coverage` is null and the seven graded facts are set.
+export async function gradeDelivery({ repoRoot, regressionRoot = repoRoot, cycleId, baselineRead, graded,
+  only = null, fallbackNote = null, declared = null, run = runGate, slot = withTestSlot }) {
+  const coverage = baselineCoverageFinding({
+    measured: baselineRead.measured,
+    graded,
+    instrument: baselineRead.instrument,
+  });
+  if (coverage) return { coverage };
+
+  const gateResults = {};
+  const gateDetail = {};
+  const gateFails = {};
+  for (const gate of GATES) {
+    // AGT-265: the regression gate waits in the one test-slot line; no slot is RED, naming the level.
+    let r;
+    if (gate.key === "regression") {
+      const slotEnv = cycleId ? { ...process.env, DEEPBENCH_CYCLE_ID: cycleId } : process.env;
+      // AGT-391: the related set, when named, through a copy -- GATES stays the full-suite definition.
+      // AGT-572: on the fallback path the csv is empty, so the resolved names go as `--only=`.
+      const asRun = only ? { ...gate, argv: regressionArgv(only.path, only.names) } : gate;
+      const taken = await slot(slotEnv, () =>
+        run(asRun, regressionRoot, { ...process.env, DEEPBENCH_TEST_SLOT: "held" }));
+      r = taken.ran ? taken.value : { status: "red", fails: null, detail: taken.notRun };
+    } else {
+      r = await run(gate, repoRoot);
+    }
+    gateResults[gate.key] = r.status;
+    gateDetail[gate.key] = r.detail;
+    if (r.fails) gateFails[gate.key] = r.fails;
+  }
+
+  // ---- FEATURE: AGT-170 -- THE REGRESSION GATE'S STATUS BECOMES THE DELTA'S. -------------------
+  //
+  // ONLY WHAT "REGRESSION GREEN" MEANS CHANGES, and everything downstream is deliberately untouched:
+  // `verdictFor` still approves iff all three gates are green, `verdictRowFor` still writes the three
+  // statuses into their own columns, and `ck_runner_verdicts_fail_closed` still refuses an approve
+  // that is not all-green. The delta decides ONE of the three inputs; it does not soften the rule
+  // that reads them. A ship with a newly red test, a red build or a red tripwire blocks exactly as
+  // before.
+  //
+  // THE ABSOLUTE ANSWER IS NEVER OVERWRITTEN, only re-graded beside itself: `regression_absolute`
+  // carries what the suite's exit code actually said, `gateDetail.regression` keeps its `exit 1 --
+  // [FAIL] ...` tail and gains the delta line, and both lists reach `--json`. A reader who wants to
+  // know whether the suite passed can still find out; what they can no longer do is read a red the
+  // delivery did not cause as this delivery's red.
+  const regressionAbsolute = gateResults.regression;
+  //
+  // AGT-170 SLICE 2: `unverified` rides in beside `baseline`. Both come off the SAME read of the SAME
+  // file, so the two lists cannot describe different baselines -- the defect
+  // `scripts/baseline-red-set.js`'s header records, applied one level down.
+  const delta = regressionDelta({
+    absolute: regressionAbsolute,
+    baseline: baselineRead.names,
+    post: gateFails.regression ?? null,
+    unverified: baselineRead.unverified,
+    // AGT-457: the THIRD list off the SAME read of the SAME file, for the reason slice 2's comment
+    // above gives -- three facts read from three reads can describe three baselines.
+    measured: baselineRead.measured,
+  });
+  // AGT-245: a DECLARED omission replaces the delta's own "no baseline handed to the gate" reason with
+  // the declaration, so the row says WHY it was omitted and by whose choice rather than only that it
+  // was. The status is untouched -- `regressionDelta` already left the absolute exit code alone, which
+  // is exactly what a declaration is allowed to cost: nothing.
+  if (declared) delta.reason = declared.source;
+  gateResults.regression = delta.status;
+  gateDetail.regression = `${gateDetail.regression} | delta: ${delta.standing === null ? "not graded" : delta.standing.length} standing, ` +
+    `${delta.newlyRed === null ? "not graded" : delta.newlyRed.length} newly red` +
+    `${delta.newlyRed && delta.newlyRed.length ? ` [${delta.newlyRed.join(", ")}]` : ""}` +
+    // Slice 2: the third count, and it is NAMED rather than counted alone for the same reason the newly
+    // red list is -- this line is what a later reader sees, and "1 unverified" with no name sends them
+    // back to re-run the suite to find out which. Silent when the count is 0 or nothing was graded, so a
+    // full-run baseline's detail line is byte-identical to slice 1's.
+    `${delta.unverifiedInBaseline && delta.unverifiedInBaseline.length ? `, ${delta.unverifiedInBaseline.length} unverified in baseline [${delta.unverifiedInBaseline.join(", ")}]` : ""}` +
+    // AGT-457: the fourth count, NAMED for the reason the third one is, and SILENT at 0 or not-graded
+    // so a detail line from a baseline that measured everything is byte-identical to slice 2's.
+    `${delta.neverMeasured && delta.neverMeasured.length ? `, ${delta.neverMeasured.length} never measured [${delta.neverMeasured.join(", ")}]` : ""}` +
+    ` -- ${delta.reason}`;
+
+  let { verdict, reasoning } = verdictFor(gateResults);
+
+  // AGT-245: APPENDED, never replaced -- the same one-direction discipline the kickoff findings below
+  // use for their prepend. The red gate that was already the reason stays the reason; what this adds is
+  // the fact that the regression half was graded without a baseline, on a named declaration.
+  // AGT-572: APPENDED FIRST, same one-direction discipline. A verdict reached on the fallback width
+  // must SAY so on the row -- a reader who finds `--related=` in the command and a different set in
+  // the run has no other way to learn which width was graded or why.
+  if (fallbackNote) reasoning += ` ${fallbackNote}.`;
+
+  if (declared) {
+    reasoning += ` Baseline omitted by declaration: ${declared.reason} (AGT-245).`;
+  }
+
+  // AGT-304: APPENDED after the AGT-245 note, same one-direction discipline -- it changes no verdict
+  // and no gate, it only stops `approve` from reading as a green suite. Silent ("") when the delta
+  // graded nothing, so a --no-baseline=<reason> run's reasoning is byte-identical to before.
+  reasoning += deltaVerdictNote(delta, baselineRead.names);
+
+  return { coverage: null, gateResults, gateDetail, gateFails, regressionAbsolute, delta, verdict, reasoning };
+}
+
 async function main() {
   const repoRoot = arg("repo", path.resolve(__dirname, ".."));
 
@@ -3396,6 +3570,32 @@ async function main() {
     const bytes = Buffer.byteLength(md, "utf8");
     return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "answer-within-cap", bytes, cap: KICKOFF_BYTE_CAP, measured: "answer.kickoff_markdown" },
       prose: `answer kickoff_markdown ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (AGT-519) -- write it as returned; --check-kickoff=<path> --answer=<this file> attests the file (AGT-187)` });
+  }
+
+  // ---- FEATURE: AGT-609 -- WHAT ARE THE CURRENT RULES? ---------------------------------------
+  //
+  // Here, beside `--check-answer` and before `--check-kickoff`, for the same reason those two are
+  // ahead of the credential check: this reads seven local files and nothing else. No board, no gate,
+  // no row, so there is nothing for a credential to authorise -- and `scripts/regrade-current.js`,
+  // the runbook's (7a-ter), and a human asking "is this verdict stale?" can all run it anywhere.
+  //
+  // 2, NEVER 0, WHEN A RULE FILE IS UNREADABLE. The same distinction every other door here draws:
+  // 0 is an answer, 2 is the absence of one. A partial hash printed as an answer would be read as a
+  // fingerprint, stamped onto rows, and would never match the tree it claims to describe.
+  if (process.argv.includes("--rules-fingerprint")) {
+    const fp = rulesFingerprint(repoRoot);
+    if (fp === null) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run",
+          error: "a RULE_FILES entry is unreadable", files: [...RULE_FILES] },
+        prose: `verifier: a RULE_FILES entry is unreadable under ${repoRoot}, so the rules fingerprint cannot be computed.\n`
+          + `  Exiting 2 -- this is NOT a fingerprint, it is the absence of one (AGT-609).\n`
+          + `  ${RULE_FILES.join("\n  ")}` });
+    }
+    return emit({ code: 0, payload: { ok: true, exitCode: 0, kind: "rules-fingerprint",
+        fingerprint: fp, files: [...RULE_FILES] },
+      prose: `${fp}\n`
+        + `  sha256 over the ${RULE_FILES.length} grading rule files, CRLF-normalised (AGT-609).\n`
+        + `  ${RULE_FILES.join("\n  ")}` });
   }
 
   // ---- SES-376: the kickoff size check, and it is the FIRST branch on purpose. ----------------
@@ -3900,11 +4100,20 @@ async function main() {
   // checked (`runner_verdicts` 2375cc65 blocked on a 1-name baseline). With no related set `GATES`
   // runs `tests/regression/run-all.js` bare, so the graded set IS `suiteTests(repoRoot)`, and a
   // baseline narrower than it is exit 2 -- a cannot-run, never a block charged to the delivery.
-  const coverage = baselineCoverageFinding({
-    measured: baselineRead.measured,
+  // AGT-609: the span that used to stand here is `gradeDelivery()` above -- ONE grading path, and
+  // this lane is one of its two callers. The arguments below are exactly what this branch computed
+  // for itself before the extraction; the exit-2 coverage emit stays HERE because the exit code is
+  // 7a's vocabulary, not the grader's.
+  const graded = await gradeDelivery({
+    repoRoot,
+    cycleId,
+    baselineRead,
     graded: relatedRead?.names ?? (Array.isArray(baselineRead.measured) ? suiteTests(repoRoot) : null),
-    instrument: baselineRead.instrument,
+    only: relatedPath ? { path: relatedPath, names: relatedRead?.fallback ? relatedRead.names : null } : null,
+    fallbackNote: relatedRead?.fallback ?? null,
+    declared: baselineDecision.declared ? { reason: baselineDecision.declared, source: baselineDecision.source } : null,
   });
+  const coverage = graded.coverage;
   if (coverage) {
     return emit({ code: 2, payload: { ok: false, exitCode: 2, ...coverage, kind: "cannot-run",
         error: "baseline-narrower-than-graded-set",
@@ -3915,93 +4124,8 @@ async function main() {
         + (relatedPath ? "" : `\n  No --related= was passed: the graded width is the FULL suite (${suiteTests(repoRoot).length} tests, AGT-572).`) });
   }
 
-  const gateResults = {};
-  const gateDetail = {};
-  const gateFails = {};
-  for (const gate of GATES) {
-    // AGT-265: the regression gate waits in the one test-slot line; no slot is RED, naming the level.
-    let r;
-    if (gate.key === "regression") {
-      const slotEnv = cycleId ? { ...process.env, DEEPBENCH_CYCLE_ID: cycleId } : process.env;
-      // AGT-391: the related set, when named, through a copy -- GATES stays the full-suite definition.
-      // AGT-572: on the fallback path the csv is empty, so the resolved names go as `--only=`.
-      const asRun = relatedPath ? { ...gate, argv: regressionArgv(relatedPath, relatedRead?.fallback ? relatedRead.names : null) } : gate;
-      const taken = await withTestSlot(slotEnv, () =>
-        runGate(asRun, repoRoot, { ...process.env, DEEPBENCH_TEST_SLOT: "held" }));
-      r = taken.ran ? taken.value : { status: "red", fails: null, detail: taken.notRun };
-    } else {
-      r = await runGate(gate, repoRoot);
-    }
-    gateResults[gate.key] = r.status;
-    gateDetail[gate.key] = r.detail;
-    if (r.fails) gateFails[gate.key] = r.fails;
-  }
-
-  // ---- FEATURE: AGT-170 -- THE REGRESSION GATE'S STATUS BECOMES THE DELTA'S. -------------------
-  //
-  // ONLY WHAT "REGRESSION GREEN" MEANS CHANGES, and everything downstream is deliberately untouched:
-  // `verdictFor` still approves iff all three gates are green, `verdictRowFor` still writes the three
-  // statuses into their own columns, and `ck_runner_verdicts_fail_closed` still refuses an approve
-  // that is not all-green. The delta decides ONE of the three inputs; it does not soften the rule
-  // that reads them. A ship with a newly red test, a red build or a red tripwire blocks exactly as
-  // before.
-  //
-  // THE ABSOLUTE ANSWER IS NEVER OVERWRITTEN, only re-graded beside itself: `regression_absolute`
-  // carries what the suite's exit code actually said, `gateDetail.regression` keeps its `exit 1 --
-  // [FAIL] ...` tail and gains the delta line, and both lists reach `--json`. A reader who wants to
-  // know whether the suite passed can still find out; what they can no longer do is read a red the
-  // delivery did not cause as this delivery's red.
-  const regressionAbsolute = gateResults.regression;
-  //
-  // AGT-170 SLICE 2: `unverified` rides in beside `baseline`. Both come off the SAME read of the SAME
-  // file, so the two lists cannot describe different baselines -- the defect
-  // `scripts/baseline-red-set.js`'s header records, applied one level down.
-  const delta = regressionDelta({
-    absolute: regressionAbsolute,
-    baseline: baselineRead.names,
-    post: gateFails.regression ?? null,
-    unverified: baselineRead.unverified,
-    // AGT-457: the THIRD list off the SAME read of the SAME file, for the reason slice 2's comment
-    // above gives -- three facts read from three reads can describe three baselines.
-    measured: baselineRead.measured,
-  });
-  // AGT-245: a DECLARED omission replaces the delta's own "no baseline handed to the gate" reason with
-  // the declaration, so the row says WHY it was omitted and by whose choice rather than only that it
-  // was. The status is untouched -- `regressionDelta` already left the absolute exit code alone, which
-  // is exactly what a declaration is allowed to cost: nothing.
-  if (baselineDecision.declared) delta.reason = baselineDecision.source;
-  gateResults.regression = delta.status;
-  gateDetail.regression = `${gateDetail.regression} | delta: ${delta.standing === null ? "not graded" : delta.standing.length} standing, ` +
-    `${delta.newlyRed === null ? "not graded" : delta.newlyRed.length} newly red` +
-    `${delta.newlyRed && delta.newlyRed.length ? ` [${delta.newlyRed.join(", ")}]` : ""}` +
-    // Slice 2: the third count, and it is NAMED rather than counted alone for the same reason the newly
-    // red list is -- this line is what a later reader sees, and "1 unverified" with no name sends them
-    // back to re-run the suite to find out which. Silent when the count is 0 or nothing was graded, so a
-    // full-run baseline's detail line is byte-identical to slice 1's.
-    `${delta.unverifiedInBaseline && delta.unverifiedInBaseline.length ? `, ${delta.unverifiedInBaseline.length} unverified in baseline [${delta.unverifiedInBaseline.join(", ")}]` : ""}` +
-    // AGT-457: the fourth count, NAMED for the reason the third one is, and SILENT at 0 or not-graded
-    // so a detail line from a baseline that measured everything is byte-identical to slice 2's.
-    `${delta.neverMeasured && delta.neverMeasured.length ? `, ${delta.neverMeasured.length} never measured [${delta.neverMeasured.join(", ")}]` : ""}` +
-    ` -- ${delta.reason}`;
-
-  let { verdict, reasoning } = verdictFor(gateResults);
-
-  // AGT-245: APPENDED, never replaced -- the same one-direction discipline the kickoff findings below
-  // use for their prepend. The red gate that was already the reason stays the reason; what this adds is
-  // the fact that the regression half was graded without a baseline, on a named declaration.
-  // AGT-572: APPENDED FIRST, same one-direction discipline. A verdict reached on the fallback width
-  // must SAY so on the row -- a reader who finds `--related=` in the command and a different set in
-  // the run has no other way to learn which width was graded or why.
-  if (relatedRead?.fallback) reasoning += ` ${relatedRead.fallback}.`;
-
-  if (baselineDecision.declared) {
-    reasoning += ` Baseline omitted by declaration: ${baselineDecision.declared} (AGT-245).`;
-  }
-
-  // AGT-304: APPENDED after the AGT-245 note, same one-direction discipline -- it changes no verdict
-  // and no gate, it only stops `approve` from reading as a green suite. Silent ("") when the delta
-  // graded nothing, so a --no-baseline=<reason> run's reasoning is byte-identical to before.
-  reasoning += deltaVerdictNote(delta, baselineRead.names);
+  const { gateResults, gateDetail, gateFails, regressionAbsolute, delta } = graded;
+  let { verdict, reasoning } = graded;
 
   // FEATURE: SES-376 -- an over-cap kickoff BLOCKS the delivery it belongs to, not just the draft.
   //

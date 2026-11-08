@@ -83,6 +83,11 @@
 //     `sweep_decision_windows(` call whose window the ship decision it writes is for. The `SES-158`
 //     control strips the command line and the arm must THROW: a clause that still passes without the
 //     command is pinning prose, not the step.
+//     AGT-609 (v7.0.978): THAT PARAGRAPH IS NOW AGT-609's. `scripts/regrade-current.js` superseded
+//     this lane's cohort walk in the tail (§A call 10 -- two re-grade lanes with two rules must never
+//     run in one tail), so this clause grades AGT-609's step and the needles below are its command,
+//     its flags and its one-slot-per-attempt rule. Nothing else in this file moved: every other arm
+//     grades `scripts/regrade-delivered.js` itself, which stays in the tree and still works.
 //
 // (g) THE ROW IS IN THE LEDGER (slice 4). `AGT-101` carried exactly ONE verdict row -- the `v7.0.563`
 //     block -- and no ship decision, so a slice that ran both legs and wrote nothing leaves the count
@@ -151,7 +156,7 @@ const TICKET = "AGT-101";
 const NEXT_TICKET = "AGT-100";
 
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
-const TER_MARKER = "**(7a-ter) DELTA RE-GRADE";
+const TER_MARKER = "**(7a-ter) RE-GRADE UNDER CURRENT RULES";
 const BIS_MARKER = "**(7a-bis) RE-GRADE";
 const SWEEP_HEADING = "**(7b) SWEEP";
 const norm = s => String(s).replace(/\s+/g, " ");
@@ -193,12 +198,12 @@ async function countVerdicts(base, key, ticket) {
 export function theTailCarriesTheDeltaRegrade(md) {
   const at = md.indexOf(TER_MARKER);
   assert.ok(at >= 0,
-    `${RUNBOOK_REL} carries no "${TER_MARKER}" paragraph -- AGT-245's step has to live IN the serial ` +
+    `${RUNBOOK_REL} carries no "${TER_MARKER}" paragraph -- the tail's re-grade step has to live IN the serial ` +
       "tail, not in a script nobody is told to run");
   const bis = md.indexOf(BIS_MARKER);
   assert.ok(bis >= 0 && bis < at,
     `${RUNBOOK_REL}'s (7a-bis) paragraph is at ${bis} and (7a-ter) at ${at}: the free re-grade lane is ` +
-      "read first, and the delta lane is the one that runs when it returned nothing");
+      "read first, and the re-grade-under-current-rules lane is the one that runs every cycle after it");
   const sweep = md.indexOf("sweep_decision_windows(");
   assert.ok(sweep > at,
     `${RUNBOOK_REL}'s (7a-ter) paragraph is at ${at} but the sweep call is at ${sweep}. The re-grade runs ` +
@@ -208,12 +213,13 @@ export function theTailCarriesTheDeltaRegrade(md) {
   assert.ok(end > at, `${RUNBOOK_REL}'s (7a-ter) paragraph is not followed by the "${SWEEP_HEADING}" heading`);
   const span = norm(md.slice(at, end));
   const required = [
-    ["scripts/regrade-delivered.js", "the command the cycle actually runs -- the whole point of putting the step here"],
-    ["--next", "slice 5: the tail runs this EVERY cycle with nothing to name, and a step that still "
+    ["scripts/regrade-current.js", "the command the cycle actually runs -- the whole point of putting the step here (AGT-609)"],
+    ["--next", "the tail runs this EVERY cycle with nothing to name, and a step that still "
       + "spelled --ticket= would be one no unattended cycle could run"],
     ["--cycle-id=", "the verdict row and the ship decision both hang off the cycle"],
-    ["ONE test slot for BOTH legs", "one acquisition across base and ship: a pair that releases the line " +
-      "between its legs races a peer cycle's suite, which is the one thing that line exists to stop"],
+    ["one test slot per attempt", "AGT-609 §A call 7: the slot is taken and RELEASED per attempt. " +
+      "test_slots capacity is 1, so a lane that held the line across three attempts would starve " +
+      "every peer cycle for the length of three suites"],
   ];
   for (const [needle, why] of required) {
     assert.ok(span.includes(needle),
@@ -647,7 +653,10 @@ async function run() {
   // ---- (f) the tail carries the step, with the SES-158 control -------------------------------
   const runbook = fs.readFileSync(path.join(ROOT, RUNBOOK_REL), "utf8");
   const terSpan = theTailCarriesTheDeltaRegrade(runbook);
-  const noCommand = runbook.split("\n").filter(l => !l.includes("scripts/regrade-delivered.js")).join("\n");
+  // AGT-609: the command the paragraph names is `scripts/regrade-current.js` now, so THAT is the line
+  // the control strips. Left pointing at the retired script this control would delete nothing, pass
+  // vacuously, and stop proving that the (f) arm notices a paragraph with no command in it.
+  const noCommand = runbook.split("\n").filter(l => !l.includes("scripts/regrade-current.js")).join("\n");
   assert.notStrictEqual(noCommand, runbook, "control for (f) changed nothing -- the mutation misses its target (the SES-158 failure)");
   assert.throws(() => theTailCarriesTheDeltaRegrade(noCommand), /does not name/,
     "CONTROL: with the command line stripped the (f) arm must THROW -- a clause that still passes without the command pins prose, not the step");
@@ -769,8 +778,8 @@ function report(pair, live, terSpan, ledger, picker, second, board) {
     `with no gate results. legNames: a [NOT RUN] transport capture is ran:false, a [PASS] capture is ran:true, and a test that ` +
     `failed AND skipped a part stays a proven red. AGT-202 exits 2 no-version; --suite=x without --dry-run exits 2 ` +
     `suite-override-requires-dry-run with the credentials stripped, while the default suite passes the fence.` +
-    `\n       The tail's (7a-ter) paragraph (${terSpan} B normalised) names the command, --next, --cycle-id= and ONE ` +
-    `test slot for BOTH legs, sits after (7a-bis) and above the sweep call, and its arm throws with the command line stripped.` +
+    `\n       The tail's (7a-ter) paragraph (${terSpan} B normalised) names the command, --next, --cycle-id= and one ` +
+    `test slot per attempt, sits after (7a-bis) and above the sweep call, and its arm throws with the command line stripped.` +
     (picker ? `\n       The picker walks ${picker.resolved} resolved rows in file order: with only ${TICKET} re-graded it ` +
       `picks ${picker.first} (the control), with both re-graded it steps to the next row, a superseded / not-delivered / ` +
       `deps-changed row is stepped OVER with its reason reported, and every row answered is pair:null (exit 3, drained).` : "") +
