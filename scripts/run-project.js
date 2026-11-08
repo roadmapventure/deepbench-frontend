@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.979 | scripts/run-project.js | AGT-602 -- an off-queue leverage mark drops that one mark, never the answer (leverage_unrecorded).
 // DeepBench v7.0.928 | scripts/run-project.js | AGT-532 -- AN UNDECIDED GATE CARD IS REPORTED, AND A
 // REFUSAL CARRIES THE REASON. Pass one reads the undecided `gated_before_build` cards from
 // `runner_items` beside the queue -- `readInstruments()` never read that table -- carries them into
@@ -512,15 +513,19 @@ export function passOverNote(answer, state) {
 // tickets or agents run better; `public.record_leverage()` then writes `leverage_reason`, and both pick
 // homes rank a marked ticket ahead of project priority. THE LIST IS THE LISTER'S: every id must be a
 // ref `prime_directive_queue()` returned (`state.queue`, read verbatim), the same direction `regrades`
-// and the pass-over are checked in. The function re-checks the queue itself -- this is the early,
-// legible half, never the only one. Absent `leverage` returns no lines at all.
+// and the pass-over are checked in. Absent `leverage` returns no lines at all.
+//
+// AGT-602 (v7.0.979): THIS FUNCTION NO LONGER CHECKS THE QUEUE. A leverage mark is advisory -- an
+// off-queue id must cost that one mark, not the manager's whole answer -- so the off-queue half moved
+// to `leverageOffQueue` below, which partitions instead of refusing. What stays here is SHAPE only
+// (not an array, not an object, a blank `improves`/`why`), and shape is still fatal at (c): a mark
+// that cannot be read at all is not a mark that can be dropped.
 export function leverageErrors(answer, state) {
   const lev = answer ? answer.leverage : undefined;
   if (lev === undefined || lev === null) return [];
   if (!Array.isArray(lev)) {
     return [`"leverage" is ${typeof lev}, not an array of {backlog_id, improves, why} -- a leverage mark that cannot be checked against the queue is refused`];
   }
-  const refs = (Array.isArray(state?.queue) ? state.queue : []).map(r => String((r && r.ref) ?? "")).filter(Boolean);
   const errors = [];
   lev.forEach((item, i) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
@@ -528,9 +533,6 @@ export function leverageErrors(answer, state) {
       return;
     }
     const id = String(item.backlog_id ?? "").trim();
-    if (!refs.includes(id)) {
-      errors.push(`"leverage"[${i}] names "${id}", which prime_directive_queue() did not return (it returned: ${refs.join(", ") || "nothing"}) -- leverage is marked only on the queue the manager was shown`);
-    }
     for (const k of ["improves", "why"]) {
       if (typeof item[k] !== "string" || item[k].trim() === "") {
         errors.push(`"leverage"[${i}] (${id || "no id"}) carries a blank "${k}" -- a leverage mark says what it makes run better and why`);
@@ -538,6 +540,25 @@ export function leverageErrors(answer, state) {
     }
   });
   return errors;
+}
+
+// AGT-602 (v7.0.979) -- AN OFF-QUEUE LEVERAGE MARK DROPS THAT MARK, NEVER THE ANSWER. The list is
+// still the lister's: a `leverage` id that `prime_directive_queue()` did not return is not recorded.
+// But leverage is ADVISORY -- it re-ranks a later pick, it does not decide this turn -- and the pick's
+// own claim removes it from the live queue the lister re-reads, so the manager's own pick was the id
+// most likely to be refused. Partition rather than refuse: `kept` is recorded, `dropped` carries the
+// line the refusal used to print (byte-identical wording, so `offQueueIds` still reads the id back
+// out of it) and the driver reports it in `leverage_unrecorded`. Pure; absent `leverage` drops nothing.
+export function leverageOffQueue(answer, state) {
+  const lev = Array.isArray(answer?.leverage) ? answer.leverage : [];
+  const refs = (Array.isArray(state?.queue) ? state.queue : []).map(r => String((r && r.ref) ?? "")).filter(Boolean);
+  const kept = [], dropped = [];
+  lev.forEach((item, i) => {
+    const id = String(item?.backlog_id ?? "").trim();
+    if (refs.includes(id)) { kept.push(item); return; }
+    dropped.push({ backlog_id: id, line: `"leverage"[${i}] names "${id}", which prime_directive_queue() did not return (it returned: ${refs.join(", ") || "nothing"}) -- leverage is marked only on the queue the manager was shown` });
+  });
+  return { kept, dropped };
 }
 
 // AGT-532 (v7.0.928) -- AN UNDECIDED GATE CARD IS REPORTED. One line per undecided
@@ -1278,14 +1299,33 @@ async function main() {
     //      decision, one before-image per row -- BEFORE the stop/report/assign fork, because it rides
     //      on any action. Absent `leverage`, nothing here runs and every payload and line below is
     //      byte-identical to before. `--dry-run` writes nothing, and says so.
-    const lev = Array.isArray(answer.leverage) && answer.leverage.length ? answer.leverage : null;
-    let levExtra = {};
+    //
+    //      AGT-602 (v7.0.979): the mark is ADVISORY, so neither of its two off-queue failures ends the
+    //      turn any more. An id the lister did not return is dropped HERE -- `leverageOffQueue` keeps
+    //      the rest -- with `pick_exclusions()`'s own reason beside it, and a `record_leverage()`
+    //      refusal drops every mark the same way instead of returning EXIT_CANNOT_RUN. Both land in
+    //      `leverage_unrecorded` and one prose line each; the action below then happens exactly as it
+    //      would have with no `leverage` at all. SHAPE errors are untouched and still fatal at (c),
+    //      and `record_leverage()` itself is unchanged -- it still writes all or nothing.
+    const part = leverageOffQueue(answer, state);
+    const lev = part.kept.length ? part.kept : null;
+    const unrecorded = [];
     let levLine = "";
+    for (const d of part.dropped) {
+      const ex = await rpc(base, key, `pick_exclusions?backlog_id=eq.${encodeURIComponent(d.backlog_id)}`);
+      const reason = ex.error
+        ? `pick_exclusions() could not be read for "${d.backlog_id}": ${ex.error}`
+        : exclusionReasonLine(d.backlog_id, ex.rows);
+      unrecorded.push({ backlog_id: d.backlog_id, reason });
+      console.error(`${d.line}; the mark is dropped, the answer stands (AGT-602) -- ${reason}`);
+      levLine += `\n  leverage: NOT RECORDED on ${d.backlog_id} -- ${reason}`;
+    }
+    let levExtra = unrecorded.length ? { leverage_unrecorded: unrecorded } : {};
     if (lev) {
       if (args.dryRun) {
         console.error(`run-project: --dry-run, so the leverage mark on ${lev.map(l => l.backlog_id).join(", ")} was NOT recorded.`);
-        levExtra = { leverage_decision: null };
-        levLine = `\n  leverage: NOT RECORDED (--dry-run) -- ${lev.map(l => l.backlog_id).join(", ")}`;
+        levExtra = { ...levExtra, leverage_decision: null };
+        levLine += `\n  leverage: NOT RECORDED (--dry-run) -- ${lev.map(l => l.backlog_id).join(", ")}`;
       } else {
         if (!String(args.cycleId ?? "").trim()) {
           return emit({ code: EXIT_CANNOT_RUN, json: args.json,
@@ -1297,12 +1337,14 @@ async function main() {
           p_items: lev.map(l => ({ backlog_id: String(l.backlog_id).trim(), improves: String(l.improves).trim(), why: String(l.why).trim() })),
         });
         if (rec.error) {
-          return emit({ code: EXIT_CANNOT_RUN, json: args.json,
-            payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "refused", error: rec.error },
-            prose: `run-project: record_leverage() refused the leverage mark: ${rec.error}. Exiting ${EXIT_CANNOT_RUN} -- the function writes all or nothing.` });
+          console.error(`run-project: record_leverage() refused the leverage mark: ${rec.error} -- nothing recorded; the answer stands (AGT-602).`);
+          levExtra = { ...levExtra, leverage_decision: null,
+            leverage_unrecorded: [...unrecorded, ...lev.map(l => ({ backlog_id: String(l.backlog_id).trim(), reason: rec.error }))] };
+          levLine += `\n  leverage: NOT RECORDED -- record_leverage() refused: ${rec.error}`;
+        } else {
+          levExtra = { ...levExtra, leverage_decision: rec.row ?? null };
+          levLine += `\n  leverage: recorded as decision ${rec.row} -- ${lev.map(l => l.backlog_id).join(", ")} now outrank project order`;
         }
-        levExtra = { leverage_decision: rec.row ?? null };
-        levLine = `\n  leverage: recorded as decision ${rec.row} -- ${lev.map(l => l.backlog_id).join(", ")} now outrank project order`;
       }
     }
 

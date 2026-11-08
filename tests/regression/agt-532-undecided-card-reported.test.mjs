@@ -1,3 +1,4 @@
+// DeepBench v7.0.979 | tests/regression/agt-532-undecided-card-reported.test.mjs | AGT-602 -- arm B drives offQueueIds through leverageOffQueue().dropped, since leverageErrors() no longer refuses an off-queue id.
 // DeepBench v7.0.928 | tests/regression/agt-532-undecided-card-reported.test.mjs | AGT-532
 //
 // FEATURE: AGT-532 -- AN UNDECIDED GATE CARD IS REPORTED, AND A REFUSAL CARRIES THE REASON.
@@ -17,9 +18,11 @@
 //     in front of the manager it belongs to at 7b.
 //
 // (B) THE REASON IS READ OFF THE REFUSAL, NOT RE-DERIVED. `offQueueIds` is driven through the
-//     SHIPPED `leverageErrors` rather than a hand-written string, because a hand-written line proves
-//     the regex matches itself and nothing else: if that refusal's wording moves, this arm must go
-//     red. `exclusionReasonLine` is asserted on a row AND on no row, because a helper that returned
+//     SHIPPED off-queue line rather than a hand-written string, because a hand-written line proves
+//     the regex matches itself and nothing else: if that line's wording moves, this arm must go
+//     red. AGT-602 (v7.0.979) moved that line's author from `leverageErrors` -- which no longer
+//     checks the queue, because an off-queue mark is now dropped rather than refused -- to
+//     `leverageOffQueue().dropped`, which is where the driver reads it from too. `exclusionReasonLine` is asserted on a row AND on no row, because a helper that returned
 //     the no-row sentence for everything would satisfy either half alone.
 //
 // (D) THE WIRING IS PINNED, because (A) and (B) are pure helpers and a build that exported them and
@@ -41,7 +44,7 @@ import {
   undecidedGateCardLines,
   offQueueIds,
   exclusionReasonLine,
-  leverageErrors,
+  leverageOffQueue,
 } from "../../scripts/run-project.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -90,12 +93,12 @@ function onlyAnotherCyclesCardIsReported() {
 // == (B) ========================================================================================
 function theRefusalCarriesTheReason() {
   // Driven through the SHIPPED refusal, not a hand-written copy of its wording.
-  const errors = leverageErrors(
+  const errors = leverageOffQueue(
     { leverage: [{ backlog_id: "ZZ-9", improves: "a", why: "b" }] },
     { queue: [{ ref: "AGT-1" }] },
-  );
+  ).dropped.map(d => d.line);
   assert.ok(errors.length >= 1,
-    "leverageErrors() refused nothing for an off-queue leverage id -- the fixture this arm reads " +
+    "leverageOffQueue() dropped nothing for an off-queue leverage id -- the fixture this arm reads " +
       "from is gone, so offQueueIds would be asserted against a string it wrote itself");
   assert.deepStrictEqual(offQueueIds(errors), ["ZZ-9"],
     `offQueueIds() did not read the off-queue id back out of the shipped refusal line(s): ` +

@@ -1,3 +1,4 @@
+// DeepBench v7.0.979 | tests/regression/agt-238-leverage-first.test.mjs | AGT-602 -- arm B grades the off-queue mark as DROPPED (leverageOffQueue) rather than refused, and pins that the driver reports it instead of exiting.
 // DeepBench v7.0.841 | tests/regression/agt-238-leverage-first.test.mjs | AGT-427 slice 2 -- arm C grades leverage-first WITHIN one need_score, since severity now leads the pick.
 // DeepBench v7.0.660 | tests/regression/agt-238-leverage-first.test.mjs | AGT-238 slice 1 -- LEVERAGE
 // FIRST ON THE BOARD, AND TICKETS ONLY FROM FINDINGS.
@@ -13,8 +14,13 @@
 //       prime_directive_queue()'s ranked ORDER BY, and the leverage CASE precedes `pj.priority` in
 //       drain_epic_next's pick. SES-158 CONTROL: the same judgement over a mutant with the leverage
 //       key removed from each ORDER BY must THROW.
-//   (B) THE DRIVER (no credentials). `answerErrors` refuses an off-queue leverage id and a blank
-//       `why`, and returns NOTHING for a valid mark or for an answer with no `leverage` at all.
+//   (B) THE DRIVER (no credentials). `answerErrors` refuses a blank `why` and a non-array, and
+//       returns NOTHING for a valid mark or for an answer with no `leverage` at all. AGT-602: an
+//       OFF-QUEUE id is no longer a refusal -- `leverageOffQueue` partitions it into `dropped`
+//       while keeping the on-queue mark, `answerErrors` stays clean, and the arm pins BOTH
+//       directions in the driver's own source: `leverage_unrecorded` is reported, and the old
+//       `Exiting` return is gone. The off-PICK `assign` refusal is asserted unchanged, because
+//       dropping the leverage check must not soften the one that guards the board's order.
 //   (C) THE LIVE LANE (read-only). In prime_directive_queue()'s selfbuild lane no row WITHOUT
 //       leverage_reason precedes a row WITH it. notRun when no served row carries one (vacuous).
 //   (D) THE LIVE GUARD. A `discovered` POST with no finding (`ZZLV-238`, source_file
@@ -28,7 +34,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { answerErrors, leverageErrors } from "../../scripts/run-project.js";
+import { answerErrors, leverageErrors, leverageOffQueue } from "../../scripts/run-project.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MIGRATION = path.join(ROOT, "docs", "design", "agt-238-leverage-first.sql");
@@ -115,9 +121,35 @@ function armB() {
   const state = { project: "p", queue: [{ ref: "AGT-1", lane: "selfbuild" }, { ref: "AGT-2", lane: "selfbuild" }, { ref: null, lane: "board" }] };
   const base = { project: "p", action: "stop", assignment: null, report: "r", needs_john: [], patterns_applied: [] };
 
-  const off = answerErrors({ ...base, leverage: [{ backlog_id: "ZZ-9", improves: "x", why: "y" }] }, state);
-  assert.strictEqual(off.length, 1, `an off-queue leverage id must be refused with exactly one line; got ${JSON.stringify(off)}`);
-  assert.match(off[0], /"leverage"\[0\] names "ZZ-9", which prime_directive_queue\(\) did not return/);
+  // AGT-602: the off-queue id is DROPPED, not refused. `answerErrors` must be clean for it (so the
+  // answer still acts), and the partition must keep the on-queue mark while dropping only that one.
+  const offItem = { backlog_id: "ZZ-9", improves: "x", why: "y" };
+  const off = answerErrors({ ...base, leverage: [offItem] }, state);
+  assert.deepStrictEqual(off, [],
+    `an off-queue leverage id must no longer be refused -- the mark is advisory and dropping it costs the mark, not the answer (AGT-602); got ${JSON.stringify(off)}`);
+
+  const part = leverageOffQueue({ ...base, leverage: [offItem, { backlog_id: "AGT-1", improves: "a", why: "b" }] }, state);
+  assert.deepStrictEqual(part.kept.map(k => k.backlog_id), ["AGT-1"],
+    `leverageOffQueue() must KEEP the on-queue mark, not drop the whole list; got ${JSON.stringify(part.kept)}`);
+  assert.deepStrictEqual(part.dropped.map(d => d.backlog_id), ["ZZ-9"],
+    `leverageOffQueue() must drop exactly the off-queue id; got ${JSON.stringify(part.dropped)}`);
+  assert.match(part.dropped[0].line, /"leverage"\[0\] names "ZZ-9", which prime_directive_queue\(\) did not return/,
+    `the dropped line's wording moved -- offQueueIds() reads the id back out of it (agt-532): ${part.dropped[0].line}`);
+
+  // THE OTHER DIRECTION: dropping the leverage check must not soften the board's own order. An
+  // `assign` naming a row that is not the pick is still refused, with its line byte-identical.
+  const offPick = answerErrors(
+    { ...base, action: "assign", assignment: { backlog_id: "AGT-2", capability_slug: "c", engine: "session" }, leverage: [offItem] },
+    { ...state, pick: { backlog_id: "AGT-1" }, roster: [] });
+  assert.ok(offPick.some(l => /may not re-order the board/.test(l)),
+    `an off-pick assign must still be refused with the board-order line; got ${JSON.stringify(offPick)}`);
+
+  // AND THE WIRING, both directions: the driver reports the dropped mark instead of exiting on it.
+  const driverSrc = fs.readFileSync(path.join(ROOT, "scripts", "run-project.js"), "utf8");
+  assert.ok(driverSrc.includes("leverage_unrecorded"),
+    "scripts/run-project.js does not carry `leverage_unrecorded` -- leverageOffQueue is exported and wired nowhere, so a dropped mark would be silent");
+  assert.ok(!driverSrc.includes("refused the leverage mark: ${rec.error}. Exiting"),
+    "scripts/run-project.js still EXITS on a record_leverage() refusal -- the refusal must drop the mark and let the answer stand (AGT-602)");
 
   const blank = answerErrors({ ...base, leverage: [{ backlog_id: "AGT-2", improves: "the pick path", why: "  " }] }, state);
   assert.strictEqual(blank.length, 1, `a blank why must be refused with exactly one line; got ${JSON.stringify(blank)}`);
@@ -129,7 +161,7 @@ function armB() {
   const valid = answerErrors({ ...base, leverage: [{ backlog_id: "AGT-1", improves: "every later cycle's pick", why: "it fixes the ranking they all read" }] }, state);
   assert.deepStrictEqual(valid, [], `a valid leverage mark must be clean; got ${JSON.stringify(valid)}`);
   assert.deepStrictEqual(answerErrors(base, state), [], "an answer with no leverage must be unchanged (clean)");
-  console.log("  [AGT-238] arm B: answerErrors refuses an off-queue id and a blank why; a valid mark and an absent one are clean.");
+  console.log("  [AGT-238] arm B: answerErrors refuses a blank why and a non-array; an off-queue id is DROPPED by leverageOffQueue (1 kept, 1 dropped) and clean at answerErrors, the off-pick assign is still refused, and the driver reports leverage_unrecorded with no Exiting return (AGT-602).");
 }
 
 // ---------------------------------------------------------------------------------------------
