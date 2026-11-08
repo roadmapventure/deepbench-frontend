@@ -3260,6 +3260,9 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/settle-ship.js \
   --ticket=<ID> --kickoff=<the kickoff path> --cycle-id=<your cycle id> [--remainder="<remainder>"] --apply
 ```
 
+  **A refused `delivered` — no verdict — SETTLES `partial` AND FILES A GATE CARD JOHN CAN ACT ON
+  (`AGT-595`): exit 0, nothing to type, and the row never stays `open` + `designed`.**
+
 - Close-out edits in the same commit set: **`CLAUDE-STATE.md` is GENERATED — do not hand-edit it
   (`SES-177`, `v7.0.228`).** Set your cycle row's `version` (and `push_sha`) and run
   `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/render-claude-state.js`; the version lines and
@@ -3421,9 +3424,8 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/check-version-claim.js \
   per-artifact pushes. 0 rows → do not push; follow the stolen-from procedure in step 0. Keep
   the `git fetch` too — it catches a different failure (a successor that shipped without taking
   your lease), and `633fe486` survived on that accident alone.
-- **Release the ticket claim — now, once the push has landed, and not one step earlier
-  (`SES-106`, `v7.0.150`; John's `q-claim-release-order`).** One statement, holder-guarded so a
-  cycle whose claim expired and was re-taken can never clear its successor's:
+- **Release the ticket claim — `node scripts/settle-ship.js --release --ticket=<ID>
+  --cycle-id=<id> --apply` DOES IT (`AGT-595`), after the push; type the SQL only on its exit 2:**
 
 ```sql
 UPDATE public.backlog_items
@@ -3433,14 +3435,11 @@ RETURNING backlog_id;   -- 0 rows = already re-claimed by someone else; leave th
 ```
 
   <!-- FEATURE: SES-316 — the release stops bumping updated_at, same reason as the claim. -->
-  **No `updated_at` here either, and for the same reason as the claim at step 5 (`SES-316`):** a
-  release is the claim's mirror image, so it is coordination too. A release that stamped
-  `updated_at` would make the decision this very cycle recorded at 7b un-restorable one statement
-  after its own push.
-
-  On an abort or a wall-stop this is still where the release happens, just without a push in
-  front of it — release at the point the cycle stops. Nothing here can strand a ticket either
-  way: an unreleased claim expires on the 6h boundary.
+  **No `updated_at` here either (`SES-316`):** a release is coordination, like the claim at step 5,
+  and one that stamped `updated_at` would make the decision this cycle recorded at 7b un-restorable
+  one statement later. It is holder-guarded, so a cycle whose claim expired can never clear its
+  successor's; on an abort or wall-stop it still happens here with no push in front of it, and an
+  unreleased claim expires at 6h, either way.
 
 <!-- FEATURE: SES-315 (b) — the close-out gives a shipped change its Reverse. -->
 - **RECORD THE SHIP AS A DECISION — this is the shipped change's Reverse handle, and it is the

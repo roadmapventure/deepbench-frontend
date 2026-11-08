@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.980 | scripts/settle-ship.js | AGT-595 -- a refused delivered settles partial + files a card; --release frees the claim.
 // DeepBench v7.0.924 | scripts/settle-ship.js | AGT-506 -- the close-out records its own ship
 // decision; a `delivered` status is refused before the first write when no verdict backs it.
 // DeepBench v7.0.852 | scripts/settle-ship.js | AGT-454 -- directive link column
@@ -96,6 +97,7 @@
 // restores every column from `row_data`, so an image built from a column list would restore a
 // partial row. Same reasoning as `applyPlan()` step 2.
 
+import crypto from "node:crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -246,6 +248,114 @@ export function planSettle(row, kickoffPath, status) {
   return { id: row.id, patch: { status, design_status: null, kickoff_link: kickoffPath } };
 }
 
+// AGT-595 -- A REFUSED `delivered` HAS A DESTINATION, AND IT IS NOT AN EXIT 2 OVER AN UNTOUCHED ROW.
+//
+// THE DEFECT, measured 2026-11-08 on tree 7f696e5 rather than recalled. `main()`'s no-verdict
+// refusal called `fail()`, which THROWS (see its header) -- and it threw before
+// `await applySettle({` ran, so the cycle took exit 2, NOTHING was written, and the ticket stayed
+// `open` with `design_status` still advertising a design that is already built and pushed. Step 7
+// of `docs/runbooks/runner-cycle.md` gave that exit no branch at all, so the next reader of the
+// board could not tell a build that never happened from one that shipped and could not be graded.
+// The refusal was RIGHT; what was missing was its destination.
+//
+// SO THE REFUSAL SETTLES `partial` AND FILES A CARD, AND IT IS NOT A NEW `kind`.
+// `runner_items_kind_check` admits exactly `ship` and `gated_before_build` (read from
+// pg_get_constraintdef at this ship, not recalled), and `scripts/build-briefing.mjs` renders §6
+// from `gated_before_build` and nothing else -- so a new kind would file a card that renders on no
+// surface John reads, which is the one outcome a card must never have. §6 already asks this card's
+// two questions. `partial` is the honest status, not a softened `delivered`: the change is live on
+// `dev` and nothing graded it, which is unbuilt work by the only test `decideStatus()` knows, and
+// it keeps the row IN the pick path (`scripts/ticket-owner.js` reads `["open","partial"]`) where a
+// `delivered` would take it out. pattern:17 -- the structure that already fits, not a parallel one.
+//
+// PURE, WHICH IS THE POINT: the status, the patch and every word of the card are decided BY VALUE,
+// so `tests/regression/agt-506-ship-decision-in-settle.test.mjs` asserts all of them with no
+// network and no board. The write half is `fileNoVerdictCard()` below the line.
+//
+// planNoVerdict({ decided, row, ticket, kickoffPath, why }) -> { decided, plan, card }
+export function planNoVerdict({ decided = null, row = null, ticket = null, kickoffPath = null, why = "" } = {}) {
+  const was = decided && typeof decided === "object" ? decided.status ?? null : null;
+  if (was !== "delivered") {
+    throw new Error(`planNoVerdict: only a \`delivered\` decision is refused for want of a verdict — got ${JSON.stringify(was)}. A \`partial\` already names unbuilt work and records no ship decision, so there is nothing here to refuse.`);
+  }
+  if (typeof why !== "string" || why.trim() === "") {
+    throw new Error("planNoVerdict: `why` is both the reason appended to the decision and the sentence the card carries to John — an empty one would file a card that says nothing");
+  }
+  const reasons = [...(Array.isArray(decided.reasons) ? decided.reasons : []), why];
+  const plan = planSettle(row, kickoffPath, "partial");
+  const card = {
+    kind: "gated_before_build",
+    backlog_id: ticket,
+    // `ck_runner_items_epic_id_review_only` admits an `epic_id` only on a card whose `backlog_id`
+    // is NULL. This card names its ticket, so the epic cell stays NULL by rule, not by omission.
+    epic_id: null,
+    display_ref: `AGT-595 ungraded delivery — ${ticket}`,
+    title: `${ticket} settled \`partial\`: its change is live on \`dev\` and no verdict graded it`,
+    value_case: why,
+    before_after:
+      `Before and after: ${ticket} read \`${row && typeof row === "object" ? row.status : "unknown"}\` and now reads \`partial\`, ` +
+      `with \`kickoff_link\` = ${kickoffPath} and \`design_status\` cleared. Nothing was reverted, and no ship decision was ` +
+      "recorded — a ship decision takes the verdict id as an argument, and there is no verdict.",
+    qa_evidence: [
+      `Refusal: readShipInputs() found no \`runner_verdicts\` row for ${ticket} on this cycle, read BEFORE the first write.`,
+      "Status: `partial`, never `delivered` — planShip() skips a `partial`, so no Reverse handle is invented for a delivery nobody graded.",
+      "Card: `gated_before_build`, the one kind build-briefing.mjs renders in §6 (`runner_items_kind_check` admits `ship` and `gated_before_build` only).",
+    ].join("\n"),
+    plain_cant: "A change of mine is live on dev and nothing recorded whether it passed, so you cannot accept it or undo it in one tap.",
+    plain_after: "The ticket is parked, not finished, with its kickoff still linked; grade it and the close-out records the handle that puts the change back.",
+    plain_worth: "No change of mine sits live without a handle you can pull.",
+  };
+  return { decided: { status: "partial", reasons }, plan, card };
+}
+
+// AGT-595 -- THE CLAIM RELEASE, WHICH WAS HAND-TYPED SQL AND NOTHING ELSE.
+//
+// MEASURED, NOT RECALLED: `grep claimed_by scripts/settle-ship.js` read 0 on tree 7f696e5, and the
+// only release anywhere on the platform was the `UPDATE ... RETURNING` block at step 7 of
+// `docs/runbooks/runner-cycle.md`. That is AGT-506's defect in a second place and with the same
+// lesson: a statement a model has to type at the end of a long cycle is a statement that gets
+// forgotten at the end of a long cycle.
+//
+// HOLDER-GUARDED, AND THAT IS THE LOAD-BEARING CONSTRAINT (`SES-106`, John's
+// `q-claim-release-order`): a cycle whose 24h claim expired and was re-taken can never clear its
+// successor's. So another holder reads `none` and is NAMED rather than cleared, and the same guard
+// is repeated in the `WHERE` of the PATCH itself -- the plan is advice, the predicate is the gate.
+//
+// NO `updated_at` (`SES-316`): a release is coordination, like the claim at step 5, and one that
+// stamped `updated_at` would make the decision this very cycle recorded at 7b un-restorable one
+// statement after its own push. The patch is exactly the two coordination cells and the test
+// deep-equals it, so a third key cannot be added here without going red.
+//
+// planRelease(row, cycleId) -> { action: "release" | "none", reason, id?, patch? }
+export function planRelease(row, cycleId) {
+  if (!row || typeof row !== "object" || row.id == null) {
+    throw new Error("planRelease: no row to release — the ticket was not found on the board");
+  }
+  if (typeof cycleId !== "string" || cycleId.trim() === "") {
+    throw new Error("planRelease: the cycle id IS the guard on this write — a release with nobody behind it would clear whoever holds the claim");
+  }
+  const ticket = row.backlog_id ?? row.id;
+  const holder = typeof row.claimed_by === "string" && row.claimed_by.trim() !== "" ? row.claimed_by : null;
+  if (holder === null) {
+    return {
+      action: "none",
+      reason: `${ticket} holds no claim — there is nothing to release, and a PATCH here would write two cells that are already NULL`,
+    };
+  }
+  if (holder !== cycleId) {
+    return {
+      action: "none",
+      reason: `${ticket} is claimed by ${holder}, not this cycle — the release is holder-guarded so a cycle whose claim expired can never clear its successor's (\`SES-106\`); leave the new holder alone`,
+    };
+  }
+  return {
+    action: "release",
+    id: row.id,
+    reason: `${ticket} is claimed by this cycle — the push has landed, so the claim is freed now, in its own statement, never in the status write (John's \`q-claim-release-order\`, \`SES-106\`)`,
+    patch: { claimed_by: null, claimed_at: null },
+  };
+}
+
 // AGT-506 -- THE SHIP DECISION IS THIS SCRIPT'S TO RECORD, NOT A LINE A MODEL HAND-TYPES AT THE
 // FOOT OF A LONG RUN.
 //
@@ -339,7 +449,7 @@ export function planShip({ status, ticket, verdict = null, cycleRow = null, exis
 // ---------------------------------------------------------------------------------------------
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle", "ship"]);
+export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle", "ship", "release"]);
 
 // AGT-167 -- ONE DIRECTION, and the constant is here rather than inline so the guard has a name a
 // test can point at. `resettleTicket()` moves a row OFF `delivered` and nothing else: `partial` is
@@ -698,6 +808,85 @@ export async function applySettle({
   return { decision, plan, after };
 }
 
+// AGT-595 -- THE CARD THE REFUSAL FILES, in `applySettle()`'s order and for `applySettle()`'s
+// reason: the decision row exists before the image, and the image before the row it images, so one
+// id names the whole sequence whatever failed halfway.
+//
+// THE IMAGE CARRIES `row_data` NULL BECAUSE THE CARD IS AN INSERT -- there was no prior row to
+// image -- AND IT IS A RECORD, NOT A ONE-COMMAND UNDO. Measured from `reverse_decision()` at this
+// ship rather than assumed: `runner_items` is in its allowlist, but its GUARD B refuses a
+// `gated_before_build` card specifically, which is what keeps runner-cycle.md's "the evidence a
+// review happened cannot be erased" (`SES-312`'s succession key) true. So the image states that the
+// row did not exist before this decision; it does not hand anyone a delete. Same honesty as
+// `writeCost()`'s note about `runner_cycles` above.
+//
+// `pk_value` IS THE MINTED UUID, NEVER THE `display_ref` (`SES-373`): `reverse_decision()`
+// addresses a row by its primary key and refuses one it cannot cast to a uuid, so a `display_ref`
+// image could never be reversed at all. `runner_items.id` defaults to `gen_random_uuid()` and
+// accepts a client-supplied uuid, which is what lets the image name the row before it exists.
+//
+// IT RUNS AFTER THE STATUS WRITE, like `writeCost()` and for the same reason: settling the ticket
+// is this script's primary job, and a card write that failed must not take the status with it.
+export async function fileNoVerdictCard({
+  base, key, cycleId = null, ticket, card, log = s => process.stdout.write(s),
+} = {}) {
+  if (typeof cycleId !== "string" || cycleId === "") {
+    fail("fileNoVerdictCard: --cycle-id is the attribution on both writes — `ck_decision_attribution` and `ck_before_image_attribution` each take exactly one, and this script is always a cycle.");
+  }
+  if (!card || typeof card !== "object") {
+    fail("fileNoVerdictCard: planNoVerdict() decides the card; this function only writes the one it was handed.");
+  }
+  const id = crypto.randomUUID();
+
+  // 1 -- the decision, before the image and before the row.
+  const decision = await rest(base, key, "rpc/record_decision", {
+    method: "POST",
+    body: JSON.stringify({
+      p_cycle_id: cycleId,
+      p_session_name: null,
+      p_kind: "gate",
+      p_backlog_id: ticket,
+      p_summary: `Close-out: ${ticket} settles \`partial\` and files a \`gated_before_build\` card — no verdict graded this delivery`,
+      p_reasoning:
+        `${card.value_case} The card is \`gated_before_build\` because \`runner_items_kind_check\` admits only that kind and \`ship\`, ` +
+        "and build-briefing.mjs §6 is the one surface that renders it — a new kind would file a card John never sees. AGT-595. pattern:17",
+      p_ladder_work_class: null,
+    }),
+  }, "record_decision (no-verdict card)");
+  if (typeof decision !== "string" || decision.length !== 36) {
+    fail(`record_decision (no-verdict card): returned ${JSON.stringify(decision)}, which is not a decision id`);
+  }
+
+  // 2 -- the image: this row did not exist. See the header on why that is a record, not a delete.
+  await rest(base, key, "runner_before_images", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify([{
+      cycle_id: cycleId,
+      session_name: null,
+      table_name: "runner_items",
+      pk_value: id,
+      row_data: null,
+      decision_id: decision,
+    }]),
+  }, `image card (decision ${decision})`);
+
+  // 3 -- the card, READ BACK. An INSERT PostgREST accepted but did not apply answers without the
+  // row, and a logged card id nobody can open is the false green this read-back exists to stop.
+  const back = await rest(base, key, "runner_items", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify([{ ...card, id, cycle_id: cycleId }]),
+  }, `file card (decision ${decision})`);
+  const filed = Array.isArray(back) ? back[0] : null;
+  if (!filed || filed.id !== id) {
+    fail(`file card (decision ${decision}): the INSERT returned ${JSON.stringify(filed ? filed.id : null)}, expected ${id}`);
+  }
+
+  log(`  card filed: ${filed.id} \`${filed.kind}\` on ${ticket}, decision ${decision}, 1 before-image (row_data null — the row did not exist)\n`);
+  return { decision, id: filed.id, card: filed };
+}
+
 // AGT-167 -- `--resettle`: NOTHING RE-SETTLED A ROW WHEN ITS CARD WAS RULED, AND THIS IS THAT WRITE.
 //
 // THE DEFECT, measured this cycle rather than recalled. One script, one kickoff, one ticket, one
@@ -856,7 +1045,7 @@ async function main() {
   for (const a of argv) {
     const name = a.startsWith("--") ? a.slice(2).split("=")[0] : a;
     if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
-      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --resettle, --ship and --apply.`);
+      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --resettle, --ship, --release and --apply.`);
     }
   }
 
@@ -867,6 +1056,7 @@ async function main() {
   const applyArg = arg(argv, "apply");
   const resettleArg = arg(argv, "resettle");
   const shipArg = arg(argv, "ship");
+  const releaseArg = arg(argv, "release");
 
   if (typeof ticket !== "string" || ticket === "") fail("--ticket=<ID> is required — this script settles exactly one ticket.");
 
@@ -913,6 +1103,105 @@ async function main() {
     // A `refuse` under `--apply` is exit 2 BEFORE the write, never a warning over one.
     if (shipPlan.action === "refuse") fail(`ship: ${shipPlan.reason}`);
     await recordShip({ base: sbase, key: skey, plan: shipPlan });
+    process.exit(0);
+  }
+
+  // AGT-595 -- THE FOURTH DOOR: the claim release. It was hand-typed SQL at step 7 and nothing
+  // else (`grep claimed_by scripts/settle-ship.js` read 0 on tree 7f696e5), which is AGT-506's
+  // defect in a second place.
+  //
+  // IT IS ITS OWN DOOR AND NOT A TAIL OF THE ORDINARY SETTLE, DELIBERATELY. The settle runs
+  // BEFORE the push and the release must happen AFTER it (`SES-106`, John's
+  // `q-claim-release-order`), so folding it into the close-out would free the ticket one step
+  // early on every cycle -- the exact ordering bug the rule exists to prevent. The three flag
+  // refusals below keep the doors apart; `--ship` is matched first, so that one is this door's
+  // second line of defence rather than its reachable path.
+  if (releaseArg !== undefined) {
+    if (kickoffArg !== undefined) {
+      fail("--kickoff is refused beside --release — a release moves the two coordination cells and reads no document; it never decides a status.");
+    }
+    if (shipArg !== undefined) {
+      fail("--ship is refused beside --release — one records the delivery's Reverse handle and the other frees the ticket; they are two writes with two subjects.");
+    }
+    if (resettleArg !== undefined) {
+      fail("--resettle is refused beside --release — one moves the row OFF `delivered` and the other frees the claim; run them in one breath and a reader cannot tell which write they are looking at.");
+    }
+    if (typeof cycleId !== "string" || cycleId === "") {
+      fail("--release needs --cycle-id=<uuid> — the release is holder-guarded, so without the cycle id there is nothing to guard it with and it could clear a successor's claim.");
+    }
+    const lbase = process.env.SUPABASE_URL;
+    const lkey = process.env.SUPABASE_SERVICE_KEY;
+    if (!lbase) fail("SUPABASE_URL is not set — the claim is read and cleared over REST.");
+    if (!lkey) fail("SUPABASE_SERVICE_KEY is not set — the claim is read and cleared over REST.");
+    const claimRows = await rest(lbase, lkey,
+      `backlog_items?backlog_id=eq.${encodeURIComponent(ticket)}&select=id,backlog_id,status,claimed_by,claimed_at`,
+      {}, "release read row");
+    if (!Array.isArray(claimRows) || claimRows.length !== 1) {
+      fail(`release read row: ${ticket} matched ${Array.isArray(claimRows) ? claimRows.length : 0} rows — one is the only number whose claim can be released.`);
+    }
+    const claimRow = claimRows[0];
+    const relPlan = planRelease(claimRow, cycleId);
+    process.stdout.write(`settle-ship: ${ticket} — claim release on cycle ${cycleId}\n`);
+    process.stdout.write(`  would ${relPlan.action} — ${relPlan.reason}\n`);
+    if (applyArg === undefined) {
+      process.stdout.write("  (no --apply; nothing was written)\n");
+      process.exit(0);
+    }
+    // ONLY `release` WRITES. A `none` is the correct and final answer for a ticket this cycle does
+    // not hold, so it exits 0 having reported itself -- never exit 2, which would turn another
+    // cycle's legitimate claim into a failed close-out.
+    if (relPlan.action === "release") {
+      const relDecision = await rest(lbase, lkey, "rpc/record_decision", {
+        method: "POST",
+        body: JSON.stringify({
+          p_cycle_id: cycleId,
+          p_session_name: null,
+          p_kind: "concurrency",
+          p_backlog_id: ticket,
+          p_summary: `Close-out: ${ticket}'s claim released by this cycle`,
+          p_reasoning:
+            `${relPlan.reason}. Holder-guarded in the PATCH predicate as well as the plan, and with NO \`updated_at\` ` +
+            "(`SES-316`) — a release that stamped it would make the decisions this cycle recorded un-restorable one " +
+            "statement after its own push. AGT-595. pattern:9",
+          p_ladder_work_class: null,
+        }),
+      }, "record_decision (release)");
+      if (typeof relDecision !== "string" || relDecision.length !== 36) {
+        fail(`record_decision (release): returned ${JSON.stringify(relDecision)}, which is not a decision id`);
+      }
+      // The image is SCOPED to the cells this write moves, and that is a reasoned exception to this
+      // file's `select=*` rule at the top: a release touches `claimed_by` / `claimed_at` only, and a
+      // full-row image would make a Reverse OF THE RELEASE rewrite every cell of the ticket,
+      // including a status a later decision had properly moved.
+      await rest(lbase, lkey, "runner_before_images", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{
+          cycle_id: cycleId,
+          session_name: null,
+          table_name: "backlog_items",
+          pk_value: claimRow.id,
+          row_data: claimRow,
+          decision_id: relDecision,
+        }]),
+      }, `image claim (decision ${relDecision})`);
+      const relBack = await rest(lbase, lkey,
+        `backlog_items?id=eq.${claimRow.id}&claimed_by=eq.${encodeURIComponent(cycleId)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify(relPlan.patch),
+        }, `release patch (decision ${relDecision})`);
+      const relAfter = Array.isArray(relBack) ? relBack[0] : null;
+      if (!relAfter) {
+        fail(`release patch (decision ${relDecision}): 0 rows — the claim was re-taken between the read and the write, so the guard held. Leave the new holder alone.`);
+      }
+      for (const k of Object.keys(relPlan.patch)) {
+        if (relAfter[k] !== null) {
+          fail(`release patch (decision ${relDecision}): ${k} read ${JSON.stringify(relAfter[k])}, expected null`);
+        }
+      }
+      process.stdout.write(`  released: decision ${relDecision}, 1 before-image, ${ticket} \`claimed_by\` and \`claimed_at\` now NULL\n`);
+    }
     process.exit(0);
   }
 
@@ -973,7 +1262,7 @@ async function main() {
 
   // AGT-128 -- the `--ticket` value read at :404, so trigger 2 knows which ticket the STOP LINE
   // has to be talking about. Without it the reader is id-blind and settles on anyone's `partial`.
-  const decided = decideStatus({ kickoffText, ticketId: ticket, gatedOpen, remainder });
+  let decided = decideStatus({ kickoffText, ticketId: ticket, gatedOpen, remainder });
   let plan;
   try {
     plan = planSettle(row, kickoffArg, decided.status);
@@ -988,17 +1277,34 @@ async function main() {
   // input to the STATUS (`decideStatus()` has no verdict parameter and keeps none): a `delivered`
   // decided off a record that names no unbuilt work stays `delivered`. What is refused is writing
   // it while the evidence the ship decision requires does not exist -- an `approve` carrying no
-  // verdict row, in the ticket's own words. The refusal raises BEFORE `applySettle()`, so the
+  // verdict row, in the ticket's own words. The refusal is decided BEFORE `applySettle()`, so the
   // decision row, the before-image and the PATCH have not happened when it fires. `partial` is
   // untouched: it records no ship decision and needs no verdict.
+  //
+  // AGT-595 CHANGED WHAT THE REFUSAL DOES, NOT WHEN IT IS DECIDED. It used to `fail()` here,
+  // which threw over an untouched row and left the ticket `open` + `designed` with no branch in
+  // the runbook to read. It now re-decides the settle as `partial` and files the card that
+  // carries the ungraded delivery to John; `planNoVerdict()` holds that reasoning in full.
+  // AGT-595 -- the card the refusal files, built here and written after the status write. `null`
+  // on every ordinary close-out, which is the condition the two call sites below read.
+  let noVerdictCard = null;
   if (decided.status === "delivered") {
     if (typeof cycleId === "string" && cycleId !== "") {
       const { verdict: settleVerdict } = await readShipInputs({ base, key, cycleId, ticket });
       process.stdout.write(settleVerdict
         ? `  verdict ${settleVerdict.id} \`${settleVerdict.verdict}\` ${settleVerdict.version} graded_sha ${settleVerdict.graded_sha}\n`
         : "  verdict (none on this cycle for this ticket)\n");
-      if (applyArg !== undefined && !settleVerdict) {
-        fail(`a \`delivered\` settle needs the verdict its ship decision attaches to — this cycle holds no \`runner_verdicts\` row for ${ticket}, so nothing is written.`);
+      if (!settleVerdict) {
+        // The sentence lives HERE, in `main()`, ABOVE the status write -- `agt-506` asserts that
+        // position by index, because a refusal decided after the write is a report, not a gate.
+        // It is no longer `applyArg`-gated: the dry run must print the same answer the write
+        // would take, or the operator reads a `delivered` plan the command will not write.
+        const why = `a \`delivered\` settle needs the verdict its ship decision attaches to — this cycle holds no \`runner_verdicts\` row for ${ticket}, so it settles \`partial\` and a \`gated_before_build\` card carries it to John (AGT-595).`;
+        const refused = planNoVerdict({ decided, row, ticket, kickoffPath: kickoffArg, why });
+        decided = refused.decided;
+        plan = refused.plan;
+        noVerdictCard = refused.card;
+        process.stdout.write(`  refused → \`${plan.patch.status}\` + one \`gated_before_build\` card: ${why}\n`);
       }
     } else {
       process.stdout.write("  verdict (not read — no --cycle-id given)\n");
@@ -1031,6 +1337,13 @@ async function main() {
     base, key, cycleId, sessionName: null, ticket, row,
     kickoffPath: kickoffArg, status: plan.patch.status, reasons: decided.reasons,
   });
+
+
+  // AGT-595 -- the card that carries an ungraded live change to John, written only when the
+  // `delivered` refusal above fired. After the status write, for `writeCost()`'s reason.
+  if (noVerdictCard) {
+    await fileNoVerdictCard({ base, key, cycleId, ticket, card: noVerdictCard });
+  }
 
   // 4 -- AGT-176 (part c): the ledger figure, its own decision and its own before-images, in the same
   // decision -> image -> read-back-PATCH order as the status write above. It runs AFTER the status

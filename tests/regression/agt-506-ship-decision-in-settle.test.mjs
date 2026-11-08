@@ -1,4 +1,4 @@
-// DeepBench v7.0.924 | tests/regression/agt-506-ship-decision-in-settle.test.mjs | AGT-506
+// DeepBench v7.0.980 | tests/regression/agt-506-ship-decision-in-settle.test.mjs | AGT-595
 //
 // THE SHIP DECISION IS RECORDED BY CODE, AND A `delivered` STATUS IS REFUSED WITHOUT ITS VERDICT.
 //
@@ -51,7 +51,10 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun } from "./_lib/self-run.js";
-import { planShip, recordShip, ALLOWED_FLAGS } from "../../scripts/settle-ship.js";
+// AGT-595 -- the refusal's destination is imported beside the refusal's position: part (D).
+import {
+  planShip, recordShip, ALLOWED_FLAGS, planNoVerdict, planRelease, planSettle, decideStatus,
+} from "../../scripts/settle-ship.js";
 // The five argument names come from SES-315's own guard rather than a second list here: that file
 // resolves `record_ship_decision()` live by these names, so a signature change breaks ONE home.
 import { SHIP_ARGS } from "./ses-315-ship-reverse.test.mjs";
@@ -263,10 +266,106 @@ function partC() {
     "step-7 paragraph this ship is about lives in the one governed file already at its bar");
 }
 
+
+// ---- (D) AGT-595: the refusal's DESTINATION, by value and by position -----------------------
+//
+// WHAT THIS ADDS, and why it is in THIS file rather than a new one. Part (C) above already pins
+// WHERE the no-verdict refusal is decided; AGT-595 changed WHAT it does, and the two facts have to
+// go red together or a later editor can keep the position and lose the destination (pattern:163 --
+// one change, every home). On `origin/dev` `typeof planNoVerdict` was `undefined` and the refusal
+// called `fail()`: exit 2, nothing written, the ticket left `open` with `design_status` still
+// advertising a built design, and step 7 of the runbook carrying no branch for that exit at all.
+//
+// EVERY ASSERTION IS A VALUE OR A SOURCE INDEX. No network, no board, nothing to clean up.
+function partD() {
+  const row = { id: "x", backlog_id: "AGT-595", status: "open", design_status: null };
+  const d = decideStatus({ kickoffText: "", ticketId: "AGT-595" });
+  assert.strictEqual(d.status, "delivered",
+    "the fixture has to BE the refusable case: an empty kickoff names no unbuilt work, so decideStatus() " +
+    "says `delivered` and the verdict question is the only thing standing between it and the write");
+  assert.strictEqual(d.reasons.length, 1, "the `delivered` branch carries exactly its one reason before anything is appended");
+
+  // QA 1 -- the refused delivery settles `partial` and carries a card.
+  const refused = planNoVerdict({ decided: d, row, ticket: "AGT-595", kickoffPath: "k.md", why: "W" });
+  assert.strictEqual(refused.decided.status, "partial",
+    "a `delivered` refused for want of a verdict settles `partial`, NOT `delivered` and NOT nothing at all: " +
+    "`partial` keeps the row in ticket-owner.js's pick path (`[\"open\",\"partial\"]`) and names the work as unfinished");
+  assert.strictEqual(refused.decided.reasons.at(-1), "W",
+    "the refusal's own sentence is APPENDED to the decision's reasons, so the `ticket-status` decision row " +
+    "records why the status moved — the earlier reasons are kept, not replaced");
+  assert.deepStrictEqual(refused.plan.patch, { status: "partial", design_status: null, kickoff_link: "k.md" },
+    "the same three cells as every other settle (planSettle() is CALLED, not re-implemented): a fourth key " +
+    "here would be a cell nobody decided, and a missing `design_status` would leave a spent kickoff advertising a built design");
+  assert.strictEqual(refused.card.kind, "gated_before_build",
+    "the card is `gated_before_build` and NOT a new kind — `runner_items_kind_check` admits only that and " +
+    "`ship`, and build-briefing.mjs renders §6 from that kind alone, so a new one files a card John never sees");
+  assert.strictEqual(refused.card.backlog_id, "AGT-595",
+    "the card names its ticket in `backlog_id`, the JOIN KEY — SES-116: composing a reference into it broke 63 of 80 card->ticket joins");
+  assert.strictEqual(refused.card.epic_id, null,
+    "`ck_runner_items_epic_id_review_only` admits an epic_id only on a card whose backlog_id is NULL; this card names a ticket, so the cell is NULL by rule");
+  assert.strictEqual(refused.card.value_case, "W",
+    "the refusal's sentence IS the card's value case — one home for the words, not a second paraphrase of them");
+  for (const k of ["title", "plain_cant", "plain_after", "plain_worth"]) {
+    assert.ok(typeof refused.card[k] === "string" && refused.card[k].trim() !== "",
+      `the card's \`${k}\` must carry prose: §6 of the briefing renders these, and an empty one is a card ` +
+      "John cannot act on — which is the same dead end as filing no card at all");
+  }
+
+  // QA 1 -- the release, all three answers.
+  assert.strictEqual(planRelease(row, "C").action, "none",
+    "an unclaimed ticket is `none`: there is nothing to release and a PATCH would write two cells that are already NULL");
+  const rel = planRelease({ ...row, claimed_by: "C" }, "C");
+  assert.strictEqual(rel.action, "release", "the holder's own cycle is the ONE case that releases");
+  assert.deepStrictEqual(rel.patch, { claimed_by: null, claimed_at: null },
+    "exactly the two coordination cells. `updated_at` is ABSENT (`SES-316`) — a release that stamped it would " +
+    "make the decisions this cycle recorded un-restorable one statement after its own push, so this deep-equal " +
+    "is the structural stop on a third key being added here");
+  assert.ok(!("updated_at" in rel.patch), "stated the other way round too: no `updated_at` key, at all");
+  const other = planRelease({ ...row, claimed_by: "OTHER" }, "C");
+  assert.strictEqual(other.action, "none",
+    "another holder is `none`, never `release`: the release is holder-guarded so a cycle whose 24h claim expired " +
+    "and was re-taken can never clear its successor's (`SES-106`, John's `q-claim-release-order`)");
+  assert.ok(other.reason.includes("OTHER"),
+    `the reason must NAME the holder it declined to clear, or an operator cannot tell a guarded release from a broken one; got ${JSON.stringify(other.reason)}`);
+
+  // QA 2 -- the other direction. A guard that only proves the new path fires proves nothing about
+  // the old one surviving (the LOO-013 lesson: assert WHICH branch fired).
+  assert.throws(() => planNoVerdict({ decided: { status: "partial", reasons: [] }, row, ticket: "AGT-595", kickoffPath: "k.md", why: "W" }),
+    /only a `delivered` decision is refused/,
+    "a `partial` decision must THROW here: it already names unbuilt work and records no ship decision, so " +
+    "there is no verdict to want — accepting it would let this path re-settle a status nobody refused");
+  assert.throws(() => planNoVerdict({ decided: d, row, ticket: "AGT-595", kickoffPath: "k.md", why: "" }),
+    /cannot be empty|says nothing/,
+    "an empty `why` must THROW: it is both the appended reason and the card's value case, so an empty one " +
+    "files a card that says nothing and records a status change with no reason");
+  assert.strictEqual(planSettle(row, "k.md", "delivered").patch.status, "delivered",
+    "AND THE ORDINARY PATH IS UNTOUCHED: planSettle() still writes `delivered` when it is asked for one. " +
+    "AGT-595 added a destination for the REFUSAL; it did not turn every delivery into a `partial`");
+
+  // The call's POSITION, which is the half a later editor can undo while keeping every value above.
+  const src = fs.readFileSync(SCRIPT, "utf8");
+  const mainSrc = src.slice(src.indexOf("async function main()"));
+  const guardAt = mainSrc.indexOf("if (!settleVerdict) {");
+  const callAt = mainSrc.indexOf("planNoVerdict({");
+  assert.ok(guardAt > 0, "main() must still hold the `if (!settleVerdict) {` guard — the refusal is decided on the absence of a verdict row and nothing else");
+  assert.ok(callAt > guardAt && callAt > 0,
+    "the planNoVerdict() call must sit INSIDE that guard. Outside it, every close-out on the platform would " +
+    "settle `partial` and file a card — the refusal's destination applied to deliveries that were never refused");
+  assert.ok(!/applyArg !== undefined && !settleVerdict/.test(mainSrc),
+    "the OLD `applyArg !== undefined && !settleVerdict` form must be gone: gated on `--apply`, the dry run " +
+    "printed a `delivered` plan the command would then refuse to write, which is the plan lying about itself");
+  assert.ok(ALLOWED_FLAGS.has("release"),
+    "`--release` must be an accepted flag — without it the command exits 2 with `unknown flag --release` and " +
+    "the runbook's release instruction cannot be followed at all, which is where the hand-typed SQL came back from");
+  assert.ok(/export async function fileNoVerdictCard/.test(src),
+    "the card's WRITE half must exist in the script: planNoVerdict() decides a card and a decided card nobody files is the refusal with no destination again");
+}
+
 export default async function run() {
   partA();
   await partB();
   partC();
+  partD();
 }
 
 selfRun(import.meta.url, run);
