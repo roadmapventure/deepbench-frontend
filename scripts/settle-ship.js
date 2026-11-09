@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.985 | scripts/settle-ship.js | AGT-628 -- the cost patch verifies the clause it promises; one settle mints one decision.
 // DeepBench v7.0.980 | scripts/settle-ship.js | AGT-595 -- a refused delivered settles partial + files a card; --release frees the claim.
 // DeepBench v7.0.924 | scripts/settle-ship.js | AGT-506 -- the close-out records its own ship
 // decision; a `delivered` status is refused before the first write when no verdict backs it.
@@ -628,7 +629,7 @@ export async function recordShip({ base, key, plan, log = s => process.stdout.wr
 // `reverse_decision()` will restore the card but not the cycle row. The image is still written —
 // the prior value must be recoverable by hand — and the reasoning below says so rather than implying
 // an undo that does not exist.
-async function writeCost({ base, key, cycleId, cost }) {
+export async function writeCost({ base, key, cycleId, cost }) {
   const cycleRows = await rest(base, key, `runner_cycles?select=*&id=eq.${encodeURIComponent(cycleId)}`, {}, "read cycle row");
   if (!Array.isArray(cycleRows) || cycleRows.length !== 1) {
     process.stdout.write(`  cost: cycle ${cycleId} matched ${Array.isArray(cycleRows) ? cycleRows.length : 0} rows — no cost written\n`);
@@ -695,7 +696,23 @@ async function writeCost({ base, key, cycleId, cost }) {
   }, `cost patch (decision ${decision})`);
   const afterCycle = Array.isArray(back) ? back[0] : null;
   if (!afterCycle) fail(`cost patch (decision ${decision}): the PATCH returned no row`);
+  // AGT-628 -- `notes` IS GRADED BY CONTAINMENT, NEVER BY EQUALITY, and that is a fact about the
+  // database rather than a loosened assertion. `trg_runner_cycles_notes_citations` is BEFORE UPDATE
+  // OF `notes` and block 3 of `runner_record_citation_guard()` (AGT-173, v7.0.652) APPENDS a
+  // `Reversible through decision handle ... ` sentence for every handle of
+  // `cycle_reversal_handles(NEW.id, NEW.item_id)` not already named, with no exception path. So the
+  // row that lands is the string this function composed PLUS the trigger's own sentences, and the
+  // equality compare below could never match: measured live on cycle
+  // 828a6ded-40ef-4a1a-8b2f-c8ff726d7c96, whose `notes` read 11,754 bytes with 3 handle sentences and
+  // the clause PRESENT. The write LANDED and the compare still exited 2 -- and each re-run minted
+  // another `ticket-status` decision, so another handle, so another sentence: unconvergeable by
+  // construction. What this function may stand behind is that the clause it promised is IN the cell,
+  // so that is what it asserts; `api_cost_dev_usd` keeps its STRICT compare in the loop below,
+  // because nothing appends to a numeric column and a wrong figure there is a wrong measurement.
+  const after = typeof afterCycle.notes === "string" ? afterCycle.notes : "";
+  if (!after.includes(clause)) fail(`cost patch (decision ${decision}): notes read ${after.length} chars without \`${clause}\``);
   for (const k of Object.keys(cyclePatch)) {
+    if (k === "notes") continue; // AGT-628: graded above.
     const got = afterCycle[k], want = cyclePatch[k];
     const same = (typeof want === "number" && got !== null && got !== undefined)
       ? Number(got) === Number(want)
@@ -750,12 +767,25 @@ export async function applySettle({
 
   // 1 -- the decision. It exists before the image, and the image before the cell.
   const summary = `Close-out: ${ticket} settles \`${plan.patch.status}\``;
+  // AGT-628 -- ONE SETTLE MINTS ONE DECISION, HOWEVER OFTEN IT RUNS. A re-run of the close-out used
+  // to write a second `ticket-status` row under this identical summary -- cycle 828a6ded holds two
+  // (`aeb2829b`, `ccd28863`), one per re-run -- and every one of them minted another reversal handle
+  // for the trigger above to append. THE IDEMPOTENCE KEY IS THIS SUMMARY UNDER THIS ATTRIBUTION,
+  // NEVER THE TICKET: the summary carries the status, so a `--resettle` to a different status is a
+  // different settle and still mints, which is right -- it is a decision nobody has recorded yet.
+  // AND A REUSE IMAGES NOTHING (see step 2 below): on a re-run `row` is the ALREADY-SETTLED row, so a
+  // second image would record `delivered` as the prior value and hand `reverse_decision()` a restore
+  // to the state it is supposed to undo.
+  const attr = hasCycle ? `cycle_id=eq.${cycleId}` : `session_name=eq.${encodeURIComponent(sessionName)}`;
+  const census = await rest(base, key, `runner_decisions?select=id,summary,decided_at&kind=eq.ticket-status&backlog_id=eq.${encodeURIComponent(ticket)}&${attr}`, {}, "settle census");
+  if (!Array.isArray(census)) fail("settle census: non-array read -- refusing to mint off a census that was not read.");
+  const already = census.find(d => d.summary === summary) ?? null;
   const reasoning =
     `settle-ship.js read ${kickoffPath} and the undecided \`gated_before_build\` cards, and decided \`${plan.patch.status}\`: ` +
     `${(Array.isArray(reasons) ? reasons : []).join("; ")}. The verdict is not an input — a \`delivered\` on a record naming unbuilt work is a bug, never an override. ` +
     `Writing status, \`design_status\` NULL (a spent kickoff stops advertising a built design) and \`kickoff_link\` = this kickoff (\`ship_handoff_census\` reads it). SES-385 slice 2. pattern:0`;
 
-  const decision = await rest(base, key, "rpc/record_decision", {
+  const decision = already ? already.id : await rest(base, key, "rpc/record_decision", {
     method: "POST",
     body: JSON.stringify({
       p_cycle_id: hasCycle ? cycleId : null,
@@ -773,6 +803,9 @@ export async function applySettle({
   const where = step => `${step} (decision ${decision})`;
 
   // 2 -- the FULL row imaged, before a single cell moves. `row` is already a select=* read.
+  if (already) {
+    log(`  reused: decision ${already.id} (decided ${already.decided_at}) already records this settle — no second decision and no second before-image (AGT-628)\n`);
+  } else {
   await rest(base, key, "runner_before_images", {
     method: "POST",
     headers: { Prefer: "return=minimal" },
@@ -785,6 +818,7 @@ export async function applySettle({
       decision_id: decision,
     }]),
   }, where("image row"));
+  }
 
   // 3 -- the PATCH, READ BACK key by key. A PATCH PostgREST accepted and silently did not apply
   // answers 200 with the old value, so the representation is compared rather than trusted.
