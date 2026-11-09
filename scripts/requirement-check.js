@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.982 | scripts/requirement-check.js | AGT-521 -- both doors carry the charters: --prepare reads victoria_charter_state() too (decision 17).
 // DeepBench v7.0.973 | scripts/requirement-check.js | AGT-615 -- A RUNNING PROJECT'S LIST OFFERS ONLY UNGRADED TICKETS. John 2026-11-06 (decision 58934bfb): "why would victoria grade a ticket already graded? that was supposed to already be in her list of not to do". `listOffer()` (pure, exported) is the whole offer rule: `--rescore` offers every ticket (AGT-431); an executing project's list offers only ungraded tickets with a standing validation (a graded one is already home -- no move, no re-grade -- so a turn on it bought only a `hold`; tooling offered 29 for 1-3 ungraded); a waiting list is unchanged. `LIST_EXECUTING_NOTE` drops its `hold` clause.
 // DeepBench v7.0.971 | scripts/requirement-check.js | AGT-613 -- A RUNNING PROJECT'S LIST IS GRADED IN PLACE. John's rule (decision 087d79ae, 2026-11-06): she grades in the active projects too, not only in the staging area. `prepareList()` reads the list project's `status` and the context carries `list_executing` (plus `list_note`, the constant `LIST_EXECUTING_NOTE`, only when true); the OFFER is unchanged (a graded 3+ ticket there is still offered and answered `hold`), so AGT-487 and AGT-431 read the list as before. `validateListVerdict()` V9: on an executing project's list a `move` is refused and a placement `home` (any answer that is not a park) is refused -- the ticket is already home, so a grade is a `pass` with home null; a `no-fit` must name where it waits (a parked home or a new project), because a stamp alone would leave it ungraded inside a running project, which is the stall AGT-608/609/610 sat in. V6's parent-home rule does not apply on such a list (the ticket is not leaving). Parks (P1-P5) are unchanged, so a 0 may still be parked out of a running project as `RESCORE_NOTE` already says.
 // DeepBench v7.0.937 | scripts/requirement-check.js | AGT-431 -- THE RE-SCORE DOOR, AND THE ORDER JOHN JUDGES. `--prepare-list --rescore` is a MODE of the list door, not a second one (pattern:17): John's ruling `e9b5bfc5` reopened every grade on the executing projects, which is requirement d.13's own reopening condition, so the mode offers every open/partial ticket (nothing held back for carrying a grade) and hands each proposal `graded: false` plus `rescore_note` -- `validateListVerdict()`'s V2 then accepts the `pass` the run exists to collect and V3 still refuses a `move` on it. NOT ONE OF HER ROWS IS TOUCHED: `grade_standing()` still names every one of them and only this one context reads false. `--rescore-report --cycle-id=<uuid>` is the second half: it re-reads the two executing projects' open/partial tickets, their standing grades and `prime_directive_queue()`'s own order, and puts the PICK'S ORDER to John as ONE yes/no `runner_questions` row (`RESCORE_QID`), its creation imaged in `runner_before_images` BEFORE the row exists so one Reverse can take it away. Live before this: all 21 open/partial tickets of `tooling` (16) and `dev-manager-capabilities` (5) were graded, `--prepare-list` offered 12 of 16 on tooling (4 held back) and `validateListVerdict()` refused a `pass` on every one of them as `already graded` (2026-11-03). pattern:10, pattern:17, pattern:152.
@@ -142,9 +143,21 @@ export function parseSource(source) {
   return { who: s.slice(0, a), table: s.slice(a + 1, b), id: s.slice(b + 1), pair: s.slice(0, b) };
 }
 
+// AGT-521: ONE shape for both doors (pattern:14).
+export function charterContext({ charters, fingerprint }) {
+  return {
+    active_charters: (Array.isArray(charters) ? charters : []).map(c => ({
+      slug: c?.slug ?? null, charter: c?.charter ?? null,
+    })),
+    // The md5 the rpc computed, echoed verbatim and never recomputed here: the stamp this run may
+    // write has to carry the SAME fingerprint the function will match it against.
+    charter_fingerprint: typeof fingerprint === "string" && fingerprint ? fingerprint : null,
+  };
+}
+
 // Victoria's task_context. The cited row travels as ITS OWN COLUMNS (minus `embedding`) -- her
 // objective is to read what it says, so a summary of it would be this file judging the source.
-export function buildTaskContext({ ticket, source, source_row, kinds, home }) {
+export function buildTaskContext({ ticket, source, source_row, kinds, home, charters, fingerprint }) {
   const t = Object(ticket) === ticket ? ticket : {};
   return {
     proposal: {
@@ -169,6 +182,7 @@ export function buildTaskContext({ ticket, source, source_row, kinds, home }) {
     // `projects` by prepare(). NULL when `--home` was not given, and NULL is the ordinary case -- a
     // ticket that is only being SCORED is not being moved, and `--apply` sends no home for it.
     home: blank(home) ? null : String(home),
+    ...charterContext({ charters, fingerprint }),
   };
 }
 
@@ -372,12 +386,7 @@ export function buildListContext({ project, epics, tickets, candidates, kinds, c
     // carries no charter text of its own (requirements d.5, d.17), it only decides that the whole
     // charter travels rather than a head of it: a fit judged against 200 characters of a charter is
     // a fit judged against its first sentence.
-    active_charters: (Array.isArray(charters) ? charters : []).map(c => ({
-      slug: c?.slug ?? null, charter: c?.charter ?? null,
-    })),
-    // The md5 the rpc computed, echoed verbatim and never recomputed here: the stamp this run may
-    // write has to carry the SAME fingerprint the function will match it against.
-    charter_fingerprint: typeof fingerprint === "string" && fingerprint ? fingerprint : null,
+    ...charterContext({ charters, fingerprint }),
     // AGT-431: THE RE-SCORE MODE, and it is a MODE OF THIS LIST DOOR rather than a second door --
     // ruling `e9b5bfc5` reopened every grade, which is the one condition requirement d.13 already
     // names as reopening one (pattern:17). Both keys are ABSENT unless the mode is on, so a context
@@ -768,6 +777,24 @@ async function rest(base, key, method, q, body, prefer) {
   return { ok: res.ok, status: res.status, text, json };
 }
 
+// AGT-521: ONE read of the charters for both doors.
+async function charterState(base, key, door) {
+  const state = await rest(base, key, "POST", "rpc/victoria_charter_state", {});
+  if (!state.ok) {
+    die(1, `requirement-check ${door}: POST rpc/victoria_charter_state -> HTTP ${state.status} ${state.text.slice(0, 400)}`);
+  }
+  const cs = Array.isArray(state.json) ? state.json[0] : state.json;
+  const charters = Array.isArray(cs?.charters) ? cs.charters : [];
+  const fingerprint = typeof cs?.fingerprint === "string" ? cs.fingerprint : "";
+  const stamped = new Set((Array.isArray(cs?.stamped) ? cs.stamped : []).map(String));
+  if (charters.length === 0) {
+    die(1, `requirement-check ${door}: victoria_charter_state() returns no active project charter — a fit ` +
+      "cannot be judged against nothing, and no model turn is spent on a list whose destinations " +
+      "are all closed");
+  }
+  return { charters, fingerprint, stamped };
+}
+
 async function prepare(args) {
   const ticketId = typeof args.ticket === "string" ? args.ticket : "";
   const source = typeof args.source === "string" ? args.source : "";
@@ -855,7 +882,10 @@ async function prepare(args) {
   }
   delete row.embedding;
 
-  const task_context = buildTaskContext({ ticket, source, source_row: row, kinds, home });
+  // 4b. AGT-521: the list door's charters, read AFTER the traceability check (decision 17).
+  const { charters, fingerprint } = await charterState(base, key, "--prepare");
+
+  const task_context = buildTaskContext({ ticket, source, source_row: row, kinds, home, charters, fingerprint });
 
   const caps = await get(`capabilities?slug=eq.${CAPABILITY}&tenant_id=eq.${TENANT}&select=default_intent_slug&limit=1`);
   const intentSlug = caps[0]?.default_intent_slug;
@@ -1004,19 +1034,7 @@ async function prepareList(args) {
   //     function owns the whole answer -- which projects are active, what each is for, the md5 of
   //     that set, and which tickets already hold a live stamp taken under it -- so this file writes
   //     no slug and no charter text of its own (requirements d.5, d.17).
-  const state = await rest(base, key, "POST", "rpc/victoria_charter_state", {});
-  if (!state.ok) {
-    die(1, `requirement-check: POST rpc/victoria_charter_state -> HTTP ${state.status} ${state.text.slice(0, 400)}`);
-  }
-  const cs = Array.isArray(state.json) ? state.json[0] : state.json;
-  const charters = Array.isArray(cs?.charters) ? cs.charters : [];
-  const fingerprint = typeof cs?.fingerprint === "string" ? cs.fingerprint : "";
-  const stamped = new Set((Array.isArray(cs?.stamped) ? cs.stamped : []).map(String));
-  if (charters.length === 0) {
-    die(1, "requirement-check: victoria_charter_state() returns no active project charter — a fit " +
-      "cannot be judged against nothing, and no model turn is spent on a list whose destinations " +
-      "are all closed");
-  }
+  const { charters, fingerprint, stamped } = await charterState(base, key, "--prepare-list");
 
   // 1c. AGT-490: WHERE A PARKED TICKET MAY WAIT. One read, beside the charters and never merged
   //     with them: `victoria_parked_homes()` owns which projects are paused or planned, so this
