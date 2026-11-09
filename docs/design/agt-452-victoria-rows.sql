@@ -48,7 +48,7 @@ do $agt452$
 declare r record; n int;
 begin
 
-  -- skill_profiles · vc-john-severity-tree · knowledge · method md5 1453ae49b9e261fe1545455f2f32f930
+  -- skill_profiles · vc-john-severity-tree · knowledge · method md5 0e0f095ec8fd77ccda372e274d13c5cf
   select * into r from public.skill_profiles where slug = $r452$vc-john-severity-tree$r452$;
   if not found then raise exception 'AGT-452 drift: vc-john-severity-tree missing'; end if;
   if r.slug is distinct from $r452$vc-john-severity-tree$r452$
@@ -133,6 +133,8 @@ Internal frequency scale as read from John's two statements (to be confirmed): 3
 SEVERITY 1 - John (AGT-396): "it is not a user confidence negative situation - especially because we are in beta mode. and its not a function, just an identifier"
 (test) Is it a cosmetic label or identifier with no function behind it, and no effect on whether a user trusts or can use the product?
 John judged at 1: AGT-396 (a label with no function); AGT-250 (needs an unknown fix first, see DEPENDENCY ON AN UNKNOWN); AGT-389 (not needed for beta, see NOT NEEDED FOR BETA).
+
+SPEND IS HARM (John, 2026-11-09, approving the rule as proposed: "Yes, add it". The sentences of the rule are not John's words). The weekly budget is the team's build capacity: when it runs out, the runner stops on the weekly pace stop, and a stopped run is harm under HARM, NOT NON-ACTION. So a ticket that measurably cuts spend -- tokens, dollars, or share of the weekly budget -- is scored on the size of the saving it shows: 5 if it frees 10% or more of the weekly budget, 4 for 5% to under 10%, 3 for 2% to under 5%. The ticket must show its numbers: the spend today and the expected saving, each with its source. A saving the ticket does not measure scores 2 under HARM, NOT NON-ACTION; say what measurement would raise it. The Quality guard still applies: a ticket that saves by moving work to a cheaper model must carry trial evidence that the cheaper model's answers hold up, and you name that guard. When a ticket also fixes another harm, give it the higher of the two scores.
 
 NOT YET DECIDED BY JOHN: what separates a 4 from a 5 for internal work; what should happen when one high-severity ticket keeps producing slices. Where you must read these, say how you read them.$r452$
     then raise exception 'AGT-452 drift: vc-john-severity-tree.method'; end if;
