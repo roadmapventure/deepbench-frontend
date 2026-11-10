@@ -1,3 +1,4 @@
+// DeepBench v7.0.986 | shared/models.js | AGT-522 -- MODELS moves to the ids this key is served: HAIKU claude-haiku-5-5, SONNET claude-sonnet-5-5 (proved live by GET /v1/models, not read from a page)
 // DeepBench v7.0.877 | shared/models.js | AGT-304 slice 17 -- MODEL_PRICING generated from public.model_pricing (scripts/sync-model-pricing.js); 6 claude-3 rows land
 // DeepBench v7.0.822 | shared/models.js | AGT-304 slice 13 -- claude-haiku-5-5 priced: model-watch 2026-10-08 wrote the 24th public.model_pricing row; LOG-149 (e) named the gap.
 // DeepBench v7.0.778 | shared/models.js | AGT-304 slice 3 -- the JS price table now carries all 23 public.model_pricing rows (14 added) so lib/activity-log.js stops writing cost_usd NULL, under model-watch decision fc1db2f0; §19t's two halves agree again.
@@ -31,8 +32,8 @@
 // FEATURE: LOG-35a -- see docs/STANDARDS.md Section 12 for the canonical-id rule this file exists to enforce
 // structurally (one place to update, every call site imports it) instead of by convention alone.
 export const MODELS = {
-  HAIKU: "claude-haiku-4-5-20251001",
-  SONNET: "claude-sonnet-4-6",
+  HAIKU: "claude-haiku-5-5",
+  SONNET: "claude-sonnet-5-5",
 };
 
 // FEATURE: SES-334 -- models that REJECT a forced tool choice, and the predicate the harness asks.

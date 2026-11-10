@@ -634,12 +634,9 @@ Every agent added to `src/data/agents.js` MUST include ALL of the following fiel
 
 ## Section 12: Canonical Model ID Standard
 
-### Canonical Anthropic model IDs (always use these exact strings)
+### Canonical Anthropic model IDs (one home: `shared/models.js`)
 
-| Short-form (DO NOT USE) | Canonical (USE THIS) |
-|-------------------------|----------------------|
-| `claude-haiku-4-5` | `claude-haiku-4-5-20251001` |
-| `claude-sonnet-4-5` | `claude-sonnet-4-6` |
+The canonical ids are the values of `MODELS` in `shared/models.js`; this section restates none (AGT-522). Short-form ids (`claude-haiku-4-5`, `claude-sonnet-4-5`) stay forbidden as values.
 
 **Rule:** Never use short-form model IDs in `logAICall()` call sites or server-side `ai_activity_log` inserts. Always use the canonical versioned string. `MODEL_ID_NORMALIZE` in `useAIActivity.js` normalizes legacy short-form IDs as a safety net — it is not a license to keep using short-form IDs in new code.
 
