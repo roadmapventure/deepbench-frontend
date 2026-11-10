@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.987 | scripts/model-trial.js | AGT-522 -- changedFiles(): the node_modules link the replay itself makes is not a change the candidate made.
 // DeepBench v7.0.881 | scripts/model-trial.js | AGT-502 -- usageSplit(): the envelope's four token quantities reach their own four columns. --input-tokens is usage.input_tokens ALONE; the trial's `tokens:` keeps the total under its own name. One exported derivation, read by scripts/audit-cluster.js's second home of it.
 // DeepBench v7.0.677 | scripts/model-trial.js | AGT-151 -- the orchestrator lane's recorded job is a
 // BUILD, so a trial of it has to re-run the Builder turn, not a design turn wearing its name.
@@ -210,6 +211,18 @@ async function pg(pathAndQuery, init) {
 const git = (args, opts = {}) => spawnSync("git", ["-C", ROOT, ...args], { encoding: "utf8", ...opts });
 const gitIn = (dir, args) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
 const lines = s => String(s ?? "").split("\n").map(l => l.trim()).filter(Boolean);
+
+// FEATURE: AGT-522 -- what a replay changed, minus the link the harness itself made.
+export const HARNESS_LINK = "node_modules";
+export function changedFiles(dir, base) {
+  const diff = lines(gitIn(dir, ["diff", "--name-only", base]).stdout);
+  const status = String(gitIn(dir, ["status", "--porcelain"]).stdout ?? "").split("\n").filter(Boolean)
+    .map(l => l.slice(3).trim())
+    .map(p => (p.includes(" -> ") ? p.split(" -> ").at(-1) : p))
+    .map(p => p.replace(/^"|"$/g, "").trim())
+    .filter(Boolean);
+  return [...new Set([...diff, ...status])].filter(p => p !== HARNESS_LINK).sort();
+}
 
 /**
  * FEATURE: AGT-502 -- the ONE place an envelope's `usage` becomes four counts and a total.
@@ -451,13 +464,7 @@ async function replayBuild({ job, cycle, spec, jobRef, candidate, cycleId }) {
 
     // Committed-vs-base AND the working tree: a candidate that commits and one that leaves the
     // edits staged or loose have both changed the same files, and neither view alone sees both.
-    const diff = lines(gitIn(scratch, ["diff", "--name-only", base]).stdout);
-    const status = String(gitIn(scratch, ["status", "--porcelain"]).stdout ?? "").split("\n").filter(Boolean)
-      .map(l => l.slice(3).trim())
-      .map(p => (p.includes(" -> ") ? p.split(" -> ").at(-1) : p))
-      .map(p => p.replace(/^"|"$/g, "").trim())
-      .filter(Boolean);
-    const changed = [...new Set([...diff, ...status])].sort();
+    const changed = changedFiles(scratch, base);
 
     const changedFile = path.join(os.tmpdir(), `trial-${job.id}.changed.json`);
     fs.writeFileSync(changedFile, JSON.stringify(changed), "utf8");
