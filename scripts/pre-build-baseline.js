@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.991 | scripts/pre-build-baseline.js | AGT-629
 // DeepBench v7.0.966 | scripts/pre-build-baseline.js | AGT-572 -- an EMPTY related set measures the FULL suite
 // DeepBench v7.0.843 | scripts/pre-build-baseline.js | AGT-451 -- the baseline is measured
 // credentialed, over the kickoff's own declared files, BEFORE the Builder is spawned.
@@ -55,7 +56,7 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
-import { relatedTests } from "./related-tests.js";
+import { relatedTests, isTestFile } from "./related-tests.js";
 import { anchorBlockLines, suiteTests } from "./verifier.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -123,8 +124,23 @@ export function notRunLine(block) {
   return `NOT A FULL RUN: ${names.length} parts declared not-run across ${names.length} tests (${names.join(", ")})`;
 }
 
+// AGT-629. Pure. The declared test files this tree DOES NOT HAVE, repo-relative and sorted -- the
+// one fact the baseline could never state. This script measures before the Builder runs, so a test
+// the build is about to ADD is absent from the related set by construction (`relatedTests()` drops a
+// name no file backs), and `baselineCoverageFinding()` then read it as a graded name nobody measured
+// and refused. Absent-pre-build is not an unmeasured red: it is a test that did not exist yet.
+// Only `tests/regression/*` entries that are real test files (`isTestFile`, so `run-all.js` and
+// `_lib/` helpers are not tests) and that the tree genuinely lacks qualify -- `exists` is injected so
+// the suite grades the judgment without a tree (the same reason `declaredFiles` and `renderOut` are
+// pure).
+export function absentDeclaredTests({ declared, exists }) {
+  return [...new Set((declared ?? []).map(norm))]
+    .filter(p => path.posix.dirname(p) === "tests/regression" && isTestFile(path.posix.basename(p)) && !exists(p))
+    .sort();
+}
+
 // Pure. The whole block, from the pieces above, so the format can be asserted without a child.
-export function renderOut({ block, sha7, iso, cycleId, declaredCount, full = false, suiteCount = 0 }) {
+export function renderOut({ block, sha7, iso, cycleId, declaredCount, full = false, suiteCount = 0, absent = [] }) {
   const lines = [
     `BASELINE (cycle-measured, credentialed, scripts/pre-build-baseline.js, tree ${sha7}, ${iso}, `
       + `cycle ${cycleId || "-"}; related set over ${declaredCount} declared files`
@@ -139,6 +155,10 @@ export function renderOut({ block, sha7, iso, cycleId, declaredCount, full = fal
     lines.push(...fails);
     if (notRun) lines.push(notRun);
   }
+  // AGT-629: its own paragraph, after the fails and the not-run notice, so the `BASELINE (` paragraph
+  // -- the one `baselineInstrumentFrom()` reads -- is byte-identical to what it was, and a block with
+  // nothing absent renders exactly as before (no line, no blank).
+  if (absent.length) lines.push("", ...absent.map(p => `- ${p} — ABSENT pre-build`));
   return `${lines.join("\n")}\n`;
 }
 
@@ -239,6 +259,7 @@ function main(argv) {
     iso: new Date().toISOString(),
     cycleId,
     declaredCount: declared.length,
+    absent: absentDeclaredTests({ declared, exists: p => fs.existsSync(path.join(root, p)) }),
     full,
     suiteCount: full ? set.length : 0,
   });
