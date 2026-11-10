@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.989 | scripts/staff-watch.js | AGT-624 -- a RULED skill-edit ask stands until a cycle it has not seen records its fingerprint; supersedes "ONLY AN UNANSWERED ASK SUPPRESSES" below.
 // DeepBench v7.0.781 | scripts/staff-watch.js | AGT-304 slice 4 -- RECORDED_KINDS admits the trigger-written gap finding (CHECK widened by agt136_gap_attribution).
 // DeepBench v7.0.634 | scripts/staff-watch.js | AGT-198 -- A STAFF FINDING REACHES THE MANAGER
 // NAMING ITS SUBJECT, AND NEITHER FINGERPRINT MOVES. `ledgerFindingFor()` set every
@@ -360,6 +361,23 @@ export function asksToFile(promotions, standingTargetIds) {
   }));
 }
 
+// AGT-624 -- fingerprints whose NEWEST answered ask saw every cycle that recorded them.
+export function ruledStandingFrom(answeredAsks, findings) {
+  const newest = new Map();
+  for (const a of answeredAsks ?? []) {
+    const prev = newest.get(a.target_id);
+    if (!prev || Date.parse(a.asked_at) > Date.parse(prev.asked_at)) newest.set(a.target_id, a);
+  }
+  const out = new Map();
+  for (const [fp, ask] of newest) {
+    const cut = Date.parse(ask.asked_at);
+    const mine = (findings ?? []).filter(f => f.fingerprint === fp);
+    const seen = new Set(mine.filter(f => Date.parse(f.created_at) <= cut).map(f => f.cycle_id));
+    if (mine.every(f => seen.has(f.cycle_id))) out.set(fp, ask);
+  }
+  return out;
+}
+
 // The text a `--promote` prints, and the text `--apply` files verbatim. Says what was seen, how
 // often, and what it is asking for -- an ask never states a verdict.
 export function skillEditTextFor(p) {
@@ -606,7 +624,7 @@ async function since(args) {
 
 async function promote(args) {
   const db = rest();
-  const rows = await db.get(`${TABLE}?select=fingerprint,agent_id,kind,cycle_id,detail,backlog_id&order=created_at.asc`);
+  const rows = await db.get(`${TABLE}?select=fingerprint,agent_id,kind,cycle_id,detail,backlog_id,created_at&order=created_at.asc`);
   const promotions = promotionsFrom(rows);
 
   const filed = [];
@@ -636,9 +654,14 @@ async function promote(args) {
       if (!prev || String(a.asked_at) < String(prev.asked_at)) standingAsks.set(a.target_id, a);
     }
 
+    // AGT-624 -- a ruled ask stands too.
+    const ruled = await db.get(
+      "runner_card_asks?target_kind=eq.skill-edit&answer=not.is.null&select=id,target_id,asked_at,answered_at&order=asked_at.desc");
+    for (const [fp, ask] of ruledStandingFrom(ruled, rows)) if (!standingAsks.has(fp)) standingAsks.set(fp, ask);
+
     for (const { fingerprint, action } of asksToFile(promotions, new Set(standingAsks.keys()))) {
       if (action === "standing") {
-        filed.push({ fingerprint, action, standing_ask_id: standingAsks.get(fingerprint).id });
+        filed.push({ fingerprint, action, standing_ask_id: standingAsks.get(fingerprint).id, ruled_at: standingAsks.get(fingerprint).answered_at ?? null });
         continue;
       }
       const p = promotions.find(x => x.fingerprint === fingerprint);
@@ -685,7 +708,7 @@ async function promote(args) {
       process.stdout.write(`  filed runner_card_asks for ${f.fingerprint}: ${
         f.action === "new"
           ? "new"
-          : `standing (ask ${f.standing_ask_id}, asked ${standing ? standing.asked_at : "?"})`}\n`);
+          : `standing (ask ${f.standing_ask_id}, asked ${standing ? standing.asked_at : "?"}${standing?.answered_at ? `, ruled ${standing.answered_at}` : ""})`}\n`);
     }
   }
 }
