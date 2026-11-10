@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.990 | scripts/verifier.js | AGT-629 -- a test the pre-build tree genuinely LACKED is not an unmeasured red: `absentPreBuildFrom()` reads the `— ABSENT pre-build` lines `renderOut()` now writes, both baseline readers carry `absent` beside `measured`, and `baselineCoverageFinding()` exempts ONLY a name on such a line. Every other uncovered name still refuses (AGT-457) and `regressionDelta()` is untouched, so a red new test still blocks.
 // DeepBench v7.0.978 | scripts/verifier.js | AGT-609 -- every verdict carries a rules fingerprint; gradeDelivery() is the ONE grading path verify-ship and the re-grade lane share.
 // DeepBench v7.0.977 | scripts/verifier.js | AGT-610 -- the risk declaration: every task names what it touches, how far it reaches, how it is undone; graded for coverage, never for its decision.
 // DeepBench v7.0.966 | scripts/verifier.js | AGT-572 -- a zero-file delivery is graded by its baseline's measured set
@@ -915,6 +916,26 @@ export function notRunTestsFrom(output) {
 // set keyed two ways cannot be compared with `includes`.
 export const PER_TEST_LINE = /^\s*-\s+`?([^`\s]+)`?\s+—\s+(?:RED\b|green\b|NOT RUN\b)/;
 
+// ---- FEATURE: AGT-629 -- A TEST THE PRE-BUILD TREE DID NOT HAVE IS NOT AN UNMEASURED RED. -----
+//
+// THE ONE CASE AGT-457's REFUSAL CANNOT TELL APART, measured on three cycles in one day (e5ac6f3b,
+// 1d955358, 041a06c3). Step 7 measures the baseline BEFORE the Builder is spawned, so a test file
+// the build is about to ADD cannot be in it -- `relatedTests()` drops a name no file backs -- and
+// `baselineCoverageFinding()` then saw a graded name with no measurement behind it and refused, which
+// is exactly what it is for in every other case. The difference is the reason for the absence: a
+// narrower baseline MISSED a test that existed; this one measured a tree where the test DID NOT EXIST.
+//
+// SO THE EXEMPTION IS A STATED FACT, NOT AN INFERENCE, and that is the whole safety argument for
+// touching this refusal at all. `renderOut()` (`scripts/pre-build-baseline.js`) writes one
+// `- <path> — ABSENT pre-build` line per declared test file the measured tree lacked; only a name on
+// such a line is exempt. No keyword, no changed-files list, no kickoff byte spent -- and every other
+// uncovered name refuses byte-for-byte as before (AGT-457). `regressionDelta()` is NOT touched: a
+// name the baseline never measured still lands in `neverMeasured`, the suite's own exit code still
+// stands, and a RED new test still blocks (pattern:166 -- a degrade does not remove a stop).
+export const ABSENT_PRE_BUILD_LINE = /^\s*-\s+`?([^`\s]+)`?\s+—\s+ABSENT pre-build\b/;
+export const absentPreBuildFrom = text => [...new Set(String(text ?? "").split("\n")
+  .map(l => l.match(ABSENT_PRE_BUILD_LINE)).filter(Boolean).map(h => path.basename(h[1])))];
+
 export function measuredTestsFrom(text) {
   const names = [];
   for (const raw of String(text ?? "").split("\n")) {
@@ -993,7 +1014,9 @@ export function baselineInstrumentFrom(text) {
 // the same thing -- it is a different measurement whose names this gate cannot align, and accepting
 // it is how a one-process log came to stand in for a per-file baseline. Null `instrument` is the
 // escape every one of the 1,014 blockless kickoffs takes, and it is NOT GRADED rather than refused.
-export function baselineCoverageFinding({ measured, graded, instrument }) {
+// AGT-629: `absent` is the FIFTH input and the ONLY exemption -- the basenames the baseline itself
+// declared the measured tree did not have (`absentPreBuildFrom`). Absent or empty changes nothing.
+export function baselineCoverageFinding({ measured, graded, instrument, absent }) {
   const inst = instrument === null || instrument === undefined ? null : String(instrument).trim();
   if (inst && !BASELINE_INSTRUMENTS.includes(inst)) {
     return {
@@ -1013,7 +1036,7 @@ export function baselineCoverageFinding({ measured, graded, instrument }) {
   const have = measured.map(n => path.basename(String(n)));
   const uncovered = [];
   for (const g of graded.map(n => path.basename(String(n)))) {
-    if (!have.includes(g) && !uncovered.includes(g)) uncovered.push(g);
+    if (!have.includes(g) && !(absent ?? []).includes(g) && !uncovered.includes(g)) uncovered.push(g);
   }
   if (!uncovered.length) return null;
   return {
@@ -1261,6 +1284,9 @@ export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFi
   return { names, unverified,
     measured: measured.length ? measured : null,
     instrument: baselineInstrumentFrom(text),
+    // AGT-629: the FOURTH list off the SAME read of the SAME file, for the reason the third one's
+    // comment above gives -- four facts read from four reads can describe four baselines.
+    absent: absentPreBuildFrom(text),
     source: `${baselinePath} (${names.length} red on the unchanged tree, ${unverified.length} never run)` };
 }
 
@@ -3426,6 +3452,8 @@ export async function gradeDelivery({ repoRoot, regressionRoot = repoRoot, cycle
     measured: baselineRead.measured,
     graded,
     instrument: baselineRead.instrument,
+    // AGT-629: off the SAME read, the same rule as `measured` and `instrument` above.
+    absent: baselineRead.absent,
   });
   if (coverage) return { coverage };
 
