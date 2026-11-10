@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.988 | scripts/settle-ship.js | AGT-634 -- an id-less STOP LINE sentence closes partial only when it DECLARES it, never when it describes the behaviour shipped.
 // DeepBench v7.0.985 | scripts/settle-ship.js | AGT-628 -- the cost patch verifies the clause it promises; one settle mints one decision.
 // DeepBench v7.0.980 | scripts/settle-ship.js | AGT-595 -- a refused delivered settles partial + files a card; --release frees the claim.
 // DeepBench v7.0.924 | scripts/settle-ship.js | AGT-506 -- the close-out records its own ship
@@ -123,6 +124,7 @@ const SENTENCE_SPLIT_RE = /(?<=[.;!?])\s+|\n+/;  // one decision per sentence; `
 const PARTIAL_RE = /\bpartial\b/i;               // the word itself: necessary, and since this ship never sufficient
 const CONDITIONAL_RE = /\b(?:if|unless|in case)\b/i;
 const CLOSE_AS_PARTIAL_RE = /\bclose\s+as\s*:\s*[`*_]*partial\b/i;
+const DECLARES_PARTIAL_RE = /(?:^[\s*_`>-]*status|\b(?:stays?|remains?|otherwise|closes?|(?:close|leave|keep|settle|mark)\s+(?:it|this|(?:the|this)\s+(?:ticket|row|ship))))\s*[:=]?\s*[`*_]*partial\b/i;
 const TICKET_ID_RE = /\b[A-Z]{2,6}-\d{1,4}[a-z]?\b/g;
 
 // A status this script must never touch. `done` is John's word (`SES-154`) and `removed` /
@@ -152,8 +154,9 @@ export const UNSETTLEABLE = new Set(["done", "removed", "removal proposed"]);
 //      this ticket closed partial; the branch that actually happened arrives at this script as
 //      trigger 4, `--remainder=`, which is a fact about the run and not a sentence about a plan.
 //   2. `Close as: partial` -> TRUE. The explicit form fires whatever else the section names.
-//   3. NAMES NO ID -> TRUE. The ship speaking about itself, which is how 11 of the 43 that still
-//      fire are written -- requiring an id would strand 11 real remainders to catch 2.
+//   3. NAMES NO ID -> TRUE ONLY WHEN IT DECLARES (`DECLARES_PARTIAL_RE`, AGT-634): a status verb or
+//      object beside the word (`the ticket stays partial`, `leave it partial`, `Closes partial:`).
+//      A clause DESCRIBING the behaviour shipped (`a refused delivered settles partial`) is skipped.
 //   4. ITS IDS INCLUDE `ticketId` -> TRUE. Any other id and the sentence is about someone else,
 //      so the loop CONTINUES rather than returning: one sentence's silence is not the section's.
 //
@@ -177,7 +180,7 @@ export function stopLineClosesPartial(text, ticketId = null) {
     if (CONDITIONAL_RE.test(sentence)) continue;                              // 1
     if (CLOSE_AS_PARTIAL_RE.test(sentence)) return true;                      // 2
     const ids = sentence.match(TICKET_ID_RE) ?? [];
-    if (ids.length === 0) return true;                                        // 3
+    if (ids.length === 0) { if (DECLARES_PARTIAL_RE.test(sentence)) return true; continue; } // 3
     if (want !== null && ids.some(id => id.toUpperCase() === want)) return true; // 4
   }
   return false;
