@@ -3320,13 +3320,28 @@ async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
   // here as well as in the lister) and the conclusion's job array (which the lister's return shape
   // does not carry). Both by primary key, so neither can describe a different row than the one the
   // lister named.
-  const prev = await rest(supabaseUrl, supabaseKey,
-    `runner_verdicts?select=id,gate_build,gate_regression,gate_hygiene,epic_name,priority_class&id=eq.${encodeURIComponent(row.verdict_id)}&limit=1`);
-  if (prev.error || !Array.isArray(prev.rows) || !prev.rows[0]) {
-    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: prev.error || `no runner_verdicts row ${row.verdict_id}` },
-      prose: `verifier --regrade: could not read the prior verdict ${row.verdict_id} (${prev.error || "no such row"}). Exiting 2 -- no verdict, nothing recorded.` });
+  //
+  // AGT-635: A LISTED ROW WITH NO PRIOR VERDICT AT ALL. `regradable_ships()`'s zero-verdict branch
+  // returns `verdict_id` NULL by construction -- the delivery shipped and was never graded, which
+  // is the one stuck class the old lister structurally could not see. There is no prior verdict to
+  // read, so the read below is SKIPPED rather than issued with a null id (it would come back with
+  // no row and exit 2 at the lister's own expense, reading "never graded" as "cannot run").
+  // `gates: {}` is the honest input: no gate is `green` to carry forward and none is `skipped` to
+  // refuse on, so every one of the three is graded from its own CI job -- which is exactly what the
+  // lister already demanded of this row, every job in the conclusion `success`, strictly more than
+  // branch 1's red-gates-only test. `epic_name`/`priority_class` are null for the same reason the
+  // read is skipped: no row carries them, and inventing them is not available.
+  const zeroVerdict = row.verdict_id === null || row.verdict_id === undefined;
+  let priorRow = { epic_name: null, priority_class: null };
+  if (!zeroVerdict) {
+    const prev = await rest(supabaseUrl, supabaseKey,
+      `runner_verdicts?select=id,gate_build,gate_regression,gate_hygiene,epic_name,priority_class&id=eq.${encodeURIComponent(row.verdict_id)}&limit=1`);
+    if (prev.error || !Array.isArray(prev.rows) || !prev.rows[0]) {
+      return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: prev.error || `no runner_verdicts row ${row.verdict_id}` },
+        prose: `verifier --regrade: could not read the prior verdict ${row.verdict_id} (${prev.error || "no such row"}). Exiting 2 -- no verdict, nothing recorded.` });
+    }
+    priorRow = prev.rows[0];
   }
-  const priorRow = prev.rows[0];
   const conc = await rest(supabaseUrl, supabaseKey,
     `ci_run_conclusions?select=commit_sha,run_id,concluded_at,jobs&run_id=eq.${encodeURIComponent(row.ci_run_id)}&limit=1`);
   if (conc.error) {
@@ -3335,7 +3350,9 @@ async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
   }
   const conclusion = Array.isArray(conc.rows) ? conc.rows[0] : null;
   const graded = regradeGateResults({
-    gates: { build: priorRow.gate_build, regression: priorRow.gate_regression, hygiene: priorRow.gate_hygiene },
+    gates: zeroVerdict
+      ? {}
+      : { build: priorRow.gate_build, regression: priorRow.gate_regression, hygiene: priorRow.gate_hygiene },
     jobs: conclusion ? conclusion.jobs : null,
   });
   if (!graded.ok) {
@@ -3355,8 +3372,11 @@ async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
   // existing delivery, never its own ladder grant, and this branch never reads class_autonomy().
   const reasoning =
     `${verdictReasoning}\n` +
-    `SES-403 re-grade of ${ticket}: the prior verdict ${row.verdict_id} (${row.version ?? "no version"}) blocked on ${(row.red_gates || []).join(", ") || "(no red gate recorded)"}, ` +
-    `which CI decides through ${jobNames.map(j => `"${j}"`).join(" and ") || "(no job)"}. Re-graded against the newest ref='dev' conclusion: run ${row.ci_run_id}, sha ${row.ci_sha}, concluded ${row.ci_concluded_at}. ` +
+    (zeroVerdict
+      ? `AGT-635 re-grade of ${ticket}: no prior verdict; all three gates graded from CI run ${row.ci_run_id} -- this delivery shipped and was never graded at all, so there is no gate proven on its own tree to carry forward, ` +
+        `and CI decides every one of them through ${jobNames.map(j => `"${j}"`).join(" and ") || "(no job)"}. Re-graded against the newest ref='dev' conclusion: run ${row.ci_run_id}, sha ${row.ci_sha}, concluded ${row.ci_concluded_at}. `
+      : `SES-403 re-grade of ${ticket}: the prior verdict ${row.verdict_id} (${row.version ?? "no version"}) blocked on ${(row.red_gates || []).join(", ") || "(no red gate recorded)"}, ` +
+        `which CI decides through ${jobNames.map(j => `"${j}"`).join(" and ") || "(no job)"}. Re-graded against the newest ref='dev' conclusion: run ${row.ci_run_id}, sha ${row.ci_sha}, concluded ${row.ci_concluded_at}. `) +
     `Gates: ${graded.reason} ` +
     `The graded tree ${gradedSha} is an ancestor of ${ciSha}. NO GATE WAS RUN LOCALLY -- CI is the authority on dev green (SES-352), and a local run would grade a different tree at a different instant.`;
   const autoDoneReason =
@@ -3365,7 +3385,9 @@ async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
   const prose =
     `verifier --regrade verdict: ${verdict.toUpperCase()} on ${ticket}${version ? ` (${version})` : ""} -- from CI run ${row.ci_run_id}\n` +
     `  ${GATES.map(g => `${g.label}=${gateResults[g.key]} [${graded.source[g.key]}]`).join("\n  ")}\n` +
-    `  prior verdict: ${row.verdict_id} (red: ${(row.red_gates || []).join(", ") || "none recorded"})\n` +
+    (zeroVerdict
+      ? `  prior verdict: none -- no prior verdict; all three gates graded from CI run ${row.ci_run_id}\n`
+      : `  prior verdict: ${row.verdict_id} (red: ${(row.red_gates || []).join(", ") || "none recorded"})\n`) +
     `  graded sha: ${ciSha} (CI's tree; ${gradedSha} is an ancestor of it)\n` +
     `  auto-done eligible: no -- ${autoDoneReason}`;
 
@@ -3373,7 +3395,7 @@ async function regradeBranch({ repoRoot, ticket, cycleId, version, dryRun }) {
     ok: verdict === "approve", exitCode: verdict === "approve" ? 0 : 1,
     kind: "regrade", verdict, gates: gateResults, gate_source: graded.source, reasoning,
     ticket, version: version || null,
-    prior_verdict_id: row.verdict_id, prior_version: row.version ?? null,
+    prior_verdict_id: row.verdict_id ?? null, prior_version: row.version ?? null,
     red_gates: row.red_gates || [], ci_jobs: jobNames,
     ci_sha: ciSha, ci_run_id: row.ci_run_id, ci_concluded_at: row.ci_concluded_at,
     graded_sha: ciSha, auto_done_eligible: false, auto_done_reason: autoDoneReason,

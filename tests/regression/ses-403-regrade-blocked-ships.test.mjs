@@ -75,6 +75,13 @@ const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 // bare labels: the serial tail's enumeration names `(7a-bis)` and `(7b)` as list items too.
 const PARAGRAPH_MARKER = "**(7a-bis) RE-GRADE";
 const SWEEP_MARKER = "**(7b) SWEEP";
+// AGT-635's migration, mirrored byte-identical beside the applied one. The admitted status set (D1)
+// and the sha shape live in that text and nowhere else, so (g)/(iv) reads it rather than restating it.
+const MIGRATION_REL = "docs/design/agt-635-zero-verdict-regrade.sql";
+// The shape ck_runner_verdicts_graded_sha enforces on a graded sha, and the shape AGT-635's branch 2
+// takes off the `/commit/` tail of `dev_link` -- D2, asserted against the live rows.
+const SHA_RE = /^[0-9a-f]{7,40}$/;
+const ALL_THREE_GATES = Object.freeze(["build", "regression", "hygiene"]);
 
 // ---------------------------------------------------------------------------------------------
 // (a) The mapping's four cases, plus the refusal that keeps a new gate key from passing silently.
@@ -292,6 +299,78 @@ function controlsGoRed(md) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// (g) AGT-635 -- THE DELIVERY THAT WAS NEVER GRADED AT ALL, in both directions.
+//
+// `regradable_ships()`'s `latest` CTE reads `runner_verdicts`, so a ticket with ZERO verdicts had
+// no row to be latest and was permanently invisible to this whole lane -- the one stuck class the
+// lister structurally could not see. AGT-552 was live proof (0 verdicts, `partial`, ship commit
+// e016ceef an ancestor of dev). The zero-verdict branch returns `verdict_id` NULL, and the flag
+// then grades with `gates: {}`: there is no prior gate to carry, so all three come from CI.
+//
+// WHY BOTH HALVES, AND WHY THE SECOND IS THE DISCRIMINATING ONE. The first arm alone would pass
+// against a helper that simply greened every ungraded gate -- which is the false green this whole
+// file exists to make impossible. The second arm is the same input with the checks job FAILING: two
+// of the three gates must come back RED. And neither may be sourced "carried from the prior
+// verdict", because there is no prior verdict to carry anything from; a source string saying
+// otherwise would be a verdict lying about its own evidence (SES-347's rule, applied to a row).
+// ---------------------------------------------------------------------------------------------
+export function theZeroVerdictLaneGradesAllThreeFromCI() {
+  // (i) No prior gates at all, both blocking jobs green -> all three gates green, ALL from CI.
+  const fresh = regradeGateResults({ gates: {}, jobs: jobs("success", "success") });
+  assert.ok(fresh.ok,
+    `a delivery with no prior verdict must be gradable when every blocking job is success: ${fresh.reason}`);
+  assert.deepStrictEqual(fresh.gateResults, { build: "green", regression: "green", hygiene: "green" },
+    "with no prior verdict there is no gate proven on the delivery's own tree, so every one of the " +
+      "three is graded from its own CI job -- and the lister already demanded that EVERY job in the " +
+      "conclusion be success before it returned this row, strictly more than branch 1's reds-only test");
+  for (const g of GATES) {
+    assert.match(fresh.source[g.key], /CI job/,
+      `${g.label} must say it came from a CI job -- that is the only evidence this row has`);
+    assert.doesNotMatch(fresh.source[g.key], /carried from the prior verdict/,
+      `${g.label} claims it was "carried from the prior verdict", but there is NO prior verdict here. ` +
+        "A zero-verdict re-grade that carries a gate forward is carrying nothing forward while saying " +
+        "it checked something -- the one sentence on this row that must never be false");
+  }
+
+  // (ii) THE OTHER DIRECTION. Same empty prior gates, checks job FAILING: the two gates that job
+  // decides go RED and stay red. Without this, (i) passes against a blanket greener.
+  const checksRed = regradeGateResults({ gates: {}, jobs: jobs("success", "failure") });
+  assert.ok(checksRed.ok,
+    `a failing job is a gradable answer, not a refusal -- the refusals are skipped gates and absent jobs: ${checksRed.reason}`);
+  assert.deepStrictEqual(checksRed.gateResults, { build: "green", regression: "red", hygiene: "red" },
+    "`Tripwire + regression (blocking)` at failure must leave BOTH regression and hygiene red -- they " +
+      "share that one job. A helper that greened an ungraded gate regardless of its job would return " +
+      "all three green here, and this lane would approve a delivery CI never passed");
+  assert.match(checksRed.source.regression, /= failure/,
+    "the red gate must name the conclusion it read, so the row can be audited rather than believed");
+  return `${Object.values(fresh.gateResults).join("/")} then ${Object.values(checksRed.gateResults).join("/")}`;
+}
+
+// (iv) D1 CANNOT WIDEN SILENTLY. The migration's own text, mirrored byte-identical at this path, is
+// the only place the admitted status set is written down -- so it is asserted here rather than
+// trusted. `open` is still pickable and `removal proposed` is not a delivery (AGT-547 and AGT-519
+// respectively, and neither is a victim of this bug); adding either to that IN list is a decision
+// that must show up as a red test, not as five more rows on a board nobody re-read.
+export function theMigrationAdmitsOnlyDeliveredAndPartial() {
+  const sql = readLf(MIGRATION_REL);
+  const squeezed = sql.replace(/\s+/g, "");
+  assert.ok(squeezed.includes("in('delivered','partial')"),
+    `${MIGRATION_REL} no longer admits exactly ('delivered','partial'). That IN list IS D1 -- if it ` +
+      `changed, the recorded reversible call changed with it and nothing here said so`);
+  assert.ok(!sql.includes("'open'"),
+    `${MIGRATION_REL} now contains the literal 'open'. AGT-547 is \`open\` and STILL PICKABLE -- ` +
+      "listing it would hand a re-grade to a ticket nobody has delivered yet");
+  assert.ok(!sql.includes("'removal proposed'"),
+    `${MIGRATION_REL} now contains the literal 'removal proposed'. AGT-519 was ruled not-real on ` +
+      "2026-11-09; a removal proposal is not a delivery to unstick");
+  // The control: a check that only looked for absences would pass against an EMPTY file.
+  assert.match(sql, /create or replace function public\.regradable_ships\(\)/i,
+    `${MIGRATION_REL} does not define regradable_ships() at all, so the three assertions above passed ` +
+      "against a file that pins nothing");
+  return squeezed.length;
+}
+
+// ---------------------------------------------------------------------------------------------
 
 export default async function run() {
   const md = readLf(RUNBOOK_REL);
@@ -302,6 +381,8 @@ export default async function run() {
   theManagerMayNotRegradeWhatTheListerDidNotReturn();             // (c2)
   const spanBytes = theTailCarriesTheRegradeStep(md);            // (d)
   controlsGoRed(md);                                             // (e)
+  const zeroVerdict = theZeroVerdictLaneGradesAllThreeFromCI();  // (g) i + ii
+  const migrationBytes = theMigrationAdmitsOnlyDeliveredAndPartial(); // (g) iv
 
   // == (f) Live arms: the three functions, write-free ===========================================
   const url = process.env.SUPABASE_URL;
@@ -371,6 +452,34 @@ export default async function run() {
     const listed = JSON.parse(shapeBody);
     assert.ok(Array.isArray(listed), `regradable_ships() must return an array, got ${shapeBody.slice(0, 120)}`);
 
+    // (g)/(iii) AGT-635, LIVE AND READ-ONLY. A zero-verdict row is the one row whose `graded_sha`
+    // is NOT a verdict's tree -- it is the ship's own commit, taken off the `/commit/` tail of
+    // `dev_link` (D2). The verifier's ancestry check feeds that value straight to
+    // `git merge-base --is-ancestor`, so a row carrying prose, a URL or a null there would either
+    // refuse every time or, worse, be read as a tree. And `red_gates` must be all three: the flag
+    // grades each gate from its own CI job, and a short list would leave a gate nobody checked
+    // vouched for by the others.
+    const zeroRows = listed.filter(r => r && (r.verdict_id === null || r.verdict_id === undefined));
+    for (const r of zeroRows) {
+      assert.match(String(r.graded_sha ?? ""), SHA_RE,
+        `regradable_ships() returned ${r.backlog_id} with verdict_id null and graded_sha ` +
+          `${JSON.stringify(r.graded_sha)}, which is not a 7-40 hex sha. That value is handed to ` +
+          "`git merge-base --is-ancestor` verbatim and is the only join between the shipped tree and " +
+          "the CI tree");
+      assert.deepStrictEqual(r.red_gates, [...ALL_THREE_GATES],
+        `regradable_ships() returned ${r.backlog_id} with verdict_id null but red_gates ` +
+          `${JSON.stringify(r.red_gates)}. Nothing has graded ANY gate on this delivery, so all ` +
+          "three must be re-graded from CI -- a shorter list silently excuses the ones left out");
+      assert.ok(r.ci_run_id !== null && r.ci_run_id !== undefined,
+        `${r.backlog_id} carries no ci_run_id, so there is no conclusion to grade its three gates from`);
+    }
+    // The control for the loop above: with zero such rows it is vacuous, so the SHAPE of the
+    // assertion is pinned here instead. A regex that accepted anything would pass the loop on a
+    // board full of prose dev_links.
+    assert.ok(!SHA_RE.test("https://github.com/x/y/commit/e016ceef") && SHA_RE.test("e016ceef8471ff8c4533b71306b31dd4df303568"),
+      "SHA_RE must reject a URL and accept a bare 40-hex sha, or (iii) proves nothing when the board " +
+        "happens to hold no zero-verdict rows");
+
     // Both refusals, and they are reached BEFORE any write -- which is what makes calling a WRITER
     // from a permanent regression test permissible here at all.
     const empty = await post("record_regrade_assignment", { p_cycle_id: NIL_UUID, p_backlog_ids: [] });
@@ -399,8 +508,9 @@ export default async function run() {
 
     console.log(`  [SES-403] (f) live: three functions each resolvable at one overload; the SQL and JS ` +
       `mappings agree on both multi-gate cases and both raise on an unmapped key; regradable_ships() ` +
-      `returns ${LISTER_COLUMNS.length} named columns and ${listed.length} row(s) right now; both ` +
-      `record_regrade_assignment refusals raised and wrote nothing`);
+      `returns ${LISTER_COLUMNS.length} named columns and ${listed.length} row(s) right now, ` +
+      `${zeroRows.length} of them zero-verdict (AGT-635) and each carrying a hex graded_sha plus all ` +
+      `three red_gates; both record_regrade_assignment refusals raised and wrote nothing`);
   }
 
   notRun(
@@ -438,7 +548,8 @@ export default async function run() {
     `dedups regression+hygiene; a green job is evidence and a failure is not (${asymmetry}); the ` +
     `skipped-gate refusal reads "${refusal.slice(0, 48)}..." and the missing-conclusion refusal fires ` +
     `on null/undefined/[]; ${RUNBOOK_REL}'s ${spanBytes}B (7a-bis) paragraph carries the command ` +
-    `before the sweep; both controls go red`);
+    `before the sweep; both controls go red; AGT-635's zero-verdict lane grades all three from CI ` +
+    `(${zeroVerdict}) and its ${migrationBytes}B migration admits only ('delivered','partial')`);
 }
 
 selfRun(import.meta.url, run);
