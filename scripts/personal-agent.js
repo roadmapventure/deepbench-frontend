@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1006 | scripts/personal-agent.js | AGT-644 -- a third record store (strategy_records), the Library read and the strategy write
+// A third store keyed by capability slug exactly as the humor one (STORES, storeFor): STRATEGY_READ_MAP
+// reads public.strategy_records with no --target, and every strategy `correction` AND `grade` row on
+// every render (a store's correctionKinds). EXTRA_READS gains `library` -- the catalog of the
+// personal_sources the agent holds a grant for (never a body, never a file's bytes), plus the section
+// text only for the Library sections the capability names in LIBRARY_SECTIONS, capped at LIBRARY_BYTES
+// -- and `vision`, the repo's docs/vision/*.md. --write on a strategy slug runs validateStrategyAnswer()
+// (pure): an offer with a proposed price carries its basis, and a curating answer's labels name a real
+// section, trust and sensitivity; then ONE strategy_records insert and one PATCH per label to the
+// catalog row's labelling columns. Never a DELETE. Career and humor paths are unchanged.
+// Kickoff: docs/kickoffs/v7.0.1006-AGT-644-harry-call-path.md.
 // DeepBench v7.0.968 | scripts/personal-agent.js | AGT-588 -- windowed career reads
 // DeepBench v7.0.935 | scripts/personal-agent.js | AGT-550 -- record sections carry HEADS, not
 // bodies, and the render REFUSES a section over the byte ceiling instead of assembling it.
@@ -192,6 +203,40 @@ export const HUMOR_READ_MAP = {
   'humor-weekly-draft': ['draft', 'grade', 'topic', 'research', 'phrase_set'],
   'humor-topic-scout': ['draft', 'topic', 'phrase_set'],
 };
+// AGT-644. The strategy store's eleven kinds (strategy_records_kind_check, AGT-643) and its OWN read
+// map, never folded into READ_MAP or HUMOR_READ_MAP. `correction` and `grade` are in no list: every
+// one of them is read on every render (the store's correctionKinds below).
+export const STRATEGY_KINDS = [
+  'brief', 'review', 'readiness', 'offer', 'roadmap', 'acquirer', 'call', 'gap', 'research', 'correction', 'grade',
+];
+export const STRATEGY_READ_MAP = {
+  'strategy-daily-brief': ['brief', 'offer', 'acquirer', 'call', 'gap'],
+  'strategy-weekly-review': ['offer', 'roadmap', 'acquirer', 'call', 'gap', 'review', 'research'],
+  'strategy-readiness-check': ['readiness', 'offer', 'acquirer', 'roadmap'],
+  'strategy-library-curate': ['gap'],
+  'strategy-advise': ['offer', 'roadmap', 'acquirer', 'gap', 'research'],
+};
+// The Library's labels (personal_sources check constraints, AGT-643): eleven sections, seven trust
+// levels, three sensitivities.
+export const LIBRARY_SECTION_NAMES = [
+  'identity', 'approach', 'ideas', 'facts', 'evidence', 'value', 'works', 'goals', 'market', 'taste', 'log',
+];
+export const LIBRARY_TRUST = ['john_confirmed', 'john_authored', 'measured', 'extracted', 'public_page', 'outside', 'vision'];
+export const LIBRARY_SENSITIVITY = ['reusable', 'client_private', 'personal_private'];
+// Which Library sections' TEXT a capability reads; every other item reaches it as a catalog line only.
+export const LIBRARY_SECTIONS = {
+  'strategy-daily-brief': ['value', 'ideas'],
+  'strategy-weekly-review': ['value', 'approach', 'evidence', 'ideas', 'works'],
+  'strategy-readiness-check': ['value', 'evidence', 'facts', 'approach'],
+  'strategy-library-curate': [],
+  'strategy-advise': ['value', 'approach', 'facts', 'evidence', 'works'],
+};
+// A capability that reads the head of every UNSECTIONED item (to label it), and how many characters.
+export const LIBRARY_UNSECTIONED_HEADS = { 'strategy-library-curate': 2000 };
+// The hard cap on the Library's text half; past it the catalog stays and the bodies drop.
+export const LIBRARY_BYTES = 200000;
+// The capabilities whose answer may carry labels[] for the catalog rows.
+export const LIBRARY_CURATORS = ['strategy-library-curate'];
 // The write check's constants: the one emoji, always last (rule 1); the hard ceiling in code points;
 // the ~200 target the summary reports against (never a quota); the 14-day window every humor read
 // uses (AGO = now - 14 days, computed per call so a long-lived import never goes stale).
@@ -255,10 +300,18 @@ export const KIND_FILTERS = {
 // the task_context key -- one string, or (AGT-543) a list of keys, each read by EXTRA_READERS below
 // and set to null when it comes back empty.
 const HUMOR_EXTRA_READS = ['market', 'career', 'napkin', 'personal_sources', 'week'];
+const STRATEGY_EXTRA_READS = ['library', 'market', 'career', 'napkin', 'week'];
 export const EXTRA_READS = {
   'career-linkedin-alerts': 'competitors',
   'humor-weekly-draft': HUMOR_EXTRA_READS,
   'humor-topic-scout': HUMOR_EXTRA_READS,
+  // AGT-644: every strategy slug reads the Library, the team's stores and the week; the readiness
+  // check and the weekly review also read the vision corpus.
+  'strategy-daily-brief': STRATEGY_EXTRA_READS,
+  'strategy-weekly-review': [...STRATEGY_EXTRA_READS, 'vision'],
+  'strategy-readiness-check': [...STRATEGY_EXTRA_READS, 'vision'],
+  'strategy-library-curate': STRATEGY_EXTRA_READS,
+  'strategy-advise': STRATEGY_EXTRA_READS,
 };
 
 // The evidence sources the design named, read-only (git log, files). Paths only -- no remote, no
@@ -276,6 +329,7 @@ export const REPOS = [
 const BOARDS = ['greenhouse', 'lever', 'ashby'];
 const RECORD_FIELDS = 'id,kind,title,body,data,target_row,source,created_at';
 const HUMOR_FIELDS = 'id,kind,title,body,data,source,created_at';
+const STRATEGY_FIELDS = 'id,kind,title,body,data,source,created_at';
 
 // AGT-543. Which store a capability reads, decided by WHICH MAP holds its slug -- data, never an
 // `if (capability === ...)` and never an agent id (pattern:2, pattern:13). The career store keeps its
@@ -284,6 +338,8 @@ const HUMOR_FIELDS = 'id,kind,title,body,data,source,created_at';
 const STORES = [
   { table: 'career_records', fields: RECORD_FIELDS, map: READ_MAP, targeted: true, allCorrections: false, repos: REPOS, write: null },
   { table: 'humor_records', fields: HUMOR_FIELDS, map: HUMOR_READ_MAP, targeted: false, allCorrections: true, repos: null, write: writeHumor },
+  // AGT-644: the strategy store reads every `correction` AND every `grade` (grades travel with corrections).
+  { table: 'strategy_records', fields: STRATEGY_FIELDS, map: STRATEGY_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeStrategy },
 ];
 
 export function storeFor(capability) {
@@ -700,8 +756,12 @@ async function readRecords(db, capability, target) {
   if (store.allCorrections) {
     // AGT-543: every humor correction applies to every humor run -- a rule the principal stated is
     // never scoped to one capability.
-    const all = await db.get(`${store.table}?kind=eq.correction&select=${store.fields}&order=created_at.asc,id.asc`);
-    return { records, corrections: all.map(r => ({ id: r.id, title: r.title, body: r.body, data: r.data, created_at: r.created_at })) };
+    // AGT-644: a store may name more than one always-read kind (strategy: correction and grade); then
+    // each row carries its kind so a grade is told from a correction. One kind reads exactly as before.
+    const ck = store.correctionKinds ?? ['correction'];
+    const kindQ = ck.length === 1 ? `kind=eq.${ck[0]}` : `kind=in.(${ck.join(',')})`;
+    const all = await db.get(`${store.table}?${kindQ}&select=${store.fields}&order=created_at.asc,id.asc`);
+    return { records, corrections: all.map(r => ({ ...(ck.length > 1 ? { kind: r.kind } : {}), id: r.id, title: r.title, body: r.body, data: r.data, created_at: r.created_at })) };
   }
   const corrections = (await db.get(
     `career_records?kind=eq.correction&data->>capability=eq.${encodeURIComponent(capability)}&select=${RECORD_FIELDS}&order=created_at.asc,id.asc`,
@@ -773,8 +833,84 @@ async function readRecentCareer(db) {
 // the note (the note's own write moves updated_at, so a 60 s margin keeps a just-noted row out).
 async function readNapkin(db, args) {
   const notedAt = Object.keys(napkinPatch(args.agent, null, null))[1];
-  const rows = await db.get(`napkin_ideas?select=id,text,status,updated_at,${notedAt}&order=updated_at.asc`);
+  let rows;
+  try {
+    rows = await db.get(`napkin_ideas?select=id,text,status,updated_at,${notedAt}&order=updated_at.asc`);
+  } catch (e) {
+    // AGT-644: an agent with no Napkin columns of its own (PostgREST 400, Postgres 42703 undefined
+    // column) never notes an entry, so it reads the live board with its research verdicts instead.
+    // An agent that HAS the columns reads exactly as before.
+    if (!/HTTP 400[\s\S]*42703/.test(e.message)) throw e;
+    return db.get('napkin_ideas?select=id,text,status,research_note,updated_at&or=(archived.is.null,archived.eq.false)&order=updated_at.asc,id.asc');
+  }
   return rows.filter(r => r[notedAt] == null || Date.parse(r[notedAt]) <= Date.parse(r.updated_at) - 60 * 1000);
+}
+
+// --- AGT-644: the Library and the vision corpus, each one task_context key ---------------------
+//
+// The catalog: every CURRENT item of a kind the agent holds a grant for, labels only -- never a body,
+// never a row of personal_source_files. The text half: only the items whose section the capability
+// names in LIBRARY_SECTIONS (their personal_source_sections rows when there are any, else body), plus,
+// for a capability in LIBRARY_UNSECTIONED_HEADS, the head of every item no one has sectioned yet.
+// The text half is capped at LIBRARY_BYTES: past it the catalog stays and the remaining bodies drop.
+const LIBRARY_CATALOG = 'id,kind,title,section,purpose,trust,sensitivity,audience,doc_date,version,origin';
+const ID_CHUNK = 80; // ids per in.() filter, so a long list never outgrows a URL
+
+async function getByIds(db, table, key, ids, select, order) {
+  const out = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const part = ids.slice(i, i + ID_CHUNK).map(encodeURIComponent).join(',');
+    out.push(...await db.get(`${table}?${key}=in.(${part})&select=${select}&order=${order}`));
+  }
+  return out;
+}
+
+async function readLibrary(db, args) {
+  const grants = await db.get(`personal_source_grants?agent_id=eq.${encodeURIComponent(args.agent)}&select=kind`);
+  const kinds = [...new Set(grants.map(g => g.kind).filter(Boolean))];
+  if (!kinds.length) return null;
+  const catalog = await db.get(`personal_sources?status=eq.current&kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
+    `&select=${LIBRARY_CATALOG}&order=section.asc.nullsfirst,id.asc`);
+  if (!catalog.length) return null;
+
+  const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? []);
+  const headChars = LIBRARY_UNSECTIONED_HEADS[args.capability] ?? 0;
+  const full = catalog.filter(c => c.section && wanted.has(c.section)).map(c => c.id);
+  const heads = headChars ? catalog.filter(c => !c.section).map(c => c.id) : [];
+  const ids = [...full, ...heads];
+  const parts = ids.length ? await getByIds(db, 'personal_source_sections', 'source_id', ids, 'source_id,ord,heading,body', 'source_id.asc,ord.asc') : [];
+  const bySource = new Map();
+  for (const p of parts) {
+    if (!bySource.has(p.source_id)) bySource.set(p.source_id, []);
+    bySource.get(p.source_id).push({ heading: p.heading, body: p.body });
+  }
+  const bodyIds = ids.filter(id => !bySource.has(id));
+  const bodies = new Map((bodyIds.length ? await getByIds(db, 'personal_sources', 'id', bodyIds, 'id,body', 'id.asc') : []).map(r => [r.id, r.body]));
+
+  const text = [];
+  let bytes = 0;
+  let capped = false;
+  const headSet = new Set(heads);
+  for (const id of ids) {
+    let item;
+    if (headSet.has(id)) item = { id, head: String(bodies.get(id) ?? (bySource.get(id) ?? []).map(s => s.body).join('\n')).slice(0, headChars) };
+    else if (bySource.has(id)) item = { id, sections: bySource.get(id) };
+    else item = { id, body: bodies.get(id) ?? null };
+    const size = Buffer.byteLength(JSON.stringify(item), 'utf8');
+    if (capped || bytes + size > LIBRARY_BYTES) { capped = true; continue; }
+    bytes += size;
+    text.push(item);
+  }
+  if (capped) console.error(`personal-agent: library text capped at ${LIBRARY_BYTES} bytes`);
+  return { catalog, text, text_bytes: bytes, text_capped: capped };
+}
+
+// The vision corpus: docs/vision/*.md of the repo this script runs in, read-only.
+function readVision() {
+  const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'vision');
+  if (!fs.existsSync(dir)) return null;
+  return fs.readdirSync(dir).filter(f => f.endsWith('.md')).sort()
+    .map(name => ({ name, text: fs.readFileSync(path.join(dir, name), 'utf8') }));
 }
 
 // The principal's own material, only the kinds this agent holds a grant row for.
@@ -812,6 +948,8 @@ const EXTRA_READERS = {
   napkin: readNapkin,
   personal_sources: readPersonalSources,
   week: readWeekShips,
+  library: readLibrary,
+  vision: readVision,
 };
 
 async function render(args) {
@@ -991,6 +1129,84 @@ async function writeHumor(args, answer) {
     ceiling: limits.ceiling,
     drafts: check.counts.map(c => ({ ...c, over_target: c.char_count > limits.target })),
   }) + '\n');
+}
+
+// --- AGT-644: the strategy write check and write -----------------------------------------------
+//
+// Pure. Every refusal is a property of this code path, never an instruction the model is asked to
+// obey (pattern:10): a price is never proposed without its basis, and a label names only values the
+// catalog's own check constraints allow. Returns {ok, errors} -- every error, not just the first.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const nonEmpty = v => (typeof v === 'string' ? v.trim() !== '' : isPlainObject(v) ? Object.keys(v).length > 0 : Array.isArray(v) && v.length > 0);
+
+export function validateStrategyAnswer(answer) {
+  const errors = [];
+  if (!isPlainObject(answer)) return { ok: false, errors: ['the answer must be a JSON object'] };
+  const items = answer.records_to_write;
+  if (!Array.isArray(items)) errors.push('the answer carries no records_to_write array');
+  for (const [i, item] of (Array.isArray(items) ? items : []).entries()) {
+    if (!isPlainObject(item)) { errors.push(`records_to_write[${i}] is not an object`); continue; }
+    if (!STRATEGY_KINDS.includes(item.kind)) errors.push(`records_to_write[${i}] has unknown kind "${item.kind}"`);
+    if (typeof item.title !== 'string' || !item.title.trim()) errors.push(`records_to_write[${i}] (${item.kind}) has no title`);
+    if (item.data !== undefined && !isPlainObject(item.data)) { errors.push(`records_to_write[${i}].data must be an object`); continue; }
+    const d = item.data ?? {};
+    if (item.kind === 'offer' && d.proposed_price !== undefined && d.proposed_price !== null && !nonEmpty(d.price_basis)) {
+      errors.push(`records_to_write[${i}] (offer) proposes a price with no data.price_basis`);
+    }
+  }
+  if (answer.labels !== undefined) {
+    if (!Array.isArray(answer.labels)) errors.push('labels must be an array');
+    for (const [i, l] of (Array.isArray(answer.labels) ? answer.labels : []).entries()) {
+      if (!isPlainObject(l)) { errors.push(`labels[${i}] is not an object`); continue; }
+      if (typeof l.source_id !== 'string' || !UUID.test(l.source_id)) errors.push(`labels[${i}].source_id is not a uuid`);
+      if (!LIBRARY_SECTION_NAMES.includes(l.section)) errors.push(`labels[${i}].section "${l.section}" is not one of the eleven sections`);
+      if (!LIBRARY_TRUST.includes(l.trust)) errors.push(`labels[${i}].trust "${l.trust}" is not one of the seven trust levels`);
+      if (!LIBRARY_SENSITIVITY.includes(l.sensitivity)) errors.push(`labels[${i}].sensitivity "${l.sensitivity}" is not one of the three`);
+      if (l.superseded_by != null && (typeof l.superseded_by !== 'string' || !UUID.test(l.superseded_by))) {
+        errors.push(`labels[${i}].superseded_by is not a uuid`);
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// The only catalog columns a label may set; status follows superseded_by and is never set alone.
+const LABEL_COLUMNS = ['section', 'purpose', 'trust', 'sensitivity', 'audience', 'superseded_by'];
+export function labelPatch(label, at) {
+  const body = {};
+  for (const c of LABEL_COLUMNS) if (label[c] !== undefined) body[c] = label[c];
+  if (label.superseded_by) body.status = 'superseded';
+  body.updated_at = at;
+  return body;
+}
+
+// --write on a strategy slug: check the whole answer first (exit 2, nothing written), ONE
+// strategy_records insert, then one PATCH per label -- only from a curating capability. Never a DELETE.
+async function writeStrategy(args, answer) {
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  const check = validateStrategyAnswer(answer);
+  if (!check.ok) return stop(`answer refused, nothing written: ${check.errors.join('; ')}`);
+  const labels = Array.isArray(answer.labels) ? answer.labels : [];
+  if (labels.length && !LIBRARY_CURATORS.includes(args.capability)) {
+    return stop(`answer refused, nothing written: labels[] are written only by ${LIBRARY_CURATORS.join(', ')}`);
+  }
+  const db = rest();
+  const source = `${args.capability} ${new Date().toISOString().slice(0, 10)}`;
+  const session_name = args.sessionName || null;
+  const rows = answer.records_to_write.map(item => ({
+    kind: item.kind, title: item.title, body: item.body ?? null, data: item.data ?? {}, source, session_name,
+  }));
+  let inserted = [];
+  if (rows.length) {
+    try { inserted = await db.insert('strategy_records', rows); } catch (e) { return stop(e.message); }
+  }
+  let patched = 0;
+  for (const l of labels) {
+    try {
+      patched += (await db.patch(`personal_sources?id=eq.${encodeURIComponent(l.source_id)}`, labelPatch(l, new Date().toISOString()))).length;
+    } catch (e) { return stop(e.message); }
+  }
+  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), labels_patched: patched }) + '\n');
 }
 
 async function fetchPostings() {
