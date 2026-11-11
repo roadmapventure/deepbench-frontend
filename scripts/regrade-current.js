@@ -80,7 +80,7 @@ import { parseLog, ownCommitRange, cohortRow } from "./regrade-cohort.js";
 // syntax error. `{ out: say }` routes it to stderr, exactly as regrade-delivered.js does.
 import { withTestSlot } from "./test-slot.js";
 import { relatedTests } from "./related-tests.js";
-import { declaredFiles, renderOut } from "./pre-build-baseline.js";
+import { mentionedFiles, renderOut } from "./pre-build-baseline.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..");
@@ -345,7 +345,7 @@ async function attempt({ repo, scratch, row, log, head, cycleId, run, slot, say 
   const kickoff = kickoffFor(repo, row);
   let declared = [];
   if (kickoff) {
-    try { declared = declaredFiles(fs.readFileSync(kickoff, "utf8")); } catch { declared = []; }
+    try { declared = mentionedFiles(fs.readFileSync(kickoff, "utf8")); } catch { declared = []; }
   }
   let names = [];
   if (declared.length) {

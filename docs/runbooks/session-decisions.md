@@ -303,7 +303,7 @@ On `outcome = 'pushed'`, that `push_sha` is the ship point: write it to your cyc
 (`runner_cycles.push_sha`). On `outcome = 'blocked'`, nothing shipped — do not finish it by hand.
 The Builder runs the kickoff's related set, never the full suite (`AGT-391`):
 `node tests/regression/run-all.js --only=<the related set>`, credentialed, against the kickoff's
-BASELINE block; the full suite runs weekly and before a release (`docs/runbooks/release-to-main.md`). Before the spawn, measure where it can be measured (`AGT-451`): credentialed `node scripts/pre-build-baseline.js --kickoff=<the kickoff path> --out=$S/pre-build-baseline-<the supervised cycle id>.txt`; paste its block into the Builder's opening line; §3e's verifier reads the same file.
+BASELINE block; the full suite runs weekly and before a release (`docs/runbooks/release-to-main.md`). Before the spawn, measure where it can be measured (`AGT-451`): credentialed `node scripts/pre-build-baseline.js --kickoff=<the kickoff path> --files=<its files as csv> --out=$S/pre-build-baseline-<the supervised cycle id>.txt`; paste its block into the Builder's opening line; §3e's verifier reads the same file.
 Then log this run too:
 
 ```

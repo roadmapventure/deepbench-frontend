@@ -2913,11 +2913,11 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/agent-prompt.js \
 
    7a grades only the related set (`scripts/related-tests.js` over 2's `files`) against the kickoff's BASELINE block (`AGT-391`, `v7.0.793`).
 
-   **Measure the baseline before the spawn, credentialed; paste its block into the Builder's opening line (`AGT-451`); check exit 1 = no Builder:**
+   **Measure the baseline pre-spawn; paste its block into the Builder's opening line (`AGT-451`); exit 1 = no Builder:**
 
 ```
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/pre-build-baseline.js --kickoff=<the kickoff_path> \
-  --out=$S/pre-build-baseline-<your cycle id>.txt
+  --files=<6's files as csv> --out=$S/pre-build-baseline-<your cycle id>.txt
 node scripts/verifier.js --check-kickoff=<the kickoff_path> --pre-build-baseline=$S/pre-build-baseline-<your cycle id>.txt
 ```
 

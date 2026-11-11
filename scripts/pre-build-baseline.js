@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1000 | scripts/pre-build-baseline.js | AGT-538 -- the declared set is DECLARED
+// (`--files=<csv>`, the cycle's own measured set), never inferred from the kickoff's prose; without
+// the flag it is the `anchors` block alone.
 // DeepBench v7.0.991 | scripts/pre-build-baseline.js | AGT-629
 // DeepBench v7.0.966 | scripts/pre-build-baseline.js | AGT-572 -- an EMPTY related set measures the FULL suite
 // DeepBench v7.0.843 | scripts/pre-build-baseline.js | AGT-451 -- the baseline is measured
@@ -40,10 +43,15 @@
 // Usage:
 //   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/pre-build-baseline.js \
 //     --kickoff=docs/kickoffs/<version>-<ID>-<name>.md \
+//     --files=<the cycle's files as csv> \
 //     --out=$S/pre-build-baseline-<your cycle id>.txt
 //
 // Flags:
-//   --kickoff=<path>  The kickoff to read the declared files out of. Required.
+//   --kickoff=<path>  The kickoff to read. Required.
+//   --files=<csv>     THE DECLARED SET (`AGT-538`): the cycle's own measured changed files, as one
+//                     csv. Without it the declared set is the kickoff's `anchors` block alone --
+//                     never its prose. An empty `--files=` is a zero-file delivery, not a missing
+//                     flag, and measures the full suite (`AGT-572`).
 //   --out=<path>      Where the block is written. Required -- stdout alone is not a hand-off.
 //   --root=<path>     The tree to measure. Default: this script's repo root.
 //   --include=<csv>   Extra test names to add to the set (`related-tests.js --include=`).
@@ -78,13 +86,20 @@ const BARE_TEST = /\btests\/regression\/[\w.-]+\.m?js\b/g;
 // grade it without a tree, a child process or a credential (the same reason `readKickoffBaseline`
 // and `baselineGate` are pure in `scripts/verifier.js`).
 //
+// AGT-538: THE WIDE READ, AND `scripts/regrade-current.js` IS ITS ONE CALLER. A re-grade has no
+// explicit set to be handed -- the delivery it grades shipped long ago and its cycle is closed -- so
+// it reads the kickoff as widely as it can and pays the false positives. A build does not: it
+// DECLARES its files with `--files=` (`explicitFiles` below) and falls back to the anchors block
+// alone (`declaredFiles` below). Anchors alone would be too narrow HERE: of the 104 shipped
+// kickoffs, 65 name a shipped file that the anchors block does not carry.
+//
 // THREE SOURCES, UNION, SORTED, DE-DUPLICATED. (1) the `anchors` block's own paths -- the kickoff's
 // most deliberate statement of what the build will touch; (2) every WHOLE backticked path token,
 // which is how §5's tasks name their files; (3) every bare `tests/regression/...` mention. A path
 // in prose without backticks and outside tests/regression is NOT declared: §2's reasoning quotes
 // file names it is not going to edit, and reading those as declarations would widen the related set
 // by whatever the prose happened to mention.
-export function declaredFiles(text) {
+export function mentionedFiles(text) {
   const out = new Set();
   const src = String(text ?? "");
   for (const a of anchorBlockLines(src)) {
@@ -96,6 +111,32 @@ export function declaredFiles(text) {
   }
   for (const m of src.matchAll(BARE_TEST)) out.add(norm(m[0]));
   return [...out].sort();
+}
+
+// AGT-538. PURE. THE FALLBACK DECLARED SET: the `anchors` block's own paths and NOTHING ELSE.
+// `AGT-226` already decided this question for the anchors clause of this same artifact -- "DECLARED,
+// NEVER INFERRED ... Inferring the anchors from a kickoff's prose -- every backticked path, every
+// quoted string -- measured 201 false positives of 377 candidates" (`scripts/verifier.js`) -- and
+// left this script inferring. Measured on the shipped `AGT-516` kickoff, whose ship (`5c839d4`) is
+// the ground truth: the wide read above returns 13 paths where the ship touched 3, and 10 of the 13
+// are prose the build never opened -- a "Governing:" citation, its own harvest, and 8 tests named in
+// §5's commands. `--include=` is still the one way to widen on purpose.
+export function declaredFiles(text) {
+  const out = new Set();
+  for (const a of anchorBlockLines(String(text ?? ""))) {
+    if (a.path) out.add(norm(a.path));
+  }
+  return [...out].sort();
+}
+
+// AGT-538. PURE. The cycle's own measured changed set, exactly as step 7 hands it over: one csv,
+// trimmed, `./`-stripped, de-duplicated, sorted. It is the PRIMARY input and the anchors block is
+// only the fallback, because a test the slice CREATES cannot be anchored to a literal in the
+// unchanged tree -- anchors alone would have missed 2 of `AGT-478`'s 6 real changed files, and they
+// miss one of `AGT-516`'s 3. An EMPTY `--files=` is an answer, not a missing flag: a zero-file
+// delivery declares nothing, and `[]` is what the full-suite branch below reads (`AGT-572`).
+export function explicitFiles(csv) {
+  return [...new Set(String(csv ?? "").split(",").map(norm).filter(Boolean))].sort();
 }
 
 // Pure. The `  [FAIL] <basename> -- <assertion>` lines the delta gate reads, one per `— RED` line of
@@ -183,6 +224,7 @@ function shortSha(root) {
 function main(argv) {
   const kickoff = arg(argv, "kickoff");
   const out = arg(argv, "out");
+  const filesArg = arg(argv, "files");
   const cycleId = (arg(argv, "cycle-id") ?? "").trim();
   const include = String(arg(argv, "include") ?? "").split(",").map(norm).filter(Boolean);
   const root = path.resolve(arg(argv, "root") ?? REPO_ROOT);
@@ -209,7 +251,9 @@ function main(argv) {
   try { text = fs.readFileSync(abs, "utf8"); }
   catch (e) { return fail(`--kickoff=${kickoff} could not be read (${e.message}). Nothing was measured.`); }
 
-  const declared = declaredFiles(text);
+  // AGT-538: DECLARED, NEVER INFERRED. `--files=` present (empty or not) is the cycle's own
+  // measured set and the kickoff's prose is not consulted at all; absent, the anchors block alone.
+  const declared = filesArg === undefined ? declaredFiles(text) : explicitFiles(filesArg);
   let set;
   try { set = relatedTests({ root, touched: declared, include }); }
   catch (e) { return fail(`the related set could not be measured over ${root} (${e.message}). Nothing was written.`); }

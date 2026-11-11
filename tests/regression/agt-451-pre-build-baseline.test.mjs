@@ -1,3 +1,4 @@
+// DeepBench v7.0.1000 | tests/regression/agt-451-pre-build-baseline.test.mjs | AGT-538 -- arm I
 // DeepBench v7.0.966 | tests/regression/agt-451-pre-build-baseline.test.mjs | AGT-572 -- arms G, H
 // DeepBench v7.0.843 | tests/regression/agt-451-pre-build-baseline.test.mjs | AGT-451
 //
@@ -20,8 +21,8 @@
 // is removed in `finally`, and nothing here reads or writes the real tree except to read files.
 //
 // ARMS (kickoff v7.0.843 §5 T4), each graded on its own and each with a CONTROL that must fail:
-//   A  declaredFiles() -- anchors path + backticked path + bare tests/regression mention, and NOT an
-//      unbackticked prose path. CONTROL: "" -> [].
+//   A  declaredFiles() -- the `anchors` block ALONE (AGT-538): not a backticked path, not a bare
+//      tests/regression mention, not an unbackticked prose path. CONTROL: "" -> [].
 //   B  no credentials -> exit 2, NOTHING written, stderr names SUPABASE_SERVICE_KEY.
 //   C  credentialed -> the block, the [FAIL] lines, the FLAG on stderr. CONTROL: no --out= -> exit 2.
 //   D  the delta: the stripped block refuses baselineGate() even WITH a related set; the measured
@@ -34,6 +35,9 @@
 //   H  (AGT-572) the gate grades that measurement: relatedFallback()/regressionArgv() pure, then the
 //      verifier spawned three ways -- an EMPTY --related= is a verdict, NO --related= is graded
 //      against the full suite, and an UNREADABLE --related= is still exit 2.
+//   I  (AGT-538) DECLARED, NEVER INFERRED: explicitFiles() pure, the three reads priced against the
+//      one kickoff with a ground-truth ship, and --files= end to end. CONTROL: a touched file the
+//      declared set never named still refuses (AGT-457 kept).
 //
 // BASELINE: RED on the unchanged tree -- scripts/pre-build-baseline.js does not exist,
 // verifier.js exports no UNCREDENTIALED_BASELINE_RE, and none of arm F's needles are in the docs.
@@ -143,9 +147,10 @@ async function armA() {
     "Reasoning about src/never.jsx, which this build does not touch.",
   ].join("\n");
   assert.deepStrictEqual(declaredFiles(text),
-    ["scripts/x.js", "tests/regression/green.test.mjs", "tests/regression/red.test.mjs"],
-    "declaredFiles must read the anchors path, the backticked path and the bare tests/regression " +
-    "mention -- and must NOT read an unbackticked prose path (src/never.jsx)");
+    ["scripts/x.js"],
+    "declaredFiles must read the `anchors` block ALONE (AGT-538) -- the backticked path " +
+    "(tests/regression/red.test.mjs), the bare tests/regression mention (green.test.mjs) and the " +
+    "unbackticked prose path (src/never.jsx) are PROSE, and a build declares its files with --files=");
   // CONTROL: nothing declared is an empty list, never a throw and never a default.
   assert.deepStrictEqual(declaredFiles(""), [], "control: an empty kickoff declares no file");
   // CONTROL: the unbackticked path would be read by a rule that dropped the backtick requirement.
@@ -158,7 +163,7 @@ async function armB() {
   const fx = fixtureTree("refuse");
   const out = path.join(fx, "out.txt");
   try {
-    const r = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${out}`, `--root=${fx}`]);
+    const r = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, "--files=scripts/x.js", `--out=${out}`, `--root=${fx}`]);
     assert.strictEqual(r.code, 2,
       `an uncredentialed run must exit 2 -- it is the defect this script exists to remove; got ${r.code}: ${r.out}`);
     assert.ok(!fs.existsSync(out),
@@ -177,7 +182,7 @@ async function armC() {
   const fx = fixtureTree("measure");
   const out = path.join(fx, "out.txt");
   try {
-    const r = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${out}`, `--root=${fx}`],
+    const r = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, "--files=scripts/x.js", `--out=${out}`, `--root=${fx}`],
       credentialedEnv());
     assert.strictEqual(r.code, 0, `a credentialed run reports, it does not gate; got ${r.code}: ${r.out}`);
     const block = lf(fs.readFileSync(out, "utf8"));
@@ -196,7 +201,7 @@ async function armC() {
     assert.ok(r.stderr.trim().endsWith(`  --pre-build-baseline=${out}`.trim()),
       `stderr must END with the flag the cycle pastes into 7a: ${r.stderr}`);
     // CONTROL: stdout alone is not a hand-off -- without --out= nothing is measured.
-    const noOut = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--root=${fx}`], credentialedEnv());
+    const noOut = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, "--files=scripts/x.js", `--root=${fx}`], credentialedEnv());
     assert.strictEqual(noOut.code, 2, `control: --out= omitted must exit 2, got ${noOut.code}: ${noOut.out}`);
   } finally {
     fs.rmSync(fx, { recursive: true, force: true });
@@ -228,7 +233,7 @@ async function armD() {
       "control: a credentialed block must NOT refuse -- the refusal is about the measurement, not the count");
 
     // The measured file reads back under the SAME reader the gate uses.
-    const r = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${out}`, `--root=${fx}`], credentialedEnv());
+    const r = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, "--files=scripts/x.js", `--out=${out}`, `--root=${fx}`], credentialedEnv());
     assert.strictEqual(r.code, 0, r.out);
     assert.deepStrictEqual(m.readRegressionBaseline(out).names, ["red.test.mjs"],
       "the file the cycle hands to 7a must read back as the one red name");
@@ -273,7 +278,7 @@ async function armE() {
       `the refusal must carry the command that fixes it: ${payload(missing).remedy}`);
 
     // The flag, pointing at the real measurement: green, and the note names what replaced the block.
-    const measured = node([SCRIPT, `--kickoff=${K}`, `--out=${out}`, `--root=${fx}`], credentialedEnv());
+    const measured = node([SCRIPT, `--kickoff=${K}`, "--files=scripts/x.js", `--out=${out}`, `--root=${fx}`], credentialedEnv());
     assert.strictEqual(measured.code, 0, measured.out);
     const armed = node([VERIFIER, `--check-kickoff=${K}`, `--pre-build-baseline=${out}`, "--json"]);
     assert.strictEqual(armed.code, 0, `a real measurement must clear the refusal: ${armed.out}`);
@@ -386,7 +391,7 @@ async function armG() {
 
     // CONTROL: the two-file kickoff is untouched. A change that widened EVERY measurement to the
     // full suite would pass every assertion above and quietly retire AGT-391's selective run.
-    const control = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${ctl}`, `--root=${fx}`],
+    const control = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, "--files=scripts/x.js", `--out=${ctl}`, `--root=${fx}`],
       credentialedEnv());
     assert.strictEqual(control.code, 0, control.out);
     const cblock = lf(fs.readFileSync(ctl, "utf8"));
@@ -433,7 +438,7 @@ async function armH() {
 
     // The measurement the three calls are graded against: k.md's related set, so it measures
     // green + red and NOT named.test.mjs.
-    const made = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${F}`, `--root=${fx}`],
+    const made = node([SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, "--files=scripts/x.js", `--out=${F}`, `--root=${fx}`],
       credentialedEnv());
     assert.strictEqual(made.code, 0, made.out);
     assert.deepStrictEqual(m.readRegressionBaseline(F).measured, ["green.test.mjs", "red.test.mjs"],
@@ -481,6 +486,113 @@ async function armH() {
   }
 }
 
+// ---- I: AGT-538 -- the declared set is DECLARED, never inferred ------------------------------
+//
+// THE DEFECT, measured on a kickoff whose ship is the ground truth. declaredFiles() used to union
+// the `anchors` block with every WHOLE backticked path and every bare tests/regression mention, so
+// §2's "Governing:" citation, the ticket's own harvest and the test names inside §5's commands were
+// all read as build declarations and widened the graded set through relatedTests(). On the AGT-516
+// kickoff that read returns 13 paths where the ship (5c839d4) touched 3. AGT-226 had already refused
+// exactly this inference for the anchors clause of this same artifact -- "DECLARED, NEVER INFERRED",
+// 201 false positives of 377 candidates -- and left this script inferring. So the cycle DECLARES its
+// measured set with --files=, the anchors block alone is the fallback, and the wide read survives
+// under its honest name (mentionedFiles) for the one caller that has no explicit set to be handed.
+async function armI() {
+  const { declaredFiles, explicitFiles, mentionedFiles } =
+    await import(path.join(ROOT, "scripts/pre-build-baseline.js"));
+
+  // PURE: the flag's own parse -- trimmed, `./`-stripped, de-duplicated, sorted.
+  assert.deepStrictEqual(explicitFiles(" ./scripts/b.js,scripts/a.js,,scripts/a.js "),
+    ["scripts/a.js", "scripts/b.js"],
+    "explicitFiles must trim, drop ./, de-duplicate and sort -- step 7 pastes a csv, not a list");
+  assert.deepStrictEqual(explicitFiles(""), [],
+    "an EMPTY --files= is a zero-file delivery (AGT-572 measures the full suite), never a throw");
+
+  // BOTH DIRECTIONS, on the one kickoff where ground truth exists: AGT-516's ship touched these 3.
+  const K = path.join(ROOT, "docs/kickoffs/v7.0.884-AGT-516-daily-arm-reads-stamp.md");
+  const k = lf(fs.readFileSync(K, "utf8"));
+  const TRUTH = [
+    "docs/ARCHITECTURE.md",
+    "docs/design/agt-516-daily-arm-reads-stamp.sql",
+    "tests/regression/agt-485-victoria-daily-check.test.mjs",
+  ];
+  const wide = mentionedFiles(k);
+  assert.strictEqual(wide.length, 13,
+    `the wide read is the 13 paths the prose mentions, which is what the re-grade still wants: ${JSON.stringify(wide)}`);
+  for (const f of TRUTH) {
+    assert.ok(wide.includes(f), `DIRECTION 1: the wide read loses no shipped file -- ${f}`);
+  }
+  const anchors = declaredFiles(k);
+  assert.strictEqual(anchors.length, 3,
+    `DIRECTION 2: the anchors block alone is 3 paths, not 13 -- 10 of the wide read's are prose the `
+    + `ship never opened: ${JSON.stringify(anchors)}`);
+  assert.ok(!anchors.includes("docs/design/agt-516-daily-arm-reads-stamp.sql"),
+    "and the anchors block LOSES one of the 3 shipped files, which is why --files= is the PRIMARY " +
+    "input and the anchors block only the fallback");
+  assert.deepStrictEqual(explicitFiles(TRUTH.join(",")), TRUTH,
+    "the declared set is exactly what the cycle hands over -- no inference in either direction");
+
+  // THE CLI. Arm G's tree plus a second script and the one test that names it, so (b)'s width and
+  // (d)'s width differ by exactly that test and the gate can be made to refuse and then not refuse.
+  const fx = fixtureTree("declared");
+  try {
+    put(fx, "scripts/y.js", 'export const y = 1;\n');
+    put(fx, "tests/regression/y.test.mjs", 'const P = "y.js";\nprocess.exit(0);\n');
+    const K2 = path.join(fx, "k.md");
+    const A = path.join(fx, "a.txt"), B = path.join(fx, "b.txt"), D = path.join(fx, "d.txt");
+    const blockOf = f => lf(fs.readFileSync(f, "utf8"));
+    const payload = r => {
+      const line = r.stdout.trim().split("\n").filter(Boolean).pop();
+      try { return JSON.parse(line); } catch { assert.fail(`--json printed no payload: ${r.out}`); }
+    };
+
+    // (a) NO --files=: k.md names `scripts/x.js` and two bare tests in PROSE and carries no anchors
+    // block, so it declares nothing at all -- a zero-file delivery, measured as the whole tree.
+    const a = node([SCRIPT, `--kickoff=${K2}`, `--out=${A}`, `--root=${fx}`], credentialedEnv());
+    assert.strictEqual(a.code, 0, a.out);
+    assert.ok(blockOf(A).includes("0 declared files is EMPTY, so the full suite of 4 tests"),
+      `prose is not a declaration: the same kickoff that used to declare 3 files declares 0: ${blockOf(A).split("\n")[0]}`);
+
+    // (b) the flag, with the one file: its related set is green + red, and y.test.mjs is outside it.
+    const b = node([SCRIPT, `--kickoff=${K2}`, "--files=scripts/x.js", `--out=${B}`, `--root=${fx}`],
+      credentialedEnv());
+    assert.strictEqual(b.code, 0, b.out);
+    assert.ok(blockOf(B).includes("related set over 1 declared files"),
+      `the header must carry the DECLARED count, which is the flag's and not the prose's: ${blockOf(B).split("\n")[0]}`);
+    assert.ok(blockOf(B).includes("Red set: 1 of 2"),
+      `--files= measures its own related set, never the suite: ${blockOf(B)}`);
+
+    // (c) AGT-457 KEPT. A file the build TOUCHED but declared NOWHERE is still a cannot-run: making
+    // the declaration explicit narrows the measurement, it does not soften the coverage refusal.
+    const REL = path.join(fx, "related.csv");
+    fs.writeFileSync(REL, "green.test.mjs,red.test.mjs,y.test.mjs");
+    const V = file => node([VERIFIER, "--dry-run", "--json", `--repo=${fx}`,
+      `--pre-build-baseline=${file}`, `--related=${REL}`], offlineEnv());
+    const c = V(B);
+    assert.strictEqual(c.code, 2,
+      `a graded test the declared set never reached must still refuse: ${c.out}`);
+    assert.strictEqual(payload(c).error, "baseline-narrower-than-graded-set");
+    assert.deepStrictEqual(payload(c).uncovered, ["y.test.mjs"],
+      `the refusal must NAME the test nobody measured: ${JSON.stringify(payload(c))}`);
+
+    // (d) CONTROL: declare the second file too and the SAME csv is covered. The refusal above is
+    // about coverage, never about --files= being present -- without this pair (c) would pass on a
+    // build that had simply stopped measuring.
+    const d = node([SCRIPT, `--kickoff=${K2}`, "--files=scripts/x.js,scripts/y.js", `--out=${D}`,
+      `--root=${fx}`], credentialedEnv());
+    assert.strictEqual(d.code, 0, d.out);
+    assert.ok(blockOf(D).includes("related set over 2 declared files"),
+      `control: the header must count both declared files: ${blockOf(D).split("\n")[0]}`);
+    assert.ok(blockOf(D).includes("Red set: 1 of 3"),
+      `control: the wider declaration reaches the third test: ${blockOf(D)}`);
+    const dctl = V(D);
+    assert.notStrictEqual(dctl.code, 2,
+      `control: the same csv over the wider measurement must reach a verdict: ${dctl.out}`);
+  } finally {
+    fs.rmSync(fx, { recursive: true, force: true });
+  }
+}
+
 const ARMS = {
   "a-declared-files": armA,
   "b-refuses-uncredentialed": armB,
@@ -490,6 +602,7 @@ const ARMS = {
   "f-the-homes": armF,
   "g-empty-set-is-full-suite": armG,
   "h-zero-file-graded": armH,
+  "i-declared-never-inferred": armI,
 };
 
 export async function run() {

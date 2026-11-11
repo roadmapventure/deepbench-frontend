@@ -199,7 +199,7 @@ function arm5() {
       SUPABASE_SERVICE_KEY: "x",
     };
     const r = spawnSync(process.execPath,
-      [SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--out=${out}`, `--root=${fx}`],
+      [SCRIPT, `--kickoff=${path.join(fx, "k.md")}`, `--files=scripts/x.js,${NEW}`, `--out=${out}`, `--root=${fx}`],
       { encoding: "utf8", env, timeout: 120000 });
     assert.strictEqual(r.status, 0,
       `a credentialed run reports, it does not gate; got ${r.status}: ${r.stdout || ""}${r.stderr || ""}`);
