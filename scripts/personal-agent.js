@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1007 | scripts/personal-agent.js | AGT-647 -- the Library is read by trust: 60 KB text cap, 12,000-character items, posts as one count line, no separate vision read, per-capability team reads
 // DeepBench v7.0.1006 | scripts/personal-agent.js | AGT-644 -- a third record store (strategy_records), the Library read and the strategy write
 // A third store keyed by capability slug exactly as the humor one (STORES, storeFor): STRATEGY_READ_MAP
 // reads public.strategy_records with no --target, and every strategy `correction` AND `grade` row on
@@ -234,7 +235,14 @@ export const LIBRARY_SECTIONS = {
 // A capability that reads the head of every UNSECTIONED item (to label it), and how many characters.
 export const LIBRARY_UNSECTIONED_HEADS = { 'strategy-library-curate': 2000 };
 // The hard cap on the Library's text half; past it the catalog stays and the bodies drop.
-export const LIBRARY_BYTES = 200000;
+// AGT-647: 200000 -> 60000 and a per-item cut, read in trust order, so a render carries the principal's
+// highest-trust material first instead of whatever happens to sort first (the humorist's 1.2 MB lesson).
+export const LIBRARY_BYTES = 60000;
+export const LIBRARY_ITEM_CHARS = 12000;
+// Kinds that reach the catalog as one count line each, never row by row (141 voice samples on 2026-11-11).
+export const LIBRARY_COUNT_ONLY_KINDS = ['linkedin_post', 'linkedin_comment'];
+// The research verdict an idea-board read keeps per entry when the agent has no note column (AGT-647).
+export const NAPKIN_VERDICT_CHARS = 400;
 // The capabilities whose answer may carry labels[] for the catalog rows.
 export const LIBRARY_CURATORS = ['strategy-library-curate'];
 // The write check's constants: the one emoji, always last (rule 1); the hard ceiling in code points;
@@ -308,10 +316,14 @@ export const EXTRA_READS = {
   // AGT-644: every strategy slug reads the Library, the team's stores and the week; the readiness
   // check and the weekly review also read the vision corpus.
   'strategy-daily-brief': STRATEGY_EXTRA_READS,
-  'strategy-weekly-review': [...STRATEGY_EXTRA_READS, 'vision'],
-  'strategy-readiness-check': [...STRATEGY_EXTRA_READS, 'vision'],
-  'strategy-library-curate': STRATEGY_EXTRA_READS,
-  'strategy-advise': STRATEGY_EXTRA_READS,
+  // AGT-647: no separate 'vision' read -- the vision documents are Library items (AGT-645) -- and each
+  // capability reads only the team stores its job needs: the brief and the weekly review see what
+  // changed (all five); a readiness check needs the Library and the market; curation needs the Library.
+  'strategy-weekly-review': STRATEGY_EXTRA_READS,
+  'strategy-readiness-check': ['library', 'market'],
+  'strategy-library-curate': ['library'],
+  // A question or a draft review: the Library, the market and the idea board; no postings, no week.
+  'strategy-advise': ['library', 'market', 'napkin'],
 };
 
 // The evidence sources the design named, read-only (git log, files). Paths only -- no remote, no
@@ -841,7 +853,10 @@ async function readNapkin(db, args) {
     // column) never notes an entry, so it reads the live board with its research verdicts instead.
     // An agent that HAS the columns reads exactly as before.
     if (!/HTTP 400[\s\S]*42703/.test(e.message)) throw e;
-    return db.get('napkin_ideas?select=id,text,status,research_note,updated_at&or=(archived.is.null,archived.eq.false)&order=updated_at.asc,id.asc');
+    // AGT-647: each research verdict is cut to its first NAPKIN_VERDICT_CHARS characters -- the verdict
+    // word and its reason lead every note, and 62 full notes were 47 KB of one render.
+    return (await db.get('napkin_ideas?select=id,text,status,research_note,updated_at&or=(archived.is.null,archived.eq.false)&order=updated_at.asc,id.asc'))
+      .map(r => ({ ...r, research_note: r.research_note == null ? null : String(r.research_note).slice(0, NAPKIN_VERDICT_CHARS) }));
   }
   return rows.filter(r => r[notedAt] == null || Date.parse(r[notedAt]) <= Date.parse(r.updated_at) - 60 * 1000);
 }
@@ -869,13 +884,14 @@ async function readLibrary(db, args) {
   const grants = await db.get(`personal_source_grants?agent_id=eq.${encodeURIComponent(args.agent)}&select=kind`);
   const kinds = [...new Set(grants.map(g => g.kind).filter(Boolean))];
   if (!kinds.length) return null;
-  const catalog = await db.get(`personal_sources?status=eq.current&kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
+  const rows = await db.get(`personal_sources?status=eq.current&kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
     `&select=${LIBRARY_CATALOG}&order=section.asc.nullsfirst,id.asc`);
-  if (!catalog.length) return null;
+  if (!rows.length) return null;
+  const { catalog, counts } = collapseCatalog(rows);
 
   const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? []);
   const headChars = LIBRARY_UNSECTIONED_HEADS[args.capability] ?? 0;
-  const full = catalog.filter(c => c.section && wanted.has(c.section)).map(c => c.id);
+  const full = trustOrder(catalog.filter(c => c.section && wanted.has(c.section))).map(c => c.id);
   const heads = headChars ? catalog.filter(c => !c.section).map(c => c.id) : [];
   const ids = [...full, ...heads];
   const parts = ids.length ? await getByIds(db, 'personal_source_sections', 'source_id', ids, 'source_id,ord,heading,body', 'source_id.asc,ord.asc') : [];
@@ -894,15 +910,39 @@ async function readLibrary(db, args) {
   for (const id of ids) {
     let item;
     if (headSet.has(id)) item = { id, head: String(bodies.get(id) ?? (bySource.get(id) ?? []).map(s => s.body).join('\n')).slice(0, headChars) };
-    else if (bySource.has(id)) item = { id, sections: bySource.get(id) };
-    else item = { id, body: bodies.get(id) ?? null };
+    else if (bySource.has(id)) item = { id, text: cutItem(bySource.get(id).map(s => (s.heading ? `## ${s.heading}\n` : '') + s.body).join('\n\n')) };
+    else item = { id, text: cutItem(bodies.get(id)) };
     const size = Buffer.byteLength(JSON.stringify(item), 'utf8');
     if (capped || bytes + size > LIBRARY_BYTES) { capped = true; continue; }
     bytes += size;
     text.push(item);
   }
   if (capped) console.error(`personal-agent: library text capped at ${LIBRARY_BYTES} bytes`);
-  return { catalog, text, text_bytes: bytes, text_capped: capped };
+  return { catalog, counts, text, text_bytes: bytes, text_capped: capped };
+}
+
+// AGT-647. Pure helpers, exported for the test.
+// Count-only kinds leave the catalog and come back as one {kind, count} line each.
+export function collapseCatalog(rows) {
+  const counts = {};
+  const catalog = [];
+  for (const r of rows) {
+    if (LIBRARY_COUNT_ONLY_KINDS.includes(r.kind)) counts[r.kind] = (counts[r.kind] ?? 0) + 1;
+    else catalog.push(r);
+  }
+  return { catalog, counts: Object.entries(counts).map(([kind, count]) => ({ kind, count })) };
+}
+// Highest trust first (LIBRARY_TRUST order; an unknown trust sorts last), then newest doc_date, then id.
+export function trustOrder(items) {
+  const rank = t => { const i = LIBRARY_TRUST.indexOf(t); return i === -1 ? LIBRARY_TRUST.length : i; };
+  return [...items].sort((a, b) => rank(a.trust) - rank(b.trust)
+    || String(b.doc_date ?? '').localeCompare(String(a.doc_date ?? '')) || String(a.id).localeCompare(String(b.id)));
+}
+// One item's text, cut to LIBRARY_ITEM_CHARS with a marker naming what was left out.
+export function cutItem(text) {
+  const t = String(text ?? '');
+  return t.length <= LIBRARY_ITEM_CHARS ? t
+    : `${t.slice(0, LIBRARY_ITEM_CHARS)}\n[... cut: ${t.length - LIBRARY_ITEM_CHARS} more characters in the Library]`;
 }
 
 // The vision corpus: docs/vision/*.md of the repo this script runs in, read-only.

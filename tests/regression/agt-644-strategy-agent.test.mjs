@@ -31,7 +31,9 @@ import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   READ_MAP, HUMOR_READ_MAP, STRATEGY_READ_MAP, STRATEGY_KINDS, EXTRA_READS, LIBRARY_SECTIONS,
   validateStrategyAnswer,
+  LIBRARY_BYTES, LIBRARY_ITEM_CHARS, LIBRARY_COUNT_ONLY_KINDS, NAPKIN_VERDICT_CHARS, collapseCatalog, trustOrder, cutItem,
 } from "../../scripts/personal-agent.js";
+// AGT-647 (v7.0.1007): arm E pins the trust-ordered, capped Library read; arm D's ceiling drops to 150000.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENT = path.join(ROOT, "scripts", "personal-agent.js");
@@ -175,6 +177,24 @@ async function run() {
       }
     });
 
+    await arm("E library by trust (AGT-647)", async () => {
+      assert.equal(LIBRARY_BYTES, 60000);
+      assert.equal(LIBRARY_ITEM_CHARS, 12000);
+      assert.equal(NAPKIN_VERDICT_CHARS, 400);
+      assert.deepEqual(LIBRARY_COUNT_ONLY_KINDS, ["linkedin_post", "linkedin_comment"]);
+      for (const s of SLUGS) assert.ok(![].concat(EXTRA_READS[s]).includes("vision"), `${s} must not read vision separately`);
+      const rows = [{ id: "a", kind: "linkedin_post" }, { id: "b", kind: "linkedin_post" }, { id: "c", kind: "document" }];
+      const { catalog, counts } = collapseCatalog(rows);
+      assert.deepEqual(catalog.map(r => r.id), ["c"], "posts leave the catalog");
+      assert.deepEqual(counts, [{ kind: "linkedin_post", count: 2 }], "posts come back as one count line");
+      assert.ok(collapseCatalog([{ id: "x", kind: "document" }]).catalog.length === 1, "control: a document stays in the catalog");
+      const ordered = trustOrder([{ id: "1", trust: "vision" }, { id: "2", trust: "john_confirmed" }, { id: "3", trust: "extracted" }, { id: "4", trust: null }]);
+      assert.deepEqual(ordered.map(r => r.id), ["2", "3", "1", "4"], "highest trust first, unknown last");
+      assert.equal(cutItem("x".repeat(100)), "x".repeat(100), "a short item is untouched");
+      const cut = cutItem("y".repeat(LIBRARY_ITEM_CHARS + 50));
+      assert.ok(cut.startsWith("y".repeat(LIBRARY_ITEM_CHARS)) && /cut: 50 more characters/.test(cut), "a long item is cut with a marker");
+    });
+
     await arm("D live", async () => {
       const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
       const key = process.env.SUPABASE_SERVICE_KEY ?? "";
@@ -189,7 +209,7 @@ async function run() {
       assert.equal(r.status, 0, `the render exits 0 (got ${r.status}: ${(r.stderr ?? "").slice(-400)})`);
       const j = JSON.parse(r.stdout.trim().split("\n").pop());
       assert.ok(Number.isFinite(j.prompt_bytes) && j.prompt_bytes > 0, `prompt_bytes is a number: ${r.stdout}`);
-      assert.ok(j.prompt_bytes < 400000, `prompt_bytes ${j.prompt_bytes} is under 400000`);
+      assert.ok(j.prompt_bytes < 150000, `prompt_bytes ${j.prompt_bytes} is under 150000 (AGT-647)`);
       const text = fs.readFileSync(out, "utf8");
 
       const svc = { apikey: key, Authorization: `Bearer ${key}` };
