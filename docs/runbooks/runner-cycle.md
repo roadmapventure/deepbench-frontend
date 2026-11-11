@@ -179,8 +179,8 @@ for repeatedly.**
    lane row — `runner_should_boot()`'s `pickable` CTE is `WHERE q.lane IN ('drain','selfbuild')`,
    so a queued **directive** row alone is not pickable. **`AGT-127` splits this slot:** an undecided
    `gated_before_build` card no open `gate-card-…` question names answers `gate_cards_to_rule`:
-   `should_boot=true`, `detail.mode='rule-cards-only'`, `detail.gate_cards_to_rule=<n>`, placed
-   HERE, after every wall, so it never fires past one. Zero such cards: this line, unchanged. **`AGT-314` splits it again:** zero cards and open/carried `audit_findings`, or an open/partial ticket in a `runner_settings.find_work_lists` project, or a batch `review_due` in `project_batch_state()` (`AGT-291`, `detail.finish_due`): `work_to_find`, `detail.mode='find-work-only'` — the fire runs `(7f)` with `--prepare --weekly`, then `victoria-reorg.md` (c) step 2 per list slug with `--cycle-id=<id>` (0 tickets: skip), then `(7e)`'s finish line, builds nothing, closes `did_not_run`, `last_step` `find-work: <lines>`. Nothing to review: this line, unchanged.
+   `mode='rule-cards-only'`, below every wall: rule, `last_step` `rule-cards: <n>`. `AGT-642`:
+   even with work ready (2h retries); then `redesign_due`, `redesign-first`: `last_step` `redesign: <id>`, `redesign-after-refusal.md`. **`AGT-314` splits it again:** zero cards and open/carried `audit_findings`, or an open/partial ticket in a `runner_settings.find_work_lists` project, or a batch `review_due` in `project_batch_state()` (`AGT-291`, `detail.finish_due`): `work_to_find`, `detail.mode='find-work-only'` — the fire runs `(7f)` with `--prepare --weekly`, then `victoria-reorg.md` (c) step 2 per list slug with `--cycle-id=<id>` (0 tickets: skip), then `(7e)`'s finish line, builds nothing, closes `did_not_run`, `last_step` `find-work: <lines>`.
 9. `unaffordable` — **`M5-06`**: the **cheapest** pickable ticket's `predicted_pct_of_week` exceeds
    the remaining weekly headroom (`100 − all_models_pct`) — all-models only: `runner_pct_per_cycle()`
    is calibrated from all-models deltas.

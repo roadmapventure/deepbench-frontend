@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.1004 | runbooks/redesign-after-refusal.md | AGT-642 — door (d): redesign-first fires ahead of any new pick. -->
 <!-- DeepBench v7.0.977 | runbooks/redesign-after-refusal.md | AGT-610 — a refused ticket is redesigned twice, then diagnosed (John, standing decision 6e94edcb, 2026-11-05). -->
 
 # Redesign after a refusal — the call path
@@ -35,6 +36,15 @@ There are three doors and a cycle meets each of them where it already looks:
   `permission-gate` with a `23514` that names the nine facts and this file. That refusal is the hook;
   `docs/runbooks/runner-cycle.md` is untouched (380,973 of 381,000 bytes — 27 bytes is not a step).
 - **(c) after a second refusal**: `--diagnose`, and nothing else.
+- **(d) `redesign-first` fires** (`AGT-642`, John's standing decision `f8e2a234`, 2026-11-11: a
+  blocked ticket stops the line). `runner_should_boot()` answers `redesign_due` — below every spend
+  wall, the database gate and `lanes_full`, but **ahead of any new pick** — and names the ticket in
+  `detail.redesign_ticket` (`public.redesign_due_ticket()`: `refusal_parked_tickets()` minus a ticket
+  whose gate card was ruled John's and minus one a redesign cycle was handed in the last 24 hours).
+  Set `last_step` to `redesign: <that id>` FIRST — that is the cooldown marker, so a pickup that ends
+  without an attempt lets the next parked ticket have its turn — then run `--next`, which takes that
+  same ticket, and continue at section 3. Undecided gate cards come before this: `rule-cards-only`
+  now fires with work pickable too (2-hour retry, `last_step` `rule-cards: <n>`).
 
 ## 3. The pickup (`--next`)
 

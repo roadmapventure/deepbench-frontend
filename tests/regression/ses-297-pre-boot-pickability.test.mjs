@@ -149,10 +149,13 @@ export const GATE_CARDS_REASON = "gate_cards_to_rule";
 // so a fire with a card to rule still rules it rather than going looking, and after every wall, so
 // it can never boot past one. The oracle below places it in exactly that position.
 export const FIND_WORK_REASON = "work_to_find";
+// AGT-642 (John 2026-11-11, directive f8e2a234): a blocked ticket stops the line. `redesign_due`
+// boots with `detail.mode='redesign-first'` ahead of any new pick, below every wall.
+export const REDESIGN_REASON = "redesign_due";
 // SES-302 / AGT-127 / AGT-314: the set is kept rather than collapsed back to a string precisely so
 // a new pass reason is a one-line change here instead of a rewrite of the consistency check. It has
 // now been that one-line change twice.
-export const BOOTING_REASONS = new Set([PASS_REASON, GATE_CARDS_REASON, FIND_WORK_REASON]);
+export const BOOTING_REASONS = new Set([PASS_REASON, GATE_CARDS_REASON, REDESIGN_REASON, FIND_WORK_REASON]);
 
 // THE MODE IS WHAT A BOOTING FIRE READS, and it is now two-valued, so it is derived HERE from the
 // reason rather than compared against a literal at each call site. A fire that took the reason and
@@ -160,6 +163,7 @@ export const BOOTING_REASONS = new Set([PASS_REASON, GATE_CARDS_REASON, FIND_WOR
 // gate does not set would do the wrong one thing.
 export const modeFor = reason =>
   reason === GATE_CARDS_REASON ? "rule-cards-only" :
+  reason === REDESIGN_REASON ? "redesign-first" :
   reason === FIND_WORK_REASON ? "find-work-only" : null;
 
 // ---------------------------------------------------------------------------
@@ -645,7 +649,12 @@ export function expectedReason(f) {
   // AGT-127: refusal 6 splits, and the oracle splits with it. Both halves are graded, so a gate
   // that counted EVERY undecided card (re-firing forever on one whose decision is John's, since a
   // `john` ruling writes no card) and a gate that counted none both disagree here.
-  if (f.pickableCount === 0 && f.gateCardsToRule > 0) return GATE_CARDS_REASON;
+  // AGT-642: the card branch no longer waits for an empty board -- a blocked ticket stops the line.
+  // With work pickable it backs off for 2 hours after a rule-cards cycle (a card that cannot be ruled
+  // must not hold every fire); on an empty board it always rules, exactly as AGT-127 shipped it.
+  if (f.gateCardsToRule > 0 && (f.pickableCount === 0 || !f.rulingCooling)) return GATE_CARDS_REASON;
+  // AGT-642: then the refusal-parked ticket due for redesign, still ahead of any new pick.
+  if (f.redesignDue) return REDESIGN_REASON;
   // AGT-314: refusal 6 splits a second time, and the oracle splits with it -- BELOW the card branch
   // (a fire with a card to rule rules it rather than going looking) and above nothing_pickable. Both
   // halves are ORed and both are graded, so a gate that read only the findings, a gate that read
@@ -685,9 +694,9 @@ async function theLiveGateObeysItsOwnLadder() {
   const v = rows[0];
 
   assert.ok(REASONS.includes(v.reason) || v.reason === PASS_REASON ||
-            v.reason === GATE_CARDS_REASON || v.reason === FIND_WORK_REASON,
+            v.reason === GATE_CARDS_REASON || v.reason === REDESIGN_REASON || v.reason === FIND_WORK_REASON,
     `runner_should_boot() returned an unknown reason ${JSON.stringify(v.reason)}; the closed set is ` +
-    `${[...REASONS, PASS_REASON, GATE_CARDS_REASON, FIND_WORK_REASON].join(", ")}`);
+    `${[...REASONS, PASS_REASON, GATE_CARDS_REASON, REDESIGN_REASON, FIND_WORK_REASON].join(", ")}`);
   // AGT-127 / AGT-314: the mode is what a booting fire READS to know which ONE thing it may do. A
   // fire that took the reason and not the mode would try to build on a board with
   // pickable_count = 0; one that read a mode the gate does not set would do the wrong one thing.
@@ -743,6 +752,23 @@ async function theLiveGateObeysItsOwnLadder() {
     await pg(url, key, "runner_questions?qid=like.gate-card-*&status=eq.open&select=qid"), "runner_questions");
   const openQ = new Set(gateQ.map(q => q.qid));
   const gateCardsToRule = gateCards.filter(c => !openQ.has(`gate-card-${String(c.id).slice(0, 8)}`)).length;
+
+  // AGT-642, from the raw tables: the 2-hour card back-off and the redesign candidate. The candidate
+  // starts from refusal_parked_tickets() (AGT-610's own list, graded by its own suite) and the oracle
+  // re-applies the two AGT-642 filters itself -- John's cards (an open gate-card question on the
+  // ticket's card) and the 24-hour cooldown -- so a function that dropped either disagrees here.
+  const sinceIso = h => new Date(Date.now() - h * 3600e3).toISOString();
+  const ruleCycles = asArray(await pg(url, key,
+    `runner_cycles?started_at=gt.${sinceIso(2)}&last_step=like.rule-cards:*&select=id`), "runner_cycles (rule-cards)");
+  const rulingCooling = ruleCycles.length > 0;
+  const parked = asArray(await pg(url, key, "rpc/refusal_parked_tickets"), "refusal_parked_tickets()");
+  const cardRows = asArray(await pg(url, key,
+    "runner_items?kind=eq.gated_before_build&backlog_id=not.is.null&select=id,backlog_id"), "runner_items (cards)");
+  const johnTickets = new Set(cardRows.filter(c => openQ.has(`gate-card-${String(c.id).slice(0, 8)}`)).map(c => c.backlog_id));
+  const redesignCycles = asArray(await pg(url, key,
+    `runner_cycles?started_at=gt.${sinceIso(24)}&last_step=like.redesign:*&select=last_step`), "runner_cycles (redesign)");
+  const cooling = id => redesignCycles.some(c => String(c.last_step).startsWith(`redesign: ${id}`));
+  const redesignDue = (parked.find(p => !johnTickets.has(p.backlog_id) && !cooling(p.backlog_id)) || {}).backlog_id ?? null;
 
   // AGT-314, from the RAW TABLES for the same reason everything else here is: the oracle must be
   // free to disagree with the function. The findings half is a count of open OR carried rows -- a
@@ -843,6 +869,8 @@ async function theLiveGateObeysItsOwnLadder() {
     pickableCount: lanes.length,
     cheapestPctOfWeek: priced.length ? Math.min(...priced) : null,
     gateCardsToRule,
+    rulingCooling,
+    redesignDue,
     openFindings,
     listTickets,
     finishDue,

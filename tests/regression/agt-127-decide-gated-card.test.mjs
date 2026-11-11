@@ -80,12 +80,13 @@ const LINKS = [
 // runner_should_boot()'s answer is `should_boot` for exactly these three reasons and no others.
 // AGT-314 added the third: `work_to_find`, the second split of refusal 6, which boots a fire to go
 // and FIND work (detail.mode='find-work-only') when there is nothing to build and no card to rule.
-const BOOTING = new Set(["pickable", "gate_cards_to_rule", "work_to_find"]);
+const BOOTING = new Set(["pickable", "gate_cards_to_rule", "redesign_due", "work_to_find"]);
 // AGT-314 made the mode two-valued, so this file derives it from the reason rather than comparing
 // against one literal -- the else arm below used to assert a flat null and would now be wrong on
 // every find-work boot.
 const modeFor = reason =>
   reason === "gate_cards_to_rule" ? "rule-cards-only" :
+  reason === "redesign_due" ? "redesign-first" :
   reason === "work_to_find" ? "find-work-only" : null;
 
 async function pg(url, key, pathAndQuery, init) {
@@ -310,9 +311,11 @@ async function run() {
     assert.equal(before.detail.mode, "rule-cards-only",
       "a gate_cards_to_rule fire must declare detail.mode='rule-cards-only' -- a fire that read the " +
       "reason and not the mode would try to build on a board with nothing pickable");
-    assert.equal(Number(before.detail.pickable_count), 0,
-      "gate_cards_to_rule may only be reached with pickable_count = 0; it is refusal 6's twin, " +
-      "never a shortcut past the walls above it");
+    // AGT-642 (John 2026-11-11, directive f8e2a234): a blocked ticket stops the line, so the card
+    // branch no longer waits for pickable_count = 0. It still sits below every wall (ses-297's
+    // oracle grades the ladder), and it must have a card to rule.
+    assert.ok(Number(before.detail.gate_cards_to_rule) > 0,
+      "gate_cards_to_rule must be justified by its own payload -- at least one rulable card");
   } else {
     assert.strictEqual(before.detail.mode, modeFor(before.reason),
       `detail.mode is ${JSON.stringify(before.detail.mode)} on reason ${before.reason}; it reads ` +

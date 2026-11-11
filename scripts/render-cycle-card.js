@@ -128,7 +128,7 @@ export function blocksByStep(steps, blocks) {
 // with several unreconstructable commands needs several blocks; one index per step was the constraint
 // that hid one of them.
 export const NOTES = {
-  gate:       { outcome: "should_boot true → step 0; find-work-only → redesign-pickup.js --next; false → did_not_run", block: 1 },
+  gate:       { outcome: "should_boot true → step 0 (a mode? L180 first); false → did_not_run", block: 1 },
   "0":        { outcome: "branch session/cycle-<UTC>; never main; an unattended cycle writes no .claude/", block: 1 },
   "0b":       { outcome: "a silent predecessor is REPORTED IN A ROW John reads; never close a row that is not yours", block: 1 },
   "1":        { outcome: "insert runner_cycles with the claimed id, outcome NULL; this step notifies nothing", block: 1 },

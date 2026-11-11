@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1004 | scripts/redesign-pickup.js | AGT-642 -- --next takes the ticket the gate named (redesign_due_ticket(): John's cards and a 24h cooldown skipped), so a blocked ticket is redesigned before any new pick.
 // DeepBench v7.0.977 | scripts/redesign-pickup.js | AGT-610 -- a refused ticket is redesigned twice, then diagnosed.
 // Spec: docs/kickoffs/v7.0.977-AGT-610-refusal-redesign-ledger.md section 4 (T2, §S).
 //
@@ -139,6 +140,20 @@ export function feedbackCliArgs(text) {
   return ["-p", "/feedback " + text, "--max-turns", "1", "--output-format", "text"];
 }
 
+/**
+ * AGT-642: which parked row the pickup takes. `due` is what rpc/redesign_due_ticket returned (a
+ * backlog id or null); a named id that is not in `rows` is refused rather than silently swapped for
+ * another ticket, and null falls back to row 1.
+ */
+export function pickCandidate(rows, due) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  if (due === null || due === undefined || due === "") return rows[0];
+  const id = String(due);
+  const hit = rows.find(r => r && r.backlog_id === id);
+  if (!hit) throw new Error(`redesign_due_ticket() named ${id}, which refusal_parked_tickets() does not list`);
+  return hit;
+}
+
 /** The paste-ready Designer command the pickup prints, so the next step needs nothing re-derived. */
 export function nextLine(row) {
   const out = row && row.out ? row.out : "<task.json>";
@@ -216,7 +231,13 @@ async function next(args) {
   if (rows === null) die(1, "redesign-pickup --next: refusal_parked_tickets() came back non-array -- refusing to pick from nothing");
   if (rows.length === 0) die(0, "redesign-pickup --next: nothing parked");
 
-  const cand = rows[0];
+  // AGT-642: the ticket the gate named (runner_should_boot().detail.redesign_ticket) is
+  // public.redesign_due_ticket() -- refusal_parked_tickets() minus John's cards and the 24-hour
+  // cooldown -- so the pickup takes THAT row, never a different one. NULL (every candidate cooling
+  // or John's) falls back to row 1, the find-work-only behaviour this door had before.
+  const due = await rest(base, key, "POST", "rpc/redesign_due_ticket", {});
+  if (!due.ok) die(1, `redesign-pickup --next: POST rpc/redesign_due_ticket -> HTTP ${due.status} ${due.text.slice(0, 400)}`);
+  const cand = pickCandidate(rows, due.json);
   const t = await rest(base, key, "GET",
     `backlog_items?backlog_id=eq.${encodeURIComponent(cand.backlog_id)}&select=${TICKET_SELECT}`);
   if (!t.ok) die(1, `redesign-pickup --next: GET backlog_items -> HTTP ${t.status} ${t.text.slice(0, 400)}`);
