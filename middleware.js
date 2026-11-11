@@ -1,3 +1,4 @@
+// DeepBench v7.0.1001 | middleware.js | AGT-297 -- keyed MCP callers
 // DeepBench v7.0.76 | middleware.js | HAR-33 PATCH-1 -- every reason='spend_cap' refusal carries
 // the stats object, repeat refusals included, because HAR-33b's John-approved superuser popup
 // always renders three stat tiles; a stats-less spend_cap refusal would be a different popup
@@ -188,10 +189,43 @@ function writeRow(url, key, ip, payload, resolution) {
   });
 }
 
+// FEATURE: AGT-297 -- a keyed MCP caller is gated on its own key, never on its IP. The per-IP gate
+// below is right for a browser, where the address IS the caller. It is wrong for an MCP connector:
+// connectors share an egress pool, so one hosted connector's address is thousands of unrelated
+// callers, and the first of them to cross the $5 trial cap refuses every other one -- while 4,002
+// of 5,018 call_source='mcp' rows carried nothing to tell them apart. So the presented key is the
+// caller identity. It is hashed at the edge and matched in Postgres (mcp_caller_gate() over
+// mcp_caller_gates), so the raw key never leaves this request, and the gate decides on that
+// caller's own permission, cap and ledger. This NARROWS NOTHING: no key, an unknown key, or a
+// failed lookup all fall through to the IP gate exactly as before.
+const MCP_KEY_HEADER = 'x-deepbench-mcp-key';
+
+function isMcpRequest(url) {
+  const p = url.pathname;
+  if (p === '/api/mcp' || p.startsWith('/api/mcp/')) return true;
+  return p === '/api/capabilities/execute' && url.searchParams.get('transport') === 'mcp';
+}
+
+// The matched key's gate row, or null for an unknown key. Throws on failure.
+async function fetchCallerGate(url, key, presented) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(presented));
+  const hex = Array.from(new Uint8Array(d), b => b.toString(16).padStart(2, '0')).join('');
+  const res = await fetch(`${url}/rest/v1/rpc/mcp_caller_gate`, {
+    method: 'POST',
+    headers: { ...supabaseAuth(key), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_key_sha256: hex }),
+    signal: timeoutSignal(SUPABASE_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`status ${res.status}`);
+  const rows = await res.json();
+  return Array.isArray(rows) && rows[0] && rows[0].caller_name ? rows[0] : null;
+}
+
 export default async function middleware(request, context) {
   let ip = null;
   try {
-    const { pathname } = new URL(request.url);
+    const url = new URL(request.url);
+    const { pathname } = url;
     const headers = request.headers;
 
     // 1. Free passes, zero Supabase reads: CORS preflight and the two browse-safe reads.
@@ -212,6 +246,27 @@ export default async function middleware(request, context) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
     if (!supabaseUrl || !supabaseKey) return failOpen('env', ip, new Error('supabase env missing'));
+
+    // 3b. AGT-297 -- a known MCP key is the caller; the IP gate below is the fallback.
+    const presentedKey = isMcpRequest(url) ? headers.get(MCP_KEY_HEADER) : null;
+    if (presentedKey) {
+      let caller = null;
+      try {
+        caller = await fetchCallerGate(supabaseUrl, supabaseKey, presentedKey);
+      } catch (err) {
+        // NOT a fail-open: the IP gate still runs. Never log the key.
+        console.error(`[AGT-297 gate] key lookup failed for ip=${ip}: ${err && err.message}`);
+      }
+      if (caller) {
+        if (caller.permission === 'unlimited') return passThrough();
+        if (caller.permission === 'blocked') return refuse('manual', ip, null);
+        const cap = Number(caller.spend_limit_usd);
+        if (Number.isFinite(cap) && (Number(caller.cost_usd) || 0) >= cap) {
+          return refuse('spend_cap', ip, shapeStats(caller));
+        }
+        return passThrough();
+      }
+    }
 
     // 4. The row. blocked_attempts/blocked_at are selected because PostgREST cannot express
     //    `blocked_attempts = blocked_attempts + 1`; the increment is computed from what we read.
