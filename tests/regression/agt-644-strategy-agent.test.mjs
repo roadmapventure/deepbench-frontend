@@ -32,7 +32,9 @@ import {
   READ_MAP, HUMOR_READ_MAP, STRATEGY_READ_MAP, STRATEGY_KINDS, EXTRA_READS, LIBRARY_SECTIONS,
   validateStrategyAnswer,
   LIBRARY_BYTES, LIBRARY_ITEM_CHARS, LIBRARY_COUNT_ONLY_KINDS, NAPKIN_VERDICT_CHARS, collapseCatalog, trustOrder, cutItem,
+  LIBRARY_MATCH_MIN, LIBRARY_TEXT_SKIP_KINDS, stemsOf, overlap, relevanceOrder,
 } from "../../scripts/personal-agent.js";
+// AGT-648 (v7.0.1008): arm F pins question-matched reading and the runbook's outside-research step.
 // AGT-647 (v7.0.1007): arm E pins the trust-ordered, capped Library read; arm D's ceiling drops to 150000.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -193,6 +195,25 @@ async function run() {
       assert.equal(cutItem("x".repeat(100)), "x".repeat(100), "a short item is untouched");
       const cut = cutItem("y".repeat(LIBRARY_ITEM_CHARS + 50));
       assert.ok(cut.startsWith("y".repeat(LIBRARY_ITEM_CHARS)) && /cut: 50 more characters/.test(cut), "a long item is cut with a marker");
+    });
+
+    await arm("F question-matched reading and outside research (AGT-648)", async () => {
+      assert.equal(LIBRARY_MATCH_MIN, 2);
+      for (const s of SLUGS) assert.deepEqual(LIBRARY_TEXT_SKIP_KINDS[s], ["resume", "cover_letter"], `${s} skips career documents as text`);
+      const ask = stemsOf("What would make RMV more valuable to an acquirer, and which buyers are likely?");
+      const exit = stemsOf("Exit thesis: who would acquire the company, which buyers and acquirers");
+      const resume = stemsOf("Resume: Product, Data and AI");
+      assert.ok(overlap(ask, exit) >= LIBRARY_MATCH_MIN, "an acquisition ask matches the exit thesis");
+      assert.ok(overlap(ask, resume) < LIBRARY_MATCH_MIN, "control: it does not match a resume");
+      const order = relevanceOrder([
+        { c: { id: "low", trust: "john_confirmed" }, hit: 0 },
+        { c: { id: "high", trust: "extracted" }, hit: 3 },
+        { c: { id: "tie", trust: "john_authored" }, hit: 3 },
+      ]).map(s => s.c.id);
+      assert.deepEqual(order, ["tie", "high", "low"], "overlap first, then trust breaks the tie");
+      const rb = lf(fs.readFileSync(RUNBOOK, "utf8"));
+      assert.ok(/^1b\. \*\*Outside research first \(AGT-648\)/m.test(rb), "runbook (b) carries the outside-research step 1b");
+      assert.ok(/--input-file=<scratch>-research\.md/.test(rb), "the research file is passed as --input-file");
     });
 
     await arm("D live", async () => {

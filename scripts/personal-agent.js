@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1008 | scripts/personal-agent.js | AGT-648 -- the Library is read by the question first: catalog items ranked by stem overlap with --ask, matches read even outside the capability sections, then trust order
 // DeepBench v7.0.1007 | scripts/personal-agent.js | AGT-647 -- the Library is read by trust: 60 KB text cap, 12,000-character items, posts as one count line, no separate vision read, per-capability team reads
 // DeepBench v7.0.1006 | scripts/personal-agent.js | AGT-644 -- a third record store (strategy_records), the Library read and the strategy write
 // A third store keyed by capability slug exactly as the humor one (STORES, storeFor): STRATEGY_READ_MAP
@@ -243,6 +244,12 @@ export const LIBRARY_ITEM_CHARS = 12000;
 export const LIBRARY_COUNT_ONLY_KINDS = ['linkedin_post', 'linkedin_comment'];
 // The research verdict an idea-board read keeps per entry when the agent has no note column (AGT-647).
 export const NAPKIN_VERDICT_CHARS = 400;
+// AGT-648: kinds a capability never reads as TEXT (they stay catalog lines). A strategy answer is about
+// the business, so the principal's resumes and cover letters, which match "product" in nearly every
+// ask, only crowd the cap.
+const CAREER_DOC_KINDS = ['resume', 'cover_letter'];
+export const LIBRARY_TEXT_SKIP_KINDS = Object.fromEntries(['strategy-daily-brief', 'strategy-weekly-review',
+  'strategy-readiness-check', 'strategy-library-curate', 'strategy-advise'].map(c => [c, CAREER_DOC_KINDS]));
 // The capabilities whose answer may carry labels[] for the catalog rows.
 export const LIBRARY_CURATORS = ['strategy-library-curate'];
 // The write check's constants: the one emoji, always last (rule 1); the hard ceiling in code points;
@@ -891,7 +898,15 @@ async function readLibrary(db, args) {
 
   const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? []);
   const headChars = LIBRARY_UNSECTIONED_HEADS[args.capability] ?? 0;
-  const full = trustOrder(catalog.filter(c => c.section && wanted.has(c.section))).map(c => c.id);
+  // AGT-648: the question decides what is read first. An item whose title, purpose, section or kind
+  // shares at least LIBRARY_MATCH_MIN stems with the ask is read even outside the capability's sections,
+  // and every item is ranked by that overlap before the trust order, so the 60 KB cap keeps what the
+  // question needs (the tryout lost the exit thesis to the cap on an acquisition question).
+  const askStems = stemsOf(args.ask);
+  const scored = catalog.map(c => ({ c, hit: overlap(askStems, stemsOf([c.title, c.purpose, c.section, c.kind].join(' '))) }));
+  const skipKinds = new Set(LIBRARY_TEXT_SKIP_KINDS[args.capability] ?? []);
+  const full = relevanceOrder(scored.filter(s => !skipKinds.has(s.c.kind)
+    && ((s.c.section && wanted.has(s.c.section)) || s.hit >= LIBRARY_MATCH_MIN))).map(s => s.c.id);
   const heads = headChars ? catalog.filter(c => !c.section).map(c => c.id) : [];
   const ids = [...full, ...heads];
   const parts = ids.length ? await getByIds(db, 'personal_source_sections', 'source_id', ids, 'source_id,ord,heading,body', 'source_id.asc,ord.asc') : [];
@@ -937,6 +952,20 @@ export function trustOrder(items) {
   const rank = t => { const i = LIBRARY_TRUST.indexOf(t); return i === -1 ? LIBRARY_TRUST.length : i; };
   return [...items].sort((a, b) => rank(a.trust) - rank(b.trust)
     || String(b.doc_date ?? '').localeCompare(String(a.doc_date ?? '')) || String(a.id).localeCompare(String(b.id)));
+}
+// AGT-648. Word stems for matching an ask to a catalog line: lowercase words of 4+ letters, cut to
+// their first 5 characters ("acquirer"/"acquisition" -> "acqui", "buyers" -> "buyer"), stop words out.
+const MATCH_STOP = new Set(['what', 'which', 'would', 'should', 'could', 'with', 'from', 'that', 'this', 'into', 'most',
+  'more', 'than', 'they', 'their', 'there', 'have', 'about', 'come', 'together', 'within', 'months', 'first', 'make']);
+export const LIBRARY_MATCH_MIN = 2;
+export function stemsOf(text) {
+  return new Set(String(text ?? '').toLowerCase().match(/[a-z]{4,}/g)?.filter(w => !MATCH_STOP.has(w)).map(w => w.slice(0, 5)) ?? []);
+}
+export function overlap(a, b) { let n = 0; for (const s of a) if (b.has(s)) n++; return n; }
+// Most question overlap first; ties fall back to trustOrder (highest trust, newest, id).
+export function relevanceOrder(scored) {
+  const byTrust = new Map(trustOrder(scored.map(s => s.c)).map((c, i) => [c.id, i]));
+  return [...scored].sort((x, y) => y.hit - x.hit || byTrust.get(x.c.id) - byTrust.get(y.c.id));
 }
 // One item's text, cut to LIBRARY_ITEM_CHARS with a marker naming what was left out.
 export function cutItem(text) {
