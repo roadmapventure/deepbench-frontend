@@ -1,3 +1,4 @@
+// DeepBench v7.0.1002 | api/prompt/db-assembly.js | AGT-636 -- a behavior Skill renders its own objective and method
 // DeepBench v7.0.965 | api/prompt/db-assembly.js | AA-169 -- renderFormatSection() is the ONE home of a Format Skill's section; objective/method/output_desc/guardrails reach the model
 // DeepBench v7.0.944 | api/prompt/db-assembly.js | AGT-552 -- a role prompt renders ONCE per bundle
 // DeepBench v7.0.895 | api/prompt/db-assembly.js | AGT-429 -- 44->4 / 22->2 / 11->1
@@ -343,7 +344,11 @@ export function buildSections(skillProfiles, agentId, agentConfigs, agentRow, in
       const traitParts = [];
       if (traits.reasoning_style) traitParts.push(`Reasoning style: ${traits.reasoning_style}`);
       if (traits.writing_style) traitParts.push(`Writing style: ${traits.writing_style}`);
-      const allParts = [...roleParts, ...traitParts];
+      // FEATURE: AGT-636 -- objective and method render, as in identity and intent
+      const skillParts = [];
+      if (sp.objective) skillParts.push(sp.objective);
+      if (sp.method) skillParts.push(sp.method);
+      const allParts = [...roleParts, ...skillParts, ...traitParts];
       content = allParts.length ? allParts.join("\n") : null;
 
     } else if (typeSlug === "intent") {
